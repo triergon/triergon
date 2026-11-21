@@ -18,7 +18,7 @@ pub enum DemuxProfile {
 impl DemuxProfile {
     /// The profile's name in reference traces.
     pub fn label(self) -> &'static str {
-        "ArchivedPesV1"
+        "demux-pes"
     }
     /// The revision of the reference demuxer this profile reproduces.
     pub fn reference_revision(self) -> &'static str {
@@ -30,7 +30,7 @@ impl DemuxProfile {
     }
     /// The operation name the profile is recorded under in comparison traces.
     pub fn operation(self) -> &'static str {
-        "mpegts-native-pes-observation-v1"
+        "mpegts-demux-pes-observation"
     }
     /// The demuxer's format flags in the reference run.
     pub fn flags(self) -> u32 {
@@ -151,7 +151,7 @@ fn representative(raw: Option<u64>, origin: Option<ClockOrigin>) -> Result<Optio
         return Ok(None);
     };
     let start = origin
-        .ok_or(Error::Invalid("native clock origin missing"))?
+        .ok_or(Error::Invalid("demux clock origin missing"))?
         .interval_origin90;
     // start is produced only by initial_interval and is bounded by two
     // periods. This is the unique congruent value in [start, start + PERIOD90).
@@ -247,7 +247,7 @@ impl DemuxClock {
         check_raw33(raw)?;
         let origin = self.origin.unwrap_or_else(|| initial_interval(raw));
         let ticks = representative(Some(raw), Some(origin))?
-            .ok_or(Error::Invalid("native encoded time missing"))?;
+            .ok_or(Error::Invalid("encoded demux timestamp missing"))?;
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
@@ -265,7 +265,9 @@ impl DemuxClock {
     /// Fails with `Invalid` for program 0.
     pub fn new(program: u16) -> Result<Self> {
         if program == 0 {
-            return Err(Error::Invalid("native clock selected program"));
+            return Err(Error::Invalid(
+                "demux clock requires a nonzero program number",
+            ));
         }
         Ok(Self {
             program,
@@ -308,7 +310,11 @@ impl DemuxClock {
             (0, None, None) => TimestampOrigin::Absent,
             (2, Some(_), None) => TimestampOrigin::PtsOnlyCompatibility,
             (3, Some(_), Some(_)) => TimestampOrigin::SourceDts,
-            _ => return Err(Error::Invalid("native clock source time flags")),
+            _ => {
+                return Err(Error::Invalid(
+                    "PES timestamps disagree with the header timing flags",
+                ));
+            }
         };
         let (next_origin, pts90, dts90) = self.placed(pts, dts)?;
         let result = DemuxTimeView {

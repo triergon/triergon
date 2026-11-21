@@ -114,7 +114,7 @@ fn actual_original_long_m2ts_first_pes_uses_carrier_start_with_real_context() {
     assert_eq!(packets[0].flags, 0);
     assert_eq!(
         packets[0].position, 384,
-        "literal pinned7f9372 native AVPacket.pos; original388 failure remains preserved"
+        "demux packet positions match the recorded carrier starts"
     );
 }
 #[cfg(feature = "reference-trace")]
@@ -325,7 +325,7 @@ fn bound_observer_does_not_retain_unrelated_startup_backing_after_inspection() {
         .unwrap()
     {
         triergon_core::Step::Ready(n) => assert_eq!(n, LONG.len()),
-        _ => panic!("real original window must be consumed, not counter-adjusted"),
+        _ => panic!("expected the cursor to consume the buffered startup window"),
     }
     assert_eq!(work.spent(), LONG.len() as u64);
     assert_eq!(i.position(), LONG.len() as u64);
@@ -457,9 +457,6 @@ fn selected_transport_fault_admission_keeps_the_validated_input_cursor() {
                 &input,
             )
             .unwrap_err();
-        assert_eq!(
-            refused.error,
-            Error::Invalid("stale native startup request")
-        );
+        assert_eq!(refused.error, Error::Invalid("stale PES startup request"));
     }
 }

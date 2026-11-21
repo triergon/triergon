@@ -412,7 +412,7 @@ fn native_m2ts_prefix_requires_the_actual_complete_unambiguous_window() {
         ambiguous[188 * i] = 0x47;
     }
     for (raw, message) in [
-        (&ambiguous[..], "native M2TS prefix grid is ambiguous"),
+        (&ambiguous[..], "M2TS prefix grid is ambiguous"),
         (
             &ambiguous[..8000],
             "source ended before the 8192-byte M2TS prefix",

@@ -60,7 +60,7 @@ fn make(b: &Budget, limits: ParseLimits) -> DemuxObserver {
         b.clone(),
         limits,
     )
-    .expect("actual DVB finite PES feature stub must become an admitted observer")
+    .expect("expected a DVB subtitle PES observer")
 }
 fn packet(b: &Budget, raw: &[u8], offset: u64) -> TransportPacket {
     let mut p = parse_transport(
@@ -194,7 +194,7 @@ fn original(raw: &[u8], body: &[u8], descriptor: &[u8]) {
         b.clone(),
         ParseLimits::default(),
     )
-    .expect("actual original feature stub");
+    .expect("expected an observer for the recorded DVB subtitle PES");
     let mut output = Vec::new();
     for (index, bytes) in raw.as_chunks::<188>().0.iter().enumerate() {
         let p = packet(&b, bytes, (index * 188) as u64);
@@ -256,7 +256,7 @@ fn dvb_namespace_scope_preflight_before_stub() {
             ParseLimits::default()
         )
         .unwrap_err(),
-        Error::Unsupported("native DVB namespace not declared")
+        Error::Unsupported("DVB subtitle PES requires an explicit DVB namespace")
     );
     for s in [
         DemuxScope {
@@ -754,7 +754,7 @@ fn dvb_wrapper_accepted_real_carriers_uses_no_rejected_policy() {
         b.clone(),
         ParseLimits::default(),
     )
-    .expect("DVB wrapper actual feature stub");
+    .expect("expected a DVB subtitle PES recovery observer");
     assert_eq!(o.policy(), RejectedPolicy::NoRejectedCarrier);
     o.push_accepted(
         packet(&b, &ts(&pes(BODY, Some(90000), None), true, 0), 376),

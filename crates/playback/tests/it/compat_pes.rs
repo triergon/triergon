@@ -435,7 +435,7 @@ fn private_audio_mismatch_reports_refusal_and_retains_source_packet() {
                         program: 1,
                         pid: 257
                     },
-                    error: C::Invalid("native private audio carriage mismatch"),
+                    error: C::Invalid("selected private audio carriage disagrees with the PMT"),
                     ..
                 },
             ))

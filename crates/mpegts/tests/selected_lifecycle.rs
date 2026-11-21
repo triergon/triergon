@@ -263,7 +263,7 @@ fn route(events: &Events, program: u16, b: &Budget) -> PatRoute {
         let mut w = WorkBudget::new(1);
         match selection
             .poll(&mut w, &AtomicBool::new(false))
-            .expect("lifecycle PAT feature runtime RED until implemented")
+            .expect("expected PAT program selection to advance")
         {
             TableStep::Yield => assert!(w.spent() <= 1),
             TableStep::Output(Some(r)) => return r,
@@ -335,7 +335,7 @@ fn drain(o: &mut RecoveryObserver) -> Vec<triergon_mpegts::compat::pes::DemuxPac
             other => panic!("unexpected {other:?}"),
         }
     }
-    panic!("native observer did not drain");
+    panic!("PES observer did not drain");
 }
 fn push_first(
     o: &mut RecoveryObserver,
@@ -365,7 +365,7 @@ fn rebind(o: &mut RecoveryObserver, r: PatRoute, e: &Events) -> PmtBinding {
         let mut w = WorkBudget::new(1);
         match job
             .poll(&mut w, &AtomicBool::new(false))
-            .expect("lifecycle drained PMT rebind runtime RED until implemented")
+            .expect("expected the drained PES observer's PMT binding to advance")
         {
             TableStep::Yield => assert!(w.spent() <= 1),
             TableStep::Output(v) => return v,
@@ -802,7 +802,7 @@ fn feature_rebind_work_zero_one_cancel_retry_and_scope_commit() {
             let mut w = WorkBudget::new(1);
             match j
                 .poll(&mut w, &AtomicBool::new(false))
-                .expect("lifecycle drained PMT rebind runtime RED until implemented")
+                .expect("expected the drained PES observer's PMT binding to advance")
             {
                 TableStep::Yield => {
                     assert!(w.spent() <= 1);
@@ -1043,7 +1043,7 @@ fn guard_binding_ordinal_prevents_stale_transport_replay() {
 }
 
 #[test]
-#[ignore = "parent CPU lease only: materialize authored inputs before native observations"]
+#[ignore = "requires generated PES lifecycle inputs"]
 fn export_authored_inputs_for_parent_reference() {
     use std::{fs, io::Write, path::PathBuf};
     let root = PathBuf::from(

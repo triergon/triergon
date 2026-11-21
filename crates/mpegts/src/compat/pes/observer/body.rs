@@ -9,7 +9,7 @@ impl DemuxObserver {
         let pending = self
             .pending
             .as_ref()
-            .ok_or(Error::Invalid("native PES input missing"))?;
+            .ok_or(Error::Invalid("PES observer input missing"))?;
         let has_payload = pending
             .payload
             .as_ref()
@@ -23,18 +23,18 @@ impl DemuxObserver {
             });
             if gap && self.finite_private() {
                 return Err(self.finite_private_error(
-                    "native private audio counter damage unobserved",
-                    "native DVB counter damage unobserved",
+                    "continuity counter damage in private audio PES",
+                    "continuity counter damage in DVB subtitle PES",
                 ));
             }
             if gap && !pending.carrier.payload_unit_start && pending.carrier.discontinuity {
                 return Err(Error::Unsupported(
-                    "native signalled counter break unobserved",
+                    "continuation has a continuity counter break and a discontinuity indicator",
                 ));
             }
             if gap && !has_payload {
                 return Err(Error::Unsupported(
-                    "native adaptation-only counter break unobserved",
+                    "continuity counter changed on a carrier without payload",
                 ));
             }
             // The observed reference marks the active byte buffer before a
@@ -45,7 +45,7 @@ impl DemuxObserver {
             self.previous_counter = Some(pending.carrier.continuity_counter);
             self.pending
                 .as_mut()
-                .ok_or(Error::Invalid("native PES input missing"))?
+                .ok_or(Error::Invalid("PES observer input missing"))?
                 .counter_checked = true;
         }
         if !has_payload {
@@ -55,7 +55,7 @@ impl DemuxObserver {
         let start = self
             .pending
             .as_ref()
-            .ok_or(Error::Invalid("native PES input missing"))?
+            .ok_or(Error::Invalid("PES observer input missing"))?
             .carrier
             .payload_unit_start;
         if start && self.active {
@@ -68,11 +68,13 @@ impl DemuxObserver {
             }
             self.begin_pes()?;
         } else if !self.active {
-            return Err(Error::Unsupported("native orphan continuation unobserved"));
+            return Err(Error::Unsupported(
+                "PES continuation without an active packet",
+            ));
         }
         self.pending
             .as_mut()
-            .ok_or(Error::Invalid("native PES input missing"))?
+            .ok_or(Error::Invalid("PES observer input missing"))?
             .started = true;
         Ok(true)
     }
@@ -81,7 +83,7 @@ impl DemuxObserver {
         let pending = self
             .pending
             .as_ref()
-            .ok_or(Error::Invalid("native PES input missing"))?;
+            .ok_or(Error::Invalid("PES observer input missing"))?;
         if pending.body_drained {
             self.pending = None;
             return Ok(true);
@@ -89,7 +91,7 @@ impl DemuxObserver {
         let payload = pending
             .payload
             .as_ref()
-            .ok_or(Error::Invalid("native PES payload missing"))?;
+            .ok_or(Error::Invalid("PES observer payload missing"))?;
         let available = payload.len() - pending.position;
         if available == 0 {
             self.pending = None;
@@ -97,14 +99,14 @@ impl DemuxObserver {
         }
         let mut count = available;
         if let Some(limit) = self.body_limit {
-            let remaining = limit
-                .checked_sub(self.payload_len())
-                .ok_or(Error::Invalid("native finite buffer length"))?;
+            let remaining = limit.checked_sub(self.payload_len()).ok_or(Error::Invalid(
+                "PES buffer already exceeds the declared payload length",
+            ))?;
             if available > remaining {
                 if self.finite_private() {
                     return Err(self.finite_private_error(
-                        "native private audio finite overrun unobserved",
-                        "native DVB finite overrun unobserved",
+                        "private audio payload exceeds the declared PES length",
+                        "DVB subtitle payload exceeds the declared PES length",
                     ));
                 }
                 if pending.carrier.payload_unit_start {
@@ -126,7 +128,9 @@ impl DemuxObserver {
             return Err(limit(retained, self.limits.pes_bytes));
         }
         if next >= DEFAULT_PACKET_CAP {
-            return Err(Error::Unsupported("native packet-cap boundary unobserved"));
+            return Err(Error::Unsupported(
+                "PES payload reaches the assembly size cap",
+            ));
         }
         if !self.reserve(Arena::Payload, work, cancel)? || !work.try_charge(1) {
             return Ok(false);
@@ -134,11 +138,11 @@ impl DemuxObserver {
         let pending = self
             .pending
             .as_mut()
-            .ok_or(Error::Invalid("native PES input missing"))?;
+            .ok_or(Error::Invalid("PES observer input missing"))?;
         let payload = pending
             .payload
             .as_ref()
-            .ok_or(Error::Invalid("native PES payload missing"))?;
+            .ok_or(Error::Invalid("PES observer payload missing"))?;
         let start = pending.position;
         let end = start.checked_add(count).ok_or(Error::Overflow)?;
         payload
@@ -176,7 +180,7 @@ impl DemuxObserver {
             pending
                 .payload
                 .take()
-                .ok_or(Error::Invalid("native PES payload missing"))?
+                .ok_or(Error::Invalid("PES observer payload missing"))?
                 .into_slice(start..end)?
         } else {
             payload.slice(start..end)?

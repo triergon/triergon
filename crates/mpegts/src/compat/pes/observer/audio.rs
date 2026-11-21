@@ -34,10 +34,10 @@ impl PrivateAudioCarriage {
     #[cfg(feature = "reference-trace")]
     pub fn label(self) -> &'static str {
         match self {
-            Self::DvbAc3Tag => "ArchivedNativePrivateAudioV1.DvbAc3Tag",
-            Self::DvbEac3Tag => "ArchivedNativePrivateAudioV1.DvbEac3Tag",
-            Self::PrivateType81Ac3 => "ArchivedNativePrivateAudioV1.PrivateType81Ac3",
-            Self::PrivateType87Eac3 => "ArchivedNativePrivateAudioV1.PrivateType87Eac3",
+            Self::DvbAc3Tag => "dvb-ac3-descriptor",
+            Self::DvbEac3Tag => "dvb-eac3-descriptor",
+            Self::PrivateType81Ac3 => "private-stream-type-0x81-ac3",
+            Self::PrivateType87Eac3 => "private-stream-type-0x87-eac3",
         }
     }
     fn stream_type(self) -> u8 {
@@ -79,7 +79,7 @@ impl PrivateAudioCarriage {
         limits.validate()?;
         if !matches!(stream_type, 6 | 0x81 | 0x87) {
             return Err(Error::Unsupported(
-                "native private audio stream type unobserved",
+                "private audio requires PMT stream type 0x06, 0x81 or 0x87",
             ));
         }
         let bytes = source
@@ -120,17 +120,17 @@ impl PrivateAudioCarriage {
                     // are not established by the four retained observations.
                     0x05 | 0x5f => {
                         return Err(Error::Unsupported(
-                            "native private audio registration/specifier context unobserved",
+                            "registration or private data specifier is unsupported for this private audio carriage",
                         ));
                     }
                     0x59 | 0x28 | 0x38 => {
                         return Err(Error::Unsupported(
-                            "native private audio conflicting descriptor context",
+                            "conflicting private audio descriptors or stream type",
                         ));
                     }
                     0x6a | 0x7a if program => {
                         return Err(Error::Unsupported(
-                            "native private audio program-level tag context unobserved",
+                            "program-level DVB audio descriptor is unsupported for private audio",
                         ));
                     }
                     0x6a => {
@@ -153,10 +153,10 @@ impl PrivateAudioCarriage {
             (0x81, _, false) => Ok(Self::PrivateType81Ac3),
             (0x87, false, _) => Ok(Self::PrivateType87Eac3),
             (6, false, false) => Err(Error::Unsupported(
-                "native private audio descriptor evidence absent",
+                "private data stream lacks a DVB AC-3 or E-AC-3 descriptor",
             )),
             _ => Err(Error::Unsupported(
-                "native private audio conflicting descriptor context",
+                "conflicting private audio descriptors or stream type",
             )),
         }?;
         if hls && stream_type == 6 && registration.is_none() {
@@ -216,20 +216,26 @@ impl DemuxObserver {
         observe: impl FnOnce() -> Result<PrivateAudioCarriage>,
     ) -> Result<Self> {
         if scope.program == 0 {
-            return Err(Error::Invalid("native PES selected program"));
+            return Err(Error::Invalid(
+                "PES observer requires a nonzero program number",
+            ));
         }
         checked_pid(scope.pid)?;
         limits.validate()?;
         if scope.stream_type != carriage.stream_type() {
-            return Err(Error::Invalid("native private audio carriage mismatch"));
+            return Err(Error::Invalid(
+                "selected private audio carriage disagrees with the PMT",
+            ));
         }
         if scope.stream_id != 0xbd {
             return Err(Error::Unsupported(
-                "native private audio stream ID unobserved",
+                "private audio requires PES stream ID 0xbd",
             ));
         }
         if observe()? != carriage {
-            return Err(Error::Invalid("native private audio carriage mismatch"));
+            return Err(Error::Invalid(
+                "selected private audio carriage disagrees with the PMT",
+            ));
         }
         let mut observer = Self::admitted(profile, scope, budget, limits)?;
         observer.private_audio = Some(carriage);

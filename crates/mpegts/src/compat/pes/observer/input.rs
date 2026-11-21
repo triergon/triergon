@@ -12,7 +12,7 @@ impl DemuxObserver {
         match (&self.demux_input, input) {
             (Some(context), Some(input)) => context.validate_cursor(input),
             (Some(_), None) => Err(Error::Invalid(
-                "bound native operation requires input cursor",
+                "input-bound PES observer requires its source cursor",
             )),
             (None, _) => Ok(()),
         }
@@ -72,7 +72,9 @@ impl DemuxObserver {
             || end.epochs != self.scope.epochs
             || end.program != self.scope.program
         {
-            return Err(Error::Invalid("native media entity source scope mismatch"));
+            return Err(Error::Invalid(
+                "media entity boundary does not match the PES source scope",
+            ));
         }
         if self.pending.is_some()
             || self.emission.is_some()
@@ -80,7 +82,9 @@ impl DemuxObserver {
             || self.fault.is_some()
             || self.ended
         {
-            return Err(Error::Invalid("native media entity operation not drained"));
+            return Err(Error::Invalid(
+                "PES observer must drain before a media entity transition",
+            ));
         }
         let position = self
             .media_position_base
@@ -249,7 +253,7 @@ impl DemuxObserver {
             ));
         }
         if !self.follows_input(context, packet.source_offset()) {
-            return Err(Error::Invalid("native PES source event order"));
+            return Err(Error::Invalid("PES source events are out of order"));
         }
         packet
             .source_offset()
@@ -316,37 +320,41 @@ impl DemuxObserver {
         if let Err(error) = self.validate_input(input) {
             Some(error)
         } else if !packet.source.belongs_to(&self.budget) {
-            Some(Error::Invalid("foreign native PES byte pool"))
+            Some(Error::Invalid("PES input belongs to a different byte pool"))
         } else if self.pending.is_some() || self.emission.is_some() {
-            Some(Error::Invalid("native PES input not drained"))
+            Some(Error::Invalid(
+                "pending PES input or emission must be drained",
+            ))
         } else if self.ended {
-            Some(Error::Invalid("native PES input after EOF"))
+            Some(Error::Invalid("PES input after EOF"))
         } else if let Some(error) = self.fault {
             Some(error)
         } else if packet.pid != self.scope.pid {
-            Some(Error::Invalid("native PES input PID"))
+            Some(Error::Invalid(
+                "PES carrier PID differs from the selected PID",
+            ))
         } else if packet.continuity_counter > 15 {
-            Some(Error::Invalid("native TS counter range"))
+            Some(Error::Invalid("TS continuity counter exceeds four bits"))
         } else if packet.source_id != Some(self.scope.entity) || context.epochs != self.scope.epochs
         {
             Some(Error::Unsupported(
-                "native PES source context transition unobserved",
+                "PES carrier belongs to a different entity or source epoch",
             ))
         } else if !transport_fault && (packet.transport_error || packet.scrambling != 0) {
             Some(Error::Unsupported(
-                "native PES damaged/opaque transport unobserved",
+                "PES carrier has a transport error or scrambling",
             ))
         } else if self.finite_private() && packet.prefix.is_some() {
             Some(self.finite_private_error(
-                "native private audio M2TS context unobserved",
-                "native DVB M2TS context unobserved",
+                "private audio PES requires TS188 carriers",
+                "DVB subtitle PES requires TS188 carriers",
             ))
         } else if self.finite_private()
             && (context.byte_run_epoch.is_some() || packet.discontinuity_indicator())
         {
             Some(self.finite_private_error(
-                "native private audio damaged/clock context unobserved",
-                "native DVB damaged/clock context unobserved",
+                "private audio PES crosses a damaged byte run or signalled discontinuity",
+                "DVB subtitle PES crosses a damaged byte run or signalled discontinuity",
             ))
         } else if !selected_boundary
             && packet.discontinuity_indicator()
@@ -356,10 +364,10 @@ impl DemuxObserver {
                 .is_some_and(|field| field.pcr.is_some())
         {
             Some(Error::Unsupported(
-                "native PCR clock boundary context unobserved",
+                "PCR discontinuity requires an explicit PES clock boundary policy",
             ))
         } else if !self.follows_input(context, packet.source_offset) {
-            Some(Error::Invalid("native PES source event order"))
+            Some(Error::Invalid("PES source events are out of order"))
         } else {
             let Some(end) = packet.source_offset.checked_add(packet.source.len() as u64) else {
                 return Some(Error::Overflow);
@@ -384,7 +392,7 @@ impl DemuxObserver {
     fn transport_bounds_to(packet: &TransportPacket, checked_end: Option<u64>) -> Result<()> {
         let prefix = packet.prefix.as_ref().map_or(0, Bytes::len);
         if (prefix != 0 && prefix != 4) || packet.source.len() != 188 + prefix {
-            return Err(Error::Invalid("native TS packet layout"));
+            return Err(Error::Invalid("invalid TS carrier layout for PES input"));
         }
         if let Some(payload) = packet.payload.as_ref() {
             let (start, end) = if let Some(end) = checked_end {
@@ -407,7 +415,9 @@ impl DemuxObserver {
                 .checked_add(payload.len() as u64)
                 .ok_or(Error::Overflow)?;
             if payload.len() > 184 || packet.payload_source_offset < start || payload_end > end {
-                return Err(Error::Invalid("native TS payload bounds"));
+                return Err(Error::Invalid(
+                    "TS payload is outside the PES input carrier",
+                ));
             }
             let relative = usize::try_from(packet.payload_source_offset - packet.source_offset)
                 .map_err(|_| Error::Overflow)?;
@@ -417,7 +427,9 @@ impl DemuxObserver {
                 .get(relative..relative + payload.len())
                 .is_some_and(|span| std::ptr::eq(span, payload.as_ref()))
             {
-                return Err(Error::Invalid("native TS payload bounds"));
+                return Err(Error::Invalid(
+                    "TS payload is outside the PES input carrier",
+                ));
             }
         }
         Ok(())

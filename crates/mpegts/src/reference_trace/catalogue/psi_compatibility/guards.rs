@@ -412,7 +412,7 @@ fn partial_pat_retains_source_incompleteness_and_real_demux_metadata() {
     );
     assert!(
         v.has_pending_current_pat(),
-        "native EOF cannot turn a partial source table into a complete source table"
+        "demux EOF must leave the source PAT partial"
     );
 }
 #[test]

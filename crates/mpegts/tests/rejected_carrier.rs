@@ -91,7 +91,7 @@ fn recovered(observer: &mut RecoveryObserver) -> RecoveredPacket {
             other => panic!("unexpected {other:?}"),
         }
     }
-    panic!("rejected native work did not progress");
+    panic!("rejected-carrier PES recovery did not progress");
 }
 
 #[test]
@@ -309,7 +309,7 @@ fn invalid_marker_never_becomes_a_validated_source_or_demux_header() {
     for _ in 0..32 {
         match parser.poll(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
             Ok(AssemblyStep::Yield) => {}
-            Err(Error::Invalid("native rejected timestamp markers")) => {
+            Err(Error::Invalid("invalid PTS prefix or marker bits in rejected PES")) => {
                 failed = true;
                 break;
             }
@@ -320,7 +320,9 @@ fn invalid_marker_never_becomes_a_validated_source_or_demux_header() {
     let mut work = WorkBudget::new(0);
     assert!(matches!(
         parser.poll(&mut work, &AtomicBool::new(false)),
-        Err(Error::Invalid("native rejected timestamp markers"))
+        Err(Error::Invalid(
+            "invalid PTS prefix or marker bits in rejected PES"
+        ))
     ));
     assert_eq!(work.spent(), 0);
     assert_eq!(parser.pending_rejection().unwrap().bytes().as_ref(), raw);
@@ -347,7 +349,9 @@ fn rejected_header_flags_are_an_explicit_unproven_context() {
     for _ in 0..32 {
         match parser.poll(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
             Ok(AssemblyStep::Yield) => {}
-            Err(Error::Unsupported("native rejected header flags unobserved")) => {
+            Err(Error::Unsupported(
+                "rejected PES requires an MPEG-2 PTS-only header with no extra flags",
+            )) => {
                 failed = true;
                 break;
             }

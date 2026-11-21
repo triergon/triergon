@@ -85,7 +85,7 @@ fn observer(case: Case, budget: &Budget) -> DemuxObserver {
     )
     .unwrap_or_else(|error| {
         panic!(
-            "registered {:?} runtime RED until implementation: {error:?}",
+            "registered carriage {:?} was refused: {error:?}",
             case.carriage
         )
     })
@@ -277,7 +277,7 @@ fn original_opcr_without_pcr_at_376_requires_primary_rejection() {
     );
     assert!(
         matches!(result, Err(Error::Invalid("OPCR without PCR"))),
-        "H222 2.4.3.5 runtime RED: original carrier requires rejection, got {result:?}"
+        "H.222.0 §2.4.3.5 requires PCR when OPCR is present, got {result:?}"
     );
 }
 #[test]
@@ -341,7 +341,7 @@ fn registered_wrong_kind_is_rejected_without_charging() {
         .unwrap_err();
         assert_eq!(
             error,
-            Error::Invalid("native registered carriage kind mismatch")
+            Error::Invalid("registered PES carriage disagrees with the PMT stream type")
         );
         assert_eq!(wrong.stream_type, case.stream_type ^ 1);
         assert_eq!(budget.used(), before);
@@ -364,7 +364,7 @@ fn registered_unobserved_stream_id_is_not_silently_substituted() {
         .unwrap_err();
         assert_eq!(
             error,
-            Error::Unsupported("native registered PES stream ID unobserved")
+            Error::Unsupported("PES stream ID is unsupported for the registered carriage")
         );
         assert_eq!(wrong.stream_id, case.stream_id ^ 1);
         assert_eq!(budget.used(), before);
@@ -385,7 +385,10 @@ fn registered_invalid_program_and_null_pid_are_rejected_before_feature_stub() {
             ParseLimits::default(),
         )
         .unwrap_err();
-        assert_eq!(error, Error::Invalid("native PES selected program"));
+        assert_eq!(
+            error,
+            Error::Invalid("PES observer requires a nonzero program number")
+        );
         wrong = scope(case);
         wrong.pid = 0x1fff;
         let error = DemuxObserver::new_registered(
@@ -459,7 +462,10 @@ fn explicit_registered_avc_recovers_foreign_input_without_new_allocation() {
     let packet = carrier(AVC, &foreign);
     let before = budget.used();
     let error = observer.push(packet, context()).unwrap_err();
-    assert_eq!(error.error, Error::Invalid("foreign native PES byte pool"));
+    assert_eq!(
+        error.error,
+        Error::Invalid("PES input belongs to a different byte pool")
+    );
     assert_eq!(error.value.source_offset, 376);
     assert!(error.value.source.belongs_to(&foreign));
     assert_eq!(budget.used(), before);

@@ -25,11 +25,11 @@ impl PsiCompatibility {
     /// The policy's name in reference traces.
     pub fn label(self) -> &'static str {
         match self {
-            Self::CurrentPatSectionBeforeWholeTable => "CurrentPatSectionBeforeWholeTableV1",
+            Self::CurrentPatSectionBeforeWholeTable => "current-pat-section-before-whole-table",
             Self::PmtDescriptorStopsAfterStreamIdentity => {
-                "PmtDescriptorStopsAfterStreamIdentityV1"
+                "pmt-descriptor-stops-after-stream-identity"
             }
-            Self::PmtNonzeroSection => "PmtNonzeroSectionV1",
+            Self::PmtNonzeroSection => "pmt-nonzero-section",
         }
     }
     fn bit(self) -> u8 {
@@ -618,7 +618,7 @@ impl Catalogue {
     }
     #[allow(
         clippy::too_many_arguments,
-        reason = "keeps source status, wire header and native observation context distinct"
+        reason = "keeps source status, wire header and demux observation context distinct"
     )]
     fn store_compat_evidence(
         &mut self,
@@ -913,13 +913,13 @@ impl Catalogue {
     ) -> Result<()> {
         let route = s
             .route
-            .ok_or(Error::Invalid("PSI compatibility native route missing"))?;
+            .ok_or(Error::Invalid("compatibility PMT has no PAT route"))?;
         if section.pid() != route.pmt_pid
             || context.source_event_ordinal <= route.context.source_event_ordinal
             || context.epochs != route.context.epochs
         {
             return Err(Error::Invalid(
-                "PSI compatibility native route context mismatch",
+                "compatibility PMT PID, event order or source epoch does not match the PAT route",
             ));
         }
         let input = SectionInput::capture(
@@ -1433,7 +1433,7 @@ impl Catalogue {
             if let Some(assembler) = state.demux_pmt.as_mut() {
                 if !assembler.partial_bytes().is_empty() {
                     return Err(Error::Unsupported(
-                        "PSI compatibility truncated native-routed PMT",
+                        "truncated PMT on the compatibility PAT route",
                     ));
                 }
                 assembler.end_of_source();
@@ -1441,7 +1441,7 @@ impl Catalogue {
                     AssemblyStep::Finished => {}
                     _ => {
                         return Err(Error::Invalid(
-                            "PSI compatibility native section input not drained",
+                            "compatibility PSI section assembler still has input at EOF",
                         ));
                     }
                 }

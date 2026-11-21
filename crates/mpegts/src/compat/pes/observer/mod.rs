@@ -513,17 +513,21 @@ impl DemuxObserver {
         limits: ParseLimits,
     ) -> Result<Self> {
         if scope.program == 0 {
-            return Err(Error::Invalid("native PES selected program"));
+            return Err(Error::Invalid(
+                "PES observer requires a nonzero program number",
+            ));
         }
         checked_pid(scope.pid)?;
         limits.validate()?;
         let (stream_type, stream_id) = carriage.selected_signature();
         if scope.stream_type != stream_type {
-            return Err(Error::Invalid("native registered carriage kind mismatch"));
+            return Err(Error::Invalid(
+                "registered PES carriage disagrees with the PMT stream type",
+            ));
         }
         if scope.stream_id != stream_id {
             return Err(Error::Unsupported(
-                "native registered PES stream ID unobserved",
+                "PES stream ID is unsupported for the registered carriage",
             ));
         }
         Self::admitted(profile, scope, budget, limits)
@@ -540,11 +544,15 @@ impl DemuxObserver {
         limits: ParseLimits,
     ) -> Result<Self> {
         if scope.program == 0 {
-            return Err(Error::Invalid("native PES selected program"));
+            return Err(Error::Invalid(
+                "PES observer requires a nonzero program number",
+            ));
         }
         checked_pid(scope.pid)?;
         if scope.stream_type != 0x1b || scope.stream_id != 0xe0 {
-            return Err(Error::Unsupported("native PES stream context unobserved"));
+            return Err(Error::Unsupported(
+                "AVC PES requires PMT stream type 0x1b and PES stream ID 0xe0",
+            ));
         }
         limits.validate()?;
         Self::admitted(profile, scope, budget, limits)
@@ -598,7 +606,9 @@ impl DemuxObserver {
     ) -> Result<()> {
         context.validate_cursor(input)?;
         if !self.recovery_idle() || self.last_input.is_some() || self.demux_input.is_some() {
-            return Err(Error::Invalid("native startup binding after input"));
+            return Err(Error::Invalid(
+                "PES startup context must be bound before input",
+            ));
         }
         if input.source() != self.scope.entity || !context.backing_bytes().belongs_to(&self.budget)
         {
@@ -649,7 +659,7 @@ impl DemuxObserver {
     /// The operation name the observer's packets are recorded under in comparison traces.
     #[cfg(feature = "reference-trace")]
     pub fn operation(&self) -> &'static str {
-        "ArchivedNativePesPacketsV1"
+        "demux-pes-packets"
     }
     /// The selected program and PID this observer cuts.
     pub fn scope(&self) -> DemuxScope {
@@ -663,7 +673,9 @@ impl DemuxObserver {
     /// demux context and must not be silently mapped to this operation.
     pub fn end_of_source(&mut self) -> Result<()> {
         if self.pending.is_some() || self.emission.is_some() {
-            return Err(Error::Invalid("native PES input not drained"));
+            return Err(Error::Invalid(
+                "pending PES input or emission must be drained",
+            ));
         }
         self.ended = true;
         Ok(())
@@ -835,7 +847,7 @@ impl DemuxObserver {
             if !self
                 .pending
                 .as_ref()
-                .ok_or(Error::Invalid("native PES input missing"))?
+                .ok_or(Error::Invalid("PES observer input missing"))?
                 .started
             {
                 if !self.poll_start(work)? {
@@ -885,7 +897,9 @@ mod tests {
         );
         assert_eq!(
             DemuxObserver::transport_bounds(&packet),
-            Err(Error::Invalid("native TS payload bounds"))
+            Err(Error::Invalid(
+                "TS payload is outside the PES input carrier"
+            ))
         );
     }
 
@@ -1135,11 +1149,11 @@ mod tests {
                     }
                     1 => {
                         packet.prefix = Some(packet.source.slice(0..1).unwrap());
-                        Error::Invalid("native TS packet layout")
+                        Error::Invalid("invalid TS carrier layout for PES input")
                     }
                     2 => {
                         packet.payload_source_offset = 567;
-                        Error::Invalid("native TS payload bounds")
+                        Error::Invalid("TS payload is outside the PES input carrier")
                     }
                     3 => {
                         packet.payload_source_offset = u64::MAX;
@@ -1147,25 +1161,29 @@ mod tests {
                     }
                     4 => {
                         packet.payload = Some(Bytes::copy_from_slice(&pool, &[0; 184]).unwrap());
-                        Error::Invalid("native TS payload bounds")
+                        Error::Invalid("TS payload is outside the PES input carrier")
                     }
                     5 => {
                         context.epochs.clock = 1;
-                        Error::Unsupported("native PES source context transition unobserved")
+                        Error::Unsupported(
+                            "PES carrier belongs to a different entity or source epoch",
+                        )
                     }
                     6 => {
                         packet.source_id = Some(SourceId(2));
-                        Error::Unsupported("native PES source context transition unobserved")
+                        Error::Unsupported(
+                            "PES carrier belongs to a different entity or source epoch",
+                        )
                     }
                     7 => {
                         observer.last_input = Some((context.source_event_ordinal, 376));
-                        Error::Invalid("native PES source event order")
+                        Error::Invalid("PES source events are out of order")
                     }
                     _ => {
                         let foreign = Budget::new(8192).unwrap();
                         packet = body_carrier(&foreign, 178, 564, 0);
                         packet.prefix = Some(packet.source.slice(0..1).unwrap());
-                        Error::Invalid("foreign native PES byte pool")
+                        Error::Invalid("PES input belongs to a different byte pool")
                     }
                 };
                 let pointer = packet.source.as_ref().as_ptr();
@@ -1203,7 +1221,7 @@ mod tests {
         packet.prefix = Some(packet.source.slice(0..1).unwrap());
         assert_eq!(
             DemuxObserver::transport_bounds(&packet),
-            Err(Error::Invalid("native TS packet layout"))
+            Err(Error::Invalid("invalid TS carrier layout for PES input"))
         );
         packet.prefix = None;
         assert_eq!(
@@ -1291,7 +1309,7 @@ mod tests {
         let rejected = observer.push(next, next_context).unwrap_err();
         assert_eq!(
             rejected.error,
-            Error::Invalid("native PES input not drained")
+            Error::Invalid("pending PES input or emission must be drained")
         );
         assert!(matches!(
             observer.poll(&mut WorkBudget::new(1), &AtomicBool::new(true)),

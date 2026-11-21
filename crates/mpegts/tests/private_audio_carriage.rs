@@ -26,7 +26,7 @@ const EPOCHS: SourceEpochs = SourceEpochs {
     configuration: 2,
 };
 const UNSUPPORTED: Error =
-    Error::Unsupported("native private audio finite PES operation not implemented");
+    Error::Unsupported("private audio playback requires complete finite PES packets");
 
 #[derive(Clone, Copy)]
 struct Case {
@@ -94,7 +94,7 @@ fn observer(case: Case, budget: &Budget) -> DemuxObserver {
         ParseLimits::default(),
     )
     .unwrap_or_else(|error| {
-        panic!("real finite private-audio runtime RED: {error:?}; stub {UNSUPPORTED:?}")
+        panic!("private audio observer refused a supported carriage: {error:?} (unsupported condition: {UNSUPPORTED:?})")
     })
 }
 fn carrier(raw: &[u8], budget: &Budget, offset: u64) -> TransportPacket {
@@ -355,7 +355,7 @@ fn audio_legacy_new_remains_h264_only() {
                 ParseLimits::default()
             )
             .unwrap_err(),
-            Error::Unsupported("native PES stream context unobserved")
+            Error::Unsupported("AVC PES requires PMT stream type 0x1b and PES stream ID 0xe0")
         );
         assert_eq!(budget.used(), used);
     }
@@ -381,7 +381,7 @@ fn audio_bad_scope_kind_id_and_limits_precede_feature_stub_without_charge() {
         bad.program = 0;
         assert_eq!(
             call(bad, case.carriage, ParseLimits::default()),
-            Error::Invalid("native PES selected program")
+            Error::Invalid("PES observer requires a nonzero program number")
         );
         bad = scope(case);
         bad.pid = 0x1fff;
@@ -393,13 +393,13 @@ fn audio_bad_scope_kind_id_and_limits_precede_feature_stub_without_charge() {
         bad.stream_type = 0x1b;
         assert_eq!(
             call(bad, case.carriage, ParseLimits::default()),
-            Error::Invalid("native private audio carriage mismatch")
+            Error::Invalid("selected private audio carriage disagrees with the PMT")
         );
         bad = scope(case);
         bad.stream_id = 0xc0;
         assert_eq!(
             call(bad, case.carriage, ParseLimits::default()),
-            Error::Unsupported("native private audio stream ID unobserved")
+            Error::Unsupported("private audio requires PES stream ID 0xbd")
         );
         assert_eq!(
             call(
@@ -430,13 +430,13 @@ fn audio_private_tag_conflicts_and_missing_evidence_never_choose_first_codec() {
                 limits
             )
             .unwrap_err(),
-            Error::Unsupported("native private audio conflicting descriptor context")
+            Error::Unsupported("conflicting private audio descriptors or stream type")
         );
     }
     assert_eq!(
         PrivateAudioCarriage::from_observed_pmt(6, PrivateAudioDescriptors::default(), limits)
             .unwrap_err(),
-        Error::Unsupported("native private audio descriptor evidence absent")
+        Error::Unsupported("private data stream lacks a DVB AC-3 or E-AC-3 descriptor")
     );
 }
 
@@ -456,7 +456,9 @@ fn audio_registration_specifier_and_program_tags_are_explicit_nonpasses_not_name
                 ParseLimits::default()
             )
             .unwrap_err(),
-            Error::Unsupported("native private audio registration/specifier context unobserved")
+            Error::Unsupported(
+                "registration or private data specifier is unsupported for this private audio carriage"
+            )
         );
     }
     assert_eq!(
@@ -469,7 +471,7 @@ fn audio_registration_specifier_and_program_tags_are_explicit_nonpasses_not_name
             ParseLimits::default()
         )
         .unwrap_err(),
-        Error::Unsupported("native private audio program-level tag context unobserved")
+        Error::Unsupported("program-level DVB audio descriptor is unsupported for private audio")
     );
 }
 
@@ -794,7 +796,10 @@ fn audio_mailbox_rejects_second_input_and_returns_exact_charged_backing() {
     let second = carrier(&raw, &budget, 564);
     let same = second.source.clone();
     let error = observer.push(second, context(9)).unwrap_err();
-    assert_eq!(error.error, Error::Invalid("native PES input not drained"));
+    assert_eq!(
+        error.error,
+        Error::Invalid("pending PES input or emission must be drained")
+    );
     assert!(error.value.source.shares_storage_with(&same));
     assert_eq!(error.value.source.as_ref(), raw);
     let out = drain(&mut observer);
@@ -815,7 +820,7 @@ fn audio_source_entity_epoch_and_foreign_pool_rejection_do_not_poison_valid_back
         let rejected = observer.push(packet, context(8)).unwrap_err();
         assert_eq!(
             rejected.error,
-            Error::Invalid("foreign native PES byte pool")
+            Error::Invalid("PES input belongs to a different byte pool")
         );
         assert!(rejected.value.source.shares_storage_with(&same));
         let mut packet = original(case, &budget);
@@ -1060,7 +1065,7 @@ fn audio_rejected_carrier_stays_original_invalid_source_and_does_not_advance_dem
     let error = observer.push_rejected(rejection, context(8)).unwrap_err();
     assert_eq!(
         error.error,
-        Error::Unsupported("native private audio rejected carrier unobserved")
+        Error::Unsupported("private audio PES does not recover rejected carriers")
     );
     assert_eq!(error.value.error(), Error::Invalid("OPCR without PCR"));
     assert_eq!(error.value.source_offset(), 376);

@@ -73,7 +73,7 @@ fn observer(b: &Budget) -> RecoveryObserver {
         b.clone(),
         ParseLimits::default(),
     )
-    .expect("selected AVC source-diagnostic operation not implemented: intended runtime RED")
+    .expect("expected an AVC PES observer with source fault recovery")
 }
 fn collect(data: &[u8], b: &Budget) -> Vec<(TraceEvent, SourceEpochs)> {
     let backing = Bytes::copy_from_slice(b, data).unwrap();
@@ -163,7 +163,7 @@ fn drain(o: &mut RecoveryObserver) -> Vec<DemuxObservation> {
             other @ AssemblyStep::Finished => panic!("unexpected {other:?}"),
         }
     }
-    panic!("bounded native assembly failed to progress");
+    panic!("bounded PES assembly failed to progress");
 }
 fn diagnostic(id: &str, expected: SelectedFault, raw: Option<u64>) {
     let b = Budget::new(1 << 20).unwrap();
@@ -432,11 +432,11 @@ fn staged(b: &Budget) -> (RecoveryObserver, TraceFault) {
     let mut o = observer(b);
     let events = collect(bytes("tei-original"), b);
     let TraceEvent::Transport(p) = &events[8].0 else {
-        panic!("real transport8")
+        panic!("expected the selected transport carrier at source event 8")
     };
     o.push_accepted(p.clone(), context(8)).unwrap();
     let TraceEvent::Diagnostic(f) = &events[10].0 else {
-        panic!("real diagnostic10")
+        panic!("expected the matching source diagnostic at event 10")
     };
     (o, f.clone())
 }
@@ -466,7 +466,7 @@ fn staged_work_cancel_and_actual_diagnostic() {
     ));
     assert!(
         drain(&mut o).is_empty(),
-        "no native packet before the actual strict diagnostic"
+        "no demux PES packet before the source diagnostic"
     );
     o.confirm_source_fault(&f, context(10)).unwrap();
     let p = one(&mut o);

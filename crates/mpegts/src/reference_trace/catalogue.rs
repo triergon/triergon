@@ -132,11 +132,13 @@ impl Catalogue {
         limits.validate()?;
         if limits.programs > 64 || limits.streams > 64 || limits.source_spans > 4096 {
             return Err(Error::Unsupported(
-                "native catalogue bounded profile limits",
+                "demux catalogue limits exceed 64 programs, 64 streams or 4096 source spans",
             ));
         }
         if program == 0 {
-            return Err(Error::Invalid("native catalogue program zero"));
+            return Err(Error::Invalid(
+                "demux catalogue requires a nonzero program number",
+            ));
         }
         Ok(Self {
             programs: BudgetVec::new(&budget),
@@ -174,7 +176,7 @@ impl Catalogue {
             0x1b => Ok(CatalogueCodec::Avc),
             0x24 => Ok(CatalogueCodec::Hevc),
             _ if !self.selected_carriage => Err(Error::Unsupported(
-                "native catalogue selected video types only",
+                "demux video catalogue supports only AVC and HEVC stream types",
             )),
             0x0f => Ok(CatalogueCodec::AacAdts),
             0x11 => Ok(CatalogueCodec::AacLatm),
@@ -196,7 +198,7 @@ impl Catalogue {
                 })
             }
             _ => Err(Error::Unsupported(
-                "native catalogue selected carriage unobserved",
+                "stream type or descriptors are unsupported by the selected demux catalogue",
             )),
         }
     }
@@ -229,7 +231,9 @@ impl Catalogue {
     pub fn required_work(event: &TraceEvent) -> Result<u64> {
         if matches!(event,TraceEvent::Pat(t) if t.source_sections.len()>256 || t.source_ranges.len()>4096 || t.programs.len()>64)
         {
-            return Err(Error::Unsupported("native catalogue PAT shape bound"));
+            return Err(Error::Unsupported(
+                "demux catalogue PAT exceeds the section, range or program bound",
+            ));
         }
         let bytes = match event {
             TraceEvent::Pat(t) => t
@@ -269,7 +273,7 @@ impl Catalogue {
             return Err(e);
         }
         if self.ended {
-            return Err(Error::Invalid("native catalogue after logical EOF"));
+            return Err(Error::Invalid("demux catalogue input after logical EOF"));
         }
         if !work.try_charge(Self::required_work(event)?) {
             return Ok(false);
@@ -293,7 +297,9 @@ impl Catalogue {
     }
     fn retain(&mut self, backings: &[Bytes], ranges: &[SourceRange]) -> Result<usize> {
         if self.evidence.len() >= self.limits.source_spans {
-            return Err(Error::Unsupported("native catalogue evidence limit"));
+            return Err(Error::Unsupported(
+                "demux catalogue source record limit reached",
+            ));
         }
         let retained = self
             .retained_ranges
@@ -301,7 +307,7 @@ impl Catalogue {
             .ok_or(Error::Overflow)?;
         if retained > self.limits.source_spans {
             return Err(Error::Unsupported(
-                "native catalogue retained source-range limit",
+                "demux catalogue retained source range limit exceeded",
             ));
         }
         let backing_bytes = backings
@@ -311,7 +317,9 @@ impl Catalogue {
             .iter()
             .try_fold(0usize, |n, r| n.checked_add(r.bytes).ok_or(Error::Overflow))?;
         if backing_bytes != range_bytes || (backing_bytes != 0 && ranges.is_empty()) {
-            return Err(Error::Invalid("native catalogue source accounting"));
+            return Err(Error::Invalid(
+                "demux catalogue retained bytes disagree with their source ranges",
+            ));
         }
         let mut bytes = BudgetVec::new(&self.budget);
         let mut kept = BudgetVec::new(&self.budget);
@@ -368,7 +376,7 @@ impl Catalogue {
             }
             TraceEvent::Discontinuity { .. } => {
                 return Err(Error::Unsupported(
-                    "native catalogue is one physical entity",
+                    "demux catalogue requires one physical entity",
                 ));
             }
             _ => {}
@@ -382,7 +390,9 @@ impl Catalogue {
             || table.source_sections.len() != usize::from(h.last_section_number) + 1
             || table.programs.len() > self.limits.programs
         {
-            return Err(Error::Invalid("native catalogue incomplete source PAT"));
+            return Err(Error::Invalid(
+                "demux catalogue requires a complete source PAT within its limits",
+            ));
         }
         let mut position = 0;
         let mut previous = None;
@@ -408,18 +418,22 @@ impl Catalogue {
                 || raw[5] & 1 == 0
                 || PsiCrc32::of(raw) != 0
             {
-                return Err(Error::Invalid("native catalogue PAT source identity"));
+                return Err(Error::Invalid(
+                    "demux catalogue PAT section disagrees with the source table",
+                ));
             }
             let first = table
                 .source_ranges
                 .as_slice()
                 .iter()
                 .find(|r| usize::from(r.section_number) == section)
-                .ok_or(Error::Invalid("native catalogue PAT source range"))?
+                .ok_or(Error::Invalid(
+                    "demux catalogue PAT section is missing its source range",
+                ))?
                 .range;
             if previous.is_some_and(|old| old >= first.offset) {
                 return Err(Error::Unsupported(
-                    "native PAT section arrival order outside bounded catalogue",
+                    "demux catalogue requires PAT sections in section-number order",
                 ));
             }
             previous = Some(first.offset);
@@ -428,22 +442,26 @@ impl Catalogue {
                     .programs
                     .as_slice()
                     .get(position)
-                    .ok_or(Error::Invalid("native catalogue PAT entries"))?;
+                    .ok_or(Error::Invalid("demux catalogue PAT entry missing"))?;
                 if expected.program_number != u16::from_be_bytes([entry[0], entry[1]])
                     || expected.pid != u16::from_be_bytes([entry[2], entry[3]]) & 0x1fff
                 {
                     return Err(Error::Invalid(
-                        "native catalogue PAT encoded entry mismatch",
+                        "demux catalogue PAT entry disagrees with the encoded program or PID",
                     ));
                 }
                 if entry[2] & 0xe0 != 0xe0 || !(0x10..=0x1ffe).contains(&expected.pid) {
-                    return Err(Error::Invalid("native catalogue PAT encoded PID"));
+                    return Err(Error::Invalid(
+                        "demux catalogue PAT has an invalid encoded PMT PID",
+                    ));
                 }
                 position += 1;
             }
         }
         if position != table.programs.len() {
-            return Err(Error::Invalid("native catalogue PAT entry count"));
+            return Err(Error::Invalid(
+                "demux catalogue PAT entry count disagrees with the encoded table",
+            ));
         }
         let mut ranges = BudgetVec::new(&self.budget);
         for r in table.source_ranges.as_slice() {
@@ -467,7 +485,7 @@ impl Catalogue {
                 p.evidence = evidence;
             } else {
                 if self.programs.len() >= self.limits.programs {
-                    return Err(Error::Unsupported("native catalogue program limit"));
+                    return Err(Error::Unsupported("demux catalogue program limit reached"));
                 }
                 self.programs
                     .try_push(Program {
@@ -509,7 +527,9 @@ impl Catalogue {
             || raw[6] != 0
             || raw[7] != 0
         {
-            return Err(Error::Invalid("native catalogue PMT source identity"));
+            return Err(Error::Invalid(
+                "demux catalogue PMT disagrees with the source section",
+            ));
         }
         if map.streams.len() > self.limits.streams
             || self
@@ -518,18 +538,22 @@ impl Catalogue {
                 .iter()
                 .all(|p| p.program != h.extension)
         {
-            return Err(Error::Invalid("native catalogue PMT has no PAT route"));
+            return Err(Error::Invalid("demux catalogue PMT has no PAT route"));
         }
         if map.pcr_pid != u16::from_be_bytes([raw[8], raw[9]]) & 0x1fff {
-            return Err(Error::Invalid("native catalogue PCR mismatch"));
+            return Err(Error::Invalid(
+                "demux catalogue PMT disagrees with the encoded PCR PID",
+            ));
         }
         let start = 12 + (usize::from(u16::from_be_bytes([raw[10], raw[11]]) & 0x0fff));
         if start > raw.len() - 4 || map.program_descriptors.as_ref() != &raw[12..start] {
-            return Err(Error::Invalid("native catalogue program descriptors"));
+            return Err(Error::Invalid(
+                "demux catalogue program descriptors disagree with the encoded PMT",
+            ));
         }
         if !map.program_descriptors.is_empty() {
             return Err(Error::Unsupported(
-                "native catalogue program descriptor interpretation unobserved",
+                "demux catalogue requires an empty program descriptor loop",
             ));
         }
         let mut at = start;
@@ -537,29 +561,33 @@ impl Catalogue {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            let encoded = raw
-                .get(at..at + 5)
-                .ok_or(Error::Invalid("native catalogue stream extent"))?;
+            let encoded = raw.get(at..at + 5).ok_or(Error::Invalid(
+                "demux catalogue PMT stream header is truncated",
+            ))?;
             let end = at + 5 + usize::from(u16::from_be_bytes([encoded[3], encoded[4]]) & 0x0fff);
             if end > raw.len() - 4
                 || stream.stream_type != encoded[0]
                 || stream.pid != u16::from_be_bytes([encoded[1], encoded[2]]) & 0x1fff
                 || stream.descriptor_bytes.as_ref() != &raw[at + 5..end]
             {
-                return Err(Error::Invalid("native catalogue encoded stream mismatch"));
+                return Err(Error::Invalid(
+                    "demux catalogue stream disagrees with the encoded PMT entry",
+                ));
             }
             if !(matches!(stream.stream_type, 0x1b | 0x24)
                 || self.selected_carriage
                     && matches!(stream.stream_type, 0x0f | 0x11 | 6 | 0x81 | 0x87))
             {
                 return Err(Error::Unsupported(
-                    "native catalogue selected video types only",
+                    "demux video catalogue supports only AVC and HEVC stream types",
                 ));
             }
             at = end;
         }
         if at != raw.len() - 4 {
-            return Err(Error::Invalid("native catalogue stream count"));
+            return Err(Error::Invalid(
+                "demux catalogue stream entries do not cover the encoded PMT",
+            ));
         }
         let evidence = self.retain(
             std::slice::from_ref(&map.source),
@@ -583,14 +611,14 @@ impl Catalogue {
                         && matches!(descriptor.tag, 0x6a | 0x7a))
                 {
                     return Err(Error::Unsupported(
-                        "native catalogue descriptor outside observed video profile",
+                        "descriptor is unsupported for video in the demux catalogue",
                     ));
                 }
                 if descriptor.tag == 0x0a && language.is_empty() {
                     for e in descriptor.languages()? {
                         if e.language_code.contains(&0) {
                             return Err(Error::Unsupported(
-                                "native catalogue embedded NUL language",
+                                "demux catalogue language code contains NUL",
                             ));
                         }
                         if !language.is_empty() {
@@ -612,7 +640,7 @@ impl Catalogue {
                 old.evidence = evidence;
             } else {
                 if self.streams.len() >= self.limits.streams {
-                    return Err(Error::Unsupported("native catalogue stream limit"));
+                    return Err(Error::Unsupported("demux catalogue stream limit reached"));
                 }
                 self.streams
                     .try_push(Stream {
@@ -629,7 +657,9 @@ impl Catalogue {
             .as_mut_slice()
             .iter_mut()
             .find(|p| p.program == h.extension)
-            .ok_or(Error::Invalid("native catalogue program vanished"))?
+            .ok_or(Error::Invalid(
+                "demux catalogue program missing at PMT update",
+            ))?
             .pcr_pid = map.pcr_pid;
         if self.pending_pmt == Some((h.extension, h.version)) {
             self.pending_pmt = None;
@@ -641,7 +671,9 @@ impl Catalogue {
             return Err(e);
         }
         if self.ended {
-            return Err(Error::Invalid("native catalogue duplicate logical EOF"));
+            return Err(Error::Invalid(
+                "demux catalogue already reached logical EOF",
+            ));
         }
         if !self.budget.same_pool(input.budget()) || !self.budget.same_pool(&end.budget) {
             return Err(Error::ForeignPool);
@@ -653,13 +685,15 @@ impl Catalogue {
             || end.location.offset != input.position()
             || end.token != input.token()
         {
-            return Err(Error::Invalid("native catalogue terminal witness mismatch"));
+            return Err(Error::Invalid(
+                "demux catalogue entity end disagrees with the input cursor",
+            ));
         }
         for e in self.evidence.as_slice() {
             for r in e.ranges.as_slice() {
                 if r.entity != end.location.source || r.end()? > end.location.offset {
                     return Err(Error::Invalid(
-                        "native catalogue evidence beyond actual end",
+                        "demux catalogue source range lies outside the completed entity",
                     ));
                 }
             }

@@ -244,7 +244,7 @@ impl ElementaryStream {
             || self.descriptor_bytes.len() != 10
         {
             return Err(Error::Unsupported(
-                "D0 single-service DVB native view context",
+                "DVB codec parameters require one subtitling descriptor with one service",
             ));
         }
         let start = self

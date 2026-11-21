@@ -83,13 +83,15 @@ impl InputContext {
             return Err(Error::SourceMismatch);
         }
         if input.token() != self.token {
-            return Err(Error::Invalid("stale native startup request"));
+            return Err(Error::Invalid("stale PES startup request"));
         }
         if !self.backing.belongs_to(input.budget()) {
             return Err(Error::ForeignPool);
         }
         if !self.extent.permits(input.position()) {
-            return Err(Error::Invalid("native input beyond observed entity EOF"));
+            return Err(Error::Invalid(
+                "PES input position is beyond the observed entity end",
+            ));
         }
         Ok(())
     }
@@ -125,10 +127,12 @@ impl InputBinding {
             || self.format != end.format
             || !matches!(self.extent, Extent::Finite(bytes) if bytes == end.location.offset)
         {
-            return Err(Error::Invalid("native startup entity End mismatch"));
+            return Err(Error::Invalid(
+                "media entity end does not match the PES input binding",
+            ));
         }
         let bytes = input.capabilities().length.ok_or(Error::Unsupported(
-            "input-bound native media continuation requires a finite entity length",
+            "input-bound PES continuation requires a known entity length",
         ))?;
         usize::try_from(bytes).map_err(|_| Error::Overflow)?;
         Ok(Self {
@@ -144,10 +148,12 @@ impl InputBinding {
             return Err(Error::SourceMismatch);
         }
         if input.token() != self.token {
-            return Err(Error::Invalid("stale native startup request"));
+            return Err(Error::Invalid("stale PES startup request"));
         }
         if !self.extent.permits(input.position()) {
-            return Err(Error::Invalid("native input beyond observed entity EOF"));
+            return Err(Error::Invalid(
+                "PES input position is beyond the observed entity end",
+            ));
         }
         Ok(())
     }
@@ -165,7 +171,9 @@ impl InputBinding {
             .checked_add(carrier_bytes as u64)
             .ok_or(Error::Overflow)?;
         if !self.extent.permits(end) || carrier_bytes != self.format.bytes() {
-            return Err(Error::Invalid("native startup packet range/format"));
+            return Err(Error::Invalid(
+                "PES carrier size or range does not match the input binding",
+            ));
         }
         let prefix = if self.basis == PositionBasis::SyncStart {
             prefix_bytes
@@ -230,7 +238,7 @@ impl InputBootstrap {
     /// actual cursor. The selected grid must be decisive within that window.
     pub fn new_m2ts_prefix(input: &InputCursor, window: &InputWindow) -> Result<Self> {
         if window.bytes().len() != Self::M2TS_PREFIX_BYTES {
-            return Err(Error::Invalid("native M2TS prefix window length"));
+            return Err(Error::Invalid("M2TS prefix requires an 8192-byte window"));
         }
         Self::with_extent(
             input,
@@ -247,26 +255,27 @@ impl InputBootstrap {
         extent: Extent,
     ) -> Result<Self> {
         if input.position() != 0 || window.offset != 0 {
-            return Err(Error::Invalid("native startup requires initial input"));
+            return Err(Error::Invalid("PES startup requires input at offset zero"));
         }
         if window.source != input.source() {
             return Err(Error::SourceMismatch);
         }
         if window.token != input.token() {
-            return Err(Error::Invalid("stale native startup request"));
+            return Err(Error::Invalid("stale PES startup request"));
         }
         if !window.bytes().belongs_to(input.budget()) {
             return Err(Error::ForeignPool);
         }
-        let retained = input
-            .buffered_owner()
-            .cloned()
-            .ok_or(Error::Invalid("native startup window not provided"))?;
+        let retained = input.buffered_owner().cloned().ok_or(Error::Invalid(
+            "PES startup requires the window buffered by the input cursor",
+        ))?;
         if !retained.shares_storage_with(window.bytes())
             || (retained.len() != window.bytes().len()
                 || retained.as_ref().as_ptr() != window.bytes().as_ref().as_ptr())
         {
-            return Err(Error::Invalid("native startup window not provided"));
+            return Err(Error::Invalid(
+                "PES startup requires the window buffered by the input cursor",
+            ));
         }
         if window.bytes().len() > Self::MAX_BORROWED_BYTES {
             return Err(Error::Limit {
@@ -294,7 +303,7 @@ impl InputBootstrap {
             return Err(Error::SourceMismatch);
         }
         if input.token() != self.token {
-            return Err(Error::Invalid("stale native startup request"));
+            return Err(Error::Invalid("stale PES startup request"));
         }
         Ok(())
     }
@@ -313,11 +322,13 @@ impl InputBootstrap {
             return Err(Error::SourceMismatch);
         }
         if *token != self.token || !matches!(self.extent, Extent::Finite(bytes) if bytes == end) {
-            return Err(Error::Invalid("native startup EOF boundary"));
+            return Err(Error::Invalid(
+                "PES startup EOF does not match the request or initial window",
+            ));
         }
         if input.capabilities().length.is_some_and(|n| n != end) {
             return Err(Error::Unsupported(
-                "native startup inconsistent declared length",
+                "PES startup EOF disagrees with the declared source length",
             ));
         }
         self.eof = true;
@@ -355,7 +366,7 @@ impl InputBootstrap {
         let width = self.format.bytes();
         if finite && (self.backing.is_empty() || !self.backing.len().is_multiple_of(width)) {
             return Err(Error::Unsupported(
-                "native startup incomplete aligned finite entity",
+                "finite PES startup needs a nonempty entity with whole transport packets",
             ));
         }
         let sync = width - 188;
@@ -406,7 +417,7 @@ impl InputBootstrap {
         }
         if self.bad_sync {
             return Err(Error::Unsupported(
-                "native startup damaged/mixed physical grid",
+                "PES startup found missing sync bytes on the expected packet grid",
             ));
         }
         let s188 = self.scores188.iter().copied().max().unwrap_or(0);
@@ -422,14 +433,18 @@ impl InputBootstrap {
                         PositionBasis::SyncStart
                     }
                 }
-                _ => return Err(Error::Unsupported("native startup competing raw sync grid")),
+                _ => {
+                    return Err(Error::Unsupported(
+                        "PES startup found a competing packet sync grid",
+                    ));
+                }
             }
         } else {
             // Require an unambiguous 192-byte prefix. Cap competing markers
             // and reject enough off-grid noise to obscure the selected chain.
             let markers: u32 = self.scores192.iter().map(|&n| u32::from(n)).sum();
             if s192 < 7 || s188 >= 6 || s204 >= 6 || markers > 10 * u32::from(s192) {
-                return Err(Error::Unsupported("native M2TS prefix grid is ambiguous"));
+                return Err(Error::Unsupported("M2TS prefix grid is ambiguous"));
             }
             PositionBasis::CarrierStart
         };

@@ -107,7 +107,7 @@ fn check_demux(
             profile.worker_sha256(),
             "19c06e53c62852b409eec9771cb11d9d7f5164b4618545a449d7e993f99346df"
         );
-        assert_eq!(profile.operation(), "mpegts-native-pes-observation-v1");
+        assert_eq!(profile.operation(), "mpegts-demux-pes-observation");
         assert_eq!(profile.flags(), 48);
         assert!(profile.default_overflow_correction());
         assert!(!profile.find_stream_info());
@@ -119,7 +119,7 @@ fn check_demux(
         assert_eq!(source.header.dts_raw33, raw_dts[index]);
         let view = context
             .project(source, &mut WorkBudget::new(1), &AtomicBool::new(false))
-            .expect("red until separately named default-native view is implemented")
+            .expect("expected a demux clock projection")
             .unwrap();
         assert_eq!(view.profile, profile);
         assert_eq!(view.program, 1);

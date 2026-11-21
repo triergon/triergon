@@ -24,17 +24,21 @@ fn preflight(
     limits: ParseLimits,
 ) -> Result<()> {
     if scope.program == 0 {
-        return Err(Error::Invalid("native PES selected program"));
+        return Err(Error::Invalid(
+            "PES observer requires a nonzero program number",
+        ));
     }
     checked_pid(scope.pid)?;
     limits.validate()?;
     if scope.stream_type != 6 || scope.stream_id != 0xbd {
         return Err(Error::Unsupported(
-            "native DVB PES stream context unobserved",
+            "DVB subtitles require PMT stream type 0x06 and PES stream ID 0xbd",
         ));
     }
     if !matches!(namespace, DescriptorNamespace::Dvb(_)) {
-        return Err(Error::Unsupported("native DVB namespace not declared"));
+        return Err(Error::Unsupported(
+            "DVB subtitle PES requires an explicit DVB namespace",
+        ));
     }
     let bytes = source
         .program
@@ -72,7 +76,7 @@ fn preflight(
         || subtitle_entries != 1
     {
         return Err(Error::Unsupported(
-            "native DVB single-service PMT context unobserved",
+            "DVB subtitle PES requires one single-service descriptor and no program descriptors",
         ));
     }
     // The exact ordered TLV remains the caller's source. No service/language

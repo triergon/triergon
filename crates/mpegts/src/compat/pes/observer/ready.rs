@@ -41,7 +41,7 @@ impl DemuxObserver {
         let bytes = packet
             .payload
             .take()
-            .ok_or(Error::Invalid("native PES payload missing"))?;
+            .ok_or(Error::Invalid("PES observer payload missing"))?;
         self.append_carrier_payload(packet, context, bytes, next)
     }
 
@@ -62,7 +62,7 @@ impl DemuxObserver {
         let bytes = packet
             .payload
             .as_ref()
-            .ok_or(Error::Invalid("native PES payload missing"))?
+            .ok_or(Error::Invalid("PES observer payload missing"))?
             .clone();
         self.append_carrier_payload(packet, context, bytes, next)
     }

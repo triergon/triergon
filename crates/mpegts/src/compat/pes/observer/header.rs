@@ -10,7 +10,7 @@ impl DemuxObserver {
         let header = parse_header(&self.budget, &self.raw_header[..self.header_used])?;
         if header.stream_id != self.scope.stream_id {
             return Err(Error::Unsupported(
-                "native PES stream-id context unobserved",
+                "PES header stream ID disagrees with the selected carriage",
             ));
         }
         self.body_limit = self
@@ -35,11 +35,11 @@ impl DemuxObserver {
         let pending = self
             .pending
             .as_ref()
-            .ok_or(Error::Invalid("native PES input missing"))?;
+            .ok_or(Error::Invalid("PES observer input missing"))?;
         let payload = pending
             .payload
             .as_ref()
-            .ok_or(Error::Invalid("native PES payload missing"))?;
+            .ok_or(Error::Invalid("PES observer payload missing"))?;
         let bytes = &payload[pending.position..];
         let Some((header, declared)) = parse_timed_header(bytes, self.limits.pes_bytes, work)
         else {
@@ -78,7 +78,7 @@ impl DemuxObserver {
         self.header = Some(header);
         self.pending
             .as_mut()
-            .ok_or(Error::Invalid("native PES input missing"))?
+            .ok_or(Error::Invalid("PES observer input missing"))?
             .position += used;
         Ok(true)
     }
@@ -109,15 +109,15 @@ impl DemuxObserver {
                     }
                     if self.raw_header[3] != self.scope.stream_id {
                         return Err(Error::Unsupported(
-                            "native PES stream-id context unobserved",
+                            "PES header stream ID disagrees with the selected carriage",
                         ));
                     }
                     let length =
                         usize::from(u16::from_be_bytes([self.raw_header[4], self.raw_header[5]]));
                     if length == 0 && self.finite_private() {
                         return Err(self.finite_private_error(
-                            "native private audio unbounded PES unobserved",
-                            "native DVB unbounded PES unobserved",
+                            "private audio PES requires a declared packet length",
+                            "DVB subtitle PES requires a declared packet length",
                         ));
                     }
                     if length != 0 {
@@ -154,11 +154,11 @@ impl DemuxObserver {
         let pending = self
             .pending
             .as_ref()
-            .ok_or(Error::Invalid("native PES input missing"))?;
+            .ok_or(Error::Invalid("PES observer input missing"))?;
         let payload = pending
             .payload
             .as_ref()
-            .ok_or(Error::Invalid("native PES payload missing"))?;
+            .ok_or(Error::Invalid("PES observer payload missing"))?;
         if pending.position == payload.len() {
             self.pending = None;
             return Ok(true);
@@ -184,11 +184,11 @@ impl DemuxObserver {
         let pending = self
             .pending
             .as_ref()
-            .ok_or(Error::Invalid("native PES input missing"))?;
+            .ok_or(Error::Invalid("PES observer input missing"))?;
         let payload = pending
             .payload
             .as_ref()
-            .ok_or(Error::Invalid("native PES payload missing"))?
+            .ok_or(Error::Invalid("PES observer payload missing"))?
             .as_ref();
         let count = (self.header_target - self.header_used)
             .min(payload.len() - pending.position)
@@ -208,7 +208,7 @@ impl DemuxObserver {
         self.header_used += count;
         self.pending
             .as_mut()
-            .ok_or(Error::Invalid("native PES input missing"))?
+            .ok_or(Error::Invalid("PES observer input missing"))?
             .position += count;
         Ok(true)
     }

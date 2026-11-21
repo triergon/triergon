@@ -250,7 +250,7 @@ impl RecoveryObserver {
     ) -> Result<()> {
         if self.pending.is_some() || self.last.is_some() {
             return Err(Error::Invalid(
-                "native recovery startup binding after input",
+                "PES recovery startup context must be bound before input",
             ));
         }
         self.inner.bind_input(context, input)
@@ -289,7 +289,7 @@ impl RecoveryObserver {
         }
         if self.pending.is_some() || self.pending_timeline.is_some() || self.fault.is_some() {
             return Err(Error::Invalid(
-                "native recovery media entity operation not drained",
+                "PES recovery must drain before a media entity transition",
             ));
         }
         if !self.inner.continue_media_entity(end, input, work, cancel)? {
@@ -364,7 +364,7 @@ impl RecoveryObserver {
             })
         {
             return Err(Refused {
-                error: Error::Invalid("native recovery input not drained/ordered"),
+                error: Error::Invalid("PES recovery input is pending or out of order"),
                 value: packet,
             });
         }
@@ -429,34 +429,38 @@ impl RecoveryObserver {
         let error = if let Some(error) = self.fault {
             Some(error)
         } else if self.pending.is_some() || !self.inner.recovery_idle() {
-            Some(Error::Invalid("native recovery input not drained"))
+            Some(Error::Invalid(
+                "rejected-carrier recovery must drain pending input",
+            ))
         } else if !rejection.bytes().belongs_to(&self.budget) {
             Some(Error::ForeignPool)
         } else if self.policy == RejectedPolicy::NoRejectedCarrier {
             Some(Error::Unsupported(if self.inner.is_dvb_subtitles() {
-                "native DVB rejected carrier unobserved"
+                "DVB subtitle PES does not recover rejected carriers"
             } else {
-                "native private audio rejected carrier unobserved"
+                "private audio PES does not recover rejected carriers"
             }))
         } else if rejection.source_id() != Some(scope.entity)
             || context.epochs != scope.epochs
             || context.byte_run_epoch.is_some()
         {
             Some(Error::Unsupported(
-                "native rejected carrier context unobserved",
+                "rejected carrier belongs to a different entity or source epoch",
             ))
         } else if !self.after_pmt_binding(context)
             || self.last.is_some_and(|(event, offset)| {
                 context.source_event_ordinal <= event || rejection.source_offset() <= offset
             })
         {
-            Some(Error::Invalid("native recovery source event order"))
+            Some(Error::Invalid(
+                "PES recovery source events are out of order",
+            ))
         } else if rejection.error() != Error::Invalid(OPCR_WITHOUT_PCR)
             || rejection.secondary_error().is_some()
             || !rejection.fully_checked()
         {
             Some(Error::Unsupported(
-                "native rejected carrier policy unobserved",
+                "PES recovery requires a fully checked carrier rejected only for OPCR without PCR",
             ))
         } else if rejection.format() != PacketFormat::Ts188
             || scope.stream_type != 0x1b
@@ -469,7 +473,7 @@ impl RecoveryObserver {
             || f.flags != 8
         {
             Some(Error::Unsupported(
-                "native rejected envelope context unobserved",
+                "rejected carrier lacks the TS188 start and adaptation fields required for AVC PES recovery",
             ))
         } else {
             None
@@ -497,7 +501,9 @@ impl RecoveryObserver {
     /// [`DemuxObserver::end_of_source`] does.
     pub fn end_of_source(&mut self) -> Result<()> {
         if self.pending.is_some() {
-            return Err(Error::Invalid("native recovery input not drained"));
+            return Err(Error::Invalid(
+                "rejected-carrier recovery must drain pending input",
+            ));
         }
         self.inner.end_of_source()
     }
@@ -585,7 +591,7 @@ impl RecoveryObserver {
                 return Ok(AssemblyStep::Yield);
             }
             let Some(RecoveryPending::Opcr(p)) = self.pending.as_mut() else {
-                return Err(Error::Invalid("native rejected input missing"));
+                return Err(Error::Invalid("pending rejected carrier missing"));
             };
             let start = p.rejection.envelope().payload_start;
             let body = &p.rejection.bytes().as_ref()[start..];
@@ -593,7 +599,7 @@ impl RecoveryObserver {
                 0 => {
                     if body.len() < 14 || body[..4] != [0, 0, 1, 0xe0] {
                         return Err(Error::Unsupported(
-                            "native rejected PES prefix/context unobserved",
+                            "rejected carrier lacks a complete AVC PES header",
                         ));
                     }
                 }
@@ -601,7 +607,7 @@ impl RecoveryObserver {
                     let total = usize::from(u16::from_be_bytes([body[4], body[5]])) + 6;
                     if total != body.len() || total < 14 {
                         return Err(Error::Unsupported(
-                            "native rejected finite PES boundary unobserved",
+                            "rejected carrier does not contain one complete finite PES",
                         ));
                     }
                     if total > self.inner.limits().pes_bytes {
@@ -611,14 +617,16 @@ impl RecoveryObserver {
                 2 => {
                     if body[6..9] != [0x80, 0x80, 5] {
                         return Err(Error::Unsupported(
-                            "native rejected header flags unobserved",
+                            "rejected PES requires an MPEG-2 PTS-only header with no extra flags",
                         ));
                     }
                 }
                 3 => {
                     let t = &body[9..14];
                     if t[0] >> 4 != 2 || t[0] & 1 == 0 || t[2] & 1 == 0 || t[4] & 1 == 0 {
-                        return Err(Error::Invalid("native rejected timestamp markers"));
+                        return Err(Error::Invalid(
+                            "invalid PTS prefix or marker bits in rejected PES",
+                        ));
                     }
                     p.pts = Some(
                         (u64::from((t[0] >> 1) & 7) << 30)
@@ -641,7 +649,9 @@ impl RecoveryObserver {
                 6 => p.spans.try_reserve_exact(1)?,
                 7 => {
                     if body.len() == 14 {
-                        return Err(Error::Unsupported("native empty rejected PES unobserved"));
+                        return Err(Error::Unsupported(
+                            "rejected carrier has an empty PES payload",
+                        ));
                     }
                     let scope = self.inner.scope();
                     p.spans
@@ -665,11 +675,13 @@ impl RecoveryObserver {
                     let offset = p.rejection.source_offset();
                     let header = EncodedHeader {
                         bytes: p.rejection.bytes().slice(start..start + 14)?,
-                        pts: p.pts.ok_or(Error::Invalid("native encoded PTS missing"))?,
+                        pts: p
+                            .pts
+                            .ok_or(Error::Invalid("rejected PES is missing its encoded PTS"))?,
                     };
                     let position = self.inner.media_position(offset)?;
                     let Some(RecoveryPending::Opcr(p)) = self.pending.take() else {
-                        return Err(Error::Invalid("native rejected input missing"));
+                        return Err(Error::Invalid("pending rejected carrier missing"));
                     };
                     self.inner.note_recovered(
                         p.rejection.envelope().cc,
@@ -699,7 +711,7 @@ impl RecoveryObserver {
                         },
                     )));
                 }
-                _ => return Err(Error::Invalid("native rejected input stage")),
+                _ => return Err(Error::Invalid("invalid rejected-carrier recovery stage")),
             }
             p.phase += 1;
         }

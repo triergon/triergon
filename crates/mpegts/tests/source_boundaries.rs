@@ -826,7 +826,9 @@ fn unfinished_pes_and_unbound_pcr_pid_preserve_strict_refusals() {
                 if boundary {
                     assert_eq!(
                         pushed.unwrap_err().error,
-                        Error::Unsupported("native PCR clock boundary context unobserved")
+                        Error::Unsupported(
+                            "PCR discontinuity requires an explicit PES clock boundary policy"
+                        )
                     );
                     break;
                 }
@@ -864,7 +866,7 @@ fn confirmed_timeline_fences_later_carriers_without_consuming_rejected_input() {
                             .expect_err("a confirmed source ordinal cannot be reused");
                         assert_eq!(
                             rejected.error,
-                            Error::Invalid("native PES source event order")
+                            Error::Invalid("PES source events are out of order")
                         );
                         assert!(rejected.value.source.shares_storage_with(&packet.source));
                         assert_eq!(rejected.value.source_offset, packet.source_offset);

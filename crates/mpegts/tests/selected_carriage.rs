@@ -198,7 +198,7 @@ fn old_constructor_keeps_audio_refusal() {
     assert_eq!(
         failure,
         Some(Error::Unsupported(
-            "native catalogue selected video types only"
+            "demux video catalogue supports only AVC and HEVC stream types"
         ))
     );
 }

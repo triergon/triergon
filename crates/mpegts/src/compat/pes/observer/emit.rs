@@ -60,9 +60,9 @@ impl DemuxObserver {
         let growth = self
             .growth
             .as_mut()
-            .ok_or(Error::Invalid("native PES growth missing"))?;
+            .ok_or(Error::Invalid("pending PES buffer growth missing"))?;
         if growth.arena != arena {
-            return Err(Error::Invalid("native PES growth phase"));
+            return Err(Error::Invalid("invalid PES buffer growth stage"));
         }
         let paid = work.take(growth.remaining);
         growth.remaining -= paid;
@@ -86,7 +86,7 @@ impl DemuxObserver {
         let pending = self
             .pending
             .as_ref()
-            .ok_or(Error::Invalid("native PES input missing"))?;
+            .ok_or(Error::Invalid("PES observer input missing"))?;
         let local_position = if let Some(context) = &self.demux_input {
             context.position(
                 self.scope.entity,
@@ -133,7 +133,7 @@ impl DemuxObserver {
         forced_corrupt: bool,
     ) -> Result<()> {
         let header = self.header.as_ref().ok_or(Error::Unsupported(
-            "native interrupted PES header unobserved",
+            "PES ended before its header was complete",
         ))?;
         if self.finite_private()
             && (boundary != DemuxBoundary::FiniteLength
@@ -143,12 +143,12 @@ impl DemuxObserver {
                 || self.body_limit != Some(self.payload_len()))
         {
             return Err(self.finite_private_error(
-                "native private audio incomplete/recovery boundary unobserved",
-                "native DVB incomplete/recovery boundary unobserved",
+                "private audio requires a complete undamaged finite PES",
+                "DVB subtitles require a complete undamaged finite PES",
             ));
         }
         if self.payload_len() == 0 {
-            return Err(Error::Unsupported("native empty PES emission unobserved"));
+            return Err(Error::Unsupported("empty PES payload at emission"));
         }
         let incomplete = self
             .body_limit
@@ -200,16 +200,16 @@ impl DemuxObserver {
         }
         let emission = self
             .emission
-            .ok_or(Error::Invalid("native PES emission missing"))?;
-        let origin = self
-            .origin
-            .ok_or(Error::Invalid("native PES origin missing"))?;
+            .ok_or(Error::Invalid("pending PES emission missing"))?;
+        let origin = self.origin.ok_or(Error::Invalid(
+            "PES emission is missing its source position",
+        ))?;
         let header = if emission.continue_without_header {
             self.header.clone()
         } else {
             self.header.take()
         }
-        .ok_or(Error::Invalid("native PES causal header missing"))?;
+        .ok_or(Error::Invalid("PES emission is missing its source header"))?;
         let span_count = self.span_count();
         let packet = CompactDemuxPacket {
             profile: self.profile,

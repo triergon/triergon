@@ -64,7 +64,7 @@ fn drain(observer: &mut DemuxObserver, ended: bool) -> Vec<DemuxPacket> {
     for _ in 0..100_000 {
         match observer
             .poll(&mut WorkBudget::new(1), &cancel)
-            .expect("runtime red until real input-boundary native PES assembly is implemented")
+            .expect("expected an input-bound demux PES packet")
         {
             AssemblyStep::Output(packet) => output.push(packet),
             AssemblyStep::Yield => {}
@@ -78,7 +78,7 @@ fn drain(observer: &mut DemuxObserver, ended: bool) -> Vec<DemuxPacket> {
             }
         }
     }
-    panic!("native packet observer failed to make bounded progress");
+    panic!("PES observer failed to make bounded progress");
 }
 
 #[derive(Clone, Copy)]
@@ -194,7 +194,7 @@ fn check(source: &[u8], format: PacketFormat, specs: &[Expected]) {
     assert_eq!(
         output.len(),
         specs.len(),
-        "exact native packet count/order; no coalescing"
+        "demux packets must match the recorded count and order without coalescing"
     );
     let mut clock = DemuxClock::new(1).unwrap();
     for (packet, spec) in output.iter().zip(specs) {
@@ -281,7 +281,7 @@ fn check(source: &[u8], format: PacketFormat, specs: &[Expected]) {
                 &mut WorkBudget::new(1),
                 &AtomicBool::new(false),
             )
-            .expect("red until the separately named raw-header clock entrypoint is implemented")
+            .expect("expected a demux clock projection from the PES header")
             .unwrap();
         assert_eq!(time.pts90, spec.demux_time);
         assert_eq!(time.dts90, spec.demux_time);
@@ -502,7 +502,7 @@ fn demux_headerless_time_is_unknown_and_does_not_seed_a_clock() {
             &mut WorkBudget::new(1),
             &AtomicBool::new(false),
         )
-        .expect("runtime red until native header time adapter exists")
+        .expect("expected the demux time for the PES header")
         .unwrap();
     assert_eq!(view.pts90, None);
     assert_eq!(view.dts90, None);
@@ -604,7 +604,10 @@ fn foreign_pool_rejection_recovers_original_charged_transport() {
     );
     let mut observer = observer(&budget);
     let error = observer.push(packets[2].clone(), context(2)).unwrap_err();
-    assert_eq!(error.error, Error::Invalid("foreign native PES byte pool"));
+    assert_eq!(
+        error.error,
+        Error::Invalid("PES input belongs to a different byte pool")
+    );
     assert_eq!(error.value.source.as_ref(), packets[2].source.as_ref());
     assert_eq!(error.value.source_offset, 376);
 }
@@ -621,7 +624,10 @@ fn undrained_mailbox_rejection_does_not_allocate_or_lose_input() {
     observer.push(packets[2].clone(), context(2)).unwrap();
     let before = budget.used();
     let error = observer.push(packets[3].clone(), context(3)).unwrap_err();
-    assert_eq!(error.error, Error::Invalid("native PES input not drained"));
+    assert_eq!(
+        error.error,
+        Error::Invalid("pending PES input or emission must be drained")
+    );
     assert_eq!(error.value.source_offset, 564);
     assert_eq!(budget.used(), before);
 }
@@ -640,7 +646,7 @@ fn unproven_source_epoch_context_is_visible_and_recovers_input() {
     let error = observer.push(packets[2].clone(), changed).unwrap_err();
     assert_eq!(
         error.error,
-        Error::Unsupported("native PES source context transition unobserved")
+        Error::Unsupported("PES carrier belongs to a different entity or source epoch")
     );
     assert_eq!(error.value.source_offset, 376);
 }
@@ -658,7 +664,7 @@ fn unproven_entity_transition_does_not_masquerade_as_clock_reset_or_eof() {
     let error = observer.push(packets[2].clone(), context(2)).unwrap_err();
     assert_eq!(
         error.error,
-        Error::Unsupported("native PES source context transition unobserved")
+        Error::Unsupported("PES carrier belongs to a different entity or source epoch")
     );
     assert_eq!(error.value.source_id, Some(SourceId(2)));
 }
@@ -675,7 +681,9 @@ fn unproven_stream_profile_is_an_explicit_nonpass() {
             budget,
             ParseLimits::default()
         ),
-        Err(Error::Unsupported("native PES stream context unobserved"))
+        Err(Error::Unsupported(
+            "AVC PES requires PMT stream type 0x1b and PES stream ID 0xe0"
+        ))
     ));
 }
 
@@ -828,7 +836,9 @@ fn check_rejected_original(source: &[u8]) {
                     assert!(emitted);
                     break;
                 }
-                other => panic!("original rejected-carrier native gold, got {other:?}"),
+                other => panic!(
+                    "expected the recorded demux packet from a rejected carrier, got {other:?}"
+                ),
             }
         }
     }

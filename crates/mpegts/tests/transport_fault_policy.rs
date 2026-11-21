@@ -304,7 +304,7 @@ fn actual_confirmation_order_and_eof_are_required() {
     let replay = policy.push(packet, context(11)).unwrap_err();
     assert_eq!(
         replay.error,
-        Error::Invalid("native PES source event order")
+        Error::Invalid("PES source events are out of order")
     );
     policy.end_of_source().unwrap();
     assert!(matches!(
