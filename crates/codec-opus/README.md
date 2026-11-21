@@ -64,6 +64,11 @@ the pre-skip or other container trims.
 
 - CELT shares a compile-time lookup across bands with the same pulse costs. Pulse
   decoding accumulates vector energy as it writes each codeword.
+- De-emphasis is a one-pole recursion per channel. When every stream of a packet decodes
+  CELT frames alone (and no SILK samples are held back), it runs once the streams are
+  decoded, for up to eight output channels in one loop, so that their recursions
+  overlap; otherwise each stream de-emphasises its own frames. Both give the same
+  output. The output gain is applied after de-emphasis, once per packet.
 - The header's output gain is applied. Its pre-skip is not: the decoder reports it as
   its start delay (`AudioDecoder::delay`), which a consumer discards together with the
   container's trims (Ogg's granule positions, Matroska's CodecDelay and

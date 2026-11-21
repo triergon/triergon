@@ -217,9 +217,9 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
             AccessUnit::Loas(_) => (0, PositionSource::AlignedPayload),
             // DVB subtitle bytes start after the two-byte PES wrapper.
             AccessUnit::DvbSubtitle(_) => (1, PositionSource::FirstPes),
-            // A PES beginning inside an MPEG audio frame stamps the next
+            // A PES beginning inside an aligned audio frame stamps the next
             // frame, including that PES's carrier position.
-            AccessUnit::MpegAudio(_) => (1, PositionSource::ClockAnchor),
+            AccessUnit::MpegAudio(_) | AccessUnit::Dts(_) => (1, PositionSource::ClockAnchor),
             AccessUnit::Adts(_)
             | AccessUnit::AdtsFragment(_)
             | AccessUnit::Ac3(_)
@@ -516,6 +516,10 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                                 i64::from(header.samples_per_frame()) * 90_000
                                     / i64::from(header.sample_rate)
                             }
+                        }
+                        AccessUnit::Dts(frame) => {
+                            let span = frame.sample_span();
+                            i64::try_from(span.numerator() * 90_000 / span.denominator() as i128)?
                         }
                         _ => 0,
                     };
