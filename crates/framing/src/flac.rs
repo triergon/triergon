@@ -65,12 +65,10 @@ impl FlacStreamInfo {
         if info.bits_per_sample < 4 {
             return Err(Error::Invalid("FLAC bits per sample"));
         }
-        if info.max_block_size < 16 || info.min_block_size > info.max_block_size {
-            // RFC 9639: both at least 16 except a final block; FFmpeg accepts these too,
-            // so only an inverted pair is refused.
-            if info.min_block_size > info.max_block_size {
-                return Err(Error::Invalid("FLAC block size range"));
-            }
+        // RFC 9639 wants both block sizes at least 16, except in a final block; FFmpeg
+        // accepts smaller ones too, so only an inverted pair is refused.
+        if info.min_block_size > info.max_block_size {
+            return Err(Error::Invalid("FLAC block size range"));
         }
         Ok(info)
     }
