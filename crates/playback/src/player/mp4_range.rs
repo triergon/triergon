@@ -2,7 +2,7 @@
 
 use super::{
     ClockChoice, Mp4DemuxSeekRequest, Output, Player, PlayerPolicy, Progress, Selection, TrackKey,
-    mp4_native_seek::native_global_seek,
+    mp4_demux_seek::native_global_seek,
 };
 use crate::{
     Engine, Result,
