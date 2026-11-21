@@ -35,6 +35,22 @@
       "status": "needs-opus-profile-and-remux-adapter",
       "generated_analogue": "codec-delay",
       "note": "Local adapter tests the demux portion only, not FATE remux output."
+    },
+    {
+      "id": "fate-sub-srt-badsyntax",
+      "sample": "sub/badsyntax.srt",
+      "operation": "subtitle-text-cues",
+      "scope": "subtitle-srt-fate",
+      "status": "demux-pass-full-upstream-command-unexecuted",
+      "note": "Complete demux cue fold from the original pinned sample. Redistribution rights remain unreviewed."
+    },
+    {
+      "id": "fate-sub-srt-empty-events",
+      "sample": "sub/empty-events-2167.srt",
+      "operation": "subtitle-text-cues",
+      "scope": "subtitle-srt-fate",
+      "status": "demux-pass-full-upstream-command-unexecuted",
+      "note": "Complete demux cue fold from the original pinned sample. Redistribution rights remain unreviewed."
     }
   ]
 }

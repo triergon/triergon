@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "subtitle-srt-fate",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "subtitle-text-cues",
+  "candidate": "subtitle-worker",
+  "worker_operation": "subtitle-text-",
+  "reference": "ffmpeg-formats-native",
+  "fetch_fate_cases": true,
+  "contract": [
+    "Read original FATE SubRip samples through physical EOF. Compare each cue's start, duration in milliseconds and text against the pinned FFmpeg SubRip demuxer.",
+    "Expected folds were recorded from the formats reference worker built from FFmpeg revision d32b387f2b0a484599d4587d651891f0c63c4238. Inputs are fetched by SHA-256 and are not redistributed."
+  ],
+  "required_profiles": [
+    "fate-sub-srt-badsyntax",
+    "fate-sub-srt-empty-events"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 2000,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

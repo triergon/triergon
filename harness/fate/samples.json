@@ -91,6 +91,16 @@
       "path": "fate/mov/mov_stream_shorter_than_movie.mov",
       "sha256": "463a1c93d3cc155721fc481e4c2783b97fb4e388d571b3fdcf6972c6ce290b5b",
       "source": "https://fate-suite.ffmpeg.org/mov/mov_stream_shorter_than_movie.mov"
+    },
+    {
+      "path": "fate/sub/badsyntax.srt",
+      "sha256": "49d15287dc75d54bbb495c51eb10ecec0f1418b00cfce188d83b01dbdaf3c13e",
+      "source": "https://fate-suite.ffmpeg.org/sub/badsyntax.srt"
+    },
+    {
+      "path": "fate/sub/empty-events-2167.srt",
+      "sha256": "743067ac7eb3444b0099a04b924c4558ab654b1b7c7eee07d9f38a15fbcbb955",
+      "source": "https://fate-suite.ffmpeg.org/sub/empty-events-2167.srt"
     }
   ]
 }
