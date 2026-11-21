@@ -267,13 +267,30 @@ impl Scan {
     }
 }
 
+/// The walk's step; past the prefix it carries the fixed fields read there.
+#[derive(Clone, Copy)]
 enum Phase {
     Prefix,
-    Count,
-    ReserveArrays,
-    ReserveNals,
-    Fill,
-    FillInline(u8),
+    Count(HvcConfigFields),
+    ReserveArrays(HvcConfigFields),
+    ReserveNals(HvcConfigFields),
+    Fill(HvcConfigFields),
+    /// The fill units left to charge for tables the counting walk already filled.
+    FillInline(HvcConfigFields, u8),
+}
+
+/// The record and its descriptor tables, held until they are published.
+#[repr(C)]
+struct Record {
+    arrays: DescriptorStorage<HvcArrayDescriptor>,
+    nals: DescriptorStorage<HvcNalDescriptor>,
+    raw: Bytes,
+}
+
+/// What one step of the walk ended with.
+enum Walked {
+    Ready(HvcConfigFields),
+    Yield,
     Complete,
 }
 
@@ -290,23 +307,22 @@ type DescriptorStorage<T> = InlineStorage<T, INLINE_DESCRIPTORS>;
 /// heap storage. Source bytes, including unknown NAL bodies, all arrays and any
 /// suffix, are retained without rewriting. Fixed-header validity is distinct from
 /// array/type/reserved-pattern issues and from decoder validity.
+// The phase's tag first, where the compiler had the niche before the state was
+// typed.
+#[repr(C)]
 pub struct HvcConfigParser {
-    raw: Option<Bytes>,
+    phase: Phase,
+    first_unsupported_array: Option<(u8, u8)>,
+    observed_width_three: bool,
+    // None once published or failed: the output takes it and a failure drops it,
+    // so no spare pool handle or empty replacement storage is kept for either.
+    record: Option<Record>,
+    scan: Scan,
+    failure: Option<Error>,
     source: HvcConfigSource,
     limits: HvcConfigLimits,
-    phase: Phase,
-    scan: Scan,
-    fields: Option<HvcConfigFields>,
-    width: Option<LengthSize>,
     total: usize,
     understood_end: usize,
-    first_unsupported_array: Option<(u8, u8)>,
-    // Taken by the published output and dropped by a latched failure, so no
-    // spare pool handle or empty replacement vectors are kept for either.
-    arrays: Option<DescriptorStorage<HvcArrayDescriptor>>,
-    nals: Option<DescriptorStorage<HvcNalDescriptor>>,
-    failure: Option<Error>,
-    observed_width_three: bool,
 }
 
 impl std::fmt::Debug for HvcConfigParser {
@@ -315,7 +331,6 @@ impl std::fmt::Debug for HvcConfigParser {
             .debug_struct("HvcConfigParser")
             .field("source", &self.source)
             .field("limits", &self.limits)
-            .field("fields", &self.fields)
             .field("total", &self.total)
             .field("failure", &self.failure)
             .finish_non_exhaustive()
@@ -342,32 +357,32 @@ impl HvcConfigParser {
             .checked_add(u64::try_from(raw.len()).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
         Ok(Self {
-            raw: Some(raw),
+            record: Some(Record {
+                raw,
+                arrays: DescriptorStorage::new(|_| HvcArrayDescriptor {
+                    range: 0..0,
+                    first_nal: 0,
+                    nal_count: 0,
+                }),
+                nals: DescriptorStorage::new(|_| HvcNalDescriptor {
+                    payload_start: 0,
+                    payload_len: 0,
+                    header: NalHeader::Hevc {
+                        nal_unit_type: 0,
+                        layer_id: 0,
+                        temporal_id_plus_one: 1,
+                    },
+                    array: 0,
+                    declared_type: 0,
+                }),
+            }),
             source,
             limits,
             phase: Phase::Prefix,
             scan: Scan::new(0),
-            fields: None,
-            width: None,
             total: 0,
             understood_end: 0,
             first_unsupported_array: None,
-            arrays: Some(DescriptorStorage::new(|_| HvcArrayDescriptor {
-                range: 0..0,
-                first_nal: 0,
-                nal_count: 0,
-            })),
-            nals: Some(DescriptorStorage::new(|_| HvcNalDescriptor {
-                payload_start: 0,
-                payload_len: 0,
-                header: NalHeader::Hevc {
-                    nal_unit_type: 0,
-                    layer_id: 0,
-                    temporal_id_plus_one: 1,
-                },
-                array: 0,
-                declared_type: 0,
-            })),
             failure: None,
             observed_width_three: false,
         })
@@ -435,66 +450,50 @@ impl HvcConfigParser {
         if let Some(error) = self.failure {
             return Err(error);
         }
-        let result = self.advance(work, cancel).and_then(|progress| {
-            if progress == ConfigProgress::Ready {
-                let fields = self.fields.ok_or(Error::Invalid("missing hvcC fields"))?;
-                let width = self
-                    .width
-                    .ok_or(Error::Invalid("missing hvcC length width"))?;
-                *ready = Some(wrap(HvcConfiguration {
-                    raw: self
-                        .raw
-                        .take()
-                        .ok_or(Error::Invalid("missing hvcC record"))?,
-                    source: self.source,
-                    fields,
-                    width,
-                    arrays: self
-                        .arrays
-                        .take()
-                        .ok_or(Error::Invalid("missing hvcC descriptors"))?,
-                    nals: self
-                        .nals
-                        .take()
-                        .ok_or(Error::Invalid("missing hvcC descriptors"))?,
-                    understood_end: self.understood_end,
-                    first_unsupported_array: self.first_unsupported_array,
-                }));
-                self.phase = Phase::Complete;
-            }
-            Ok(progress)
+        let result = self.advance(work, cancel).map(|walked| match walked {
+            // A record no longer held was published already.
+            Walked::Ready(fields) => match self.record.take() {
+                Some(Record { arrays, nals, raw }) => {
+                    *ready = Some(wrap(HvcConfiguration {
+                        raw,
+                        source: self.source,
+                        fields,
+                        width: LengthSize::from_minus_one(fields.length_size_minus_one()),
+                        arrays,
+                        nals,
+                        understood_end: self.understood_end,
+                        first_unsupported_array: self.first_unsupported_array,
+                    }));
+                    ConfigProgress::Ready
+                }
+                None => ConfigProgress::Complete,
+            },
+            Walked::Yield => ConfigProgress::Yield,
+            Walked::Complete => ConfigProgress::Complete,
         });
         if let Err(error) = result
             && !retryable(error)
         {
             self.failure = Some(error);
-            self.raw = None;
-            self.arrays = None;
-            self.nals = None;
+            self.record = None;
         }
         result
     }
 
-    fn tables_fit_inline(&self) -> bool {
-        usize::from(self.scan.array_count) <= INLINE_DESCRIPTORS && self.total <= INLINE_DESCRIPTORS
-    }
-
     #[inline(never)]
-    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ConfigProgress> {
+    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Walked> {
+        let Some(record) = &mut self.record else {
+            return Ok(Walked::Complete);
+        };
+        let raw = &record.raw;
+        let (arrays, nals) = (&mut record.arrays, &mut record.nals);
         loop {
-            if matches!(self.phase, Phase::Complete) {
-                return Ok(ConfigProgress::Complete);
-            }
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             if !work.try_charge(1) {
-                return Ok(ConfigProgress::Yield);
+                return Ok(Walked::Yield);
             }
-            let raw = self
-                .raw
-                .as_ref()
-                .ok_or(Error::Invalid("missing hvcC record"))?;
             match self.phase {
                 Phase::Prefix => {
                     if raw[0] != 1 {
@@ -506,20 +505,21 @@ impl HvcConfigParser {
                     }
                     let count = fields.array_count();
                     check_limit(usize::from(count), self.limits.maximum_arrays)?;
-                    self.width = Some(LengthSize::new(fields.length_size_minus_one() + 1)?);
-                    self.fields = Some(fields);
                     self.scan = Scan::new(count);
-                    self.phase = Phase::Count;
+                    self.phase = Phase::Count(fields);
                 }
-                Phase::Count | Phase::Fill => {
+                Phase::Count(fields) | Phase::Fill(fields) => {
                     // Commit scan state only after the event's work succeeds.
-                    let filling = matches!(self.phase, Phase::Fill);
+                    let filling = matches!(self.phase, Phase::Fill(_));
                     let mut next = self.scan;
                     let event = next.next(raw.as_ref(), self.limits)?;
                     match event {
-                        Event::Array { header, count } => {
+                        Event::Array {
+                            header: array_header,
+                            count,
+                        } => {
                             let first = if filling {
-                                self.nals.as_ref().map_or(0, DescriptorStorage::len)
+                                nals.len()
                             } else {
                                 let first = self.total;
                                 let total = first.checked_add(count).ok_or(Error::Overflow)?;
@@ -533,43 +533,37 @@ impl HvcConfigParser {
                                 }
                                 first
                             };
-                            if filling || self.tables_fit_inline() {
-                                self.arrays
-                                    .as_mut()
-                                    .ok_or(Error::Invalid("missing hvcC descriptors"))?
-                                    .try_push(HvcArrayDescriptor::new(header, first, count)?)?;
+                            if filling || tables_fit_inline(self.scan.array_count, self.total) {
+                                arrays.try_push(HvcArrayDescriptor::new(
+                                    array_header,
+                                    first,
+                                    count,
+                                )?)?;
                             }
                         }
                         Event::Nal {
                             length,
                             payload,
-                            header,
-                        } if filling || self.tables_fit_inline() => {
-                            self.nals
-                                .as_mut()
-                                .ok_or(Error::Invalid("missing hvcC descriptors"))?
-                                .try_push(HvcNalDescriptor::new(
-                                    &length,
-                                    payload,
-                                    header,
-                                    usize::from(next.index),
-                                    next.declared_type,
-                                ))?;
+                            header: nal_header,
+                        } if filling || tables_fit_inline(self.scan.array_count, self.total) => {
+                            nals.try_push(HvcNalDescriptor::new(
+                                &length,
+                                payload,
+                                nal_header,
+                                usize::from(next.index),
+                                next.declared_type,
+                            ))?;
                         }
-                        Event::ArrayEnd(end) if filling || self.tables_fit_inline() => {
-                            let array = self
-                                .arrays
-                                .as_mut()
-                                .ok_or(Error::Invalid("missing hvcC descriptors"))?
-                                .as_mut_slice()
-                                .last_mut()
-                                .ok_or(Error::Invalid("missing hvcC array"))?;
-                            if array.nal_indices().end
-                                != self.nals.as_ref().map_or(0, DescriptorStorage::len)
-                            {
-                                return Err(Error::Invalid("hvcC array second walk"));
+                        Event::ArrayEnd(end)
+                            if filling || tables_fit_inline(self.scan.array_count, self.total) =>
+                        {
+                            // The array the walk is in ends with the NAL units read.
+                            match arrays.as_mut_slice().last_mut() {
+                                Some(array) if array.nal_indices().end == nals.len() => {
+                                    array.range.end = end;
+                                }
+                                _ => return Err(Error::Invalid("hvcC array second walk")),
                             }
-                            array.range.end = end;
                         }
                         Event::End(end) => {
                             if !filling {
@@ -592,52 +586,43 @@ impl HvcConfigParser {
                                     .ok_or(Error::Overflow)?;
                                 let limit = raw.budget().limit();
                                 check_limit(minimum, limit)?;
-                                self.phase = Phase::ReserveArrays;
+                                self.phase = Phase::ReserveArrays(fields);
                             } else {
                                 if end != self.understood_end
-                                    || self.nals.as_ref().map_or(0, DescriptorStorage::len)
-                                        != self.total
-                                    || self.arrays.as_ref().map_or(0, DescriptorStorage::len)
-                                        != usize::from(next.array_count)
+                                    || nals.len() != self.total
+                                    || arrays.len() != usize::from(next.array_count)
                                 {
                                     return Err(Error::Invalid("hvcC second walk"));
                                 }
-                                return Ok(ConfigProgress::Ready);
+                                return Ok(Walked::Ready(fields));
                             }
                         }
                         _ => {}
                     }
                     self.scan = next;
                 }
-                Phase::ReserveArrays => {
-                    let arrays = self
-                        .arrays
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing hvcC descriptors"))?;
+                Phase::ReserveArrays(fields) => {
                     arrays.reserve(raw.budget(), usize::from(self.scan.array_count))?;
                     if self.total > INLINE_DESCRIPTORS {
                         // Only NALs may spill. The fill walk rebuilds the
                         // inline array prefix when the arrays still fit.
                         arrays.clear_inline();
                     }
-                    self.phase = Phase::ReserveNals;
+                    self.phase = Phase::ReserveNals(fields);
                 }
-                Phase::ReserveNals => {
-                    self.nals
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing hvcC descriptors"))?
-                        .reserve(raw.budget(), self.total)?;
-                    if self.tables_fit_inline() {
+                Phase::ReserveNals(fields) => {
+                    nals.reserve(raw.budget(), self.total)?;
+                    if tables_fit_inline(self.scan.array_count, self.total) {
                         // Retain one charged checkpoint per array start, NAL,
                         // array end and record end, even across short steps.
                         let events = 2 * usize::from(self.scan.array_count) + self.total + 1;
-                        self.phase = Phase::FillInline(events as u8);
+                        self.phase = Phase::FillInline(fields, events as u8);
                     } else {
                         self.scan = Scan::new(self.scan.array_count);
-                        self.phase = Phase::Fill;
+                        self.phase = Phase::Fill(fields);
                     }
                 }
-                Phase::FillInline(ref mut remaining) => {
+                Phase::FillInline(fields, ref mut remaining) => {
                     *remaining -= 1;
                     // These entries were stored during validation. Spend the
                     // remaining fill units at once when the work allows, else
@@ -654,16 +639,20 @@ impl HvcConfigParser {
                             return Err(Error::Cancelled);
                         }
                         if !work.try_charge(1) {
-                            return Ok(ConfigProgress::Yield);
+                            return Ok(Walked::Yield);
                         }
                         *remaining -= 1;
                     }
-                    return Ok(ConfigProgress::Ready);
+                    return Ok(Walked::Ready(fields));
                 }
-                Phase::Complete => return Ok(ConfigProgress::Complete),
             }
         }
     }
+}
+
+/// Whether both descriptor tables of a record with these counts fit inline.
+const fn tables_fit_inline(array_count: u8, total: usize) -> bool {
+    array_count as usize <= INLINE_DESCRIPTORS && total <= INLINE_DESCRIPTORS
 }
 
 fn check_limit(requested: usize, maximum: usize) -> Result<()> {
