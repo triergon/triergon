@@ -1,4 +1,4 @@
-//! A self-contained XLL entry, from ETSI TS 102 114 V1.6.1.
+//! A self-contained XLL entry with an optional independent core, from ETSI TS 102 114 V1.6.1.
 //!
 //! Annex F.4.3 alignment establishes an AU boundary, not decoder recovery.
 //! Tables 7-2, 7-5, 7-6 and 7-7 identify the active asset and its navigation.
@@ -7,7 +7,9 @@
 use super::Packet;
 use triergon_bitstream::{BitCursor, BitSource};
 use triergon_core::{Error, Result, WorkBudget};
-use triergon_framing::{DtsFrameExtentLimits, probe_dts_extension_substream_extent};
+use triergon_framing::{
+    DtsFrameExtentLimits, probe_dts_core_header, probe_dts_extension_substream_extent,
+};
 
 const UNSUPPORTED: Error = Error::Unsupported("MPEG-TS DTS-HD seek recovery layout");
 
@@ -55,19 +57,55 @@ pub(super) fn entry(packet: &Packet) -> Result<Option<Header>> {
         .stream()
         .dvb_dts_hd()?
         .ok_or(UNSUPPORTED)?;
-    if descriptor.core.is_some() || descriptor.extensions[1..].iter().any(Option::is_some) {
+    if descriptor.extensions[1..].iter().any(Option::is_some) {
         return Err(UNSUPPORTED);
     }
     let mut assets = descriptor.extensions[0].ok_or(UNSUPPORTED)?.assets();
     // Annex G.3.1 maps DVB asset_construction to Table E-2: 17 is XLL
-    // without a core. Do not reinterpret LBR or another advertised asset.
-    if assets.next().is_none_or(|asset| asset.construction != 17) || assets.next().is_some() {
+    // without a core; 14 is a separate core plus XLL. Other constructions
+    // require different component recovery proofs.
+    let core = descriptor.core.is_some();
+    let construction = if core { 14 } else { 17 };
+    if assets
+        .next()
+        .is_none_or(|asset| asset.construction != construction)
+        || assets.next().is_some()
+    {
         return Err(UNSUPPORTED);
     }
-    entry_bytes(packet.bytes().as_ref())
+    let bytes = packet.bytes().as_ref();
+    if core {
+        let mut core_assets = descriptor.core.ok_or(UNSUPPORTED)?.assets();
+        if core_assets
+            .next()
+            .is_none_or(|asset| asset.construction != 1)
+            || core_assets.next().is_some()
+        {
+            return Err(UNSUPPORTED);
+        }
+        let header = probe_dts_core_header(bytes)?;
+        // Construction 14 has no internal core extensions (Table E-2).
+        if header.extension != 0 || header.frame_bytes % 4 != 0 {
+            return Err(UNSUPPORTED);
+        }
+        let mut entry = entry_bytes(
+            bytes.get(header.frame_bytes..).ok_or(Error::Truncated)?,
+            true,
+        )?;
+        if header.history != 0 {
+            return Ok(None);
+        }
+        if let Some(entry) = &mut entry {
+            entry.at += header.frame_bytes;
+            entry.end += header.frame_bytes;
+        }
+        Ok(entry)
+    } else {
+        entry_bytes(bytes, false)
+    }
 }
 
-fn entry_bytes(bytes: &[u8]) -> Result<Option<Header>> {
+fn entry_bytes(bytes: &[u8], core: bool) -> Result<Option<Header>> {
     let extent = probe_dts_extension_substream_extent(
         bytes,
         DtsFrameExtentLimits {
@@ -178,8 +216,12 @@ fn entry_bytes(bytes: &[u8]) -> Result<Option<Header>> {
         return Err(Error::Invalid("DTS-HD seek asset descriptor extent"));
     }
     bits = BitCursor::at(header, descriptor_end);
-    if read(&mut bits, 1)? != 0 {
-        return Err(UNSUPPORTED); // Backward-compatible core present.
+    if (read(&mut bits, 1)? != 0) != core {
+        return Err(UNSUPPORTED);
+    }
+    if core && read(&mut bits, 5)? != 0 {
+        // Table 7-2: default external core maps to extension/asset zero.
+        return Err(UNSUPPORTED);
     }
     if !immediate {
         return Ok(None);
