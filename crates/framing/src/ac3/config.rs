@@ -353,8 +353,7 @@ enum Phase {
 /// descriptors are stored inline; returned spans alias the original record.
 /// Trailing dec3 reserved bytes are retained without scanning or interpretation.
 pub struct Ac3ConfigParser {
-    source: Option<Bytes>,
-    cursor: Option<InputCursor>,
+    state: State,
     identity: SourceId,
     generation: u64,
     limits: Ac3ConfigLimits,
@@ -367,19 +366,28 @@ pub struct Ac3ConfigParser {
     count: u8,
     completed: usize,
     data_rate: u16,
-    complete: bool,
-    failure: Option<Error>,
+}
+
+/// Where a parse stands. The record and its cursor are held only while it is read.
+enum State {
+    Reading { source: Bytes, cursor: InputCursor },
+    Complete,
+    Failed(Error),
 }
 
 impl std::fmt::Debug for Ac3ConfigParser {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let failure = match self.state {
+            State::Failed(error) => Some(error),
+            State::Reading { .. } | State::Complete => None,
+        };
         formatter
             .debug_struct("Ac3ConfigParser")
             .field("source", &self.identity)
             .field("generation", &self.generation)
             .field("limits", &self.limits)
-            .field("complete", &self.complete)
-            .field("failure", &self.failure)
+            .field("complete", &matches!(self.state, State::Complete))
+            .field("failure", &failure)
             .finish_non_exhaustive()
     }
 }
@@ -409,8 +417,10 @@ impl Ac3ConfigParser {
         let cursor = record_input::cursor(pool, source, &record, limits.maximum_input_window)?;
         let generation = cursor.generation();
         Ok(Self {
-            source: Some(record),
-            cursor: Some(cursor),
+            state: State::Reading {
+                source: record,
+                cursor,
+            },
             identity: source,
             generation,
             limits,
@@ -427,14 +437,7 @@ impl Ac3ConfigParser {
             count: 0,
             completed: 0,
             data_rate: 0,
-            complete: false,
-            failure: None,
         })
-    }
-    fn stop(&mut self, error: Error) {
-        self.failure = Some(error);
-        self.source = None;
-        self.cursor = None;
     }
     /// Advances by at most the work left in `work`, and returns the record once it is
     /// read. Fails when a `dac3` record is longer than three bytes, a `dec3` record
@@ -445,52 +448,42 @@ impl Ac3ConfigParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<Ac3Configuration>> {
-        if let Some(error) = self.failure {
+        if let State::Failed(error) = self.state {
             return Err(error);
         }
         if cancel.load(Ordering::Relaxed) {
-            self.stop(Error::Cancelled);
+            self.state = State::Failed(Error::Cancelled);
             return Err(Error::Cancelled);
         }
-        let result = self.step_inner(work, cancel);
+        let result = self.read(work, cancel);
         if let Err(error) = result {
-            self.stop(error);
+            self.state = State::Failed(error);
         }
         result
     }
-    fn step_inner(
+    fn read(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<Ac3Configuration>> {
-        if self.complete {
+        let State::Reading { source, cursor } = &mut self.state else {
             return Ok(BuildStep::Complete);
-        }
+        };
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             if self.phase != Phase::Finish && self.used < self.need {
-                let cursor = self
-                    .cursor
-                    .as_mut()
-                    .ok_or(Error::Invalid("missing audio record cursor"))?;
                 match cursor.read_into(&mut self.scratch[self.used..self.need], work, cancel)? {
                     Step::Ready(count) => {
                         self.used = self.used.checked_add(count).ok_or(Error::Overflow)?;
                     }
                     Step::Yield => return Ok(BuildStep::Yield),
                     Step::End(_) => return Err(Error::Truncated),
-                    Step::NeedInput(request) => {
-                        let source = self
-                            .source
-                            .as_ref()
-                            .ok_or(Error::Invalid("missing audio record source"))?;
-                        match record_input::window(source, &request)? {
-                            Some(window) => cursor.provide(&window)?,
-                            None => cursor.finish(request.source, request.token)?,
-                        }
-                    }
+                    Step::NeedInput(request) => match record_input::window(source, &request)? {
+                        Some(window) => cursor.provide(&window)?,
+                        None => cursor.finish(request.source, request.token)?,
+                    },
                 }
                 continue;
             }
@@ -504,22 +497,14 @@ impl Ac3ConfigParser {
             }
             match self.phase {
                 Phase::Dac3 => {
-                    let source = self
-                        .source
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing dac3 source"))?;
                     if source.len() != 3 {
                         return Err(Error::Invalid("extra dac3 record bytes"));
                     }
                     let fields = Dac3Fields {
                         raw: [self.scratch[0], self.scratch[1], self.scratch[2]],
                     };
-                    let raw = self
-                        .source
-                        .take()
-                        .ok_or(Error::Invalid("missing dac3 source"))?;
-                    self.cursor = None;
-                    self.complete = true;
+                    let raw = source.clone();
+                    self.state = State::Complete;
                     return Ok(BuildStep::Ready(Ac3Configuration::Dac3(
                         Dac3Configuration {
                             raw,
@@ -545,10 +530,6 @@ impl Ac3ConfigParser {
                     self.phase = Phase::Descriptor;
                 }
                 Phase::Descriptor => {
-                    let cursor = self
-                        .cursor
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing dec3 cursor"))?;
                     self.entries[self.completed] = Dec3Substream {
                         raw: self.scratch,
                         width: u8::try_from(self.need).map_err(|_| Error::Overflow)?,
@@ -565,12 +546,8 @@ impl Ac3ConfigParser {
                     }
                 }
                 Phase::Finish => {
-                    let raw = self
-                        .source
-                        .take()
-                        .ok_or(Error::Invalid("missing dec3 source"))?;
-                    self.cursor = None;
-                    self.complete = true;
+                    let raw = source.clone();
+                    self.state = State::Complete;
                     return Ok(BuildStep::Ready(Ac3Configuration::Dec3(
                         Dec3Configuration {
                             raw,
