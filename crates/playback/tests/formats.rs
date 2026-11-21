@@ -4730,3 +4730,78 @@ fn direct_read_exposes_pending_input_after_one_transport_poll() {
     ));
     assert!(slot.as_ref().is_some_and(|output| player.current(output)));
 }
+
+#[test]
+fn packet_views_carry_the_source_clock_and_the_demux_clock_beside_it() {
+    use triergon_core::container::{PacketInfo, TrackId};
+    let (mut p, _) = mp4(
+        include_bytes!("fixtures/mp4/r-multitrack.mov"),
+        View::Demux,
+        7,
+        1,
+    )
+    .unwrap();
+    let out = collect(&mut p, 17).unwrap();
+    let mut mp4_packets = 0;
+    for o in &out {
+        let Some(packet) = o.packet() else {
+            continue;
+        };
+        let Event::Mp4(Mp4Event::Packet(source)) = o.event() else {
+            panic!("a packet view of another event");
+        };
+        assert_eq!(
+            packet.track(),
+            TrackId(u64::from(source.configuration.track.track_id))
+        );
+        assert_eq!(packet.payload(), source.source.payload.as_ref());
+        assert_eq!(packet.pts_time().unwrap(), o.event().source_pts().unwrap());
+        let demux = packet.demux_times().unwrap();
+        let demux_pts = demux
+            .pts
+            .map(|ticks| Time::from_ticks(i128::from(ticks), demux.time_base).unwrap());
+        assert_eq!(demux_pts, o.event().demux_pts().unwrap());
+        mp4_packets += 1;
+    }
+    assert_eq!(mp4_packets, 12);
+
+    let raw = include_bytes!("fixtures/mkv/observed-11.mkv");
+    let (selected, b, _) = probe(raw, 7, true);
+    let engine = Engine::matroska(
+        triergon_matroska::Reader::new(
+            &b,
+            ID,
+            selected.input.capabilities(),
+            triergon_matroska::Limits::default(),
+            4096,
+        )
+        .unwrap(),
+    );
+    let mut p = Player::new(
+        engine,
+        selected.source,
+        Selection::All,
+        PlayerPolicy::default(),
+    )
+    .unwrap();
+    let out = collect(&mut p, 17).unwrap();
+    let mut matroska_packets = 0;
+    for o in &out {
+        let Some(packet) = o.packet() else {
+            continue;
+        };
+        let Event::Matroska(triergon_matroska::Event::Packet(source)) = o.event() else {
+            panic!("a packet view of another event");
+        };
+        assert_eq!(packet.track(), PacketInfo::track(source));
+        assert_eq!(packet.payload(), source.packet.data.as_ref());
+        assert_eq!(packet.pts(), source.packet.pts_ns);
+        assert_eq!(packet.demux_times().unwrap().pts, source.packet.pts_ns);
+        matroska_packets += 1;
+    }
+    assert!(matroska_packets > 0);
+    assert!(out.iter().all(|o| match o.event() {
+        Event::Ts(_) | Event::DemuxPes { .. } => o.packet().is_none(),
+        _ => true,
+    }));
+}

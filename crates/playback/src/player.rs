@@ -189,6 +189,11 @@ impl Output {
     pub fn event(&self) -> &Event {
         &self.event
     }
+    /// [`Event::packet`] of this output's event.
+    #[inline]
+    pub fn packet(&self) -> Option<crate::Packet<'_>> {
+        self.event.packet()
+    }
     pub fn delivery(&self) -> Delivery {
         self.delivery
     }

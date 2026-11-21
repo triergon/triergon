@@ -13,8 +13,8 @@ mod player;
 mod sample_sort;
 pub use engine::Engine;
 pub use event::{
-    EngineStep, Event, Mp4EmptyPacket, Mp4Event, Mp4MissingSample, Mp4Packet, Mp4ShortPacket,
-    TsEvent,
+    DemuxTimes, EngineStep, Event, Mp4EmptyPacket, Mp4Event, Mp4MissingSample, Mp4Packet,
+    Mp4ShortPacket, Packet, TsEvent,
 };
 pub use player::{
     ClockChoice, Delivery, MatroskaReplayOutput, Mp4DemuxSeekCommand, Mp4DemuxSeekJob,

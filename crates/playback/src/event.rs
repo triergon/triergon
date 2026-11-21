@@ -2,8 +2,10 @@
 
 use crate::compat::pes::AdmittedCarriage;
 use crate::{Result, SeekIntent, TrackKey, mp4_plan::Mp4Configuration};
+use triergon_core::container::{PacketInfo, RandomAccess, TrackId, Trim};
 use triergon_core::{Error, InputRequest, SourceLocation, Time, TimeBase};
 use triergon_isobmff::{
+    Access,
     compat::mov::{front::FrontReadBoundary, packets::PacketOccurrence, recovery::ShortSample},
     payload::SourcePacket,
 };
@@ -131,6 +133,20 @@ impl EngineStep {
 }
 
 impl Event {
+    /// The format-neutral view of the packet this event delivers, when its
+    /// payload is one contiguous slice: a Matroska frame or an MP4 sample.
+    /// Transport stream PES (spans, not one slice) have none; their access
+    /// units come from the readers of `triergon-hls` or `triergon_mpegts::Reader`.
+    #[inline]
+    pub fn packet(&self) -> Option<Packet<'_>> {
+        match self {
+            Self::Matroska(MkvEvent::Packet(packet)) => Some(Packet::Matroska(packet)),
+            Self::Mp4(Mp4Event::Packet(packet)) => Some(Packet::Mp4(packet)),
+            Self::Mp4(Mp4Event::ShortPacket(packet)) => Some(Packet::Mp4Short(packet)),
+            _ => None,
+        }
+    }
+
     pub fn track(&self) -> Option<TrackKey> {
         match self {
             Self::DemuxPes { packet, .. } => Some(TrackKey::Ts {
@@ -220,6 +236,184 @@ impl Event {
                 ..
             }) => p.payload_len,
             _ => 0,
+        }
+    }
+}
+
+/// The format-neutral view of a delivered packet: a borrow of the event's own
+/// packet, never a copy. Implements [`PacketInfo`] on the source clock; the demux
+/// clock is [`Packet::demux_times`].
+#[derive(Clone, Copy, Debug)]
+pub enum Packet<'a> {
+    /// A Matroska frame.
+    Matroska(&'a triergon_matroska::TypedPacket),
+    /// An MP4 sample.
+    Mp4(&'a Mp4Packet),
+    /// The readable prefix of an MP4 sample the source ends inside.
+    Mp4Short(&'a Mp4ShortPacket),
+}
+
+const _: () = assert!(size_of::<Packet<'_>>() <= 2 * size_of::<usize>());
+
+/// A packet's timestamps on the demux clock.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DemuxTimes {
+    /// The length of one tick.
+    pub time_base: TimeBase,
+    /// Presentation tick; `None` where the demux view has none.
+    pub pts: Option<i64>,
+    /// Decode tick; `None` where the demux view has none.
+    pub dts: Option<i64>,
+    /// Duration in ticks; `None` where the demux view has none.
+    pub duration: Option<i64>,
+    /// Decoded samples to discard, where the demux view carries a trim.
+    pub trim: Trim,
+}
+
+/// A sample tick as `i64`; `None` when it does not fit.
+#[inline]
+fn tick(ticks: Option<i128>) -> Option<i64> {
+    ticks.and_then(|ticks| i64::try_from(ticks).ok())
+}
+
+/// The leading and trailing trim of an encoded skip-samples record: bytes 0..4
+/// and 4..8, little endian.
+#[inline]
+fn skip_samples_trim(record: Option<[u8; 10]>) -> Trim {
+    let Some(record) = record else {
+        return Trim::default();
+    };
+    let word = |at: usize| {
+        let value =
+            u32::from_le_bytes([record[at], record[at + 1], record[at + 2], record[at + 3]]);
+        (value != 0).then_some(i64::from(value))
+    };
+    Trim {
+        start: word(0),
+        end: word(4),
+    }
+}
+
+impl Packet<'_> {
+    /// The packet's timestamps on the demux clock; `None` for an MP4 packet of a
+    /// plan indexed in the source view, which has no demux occurrence.
+    pub fn demux_times(&self) -> Option<DemuxTimes> {
+        match *self {
+            Self::Matroska(packet) => Some(DemuxTimes {
+                time_base: packet.time_base(),
+                pts: packet.pts(),
+                dts: packet.dts(),
+                duration: packet.duration(),
+                trim: packet.trim(),
+            }),
+            Self::Mp4(packet) => packet.occurrence.as_ref().map(|occurrence| DemuxTimes {
+                time_base: occurrence.media_clock.demux_base,
+                pts: occurrence.demux.pts,
+                dts: occurrence.demux.dts,
+                duration: Some(occurrence.demux.duration),
+                trim: skip_samples_trim(packet.encoded_skip_samples),
+            }),
+            Self::Mp4Short(packet) => Some(DemuxTimes {
+                time_base: packet.occurrence.media_clock.demux_base,
+                pts: packet.occurrence.demux.pts,
+                dts: packet.occurrence.demux.dts,
+                duration: Some(packet.occurrence.demux.duration),
+                trim: skip_samples_trim(packet.encoded_skip_samples),
+            }),
+        }
+    }
+
+    /// The source time base of an MP4 packet's track; `None` for a track whose
+    /// media timescale is zero.
+    #[inline]
+    fn mp4_base(&self) -> Option<TimeBase> {
+        match self {
+            Self::Matroska(_) => None,
+            Self::Mp4(packet) => packet.configuration.track.base.get(),
+            Self::Mp4Short(packet) => packet.configuration.track.base.get(),
+        }
+    }
+}
+
+/// Source timestamps of MP4 packets are ticks of the track's media timescale.
+/// A track with a zero timescale has no source clock: its packets report no
+/// timestamps, in the demux base (one second per tick where FFmpeg uses that).
+impl PacketInfo for Packet<'_> {
+    #[inline]
+    fn track(&self) -> TrackId {
+        match self {
+            Self::Matroska(packet) => PacketInfo::track(*packet),
+            Self::Mp4(packet) => TrackId(u64::from(packet.configuration.track.track_id)),
+            Self::Mp4Short(packet) => TrackId(u64::from(packet.occurrence.track_id)),
+        }
+    }
+    #[inline]
+    fn payload(&self) -> &[u8] {
+        match self {
+            Self::Matroska(packet) => packet.packet.data.as_ref(),
+            Self::Mp4(packet) => packet.source.payload.as_ref(),
+            Self::Mp4Short(packet) => packet.prefix.payload.as_ref(),
+        }
+    }
+    #[inline]
+    fn time_base(&self) -> TimeBase {
+        match self {
+            Self::Matroska(packet) => packet.time_base(),
+            Self::Mp4(packet) => self.mp4_base().unwrap_or_else(|| {
+                packet
+                    .occurrence
+                    .as_ref()
+                    .map_or(TimeBase::MICROSECONDS, |o| o.media_clock.demux_base)
+            }),
+            Self::Mp4Short(packet) => self
+                .mp4_base()
+                .unwrap_or(packet.occurrence.media_clock.demux_base),
+        }
+    }
+    #[inline]
+    fn pts(&self) -> Option<i64> {
+        match self {
+            Self::Matroska(packet) => packet.pts(),
+            Self::Mp4(packet) => self.mp4_base().and(tick(packet.source.sample.cts_ticks)),
+            Self::Mp4Short(packet) => self.mp4_base().and(tick(packet.prefix.declared.cts_ticks)),
+        }
+    }
+    #[inline]
+    fn dts(&self) -> Option<i64> {
+        match self {
+            Self::Matroska(packet) => packet.dts(),
+            Self::Mp4(packet) => self.mp4_base().and(tick(packet.source.sample.dts_ticks)),
+            Self::Mp4Short(packet) => self.mp4_base().and(tick(packet.prefix.declared.dts_ticks)),
+        }
+    }
+    #[inline]
+    fn duration(&self) -> Option<i64> {
+        match self {
+            Self::Matroska(packet) => packet.duration(),
+            Self::Mp4(packet) => {
+                self.mp4_base()?;
+                Some(i64::from(packet.source.sample.duration_ticks))
+            }
+            Self::Mp4Short(_) => None,
+        }
+    }
+    #[inline]
+    fn random_access(&self) -> RandomAccess {
+        match self {
+            Self::Matroska(packet) => packet.random_access(),
+            Self::Mp4(packet) => match packet.source.sample.access {
+                Access::ContainerSync => RandomAccess::Sync,
+                Access::NonSync => RandomAccess::NotSync,
+                Access::Unknown => RandomAccess::Unknown,
+            },
+            Self::Mp4Short(_) => RandomAccess::Unknown,
+        }
+    }
+    #[inline]
+    fn trim(&self) -> Trim {
+        match self {
+            Self::Matroska(packet) => packet.trim(),
+            Self::Mp4(_) | Self::Mp4Short(_) => Trim::default(),
         }
     }
 }
