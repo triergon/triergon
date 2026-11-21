@@ -265,13 +265,14 @@ enum Phase {
 /// samples start at nondecreasing offsets with increasing ordinals, the sample limit and,
 /// with media extents, that every sample lies in an `mdat`. A track whose samples go
 /// backwards in the file is valid but cannot be merged: polling returns
-/// `Error::Unsupported` before any sample, and
-/// [`resume_in_track_order`](Self::resume_in_track_order) can continue track by track.
+/// `Error::Unsupported` before any sample, and a cursor with media extents can then
+/// continue track by track with [`resume_in_track_order`](Self::resume_in_track_order).
 ///
 /// The merge then keeps one sample per track and one ready sample, charged to the budget,
 /// and sorts nothing by time. Equal start offsets, zero-size samples included, follow the
-/// given track order. Each sample costs a work unit per track. Poll until
-/// [`CursorStatus::Ready`], then take the sample with [`take_sample`](Self::take_sample).
+/// given track order. Each sample costs two work units per track on top of its own
+/// track's read. Poll until [`CursorStatus::Ready`], then take the sample with
+/// [`take_sample`](Self::take_sample).
 #[derive(Debug)]
 pub struct PhysicalSampleCursor<'a> {
     slots: BudgetVec<Slot<'a>>,
@@ -464,9 +465,11 @@ impl<'a> PhysicalSampleCursor<'a> {
     pub fn validated_samples(&self) -> u64 {
         self.validated
     }
-    /// After the backward-layout refusal, continues with each track's samples, one track
-    /// after another in the order given; `false`, with nothing changed, in any other state.
-    /// The samples keep their ordinals but are not in byte order.
+    /// After the backward-layout refusal of a cursor with media extents, continues with
+    /// each track's samples, one track after another in the order given; `false`, with
+    /// nothing changed, in any other state. A cursor without media extents refuses at the
+    /// first backward sample, before the rest are checked, and cannot continue; nor can one
+    /// with deferred media. The samples keep their ordinals but are not in byte order.
     pub fn resume_in_track_order(&mut self) -> bool {
         if self.phase != Phase::ValidateEnter
             || self.index != self.slots.len()

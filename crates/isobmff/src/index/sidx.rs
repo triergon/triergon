@@ -22,8 +22,8 @@ pub struct SegmentReference {
     /// 31-bit `referenced_size`.
     pub range: Range<u64>,
     /// Earliest presentation time of the referenced material: the box's
-    /// `earliest_presentation_time` plus the durations of the references before it,
-    /// on the presentation timeline after edits; not a decode time.
+    /// `earliest_presentation_time` plus the durations of the references before it. A
+    /// presentation time, not a decode time.
     pub earliest_presentation: Time,
     /// `subsegment_duration`, in the index timescale.
     pub presentation_duration: Time,

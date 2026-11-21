@@ -1,9 +1,4 @@
-//! [`Reader`], the source view through the neutral container model. It needs a seekable
-//! source: it walks the root boxes, indexes every track, then delivers samples in ascending
-//! byte order across tracks and decode order within each. Times are media ticks without
-//! edits, which stay on [`Track::edits`]; a fragment without `tfdt` has unknown times.
-//! Boxes the neutral model has no field for stay readable through [`Reader::movie_box`]
-//! and [`SampleDescription::raw`].
+//! [`Reader`], the source view through the neutral container model.
 use crate::config::ObjectTypeScan;
 use crate::fragment::FragmentCursorPosition;
 use crate::open::{Movie, MovieOpen, MovieTrack, OpenLimits, OpenStep};
@@ -373,8 +368,13 @@ struct Seeking {
 
 type Output = Step<Neutral<Packet, ReaderEvent>, Backpressure>;
 
-/// A resumable ISO BMFF reader over the source view; see the module
-/// documentation for what it reports. Errors are sticky until [`Reader::reset`].
+/// The source view through the neutral container model: the one type to open a file and
+/// read its packets with. It needs a seekable source: it walks the root boxes, indexes
+/// every track, then delivers samples in ascending byte order across tracks and decode
+/// order within each. Times are media ticks without edits, which stay on
+/// [`Track::edits`]; a fragment without `tfdt` has unknown times. Boxes the neutral model
+/// has no field for stay readable through [`Reader::movie_box`] and
+/// [`SampleDescription::raw`]. Errors are sticky until [`Reader::reset`].
 #[derive(Debug)]
 pub struct Reader {
     input: InputCursor,
