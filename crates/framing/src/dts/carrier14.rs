@@ -5,6 +5,7 @@
 //! narrower than the frame reader's sync, which accepts any value in those bits. A
 //! packet that does not start with the pattern stays opaque: it gets no header, no
 //! unpacked payload, no claim about its audio, and no end but the end of the source.
+use crate::dts::reader::{ReaderInput, limit, retryable, source_error};
 use crate::dts::{
     Dts14BitPayload, Dts14BitUnpacker, DtsCoreHeader, DtsPackingLimits, DtsSourceIdentity,
     DtsWordOrder, probe_core_header,
@@ -99,19 +100,81 @@ impl Dts14CarrierPacket {
         self.payload.as_ref().map(Dts14BitPayload::canonical_bytes)
     }
 }
-#[derive(Clone, Copy)]
-enum Phase {
+/// The packet a [`Dts14CarrierReader`] is reading.
+enum Packet {
+    /// Reserving the first storage of the next packet.
     Reserve,
-    Scan,
-    Check,
-    Append,
-    GrowReserve,
-    GrowCopy,
-    GrowSwap,
-    Freeze,
-    Unpack,
-    Publish,
+    /// Reading the packet's bytes into `buffer`.
+    Body {
+        buffer: BudgetVec<u8>,
+        extent: Extent,
+        step: BodyStep,
+    },
+    /// The packet's bytes, which start with the sync pattern and are unpacked next.
+    Frozen { raw: Bytes },
+    /// Unpacking the packet's 14-bit words.
+    Unpack {
+        raw: Bytes,
+        unpacker: Dts14BitUnpacker,
+    },
+    /// The packet, to be returned.
+    Ready {
+        raw: Bytes,
+        payload: Option<Dts14BitPayload>,
+        syntax: Dts14CarrierSyntax,
+    },
+    /// The source ended after the last packet.
+    Ended(SourceLocation),
 }
+
+/// Where the frame of a packet that starts with the sync pattern ends.
+#[derive(Clone, Copy)]
+enum Extent {
+    /// The packet's first 18 bytes are not read yet.
+    Unprobed,
+    /// Its header gives no length of whole words, or the packet does not start with
+    /// the pattern.
+    Unknown,
+    /// The frame spans this many source bytes.
+    Known(usize),
+}
+
+/// Moving the first `count` lookahead bytes into the packet, `at` of them so far.
+#[derive(Clone, Copy)]
+struct Append {
+    at: usize,
+    count: usize,
+}
+
+/// The steps of reading a packet's bytes.
+enum BodyStep {
+    /// Reading the six bytes after the packet so far into the lookahead.
+    Scan,
+    /// Deciding whether the lookahead starts the next packet.
+    Check,
+    /// Moving lookahead bytes into the packet.
+    Append(Append),
+    /// Moving the packet into the larger storage `next`, then appending on.
+    Grow {
+        append: Append,
+        next: BudgetVec<u8>,
+        step: GrowStep,
+    },
+    /// The packet's bytes are complete.
+    Freeze,
+}
+
+/// The steps of moving a packet into larger storage.
+#[derive(Clone, Copy)]
+enum GrowStep {
+    /// Reserving the larger storage.
+    Reserve,
+    /// Copying the packet, `copied` bytes of it so far.
+    Copy { copied: usize },
+    /// Replacing the packet's storage with the larger one.
+    Swap,
+}
+
 /// Cuts a 14-bit DTS stream into packets at its sync pattern: the 16-bit words
 /// `1FFF E800 07Fx` in a given byte order.
 ///
@@ -135,31 +198,19 @@ enum Phase {
 /// [`provide`](Self::provide), [`finish`](Self::finish) or [`fail`](Self::fail).
 pub struct Dts14CarrierReader {
     pool: Budget,
-    cursor: Option<InputCursor>,
-    last_request: InputRequest,
+    input: ReaderInput,
     order: DtsWordOrder,
     limits: Dts14CarrierLimits,
-    phase: Phase,
-    buffer: Option<BudgetVec<u8>>,
-    growth: Option<BudgetVec<u8>>,
-    growth_at: usize,
-    extent: Option<usize>,
-    header_probed: bool,
+    packet: Packet,
     last_window_start: u64,
     last_window_end: u64,
-    raw: Option<Bytes>,
-    unpacker: Option<Dts14BitUnpacker>,
-    payload: Option<Dts14BitPayload>,
-    syntax: Dts14CarrierSyntax,
+    /// The bytes after the packet so far, read to find the pattern that ends it.
     look: [u8; 6],
     look_len: usize,
-    append_at: usize,
-    append_count: usize,
     offset: u64,
-    end: Option<SourceLocation>,
-    complete: bool,
+    /// The end of the source, once it ended inside the packet being read.
+    source_end: Option<SourceLocation>,
     packets: usize,
-    failure: Option<Error>,
 }
 impl std::fmt::Debug for Dts14CarrierReader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -169,7 +220,7 @@ impl std::fmt::Debug for Dts14CarrierReader {
             .field("position", &self.position())
             .field("generation", &self.generation())
             .field("packets", &self.packets)
-            .field("failure", &self.failure)
+            .field("failure", &self.input.failure())
             .finish_non_exhaustive()
     }
 }
@@ -200,65 +251,38 @@ impl Dts14CarrierReader {
             .checked_add(Bytes::owner_overhead_bytes())
             .and_then(|n| n.checked_add(Budget::control_storage_bytes()))
             .ok_or(Error::Overflow)?;
-        if minimum > pool.limit() {
-            return Err(Error::Limit {
-                requested: minimum,
-                maximum: pool.limit(),
-            });
-        }
+        limit(minimum, pool.limit())?;
         let cursor = InputCursor::new(pool, source, caps, limits.maximum_input_window)?;
-        let last_request = cursor.request();
         Ok(Self {
             pool: pool.clone(),
-            cursor: Some(cursor),
-            last_request,
+            input: ReaderInput::Open(cursor),
             order,
             limits,
-            phase: Phase::Reserve,
-            buffer: None,
-            growth: None,
-            growth_at: 0,
-            extent: None,
-            header_probed: false,
+            packet: Packet::Reserve,
             last_window_start: 0,
             last_window_end: 0,
-            raw: None,
-            unpacker: None,
-            payload: None,
-            syntax: Dts14CarrierSyntax::OpaqueCarrier,
             look: [0; 6],
             look_len: 0,
-            append_at: 0,
-            append_count: 0,
             offset: 0,
-            end: None,
-            complete: false,
+            source_end: None,
             packets: 0,
-            failure: None,
         })
     }
     /// The request for the bytes at [`position`](Self::position). A failed reader
     /// returns the request it had open when it failed.
     pub fn request(&self) -> InputRequest {
-        self.cursor
-            .as_ref()
-            .map_or_else(|| self.last_request.clone(), InputCursor::request)
+        self.input.request()
     }
     /// Source offset of the next byte the reader takes from its input. After a
     /// packet that ended at a following sync pattern it is six bytes past the
     /// packet's end: the reader has read that pattern.
     pub fn position(&self) -> u64 {
-        self.cursor
-            .as_ref()
-            .map_or(self.last_request.offset, InputCursor::position)
+        self.input.position()
     }
     /// Generation of the reader's input cursor, which every packet carries in its
     /// identity. [`reset`](Self::reset) starts a new one.
     pub fn generation(&self) -> u64 {
-        self.request().token.generation()
-    }
-    fn healthy(&self) -> Result<()> {
-        self.failure.map_or(Ok(()), Err)
+        self.input.generation()
     }
     /// Answers the current request with `window`.
     ///
@@ -268,8 +292,7 @@ impl Dts14CarrierReader {
     /// [`InputCursor::provide`]), which leaves the reader as it was. A failed reader
     /// returns its earlier error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
-        self.healthy()?;
-        self.cursor_mut()?.provide(window)?;
+        self.input.cursor()?.provide(window)?;
         self.last_window_start = window.offset;
         self.last_window_end = window
             .offset
@@ -286,12 +309,11 @@ impl Dts14CarrierReader {
     /// length. A token or source that does not match the request is refused and
     /// leaves the reader as it was. A failed reader returns its earlier error.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
-        self.healthy()?;
-        let r = self.cursor_mut()?.finish(source, token);
-        if r == Err(Error::Truncated) {
-            self.abort(Error::Truncated);
+        let result = self.input.cursor()?.finish(source, token);
+        if result == Err(Error::Truncated) {
+            self.stop(Error::Truncated);
         }
-        r
+        result
     }
     /// Answers the current request with a source failure. The reader drops the
     /// packet it was reading and from then on returns [`Error::Transport`] or
@@ -307,12 +329,8 @@ impl Dts14CarrierReader {
         token: InputToken,
         failure: SourceFailure,
     ) -> Result<()> {
-        self.healthy()?;
-        self.cursor_mut()?.fail(source, token, failure)?;
-        self.abort(match failure {
-            SourceFailure::Transport => Error::Transport,
-            SourceFailure::Cancelled => Error::Cancelled,
-        });
+        self.input.cursor()?.fail(source, token, failure)?;
+        self.stop(source_error(failure));
         Ok(())
     }
     /// Restarts at source offset `offset`, where a packet then starts, and returns
@@ -326,39 +344,24 @@ impl Dts14CarrierReader {
     /// offset it cannot serve (see [`InputCursor::reset`]). A failed reader returns
     /// its earlier error and cannot be reset.
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
-        self.healthy()?;
+        let cursor = self.input.cursor()?;
         if !offset.is_multiple_of(2) {
             return Err(Error::Unsupported("DTS carrier reset outside word grid"));
         }
-        let r = self.cursor_mut()?.reset(offset)?;
-        self.clear();
-        self.phase = Phase::Reserve;
+        let request = cursor.reset(offset)?;
+        self.packet = Packet::Reserve;
         self.look_len = 0;
         self.offset = offset;
         self.last_window_start = offset;
         self.last_window_end = offset;
-        self.end = None;
-        self.complete = false;
+        self.source_end = None;
         self.packets = 0;
-        Ok(r)
+        Ok(request)
     }
-    fn clear(&mut self) {
-        self.buffer = None;
-        self.growth = None;
-        self.raw = None;
-        self.unpacker = None;
-        self.payload = None;
-    }
-    fn cursor_mut(&mut self) -> Result<&mut InputCursor> {
-        self.cursor
-            .as_mut()
-            .ok_or(Error::Invalid("missing healthy carrier cursor"))
-    }
-    fn abort(&mut self, e: Error) {
-        self.last_request = self.request();
-        self.cursor = None;
-        self.failure = Some(e);
-        self.clear();
+    /// Ends the reader with `error`, dropping the packet it was reading.
+    fn stop(&mut self, error: Error) {
+        self.input.fail_with(error);
+        self.packet = Packet::Reserve;
     }
     /// Reads on, as far as `work` allows. [`Step::Ready`] carries the next packet,
     /// [`Step::NeedInput`] the request to answer before the next call, and
@@ -379,14 +382,16 @@ impl Dts14CarrierReader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<Dts14CarrierPacket>> {
-        self.healthy()?;
-        let r = self.advance(work, cancel);
-        if let Err(e) = r
-            && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
-        {
-            self.abort(e);
+        if let Some(error) = self.input.failure() {
+            return Err(error);
         }
-        r
+        let result = self.advance(work, cancel);
+        if let Err(error) = result
+            && !retryable(error)
+        {
+            self.stop(error);
+        }
+        result
     }
     fn advance(
         &mut self,
@@ -397,354 +402,354 @@ impl Dts14CarrierReader {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if self.complete {
-                return Ok(Step::End(
-                    self.end.ok_or(Error::Invalid("carrier end missing"))?,
-                ));
+            if let Packet::Ended(end) = self.packet {
+                return Ok(Step::End(end));
             }
             if work.remaining() == 0 {
                 return Ok(Step::Yield);
             }
-            match self.phase {
-                Phase::Reserve => {
+            match &mut self.packet {
+                Packet::Reserve => {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    let b = self
-                        .buffer
-                        .get_or_insert_with(|| BudgetVec::new(&self.pool));
-                    b.try_reserve_exact(self.limits.maximum_packet_bytes.min(128))?;
-                    self.extent = None;
-                    self.header_probed = false;
-                    self.syntax = Dts14CarrierSyntax::OpaqueCarrier;
-                    self.phase = if self.look_len == 0 {
-                        Phase::Scan
-                    } else {
-                        self.append_at = 0;
-                        self.append_count = self.look_len;
-                        Phase::Append
+                    let mut buffer = BudgetVec::new(&self.pool);
+                    buffer.try_reserve_exact(self.limits.maximum_packet_bytes.min(128))?;
+                    self.packet = Packet::Body {
+                        buffer,
+                        extent: Extent::Unprobed,
+                        step: self.after_lookahead(),
                     };
                 }
-                Phase::Scan => {
-                    match self
-                        .cursor
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing carrier scan cursor"))?
-                        .read_into(&mut self.look[self.look_len..], work, cancel)?
-                    {
-                        Step::Ready(n) => {
-                            if n == 0 {
-                                return Err(Error::Invalid("empty carrier read"));
+                Packet::Body {
+                    buffer,
+                    extent,
+                    step,
+                } => match step {
+                    BodyStep::Scan => {
+                        match self.input.cursor()?.read_into(
+                            &mut self.look[self.look_len..],
+                            work,
+                            cancel,
+                        )? {
+                            Step::Ready(n) => {
+                                if n == 0 {
+                                    return Err(Error::Invalid("empty carrier read"));
+                                }
+                                self.look_len += n;
+                                if self.look_len == 6 {
+                                    *step = BodyStep::Check;
+                                }
                             }
-                            self.look_len += n;
-                            if self.look_len == 6 {
-                                self.phase = Phase::Check;
-                            }
-                        }
-                        Step::NeedInput(r) => return Ok(Step::NeedInput(r)),
-                        Step::Yield => return Ok(Step::Yield),
-                        Step::End(e) => {
-                            self.end = Some(e);
-                            if self.look_len == 0 {
-                                self.phase = Phase::Freeze;
-                            } else {
-                                self.append_at = 0;
-                                self.append_count = self.look_len;
-                                self.phase = Phase::Append;
-                            }
-                        }
-                    }
-                }
-                Phase::Check => {
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    let b = self
-                        .buffer
-                        .as_ref()
-                        .ok_or(Error::Invalid("carrier builder missing"))?;
-                    // Reuse the existing fixed120-bit primary header probe.
-                    // The physical extent is admitted only for exact-word
-                    // geometry; neither a96-byte cutoff nor a signature alone
-                    // proves a boundary. This never validates coded audio.
-                    if !self.header_probed && b.len() >= 18 {
-                        self.header_probed = true;
-                        if conventional_sync(b.as_slice(), self.order) {
-                            let prefix: [u8; 18] = b.as_slice()[..18]
-                                .try_into()
-                                .map_err(|_| Error::Truncated)?;
-                            let bits = crate::dts::sync14::header_payload(&prefix, self.order)?;
-                            if let Ok(header) = probe_core_header(&bits)
-                                && header.frame_bytes % 7 == 0
-                            {
-                                self.extent = Some(
-                                    (header.frame_bytes / 7)
-                                        .checked_mul(8)
-                                        .ok_or(Error::Overflow)?,
-                                );
+                            Step::NeedInput(r) => return Ok(Step::NeedInput(r)),
+                            Step::Yield => return Ok(Step::Yield),
+                            Step::End(e) => {
+                                self.source_end = Some(e);
+                                *step = if self.look_len == 0 {
+                                    BodyStep::Freeze
+                                } else {
+                                    BodyStep::Append(Append {
+                                        at: 0,
+                                        count: self.look_len,
+                                    })
+                                };
                             }
                         }
                     }
-                    if b.len() >= 6 && conventional_sync(&self.look, self.order) {
-                        if !conventional_sync(b.as_slice(), self.order) {
-                            return Err(Error::Unsupported(
-                                "mixed opaque/conventional DTS carrier",
-                            ));
-                        }
-                        match self.extent {
-                            Some(end) if b.len() == end => {
-                                self.phase = Phase::Freeze;
-                                continue;
-                            }
-                            Some(end) if b.len() < end => {}
-                            Some(_) => {
-                                return Err(Error::Unsupported("late DTS carrier synchronization"));
-                            }
-                            None if self.header_probed => {
-                                return Err(Error::Unsupported("unresolved DTS carrier extent"));
-                            }
-                            None => {}
-                        }
-                    }
-                    self.append_at = 0;
-                    self.append_count = 2;
-                    self.phase = Phase::Append;
-                }
-                Phase::Append => {
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    if self.append_at < self.append_count {
-                        let b = self
-                            .buffer
-                            .as_mut()
-                            .ok_or(Error::Invalid("carrier append missing"))?;
-                        if b.len() >= self.limits.maximum_packet_bytes {
-                            return Err(Error::Limit {
-                                requested: b.len().checked_add(1).ok_or(Error::Overflow)?,
-                                maximum: self.limits.maximum_packet_bytes,
-                            });
-                        }
-                        if b.len() == b.capacity() {
-                            self.phase = Phase::GrowReserve;
-                            continue;
-                        }
-                        b.try_push(self.look[self.append_at]).map_err(|e| e.error)?;
-                        self.append_at += 1;
-                    } else {
-                        self.look.copy_within(self.append_count..self.look_len, 0);
-                        self.look_len -= self.append_count;
-                        self.phase = if self.end.is_some() {
-                            Phase::Freeze
-                        } else {
-                            Phase::Scan
-                        };
-                    }
-                }
-                Phase::GrowReserve => {
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    let old = self
-                        .buffer
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing carrier growth input"))?;
-                    let target = old
-                        .capacity()
-                        .checked_mul(2)
-                        .ok_or(Error::Overflow)?
-                        .min(self.limits.maximum_packet_bytes);
-                    let minimum = old
-                        .capacity()
-                        .checked_add(target)
-                        .and_then(|n| n.checked_add(Budget::control_storage_bytes()))
-                        .ok_or(Error::Overflow)?;
-                    if minimum > self.pool.limit() {
-                        return Err(Error::Limit {
-                            requested: minimum,
-                            maximum: self.pool.limit(),
-                        });
-                    }
-                    let next = self
-                        .growth
-                        .get_or_insert_with(|| BudgetVec::new(&self.pool));
-                    // Only an empty allocation grows. No dynamic prefix moves
-                    // inside an allocation call or one uncharged operation.
-                    next.try_reserve_exact(target)?;
-                    self.growth_at = 0;
-                    self.phase = Phase::GrowCopy;
-                }
-                Phase::GrowCopy => {
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    let old = self
-                        .buffer
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing carrier copied input"))?;
-                    if self.growth_at == old.len() {
-                        self.phase = Phase::GrowSwap;
-                    } else {
-                        let next = self
-                            .growth
-                            .as_mut()
-                            .ok_or(Error::Invalid("missing carrier growth output"))?;
-                        if next.len() == next.capacity() {
-                            return Err(Error::Invalid("carrier growth reservation exhausted"));
-                        }
-                        next.try_push(old.as_slice()[self.growth_at])
-                            .map_err(|e| e.error)?;
-                        self.growth_at += 1;
-                    }
-                }
-                Phase::GrowSwap => {
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    self.buffer = self.growth.take();
-                    self.phase = Phase::Append;
-                }
-                Phase::Freeze => {
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    let b = self
-                        .buffer
-                        .take()
-                        .ok_or(Error::Invalid("carrier freeze missing"))?;
-                    if b.is_empty() && self.end.is_some() {
-                        self.complete = true;
-                        continue;
-                    }
-                    if self.packets >= self.limits.maximum_packets {
-                        self.buffer = Some(b);
-                        return Err(Error::Limit {
-                            requested: self.packets.checked_add(1).ok_or(Error::Overflow)?,
-                            maximum: self.limits.maximum_packets,
-                        });
-                    }
-                    match b.freeze() {
-                        Ok(raw) => self.raw = Some(raw),
-                        Err(e) => {
-                            self.buffer = Some(e.value);
-                            return Err(e.error);
-                        }
-                    }
-                    let raw = self
-                        .raw
-                        .as_ref()
-                        .ok_or(Error::Invalid("carrier raw missing"))?;
-                    if raw.len() >= 6 && conventional_sync(raw.as_ref(), self.order) {
-                        if raw.len() % 2 != 0 {
-                            self.syntax = Dts14CarrierSyntax::Refused(Error::Truncated);
-                            self.phase = Phase::Publish;
-                        } else {
-                            self.phase = Phase::Unpack;
-                        }
-                    } else {
-                        self.phase = Phase::Publish;
-                    }
-                }
-                Phase::Unpack => {
-                    if self.unpacker.is_none() {
+                    BodyStep::Check => {
                         if !work.try_charge(1) {
                             return Ok(Step::Yield);
                         }
-                        self.unpacker = Some(Dts14BitUnpacker::new(
-                            &self.pool,
-                            self.identity(),
-                            self.raw
-                                .as_ref()
-                                .ok_or(Error::Invalid("carrier unpack missing"))?
-                                .clone(),
-                            self.order,
-                            DtsPackingLimits {
-                                maximum_source_bytes: self.limits.maximum_packet_bytes,
-                                maximum_output_bytes: self.limits.maximum_packet_bytes,
-                            },
-                        )?);
-                    }
-                    match self
-                        .unpacker
-                        .as_mut()
-                        .ok_or(Error::Invalid("carrier unpacker missing"))?
-                        .step(work, cancel)?
-                    {
-                        Step::Ready(p) => {
-                            // No discarded tail or silently selected FSIZE domain.
-                            let checked =
-                                probe_core_header(p.canonical_bytes().as_ref()).and_then(|h| {
-                                    if p.residual_bits() != 0
-                                        || h.frame_bytes != p.canonical_bytes().len()
-                                    {
-                                        Err(Error::Unsupported(
-                                            "DTS carrier unresolved extent/tail",
-                                        ))
-                                    } else {
-                                        Ok(h)
-                                    }
-                                });
-                            self.syntax = match checked {
-                                Ok(h) => Dts14CarrierSyntax::ExactNormal(h),
-                                Err(e) => Dts14CarrierSyntax::Refused(e),
-                            };
-                            self.payload = Some(p);
-                            self.unpacker = None;
-                            self.phase = Phase::Publish;
+                        let packet = buffer.as_slice();
+                        // The extent comes from the same 120-bit header probe as the
+                        // frame reader's, and only for a frame of whole words; neither
+                        // a 96-byte cutoff nor the pattern alone proves a boundary,
+                        // and the coded audio is never checked.
+                        if matches!(extent, Extent::Unprobed) && packet.len() >= 18 {
+                            *extent = probe_extent(packet, self.order)?;
                         }
-                        Step::Yield => return Ok(Step::Yield),
-                        _ => return Err(Error::Invalid("carrier owned unpack progress")),
+                        if packet.len() >= 6 && conventional_sync(&self.look, self.order) {
+                            if !conventional_sync(packet, self.order) {
+                                return Err(Error::Unsupported(
+                                    "mixed opaque/conventional DTS carrier",
+                                ));
+                            }
+                            match *extent {
+                                Extent::Known(end) if packet.len() == end => {
+                                    *step = BodyStep::Freeze;
+                                    continue;
+                                }
+                                Extent::Known(end) if packet.len() < end => {}
+                                Extent::Known(_) => {
+                                    return Err(Error::Unsupported(
+                                        "late DTS carrier synchronization",
+                                    ));
+                                }
+                                Extent::Unknown => {
+                                    return Err(Error::Unsupported(
+                                        "unresolved DTS carrier extent",
+                                    ));
+                                }
+                                Extent::Unprobed => {}
+                            }
+                        }
+                        *step = BodyStep::Append(Append { at: 0, count: 2 });
                     }
-                }
-                Phase::Publish => {
+                    BodyStep::Append(append) => {
+                        if !work.try_charge(1) {
+                            return Ok(Step::Yield);
+                        }
+                        let Append { at, count } = *append;
+                        if at < count {
+                            if buffer.len() >= self.limits.maximum_packet_bytes {
+                                return Err(Error::Limit {
+                                    requested: buffer
+                                        .len()
+                                        .checked_add(1)
+                                        .ok_or(Error::Overflow)?,
+                                    maximum: self.limits.maximum_packet_bytes,
+                                });
+                            }
+                            if buffer.len() == buffer.capacity() {
+                                *step = BodyStep::Grow {
+                                    append: *append,
+                                    next: BudgetVec::new(&self.pool),
+                                    step: GrowStep::Reserve,
+                                };
+                                continue;
+                            }
+                            buffer.try_push(self.look[at]).map_err(|e| e.error)?;
+                            append.at += 1;
+                        } else {
+                            self.look.copy_within(count..self.look_len, 0);
+                            self.look_len -= count;
+                            *step = if self.source_end.is_some() {
+                                BodyStep::Freeze
+                            } else {
+                                BodyStep::Scan
+                            };
+                        }
+                    }
+                    BodyStep::Grow {
+                        append,
+                        next,
+                        step: grow,
+                    } => {
+                        if !work.try_charge(1) {
+                            return Ok(Step::Yield);
+                        }
+                        match *grow {
+                            GrowStep::Reserve => {
+                                let target = buffer
+                                    .capacity()
+                                    .checked_mul(2)
+                                    .ok_or(Error::Overflow)?
+                                    .min(self.limits.maximum_packet_bytes);
+                                let minimum = buffer
+                                    .capacity()
+                                    .checked_add(target)
+                                    .and_then(|n| n.checked_add(Budget::control_storage_bytes()))
+                                    .ok_or(Error::Overflow)?;
+                                limit(minimum, self.pool.limit())?;
+                                // Only empty storage grows: no copied bytes move inside
+                                // an allocation or any one uncharged operation.
+                                next.try_reserve_exact(target)?;
+                                *grow = GrowStep::Copy { copied: 0 };
+                            }
+                            GrowStep::Copy { copied } => {
+                                if copied == buffer.len() {
+                                    *grow = GrowStep::Swap;
+                                } else {
+                                    if next.len() == next.capacity() {
+                                        return Err(Error::Invalid(
+                                            "carrier growth reservation exhausted",
+                                        ));
+                                    }
+                                    next.try_push(buffer.as_slice()[copied])
+                                        .map_err(|e| e.error)?;
+                                    *grow = GrowStep::Copy { copied: copied + 1 };
+                                }
+                            }
+                            GrowStep::Swap => {
+                                let append = *append;
+                                *buffer = std::mem::replace(next, BudgetVec::new(&self.pool));
+                                *step = BodyStep::Append(append);
+                            }
+                        }
+                    }
+                    BodyStep::Freeze => {
+                        if !work.try_charge(1) {
+                            return Ok(Step::Yield);
+                        }
+                        if buffer.is_empty()
+                            && let Some(end) = self.source_end
+                        {
+                            self.packet = Packet::Ended(end);
+                            continue;
+                        }
+                        if self.packets >= self.limits.maximum_packets {
+                            return Err(Error::Limit {
+                                requested: self.packets.checked_add(1).ok_or(Error::Overflow)?,
+                                maximum: self.limits.maximum_packets,
+                            });
+                        }
+                        let raw =
+                            match std::mem::replace(buffer, BudgetVec::new(&self.pool)).freeze() {
+                                Ok(raw) => raw,
+                                Err(refused) => {
+                                    *buffer = refused.value;
+                                    return Err(refused.error);
+                                }
+                            };
+                        self.packet =
+                            if raw.len() >= 6 && conventional_sync(raw.as_ref(), self.order) {
+                                if raw.len() % 2 != 0 {
+                                    Packet::Ready {
+                                        raw,
+                                        payload: None,
+                                        syntax: Dts14CarrierSyntax::Refused(Error::Truncated),
+                                    }
+                                } else {
+                                    Packet::Frozen { raw }
+                                }
+                            } else {
+                                Packet::Ready {
+                                    raw,
+                                    payload: None,
+                                    syntax: Dts14CarrierSyntax::OpaqueCarrier,
+                                }
+                            };
+                    }
+                },
+                Packet::Frozen { raw } => {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    let raw = self
-                        .raw
-                        .take()
-                        .ok_or(Error::Invalid("carrier publication missing"))?;
-                    let next = self
-                        .offset
-                        .checked_add(u64::try_from(raw.len()).map_err(|_| Error::Overflow)?)
-                        .ok_or(Error::Overflow)?;
-                    let boundary = match self.end {
-                        Some(e) => {
-                            if e.offset != next {
-                                return Err(Error::Invalid("carrier EOF range"));
-                            }
-                            self.complete = true;
-                            Dts14CarrierBoundary::ExplicitSourceEnd
-                        }
-                        None => Dts14CarrierBoundary::FollowingCarrierSync { offset: next },
-                    };
-                    let packet = Dts14CarrierPacket {
-                        identity: self.identity(),
-                        raw,
-                        payload: self.payload.take(),
-                        boundary,
-                        syntax: self.syntax,
-                        provision: Dts14CarrierProvision {
-                            last_window_start: self.last_window_start,
-                            last_window_end: self.last_window_end,
-                            consumed_through: self.position(),
+                    let raw = raw.clone();
+                    let unpacker = Dts14BitUnpacker::new(
+                        &self.pool,
+                        self.identity(),
+                        raw.clone(),
+                        self.order,
+                        DtsPackingLimits {
+                            maximum_source_bytes: self.limits.maximum_packet_bytes,
+                            maximum_output_bytes: self.limits.maximum_packet_bytes,
                         },
-                    };
-                    self.offset = next;
-                    self.packets = self.packets.checked_add(1).ok_or(Error::Overflow)?;
-                    self.phase = Phase::Reserve;
-                    return Ok(Step::Ready(packet));
+                    )?;
+                    self.packet = Packet::Unpack { raw, unpacker };
                 }
+                Packet::Unpack { raw, unpacker } => match unpacker.step(work, cancel)? {
+                    Step::Ready(p) => {
+                        // No tail is discarded and no reading of FSIZE is chosen.
+                        let checked =
+                            probe_core_header(p.canonical_bytes().as_ref()).and_then(|h| {
+                                if p.residual_bits() != 0
+                                    || h.frame_bytes != p.canonical_bytes().len()
+                                {
+                                    Err(Error::Unsupported("DTS carrier unresolved extent/tail"))
+                                } else {
+                                    Ok(h)
+                                }
+                            });
+                        let syntax = match checked {
+                            Ok(h) => Dts14CarrierSyntax::ExactNormal(h),
+                            Err(e) => Dts14CarrierSyntax::Refused(e),
+                        };
+                        let raw = raw.clone();
+                        self.packet = Packet::Ready {
+                            raw,
+                            payload: Some(p),
+                            syntax,
+                        };
+                    }
+                    Step::Yield => return Ok(Step::Yield),
+                    _ => return Err(Error::Invalid("carrier owned unpack progress")),
+                },
+                Packet::Ready { .. } => return self.publish(work),
+                Packet::Ended(end) => return Ok(Step::End(*end)),
             }
         }
     }
+    /// The first step of reading a packet: scanning on, or first moving in the
+    /// lookahead bytes of the pattern that ended the packet before.
+    fn after_lookahead(&self) -> BodyStep {
+        if self.look_len == 0 {
+            BodyStep::Scan
+        } else {
+            BodyStep::Append(Append {
+                at: 0,
+                count: self.look_len,
+            })
+        }
+    }
+    /// Returns the ready packet and moves on to the next one.
+    fn publish(&mut self, work: &mut WorkBudget) -> Result<Step<Dts14CarrierPacket>> {
+        if !work.try_charge(1) {
+            return Ok(Step::Yield);
+        }
+        let Packet::Ready {
+            raw,
+            payload,
+            syntax,
+        } = std::mem::replace(&mut self.packet, Packet::Reserve)
+        else {
+            return Err(Error::Invalid("carrier publication missing"));
+        };
+        let next = self
+            .offset
+            .checked_add(u64::try_from(raw.len()).map_err(|_| Error::Overflow)?)
+            .ok_or(Error::Overflow)?;
+        let boundary = match self.source_end {
+            Some(e) => {
+                if e.offset != next {
+                    return Err(Error::Invalid("carrier EOF range"));
+                }
+                self.packet = Packet::Ended(e);
+                Dts14CarrierBoundary::ExplicitSourceEnd
+            }
+            None => Dts14CarrierBoundary::FollowingCarrierSync { offset: next },
+        };
+        let packet = Dts14CarrierPacket {
+            identity: self.identity(),
+            raw,
+            payload,
+            boundary,
+            syntax,
+            provision: Dts14CarrierProvision {
+                last_window_start: self.last_window_start,
+                last_window_end: self.last_window_end,
+                consumed_through: self.position(),
+            },
+        };
+        self.offset = next;
+        self.packets = self.packets.checked_add(1).ok_or(Error::Overflow)?;
+        Ok(Step::Ready(packet))
+    }
     fn identity(&self) -> DtsSourceIdentity {
         DtsSourceIdentity {
-            source: self.request().source,
+            source: self.input.source(),
             generation: self.generation(),
             offset: self.offset,
         }
     }
+}
+
+/// Where the frame of a packet ends, from the header in its first 18 bytes when
+/// the packet starts with the sync pattern.
+fn probe_extent(packet: &[u8], order: DtsWordOrder) -> Result<Extent> {
+    if !conventional_sync(packet, order) {
+        return Ok(Extent::Unknown);
+    }
+    let prefix: [u8; 18] = packet[..18].try_into().map_err(|_| Error::Truncated)?;
+    let bits = crate::dts::sync14::header_payload(&prefix, order)?;
+    Ok(match probe_core_header(&bits) {
+        Ok(header) if header.frame_bytes % 7 == 0 => Extent::Known(
+            (header.frame_bytes / 7)
+                .checked_mul(8)
+                .ok_or(Error::Overflow)?,
+        ),
+        _ => Extent::Unknown,
+    })
 }
 /// Conventional physical representation of the primary extended normal sync.
 /// Only the carrier signature is tested here; this is not syntax validation.
