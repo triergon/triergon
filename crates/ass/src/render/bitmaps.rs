@@ -16,9 +16,9 @@ use triergon_raster::{
 
 use super::CacheLimits;
 use super::cache::{Cache, CacheKey, Found, Kept, sizes};
+use super::from_26_6;
 use super::outlines::{KeptOutline, Outlines};
 use super::placement::{GlyphDrawing, PlacedRun, Placer, Runs};
-use super::units::d6_to_double;
 use crate::{Karaoke, Rgba, charge};
 
 /// The work of a lookup: of a bitmap, and of a composite per glyph of its
@@ -350,8 +350,7 @@ impl Painter {
         };
         let mut effect_timing = placed.effect_timing;
         if placed.effect == Some(Karaoke::Fill) {
-            effect_timing = (d6_to_double(leftmost_x)
-                + d6_to_double(effect_timing) * frame.pixel_aspect)
+            effect_timing = (from_26_6(leftmost_x) + from_26_6(effect_timing) * frame.pixel_aspect)
                 .round() as i32;
         }
         charge(work, LOOKUP_UNITS.saturating_mul(drawn.len()))?;

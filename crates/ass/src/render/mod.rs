@@ -19,7 +19,6 @@ mod outlines;
 mod placement;
 mod shaping;
 mod text;
-mod units;
 mod wrap;
 
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -52,6 +51,11 @@ pub struct Frame<'r> {
     /// How they differ from the previous frame's (`ass_render_frame`'s
     /// `detect_change`).
     pub change: Change,
+}
+
+/// A 26.6 fixed-point value in pixels.
+fn from_26_6(x: i32) -> f64 {
+    f64::from(x) / 64.0
 }
 
 /// The spare capacity, in bytes, a stage's store keeps after it is filled.

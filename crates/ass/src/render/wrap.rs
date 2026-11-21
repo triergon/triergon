@@ -8,9 +8,9 @@ use std::ops::Range;
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 
+use super::from_26_6;
 use super::geometry::Scales;
-use super::units::{d6_to_double, fmax};
-use crate::{WrapStyle, charge};
+use crate::{WrapStyle, charge, number};
 
 const SPACE: u32 = b' ' as u32;
 const NEWLINE: u32 = b'\n' as u32;
@@ -31,7 +31,7 @@ pub(super) trait WrapText {
 
     /// The right end of character `e` minus the left end of `s`, in pixels.
     fn width(&self, s: usize, e: usize) -> f64 {
-        d6_to_double(self.extent(e).1.wrapping_sub(self.extent(s).0))
+        from_26_6(self.extent(e).1.wrapping_sub(self.extent(s).0))
     }
 
     /// The last character before `end` that is not a space, or `start`.
@@ -242,8 +242,8 @@ impl Lines {
                 let (a, d, border) = chars.metrics(i);
                 asc = a.max(asc);
                 desc = d.max(desc);
-                border_y = fmax(border_y, border[1]);
-                border_x = fmax(border_x, border[0]);
+                border_y = number::max(border_y, border[1]);
+                border_x = number::max(border_x, border[0]);
                 newlines &= chars.symbol(i) == NEWLINE;
             }
             let scale = if newlines { 0.5 / 64.0 } else { 1.0 / 64.0 };

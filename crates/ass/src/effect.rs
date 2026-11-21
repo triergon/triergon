@@ -1,7 +1,7 @@
 //! The `Banner` and `Scroll` transition effects of the event effect field.
 
 use crate::c_long::atoi;
-use crate::number::ffmax;
+use crate::number;
 
 /// Which way a transition moves the text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -59,7 +59,7 @@ pub(crate) fn transition(
     // truncating in storage pixels.
     let shift = |delay: i32, layout: i32, play: i32| {
         let scale = f64::from(layout) / f64::from(play);
-        let delay = f64::from(ffmax(f64::from(delay) / scale, 1.0) as i32) * scale;
+        let delay = f64::from(number::max(f64::from(delay) / scale, 1.0) as i32) * scale;
         elapsed as f64 / delay
     };
     if effect.starts_with(b"Banner;") {

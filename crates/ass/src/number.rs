@@ -260,7 +260,7 @@ pub(crate) fn dtoi32(value: f64) -> i32 {
 }
 
 /// The larger double as C's `a > b ? a : b`, so a NaN `a` yields `b`.
-pub(crate) fn ffmax(a: f64, b: f64) -> f64 {
+pub(crate) fn max(a: f64, b: f64) -> f64 {
     if a > b { a } else { b }
 }
 
@@ -311,6 +311,7 @@ mod tests {
         assert_eq!(hex_tag_value(b"&hFF"), 0);
         assert_eq!(dtoi32(f64::NAN), i32::MIN);
         assert_eq!(dtoi32(-2.9), -2);
-        assert_eq!(ffmax(f64::NAN, 0.0), 0.0);
+        assert_eq!(max(f64::NAN, 0.0), 0.0);
+        assert!(max(0.0, f64::NAN).is_nan());
     }
 }

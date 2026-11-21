@@ -9,15 +9,15 @@ use triergon_raster::{Vector, pixels_26_6};
 use triergon_shape::bidi::Level;
 
 use super::fonts::Library;
+use super::from_26_6;
 use super::geometry::{Geometry, Scales};
 use super::outlines::{GlyphKey, KeptOutline, Outlines};
 use super::shaping::{Shaped, ShapedGlyph, Shaping};
 use super::text::{Char, Evaluated, Text};
-use super::units::{d6_to_double, fmax};
 use super::wrap::{Lines, WrapText, Wrapping};
 use crate::{
     EventState, HAlign, Justify, Karaoke, KaraokeGlyph, KaraokeMark, Limits, Margins, Rgba,
-    Syllables,
+    Syllables, number,
 };
 
 /// An outline and how it is scaled to the frame.
@@ -397,7 +397,7 @@ impl Layout {
         for i in range {
             let symbol = text.chars()[i].symbol;
             if self.chars[i].shown && symbol != u32::from(b'\n') && symbol != 0 {
-                width += d6_to_double(self.advances[i].x);
+                width += from_26_6(self.advances[i].x);
             }
         }
         width
@@ -412,7 +412,7 @@ impl Layout {
         max_text_width: f64,
     ) {
         let max_width = self.lines.lines.iter().fold(0.0, |max, line| {
-            fmax(max, self.line_width(text, line.chars.clone()))
+            number::max(max, self.line_width(text, line.chars.clone()))
         });
         for line in self.lines.lines.iter() {
             let width = self.line_width(text, line.chars.clone());
@@ -454,9 +454,9 @@ impl Layout {
             .zip(&*self.advances)
         {
             if laid.shown {
-                let s = d6_to_double(self.glyphs[cluster.glyphs.start].pos.x);
+                let s = from_26_6(self.glyphs[cluster.glyphs.start].pos.x);
                 x_min = x_min.min(s);
-                x_max = x_max.max(s + d6_to_double(advance.x));
+                x_max = x_max.max(s + from_26_6(advance.x));
             }
         }
         TextBox {

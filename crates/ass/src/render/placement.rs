@@ -14,12 +14,12 @@ use triergon_raster::compat::libass::{
 use triergon_raster::{Vector, pixels_26_6};
 
 use super::collisions;
+use super::from_26_6;
 use super::geometry::{Geometry, Scales};
 use super::layout::{LaidChar, Layout, TextBox, Timing};
 use super::outlines::KeptOutline;
 use super::shaping::Shaped;
 use super::text::{Char, GlyphStyle, Text};
-use super::units::d6_to_double;
 use crate::{
     EventState, HAlign, Karaoke, Margins, Placement as EventPlacement, Rgba, ScrollDirection,
     VAlign,
@@ -407,7 +407,7 @@ impl<'a> Placer<'a> {
             advance: style.spacing_scaled.wrapping_add(glyph.advance.x),
             scale_fix: style.scale_fix,
             position: Vector::new(
-                pixels_26_6(self.x + d6_to_double(glyph.pos.x) * par),
+                pixels_26_6(self.x + from_26_6(glyph.pos.x) * par),
                 self.y.wrapping_add(glyph.pos.y),
             ),
             outline_scale: outline.scale,
