@@ -419,10 +419,36 @@ pub fn fate_coverage(
 /// which list `samples` with their `sha256`.
 const REVIEWED_INPUTS: [&str; 2] = ["harness/fonts/corpus.json", "harness/fate/samples.json"];
 
-fn reviewed_inputs(root: &Path) -> Result<Vec<Value>, String> {
-    REVIEWED_INPUTS
+fn reviewed_input_sets(root: &Path, contract: &Value) -> Result<Vec<PathBuf>, String> {
+    let Some(sets) = contract.get("reviewed_input_sets") else {
+        return Ok(Vec::new());
+    };
+    sets.as_array()
+        .ok_or("reviewed_input_sets must be a list")?
         .iter()
-        .map(|path| read_json(&root.join(path)).map_err(|e| format!("{path}: {e}")))
+        .map(|value| {
+            let name = value
+                .as_str()
+                .filter(|name| {
+                    !name.is_empty()
+                        && name
+                            .bytes()
+                            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+                })
+                .ok_or("invalid reviewed input set name")?;
+            Ok(root
+                .join("harness/evidence/sets")
+                .join(format!("{name}.json")))
+        })
+        .collect()
+}
+
+fn reviewed_inputs(root: &Path, contract: &Value) -> Result<Vec<Value>, String> {
+    REVIEWED_INPUTS
+        .into_iter()
+        .map(|path| root.join(path))
+        .chain(reviewed_input_sets(root, contract)?)
+        .map(|path| read_json(&path).map_err(|e| format!("{}: {e}", path.display())))
         .collect()
 }
 
@@ -448,7 +474,12 @@ fn rights_reviewed(reviewed: &[Value], case: &Value) -> bool {
             };
             reviewed
                 .iter()
-                .flat_map(|manifest| list(manifest, "sources"))
+                .flat_map(
+                    |manifest| match manifest.get("sources").and_then(Value::as_array) {
+                        Some(sources) => sources,
+                        None => std::slice::from_ref(manifest),
+                    },
+                )
                 .filter(|source| s(source, "licence") == Some(licence))
                 .flat_map(|source| list(source, "files"))
                 .any(|file| s(file, "sha256") == Some(sha))
@@ -1010,9 +1041,11 @@ pub(crate) fn gate_key(
         "harness/comparison-rules.json",
     ]
     .map(|path| root.join(path));
+    let input_sets = reviewed_input_sets(root, &contract)?;
     let files: Vec<&Path> = [options.contract.as_path(), options.manifest.as_path()]
         .into_iter()
         .chain(shared.iter().chain(documents).map(PathBuf::as_path))
+        .chain(input_sets.iter().map(PathBuf::as_path))
         .chain(options.additional_reports.iter().map(PathBuf::as_path))
         .collect();
     let workers: Vec<(&str, &Path)> = workers
@@ -1138,7 +1171,7 @@ pub(crate) fn collect(
         .corpus
         .canonicalize()
         .map_err(|e| format!("{}: {e}", options.corpus.display()))?;
-    let reviewed = reviewed_inputs(root)?;
+    let reviewed = reviewed_inputs(root, &contract)?;
     let cases = manifest
         .get("cases")
         .and_then(Value::as_array)
@@ -1615,7 +1648,7 @@ pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
 mod prefix_tests {
     use super::{
         PrefixFeature, entity_input_failure, measure_pinned, open_cases, ratchet, read_json,
-        recorded_corpus, reviewed_inputs, rights_reviewed, s,
+        recorded_corpus, reviewed_input_sets, reviewed_inputs, rights_reviewed, s,
     };
     use crate::json::{Value, parse};
     use std::collections::BTreeMap;
@@ -1777,6 +1810,8 @@ mod prefix_tests {
             )
             .unwrap(),
             parse(r#"{"samples": [{"path": "fate/a.ts", "sha256": "cc"}]}"#).unwrap(),
+            parse(r#"{"licence": "CC0-1.0", "files": [{"path": "a.flac", "sha256": "dd"}]}"#)
+                .unwrap(),
         ];
         let case = |text: &str| parse(text).unwrap();
         assert!(rights_reviewed(
@@ -1787,6 +1822,8 @@ mod prefix_tests {
         assert!(rights_reviewed(&reviewed, &case(font)));
         let fetched = r#"{"rights": "fetched-not-redistributed", "sha256": "cc"}"#;
         assert!(rights_reviewed(&reviewed, &case(fetched)));
+        let archived = r#"{"rights": "reviewed-licence", "licence": "CC0-1.0", "sha256": "dd"}"#;
+        assert!(rights_reviewed(&reviewed, &case(archived)));
         for unreviewed in [
             r#"{"rights": "fetched-not-redistributed", "sha256": "aa"}"#,
             r#"{"rights": "fetched-not-redistributed", "source": "fate-suite/a.ts"}"#,
@@ -1805,9 +1842,21 @@ mod prefix_tests {
     }
 
     #[test]
+    fn reviewed_input_sets_resolve_only_evidence_names() {
+        let root = Path::new("repo");
+        let contract = parse(r#"{"reviewed_input_sets": ["source-a"]}"#).unwrap();
+        assert_eq!(
+            reviewed_input_sets(root, &contract).unwrap(),
+            [root.join("harness/evidence/sets/source-a.json")]
+        );
+        let invalid = parse(r#"{"reviewed_input_sets": ["../source"]}"#).unwrap();
+        assert!(reviewed_input_sets(root, &invalid).is_err());
+    }
+
+    #[test]
     fn every_subtitle_case_may_be_measured() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let reviewed = reviewed_inputs(root).unwrap();
+        let reviewed = reviewed_inputs(root, &Value::Null).unwrap();
         for feature in ["pgs", "dvb", "dvd", "cc", "teletext"] {
             let path = root.join(format!("harness/features/subtitle-{feature}/corpus.json"));
             let manifest = read_json(&path).unwrap();
@@ -1916,7 +1965,7 @@ mod prefix_tests {
                 ("font-outlines", "font-", 53),
             ]
         );
-        let reviewed = reviewed_inputs(root).unwrap();
+        let reviewed = reviewed_inputs(root, &Value::Null).unwrap();
         for feature in &features {
             assert_eq!(feature.corpus, root.join(".research/fonts/files"));
             assert!(

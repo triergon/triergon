@@ -415,7 +415,13 @@ const VECTOR_CONTRACT: &str = "harness/features/matroska-segment-metadata/contra
 pub fn vectors(root: &Path, net: &dyn Transport, limit: usize) -> Result<Vec<String>, String> {
     let cache = download_cache();
     let mut verified = required_vectors(root, net, cache.as_deref(), limit)?;
-    verified.extend(fate_corpus_vectors(root, net, cache.as_deref(), limit)?);
+    verified.extend(fetch_pins(
+        root,
+        corpus_pins(root)?,
+        net,
+        cache.as_deref(),
+        limit,
+    )?);
     crate::transport_fixtures::dts_discovery::prepare(root)?;
     Ok(verified)
 }
@@ -426,12 +432,13 @@ pub struct Pin {
     pub directory: String,
     pub file: String,
     pub sha256: String,
+    url: Option<String>,
 }
 
 /// Every vector `fetch-vectors` fetches, without fetching any.
 pub fn pins(root: &Path) -> Result<Vec<Pin>, String> {
     let mut pins = required_pins(root)?;
-    pins.extend(fate_corpus_pins(root)?);
+    pins.extend(corpus_pins(root)?);
     Ok(pins)
 }
 
@@ -442,16 +449,6 @@ fn required_vectors(
     limit: usize,
 ) -> Result<Vec<String>, String> {
     fetch_pins(root, required_pins(root)?, net, cache, limit)
-}
-
-/// Fetch the FATE cases of registered corpora that request them.
-fn fate_corpus_vectors(
-    root: &Path,
-    net: &dyn Transport,
-    cache: Option<&Path>,
-    limit: usize,
-) -> Result<Vec<String>, String> {
-    fetch_pins(root, fate_corpus_pins(root)?, net, cache, limit)
 }
 
 fn fetch_pins(
@@ -467,9 +464,12 @@ fn fetch_pins(
             &root.join(&pin.directory),
             &pin.file,
             &pin.sha256,
-            net,
             cache,
             limit,
+            |relative| match pin.url.as_deref() {
+                Some(url) => net.https(url, "triergon-required-test-vectors", limit),
+                None => download_vector(relative, net, limit),
+            },
         )?;
         verified.push(pin.file);
     }
@@ -497,16 +497,19 @@ fn required_pins(root: &Path) -> Result<Vec<Pin>, String> {
             directory: ".research/fate-samples".into(),
             file: file.to_owned(),
             sha256: sha256.to_owned(),
+            url: None,
         });
     }
     Ok(pins)
 }
 
-/// The FATE cases of registered corpora that request them, once each.
-fn fate_corpus_pins(root: &Path) -> Result<Vec<Pin>, String> {
+/// The cases declared as public downloads by their registered corpus.
+fn corpus_pins(root: &Path) -> Result<Vec<Pin>, String> {
     let mut all = Vec::new();
     for contract in crate::harness::features::discover(root)? {
-        if contract.document.get("fetch_fate_cases") != Some(&Value::Bool(true)) {
+        let fate = contract.document.get("fetch_fate_cases") == Some(&Value::Bool(true));
+        let https = contract.document.get("fetch_https_cases") == Some(&Value::Bool(true));
+        if !fate && !https {
             continue;
         }
         let manifest = crate::checks::read_json(&contract.manifest())?;
@@ -521,37 +524,51 @@ fn fate_corpus_pins(root: &Path) -> Result<Vec<Pin>, String> {
             .and_then(Value::as_array)
             .unwrap_or_default()
         {
-            let Some(relative) = case
+            let file = case.get("file").and_then(Value::as_str);
+            let url = case.get("input_url").filter(|_| https);
+            let url = url
+                .map(|value| {
+                    value
+                        .as_str()
+                        .filter(|url| {
+                            url.starts_with("https://")
+                                && !url.bytes().any(|byte| byte.is_ascii_whitespace())
+                        })
+                        .ok_or_else(|| format!("{}: invalid input URL", contract.id))
+                })
+                .transpose()?;
+            let fate_path = case
                 .get("source")
                 .and_then(Value::as_str)
                 .and_then(|source| source.strip_prefix("fate-suite/"))
-            else {
-                continue;
+                .filter(|_| fate);
+            let relative = match (url, fate_path) {
+                (Some(_), None) => file
+                    .filter(|file| relative_path(file))
+                    .ok_or_else(|| format!("{}: invalid downloaded input path", contract.id))?,
+                (None, Some(path)) if file == Some(path) => path,
+                (None, None) => continue,
+                _ => return Err(format!("{}: inconsistent input source", contract.id)),
             };
-            if case.get("file").and_then(Value::as_str) != Some(relative) {
-                return Err(format!(
-                    "{}: FATE source and input paths differ",
-                    contract.id
-                ));
-            }
             let expected = case
                 .get("sha256")
                 .and_then(Value::as_str)
                 .ok_or("required vector without a hash")?;
             if pins
-                .insert(relative, expected)
-                .is_some_and(|sha| sha != expected)
+                .insert(relative, (expected, url))
+                .is_some_and(|pin| pin != (expected, url))
             {
                 return Err(format!(
-                    "{}: conflicting FATE hashes for {relative}",
+                    "{}: conflicting input pins for {relative}",
                     contract.id
                 ));
             }
         }
-        all.extend(pins.into_iter().map(|(file, sha256)| Pin {
+        all.extend(pins.into_iter().map(|(file, (sha256, url))| Pin {
             directory: directory.to_owned(),
             file: file.to_owned(),
             sha256: sha256.to_owned(),
+            url: url.map(str::to_owned),
         }));
     }
     Ok(all)
@@ -564,9 +581,9 @@ pub fn fate_sample(directory: &Path, relative: &str, sha256: &str) -> Result<(),
         directory,
         relative,
         sha256,
-        &Network,
         download_cache().as_deref(),
         VECTOR_LIMIT,
+        |relative| download_vector(relative, &Network, VECTOR_LIMIT),
     )
 }
 
@@ -582,9 +599,9 @@ fn fetch_vector(
     directory: &Path,
     relative: &str,
     expected: &str,
-    net: &dyn Transport,
     cache: Option<&Path>,
     limit: usize,
+    download: impl FnOnce(&str) -> Result<Vec<u8>, String>,
 ) -> Result<(), String> {
     if !relative_path(relative) {
         return Err("invalid required vector path".into());
@@ -608,7 +625,7 @@ fn fetch_vector(
     let data = if let Some(data) = cache.and_then(|dir| cached(dir, expected, limit, matches)) {
         data
     } else {
-        let data = download_vector(relative, net, limit)?;
+        let data = download(relative)?;
         if data.len() > limit {
             return Err("required vector exceeds download bound".into());
         }
@@ -720,7 +737,15 @@ mod tests {
             ..Fake::default()
         };
         let input = root.join(".research/range").join(relative);
-        let run = |transport| fate_corpus_vectors(&root, transport, Some(&cache), VECTOR_LIMIT);
+        let run = |transport| {
+            fetch_pins(
+                &root,
+                corpus_pins(&root).unwrap(),
+                transport,
+                Some(&cache),
+                VECTOR_LIMIT,
+            )
+        };
         assert_eq!(run(&net).unwrap(), [relative]);
         assert_eq!(net.calls.borrow().len(), 1);
         assert_eq!(fs::read(&input).unwrap(), bytes);
@@ -731,6 +756,43 @@ mod tests {
         assert_eq!(run(&offline).unwrap(), [relative]);
         assert!(offline.calls.borrow().is_empty());
         assert_eq!(fs::read(&input).unwrap(), bytes);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn licensed_download_uses_the_corpus_url_and_its_pin() {
+        let root = crate::walk::scratch("https-corpus");
+        let feature = root.join("harness/features/frames");
+        let url = "https://example.org/frames.flac";
+        let bytes = b"pinned vector";
+        let hash = sha256::hex(bytes);
+        fs::create_dir_all(&feature).unwrap();
+        fs::write(
+            feature.join("contract.json"),
+            r#"{"id":"frames","fetch_https_cases":true}"#,
+        )
+        .unwrap();
+        fs::write(
+            feature.join("corpus.json"),
+            format!(
+                r#"{{"directory":".research/frames","cases":[{{"file":"test.flac","input_url":"{url}","sha256":"{hash}"}}]}}"#
+            ),
+        )
+        .unwrap();
+        let net = Fake {
+            https: Some(bytes.to_vec()),
+            ..Fake::default()
+        };
+        let pins = corpus_pins(&root).unwrap();
+        assert_eq!(
+            fetch_pins(&root, pins, &net, None, VECTOR_LIMIT).unwrap(),
+            ["test.flac"]
+        );
+        assert_eq!(net.calls.borrow().as_slice(), [url]);
+        assert_eq!(
+            fs::read(root.join(".research/frames/test.flac")).unwrap(),
+            bytes
+        );
         fs::remove_dir_all(root).unwrap();
     }
 

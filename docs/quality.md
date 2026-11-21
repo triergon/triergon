@@ -127,10 +127,12 @@ limit becomes an explicit, reviewed rule for that case.
   collections.
 - **Input rights.** A case is measured only when its `rights` are `authored-synthetic`,
   `reviewed-licence` with a `licence` under which a reviewed input manifest
-  (`harness/fonts/corpus.json`) records the file's hash, or `fetched-not-redistributed`
+  records the file's hash, or `fetched-not-redistributed`
   for an upstream regression sample (or a local remux of one) whose hash
   `harness/fate/samples.json` records: fetched into the ignored cache, compared locally,
-  never redistributed. Any other case fails as `rights-unreviewed`.
+  never redistributed. A report contract can name additional licensed evidence
+  input sets in `reviewed_input_sets`, with each set recording the licence and
+  file hashes. Any other case fails as `rights-unreviewed`.
 - **Authored corpus.** Small canonical streams from synthetic signals and authored
   structures, identical across encoder versions (`cargo xtask fixtures`,
   `harness/features/<feature>/{contract,corpus}.json`).
@@ -139,7 +141,9 @@ limit becomes an explicit, reviewed rule for that case.
   FATE name is not a test until its input, operation and expected result are mapped and
   run.
 - **Required vectors.** Larger external vectors are fetched and hash-verified by `cargo
-  xtask fetch-vectors` and kept outside version control.
+  xtask fetch-vectors` and kept outside version control. A corpus that pins public
+  HTTPS inputs can set `fetch_https_cases` in its contract and give each download
+  an `input_url` and `sha256` in the corpus.
 
 ## Correctness by module family
 

@@ -31,6 +31,69 @@ fn constant_and_verbatim_subframes() {
 }
 
 #[test]
+fn frame_format_transitions_preserve_native_samples() {
+    // RFC 9639 sections 9.1.2 and 9.1.3: each header carries its own
+    // sample rate and channel assignment. Exercise both growth and shrinkage
+    // using the same decoder and output buffers throughout.
+    let cases: &[(u8, u32, &[&[i64]])] = &[
+        (9, 44_100, &[&[1, -2, 3, -4], &[100, 200, -300, -400]]),
+        (10, 48_000, &[&[-7, 8, -9, 10]]),
+        (
+            8,
+            32_000,
+            &[&[11, 12, 13, 14], &[21, 22, 23, 24], &[31, 32, 33, 34]],
+        ),
+        (9, 44_100, &[&[-1, -2, -3, -4], &[4, 3, 2, 1]]),
+    ];
+    let mut flac = decoder(2, 16);
+    let mut integer = flac.integer_frame();
+    let mut float = AudioFrame::default();
+    for &(rate_code, rate, channels) in cases {
+        let mut au = frame(4, (channels.len() - 1) as u8, S16, &|b| {
+            for samples in channels {
+                verbatim(b, 16, samples);
+            }
+        });
+        au[2] = (au[2] & 0xf0) | rate_code;
+        au[7] = triergon_bitstream::crc::crc8(0, &au[..7]);
+        let end = au.len() - 2;
+        let crc = triergon_bitstream::crc::crc16_a52(0, &au[..end]);
+        au[end..].copy_from_slice(&crc.to_be_bytes());
+        flac.decode_integer(&au, &mut integer).unwrap();
+        flac.decode_float(&au, &mut float).unwrap();
+        assert_eq!(
+            (
+                integer.sample_rate,
+                integer.layout.channels(),
+                integer.samples_per_channel
+            ),
+            (rate, channels.len(), 4)
+        );
+        assert_eq!(
+            (
+                float.sample_rate,
+                float.layout.channels(),
+                float.samples_per_channel
+            ),
+            (rate, channels.len(), 4)
+        );
+        for (index, samples) in channels.iter().enumerate() {
+            assert_eq!(
+                integer.plane(index),
+                samples.iter().map(|&v| v as i32).collect::<Vec<_>>()
+            );
+            assert_eq!(
+                float.planes[index],
+                samples
+                    .iter()
+                    .map(|&v| v as f32 / 32768.0)
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+}
+
+#[test]
 fn fixed_predictors_of_every_order() {
     let residual = [3, -1, 4, -1, 5, -9, 2, 6, 0, 1, -2, 1];
     for order in 0..=4usize {

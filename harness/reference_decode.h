@@ -31,6 +31,7 @@
 #include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/intreadwrite.h>
 #include <libavutil/opt.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -297,7 +298,53 @@ static int file_lane(const char *name, const char **demuxer) {
 
 /* A file-format lane: the demuxer reads the piped (non-seekable) file, the decoder for
  * its first audio stream decodes every packet, and the same filter chain converts. */
-static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, struct out *o) {
+static void flac_frame(const AVFrame *frame, uint8_t **bytes, unsigned *capacity, struct out *o) {
+    int channels = frame->ch_layout.nb_channels;
+    int samples = frame->nb_samples;
+    enum AVSampleFormat format = frame->format;
+    if (channels < 1 || channels > 8 || samples < 1 || samples > UINT16_MAX ||
+        (format != AV_SAMPLE_FMT_S16 && format != AV_SAMPLE_FMT_S16P &&
+         format != AV_SAMPLE_FMT_S32 && format != AV_SAMPLE_FMT_S32P))
+        die("FLAC frame format", AVERROR_INVALIDDATA);
+    size_t count = (size_t)samples * channels;
+    size_t needed = 12 + count * 4;
+    av_fast_malloc(bytes, capacity, needed);
+    if (!*bytes) die("FLAC PCM output", AVERROR(ENOMEM));
+    AV_WL32(*bytes, frame->sample_rate);
+    AV_WL32(*bytes + 4, channels);
+    AV_WL32(*bytes + 8, samples);
+    int planar = av_sample_fmt_is_planar(format);
+    int width = av_get_bytes_per_sample(format);
+    uint8_t *output = *bytes + 12;
+    for (int sample = 0; sample < samples; sample++) {
+        for (int channel = 0; channel < channels; channel++) {
+            const uint8_t *input = frame->extended_data[planar ? channel : 0] +
+                (size_t)(planar ? sample : sample * channels + channel) * width;
+            float value;
+            if (width == 2) {
+                int16_t sample_value;
+                memcpy(&sample_value, input, 2);
+                value = (float)sample_value / 32768.0f;
+            } else {
+                int32_t sample_value;
+                memcpy(&sample_value, input, 4);
+                value = (float)sample_value / 2147483648.0f;
+            }
+            uint32_t bits;
+            memcpy(&bits, &value, 4);
+            AV_WL32(output, bits);
+            output += 4;
+        }
+    }
+    fold(&o->digest, *bytes, needed);
+    if (o->raw && fwrite(*bytes, 1, needed, o->raw) != needed)
+        die("FLAC PCM output", AVERROR(EIO));
+    o->frames++;
+    o->bytes += needed;
+}
+
+static void demux_pass(const char *demuxer, const uint8_t *data, size_t size,
+                       int flac_frames, struct out *o) {
     struct memory_input m = {data, size, 0};
     unsigned char *buffer = av_malloc(65536);
     AVIOContext *io = avio_alloc_context(buffer, 65536, 0, &m, memory_read, NULL, NULL);
@@ -329,13 +376,18 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
     AVFrame *frame = av_frame_alloc();
     AVFilterGraph *graph = NULL;
     AVFilterContext *src = NULL, *sink = NULL;
+    uint8_t *native_bytes = NULL;
+    unsigned capacity = 0;
     for (int done = 0; !done;) {
         r = av_read_frame(fmt, pkt);
         if (r < 0) {
-            avcodec_send_packet(dec, NULL);
+            if (flac_frames && r != AVERROR_EOF) die("read FLAC", r);
+            r = avcodec_send_packet(dec, NULL);
+            if (flac_frames && r < 0) die("FLAC drain", r);
             done = 1;
         } else {
-            if (pkt->stream_index == index && (r = avcodec_send_packet(dec, pkt)) < 0 && r != AVERROR_INVALIDDATA)
+            if (pkt->stream_index == index && (r = avcodec_send_packet(dec, pkt)) < 0 &&
+                (flac_frames || r != AVERROR_INVALIDDATA))
                 die("send", r);
             av_packet_unref(pkt);
         }
@@ -343,6 +395,11 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
             r = avcodec_receive_frame(dec, frame);
             if (r == AVERROR(EAGAIN) || r == AVERROR_EOF) break;
             if (r < 0) die("receive", r);
+            if (flac_frames) {
+                flac_frame(frame, &native_bytes, &capacity, o);
+                av_frame_unref(frame);
+                continue;
+            }
             if (!graph) graph = graph_for(dec, frame, 0, &src, &sink);
             if ((r = av_buffersrc_add_frame_flags(src, frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0) die("buffersrc", r);
             av_frame_unref(frame);
@@ -353,6 +410,15 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
         if ((r = av_buffersrc_add_frame_flags(src, NULL, 0)) < 0) die("buffersrc eof", r);
         sink_frames(sink, o, 0);
         avfilter_graph_free(&graph);
+    }
+    if (flac_frames) {
+        static const uint8_t eof[] = "EOF";
+        fold(&o->digest, eof, sizeof eof);
+        if (o->raw && fwrite(eof, 1, sizeof eof, o->raw) != sizeof eof)
+            die("FLAC EOF output", AVERROR(EIO));
+        o->frames++;
+        o->bytes += sizeof eof;
+        av_free(native_bytes);
     }
     av_frame_free(&frame);
     av_packet_free(&pkt);
@@ -371,8 +437,10 @@ static void pass(const char *name, const AVCodecParameters *par, const uint8_t *
     const char *demuxer;
     if (configured_aac_operation(name, video))
         aac_access_units(data, size, o);
+    else if (!video && !strcmp(name, "flac-frames"))
+        demux_pass("flac", data, size, 1, o);
     else if (!video && file_lane(name, &demuxer))
-        demux_pass(demuxer, data, size, o);
+        demux_pass(demuxer, data, size, 0, o);
     else
         one_pass(name, par, data, size, video, o);
 }
@@ -431,8 +499,17 @@ int main(int argc, char **argv) {
         if (write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16) return 2;
         /* Equal memory work is equal units and bytes; the digest goes to stderr because
          * audio output may differ within the graded 1 LSB (see native_correctness.py). */
-        printf("{\"packets\":%llu,\"bytes\":%llu}\n", (unsigned long long)o.frames, (unsigned long long)o.bytes);
-        fprintf(stderr, "{\"digest\":%llu}\n", (unsigned long long)fold_finish(o.digest));
+        if (!video && !strcmp(name, "flac-frames")) {
+            printf("{\"packets\":%llu,\"bytes\":%llu,\"digest\":%llu}\n", (unsigned long long)o.frames,
+                   (unsigned long long)o.bytes, (unsigned long long)fold_finish(o.digest));
+        } else {
+            printf("{\"packets\":%llu,\"bytes\":%llu}\n", (unsigned long long)o.frames, (unsigned long long)o.bytes);
+            fprintf(stderr, "{\"digest\":%llu}\n", (unsigned long long)fold_finish(o.digest));
+        }
+    } else if (!strcmp(kind, "fold") && !video && !strcmp(name, "flac-frames")) {
+        pass(name, par, data, (size_t)size, video, &o);
+        printf("{\"packets\":%llu,\"bytes\":%llu,\"digest\":%llu,\"eof\":true}\n", (unsigned long long)o.frames,
+               (unsigned long long)o.bytes, (unsigned long long)fold_finish(o.digest));
     } else if (!strcmp(kind, "raw") && argc > 3) {
         o.raw = fopen(argv[3], "wb");
         if (!o.raw) die("raw output", AVERROR(errno));
