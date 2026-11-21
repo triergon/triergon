@@ -8,7 +8,8 @@ use std::cell::RefCell;
 use triergon_core::{Budget, Bytes, WorkBudget};
 use triergon_font::compat::libass;
 use triergon_font::{Font, GlyphId, Limits};
-use triergon_shape::{Extents, FaceRotations, GlyphRotations, Metrics, SizedMetrics};
+use triergon_shape::compat::libass::{FaceRotations, GlyphRotations, SizedMetrics};
+use triergon_shape::{Extents, Metrics};
 
 fn vertical_font() -> (Budget, Font) {
     let budget = Budget::new(16 << 20).expect("budget");

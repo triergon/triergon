@@ -6,22 +6,19 @@ use std::hash::Hash;
 use triergon_core::{Budget, Error, Reservation, Result};
 use triergon_font::GlyphId;
 
-/// libass's first code point an `@` font draws rotated
-/// (`VERTICAL_LOWER_BOUND`).
+/// The first code point an `@` font draws rotated.
 const VERTICAL_LOWER_BOUND: u32 = 0x2F1;
 
-/// Whether an `@` font draws a glyph found through `code` turned by 90°
-/// (`DECO_ROTATE` in `ass_render.c`), and whether that lookup rotates the
-/// glyph's metrics when it is the glyph's first: code points from U+02F1.
+/// Whether an `@` font draws a glyph found through `code` turned by 90°, and
+/// whether that lookup rotates the glyph's metrics when it is the glyph's
+/// first: code points from U+02F1.
 pub const fn rotates(code: u32) -> bool {
     code >= VERTICAL_LOWER_BOUND
 }
 
-/// The rotation decisions of libass's glyph metrics cache for `@` fonts
-/// (`get_cached_metrics` and `ass_glyph_metrics_construct` in
-/// `ass_shaper.c`): whether the default-load metrics the cache keeps for a
-/// glyph of face `K` are rotated, their horizontal advance replaced by the
-/// vertical one.
+/// The rotation decisions of libass's glyph metrics cache for `@` fonts:
+/// whether the default-load metrics the cache keeps for a glyph of face `K`
+/// are rotated, their horizontal advance replaced by the vertical one.
 ///
 /// The first lookup that loads a glyph decides: a character lookup through a
 /// code point that [`rotates`] rotates it, and any other lookup (another
@@ -113,7 +110,7 @@ impl<K: Copy + Eq + Hash> GlyphRotations<K> {
 /// The decisions of one face at one size, which [`SizedMetrics::rotating`]
 /// reads and records.
 ///
-/// [`SizedMetrics::rotating`]: crate::SizedMetrics::rotating
+/// [`SizedMetrics::rotating`]: super::SizedMetrics::rotating
 #[derive(Debug)]
 pub struct FaceRotations<'a, K> {
     rotations: &'a RefCell<GlyphRotations<K>>,

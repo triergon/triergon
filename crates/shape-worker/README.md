@@ -19,7 +19,7 @@ shape-worker OPERATION-dump   FILE ARGUMENT...
 | OPERATION | FILE | ARGUMENT... | Read |
 |---|---|---|---|
 | `shape` | a font file | `DIRECTION SCRIPT LANGUAGE FEATURES TEXT...` | every text shaped as one run with every face of the file at its default scale: the glyph count, then every glyph's id, cluster, advances and offsets; packets count glyphs and bytes code points |
-| `shape-libass` | a font file | `SIZE DIRECTION SCRIPT LANGUAGE FEATURES TEXT...` | as `shape`, but every face at the 26.6 pixel height `SIZE` through `SizedMetrics`, libass's font functions; a face it cannot set up is recorded as rejected |
+| `shape-libass` | a font file | `SIZE DIRECTION SCRIPT LANGUAGE FEATURES TEXT...` | as `shape`, but every face at the 26.6 pixel height `SIZE` through `compat::libass::SizedMetrics`, libass's font functions; a face it cannot set up is recorded as rejected |
 | `bidi` | text, one paragraph or line set per line | `BASE BRACKETS` | levels per paragraph and each line reordered as libass does: directions, levels and the visual-to-logical map; packets count lines |
 | `simple` | text, one line each | `BASE` | libass's simple shaping level: the shaped code points; packets count lines |
 | `unicode` | code point ranges | none | every code point's HarfBuzz and FriBidi properties; packets count code points |

@@ -18,9 +18,9 @@ use triergon_core::{Budget, Bytes, WorkBudget};
 use triergon_font::compat::libass;
 use triergon_font::{Font, Limits};
 use triergon_shape::bidi::{self, BaseDirection, BidiClass, Bracket, Level, Resolver};
+use triergon_shape::compat::libass::SizedMetrics;
 use triergon_shape::{
-    Buffer, Direction, Face, Feature, Language, Metrics, OtMetrics, Plan, Scale, Script,
-    SizedMetrics, Tag,
+    Buffer, Direction, Face, Feature, Language, Metrics, OtMetrics, Plan, Scale, Script, Tag,
 };
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;

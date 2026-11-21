@@ -42,13 +42,14 @@ for (glyph, position) in buffer.glyphs() {
 `shape` shapes `text[item]` with the rest of `text` as context, as
 `hb_buffer_add_utf32` does; clusters are indices into `text` and glyphs come in
 visual order, positioned in the units of the metrics' `Scale`. `Metrics` is the
-font-function interface. `SizedMetrics` answers as libass's FreeType-backed
-functions do over a face at a size (`triergon_font::SizedFont`): the character
-map libass selects, or with `SizedMetrics::with_charmap` the one a face has been
-left on, read as libass reads it, default-load advances and `FT_KERNING_DEFAULT`
-kerning, at the size's scale and pixels per em, loading charstrings within the
-caller's `WorkBudget`. For a face of an `@` font, `SizedMetrics::rotating` takes
-one face's entries (`FaceRotations`) of libass's glyph metrics cache,
+font-function interface. `compat::libass` holds what libass decides about
+shaping: `SizedMetrics` answers as libass's FreeType-backed functions do over a
+face at a size (`triergon_font::SizedFont`): the character map libass selects,
+or with `SizedMetrics::with_charmap` the one a face has been left on, read as
+libass reads it, default-load advances and `FT_KERNING_DEFAULT` kerning, at the
+size's scale and pixels per em, loading charstrings within the caller's
+`WorkBudget`. For a face of an `@` font, `SizedMetrics::rotating` takes one
+face's entries (`FaceRotations`) of libass's glyph metrics cache,
 `GlyphRotations`, which its owner keys by font, face and size as libass does and
 keeps as long as it shapes: a glyph whose first lookup is through a code point
 that `rotates` (U+02F1 and above) advances by its default-load vertical advance,
@@ -255,8 +256,8 @@ Paragraphs are limited to 2³² characters.
     FreeType: `ass_font_index_magic` with `FT_Get_Char_Index` and
     `FT_Face_GetCharVariantIndex`, cached `FT_LOAD_DEFAULT` metrics for advances
     and extents, that load's outline for contour points, and
-    `FT_KERNING_DEFAULT` kerning. The candidate shapes with `SizedMetrics` over
-    `compat::libass::at_size`. This compares device tables, contour-point anchors and
+    `FT_KERNING_DEFAULT` kerning. The candidate shapes with
+    `compat::libass::SizedMetrics` over `triergon_font::compat::libass::at_size`. This compares device tables, contour-point anchors and
     FreeType's advances, the extents fallback mark positioning reads from
     glyphs FreeType's auto-hinter gives a CJK style (NotoEmoji), and the hinted
     contour points and extents of instructed TrueType faces (DejaVu Sans `c` with
@@ -312,8 +313,8 @@ conformance files check UAX #9 itself.
 
 MIT or Apache-2.0, at your option, with HarfBuzz 14.6.0's "Old MIT" licence and libass
 0.17.5's ISC licence for the modules derived from them: the shaping pipeline, layout
-tables, script shapers and their generated tables are translated from HarfBuzz, and the
-sized font functions and `@` font rotations follow libass. `LICENSE` holds the
+tables, script shapers and their generated tables are translated from HarfBuzz, and
+`compat::libass` (the sized font functions and `@` font rotations) follows libass. `LICENSE` holds the
 notices, including the Unicode data notices described in
 [THIRD-PARTY.md](THIRD-PARTY.md), and
 [docs/provenance.md](../../docs/provenance.md#triergon-shape) lists the modules.

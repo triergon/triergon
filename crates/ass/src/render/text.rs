@@ -260,7 +260,7 @@ impl Text {
             let decorations = Decorations {
                 underline: glyph.state.underline,
                 strike_out: glyph.state.strike_out,
-                rotate: desc.vertical && triergon_shape::rotates(symbol),
+                rotate: desc.vertical && triergon_shape::compat::libass::rotates(symbol),
             };
             let style = GlyphStyle::new(&glyph.state, decorations, drawing.is_some(), scales, par);
             // The previous character's style is the last one kept: an equal

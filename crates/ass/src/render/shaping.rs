@@ -16,9 +16,9 @@ use triergon_font::GlyphId;
 use triergon_font::compat::libass;
 use triergon_raster::{Vector, pixels_26_6};
 use triergon_shape::bidi::{BaseDirection, BidiClass, Level, Resolver, reorder_line};
+use triergon_shape::compat::libass::{FaceRotations, GlyphRotations, SizedMetrics};
 use triergon_shape::{
-    Buffer, Direction, Face, FaceRotations, Feature, GlyphRotations, Language, Plan,
-    Script as WritingScript, SizedMetrics, Tag,
+    Buffer, Direction, Face, Feature, Language, Plan, Script as WritingScript, Tag,
 };
 
 use super::fonts::Library;
