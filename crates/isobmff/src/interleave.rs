@@ -4,8 +4,11 @@
 //! demux packet schedule. This module implements an explicitly selected physical
 //! address order. It does not claim the reference MOV reader's default interleaving.
 use crate::{
-    BoxHeader, FragmentCursor, FragmentIndex, Sample, SampleCursor, SampleStep, SampleTable,
-    SpanStep, TimingRunPolicy, TimingRunSurplus, fragment::RunPosition, regular::SampleRanges,
+    Sample, SampleStep,
+    boxes::BoxHeader,
+    fragment::{FragmentCursor, FragmentIndex, RunPosition},
+    sample::SpanStep,
+    table::{SampleCursor, SampleRanges, SampleTable, TimingRunPolicy, TimingRunSurplus},
 };
 use std::{
     ops::Range,

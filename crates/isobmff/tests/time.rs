@@ -1,7 +1,10 @@
 mod common;
 use common::child;
 use triergon_core::{Budget, Time, TimeBase, WorkBudget};
-use triergon_isobmff::{EditList, Limits, MovieHeader, SampleStep, TrackHeader};
+use triergon_isobmff::{
+    Limits, SampleStep,
+    movie::{EditList, MovieHeader, TrackHeader},
+};
 
 #[test]
 fn prime_scale_edit_mapping_keeps_the_independent_fraction_exact() {
@@ -69,7 +72,7 @@ fn prime_scale_edit_mapping_keeps_the_independent_fraction_exact() {
 #[test]
 fn empty_and_non_unit_edit_rates_do_not_fabricate_point_mappings() {
     use triergon_core::Error;
-    use triergon_isobmff::EditEntry;
+    use triergon_isobmff::movie::EditEntry;
     let base = TimeBase::new(1, 48_000).unwrap();
     let zero = Time::new(0, 1).unwrap();
     let empty = EditEntry {

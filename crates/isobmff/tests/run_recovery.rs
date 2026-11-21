@@ -3,10 +3,12 @@ use common::{child, roots};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, Time, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    BoxView, BuildStatus, Limits, PhysicalInterleaveLimits, PhysicalSampleCursor, SampleStep,
-    SampleTableBuilder, SourceCompositionLookup, SourceSeekLimits, SourceSeekPlanner,
-    SourceSeekRequest, SourceTrack, TimingRunPolicy,
+    BuildStatus, Limits, SampleStep,
+    boxes::BoxView,
     compat::mov::recovery::{RunKind, RunRecoveryBuilder, RunRecoveryProfile, RunRecoveryTable},
+    interleave::{PhysicalInterleaveLimits, PhysicalSampleCursor, SourceTrack},
+    seek::{SourceCompositionLookup, SourceSeekLimits, SourceSeekPlanner, SourceSeekRequest},
+    table::{SampleTableBuilder, TimingRunPolicy},
 };
 const STTS: &[u8] = include_bytes!("fixtures/bad-stts-count-mismatch.mov");
 const CTTS: &[u8] = include_bytes!("fixtures/bad-ctts-count-mismatch.mov");

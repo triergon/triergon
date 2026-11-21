@@ -4,8 +4,15 @@ use common::{child, children, roots, table};
 use std::sync::atomic::AtomicBool;
 use triergon_core::TimeBase;
 use triergon_core::{Budget, Error, InputCursor, SourceCapabilities, SourceId, WorkBudget};
+#[cfg(feature = "reference-trace")]
 use triergon_isobmff::{
-    BoxView, ConfigurationLimits, EditList, Limits, SampleStep, SampleTable, TrackHeader,
+    BuildStatus,
+    compat::mov::packets::StreamView,
+    reference_trace::mov::sample_entry::{PrivateCatalogueProfile, PrivateConfigurationJob},
+};
+use triergon_isobmff::{
+    Limits, SampleStep,
+    boxes::BoxView,
     compat::mov::{
         edits::{EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditProfile},
         encoded::{
@@ -14,12 +21,9 @@ use triergon_isobmff::{
         },
         packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
     },
-};
-#[cfg(feature = "reference-trace")]
-use triergon_isobmff::{
-    BuildStatus,
-    compat::mov::packets::StreamView,
-    reference_trace::mov::sample_entry::{PrivateCatalogueProfile, PrivateConfigurationJob},
+    config::ConfigurationLimits,
+    movie::{EditList, TrackHeader},
+    table::SampleTable,
 };
 #[cfg(feature = "reference-trace")]
 const RAW: &[u8] = include_bytes!("fixtures/private-catalogue-v8/dOps-only-size-11.mov");

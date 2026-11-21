@@ -4,13 +4,15 @@ use common::{child, fixtures::CASES};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    BoxView, BuildStatus, EditList, Limits, MovieHeader, Sample, SampleCursor, SampleStep,
-    TrackHeader,
+    BuildStatus, Limits, Sample, SampleStep,
+    boxes::BoxView,
     compat::mov::{
         edits::{EditCursor, EditLimits},
         packets::{CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, ResumePoint},
         seek::GlobalSeekJob,
     },
+    movie::{EditList, MovieHeader, TrackHeader},
+    table::SampleCursor,
 };
 
 fn word_box(kind: &[u8; 4], rows: &[u32], version: u8) -> Vec<u8> {

@@ -1,6 +1,6 @@
 use crate::common;
 use triergon_core::Budget;
-use triergon_isobmff::{BoxView, RecoveryKind};
+use triergon_isobmff::{boxes::BoxView, sample_groups::RecoveryKind};
 
 pub fn boxed(pool: &Budget, kind: &[u8; 4], payload: &[u8], start: u64) -> BoxView {
     let mut wire = u32::try_from(payload.len() + 8)

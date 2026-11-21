@@ -5,7 +5,7 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, TimeBase, WorkBudget,
 };
 use triergon_isobmff::{
-    ConfigurationLimits, EditList, Limits, SampleStep, SampleTable, TrackHeader,
+    Limits, SampleStep,
     compat::mov::{
         edits::{
             EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
@@ -18,6 +18,9 @@ use triergon_isobmff::{
         packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
         seek::{IndexCursor, IndexLimits},
     },
+    config::ConfigurationLimits,
+    movie::{EditList, TrackHeader},
+    table::SampleTable,
 };
 const BASE: &[u8] = include_bytes!("fixtures/encoded-dependency-v4/dep-unreferenced.mp4");
 struct Source {

@@ -5,7 +5,7 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
 use triergon_isobmff::{
-    ConfigurationLimits, Sample, SampleStep, SampleTable, TrackHeader,
+    Sample, SampleStep,
     compat::mov::{
         encoded::{
             EncodedConfigProfile, EncodedConfigSequence, EncodedConfigStep, EncodedCreation,
@@ -13,6 +13,9 @@ use triergon_isobmff::{
         },
         packets::CursorStatus,
     },
+    config::ConfigurationLimits,
+    movie::TrackHeader,
+    table::SampleTable,
 };
 const BASE: &[u8] = include_bytes!("fixtures/encoded-v1/control-avc-aac-front.mp4");
 const DIFFERENT: &[u8] = include_bytes!("fixtures/encoded-config-v3/different121.mp4");

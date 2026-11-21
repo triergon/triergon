@@ -14,13 +14,8 @@ use triergon_core::{
     Time, WorkBudget, blocking::Feed,
 };
 use triergon_isobmff::{
-    BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView, BuildStatus, EditList, FragmentBuilder,
-    FragmentContext, FragmentIndex, ImplicitBase, Limits, MediaDataPolicy, MovieHeader,
-    MovieSeekClocks, MovieSeekLimits, MovieSeekResult, MovieSourceSeekContext,
-    MovieSourceSeekPlanner, RecoveryDescriptions, RecoveryKind, RecoveryMappings, RecoveryScope,
-    RecoverySyntax, Sample, SampleDescription, SampleReader, SampleStep, SampleTable,
-    SampleTableBuilder, SampleTablePolicy, SourcePacket, SourceTrack, TrackHeader,
-    TrackSampleCursor, Trex,
+    BuildStatus, Limits, Sample, SampleStep,
+    boxes::{BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView, MediaDataPolicy},
     compat::mov::{
         packets::{CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, StreamView},
         recovery::{
@@ -30,11 +25,23 @@ use triergon_isobmff::{
         },
         seek::{GlobalSeekJob, IndexCursor, IndexLimits, SeekLimits},
     },
+    fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
+    interleave::{SourceTrack, TrackSampleCursor},
+    movie::{EditList, MovieHeader, SampleDescription, TrackHeader},
+    payload::{SampleReader, SourcePacket},
     reference_trace::mov::{
         fragment_clock::{FragmentClockProfile, check_signed_decode_runs},
         sample_entry::{RawVisualEntriesJob, SampleEntryHeaderProfile},
         transport::{RawVideoTransportBuilder, RawVideoTransportProfile},
     },
+    sample_groups::{
+        RecoveryDescriptions, RecoveryKind, RecoveryMappings, RecoveryScope, RecoverySyntax,
+    },
+    seek::{
+        MovieSeekClocks, MovieSeekLimits, MovieSeekResult, MovieSourceSeekContext,
+        MovieSourceSeekPlanner,
+    },
+    table::{SampleTable, SampleTableBuilder, SampleTablePolicy},
 };
 
 const MAX_SAMPLE_BYTES: usize = 16 * 1024 * 1024;
@@ -1255,7 +1262,7 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
         Ok(())
     }
     pub fn index_trace(&self, model: &Model, out: &mut String) -> Result<()> {
-        use triergon_isobmff::{
+        use triergon_isobmff::index::{
             FragmentRandomAccessStep, IndexStep, MovieFragmentRandomAccessTail, SegmentIndex,
             TrackFragmentRandomAccess,
         };
@@ -1357,7 +1364,7 @@ fn groups(
             descriptions = Some(RecoveryDescriptions::parse(
                 box_.clone(),
                 syntax,
-                triergon_isobmff::RecoveryLimits::default(),
+                triergon_isobmff::sample_groups::RecoveryLimits::default(),
             )?);
         } else {
             if mappings.is_some() {
@@ -1365,7 +1372,7 @@ fn groups(
             }
             mappings = Some(RecoveryMappings::parse(
                 box_.clone(),
-                triergon_isobmff::RecoveryLimits::default(),
+                triergon_isobmff::sample_groups::RecoveryLimits::default(),
             )?);
         }
     }

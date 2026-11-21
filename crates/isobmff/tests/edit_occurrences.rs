@@ -2,11 +2,14 @@ mod common;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    BoxView, EditList, Limits, MovieHeader, Sample, SampleStep, SampleTable, TrackHeader,
+    Limits, Sample, SampleStep,
+    boxes::BoxView,
     compat::mov::{
         edits::{EditCursor, EditLimits},
         packets::{CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
     },
+    movie::{EditList, MovieHeader, TrackHeader},
+    table::SampleTable,
 };
 
 struct Wanted {

@@ -3,11 +3,13 @@ use common::{child, children, roots, table};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Error, InputCursor, SourceCapabilities, SourceId, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Limits, SampleTable, TrackHeader,
+    BuildStatus, Limits,
     compat::mov::packets::StreamView,
+    movie::TrackHeader,
     reference_trace::mov::sample_entry::{
         PrivateCatalogueProfile, PrivateConfigCause, PrivateConfiguration, PrivateConfigurationJob,
     },
+    table::SampleTable,
 };
 const BASE: &[u8] = include_bytes!("fixtures/private-catalogue-v8/dOps-only-size-11.mov");
 struct Source {
@@ -401,7 +403,7 @@ fn prior_rejection_predicate_remains_independent_of_new_catalogue_view() {
     let s = Source::new(BASE);
     let mut old = triergon_isobmff::reference_trace::mov::sample_entry::SampleEntryHeaderJob::new(
         &s.table.descriptions()[0],
-        triergon_isobmff::EntryLayout::Visual,
+        triergon_isobmff::movie::EntryLayout::Visual,
         Limits::default(),
         triergon_isobmff::reference_trace::mov::sample_entry::SampleEntryHeaderProfile,
     )

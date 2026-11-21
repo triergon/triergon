@@ -1,6 +1,6 @@
 mod common;
 use triergon_core::{Budget, Error};
-use triergon_isobmff::{BoxView, FragmentDecodeTime};
+use triergon_isobmff::{boxes::BoxView, fragment::FragmentDecodeTime};
 
 fn view(budget: &Budget, version: u8, flags: [u8; 3], value: &[u8]) -> BoxView {
     let mut bytes = Vec::new();

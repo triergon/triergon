@@ -6,7 +6,7 @@ use common::{collect, off, run_open};
 use triergon_core::{
     Budget, Bytes, InputCursor, Result, SourceCapabilities, SourceId, Time, WorkBudget,
 };
-use triergon_isobmff::{BoxStep, ConfigurationLimits, EntryLayout, Limits};
+use triergon_isobmff::{Limits, boxes::BoxStep, config::ConfigurationLimits, movie::EntryLayout};
 use triergon_mpegts::{
     PacketFormat, ParseLimits, TraceEvent,
     clock::SourceTimePolicy,

@@ -1,8 +1,9 @@
 mod common;
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BoxView, FragmentRandomAccessStep, Limits, MovieFragmentRandomAccessTail,
-    TrackFragmentRandomAccess,
+    Limits,
+    boxes::BoxView,
+    index::{FragmentRandomAccessStep, MovieFragmentRandomAccessTail, TrackFragmentRandomAccess},
 };
 
 fn raw(pool: &Budget, kind: &[u8; 4], body: &[u8], start: u64) -> BoxView {

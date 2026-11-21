@@ -1,6 +1,9 @@
 mod common;
 use triergon_core::{Budget, Error, WorkBudget};
-use triergon_isobmff::{BoxHeader, BoxStep, BoxView, HeaderRead, Limits};
+use triergon_isobmff::{
+    Limits,
+    boxes::{BoxHeader, BoxStep, BoxView, HeaderRead},
+};
 
 #[test]
 fn composition_wire_bits_and_versioned_sign_are_both_preserved() {
@@ -99,7 +102,10 @@ fn retained_sample_entry_keeps_the_shared_core_charge_alive() {
         let table = common::table(stbl, &budget, 1).unwrap();
         let entry = table.descriptions()[0].raw().clone();
         let mut children = table.descriptions()[0]
-            .extensions(triergon_isobmff::EntryLayout::Visual, Limits::default())
+            .extensions(
+                triergon_isobmff::movie::EntryLayout::Visual,
+                Limits::default(),
+            )
             .unwrap();
         let mut count = 0;
         loop {

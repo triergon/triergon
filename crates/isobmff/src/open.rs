@@ -6,9 +6,13 @@
 //! [`InputCursor`]. A source without random access can stop at the first media
 //! after a front movie, which [`Movie::read_scope`] records.
 use crate::{
-    BoxChildren, BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView, BuildStatus, EditList,
-    FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Limits, MovieHeader,
-    SampleTable, SampleTableBuilder, TerminalMdat, TimingRunPolicy, TrackHeader, Trex, fields,
+    BuildStatus, Limits,
+    boxes::{BoxChildren, BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView},
+    fields,
+    fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
+    movie::{EditList, MovieHeader, TrackHeader},
+    payload::TerminalMdat,
+    table::{SampleTable, SampleTableBuilder, TimingRunPolicy},
 };
 use std::{
     ops::Range,
@@ -30,7 +34,11 @@ pub fn box_reader(
     native_recovery: bool,
 ) -> Result<BoxReader> {
     if native_recovery {
-        BoxReader::new_recovery(input, metadata_bytes, crate::RunRecoveryProfile)
+        BoxReader::new_recovery(
+            input,
+            metadata_bytes,
+            crate::table::recovery::RunRecoveryProfile,
+        )
     } else {
         BoxReader::new(input, metadata_bytes)
     }
@@ -814,8 +822,13 @@ impl MovieOpen {
         let mdhd = p.mdhd.as_ref().ok_or(Error::Invalid("missing mdhd"))?;
         let hdlr = p.hdlr.as_ref().ok_or(Error::Invalid("missing hdlr"))?;
         let header = if self.native_recovery {
-            crate::RecoveryTrackHeader::parse(tkhd, mdhd, hdlr, crate::RunRecoveryProfile)?
-                .into_source()
+            crate::compat::mov::field_recovery::RecoveryTrackHeader::parse(
+                tkhd,
+                mdhd,
+                hdlr,
+                crate::table::recovery::RunRecoveryProfile,
+            )?
+            .into_source()
         } else {
             TrackHeader::parse(tkhd, mdhd, hdlr)?
         };

@@ -9,7 +9,6 @@ use triergon_core::{
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_isobmff::{
-    AacConfigurationJob, AacConfigurationStep, ConfigurationLimits, ObjectTypeScan,
     compat::mov::{
         edits::{
             EncodedEditContext as EditContext, EncodedEditJob as EditJob,
@@ -19,6 +18,7 @@ use triergon_isobmff::{
         packets::CursorStatus,
         seek::SeekLimits,
     },
+    config::{AacConfigurationJob, AacConfigurationStep, ConfigurationLimits, ObjectTypeScan},
 };
 use triergon_playback::{
     ByteSource, Format, Mp4Event, Mp4NativeSeekRequest, Mp4Packet, Mp4RangeOpen, Mp4RangePlayer,

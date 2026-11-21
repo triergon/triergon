@@ -6,11 +6,18 @@ mod wire;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, Time, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, CompositionTarget, EditList, MovieEditLocator, MoviePoint, MovieSeekClocks,
-    MovieSeekLimits, MovieSeekResult, MovieSeekStatus, MovieSourceSeekContext,
-    MovieSourceSeekPlanner, RecoveryDescriptions, RecoveryKind, RecoveryLimits,
-    RecoveryMappingOrigin, RecoveryMappings, RecoveryScope, RecoverySyntax, SampleStep,
-    SourceCompositionLookup, SourceTrack,
+    BuildStatus, SampleStep,
+    interleave::SourceTrack,
+    movie::EditList,
+    sample_groups::{
+        RecoveryDescriptions, RecoveryKind, RecoveryLimits, RecoveryMappingOrigin,
+        RecoveryMappings, RecoveryScope, RecoverySyntax,
+    },
+    seek::{
+        CompositionTarget, MovieEditLocator, MoviePoint, MovieSeekClocks, MovieSeekLimits,
+        MovieSeekResult, MovieSeekStatus, MovieSourceSeekContext, MovieSourceSeekPlanner,
+        SourceCompositionLookup,
+    },
 };
 
 #[test]
@@ -314,7 +321,7 @@ fn checked_seek_retains_a_non_sync_fragment_prefix_without_marking_it_sync() {
     );
 }
 
-fn fragment_sample_table(pool: &Budget) -> triergon_isobmff::SampleTable {
+fn fragment_sample_table(pool: &Budget) -> triergon_isobmff::table::SampleTable {
     let boxes = common::roots(
         pool,
         include_bytes!("fixtures/native-open-v6/tfdt-control-08.mp4"),

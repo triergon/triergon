@@ -12,7 +12,7 @@ pub const EOF: i64 = -541478725;
 pub const DOMAIN: u64 = 0x4d4f5633;
 pub const CORRUPT_PACKET: u32 = 2;
 
-pub fn raw_box(out: &mut String, raw: &triergon_isobmff::BoxView) {
+pub fn raw_box(out: &mut String, raw: &triergon_isobmff::boxes::BoxView) {
     write!(out, "{{\"offset\":{},\"box_hex\":\"", raw.header().start).expect("String write");
     push_hex(out, raw.bytes().as_ref());
     out.push_str("\"}");
@@ -20,7 +20,7 @@ pub fn raw_box(out: &mut String, raw: &triergon_isobmff::BoxView) {
 fn time(out: &mut String, t: &triergon_core::Time) {
     write!(out, "[{},{}]", t.numerator(), t.denominator()).expect("String write");
 }
-fn edit(out: &mut String, e: &triergon_isobmff::EditEntry) {
+fn edit(out: &mut String, e: &triergon_isobmff::movie::EditEntry) {
     write!(
         out,
         "[{}, {}, {}, {}]",
@@ -71,8 +71,8 @@ pub fn source_sample(out: &mut String, s: &triergon_isobmff::Sample) {
     }
     out.push('}');
 }
-pub fn source_landings(out: &mut String, r: &triergon_isobmff::MovieSeekResult<'_>) {
-    use triergon_isobmff::RecoveryDefinitionOrigin;
+pub fn source_landings(out: &mut String, r: &triergon_isobmff::seek::MovieSeekResult<'_>) {
+    use triergon_isobmff::sample_groups::RecoveryDefinitionOrigin;
     out.push_str(",\"point_receipt\":");
     if let Some(p) = &r.point {
         out.push_str("{\"requested_movie\":");

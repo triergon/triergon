@@ -6,12 +6,14 @@ mod support;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, SampleStep, SourceSeekLimits, SourceSeekPlanner, SourceSeekRequest, SourceTrack,
+    BuildStatus, SampleStep,
     compat::mov::{
         clock::ClockOrigin,
         packets::{CursorStatus, DemuxProfile, PacketOccurrence},
         seek::{IndexCursor, IndexEntry, IndexLimits, SeekJob, SeekLimits, SeekPlan},
     },
+    interleave::SourceTrack,
+    seek::{SourceSeekLimits, SourceSeekPlanner, SourceSeekRequest},
 };
 fn index(pool: &Budget, movie: &support::Movie, quantum: u64) -> Vec<IndexEntry> {
     let sources = movie.demux();

@@ -18,6 +18,16 @@ pub mod mov {
     //! Projections of FFmpeg's MOV demuxer. The reference revision is the one named
     //! on [`compat::mov`](crate::compat::mov).
 
+    pub(crate) mod fragment_open_clock;
+    pub(crate) mod private_catalogue;
+    pub(crate) mod private_diagnostics;
+    pub(crate) mod raw_video_transport;
+    pub(crate) mod receiver_clock;
+    pub(crate) mod rejected_packet_seek;
+    pub(crate) mod root_walk_transport;
+    pub(crate) mod sample_entry_header;
+    pub(crate) mod transport_window;
+
     pub mod transport {
         //! Models of FFmpeg's buffered reader during open.
         //!
@@ -27,11 +37,11 @@ pub mod mov {
         //! [`DescriptionRecoveryTable`](crate::compat::mov::recovery::DescriptionRecoveryTable),
         //! they let a recovered first packet past the physical end report the
         //! end-of-file FFmpeg reaches ([`ModeledInitialRead`]).
-        pub use crate::raw_video_transport::{
+        pub use super::raw_video_transport::{
             EntryRevisit, ModeledInitialRead, ModeledOpenState, RawVideoTransportBuilder,
             RawVideoTransportModel, RawVideoTransportProfile,
         };
-        pub use crate::root_walk_transport::{
+        pub use super::root_walk_transport::{
             RootWalkTransportBuilder, RootWalkTransportModel, RootWalkTransportProfile,
         };
     }
@@ -42,7 +52,7 @@ pub mod mov {
         //! When every supported open window needs an absolute seek past the physical
         //! source, FFmpeg's read fails. [`InitialOperationJob`] detects that case and
         //! reports it as a [`RejectedPacketSeek`], with FFmpeg's return code.
-        pub use crate::rejected_packet_seek::{
+        pub use super::rejected_packet_seek::{
             InitialOperation, InitialOperationJob, RejectedPacketSeek, RejectedPacketSeekProfile,
         };
     }
@@ -55,11 +65,11 @@ pub mod mov {
         //! applies that to a track's raw visual entries and fails on a rejected one.
         //! [`PrivateConfigurationJob`] derives the private bytes FFmpeg publishes for a
         //! raw-video entry.
-        pub use crate::private_catalogue::{
+        pub use super::private_catalogue::{
             PrivateCatalogueProfile, PrivateConfigCause, PrivateConfiguration,
             PrivateConfigurationJob,
         };
-        pub use crate::sample_entry_header::{
+        pub use super::sample_entry_header::{
             HeaderCause, HeaderRejection, RawVisualEntriesJob, SampleEntryHeader,
             SampleEntryHeaderJob, SampleEntryHeaderProfile,
         };
@@ -72,7 +82,7 @@ pub mod mov {
         //! and reports a fragment whose clock it refuses, with its return code.
         //! [`check_signed_decode_runs`] refuses the fragments of a file whose decode run
         //! ends past that clock.
-        pub use crate::fragment_open_clock::{
+        pub use super::fragment_open_clock::{
             FragmentClockJob, FragmentClockProfile, FragmentClockResult, check_signed_decode_runs,
         };
     }
@@ -83,7 +93,7 @@ pub mod mov {
         //! The API moves timestamps near the top of the signed range to a relative
         //! value. [`ReceiverClock`] reports that value beside the demuxer's field and
         //! [`ReceiverOrigin`] says which of the two it is.
-        pub use crate::receiver_clock::{
+        pub use super::receiver_clock::{
             ReceiverClock, ReceiverClockProfile, ReceiverOrigin, ReceiverPacketTimes,
         };
     }
@@ -93,13 +103,13 @@ pub mod mov {
         //!
         //! [`PrivateDiagnosticJob`] reports the messages and return code FFmpeg produces
         //! while walking the entry's children.
-        pub use crate::private_diagnostics::{
+        pub use super::private_diagnostics::{
             DiagnosticKind, PrivateDiagnosticJob, PrivateDiagnostics, ReceiverDiagnostic,
         };
     }
 
     pub mod encoded {
         //! Labels of the encoded recovery view.
-        pub use crate::encoded_recovery::RecoveryReceiverCause;
+        pub use crate::compat::mov::encoded_recovery::RecoveryReceiverCause;
     }
 }

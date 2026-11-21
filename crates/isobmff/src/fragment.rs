@@ -4,10 +4,15 @@
 //! named flag semantics. Selected signed trun v1 uses FDAM3 replacement8.8.8.2
 //! and MPEG m76694 table9 Original, experimentally. Final clauses/brands stay open.
 use crate::{
-    Access, BoxChildren, BoxStep, BoxView, BuildStatus, FragmentDecodeTime, Limits, Sample,
-    SampleSpan, SampleStep, SpanStep, add_offset, fields, policy,
+    Access, BuildStatus, Limits, Sample, SampleStep,
+    boxes::{BoxChildren, BoxStep, BoxView},
+    fields, policy,
+    sample::{SampleSpan, SpanStep},
 };
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
+
+mod decode_time;
+pub use decode_time::FragmentDecodeTime;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Trex {
@@ -1184,4 +1189,11 @@ impl FragmentCursor<'_> {
             decode: self.decode,
         }
     }
+}
+
+fn add_offset(base: u64, delta: i32) -> Result<u64> {
+    let end = i128::from(base)
+        .checked_add(i128::from(delta))
+        .ok_or(Error::Overflow)?;
+    u64::try_from(end).map_err(|_| Error::Overflow)
 }

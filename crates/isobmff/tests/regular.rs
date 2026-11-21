@@ -2,8 +2,9 @@ mod common;
 use common::{child, fixtures::CASES};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    EditList, Limits, MovieHeader, SampleStep, SampleTable, SampleTableBuilder, SampleTablePolicy,
-    SyncSamplePolicy, TrackHeader,
+    Limits, SampleStep,
+    movie::{EditList, MovieHeader, TrackHeader},
+    table::{SampleTable, SampleTableBuilder, SampleTablePolicy, SyncSamplePolicy},
 };
 
 fn sync_table(bytes: &[u8], policy: SyncSamplePolicy, quantum: u64) -> Result<SampleTable, Error> {
@@ -318,7 +319,7 @@ fn required_signed_ctts_v1_preserves_raw_bits_and_negative_source_time() {
 #[test]
 fn sparse_co64_offsets_never_narrow_to_host_slice_indices() {
     use common::fixtures::{SPARSE_LENGTH, SPARSE_OFFSET, SPARSE_PREFIX};
-    use triergon_isobmff::{BoxHeader, BoxView, HeaderRead};
+    use triergon_isobmff::boxes::{BoxHeader, BoxView, HeaderRead};
     let budget = Budget::new(1024 * 1024).unwrap();
     let storage = common::bytes(&budget, SPARSE_PREFIX);
     let mut offset = 0usize;

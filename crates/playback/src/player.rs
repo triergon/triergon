@@ -714,7 +714,7 @@ impl<S: Source> Player<S> {
             return Err(Error::SourceMismatch);
         }
         match &command.point {
-            triergon_isobmff::MoviePoint::Media(point) => {
+            triergon_isobmff::seek::MoviePoint::Media(point) => {
                 let target = if self.clock == ClockChoice::SourceExact {
                     point.source_time
                 } else {
@@ -726,10 +726,10 @@ impl<S: Source> Player<S> {
                     Ok(MovieSeekOutcome::Yield)
                 }
             }
-            triergon_isobmff::MoviePoint::Empty(point) => {
+            triergon_isobmff::seek::MoviePoint::Empty(point) => {
                 Ok(MovieSeekOutcome::Empty(point.clone()))
             }
-            triergon_isobmff::MoviePoint::Outside {
+            triergon_isobmff::seek::MoviePoint::Outside {
                 requested_movie_time,
             } => Ok(MovieSeekOutcome::Outside {
                 requested_movie_time: *requested_movie_time,

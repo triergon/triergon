@@ -13,12 +13,12 @@ use triergon_core::{
     SourceLocation, Step, Time, TimeBase, WorkBudget,
 };
 use triergon_isobmff::{
-    SampleReader, SourcePacket,
     compat::mov::{
         front::FrontReadBoundary,
         packets::{CursorStatus, PacketCursor, PacketOccurrence},
         recovery::{RecoverySampleExtent, RecoverySampleRead, RunRecoveryProfile, ShortSample},
     },
+    payload::{SampleReader, SourcePacket},
 };
 use triergon_matroska::{Event as MkvEvent, ParseStep, Reader};
 use triergon_mpegts::{
@@ -91,7 +91,7 @@ pub struct TsEvent {
 }
 #[derive(Debug)]
 pub enum RawEvent {
-    Mp4Root(triergon_isobmff::BoxView),
+    Mp4Root(triergon_isobmff::boxes::BoxView),
     EntityEnd(ts::MediaEntityEnd),
     NativeTs {
         packet: DemuxPacket,
@@ -2563,7 +2563,7 @@ impl RawEvent {
             Self::NativeTs { packet, .. } => packet.payload_len,
             Self::Matroska(MkvEvent::Packet(p)) => p.packet.data.len(),
             Self::Matroska(MkvEvent::Envelope(
-                triergon_matroska::element::ElementEvent::Leaf { data, .. },
+                triergon_matroska::ElementEvent::Leaf { data, .. },
             )) => data.len(),
             Self::Mp4(Mp4Event::Packet(p)) => p.source.payload.len(),
             Self::Mp4(Mp4Event::NativeShortPacket(p)) => p.prefix.payload.len(),

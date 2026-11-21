@@ -2,8 +2,11 @@ use crate::common;
 use std::ops::Range;
 use triergon_core::{Budget, WorkBudget};
 use triergon_isobmff::{
-    BoxView, BuildStatus, EditList, FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase,
-    Limits, SampleStep, SampleTable, Trex,
+    BuildStatus, Limits, SampleStep,
+    boxes::BoxView,
+    fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
+    movie::EditList,
+    table::SampleTable,
 };
 
 pub fn regular(pool: &Budget, name: &str) -> (SampleTable, Vec<Range<u64>>) {

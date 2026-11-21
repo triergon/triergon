@@ -6,9 +6,12 @@ use std::{
 };
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BoxView, BuildStatus, FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Limits,
-    Sample, SampleStep, SampleTable, SourceSeekLimits, SourceSeekPlan, SourceSeekPlanner,
-    SourceSeekRequest, SourceTrack, Trex,
+    BuildStatus, Limits, Sample, SampleStep,
+    boxes::BoxView,
+    fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
+    interleave::SourceTrack,
+    seek::{SourceSeekLimits, SourceSeekPlan, SourceSeekPlanner, SourceSeekRequest},
+    table::SampleTable,
 };
 
 fn regular(pool: &Budget, name: &str) -> (SampleTable, Vec<Range<u64>>) {

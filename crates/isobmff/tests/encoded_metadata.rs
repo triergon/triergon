@@ -5,7 +5,6 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
 use triergon_isobmff::{
-    ConfigurationLimits, SampleTable, TrackHeader,
     compat::mov::{
         encoded::{
             EncodedCreationSource, EncodedMetadataProfile, EncodedSelection, EncodedStream,
@@ -13,6 +12,9 @@ use triergon_isobmff::{
         },
         packets::CursorStatus,
     },
+    config::ConfigurationLimits,
+    movie::TrackHeader,
+    table::SampleTable,
 };
 
 const WAVE: &[u8] = include_bytes!("fixtures/encoded-metadata-v4/qt-v1-wave.mov");

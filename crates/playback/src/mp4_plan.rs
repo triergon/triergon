@@ -18,8 +18,8 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Reservation, Rounding, Time, TimeBase, WorkBudget,
 };
 use triergon_isobmff::{
-    self as iso, BoxView, EditList, InterleaveStatus, PhysicalInterleaveLimits,
-    PhysicalSampleCursor, Sample, SampleCursor, SampleDescription, SampleStep, SourceTrack,
+    self as iso, Sample, SampleStep,
+    boxes::BoxView,
     compat::mov::{
         clock::{MediaClock, SourceTimeBase},
         edits::FragmentAacTrimJob,
@@ -28,6 +28,9 @@ use triergon_isobmff::{
             StreamView,
         },
     },
+    interleave::{InterleaveStatus, PhysicalInterleaveLimits, PhysicalSampleCursor, SourceTrack},
+    movie::{EditList, SampleDescription},
+    table::SampleCursor,
 };
 fn push<T>(v: &mut BudgetVec<T>, x: T) -> Result<()> {
     v.try_push(x).map_err(|e| e.error)
@@ -109,7 +112,7 @@ pub struct Mp4Configuration {
     pub revision: u64,
 }
 pub struct PlanTrack {
-    pub(crate) trex: Option<iso::Trex>,
+    pub(crate) trex: Option<iso::fragment::Trex>,
     pub(crate) next_ordinal: u64,
     pub(crate) fragment_aac_trim: u32,
     pub snapshot: TrackSnapshot,
@@ -174,7 +177,7 @@ pub struct PreparedMp4 {
     pub(crate) media: BudgetVec<Range<u64>>,
     pub(crate) media_cache: BudgetVec<CachedMedia>,
     pub(crate) forward_regular_extents: Option<usize>,
-    pub(crate) terminal_mdat: Option<iso::TerminalMdat>,
+    pub(crate) terminal_mdat: Option<iso::payload::TerminalMdat>,
     pub(crate) raw_roots: BudgetVec<BoxView>,
     pub(crate) movie_base: TimeBase,
     pub(crate) pool: Budget,
@@ -203,7 +206,7 @@ impl PreparedMp4 {
     pub fn read_scope(&self) -> crate::mp4_open::MetadataReadScope {
         self.read_scope
     }
-    pub fn terminal_mdat(&self) -> Option<iso::TerminalMdat> {
+    pub fn terminal_mdat(&self) -> Option<iso::payload::TerminalMdat> {
         self.terminal_mdat
     }
     pub fn movie_base(&self) -> TimeBase {
@@ -526,9 +529,9 @@ impl<'a> Mp4IndexJob<'a> {
             max_samples: limits.samples,
         };
         let timing_policy = if view == Mp4View::SourcePhysical {
-            iso::TimingRunPolicy::Strict
+            iso::table::TimingRunPolicy::Strict
         } else {
-            iso::TimingRunPolicy::BoundedPrefix
+            iso::table::TimingRunPolicy::BoundedPrefix
         };
         let forward_regular = match movie.read_scope() {
             crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(h)
@@ -545,7 +548,10 @@ impl<'a> Mp4IndexJob<'a> {
                         .iter()
                         .all(|track| track.edits().is_none() && track.fragments().is_empty()) =>
             {
-                Some(iso::ForwardRegularMdat::new(h, movie.source_length())?)
+                Some(iso::interleave::ForwardRegularMdat::new(
+                    h,
+                    movie.source_length(),
+                )?)
             }
             _ => None,
         };
@@ -1144,7 +1150,7 @@ impl<'a> Mp4IndexJob<'a> {
 /// Source movie-time mapping uses the existing format job. The command binds
 /// the actual model/pool/entity, so callers cannot invent a source mapping.
 pub struct MovieSeekJob<'a> {
-    locator: iso::MovieEditLocator<'a>,
+    locator: iso::seek::MovieEditLocator<'a>,
     source: triergon_core::SourceId,
     generation: u64,
     pool: Budget,
@@ -1153,7 +1159,7 @@ pub struct MovieSeekJob<'a> {
     raw_edits: Option<BoxView>,
 }
 pub struct MovieSeekCommand {
-    pub(crate) point: iso::MoviePoint,
+    pub(crate) point: iso::seek::MoviePoint,
     pub(crate) source: triergon_core::SourceId,
     pub(crate) generation: u64,
     pub(crate) pool: Budget,
@@ -1162,7 +1168,7 @@ pub struct MovieSeekCommand {
     raw_edits: Option<BoxView>,
 }
 impl MovieSeekCommand {
-    pub fn point(&self) -> &iso::MoviePoint {
+    pub fn point(&self) -> &iso::seek::MoviePoint {
         &self.point
     }
     pub fn raw_media_clock(&self) -> &BoxView {
@@ -1180,9 +1186,9 @@ impl PreparedMp4 {
         maximum_edits: u32,
     ) -> Result<MovieSeekJob<'_>> {
         let t = self.track(track)?;
-        let locator = iso::MovieEditLocator::new(
+        let locator = iso::seek::MovieEditLocator::new(
             t.edits.as_ref(),
-            iso::MovieSeekClocks {
+            iso::seek::MovieSeekClocks {
                 movie_base: self.movie_base,
                 media_base: t.snapshot.base.require()?,
                 media_duration: None,
@@ -1219,8 +1225,8 @@ impl MovieSeekJob<'_> {
 }
 #[derive(Clone, Debug)]
 pub enum MovieSeekOutcome {
-    Applied(iso::MovieSourcePoint),
+    Applied(iso::seek::MovieSourcePoint),
     Yield,
-    Empty(iso::MovieEmptyEdit),
+    Empty(iso::seek::MovieEmptyEdit),
     Outside { requested_movie_time: Time },
 }

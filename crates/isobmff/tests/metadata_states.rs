@@ -2,7 +2,7 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, Step, WorkBudget,
 };
-use triergon_isobmff::{BoxEvent, BoxReader};
+use triergon_isobmff::boxes::{BoxEvent, BoxReader};
 fn announced(pool: &Budget, size: u32, known: bool) -> (InputCursor, BoxReader) {
     let mut input = InputCursor::new(
         pool,

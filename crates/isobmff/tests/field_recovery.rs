@@ -3,12 +3,14 @@ use common::{child, roots};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    Access, BoxView, BuildStatus, Limits, SampleStep, TrackHeader,
+    Access, BuildStatus, Limits, SampleStep,
+    boxes::BoxView,
     compat::mov::{
         packets::{CursorStatus, PacketLimits},
         recovery::{RecoveryTrackHeader, RunRecoveryBuilder, RunRecoveryProfile, RunRecoveryTable},
         seek::IndexLimits,
     },
+    movie::TrackHeader,
 };
 fn source(input: &[u8], pool: &Budget) -> (BoxView, RecoveryTrackHeader, Vec<Range<u64>>) {
     let top = roots(pool, input).unwrap();

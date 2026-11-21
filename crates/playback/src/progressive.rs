@@ -9,8 +9,9 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Error, InputCursor, Step, WorkBudget};
 use triergon_isobmff::{
-    self as iso, BoxChildren, BoxEvent, BoxReader, BoxStep, BoxView, BuildStatus, FragmentBuilder,
-    FragmentContext, ImplicitBase, OwnedFragmentCursor, SampleStep,
+    self as iso, BuildStatus, SampleStep,
+    boxes::{BoxChildren, BoxEvent, BoxReader, BoxStep, BoxView},
+    fragment::{FragmentBuilder, FragmentContext, ImplicitBase, OwnedFragmentCursor},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -37,7 +38,7 @@ enum SourceCursor {
     Native(iso::compat::mov::front::FrontFragment),
 }
 impl SourceCursor {
-    fn index(&self) -> &iso::FragmentIndex {
+    fn index(&self) -> &iso::fragment::FragmentIndex {
         match self {
             Self::Physical(c) => c.index(),
             Self::Native(c) => c.index(),
@@ -105,7 +106,7 @@ pub(crate) struct ProgressiveState {
     roots: u64,
     regular_media_seen: usize,
     reader: Option<BoxReader>,
-    header: Option<iso::BoxHeader>,
+    header: Option<iso::boxes::BoxHeader>,
     moof: Option<BoxView>,
     children: Option<BoxChildren>,
     traf: Option<BoxView>,
@@ -127,7 +128,7 @@ pub(crate) struct ProgressiveState {
     rows: BudgetVec<PendingRow>,
     row: usize,
     extent: Option<std::ops::Range<u64>>,
-    terminal: Option<iso::TerminalMdat>,
+    terminal: Option<iso::payload::TerminalMdat>,
     finished: bool,
 }
 impl ProgressiveState {
@@ -152,7 +153,7 @@ impl ProgressiveState {
         };
         let next_root = h.end()?;
         let terminal = if next_root.is_none() {
-            Some(iso::TerminalMdat::new(h)?)
+            Some(iso::payload::TerminalMdat::new(h)?)
         } else {
             None
         };
@@ -293,7 +294,7 @@ impl ProgressiveState {
                                 *current = h.payload_range()?;
                                 self.phase = Phase::Drain;
                             } else {
-                                let terminal = iso::TerminalMdat::new(h)?;
+                                let terminal = iso::payload::TerminalMdat::new(h)?;
                                 let row = engine
                                     .plan
                                     .row(*engine.row)
@@ -318,7 +319,7 @@ impl ProgressiveState {
                         engine.plan.forward_regular_extents = None;
                         self.next_root = h.end()?;
                         self.terminal = if self.next_root.is_none() {
-                            Some(iso::TerminalMdat::new(h)?)
+                            Some(iso::payload::TerminalMdat::new(h)?)
                         } else {
                             None
                         };

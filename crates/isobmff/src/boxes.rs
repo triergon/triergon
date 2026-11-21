@@ -3,6 +3,9 @@ use crate::{Limits, fields, policy};
 use std::ops::Range;
 use triergon_core::{Bytes, Error, Result, WorkBudget};
 
+mod reader;
+pub use reader::{BoxEvent, BoxReader, MediaDataPolicy};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BoxHeader {
     pub kind: [u8; 4],

@@ -5,7 +5,7 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceId, TimeBase, WorkBudget,
 };
 use triergon_isobmff::{
-    ConfigurationLimits, EditList, Limits, SampleTable, TrackHeader,
+    Limits,
     compat::mov::{
         edits::{
             EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
@@ -17,6 +17,9 @@ use triergon_isobmff::{
         },
         packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
     },
+    config::ConfigurationLimits,
+    movie::{EditList, TrackHeader},
+    table::SampleTable,
 };
 
 #[cfg(feature = "reference-trace")]

@@ -9,8 +9,10 @@ use triergon_core::{
     SourceFailure, SourceId, Step, WorkBudget,
 };
 use triergon_isobmff::{
-    QtPcmEncodingV0, QtPcmSampleReaderV0, QtPcmSourcePacketV0, QtSoundDescriptionV0, Sample,
-    SampleStep, SampleTable, TrackHeader,
+    Sample, SampleStep,
+    movie::TrackHeader,
+    quicktime::{QtPcmEncodingV0, QtPcmSampleReaderV0, QtPcmSourcePacketV0, QtSoundDescriptionV0},
+    table::SampleTable,
 };
 const MONO: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-u8-mono-front.mov");
 const STEREO: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-s16be-stereo-front.mov");

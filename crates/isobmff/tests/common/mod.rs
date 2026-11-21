@@ -2,7 +2,11 @@
 pub mod fixtures;
 
 use triergon_core::{Budget, Bytes, Error, WorkBudget};
-use triergon_isobmff::{BoxStep, BoxView, BuildStatus, Limits, SampleTable, SampleTableBuilder};
+use triergon_isobmff::{
+    BuildStatus, Limits,
+    boxes::{BoxStep, BoxView},
+    table::{SampleTable, SampleTableBuilder},
+};
 
 pub fn bytes(budget: &Budget, input: &[u8]) -> Bytes {
     Bytes::copy_from_slice(budget, input).expect("test fixture budget")
@@ -37,13 +41,13 @@ pub fn roots(budget: &Budget, input: &[u8]) -> Result<Vec<BoxView>, Error> {
     let mut position = 0usize;
     while position < storage.len() {
         let end = u64::try_from(storage.len()).map_err(|_| Error::Overflow)?;
-        let status = triergon_isobmff::BoxHeader::parse(
+        let status = triergon_isobmff::boxes::BoxHeader::parse(
             &storage[position..],
             position as u64,
             Some(end),
             true,
         )?;
-        let triergon_isobmff::HeaderRead::Ready(header) = status else {
+        let triergon_isobmff::boxes::HeaderRead::Ready(header) = status else {
             return Err(Error::Truncated);
         };
         let count =

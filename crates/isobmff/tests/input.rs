@@ -4,7 +4,7 @@ use triergon_core::{
     Budget, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure, SourceId, Step,
     WorkBudget,
 };
-use triergon_isobmff::{BoxEvent, BoxReader};
+use triergon_isobmff::boxes::{BoxEvent, BoxReader};
 
 #[test]
 fn one_byte_windows_and_internal_ranges_keep_the_logical_generation() {

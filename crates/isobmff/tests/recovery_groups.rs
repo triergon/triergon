@@ -4,9 +4,12 @@ mod wire;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, RecoveryDefinitionOrigin as Definition, RecoveryDescription, RecoveryDescriptions,
-    RecoveryKind as Kind, RecoveryLimits, RecoveryLookup, RecoveryMappingOrigin as Mapping,
-    RecoveryMappings, RecoveryScope, RecoverySelection, RecoverySyntax as Syntax,
+    BuildStatus,
+    sample_groups::{
+        RecoveryDefinitionOrigin as Definition, RecoveryDescription, RecoveryDescriptions,
+        RecoveryKind as Kind, RecoveryLimits, RecoveryLookup, RecoveryMappingOrigin as Mapping,
+        RecoveryMappings, RecoveryScope, RecoverySelection, RecoverySyntax as Syntax,
+    },
 };
 
 fn entry(

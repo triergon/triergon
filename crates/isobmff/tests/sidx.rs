@@ -1,6 +1,10 @@
 mod common;
 use triergon_core::{Budget, Error, Time, WorkBudget};
-use triergon_isobmff::{BoxView, IndexStep, Limits, SegmentIndex};
+use triergon_isobmff::{
+    Limits,
+    boxes::BoxView,
+    index::{IndexStep, SegmentIndex},
+};
 
 fn index_box(
     budget: &Budget,

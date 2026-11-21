@@ -2,7 +2,8 @@ mod common;
 use common::{child, fixtures::CASES};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, FragmentBuilder, FragmentContext, ImplicitBase, Limits, SampleStep, Trex,
+    BuildStatus, Limits, SampleStep,
+    fragment::{FragmentBuilder, FragmentContext, ImplicitBase, Trex},
 };
 
 #[test]
@@ -162,9 +163,10 @@ fn required_moof_relative_fragment_preserves_frozen_source_ranges_and_tfdt() {
         let mut ordinal = 1;
         for moof in top.iter().filter(|b| b.header().kind == *b"moof") {
             let traf = child(moof, b"traf").unwrap();
-            let expected_time =
-                triergon_isobmff::FragmentDecodeTime::parse(child(&traf, b"tfdt").unwrap())
-                    .unwrap();
+            let expected_time = triergon_isobmff::fragment::FragmentDecodeTime::parse(
+                child(&traf, b"tfdt").unwrap(),
+            )
+            .unwrap();
             let mut builder = FragmentBuilder::new(
                 traf.clone(),
                 trex,
@@ -251,7 +253,7 @@ fn original_traf(
     budget: &Budget,
     track_id: u32,
     offsets: &[Option<i32>],
-) -> triergon_isobmff::BoxView {
+) -> triergon_isobmff::boxes::BoxView {
     let mut children = Vec::new();
     children.extend_from_slice(&16u32.to_be_bytes());
     children.extend_from_slice(b"tfhd");
@@ -272,7 +274,7 @@ fn original_traf(
         .to_vec();
     raw.extend_from_slice(b"traf");
     raw.extend_from_slice(&children);
-    triergon_isobmff::BoxView::new(common::bytes(budget, &raw), 0).unwrap()
+    triergon_isobmff::boxes::BoxView::new(common::bytes(budget, &raw), 0).unwrap()
 }
 
 fn original_index(
@@ -280,7 +282,7 @@ fn original_index(
     track_id: u32,
     offsets: &[Option<i32>],
     implicit_base: ImplicitBase,
-) -> triergon_isobmff::FragmentIndex {
+) -> triergon_isobmff::fragment::FragmentIndex {
     let mut builder = FragmentBuilder::new(
         original_traf(budget, track_id, offsets),
         Trex {
@@ -362,7 +364,7 @@ fn original_modern_fragment_profiles_preserve_facts_and_unknown_clocks() {
                 .filter(|b| b.header().kind == *b"trak")
             {
                 let media = child(track, b"mdia").unwrap();
-                let header = triergon_isobmff::TrackHeader::parse(
+                let header = triergon_isobmff::movie::TrackHeader::parse(
                     &child(track, b"tkhd").unwrap(),
                     &child(&media, b"mdhd").unwrap(),
                     &child(&media, b"hdlr").unwrap(),

@@ -5,12 +5,13 @@ mod support;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};
 use triergon_isobmff::{
-    SampleStep, SourceTrack, TrackSampleCursor,
+    SampleStep,
     compat::mov::{
         clock::ClockOrigin,
         packets::{CursorStatus, DemuxProfile},
         seek::{IndexCursor, IndexLimits},
     },
+    interleave::{SourceTrack, TrackSampleCursor},
 };
 
 // Demux tuple: position, raw signed timestamp, signed index flags, min_distance.

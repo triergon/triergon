@@ -802,7 +802,7 @@ fn real_hevc_mp4_packets_frame_as_annex_b_from_their_source_bytes() {
 }
 fn aac_fixture_player() -> (Player<ByteSource>, Budget, Bytes, u64) {
     use triergon_isobmff::compat::mov::{encoded::*, packets::CursorStatus};
-    use triergon_isobmff::*;
+    use triergon_isobmff::config::ConfigurationLimits;
     let raw = include_bytes!("fixtures/mp4/encoded-avc-aac-front.mp4");
     let b = pool();
     let input = InputCursor::new(

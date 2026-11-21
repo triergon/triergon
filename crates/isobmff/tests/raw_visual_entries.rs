@@ -3,8 +3,10 @@ use common::{child, children, roots, table};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Limits, SampleTable, TrackHeader,
+    BuildStatus, Limits,
+    movie::TrackHeader,
     reference_trace::mov::sample_entry::{RawVisualEntriesJob, SampleEntryHeaderProfile},
+    table::SampleTable,
 };
 
 const CARRIAGE: &[u8] = include_bytes!("fixtures/r-private-carriage.mov");

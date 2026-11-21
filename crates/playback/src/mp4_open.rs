@@ -11,8 +11,8 @@ pub(crate) use triergon_isobmff::open::{
 };
 pub use triergon_isobmff::open::{MetadataReadScope, Movie, MovieTrack, OpenLimits};
 use triergon_isobmff::{
-    TimingRunPolicy,
     open::{MovieOpen, OpenStep},
+    table::TimingRunPolicy,
 };
 
 pub struct OpenedMp4<S: Source> {

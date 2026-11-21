@@ -20,9 +20,12 @@ use triergon_core::{
     WorkBudget,
 };
 use triergon_isobmff::{
-    BoxEvent, BoxReader, BoxStep, BoxView, BuildStatus, InterleaveStatus, Limits,
-    PhysicalInterleaveLimits, PhysicalSampleCursor, SampleReader, SampleTableBuilder, SourceTrack,
-    TrackHeader,
+    BuildStatus, Limits,
+    boxes::{BoxEvent, BoxReader, BoxStep, BoxView},
+    interleave::{InterleaveStatus, PhysicalInterleaveLimits, PhysicalSampleCursor, SourceTrack},
+    movie::TrackHeader,
+    payload::SampleReader,
+    table::SampleTableBuilder,
 };
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;

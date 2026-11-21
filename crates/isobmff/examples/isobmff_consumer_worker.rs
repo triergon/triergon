@@ -18,8 +18,9 @@ use std::{
 };
 use triergon_core::{Error, Time};
 use triergon_isobmff::{
-    MediaDataPolicy, RecoveryKind, RecoverySyntax, SampleTablePolicy, SyncSamplePolicy,
-    TimingRunPolicy,
+    boxes::MediaDataPolicy,
+    sample_groups::{RecoveryKind, RecoverySyntax},
+    table::{SampleTablePolicy, SyncSamplePolicy, TimingRunPolicy},
 };
 
 #[derive(Clone, Copy)]

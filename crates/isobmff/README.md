@@ -88,8 +88,10 @@ use triergon_core::{
     Step, WorkBudget,
 };
 use triergon_isobmff::{
-    BoxEvent, BoxReader, BoxStep, BoxView, BuildStatus, Limits, SampleReader, SampleStep,
-    SampleTableBuilder,
+    BuildStatus, Limits, SampleStep,
+    boxes::{BoxEvent, BoxReader, BoxStep, BoxView},
+    payload::SampleReader,
+    table::SampleTableBuilder,
 };
 
 # let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/r-multitrack.mov");

@@ -6,11 +6,12 @@ use triergon_core::{
     SourceFailure, SourceId, Step, WorkBudget,
 };
 use triergon_isobmff::{
-    SampleTable, TrackHeader,
     compat::mov::{
         packets::CursorStatus,
         pcm::{PcmCursor, PcmLimits, PcmPacket, PcmProfile, PcmReader, PcmStream},
     },
+    movie::TrackHeader,
+    table::SampleTable,
 };
 
 const MONO: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-u8-mono-front.mov");

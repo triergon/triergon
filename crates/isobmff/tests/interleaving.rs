@@ -5,9 +5,16 @@ use triergon_core::{
     Budget, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
 use triergon_isobmff::{
-    BoxView, BuildStatus, FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase,
-    InterleaveStatus, Limits, PhysicalInterleaveLimits, PhysicalSampleCursor, SampleReader,
-    SampleStep, SampleTable, SourceTrack, TrackHeader, TrackSampleCursor, Trex,
+    BuildStatus, Limits, SampleStep,
+    boxes::BoxView,
+    fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
+    interleave::{
+        InterleaveStatus, PhysicalInterleaveLimits, PhysicalSampleCursor, SourceTrack,
+        TrackSampleCursor,
+    },
+    movie::TrackHeader,
+    payload::SampleReader,
+    table::SampleTable,
 };
 
 fn regular_tables(budget: &Budget, name: &str) -> Vec<(u32, SampleTable)> {

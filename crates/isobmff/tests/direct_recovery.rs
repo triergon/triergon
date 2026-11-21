@@ -6,7 +6,8 @@ use std::{
 };
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BoxView, BuildStatus, Limits, SampleStep,
+    BuildStatus, Limits, SampleStep,
+    boxes::BoxView,
     compat::mov::{
         packets::{CursorStatus, PacketLimits},
         recovery::{

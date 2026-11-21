@@ -5,8 +5,7 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, TimeBase, WorkBudget,
 };
 use triergon_isobmff::{
-    ConfigurationLimits, EditList, Limits, RecoveryKind, RecoveryLimits, RecoveryLookup,
-    SampleTable, TrackHeader,
+    Limits,
     compat::mov::{
         edits::{
             EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
@@ -19,6 +18,10 @@ use triergon_isobmff::{
         packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
         seek::{IndexCursor, IndexLimits},
     },
+    config::ConfigurationLimits,
+    movie::{EditList, TrackHeader},
+    sample_groups::{RecoveryKind, RecoveryLimits, RecoveryLookup},
+    table::SampleTable,
 };
 const BASE: &[u8] = include_bytes!("fixtures/encoded-recovery-v5/roll-negative-v0.mp4");
 struct Source {
@@ -232,7 +235,7 @@ fn selection(
     plan: &EncodedEditPlan,
     kind: RecoveryKind,
     ordinal: u64,
-) -> triergon_isobmff::RecoverySelection {
+) -> triergon_isobmff::sample_groups::RecoverySelection {
     let facts = plan
         .recovery_facts()
         .expect("validated owned source group facts");

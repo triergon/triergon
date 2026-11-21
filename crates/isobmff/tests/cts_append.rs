@@ -6,12 +6,13 @@ mod support;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};
 use triergon_isobmff::{
-    SampleStep, SourceTrack, TrackSampleCursor,
+    SampleStep,
     compat::mov::{
         clock::ClockOrigin,
         packets::{CursorStatus, DemuxProfile},
         seek::{IndexCursor, IndexLimits},
     },
+    interleave::{SourceTrack, TrackSampleCursor},
 };
 
 fn check(bytes: &[u8], positions: [i64; 6], distances: [i32; 6]) {

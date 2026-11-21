@@ -12,7 +12,7 @@ use triergon_framing::{
     hevc::{HvcConfigLimits, HvcConfigParser, HvcConfigSource},
     nal::{NalPacket, NalPacketConfiguration, NalPacketLimits, NalPacketOutput, NalPacketSession},
 };
-use triergon_isobmff::{BoxStep, EntryLayout, Limits};
+use triergon_isobmff::{Limits, boxes::BoxStep, movie::EntryLayout};
 use triergon_playback::{
     io::{SelectedInput, SourceOwner},
     mp4_open::{Mp4Open, OpenProgress},

@@ -6,8 +6,7 @@ use triergon_core::{
     WorkBudget,
 };
 use triergon_isobmff::{
-    BuildStatus, ConfigurationLimits, EditList, Limits, MovieHeader, SampleTable, TrackHeader,
-    check_dts_core_description,
+    BuildStatus, Limits,
     compat::mov::{
         edits::{
             EditCursor, EditLimits, EncodedEditContext, EncodedEditJob, EncodedEditLimits,
@@ -21,6 +20,9 @@ use triergon_isobmff::{
         packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
         seek::{GlobalSeekJob, IndexCursor, IndexLimits, SeekLimits},
     },
+    config::{ConfigurationLimits, check_dts_core_description},
+    movie::{EditList, MovieHeader, TrackHeader},
+    table::SampleTable,
 };
 const ORIGINAL: &[u8] = include_bytes!("fixtures/encoded-edit-v2/original.mp4");
 const AUDIO0: &[u8] = include_bytes!("fixtures/encoded-edit-v2/audio0.mp4");
@@ -900,7 +902,7 @@ fn opus_global_seek_aligns_audio_without_the_range_checkpoints() {
         .unwrap()
         .source_result()
         .unwrap()
-        .source_scope(triergon_isobmff::RecoveryKind::Roll);
+        .source_scope(triergon_isobmff::sample_groups::RecoveryKind::Roll);
     assert!(recovery.track_descriptions.is_some());
     assert!(recovery.mappings.is_some());
     let tracks = [video.track(), audio.track()];

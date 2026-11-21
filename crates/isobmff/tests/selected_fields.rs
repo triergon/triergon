@@ -4,8 +4,10 @@ mod common;
 use std::{fs, path::Path};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BoxView, BuildStatus, FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Limits,
-    Sample, SampleStep, SampleTable, SampleTableBuilder, Trex,
+    BuildStatus, Limits, Sample, SampleStep,
+    boxes::BoxView,
+    fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
+    table::{SampleTable, SampleTableBuilder},
 };
 
 #[derive(Debug)]

@@ -6,8 +6,9 @@ use std::{
 };
 use triergon_core::{Budget, Error, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    SampleTable, TrackHeader,
     compat::mov::packets::{CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
+    movie::TrackHeader,
+    table::SampleTable,
 };
 
 type Table = (u32, TimeBase, SampleTable);

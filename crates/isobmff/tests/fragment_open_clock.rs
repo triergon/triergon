@@ -3,7 +3,8 @@ use common::{child, roots};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, InputCursor, SourceCapabilities, SourceId, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Limits, Trex,
+    BuildStatus, Limits,
+    fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
     reference_trace::mov::fragment_clock::{
         FragmentClockJob, FragmentClockProfile, check_signed_decode_runs,
     },

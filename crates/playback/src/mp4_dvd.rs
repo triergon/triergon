@@ -9,7 +9,7 @@
 use crate::bitmap_bridge::{BitmapInput, BitmapScope, DvdBridgeConfig};
 use crate::{Delivery, Mp4Event, Mp4Packet, Output, RawEvent, TrackKey};
 use triergon_core::{Error, Result, WorkBudget};
-use triergon_isobmff::{ConfigurationLimits, ObjectTypeScan};
+use triergon_isobmff::config::{ConfigurationLimits, ObjectTypeScan};
 use triergon_subtitles::{compat, pgs::PacketClock};
 
 /// The object type of DVD subpicture streams.

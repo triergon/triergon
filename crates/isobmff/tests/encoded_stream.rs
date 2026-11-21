@@ -5,11 +5,14 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
 use triergon_isobmff::{
-    BoxView, ConfigurationLimits, SampleTable, TrackHeader,
+    boxes::BoxView,
     compat::mov::{
         encoded::{EncodedEntryKind, EncodedStream, EncodedStreamJob, EncodedStreamProfile},
         packets::CursorStatus,
     },
+    config::ConfigurationLimits,
+    movie::TrackHeader,
+    table::SampleTable,
 };
 const AVC: &[u8] = include_bytes!("fixtures/encoded-v1/control-avc-aac-front.mp4");
 const HEVC: &[u8] = include_bytes!("fixtures/encoded-v1/control-hevc-aac-front.mp4");
@@ -97,7 +100,8 @@ fn config(data: &Source, kind: &[u8; 4], skip: usize) -> BoxView {
         .children(skip, triergon_isobmff::Limits::default())
         .unwrap();
     loop {
-        if let triergon_isobmff::BoxStep::Box(b) = scan.poll(&mut WorkBudget::new(16)).unwrap()
+        if let triergon_isobmff::boxes::BoxStep::Box(b) =
+            scan.poll(&mut WorkBudget::new(16)).unwrap()
             && b.header().kind == *kind
         {
             return b;

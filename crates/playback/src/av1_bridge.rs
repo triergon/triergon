@@ -9,7 +9,11 @@ use triergon_framing::{
         Av1TemporalUnitJob, Av1TemporalUnitLimits,
     },
 };
-use triergon_isobmff::{Access, BoxChildren, BoxStep, EntryLayout, Limits};
+use triergon_isobmff::{
+    Access, Limits,
+    boxes::{BoxChildren, BoxStep},
+    movie::EntryLayout,
+};
 use triergon_matroska::{Configuration, TypedPacket as MatroskaPacket};
 
 /// The player or sink keeps the original packet (and its clock) for the lifetime

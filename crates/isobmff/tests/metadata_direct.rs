@@ -1,6 +1,6 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, InputCursor, SourceCapabilities, SourceId, Step, WorkBudget};
-use triergon_isobmff::{BoxEvent, BoxReader};
+use triergon_isobmff::boxes::{BoxEvent, BoxReader};
 
 #[test]
 fn reserved_metadata_body_consumes_inline_bytes_under_complete_pool_pressure() {

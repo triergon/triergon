@@ -1,6 +1,6 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, InputCursor, SourceCapabilities, SourceId, Step, WorkBudget};
-use triergon_isobmff::{Access, Sample, SampleReader};
+use triergon_isobmff::{Access, Sample, payload::SampleReader};
 
 #[test]
 fn reserved_packet_consumes_inline_body_under_complete_pool_pressure() {

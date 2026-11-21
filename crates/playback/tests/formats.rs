@@ -1685,7 +1685,7 @@ fn real_movie_edit_seek_maps_exact_source_point_before_playback_fence() {
         .unwrap();
     while !job.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
     let command = job.finish().unwrap();
-    let triergon_isobmff::MoviePoint::Media(point) = command.point() else {
+    let triergon_isobmff::seek::MoviePoint::Media(point) = command.point() else {
         panic!("frozen edit fixture must contain this movie point")
     };
     assert_eq!(point.requested_movie_time, Time::new(1, 2).unwrap());
@@ -2936,12 +2936,17 @@ fn combined_playback_probe_opens_real_sequential_mp4() {
 }
 
 fn observed_mp4_open(bytes: &[u8]) -> (mp4_open::OpenedMp4<Observed>, Calls, Budget) {
-    open_with_timing_policy(bytes, triergon_isobmff::TimingRunPolicy::Strict, true).unwrap()
+    open_with_timing_policy(
+        bytes,
+        triergon_isobmff::table::TimingRunPolicy::Strict,
+        true,
+    )
+    .unwrap()
 }
 
 fn open_with_timing_policy(
     bytes: &[u8],
-    policy: triergon_isobmff::TimingRunPolicy,
+    policy: triergon_isobmff::table::TimingRunPolicy,
     random_access: bool,
 ) -> Result<(mp4_open::OpenedMp4<Observed>, Calls, Budget)> {
     let pool = pool();
@@ -3156,7 +3161,7 @@ fn next_range_output<S: Source>(player: &mut Mp4RangePlayer<'_, S>) -> Option<Ou
 
 #[test]
 fn bounded_timing_accepts_forward_index_with_finite_media() {
-    use triergon_isobmff::TimingRunPolicy;
+    use triergon_isobmff::table::TimingRunPolicy;
 
     let bytes = include_bytes!("../../isobmff/tests/fixtures/bad-stts-count-mismatch.mov");
     let (opened, _, _) =
@@ -3487,7 +3492,7 @@ fn forward_encoded_edit_order_refusal_survives_repeated_poll() {
 
 #[test]
 fn bounded_timing_range_playback_preserves_packets_and_seeks() {
-    use triergon_isobmff::{TimingRunPolicy, TimingRunSurplus};
+    use triergon_isobmff::table::{TimingRunPolicy, TimingRunSurplus};
 
     for (bytes, offset, surplus) in [
         (
@@ -3939,7 +3944,7 @@ fn range_configs(
                 EncodedSelection {
                     major_brand,
                     description: description.index,
-                    limits: triergon_isobmff::ConfigurationLimits::default(),
+                    limits: triergon_isobmff::config::ConfigurationLimits::default(),
                 },
             )
             .unwrap();
@@ -4176,7 +4181,7 @@ fn range_projection_does_not_admit_a_demux_clock_for_data_tracks() {
 
 #[test]
 fn range_media_projection_checks_excluded_sample_extents() {
-    use triergon_isobmff::{BoxStep, Limits};
+    use triergon_isobmff::{Limits, boxes::BoxStep};
 
     let (opened, _) = open(RTP_HINTS, 97, 4096).unwrap();
     let hint = &opened.movie.tracks()[1];
@@ -4283,7 +4288,8 @@ fn edited_visual_description_fixture(
 #[test]
 fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
     use triergon_isobmff::{
-        BoxStep, EntryLayout, Limits, SampleStep,
+        Limits, SampleStep,
+        boxes::BoxStep,
         compat::mov::{
             edits::{EncodedEditContext, EncodedEditJob},
             encoded::{
@@ -4291,6 +4297,7 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
                 EncodedSelection, EncodedStreamJob,
             },
         },
+        movie::EntryLayout,
     };
 
     for (format, config_kind, records) in [
@@ -4325,7 +4332,7 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
                     EncodedSelection {
                         major_brand: opened.movie.major_brand(),
                         description,
-                        limits: triergon_isobmff::ConfigurationLimits::default(),
+                        limits: triergon_isobmff::config::ConfigurationLimits::default(),
                     },
                     EncodedContextProfile,
                 ),

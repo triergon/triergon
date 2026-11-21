@@ -23,6 +23,24 @@ pub mod mov {
     //! Reference: the `mov` demuxer with `+noparse+nofillin`, FFmpeg git revision
     //! `d32b387f` on the 9.0 branch.
 
+    pub(crate) mod clocks;
+    pub(crate) mod cursor;
+    pub(crate) mod edit_list;
+    pub(crate) mod encoded_configs;
+    pub(crate) mod encoded_contexts;
+    pub(crate) mod encoded_dependency;
+    pub(crate) mod encoded_edits;
+    pub(crate) mod encoded_metadata;
+    pub(crate) mod encoded_recovery;
+    pub(crate) mod encoded_recovery_context;
+    pub(crate) mod encoded_stream;
+    pub(crate) mod field_recovery;
+    pub(crate) mod front_movie;
+    pub(crate) mod index;
+    pub(crate) mod pcm_packets;
+    pub(crate) mod physical_read;
+    pub(crate) mod view;
+
     pub mod clock {
         //! The demuxer's signed clocks.
         //!
@@ -32,10 +50,10 @@ pub mod mov {
         //! declared timescale. [`ClockOrigin`] says where a packet's decode time came
         //! from and [`SchedulingClock`] orders heads across tracks;
         //! [`seekable_head_precedes`] compares two heads as the demuxer does.
-        pub use crate::mov_clock::{
+        pub use super::clocks::{
             ClockField, MediaClock, MediaClockCause, SchedulingClock, SourceTimeBase,
         };
-        pub use crate::mov_cursor::{ClockOrigin, PredecessorClock, seekable_head_precedes};
+        pub use super::cursor::{ClockOrigin, PredecessorClock, seekable_head_precedes};
     }
 
     pub mod packets {
@@ -46,11 +64,11 @@ pub mod mov {
         //! sample, the [`PacketView`] the demuxer reports and their clocks. A
         //! [`StreamView`] is a track's catalogue entry and [`PacketProjector`] projects
         //! one source sample on its own.
-        pub use crate::mov_cursor::{
+        pub use super::cursor::{
             DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, PacketOccurrence, ResumePoint,
         };
-        pub use crate::mov_edits::CursorStatus;
-        pub use crate::mov_view::{PacketProjector, PacketView, StreamView};
+        pub use super::edit_list::CursorStatus;
+        pub use super::view::{PacketProjector, PacketView, StreamView};
     }
 
     pub mod edits {
@@ -61,13 +79,13 @@ pub mod mov {
         //! scans the track's metadata once and returns an [`EncodedEditPlan`] for
         //! [`PacketCursor::new_encoded_regular`](super::packets::PacketCursor::new_encoded_regular)
         //! or [`PacketCursor::new_front_with_encoded_edits`](super::packets::PacketCursor::new_front_with_encoded_edits).
-        pub use crate::encoded_edits::{
+        pub use super::cursor::EditIdentity;
+        pub use super::edit_list::{DurationBasis, EditCursor, EditLimits, EditOccurrence};
+        pub use super::encoded_edits::{
             EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
             EncodedEditProfile, fragment_aac::FragmentAacTrimJob,
         };
-        pub use crate::mov_cursor::EditIdentity;
-        pub use crate::mov_edits::{DurationBasis, EditCursor, EditLimits, EditOccurrence};
-        pub use crate::mov_view::ProjectedEdit;
+        pub use super::view::ProjectedEdit;
     }
 
     pub mod seek {
@@ -77,8 +95,8 @@ pub mod mov {
         //! [`GlobalSeekJob`] all of them; both return a plan whose [`SeekLanding`] says
         //! which entry was selected. [`RangeSeekJob`] does the same from a packet
         //! cursor that recorded checkpoints.
-        pub use crate::mov_cursor::RangeSeekJob;
-        pub use crate::mov_index::{
+        pub use super::cursor::RangeSeekJob;
+        pub use super::index::{
             GlobalSeekJob, GlobalSeekPlan, IndexCursor, IndexEntry, IndexLimits, SeekCursor,
             SeekJob, SeekLanding, SeekLimits, SeekPlan,
         };
@@ -92,7 +110,7 @@ pub mod mov {
         //! read a nonseekable input from its start. [`FrontTrack`] keeps one track's
         //! clock across [`FrontFragment`]s, and a [`FrontSample`] names the
         //! [`FrontReadBoundary`] up to which its payload can be read.
-        pub use crate::mov_front::{FrontFragment, FrontReadBoundary, FrontSample, FrontTrack};
+        pub use super::front_movie::{FrontFragment, FrontReadBoundary, FrontSample, FrontTrack};
     }
 
     pub mod encoded {
@@ -108,24 +126,24 @@ pub mod mov {
         //!
         //! [`EncodedInitial`] and [`EncodedConfigSequence`] follow the configuration of a
         //! track with more than one description.
-        pub use crate::encoded_configs::{
+        pub use super::encoded_configs::{
             EncodedConfigProfile, EncodedConfigSequence, EncodedConfigStep, EncodedCreation,
             EncodedInitial,
         };
-        pub use crate::encoded_contexts::{
+        pub use super::encoded_contexts::{
             EncodedContextProfile, SourceProfileFault, WaveObservation,
         };
-        pub use crate::encoded_metadata::{
+        pub use super::encoded_metadata::{
             CreationCause, DependedOn, DependencyView, EncodedCreationSource,
             EncodedMetadataProfile, EncodedSelection, EncodedSource, HandlerSource, LanguageCause,
             LanguageSource, SoundV1Source,
         };
-        pub use crate::encoded_recovery::{
+        pub use super::encoded_recovery::{
             DependencyCause, DependencyObservation, EncodedRecoveryProfile, RecoveryFacts,
             RecoveryGroup,
         };
-        pub use crate::encoded_recovery_context::RecoveryObservation;
-        pub use crate::encoded_stream::{
+        pub use super::encoded_recovery_context::RecoveryObservation;
+        pub use super::encoded_stream::{
             EncodedEntryKind, EncodedStream, EncodedStreamJob, EncodedStreamProfile,
         };
     }
@@ -139,7 +157,7 @@ pub mod mov {
         //!
         //! - Field recovery. [`RecoveryTrackHeader`] accepts a zero timescale and
         //!   [`PartialSampleReader`] or
-        //!   [`SampleReader::poll_recovery`](crate::SampleReader::poll_recovery)
+        //!   [`SampleReader::poll_recovery`](crate::payload::SampleReader::poll_recovery)
         //!   return the part of a sample that exists ([`ShortSample`]).
         //! - Run recovery. [`RunRecoveryBuilder`] accepts overlong timing and sync
         //!   tables. [`RunRecoveryTable`] keeps the raw tables with their
@@ -153,13 +171,14 @@ pub mod mov {
         //!   [`DescriptionEvent`] for each declaration, including those the demuxer
         //!   drops from its catalogue, and [`PhysicalReader`] reads an event's bytes at
         //!   the physical end of the file.
-        pub use crate::metadata::RecoveryTrackHeader;
-        pub use crate::packet::{RecoverySampleExtent, RecoverySampleRead, ShortSample};
-        pub use crate::physical_read::{
+        pub use super::field_recovery::{
+            PartialSampleReader, PayloadBounds, RecoveredPayload, RecoverySampleExtent,
+            RecoverySampleRead, RecoveryTrackHeader, ShortSample,
+        };
+        pub use super::physical_read::{
             PhysicalPayload, PhysicalRead, PhysicalReadProfile, PhysicalReader,
         };
-        pub use crate::recovery_payload::{PartialSampleReader, PayloadBounds, RecoveredPayload};
-        pub use crate::regular::{
+        pub use crate::table::recovery::{
             DescriptionAssociation, DescriptionContext, DescriptionEmission, DescriptionEvent,
             DescriptionIndexCursor, DescriptionIndexEvent, DescriptionPacketCursor,
             DescriptionRead, DescriptionRecoveryBuilder, DescriptionRecoveryProfile,
@@ -175,11 +194,11 @@ pub mod mov {
     pub mod pcm {
         //! QuickTime PCM packets.
         //!
-        //! [`PcmStream`] admits one track of [`QtSoundDescriptionV0`](crate::QtSoundDescriptionV0)
+        //! [`PcmStream`] admits one track of [`QtSoundDescriptionV0`](crate::quicktime::QtSoundDescriptionV0)
         //! samples. [`PcmCursor`] groups them into the [`PcmPacket`]s the demuxer emits,
         //! which do not match the source samples, and [`PcmReader`] reads one packet's
         //! bytes as a [`PcmPayload`].
-        pub use crate::mov_pcm::{
+        pub use super::pcm_packets::{
             PcmCursor, PcmLimits, PcmPacket, PcmPayload, PcmProfile, PcmReader, PcmStream,
         };
     }

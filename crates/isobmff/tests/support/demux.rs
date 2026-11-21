@@ -2,8 +2,11 @@ use crate::common::{self, child};
 use std::ops::Range;
 use triergon_core::{Budget, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, EditList, FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Limits,
-    MovieHeader, SampleTable, TrackHeader, Trex, compat::mov::packets::DemuxTrack,
+    BuildStatus, Limits,
+    compat::mov::packets::DemuxTrack,
+    fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
+    movie::{EditList, MovieHeader, TrackHeader},
+    table::SampleTable,
 };
 pub struct Track {
     pub id: u32,

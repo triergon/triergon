@@ -3,8 +3,10 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, Step, WorkBudget,
 };
 use triergon_isobmff::{
-    Access, BoxEvent, BoxHeader, BoxReader, MediaDataPolicy, Sample, SampleReader,
+    Access, Sample,
+    boxes::{BoxEvent, BoxHeader, BoxReader, MediaDataPolicy},
     compat::mov::recovery::{PartialSampleReader, PayloadBounds, RunRecoveryProfile},
+    payload::SampleReader,
 };
 fn sample(range: Range<u64>) -> Sample {
     Sample {
