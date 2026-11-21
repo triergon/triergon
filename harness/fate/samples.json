@@ -3,6 +3,26 @@
   "note": "Upstream regression samples and local remuxes used by the comparison corpora. Samples are fetched into the ignored corpus cache by these hashes and never redistributed. Their redistribution rights are unreviewed.",
   "samples": [
     {
+      "path": ".research/fixtures-mpegts-dts-discovery/false-sync.ts",
+      "sha256": "861185df4157bd517cd77e982340b2c906ef51c3373be8d07a9c66c3cfadd297",
+      "source": "FATE dts/dts.ts; reproducible false-sync mutation by cargo xtask fixture transport-dts-discovery"
+    },
+    {
+      "path": ".research/fixtures-mpegts-dts-discovery/second-sync.ts",
+      "sha256": "24181cba3c4925761996e8d72f9949b926c276fdeb32c4d8773ff663aad7d376",
+      "source": "FATE dts/dts.ts; reproducible second-sync mutation by cargo xtask fixture transport-dts-discovery"
+    },
+    {
+      "path": ".research/fixtures-mpegts-dts-discovery/different-mode.ts",
+      "sha256": "41b927f0750ab899861839b5e87cedd79b76bf0ec96e20bfcaf373b682351cd4",
+      "source": "FATE dts/dts.ts; reproducible different-mode mutation by cargo xtask fixture transport-dts-discovery"
+    },
+    {
+      "path": ".research/fixtures-mpegts-dts-discovery/ambiguous.ts",
+      "sha256": "73fae338b8afa9345c510fd260342239d59fcceaf3692f860f1bfa0cfca42509",
+      "source": "FATE dts/dts.ts; reproducible ambiguous-route mutation by cargo xtask fixture transport-dts-discovery"
+    },
+    {
       "path": "fate/dts/dts.ts",
       "sha256": "749561299cf838d55f52d5697f78c273a6c381c5e6c8300f859dfe23252ae2c2",
       "source": "https://fate-suite.ffmpeg.org/dts/dts.ts"

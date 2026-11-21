@@ -58,9 +58,31 @@ pub mod adts {
 pub mod annex_b;
 
 pub mod dts {
-    //! Explicit selection of DTS core on private-data routes without a descriptor.
-    //! The comparison uses the same codec declaration with FFmpeg git revision
-    //! `d32b387f` on the 9.0 branch.
+    //! DTS core identification on private-data routes without a descriptor.
+    //!
+    //! `ReaderLimits::probe_unlabelled_dts_core` explicitly enables envelope
+    //! identification. The program must have empty program descriptors and exactly
+    //! one private-data entry with an empty descriptor loop. Only its initial
+    //! private_stream_1 PES, starting at elementary offset zero, is considered.
+    //! Two complete canonical big-endian core envelopes must have matching sample
+    //! rate, channel mode and block count. At most 32768 payload bytes are read,
+    //! one work unit per byte or span boundary, with no allocation or sync search.
+    //! The original PES stays in the charged mailbox across yields. A failed
+    //! initial probe emits an unsupported-track event at that PES. A new map, clock or byte run
+    //! requires fresh evidence; neither source signalling nor clocks are rewritten.
+    //! This proves envelopes, not audio decoding or absence of embedded extensions.
+    //!
+    //! Explicit `UnlabelledCore` selection remains available for split initial
+    //! frames. Word-swapped and 14-bit packing are recognized by framing's packing
+    //! classifier but are not admitted here. DVB DTS descriptors retain their
+    //! existing explicit namespace interpretation. ATSC has no DTS mapping in the
+    //! current classifier. Registration-based DTS and Blu-ray stream-type namespaces
+    //! are not inferred from private tag numbers.
+    //! The explicit-selection comparison uses the same codec declaration with
+    //! FFmpeg git revision `d32b387f` on the 9.0 branch. Ordinary discovery in
+    //! that transport-dts build identifies FATE `dts/dts.ts` as binary data.
+    //! The `mpegts-dts-discovery` comparison validates automatic admission and
+    //! the complete packet fold against a public DTS parser and demuxer adapter.
 
     /// A caller-identified DTS core stream with empty program and elementary
     /// descriptor loops. The reader validates each frame and keeps the original

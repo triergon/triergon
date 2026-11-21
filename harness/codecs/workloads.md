@@ -1,6 +1,6 @@
 # Timing and memory workloads
 
-The 20 workloads in `WORKLOADS.json` (input hashes, operation and iterations) are
+The 20 workloads in `workloads.json` (input hashes, operation and iterations) are
 generated with FFmpeg 9.0.2 (x264, x265 and native AAC encoders) from deterministic
 lavfi sources:
 
