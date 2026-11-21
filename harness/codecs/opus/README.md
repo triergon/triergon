@@ -44,3 +44,9 @@ comparison passes its exact and numeric checks; worst channel RMS error is
 a diagnostic using the same release, not the prepared pinned build or native
 qualification. The family 2 header specifies ACN component semantics; the reported
 layout is separately observed from the selected decoder, not inferred from the header.
+
+The same comparison passes with the prepared `decode` profile on macOS.
+It matches layout, frame lengths, 48 kHz, four channels and all 4,800
+samples per channel. The worst RMS error is 9.82976633815388e-9. The
+largest absolute error is 3.725290298461914e-8. Native runtime and memory
+measurements remain open.
