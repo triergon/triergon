@@ -420,9 +420,12 @@ impl Receiver {
             return Err(Error::Invalid("PGS receiver palette shared"));
         };
         let entries = body.start + 2..body.end.max(body.start + 2);
-        let whole = raw.get(entries.clone()).unwrap_or_default().chunks_exact(5);
+        let (whole, _) = raw
+            .get(entries.clone())
+            .unwrap_or_default()
+            .as_chunks::<5>();
         let tail = entries.start + 5 * whole.len();
-        for &[index, y, cr, cb, alpha] in whole.map(|e| <&[u8; 5]>::try_from(e).expect("5 bytes")) {
+        for &[index, y, cr, cb, alpha] in whole {
             words[usize::from(index)] = matrix.argb(y, cr, cb, alpha);
         }
         // An entry starting inside the segment but ending past it reads on.
