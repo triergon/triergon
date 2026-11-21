@@ -412,15 +412,12 @@ impl std::fmt::Debug for DtsHeaderInspector {
 }
 
 impl DtsHeaderInspector {
-    /// An inspector of `source`, a record that begins where a frame's sync word
-    /// is expected and that `identity` locates. `source` must be charged to
-    /// `pool`. Bytes after the header are not read.
-    ///
-    /// # Errors
-    ///
-    /// `ForeignPool` when `source` is charged to another pool. `Invalid` when
-    /// `maximum_record_bytes` is zero, `Limit` when the record is longer than
-    /// that. `Overflow` when the record ends beyond offset `u64::MAX`.
+    /// An inspector of `source`, a record that begins where a frame's sync word is
+    /// expected and that `identity` locates. `source` must be charged to `pool`. Bytes
+    /// after the header are not read. Fails with `ForeignPool` when `source` is charged
+    /// to another pool; `Invalid` when `maximum_record_bytes` is zero, `Limit` when the
+    /// record is longer than that; `Overflow` when the record ends beyond offset
+    /// `u64::MAX`.
     pub fn new(
         pool: &Budget,
         identity: DtsSourceIdentity,
@@ -463,14 +460,11 @@ impl DtsHeaderInspector {
         })
     }
 
-    /// Advances the inspection. `Ready` occurs once, then `End` at the record's
-    /// end: the end of the owned record, not an observed end of the transport.
-    /// `Yield` means the work is spent. An owned record never requests input.
-    ///
-    /// # Errors
-    ///
-    /// `Cancelled` when `cancel` is set. A header that breaks the specification
-    /// is not an error: it is reported in the result.
+    /// Advances the inspection. `Ready` occurs once, then `End` at the record's end:
+    /// the end of the owned record, not an observed end of the transport. `Yield` means
+    /// the work is spent. An owned record never requests input. Fails with `Cancelled`
+    /// when `cancel` is set. A header that breaks the specification is not an error: it
+    /// is reported in the result.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

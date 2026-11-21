@@ -334,10 +334,8 @@ impl Picture {
 /// `reserved_zero_2bits`, reads Exp-Golomb codes of up to 32 leading zero bits,
 /// saturates the frame size and leaves the cropping unchecked.
 ///
-/// # Errors
-///
-/// When the SPS is cut short or a field is out of range ("AVC Exp-Golomb field out
-/// of range").
+/// Fails when the SPS is cut short or a field is out of range ("AVC Exp-Golomb field
+/// out of range").
 pub fn read_sps(
     payload: &[u8],
     reading: AvcReading,
@@ -478,12 +476,9 @@ fn skip_hrd(bits: &mut Rbsp<'_>) -> Result<()> {
     Ok(())
 }
 
-/// Reads a PPS payload (after the NAL header).
-///
-/// # Errors
-///
-/// When the PPS is cut short, a field is out of range, or it has slice groups
-/// (flexible macroblock ordering, which is not read).
+/// Reads a PPS payload (after the NAL header). Fails when the PPS is cut short, a field
+/// is out of range, or it has slice groups (flexible macroblock ordering, which is not
+/// read).
 pub fn read_pps(payload: &[u8], reading: AvcReading) -> Result<AvcPps> {
     let mut bits = Rbsp::new(payload, reading);
     let id = bits.unsigned(255)? as u8;
@@ -513,11 +508,8 @@ pub fn read_pps(payload: &[u8], reading: AvcReading) -> Result<AvcPps> {
     })
 }
 
-/// The `pic_parameter_set_id` of a slice payload (after the NAL header).
-///
-/// # Errors
-///
-/// When the header is cut short or a field is out of range.
+/// The `pic_parameter_set_id` of a slice payload (after the NAL header). Fails when the
+/// header is cut short or a field is out of range.
 pub fn slice_pps_id(payload: &[u8], reading: AvcReading) -> Result<u8> {
     let mut bits = Rbsp::new(payload, reading);
     bits.unsigned(u32::MAX)?; // first_mb_in_slice
@@ -525,12 +517,9 @@ pub fn slice_pps_id(payload: &[u8], reading: AvcReading) -> Result<u8> {
     Ok(bits.unsigned(255)? as u8)
 }
 
-/// Reads a slice header payload (after the NAL header) of a picture with
-/// the given `nal_ref_idc != 0` and IDR flag, through `depth`.
-///
-/// # Errors
-///
-/// When the header is cut short or a field is out of range.
+/// Reads a slice header payload (after the NAL header) of a picture with the given
+/// `nal_ref_idc != 0` and IDR flag, through `depth`. Fails when the header is cut short
+/// or a field is out of range.
 pub fn read_slice_header(
     payload: &[u8],
     reference: bool,

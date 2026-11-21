@@ -440,12 +440,9 @@ impl<P> DecodedPictures<P> {
         self.stored.iter().map(|p| &p.picture)
     }
 
-    /// Makes room for `additional` more pictures: storing them then neither
-    /// allocates nor fails, whatever leaves the buffer in between.
-    ///
-    /// # Errors
-    ///
-    /// When the pool refuses the memory; the buffer is left as it was.
+    /// Makes room for `additional` more pictures: storing them then neither allocates
+    /// nor fails, whatever leaves the buffer in between. Fails when the pool refuses
+    /// the memory; the buffer is left as it was.
     pub fn try_reserve(&mut self, additional: usize) -> Result<()> {
         self.stored.try_reserve(additional)
     }
@@ -489,11 +486,8 @@ impl<P> DecodedPictures<P> {
         self.retain_references(|_, _| false);
     }
 
-    /// Stores a picture without bumping or removal, and names it.
-    ///
-    /// # Errors
-    ///
-    /// When the pool refuses the memory; the picture is given back.
+    /// Stores a picture without bumping or removal, and names it. Fails when the pool
+    /// refuses the memory; the picture is given back.
     pub fn store(
         &mut self,
         new: NewPicture,
@@ -631,11 +625,9 @@ impl<P> DecodedPictures<P> {
     /// without being stored when the buffer is full (C.4.5.2): then `None`.
     /// A non-reference picture that is not output is not stored either.
     ///
-    /// # Errors
-    ///
-    /// [`StoreError::Full`] when every buffer holds a reference picture and
-    /// none waits for output; [`StoreError::Refused`] when the pool refuses
-    /// the memory. The picture is given back.
+    /// Fails with [`StoreError::Full`] when every buffer holds a reference picture and
+    /// none waits for output; [`StoreError::Refused`] when the pool refuses the memory.
+    /// The picture is given back.
     pub fn avc_store(
         &mut self,
         current: NewPicture,
@@ -683,9 +675,7 @@ impl<P> DecodedPictures<P> {
     /// own before it joins; otherwise the pair waits for output when the
     /// field's OutputFlag is 1 ([`Entry::pair`]).
     ///
-    /// # Errors
-    ///
-    /// When `first` is not stored; the field is given back.
+    /// Fails when `first` is not stored; the field is given back.
     pub fn avc_store_second_field(
         &mut self,
         first: PictureId,
@@ -712,9 +702,7 @@ impl<P> DecodedPictures<P> {
     /// needed for output, stored after bumping while the buffer of
     /// `dpb_frames` frame buffers is full.
     ///
-    /// # Errors
-    ///
-    /// As [`DecodedPictures::avc_store`].
+    /// Fails as [`DecodedPictures::avc_store`] does.
     pub fn avc_store_gap_frame(
         &mut self,
         poc: i32,
@@ -769,13 +757,10 @@ impl<P> DecodedPictures<P> {
         }
     }
 
-    /// H.265 C.3.4 and C.5.2.3: stores the current picture (marked as used
-    /// for short-term reference, and needed for output when PicOutputFlag is
-    /// 1), then bumps while too many pictures wait or one waits too long.
-    ///
-    /// # Errors
-    ///
-    /// When the pool refuses the memory; the picture is given back.
+    /// H.265 C.3.4 and C.5.2.3: stores the current picture (marked as used for
+    /// short-term reference, and needed for output when PicOutputFlag is 1), then bumps
+    /// while too many pictures wait or one waits too long. Fails when the pool refuses
+    /// the memory; the picture is given back.
     pub fn hevc_store(
         &mut self,
         poc: i32,

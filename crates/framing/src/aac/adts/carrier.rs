@@ -51,8 +51,6 @@ impl AacAdtsCarrier {
     /// [`selected_error`](Self::selected_error) and the unit is as long as the
     /// header declares.
     ///
-    /// # Errors
-    ///
     /// Any other unit is returned as it was.
     pub fn into_selected_frame(self) -> std::result::Result<AacAdtsFrame, Self> {
         let Some(header) = self.header else {
@@ -148,9 +146,7 @@ impl AacAdtsCarrierReader {
     /// unit keeps [`Error::Invalid`] as its diagnostic, and its syntax is not
     /// validated.
     ///
-    /// # Errors
-    ///
-    /// When a limit is zero.
+    /// Fails when a limit is zero.
     pub fn for_parser_packets(
         pool: &Budget,
         source: SourceId,
@@ -175,9 +171,7 @@ impl AacAdtsCarrierReader {
     /// ([`AacAdtsCarrierBoundary::DeclaredEnvelope`] with a nonzero
     /// `header_offset`).
     ///
-    /// # Errors
-    ///
-    /// When a limit is zero.
+    /// Fails when a limit is zero.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -220,32 +214,20 @@ impl AacAdtsCarrierReader {
     pub fn completed_packets(&self) -> usize {
         self.inner.completed_frames()
     }
-    /// Answers the current request with `window`, whose bytes the reader shares
-    /// until it has copied them into a unit.
-    ///
-    /// # Errors
-    ///
-    /// When the window is refused as by
-    /// [`InputCursor::provide`](triergon_core::InputCursor::provide), which changes
-    /// nothing, or the reader has failed.
+    /// Answers the current request with `window`, as
+    /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
+    /// window changes nothing. A failed reader returns its error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.inner.provide(window)
     }
-    /// [`provide`](Self::provide) for a window the caller gives away.
-    ///
-    /// # Errors
-    ///
-    /// As [`provide`](Self::provide); a refused window is dropped.
+    /// [`provide`](Self::provide) for a window the caller gives away; a refused window
+    /// is dropped.
     pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
         self.inner.provide_owned(window)
     }
     /// [`provide`](Self::provide) for at most
     /// [`InputCursor::INLINE_CAPACITY`](triergon_core::InputCursor::INLINE_CAPACITY)
     /// bytes, copied into the reader without an allocation.
-    ///
-    /// # Errors
-    ///
-    /// As [`provide`](Self::provide), and when `bytes` is longer than that.
     pub fn provide_inline(
         &mut self,
         source: SourceId,
@@ -255,26 +237,17 @@ impl AacAdtsCarrierReader {
     ) -> Result<()> {
         self.inner.provide_inline(source, token, offset, bytes)
     }
-    /// Answers the current request with the end of the source, which lies after
-    /// the bytes already provided.
-    ///
-    /// # Errors
-    ///
-    /// When the source ends before its known length: the reader fails for good with
-    /// [`Error::Truncated`] and produces no unit from the bytes left. A token or
-    /// source other than the current one, or a reader that has failed, changes
-    /// nothing.
+    /// Answers the current request with the end of the source, as
+    /// [`InputCursor::finish`](triergon_core::InputCursor::finish) does: a source that
+    /// ends before its known length fails the reader with [`Error::Truncated`], and the
+    /// bytes left become no unit.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.inner.finish(source, token)
     }
-    /// Answers the current request with a failure. Buffered bytes and an unfinished
-    /// unit are dropped, and every later step returns [`Error::Transport`] or
-    /// [`Error::Cancelled`].
-    ///
-    /// # Errors
-    ///
-    /// When the token or source is not the current one or the reader has failed
-    /// already; nothing changes.
+    /// Answers the current request with a failure, as
+    /// [`InputCursor::fail`](triergon_core::InputCursor::fail) does: every later call
+    /// returns [`Error::Transport`] or [`Error::Cancelled`], as `failure` says. An
+    /// unfinished unit is dropped.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -289,9 +262,7 @@ impl AacAdtsCarrierReader {
     /// cleared together; a source length learned from [`finish`](Self::finish) is
     /// kept.
     ///
-    /// # Errors
-    ///
-    /// When `offset` is not zero and the source has no random access, or `offset`
+    /// Fails when `offset` is not zero and the source has no random access, or `offset`
     /// lies past the known length. The reader stays as it was.
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
         self.inner.reset(offset)
@@ -304,12 +275,10 @@ impl AacAdtsCarrierReader {
     /// [`Step::End`] reports the end of the source once every byte has been
     /// produced in a unit.
     ///
-    /// # Errors
-    ///
-    /// When a unit exceeds `maximum_packet_bytes` or the units exceed
+    /// Fails when a unit exceeds `maximum_packet_bytes` or the units exceed
     /// `maximum_packets`, when `cancel` is set, or when the source failed or ended
-    /// before its known length. The reader then returns the same error from every
-    /// later call until [`reset`](Self::reset). [`Error::Backpressure`] and
+    /// before its known length. The reader then returns the same error from every later
+    /// call until [`reset`](Self::reset). [`Error::Backpressure`] and
     /// [`Error::Allocation`] keep its state, to be stepped again.
     pub fn step(
         &mut self,

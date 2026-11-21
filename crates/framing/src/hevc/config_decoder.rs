@@ -74,11 +74,7 @@ pub struct HvcDecoderConfigWriter {
 }
 impl HvcDecoderConfigWriter {
     /// Starts the conversion of `input` into a buffer of at most `maximum` bytes
-    /// charged to `pool`.
-    ///
-    /// # Errors
-    ///
-    /// When the record belongs to another pool.
+    /// charged to `pool`. Fails when the record belongs to another pool.
     pub fn new(pool: &Budget, input: HvcConfiguration, maximum: usize) -> Result<Self> {
         if !input.source_bytes().belongs_to(pool) {
             return Err(Error::ForeignPool);
@@ -94,12 +90,9 @@ impl HvcDecoderConfigWriter {
         })
     }
     /// Advances by at most the units in `work` and returns the output once, as
-    /// [`BuildStep`] describes. A refusal is an output, not an error. Checking an
-    /// array costs one unit; the rest is the work of [`HvcAnnexBWriter::step`].
-    ///
-    /// # Errors
-    ///
-    /// As [`HvcAnnexBWriter::step`].
+    /// [`BuildStep`] describes. A refusal is an output, not an error. Checking an array
+    /// costs one unit; the rest is the work of [`HvcAnnexBWriter::step`]. Fails as
+    /// [`HvcAnnexBWriter::step`] does.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

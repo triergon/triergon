@@ -31,11 +31,10 @@ pub struct VorbisIdentification {
 impl VorbisIdentification {
     /// Parse an identification header packet.
     ///
-    /// # Errors
-    ///
-    /// When the packet is shorter than 30 bytes or is not an identification header, its
-    /// `vorbis_version` is not 0, a channel count, sample rate or block size is out of
-    /// range, the short block is longer than the long one, or the framing bit is clear.
+    /// Fails when the packet is shorter than 30 bytes or is not an identification
+    /// header, its `vorbis_version` is not 0, a channel count, sample rate or block
+    /// size is out of range, the short block is longer than the long one, or the
+    /// framing bit is clear.
     pub fn parse(packet: &[u8]) -> Result<VorbisIdentification> {
         if packet.len() < 30 {
             return Err(Error::Truncated);
@@ -115,12 +114,8 @@ impl VorbisBlock {
 }
 
 impl VorbisModes {
-    /// The modes of a setup header packet.
-    ///
-    /// # Errors
-    ///
-    /// When `setup` is not a setup header, or does not end in a run of well-formed modes
-    /// that the count before it agrees with.
+    /// The modes of a setup header packet. Fails when `setup` is not a setup header, or
+    /// does not end in a run of well-formed modes that the count before it agrees with.
     pub fn from_setup(setup: &[u8]) -> Result<VorbisModes> {
         if header_type(setup) != Some(5) {
             return Err(Error::Invalid("Vorbis setup header"));
@@ -179,12 +174,9 @@ impl VorbisModes {
     }
 
     /// The block an audio packet codes: its mode number follows the packet type bit,
-    /// and a long block's window flags follow the mode number.
-    ///
-    /// # Errors
-    ///
-    /// When the packet is empty, is a header packet, names a mode the setup header does
-    /// not have, or ends before the window flags of a long block.
+    /// and a long block's window flags follow the mode number. Fails when the packet is
+    /// empty, is a header packet, names a mode the setup header does not have, or ends
+    /// before the window flags of a long block.
     pub fn block(&self, packet: &[u8]) -> Result<VorbisBlock> {
         let first = *packet.first().ok_or(Error::Truncated)?;
         if first & 1 != 0 {
@@ -262,11 +254,8 @@ pub struct VorbisHeaders<'a> {
 }
 
 impl<'a> VorbisHeaders<'a> {
-    /// The headers of a Xiph-laced configuration, each checked for its type byte.
-    ///
-    /// # Errors
-    ///
-    /// When the lacing is malformed, does not hold three packets, or a packet does not
+    /// The headers of a Xiph-laced configuration, each checked for its type byte. Fails
+    /// when the lacing is malformed, does not hold three packets, or a packet does not
     /// start with the type byte and `vorbis` of its place.
     pub fn from_laced(bytes: &'a [u8]) -> Result<VorbisHeaders<'a>> {
         let mut ranges = Vec::with_capacity(3);
@@ -290,12 +279,8 @@ impl<'a> VorbisHeaders<'a> {
 }
 
 /// Checks a Vorbis configuration (the three header packets, Xiph-laced, as Matroska
-/// CodecPrivate holds them) and copies it to `out`.
-///
-/// # Errors
-///
-/// When the lacing or a header packet is malformed, or the budget of `out` refuses
-/// the bytes.
+/// CodecPrivate holds them) and copies it to `out`. Fails when the lacing or a header
+/// packet is malformed, or the budget of `out` refuses the bytes.
 pub fn canonical_configuration(configuration: &[u8], out: &mut BudgetVec<u8>) -> Result<()> {
     VorbisHeaders::from_laced(configuration)?;
     replace(out, &[configuration])

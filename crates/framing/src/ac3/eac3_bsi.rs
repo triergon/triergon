@@ -43,11 +43,8 @@ impl Eac3BitSpan {
     pub const fn range(&self) -> Eac3BitRange {
         self.range
     }
-    /// Bit `index` of the span; 0 is its first bit.
-    ///
-    /// # Errors
-    ///
-    /// When `index` is not below the span's bit count.
+    /// Bit `index` of the span; 0 is its first bit. Fails when `index` is not below the
+    /// span's bit count.
     pub fn bit(&self, index: usize) -> Result<bool> {
         if index >= self.range.bits {
             return Err(Error::Invalid("E-AC-3 bit span index"));
@@ -55,12 +52,9 @@ impl Eac3BitSpan {
         let position = self.range.start.checked_add(index).ok_or(Error::Overflow)?;
         Ok(self.frame.bytes()[position / 8] & (1 << (7 - position % 8)) != 0)
     }
-    /// Source bytes covering the span. The first/last bytes can also contain
-    /// adjacent fields; range() retains the exact bit boundary.
-    ///
-    /// # Errors
-    ///
-    /// Never: a span lies inside its frame.
+    /// Source bytes covering the span. The first/last bytes can also contain adjacent
+    /// fields; range() retains the exact bit boundary. Never fails: a span lies inside
+    /// its frame.
     pub fn covering_bytes(&self) -> Result<Bytes> {
         let end = self
             .range
@@ -174,12 +168,8 @@ impl Eac3Bsi {
     pub const fn facts(&self) -> Eac3BsiFacts {
         self.facts
     }
-    /// An owned view of `range`, which shares the frame's bytes.
-    ///
-    /// # Errors
-    ///
-    /// When `range` starts inside the syncword or ends after
-    /// [`Eac3BsiFacts::end_bit`].
+    /// An owned view of `range`, which shares the frame's bytes. Fails when `range`
+    /// starts inside the syncword or ends after [`Eac3BsiFacts::end_bit`].
     pub fn bit_span(&self, range: Eac3BitRange) -> Result<Eac3BitSpan> {
         let end = range.start.checked_add(range.bits).ok_or(Error::Overflow)?;
         if range.start < 16 || end > self.facts.end_bit {
@@ -308,13 +298,11 @@ impl std::fmt::Debug for Eac3BsiParser {
 impl Eac3BsiParser {
     /// A parser of `frame` that starts reading where the frame's header ends.
     ///
-    /// # Errors
-    ///
-    /// When a limit is zero; when `frame` is not charged to `pool`, is longer than
-    /// `maximum_frame_bytes`, is an AC-3 frame, has the reserved `strmtyp` 3 or
-    /// does not hold exactly the bytes its header declares; and when the header
-    /// fields alone exceed `maximum_bsi_bits` or reach the auxiliary data and CRC
-    /// fields that end the frame.
+    /// Fails when a limit is zero; when `frame` is not charged to `pool`, is longer
+    /// than `maximum_frame_bytes`, is an AC-3 frame, has the reserved `strmtyp` 3 or
+    /// does not hold exactly the bytes its header declares; and when the header fields
+    /// alone exceed `maximum_bsi_bits` or reach the auxiliary data and CRC fields that
+    /// end the frame.
     pub fn new(pool: &Budget, frame: Ac3Frame, limits: Eac3BsiLimits) -> Result<Self> {
         if limits.maximum_frame_bytes == 0 || limits.maximum_bsi_bits == 0 {
             return Err(Error::Invalid("zero E-AC-3 BSI policy"));
@@ -487,15 +475,11 @@ impl Eac3BsiParser {
         }
     }
 
-    /// Advances by at most the work left in `work`, where each bit read costs one
-    /// unit, and returns the frame with its bit stream information once that is
-    /// read.
-    ///
-    /// # Errors
-    ///
-    /// When the fields reach the auxiliary data and CRC fields that end the frame
-    /// or exceed `maximum_bsi_bits`, `mixdef` is 3, or `cancel` is set. Every later
-    /// call returns the same error.
+    /// Advances by at most the work left in `work`, where each bit read costs one unit,
+    /// and returns the frame with its bit stream information once that is read. Fails
+    /// when the fields reach the auxiliary data and CRC fields that end the frame or
+    /// exceed `maximum_bsi_bits`, `mixdef` is 3, or `cancel` is set. Every later call
+    /// returns the same error.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

@@ -202,10 +202,8 @@ impl Dts14SyncReader {
     /// than the first since construction or the last reset is
     /// [`Error::Unsupported`].
     ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] when a limit is zero, and [`Error::Limit`] when a frame of
-    /// `maximum_physical_frame_bytes` cannot fit `pool`.
+    /// Fails with [`Error::Invalid`] when a limit is zero, and [`Error::Limit`] when a
+    /// frame of `maximum_physical_frame_bytes` cannot fit `pool`.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -264,9 +262,7 @@ impl Dts14SyncReader {
     /// checked for that frame alone; a payload that does not end on a byte boundary
     /// or does not hold `FSIZE` + 1 bytes is [`Error::Unsupported`].
     ///
-    /// # Errors
-    ///
-    /// As [`new`](Self::new).
+    /// Fails as [`new`](Self::new) does.
     pub fn per_frame(
         pool: &Budget,
         source: SourceId,
@@ -284,24 +280,16 @@ impl Dts14SyncReader {
     pub fn request(&self) -> InputRequest {
         self.input.request()
     }
-    /// Answers the current request with `window`.
-    ///
-    /// # Errors
-    ///
-    /// The cursor's refusal of a window that does not answer the request (see
-    /// [`InputCursor::provide`]), which leaves the reader as it was. A failed reader
-    /// returns its earlier error.
+    /// Answers the current request with `window`, as
+    /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
+    /// window changes nothing. A failed reader returns its error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.input.cursor()?.provide(window)
     }
-    /// Answers the current request with the end of the source, which also ends the
-    /// frame being read.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Truncated`], from then on, when the source ends before its known
-    /// length. A token or source that does not match the request is refused and
-    /// leaves the reader as it was. A failed reader returns its earlier error.
+    /// Answers the current request with the end of the source, as
+    /// [`InputCursor::finish`](triergon_core::InputCursor::finish) does: a source that
+    /// ends before its known length fails the reader with [`Error::Truncated`]. The end
+    /// of the source also ends the frame being read.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         let result = self.input.cursor()?.finish(source, token);
         if result == Err(Error::Truncated) {
@@ -309,14 +297,10 @@ impl Dts14SyncReader {
         }
         result
     }
-    /// Answers the current request with a source failure. The reader drops the frame
-    /// it was reading and from then on returns [`Error::Transport`] or
-    /// [`Error::Cancelled`]; the bytes read so far never become a frame.
-    ///
-    /// # Errors
-    ///
-    /// A token or source that does not match the request is refused and leaves the
-    /// reader as it was. A failed reader returns its earlier error.
+    /// Answers the current request with a failure, as
+    /// [`InputCursor::fail`](triergon_core::InputCursor::fail) does: every later call
+    /// returns [`Error::Transport`] or [`Error::Cancelled`], as `failure` says. The
+    /// bytes read so far never become a frame.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -333,11 +317,9 @@ impl Dts14SyncReader {
     /// next frame, and the cursor takes a new generation, so answers to earlier
     /// requests are refused. Frames already returned stay as they are.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Unsupported`] when `offset` is odd, or the cursor's refusal of an
-    /// offset it cannot serve (see [`InputCursor::reset`]). A failed reader returns
-    /// its earlier error and cannot be reset.
+    /// Fails with [`Error::Unsupported`] when `offset` is odd, or the cursor's refusal
+    /// of an offset it cannot serve (see [`InputCursor::reset`]). A failed reader
+    /// returns its earlier error and cannot be reset.
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
         let cursor = self.input.cursor()?;
         if !offset.is_multiple_of(2) {
@@ -367,17 +349,14 @@ impl Dts14SyncReader {
     /// [`Step::End`] the end of the source once the last frame is returned;
     /// [`Step::Yield`] means the work is spent.
     ///
-    /// # Errors
-    ///
     /// [`Error::Backpressure`] and [`Error::Allocation`] leave the reader as it was:
-    /// free pool storage and call again. Every other error is kept and returned by
-    /// all later calls: [`Error::Cancelled`] when `cancel` is set, the refusal of a
-    /// frame's header by [`probe_core_header`], [`Error::Unsupported`] for a frame
-    /// that is not a multiple of seven bytes, that does not hold `FSIZE` + 1 bytes
-    /// when the source ends, or whose length a reader from [`new`](Self::new) does
-    /// not accept, [`Error::Truncated`] when the source ends inside a header or a
-    /// word, and [`Error::Limit`] when a frame or the number of frames exceeds its
-    /// limit.
+    /// free pool storage and call again. Every other error is kept and returned by all
+    /// later calls: [`Error::Cancelled`] when `cancel` is set, the refusal of a frame's
+    /// header by [`probe_core_header`], [`Error::Unsupported`] for a frame that is not
+    /// a multiple of seven bytes, that does not hold `FSIZE` + 1 bytes when the source
+    /// ends, or whose length a reader from [`new`](Self::new) does not accept,
+    /// [`Error::Truncated`] when the source ends inside a header or a word, and
+    /// [`Error::Limit`] when a frame or the number of frames exceeds its limit.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

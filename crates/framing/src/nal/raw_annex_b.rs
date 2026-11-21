@@ -213,13 +213,9 @@ impl std::fmt::Debug for RawAnnexBReader {
 }
 
 impl RawAnnexBReader {
-    /// A reader at offset zero of `source`, charged to `pool`.
-    /// The caller provides the codec from a trusted route or separate probe.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] when a limit other than `maximum_padding_bytes` is
-    /// zero.
+    /// A reader at offset zero of `source`, charged to `pool`. The caller provides the
+    /// codec from a trusted route or separate probe. Fails with [`Error::Invalid`] when
+    /// a limit other than `maximum_padding_bytes` is zero.
     pub fn new(
         pool: &Budget,
         codec: Codec,
@@ -246,25 +242,16 @@ impl RawAnnexBReader {
         })
     }
 
-    /// Answers the current request with `window`, whose bytes the reader
-    /// shares. An empty window is no answer yet; only
-    /// [`finish`](Self::finish) ends the source.
-    ///
-    /// # Errors
-    ///
-    /// A window that does not answer the current request is refused and changes
-    /// nothing: another token, source, pool or offset, or more bytes than the
-    /// request allows. After a final error of [`step`](Self::step), that error.
+    /// Answers the current request with `window`, as
+    /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
+    /// window changes nothing. A failed reader returns its error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.healthy()?;
         self.nal.provide(window)
     }
 
-    /// [`provide`](Self::provide) for a window the caller gives away.
-    ///
-    /// # Errors
-    ///
-    /// As [`provide`](Self::provide); a refused window is dropped.
+    /// [`provide`](Self::provide) for a window the caller gives away; a refused window
+    /// is dropped.
     pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
         self.healthy()?;
         self.nal.provide_owned(window)
@@ -297,8 +284,6 @@ impl RawAnnexBReader {
     /// two zero bytes in a row, and when the work left or the unit's buffer
     /// cannot take it.
     ///
-    /// # Errors
-    ///
     /// A `request` other than the current one is refused, as by
     /// [`provide`](Self::provide); [`Error::Cancelled`] when `cancel` is set.
     pub fn append_payload(
@@ -315,14 +300,9 @@ impl RawAnnexBReader {
         self.nal.append_annex_payload(request, bytes, work, cancel)
     }
 
-    /// Answers the current request with the end of the source, which lies after
-    /// the bytes already provided.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Truncated`], here and from every later call, when the source
-    /// ends before its declared length. A `source` or `token` other than the
-    /// current one is refused and changes nothing.
+    /// Answers the current request with the end of the source, as
+    /// [`InputCursor::finish`](triergon_core::InputCursor::finish) does: a source that
+    /// ends before its known length fails the reader with [`Error::Truncated`].
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
         let result = self.nal.finish(source, token);
@@ -332,14 +312,9 @@ impl RawAnnexBReader {
         result
     }
 
-    /// Answers the current request with a failure of the source. Every later
-    /// call returns [`Error::Transport`] or [`Error::Cancelled`], as `failure`
-    /// says.
-    ///
-    /// # Errors
-    ///
-    /// A `source` or `token` other than the current one is refused and changes
-    /// nothing.
+    /// Answers the current request with a failure, as
+    /// [`InputCursor::fail`](triergon_core::InputCursor::fail) does: every later call
+    /// returns [`Error::Transport`] or [`Error::Cancelled`], as `failure` says.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -359,21 +334,18 @@ impl RawAnnexBReader {
     /// carries the request to answer; `End` follows the last access unit of a
     /// finished source. Work is charged per source byte and per NAL unit.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Unsupported`] for H.264 slice data partitioning, redundant
-    /// coded pictures, NAL unit types 13 to 16 and 19 to 21, and an SPS
-    /// `profile_idc` other than 44, 66, 77, 88, 100, 110, 122 and 244;
-    /// [`Error::Invalid`] for an H.264 slice whose parameter sets the stream
-    /// has not carried; the error of [`read_sps`](crate::avc::read_sps),
-    /// [`read_pps`](crate::avc::read_pps) or
-    /// [`read_slice_header`](crate::avc::read_slice_header) for an H.264
-    /// parameter set or slice header it refuses (emulation prevention is read
-    /// strictly); [`Error::Truncated`] for an H.265 slice of only its header;
-    /// [`Error::Limit`] past an access-unit limit; the errors of
-    /// [`NalReader::step`] for the framing. [`Error::Backpressure`] and
-    /// [`Error::Allocation`] are retryable: the reader keeps its progress. Every
-    /// other error is final and returned again by each later call.
+    /// Fails with [`Error::Unsupported`] for H.264 slice data partitioning, redundant
+    /// coded pictures, NAL unit types 13 to 16 and 19 to 21, and an SPS `profile_idc`
+    /// other than 44, 66, 77, 88, 100, 110, 122 and 244; [`Error::Invalid`] for an
+    /// H.264 slice whose parameter sets the stream has not carried; the error of
+    /// [`read_sps`](crate::avc::read_sps), [`read_pps`](crate::avc::read_pps) or
+    /// [`read_slice_header`](crate::avc::read_slice_header) for an H.264 parameter set
+    /// or slice header it refuses (emulation prevention is read strictly);
+    /// [`Error::Truncated`] for an H.265 slice of only its header; [`Error::Limit`]
+    /// past an access-unit limit; the errors of [`NalReader::step`] for the framing.
+    /// [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the reader
+    /// keeps its progress. Every other error is final and returned again by each later
+    /// call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

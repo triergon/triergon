@@ -227,13 +227,10 @@ impl std::fmt::Debug for Dts14CarrierReader {
     }
 }
 impl Dts14CarrierReader {
-    /// A reader at offset zero of `source`, whose 16-bit words are in `order`.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] when a limit is zero, and [`Error::Limit`] when the first
-    /// 128 bytes of a packet, or `maximum_packet_bytes` if that is less, cannot fit
-    /// `pool`.
+    /// A reader at offset zero of `source`, whose 16-bit words are in `order`. Fails
+    /// with [`Error::Invalid`] when a limit is zero, and [`Error::Limit`] when the
+    /// first 128 bytes of a packet, or `maximum_packet_bytes` if that is less, cannot
+    /// fit `pool`.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -286,13 +283,9 @@ impl Dts14CarrierReader {
     pub fn generation(&self) -> u64 {
         self.input.generation()
     }
-    /// Answers the current request with `window`.
-    ///
-    /// # Errors
-    ///
-    /// The cursor's refusal of a window that does not answer the request (see
-    /// [`InputCursor::provide`]), which leaves the reader as it was. A failed reader
-    /// returns its earlier error.
+    /// Answers the current request with `window`, as
+    /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
+    /// window changes nothing. A failed reader returns its error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.input.cursor()?.provide(window)?;
         self.last_window_start = window.offset;
@@ -302,14 +295,10 @@ impl Dts14CarrierReader {
             .ok_or(Error::Overflow)?;
         Ok(())
     }
-    /// Answers the current request with the end of the source, which also ends the
-    /// packet being read.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Truncated`], from then on, when the source ends before its known
-    /// length. A token or source that does not match the request is refused and
-    /// leaves the reader as it was. A failed reader returns its earlier error.
+    /// Answers the current request with the end of the source, as
+    /// [`InputCursor::finish`](triergon_core::InputCursor::finish) does: a source that
+    /// ends before its known length fails the reader with [`Error::Truncated`]. The end
+    /// of the source also ends the packet being read.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         let result = self.input.cursor()?.finish(source, token);
         if result == Err(Error::Truncated) {
@@ -317,14 +306,10 @@ impl Dts14CarrierReader {
         }
         result
     }
-    /// Answers the current request with a source failure. The reader drops the
-    /// packet it was reading and from then on returns [`Error::Transport`] or
-    /// [`Error::Cancelled`]; the bytes read so far never become a packet.
-    ///
-    /// # Errors
-    ///
-    /// A token or source that does not match the request is refused and leaves the
-    /// reader as it was. A failed reader returns its earlier error.
+    /// Answers the current request with a failure, as
+    /// [`InputCursor::fail`](triergon_core::InputCursor::fail) does: every later call
+    /// returns [`Error::Transport`] or [`Error::Cancelled`], as `failure` says. The
+    /// bytes read so far never become a packet.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -340,11 +325,9 @@ impl Dts14CarrierReader {
     /// count starts again and the cursor takes a new generation, so answers to
     /// earlier requests are refused. Packets already returned stay as they are.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Unsupported`] when `offset` is odd, or the cursor's refusal of an
-    /// offset it cannot serve (see [`InputCursor::reset`]). A failed reader returns
-    /// its earlier error and cannot be reset.
+    /// Fails with [`Error::Unsupported`] when `offset` is odd, or the cursor's refusal
+    /// of an offset it cannot serve (see [`InputCursor::reset`]). A failed reader
+    /// returns its earlier error and cannot be reset.
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
         let cursor = self.input.cursor()?;
         if !offset.is_multiple_of(2) {
@@ -370,15 +353,13 @@ impl Dts14CarrierReader {
     /// [`Step::End`] the end of the source once the last packet is returned;
     /// [`Step::Yield`] means the work is spent.
     ///
-    /// # Errors
-    ///
     /// [`Error::Backpressure`] and [`Error::Allocation`] leave the reader as it was:
-    /// free pool storage and call again. Every other error is kept and returned by
-    /// all later calls: [`Error::Cancelled`] when `cancel` is set,
-    /// [`Error::Unsupported`] for a sync pattern that follows opaque bytes, that
-    /// follows a packet whose header gives no length of whole words, or that first
-    /// comes after the frame's end, and [`Error::Limit`] when a packet, the number
-    /// of packets or the pool's size is exceeded.
+    /// free pool storage and call again. Every other error is kept and returned by all
+    /// later calls: [`Error::Cancelled`] when `cancel` is set, [`Error::Unsupported`]
+    /// for a sync pattern that follows opaque bytes, that follows a packet whose header
+    /// gives no length of whole words, or that first comes after the frame's end, and
+    /// [`Error::Limit`] when a packet, the number of packets or the pool's size is
+    /// exceeded.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

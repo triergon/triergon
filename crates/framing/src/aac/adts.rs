@@ -155,12 +155,9 @@ impl AacAdtsHeader {
     }
 }
 
-/// The ADTS header in the first seven bytes of `raw`, without validation: the
-/// fields of a malformed header, or of one the frame readers refuse, stay readable.
-///
-/// # Errors
-///
-/// When `raw` holds fewer than seven bytes.
+/// The ADTS header in the first seven bytes of `raw`, without validation: the fields of
+/// a malformed header, or of one the frame readers refuse, stay readable. Fails when
+/// `raw` holds fewer than seven bytes.
 pub fn inspect_adts_header(raw: &[u8]) -> Result<AacAdtsHeader> {
     Ok(AacAdtsHeader {
         prefix: raw
@@ -253,13 +250,9 @@ impl std::fmt::Debug for AacAdtsParser {
     }
 }
 impl AacAdtsParser {
-    /// A parser of `raw`, the frame that starts at `source`.
-    ///
-    /// # Errors
-    ///
-    /// When `raw` is empty, longer than `maximum_frame_bytes` or charged to another
-    /// pool than `pool`, when that limit is zero, or when the frame's end offset does
-    /// not fit `u64`.
+    /// A parser of `raw`, the frame that starts at `source`. Fails when `raw` is empty,
+    /// longer than `maximum_frame_bytes` or charged to another pool than `pool`, when
+    /// that limit is zero, or when the frame's end offset does not fit `u64`.
     pub fn new(
         pool: &Budget,
         source: AacSource,
@@ -286,14 +279,12 @@ impl AacAdtsParser {
     /// [`BuildStep::Ready`] carries the frame, once; later calls return
     /// [`BuildStep::Complete`].
     ///
-    /// # Errors
-    ///
-    /// When the buffer ends before the header, the CRC or the declared frame length;
-    /// when the syncword is not `0xfff`, the layer is not 0, the sampling frequency
-    /// index names no frequency, the frame length is shorter than the header and
-    /// CRC, or bytes follow the frame; when the profile is not AAC LC or the frame
-    /// holds several raw data blocks; when `cancel` is set. The parser then returns
-    /// the same error from every later call.
+    /// Fails when the buffer ends before the header, the CRC or the declared frame
+    /// length; when the syncword is not `0xfff`, the layer is not 0, the sampling
+    /// frequency index names no frequency, the frame length is shorter than the header
+    /// and CRC, or bytes follow the frame; when the profile is not AAC LC or the frame
+    /// holds several raw data blocks; when `cancel` is set. The parser then returns the
+    /// same error from every later call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -418,11 +409,9 @@ impl AacAdtsParameters {
     /// units carry SBR data, or the program config element that channel
     /// configuration 0 needs, in band.
     ///
-    /// # Errors
-    ///
-    /// When the core is not AAC LC, its frequency is coded as a 24-bit value, the
-    /// channel configuration exceeds 7, `frameLengthFlag` is set or a
-    /// `coreCoderDelay` is present.
+    /// Fails when the core is not AAC LC, its frequency is coded as a 24-bit value, the
+    /// channel configuration exceeds 7, `frameLengthFlag` is set or a `coreCoderDelay`
+    /// is present.
     pub fn from_asc(f: AacAscFacts) -> Result<Self> {
         if f.core_object_type.code != 2 || f.core_frequency.index == 15 {
             return Err(Error::Unsupported(
@@ -451,14 +440,10 @@ impl AacAdtsParameters {
             copyright_id_start: false,
         })
     }
-    /// Build a header for an access unit the consumer already owns.
-    /// The payload stays in its original storage.
-    ///
-    /// # Errors
-    ///
-    /// When `frequency_index`, `channel_configuration` or `buffer_fullness` is out of
-    /// range, or the frame of `payload_bytes` and the seven header bytes exceeds
-    /// the 8191 bytes `aac_frame_length` can declare.
+    /// Build a header for an access unit the consumer already owns. The payload stays
+    /// in its original storage. Fails when `frequency_index`, `channel_configuration`
+    /// or `buffer_fullness` is out of range, or the frame of `payload_bytes` and the
+    /// seven header bytes exceeds the 8191 bytes `aac_frame_length` can declare.
     pub fn header_for_payload(self, payload_bytes: usize) -> Result<[u8; 7]> {
         self.header(payload_bytes.checked_add(7).ok_or(Error::Overflow)?)
     }
@@ -518,11 +503,8 @@ impl AacAdtsOutput {
     pub const fn constructed_header(&self) -> AacAdtsHeader {
         self.header
     }
-    /// The payload within [`bytes`](Self::bytes), sharing its allocation.
-    ///
-    /// # Errors
-    ///
-    /// Never for a writer's output, which always holds the seven header bytes.
+    /// The payload within [`bytes`](Self::bytes), sharing its allocation. Never fails
+    /// for a writer's output, which always holds the seven header bytes.
     pub fn payload_bytes(&self) -> Result<Bytes> {
         self.bytes.slice(7..self.bytes.len())
     }
@@ -547,13 +529,11 @@ impl AacAdtsWriter {
     /// A writer for `payload`, the access unit that starts at `source`, with a
     /// header of `params`.
     ///
-    /// # Errors
-    ///
-    /// When `payload` is charged to another pool than `pool`; when the frame, seven
-    /// bytes longer than the payload, exceeds `maximum_output_bytes`, the 8191
-    /// bytes `aac_frame_length` can declare, or what the pool can ever hold beside
-    /// the payload; when a field of `params` is out of range; or when the payload's
-    /// end offset does not fit `u64`.
+    /// Fails when `payload` is charged to another pool than `pool`; when the frame,
+    /// seven bytes longer than the payload, exceeds `maximum_output_bytes`, the 8191
+    /// bytes `aac_frame_length` can declare, or what the pool can ever hold beside the
+    /// payload; when a field of `params` is out of range; or when the payload's end
+    /// offset does not fit `u64`.
     pub fn new(
         pool: &Budget,
         source: AacSource,
@@ -607,11 +587,9 @@ impl AacAdtsWriter {
     /// [`BuildStep::Ready`] carries the frame, once; later calls return
     /// [`BuildStep::Complete`].
     ///
-    /// # Errors
-    ///
-    /// When `cancel` is set: the writer then returns the same error from every later
-    /// call. [`Error::Backpressure`] and [`Error::Allocation`] keep what is written,
-    /// to be stepped again.
+    /// Fails when `cancel` is set: the writer then returns the same error from every
+    /// later call. [`Error::Backpressure`] and [`Error::Allocation`] keep what is
+    /// written, to be stepped again.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

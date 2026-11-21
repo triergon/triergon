@@ -75,22 +75,16 @@ pub struct AvcVuiTiming {
     pub fixed_frame_rate_flag: bool,
 }
 
-/// The `seq_parameter_set_id` and display raster of an SPS payload.
-///
-/// # Errors
-///
-/// When the SPS is cut short, a field is out of range, the profile is not one whose
-/// SPS syntax is known, the cropping exceeds the coded frame or the raster is empty.
+/// The `seq_parameter_set_id` and display raster of an SPS payload. Fails when the SPS
+/// is cut short, a field is out of range, the profile is not one whose SPS syntax is
+/// known, the cropping exceeds the coded frame or the raster is empty.
 pub fn read_sps_raster(raw: &[u8]) -> Result<(u8, AvcRaster)> {
     let (id, raster, _) = sps_prefix(&mut Rbsp::new(raw))?;
     Ok((id, raster))
 }
 
-/// As [`read_sps_raster`], with the VUI's timing when the SPS has one.
-///
-/// # Errors
-///
-/// Also when the VUI ends before its timing does.
+/// As [`read_sps_raster`], with the VUI's timing when the SPS has one. Also fails when
+/// the VUI ends before its timing does.
 pub fn read_sps_timing(raw: &[u8]) -> Result<(u8, AvcRaster, Option<AvcVuiTiming>)> {
     let mut r = Rbsp::new(raw);
     let (id, raster, _) = sps_prefix(&mut r)?;
@@ -106,14 +100,11 @@ pub fn read_sps_timing(raw: &[u8]) -> Result<(u8, AvcRaster, Option<AvcVuiTiming
     Ok((id, raster, timing))
 }
 
-/// The `seq_parameter_set_id` of a frame-only SPS payload and the number of frames
-/// its pictures may be reordered by: `max_num_reorder_frames`, or 0 for a
-/// Constrained Baseline SPS that does not state it.
-///
-/// # Errors
-///
-/// As [`read_sps_raster`]; also `Unsupported` when the SPS codes fields, or when it
-/// does not state the limit and is not Constrained Baseline.
+/// The `seq_parameter_set_id` of a frame-only SPS payload and the number of frames its
+/// pictures may be reordered by: `max_num_reorder_frames`, or 0 for a Constrained
+/// Baseline SPS that does not state it. Fails as [`read_sps_raster`] does; also
+/// `Unsupported` when the SPS codes fields, or when it does not state the limit and is
+/// not Constrained Baseline.
 pub fn read_sps_reorder(raw: &[u8]) -> Result<(u8, u8)> {
     let mut r = Rbsp::new(raw);
     let (id, _, frame_only) = sps_prefix(&mut r)?;
@@ -271,22 +262,16 @@ fn vui_timing(r: &mut Rbsp<'_>) -> Result<Option<AvcVuiTiming>> {
     }))
 }
 
-/// The `pic_parameter_set_id` and `seq_parameter_set_id` of a PPS payload.
-///
-/// # Errors
-///
-/// When the PPS is cut short or an identifier is out of range.
+/// The `pic_parameter_set_id` and `seq_parameter_set_id` of a PPS payload. Fails when
+/// the PPS is cut short or an identifier is out of range.
 pub fn read_pps_ids(raw: &[u8]) -> Result<(u8, u8)> {
     let mut r = Rbsp::new(raw);
     Ok((r.bounded(255)? as u8, r.bounded(31)? as u8))
 }
 
 /// The `first_mb_in_slice`, `slice_type % 5` (0 P, 1 B, 2 I, 3 SP, 4 SI) and
-/// `pic_parameter_set_id` of a slice payload.
-///
-/// # Errors
-///
-/// When the header is cut short or a field is out of range.
+/// `pic_parameter_set_id` of a slice payload. Fails when the header is cut short or a
+/// field is out of range.
 pub fn read_slice_prefix(raw: &[u8]) -> Result<(u32, u32, u8)> {
     let mut r = Rbsp::new(raw);
     let first_mb = r.ue()?;

@@ -43,13 +43,11 @@ impl ParserHints {
     /// flags. The caller answers for that: the packet does not record it, and
     /// nothing is claimed for a parser that was reset or reopened.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] when the packet's `provision` contradicts itself or the
-    /// packet's boundary: a window that ends before it starts, a read position past
-    /// the window's end, or a read position other than six bytes past a following
-    /// sync pattern or the packet's end at the end of the source.
-    /// [`Error::Overflow`] when an offset does not fit `i64`.
+    /// Fails with [`Error::Invalid`] when the packet's `provision` contradicts itself
+    /// or the packet's boundary: a window that ends before it starts, a read position
+    /// past the window's end, or a read position other than six bytes past a following
+    /// sync pattern or the packet's end at the end of the source; [`Error::Overflow`]
+    /// when an offset does not fit `i64`.
     pub fn observe(packet: &Dts14CarrierPacket) -> Result<Self> {
         let start = packet.identity.offset;
         let end = start

@@ -208,14 +208,10 @@ pub struct Av1ConfigParser {
 }
 
 impl Av1ConfigParser {
-    /// A parser for `record`, the complete payload of an `av1C` box. `source`
-    /// names the record in the configuration and in the facts of its OBUs.
-    ///
-    /// # Errors
-    ///
-    /// When a limit is zero, or the record is charged to another pool than
-    /// `pool`, is longer than `maximum_record_bytes` or is shorter than its
-    /// four fixed bytes.
+    /// A parser for `record`, the complete payload of an `av1C` box. `source` names the
+    /// record in the configuration and in the facts of its OBUs. Fails when a limit is
+    /// zero, or the record is charged to another pool than `pool`, is longer than
+    /// `maximum_record_bytes` or is shorter than its four fixed bytes.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -258,14 +254,12 @@ impl Av1ConfigParser {
     /// per OBU, and one final record handoff. Backpressure retains the exact
     /// pending builder/descriptor. No source or payload reparse on retry.
     ///
-    /// # Errors
-    ///
-    /// Cancellation; a `version` other than 1; an OBU that
-    /// [`Av1ObuReader::step`] refuses in low-overhead framing, such as one
-    /// without a size field or one the record ends inside; a Sequence Header
-    /// OBU after another OBU; more OBUs than `maximum_obus`. Each is final:
-    /// every later call returns the same error. Backpressure and allocation
-    /// errors leave the parser where it was, to be stepped again.
+    /// Fails on cancellation; a `version` other than 1; an OBU that
+    /// [`Av1ObuReader::step`] refuses in low-overhead framing, such as one without a
+    /// size field or one the record ends inside; a Sequence Header OBU after another
+    /// OBU; more OBUs than `maximum_obus`. Each is final: every later call returns the
+    /// same error. Backpressure and allocation errors leave the parser where it was, to
+    /// be stepped again.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

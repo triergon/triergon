@@ -39,10 +39,7 @@ impl DtsPacking {
             Self::Words14Be | Self::Words14Le => 14,
         }
     }
-    /// Number of payload bits in `source_bytes` bytes stored this way.
-    ///
-    /// # Errors
-    ///
+    /// Number of payload bits in `source_bytes` bytes stored this way. Fails with
     /// `Truncated` when `source_bytes` is not a whole number of storage units,
     /// `Overflow` when the count does not fit `usize`.
     pub fn payload_bits(self, source_bytes: usize) -> Result<usize> {
@@ -74,10 +71,8 @@ impl DtsPacking {
     /// six for the 14-bit packings. The two unused high bits of a 14-bit word are
     /// not examined and stay in the source.
     ///
-    /// # Errors
-    ///
-    /// `Truncated` when `prefix` has fewer than four bytes, or matches the start
-    /// of a 14-bit sync word and ends before its sixth byte. `Invalid` when it
+    /// Fails with `Truncated` when `prefix` has fewer than four bytes, or matches the
+    /// start of a 14-bit sync word and ends before its sixth byte; `Invalid` when it
     /// begins with the sync word in no packing.
     pub fn detect(prefix: &[u8]) -> Result<Self> {
         if prefix.len() < 4 {
@@ -173,12 +168,8 @@ impl DtsPackedPayload {
     pub fn alignment_zero_bits(&self) -> u8 {
         ((8 - self.valid_bits % 8) % 8) as u8
     }
-    /// Where payload bit `position`, counted from zero in bitstream order, lies
-    /// in the source.
-    ///
-    /// # Errors
-    ///
-    /// `Invalid` when `position` is not below `valid_bits()`.
+    /// Where payload bit `position`, counted from zero in bitstream order, lies in the
+    /// source. Fails with `Invalid` when `position` is not below `valid_bits()`.
     pub fn source_bit(&self, position: usize) -> Result<DtsPackedBitLocation> {
         if position >= self.valid_bits {
             return Err(Error::Invalid("DTS non-source alignment bit"));
@@ -212,10 +203,7 @@ impl DtsPackedPayload {
             msb0_bit: msb0,
         })
     }
-    /// Payload bit `position`, counted from zero in bitstream order: 0 or 1.
-    ///
-    /// # Errors
-    ///
+    /// Payload bit `position`, counted from zero in bitstream order: 0 or 1. Fails with
     /// `Invalid` when `position` is not below `valid_bits()`.
     pub fn bit(&self, position: usize) -> Result<u8> {
         if position >= self.valid_bits {
@@ -223,14 +211,10 @@ impl DtsPackedPayload {
         }
         Ok((self.storage.as_ref()[position / 8] >> (7 - position % 8)) & 1)
     }
-    /// The two bits above the payload in source word `index`, counted from
-    /// zero, for the 14-bit packings: 0 to 3. `None` for
-    /// [`DtsPacking::Words16Le`], whose words are all payload.
-    ///
-    /// # Errors
-    ///
-    /// `Invalid` for [`DtsPacking::CanonicalBe`], which has no words, and when
-    /// the record has no word `index`.
+    /// The two bits above the payload in source word `index`, counted from zero, for
+    /// the 14-bit packings: 0 to 3. `None` for [`DtsPacking::Words16Le`], whose words
+    /// are all payload. Fails with `Invalid` for [`DtsPacking::CanonicalBe`], which has
+    /// no words, and when the record has no word `index`.
     pub fn unused_word_high_bits(&self, index: usize) -> Result<Option<u8>> {
         if matches!(self.packing, DtsPacking::CanonicalBe) {
             return Err(Error::Invalid("canonical byte stream has no storage words"));
@@ -304,13 +288,11 @@ impl DtsPackedPayloadJob {
     /// `identity` locates. `raw` must be charged to `pool`, and the unpacked
     /// storage is charged to it.
     ///
-    /// # Errors
-    ///
-    /// `ForeignPool` when `raw` is charged to another pool. `Truncated` when a
-    /// record of words has an odd number of bytes. `Limit` when the record or
-    /// its unpacked storage exceeds `limits`, and, for a record of words, when
-    /// the pool's limit cannot hold the record and the storage together.
-    /// `Overflow` when the record ends beyond offset `u64::MAX`.
+    /// Fails with `ForeignPool` when `raw` is charged to another pool; `Truncated` when
+    /// a record of words has an odd number of bytes; `Limit` when the record or its
+    /// unpacked storage exceeds `limits`, and, for a record of words, when the pool's
+    /// limit cannot hold the record and the storage together; `Overflow` when the
+    /// record ends beyond offset `u64::MAX`.
     pub fn new(
         pool: &Budget,
         identity: DtsSourceIdentity,
@@ -368,11 +350,9 @@ impl DtsPackedPayloadJob {
     /// record's end in its source. `Yield` means the work is spent. An owned
     /// record never requests input.
     ///
-    /// # Errors
-    ///
-    /// `Cancelled` when `cancel` is set. `Backpressure` or `Allocation` when the
-    /// storage cannot be allocated: after these two, and only these, `step` may
-    /// be called again.
+    /// Fails with `Cancelled` when `cancel` is set; `Backpressure` or `Allocation` when
+    /// the storage cannot be allocated: after these two, and only these, `step` may be
+    /// called again.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

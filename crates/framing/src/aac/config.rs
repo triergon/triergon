@@ -455,13 +455,10 @@ impl AacAscParser {
             .checked_mul(size_of::<AacPceElement>())
             .ok_or(Error::Overflow)
     }
-    /// A parser over every bit of `raw`, the record that starts at `source`.
-    ///
-    /// # Errors
-    ///
-    /// When `raw` is empty, longer than `limits.maximum_record_bytes` or charged to
-    /// another pool than `pool`, when that limit is zero, or when the record's end
-    /// offset does not fit `u64`.
+    /// A parser over every bit of `raw`, the record that starts at `source`. Fails when
+    /// `raw` is empty, longer than `limits.maximum_record_bytes` or charged to another
+    /// pool than `pool`, when that limit is zero, or when the record's end offset does
+    /// not fit `u64`.
     pub fn new(
         pool: &Budget,
         source: AacSource,
@@ -472,13 +469,10 @@ impl AacAscParser {
         Self::with_bit_length(pool, source, raw, bits, limits)
     }
 
-    /// A parser over the first `bits` bits of `raw`. The extent is taken as the
-    /// caller gives it: it is neither derived from the record nor checked against
-    /// its content. The output still holds every byte of `raw`.
-    ///
-    /// # Errors
-    ///
-    /// As [`new`](Self::new), and when `bits` exceeds the bits in `raw`.
+    /// A parser over the first `bits` bits of `raw`. The extent is taken as the caller
+    /// gives it: it is neither derived from the record nor checked against its content.
+    /// The output still holds every byte of `raw`. Fails as [`new`](Self::new) does,
+    /// and when `bits` exceeds the bits in `raw`.
     pub fn with_bit_length(
         pool: &Budget,
         source: AacSource,
@@ -528,17 +522,14 @@ impl AacAscParser {
     /// [`BuildStep::Ready`] carries the configuration, once; later calls return
     /// [`BuildStep::Complete`].
     ///
-    /// # Errors
-    ///
-    /// When the extent ends inside a field; when an object type is not AAC LC, alone
-    /// or under SBR or PS, the channel configuration is not 0, 1 to 7, 11, 12 or 14,
-    /// `extensionFlag3` is set or a `0x2b7` sync extension names another object type
-    /// than SBR; when a sampling frequency index is 13 or 14 or an explicit frequency
-    /// is zero; when a program config element exceeds the limits or what the pool
-    /// can ever hold; when `cancel` is set. The parser then returns the same error
-    /// from every later call. [`Error::Backpressure`] and [`Error::Allocation`] for
-    /// the entries of a program config element leave it as it was, to be stepped
-    /// again.
+    /// Fails when the extent ends inside a field; when an object type is not AAC LC,
+    /// alone or under SBR or PS, the channel configuration is not 0, 1 to 7, 11, 12 or
+    /// 14, `extensionFlag3` is set or a `0x2b7` sync extension names another object
+    /// type than SBR; when a sampling frequency index is 13 or 14 or an explicit
+    /// frequency is zero; when a program config element exceeds the limits or what the
+    /// pool can ever hold; when `cancel` is set. The parser then returns the same error
+    /// from every later call. [`Error::Backpressure`] and [`Error::Allocation`] for the
+    /// entries of a program config element leave it as it was, to be stepped again.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

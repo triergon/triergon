@@ -231,12 +231,9 @@ impl std::fmt::Debug for DtsNormalSourceReader {
 }
 
 impl DtsNormalSourceReader {
-    /// A reader at offset zero of `source`, whose stream is stored in `packing`.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] when a limit is zero, and [`Error::Limit`] when a frame of
-    /// `maximum_source_frame_bytes` cannot fit `pool`.
+    /// A reader at offset zero of `source`, whose stream is stored in `packing`. Fails
+    /// with [`Error::Invalid`] when a limit is zero, and [`Error::Limit`] when a frame
+    /// of `maximum_source_frame_bytes` cannot fit `pool`.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -292,24 +289,16 @@ impl DtsNormalSourceReader {
     pub fn generation(&self) -> u64 {
         self.input.generation()
     }
-    /// Answers the current request with `window`.
-    ///
-    /// # Errors
-    ///
-    /// The cursor's refusal of a window that does not answer the request (see
-    /// [`InputCursor::provide`]), which leaves the reader as it was. A failed reader
-    /// returns its earlier error.
+    /// Answers the current request with `window`, as
+    /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
+    /// window changes nothing. A failed reader returns its error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.input.cursor()?.provide(window)
     }
-    /// Answers the current request with the end of the source, which also ends the
-    /// frame being read.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Truncated`], from then on, when the source ends before its known
-    /// length. A token or source that does not match the request is refused and
-    /// leaves the reader as it was. A failed reader returns its earlier error.
+    /// Answers the current request with the end of the source, as
+    /// [`InputCursor::finish`](triergon_core::InputCursor::finish) does: a source that
+    /// ends before its known length fails the reader with [`Error::Truncated`]. The end
+    /// of the source also ends the frame being read.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         let result = self.input.cursor()?.finish(source, token);
         if result == Err(Error::Truncated) {
@@ -317,14 +306,10 @@ impl DtsNormalSourceReader {
         }
         result
     }
-    /// Answers the current request with a source failure. The reader drops the frame
-    /// it was reading and from then on returns [`Error::Transport`] or
-    /// [`Error::Cancelled`]; the bytes read so far never become a frame.
-    ///
-    /// # Errors
-    ///
-    /// A token or source that does not match the request is refused and leaves the
-    /// reader as it was. A failed reader returns its earlier error.
+    /// Answers the current request with a failure, as
+    /// [`InputCursor::fail`](triergon_core::InputCursor::fail) does: every later call
+    /// returns [`Error::Transport`] or [`Error::Cancelled`], as `failure` says. The
+    /// bytes read so far never become a frame.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -340,12 +325,10 @@ impl DtsNormalSourceReader {
     /// starts again and the cursor takes a new generation, so answers to earlier
     /// requests are refused. Frames already returned stay as they are.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Unsupported`] when `offset` is not a multiple of the packing's source
-    /// unit, or the cursor's refusal of an offset it cannot serve (see
-    /// [`InputCursor::reset`]). A failed reader returns its earlier error and cannot
-    /// be reset.
+    /// Fails with [`Error::Unsupported`] when `offset` is not a multiple of the
+    /// packing's source unit, or the cursor's refusal of an offset it cannot serve (see
+    /// [`InputCursor::reset`]). A failed reader returns its earlier error and cannot be
+    /// reset.
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
         let cursor = self.input.cursor()?;
         if !offset.is_multiple_of(self.packing.source_unit_bytes() as u64) {
@@ -371,15 +354,13 @@ impl DtsNormalSourceReader {
     /// [`Step::End`] the end of the source once the last frame is returned;
     /// [`Step::Yield`] means the work is spent.
     ///
-    /// # Errors
-    ///
     /// [`Error::Backpressure`] and [`Error::Allocation`] leave the reader as it was:
-    /// free pool storage and call again. Every other error is kept and returned by
-    /// all later calls: [`Error::Cancelled`] when `cancel` is set, [`Error::Invalid`]
-    /// when the stream does not start with `SYNC`, [`Error::Unsupported`] when it
-    /// starts with a termination frame (`FTYPE` 0) or a `SHORT` other than 31,
-    /// [`Error::Truncated`] when the source ends inside a header or a source word,
-    /// and [`Error::Limit`] when a frame or the number of frames exceeds its limit.
+    /// free pool storage and call again. Every other error is kept and returned by all
+    /// later calls: [`Error::Cancelled`] when `cancel` is set, [`Error::Invalid`] when
+    /// the stream does not start with `SYNC`, [`Error::Unsupported`] when it starts
+    /// with a termination frame (`FTYPE` 0) or a `SHORT` other than 31,
+    /// [`Error::Truncated`] when the source ends inside a header or a source word, and
+    /// [`Error::Limit`] when a frame or the number of frames exceeds its limit.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

@@ -103,9 +103,7 @@ impl DtsPackedHeader {
 ///
 /// [`DtsPackedPayload::storage_bytes`]: crate::dts::DtsPackedPayload::storage_bytes
 ///
-/// # Errors
-///
-/// `Invalid` when `valid_bits` exceeds the bits `storage` holds.
+/// Fails with `Invalid` when `valid_bits` exceeds the bits `storage` holds.
 pub fn inspect_header_bits(storage: &[u8], valid_bits: usize) -> Result<DtsPackedHeader> {
     if valid_bits > storage.len().checked_mul(8).ok_or(Error::Overflow)? {
         return Err(Error::Invalid("DTS valid bit extent"));

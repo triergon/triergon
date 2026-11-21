@@ -170,16 +170,14 @@ impl HeaderBits<'_> {
 /// regardless of the size of the caller's slice. Success does not certify a
 /// complete body, coded audio or decoder readiness.
 ///
-/// # Errors
-///
-/// `Truncated` when `input` ends before the header does: 13 bytes, or 15 with
-/// `HCRC`. `Invalid` when `input` begins with neither the core nor the extension
-/// substream sync word, and for a field the specification rules out: an `SFREQ`
-/// or `RATE` code without a value, `FSIZE` below 95, `NBLKS` below 5, a set
-/// reserved bit, `LFF` 3, `PCMR` 4 or 7, a `SHORT` other than 31 or an `NBLKS`
-/// other than 7, 15, 31, 63 and 127. `Unsupported` for the extension substream
-/// sync word `0x64582025`, a termination frame, `VERNUM` above 7, and
-/// `EXT_AUDIO` set with an `EXT_AUDIO_ID` other than 0, 2 and 6.
+/// Fails with `Truncated` when `input` ends before the header does: 13 bytes, or 15
+/// with `HCRC`; `Invalid` when `input` begins with neither the core nor the extension
+/// substream sync word, and for a field the specification rules out: an `SFREQ` or
+/// `RATE` code without a value, `FSIZE` below 95, `NBLKS` below 5, a set reserved bit,
+/// `LFF` 3, `PCMR` 4 or 7, a `SHORT` other than 31 or an `NBLKS` other than 7, 15, 31,
+/// 63 and 127; `Unsupported` for the extension substream sync word `0x64582025`, a
+/// termination frame, `VERNUM` above 7, and `EXT_AUDIO` set with an `EXT_AUDIO_ID`
+/// other than 0, 2 and 6.
 pub fn probe_core_header(input: &[u8]) -> Result<DtsCoreHeader> {
     check_sync(input)?;
     if input.len() < 11 {
@@ -431,12 +429,8 @@ impl std::fmt::Debug for DtsCoreFrameReader {
 }
 
 impl DtsCoreFrameReader {
-    /// A reader at offset zero of `source`. Input windows must be charged to
-    /// `pool`, and the frames are charged to it.
-    ///
-    /// # Errors
-    ///
-    /// `Invalid` when a limit is zero.
+    /// A reader at offset zero of `source`. Input windows must be charged to `pool`,
+    /// and the frames are charged to it. Fails with `Invalid` when a limit is zero.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -476,28 +470,17 @@ impl DtsCoreFrameReader {
     pub fn request(&self) -> InputRequest {
         self.input.request()
     }
-    /// Answers the current request with `window`, whose bytes the reader shares.
-    /// An empty window means "none yet", never the end of the source.
-    ///
-    /// # Errors
-    ///
-    /// The error that ended the reader, if any. Otherwise a window is refused,
-    /// leaving the reader as it was, when it carries another token or source
-    /// than the request, is charged to another pool, exceeds
-    /// `maximum_input_window`, does not start at `position`, or arrives while
-    /// earlier bytes are unread or after the end of the source.
+    /// Answers the current request with `window`, as
+    /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
+    /// window changes nothing. A failed reader returns its error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.input.cursor()?.provide(window)
     }
-    /// Answers the current request with the end of the source, which lies after
-    /// the bytes already provided. [`step`](Self::step) then returns `End` once
-    /// it has read them, or `Truncated` when they end inside a frame.
-    ///
-    /// # Errors
-    ///
-    /// The error that ended the reader, if any; a token or source other than
-    /// the request's; and `Truncated`, which ends the reader, when the source
-    /// ends before the length its capabilities declared.
+    /// Answers the current request with the end of the source, as
+    /// [`InputCursor::finish`](triergon_core::InputCursor::finish) does: a source that
+    /// ends before its known length fails the reader with [`Error::Truncated`].
+    /// [`step`](Self::step) then returns `End` once it has read the bytes provided, or
+    /// `Truncated` when they end inside a frame.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         let result = self.input.cursor()?.finish(source, token);
         if result == Err(Error::Truncated) {
@@ -505,14 +488,9 @@ impl DtsCoreFrameReader {
         }
         result
     }
-    /// Answers the current request with a failure of the source. This ends the
-    /// reader: every later call returns `Transport` or `Cancelled`, as `failure`
-    /// says. Frames returned earlier stay valid.
-    ///
-    /// # Errors
-    ///
-    /// The error that ended the reader, if any, and a token or source other
-    /// than the request's.
+    /// Answers the current request with a failure, as
+    /// [`InputCursor::fail`](triergon_core::InputCursor::fail) does: every later call
+    /// returns [`Error::Transport`] or [`Error::Cancelled`], as `failure` says.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -535,14 +513,12 @@ impl DtsCoreFrameReader {
     /// the next call, `Yield` means the work is spent, and `End` that the source
     /// ended on a frame boundary, at the location given.
     ///
-    /// # Errors
-    ///
-    /// `Cancelled` when `cancel` is set. `Truncated` when the source ends inside
-    /// a frame. A header [`probe_core_header`] refuses, with its error. `Limit`
-    /// when a frame exceeds `maximum_frame_bytes` or what the pool can hold, and
-    /// when input continues after `maximum_frames` frames. `Backpressure` or
-    /// `Allocation` when the frame's storage cannot be allocated: after these
-    /// two, and only these, `step` may be called again.
+    /// Fails with `Cancelled` when `cancel` is set; `Truncated` when the source ends
+    /// inside a frame; the error of [`probe_core_header`] for a header it refuses;
+    /// `Limit` when a frame exceeds `maximum_frame_bytes` or what the pool can hold, and
+    /// when input continues after `maximum_frames` frames; `Backpressure` or
+    /// `Allocation` when the frame's storage cannot be allocated: after these two, and
+    /// only these, `step` may be called again.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

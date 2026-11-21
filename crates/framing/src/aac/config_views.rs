@@ -68,9 +68,7 @@ pub enum AacDecoderConfigDecision {
 /// parsed fields. It does not validate the record's syntax and does not promise
 /// that a decoder opens or decodes the audio.
 ///
-/// # Errors
-///
-/// When `policy.maximum_channels` is zero.
+/// Fails when `policy.maximum_channels` is zero.
 pub fn decoder_configuration_view(
     config: &AacAudioSpecificConfig,
     policy: AacDecoderConfigPolicy,
@@ -205,12 +203,9 @@ pub struct AacAscScopeParser {
     failure: Option<Error>,
 }
 impl AacAscScopeParser {
-    /// A parser of `raw`, the record that starts at `source`, whose declared length
-    /// is `bits` bits.
-    ///
-    /// # Errors
-    ///
-    /// When `bits` exceeds the bits in `raw`, and as [`AacAscParser::new`].
+    /// A parser of `raw`, the record that starts at `source`, whose declared length is
+    /// `bits` bits. Fails when `bits` exceeds the bits in `raw`, and as
+    /// [`AacAscParser::new`].
     pub fn new(
         pool: &Budget,
         source: AacSource,
@@ -280,10 +275,8 @@ impl AacAscScopeParser {
     /// [`BuildStep::Ready`] carries both outcomes, once; later calls return
     /// [`BuildStep::Complete`].
     ///
-    /// # Errors
-    ///
-    /// When `cancel` is set, or a program config element exceeds the limits or what
-    /// the pool can ever hold. The parser then returns the same error from every
+    /// Fails when `cancel` is set, or a program config element exceeds the limits or
+    /// what the pool can ever hold. The parser then returns the same error from every
     /// later call. [`Error::Backpressure`] and [`Error::Allocation`] leave it as it
     /// was, to be stepped again.
     pub fn step(

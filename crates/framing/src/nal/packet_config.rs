@@ -140,11 +140,8 @@ impl std::fmt::Debug for NalPacketConfigWriter<'_> {
     }
 }
 impl<'a> NalPacketConfigWriter<'a> {
-    /// A writer for `configuration`, whose bytes are charged to `pool`; the
-    /// output is charged to it too and holds at most `maximum_output_bytes`.
-    ///
-    /// # Errors
-    ///
+    /// A writer for `configuration`, whose bytes are charged to `pool`; the output is
+    /// charged to it too and holds at most `maximum_output_bytes`. Fails with
     /// [`Error::ForeignPool`] when `configuration` is charged to another pool.
     pub fn new(
         pool: &Budget,
@@ -208,16 +205,13 @@ impl<'a> NalPacketConfigWriter<'a> {
     /// Sizes the extradata, then copies it. Work is charged per array checked,
     /// NAL unit sized and byte copied.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Unsupported`] for an HEVC record that declares an array of a
+    /// Fails with [`Error::Unsupported`] for an HEVC record that declares an array of a
     /// NAL unit type other than 32 to 34, 39 and 40, which
     /// [`take_receiver_rejection`](Self::take_receiver_rejection) then reports;
-    /// [`Error::Limit`] when the extradata exceeds `maximum_output_bytes` or the
-    /// pool's limit; [`Error::Cancelled`] when `cancel` is set.
-    /// [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the
-    /// writer keeps its progress. Every other error is final and returned again
-    /// by each later call.
+    /// [`Error::Limit`] when the extradata exceeds `maximum_output_bytes` or the pool's
+    /// limit; [`Error::Cancelled`] when `cancel` is set. [`Error::Backpressure`] and
+    /// [`Error::Allocation`] are retryable: the writer keeps its progress. Every other
+    /// error is final and returned again by each later call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

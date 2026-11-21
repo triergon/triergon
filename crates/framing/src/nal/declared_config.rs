@@ -228,15 +228,11 @@ impl std::fmt::Debug for DeclaredConfigParser<'_> {
 }
 
 impl<'a> DeclaredConfigParser<'a> {
-    /// A parser for the record `raw`, charged to `pool`, with the layout that
-    /// `arrays` declares. `source` and `sample_width` are kept as declared.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::ForeignPool`] when `raw` is charged to another pool;
-    /// [`Error::Invalid`] when it is empty or a byte limit is zero;
-    /// [`Error::Limit`] when the record exceeds `maximum_record_bytes` or the
-    /// arrays `maximum_arrays`.
+    /// A parser for the record `raw`, charged to `pool`, with the layout that `arrays`
+    /// declares. `source` and `sample_width` are kept as declared. Fails with
+    /// [`Error::ForeignPool`] when `raw` is charged to another pool; [`Error::Invalid`]
+    /// when it is empty or a byte limit is zero; [`Error::Limit`] when the record
+    /// exceeds `maximum_record_bytes` or the arrays `maximum_arrays`.
     pub fn new(
         pool: &Budget,
         codec: Codec,
@@ -280,17 +276,15 @@ impl<'a> DeclaredConfigParser<'a> {
 
     /// Checks the declared layout against the record and builds its views.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] for a range that is out of order or leaves its array
-    /// or the record, a length field that is not 1 to 4 bytes directly before
-    /// its NAL unit or whose value is not the unit's length, an array type
-    /// above the codec's largest `nal_unit_type` and a refused NAL header;
-    /// [`Error::Truncated`] for a NAL unit shorter than its header;
-    /// [`Error::Limit`] past `maximum_nals` or `maximum_nal_bytes`;
-    /// [`Error::Cancelled`] when `cancel` is set. [`Error::Backpressure`] and
-    /// [`Error::Allocation`] are retryable: the parser keeps its progress. Every
-    /// other error is final and returned again by each later call.
+    /// Fails with [`Error::Invalid`] for a range that is out of order or leaves its
+    /// array or the record, a length field that is not 1 to 4 bytes directly before its
+    /// NAL unit or whose value is not the unit's length, an array type above the
+    /// codec's largest `nal_unit_type` and a refused NAL header; [`Error::Truncated`]
+    /// for a NAL unit shorter than its header; [`Error::Limit`] past `maximum_nals` or
+    /// `maximum_nal_bytes`; [`Error::Cancelled`] when `cancel` is set.
+    /// [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the parser
+    /// keeps its progress. Every other error is final and returned again by each later
+    /// call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

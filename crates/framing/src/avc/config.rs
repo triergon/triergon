@@ -373,13 +373,10 @@ impl std::fmt::Debug for AvcConfigParser {
 }
 
 impl AvcConfigParser {
-    /// Starts the parse of `raw`, one complete record charged to `pool`.
-    ///
-    /// # Errors
-    ///
-    /// When `maximum_record_bytes` or `maximum_nal_bytes` is zero, `raw` belongs to
-    /// another pool, is empty or is longer than `maximum_record_bytes`, or the
-    /// record's end offset in the source overflows `u64`.
+    /// Starts the parse of `raw`, one complete record charged to `pool`. Fails when
+    /// `maximum_record_bytes` or `maximum_nal_bytes` is zero, `raw` belongs to another
+    /// pool, is empty or is longer than `maximum_record_bytes`, or the record's end
+    /// offset in the source overflows `u64`.
     pub fn new(
         pool: &Budget,
         source: AvcConfigSource,
@@ -433,15 +430,13 @@ impl AvcConfigParser {
     /// Advances by at most the units in `work` and returns the record once, as
     /// [`BuildStep`] describes.
     ///
-    /// # Errors
-    ///
-    /// When `cancel` is set; when `configurationVersion` is not 1 or the sample
-    /// length field is three bytes; when the record ends inside a field or a NAL
-    /// unit, or before the extension that `AVCProfileIndication` 100, 110, 122 or
-    /// 144 requires; when a NAL unit is empty or has `forbidden_zero_bit` set; when
-    /// a limit is exceeded. Every later call returns the same error. A pool that
-    /// lacks room for the record's descriptors until other storage is released is
-    /// `Backpressure` or `Allocation` instead, and the call can be repeated.
+    /// Fails when `cancel` is set; when `configurationVersion` is not 1 or the sample
+    /// length field is three bytes; when the record ends inside a field or a NAL unit,
+    /// or before the extension that `AVCProfileIndication` 100, 110, 122 or 144
+    /// requires; when a NAL unit is empty or has `forbidden_zero_bit` set; when a limit
+    /// is exceeded. Every later call returns the same error. A pool that lacks room for
+    /// the record's descriptors until other storage is released is `Backpressure` or
+    /// `Allocation` instead, and the call can be repeated.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -452,13 +447,10 @@ impl AvcConfigParser {
             .into_build_step(ready)
     }
 
-    /// Publishes into an empty caller-provided slot without returning the record.
-    /// An occupied slot is rejected before any state, work or retained storage changes.
-    /// Yield, completion and errors leave an initially empty slot empty.
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::step`]; also when `ready` is occupied.
+    /// Publishes into an empty caller-provided slot without returning the record. An
+    /// occupied slot is rejected before any state, work or retained storage changes.
+    /// Yield, completion and errors leave an initially empty slot empty. Fails as
+    /// [`Self::step`] does; also when `ready` is occupied.
     pub fn step_into(
         &mut self,
         work: &mut WorkBudget,
@@ -846,11 +838,8 @@ impl AvcConfiguration {
         &self.raw[self.understood_end()..]
     }
     /// [`Self::trailing_bytes`] as an owner that shares the record's allocation and
-    /// keeps all of it charged.
-    ///
-    /// # Errors
-    ///
-    /// Only for a range outside the record, which a parsed record rules out.
+    /// keeps all of it charged. Fails only for a range outside the record, which a
+    /// parsed record rules out.
     pub fn retain_trailing_bytes(&self) -> Result<Bytes> {
         self.raw.slice(self.understood_end()..self.raw.len())
     }
@@ -862,22 +851,16 @@ impl AvcConfiguration {
             .checked_mul(size_of::<AvcNalDescriptor>())
             .ok_or(Error::Overflow)
     }
-    /// Heap descriptor capacity only; arrays and up to four NALs are inline.
-    ///
-    /// # Errors
-    ///
-    /// When the size in bytes overflows `usize`.
+    /// Heap descriptor capacity only; arrays and up to four NALs are inline. Fails when
+    /// the size in bytes overflows `usize`.
     pub fn descriptor_storage_bytes(&self) -> Result<usize> {
         self.nals
             .heap_capacity()
             .checked_mul(size_of::<AvcNalDescriptor>())
             .ok_or(Error::Overflow)
     }
-    /// Full hidden raw backing plus actual descriptor heap capacities.
-    ///
-    /// # Errors
-    ///
-    /// When the sum in bytes overflows `usize`.
+    /// Full hidden raw backing plus actual descriptor heap capacities. Fails when the
+    /// sum in bytes overflows `usize`.
     pub fn retained_storage_bytes(&self) -> Result<usize> {
         self.descriptor_storage_bytes()?
             .checked_add(self.raw.retained_storage_bytes())

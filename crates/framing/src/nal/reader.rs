@@ -14,11 +14,8 @@ use triergon_core::{
 pub struct LengthSize(u8);
 
 impl LengthSize {
-    /// A length field of `bytes` bytes.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] unless `bytes` is 1 to 4.
+    /// A length field of `bytes` bytes. Fails with [`Error::Invalid`] unless `bytes` is
+    /// 1 to 4.
     pub fn new(bytes: u8) -> Result<Self> {
         if !(1..=4).contains(&bytes) {
             return Err(Error::Invalid("NAL length width must be 1 through 4"));
@@ -221,13 +218,9 @@ pub struct NalReader {
 }
 
 impl NalReader {
-    /// A reader at offset zero of `source`. Its input windows and NAL units are
-    /// charged to `pool`.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] when a limit other than `maximum_padding_bytes` is
-    /// zero.
+    /// A reader at offset zero of `source`. Its input windows and NAL units are charged
+    /// to `pool`. Fails with [`Error::Invalid`] when a limit other than
+    /// `maximum_padding_bytes` is zero.
     pub fn new(
         pool: &Budget,
         codec: Codec,
@@ -339,15 +332,9 @@ impl NalReader {
         self.cursor.budget()
     }
 
-    /// Answers the current request with `window`, whose bytes the reader
-    /// shares. Rejected caller responses do not change parser state. A short or
-    /// empty window is starvation; only `finish` establishes source completion.
-    ///
-    /// # Errors
-    ///
-    /// A window that does not answer the current request is refused: another
-    /// token, source, pool or offset, or more bytes than the request allows.
-    /// After a final error of [`step`](Self::step), that error.
+    /// Answers the current request with `window`, as
+    /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
+    /// window changes nothing. A failed reader returns its error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -355,11 +342,8 @@ impl NalReader {
         self.cursor.provide(window)
     }
 
-    /// [`provide`](Self::provide) for a window the caller gives away.
-    ///
-    /// # Errors
-    ///
-    /// As [`provide`](Self::provide); a refused window is dropped.
+    /// [`provide`](Self::provide) for a window the caller gives away; a refused window
+    /// is dropped.
     pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -411,14 +395,9 @@ impl NalReader {
         }
     }
 
-    /// Answers the current request with the end of the source, which lies after
-    /// the bytes already provided.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Truncated`], here and from every later call, when the source
-    /// ends before its declared length. A `source` or `token` other than the
-    /// current one is refused and changes nothing.
+    /// Answers the current request with the end of the source, as
+    /// [`InputCursor::finish`](triergon_core::InputCursor::finish) does: a source that
+    /// ends before its known length fails the reader with [`Error::Truncated`].
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -430,14 +409,9 @@ impl NalReader {
         result
     }
 
-    /// Answers the current request with a failure of the source. Every later
-    /// call returns [`Error::Transport`] or [`Error::Cancelled`], as `failure`
-    /// says.
-    ///
-    /// # Errors
-    ///
-    /// A `source` or `token` other than the current one is refused and changes
-    /// nothing.
+    /// Answers the current request with a failure, as
+    /// [`InputCursor::fail`](triergon_core::InputCursor::fail) does: every later call
+    /// returns [`Error::Transport`] or [`Error::Cancelled`], as `failure` says.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -480,17 +454,14 @@ impl NalReader {
     /// Backpressure/allocation errors are retryable with the same parser;
     /// all content, transport and cancellation failures are sticky.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] for a length field of zero, anything but zero bytes
-    /// before the first start code, a nonzero byte after `00 00 00`, an Annex B
-    /// unit of no bytes and a refused NAL header; [`Error::Truncated`] when the
-    /// source ends inside a length field, a length-prefixed unit or the zeros
-    /// before a first start code, when a length field declares more bytes than
-    /// a source of known length has left, and for a unit shorter than its
-    /// header; [`Error::Limit`] past `maximum_nal_bytes`,
-    /// `maximum_padding_bytes` or `maximum_nal_units`; [`Error::Cancelled`] when
-    /// `cancel` is set.
+    /// Fails with [`Error::Invalid`] for a length field of zero, anything but zero
+    /// bytes before the first start code, a nonzero byte after `00 00 00`, an Annex B
+    /// unit of no bytes and a refused NAL header; [`Error::Truncated`] when the source
+    /// ends inside a length field, a length-prefixed unit or the zeros before a first
+    /// start code, when a length field declares more bytes than a source of known
+    /// length has left, and for a unit shorter than its header; [`Error::Limit`] past
+    /// `maximum_nal_bytes`, `maximum_padding_bytes` or `maximum_nal_units`;
+    /// [`Error::Cancelled`] when `cancel` is set.
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<NalUnit>> {
         if let Some(error) = self.failure {
             return Err(error);

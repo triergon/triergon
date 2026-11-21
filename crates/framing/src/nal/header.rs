@@ -62,14 +62,10 @@ impl NalHeaderError {
 }
 
 impl NalHeader {
-    /// H.264 (08/2024) 7.3.1 and H.265 (07/2024) 7.3.1.2. Extended AVC
-    /// headers, RBSP syntax and type-specific constraints are outside this call.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Truncated`] when `nal` is shorter than the header;
-    /// [`Error::Invalid`] when `forbidden_zero_bit` is set or an H.265
-    /// `nuh_temporal_id_plus1` is zero.
+    /// H.264 (08/2024) 7.3.1 and H.265 (07/2024) 7.3.1.2. Extended AVC headers, RBSP
+    /// syntax and type-specific constraints are outside this call. Fails with
+    /// [`Error::Truncated`] when `nal` is shorter than the header; [`Error::Invalid`]
+    /// when `forbidden_zero_bit` is set or an H.265 `nuh_temporal_id_plus1` is zero.
     pub fn parse(codec: Codec, nal: &[u8]) -> Result<Self> {
         Self::parse_compact(codec, nal).map_err(NalHeaderError::error)
     }

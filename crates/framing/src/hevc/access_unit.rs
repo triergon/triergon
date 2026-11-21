@@ -21,15 +21,11 @@ pub struct HevcAnnexBConfig {
 }
 
 impl HevcAnnexBConfig {
-    /// Prepares `record` for [`HevcAnnexBJob`]: samples have NAL length fields of
-    /// the width it declares, and a random access unit starts with the NAL units of
-    /// its VPS, SPS and PPS arrays.
-    ///
-    /// # Errors
-    ///
-    /// When a NAL unit's type and the type its array declares differ and either is
-    /// a VPS, SPS or PPS, or the Annex B size of the parameter sets overflows
-    /// `usize`.
+    /// Prepares `record` for [`HevcAnnexBJob`]: samples have NAL length fields of the
+    /// width it declares, and a random access unit starts with the NAL units of its
+    /// VPS, SPS and PPS arrays. Fails when a NAL unit's type and the type its array
+    /// declares differ and either is a VPS, SPS or PPS, or the Annex B size of the
+    /// parameter sets overflows `usize`.
     pub fn new(record: HvcConfiguration) -> Result<Self> {
         let mut parameter_bytes = 0;
         for nal in record.nals() {
@@ -49,13 +45,9 @@ impl HevcAnnexBConfig {
         &self.record
     }
 
-    /// Starts the conversion of `sample`, whose NAL units each follow a length field
-    /// of the width the record declares.
-    ///
-    /// # Errors
-    ///
-    /// When a limit is zero, or the sample is empty or longer than
-    /// `limits.maximum_packet_bytes`.
+    /// Starts the conversion of `sample`, whose NAL units each follow a length field of
+    /// the width the record declares. Fails when a limit is zero, or the sample is
+    /// empty or longer than `limits.maximum_packet_bytes`.
     pub fn job<'a>(
         &'a self,
         sample: &'a [u8],
@@ -172,9 +164,7 @@ impl<'a> HevcAnnexBJob<'a> {
     /// One work unit covers the length field and fixed HEVC header. Even after
     /// finding IRAP, the complete sample must validate before publication.
     ///
-    /// # Errors
-    ///
-    /// When `cancel` is set, a length field or NAL unit runs past the end of the
+    /// Fails when `cancel` is set, a length field or NAL unit runs past the end of the
     /// sample, a NAL unit is shorter than its two-byte header or has
     /// `forbidden_zero_bit` set or `nuh_temporal_id_plus1` zero, or a limit is
     /// exceeded. Every later call returns the same error.

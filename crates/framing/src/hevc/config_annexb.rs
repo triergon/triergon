@@ -60,11 +60,8 @@ impl std::fmt::Debug for HvcAnnexBWriter {
 }
 impl HvcAnnexBWriter {
     /// Starts writing the NAL units of `input` into a buffer of at most
-    /// `maximum_output_bytes` bytes charged to `pool`.
-    ///
-    /// # Errors
-    ///
-    /// When the record belongs to another pool.
+    /// `maximum_output_bytes` bytes charged to `pool`. Fails when the record belongs to
+    /// another pool.
     pub fn new(
         pool: &Budget,
         input: HvcConfiguration,
@@ -89,12 +86,10 @@ impl HvcAnnexBWriter {
     /// [`BuildStep`] describes. Sizing the output costs one unit for each NAL unit
     /// and writing it one for each byte.
     ///
-    /// # Errors
-    ///
-    /// When `cancel` is set, the output would exceed `maximum_output_bytes`, or the
-    /// pool's limit is below the record and the output together. Every later call
-    /// returns the same error. A pool that lacks the room only until other storage
-    /// is released is `Backpressure` or `Allocation` instead, and the call can be
+    /// Fails when `cancel` is set, the output would exceed `maximum_output_bytes`, or
+    /// the pool's limit is below the record and the output together. Every later call
+    /// returns the same error. A pool that lacks the room only until other storage is
+    /// released is `Backpressure` or `Allocation` instead, and the call can be
     /// repeated.
     pub fn step(
         &mut self,

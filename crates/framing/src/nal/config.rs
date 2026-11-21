@@ -111,11 +111,9 @@ impl Configuration {
     /// must supply the framing fact from a separately validated source. A wrong
     /// or conflicting declaration cannot be detected by this opaque constructor.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] when `source` is empty, a limit that must not be zero
-    /// is, or `encoding` is not the record of `codec`; [`Error::ForeignPool`]
-    /// when `source` is charged to another pool; [`Error::Limit`] when it exceeds
+    /// Fails with [`Error::Invalid`] when `source` is empty, a limit that must not be
+    /// zero is, or `encoding` is not the record of `codec`; [`Error::ForeignPool`] when
+    /// `source` is charged to another pool; [`Error::Limit`] when it exceeds
     /// `maximum_source_bytes`.
     pub fn declared_record(
         pool: &Budget,
@@ -192,15 +190,11 @@ pub struct AnnexBConfigParser {
 }
 
 impl AnnexBConfigParser {
-    /// A parser for `source`, the whole configuration, charged to `pool`.
-    /// `source_id` names it in each parameter set's facts, and `sample_framing`
-    /// is kept as declared.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] when `source` is empty or a limit that must not be
-    /// zero is; [`Error::ForeignPool`] when `source` is charged to another pool;
-    /// [`Error::Limit`] when it exceeds `maximum_source_bytes`.
+    /// A parser for `source`, the whole configuration, charged to `pool`. `source_id`
+    /// names it in each parameter set's facts, and `sample_framing` is kept as
+    /// declared. Fails with [`Error::Invalid`] when `source` is empty or a limit that
+    /// must not be zero is; [`Error::ForeignPool`] when `source` is charged to another
+    /// pool; [`Error::Limit`] when it exceeds `maximum_source_bytes`.
     pub fn new(
         pool: &Budget,
         codec: Codec,
@@ -248,15 +242,13 @@ impl AnnexBConfigParser {
     /// Frames the source's NAL units and keeps each as a parameter set. Work is
     /// charged per source byte and per parameter set.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Unsupported`] for a NAL unit that is not a parameter set of the
-    /// codec; [`Error::Invalid`] for a source that holds no parameter set;
+    /// Fails with [`Error::Unsupported`] for a NAL unit that is not a parameter set of
+    /// the codec; [`Error::Invalid`] for a source that holds no parameter set;
     /// [`Error::Limit`] past `maximum_parameter_sets`; the errors of
-    /// [`NalReader::step`] for the Annex B framing; [`Error::Cancelled`] when
-    /// `cancel` is set. [`Error::Backpressure`] and [`Error::Allocation`] are
-    /// retryable: the parser keeps its progress. Every other error is final and
-    /// returned again by each later call.
+    /// [`NalReader::step`] for the Annex B framing; [`Error::Cancelled`] when `cancel`
+    /// is set. [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the
+    /// parser keeps its progress. Every other error is final and returned again by each
+    /// later call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

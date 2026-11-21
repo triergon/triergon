@@ -550,10 +550,8 @@ impl NalPacketSession {
     /// and outputs are charged to it too. Byte limits above
     /// [`NalPacketLimits::MAXIMUM_SPAN`] are lowered to it.
     ///
-    /// # Errors
-    ///
-    /// [`Error::ForeignPool`] when `configuration` is charged to another pool;
-    /// [`Error::Invalid`] when `maximum_nals` or `maximum_segments` is zero;
+    /// Fails with [`Error::ForeignPool`] when `configuration` is charged to another
+    /// pool; [`Error::Invalid`] when `maximum_nals` or `maximum_segments` is zero;
     /// [`Error::Limit`] when the configuration exceeds
     /// [`NalPacketLimits::MAXIMUM_SPAN`].
     pub fn new(
@@ -641,15 +639,13 @@ impl NalPacketSession {
     /// with the side data, work-bounded, before it adopts the record. An HEVC
     /// session keeps side data on the packet and never adopts it.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] after [`drain`](Self::drain), and when `avc_update`
-    /// is given without nonempty AVC side data or is missing for it;
-    /// [`Error::ForeignPool`] when the packet, its side data or the update is
-    /// charged to another pool than the configuration; [`Error::Limit`] past
+    /// Fails with [`Error::Invalid`] after [`drain`](Self::drain), and when
+    /// `avc_update` is given without nonempty AVC side data or is missing for it;
+    /// [`Error::ForeignPool`] when the packet, its side data or the update is charged
+    /// to another pool than the configuration; [`Error::Limit`] past
     /// `maximum_packet_bytes`, and for an update above
-    /// [`NalPacketLimits::MAXIMUM_SPAN`]; [`Error::Overflow`] when the packet's
-    /// end offset does not fit `u64`. The session stays as it was.
+    /// [`NalPacketLimits::MAXIMUM_SPAN`]; [`Error::Overflow`] when the packet's end
+    /// offset does not fit `u64`. The session stays as it was.
     pub fn packet<M>(
         &mut self,
         source: NalPacket<M>,
@@ -668,9 +664,7 @@ impl NalPacketSession {
     /// the error with which the strict parser refuses a record stays on the
     /// configuration and on every output and rejection.
     ///
-    /// # Errors
-    ///
-    /// As [`packet`](Self::packet).
+    /// Fails as [`packet`](Self::packet) does.
     pub fn receiver_packet<M>(
         &mut self,
         source: NalPacket<M>,
@@ -1128,12 +1122,8 @@ impl<M> NalPacketOutput<M> {
             .as_ref()
             .get(part.source_range())
     }
-    /// One segment's payload as its own handle on the retained packet or
-    /// configuration owner. No bytes are copied.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] past the last segment.
+    /// One segment's payload as its own handle on the retained packet or configuration
+    /// owner. No bytes are copied. Fails with [`Error::Invalid`] past the last segment.
     pub fn retain_segment_bytes(&self, index: usize) -> Result<Bytes> {
         let part = self
             .segments
@@ -1471,11 +1461,8 @@ impl<M> NalPacketJob<'_, M> {
             receiver_epoch: state.session.receiver_epoch,
         })
     }
-    /// The same state engine as `step_into`, returning the output directly.
-    ///
-    /// # Errors
-    ///
-    /// As [`step_into`](Self::step_into), without the occupied slot.
+    /// The same state engine as `step_into`, returning the output directly. Fails as
+    /// [`step_into`](Self::step_into) does, without the occupied slot.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -1494,22 +1481,18 @@ impl<M> NalPacketJob<'_, M> {
     /// Occupied slots are rejected before any job, work or owner change and do
     /// not poison the job. Yield, completion and errors leave the slot empty.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] for an occupied slot. For the packet:
+    /// Fails with [`Error::Invalid`] for an occupied slot. For the packet:
     /// [`Error::Truncated`] when it ends inside a length field or a NAL unit;
-    /// [`Error::Invalid`] for an empty AVC packet, an HEVC NAL length of zero
-    /// and update side data that differs from its parsed record;
-    /// [`Error::Unsupported`] for an HEVC record that declares an array of a
-    /// NAL unit type other than 32 to 34, 39 and 40; [`Error::Limit`] past a
-    /// limit of the session or of the pool; [`Error::Cancelled`] when `cancel`
-    /// is set. A job of [`NalPacketSession::packet`] also fails with the error
-    /// of [`NalHeader::parse`](crate::nal::NalHeader::parse) for a NAL header it
-    /// refuses, and with [`Error::Truncated`] for an AVC IDR NAL unit of one
-    /// byte.
-    /// [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the job
-    /// keeps its progress. Every other error is final and returned again by
-    /// each later call.
+    /// [`Error::Invalid`] for an empty AVC packet, an HEVC NAL length of zero and
+    /// update side data that differs from its parsed record; [`Error::Unsupported`] for
+    /// an HEVC record that declares an array of a NAL unit type other than 32 to 34, 39
+    /// and 40; [`Error::Limit`] past a limit of the session or of the pool;
+    /// [`Error::Cancelled`] when `cancel` is set. A job of [`NalPacketSession::packet`]
+    /// also fails with the error of [`NalHeader::parse`](crate::nal::NalHeader::parse)
+    /// for a NAL header it refuses, and with [`Error::Truncated`] for an AVC IDR NAL
+    /// unit of one byte. [`Error::Backpressure`] and [`Error::Allocation`] are
+    /// retryable: the job keeps its progress. Every other error is final and returned
+    /// again by each later call.
     #[inline(never)]
     pub fn step_into(
         &mut self,

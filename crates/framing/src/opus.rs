@@ -51,12 +51,9 @@ impl core::fmt::Debug for OpusHead {
 
 impl OpusHead {
     /// Parse an `OpusHead` packet (RFC 7845 section 5.1). Bytes after the mapping table
-    /// are ignored, as the specification requires of a version 0 header.
-    ///
-    /// # Errors
-    ///
-    /// When the magic is missing, the packet ends before a field or the mapping table,
-    /// the version is above 15, the channel count is 0 or, in family 0, above 2, or the
+    /// are ignored, as the specification requires of a version 0 header. Fails when the
+    /// magic is missing, the packet ends before a field or the mapping table, the
+    /// version is above 15, the channel count is 0 or, in family 0, above 2, or the
     /// stream counts or a mapping index are out of range.
     pub fn parse(bytes: &[u8]) -> Result<OpusHead> {
         if !bytes.starts_with(b"OpusHead") {
@@ -83,11 +80,8 @@ impl OpusHead {
     }
 
     /// Parse the payload of an ISO BMFF `dOps` box (Opus in ISO BMFF, section 4.3.2):
-    /// the same fields, big-endian, without the magic.
-    ///
-    /// # Errors
-    ///
-    /// When the box version is not 0, and as [`parse`](Self::parse) for the fields.
+    /// the same fields, big-endian, without the magic. Fails when the box version is
+    /// not 0, and as [`parse`](Self::parse) for the fields.
     pub fn from_dops(bytes: &[u8]) -> Result<OpusHead> {
         let field = |range: core::ops::Range<usize>| bytes.get(range).ok_or(Error::Truncated);
         let version = field(0..1)?[0];
@@ -230,12 +224,9 @@ fn packet_frames(packet: &[u8]) -> Result<u32> {
 }
 
 /// Duration of a packet at 48 kHz. A packet longer than 120 ms is invalid (RFC 6716
-/// section 3.2.5).
-///
-/// # Errors
-///
-/// When the packet is empty, is a code 3 packet without its frame-count byte or with a
-/// count of 0, or its frames add up to more than 5760 samples.
+/// section 3.2.5). Fails when the packet is empty, is a code 3 packet without its
+/// frame-count byte or with a count of 0, or its frames add up to more than 5760
+/// samples.
 pub fn packet_samples(packet: &[u8]) -> Result<u32> {
     let frames = packet_frames(packet)?;
     let samples = frames * frame_samples(packet[0]);
@@ -246,12 +237,9 @@ pub fn packet_samples(packet: &[u8]) -> Result<u32> {
 }
 
 /// Writes the canonical configuration of `configuration` to `out`: the `OpusHead`
-/// packet of an `OpusHead` packet (Ogg, Matroska CodecPrivate) or of an ISO BMFF
-/// `dOps` box payload.
-///
-/// # Errors
-///
-/// When `configuration` is neither, or the budget of `out` refuses the bytes.
+/// packet of an `OpusHead` packet (Ogg, Matroska CodecPrivate) or of an ISO BMFF `dOps`
+/// box payload. Fails when `configuration` is neither, or the budget of `out` refuses
+/// the bytes.
 pub fn canonical_configuration(configuration: &[u8], out: &mut BudgetVec<u8>) -> Result<()> {
     let head = if configuration.starts_with(b"OpusHead") {
         OpusHead::parse(configuration)?

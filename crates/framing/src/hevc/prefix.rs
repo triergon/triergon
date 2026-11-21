@@ -25,21 +25,14 @@ pub struct HevcSpsPrefix {
     pub height: u32,
 }
 
-/// The `vps_video_parameter_set_id` of a VPS payload.
-///
-/// # Errors
-///
-/// When the VPS is cut short.
+/// The `vps_video_parameter_set_id` of a VPS payload. Fails when the VPS is cut short.
 pub fn read_vps_id(payload: &[u8]) -> Result<u8> {
     Ok(Rbsp::new(payload).fixed(4)? as u8)
 }
 
-/// The identifiers, sub-layer count and display raster of an SPS payload.
-///
-/// # Errors
-///
-/// When the SPS is cut short, a field is out of range, the conformance window
-/// exceeds the coded picture or the raster is empty.
+/// The identifiers, sub-layer count and display raster of an SPS payload. Fails when
+/// the SPS is cut short, a field is out of range, the conformance window exceeds the
+/// coded picture or the raster is empty.
 pub fn read_sps_prefix(payload: &[u8]) -> Result<HevcSpsPrefix> {
     sps_prefix(&mut Rbsp::new(payload))
 }
@@ -78,12 +71,8 @@ fn sps_prefix(bits: &mut Rbsp<'_>) -> Result<HevcSpsPrefix> {
 }
 
 /// The `vps_num_units_in_tick` and `vps_time_scale` of a single-layer VPS payload
-/// (H.265 §7.3.2.1), when it has timing.
-///
-/// # Errors
-///
-/// When the VPS is cut short or a field is out of range, and `Unsupported` when it
-/// has more than one layer or layer set.
+/// (H.265 §7.3.2.1), when it has timing. Fails when the VPS is cut short or a field is
+/// out of range, and `Unsupported` when it has more than one layer or layer set.
 pub fn read_vps_timing(payload: &[u8]) -> Result<Option<(u32, u32)>> {
     vps_timing(&mut Rbsp::new(payload))
 }
@@ -181,13 +170,10 @@ fn skip_vps_hrd(bits: &mut Rbsp<'_>) -> Result<()> {
 }
 
 /// The `sps_seq_parameter_set_id`, `sps_video_parameter_set_id` and
-/// `sps_max_num_reorder_pics` of an SPS payload with one temporal sub-layer and at
-/// most 10 bits per sample.
-///
-/// # Errors
-///
-/// As [`read_sps_prefix`]; a bit depth above 10 is out of range, and an SPS with
-/// more sub-layers, which may each reorder differently, is `Unsupported`.
+/// `sps_max_num_reorder_pics` of an SPS payload with one temporal sub-layer and at most
+/// 10 bits per sample. Fails as [`read_sps_prefix`] does; a bit depth above 10 is out
+/// of range, and an SPS with more sub-layers, which may each reorder differently, is
+/// `Unsupported`.
 pub fn read_sps_reorder(payload: &[u8]) -> Result<(u8, u8, u8)> {
     let mut bits = Rbsp::new(payload);
     let sps = sps_prefix(&mut bits)?;
@@ -217,13 +203,9 @@ pub struct HevcVuiTiming {
     pub num_ticks_poc_diff_one_minus1: Option<u32>,
 }
 
-/// The VUI timing of an SPS payload, when it has one. Inferring it from the VPS and
-/// the HRD is the caller's.
-///
-/// # Errors
-///
-/// As [`read_sps_prefix`]; also when a field between the raster and the timing is
-/// cut short or out of range.
+/// The VUI timing of an SPS payload, when it has one. Inferring it from the VPS and the
+/// HRD is the caller's. Fails as [`read_sps_prefix`] does; also when a field between
+/// the raster and the timing is cut short or out of range.
 pub fn read_sps_timing(payload: &[u8]) -> Result<Option<HevcVuiTiming>> {
     let mut bits = Rbsp::new(payload);
     let sps = sps_prefix(&mut bits)?;
@@ -386,10 +368,7 @@ fn skip_profile_tier_level(bits: &mut Rbsp<'_>, sublayers: u8) -> Result<()> {
 }
 
 /// The `pps_pic_parameter_set_id` and `pps_seq_parameter_set_id` of a PPS payload.
-///
-/// # Errors
-///
-/// When the PPS is cut short or an identifier is out of range.
+/// Fails when the PPS is cut short or an identifier is out of range.
 pub fn read_pps_ids(payload: &[u8]) -> Result<(u8, u8)> {
     pps_ids(&mut Rbsp::new(payload))
 }
@@ -399,13 +378,9 @@ fn pps_ids(bits: &mut Rbsp<'_>) -> Result<(u8, u8)> {
 }
 
 /// Checks the syntax of a single-layer parameter-set chain further than its
-/// identifiers: the VPS through its trailing bits, the SPS through its VUI timing
-/// and the PPS through its extension flags.
-///
-/// # Errors
-///
-/// When a payload is cut short or a field is out of range, and `Unsupported` for a
-/// VPS with more than one layer or layer set.
+/// identifiers: the VPS through its trailing bits, the SPS through its VUI timing and
+/// the PPS through its extension flags. Fails when a payload is cut short or a field is
+/// out of range, and `Unsupported` for a VPS with more than one layer or layer set.
 pub fn check_parameter_sets(vps: &[u8], sps: &[u8], pps: &[u8]) -> Result<()> {
     check_vps(vps)?;
     read_sps_timing(sps)?;
@@ -463,11 +438,8 @@ fn check_pps_prefix(payload: &[u8]) -> Result<()> {
 }
 
 /// The `first_slice_segment_in_pic_flag` and `slice_pic_parameter_set_id` of a slice
-/// segment payload of NAL unit type `nal_type`.
-///
-/// # Errors
-///
-/// When the header is cut short or the identifier is out of range.
+/// segment payload of NAL unit type `nal_type`. Fails when the header is cut short or
+/// the identifier is out of range.
 pub fn read_slice_prefix(payload: &[u8], nal_type: u8) -> Result<(bool, u8)> {
     let mut bits = Rbsp::new(payload);
     let first = bits.flag()?;

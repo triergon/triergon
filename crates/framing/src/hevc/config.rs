@@ -154,11 +154,8 @@ impl HvcConfigFields {
     }
 }
 /// The fixed fields of the `hvcC` record that starts `raw`, with no check of its
-/// version, its fields or what follows them.
-///
-/// # Errors
-///
-/// When `raw` is shorter than the 23 fixed bytes.
+/// version, its fields or what follows them. Fails when `raw` is shorter than the 23
+/// fixed bytes.
 pub fn inspect_config_prefix(raw: &[u8]) -> Result<HvcConfigFields> {
     Ok(HvcConfigFields {
         prefix: raw
@@ -326,13 +323,10 @@ impl std::fmt::Debug for HvcConfigParser {
 }
 
 impl HvcConfigParser {
-    /// Starts the parse of `raw`, one complete record charged to `pool`.
-    ///
-    /// # Errors
-    ///
-    /// When `maximum_record_bytes` or `maximum_nal_bytes` is zero, `raw` belongs to
-    /// another pool, is empty or is longer than `maximum_record_bytes`, or the
-    /// record's end offset in the source overflows `u64`.
+    /// Starts the parse of `raw`, one complete record charged to `pool`. Fails when
+    /// `maximum_record_bytes` or `maximum_nal_bytes` is zero, `raw` belongs to another
+    /// pool, is empty or is longer than `maximum_record_bytes`, or the record's end
+    /// offset in the source overflows `u64`.
     pub fn new(
         pool: &Budget,
         source: HvcConfigSource,
@@ -395,16 +389,14 @@ impl HvcConfigParser {
     /// Advances by at most the units in `work` and returns the record once, as
     /// [`BuildStep`] describes.
     ///
-    /// # Errors
-    ///
-    /// When `cancel` is set; when `configurationVersion` is not 1 or the sample
+    /// Fails when `cancel` is set; when `configurationVersion` is not 1 or the sample
     /// length field is three bytes; when the record ends inside its fixed bytes, an
-    /// array header, a length field or a NAL unit; when a NAL unit is empty,
-    /// shorter than its two-byte header, or has `forbidden_zero_bit` set or
-    /// `nuh_temporal_id_plus1` zero; when a limit is exceeded, the pool's own by
-    /// the record with its descriptors included. Every later call returns the same
-    /// error. A pool that lacks the room only until other storage is released is
-    /// `Backpressure` or `Allocation` instead, and the call can be repeated.
+    /// array header, a length field or a NAL unit; when a NAL unit is empty, shorter
+    /// than its two-byte header, or has `forbidden_zero_bit` set or
+    /// `nuh_temporal_id_plus1` zero; when a limit is exceeded, the pool's own by the
+    /// record with its descriptors included. Every later call returns the same error. A
+    /// pool that lacks the room only until other storage is released is `Backpressure`
+    /// or `Allocation` instead, and the call can be repeated.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -415,13 +407,10 @@ impl HvcConfigParser {
             .into_build_step(ready)
     }
 
-    /// Publishes into an empty caller-provided slot without returning the record.
-    /// An occupied slot is rejected before any state, work or retained storage changes.
-    /// Yield, completion and errors leave an initially empty slot empty.
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::step`]; also when `ready` is occupied.
+    /// Publishes into an empty caller-provided slot without returning the record. An
+    /// occupied slot is rejected before any state, work or retained storage changes.
+    /// Yield, completion and errors leave an initially empty slot empty. Fails as
+    /// [`Self::step`] does; also when `ready` is occupied.
     pub fn step_into(
         &mut self,
         work: &mut WorkBudget,
@@ -871,11 +860,8 @@ impl HvcConfiguration {
         &self.raw[self.understood_end..]
     }
     /// [`Self::opaque_suffix`] as an owner that shares the record's allocation and
-    /// keeps all of it charged.
-    ///
-    /// # Errors
-    ///
-    /// Only for a range outside the record, which a parsed record rules out.
+    /// keeps all of it charged. Fails only for a range outside the record, which a
+    /// parsed record rules out.
     pub fn retain_opaque_suffix(&self) -> Result<Bytes> {
         self.raw.slice(self.understood_end..self.raw.len())
     }
@@ -893,11 +879,8 @@ impl HvcConfiguration {
             })
             .ok_or(Error::Overflow)
     }
-    /// Heap descriptor capacity only; up to four entries per table are inline.
-    ///
-    /// # Errors
-    ///
-    /// When the size in bytes overflows `usize`.
+    /// Heap descriptor capacity only; up to four entries per table are inline. Fails
+    /// when the size in bytes overflows `usize`.
     pub fn descriptor_storage_bytes(&self) -> Result<usize> {
         self.arrays
             .heap_capacity()
@@ -911,11 +894,8 @@ impl HvcConfiguration {
             .ok_or(Error::Overflow)
     }
     /// Bytes the record keeps charged: the whole allocation behind
-    /// [`Self::source_bytes`] and [`Self::descriptor_storage_bytes`].
-    ///
-    /// # Errors
-    ///
-    /// When the sum overflows `usize`.
+    /// [`Self::source_bytes`] and [`Self::descriptor_storage_bytes`]. Fails when the
+    /// sum overflows `usize`.
     pub fn retained_storage_bytes(&self) -> Result<usize> {
         self.descriptor_storage_bytes()?
             .checked_add(self.raw.retained_storage_bytes())
@@ -996,10 +976,7 @@ impl<'a> HvcConfigNal<'a> {
     }
 
     /// Require matching array and header types when either names a VPS, SPS or PPS.
-    ///
-    /// # Errors
-    ///
-    /// When the two types differ and either is 32, 33 or 34.
+    /// Fails when the two types differ and either is 32, 33 or 34.
     pub fn check_parameter_set_declaration(&self) -> Result<()> {
         if ((32..=34).contains(&self.declared_nal_type())
             || self.header().parameter_set_kind().is_some())

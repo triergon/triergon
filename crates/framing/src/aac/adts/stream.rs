@@ -93,11 +93,8 @@ enum StreamOutput {
     Carrier(AacAdtsCarrier),
 }
 impl AacAdtsStreamReader {
-    /// A reader of `source` from offset zero, with windows charged to `pool`.
-    ///
-    /// # Errors
-    ///
-    /// When a limit is zero.
+    /// A reader of `source` from offset zero, with windows charged to `pool`. Fails
+    /// when a limit is zero.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -199,30 +196,20 @@ impl AacAdtsStreamReader {
             .as_mut()
             .ok_or(Error::Invalid("missing ADTS input cursor"))
     }
-    /// Answers the current request with `window`, whose bytes the reader shares
-    /// until it has copied them into a frame.
-    ///
-    /// # Errors
-    ///
-    /// When the window is refused as by [`InputCursor::provide`], which changes
-    /// nothing, or the reader has failed.
+    /// Answers the current request with `window`, as
+    /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
+    /// window changes nothing. A failed reader returns its error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.cursor_mut()?.provide(window)
     }
-    /// [`provide`](Self::provide) for a window the caller gives away.
-    ///
-    /// # Errors
-    ///
-    /// As [`provide`](Self::provide); a refused window is dropped.
+    /// [`provide`](Self::provide) for a window the caller gives away; a refused window
+    /// is dropped.
     pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
         self.cursor_mut()?.provide_owned(window)
     }
-    /// [`provide`](Self::provide) for at most [`InputCursor::INLINE_CAPACITY`] bytes,
-    /// copied into the reader without an allocation.
-    ///
-    /// # Errors
-    ///
-    /// As [`provide`](Self::provide), and when `bytes` is longer than that.
+    /// [`provide`](Self::provide) for at most
+    /// [`InputCursor::INLINE_CAPACITY`](triergon_core::InputCursor::INLINE_CAPACITY)
+    /// bytes, copied into the reader without an allocation.
     pub fn provide_inline(
         &mut self,
         source: SourceId,
@@ -233,14 +220,9 @@ impl AacAdtsStreamReader {
         self.cursor_mut()?
             .provide_inline(source, token, offset, bytes)
     }
-    /// Answers the current request with the end of the source, which lies after
-    /// the bytes already provided.
-    ///
-    /// # Errors
-    ///
-    /// When the source ends before its known length: the reader fails for good with
-    /// [`Error::Truncated`]. A token or source other than the current one, or a
-    /// reader that has failed, changes nothing.
+    /// Answers the current request with the end of the source, as
+    /// [`InputCursor::finish`](triergon_core::InputCursor::finish) does: a source that
+    /// ends before its known length fails the reader with [`Error::Truncated`].
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         let result = self.cursor_mut()?.finish(source, token);
         if let Some(c) = &self.cursor {
@@ -251,14 +233,10 @@ impl AacAdtsStreamReader {
         }
         result
     }
-    /// Answers the current request with a failure. Buffered bytes and an unfinished
-    /// frame are dropped, and every later step returns [`Error::Transport`] or
-    /// [`Error::Cancelled`].
-    ///
-    /// # Errors
-    ///
-    /// When the token or source is not the current one or the reader has failed
-    /// already; nothing changes.
+    /// Answers the current request with a failure, as
+    /// [`InputCursor::fail`](triergon_core::InputCursor::fail) does: every later call
+    /// returns [`Error::Transport`] or [`Error::Cancelled`], as `failure` says. An
+    /// unfinished frame is dropped.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -278,9 +256,7 @@ impl AacAdtsStreamReader {
     /// cleared together; a source length learned from [`finish`](Self::finish) is
     /// kept.
     ///
-    /// # Errors
-    ///
-    /// When `offset` is not zero and the source has no random access, or `offset`
+    /// Fails when `offset` is not zero and the source has no random access, or `offset`
     /// lies past the known length. The reader stays as it was.
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
         if !self.capabilities.random_access && offset != 0 {
@@ -338,17 +314,15 @@ impl AacAdtsStreamReader {
     /// or [`fail`](Self::fail). [`Step::Yield`] asks for another call with more
     /// work. [`Step::End`] reports the end of the source at a frame boundary.
     ///
-    /// # Errors
-    ///
-    /// When the source ends inside a frame, or a frame passes its known length;
+    /// Fails when the source ends inside a frame, or a frame passes its known length;
     /// when the syncword is not `0xfff`, the layer is not 0, the sampling frequency
-    /// index names no frequency or the frame length is shorter than the header and
-    /// CRC; when the profile is not AAC LC or the frame holds several raw data
-    /// blocks; when a frame exceeds `maximum_frame_bytes` or the frames exceed
-    /// `maximum_frames`; when `cancel` is set or the source failed. The reader then
-    /// returns the same error from every later call until [`reset`](Self::reset).
-    /// [`Error::Backpressure`] and [`Error::Allocation`] keep its state, to be
-    /// stepped again.
+    /// index names no frequency or the frame length is shorter than the header and CRC;
+    /// when the profile is not AAC LC or the frame holds several raw data blocks; when
+    /// a frame exceeds `maximum_frame_bytes` or the frames exceed `maximum_frames`;
+    /// when `cancel` is set or the source failed. The reader then returns the same
+    /// error from every later call until [`reset`](Self::reset).
+    /// [`Error::Backpressure`] and [`Error::Allocation`] keep its state, to be stepped
+    /// again.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

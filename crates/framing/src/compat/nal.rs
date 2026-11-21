@@ -233,14 +233,11 @@ impl std::fmt::Debug for ReceiverAvcConfigParser {
     }
 }
 impl ReceiverAvcConfigParser {
-    /// A parser for `raw`, the record of a session's initial configuration (the
-    /// payload of an `avcC` box), charged to `pool`.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] when a byte limit is zero; [`Error::ForeignPool`] when
-    /// `raw` is charged to another pool; [`Error::Limit`] when it exceeds
-    /// `maximum_record_bytes`; [`Error::Truncated`] when it is empty.
+    /// A parser for `raw`, the record of a session's initial configuration (the payload
+    /// of an `avcC` box), charged to `pool`. Fails with [`Error::Invalid`] when a byte
+    /// limit is zero; [`Error::ForeignPool`] when `raw` is charged to another pool;
+    /// [`Error::Limit`] when it exceeds `maximum_record_bytes`; [`Error::Truncated`]
+    /// when it is empty.
     pub fn new(
         pool: &Budget,
         source: AvcConfigSource,
@@ -279,9 +276,7 @@ impl ReceiverAvcConfigParser {
     /// Only a parser made here reports
     /// [`take_update_rejection`](Self::take_update_rejection).
     ///
-    /// # Errors
-    ///
-    /// As [`new`](Self::new).
+    /// Fails as [`new`](Self::new) does.
     pub fn new_update(
         pool: &Budget,
         source: AvcConfigSource,
@@ -303,17 +298,14 @@ impl ReceiverAvcConfigParser {
     /// Parses the record. One work unit reads at most the six fixed bytes, or
     /// the length and header of one NAL unit.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Unsupported`] for a `configurationVersion` other than 1;
-    /// [`Error::Truncated`] for a record that ends inside its fixed bytes, its
-    /// SPS and PPS arrays or an SPS extension entry; [`Error::Invalid`] for a
-    /// NAL length of zero and a refused NAL header; [`Error::Limit`] past
-    /// `maximum_nals` or `maximum_nal_bytes`; [`Error::Cancelled`] when `cancel`
-    /// is set.
-    /// [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the
-    /// parser keeps its progress. Every other error is final and returned again
-    /// by each later call.
+    /// Fails with [`Error::Unsupported`] for a `configurationVersion` other than 1;
+    /// [`Error::Truncated`] for a record that ends inside its fixed bytes, its SPS and
+    /// PPS arrays or an SPS extension entry; [`Error::Invalid`] for a NAL length of
+    /// zero and a refused NAL header; [`Error::Limit`] past `maximum_nals` or
+    /// `maximum_nal_bytes`; [`Error::Cancelled`] when `cancel` is set.
+    /// [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the parser
+    /// keeps its progress. Every other error is final and returned again by each later
+    /// call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -324,14 +316,11 @@ impl ReceiverAvcConfigParser {
             .into_build_step(ready)
     }
 
-    /// Publishes into an empty caller-provided slot. Occupied slots are rejected
-    /// before any state, work or retained storage changes, including update rejections.
-    /// Yield, completion and errors leave an initially empty slot empty.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] for an occupied slot, after which the parser can be
-    /// stepped again; otherwise as [`step`](Self::step).
+    /// Publishes into an empty caller-provided slot. Occupied slots are rejected before
+    /// any state, work or retained storage changes, including update rejections. Yield,
+    /// completion and errors leave an initially empty slot empty. Fails with
+    /// [`Error::Invalid`] for an occupied slot, after which the parser can be stepped
+    /// again; otherwise as [`step`](Self::step).
     pub fn step_into(
         &mut self,
         work: &mut WorkBudget,
@@ -377,14 +366,11 @@ pub struct ReceiverHevcConfigParser {
     inner: HvcConfigParser,
 }
 impl ReceiverHevcConfigParser {
-    /// A parser for `raw`, the record of a session's configuration (the payload
-    /// of an `hvcC` box), charged to `pool`.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] when a byte limit is zero; [`Error::ForeignPool`] when
-    /// `raw` is charged to another pool; [`Error::Limit`] when it exceeds
-    /// `maximum_record_bytes`; [`Error::Truncated`] when it is empty.
+    /// A parser for `raw`, the record of a session's configuration (the payload of an
+    /// `hvcC` box), charged to `pool`. Fails with [`Error::Invalid`] when a byte limit
+    /// is zero; [`Error::ForeignPool`] when `raw` is charged to another pool;
+    /// [`Error::Limit`] when it exceeds `maximum_record_bytes`; [`Error::Truncated`]
+    /// when it is empty.
     pub fn new(
         pool: &Budget,
         source: HvcConfigSource,
@@ -398,16 +384,14 @@ impl ReceiverHevcConfigParser {
     /// Parses the record. One work unit reads at most the 23 fixed bytes, one
     /// array header, or the length and header of one NAL unit.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Unsupported`] for a `configurationVersion` other than 1;
-    /// [`Error::Truncated`] for a record that ends inside its fixed bytes, an
-    /// array header or a NAL unit; [`Error::Invalid`] for a NAL length of zero
-    /// and a refused NAL header; [`Error::Limit`] past `maximum_arrays`,
-    /// `maximum_nals` or `maximum_nal_bytes`; [`Error::Cancelled`] when `cancel`
-    /// is set. [`Error::Backpressure`] and [`Error::Allocation`] are retryable:
-    /// the parser keeps its progress. Every other error is final and returned
-    /// again by each later call.
+    /// Fails with [`Error::Unsupported`] for a `configurationVersion` other than 1;
+    /// [`Error::Truncated`] for a record that ends inside its fixed bytes, an array
+    /// header or a NAL unit; [`Error::Invalid`] for a NAL length of zero and a refused
+    /// NAL header; [`Error::Limit`] past `maximum_arrays`, `maximum_nals` or
+    /// `maximum_nal_bytes`; [`Error::Cancelled`] when `cancel` is set.
+    /// [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the parser
+    /// keeps its progress. Every other error is final and returned again by each later
+    /// call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -418,14 +402,11 @@ impl ReceiverHevcConfigParser {
             .into_build_step(ready)
     }
 
-    /// Publishes into an empty caller-provided slot. Occupied slots are rejected
-    /// before any state, work or retained storage changes. Yield, completion and errors
-    /// leave an initially empty slot empty.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] for an occupied slot, after which the parser can be
-    /// stepped again; otherwise as [`step`](Self::step).
+    /// Publishes into an empty caller-provided slot. Occupied slots are rejected before
+    /// any state, work or retained storage changes. Yield, completion and errors leave
+    /// an initially empty slot empty. Fails with [`Error::Invalid`] for an occupied
+    /// slot, after which the parser can be stepped again; otherwise as
+    /// [`step`](Self::step).
     pub fn step_into(
         &mut self,
         work: &mut WorkBudget,

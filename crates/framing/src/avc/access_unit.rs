@@ -17,12 +17,8 @@ pub struct AvcAnnexBConfig {
 
 impl AvcAnnexBConfig {
     /// Prepares `record` for [`AvcAnnexBJob`]: samples have NAL length fields of the
-    /// width it declares, and an IDR access unit starts with its SPS and PPS NAL
-    /// units.
-    ///
-    /// # Errors
-    ///
-    /// When the Annex B size of those parameter sets overflows `usize`.
+    /// width it declares, and an IDR access unit starts with its SPS and PPS NAL units.
+    /// Fails when the Annex B size of those parameter sets overflows `usize`.
     pub fn new(record: AvcConfiguration) -> Result<Self> {
         let mut parameter_bytes = 0usize;
         for nal in record.nals().filter(parameter_set) {
@@ -179,13 +175,9 @@ pub struct AvcAnnexBJob<'a> {
 }
 
 impl<'a> AvcAnnexBJob<'a> {
-    /// Starts the conversion of `sample`, whose NAL units each follow a length field
-    /// of the width the record of `config` declares.
-    ///
-    /// # Errors
-    ///
-    /// When a limit is zero, or the sample is empty or longer than
-    /// `limits.maximum_packet_bytes`.
+    /// Starts the conversion of `sample`, whose NAL units each follow a length field of
+    /// the width the record of `config` declares. Fails when a limit is zero, or the
+    /// sample is empty or longer than `limits.maximum_packet_bytes`.
     pub fn new(
         config: &'a AvcAnnexBConfig,
         sample: &'a [u8],
@@ -219,9 +211,7 @@ impl<'a> AvcAnnexBJob<'a> {
     /// One work unit covers one checked length field and fixed NAL header.
     /// A malformed tail never publishes a partially converted access unit.
     ///
-    /// # Errors
-    ///
-    /// When `cancel` is set, a length field or NAL unit runs past the end of the
+    /// Fails when `cancel` is set, a length field or NAL unit runs past the end of the
     /// sample, a NAL unit is empty or has `forbidden_zero_bit` set, or a limit is
     /// exceeded. Every later call returns the same error.
     pub fn step(

@@ -209,12 +209,9 @@ impl Av1Obu {
     pub const fn facts(&self) -> Av1ObuFacts {
         self.facts
     }
-    /// The payload, sharing the allocation of [`wire_bytes`](Self::wire_bytes).
-    ///
-    /// # Errors
-    ///
-    /// Only when the lengths of [`facts`](Self::facts) do not describe the
-    /// bytes, which holds for no OBU a reader or parser of this module returns.
+    /// The payload, sharing the allocation of [`wire_bytes`](Self::wire_bytes). Fails
+    /// only when the lengths of [`facts`](Self::facts) do not describe the bytes, which
+    /// holds for no OBU a reader or parser of this module returns.
     pub fn payload_bytes(&self) -> Result<Bytes> {
         let start = self
             .facts
@@ -277,12 +274,8 @@ pub struct Av1ObuReader {
 }
 
 impl Av1ObuReader {
-    /// A reader at offset zero of `source`, taking input windows charged to
-    /// `pool`.
-    ///
-    /// # Errors
-    ///
-    /// When a limit is zero, or when `framing` is [`Av1ObuFraming::OneObu`] and
+    /// A reader at offset zero of `source`, taking input windows charged to `pool`.
+    /// Fails when a limit is zero, or when `framing` is [`Av1ObuFraming::OneObu`] and
     /// `capabilities` gives no length or a length of zero.
     pub fn new(
         pool: &Budget,
@@ -350,15 +343,9 @@ impl Av1ObuReader {
         self.cursor.position()
     }
 
-    /// Answers the current request with `window`.
-    ///
-    /// # Errors
-    ///
-    /// The error the reader stopped with, or a window the request does not
-    /// admit: another token, source or pool, an offset other than
-    /// [`position`](Self::position), or more bytes than
-    /// [`Av1ObuLimits::maximum_input_window`]. A refused window leaves the
-    /// reader as it was.
+    /// Answers the current request with `window`, as
+    /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
+    /// window changes nothing. A failed reader returns its error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -366,14 +353,10 @@ impl Av1ObuReader {
         self.cursor.provide(window)
     }
 
-    /// Answers the current request with the end of the source. An end inside an
-    /// OBU makes the next [`step`](Self::step) fail as truncated.
-    ///
-    /// # Errors
-    ///
-    /// The error the reader stopped with, a token or source other than the
-    /// current one, or a source that ends before its known length, which stops
-    /// the reader as truncated.
+    /// Answers the current request with the end of the source, as
+    /// [`InputCursor::finish`](triergon_core::InputCursor::finish) does: a source that
+    /// ends before its known length fails the reader with [`Error::Truncated`]. An end
+    /// inside an OBU makes the next [`step`](Self::step) fail as truncated.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -385,13 +368,9 @@ impl Av1ObuReader {
         result
     }
 
-    /// Answers the current request with a failure of the source: the reader
-    /// stops, and every later call returns the transport or cancellation error.
-    ///
-    /// # Errors
-    ///
-    /// The error the reader already stopped with, or a token or source other
-    /// than the current one.
+    /// Answers the current request with a failure, as
+    /// [`InputCursor::fail`](triergon_core::InputCursor::fail) does: every later call
+    /// returns [`Error::Transport`] or [`Error::Cancelled`], as `failure` says.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -431,16 +410,13 @@ impl Av1ObuReader {
     /// source at an OBU boundary, after the single OBU of
     /// [`Av1ObuFraming::OneObu`].
     ///
-    /// # Errors
-    ///
-    /// Cancellation; a source that ends inside an OBU; a size field that
+    /// Fails on cancellation; a source that ends inside an OBU; a size field that
     /// continues past eight bytes or exceeds `u32::MAX`; an OBU longer than
-    /// `maximum_obu_bytes`, or one more than `maximum_obus`; an OBU without a
-    /// size field in low-overhead framing; for a single OBU, a size that
-    /// disagrees with the source length, or bytes after the OBU. Each stops the
-    /// reader, and every later call returns the same error. A pool that refuses
-    /// the OBU's storage returns backpressure or an allocation error, after
-    /// which the call may be repeated.
+    /// `maximum_obu_bytes`, or one more than `maximum_obus`; an OBU without a size
+    /// field in low-overhead framing; for a single OBU, a size that disagrees with the
+    /// source length, or bytes after the OBU. Each stops the reader, and every later
+    /// call returns the same error. A pool that refuses the OBU's storage returns
+    /// backpressure or an allocation error, after which the call may be repeated.
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<Av1Obu>> {
         if let Some(error) = self.failure {
             return Err(error);

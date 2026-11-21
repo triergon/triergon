@@ -84,13 +84,11 @@ impl DtsFrameExtent {
 /// frame body; the caller must separately acquire the returned declared extent.
 /// Word-swapped and 14-bit carriers are outside this API.
 ///
-/// # Errors
-///
-/// `Truncated` when `input` ends inside the prefix. `Invalid` when it begins with
-/// neither the core nor the extension substream sync word, and when a limit is
-/// zero. `Limit` when the header or the frame is larger than `limits` allow.
-/// Otherwise whatever [`probe_core_header`] or
-/// [`probe_extension_substream_extent`] refuses the prefix with.
+/// Fails with `Truncated` when `input` ends inside the prefix; `Invalid` when it begins
+/// with neither the core nor the extension substream sync word, and when a limit is
+/// zero; `Limit` when the header or the frame is larger than `limits` allow. Otherwise
+/// whatever [`probe_core_header`] or [`probe_extension_substream_extent`] refuses the
+/// prefix with.
 pub fn probe_frame_extent(input: &[u8], limits: DtsFrameExtentLimits) -> Result<DtsFrameExtent> {
     match input.get(..4).ok_or(Error::Truncated)? {
         [0x7f, 0xfe, 0x80, 0x01] => {
@@ -115,12 +113,10 @@ pub fn probe_frame_extent(input: &[u8], limits: DtsFrameExtentLimits) -> Result<
 /// Rejects a header that overlaps its size prefix/CRC or leaves no asset data
 /// in the frame. This is an extent sanity check, not full header validation.
 ///
-/// # Errors
-///
-/// `Truncated` when `input` ends inside the size prefix. `Invalid` when it does
-/// not begin with the extension substream sync word `0x64582025`, when the
-/// declared sizes cannot hold a header and data after it, and when a limit is
-/// zero. `Limit` when the header or the frame is larger than `limits` allow.
+/// Fails with `Truncated` when `input` ends inside the size prefix; `Invalid` when it
+/// does not begin with the extension substream sync word `0x64582025`, when the
+/// declared sizes cannot hold a header and data after it, and when a limit is zero;
+/// `Limit` when the header or the frame is larger than `limits` allow.
 pub fn probe_extension_substream_extent(
     input: &[u8],
     limits: DtsFrameExtentLimits,

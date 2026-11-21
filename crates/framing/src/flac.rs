@@ -41,12 +41,9 @@ impl FlacStreamInfo {
     /// Size of the block body.
     pub const BYTES: usize = 34;
 
-    /// Parse a STREAMINFO block body.
-    ///
-    /// # Errors
-    ///
-    /// When `body` is shorter than [`Self::BYTES`], codes fewer than 4 bits per
-    /// sample, or has a minimum block size above its maximum.
+    /// Parse a STREAMINFO block body. Fails when `body` is shorter than
+    /// [`Self::BYTES`], codes fewer than 4 bits per sample, or has a minimum block size
+    /// above its maximum.
     pub fn parse(body: &[u8]) -> Result<FlacStreamInfo> {
         let b = body.get(..Self::BYTES).ok_or(Error::Truncated)?;
         let be24 = |at: usize| u32::from_be_bytes([0, b[at], b[at + 1], b[at + 2]]);
@@ -85,13 +82,10 @@ pub struct FlacMetadataBlock<'a> {
     pub body: &'a [u8],
 }
 
-/// The metadata blocks after an `fLaC` marker, in order, ending at the block marked last
-/// or at the end of `bytes`.
-///
-/// # Errors
-///
-/// When `bytes` does not start with the marker. The iterator yields one error and
-/// then ends when `bytes` stops inside a block header or body.
+/// The metadata blocks after an `fLaC` marker, in order, ending at the block marked
+/// last or at the end of `bytes`. Fails when `bytes` does not start with the marker.
+/// The iterator yields one error and then ends when `bytes` stops inside a block header
+/// or body.
 pub fn metadata_blocks(
     bytes: &[u8],
 ) -> Result<impl Iterator<Item = Result<FlacMetadataBlock<'_>>>> {
@@ -123,13 +117,9 @@ pub fn metadata_blocks(
     }))
 }
 
-/// The STREAMINFO of a canonical configuration: its first metadata block.
-///
-/// # Errors
-///
-/// When `configuration` does not start with the `fLaC` marker, or its first metadata
-/// block is missing, incomplete, not STREAMINFO or one [`FlacStreamInfo::parse`]
-/// refuses.
+/// The STREAMINFO of a canonical configuration: its first metadata block. Fails when
+/// `configuration` does not start with the `fLaC` marker, or its first metadata block
+/// is missing, incomplete, not STREAMINFO or one [`FlacStreamInfo::parse`] refuses.
 pub fn stream_info(configuration: &[u8]) -> Result<FlacStreamInfo> {
     let first = metadata_blocks(configuration)?
         .next()
@@ -175,9 +165,7 @@ fn ogg_native(packet: &[u8]) -> Result<&[u8]> {
 /// A stream that starts at a frame header carries none; `out` stays empty and the
 /// frames describe themselves.
 ///
-/// # Errors
-///
-/// When the first metadata block is not a complete STREAMINFO, the `dfLa` or Ogg
+/// Fails when the first metadata block is not a complete STREAMINFO, the `dfLa` or Ogg
 /// mapping version is not supported, or the budget of `out` refuses the bytes.
 pub fn canonical_configuration(configuration: &[u8], out: &mut BudgetVec<u8>) -> Result<()> {
     if configuration.is_empty() {

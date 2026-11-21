@@ -246,13 +246,11 @@ impl ParserPacket {
     /// The parser's clock for the packet. It is not the duration of a source
     /// frame's coding window.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Unsupported`] where the parser's clock is not modelled: the header
-    /// in the packet's first 18 bytes is refused or sets `EXT_AUDIO`, the packet
-    /// holds the extension substream sync `64 58 20 25` at the byte offset
-    /// `FSIZE` + 1 rounded up to a multiple of four, or an earlier packet of the
-    /// operation had one of these.
+    /// Fails with [`Error::Unsupported`] where the parser's clock is not modelled: the
+    /// header in the packet's first 18 bytes is refused or sets `EXT_AUDIO`, the packet
+    /// holds the extension substream sync `64 58 20 25` at the byte offset `FSIZE` + 1
+    /// rounded up to a multiple of four, or an earlier packet of the operation had one
+    /// of these.
     pub fn clock(&self) -> Result<ParserClock> {
         self.clock
     }
@@ -403,9 +401,7 @@ impl std::fmt::Debug for ParserOperation {
 impl ParserOperation {
     /// An operation at offset zero of `source`, whose 16-bit words are in `order`.
     ///
-    /// # Errors
-    ///
-    /// Those of [`Dts14SyncReader::per_frame`] and [`Dts14CarrierReader::new`] for
+    /// Fails as [`Dts14SyncReader::per_frame`] and [`Dts14CarrierReader::new`] do for
     /// their limits.
     pub fn new(
         pool: &Budget,
@@ -438,14 +434,10 @@ impl ParserOperation {
     pub fn context(&self) -> ParserOperationContext {
         self.context
     }
-    /// Takes the event that [`ParserOperationStep::Event`] announced, once. Until
-    /// then every [`step`](Self::step) returns `Event` again and reads nothing,
-    /// allocates nothing and charges no work.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] when no event is ready. A failed operation returns its
-    /// earlier error.
+    /// Takes the event that [`ParserOperationStep::Event`] announced, once. Until then
+    /// every [`step`](Self::step) returns `Event` again and reads nothing, allocates
+    /// nothing and charges no work. Fails with [`Error::Invalid`] when no event is
+    /// ready. A failed operation returns its earlier error.
     pub fn take_event(&mut self) -> Result<ParserOperationEvent> {
         self.healthy()?;
         self.ready_event
@@ -482,12 +474,8 @@ impl ParserOperation {
             _ => Err(Error::Invalid("DTS operation view is terminal")),
         }
     }
-    /// The input request of one reader.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] when that reader has stopped. A failed operation returns
-    /// its earlier error.
+    /// The input request of one reader. Fails with [`Error::Invalid`] when that reader
+    /// has stopped. A failed operation returns its earlier error.
     pub fn request(&self, lane: ParserOperationLane) -> Result<InputRequest> {
         self.healthy()?;
         match (lane, &self.source, &self.parser) {
@@ -498,12 +486,9 @@ impl ParserOperation {
             _ => Err(Error::Invalid("DTS operation view is terminal")),
         }
     }
-    /// Answers the current request of one reader with `window`.
-    ///
-    /// # Errors
-    ///
-    /// As [`request`](Self::request), or the reader's refusal of a window that does
-    /// not answer its request, which leaves the operation as it was.
+    /// Answers the current request of one reader with `window`. Fails as
+    /// [`request`](Self::request) does, or with the reader's refusal of a window that
+    /// does not answer its request, which leaves the operation as it was.
     pub fn provide(&mut self, lane: ParserOperationLane, window: &InputWindow) -> Result<()> {
         match self.reader(lane)? {
             LaneReader::Source(reader) => reader.provide(window),
@@ -513,11 +498,9 @@ impl ParserOperation {
     /// Answers the current request of one reader with the end of the source. Each
     /// reader is told separately.
     ///
-    /// # Errors
-    ///
-    /// As [`request`](Self::request), or the reader's refusal of a token or source
-    /// that does not match its request, which leaves the operation as it was.
-    /// [`Error::Truncated`] when the source ends before its known length; that
+    /// Fails as [`request`](Self::request) does, or with the reader's refusal of a token
+    /// or source that does not match its request, which leaves the operation as it was,
+    /// or with [`Error::Truncated`] when the source ends before its known length: that
     /// reader then stops with a [`ParserOperationEvent::ViewRefusal`].
     pub fn finish(
         &mut self,
@@ -535,10 +518,8 @@ impl ParserOperation {
     /// every later call returns [`Error::Transport`] or [`Error::Cancelled`]. The
     /// other reader's bytes never become a last frame or packet.
     ///
-    /// # Errors
-    ///
-    /// As [`request`](Self::request), or the reader's refusal of a token or source
-    /// that does not match its request, which leaves the operation as it was.
+    /// Fails as [`request`](Self::request) does, or with the reader's refusal of a token
+    /// or source that does not match its request, which leaves the operation as it was.
     pub fn fail(
         &mut self,
         lane: ParserOperationLane,
@@ -591,14 +572,11 @@ impl ParserOperation {
     /// readers' own work, one unit is charged for each turn and 128 for the clock of
     /// each parser packet.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Backpressure`] and [`Error::Allocation`] leave the operation as it
-    /// was: free pool storage and call again. [`Error::Cancelled`] when `cancel` is
-    /// set, and [`Error::Invalid`] when the two readers end at different source
-    /// locations, fail the operation for good. Any other error of a reader is not
-    /// returned: it stops that reader and arrives as a
-    /// [`ParserOperationEvent::ViewRefusal`].
+    /// [`Error::Backpressure`] and [`Error::Allocation`] leave the operation as it was:
+    /// free pool storage and call again. [`Error::Cancelled`] when `cancel` is set, and
+    /// [`Error::Invalid`] when the two readers end at different source locations, fail
+    /// the operation for good. Any other error of a reader is not returned: it stops
+    /// that reader and arrives as a [`ParserOperationEvent::ViewRefusal`].
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -755,10 +733,8 @@ impl FactAssociationJob {
     /// A job for a source frame and a parser packet of the operation that `context`
     /// describes.
     ///
-    /// # Errors
-    ///
-    /// [`Error::ForeignPool`] when the bytes of either are not charged to `pool`,
-    /// [`Error::SourceMismatch`] when either comes from another source, and
+    /// Fails with [`Error::ForeignPool`] when the bytes of either are not charged to
+    /// `pool`, [`Error::SourceMismatch`] when either comes from another source, and
     /// [`Error::Invalid`] when either carries a cursor generation other than the
     /// context's or the frame's source range is not within the packet's.
     pub fn new(
@@ -812,11 +788,9 @@ impl FactAssociationJob {
     /// is spent. The job reads no input and returns neither [`Step::NeedInput`] nor
     /// [`Step::End`].
     ///
-    /// # Errors
-    ///
-    /// [`Error::Invalid`] when a byte differs or the association has been returned
-    /// already, and [`Error::Cancelled`] when `cancel` is set. A difference and a
-    /// cancellation are kept and returned by all later calls.
+    /// Fails with [`Error::Invalid`] when a byte differs or the association has been
+    /// returned already, and [`Error::Cancelled`] when `cancel` is set. A difference
+    /// and a cancellation are kept and returned by all later calls.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

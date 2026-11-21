@@ -285,20 +285,13 @@ impl Dec3Configuration {
         self.generation
     }
     /// The bytes after the last entry, uninterpreted and sharing the record's
-    /// allocation; empty when the record ends with its entries.
-    ///
-    /// # Errors
-    ///
-    /// Never: the range lies inside the record.
+    /// allocation; empty when the record ends with its entries. Never fails: the range
+    /// lies inside the record.
     pub fn trailing_reserved_bytes(&self) -> Result<Bytes> {
         self.raw.slice(self.tail_offset..self.raw.len())
     }
     /// The bytes of entry `index` of [`substreams`](Self::substreams), sharing the
-    /// record's allocation.
-    ///
-    /// # Errors
-    ///
-    /// When `index` is not below the number of entries.
+    /// record's allocation. Fails when `index` is not below the number of entries.
     pub fn substream_bytes(&self, index: usize) -> Result<Bytes> {
         let entry = self
             .substreams()
@@ -393,14 +386,10 @@ impl std::fmt::Debug for Ac3ConfigParser {
 
 impl Ac3ConfigParser {
     /// A parser of `record`, the complete payload of the box that `kind` names.
-    /// `source` only labels the result.
-    ///
-    /// # Errors
-    ///
-    /// When `maximum_independent_substreams` is not 1 to 8 or another limit is
-    /// zero; when `record` is not charged to `pool`, is longer than
-    /// `maximum_record_bytes`, or is shorter than three bytes (`dac3`) or two
-    /// (`dec3`).
+    /// `source` only labels the result. Fails when `maximum_independent_substreams` is
+    /// not 1 to 8 or another limit is zero; when `record` is not charged to `pool`, is
+    /// longer than `maximum_record_bytes`, or is shorter than three bytes (`dac3`) or
+    /// two (`dec3`).
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -447,13 +436,9 @@ impl Ac3ConfigParser {
         self.source = None;
         self.cursor = None;
     }
-    /// Advances by at most the work left in `work`, and returns the record once
-    /// it is read.
-    ///
-    /// # Errors
-    ///
-    /// When a `dac3` record is longer than three bytes, a `dec3` record declares
-    /// more independent substreams than the limit or ends inside an entry, or
+    /// Advances by at most the work left in `work`, and returns the record once it is
+    /// read. Fails when a `dac3` record is longer than three bytes, a `dec3` record
+    /// declares more independent substreams than the limit or ends inside an entry, or
     /// `cancel` is set. Every later call returns the same error.
     pub fn step(
         &mut self,

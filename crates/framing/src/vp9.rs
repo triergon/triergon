@@ -123,13 +123,9 @@ impl Vp9Configuration {
     pub const fn generation(&self) -> u64 {
         self.generation
     }
-    /// `codecInitializationData` as coded: the record after its eight fixed
-    /// bytes, sharing its allocation. Empty in a record that follows the
-    /// binding.
-    ///
-    /// # Errors
-    ///
-    /// None for a record a parser returned, which holds its eight fixed bytes.
+    /// `codecInitializationData` as coded: the record after its eight fixed bytes,
+    /// sharing its allocation. Empty in a record that follows the binding. Never fails
+    /// for a record a parser returned, which holds its eight fixed bytes.
     pub fn initialization_bytes(&self) -> Result<Bytes> {
         self.raw.slice(8..self.raw.len())
     }
@@ -167,16 +163,11 @@ pub struct Vp9ConfigParser {
 }
 
 impl Vp9ConfigParser {
-    /// A parser for `record`, the payload of a `vpcC` box after its `FullBox`
-    /// header, which `context` carries. `source` names the record in the
-    /// configuration.
-    ///
-    /// # Errors
-    ///
-    /// When a limit is zero; the record is charged to another pool than
-    /// `pool`, is longer than `maximum_record_bytes` or is shorter than its
-    /// eight fixed bytes; the box version is not 1; or the flags exceed 24
-    /// bits.
+    /// A parser for `record`, the payload of a `vpcC` box after its `FullBox` header,
+    /// which `context` carries. `source` names the record in the configuration. Fails
+    /// when a limit is zero; the record is charged to another pool than `pool`, is
+    /// longer than `maximum_record_bytes` or is shorter than its eight fixed bytes; the
+    /// box version is not 1; or the flags exceed 24 bits.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -212,14 +203,10 @@ impl Vp9ConfigParser {
         self.cursor = None;
     }
 
-    /// Reads the fixed fields, one work unit per byte and one for the length
-    /// check, and returns the configuration.
-    ///
-    /// # Errors
-    ///
-    /// Cancellation, or a record shorter or longer than its eight fixed bytes
-    /// and the `codecInitializationDataSize` they declare. Each is final: every
-    /// later call returns the same error.
+    /// Reads the fixed fields, one work unit per byte and one for the length check, and
+    /// returns the configuration. Fails on cancellation, or a record shorter or longer
+    /// than its eight fixed bytes and the `codecInitializationDataSize` they declare.
+    /// Each is final: every later call returns the same error.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

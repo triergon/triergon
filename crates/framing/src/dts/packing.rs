@@ -99,12 +99,8 @@ impl Dts14BitPayload {
     pub const fn residual_value(&self) -> u8 {
         self.residual_value
     }
-    /// The two bits above the payload in source word `word`, counted from zero:
-    /// 0 to 3.
-    ///
-    /// # Errors
-    ///
-    /// `Invalid` when the record has no word `word`.
+    /// The two bits above the payload in source word `word`, counted from zero: 0 to 3.
+    /// Fails with `Invalid` when the record has no word `word`.
     pub fn unused_high_bits(&self, word: usize) -> Result<u8> {
         let at = word.checked_mul(2).ok_or(Error::Overflow)?;
         let end = at.checked_add(2).ok_or(Error::Overflow)?;
@@ -115,12 +111,8 @@ impl Dts14BitPayload {
             .ok_or(Error::Invalid("DTS packed word index"))?;
         u8::try_from(self.order.word([pair[0], pair[1]]) >> 14).map_err(|_| Error::Overflow)
     }
-    /// Where payload bit `bit`, counted from zero in bitstream order, lies in
-    /// the packed source.
-    ///
-    /// # Errors
-    ///
-    /// `Invalid` when `bit` is not below `payload_bits()`.
+    /// Where payload bit `bit`, counted from zero in bitstream order, lies in the
+    /// packed source. Fails with `Invalid` when `bit` is not below `payload_bits()`.
     pub fn payload_bit_source(&self, bit: usize) -> Result<DtsPackedBitLocation> {
         if bit >= self.payload_bits {
             return Err(Error::Invalid("DTS packed payload bit index"));
@@ -204,12 +196,10 @@ impl Dts14BitUnpacker {
     /// `order` that `identity` locates. `source` must be charged to `pool`, and
     /// the output is charged to it.
     ///
-    /// # Errors
-    ///
-    /// `ForeignPool` when `source` is charged to another pool. `Truncated` for
-    /// an odd number of bytes. `Limit` when the record or its output exceeds
+    /// Fails with `ForeignPool` when `source` is charged to another pool; `Truncated`
+    /// for an odd number of bytes; `Limit` when the record or its output exceeds
     /// `limits`, and when the pool's limit cannot hold the record and the output
-    /// together. `Overflow` when the record ends beyond offset `u64::MAX`.
+    /// together; `Overflow` when the record ends beyond offset `u64::MAX`.
     pub fn new(
         pool: &Budget,
         identity: DtsSourceIdentity,
@@ -266,11 +256,9 @@ impl Dts14BitUnpacker {
     /// location of the record's end in its source. `Yield` means the work is
     /// spent. An owned record never requests input.
     ///
-    /// # Errors
-    ///
-    /// `Cancelled` when `cancel` is set. `Backpressure` or `Allocation` when the
-    /// output cannot be allocated: after these two, and only these, `step` may
-    /// be called again.
+    /// Fails with `Cancelled` when `cancel` is set; `Backpressure` or `Allocation` when
+    /// the output cannot be allocated: after these two, and only these, `step` may be
+    /// called again.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

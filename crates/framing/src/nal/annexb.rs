@@ -44,13 +44,9 @@ pub struct AnnexBWriter {
 }
 
 impl AnnexBWriter {
-    /// A writer for `input`, whose bytes are charged to `pool`; the output is
-    /// charged to it too.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::ForeignPool`] when `input` is charged to another pool;
-    /// [`Error::Limit`] when the NAL unit and its start code exceed
+    /// A writer for `input`, whose bytes are charged to `pool`; the output is charged
+    /// to it too. Fails with [`Error::ForeignPool`] when `input` is charged to another
+    /// pool; [`Error::Limit`] when the NAL unit and its start code exceed
     /// `maximum_output_bytes`.
     pub fn new(pool: &Budget, input: NalUnit, maximum_output_bytes: usize) -> Result<Self> {
         if !input.bytes().belongs_to(pool) {
@@ -76,14 +72,11 @@ impl AnnexBWriter {
         })
     }
 
-    /// Charges one unit per output byte copied and one per reserve/freeze
-    /// attempt. A failed freeze retains the completed builder for retry.
-    ///
-    /// # Errors
-    ///
+    /// Charges one unit per output byte copied and one per reserve/freeze attempt. A
+    /// failed freeze retains the completed builder for retry. Fails with
     /// [`Error::Cancelled`] when `cancel` is set. [`Error::Backpressure`] and
-    /// [`Error::Allocation`] are retryable: the writer keeps its progress. Every
-    /// other error is final and returned again by each later call.
+    /// [`Error::Allocation`] are retryable: the writer keeps its progress. Every other
+    /// error is final and returned again by each later call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

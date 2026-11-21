@@ -174,25 +174,19 @@ impl Ac3FrameHeader {
     pub fn coded_samples(self) -> u16 {
         u16::from(self.blocks) * 256
     }
-    /// Coded sample span only. A dependent frame is not additional programme
-    /// time and must not be added to its independent stream's presentation span.
-    ///
-    /// # Errors
-    ///
-    /// When `sample_rate_hz` is zero, which no header from [`probe_header`] has.
+    /// Coded sample span only. A dependent frame is not additional programme time and
+    /// must not be added to its independent stream's presentation span. Fails when
+    /// `sample_rate_hz` is zero, which no header from [`probe_header`] has.
     pub fn sample_span(self) -> Result<Time> {
         Time::new(
             i128::from(self.coded_samples()),
             u128::from(self.sample_rate_hz),
         )
     }
-    /// Exact unreduced (bits * samples/second, samples) rate ratio. At 44.1 kHz
-    /// this need not equal the AC-3 nominal bit-rate code's integral rate.
-    ///
-    /// # Errors
-    ///
-    /// When `blocks` is zero or the first term exceeds `u64`; neither holds for a
-    /// header from [`probe_header`].
+    /// Exact unreduced (bits * samples/second, samples) rate ratio. At 44.1 kHz this
+    /// need not equal the AC-3 nominal bit-rate code's integral rate. Fails when
+    /// `blocks` is zero or the first term exceeds `u64`; neither holds for a header
+    /// from [`probe_header`].
     pub fn bit_rate_ratio(self) -> Result<(u64, u16)> {
         let numerator = u64::try_from(self.frame_bytes)
             .map_err(|_| Error::Overflow)?
@@ -386,13 +380,11 @@ fn prefix_bits_match_a_scalar_read_at_each_alignment() {
 /// not scanned. Truncated means the bounded prefix needs more bytes; unsupported
 /// BSIDs and byte order are not guessed. CRCs/audio payload remain unchecked.
 ///
-/// # Errors
-///
-/// When `prefix` ends before the fields it codes: two bytes show the syncword, six
-/// the frame length, and twelve always suffice. When it does not start with
+/// Fails when `prefix` ends before the fields it codes: two bytes show the syncword,
+/// six the frame length, and twelve always suffice; when it does not start with
 /// `0B 77`; for `bsid` 9, 10 or above 16; for a reserved `fscod`, `frmsizecod` or
-/// `fscod2`; and when the declared frame is too short to hold the fields ahead of
-/// its last sixteen bits.
+/// `fscod2`; and when the declared frame is too short to hold the fields ahead of its
+/// last sixteen bits.
 pub fn probe_header(prefix: &[u8]) -> Result<Ac3FrameHeader> {
     let prefix = &prefix[..prefix.len().min(MAX_PREFIX)];
     probe_with_layout(prefix, layout(prefix)?)
@@ -609,12 +601,8 @@ impl std::fmt::Debug for Ac3FrameReader {
 }
 
 impl Ac3FrameReader {
-    /// A reader at offset zero of `source`. Input windows must be charged to
-    /// `pool`, and so are the frames it returns.
-    ///
-    /// # Errors
-    ///
-    /// When a limit is zero.
+    /// A reader at offset zero of `source`. Input windows must be charged to `pool`,
+    /// and so are the frames it returns. Fails when a limit is zero.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -670,26 +658,17 @@ impl Ac3FrameReader {
     pub fn position(&self) -> u64 {
         self.cursor.position()
     }
-    /// Answers the current request with `window`. An empty window means "none
-    /// yet", never the end of the source.
-    ///
-    /// # Errors
-    ///
-    /// The reader's earlier failure, if it has one. A window that does not answer
-    /// the current request (another token, source, pool or offset, or more bytes
-    /// than the request allows) is refused and leaves the reader as it was.
+    /// Answers the current request with `window`, as
+    /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
+    /// window changes nothing. A failed reader returns its error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
         }
         self.cursor.provide(window)
     }
-    /// [`provide`](Self::provide) for a window the caller gives away. A refused
-    /// window is dropped.
-    ///
-    /// # Errors
-    ///
-    /// As [`provide`](Self::provide).
+    /// [`provide`](Self::provide) for a window the caller gives away; a refused window
+    /// is dropped.
     pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -706,10 +685,8 @@ impl Ac3FrameReader {
     /// `request` is the one [`step`](Self::step) returned at a frame boundary and
     /// `length` the total length of `parts`, in bytes. `Ok(None)` declines.
     ///
-    /// # Errors
-    ///
-    /// The reader's earlier failure; `cancel`, which fails the reader; and a pool
-    /// without room for the frame, which leaves the reader as it was.
+    /// Fails with the reader's earlier failure; `cancel`, which fails the reader; and a
+    /// pool without room for the frame, which leaves the reader as it was.
     pub fn read_frame_parts<'a>(
         &mut self,
         request: &InputRequest,
@@ -799,15 +776,11 @@ impl Ac3FrameReader {
         }))
     }
 
-    /// Answers the current request with the end of the source. Once the bytes
-    /// already provided are read, [`step`](Self::step) returns [`Step::End`] at a
-    /// frame boundary and fails inside a frame.
-    ///
-    /// # Errors
-    ///
-    /// The reader's earlier failure; a token or source other than the current one,
-    /// which leaves the reader as it was; and an end that is not the known length
-    /// of the source, which fails the reader.
+    /// Answers the current request with the end of the source, as
+    /// [`InputCursor::finish`](triergon_core::InputCursor::finish) does: a source that
+    /// ends before its known length fails the reader with [`Error::Truncated`]. Once
+    /// the bytes already provided are read, [`step`](Self::step) returns [`Step::End`]
+    /// at a frame boundary and fails inside a frame.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -818,13 +791,9 @@ impl Ac3FrameReader {
         }
         result
     }
-    /// Answers the current request with a failure. Bytes not yet read are dropped
-    /// and every later call returns the failure's error.
-    ///
-    /// # Errors
-    ///
-    /// The reader's earlier failure, or a token or source other than the current
-    /// one, which leaves the reader as it was.
+    /// Answers the current request with a failure, as
+    /// [`InputCursor::fail`](triergon_core::InputCursor::fail) does: every later call
+    /// returns [`Error::Transport`] or [`Error::Cancelled`], as `failure` says.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -859,14 +828,12 @@ impl Ac3FrameReader {
     /// [`fail`](Self::fail). [`Step::Yield`] means `work` is spent. [`Step::End`]
     /// means the source ended at a frame boundary.
     ///
-    /// # Errors
-    ///
-    /// When the bytes at a frame boundary are not a header [`probe_header`]
+    /// Fails when the bytes at a frame boundary are not a header [`probe_header`]
     /// accepts, the frame's family is not the selected one, a frame is longer than
     /// `maximum_frame_bytes` or passes the known length of the source, the frames
-    /// outnumber `maximum_frames`, the source ends inside a frame, or `cancel` is
-    /// set. Every later call returns the same error. A pool without room for the
-    /// frame leaves the reader where it was: release output and call again.
+    /// outnumber `maximum_frames`, the source ends inside a frame, or `cancel` is set.
+    /// Every later call returns the same error. A pool without room for the frame
+    /// leaves the reader where it was: release output and call again.
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<Ac3Frame>> {
         if let Some(error) = self.failure {
             return Err(error);
