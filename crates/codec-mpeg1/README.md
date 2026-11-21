@@ -101,6 +101,7 @@ Unit tests cover the VLC tables (prefix-free and complete), DC differentials, es
 levels, reconstruction oddification and saturation, half-sample rounding, motion
 search and bounds, the zero-residual shortcut against the complete transform, the
 inverse transform over a block's nonzero coefficients and the forward rows against a
-butterfly transform, and skips reused for a repeated picture against the computed
-path. `tests/encoder.rs` covers configuration, geometry refusal and exact output
+butterfly transform, skips reused for a repeated picture against the computed path,
+and rate plans against the headers already written and pictures cut short by the VBV
+guard. `tests/encoder.rs` covers configuration, geometry refusal and exact output
 after a budget retry. See the [quality gates](../../docs/quality.md).

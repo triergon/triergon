@@ -111,15 +111,20 @@ pub struct EncodedPicture {
 #[derive(Debug)]
 pub struct Encoder {
     cfg: EncoderConfig,
+    /// The reconstruction the next picture predicts from, and the one being coded.
     reference: Planes,
     recon: Planes,
+    /// The picture being coded, sized to the bound of one picture.
     writer: BitWriter,
     /// Writer of the first I picture's trial pass, dropped once it has run.
     probe: Option<BitWriter>,
     quant: Box<Quantizer>,
     rc: RateControl,
+    /// The analysis of every macroblock of the picture being coded.
     analysis: BudgetVec<Decision>,
+    /// Rate-model activity of every macroblock row.
     row_activity: BudgetVec<f64>,
+    /// The previous P picture's vectors, temporal predictors of the search.
     previous_mvs: BudgetVec<Mv>,
     /// Current and reference luma for motion search, one half each.
     coarse_planes: BudgetVec<u8>,
@@ -129,7 +134,7 @@ pub struct Encoder {
     /// tells a repeated picture.
     previous_chroma: BudgetVec<u8>,
     /// Per macroblock, the quantiser at which the previous picture skipped it
-    /// after its residual quantised to zero; 0 where it did not.
+    /// after its residual quantised to zero; 0 (no quantiser) where it did not.
     skipped_at: BudgetVec<u8>,
     /// Macroblocks skipped again from `skipped_at` without coding a residual.
     #[cfg(test)]
