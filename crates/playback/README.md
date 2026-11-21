@@ -147,8 +147,10 @@ declared.
 Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB
 admission, and a subtitle track when a DVB namespace names DVB subtitling or
 teletext; stream type `0x90` (PGS) is a subtitle track. M2TS prefix startup
-(`NativeStartup::new_m2ts_prefix_v2`) needs an 8 KiB input window. The DVB native
-PES parser caps a continued segment at 65,536 bytes.
+(`NativeStartup::new_m2ts_prefix_v2`) needs an 8 KiB input window.
+`PreparedNative::into_program_player` selects up to 64 PIDs from the prepared
+M2TS source and retains its native clock and original carrier offsets through
+physical EOF. The DVB native PES parser caps a continued segment at 65,536 bytes.
 
 **Progressive TS188.** One sequential input with a stable PAT, PMT and clock,
 one AVC track and one ADTS AAC track. AVC starts on a timed IDR with an
