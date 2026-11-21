@@ -229,7 +229,7 @@ Reset, close and continuation outside a seek plan discard the index.
 a contiguous entity plan. A later seek with exactly the same IDs, lengths and
 order can reuse it for the same selected track.
 
-For one clear TS188 entity containing a single supported elementary stream,
+For one clear TS188 or M2TS192 entity containing a single supported elementary stream,
 the index can also retain physical restart checkpoints. The source must have
 one current PAT section, one unchanged PMT and ordinary continuity without
 duplicates, discontinuities or transport, configuration or clock faults.
@@ -240,7 +240,8 @@ complete PAT and PMT carriers immediately before a timestamped PES.
 The independently framed profiles are:
 
 - MPEG-1/2 Layer I or II audio: exactly one complete frame with an indexed
-  bitrate, including its header and payload in one finite PES carrier.
+  bitrate, including its header and payload in one finite PES of at most 32
+  consecutive carriers.
 - AVC: one progressive IDR picture with its referenced SPS and PPS in the same
   aligned, finite PES. Up to eight ordered I slices are admitted, starting at
   macroblock zero and identifying the same picture.
@@ -253,7 +254,7 @@ access unit's original bytes. Parameter-set and slice headers establish the
 local setup chain and independence; framing does not validate decoded pixels.
 
 The first scan validates the whole entity. Each checkpoint binds the original
-source ID and length, all complete PAT/PMT/PES carrier records, independently
+source ID and length, all complete PAT/PMT/PES carrier records (including opaque M2TS prefix bytes), independently
 parsed PES header and payload ranges, the original active tables, the elementary
 byte coordinate and the preceding access-unit and NAL counts. At most
 `maximum_entries` checkpoints are allocated under the shared budget. Later
@@ -263,15 +264,18 @@ the landing, reconstructs transport state from those in-band tables, and
 restores the original elementary/PES coordinates, source clocks, table
 provenance and output limits. The caller resets its decoder at the independent
 access unit; the resumed bytes carry its configuration. Changed checkpoint
-bytes are a source mismatch. Video framing can read into the following PES to
-establish the final NAL boundary.
+bytes are a source mismatch. Repository-generated M2TS192 Layer I and II
+controls compare forward and backward repeated seeks with reference scan/replay
+through EOF; reader tests prohibit prefix reads and compare original PES ranges
+and complete packet facts for those same inputs. Video framing can read into
+the following PES to establish the final NAL boundary.
 This bootstrap follows H.222.0 §§2.4.3.3, 2.4.3.6–7 and 2.4.4, H.264
 §§7.3.2.1–2, 7.3.3 and 7.4.1.2.4, and H.265 §§7.3.2.1–3, 7.3.6.1 and 7.4.2.4.4.
 
 Other landings replay the entity prefix to reconstruct transport and decoder
 framing state. This includes offsets without a local table/PES proof,
-multi-carrier audio PES, free-format or Layer III audio, video needing prior
-setup or carrying SEI or other IRAP types, M2TS and contiguous entity plans.
+audio PES spanning more than 32 carriers, free-format or Layer III audio, video needing prior
+setup or carrying SEI or other IRAP types, and contiguous entity plans.
 Checkpoint storage refusal preserves replay; pressure during a direct restart
 drops the optional index and restarts replay. Sources must remain stable between
 requests: the bounded byte comparison does not revalidate an unread prefix or

@@ -728,7 +728,7 @@ fn physical_audio_seek_cases(
     cases: &mut Vec<Value>,
 ) -> R<()> {
     let pid = PID.to_string();
-    for (name, header, length, step, first, repeated) in [
+    for (name, header, length, step, first, repeated, m2ts) in [
         (
             "mpeg1-layer1-physical-repeated-preroll",
             [0xff, 0xff, 0x14, 0xc0],
@@ -736,6 +736,7 @@ fn physical_audio_seek_cases(
             720,
             7,
             1,
+            false,
         ),
         (
             "mpeg1-layer2-physical-repeated-preroll",
@@ -744,6 +745,25 @@ fn physical_audio_seek_cases(
             2160,
             1,
             7,
+            false,
+        ),
+        (
+            "mpeg1-layer1-m2ts-multi-carrier-repeated-preroll",
+            [0xff, 0xff, 0x94, 0xc0],
+            288,
+            720,
+            7,
+            1,
+            true,
+        ),
+        (
+            "mpeg1-layer2-m2ts-multi-carrier-repeated-preroll",
+            [0xff, 0xfd, 0xe4, 0xc0],
+            1152,
+            2160,
+            1,
+            7,
+            true,
         ),
     ] {
         let codec = Codec {
@@ -763,7 +783,7 @@ fn physical_audio_seek_cases(
         }
         for index in 0..10 {
             // Identical CRC-checked sections bootstrap the program at every
-            // checkpoint. The complete timestamped PES fits in one carrier.
+            // checkpoint, including when the complete PES spans carriers.
             ts.tables(&codec, &[])?;
             let pts = 90_000 + index * step;
             ts.pes(
@@ -773,8 +793,8 @@ fn physical_audio_seek_cases(
         }
         let input = Input {
             name,
-            m2ts: false,
-            data: ts.finish(false),
+            m2ts,
+            data: ts.finish(m2ts),
         };
         let first = (90_001 + first * step).to_string();
         let repeated = (90_001 + repeated * step).to_string();

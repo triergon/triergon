@@ -422,14 +422,15 @@ mod tests {
 
     #[test]
     fn repeated_audio_fixtures_read_only_the_physical_suffix() {
-        for (name, header, length, step, first, repeated) in [
+        for (name, header, length, step, first, repeated, width) in [
             (
                 "mpeg1-layer1-physical-repeated-preroll",
                 [0xff, 0xff, 0x14, 0xc0],
-                32,
+                32_usize,
                 720,
                 7,
                 1,
+                188,
             ),
             (
                 "mpeg1-layer2-physical-repeated-preroll",
@@ -438,13 +439,33 @@ mod tests {
                 2160,
                 1,
                 7,
+                188,
+            ),
+            (
+                "mpeg1-layer1-m2ts-multi-carrier-repeated-preroll",
+                [0xff, 0xff, 0x94, 0xc0],
+                288,
+                720,
+                7,
+                1,
+                192,
+            ),
+            (
+                "mpeg1-layer2-m2ts-multi-carrier-repeated-preroll",
+                [0xff, 0xfd, 0xe4, 0xc0],
+                1152,
+                2160,
+                1,
+                7,
+                192,
             ),
         ] {
             let pool = Budget::new(2 << 20).unwrap();
+            let extension = if width == 188 { "ts" } else { "m2ts" };
             let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-                "../../harness/features/mpegts-previous-audio/inputs/{name}.ts"
+                "../../harness/features/mpegts-previous-audio/inputs/{name}.{extension}"
             ));
-            let input = ts_input::parse(&pool, &path, &["188".into(), "7".into()]).unwrap();
+            let input = ts_input::parse(&pool, &path, &[width.to_string(), "7".into()]).unwrap();
             let mut caps = ts_input::capabilities(&input.input);
             caps.random_access = true;
             let track = TrackId(256);
@@ -480,7 +501,8 @@ mod tests {
             .unwrap();
 
             request.target = Time::new(90_001 + repeated * step, 90_000).unwrap();
-            let floor = (17 + 3 * repeated as u64) * 188;
+            let carriers = (length + 14).div_ceil(184);
+            let floor = (17 + (2 + carriers as u64) * repeated as u64) * width;
             let start = reader.request_seek(request).unwrap();
             assert_eq!(start.offset, floor, "{name}: physical PAT offset");
             let mut next = floor;
