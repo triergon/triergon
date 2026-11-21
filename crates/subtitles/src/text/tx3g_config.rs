@@ -456,7 +456,8 @@ impl ConfigJob {
                     self.paid = false;
                     self.phase = Phase::FontHeader;
                 }
-                Phase::Ready | Phase::Taken => unreachable!(),
+                // The loop's head returns in these phases.
+                Phase::Ready | Phase::Taken => continue,
             }
         }
     }

@@ -202,7 +202,8 @@ impl<'a> PointQuery<'a> {
                     self.result = Some(result);
                     self.phase = Phase::Ready;
                 }
-                Phase::Ready => unreachable!(),
+                // The loop's head returns in these phases.
+                Phase::Ready => continue,
             }
         }
     }

@@ -668,7 +668,8 @@ impl SemanticJob {
                     self.phase = Phase::Runs;
                     self.paid = false;
                 }
-                Phase::Ready | Phase::Taken => unreachable!(),
+                // The loop's head returns in these phases.
+                Phase::Ready | Phase::Taken => continue,
             }
         }
     }
