@@ -793,7 +793,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 20] = [
+const PROFILE_REFERENCES: [ProfileReference; 21] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -860,6 +860,17 @@ const PROFILE_REFERENCES: [ProfileReference; 20] = [
         record: "ffmpeg-transport-dts",
         kind: "FFmpeg MPEG-TS and DTS core access units",
         libraries: "transport_dts_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-transport-mpeg-video",
+        binary: "ffmpeg-transport-mpeg-video-worker",
+        source: "harness/reference_ts_worker.c",
+        record: "ffmpeg-transport-mpeg-video",
+        kind: "FFmpeg MPEG-TS and ordinary MPEG-1/2 video access units",
+        libraries: "transport_mpeg_video_reference",
         packages: CONTAINER_PACKAGES,
         options: CONTAINER_OPTIONS,
         ..REFERENCE

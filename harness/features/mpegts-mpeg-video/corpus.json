@@ -1,0 +1,134 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "mpeg1-ts188-25",
+      "profile": "mpeg1-ts188-25",
+      "file": "harness/features/mpegts-mpeg-video/inputs/mpeg1-ts188-25.ts",
+      "sha256": "7b29430b2b8e975219adbb41101f40c9fbbce844329d071d5feeb81406c301cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66,
+        "digest": 17060920420702619620
+      }
+    },
+    {
+      "id": "mpeg1-ts188-30000-1001",
+      "profile": "mpeg1-ts188-30000-1001",
+      "file": "harness/features/mpegts-mpeg-video/inputs/mpeg1-ts188-30000-1001.ts",
+      "sha256": "8e76429ade382e0a6fa42b7b4db3b86bc89f8f025e3a64fe20ee63ae00e73af4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66,
+        "digest": 11985472278437224004
+      }
+    },
+    {
+      "id": "mpeg1-m2ts192-25",
+      "profile": "mpeg1-m2ts192-25",
+      "file": "harness/features/mpegts-mpeg-video/inputs/mpeg1-m2ts192-25.m2ts",
+      "sha256": "cea7328723571176b8874fc8ee1957722effb300165195a13c599280dbac7a8d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66,
+        "digest": 13384953836140247008
+      }
+    },
+    {
+      "id": "mpeg1-m2ts192-30000-1001",
+      "profile": "mpeg1-m2ts192-30000-1001",
+      "file": "harness/features/mpegts-mpeg-video/inputs/mpeg1-m2ts192-30000-1001.m2ts",
+      "sha256": "33066b638729e13612425805744bafb624c406d4b6b272ca59e22507bee7c3fa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66,
+        "digest": 8309505693874851392
+      }
+    },
+    {
+      "id": "mpeg2-ts188-25",
+      "profile": "mpeg2-ts188-25",
+      "file": "harness/features/mpegts-mpeg-video/inputs/mpeg2-ts188-25.ts",
+      "sha256": "db7cf6302350d1dfc3ad9aeb185653392f5b9afb77f00bc8bf82f033c5dff60a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 104,
+        "digest": 2257906817321117378
+      }
+    },
+    {
+      "id": "mpeg2-ts188-30000-1001",
+      "profile": "mpeg2-ts188-30000-1001",
+      "file": "harness/features/mpegts-mpeg-video/inputs/mpeg2-ts188-30000-1001.ts",
+      "sha256": "0428067c2111504400fb1bb0b2d4c1eb8a6ff6999b84c73470b89d7db51a4a11",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 104,
+        "digest": 3318320364372513476
+      }
+    },
+    {
+      "id": "mpeg2-m2ts192-25",
+      "profile": "mpeg2-m2ts192-25",
+      "file": "harness/features/mpegts-mpeg-video/inputs/mpeg2-m2ts192-25.m2ts",
+      "sha256": "01ea48d699fb3a02791d523278e71543733b5a69473bd47bfa1a5741a12d1089",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 104,
+        "digest": 659162631804791774
+      }
+    },
+    {
+      "id": "mpeg2-m2ts192-30000-1001",
+      "profile": "mpeg2-m2ts192-30000-1001",
+      "file": "harness/features/mpegts-mpeg-video/inputs/mpeg2-m2ts192-30000-1001.m2ts",
+      "sha256": "2b261cbf215599850fa09bd0311beeb3e79c3252fa02e82b0462268d8b83e62a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 104,
+        "digest": 1719576178856187872
+      }
+    }
+  ]
+}

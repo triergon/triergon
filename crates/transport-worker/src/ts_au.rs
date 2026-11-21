@@ -222,6 +222,7 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
                 u64::from(unit.random_access),
                 PositionSource::AlignedPayload,
             ),
+            AccessUnit::MpegVideo(_) => (1, PositionSource::AlignedPayload),
             AccessUnit::Loas(_) => (0, PositionSource::AlignedPayload),
             // DVB subtitle bytes start after the two-byte PES wrapper.
             AccessUnit::DvbSubtitle(_) => (1, PositionSource::FirstPes),
@@ -517,6 +518,10 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     (previous, duration)
                 } else {
                     let duration = match packet.access_unit() {
+                        // The parser-enabled NOFILLIN reference leaves MPEG video
+                        // packet duration absent without stream discovery. The source
+                        // picture retains its sequence-derived exact duration.
+                        AccessUnit::MpegVideo(_) => 0,
                         AccessUnit::MpegAudio(frame) => {
                             let first = !std::mem::replace(&mut track.mpeg_audio_seen, true);
                             // The reference reports no initial Layer I/II duration

@@ -21,6 +21,8 @@ mod entities;
 mod latm;
 #[path = "container_reader/mpeg_audio.rs"]
 mod mpeg_audio;
+#[path = "container_reader/mpeg_video.rs"]
+mod mpeg_video;
 #[path = "container_reader/opaque_video.rs"]
 mod opaque_video;
 #[path = "container_reader/physical_seek.rs"]

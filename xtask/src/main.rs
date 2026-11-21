@@ -81,7 +81,7 @@ commands:
   subtitle-fixtures record|verify FEATURE REFERENCE [options]   record or verify subtitle folds
   prepare-ffmpeg [--jobs N] [--profile PROFILE]
                  build a pinned FFmpeg reference into .research/reference[-PROFILE]:
-                 matroska (default), formats, video, subtitles, transport-dts (git revision on the 9.0 branch);
+                 matroska (default), formats, video, subtitles, transport-dts, transport-mpeg-video (git revision on the 9.0 branch);
                  decode, capture, capture-small (the 9.0.2 release)
   prepare-mpg123 [--jobs N]   build the pinned static free-format MPEG audio reference
   references     keys|pack|fetch|upload   the keys of the pinned reference builds, and
@@ -862,6 +862,7 @@ families and options:
   transport-dts-hd-grouped [--record REFERENCE]   generate DTS-HD source AU controls
   transport-dts-seek --record REFERENCE   regenerate DTS core seek inputs and pins
   transport-audio-seek --record REFERENCE   regenerate additional MPEG-TS audio seek inputs and pins
+  transport-mpeg-video --record REFERENCE [--reference-library PATH]   generate MPEG video picture inputs and observations
   transport-matched --record SEEK_REFERENCE AUDIO_REFERENCE
            regenerate MPEG-TS seek and free-format audio controls and pins
   zlib     [--kind stored|fixed|dynamic] [--scope N] [--lace 0-3] [--aac] [--mixed] [--empty]
@@ -894,6 +895,9 @@ fn fixture(root: &Path, args: &[String]) -> Task {
     }
     if family == "transport-audio-seek" {
         return transport_fixtures::matched::author_audio_seek(root, &args[1..]);
+    }
+    if family == "transport-mpeg-video" {
+        return transport_fixtures::matched::author_mpeg_video(root, &args[1..]);
     }
     if family == "transport-matched" {
         return transport_fixtures::matched::author(root, &args[1..]);
@@ -1036,6 +1040,7 @@ fn prepare_check(part: Option<Part>) -> Task {
             &["prepare-ffmpeg"],
             &["prepare-ffmpeg", "--profile", "formats"],
             &["prepare-ffmpeg", "--profile", "transport-dts"],
+            &["prepare-ffmpeg", "--profile", "transport-mpeg-video"],
             &["prepare-mpg123"],
             &["prepare-ffmpeg", "--profile", "video"],
             &["fixtures"],

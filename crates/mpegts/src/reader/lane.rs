@@ -4,6 +4,7 @@ mod dvb;
 mod eac3;
 mod loas;
 mod mpeg_audio;
+mod mpeg_video;
 mod unframed_audio;
 
 use super::model::{ClockContext, PacketData, PayloadSources, Shared, UnframedData};
@@ -39,6 +40,7 @@ use triergon_framing::{
 #[allow(clippy::large_enum_variant)]
 enum Framer {
     Video(RawAnnexBReader),
+    MpegVideo(mpeg_video::Reader),
     Adts(AacAdtsStreamReader),
     AdtsFragments(AacAdtsCarrierReader),
     Loas(aligned_audio::Reader<3, ()>),
@@ -66,7 +68,7 @@ impl Framer {
             Self::Ac3(reader) => reader.input_wait_buffer_capacity(),
             Self::Eac3(reader) => reader.input_wait_storage()?,
             // Direct PES carriages do not keep a pending unit between inputs.
-            Self::LatmPes | Self::Dvb(_) => 0,
+            Self::LatmPes | Self::Dvb(_) | Self::MpegVideo(_) => 0,
         })
     }
 
@@ -105,6 +107,7 @@ impl Framer {
         let stream = track.stream();
         let namespace = stream.descriptor_namespace();
         match stream.stream_type {
+            1 | 2 => Ok(Self::MpegVideo(mpeg_video::Reader::default())),
             kind @ (0x1b | 0x24) => Ok(Self::Video(RawAnnexBReader::new(
                 pool,
                 if kind == 0x1b {
@@ -290,7 +293,9 @@ impl Framer {
                 AccessUnit::Ac3(Ac3AccessUnit::single(frame))
             }),
             Self::Eac3(reader) => map(reader.step(work, cancel)?, AccessUnit::Ac3),
-            Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
+            Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
+                unreachable!("this route uses validated PES input")
+            }
         })
     }
     fn provide(&mut self, window: InputWindow) -> Result<()> {
@@ -305,7 +310,9 @@ impl Framer {
             Self::AdtsFragments(reader) => reader.provide_owned(window),
             Self::Ac3(reader) => reader.provide_owned(window),
             Self::Eac3(reader) => reader.provide(window),
-            Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
+            Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
+                unreachable!("this route uses validated PES input")
+            }
         }
     }
     fn finish(&mut self, request: InputRequest) -> Result<()> {
@@ -320,7 +327,9 @@ impl Framer {
             Self::AdtsFragments(reader) => reader.finish(request.source, request.token),
             Self::Ac3(reader) => reader.finish(request.source, request.token),
             Self::Eac3(reader) => reader.finish(request),
-            Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
+            Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
+                unreachable!("this route uses validated PES input")
+            }
         }
     }
 }
@@ -1433,6 +1442,25 @@ impl Lane {
                 }
                 return Ok(LaneStep::End);
             };
+            if let Framer::MpegVideo(reader) = framer {
+                if self.input.is_some() {
+                    let Some(unit) =
+                        reader.step(&self.pieces, self.track.stream().stream_type, work, cancel)?
+                    else {
+                        return Ok(LaneStep::Yield);
+                    };
+                    let end = unit.range.end;
+                    self.start_build(AccessUnit::MpegVideo(unit))?;
+                    self.supplied = end;
+                    self.input = None;
+                    continue;
+                }
+                return Ok(if draining {
+                    LaneStep::End
+                } else {
+                    LaneStep::NeedPayload
+                });
+            }
             if let Framer::Dvb(reader) = framer {
                 if self.input.is_some() {
                     let Some(unit) = reader.step(&self.pieces, work, cancel)? else {
