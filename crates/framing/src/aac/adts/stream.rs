@@ -56,8 +56,9 @@ enum Phase {
 pub struct AacAdtsStreamReader {
     capabilities: SourceCapabilities,
     input: ReaderInput,
-    /// The frame being built; each freeze leaves an empty vector.
-    buffer: BudgetVec<u8>,
+    /// The frame being built, taken at each freeze: replacing a vector there instead
+    /// costs more instructions per frame.
+    buffer: Option<BudgetVec<u8>>,
     header: Option<AacAdtsHeader>,
     selected_error: Option<Error>,
     pool: Budget,
@@ -147,7 +148,7 @@ impl AacAdtsStreamReader {
             frame_start: 0,
             frame_bytes: 0,
             header: None,
-            buffer: BudgetVec::new(pool),
+            buffer: None,
             growth_target: 0,
             growth_copy_credit: 0,
             completed: 0,
@@ -161,7 +162,7 @@ impl AacAdtsStreamReader {
     /// Capacity of the mutable frame buffer, excluding buffered source bytes.
     #[doc(hidden)]
     pub fn input_wait_buffer_capacity(&self) -> usize {
-        self.buffer.capacity()
+        self.buffer.as_ref().map_or(0, BudgetVec::capacity)
     }
 
     /// The request for the bytes the reader needs next, at
@@ -269,7 +270,7 @@ impl AacAdtsStreamReader {
         self.frame_start = offset;
         self.frame_bytes = 0;
         self.header = None;
-        self.buffer = BudgetVec::new(&self.pool);
+        self.buffer = None;
         self.growth_target = 0;
         self.growth_copy_credit = 0;
         self.completed = 0;
@@ -289,7 +290,7 @@ impl AacAdtsStreamReader {
             self.capabilities = c.capabilities();
         }
         self.input.fail_with(error);
-        self.buffer = BudgetVec::new(&self.pool);
+        self.buffer = None;
         self.header = None;
     }
     /// Reads for as long as `work` lasts.
@@ -395,7 +396,7 @@ impl AacAdtsStreamReader {
                 .map_or(0, Bytes::retained_storage_bytes),
             ReaderInput::Failed { .. } => 0,
         };
-        let capacity = self.buffer.capacity();
+        let capacity = self.buffer.as_ref().map_or(0, BudgetVec::capacity);
         Budget::control_storage_bytes()
             .checked_add(source)
             .and_then(|n| n.checked_add(capacity))

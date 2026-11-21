@@ -5,10 +5,9 @@ use super::{AacAdtsStreamReader, Phase, StreamOutput};
 use crate::aac::AacSource;
 use crate::aac::adts::carrier::{AacAdtsCarrier, AacAdtsCarrierBoundary};
 use crate::aac::adts::{AacAdtsFrame, inspect_adts_header, validate_selected_header};
-use crate::freeze_whole;
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Bytes, Error, Result, SourceLocation, Step, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
 
 /// Outcome of one phase step.
 type Flow = ControlFlow<Step<StreamOutput>>;
@@ -194,7 +193,7 @@ impl AacAdtsStreamReader {
             });
         }
         self.check_minimum(self.used)?;
-        self.buffer.try_reserve_exact(self.used)?;
+        frame(&mut self.buffer, &self.pool).try_reserve_exact(self.used)?;
         self.phase = Phase::CopyHeader;
         Ok(NEXT)
     }
@@ -212,7 +211,7 @@ impl AacAdtsStreamReader {
         if n == 0 {
             return Ok(YIELD);
         }
-        self.buffer
+        frame(&mut self.buffer, &self.pool)
             .try_extend_from_slice(&self.prefix[self.copied..self.copied + n])?;
         self.copied += n;
         Ok(NEXT)
@@ -220,7 +219,7 @@ impl AacAdtsStreamReader {
 
     #[inline]
     fn read_body(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Flow> {
-        let b = &self.buffer;
+        let b = frame(&mut self.buffer, &self.pool);
         let remaining = self
             .frame_bytes
             .checked_sub(b.len())
@@ -257,7 +256,7 @@ impl AacAdtsStreamReader {
             return Ok(NEXT);
         }
         let cursor = self.input.cursor()?;
-        let buffer = &mut self.buffer;
+        let buffer = frame(&mut self.buffer, &self.pool);
         let maximum = if scanning {
             1
         } else {
@@ -299,7 +298,10 @@ impl AacAdtsStreamReader {
         }
         let h = inspect_adts_header(&self.prefix)?;
         if self.plausible_envelope(h) {
-            let start = self.buffer.len().checked_sub(7).ok_or(Error::Overflow)?;
+            let start = frame(&mut self.buffer, &self.pool)
+                .len()
+                .checked_sub(7)
+                .ok_or(Error::Overflow)?;
             let end = start
                 .checked_add(usize::from(h.frame_length()))
                 .ok_or(Error::Overflow)?;
@@ -327,7 +329,17 @@ impl AacAdtsStreamReader {
             return Ok(YIELD);
         }
         self.check_minimum(Bytes::owner_overhead_bytes())?;
-        let raw = freeze_whole(&mut self.buffer)?;
+        let b = self
+            .buffer
+            .take()
+            .unwrap_or_else(|| BudgetVec::new(&self.pool));
+        let raw = match b.freeze() {
+            Ok(b) => b,
+            Err(e) => {
+                self.buffer = Some(e.value);
+                return Err(e.error);
+            }
+        };
         let prefix = raw.slice(0..self.header_offset)?;
         let cursor = self.input.cursor()?;
         let source = AacSource {
@@ -382,7 +394,7 @@ impl AacAdtsStreamReader {
             return Ok(YIELD);
         }
         self.check_minimum(self.growth_target)?;
-        let b = &mut self.buffer;
+        let b = frame(&mut self.buffer, &self.pool);
         b.try_reserve_exact(
             self.growth_target
                 .checked_sub(b.len())
@@ -411,10 +423,20 @@ impl AacAdtsStreamReader {
             generation: cursor.generation(),
             offset: self.frame_start,
         };
-        if self.buffer.len() != self.frame_bytes {
+        let b = self
+            .buffer
+            .take()
+            .unwrap_or_else(|| BudgetVec::new(&self.pool));
+        if b.len() != self.frame_bytes {
             return Err(Error::Invalid("ADTS complete output extent"));
         }
-        let raw = freeze_whole(&mut self.buffer)?;
+        let raw = match b.freeze() {
+            Ok(b) => b,
+            Err(e) => {
+                self.buffer = Some(e.value);
+                return Err(e.error);
+            }
+        };
         if self.carrier {
             let boundary = if self.eof_fragment {
                 AacAdtsCarrierBoundary::ExplicitEofFragment
@@ -454,4 +476,10 @@ impl AacAdtsStreamReader {
             offset: self.position(),
         })))
     }
+}
+
+/// The frame being built; the first use after a freeze starts an empty one.
+#[inline(always)]
+fn frame<'a>(buffer: &'a mut Option<BudgetVec<u8>>, pool: &Budget) -> &'a mut BudgetVec<u8> {
+    buffer.get_or_insert_with(|| BudgetVec::new(pool))
 }
