@@ -42,6 +42,7 @@ mod shape;
 mod stats;
 mod status;
 mod subtitle_fixtures;
+mod test_skips;
 mod toml;
 mod transport_fixtures;
 mod walk;
@@ -995,6 +996,18 @@ fn with_target<'a>(args: &[&'a str], target: &'a [String]) -> Vec<&'a str> {
 
 /// Run with the pinned FFmpeg reference first on `PATH`, as the harness expects.
 fn run(command: &mut Command) -> Task {
+    let shown = shown_on_reference_path(command)?;
+    let status = command.status().map_err(|e| format!("{shown}: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("{shown}: {status}"))
+    }
+}
+
+/// Puts the pinned FFmpeg reference first on `command`'s `PATH`, and prints and
+/// returns the command line.
+fn shown_on_reference_path(command: &mut Command) -> Result<String, String> {
     let reference = root().join(".research/reference/install/bin");
     let path = std::env::var_os("PATH").unwrap_or_default();
     let path = std::env::join_paths(std::iter::once(reference).chain(std::env::split_paths(&path)))
@@ -1006,11 +1019,36 @@ fn run(command: &mut Command) -> Task {
         .collect::<Vec<_>>()
         .join(" ");
     println!("$ {shown}");
-    let status = command.status().map_err(|e| format!("{shown}: {e}"))?;
-    if status.success() {
+    Ok(shown)
+}
+
+/// The workspace tests for the worker target, as [`run`] runs them, then how many
+/// checks they left out for inputs this checkout lacks ([`test_skips`]).
+fn workspace_tests(root: &Path) -> Task {
+    let target = harness::gate_build::target_args()?;
+    let args: Vec<String> = with_target(&["test", "--workspace", "--locked"], &target)
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    let cargo = || {
+        let mut command = Command::new("cargo");
+        command.env("CARGO_INCREMENTAL", "0").current_dir(root);
+        command
+    };
+    let mut command = cargo();
+    command.args(&args);
+    let shown = shown_on_reference_path(&mut command)?;
+    let (code, skips) = test_skips::run(&mut command)?;
+    let sources = if skips.is_empty() {
+        std::collections::BTreeMap::default()
+    } else {
+        test_skips::sources(root, &mut cargo(), &args)?
+    };
+    println!("{}", test_skips::summary(&skips, &sources));
+    if code == 0 {
         Ok(())
     } else {
-        Err(format!("{shown}: {status}"))
+        Err(format!("{shown}: exit status {code}"))
     }
 }
 
@@ -1369,9 +1407,7 @@ type Step = fn(&Path) -> Task;
 /// Every step of `check`, in order, with the part it belongs to.
 const CHECK: &[(Part, Step)] = &[
     (Part::Lint, fmt),
-    (Part::Test, |root| {
-        cargo_for_workers(root, None, &["test", "--workspace", "--locked"])
-    }),
+    (Part::Test, workspace_tests),
     (Part::Variants, |root| {
         for package in REFERENCE_TRACE_CRATES {
             cargo_for_workers(

@@ -5,7 +5,7 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::json::Value;
-use crate::sha256;
+use crate::{sha256, test_skips};
 
 use super::{R, git, owned, status};
 
@@ -19,7 +19,9 @@ const TEST_INPUTS: [&str; 3] = [
 /// Runs the workspace tests in one profile, or takes the result of a kept set
 /// for the same key: every tracked file as the working tree holds it, untracked
 /// files that are not ignored, the test inputs of [`TEST_INPUTS`], and what every
-/// gate key holds (the measuring code, toolchains, target and host class).
+/// gate key holds (the measuring code, toolchains, target and host class). A gate
+/// host holds the test inputs, so a check a suite reports it left out for an absent
+/// input fails the step ([`test_skips::gate_failures`]).
 ///
 /// Release tests build in [`RELEASE_TESTS_TARGET_DIR`]: in the gate build's own
 /// directory, their feature set would rebuild its workers, and steps measured after
@@ -51,16 +53,30 @@ pub(super) fn test(root: &Path, output: &Path, profile: &str, full: bool) -> R<i
         ("inputs", Value::Object(inputs)),
     ]);
     let key = crate::harness::reuse::Key::new(root, "gate test", settings, &[], &[])?;
-    let cargo = |args: &[String]| {
-        status(
-            Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
-                .args(args)
-                .env("CARGO_INCREMENTAL", "0")
-                .current_dir(root),
-        )
+    let cargo = || {
+        let mut cargo = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
+        cargo.env("CARGO_INCREMENTAL", "0").current_dir(root);
+        cargo
     };
-    let reused = crate::harness::reuse::step(root, output, &key, full, || cargo(&command))?;
-    let read = cargo(&index)?;
+    let reused = crate::harness::reuse::step(root, output, &key, full, || {
+        let (code, skips) = test_skips::run(cargo().args(&command))?;
+        if skips.is_empty() {
+            return Ok(code);
+        }
+        let build: Vec<String> = command.iter().take_while(|a| *a != "--").cloned().collect();
+        let sources = test_skips::sources(root, &mut cargo(), &build)?;
+        println!("{}", test_skips::summary(&skips, &sources));
+        let failures = test_skips::gate_failures(&skips, &sources);
+        for failure in &failures {
+            println!("{failure}");
+        }
+        Ok(if failures.is_empty() {
+            code
+        } else {
+            code.max(1)
+        })
+    })?;
+    let read = status(cargo().args(&index))?;
     Ok(if reused != 0 { reused } else { read })
 }
 

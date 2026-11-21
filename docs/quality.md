@@ -1139,7 +1139,14 @@ file as the working tree holds it and the untracked files git does not ignore, b
 evidence index (which a promotion changes) and `docs/`, and the test inputs the crate
 tests read when present (`.research/fate-samples`, `.research/flac-generated`,
 `.research/flac-test-files`). The few tests that read the evidence index skip the reused
-run and run on every `gate test`, so a failing index is never reused as a pass. The gate
+run and run on every `gate test`, so a failing index is never reused as a pass. A vector
+suite whose inputs are absent passes and writes one `skipped: ...` line to its own
+standard error for each check it left out; `gate test` fails on such a line from a suite
+whose inputs a gate image holds (the AC-3, H.264 and HEVC vector and conformance
+suites), naming the suite and the input, and lists the others, whose inputs no gate image
+holds (the AAC, DTS and FLAC vector suites). `cargo xtask check-design` checks that
+division against the evidence sets gate images are built with, and the test part of
+`cargo xtask check` prints how many checks its run left out, by suite. The gate
 runs each profile once. The release tests build in `target/gate-tests`, so they never
 rebuild the gate build's workers that later steps on the same host time. The `checked` profile
 is the release optimisation with every overflow check and every `debug_assert!` and

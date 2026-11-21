@@ -111,6 +111,7 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
         document(crate::exceptions::NOT_COMPARED),
     ));
     errors.extend(crate::status::check(root, &data));
+    errors.extend(crate::test_skips::design_errors(&data));
     // Generated manifests: the case ids and the pins match, in the recorded form.
     for generator in crate::generators::GENERATORS {
         errors.extend(generator.check(root));
