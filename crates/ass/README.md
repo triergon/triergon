@@ -10,11 +10,12 @@ images libass's `ass_render_frame` gives. It depends on
 [`triergon-font`](../font) for faces, [`triergon-shape`](../shape) for bidi and
 OpenType shaping and [`triergon-raster`](../raster) for outlines and bitmaps.
 
-libass's results are the crate root's contract, as FreeType's are
-`triergon-font`'s. What libass decides about faces, shaping and drawing on
-top of those crates' roots the renderer takes from their `compat::libass`
-modules; `compat::libass` here gives the settings a player hands libass
-(`cache_limits`, as `ass_set_cache_limits` sets them).
+libass's results are the crate root's contract, its departures from VSFilter
+included, as FreeType's are `triergon-font`'s. What libass decides about
+faces, shaping and drawing on top of those crates' roots the renderer takes
+from their `compat::libass` modules; `compat::libass` here holds the choices
+libass makes among the renderer's settings (`cache_limits`, as
+`ass_set_cache_limits` sets them).
 
 ## Usage
 

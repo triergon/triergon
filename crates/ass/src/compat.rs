@@ -1,8 +1,9 @@
 //! Reference-compatible policies.
 //!
-//! The crate root reads and renders scripts as libass does; what it leaves to
-//! its caller is how a renderer is configured. Where a consumer wants the
-//! settings a player gives one renderer, the modules here give them. Each
-//! module is one renderer; its documentation names the version it reproduces.
+//! The crate root reads and renders scripts with libass's results, its
+//! departures from VSFilter included; what it leaves to its caller is the
+//! renderer's settings. Where a consumer needs the choices one renderer
+//! makes, the modules here reproduce them. Each module is one renderer; its
+//! documentation names the version it reproduces.
 
 pub mod libass;

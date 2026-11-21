@@ -85,7 +85,9 @@ through a handle of its own (`GlyphSource::Bitmap`; `Run::render` uses
 `Arc<Bitmap>`), which the run and `Composite::new` hold them by. A bitmap is
 keyed by its shape and its `BitmapTransform`, a stroked border by its glyph
 and its `BorderStroke`, and a composite by `Effects::key` and its glyphs'
-bitmaps and places, as libass keys them.
+bitmaps and places, as libass keys them: the places count from
+`Composite::origin_of` the run's glyphs (`Vector::offset_from`), which is the
+origin its composite will have.
 
 ## What it matches
 
@@ -113,7 +115,8 @@ matches libass point for point and segment for segment.
 
 The arithmetic is libass's own: 26.6 integer subdivision with its rounding, the
 16-bit wrapping of the tile and blur engines, rounding half to even, and the C
-`a > b ? a : b` treatment of NaN. Floating-point expressions keep libass's
+`a > b ? a : b` treatment of NaN (`fp::max` and `fp::min`, public for a
+renderer that computes with the same macros). Floating-point expressions keep libass's
 order and grouping, and the reference is built without floating-point
 contraction (`-ffp-contract=off`), so neither side fuses multiply-adds:
 additions, multiplications, divisions and square roots, which IEEE 754 rounds

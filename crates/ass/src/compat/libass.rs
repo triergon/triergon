@@ -1,5 +1,5 @@
-//! The renderer settings a player gives libass through its setters, as
-//! [`Settings`](crate::Settings) holds them: the cache limits
+//! Renderer settings as libass's setters choose them, in the form
+//! [`Settings`](crate::Settings) holds: the cache limits
 //! `ass_set_cache_limits` sets ([`cache_limits`]).
 //!
 //! Reference: libass 0.17.5.
