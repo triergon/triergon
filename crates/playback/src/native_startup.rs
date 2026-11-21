@@ -4,6 +4,7 @@
 use crate::input::{Source, SourceReply};
 use crate::{
     Engine, Format, Player, PlayerPolicy, Result, Selection, TsNativeSelection,
+    TsNativeTrackSelection,
     io::{SelectedInput, SourceOwner},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -330,6 +331,31 @@ impl PrefixRead {
 impl<S: Source> PreparedNative<S> {
     pub fn context(&self) -> &InputContext {
         &self.context
+    }
+    /// Select several PIDs from the prepared source as one program.
+    /// All selected streams share the startup context, carrier grid and program
+    /// clock. The player continues reading the source through physical EOF.
+    pub fn into_program_player(
+        self,
+        program: u16,
+        limits: ParseLimits,
+        policy: SourceTimePolicy,
+        namespace: triergon_mpegts::psi::DescriptorNamespace,
+        natives: &[TsNativeTrackSelection],
+        player_policy: PlayerPolicy,
+    ) -> Result<Player<S>> {
+        self.context.validate_cursor(&self.input)?;
+        let engine = Engine::ts_native_program(
+            self.input,
+            self.format,
+            program,
+            limits,
+            policy,
+            namespace,
+            natives,
+        )?
+        .with_ts_input_context(self.context);
+        Player::new(engine, self.source, Selection::All, player_policy)
     }
     pub fn into_player(
         self,
