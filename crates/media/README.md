@@ -210,6 +210,9 @@ plus a compact node arena; `Edition`, `Chapter`, `Tag`, `SimpleTag`,
 `SegmentInfo` and `Attachment` are borrowed views with no string or payload
 copies. Attachments stay valid after the reader is dropped. Chapter times are
 exact unsigned nanoseconds; ordered editions are reported, not executed.
+Building a document validates every node once in resumable, work-charged steps;
+text fields are checked in place in the document's buffer, without taking a
+handle to it per field.
 
 ## Conformance
 

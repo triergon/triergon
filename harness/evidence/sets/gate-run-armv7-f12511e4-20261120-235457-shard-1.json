@@ -1,0 +1,57 @@
+{
+ "name": "gate-run-armv7-f12511e4-20261120-235457-shard-1",
+ "path": "gate-run-armv7-f12511e4-20261120-235457-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run of Matroska segment metadata and the external HDR vector on 32-bit ARMv7 with metadata documents parsed without per-node source handles: timing, memory and grades of all 49 cases.",
+ "key": "evidence/gate-runs/f12511e4f9d631c2aac50445a572a1722b3de5d3-armv7-20261120-235457/shard-1/6d79e0b9012f36a88c96b26d173b80c13a46cccbb85107172f4b70b94d6832b2.tar.zst",
+ "sha256": "6d79e0b9012f36a88c96b26d173b80c13a46cccbb85107172f4b70b94d6832b2",
+ "bytes": 8127815,
+ "results": [
+  {
+   "path": "memory/external-vector/gate-result.json",
+   "command": "external-vector --memory",
+   "key": "b10a4d62119b9ce035b888a251df1cabe1cd7f9d500e93e2918ab0f43660afea",
+   "status": 0,
+   "report_sha256": "785608960b82f4d1de77ffb88ea06864c52a2523bf2623f0a75c9b7e9d0906c5",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-segment-metadata/gate-result.json",
+   "command": "report --memory",
+   "key": "f821f5dd6de543b5fe53929dfa92d3501a6154f5c32e85a74675c46993474c50",
+   "status": 0,
+   "report_sha256": "ad4a2152f982c5a9fa6f134add18cbba230193ceccc07b01d2abbbce33ce5103",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/external-vector/gate-result.json",
+   "command": "external-vector --benchmark",
+   "key": "9557788a69f2e290f483bcc5b41038225755e13113d5e5ddddfa4b77ebbc0469",
+   "status": 0,
+   "report_sha256": "5787c16739f331c80289edcf49a28704bc7e5ac723a8162531083fa2231fd4e0",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-segment-metadata/gate-result.json",
+   "command": "report --benchmark",
+   "key": "dd6adb635818ad14263b8114781b962e4861848d89d8230e3f761272013afcdd",
+   "status": 0,
+   "report_sha256": "3a5eff169110ad42fd6014645329f94d377c4865c391db5ce3ed661d53989351",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/external-vector/gate-result.json",
+   "command": "grade",
+   "key": "dbf0f43adfacd9510ba5080cedb56c86b1f7ba22a62c0b66908cd1bfb4abdf94",
+   "status": 0,
+   "report_sha256": "69af64ae5611f9995c417656439ae41b5da845694bd243444ca610556a8fd58e"
+  },
+  {
+   "path": "graded/matroska-segment-metadata/gate-result.json",
+   "command": "grade",
+   "key": "8229edd2d176005815cdf4418999664b4335a07fc3b81368bb9ad793a42e2a75",
+   "status": 0,
+   "report_sha256": "882521e26952c32132d03209921c284988f0383ec95085bfbf2c13b5341acc42"
+  }
+ ]
+}
