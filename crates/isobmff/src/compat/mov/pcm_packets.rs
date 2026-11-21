@@ -287,6 +287,38 @@ struct Group {
     description: SoundDescriptionV0,
 }
 
+/// The chunk tables of a PCM track and where the packets have reached in them.
+#[derive(Debug)]
+struct Grouping {
+    stsc: Words,
+    offsets: Offsets,
+    chunk: u32,
+    stsc_row: u32,
+    chunk_left: u32,
+    chunk_used: u32,
+    /// The packet being grouped, a source sample read for it, and a packet grouped
+    /// but not yet taken.
+    group: Option<Group>,
+    pending: Option<Sample>,
+    ready: Option<PcmPacket>,
+}
+
+/// Where a [`PcmCursor`] stands.
+// Boxing the grouping would put the per-sample state behind a pointer.
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
+enum PcmState {
+    /// Reading `stsc` and the chunk offsets among the `stbl` children.
+    Tables {
+        children: BoxChildren,
+        stsc: Option<Words>,
+        offsets: Option<Offsets>,
+    },
+    Packets(Grouping),
+    Ended,
+    Failed(Error),
+}
+
 /// Groups a QuickTime PCM track's samples into the [`PcmPacket`]s FFmpeg's MOV
 /// demuxer emits, from the sample table, with no per-sample storage. Every source
 /// sample is checked. The cursor is bound to the input's pool, source and
@@ -297,26 +329,15 @@ pub struct PcmCursor<'a> {
     header: &'a TrackHeader,
     table: &'a SampleTable,
     source_cursor: SampleCursor<'a>,
-    children: Option<BoxChildren>,
-    stsc: Option<Words>,
-    offsets: Option<Offsets>,
     initial: SoundDescriptionV0,
     media: Range<u64>,
     limits: PcmLimits,
     pool: Budget,
     source: SourceId,
     generation: InputToken,
-    chunk: u32,
-    stsc_row: u32,
-    chunk_left: u32,
-    chunk_used: u32,
     source_done: u64,
     generated: u64,
-    group: Option<Group>,
-    pending: Option<Sample>,
-    ready: Option<PcmPacket>,
-    failed: Option<Error>,
-    ended: bool,
+    state: PcmState,
 }
 impl<'a> PcmCursor<'a> {
     /// A cursor over `table`, whose samples must lie in the `media` extent
@@ -354,26 +375,19 @@ impl<'a> PcmCursor<'a> {
             header,
             table,
             source_cursor: table.cursor(),
-            children: Some(table.raw().children(0, Limits::default())?),
-            stsc: None,
-            offsets: None,
             initial,
             media,
             limits,
             pool: input.budget().clone(),
             source: input.source(),
             generation: input.token(),
-            chunk: 0,
-            stsc_row: 0,
-            chunk_left: 0,
-            chunk_used: 0,
             source_done: 0,
             generated: 0,
-            group: None,
-            pending: None,
-            ready: None,
-            failed: None,
-            ended: false,
+            state: PcmState::Tables {
+                children: table.raw().children(0, Limits::default())?,
+                stsc: None,
+                offsets: None,
+            },
         })
     }
     fn check(
@@ -387,13 +401,7 @@ impl<'a> PcmCursor<'a> {
         Ok(())
     }
     fn poison(&mut self, error: Error) -> Error {
-        self.failed = Some(error);
-        self.ready = None;
-        self.group = None;
-        self.pending = None;
-        self.children = None;
-        self.stsc = None;
-        self.offsets = None;
+        self.state = PcmState::Failed(error);
         error
     }
     /// Advances to the next packet. Failures are sticky. `Error::Unsupported` for
@@ -406,7 +414,7 @@ impl<'a> PcmCursor<'a> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<CursorStatus> {
-        if let Some(error) = self.failed {
+        if let PcmState::Failed(error) = self.state {
             return Err(error);
         }
         let result = self.inner(input, work, cancel);
@@ -419,95 +427,113 @@ impl<'a> PcmCursor<'a> {
         cancel: &AtomicBool,
     ) -> Result<CursorStatus> {
         self.check(input, work, cancel)?;
-        if self.ready.is_some() {
-            return Ok(CursorStatus::Ready);
-        }
-        if self.ended {
-            return Ok(CursorStatus::End);
+        match &self.state {
+            PcmState::Packets(grouping) if grouping.ready.is_some() => {
+                return Ok(CursorStatus::Ready);
+            }
+            PcmState::Ended => return Ok(CursorStatus::End),
+            _ => {}
         }
         loop {
             if work.remaining() == 0 {
                 return Ok(CursorStatus::Yield);
             }
-            if let Some(children) = &mut self.children {
-                let limits = Limits {
-                    max_records: self.limits.max_metadata_rows,
-                    ..Limits::default()
-                };
-                match children.poll(work)? {
-                    Next::Yield => return Ok(CursorStatus::Yield),
-                    Next::Item(raw) => match &raw.header().kind {
-                        b"stsc" => {
-                            if self.stsc.is_some() {
-                                return Err(Error::Invalid("PCM duplicate stsc"));
+            let grouping = match &mut self.state {
+                PcmState::Tables {
+                    children,
+                    stsc,
+                    offsets,
+                } => {
+                    let limits = Limits {
+                        max_records: self.limits.max_metadata_rows,
+                        ..Limits::default()
+                    };
+                    match children.poll(work)? {
+                        Next::Yield => return Ok(CursorStatus::Yield),
+                        Next::Item(raw) => match &raw.header().kind {
+                            b"stsc" => {
+                                if stsc.is_some() {
+                                    return Err(Error::Invalid("PCM duplicate stsc"));
+                                }
+                                *stsc = Some(Words::parse(raw, 12, limits)?);
                             }
-                            self.stsc = Some(Words::parse(raw, 12, limits)?);
-                        }
-                        b"stco" | b"co64" => {
-                            if self.offsets.is_some() {
-                                return Err(Error::Invalid("PCM duplicate chunk offsets"));
+                            b"stco" | b"co64" => {
+                                if offsets.is_some() {
+                                    return Err(Error::Invalid("PCM duplicate chunk offsets"));
+                                }
+                                *offsets = Some(Offsets::parse(raw, limits)?);
                             }
-                            self.offsets = Some(Offsets::parse(raw, limits)?);
+                            b"ctts" | b"stss" | b"stps" | b"sdtp" => {
+                                return Err(Error::Unsupported(
+                                    "PCM unobserved composition/access table",
+                                ));
+                            }
+                            _ => (),
+                        },
+                        Next::End => {
+                            let (Some(stsc), Some(offsets)) = (stsc.take(), offsets.take()) else {
+                                return Err(Error::Invalid("PCM chunk tables absent"));
+                            };
+                            self.state = PcmState::Packets(Grouping {
+                                stsc,
+                                offsets,
+                                chunk: 0,
+                                stsc_row: 0,
+                                chunk_left: 0,
+                                chunk_used: 0,
+                                group: None,
+                                pending: None,
+                                ready: None,
+                            });
                         }
-                        b"ctts" | b"stss" | b"stps" | b"sdtp" => {
-                            return Err(Error::Unsupported(
-                                "PCM unobserved composition/access table",
-                            ));
-                        }
-                        _ => (),
-                    },
-                    Next::End => {
-                        if self.stsc.is_none() || self.offsets.is_none() {
-                            return Err(Error::Invalid("PCM chunk tables absent"));
-                        }
-                        self.children = None;
                     }
+                    continue;
                 }
-                continue;
-            }
-            if self.group.is_none() {
+                PcmState::Packets(grouping) => grouping,
+                PcmState::Ended => return Ok(CursorStatus::End),
+                PcmState::Failed(error) => return Err(*error),
+            };
+            let Some(group) = &mut grouping.group else {
                 if !work.try_charge(1) {
                     return Ok(CursorStatus::Yield);
                 }
                 if self.source_done == self.table.sample_count() {
-                    if self.chunk_left != 0
-                        || self.chunk
-                            != self
-                                .offsets
-                                .as_ref()
-                                .ok_or(Error::Invalid("PCM offsets absent"))?
-                                .table
-                                .count
-                    {
+                    if grouping.chunk_left != 0 || grouping.chunk != grouping.offsets.table.count {
                         return Err(Error::Invalid("PCM incomplete source chunk accounting"));
                     }
-                    self.ended = true;
+                    self.state = PcmState::Ended;
                     return Ok(CursorStatus::End);
                 }
-                self.start_group()?;
+                bounded(
+                    self.generated.checked_add(1).ok_or(Error::Overflow)?,
+                    self.limits.max_packets,
+                )?;
+                grouping.group = Some(grouping.start_group(
+                    self.header,
+                    self.table,
+                    &self.initial,
+                    &self.media,
+                    self.limits,
+                    self.source_done,
+                )?);
                 continue;
-            }
-            if self.pending.is_none() {
+            };
+            let sample = if let Some(sample) = grouping.pending.take() {
+                sample
+            } else {
                 match self.source_cursor.poll(work)? {
                     Next::Yield => return Ok(CursorStatus::Yield),
                     Next::End => {
                         return Err(Error::Invalid("PCM source sample count ended early"));
                     }
-                    Next::Item(sample) => self.pending = Some(sample),
+                    Next::Item(sample) => sample,
                 }
-            }
+            };
             if !work.try_charge(1) {
+                grouping.pending = Some(sample);
                 return Ok(CursorStatus::Yield);
             }
-            let sample = self
-                .pending
-                .take()
-                .ok_or(Error::Invalid("PCM pending source sample absent"))?;
             sample.require_within(self.media.clone())?;
-            let group = self
-                .group
-                .as_mut()
-                .ok_or(Error::Invalid("PCM group absent"))?;
             let expected = self.source_done.checked_add(1).ok_or(Error::Overflow)?;
             let frame = u64::try_from(group.description.pcm_layout()?.frame_bytes())
                 .map_err(|_| Error::Overflow)?;
@@ -534,24 +560,23 @@ impl<'a> PcmCursor<'a> {
             group.source_range.end = sample.range.end;
             group.consumed = group.consumed.checked_add(1).ok_or(Error::Overflow)?;
             self.source_done = expected;
-            if group.consumed != group.count {
-                continue;
-            }
-            let group = self
+            let Some(group) = grouping
                 .group
-                .take()
-                .ok_or(Error::Invalid("PCM complete group absent"))?;
-            self.chunk_left = self
+                .take_if(|group| group.consumed == group.count)
+            else {
+                continue;
+            };
+            grouping.chunk_left = grouping
                 .chunk_left
                 .checked_sub(group.count)
                 .ok_or(Error::Overflow)?;
-            self.chunk_used = self
+            grouping.chunk_used = grouping
                 .chunk_used
                 .checked_add(group.count)
                 .ok_or(Error::Overflow)?;
             let ordinal = self.generated;
             self.generated = self.generated.checked_add(1).ok_or(Error::Overflow)?;
-            self.ready = Some(PcmPacket {
+            grouping.ready = Some(PcmPacket {
                 initial: self.initial.clone(),
                 description: group.description,
                 raw_table: self.table.raw().clone(),
@@ -569,38 +594,57 @@ impl<'a> PcmCursor<'a> {
             return Ok(CursorStatus::Ready);
         }
     }
-    fn start_group(&mut self) -> Result<()> {
-        bounded(
-            self.generated.checked_add(1).ok_or(Error::Overflow)?,
-            self.limits.max_packets,
-        )?;
-        let stsc = self
-            .stsc
-            .as_ref()
-            .ok_or(Error::Invalid("PCM stsc absent"))?;
-        let offsets = self
-            .offsets
-            .as_ref()
-            .ok_or(Error::Invalid("PCM offsets absent"))?;
+    /// Takes the ready packet; `Error::Invalid` when none is ready.
+    pub fn take_packet(
+        &mut self,
+        input: &mut InputCursor,
+        cancel: &AtomicBool,
+    ) -> Result<PcmPacket> {
+        if let PcmState::Failed(error) = self.state {
+            return Err(error);
+        }
+        let result = (|| {
+            self.check(input, &mut WorkBudget::new(0), cancel)?;
+            match &mut self.state {
+                PcmState::Packets(grouping) => grouping.ready.take(),
+                _ => None,
+            }
+            .ok_or(Error::Invalid("PCM packet not ready"))
+        })();
+        result.map_err(|e| self.poison(e))
+    }
+}
+
+impl Grouping {
+    /// The next packet's group: up to 1024 samples of the current chunk, or of the next
+    /// chunk once it is used up.
+    fn start_group(
+        &mut self,
+        header: &TrackHeader,
+        table: &SampleTable,
+        initial: &SoundDescriptionV0,
+        media: &Range<u64>,
+        limits: PcmLimits,
+        source_done: u64,
+    ) -> Result<Group> {
         if self.chunk_left == 0 {
-            if self.chunk >= offsets.table.count {
+            if self.chunk >= self.offsets.table.count {
                 return Err(Error::Invalid("PCM chunk count exhausted"));
             }
             self.chunk = self.chunk.checked_add(1).ok_or(Error::Overflow)?;
             let next = self.stsc_row.checked_add(1).ok_or(Error::Overflow)?;
-            if next < stsc.count && stsc.word(next, 0)? == self.chunk {
+            if next < self.stsc.count && self.stsc.word(next, 0)? == self.chunk {
                 self.stsc_row = next;
             }
-            self.chunk_left = stsc.word(self.stsc_row, 4)?;
+            self.chunk_left = self.stsc.word(self.stsc_row, 4)?;
             self.chunk_used = 0;
         }
         let count = self.chunk_left.min(1024);
         if count == 0 {
             return Err(Error::Invalid("PCM empty chunk group"));
         }
-        let index = stsc.word(self.stsc_row, 8)?;
-        let entry = self
-            .table
+        let index = self.stsc.word(self.stsc_row, 8)?;
+        let entry = table
             .descriptions()
             .get(
                 usize::try_from(
@@ -611,11 +655,12 @@ impl<'a> PcmCursor<'a> {
                 .map_err(|_| Error::Overflow)?,
             )
             .ok_or(Error::Invalid("PCM description absent"))?;
-        let description = SoundDescriptionV0::parse(self.header, entry)?;
+        let description = SoundDescriptionV0::parse(header, entry)?;
         description.pcm_layout()?;
         let initial_bytes =
-            u64::try_from(self.initial.pcm_layout()?.frame_bytes()).map_err(|_| Error::Overflow)?;
-        let start = offsets
+            u64::try_from(initial.pcm_layout()?.frame_bytes()).map_err(|_| Error::Overflow)?;
+        let start = self
+            .offsets
             .get(self.chunk - 1)?
             .checked_add(
                 u64::from(self.chunk_used)
@@ -628,41 +673,23 @@ impl<'a> PcmCursor<'a> {
             .ok_or(Error::Overflow)?;
         bounded(
             length,
-            u64::try_from(self.limits.max_packet_bytes).map_err(|_| Error::Overflow)?,
+            u64::try_from(limits.max_packet_bytes).map_err(|_| Error::Overflow)?,
         )?;
         let end = start.checked_add(length).ok_or(Error::Overflow)?;
         // This bounded view does not guess a short demux request outside media.
-        if start < self.media.start || end > self.media.end {
+        if start < media.start || end > media.end {
             return Err(Error::Unsupported(
                 "PCM native request outside established media",
             ));
         }
-        self.group = Some(Group {
+        Ok(Group {
             count,
             consumed: 0,
-            first: self.source_done.checked_add(1).ok_or(Error::Overflow)?,
+            first: source_done.checked_add(1).ok_or(Error::Overflow)?,
             source_range: 0..0,
             demux_range: start..end,
             description,
-        });
-        Ok(())
-    }
-    /// Takes the ready packet; `Error::Invalid` when none is ready.
-    pub fn take_packet(
-        &mut self,
-        input: &mut InputCursor,
-        cancel: &AtomicBool,
-    ) -> Result<PcmPacket> {
-        if let Some(error) = self.failed {
-            return Err(error);
-        }
-        let result = (|| {
-            self.check(input, &mut WorkBudget::new(0), cancel)?;
-            self.ready
-                .take()
-                .ok_or(Error::Invalid("PCM packet not ready"))
-        })();
-        result.map_err(|e| self.poison(e))
+        })
     }
 }
 
@@ -786,22 +813,19 @@ impl PcmReader {
         if work.remaining() == 0 {
             return Ok(Step::Yield);
         }
+        let length = self.length;
         loop {
-            let buffer = self
+            let full = self
                 .buffer
-                .as_mut()
-                .ok_or(Error::Invalid("PCM physical reader finished"))?;
-            if buffer.len() == self.length {
-                if !self.freeze_paid {
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    self.freeze_paid = true;
+                .as_ref()
+                .is_some_and(|buffer| buffer.len() == length);
+            if full && !self.freeze_paid {
+                if !work.try_charge(1) {
+                    return Ok(Step::Yield);
                 }
-                let buffer = self
-                    .buffer
-                    .take()
-                    .ok_or(Error::Invalid("PCM physical buffer absent"))?;
+                self.freeze_paid = true;
+            }
+            if let Some(buffer) = self.buffer.take_if(|buffer| buffer.len() == length) {
                 let payload = match buffer.freeze() {
                     Ok(b) => b,
                     Err(failure) => {
@@ -816,7 +840,11 @@ impl PcmReader {
                     token: self.token.clone(),
                 }));
             }
-            let remaining = self.length - buffer.len();
+            let buffer = self
+                .buffer
+                .as_mut()
+                .ok_or(Error::Invalid("PCM physical reader finished"))?;
+            let remaining = length - buffer.len();
             match input.read_append(buffer, remaining, work, cancel)? {
                 Step::Ready(_) => self.position = input.position(),
                 Step::NeedInput(r) => return Ok(Step::NeedInput(r)),
