@@ -143,6 +143,10 @@ route as unsupported and later PES cannot rescue it.
 LCEVC video and linkage descriptors have bounded typed readers. They retain
 the original descriptor bytes and validate profile, reserved and linkage fields.
 
+LCEVC association resolves the selected enhancement stream against one base
+stream in the active program map. MPEG-1/2, AVC and HEVC bases are supported.
+Missing, malformed and ambiguous links are reported explicitly.
+
 ### Packets, events and timing
 
 `Packet` implements `PacketInfo` and retains its PMT, source configuration epoch,

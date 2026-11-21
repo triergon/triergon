@@ -17,7 +17,7 @@ pub use dvb::{
     CodecIdentification, DescriptorNamespace, DvbNamespaceEvidence, DvbSubtitling,
     DvbSubtitlingService, DvbSubtitlingServices, DvbSubtitlingSignalling,
 };
-pub use lcevc::{LcevcLinkage, LcevcVideo};
+pub use lcevc::{LcevcAssociation, LcevcLinkage, LcevcVideo};
 pub use pat_table::{PatCollector, PatSourceRange, PatTable};
 pub use section::{PsiCrc32, Section, SectionAssembler};
 pub use signalling::{
