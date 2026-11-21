@@ -7,8 +7,9 @@
 //! workers, then 30 randomly ordered sets of the four runs (candidate and reference,
 //! heap and RSS) are measured. The memory gate of docs/quality.md#gates holds when the
 //! paired 95% upper bounds of peak live heap (`heap_ratio_upper_95`) and total resident
-//! peak RSS (`total_rss_ratio_upper_95`) are both below 1.0, on native AArch64 Linux, on
-//! the gate build, with at least 30 pairs. Every raw observation is written.
+//! peak RSS (`total_rss_ratio_upper_95`) are both below the ceilings of
+//! `harness/policy.json`, on a gate target's native Linux, on the gate build, with at
+//! least [`PAIRS`] pairs. Every raw observation is written.
 
 use std::ffi::OsString;
 use std::fs;
@@ -16,11 +17,11 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use super::correctness::file_sha;
-use crate::harness::{gate_build, memory, worker};
+use crate::harness::{gate_build, memory, policy, worker};
 use crate::json::{self, Value};
 use crate::python;
 
-pub const PAIRS: usize = 30;
+pub const PAIRS: usize = crate::harness::timing::GATE_PAIRS;
 /// After timing's seed and its two retries (`super::timing::SEED` onwards).
 pub const SEED: u64 = super::timing::SEED + 3;
 const WORK_TIMEOUT: Duration = Duration::from_secs(600);
@@ -88,22 +89,28 @@ pub fn gate_target() -> Result<Option<&'static str>, String> {
     }
 }
 
-/// The memory verdict of one collection: both paired upper bounds below 1.0 on an
-/// admitted observation of enough pairs, on the gate platform and build.
-pub fn verdict(measured: &Value, pairs: usize, platform: bool, gate_build: bool) -> Value {
+/// The memory verdict of one collection: both paired upper bounds below their
+/// ceilings on an admitted observation of enough pairs, on the gate platform and build.
+pub fn verdict(
+    measured: &Value,
+    pairs: usize,
+    platform: bool,
+    gate_build: bool,
+    ceilings: policy::Memory,
+) -> Value {
     let status = measured
         .get("status")
         .and_then(Value::as_str)
         .unwrap_or("invalid-memory-observation");
     let admitted = status == "qualified" && pairs >= PAIRS && platform && gate_build;
-    let below = |name: &str| {
+    let below = |name: &str, ceiling: f64| {
         measured
             .get(name)
             .and_then(Value::as_f64)
-            .is_some_and(|ratio| ratio < 1.0)
+            .is_some_and(|ratio| ratio < ceiling)
     };
-    let heap = admitted && below("heap_ratio_upper_95");
-    let rss = admitted && below("total_rss_ratio_upper_95");
+    let heap = admitted && below("heap_ratio_upper_95", ceilings.heap);
+    let rss = admitted && below("total_rss_ratio_upper_95", ceilings.total_rss);
     Value::object([
         ("memory_status", Value::str(status)),
         ("admitted", Value::Bool(admitted)),
@@ -152,6 +159,7 @@ pub fn run_limit(manifest: &Value, target: &str) -> Result<Duration, String> {
 }
 
 pub fn run(options: &Options) -> Result<(), String> {
+    let ceilings = policy::Memory::load(&options.repository)?;
     let manifest = crate::checks::read_json(&options.workloads)
         .map_err(|e| format!("{}: {e}", options.workloads.display()))?;
     let limit = run_limit(&manifest, &crate::harness::report::gate_target()?)?;
@@ -274,7 +282,8 @@ pub fn run(options: &Options) -> Result<(), String> {
         };
         planned.push((w, id, record, input, ready));
     }
-    let pairs = memory::Pairs::gate(options.pairs, memory::CEILING).early_stop(options.early_stop);
+    let pairs =
+        memory::Pairs::gate(options.pairs, ceilings.ceiling()).early_stop(options.early_stop);
     let mut jobs = Vec::new();
     let mut collected = Vec::new();
     for (index, (w, _, _, input, ready)) in planned.iter().enumerate() {
@@ -333,6 +342,7 @@ pub fn run(options: &Options) -> Result<(), String> {
             options.pairs,
             gate_platform(),
             refusals.is_empty() && parity_matches,
+            ceilings,
         );
         if measured.get("status").and_then(Value::as_str) == Some("qualified") {
             let held = verdict.get("memory_gate").is_some_and(Value::truthy);
@@ -420,6 +430,12 @@ mod tests {
     fn gates(value: &Value) -> (bool, bool, bool) {
         let flag = |k: &str| value.get(k).is_some_and(Value::truthy);
         (flag("heap_gate"), flag("rss_gate"), flag("memory_gate"))
+    }
+
+    /// The verdict under the repository's memory ceilings.
+    fn verdict(measured: &Value, pairs: usize, platform: bool, gate_build: bool) -> Value {
+        let ceilings = policy::Memory::load(&crate::root()).unwrap();
+        super::verdict(measured, pairs, platform, gate_build, ceilings)
     }
 
     #[test]

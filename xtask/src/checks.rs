@@ -102,6 +102,7 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
         (_, Err(error)) => return Err(vec![format!("harness/module-gates.json: {error}")]),
     };
     errors.extend(runtime_mentions(root));
+    errors.extend(policy_values(root));
     errors.extend(contract_fields(root));
     // Generated manifests: the case ids and the pins match, in the recorded form.
     for generator in crate::generators::GENERATORS {
@@ -194,6 +195,52 @@ fn contract_fields(root: &Path) -> Vec<String> {
                 .map(move |error| format!("{rel}: {error}"))
         })
         .collect()
+}
+
+/// What `harness/policy.json` states beside the runtime gate agrees with the code that
+/// applies it: the memory ceilings admit nothing at or above the reference, and the
+/// pairs and targets it names are the ones the gate runs.
+fn policy_values(root: &Path) -> Vec<String> {
+    use crate::harness::policy::Memory;
+    let mut errors = Vec::new();
+    match Memory::load(root) {
+        Ok(memory) => {
+            if !(0.0 < memory.ceiling() && memory.heap <= 1.0 && memory.total_rss <= 1.0) {
+                errors.push(
+                    "harness/policy.json: a memory ceiling must lie above 0 and not above 1, \
+                     the reference"
+                        .into(),
+                );
+            }
+        }
+        Err(error) => errors.push(error),
+    }
+    let policy = read_json(&root.join("harness/policy.json")).unwrap_or(Value::Null);
+    let pairs = policy
+        .get("runtime")
+        .and_then(|runtime| runtime.get("minimum_pairs"))
+        .and_then(Value::as_f64);
+    let gate_pairs = crate::harness::timing::GATE_PAIRS;
+    #[allow(clippy::float_cmp)] // A small whole number.
+    if pairs != Some(gate_pairs as f64) {
+        errors.push(format!(
+            "harness/policy.json: runtime.minimum_pairs is not the gate's {gate_pairs} pairs"
+        ));
+    }
+    let targets: Vec<&str> = policy
+        .get("qualification_targets")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    if targets != crate::gate::TARGETS {
+        errors.push(format!(
+            "harness/policy.json: qualification_targets are not the gate's targets {:?}",
+            crate::gate::TARGETS
+        ));
+    }
+    errors
 }
 
 /// `harness/policy.json` is the only definition of the runtime ceiling and target.
@@ -881,7 +928,10 @@ mod tests {
         fs::create_dir_all(root.join("research/sub")).unwrap();
         fs::create_dir_all(root.join("harness/fate")).unwrap();
         fs::create_dir_all(root.join("harness/features")).unwrap();
-        let policy = r#"{"runtime": {"ratio_max": 1.2, "optimisation_target": 0.8}}"#;
+        let policy = r#"{"runtime": {"ratio_max": 1.2, "optimisation_target": 0.8, "minimum_pairs": 30},
+            "memory": {"peak_live_heap_ratio_max_exclusive": 1.0,
+                       "total_resident_peak_rss_ratio_max_exclusive": 1.0},
+            "qualification_targets": ["thumbv7neon-unknown-linux-gnueabihf", "aarch64-unknown-linux-gnu"]}"#;
         let gates = r#"{"modules": [{"accepted": false}, {"accepted": false}]}"#;
         fs::write(root.join("harness/policy.json"), policy).unwrap();
         fs::write(root.join("harness/module-gates.json"), gates).unwrap();

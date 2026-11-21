@@ -12,7 +12,7 @@ use super::acceptance::acceptance;
 use super::comparison::{reference_record, reference_summary};
 use super::gate_build;
 use super::parity::{self, Run};
-use super::policy::Runtime;
+use super::policy::{Memory, Runtime};
 use super::provenance::source_identity_error;
 use super::report::{
     PrefixFeature, case_arguments, expected_for, gate_target, resolved_case_arguments,
@@ -205,10 +205,10 @@ fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
                 reference: comparison,
                 registered: options.baseline_worker.is_none(),
             };
+            let ceiling = Memory::load(root)?.ceiling();
             let job = super::memory::Job::new(&workers, [path.clone()], |slot| {
                 let pairs = match options.baseline_worker {
-                    None => Pairs::gate(options.pairs, super::memory::CEILING)
-                        .early_stop(options.early_stop),
+                    None => Pairs::gate(options.pairs, ceiling).early_stop(options.early_stop),
                     Some(_) => Pairs::fixed(options.pairs),
                 };
                 super::memory::collect(slot, root, workers, &path, pairs, 280, &timed)

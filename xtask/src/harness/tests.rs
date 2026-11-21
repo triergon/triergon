@@ -188,7 +188,8 @@ fn an_early_stopped_memory_collection_is_valid_only_under_its_rule() {
     let original = rows[0].get("memory").unwrap();
     let certificate = original.get("certificate").unwrap();
     let samples = original.get("samples").unwrap().as_array().unwrap()[..20].to_vec();
-    let gate = super::timing::Pairs::gate(30, super::memory::CEILING);
+    let ceiling = super::policy::Memory::load(root()).unwrap().ceiling();
+    let gate = super::timing::Pairs::gate(30, ceiling);
     let memory = super::memory::evaluate(root(), &samples, gate, 0, certificate, None);
     assert_eq!(memory.get("status"), Some(&Value::str("qualified")));
     assert_eq!(memory.get("pairs"), Some(&Value::int(20)));

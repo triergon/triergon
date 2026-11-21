@@ -14,7 +14,7 @@
 //! 4. memory: admit both workers to the shared observer and run separate heap
 //!    and RSS measurements. Each worker must reproduce its checked output.
 //!    Peak live heap must be lower in every pair. The upper paired 95% bounds
-//!    for heap and total resident peak RSS must both be below 1.0.
+//!    for heap and total resident peak RSS must both be below their ceilings there.
 //!
 //! The machine must be otherwise idle: the timing session rejects a run during
 //! which a tracked process used CPU and retries it, and a CPU-contention check
@@ -562,6 +562,7 @@ fn finish_case(
     case: MeasuredCase,
     measured: Value,
     open_on_target: bool,
+    ceilings: policy::Memory,
 ) -> Result<Value, String> {
     let correctness = case.correctness().clone();
     let timed = case.field("runtime");
@@ -580,24 +581,20 @@ fn finish_case(
         .and_then(Value::as_str)
         .unwrap_or("invalid-memory-observation");
     let admitted = memory_status == "qualified"
-        && a.memory_pairs >= 30
-        && cfg!(all(
-            target_os = "linux",
-            any(target_arch = "aarch64", target_arch = "arm"),
-            target_env = "gnu"
-        ));
-    let lower = |name| {
+        && a.memory_pairs >= GATE_PAIRS
+        && crate::codecs::memory::gate_platform();
+    let lower = |name, ceiling: f64| {
         measured
             .get(name)
             .and_then(Value::as_f64)
-            .is_some_and(|ratio| ratio < 1.0)
+            .is_some_and(|ratio| ratio < ceiling)
     };
     let heap_gate = admitted
-        && lower("heap_ratio_upper_95")
+        && lower("heap_ratio_upper_95", ceilings.heap)
         && measured
             .get("heap_lower_in_each_pair")
             .is_some_and(Value::truthy);
-    let rss_gate = admitted && lower("total_rss_ratio_upper_95");
+    let rss_gate = admitted && lower("total_rss_ratio_upper_95", ceilings.total_rss);
     let memory_status = Value::str(memory_status);
     record.push(("memory".into(), measured));
     let flag = |key: &str| correctness.get(key).is_some_and(Value::truthy);
@@ -706,6 +703,7 @@ fn memory_stage(
     // Cases of one generated input would share its file and so run one after
     // another; side by side, each measures its own copy, of the same bytes.
     let side_by_side = gate_build::allowed_cpu_list().is_none_or(|cpus| cpus.len() > 1);
+    let ceilings = policy::Memory::load(root)?;
     let mut setups = Vec::new();
     for (run, (a, prepared)) in runs.iter().enumerate() {
         let copies = side_by_side.then(|| {
@@ -733,7 +731,7 @@ fn memory_stage(
                 reference: Path::new(&a.reference),
                 registered: prepared.refusals.is_empty(),
             },
-            pairs: Pairs::gate(a.memory_pairs, memory::CEILING).early_stop(a.early_stop),
+            pairs: Pairs::gate(a.memory_pairs, ceilings.ceiling()).early_stop(a.early_stop),
             seed: a.seed + MEMORY_SEED,
             _copies: copies,
             inputs,
@@ -797,7 +795,7 @@ fn memory_stage(
                         Value::object([("status", Value::str("missing-correctness-output"))])
                     });
                     let open_on_target = open.contains(&measured.id);
-                    finish_case(a, measured, memory, open_on_target)
+                    finish_case(a, measured, memory, open_on_target, ceilings)
                 })
                 .collect()
         })

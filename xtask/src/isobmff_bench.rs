@@ -16,7 +16,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::checks::read_json;
 use crate::codecs::correctness::file_sha;
 use crate::harness::diff::equal;
-use crate::harness::policy::Runtime;
+use crate::harness::policy::{Memory, Runtime};
 use crate::harness::timing::{self, Operation};
 use crate::harness::worker::{self, Finished};
 use crate::harness::{
@@ -1056,7 +1056,7 @@ pub(crate) fn measure_memory(
             &build.candidate,
             &build.reference,
             &input,
-            timing::Pairs::gate(options.memory_pairs, memory::CEILING)
+            timing::Pairs::gate(options.memory_pairs, Memory::load(root)?.ceiling())
                 .early_stop(options.early_stop),
             options.seed,
             memory::Commands {

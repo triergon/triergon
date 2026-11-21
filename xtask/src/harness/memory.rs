@@ -25,11 +25,6 @@ use crate::stats;
 
 type R<T> = Result<T, String>;
 
-/// The memory gates' ratio ceiling: the candidate's peak heap and total resident
-/// peak must lie strictly below the reference's, so a gate collection stops
-/// early only when both settle below it.
-pub const CEILING: f64 = 1.0;
-
 /// Pairs of one collection that may be measured again after the kernel RSS bound
 /// voided them ([`voided_by_foreign_update`]); beyond this the collection fails.
 pub const MAX_RETRIES: usize = 2;
@@ -2126,12 +2121,13 @@ pub fn evidence_valid_with_outputs(
             stop_below: match memory.get("early_stop") {
                 Some(stop) => {
                     // A collection may stop early only under the memory gates' own ceiling.
-                    #[allow(clippy::float_cmp)] // The record must carry the constant exactly.
-                    let named = stop.get("ceiling")?.as_f64()? == CEILING;
+                    let ceiling = super::policy::Memory::load(root).ok()?.ceiling();
+                    #[allow(clippy::float_cmp)] // The record must carry the policy value exactly.
+                    let named = stop.get("ceiling")?.as_f64()? == ceiling;
                     if s(stop, "rule") != Some(EARLY_STOP_RULE) || !named {
                         return Some(false);
                     }
-                    Some(CEILING)
+                    Some(ceiling)
                 }
                 None => None,
             },
@@ -2311,11 +2307,14 @@ mod command_tests {
         let mut totals: Vec<(f64, f64)> = (0..20)
             .map(|i| (if i % 2 == 0 { 900.0 } else { 910.0 }, 1000.0))
             .collect();
-        let gate = Pairs::gate(30, CEILING);
+        let ceiling = crate::harness::policy::Memory::load(&crate::root())
+            .unwrap()
+            .ceiling();
+        let gate = Pairs::gate(30, ceiling);
         assert!(settled(&heaps[..19], &totals[..19], gate).is_none());
         assert!(settled(&heaps, &totals, gate).is_some());
         assert!(settled(&heaps, &totals, Pairs::fixed(30)).is_none());
-        assert!(settled(&heaps, &totals, Pairs::gate(20, CEILING)).is_none());
+        assert!(settled(&heaps, &totals, Pairs::gate(20, ceiling)).is_none());
         // Equal to the reference is not lower; two of the first ten may be.
         totals[2] = (1000.0, 1000.0);
         totals[5] = (1100.0, 1000.0);

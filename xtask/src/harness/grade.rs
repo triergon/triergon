@@ -1039,7 +1039,8 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
             selected(a, spec, &contract, identity)?;
         }
     }
-    let ceiling = super::policy::Runtime::load(root)?.ceiling;
+    let policy = super::policy::Policy::load(root)?;
+    let ceiling = policy.runtime.ceiling;
     let combine = |spec: &Value| -> R<Value> {
         let id = text(spec, "id")?;
         let clock = expanded_case(&timed, &options.timing, timed_rows[id])?;
@@ -1183,7 +1184,7 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
     }
     // Each case's runtime, heap and total RSS bounds, as the codec bounds are graded.
     let open_bounds = super::bounds::open_bounds(&contract, &manifest, target)?;
-    let (lines, failed) = super::bounds::verdict(label, &bounded, &open_bounds, ceiling);
+    let (lines, failed) = super::bounds::verdict(label, &bounded, &open_bounds, policy);
     for line in &lines {
         println!("{line}");
     }

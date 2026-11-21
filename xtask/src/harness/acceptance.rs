@@ -10,7 +10,7 @@ use std::path::Path;
 use super::comparison::validate_case_evidence;
 use super::diff::equal;
 use super::gate_build;
-use super::policy::Runtime;
+use super::policy::Policy;
 use crate::json::Value;
 
 pub const LINUX_CPU_KEY: &str = "__linux_cpu__";
@@ -280,25 +280,23 @@ pub(crate) fn grade_case(
     identity: &Value,
     target: &str,
 ) -> CaseVerdict {
-    match Runtime::load(root) {
-        Ok(runtime) => {
-            grade_case_with_runtime(root, contract, row, identity, target, Some(runtime))
-        }
+    match Policy::load(root) {
+        Ok(policy) => grade_case_with_policy(root, contract, row, identity, target, Some(policy)),
         Err(error) => {
-            let mut verdict = grade_case_with_runtime(root, contract, row, identity, target, None);
+            let mut verdict = grade_case_with_policy(root, contract, row, identity, target, None);
             verdict.reasons.insert(0, error);
             verdict
         }
     }
 }
 
-fn grade_case_with_runtime(
+fn grade_case_with_policy(
     root: &Path,
     contract: &Value,
     row: &Value,
     identity: &Value,
     target: &str,
-    runtime: Option<Runtime>,
+    policy: Option<Policy>,
 ) -> CaseVerdict {
     let mut reasons = Vec::new();
     let contract_id = s(contract, "id");
@@ -380,12 +378,12 @@ fn grade_case_with_runtime(
             contract,
             &selected,
             require_linux,
-            runtime.map(|gate| gate.ceiling),
+            policy.map(|policy| policy.runtime.ceiling),
         )
         && !timing.get("contaminants").is_some_and(Value::truthy)
         && upper.is_finite()
         && upper > 0.0
-        && runtime.is_some_and(|gate| upper <= gate.ceiling);
+        && policy.is_some_and(|policy| upper <= policy.runtime.ceiling);
     if !timing_ok {
         reasons.push(format!("{id}: runtime gate unproven or failed"));
     }
@@ -405,7 +403,10 @@ fn grade_case_with_runtime(
         .get("expected_memory_outputs")
         .is_none_or(|expected| memory_outputs_match(memory, expected))
         && s(memory, "status") == Some("qualified")
-        && ratios.iter().all(|r| r.is_finite() && *r < 1.0)
+        && ratios.iter().all(|r| r.is_finite())
+        && policy.is_some_and(|policy| {
+            ratios[0] < policy.memory.total_rss && ratios[1] < policy.memory.heap
+        })
         && ratios[0] > 0.0
         && ratios[1] >= 0.0;
     if !memory_ok {
@@ -560,9 +561,7 @@ pub(crate) fn acceptance_iter(
     additional: &[Value],
 ) -> Value {
     let mut reasons = Vec::new();
-    let runtime = Runtime::load(root)
-        .map_err(|error| reasons.push(error))
-        .ok();
+    let policy = Policy::load(root).map_err(|error| reasons.push(error)).ok();
     let registered = registered_refusals(contract)
         .map_err(|error| reasons.push(error))
         .unwrap_or_default();
@@ -617,7 +616,7 @@ pub(crate) fn acceptance_iter(
                 }
             } else {
                 let verdict =
-                    grade_case_with_runtime(root, contract, &row, identity, target, runtime);
+                    grade_case_with_policy(root, contract, &row, identity, target, policy);
                 reasons.extend(verdict.reasons);
             }
         }
@@ -875,6 +874,7 @@ mod refusal_tests {
 
 #[cfg(test)]
 mod policy_tests {
+    use super::super::policy::Runtime;
     use super::*;
 
     struct Fixture {

@@ -14,7 +14,7 @@ use super::acceptance::acceptance_iter;
 use super::comparison::reference_summary;
 use super::gate_build;
 use super::parity::{self, Comparison, Run};
-use super::policy::Runtime;
+use super::policy::{Memory, Runtime};
 use super::provenance::source_identity_error;
 use super::reuse;
 use super::timing::{Operation, Pairs, Work, benchmark};
@@ -1151,7 +1151,8 @@ pub(crate) fn collect(
     let (timing_pairs, memory_pairs) = match options.baseline_worker {
         None => (
             Pairs::gate(options.pairs, Runtime::load(root)?.ceiling).early_stop(options.early_stop),
-            Pairs::gate(planned_memory, super::memory::CEILING).early_stop(options.early_stop),
+            Pairs::gate(planned_memory, Memory::load(root)?.ceiling())
+                .early_stop(options.early_stop),
         ),
         Some(_) => (Pairs::fixed(options.pairs), Pairs::fixed(planned_memory)),
     };
