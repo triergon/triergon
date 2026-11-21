@@ -4,9 +4,10 @@
     missing_debug_implementations,
     clippy::print_stdout,
     clippy::print_stderr,
+    clippy::unwrap_used,
     clippy::expect_used
 )]
-// Pending: `missing_docs`, `unreachable_pub`, `clippy::unwrap_used`.
+// Pending: `missing_docs`, `unreachable_pub`.
 // Pending: these rewrites change the generated code of measured hot paths and are
 // adopted with an A/B timing run.
 #![allow(

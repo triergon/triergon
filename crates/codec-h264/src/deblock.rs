@@ -2,7 +2,7 @@
 //! its slices are reconstructed. Supports frames, field pictures and MBAFF frames.
 
 use crate::mbinfo::{Kind, MbInfo, MbWidth, SliceDbk};
-use crate::picture::{FrameBuf, Motion};
+use crate::picture::{FrameBuf, Motion, array, array_mut, copied};
 use crate::slicedec::CurPic;
 use crate::tables::{ALPHA, BETA, TC0};
 use triergon_codec::{Budget, BudgetVec, StorageError};
@@ -87,13 +87,13 @@ fn uniform_motion(m: &Motion, q: usize) -> Uni {
         mv: [[0; 2]; 2],
     };
     for l in 0..2 {
-        let r: &[i32; 4] = m.ref_id[l][q * 4..q * 4 + 4].try_into().unwrap();
+        let r: &[i32; 4] = array(&m.ref_id[l], q * 4);
         if r[1] != r[0] || r[2] != r[0] || r[3] != r[0] {
             return NOT_UNI;
         }
         u.rid[l] = r[0];
         if r[0] >= 0 {
-            let mv: &[[i16; 2]; 16] = m.mv[l][q * 16..q * 16 + 16].try_into().unwrap();
+            let mv: &[[i16; 2]; 16] = array(&m.mv[l], q * 16);
             if mv.iter().any(|v| *v != mv[0]) {
                 return NOT_UNI;
             }
@@ -140,14 +140,14 @@ impl BsCtx<'_> {
             }
             return out;
         }
-        let mvp0: &[[i16; 2]; 16] = m.mv[0][p * 16..p * 16 + 16].try_into().unwrap();
-        let mvp1: &[[i16; 2]; 16] = m.mv[1][p * 16..p * 16 + 16].try_into().unwrap();
-        let mvq0: &[[i16; 2]; 16] = m.mv[0][q * 16..q * 16 + 16].try_into().unwrap();
-        let mvq1: &[[i16; 2]; 16] = m.mv[1][q * 16..q * 16 + 16].try_into().unwrap();
-        let rp0: &[i32; 4] = m.ref_id[0][p * 4..p * 4 + 4].try_into().unwrap();
-        let rp1: &[i32; 4] = m.ref_id[1][p * 4..p * 4 + 4].try_into().unwrap();
-        let rq0: &[i32; 4] = m.ref_id[0][q * 4..q * 4 + 4].try_into().unwrap();
-        let rq1: &[i32; 4] = m.ref_id[1][q * 4..q * 4 + 4].try_into().unwrap();
+        let mvp0: &[[i16; 2]; 16] = array(&m.mv[0], p * 16);
+        let mvp1: &[[i16; 2]; 16] = array(&m.mv[1], p * 16);
+        let mvq0: &[[i16; 2]; 16] = array(&m.mv[0], q * 16);
+        let mvq1: &[[i16; 2]; 16] = array(&m.mv[1], q * 16);
+        let rp0: &[i32; 4] = array(&m.ref_id[0], p * 4);
+        let rp1: &[i32; 4] = array(&m.ref_id[1], p * 4);
+        let rq0: &[i32; 4] = array(&m.ref_id[0], q * 4);
+        let rq1: &[i32; 4] = array(&m.ref_id[1], q * 4);
         let mut out = [0u8; 4];
         for k in 0..4 {
             let (a, b) = (pb[k] & 15, qb[k] & 15);
@@ -342,7 +342,7 @@ fn qp_avg(p: [i8; 2], q: [i32; 2]) -> [i32; 2] {
 fn load_h<const N: usize>(s: &[u8], q0: usize, step: usize, l: &mut Lanes, at: usize) {
     for k in 0..8 {
         let o = q0 + k * step - 4 * step;
-        let src: &[u8; N] = s[o..o + N].try_into().unwrap();
+        let src: &[u8; N] = array(s, o);
         l[k][at..at + N].copy_from_slice(src);
     }
 }
@@ -361,7 +361,7 @@ fn store_h<const N: usize>(
 ) {
     for k in lo..hi {
         let o = q0 + k * step - 4 * step;
-        let dst: &mut [u8; N] = (&mut s[o..o + N]).try_into().unwrap();
+        let dst: &mut [u8; N] = array_mut(s, o);
         dst.copy_from_slice(&l[k][at..at + N]);
     }
 }
@@ -395,7 +395,12 @@ fn transpose8(r: &mut [u64; 8]) {
 /// column (k - 4).
 #[cfg(target_pointer_width = "64")]
 #[inline(always)]
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
+#[allow(clippy::needless_range_loop)]
+// indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
+#[expect(
+    clippy::unwrap_used,
+    reason = "lengths fixed by the ranges; this form transposes fastest"
+)]
 fn load_v<const N: usize>(s: &[u8], q0: usize, line_step: usize, l: &mut Lanes, at: usize) {
     for half in 0..N / 8 {
         let mut r = [0u64; 8];
@@ -414,7 +419,12 @@ fn load_v<const N: usize>(s: &[u8], q0: usize, line_step: usize, l: &mut Lanes, 
 /// are unchanged).
 #[cfg(target_pointer_width = "64")]
 #[inline(always)]
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
+#[allow(clippy::needless_range_loop)]
+// indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
+#[expect(
+    clippy::unwrap_used,
+    reason = "lengths fixed by the ranges; this form transposes fastest"
+)]
 fn store_v<const N: usize>(s: &mut [u8], q0: usize, line_step: usize, l: &Lanes, at: usize) {
     for half in 0..N / 8 {
         let mut r = [0u64; 8];
@@ -450,6 +460,10 @@ fn transpose4(r: &mut [u32; 4]) {
 /// column (k - 4).
 #[cfg(not(target_pointer_width = "64"))]
 #[inline(always)]
+#[expect(
+    clippy::unwrap_used,
+    reason = "lengths fixed by the ranges; this form transposes fastest"
+)]
 fn load_v<const N: usize>(s: &[u8], q0: usize, line_step: usize, l: &mut Lanes, at: usize) {
     for quarter in 0..N / 4 {
         // Columns p3..p0 and q0..q3 of four lines.
@@ -473,6 +487,10 @@ fn load_v<const N: usize>(s: &[u8], q0: usize, line_step: usize, l: &mut Lanes, 
 /// are unchanged).
 #[cfg(not(target_pointer_width = "64"))]
 #[inline(always)]
+#[expect(
+    clippy::unwrap_used,
+    reason = "lengths fixed by the ranges; this form transposes fastest"
+)]
 fn store_v<const N: usize>(s: &mut [u8], q0: usize, line_step: usize, l: &Lanes, at: usize) {
     for quarter in 0..N / 4 {
         let lanes = at + quarter * 4..at + quarter * 4 + 4;
@@ -626,7 +644,7 @@ fn filter_chroma(l: &mut Lanes, pr: &LineParams) -> u8 {
     }
     l[3] = op;
     l[4] = oq;
-    let [cb, cr]: [[u8; 8]; 2] = [diff[..8].try_into().unwrap(), diff[8..].try_into().unwrap()];
+    let [cb, cr]: [[u8; 8]; 2] = [copied(&diff, 0), copied(&diff, 8)];
     u8::from(cb != [0; 8]) | (u8::from(cr != [0; 8]) << 1)
 }
 
@@ -863,10 +881,10 @@ fn internal_bs(ctx: &BsCtx<'_>, q: usize, t8: bool) -> ([[u8; 4]; 4], [[u8; 4]; 
     let mq = &ctx.mbs[q];
     let nz = mq.nzmask as u32;
     let m = ctx.motion;
-    let r0: [i32; 4] = m.ref_id[0][q * 4..q * 4 + 4].try_into().unwrap();
-    let r1: [i32; 4] = m.ref_id[1][q * 4..q * 4 + 4].try_into().unwrap();
-    let mv0: [[i16; 2]; 16] = m.mv[0][q * 16..q * 16 + 16].try_into().unwrap();
-    let mv1: [[i16; 2]; 16] = m.mv[1][q * 16..q * 16 + 16].try_into().unwrap();
+    let r0: [i32; 4] = copied(&m.ref_id[0], q * 4);
+    let r1: [i32; 4] = copied(&m.ref_id[1], q * 4);
+    let mv0: [[i16; 2]; 16] = copied(&m.mv[0], q * 16);
+    let mv1: [[i16; 2]; 16] = copied(&m.mv[1], q * 16);
     let limy = if mq.field || ctx.field_pic { 2 } else { 4 };
     let b8 = |b: usize| (b / 8) * 2 + (b % 4) / 2;
     let pair = |pb: usize, qb: usize| -> u8 {
