@@ -3,7 +3,7 @@ use super::event::{FaultKind, TraceEvent, TraceFault};
 use super::{PesRoute, PsiRoute, Route, TransportStream};
 use crate::SourceEpochs;
 use crate::pes::PesAssembler;
-use crate::psi::{PatReader, PatTable, PmtReader, ProgramMap, TableStep};
+use crate::psi::{PatReader, PatSection, PatTable, PmtReader, ProgramMap, Section, TableStep};
 use crate::retryable;
 use crate::transport::Continuity;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,6 +24,49 @@ pub(super) struct MapBuild {
     routes: BudgetVec<PesRoute>,
     position: usize,
     epoch: u64,
+}
+
+/// Which table a section on a PSI route belongs to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum PsiTable {
+    Pat,
+    Pmt,
+}
+
+/// The one piece of table work between carriers. While it is a section, a table
+/// or a map, no carrier is read and the carrier in hand does not advance.
+#[derive(Debug)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "one bounded in-progress table parser inline; boxing would allocate outside Budget"
+)]
+pub(super) enum PsiWork {
+    Idle,
+    /// A diagnostic to publish before anything else.
+    Fault(TraceFault),
+    /// A complete section: publish it, then parse it unless it repeats the accepted table.
+    Section {
+        section: Section,
+        table: PsiTable,
+    },
+    /// A PAT or PMT section being parsed.
+    Table(Job),
+    /// An accepted PMT being bound to routes.
+    Map(MapBuild),
+}
+
+impl PsiWork {
+    /// Whether table work keeps carriers from being read.
+    pub(super) fn blocks_carriers(&self) -> bool {
+        matches!(self, Self::Section { .. } | Self::Table(_) | Self::Map(_))
+    }
+}
+
+/// What a table parser ended with.
+enum TableOutput {
+    PatSection(PatSection),
+    Map(ProgramMap),
+    Done,
 }
 
 impl TransportStream {
@@ -125,20 +168,39 @@ impl TransportStream {
         self.tsid = Some(table.header.extension);
         Ok(())
     }
+    /// Stages one stream of the map being built per work unit, then commits it.
     fn poll_map(
         &mut self,
+        mut build: MapBuild,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<TraceEvent>> {
-        let Some(build) = self.map_build.as_mut() else {
-            return Ok(None);
-        };
+        match self.stage_routes(&mut build, work, cancel) {
+            Ok(true) => self.commit_map(build),
+            Ok(false) => {
+                self.psi = PsiWork::Map(build);
+                Ok(None)
+            }
+            Err(error) => {
+                self.psi = PsiWork::Map(build);
+                Err(error)
+            }
+        }
+    }
+
+    /// True once every stream is staged and the commit's work unit is paid.
+    fn stage_routes(
+        &mut self,
+        build: &mut MapBuild,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
         while build.position < build.map.streams.len() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             if !work.try_charge(1) {
-                return Ok(None);
+                return Ok(false);
             }
             let stream = &build.map.streams.as_slice()[build.position];
             let reuse = self.routes.as_slice().iter().position(|old| {
@@ -182,14 +244,11 @@ impl TransportStream {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        if !work.try_charge(1) {
-            return Ok(None);
-        }
-        // Atomic commit: all allocations and validation precede these bounded moves.
-        let mut build = self
-            .map_build
-            .take()
-            .ok_or(Error::Invalid("PMT transaction missing"))?;
+        Ok(work.try_charge(1))
+    }
+
+    /// Atomic commit: all allocations and validation precede these bounded moves.
+    fn commit_map(&mut self, mut build: MapBuild) -> Result<Option<TraceEvent>> {
         for route in build.routes.as_mut_slice() {
             if let Some(index) = route.reuse.take() {
                 let previous = &mut self.routes.as_mut_slice()[index];
@@ -232,7 +291,7 @@ impl TransportStream {
         if let Some(fault) = pending_rebind {
             self.clock_quarantined = true;
             // poll_jobs emits this immediately after the committed raw PMT event.
-            self.fault = Some(fault);
+            self.psi = PsiWork::Fault(fault);
         }
         Ok(Some(TraceEvent::ProgramMap {
             map: build.map,
@@ -240,6 +299,7 @@ impl TransportStream {
             configuration_epoch: build.epoch,
         }))
     }
+
     // Runs per PSI section or table step, never per carrier.
     #[cold]
     pub(super) fn poll_jobs(
@@ -247,127 +307,30 @@ impl TransportStream {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<TraceEvent>> {
-        if let Some(fault) = self.fault.take() {
-            return Ok(Some(TraceEvent::Diagnostic(fault)));
-        }
-        if self.map_build.is_some() {
-            return self.poll_map(work, cancel);
-        }
-        if let Some(section) = self.section.as_ref() {
-            if section.crc_remainder() == Some(0)
-                && self
-                    .accepted_table_source()
-                    .is_some_and(|current| current.as_ref() == section.bytes().as_ref())
-            {
-                // The active table already passed validation in this route.
-                // Publish the repeat's section with its own source ranges.
-                let section = self
-                    .section
-                    .take()
-                    .ok_or(Error::Invalid("PSI source missing"))?;
-                return Ok(Some(TraceEvent::Section(section)));
-            }
-            let job = match self.route {
-                Route::Pat => PatReader::new(section, &self.budget, self.limits).map(Job::Pat),
-                Route::Pmt => PmtReader::new_with_namespace(
-                    section,
-                    &self.budget,
-                    self.limits,
-                    self.descriptor_namespace,
-                )
-                .map(Job::Pmt),
-                _ => return Err(Error::Invalid("PSI source without PSI route")),
-            };
-            match job {
-                Ok(job) => self.job = Some(job),
-                Err(error) if retryable(error) => return Err(error),
-                Err(error) => {
-                    self.fault = Some(TraceFault {
-                        kind: FaultKind::Psi,
-                        pid: Some(section.pid()),
-                        location: self.location(),
-                        error,
-                        rejected: None,
-                    });
+        match std::mem::replace(&mut self.psi, PsiWork::Idle) {
+            PsiWork::Idle => self.poll_collector(work, cancel),
+            PsiWork::Fault(fault) => Ok(Some(TraceEvent::Diagnostic(fault))),
+            PsiWork::Section { section, table } => self.start_table(section, table),
+            PsiWork::Map(build) => self.poll_map(build, work, cancel),
+            PsiWork::Table(mut job) => match Self::poll_table(&mut job, work, cancel) {
+                None => {
+                    self.psi = PsiWork::Table(job);
+                    Ok(None)
                 }
-            }
-            let section = self
-                .section
-                .take()
-                .ok_or(Error::Invalid("PSI source missing"))?;
-            return Ok(Some(TraceEvent::Section(section)));
+                Some(Err(error)) if retryable(error) => {
+                    self.psi = PsiWork::Table(job);
+                    Err(error)
+                }
+                Some(output) => self.finish_table(&job, output, work, cancel),
+            },
         }
-        if let Some(job) = self.job.as_mut() {
-            match job {
-                Job::Pat(reader) => match reader.poll(work, cancel) {
-                    Ok(TableStep::Output(section)) => {
-                        self.job = None;
-                        self.collector
-                            .submit(section)
-                            .map_err(|error| error.error)?;
-                    }
-                    Ok(TableStep::Yield) => return Ok(None),
-                    Ok(TableStep::Done) => self.job = None,
-                    Err(error) if retryable(error) => return Err(error),
-                    Err(error) => {
-                        self.job = None;
-                        return Ok(Some(self.diagnostic(FaultKind::Psi, Some(0), error)));
-                    }
-                },
-                Job::Pmt(reader) => match reader.poll(work, cancel) {
-                    Ok(TableStep::Output(map)) => {
-                        self.job = None;
-                        if map.header.extension != self.program {
-                            return Ok(Some(self.diagnostic(
-                                FaultKind::Program,
-                                self.pmt.as_ref().map(|pmt| pmt.pid),
-                                Error::Invalid("PMT program differs from active PAT"),
-                            )));
-                        }
-                        if !map.header.current_next {
-                            return Ok(Some(TraceEvent::ProgramMap {
-                                map,
-                                active: false,
-                                configuration_epoch: self.config_epoch,
-                            }));
-                        }
-                        if self
-                            .pmt_source
-                            .as_ref()
-                            .is_some_and(|old| old.as_ref() == map.source.as_ref())
-                        {
-                            return Ok(None);
-                        }
-                        if self.pmt_version == Some(map.header.version) {
-                            return Ok(Some(self.diagnostic(
-                                FaultKind::Program,
-                                self.pmt.as_ref().map(|pmt| pmt.pid),
-                                Error::Invalid("PMT conflicting repeat"),
-                            )));
-                        }
-                        let epoch = self.config_epoch.checked_add(1).ok_or(Error::Overflow)?;
-                        self.map_build = Some(MapBuild {
-                            map,
-                            routes: BudgetVec::new(&self.budget),
-                            position: 0,
-                            epoch,
-                        });
-                        return self.poll_map(work, cancel);
-                    }
-                    Ok(TableStep::Yield) => return Ok(None),
-                    Ok(TableStep::Done) => self.job = None,
-                    Err(error) if retryable(error) => return Err(error),
-                    Err(error) => {
-                        self.job = None;
-                        return Ok(Some(self.diagnostic(
-                            FaultKind::Psi,
-                            self.pmt.as_ref().map(|pmt| pmt.pid),
-                            error,
-                        )));
-                    }
-                },
-            }
-        }
+    }
+
+    fn poll_collector(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<TraceEvent>> {
         match self.collector.poll(work, cancel) {
             Ok(TableStep::Output(table)) => {
                 self.apply_pat(&table)?;
@@ -381,11 +344,140 @@ impl TransportStream {
             }
         }
     }
-    pub(super) fn accepted_table_source(&self) -> Option<&Bytes> {
-        match self.route {
-            Route::Pat => self.collector.active_single_section(),
-            Route::Pmt => self.pmt_source.as_ref(),
-            _ => None,
+
+    /// Publishes a complete section and starts parsing it unless it repeats the
+    /// accepted table, which already passed validation on this route.
+    fn start_table(&mut self, section: Section, table: PsiTable) -> Result<Option<TraceEvent>> {
+        if section.crc_remainder() == Some(0)
+            && self
+                .accepted_table_source(table)
+                .is_some_and(|current| current.as_ref() == section.bytes().as_ref())
+        {
+            // Publish the repeat's section with its own source ranges.
+            return Ok(Some(TraceEvent::Section(section)));
+        }
+        let job = match table {
+            PsiTable::Pat => PatReader::new(&section, &self.budget, self.limits).map(Job::Pat),
+            PsiTable::Pmt => PmtReader::new_with_namespace(
+                &section,
+                &self.budget,
+                self.limits,
+                self.descriptor_namespace,
+            )
+            .map(Job::Pmt),
+        };
+        match job {
+            Ok(job) => self.psi = PsiWork::Table(job),
+            Err(error) if retryable(error) => {
+                self.psi = PsiWork::Section { section, table };
+                return Err(error);
+            }
+            Err(error) => {
+                self.psi = PsiWork::Fault(TraceFault {
+                    kind: FaultKind::Psi,
+                    pid: Some(section.pid()),
+                    location: self.location(),
+                    error,
+                    rejected: None,
+                });
+            }
+        }
+        Ok(Some(TraceEvent::Section(section)))
+    }
+
+    /// One step of the table parser; `None` while it yields.
+    fn poll_table(
+        job: &mut Job,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Option<Result<TableOutput>> {
+        match job {
+            Job::Pat(reader) => match reader.poll(work, cancel) {
+                Ok(TableStep::Output(section)) => Some(Ok(TableOutput::PatSection(section))),
+                Ok(TableStep::Yield) => None,
+                Ok(TableStep::Done) => Some(Ok(TableOutput::Done)),
+                Err(error) => Some(Err(error)),
+            },
+            Job::Pmt(reader) => match reader.poll(work, cancel) {
+                Ok(TableStep::Output(map)) => Some(Ok(TableOutput::Map(map))),
+                Ok(TableStep::Yield) => None,
+                Ok(TableStep::Done) => Some(Ok(TableOutput::Done)),
+                Err(error) => Some(Err(error)),
+            },
+        }
+    }
+
+    /// Acts on the end of a table parser: submits a PAT section, publishes or starts
+    /// binding a PMT, or reports the parse error.
+    fn finish_table(
+        &mut self,
+        job: &Job,
+        output: Result<TableOutput>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<TraceEvent>> {
+        let pmt_pid = self.pmt.as_ref().map(|pmt| pmt.pid);
+        match output {
+            Ok(TableOutput::PatSection(section)) => {
+                self.collector
+                    .submit(section)
+                    .map_err(|error| error.error)?;
+            }
+            Ok(TableOutput::Done) => {}
+            Err(error) => {
+                let pid = if matches!(job, Job::Pat(_)) {
+                    Some(0)
+                } else {
+                    pmt_pid
+                };
+                return Ok(Some(self.diagnostic(FaultKind::Psi, pid, error)));
+            }
+            Ok(TableOutput::Map(map)) => {
+                if map.header.extension != self.program {
+                    return Ok(Some(self.diagnostic(
+                        FaultKind::Program,
+                        pmt_pid,
+                        Error::Invalid("PMT program differs from active PAT"),
+                    )));
+                }
+                if !map.header.current_next {
+                    return Ok(Some(TraceEvent::ProgramMap {
+                        map,
+                        active: false,
+                        configuration_epoch: self.config_epoch,
+                    }));
+                }
+                if self
+                    .pmt_source
+                    .as_ref()
+                    .is_some_and(|old| old.as_ref() == map.source.as_ref())
+                {
+                    return Ok(None);
+                }
+                if self.pmt_version == Some(map.header.version) {
+                    return Ok(Some(self.diagnostic(
+                        FaultKind::Program,
+                        pmt_pid,
+                        Error::Invalid("PMT conflicting repeat"),
+                    )));
+                }
+                let epoch = self.config_epoch.checked_add(1).ok_or(Error::Overflow)?;
+                let build = MapBuild {
+                    map,
+                    routes: BudgetVec::new(&self.budget),
+                    position: 0,
+                    epoch,
+                };
+                return self.poll_map(build, work, cancel);
+            }
+        }
+        self.poll_collector(work, cancel)
+    }
+
+    pub(super) fn accepted_table_source(&self, table: PsiTable) -> Option<&Bytes> {
+        match table {
+            PsiTable::Pat => self.collector.active_single_section(),
+            PsiTable::Pmt => self.pmt_source.as_ref(),
         }
     }
 }

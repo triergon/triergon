@@ -13,13 +13,13 @@ pub use entity::{MediaEntityEnd, ObservedTrace};
 pub use event::{CarrierObservation, CompactTraceEvent, FaultKind, TraceEvent, TraceFault};
 pub use feed::{FeedCarrier, FeedContinuation, FeedItem, FeedPayloadRun};
 use held::Stage;
-use tables::{Job, MapBuild};
+use tables::PsiWork;
 
 pub(crate) use storage::{StorageItem, TransportStorageCursor};
 
 use crate::pes::PesAssembler;
 use crate::psi::SectionAssembler;
-use crate::psi::{DescriptorNamespace, PatCollector, Section};
+use crate::psi::{DescriptorNamespace, PatCollector};
 use crate::transport::{Continuity, TransportFramer, TransportPacket};
 use crate::{PacketFormat, ParseLimits, SourceEpochs};
 use std::sync::atomic::AtomicUsize;
@@ -95,10 +95,7 @@ pub struct TransportStream {
     packet: Option<TransportPacket>,
     stage: Stage,
     route: Route,
-    fault: Option<TraceFault>,
-    section: Option<Section>,
-    job: Option<Job>,
-    map_build: Option<MapBuild>,
+    psi: PsiWork,
     entity_end: Option<SourceLocation>,
     logical_end: bool,
     eof_route: usize,
@@ -235,10 +232,7 @@ impl TransportStream {
             packet: None,
             stage: Stage::Read,
             route: Route::Ignore,
-            fault: None,
-            section: None,
-            job: None,
-            map_build: None,
+            psi: PsiWork::Idle,
             entity_end: None,
             logical_end: false,
             eof_route: 0,

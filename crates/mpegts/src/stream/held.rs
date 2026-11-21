@@ -1,5 +1,6 @@
 //! The stages of the carrier in hand.
 use super::event::{FaultKind, TraceEvent, TraceFault};
+use super::tables::{PsiTable, PsiWork};
 use super::{Route, TransportStream};
 use crate::AssemblyStep;
 use crate::pes::{Pes, PesAssembler};
@@ -122,7 +123,7 @@ impl TransportStream {
             } else {
                 FaultKind::Transport
             };
-            self.fault = Some(TraceFault {
+            self.psi = PsiWork::Fault(TraceFault {
                 kind,
                 pid: Some(pid),
                 location: self.location(),
@@ -221,6 +222,11 @@ impl TransportStream {
             .as_ref()
             .ok_or(Error::Invalid("TS payload missing"))?;
         let pid = packet.pid;
+        let table = if self.route == Route::Pat {
+            PsiTable::Pat
+        } else {
+            PsiTable::Pmt
+        };
         if pusi
             && work.remaining() >= payload.len() as u64
             && let [0, section_and_stuffing @ ..] = payload.as_ref()
@@ -229,7 +235,7 @@ impl TransportStream {
                 Route::Pmt => self.pmt.as_ref().is_some_and(|pmt| pmt.assembler.idle()),
                 _ => false,
             }
-            && let Some(accepted) = self.accepted_table_source()
+            && let Some(accepted) = self.accepted_table_source(table)
             && let Some(stuffing) = section_and_stuffing.strip_prefix(accepted.as_ref())
             && stuffing.iter().all(|&byte| byte == 0xff)
         {
@@ -240,13 +246,10 @@ impl TransportStream {
                 self.omit_feed_events(1)?;
             } else {
                 let start = offset.checked_add(1).ok_or(Error::Overflow)?;
-                self.section = Some(Section::repeated(
-                    &self.budget,
-                    pid,
-                    accepted,
-                    entity,
-                    start,
-                )?);
+                self.psi = PsiWork::Section {
+                    section: Section::repeated(&self.budget, pid, accepted, entity, start)?,
+                    table,
+                };
             }
             work.take(length);
             self.stage = Stage::Release;
@@ -279,7 +282,7 @@ impl TransportStream {
                 // Use the same explicit source-diagnostic recovery as poll faults;
                 // invariant/ownership/resource errors still propagate unchanged.
                 self.discard_route(self.route);
-                self.fault = Some(TraceFault {
+                self.psi = PsiWork::Fault(TraceFault {
                     kind: FaultKind::Psi,
                     pid: Some(pid),
                     location: self.location(),
@@ -370,18 +373,18 @@ impl TransportStream {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<TraceEvent>> {
-        let assembler = if self.route == Route::Pat {
-            &mut self.pat.assembler
+        let (assembler, table) = if self.route == Route::Pat {
+            (&mut self.pat.assembler, PsiTable::Pat)
         } else {
-            &mut self
+            let pmt = self
                 .pmt
                 .as_mut()
-                .ok_or(Error::Invalid("PMT route missing"))?
-                .assembler
+                .ok_or(Error::Invalid("PMT route missing"))?;
+            (&mut pmt.assembler, PsiTable::Pmt)
         };
         let result = assembler.poll(work, cancel).map(|step| match step {
             AssemblyStep::Output(section) => {
-                self.section = Some(section);
+                self.psi = PsiWork::Section { section, table };
                 false
             }
             AssemblyStep::Yield => false,

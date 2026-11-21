@@ -2,6 +2,7 @@
 use super::event::{CarrierObservation, CompactTraceEvent, FaultKind, TraceEvent, TraceFault};
 use super::feed::{FeedCarrier, FeedContinuation, FeedItem};
 use super::held::Counted;
+use super::tables::PsiWork;
 use super::{Route, Stage, TransportStream};
 use crate::SourceEpochs;
 use crate::pes::Pes;
@@ -377,16 +378,11 @@ impl TransportStream {
             if self.boundary_event {
                 return Ok(ready(self.take_boundary()));
             }
-            if self.fault.is_some()
-                || self.map_build.is_some()
-                || self.section.is_some()
-                || self.job.is_some()
-                || self.collector.has_pending()
-            {
+            if !matches!(self.psi, PsiWork::Idle) || self.collector.has_pending() {
                 if let Some(event) = self.poll_jobs(work, cancel)? {
                     return Ok(ready(event));
                 }
-                if self.job.is_some() || self.section.is_some() || self.map_build.is_some() {
+                if self.psi.blocks_carriers() {
                     return Ok(Step::Yield);
                 }
             } else if FEED && cancel.load(Ordering::Relaxed) {

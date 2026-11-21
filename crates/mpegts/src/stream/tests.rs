@@ -1,4 +1,5 @@
 use super::feed::PAYLOAD_RUN_WORK;
+use super::tables::PsiWork;
 use super::*;
 use crate::AssemblyStep;
 use crate::compat::pes::{DemuxObserver, ReadyContinuation, SourceContext};
@@ -70,7 +71,7 @@ fn idle_psi_preserves_cancellation_and_zero_work_fault_delivery() {
         stream.poll(&mut input, &mut work, &cancel),
         Ok(Step::Yield)
     ));
-    stream.fault = Some(TraceFault {
+    stream.psi = PsiWork::Fault(TraceFault {
         kind: FaultKind::Transport,
         pid: Some(PID),
         location: SourceLocation {
@@ -704,10 +705,10 @@ fn invalid_psi_pointer_restores_payload_before_diagnostic_recovery() {
     stream.stage = Stage::Payload;
     stream.feed::<false>(&mut WorkBudget::new(1)).unwrap();
     assert_eq!(stream.stage, Stage::Release);
-    assert_eq!(
-        stream.fault.as_ref().unwrap().error,
-        Error::Invalid(POINTER_FIELD)
-    );
+    let PsiWork::Fault(fault) = &stream.psi else {
+        panic!("PSI pointer fault not kept");
+    };
+    assert_eq!(fault.error, Error::Invalid(POINTER_FIELD));
     let payload = stream.packet.as_ref().unwrap().payload.as_ref().unwrap();
     assert_eq!(payload.storage_address(), address);
     assert_eq!(payload.as_ref(), &raw[4..]);
