@@ -58,14 +58,17 @@ pub struct DvbServiceSelection {
 pub enum DvbQueueAction<'a> {
     /// A subtitle without rectangles clears the screen.
     Clear {
+        /// The packet-clock time of the clear, in nanoseconds.
         at_ns: i64,
     },
+    /// Show a subtitle.
     Show(DvbQueuePicture<'a>),
 }
 
 /// A subtitle with rectangles, borrowed from the decoder until its next call.
 #[derive(Clone, Copy, Debug)]
 pub struct DvbQueuePicture<'a> {
+    /// The start on the packet clock, in nanoseconds.
     pub start_ns: i64,
     /// The display size the rectangles are placed on, when plausible.
     pub canvas: Option<Size>,
@@ -228,6 +231,7 @@ impl DvbTsBridge {
         Ok(true)
     }
 
+    /// Marks the end of the PID's PES.
     pub fn finish_input(&mut self) {
         self.eof = true;
     }

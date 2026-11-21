@@ -8,6 +8,8 @@ use triergon_framing::{
     aac::{AacAdtsOutput, AacAdtsParameters, AacAdtsWriter, AacAudioSpecificConfig, AacSource},
 };
 use triergon_playback::Mp4Packet;
+/// Wraps the raw AAC access units of one MP4 track and configuration revision in
+/// ADTS headers.
 #[derive(Debug)]
 pub struct AacBridge {
     pool: Budget,
@@ -18,17 +20,25 @@ pub struct AacBridge {
     parameters: AacAdtsParameters,
     maximum: usize,
 }
+/// The ADTS framing of one MP4 packet, stepped within a work budget.
 #[derive(Debug)]
 pub struct AacPacketJob {
     source: Option<Mp4Packet>,
     writer: AacAdtsWriter,
 }
+/// One MP4 packet framed as ADTS.
 #[derive(Debug)]
 pub struct AacPacketOutput {
+    /// The source packet.
     pub source: Mp4Packet,
+    /// The ADTS header and the packet's payload.
     pub adts: AacAdtsOutput,
 }
 impl AacBridge {
+    /// A bridge for `track` of `source` at configuration `revision`, writing frames of at
+    /// most `maximum` bytes. Fails with `ForeignPool` when `configuration` is not charged
+    /// to `pool` and with `Invalid` for track 0 or a `maximum` below 7. It also fails
+    /// when ADTS cannot carry the configuration.
     pub fn new(
         pool: &Budget,
         source: triergon_core::SourceId,
@@ -54,9 +64,13 @@ impl AacBridge {
             maximum,
         })
     }
+    /// The AudioSpecificConfig the headers are written from.
     pub fn configuration(&self) -> &AacAudioSpecificConfig {
         &self.configuration
     }
+    /// Starts framing `packet`. Fails with `SourceMismatch` for another source and with
+    /// `Invalid` when its track, revision or `mp4a` sample entry differs from the
+    /// bridge's.
     pub fn packet(&self, packet: Mp4Packet) -> Result<AacPacketJob> {
         if packet.source.source != self.source {
             return Err(Error::SourceMismatch);
@@ -87,6 +101,7 @@ impl AacBridge {
     }
 }
 impl AacPacketJob {
+    /// Writes the frame within `w`: `Ready` once, then `Complete`.
     pub fn step(
         &mut self,
         w: &mut triergon_core::WorkBudget,

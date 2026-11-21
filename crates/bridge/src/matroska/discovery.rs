@@ -11,6 +11,7 @@ use triergon_playback::{
 };
 use triergon_subtitles::pgs::{Composition, Envelope, SegmentIter};
 
+/// Bounds of Matroska startup discovery; reaching one ends it.
 #[derive(Clone, Copy, Debug)]
 pub struct MatroskaDiscoveryLimits {
     /// Count complete demuxed packet payloads, including the packet that
@@ -32,18 +33,27 @@ impl Default for MatroskaDiscoveryLimits {
     }
 }
 
+/// Why discovery stopped.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MatroskaDiscoveryCutoff {
+    /// Every selected stream is ready.
     StreamsReady,
+    /// The packet byte bound was reached.
     PacketBytes,
+    /// The source byte bound was reached.
     SourceBytes,
+    /// The output bound was reached.
     OutputCount,
+    /// The source ended.
     SourceEnd,
 }
 
+/// One step of discovery.
 #[derive(Debug)]
 pub enum MatroskaDiscoveryStep {
+    /// The player's progress: answer its request or poll again.
     Progress(Progress),
+    /// Discovery stopped: call `finish`.
     Ready(MatroskaDiscoveryCutoff),
 }
 
@@ -245,6 +255,7 @@ impl ReplayBuffer {
 pub struct MatroskaReplayPrefix(BudgetVec<MatroskaReplayOutput>);
 
 impl MatroskaReplayPrefix {
+    /// The buffered events, in source order.
     pub fn events(&self) -> impl ExactSizeIterator<Item = &MkvEvent> {
         self.0.as_slice().iter().map(|output| &output.event)
     }
@@ -279,14 +290,19 @@ impl MatroskaReplayPrefix {
 #[derive(Debug)]
 pub struct MatroskaCompactDiscovery<S: Source>(MatroskaDiscovery<S>);
 
+/// The end of compact discovery.
 #[derive(Debug)]
 pub struct MatroskaCompactDiscovered<S: Source> {
+    /// The player, reading on after the prefix without the discovery bound.
     pub player: Player<MatroskaStartupSource<S>>,
+    /// The outputs read while discovering, to deliver first.
     pub prefix: MatroskaReplayPrefix,
+    /// Why discovery stopped.
     pub cutoff: MatroskaDiscoveryCutoff,
 }
 
 impl<S: Source> MatroskaCompactDiscovery<S> {
+    /// Discovery over a fresh player of `engine`.
     pub fn new(
         engine: Engine,
         source: SourceOwner<S>,
@@ -319,6 +335,7 @@ impl<S: Source> MatroskaCompactDiscovery<S> {
         Ok(discovery)
     }
 
+    /// The buffered events, in source order.
     pub fn buffered_events(&self) -> impl ExactSizeIterator<Item = &MkvEvent> {
         let ReplayBuffer::Matroska(outputs) = &self.0.outputs else {
             unreachable!("compact discovery always has a Matroska replay buffer");
@@ -326,10 +343,13 @@ impl<S: Source> MatroskaCompactDiscovery<S> {
         outputs.as_slice().iter().map(|output| &output.event)
     }
 
+    /// Reports that a consumer found the codec of `track` under configuration
+    /// `revision`, as [`MatroskaDiscovery::confirm_stream_ready`] does.
     pub fn confirm_stream_ready(&mut self, track: u64, revision: u64) -> Result<()> {
         self.0.confirm_stream_ready(track, revision)
     }
 
+    /// Reads within `work` until every selected stream is ready or a bound is reached.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,
@@ -338,6 +358,7 @@ impl<S: Source> MatroskaCompactDiscovery<S> {
         self.0.poll(work, cancel)
     }
 
+    /// Ends discovery. Fails with `Invalid` while it is still running.
     pub fn finish(mut self) -> Result<MatroskaCompactDiscovered<S>> {
         let cutoff = self.0.release_source()?;
         let ReplayBuffer::Matroska(outputs) = self.0.outputs else {
@@ -351,14 +372,19 @@ impl<S: Source> MatroskaCompactDiscovery<S> {
     }
 }
 
+/// The end of discovery.
 #[derive(Debug)]
 pub struct MatroskaDiscovered<S: Source> {
+    /// The player, reading on after the prefix without the discovery bound.
     pub player: Player<MatroskaStartupSource<S>>,
+    /// The outputs read while discovering, to deliver first.
     pub prefix: BudgetVec<Output>,
+    /// Why discovery stopped.
     pub cutoff: MatroskaDiscoveryCutoff,
 }
 
 impl<S: Source> MatroskaDiscovery<S> {
+    /// Discovery over a fresh player of `engine`.
     pub fn new(
         engine: Engine,
         source: SourceOwner<S>,
@@ -408,6 +434,7 @@ impl<S: Source> MatroskaDiscovery<S> {
         })
     }
 
+    /// The buffered outputs, in source order.
     pub fn buffered(&self) -> &[Output] {
         let ReplayBuffer::Full(outputs) = &self.outputs else {
             unreachable!("ordinary discovery always has a full replay buffer");
@@ -442,6 +469,7 @@ impl<S: Source> MatroskaDiscovery<S> {
         Ok(())
     }
 
+    /// Reads within `work` until every selected stream is ready or a bound is reached.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,
@@ -578,6 +606,7 @@ impl<S: Source> MatroskaDiscovery<S> {
         Ok(cutoff)
     }
 
+    /// Ends discovery. Fails with `Invalid` while it is still running.
     pub fn finish(mut self) -> Result<MatroskaDiscovered<S>> {
         let cutoff = self.release_source()?;
         let ReplayBuffer::Full(outputs) = self.outputs else {

@@ -16,7 +16,9 @@ use triergon_playback::{Mp4Packet, mp4_plan::Mp4Configuration};
 /// of the receiver view. Bind a new bridge after a source configuration changes.
 #[derive(Clone, Copy, Debug)]
 pub enum Av1Input<'a> {
+    /// A Matroska packet.
     Matroska(&'a MatroskaPacket),
+    /// An MP4 packet.
     Mp4(&'a Mp4Packet),
 }
 
@@ -34,6 +36,7 @@ enum Binding {
     },
 }
 
+/// Reads the AV1 configuration of one track before its first packet.
 #[derive(Debug)]
 pub struct Av1BridgeSetup {
     pool: Budget,
@@ -46,6 +49,7 @@ pub struct Av1BridgeSetup {
     packet_limits: Av1TemporalUnitLimits,
 }
 
+/// Frames the packets of one bound AV1 track as temporal units.
 #[derive(Debug)]
 pub struct Av1Bridge {
     binding: Binding,
@@ -160,6 +164,8 @@ impl Av1BridgeSetup {
         })
     }
 
+    /// Reads the configuration within `work`; `Ready` yields the bridge once. A failure
+    /// other than backpressure or allocation is final.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -246,6 +252,8 @@ impl Av1BridgeSetup {
 }
 
 impl Av1Bridge {
+    /// Starts framing `packet`. Fails with `Invalid` for a packet of another track,
+    /// configuration or source.
     pub fn packet<'a>(&'a self, packet: Av1Input<'a>) -> Result<Av1TemporalUnitJob<'a>> {
         let (bytes, random_access) = match (&self.binding, packet) {
             (

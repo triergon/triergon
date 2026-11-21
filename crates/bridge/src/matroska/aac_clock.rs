@@ -67,12 +67,15 @@ impl MatroskaClockProbe<'_, MatroskaTrackFeed> {
 }
 
 impl MatroskaClockPrefix<'_, MatroskaTrackFeed> {
+    /// The clock of the packet the probe numbered `ordinal`. Fails with `Invalid` for an
+    /// ordinal it did not give.
     pub fn timing(&self, ordinal: usize) -> Result<MatroskaPacketTiming> {
         self.resolve(ordinal, "AAC clock prefix ordinal")
     }
 }
 
 impl MatroskaClock<'_, MatroskaTrackFeed> {
+    /// The clock of the next framed packet.
     pub fn observe(&mut self, packet: &MatroskaFeedPacket<'_>) -> Result<MatroskaPacketTiming> {
         self.advance(|feed| feed.aac_timing(packet))
     }

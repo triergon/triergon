@@ -27,6 +27,8 @@ pub struct MatroskaBitmapClockProbe<'track, 'prefix> {
 }
 
 impl<'track, 'prefix> MatroskaBitmapClockProbe<'track, 'prefix> {
+    /// A probe over `prefix`, the buffered stream-probe outputs in order. Fails with
+    /// `Limit` above `maximum_outputs` outputs.
     pub fn new(
         track: &'track MatroskaBitmapTrack,
         prefix: &'prefix [Output],
@@ -117,6 +119,8 @@ impl<'track, 'prefix> MatroskaBitmapClockProbe<'track, 'prefix> {
             .map(Some)
     }
 
+    /// As [`Self::packet`], bound to the track's DVB decoder. Fails with `Invalid` for
+    /// a track that is not DVB.
     pub fn dvb_packet(
         &self,
         output_index: usize,
@@ -165,6 +169,8 @@ impl MatroskaBitmapLiveClock<'_> {
         )))
     }
 
+    /// The next packet of the track with its clock, advancing the clock; `None` for an
+    /// output of another track.
     pub fn packet(
         &mut self,
         output: &Output,
@@ -177,6 +183,8 @@ impl MatroskaBitmapLiveClock<'_> {
         Ok(Some(packet))
     }
 
+    /// As [`Self::packet`], bound to the track's DVB decoder. Fails with `Invalid` for
+    /// a track that is not DVB.
     pub fn dvb_packet(
         &mut self,
         output: &Output,

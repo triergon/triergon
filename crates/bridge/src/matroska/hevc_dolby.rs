@@ -19,16 +19,23 @@ use triergon_framing::{
 use triergon_matroska::{Configuration, TypedPacket as Packet};
 use triergon_playback::Output;
 
+/// Bounds of a Matroska HEVC, AC-3 or E-AC-3 feed.
 #[derive(Clone, Copy, Debug)]
 pub struct MatroskaHevcDolbyLimits {
+    /// HEVC decoder configuration record bounds.
     pub hevc_config: HvcConfigLimits,
+    /// HEVC access unit bounds.
     pub hevc_packet: HevcAnnexBLimits,
+    /// AC-3 and E-AC-3 packet bounds.
     pub dolby_packet: MatroskaDolbyLimits,
 }
 
+/// Bounds of one AC-3 or E-AC-3 packet.
 #[derive(Clone, Copy, Debug)]
 pub struct MatroskaDolbyLimits {
+    /// The largest packet in bytes.
     pub maximum_packet_bytes: usize,
+    /// The most syncframes in one packet.
     pub maximum_syncframes: usize,
 }
 
@@ -69,6 +76,10 @@ pub struct MatroskaHevcDolbySetup {
 }
 
 impl MatroskaHevcDolbySetup {
+    /// Binds track index `track` of `configuration`. Fails with `ForeignPool` when the
+    /// configuration is not charged to `pool`, with `Invalid` for an unknown track or an
+    /// HEVC track without initialization, with `Limit` for a record above `hevc_config`,
+    /// and with `Unsupported` for another codec.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -120,6 +131,7 @@ impl MatroskaHevcDolbySetup {
         })
     }
 
+    /// Parses the HEVC configuration record within `work`; `Ready` yields the feed once.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -181,6 +193,7 @@ enum FeedCodec {
     Dolby(DolbyCodec),
 }
 
+/// The feed of one bound HEVC, AC-3 or E-AC-3 track.
 #[derive(Debug)]
 pub struct MatroskaHevcDolbyFeed {
     association: Association,
@@ -211,6 +224,7 @@ enum PacketJob<'a> {
     Dolby(DolbyJob<'a>),
 }
 
+/// The framing of one packet, stepped within a work budget.
 #[derive(Debug)]
 pub struct MatroskaHevcDolbyJob<'a> {
     source: &'a Packet,
@@ -218,6 +232,7 @@ pub struct MatroskaHevcDolbyJob<'a> {
 }
 
 impl<'a> MatroskaHevcDolbyJob<'a> {
+    /// Frames the packet within `work`.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -245,9 +260,12 @@ impl<'a> MatroskaHevcDolbyJob<'a> {
     }
 }
 
+/// One framed packet.
 #[derive(Debug)]
 pub struct MatroskaHevcDolbyPacket<'a> {
+    /// The source packet, with its container clocks.
     pub source: &'a Packet,
+    /// The framed payload.
     pub payload: MatroskaHevcDolbyPayload<'a>,
 }
 
@@ -306,13 +324,22 @@ fn dolby_final_syncframe(family: Ac3Family, mut raw: &[u8]) -> Option<Ac3FrameHe
     None
 }
 
+/// The framed payload of a packet.
 #[derive(Debug)]
 pub enum MatroskaHevcDolbyPayload<'a> {
+    /// An HEVC access unit in Annex B form.
     Hevc(HevcAnnexBAccessUnit<'a>),
-    Dolby { family: Ac3Family, raw: &'a [u8] },
+    /// Complete AC-3 or E-AC-3 syncframes.
+    Dolby {
+        /// The syncframes' bitstream family.
+        family: Ac3Family,
+        /// The packet bytes, every syncframe checked.
+        raw: &'a [u8],
+    },
 }
 
 impl MatroskaHevcDolbyPayload<'_> {
+    /// The payload length in bytes.
     pub fn byte_len(&self) -> usize {
         match self {
             Self::Hevc(unit) => unit.byte_len(),
@@ -320,6 +347,7 @@ impl MatroskaHevcDolbyPayload<'_> {
         }
     }
 
+    /// The payload as byte spans, in order.
     pub fn segments(&self) -> impl Iterator<Item = &[u8]> {
         let (hevc, dolby) = match self {
             Self::Hevc(unit) => (Some(unit.segments()), None),

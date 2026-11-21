@@ -13,22 +13,32 @@ use triergon_subtitles::{compat, dvb, pgs::PacketClock};
 
 const NS_PER_SECOND: u64 = 1_000_000_000;
 
+/// The bitmap subtitle codec of a Matroska track.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MatroskaBitmapCodec {
+    /// `S_HDMV/PGS`.
     Pgs,
+    /// `S_VOBSUB`.
     VobSub,
+    /// `S_DVBSUB`.
     Dvb,
 }
 
+/// The Matroska packet behind a bitmap input, kept as its metadata.
 #[derive(Debug)]
 pub struct MatroskaBitmapSource {
+    /// The source packet.
     pub packet: Packet,
+    /// How the player delivered it.
     pub delivery: Delivery,
 }
 
+/// A DVB subtitle packet with its Matroska source.
 #[derive(Debug)]
 pub struct MatroskaDvbPacket {
+    /// The packet for the DVB decoder.
     pub packet: dvb::DvbPacket,
+    /// The Matroska packet.
     pub source: MatroskaBitmapSource,
 }
 
@@ -159,6 +169,7 @@ impl MatroskaBitmapTrack {
         })
     }
 
+    /// The track's codec.
     pub fn codec(&self) -> MatroskaBitmapCodec {
         match self.codec {
             Codec::Pgs => MatroskaBitmapCodec::Pgs,
@@ -167,6 +178,7 @@ impl MatroskaBitmapTrack {
         }
     }
 
+    /// The scope every input of the track carries.
     pub fn scope(&self) -> BitmapScope {
         self.scope
     }

@@ -64,6 +64,7 @@ impl MatroskaVideoSeekGate {
         Ok(self.landed)
     }
 
+    /// Whether the video reached its landing keyframe.
     pub fn landed(&self) -> bool {
         self.landed
     }

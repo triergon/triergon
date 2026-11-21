@@ -44,7 +44,10 @@ pub enum TeletextStep {
     /// A page for the text bridge.
     Cue(TextSource),
     /// An empty page: clear what is shown.
-    Clear { at: Option<Time> },
+    Clear {
+        /// When to clear, on the player's timeline, if known.
+        at: Option<Time>,
+    },
     /// The decoder refused the packet; decoding continues with the next.
     Refused(Refusal),
     /// Input finished and the decoder drained.
@@ -151,6 +154,7 @@ impl TeletextTsBridge {
         Ok(true)
     }
 
+    /// Marks the end of the PID's PES.
     pub fn finish_input(&mut self) {
         self.eof = true;
     }

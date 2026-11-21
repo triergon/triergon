@@ -44,11 +44,16 @@ use triergon_playback::{Delivery, Event, Output};
 pub use video_clock::MatroskaAvcClock;
 pub use video_seek::MatroskaVideoSeekGate;
 
+/// Bounds of a Matroska AVC or AAC feed.
 #[derive(Clone, Copy, Debug)]
 pub struct MatroskaFeedLimits {
+    /// AVC decoder configuration record bounds.
     pub avc_config: AvcConfigLimits,
+    /// AVC access unit bounds.
     pub avc_packet: AvcAnnexBLimits,
+    /// AudioSpecificConfig bounds.
     pub aac_config: AacConfigLimits,
+    /// The largest ADTS frame in bytes, header included.
     pub aac_output_bytes: usize,
 }
 
@@ -213,6 +218,7 @@ impl MatroskaFeedSetup {
         })
     }
 
+    /// Parses the initialization within `work`; `Ready` yields the feed once.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -293,6 +299,7 @@ fn parse(
     }
 }
 
+/// The feed of one bound AVC or AAC track.
 #[derive(Debug)]
 pub struct MatroskaTrackFeed {
     association: Association,
@@ -345,6 +352,7 @@ enum PacketJob<'a> {
     Aac(Option<[u8; 7]>),
 }
 
+/// The framing of one packet, stepped within a work budget.
 #[derive(Debug)]
 pub struct MatroskaFeedJob<'a> {
     source: &'a Packet,
@@ -353,6 +361,7 @@ pub struct MatroskaFeedJob<'a> {
 }
 
 impl<'a> MatroskaFeedJob<'a> {
+    /// Frames the packet within `work`.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -388,19 +397,31 @@ impl<'a> MatroskaFeedJob<'a> {
     }
 }
 
+/// One framed packet.
 #[derive(Debug)]
 pub struct MatroskaFeedPacket<'a> {
+    /// The source packet, with its container clocks.
     pub source: &'a Packet,
+    /// The framed payload.
     pub payload: MatroskaFeedPayload<'a>,
 }
 
+/// The framed payload of a packet.
 #[derive(Debug)]
 pub enum MatroskaFeedPayload<'a> {
+    /// An AVC access unit in Annex B form.
     Avc(AvcAnnexBAccessUnit<'a>),
-    Aac { header: [u8; 7], raw: &'a [u8] },
+    /// An AAC access unit behind its ADTS header.
+    Aac {
+        /// The ADTS header.
+        header: [u8; 7],
+        /// The raw access unit, borrowed from the packet.
+        raw: &'a [u8],
+    },
 }
 
 impl MatroskaFeedPayload<'_> {
+    /// The payload length in bytes.
     pub fn byte_len(&self) -> usize {
         match self {
             Self::Avc(unit) => unit.byte_len(),

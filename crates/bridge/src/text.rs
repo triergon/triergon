@@ -15,6 +15,7 @@ enum Record {
     Matroska(triergon_matroska::TypedPacket),
     Document(Input),
 }
+/// One text subtitle packet or document, as a [`TextBridge`] takes it.
 #[derive(Clone, Debug)]
 pub struct TextSource {
     record: Record,
@@ -40,12 +41,17 @@ pub(crate) fn receiver_timing(start_us: Option<i64>, display_ms: Option<u32>) ->
             .transpose()?,
     ))
 }
+/// An output without a text packet, returned with the reason.
 #[derive(Debug)]
 pub struct RejectedOutput {
+    /// The output.
     pub output: Output,
+    /// Why it was refused.
     pub error: Error,
 }
 impl TextSource {
+    /// The MP4 or Matroska packet of `output`. Refuses any other event with `Invalid`,
+    /// returning the output.
     #[expect(
         clippy::result_large_err,
         reason = "return exact charged producer output"
@@ -74,6 +80,7 @@ impl TextSource {
             pool,
         })
     }
+    /// A complete document or receiver event, read as `input` describes it.
     pub fn document(pool: &Budget, input: Input) -> Self {
         Self {
             source: input.source_id,
@@ -108,6 +115,7 @@ impl TextSource {
         };
         Ok(Self::document(pool, input))
     }
+    /// The MP4 packet, for a source made from one.
     pub fn mp4(&self) -> Option<&Mp4Packet> {
         if let Record::Mp4(p) = &self.record {
             Some(p)
@@ -115,6 +123,7 @@ impl TextSource {
             None
         }
     }
+    /// The Matroska packet, for a source made from one.
     pub fn matroska(&self) -> Option<&triergon_matroska::TypedPacket> {
         if let Record::Matroska(p) = &self.record {
             Some(p)
@@ -123,25 +132,36 @@ impl TextSource {
         }
     }
 }
+/// One cue with its source.
 #[derive(Debug)]
 pub struct TextOutput {
+    /// The packet or document the cue came from.
     pub source: TextSource,
+    /// The cue.
     pub cue: text::Cue,
 }
+/// One step of a [`TextBridge`].
 #[expect(
     clippy::large_enum_variant,
     reason = "bounded inline source event retains all charged owners"
 )]
 #[derive(Debug)]
 pub enum TextStep {
+    /// The work budget ran out: step again.
     Yield,
+    /// A cue.
     Cue(TextOutput),
+    /// Provide the next packet, or `finish`.
     NeedPacket,
+    /// After `finish`, every cue was returned.
     Finished,
 }
+/// A refused source, returned with the reason.
 #[derive(Debug)]
 pub struct TextRejection {
+    /// The source.
     pub source: TextSource,
+    /// Why it was refused.
     pub error: Error,
 }
 #[derive(Debug)]
@@ -153,6 +173,8 @@ struct CopyStage {
     scan: usize,
     scanned: bool,
 }
+/// Extracts the cues of one text track's packets in order, one pending packet at a
+/// time.
 #[derive(Debug)]
 pub struct TextBridge {
     extractor: Extractor,
@@ -170,6 +192,7 @@ fn exact_ns(t: triergon_matroska::timing::ExactTime) -> Result<Time> {
     Time::new(t.numerator(), u128::from(t.denominator()) * 1_000_000_000)
 }
 impl TextBridge {
+    /// A bridge for `track` of `source` in playback `generation`.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -190,6 +213,7 @@ impl TextBridge {
             finishing: false,
         }
     }
+    /// Starts over in `generation`, dropping a pending packet.
     pub fn reset(&mut self, generation: u64) {
         self.extractor.reset(generation);
         self.generation = generation;
@@ -198,6 +222,7 @@ impl TextBridge {
         self.sequence = 0;
         self.finishing = false;
     }
+    /// Marks the end of the track's packets.
     pub fn finish(&mut self) {
         self.finishing = true;
         if self.copy.is_none() {
@@ -290,6 +315,9 @@ impl TextBridge {
             }
         }
     }
+    /// Takes the next packet. Refuses it, returning it, while one is pending or after
+    /// `finish` (`Invalid`), for another source (`SourceMismatch`), or when the
+    /// extractor refuses it.
     #[expect(
         clippy::result_large_err,
         reason = "rejection returns exact source owner inline"
@@ -472,6 +500,7 @@ impl TextBridge {
         }
         Ok(true)
     }
+    /// Extracts within `w`.
     pub fn step(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<TextStep> {
         if c.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);

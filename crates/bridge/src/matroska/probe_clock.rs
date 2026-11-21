@@ -7,8 +7,11 @@ const MAX_PREFIX_PACKETS: usize = 4096;
 /// One packet's native clock in nanoseconds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MatroskaPacketTiming {
+    /// The presentation time.
     pub pts_ns: Option<i64>,
+    /// The decode time.
     pub dts_ns: Option<i64>,
+    /// The duration.
     pub duration_ns: Option<u64>,
 }
 

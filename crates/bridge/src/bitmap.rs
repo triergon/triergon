@@ -9,21 +9,33 @@ use triergon_core::{
     WorkBudget,
 };
 use triergon_subtitles::{compat, pgs};
+/// The source, track, generation and configuration a bitmap receiver is bound to;
+/// every packet it takes carries the same scope.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BitmapScope {
+    /// The player's input.
     pub source: SourceId,
+    /// The source track number.
     pub track: u64,
+    /// The playback generation.
     pub generation: u64,
+    /// The configuration revision.
     pub configuration: u64,
 }
+/// One bitmap subtitle packet for a receiver, with caller metadata.
 #[derive(Debug)]
 pub struct BitmapInput<M> {
+    /// The scope the packet was read in.
     pub scope: BitmapScope,
+    /// The packet's position in its track.
     pub sequence: u64,
+    /// The packet payload.
     pub raw: Bytes,
+    /// The packet's timestamps.
     pub clock: pgs::PacketClock,
     /// The packet's duration in ticks of `clock.timebase`, where known.
     pub duration: Option<i64>,
+    /// Caller data kept with the packet.
     pub metadata: M,
 }
 #[derive(Debug)]
@@ -32,6 +44,7 @@ struct Data<M> {
     /// Keeps the owner's allocation charged to the pool while it lives.
     _charge: Reservation,
 }
+/// A shared, budget-charged owner of one admitted packet.
 #[derive(Debug)]
 pub struct BitmapOwner<M>(Arc<Data<M>>);
 impl<M> Clone for BitmapOwner<M> {
@@ -40,6 +53,7 @@ impl<M> Clone for BitmapOwner<M> {
     }
 }
 impl<M> BitmapOwner<M> {
+    /// The packet.
     #[expect(
         clippy::expect_used,
         reason = "every owner is built holding its input and never gives it up"
@@ -48,9 +62,12 @@ impl<M> BitmapOwner<M> {
         self.0.input.as_ref().expect("published bitmap packet")
     }
 }
+/// A refused packet, returned with the reason.
 #[derive(Debug)]
 pub struct BitmapRejection<M> {
+    /// The packet.
     pub input: BitmapInput<M>,
+    /// Why it was refused.
     pub error: Error,
 }
 fn check<M>(pool: &Budget, scope: BitmapScope, input: &BitmapInput<M>) -> Result<()> {
@@ -137,6 +154,8 @@ fn allocate_owner<M>(
         _charge: charge,
     })))
 }
+/// The PGS receiver of `compat::pgs` over one track's packets, in order, one pending
+/// packet at a time.
 #[derive(Debug)]
 pub struct PgsBridge<M> {
     pool: Budget,
@@ -150,24 +169,37 @@ pub struct PgsBridge<M> {
 /// One decoded packet with the receiver's output for it.
 #[derive(Debug)]
 pub struct PgsOutput<M> {
+    /// The packet.
     pub packet: BitmapOwner<M>,
+    /// The receiver's output for it.
     pub decoded: compat::pgs::ReceiverPacket,
 }
 
+/// What a packet-clock bitmap queue does for one PGS output.
 #[derive(Clone, Copy, Debug)]
 pub enum PgsQueueAction<'a> {
-    Clear { at_ns: i64 },
+    /// An event without rectangles clears the track.
+    Clear {
+        /// The packet-clock time of the clear, in nanoseconds.
+        at_ns: i64,
+    },
+    /// Show a picture.
     Show(PgsQueuePicture<'a>),
 }
 
+/// A PGS picture for a packet-clock bitmap queue.
 #[derive(Clone, Copy, Debug)]
 pub struct PgsQueuePicture<'a> {
+    /// The start on the packet clock in nanoseconds: the PTS, else the DTS, else zero.
     pub start_ns: i64,
+    /// The presentation canvas in pixels, when each side lies within 160 to 8,192.
     pub canvas: Option<[u16; 2]>,
     rectangles: &'a [pgs::RecoveredRect],
 }
 
 impl<'a> PgsQueuePicture<'a> {
+    /// The displayable rectangles: nonempty, at most 8,192 pixels on a side, and with
+    /// every pixel present.
     pub fn rectangles(self) -> impl Iterator<Item = &'a pgs::RecoveredRect> {
         self.rectangles.iter().filter(|r| {
             r.width > 0
@@ -209,14 +241,20 @@ impl<M> PgsOutput<M> {
     }
 }
 
+/// One step of a [`PgsBridge`].
 #[derive(Debug)]
 pub enum PgsStep<M> {
+    /// The work budget ran out, or input was pushed: step again.
     Yield,
+    /// Provide the next packet, or `finish`.
     NeedPacket,
+    /// One decoded packet.
     Output(PgsOutput<M>),
+    /// After `finish`, the receiver drained.
     Finished,
 }
 impl<M> PgsBridge<M> {
+    /// A receiver for packets of `scope`.
     pub fn new(
         pool: &Budget,
         scope: BitmapScope,
@@ -234,6 +272,9 @@ impl<M> PgsBridge<M> {
             maximum_packet: limits.max_packet_bytes,
         })
     }
+    /// Takes the next packet. Refuses it, returning it, while a packet is pending or
+    /// after `finish` (`Invalid`), above the packet limit (`Limit`), outside the scope,
+    /// or when its owner cannot be charged.
     #[expect(
         clippy::result_large_err,
         reason = "returns exact packet owner on refusal"
@@ -262,9 +303,13 @@ impl<M> PgsBridge<M> {
         self.pushed = false;
         Ok(())
     }
+    /// Marks the end of the track's packets.
     pub fn finish(&mut self) {
         self.finished = true;
     }
+    /// Binds the receiver to a new scope with fresh decoder state, dropping a pending
+    /// packet; `false` when `w` had no work left. Fails with `Invalid` for the current
+    /// scope.
     pub fn reset(
         &mut self,
         scope: BitmapScope,
@@ -289,6 +334,7 @@ impl<M> PgsBridge<M> {
         self.scope = scope;
         Ok(true)
     }
+    /// Decodes within `w`.
     pub fn step(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<PgsStep<M>> {
         if c.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
@@ -340,7 +386,9 @@ impl<M> PgsBridge<M> {
 /// The settings and bounds of a [`DvdReceiver`]'s decoder.
 #[derive(Clone, Debug, Default)]
 pub struct DvdBridgeConfig {
+    /// The decoder settings.
     pub settings: compat::dvd::Settings,
+    /// The decoder bounds.
     pub limits: compat::dvd::Limits,
 }
 
@@ -349,20 +397,28 @@ pub struct DvdBridgeConfig {
 /// `width * height` colour indices, row by row.
 #[derive(Debug)]
 pub struct DvdPicture {
+    /// The display start after the packet clock, in milliseconds.
     pub start_ms: u32,
     /// The stop offset, else the packet's duration as FFmpeg's decode API
     /// ends a subtitle without a stop; 0 when neither is known.
     pub end_ms: u32,
+    /// Whether the subpicture is forced.
     pub forced: bool,
+    /// The left edge on the canvas, in pixels.
     pub x: u16,
+    /// The top edge on the canvas, in pixels.
     pub y: u16,
+    /// The width in pixels.
     pub width: u16,
+    /// The height in pixels.
     pub height: u16,
     palette: BudgetVec<u32>,
+    /// `width * height` colour indices, row by row.
     pub pixels: Bytes,
 }
 
 impl DvdPicture {
+    /// The colours the indices select.
     pub fn palette(&self) -> &[u32] {
         self.palette.as_slice()
     }
@@ -401,14 +457,18 @@ impl DvdPicture {
 /// A display offset and its position on the packet's timeline.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvdDisplayBoundary {
+    /// The offset after the packet clock, in milliseconds.
     pub milliseconds: u32,
+    /// The packet's PTS plus the offset; `None` without a PTS.
     pub at: Option<Time>,
 }
 
 /// A picture placed on its packet's timeline.
 #[derive(Clone, Copy, Debug)]
 pub struct DvdPresentation<'a> {
+    /// The picture.
     pub picture: &'a DvdPicture,
+    /// When it appears.
     pub show: DvdDisplayBoundary,
     /// `None` for a subpicture without a stop.
     pub clear: Option<DvdDisplayBoundary>,
@@ -417,15 +477,20 @@ pub struct DvdPresentation<'a> {
 /// A DVD picture ready for a packet-clock indexed subtitle queue.
 #[derive(Clone, Copy, Debug)]
 pub struct DvdQueuePicture<'a> {
+    /// The start on the packet clock in nanoseconds: the PTS, else the DTS, else zero.
     pub start_ns: i64,
+    /// The configuration's canvas, when each side lies within 160 to 8,192.
     pub canvas: Option<[u32; 2]>,
+    /// The picture.
     pub picture: &'a DvdPicture,
 }
 
 /// One decoded packet and what it presents.
 #[derive(Debug)]
 pub struct DvdOutput<M> {
+    /// The packet.
     pub packet: BitmapOwner<M>,
+    /// The subpicture the packet completes, if any.
     pub picture: Option<DvdPicture>,
     /// The canvas of the decoder's settings (the configuration's `size:`).
     pub canvas: Option<[u32; 2]>,
@@ -474,11 +539,16 @@ impl<M> DvdOutput<M> {
     }
 }
 
+/// One step of a [`DvdReceiver`].
 #[derive(Debug)]
 pub enum DvdReceiverStep<M> {
+    /// The work budget ran out: step again.
     Yield,
+    /// Provide the next packet, or `finish`.
     NeedPacket,
+    /// One decoded packet.
     Output(DvdOutput<M>),
+    /// After `finish`, the receiver drained.
     Finished,
 }
 
@@ -500,6 +570,7 @@ pub struct DvdReceiver<M> {
 }
 
 impl<M> DvdReceiver<M> {
+    /// A receiver for packets of `scope`.
     pub fn new(pool: &Budget, scope: BitmapScope, config: DvdBridgeConfig) -> Result<Self> {
         Ok(Self {
             pool: pool.clone(),
@@ -513,6 +584,9 @@ impl<M> DvdReceiver<M> {
         })
     }
 
+    /// Takes the next packet. Refuses it, returning it, outside the scope, while a
+    /// packet is pending or after `finish`, or when its `sequence` does not increase
+    /// (`Invalid`).
     #[expect(
         clippy::result_large_err,
         reason = "returns exact source packet and metadata on admission failure"
@@ -542,6 +616,7 @@ impl<M> DvdReceiver<M> {
         Ok(())
     }
 
+    /// Marks the end of the track's packets.
     pub fn finish(&mut self) {
         self.finished = true;
     }

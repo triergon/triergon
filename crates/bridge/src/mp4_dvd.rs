@@ -82,6 +82,7 @@ pub struct Mp4DvdTrack {
 }
 
 impl Mp4DvdTrack {
+    /// The scope every input of the track carries.
     pub fn scope(&self) -> BitmapScope {
         self.scope
     }

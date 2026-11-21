@@ -96,12 +96,15 @@ impl MatroskaClockProbe<'_, MatroskaHevcDolbyFeed> {
 }
 
 impl MatroskaClockPrefix<'_, MatroskaHevcDolbyFeed> {
+    /// The clock of the packet the probe numbered `ordinal`. Fails with `Invalid` for an
+    /// ordinal it did not give.
     pub fn timing(&self, ordinal: usize) -> Result<MatroskaPacketTiming> {
         self.resolve(ordinal, "Dolby clock prefix ordinal")
     }
 }
 
 impl MatroskaClock<'_, MatroskaHevcDolbyFeed> {
+    /// The clock of the next framed packet.
     pub fn observe(
         &mut self,
         packet: &MatroskaHevcDolbyPacket<'_>,

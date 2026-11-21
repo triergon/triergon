@@ -20,6 +20,7 @@ use triergon_subtitles::compat::cc::{
 /// The video the captions come from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CaptionVideo {
+    /// The coding of the video packets.
     pub coding: VideoCoding,
     /// The clock of the packets' times.
     pub time_base: TimeBase,
@@ -31,17 +32,23 @@ pub struct CaptionVideo {
 /// H.264 or HEVC access unit, or a run of MPEG-2 video such as a PES payload.
 #[derive(Clone, Debug)]
 pub struct CaptionUnit {
+    /// The packet bytes, charged to the bridge's pool.
     pub data: Bytes,
+    /// The presentation time.
     pub pts: Option<i64>,
     /// The decode time, where the container states one. A TS PES without a
     /// DTS decodes at its PTS (H.222.0 §2.4.3.7); Matroska states none.
     pub dts: Option<i64>,
+    /// The packet duration, where the container states one.
     pub duration: Option<i64>,
 }
 
+/// A refused unit, returned with the reason.
 #[derive(Debug)]
 pub struct CaptionRejection {
+    /// The unit.
     pub unit: CaptionUnit,
+    /// Why it was refused.
     pub error: Error,
 }
 
@@ -162,6 +169,9 @@ impl CaptionBridge {
         &self.header
     }
 
+    /// Takes the next packet. Refuses it, returning it, while one is pending or after
+    /// the end (`Invalid`), when it is not charged to the bridge's pool (`ForeignPool`),
+    /// or above `max_packet_bytes` (`Limit`).
     pub fn provide(&mut self, unit: CaptionUnit) -> std::result::Result<(), CaptionRejection> {
         let error = if self.pending.is_some() || self.end != End::Open {
             Error::Invalid("caption unit pending or finished")
