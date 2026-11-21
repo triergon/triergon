@@ -1,5 +1,10 @@
 //! Driving any [`ContainerReader`], or a parser's [`InputCursor`], from a [`std::io`]
 //! source.
+//!
+//! These adapters read inside the call and may block, which suits a reader on a
+//! thread of its own. A `triergon-playback` player is not driven through them: it
+//! takes that crate's `Source`, whose `poll` answers at once with a pending reply
+//! instead of waiting, so that a player can run on an event loop.
 use crate::container::{ContainerReader, Event, SeekRequest};
 use crate::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, Result,
