@@ -1,4 +1,5 @@
 //! Bounded source seeks in the exact presentation clock.
+mod dts_hd;
 mod physical;
 mod retained;
 
@@ -188,6 +189,13 @@ pub(super) struct Seeking {
     retain: Option<Retain>,
     full_scan: bool,
     direct: Option<physical::Direct>,
+    probing: Option<Probing>,
+}
+
+struct Probing {
+    packet: Packet,
+    probe: SeekProbe,
+    xll_header: Option<dts_hd::Header>,
 }
 
 #[derive(Clone, Copy)]
@@ -284,9 +292,10 @@ fn latm_entry(multiplex: &[u8]) -> Option<()> {
     (payload != 0 && bits.remaining() < 8).then_some(())
 }
 
-fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
+fn packet_probe(packet: Packet) -> Result<Probing> {
     let clock = packet.clock();
     let time = clock.and_then(|clock| clock.pts.exact);
+    let mut xll_header = None;
     let (offset, random_access) = match packet.access_unit() {
         AccessUnit::Video(unit) => (unit.range.start, unit.random_access),
         AccessUnit::Adts(frame) => (frame.source().offset, time.is_some()),
@@ -312,6 +321,13 @@ fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
                 time.is_some() && header.history == 0,
             )
         }
+        AccessUnit::DtsExtension(frame) => {
+            xll_header = dts_hd::entry(&packet)?;
+            (
+                frame.elementary_range().start,
+                time.is_some() && xll_header.is_some(),
+            )
+        }
         AccessUnit::AdtsFragment(fragment) => (fragment.source().offset, false),
         _ => {
             return Err(Error::Unsupported(
@@ -320,7 +336,7 @@ fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
         }
     };
     let pes = packet.sources()[0].pes.pes();
-    Ok(SeekProbe {
+    let probe = SeekProbe {
         offset,
         epochs: packet.epochs(),
         byte_run: pes.byte_run_epoch,
@@ -329,6 +345,11 @@ fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
         time,
         random_access,
         has_vcl: true,
+    };
+    Ok(Probing {
+        packet,
+        probe,
+        xll_header,
     })
 }
 
@@ -483,7 +504,8 @@ impl Reader {
         }
     }
 
-    /// Seek a selected AVC, HEVC, AAC-LC in ADTS or LOAS, AC-3, E-AC-3, MPEG audio or DTS core
+    /// Seek a selected AVC, HEVC, AAC-LC in ADTS or LOAS, AC-3, E-AC-3, MPEG audio,
+    /// DTS core or self-contained lossless-only DTS-HD XLL
     /// track in one length-known, seekable entity. The reader lands on the last coded
     /// random-access picture or complete audio frame carrying the greatest
     /// resolved PTS at or before the target. It delivers original transport,
@@ -494,6 +516,9 @@ impl Reader {
     /// epochs are refused. A completed index for the same track skips the
     /// landing scan. Verified in-band Layer I/II checkpoints can also skip
     /// prefix reads; other indexed landings reconstruct state by replay.
+    /// DTS-HD entries require one extension-zero asset with its own static setup,
+    /// XLL sync at offset zero, no smoothing buffer or decoding delay, and a complete
+    /// XLL frame with a valid common-header CRC. Other DTS-HD recovery layouts are refused.
     #[cold]
     pub fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
         self.begin_seek(request, None, None, None)
@@ -712,6 +737,7 @@ impl Reader {
             full_scan: retain.is_some(),
             retain,
             direct,
+            probing: None,
         })
         .map_err(|rejected| rejected.error)?;
         let mut input = if let Some(plan) = &entities {
@@ -753,6 +779,55 @@ impl Reader {
             }
             let seek = &mut self.seek.as_mut_slice()[0];
             let request = seek.request;
+            if let Some(probing) = &mut seek.probing {
+                if let Some(header) = &mut probing.xll_header {
+                    let checked =
+                        header
+                            .step(probing.packet.bytes().as_ref(), work)
+                            .map_err(|error| {
+                                if matches!(seek.phase, Phase::Replay { .. }) {
+                                    Error::SourceMismatch
+                                } else {
+                                    error
+                                }
+                            })?;
+                    if !checked {
+                        return Ok(Step::Yield);
+                    }
+                }
+                let Probing { packet, probe, .. } =
+                    seek.probing.take().expect("pending seek probe");
+                match &mut seek.phase {
+                    Phase::Scan(scan) => {
+                        let better = scan.observe(
+                            probe,
+                            request.target,
+                            self.limits.time_policy,
+                            seek.selected_epochs,
+                        )?;
+                        if let Some(retain) = &mut seek.retain
+                            && !retain.packet(packet, better)
+                        {
+                            seek.retain = None;
+                        }
+                    }
+                    Phase::Replay {
+                        landing,
+                        scanned_bytes,
+                        skipped,
+                    } => {
+                        if !probe.random_access || probe.time != Some(landing.time) {
+                            return Err(Error::SourceMismatch);
+                        }
+                        let result = seek_result(request, *landing, *scanned_bytes, *skipped);
+                        seek.phase = Phase::Deliver(packet);
+                        seek.direct = None;
+                        return Ok(Step::Ready(Event::Seek(result)));
+                    }
+                    _ => unreachable!("seek probe precedes delivery"),
+                }
+                continue;
+            }
             if let Phase::Retained(output) = &mut seek.phase {
                 work.try_charge(1);
                 if let Some(event) = output.next(&mut self.tracks) {
@@ -822,17 +897,7 @@ impl Reader {
                         if let Some(index) = &mut scan.index {
                             index.packet(&packet);
                         }
-                        let better = scan.observe(
-                            packet_probe(&packet)?,
-                            request.target,
-                            self.limits.time_policy,
-                            seek.selected_epochs,
-                        )?;
-                        if let Some(retain) = &mut seek.retain
-                            && !retain.packet(packet, better)
-                        {
-                            seek.retain = None;
-                        }
+                        seek.probing = Some(packet_probe(packet)?);
                     }
                 }
                 (Phase::Scan(scan), Step::Ready(Event::Other(event))) => {
@@ -915,9 +980,7 @@ impl Reader {
                 }
                 (
                     Phase::Replay {
-                        landing,
-                        scanned_bytes,
-                        skipped,
+                        landing, skipped, ..
                     },
                     Step::Ready(Event::Packet(packet)),
                 ) => {
@@ -931,10 +994,6 @@ impl Reader {
                         *skipped = true;
                         continue;
                     }
-                    let probe = packet_probe(&packet).map_err(|_| Error::SourceMismatch)?;
-                    if !probe.random_access || probe.time != Some(landing.time) {
-                        return Err(Error::SourceMismatch);
-                    }
                     if seek
                         .direct
                         .as_ref()
@@ -942,10 +1001,7 @@ impl Reader {
                     {
                         return Err(Error::SourceMismatch);
                     }
-                    let result = seek_result(request, *landing, *scanned_bytes, *skipped);
-                    self.seek.as_mut_slice()[0].phase = Phase::Deliver(packet);
-                    self.seek.as_mut_slice()[0].direct = None;
-                    return Ok(Step::Ready(Event::Seek(result)));
+                    seek.probing = Some(packet_probe(packet).map_err(|_| Error::SourceMismatch)?);
                 }
                 (Phase::Replay { .. }, Step::Ready(Event::Other(event))) => {
                     if matches!(&event, ReaderEvent::Source(source)
