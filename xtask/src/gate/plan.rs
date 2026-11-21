@@ -73,7 +73,10 @@ pub(super) const COVERED: &[(&str, Coverage)] = &[
     ("font-hinting-default", Coverage::Item("fonts compare")),
     ("mkv-codec-state", Coverage::Item("oracle-compare")),
     ("mkv-metadata-oracle", Coverage::Item("oracle-compare")),
-    ("mkv-track-extensions-oracle", Coverage::Item("oracle-compare")),
+    (
+        "mkv-track-extensions-oracle",
+        Coverage::Item("oracle-compare"),
+    ),
     ("font-store", Coverage::Item("oracle-compare")),
     ("shape-libass", Coverage::Item("shape compare")),
     ("shape-text", Coverage::Item("shape compare")),
