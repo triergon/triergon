@@ -210,22 +210,43 @@ impl Eac3Bsi {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+/// The next field to read, by syntax group of the bit stream information (ATSC
+/// A/52:2018, E.2.2.2).
+#[derive(Clone, Copy)]
 enum Phase {
-    MixPresent,
-    MixDownmix,
-    MixCenter,
-    MixSurround,
-    MixLfeFlag,
-    MixLfeValue,
-    ProgrammeFlag,
-    ProgrammeValue,
-    Programme2Flag,
-    Programme2Value,
+    Mixing(MixField),
+    Programme(ProgrammeField),
+    Info(InfoField),
+    Conversion(ConversionField),
+    Additional(AdditionalField),
+    Finish,
+}
+
+/// The mixing metadata every stream type carries: `mixmdate` and the mix levels.
+#[derive(Clone, Copy)]
+enum MixField {
+    Present,
+    Downmix,
+    Center,
+    Surround,
+    LfeFlag,
+    LfeValue,
+    /// The end of the mixing metadata: its range is recorded.
+    Done,
+}
+
+/// The mixing metadata of an independent stream (`strmtyp` 0): programme scale
+/// factors, mixing definition, pan and frame mixing information.
+#[derive(Clone, Copy)]
+enum ProgrammeField {
+    ScaleFlag,
+    ScaleValue,
+    Scale2Flag,
+    Scale2Value,
     ExternalFlag,
     ExternalValue,
-    MixDefinition,
-    MixControl,
+    Definition,
+    Control,
     PanFlag,
     PanValue,
     Pan2Flag,
@@ -233,27 +254,93 @@ enum Phase {
     FrameMixFlag,
     BlockFlag,
     BlockValue,
-    MixDone,
-    InfoPresent,
-    InfoService,
-    InfoCopyright,
-    InfoOriginal,
-    InfoSurround,
-    InfoHeadphone,
-    InfoSurroundEx,
+}
+
+/// The informational metadata: `infomdate` and the fields it enables.
+#[derive(Clone, Copy)]
+enum InfoField {
+    Present,
+    Service,
+    Copyright,
+    Original,
+    Surround,
+    Headphone,
+    SurroundEx,
     ProductionFlag,
     ProductionValue,
     Production2Flag,
     Production2Value,
     SourceRate,
-    InfoDone,
-    ConverterSync,
-    ConvertedBlock,
-    ConvertedSize,
-    AdditionalFlag,
-    AdditionalLength,
-    AdditionalBytes,
-    Finish,
+    /// The end of the informational metadata: its range is recorded.
+    Done,
+}
+
+/// The fields of a frame converted from AC-3: `convsync`, `blkid`, `frmsizecod`.
+#[derive(Clone, Copy)]
+enum ConversionField {
+    Sync,
+    Block,
+    Size,
+}
+
+/// `addbsie`, `addbsil` and the additional bit stream information.
+#[derive(Clone, Copy)]
+enum AdditionalField {
+    Flag,
+    Length,
+    Bytes,
+}
+
+/// Where a parse stands. The frame is held only until it is returned.
+enum State {
+    Reading(Ac3Frame),
+    Complete,
+    Failed(Error),
+}
+
+/// What one step reads: the frame's bytes, with the caller's work and cancellation.
+struct Input<'a> {
+    bytes: &'a [u8],
+    work: &'a mut WorkBudget,
+    cancel: &'a AtomicBool,
+}
+
+/// The value of the next field of `$width` bits, or `Ok(None)` from the enclosing
+/// function when the work runs out inside it: a field can span any number of calls.
+macro_rules! field {
+    ($walk:expr, $input:expr, $width:expr) => {
+        match $walk.reader.read($input, $width)? {
+            Some(value) => value,
+            None => return Ok(None),
+        }
+    };
+}
+
+/// The bit position and the bits of the field read so far.
+struct FieldReader {
+    position: usize,
+    before_tail: usize,
+    maximum_bsi_bits: usize,
+    partial_seen: u8,
+    partial_width: u8,
+    partial_value: u16,
+}
+
+/// What the walk over the fields keeps: the header fields that select the syntax,
+/// the reader and the facts read.
+struct Walk {
+    stream_type: u8,
+    mode: u8,
+    lfe: bool,
+    fscod: u8,
+    blocks: u8,
+    phase: Phase,
+    reader: FieldReader,
+    mix_start: usize,
+    info_start: usize,
+    block: u8,
+    additional_remaining: u8,
+    facts: Eac3BsiFacts,
 }
 
 /// Inspects a complete same-pool E-AC-3 frame from Ac3FrameReader. The reader
@@ -261,36 +348,23 @@ enum Phase {
 /// BSI bit work and cancellation. It allocates no output storage or descriptors.
 /// Mixing definitions 0/1/2 are selected; flexible definition 3 is unsupported.
 pub struct Eac3BsiParser {
-    frame: Option<Ac3Frame>,
     limits: Eac3BsiLimits,
-    stream_type: u8,
-    mode: u8,
-    lfe: bool,
-    fscod: u8,
-    blocks: u8,
-    phase: Phase,
-    position: usize,
-    before_tail: usize,
-    partial_seen: u8,
-    partial_width: u8,
-    partial_value: u16,
-    mix_start: usize,
-    info_start: usize,
-    block: u8,
-    additional_remaining: u8,
-    facts: Eac3BsiFacts,
-    complete: bool,
-    failure: Option<Error>,
+    state: State,
+    walk: Walk,
 }
 
 impl std::fmt::Debug for Eac3BsiParser {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let failure = match self.state {
+            State::Failed(error) => Some(error),
+            State::Reading(_) | State::Complete => None,
+        };
         formatter
             .debug_struct("Eac3BsiParser")
             .field("limits", &self.limits)
-            .field("position_bits", &self.position)
-            .field("complete", &self.complete)
-            .field("failure", &self.failure)
+            .field("position_bits", &self.walk.reader.position)
+            .field("complete", &matches!(self.state, State::Complete))
+            .field("failure", &failure)
             .finish_non_exhaustive()
     }
 }
@@ -386,93 +460,36 @@ impl Eac3BsiParser {
             trailer,
         };
         Ok(Self {
-            frame: Some(frame),
             limits,
-            stream_type,
-            mode: header.acmod,
-            lfe: header.lfe_on,
-            fscod,
-            blocks: header.blocks,
-            phase: Phase::MixPresent,
-            position,
-            before_tail,
-            partial_seen: 0,
-            partial_width: 0,
-            partial_value: 0,
-            mix_start: 0,
-            info_start: 0,
-            block: 0,
-            additional_remaining: 0,
-            facts,
-            complete: false,
-            failure: None,
+            state: State::Reading(frame),
+            walk: Walk {
+                stream_type,
+                mode: header.acmod,
+                lfe: header.lfe_on,
+                fscod,
+                blocks: header.blocks,
+                phase: Phase::Mixing(MixField::Present),
+                reader: FieldReader {
+                    position,
+                    before_tail,
+                    maximum_bsi_bits: limits.maximum_bsi_bits,
+                    partial_seen: 0,
+                    partial_width: 0,
+                    partial_value: 0,
+                },
+                mix_start: 0,
+                info_start: 0,
+                block: 0,
+                additional_remaining: 0,
+                facts,
+            },
         })
     }
 
     /// Bit position of the next field to read, counted from the first bit of the
     /// syncword.
     pub fn position_bits(&self) -> usize {
-        self.position
-    }
-
-    fn read(
-        &mut self,
-        width: u8,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<Option<u16>> {
-        if width == 0 || width > 16 {
-            return Err(Error::Invalid("E-AC-3 BSI field width"));
-        }
-        if self.partial_width == 0 {
-            self.partial_width = width;
-        }
-        if self.partial_width != width {
-            return Err(Error::Invalid("E-AC-3 partial field state"));
-        }
-        while self.partial_seen < width {
-            if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
-            }
-            if !work.try_charge(1) {
-                return Ok(None);
-            }
-            if self.position >= self.before_tail {
-                return Err(Error::Invalid("E-AC-3 BSI overlaps auxiliary/error tail"));
-            }
-            let used = self
-                .position
-                .checked_sub(16)
-                .and_then(|value| value.checked_add(1))
-                .ok_or(Error::Overflow)?;
-            if used > self.limits.maximum_bsi_bits {
-                return Err(Error::Limit {
-                    requested: used,
-                    maximum: self.limits.maximum_bsi_bits,
-                });
-            }
-            let frame = self
-                .frame
-                .as_ref()
-                .ok_or(Error::Invalid("missing E-AC-3 frame"))?;
-            let value = (frame.bytes()[self.position / 8] >> (7 - self.position % 8)) & 1;
-            self.partial_value = (self.partial_value << 1) | u16::from(value);
-            self.partial_seen += 1;
-            self.position = self.position.checked_add(1).ok_or(Error::Overflow)?;
-        }
-        let result = self.partial_value;
-        self.partial_seen = 0;
-        self.partial_width = 0;
-        self.partial_value = 0;
-        Ok(Some(result))
-    }
-
-    fn after_mix_channels(&self) -> Phase {
-        if self.stream_type == 0 {
-            Phase::ProgrammeFlag
-        } else {
-            Phase::MixDone
-        }
+        self.walk.reader.position
     }
 
     /// Advances by at most the work left in `work`, where each bit read costs one unit,
@@ -485,337 +502,443 @@ impl Eac3BsiParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<Eac3Bsi>> {
-        if let Some(error) = self.failure {
+        if let State::Failed(error) = self.state {
             return Err(error);
         }
-        let result = self.step_inner(work, cancel);
+        let result = self.read(work, cancel);
         if let Err(error) = result {
-            self.failure = Some(error);
-            self.frame = None;
+            self.state = State::Failed(error);
         }
         result
     }
 
-    fn step_inner(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<BuildStep<Eac3Bsi>> {
+    fn read(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStep<Eac3Bsi>> {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        if self.complete {
+        let State::Reading(frame) = &self.state else {
             return Ok(BuildStep::Complete);
-        }
-        // A field can span arbitrarily many calls, including one-bit grants.
-        macro_rules! field {
-            ($width:expr) => {
-                match self.read($width, work, cancel)? {
-                    Some(value) => value,
-                    None => return Ok(BuildStep::Yield),
-                }
-            };
-        }
+        };
+        let input = &mut Input {
+            bytes: frame.bytes().as_ref(),
+            work,
+            cancel,
+        };
+        let walk = &mut self.walk;
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            match self.phase {
-                Phase::MixPresent => {
-                    if field!(1) != 0 {
-                        self.mix_start = self.position - 1;
-                        self.phase = Phase::MixDownmix;
-                    } else {
-                        self.phase = Phase::InfoPresent;
+            let next = match walk.phase {
+                Phase::Mixing(field) => walk.mixing(input, field)?,
+                Phase::Programme(field) => walk.programme(input, field)?,
+                Phase::Info(field) => walk.informational(input, field)?,
+                Phase::Conversion(field) => walk.conversion(input, field)?,
+                Phase::Additional(field) => walk.additional(input, field)?,
+                Phase::Finish => {
+                    if !input.work.try_charge(1) {
+                        return Ok(BuildStep::Yield);
                     }
-                }
-                Phase::MixDownmix => {
-                    if self.mode > 2 {
-                        field!(2);
-                    }
-                    self.phase = Phase::MixCenter;
-                }
-                Phase::MixCenter => {
-                    if matches!(self.mode, 3 | 5 | 7) {
-                        field!(6);
-                    }
-                    self.phase = Phase::MixSurround;
-                }
-                Phase::MixSurround => {
-                    if self.mode >= 4 {
-                        field!(6);
-                    }
-                    self.phase = Phase::MixLfeFlag;
-                }
-                Phase::MixLfeFlag => {
-                    if self.lfe && field!(1) != 0 {
-                        self.phase = Phase::MixLfeValue;
-                    } else {
-                        self.phase = self.after_mix_channels();
-                    }
-                }
-                Phase::MixLfeValue => {
-                    field!(5);
-                    self.phase = self.after_mix_channels();
-                }
-                Phase::ProgrammeFlag => {
-                    self.phase = if field!(1) != 0 {
-                        Phase::ProgrammeValue
-                    } else {
-                        Phase::Programme2Flag
+                    walk.facts.end_bit = walk.reader.position;
+                    let bsi = Eac3Bsi {
+                        frame: frame.clone(),
+                        facts: walk.facts,
                     };
+                    self.state = State::Complete;
+                    return Ok(BuildStep::Ready(bsi));
                 }
-                Phase::ProgrammeValue => {
-                    field!(6);
-                    self.phase = Phase::Programme2Flag;
+            };
+            match next {
+                Some(phase) => walk.phase = phase,
+                None => return Ok(BuildStep::Yield),
+            }
+        }
+    }
+}
+
+impl FieldReader {
+    /// The next field of `width` bits once all of them are read, one unit of work per
+    /// bit; `None` when the work runs out first.
+    fn read(&mut self, input: &mut Input<'_>, width: u8) -> Result<Option<u16>> {
+        if width == 0 || width > 16 {
+            return Err(Error::Invalid("E-AC-3 BSI field width"));
+        }
+        if self.partial_width == 0 {
+            self.partial_width = width;
+        }
+        if self.partial_width != width {
+            return Err(Error::Invalid("E-AC-3 partial field state"));
+        }
+        while self.partial_seen < width {
+            if input.cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !input.work.try_charge(1) {
+                return Ok(None);
+            }
+            if self.position >= self.before_tail {
+                return Err(Error::Invalid("E-AC-3 BSI overlaps auxiliary/error tail"));
+            }
+            let used = self
+                .position
+                .checked_sub(16)
+                .and_then(|value| value.checked_add(1))
+                .ok_or(Error::Overflow)?;
+            if used > self.maximum_bsi_bits {
+                return Err(Error::Limit {
+                    requested: used,
+                    maximum: self.maximum_bsi_bits,
+                });
+            }
+            let value = (input.bytes[self.position / 8] >> (7 - self.position % 8)) & 1;
+            self.partial_value = (self.partial_value << 1) | u16::from(value);
+            self.partial_seen += 1;
+            self.position = self.position.checked_add(1).ok_or(Error::Overflow)?;
+        }
+        let result = self.partial_value;
+        self.partial_seen = 0;
+        self.partial_width = 0;
+        self.partial_value = 0;
+        Ok(Some(result))
+    }
+}
+
+/// Each group reads one field per call and returns the phase after it; `None` when
+/// the work ran out inside the field.
+impl Walk {
+    fn after_mix_channels(&self) -> Phase {
+        if self.stream_type == 0 {
+            Phase::Programme(ProgrammeField::ScaleFlag)
+        } else {
+            Phase::Mixing(MixField::Done)
+        }
+    }
+
+    /// `mixmdate`, the downmix and LFE mix levels, and the end of the mixing metadata.
+    fn mixing(&mut self, input: &mut Input<'_>, field: MixField) -> Result<Option<Phase>> {
+        let next = match field {
+            MixField::Present => {
+                if field!(self, input, 1) != 0 {
+                    self.mix_start = self.reader.position - 1;
+                    Phase::Mixing(MixField::Downmix)
+                } else {
+                    Phase::Info(InfoField::Present)
                 }
-                Phase::Programme2Flag => {
-                    if self.mode == 0 && field!(1) != 0 {
-                        self.phase = Phase::Programme2Value;
-                    } else {
-                        self.phase = Phase::ExternalFlag;
-                    }
+            }
+            MixField::Downmix => {
+                if self.mode > 2 {
+                    field!(self, input, 2);
                 }
-                Phase::Programme2Value => {
-                    field!(6);
-                    self.phase = Phase::ExternalFlag;
+                Phase::Mixing(MixField::Center)
+            }
+            MixField::Center => {
+                if matches!(self.mode, 3 | 5 | 7) {
+                    field!(self, input, 6);
                 }
-                Phase::ExternalFlag => {
-                    self.phase = if field!(1) != 0 {
-                        Phase::ExternalValue
-                    } else {
-                        Phase::MixDefinition
-                    };
+                Phase::Mixing(MixField::Surround)
+            }
+            MixField::Surround => {
+                if self.mode >= 4 {
+                    field!(self, input, 6);
                 }
-                Phase::ExternalValue => {
-                    field!(6);
-                    self.phase = Phase::MixDefinition;
+                Phase::Mixing(MixField::LfeFlag)
+            }
+            MixField::LfeFlag => {
+                if self.lfe && field!(self, input, 1) != 0 {
+                    Phase::Mixing(MixField::LfeValue)
+                } else {
+                    self.after_mix_channels()
                 }
-                Phase::MixDefinition => {
-                    let definition = u8::try_from(field!(2)).map_err(|_| Error::Overflow)?;
-                    self.facts.mixing_definition = Some(definition);
-                    self.phase = match definition {
-                        0 => Phase::PanFlag,
-                        1 | 2 => Phase::MixControl,
-                        _ => return Err(Error::Unsupported("E-AC-3 flexible mixing definition 3")),
-                    };
+            }
+            MixField::LfeValue => {
+                field!(self, input, 5);
+                self.after_mix_channels()
+            }
+            MixField::Done => {
+                self.facts.mixing_metadata = Some(Eac3BitRange {
+                    start: self.mix_start,
+                    bits: self.reader.position - self.mix_start,
+                });
+                Phase::Info(InfoField::Present)
+            }
+        };
+        Ok(Some(next))
+    }
+
+    /// The mixing metadata of an independent stream.
+    fn programme(&mut self, input: &mut Input<'_>, field: ProgrammeField) -> Result<Option<Phase>> {
+        let next = match field {
+            ProgrammeField::ScaleFlag => {
+                if field!(self, input, 1) != 0 {
+                    ProgrammeField::ScaleValue
+                } else {
+                    ProgrammeField::Scale2Flag
                 }
-                Phase::MixControl => {
-                    field!(if self.facts.mixing_definition == Some(1) {
+            }
+            ProgrammeField::ScaleValue => {
+                field!(self, input, 6);
+                ProgrammeField::Scale2Flag
+            }
+            ProgrammeField::Scale2Flag => {
+                if self.mode == 0 && field!(self, input, 1) != 0 {
+                    ProgrammeField::Scale2Value
+                } else {
+                    ProgrammeField::ExternalFlag
+                }
+            }
+            ProgrammeField::Scale2Value => {
+                field!(self, input, 6);
+                ProgrammeField::ExternalFlag
+            }
+            ProgrammeField::ExternalFlag => {
+                if field!(self, input, 1) != 0 {
+                    ProgrammeField::ExternalValue
+                } else {
+                    ProgrammeField::Definition
+                }
+            }
+            ProgrammeField::ExternalValue => {
+                field!(self, input, 6);
+                ProgrammeField::Definition
+            }
+            ProgrammeField::Definition => {
+                let definition =
+                    u8::try_from(field!(self, input, 2)).map_err(|_| Error::Overflow)?;
+                self.facts.mixing_definition = Some(definition);
+                match definition {
+                    0 => ProgrammeField::PanFlag,
+                    1 | 2 => ProgrammeField::Control,
+                    _ => return Err(Error::Unsupported("E-AC-3 flexible mixing definition 3")),
+                }
+            }
+            ProgrammeField::Control => {
+                field!(
+                    self,
+                    input,
+                    if self.facts.mixing_definition == Some(1) {
                         5
                     } else {
                         12
-                    });
-                    self.phase = Phase::PanFlag;
-                }
-                Phase::PanFlag => {
-                    if self.mode < 2 && field!(1) != 0 {
-                        self.phase = Phase::PanValue;
-                    } else {
-                        self.phase = Phase::Pan2Flag;
                     }
-                }
-                Phase::PanValue => {
-                    field!(14);
-                    self.phase = Phase::Pan2Flag;
-                }
-                Phase::Pan2Flag => {
-                    if self.mode == 0 && field!(1) != 0 {
-                        self.phase = Phase::Pan2Value;
-                    } else {
-                        self.phase = Phase::FrameMixFlag;
-                    }
-                }
-                Phase::Pan2Value => {
-                    field!(14);
-                    self.phase = Phase::FrameMixFlag;
-                }
-                Phase::FrameMixFlag => {
-                    if field!(1) != 0 {
-                        self.block = 0;
-                        self.phase = if self.blocks == 1 {
-                            Phase::BlockValue
-                        } else {
-                            Phase::BlockFlag
-                        };
-                    } else {
-                        self.phase = Phase::MixDone;
-                    }
-                }
-                Phase::BlockFlag => {
-                    if self.block == self.blocks {
-                        self.phase = Phase::MixDone;
-                    } else if field!(1) != 0 {
-                        self.phase = Phase::BlockValue;
-                    } else {
-                        self.block += 1;
-                    }
-                }
-                Phase::BlockValue => {
-                    field!(5);
-                    self.block += 1;
-                    self.phase = if self.block == self.blocks {
-                        Phase::MixDone
-                    } else {
-                        Phase::BlockFlag
-                    };
-                }
-                Phase::MixDone => {
-                    self.facts.mixing_metadata = Some(Eac3BitRange {
-                        start: self.mix_start,
-                        bits: self.position - self.mix_start,
-                    });
-                    self.phase = Phase::InfoPresent;
-                }
-                Phase::InfoPresent => {
-                    if field!(1) != 0 {
-                        self.info_start = self.position - 1;
-                        self.phase = Phase::InfoService;
-                    } else {
-                        self.phase = Phase::ConverterSync;
-                    }
-                }
-                Phase::InfoService => {
-                    self.facts.bitstream_mode =
-                        Some(u8::try_from(field!(3)).map_err(|_| Error::Overflow)?);
-                    self.phase = Phase::InfoCopyright;
-                }
-                Phase::InfoCopyright => {
-                    self.facts.copyright = Some(field!(1) != 0);
-                    self.phase = Phase::InfoOriginal;
-                }
-                Phase::InfoOriginal => {
-                    self.facts.original = Some(field!(1) != 0);
-                    self.phase = Phase::InfoSurround;
-                }
-                Phase::InfoSurround => {
-                    if self.mode == 2 {
-                        self.facts.surround_mode =
-                            Some(u8::try_from(field!(2)).map_err(|_| Error::Overflow)?);
-                    }
-                    self.phase = Phase::InfoHeadphone;
-                }
-                Phase::InfoHeadphone => {
-                    if self.mode == 2 {
-                        self.facts.headphone_mode =
-                            Some(u8::try_from(field!(2)).map_err(|_| Error::Overflow)?);
-                    }
-                    self.phase = Phase::InfoSurroundEx;
-                }
-                Phase::InfoSurroundEx => {
-                    if self.mode >= 6 {
-                        self.facts.surround_ex_mode =
-                            Some(u8::try_from(field!(2)).map_err(|_| Error::Overflow)?);
-                    }
-                    self.phase = Phase::ProductionFlag;
-                }
-                Phase::ProductionFlag => {
-                    self.phase = if field!(1) != 0 {
-                        Phase::ProductionValue
-                    } else {
-                        Phase::Production2Flag
-                    };
-                }
-                Phase::ProductionValue => {
-                    self.facts.production =
-                        Some(u8::try_from(field!(8)).map_err(|_| Error::Overflow)?);
-                    self.phase = Phase::Production2Flag;
-                }
-                Phase::Production2Flag => {
-                    if self.mode == 0 && field!(1) != 0 {
-                        self.phase = Phase::Production2Value;
-                    } else {
-                        self.phase = Phase::SourceRate;
-                    }
-                }
-                Phase::Production2Value => {
-                    self.facts.second_production =
-                        Some(u8::try_from(field!(8)).map_err(|_| Error::Overflow)?);
-                    self.phase = Phase::SourceRate;
-                }
-                Phase::SourceRate => {
-                    if self.fscod != 3 {
-                        self.facts.source_fscod = Some(field!(1) != 0);
-                    }
-                    self.phase = Phase::InfoDone;
-                }
-                Phase::InfoDone => {
-                    self.facts.informational_metadata = Some(Eac3BitRange {
-                        start: self.info_start,
-                        bits: self.position - self.info_start,
-                    });
-                    self.phase = Phase::ConverterSync;
-                }
-                Phase::ConverterSync => {
-                    if self.stream_type == 0 && self.blocks != 6 {
-                        self.facts.converter_sync = Some(field!(1) != 0);
-                    }
-                    self.phase = Phase::ConvertedBlock;
-                }
-                Phase::ConvertedBlock => {
-                    if self.stream_type != 2 {
-                        self.phase = Phase::AdditionalFlag;
-                    } else if self.blocks == 6 {
-                        self.facts.effective_block_id = Some(true);
-                        self.phase = Phase::ConvertedSize;
-                    } else {
-                        let block_id = field!(1) != 0;
-                        self.facts.block_id = Some(block_id);
-                        self.facts.effective_block_id = Some(block_id);
-                        self.phase = if block_id {
-                            Phase::ConvertedSize
-                        } else {
-                            Phase::AdditionalFlag
-                        };
-                    }
-                }
-                Phase::ConvertedSize => {
-                    self.facts.converted_frame_size_code =
-                        Some(u8::try_from(field!(6)).map_err(|_| Error::Overflow)?);
-                    self.phase = Phase::AdditionalFlag;
-                }
-                Phase::AdditionalFlag => {
-                    self.phase = if field!(1) != 0 {
-                        Phase::AdditionalLength
-                    } else {
-                        Phase::Finish
-                    };
-                }
-                Phase::AdditionalLength => {
-                    self.additional_remaining = u8::try_from(field!(6))
-                        .map_err(|_| Error::Overflow)?
-                        .checked_add(1)
-                        .ok_or(Error::Overflow)?;
-                    self.facts.additional_bsi = Some(Eac3BitRange {
-                        start: self.position,
-                        bits: usize::from(self.additional_remaining) * 8,
-                    });
-                    self.phase = Phase::AdditionalBytes;
-                }
-                Phase::AdditionalBytes => {
-                    if self.additional_remaining == 0 {
-                        self.phase = Phase::Finish;
-                    } else {
-                        field!(8);
-                        self.additional_remaining -= 1;
-                    }
-                }
-                Phase::Finish => {
-                    if !work.try_charge(1) {
-                        return Ok(BuildStep::Yield);
-                    }
-                    self.facts.end_bit = self.position;
-                    let frame = self
-                        .frame
-                        .take()
-                        .ok_or(Error::Invalid("missing E-AC-3 BSI output frame"))?;
-                    self.complete = true;
-                    return Ok(BuildStep::Ready(Eac3Bsi {
-                        frame,
-                        facts: self.facts,
-                    }));
+                );
+                ProgrammeField::PanFlag
+            }
+            ProgrammeField::PanFlag => {
+                if self.mode < 2 && field!(self, input, 1) != 0 {
+                    ProgrammeField::PanValue
+                } else {
+                    ProgrammeField::Pan2Flag
                 }
             }
-        }
+            ProgrammeField::PanValue => {
+                field!(self, input, 14);
+                ProgrammeField::Pan2Flag
+            }
+            ProgrammeField::Pan2Flag => {
+                if self.mode == 0 && field!(self, input, 1) != 0 {
+                    ProgrammeField::Pan2Value
+                } else {
+                    ProgrammeField::FrameMixFlag
+                }
+            }
+            ProgrammeField::Pan2Value => {
+                field!(self, input, 14);
+                ProgrammeField::FrameMixFlag
+            }
+            ProgrammeField::FrameMixFlag => {
+                if field!(self, input, 1) == 0 {
+                    return Ok(Some(Phase::Mixing(MixField::Done)));
+                }
+                self.block = 0;
+                if self.blocks == 1 {
+                    ProgrammeField::BlockValue
+                } else {
+                    ProgrammeField::BlockFlag
+                }
+            }
+            ProgrammeField::BlockFlag => {
+                if self.block == self.blocks {
+                    return Ok(Some(Phase::Mixing(MixField::Done)));
+                }
+                if field!(self, input, 1) != 0 {
+                    ProgrammeField::BlockValue
+                } else {
+                    self.block += 1;
+                    ProgrammeField::BlockFlag
+                }
+            }
+            ProgrammeField::BlockValue => {
+                field!(self, input, 5);
+                self.block += 1;
+                if self.block == self.blocks {
+                    return Ok(Some(Phase::Mixing(MixField::Done)));
+                }
+                ProgrammeField::BlockFlag
+            }
+        };
+        Ok(Some(Phase::Programme(next)))
+    }
+
+    /// `infomdate` and the informational metadata it enables.
+    fn informational(&mut self, input: &mut Input<'_>, field: InfoField) -> Result<Option<Phase>> {
+        let next = match field {
+            InfoField::Present => {
+                if field!(self, input, 1) == 0 {
+                    return Ok(Some(Phase::Conversion(ConversionField::Sync)));
+                }
+                self.info_start = self.reader.position - 1;
+                InfoField::Service
+            }
+            InfoField::Service => {
+                self.facts.bitstream_mode =
+                    Some(u8::try_from(field!(self, input, 3)).map_err(|_| Error::Overflow)?);
+                InfoField::Copyright
+            }
+            InfoField::Copyright => {
+                self.facts.copyright = Some(field!(self, input, 1) != 0);
+                InfoField::Original
+            }
+            InfoField::Original => {
+                self.facts.original = Some(field!(self, input, 1) != 0);
+                InfoField::Surround
+            }
+            InfoField::Surround => {
+                if self.mode == 2 {
+                    self.facts.surround_mode =
+                        Some(u8::try_from(field!(self, input, 2)).map_err(|_| Error::Overflow)?);
+                }
+                InfoField::Headphone
+            }
+            InfoField::Headphone => {
+                if self.mode == 2 {
+                    self.facts.headphone_mode =
+                        Some(u8::try_from(field!(self, input, 2)).map_err(|_| Error::Overflow)?);
+                }
+                InfoField::SurroundEx
+            }
+            InfoField::SurroundEx => {
+                if self.mode >= 6 {
+                    self.facts.surround_ex_mode =
+                        Some(u8::try_from(field!(self, input, 2)).map_err(|_| Error::Overflow)?);
+                }
+                InfoField::ProductionFlag
+            }
+            InfoField::ProductionFlag => {
+                if field!(self, input, 1) != 0 {
+                    InfoField::ProductionValue
+                } else {
+                    InfoField::Production2Flag
+                }
+            }
+            InfoField::ProductionValue => {
+                self.facts.production =
+                    Some(u8::try_from(field!(self, input, 8)).map_err(|_| Error::Overflow)?);
+                InfoField::Production2Flag
+            }
+            InfoField::Production2Flag => {
+                if self.mode == 0 && field!(self, input, 1) != 0 {
+                    InfoField::Production2Value
+                } else {
+                    InfoField::SourceRate
+                }
+            }
+            InfoField::Production2Value => {
+                self.facts.second_production =
+                    Some(u8::try_from(field!(self, input, 8)).map_err(|_| Error::Overflow)?);
+                InfoField::SourceRate
+            }
+            InfoField::SourceRate => {
+                if self.fscod != 3 {
+                    self.facts.source_fscod = Some(field!(self, input, 1) != 0);
+                }
+                InfoField::Done
+            }
+            InfoField::Done => {
+                self.facts.informational_metadata = Some(Eac3BitRange {
+                    start: self.info_start,
+                    bits: self.reader.position - self.info_start,
+                });
+                return Ok(Some(Phase::Conversion(ConversionField::Sync)));
+            }
+        };
+        Ok(Some(Phase::Info(next)))
+    }
+
+    /// `convsync`, and `blkid` and `frmsizecod` of a frame converted from AC-3.
+    fn conversion(
+        &mut self,
+        input: &mut Input<'_>,
+        field: ConversionField,
+    ) -> Result<Option<Phase>> {
+        let next = match field {
+            ConversionField::Sync => {
+                if self.stream_type == 0 && self.blocks != 6 {
+                    self.facts.converter_sync = Some(field!(self, input, 1) != 0);
+                }
+                Phase::Conversion(ConversionField::Block)
+            }
+            ConversionField::Block => {
+                if self.stream_type != 2 {
+                    Phase::Additional(AdditionalField::Flag)
+                } else if self.blocks == 6 {
+                    self.facts.effective_block_id = Some(true);
+                    Phase::Conversion(ConversionField::Size)
+                } else {
+                    let block_id = field!(self, input, 1) != 0;
+                    self.facts.block_id = Some(block_id);
+                    self.facts.effective_block_id = Some(block_id);
+                    if block_id {
+                        Phase::Conversion(ConversionField::Size)
+                    } else {
+                        Phase::Additional(AdditionalField::Flag)
+                    }
+                }
+            }
+            ConversionField::Size => {
+                self.facts.converted_frame_size_code =
+                    Some(u8::try_from(field!(self, input, 6)).map_err(|_| Error::Overflow)?);
+                Phase::Additional(AdditionalField::Flag)
+            }
+        };
+        Ok(Some(next))
+    }
+
+    /// `addbsie`, `addbsil` and the additional bit stream information, one byte per
+    /// call.
+    fn additional(
+        &mut self,
+        input: &mut Input<'_>,
+        field: AdditionalField,
+    ) -> Result<Option<Phase>> {
+        let next = match field {
+            AdditionalField::Flag => {
+                if field!(self, input, 1) != 0 {
+                    Phase::Additional(AdditionalField::Length)
+                } else {
+                    Phase::Finish
+                }
+            }
+            AdditionalField::Length => {
+                self.additional_remaining = u8::try_from(field!(self, input, 6))
+                    .map_err(|_| Error::Overflow)?
+                    .checked_add(1)
+                    .ok_or(Error::Overflow)?;
+                self.facts.additional_bsi = Some(Eac3BitRange {
+                    start: self.reader.position,
+                    bits: usize::from(self.additional_remaining) * 8,
+                });
+                Phase::Additional(AdditionalField::Bytes)
+            }
+            AdditionalField::Bytes => {
+                if self.additional_remaining == 0 {
+                    Phase::Finish
+                } else {
+                    field!(self, input, 8);
+                    self.additional_remaining -= 1;
+                    Phase::Additional(AdditionalField::Bytes)
+                }
+            }
+        };
+        Ok(Some(next))
     }
 }
