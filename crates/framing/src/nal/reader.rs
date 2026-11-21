@@ -23,6 +23,11 @@ impl LengthSize {
         Ok(Self(bytes))
     }
 
+    /// The width a two-bit `lengthSizeMinusOne` field codes.
+    pub(crate) const fn from_minus_one(bits: u8) -> Self {
+        Self((bits & 3) + 1)
+    }
+
     /// The width in bytes, 1 to 4.
     pub const fn bytes(self) -> u8 {
         self.0

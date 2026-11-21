@@ -323,11 +323,26 @@ impl Scan {
     }
 }
 
+/// The walk's step; past the prefix it carries the record's six fixed bytes.
+#[derive(Clone, Copy)]
 enum Phase {
     Prefix,
-    Count,
-    Reserve,
-    Fill,
+    Count([u8; 6]),
+    Reserve([u8; 6]),
+    Fill([u8; 6]),
+}
+
+/// The record and its NAL descriptors, held until they are published.
+#[repr(C)]
+struct Record {
+    raw: Bytes,
+    nals: AvcNalStorage,
+}
+
+/// What one step of the walk ended with.
+enum Walked {
+    Ready([u8; 6]),
+    Yield,
     Complete,
 }
 
@@ -340,22 +355,22 @@ enum Phase {
 /// Other fills walk the record again. A work unit reads at most six fixed bytes
 /// or one length and fixed NAL header. NAL bodies remain bounded spans.
 /// Source delivery chunks belong to the enclosing container/core input job.
+// Hot fields at the offsets the compiler gave them before the state was typed.
+#[repr(C)]
 pub struct AvcConfigParser {
-    raw: Option<Bytes>,
+    scan: Scan,
+    // None once published or failed: the output takes it and a failure drops it,
+    // so no spare pool handle or empty replacement storage is kept for either.
+    record: Option<Record>,
     source: AvcConfigSource,
     limits: AvcConfigLimits,
-    phase: Phase,
-    scan: Scan,
-    fields: Option<AvcConfigFields>,
-    width: Option<LengthSize>,
-    arrays: [ArrayDescriptor; 3],
     array_count: usize,
     total: usize,
     understood_end: usize,
-    // Taken by the published output and dropped by a latched failure, so no
-    // spare pool handle or empty replacement vector is kept for either.
-    nals: Option<AvcNalStorage>,
     failure: Option<Error>,
+    arrays: [ArrayDescriptor; 3],
+    phase: Phase,
+    extension: Option<[u8; 4]>,
     receiver: bool,
 }
 
@@ -365,7 +380,6 @@ impl std::fmt::Debug for AvcConfigParser {
             .debug_struct("AvcConfigParser")
             .field("source", &self.source)
             .field("limits", &self.limits)
-            .field("fields", &self.fields)
             .field("total", &self.total)
             .field("failure", &self.failure)
             .finish_non_exhaustive()
@@ -392,13 +406,14 @@ impl AvcConfigParser {
             .checked_add(u64::try_from(raw.len()).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
         Ok(Self {
-            raw: Some(raw),
+            record: Some(Record {
+                raw,
+                nals: AvcNalStorage::new(|_| AvcNalDescriptor::EMPTY),
+            }),
             source,
             limits,
             phase: Phase::Prefix,
             scan: Scan::new(),
-            fields: None,
-            width: None,
             arrays: std::array::from_fn(|_| ArrayDescriptor {
                 kind: AvcConfigArrayKind::Sequence,
                 range: 0..0,
@@ -408,8 +423,8 @@ impl AvcConfigParser {
             array_count: 0,
             total: 0,
             understood_end: 0,
-            nals: Some(AvcNalStorage::new(|_| AvcNalDescriptor::EMPTY)),
             failure: None,
+            extension: None,
             receiver: false,
         })
     }
@@ -484,38 +499,39 @@ impl AvcConfigParser {
         if let Some(error) = self.failure {
             return Err(error);
         }
-        let result = self.advance(work, cancel).and_then(|progress| {
-            if progress == ConfigProgress::Ready {
-                *ready = Some(wrap(AvcConfiguration {
-                    raw: self
-                        .raw
-                        .take()
-                        .ok_or(Error::Invalid("missing AVC record"))?,
-                    source: self.source,
-                    fields: self.fields.ok_or(Error::Invalid("missing AVC fields"))?,
-                    width: self.width.ok_or(Error::Invalid("missing AVC width"))?,
-                    arrays: self.arrays.clone(),
-                    nals: self
-                        .nals
-                        .take()
-                        .ok_or(Error::Invalid("missing AVC descriptors"))?,
-                }));
-                self.phase = Phase::Complete;
-            }
-            Ok(progress)
+        let result = self.advance(work, cancel).map(|walked| match walked {
+            // A record no longer held was published already.
+            Walked::Ready(prefix) => match self.record.take() {
+                Some(Record { raw, nals }) => {
+                    *ready = Some(wrap(AvcConfiguration {
+                        raw,
+                        source: self.source,
+                        fields: AvcConfigFields {
+                            prefix,
+                            extension: self.extension,
+                        },
+                        width: LengthSize::from_minus_one(prefix[4]),
+                        arrays: self.arrays.clone(),
+                        nals,
+                    }));
+                    ConfigProgress::Ready
+                }
+                None => ConfigProgress::Complete,
+            },
+            Walked::Yield => ConfigProgress::Yield,
+            Walked::Complete => ConfigProgress::Complete,
         });
         if let Err(error) = result
             && !retryable(error)
         {
             self.failure = Some(error);
-            self.raw = None;
-            self.nals = None;
+            self.record = None;
         }
         result
     }
 
     #[inline(never)]
-    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ConfigProgress> {
+    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Walked> {
         // Keep the cursor local for a step and save it only when returning to
         // the caller. Each event still commits only after its work succeeds.
         let mut scan = self.scan;
@@ -530,19 +546,24 @@ impl AvcConfigParser {
         scan: &mut Scan,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ConfigProgress> {
-        let input = self.raw.as_ref().map(|raw| (raw.as_ref(), raw.budget()));
+    ) -> Result<Walked> {
+        let Some(record) = &mut self.record else {
+            // Published: a set `cancel` still fails the call, as it does a walk.
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            return Ok(Walked::Complete);
+        };
+        let raw: &[u8] = record.raw.as_ref();
+        let pool = record.raw.budget();
+        let nals = &mut record.nals;
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if matches!(self.phase, Phase::Complete) {
-                return Ok(ConfigProgress::Complete);
-            }
             if !work.try_charge(1) {
-                return Ok(ConfigProgress::Yield);
+                return Ok(Walked::Yield);
             }
-            let (raw, pool) = input.ok_or(Error::Invalid("missing AVC record"))?;
             match self.phase {
                 Phase::Prefix => {
                     if raw[0] != 1 {
@@ -556,14 +577,10 @@ impl AvcConfigParser {
                     if prefix[4] & 3 == 2 && !self.receiver {
                         return Err(Error::Invalid("AVC three-byte sample length"));
                     }
-                    self.width = Some(LengthSize::new((prefix[4] & 3) + 1)?);
-                    self.fields = Some(AvcConfigFields {
-                        prefix,
-                        extension: None,
-                    });
-                    self.phase = Phase::Count;
+                    self.phase = Phase::Count(prefix);
                 }
-                Phase::Count | Phase::Fill => {
+                Phase::Count(prefix) | Phase::Fill(prefix) => {
+                    let counting = matches!(self.phase, Phase::Count(_));
                     let mut next = *scan;
                     let event = next.next(raw, self.limits, self.receiver)?;
                     match event {
@@ -571,7 +588,7 @@ impl AvcConfigParser {
                             kind,
                             start,
                             extension,
-                        } if matches!(self.phase, Phase::Count) => {
+                        } if counting => {
                             let start = u32::try_from(start).map_err(|_| Error::Overflow)?;
                             let slot = self
                                 .arrays
@@ -585,14 +602,11 @@ impl AvcConfigParser {
                                 nal_count: 0,
                             };
                             self.array_count += 1;
-                            if let Some(extension) = extension {
-                                self.fields
-                                    .as_mut()
-                                    .ok_or(Error::Invalid("missing AVC fields"))?
-                                    .extension = Some(extension);
+                            if extension.is_some() {
+                                self.extension = extension;
                             }
                         }
-                        Event::GroupEnd(end) if matches!(self.phase, Phase::Count) => {
+                        Event::GroupEnd(end) if counting => {
                             let slot = &mut self.arrays[self.array_count - 1];
                             slot.range.end = u32::try_from(end).map_err(|_| Error::Overflow)?;
                             // Each group consumed its literal count (at most255).
@@ -601,43 +615,38 @@ impl AvcConfigParser {
                         Event::Nal {
                             kind,
                             payload,
-                            header,
+                            header: nal_header,
                         } => {
-                            if matches!(self.phase, Phase::Count) {
+                            if counting {
                                 let count = self.total.checked_add(1).ok_or(Error::Overflow)?;
                                 check_limit(count, self.limits.maximum_nals)?;
-                                if let Some(AvcNalStorage::Inline { data, len }) = &mut self.nals
+                                if let AvcNalStorage::Inline { data, len } = nals
                                     && let Some(slot) = data.get_mut(self.total)
                                 {
-                                    *slot = AvcNalDescriptor::new(&payload, kind, header);
+                                    *slot = AvcNalDescriptor::new(&payload, kind, nal_header);
                                     *len = count as u8;
                                 }
                                 self.total = count;
                             } else {
-                                let nal = AvcNalDescriptor::new(&payload, kind, header);
-                                self.nals
-                                    .as_mut()
-                                    .ok_or(Error::Invalid("missing AVC descriptors"))?
-                                    .try_push(nal)?;
+                                nals.try_push(AvcNalDescriptor::new(&payload, kind, nal_header))?;
                             }
                         }
                         Event::End(end) => {
-                            if matches!(self.phase, Phase::Count) {
+                            if counting {
                                 self.understood_end = end;
-                                self.phase = Phase::Reserve;
+                                self.phase = Phase::Reserve(prefix);
                             } else {
-                                return self.publication_ready(end);
+                                if end != self.understood_end || nals.len() != self.total {
+                                    return Err(Error::Invalid("AVC second walk"));
+                                }
+                                return Ok(Walked::Ready(prefix));
                             }
                         }
                         _ => {}
                     }
                     *scan = next;
                 }
-                Phase::Reserve => {
-                    let nals = self
-                        .nals
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing AVC descriptors"))?;
+                Phase::Reserve(prefix) => {
                     nals.reserve(pool, self.total)?;
 
                     // A complete small record can reuse the first walk's facts.
@@ -648,24 +657,17 @@ impl AvcConfigParser {
                         if cancel.load(Ordering::Relaxed) {
                             return Err(Error::Cancelled);
                         }
-                        return self.publication_ready(self.understood_end);
+                        if nals.len() != self.total {
+                            return Err(Error::Invalid("AVC second walk"));
+                        }
+                        return Ok(Walked::Ready(prefix));
                     }
                     nals.clear_inline();
                     *scan = Scan::new();
-                    self.phase = Phase::Fill;
+                    self.phase = Phase::Fill(prefix);
                 }
-                Phase::Complete => return Ok(ConfigProgress::Complete),
             }
         }
-    }
-
-    fn publication_ready(&self, end: usize) -> Result<ConfigProgress> {
-        if end != self.understood_end
-            || self.nals.as_ref().map_or(0, AvcNalStorage::len) != self.total
-        {
-            return Err(Error::Invalid("AVC second walk"));
-        }
-        Ok(ConfigProgress::Ready)
     }
 }
 
