@@ -10,7 +10,6 @@ use crate::{
     table::SampleLocator,
 };
 use std::{
-    mem,
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -223,14 +222,15 @@ impl<'a> RangeWalk<'a> {
         }
     }
     /// Locates the sample at `ordinal` and finds an extent that holds it, one extent per
-    /// work unit; `Some` with the sample once one does, `None` when the work is spent.
+    /// work unit; `Some` with the sample once one does, which stays until
+    /// [`advance`](Self::advance), and `None` when the work is spent.
     fn check(
         &mut self,
         source: SourceTrack<'a>,
         media: &[Range<u64>],
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<Sample>> {
+    ) -> Result<Option<&Sample>> {
         loop {
             let sample = if let Some(sample) = &self.pending {
                 sample
@@ -253,7 +253,7 @@ impl<'a> RangeWalk<'a> {
             }
             if sample.require_within(extent.clone()).is_ok() {
                 self.validated = self.validated.checked_add(1).ok_or(Error::Overflow)?;
-                return Ok(self.pending.take());
+                return Ok(self.pending.as_ref());
             }
             self.extent = self.extent.checked_add(1).ok_or(Error::Overflow)?;
             if cancel.load(Ordering::Relaxed) {
@@ -261,10 +261,18 @@ impl<'a> RangeWalk<'a> {
             }
         }
     }
+    /// Moves on to the next ordinal after a checked sample.
+    fn advance(&mut self) -> Result<()> {
+        self.pending = None;
+        self.ordinal = self.ordinal.checked_add(1).ok_or(Error::Overflow)?;
+        Ok(())
+    }
 }
 
 /// Where a plan stands. Each phase owns what it reads and what the phases before it
-/// found.
+/// found, and changes in place.
+// Boxing the walk would put the per-sample state behind a pointer.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 enum Phase<'a> {
     /// Checking that no media extent is reversed, from extent `next`; `next_ordinal`
@@ -289,16 +297,13 @@ enum Phase<'a> {
         probes: u64,
         lookup: Option<IndexedLookup<'a>>,
     },
-    /// Checking the first sample to decode.
-    DecodeStart {
+    /// Checking the samples from the decode start through the target; `decode_start`
+    /// once the walk has passed it.
+    Ranges {
         target: Sample,
         sync_sample: Sample,
         available_preroll: u16,
-        walk: RangeWalk<'a>,
-    },
-    /// Checking the samples after the decode start, through the target.
-    Ranges {
-        landing: SourceSeekLanding,
+        decode_start: Option<Sample>,
         walk: RangeWalk<'a>,
     },
     Ready(SourceSeekLanding),
@@ -373,8 +378,7 @@ impl<'a> SourceSeekPlanner<'a> {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            // A sample the finished phase hands to the next one.
-            let found = match &mut self.phase {
+            match &mut self.phase {
                 Phase::Extents { next, next_ordinal } => {
                     if let Some(extent) = self.media.get(*next) {
                         if !work.try_charge(1) {
@@ -390,7 +394,6 @@ impl<'a> SourceSeekPlanner<'a> {
                             next_ordinal: *next_ordinal,
                         };
                     }
-                    continue;
                 }
                 Phase::Fragments { next, next_ordinal } => {
                     if let Some(index) = self.source.fragment_indexes().get(*next) {
@@ -416,7 +419,6 @@ impl<'a> SourceSeekPlanner<'a> {
                             self.request.target_ordinal,
                         )?);
                     }
-                    continue;
                 }
                 Phase::Target(lookup) => match lookup.poll(work)? {
                     Next::Yield => return Ok(BuildStatus::Yield),
@@ -430,14 +432,13 @@ impl<'a> SourceSeekPlanner<'a> {
                             probes: 0,
                             lookup: None,
                         };
-                        continue;
                     }
                 },
                 Phase::Sync {
+                    target,
                     sync_ordinal,
                     probes,
                     lookup,
-                    ..
                 } => {
                     let probe = if let Some(probe) = lookup {
                         probe
@@ -473,7 +474,32 @@ impl<'a> SourceSeekPlanner<'a> {
                     let passed_sync = probe.passed_sync();
                     *lookup = None;
                     if sample.access == Access::ContainerSync {
-                        sample
+                        let preceding = sample
+                            .ordinal
+                            .checked_sub(1)
+                            .ok_or(Error::Invalid("zero seek sync ordinal"))?;
+                        let available = preceding.min(u64::from(self.request.preroll_samples));
+                        let available_preroll =
+                            u16::try_from(available).map_err(|_| Error::Overflow)?;
+                        let range_start = sample
+                            .ordinal
+                            .checked_sub(available)
+                            .ok_or(Error::Overflow)?;
+                        let range_count = self
+                            .request
+                            .target_ordinal
+                            .checked_sub(range_start)
+                            .and_then(|value| value.checked_add(1))
+                            .ok_or(Error::Overflow)?;
+                        sample_limit(range_count, self.limits.max_range_samples)?;
+                        let target = target.clone();
+                        self.phase = Phase::Ranges {
+                            target,
+                            sync_sample: sample,
+                            available_preroll,
+                            decode_start: None,
+                            walk: RangeWalk::new(range_start),
+                        };
                     } else {
                         *sync_ordinal =
                             sample
@@ -494,98 +520,49 @@ impl<'a> SourceSeekPlanner<'a> {
                             *probes = passed;
                             *sync_ordinal = sync;
                         }
-                        continue;
                     }
                 }
-                Phase::DecodeStart { walk, .. } => {
+                Phase::Ranges {
+                    target,
+                    sync_sample,
+                    available_preroll,
+                    decode_start,
+                    walk,
+                } => {
+                    let at_target = walk.ordinal == self.request.target_ordinal;
                     let Some(sample) = walk.check(self.source, self.media, work, cancel)? else {
                         return Ok(BuildStatus::Yield);
                     };
-                    sample
-                }
-                Phase::Ranges { walk, .. } => {
-                    let Some(sample) = walk.check(self.source, self.media, work, cancel)? else {
-                        return Ok(BuildStatus::Yield);
-                    };
-                    if walk.ordinal != self.request.target_ordinal {
-                        walk.ordinal = walk.ordinal.checked_add(1).ok_or(Error::Overflow)?;
+                    if !at_target {
+                        if decode_start.is_none() {
+                            *decode_start = Some(sample.clone());
+                        }
+                        walk.advance()?;
                         continue;
                     }
-                    sample
+                    // The target is the decode start where the walk began at it.
+                    let decode_start = decode_start.take().unwrap_or_else(|| sample.clone());
+                    let landing = SourceSeekLanding {
+                        track_id: self.source.track_id(),
+                        requested_ordinal: self.request.target_ordinal,
+                        target: target.clone(),
+                        sync_sample: sync_sample.clone(),
+                        decode_start,
+                        requested_preroll_samples: self.request.preroll_samples,
+                        available_preroll_samples: *available_preroll,
+                        missing_preroll_samples: self
+                            .request
+                            .preroll_samples
+                            .checked_sub(*available_preroll)
+                            .ok_or(Error::Overflow)?,
+                        validated_samples: walk.validated,
+                    };
+                    self.phase = Phase::Ready(landing);
                 }
                 Phase::Ready(_) => return Ok(BuildStatus::Ready),
                 Phase::Failed(error) => return Err(*error),
-            };
-            // The phase's job is done. The planner counts as failed until the next
-            // phase is in place; `poll` records the error if that fails.
-            let finished = mem::replace(&mut self.phase, Phase::Failed(Error::Cancelled));
-            self.phase = self.next_phase(finished, found)?;
+            }
         }
-    }
-    /// The phase that follows `finished`, whose job found `sample`: the sync sample
-    /// after [`Phase::Sync`], the decode start after [`Phase::DecodeStart`] and the
-    /// target after [`Phase::Ranges`].
-    fn next_phase(&self, finished: Phase<'a>, sample: Sample) -> Result<Phase<'a>> {
-        Ok(match finished {
-            Phase::Sync { target, .. } => {
-                let preceding = sample
-                    .ordinal
-                    .checked_sub(1)
-                    .ok_or(Error::Invalid("zero seek sync ordinal"))?;
-                let available = preceding.min(u64::from(self.request.preroll_samples));
-                let available_preroll = u16::try_from(available).map_err(|_| Error::Overflow)?;
-                let range_start = sample
-                    .ordinal
-                    .checked_sub(available)
-                    .ok_or(Error::Overflow)?;
-                let range_count = self
-                    .request
-                    .target_ordinal
-                    .checked_sub(range_start)
-                    .and_then(|value| value.checked_add(1))
-                    .ok_or(Error::Overflow)?;
-                sample_limit(range_count, self.limits.max_range_samples)?;
-                Phase::DecodeStart {
-                    target,
-                    sync_sample: sample,
-                    available_preroll,
-                    walk: RangeWalk::new(range_start),
-                }
-            }
-            Phase::DecodeStart {
-                target,
-                sync_sample,
-                available_preroll,
-                mut walk,
-            } => {
-                let landing = SourceSeekLanding {
-                    track_id: self.source.track_id(),
-                    requested_ordinal: self.request.target_ordinal,
-                    target,
-                    sync_sample,
-                    decode_start: sample,
-                    requested_preroll_samples: self.request.preroll_samples,
-                    available_preroll_samples: available_preroll,
-                    missing_preroll_samples: self
-                        .request
-                        .preroll_samples
-                        .checked_sub(available_preroll)
-                        .ok_or(Error::Overflow)?,
-                    validated_samples: walk.validated,
-                };
-                if walk.ordinal == self.request.target_ordinal {
-                    Phase::Ready(landing)
-                } else {
-                    walk.ordinal = walk.ordinal.checked_add(1).ok_or(Error::Overflow)?;
-                    Phase::Ranges { landing, walk }
-                }
-            }
-            Phase::Ranges { landing, walk } => Phase::Ready(SourceSeekLanding {
-                validated_samples: walk.validated,
-                ..landing
-            }),
-            other => other,
-        })
     }
     /// [`poll`](Self::poll), with the landing once the plan is ready.
     pub(crate) fn poll_landing(
