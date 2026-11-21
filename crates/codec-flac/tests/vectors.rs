@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use triergon::{Budget, ContainerReader, PacketInfo};
 use triergon_codec_flac::{AudioFrame, Decoder};
 use triergon_framing::flac;
+use triergon_harness_protocol::md5;
 
 /// The configuration and frames of a native FLAC file, read by the elementary reader up
 /// to its first error; `None` when it does not open as FLAC.
@@ -76,7 +77,7 @@ fn check_md5(max_bytes: u64) {
             };
             let mut decoder = Decoder::new(&configuration).unwrap();
             let (mut integer, mut float) = (decoder.integer_frame(), AudioFrame::default());
-            let mut md5 = Md5::default();
+            let mut pcm = Vec::new();
             let mut uniform = true;
             for au in &frames {
                 let Ok(frame) = decoder.decode_integer(au, &mut integer) else {
@@ -95,17 +96,15 @@ fn check_md5(max_bytes: u64) {
                         (x << (32 - bits)) as f32 / 2_147_483_648.0
                     }
                 };
-                let mut bytes = Vec::new();
                 for i in 0..integer.samples_per_channel {
                     for (plane, floats) in integer.planes().zip(&float.planes) {
                         assert_eq!(floats[i], scale(plane[i]), "{}", path.display());
-                        bytes.extend_from_slice(&plane[i].to_le_bytes()[..width]);
+                        pcm.extend_from_slice(&plane[i].to_le_bytes()[..width]);
                     }
                 }
-                md5.update(&bytes);
             }
             if uniform && info.md5 != [0; 16] {
-                assert_eq!(md5.finish(), info.md5, "{}", path.display());
+                assert_eq!(md5::digest(&pcm), info.md5, "{}", path.display());
                 checked += 1;
             }
         }
@@ -134,82 +133,4 @@ fn damaged_files_never_panic() {
             let _ = decoder.decode(au, &mut out);
         }
     }
-}
-
-/// MD5 (RFC 1321), for the STREAMINFO signature.
-struct Md5 {
-    state: [u32; 4],
-    buffer: Vec<u8>,
-    len: u64,
-}
-
-impl Default for Md5 {
-    fn default() -> Self {
-        Md5 {
-            state: [0x6745_2301, 0xefcd_ab89, 0x98ba_dcfe, 0x1032_5476],
-            buffer: Vec::new(),
-            len: 0,
-        }
-    }
-}
-
-impl Md5 {
-    fn update(&mut self, bytes: &[u8]) {
-        self.len += bytes.len() as u64;
-        self.buffer.extend_from_slice(bytes);
-        let whole = self.buffer.len() / 64 * 64;
-        for block in self.buffer[..whole].chunks_exact(64) {
-            compress(&mut self.state, block);
-        }
-        self.buffer.drain(..whole);
-    }
-
-    fn finish(mut self) -> [u8; 16] {
-        let bits = self.len * 8;
-        let mut tail = vec![0x80];
-        tail.resize((119 - self.buffer.len() % 64) % 64 + 1, 0);
-        tail.extend_from_slice(&bits.to_le_bytes());
-        self.update(&tail);
-        let mut out = [0; 16];
-        for (chunk, word) in out.chunks_exact_mut(4).zip(self.state) {
-            chunk.copy_from_slice(&word.to_le_bytes());
-        }
-        out
-    }
-}
-
-fn compress(state: &mut [u32; 4], block: &[u8]) {
-    const SHIFTS: [u32; 16] = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
-    let mut words = [0u32; 16];
-    for (word, bytes) in words.iter_mut().zip(block.chunks_exact(4)) {
-        *word = u32::from_le_bytes(bytes.try_into().unwrap());
-    }
-    let [mut a, mut b, mut c, mut d] = *state;
-    for i in 0..64 {
-        let (f, g) = match i / 16 {
-            0 => ((b & c) | (!b & d), i),
-            1 => ((d & b) | (!d & c), (5 * i + 1) % 16),
-            2 => (b ^ c ^ d, (3 * i + 5) % 16),
-            _ => (c ^ (b | !d), (7 * i) % 16),
-        };
-        let k = ((i as f64 + 1.0).sin().abs() * 4_294_967_296.0) as u32;
-        let rotated = a
-            .wrapping_add(f)
-            .wrapping_add(k)
-            .wrapping_add(words[g])
-            .rotate_left(SHIFTS[i / 16 * 4 + i % 4]);
-        (a, d, c) = (d, c, b);
-        b = b.wrapping_add(rotated);
-    }
-    for (s, v) in state.iter_mut().zip([a, b, c, d]) {
-        *s = s.wrapping_add(v);
-    }
-}
-
-#[test]
-fn md5_known_answer() {
-    let mut md5 = Md5::default();
-    md5.update(b"The quick brown fox jumps over the lazy dog");
-    let hex: String = md5.finish().iter().map(|b| format!("{b:02x}")).collect();
-    assert_eq!(hex, "9e107d9d372bb6826bd81d3542a419d6");
 }

@@ -16,6 +16,7 @@ triergon-framing = { path = "../framing" }
 
 [dev-dependencies]
 triergon = { path = "../triergon", features = ["elementary", "ogg"] }
+triergon-harness-protocol = { path = "../harness-protocol" }
 
 [lints]
 workspace = true

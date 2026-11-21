@@ -199,6 +199,7 @@ dependencies = [
  "triergon-codec",
  "triergon-core",
  "triergon-framing",
+ "triergon-harness-protocol",
 ]
 
 [[package]]
