@@ -14,8 +14,8 @@ use crate::{
 use lane::{Lane, LaneStep, PesRun, StorageScan};
 pub use model::{
     Ac3AccessUnit, AccessUnit, DtsAudioFrame, DtsExtensionFrame, DvbSubtitleUnit, IncompleteVideo,
-    LoasFrame, MpegAudioFrame, Packet, PacketClock, PayloadSource, ReaderEvent, SourceEvent, Track,
-    UnframedAudio,
+    LoasFrame, MpegAudioFrame, MpegPictureCoding, MpegVideoPicture, Packet, PacketClock,
+    PayloadSource, ReaderEvent, SourceEvent, Track, UnframedAudio,
 };
 use model::{ClockContext, Shared};
 pub use seek::SeekEntity;

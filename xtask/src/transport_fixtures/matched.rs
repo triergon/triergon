@@ -1,6 +1,9 @@
 //! Independently authored TS controls for selected-track seek and audio framing.
+mod mpeg_video;
 mod xll;
 mod xll_mode_zero;
+
+pub use mpeg_video::author as author_mpeg_video;
 
 use super::{Codec, PID, PROGRAM, Part, R, Transport, part, source};
 use crate::corpus::write_json;

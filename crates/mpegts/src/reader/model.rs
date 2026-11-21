@@ -387,12 +387,47 @@ impl DtsExtensionFrame {
     }
 }
 
+/// Picture coding type from H.262 section 6.2.3.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MpegPictureCoding {
+    #[default]
+    Intra,
+    Predictive,
+    Bidirectional,
+}
+
+/// A picture with sequence setup and its original coded slices.
+#[derive(Debug)]
+pub struct MpegVideoPicture {
+    pub(super) bytes: Bytes,
+    pub(super) range: Range<u64>,
+    pub width: u16,
+    pub height: u16,
+    pub temporal_reference: u16,
+    pub coding: MpegPictureCoding,
+    /// Picture start-code offset in the private elementary view.
+    pub picture_offset: u64,
+    pub slice_count: u8,
+    pub mpeg2: bool,
+    pub(super) duration: Time,
+}
+
+impl MpegVideoPicture {
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+    pub fn elementary_range(&self) -> Range<u64> {
+        self.range.clone()
+    }
+}
+
 /// Original framed bytes and syntax facts, before decoder-feed conversion.
 /// Framer offsets use a private concatenated elementary view (`SourceId(0)`);
 /// physical transport provenance is retained by [`Packet::sources`].
 #[derive(Debug)]
 pub enum AccessUnit {
     Video(RawAccessUnit),
+    MpegVideo(MpegVideoPicture),
     Adts(AacAdtsFrame),
     Loas(LoasFrame),
     MpegAudio(MpegAudioFrame),
@@ -413,6 +448,7 @@ pub enum AccessUnit {
 impl AccessUnit {
     fn stored_bytes(&self) -> &Bytes {
         match self {
+            Self::MpegVideo(frame) => frame.bytes(),
             Self::Adts(frame) => frame.source_bytes(),
             Self::AdtsFragment(fragment) => fragment.source_bytes(),
             Self::Loas(frame) => frame.bytes(),
@@ -429,6 +465,7 @@ impl AccessUnit {
     pub(super) fn range(&self) -> Range<u64> {
         match self {
             Self::Video(unit) => unit.range.clone(),
+            Self::MpegVideo(unit) => unit.range.clone(),
             Self::Adts(frame) => {
                 frame.source().offset..frame.source().offset + frame.source_bytes().len() as u64
             }
@@ -464,6 +501,7 @@ impl AccessUnit {
     }
     pub(super) fn duration(&self) -> Result<Option<Time>> {
         match self {
+            Self::MpegVideo(unit) => Ok(Some(unit.duration)),
             Self::Video(_)
             | Self::Loas(_)
             | Self::DvbSubtitle(_)
@@ -562,6 +600,10 @@ impl PacketInfo for Packet {
     }
     fn random_access(&self) -> RandomAccess {
         match &self.0.unit {
+            AccessUnit::MpegVideo(unit) if unit.coding == MpegPictureCoding::Intra => {
+                RandomAccess::Sync
+            }
+            AccessUnit::MpegVideo(_) => RandomAccess::NotSync,
             AccessUnit::Video(unit) if unit.random_access => RandomAccess::Sync,
             AccessUnit::Video(unit) if unit.has_vcl => RandomAccess::NotSync,
             _ => RandomAccess::Unknown,

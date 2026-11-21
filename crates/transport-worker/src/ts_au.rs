@@ -7,7 +7,9 @@ use crate::ts::{au_recovery, confirm_control_only_entity, fold_payload};
 use crate::ts_input::{self, FIRST_SOURCE, Request};
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
-use triergon_core::container::{ContainerReader, Event, PacketInfo, TrackId, TrackInfo};
+use triergon_core::container::{
+    ContainerReader, Event, PacketInfo, RandomAccess, TrackId, TrackInfo,
+};
 use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputWindow, Rounding, SourceCapabilities, SourceId,
     SourceLocation, Step, TimeBase, WorkBudget,
@@ -220,6 +222,10 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
         let (flags, position) = match packet.access_unit() {
             AccessUnit::Video(unit) => (
                 u64::from(unit.random_access),
+                PositionSource::AlignedPayload,
+            ),
+            AccessUnit::MpegVideo(_) => (
+                u64::from(packet.random_access() == RandomAccess::Sync),
                 PositionSource::AlignedPayload,
             ),
             AccessUnit::Loas(_) => (0, PositionSource::AlignedPayload),
@@ -518,6 +524,10 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     (previous, duration)
                 } else {
                     let duration = match packet.access_unit() {
+                        // The parser-enabled NOFILLIN reference leaves MPEG video
+                        // packet duration absent without stream discovery. The source
+                        // picture retains its sequence-derived exact duration.
+                        AccessUnit::MpegVideo(_) => 0,
                         AccessUnit::MpegAudio(frame) => {
                             let first = !std::mem::replace(&mut track.mpeg_audio_seen, true);
                             // The reference reports no initial Layer I/II duration
