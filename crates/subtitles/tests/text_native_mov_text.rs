@@ -302,17 +302,17 @@ fn foreign_pool_busy_and_stale_generation_rejections_return_exact_input() {
         .provide(input(&foreign, b"foreign"), Clock::default())
         .unwrap_err();
     assert_eq!(e.error, Error::ForeignPool);
-    assert_eq!(e.input.payload.as_ref(), b"foreign");
+    assert_eq!(e.value.payload.as_ref(), b"foreign");
     let mut i = input(&pool, b"stale");
     i.generation = 5;
     let e = d.provide(i, Clock::default()).unwrap_err();
-    assert_eq!(e.input.generation, 5);
+    assert_eq!(e.value.generation, 5);
     d.provide(input(&pool, &sample(b"a", &[])), Clock::default())
         .unwrap();
     let e = d
         .provide(input(&pool, b"busy"), Clock::default())
         .unwrap_err();
-    assert_eq!(e.input.payload.as_ref(), b"busy");
+    assert_eq!(e.value.payload.as_ref(), b"busy");
 }
 #[test]
 fn take_cancel_reset_and_context_drop_preserve_retained_output_owners() {
@@ -376,7 +376,7 @@ fn eof_has_no_delayed_ass_and_never_accepts_an_extra_packet() {
     let e = d
         .provide(input(&pool, &sample(b"x", &[])), Clock::default())
         .unwrap_err();
-    assert_eq!(e.input.payload.as_ref(), sample(b"x", &[]));
+    assert_eq!(e.value.payload.as_ref(), sample(b"x", &[]));
 }
 #[test]
 fn complete_u16_text_length_is_not_clamped_to_the_2048_recommendation() {

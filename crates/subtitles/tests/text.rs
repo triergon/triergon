@@ -242,7 +242,7 @@ fn run_case(index: usize) {
             let mut parser = Extractor::new(&pool, limits, input.generation);
             if let Err(rejected) = parser.provide(input) {
                 check_error(rejected.error, case.error, case.id);
-                same_input(&rejected.input, &original);
+                same_input(&rejected.value, &original);
                 assert!(case.events.is_empty());
             } else {
                 parser.finish_input();
@@ -402,7 +402,7 @@ fn busy_input_rejection_returns_exact_owner() {
         rejection.error,
         Error::Invalid("text input already pending")
     );
-    same_input(&rejection.input, &original);
+    same_input(&rejection.value, &original);
     assert_eq!(next_opaque(&mut parser).input.payload.as_ref(), b"first");
 }
 
@@ -420,7 +420,7 @@ fn stale_generation_returns_exact_owner() {
             received: 1
         }
     );
-    same_input(&rejection.input, &original);
+    same_input(&rejection.value, &original);
 }
 
 #[test]
@@ -446,7 +446,7 @@ fn every_source_owner_must_belong_to_the_same_pool() {
         let mut parser = Extractor::new(&pool, Limits::default(), 1);
         let rejection = parser.provide(input).unwrap_err();
         assert_eq!(rejection.error, Error::ForeignPool);
-        same_input(&rejection.input, &original);
+        same_input(&rejection.value, &original);
     }
 }
 
@@ -468,7 +468,7 @@ fn input_limit_rejection_does_not_consume_input() {
             maximum: 3
         }
     );
-    same_input(&rejection.input, &original);
+    same_input(&rejection.value, &original);
     parser.provide(opaque(&pool, b"ok", 1)).unwrap();
     assert_eq!(next_opaque(&mut parser).input.payload.as_ref(), b"ok");
 }
@@ -492,7 +492,7 @@ fn configuration_limit_is_independent_of_payload_limit() {
             maximum: 1
         }
     );
-    same_input(&rejection.input, &original);
+    same_input(&rejection.value, &original);
 }
 
 #[test]
@@ -772,7 +772,7 @@ fn oversized_charset_label_returns_exact_unconsumed_source() {
             maximum: 256
         }
     );
-    same_input(&rejection.input, &original);
+    same_input(&rejection.value, &original);
 }
 
 #[test]
@@ -793,5 +793,5 @@ fn addition_limit_returns_all_source_facts_without_reclassification() {
             maximum: 16
         }
     );
-    same_input(&rejection.input, &original);
+    same_input(&rejection.value, &original);
 }

@@ -7,11 +7,11 @@ mod packet;
 mod write;
 
 pub use super::decoded::{Clock, Subtitle};
-use super::{Format, Input, ProvideError, unicode::cancelled};
+use super::{Format, Input, unicode::cancelled};
 use config::Configuration;
 use packet::PacketJob;
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, Error, Result, TimeBase, WorkBudget};
+use triergon_core::{Budget, Bytes, Error, Refused, Result, TimeBase, WorkBudget};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Options {
@@ -125,11 +125,18 @@ impl Decoder {
 
     #[expect(
         clippy::result_large_err,
-        reason = "Return the exact existing Input on rejection without allocating; ProvideError has an existing physical size guard."
+        reason = "A refused input goes back to the caller inline, without an allocation; its size is guarded in the text module."
     )]
-    pub fn provide(&mut self, input: Input, clock: Clock) -> std::result::Result<(), ProvideError> {
+    pub fn provide(
+        &mut self,
+        input: Input,
+        clock: Clock,
+    ) -> std::result::Result<(), Refused<Input>> {
         if let Err(error) = self.check(&input) {
-            return Err(ProvideError { error, input });
+            return Err(Refused {
+                error,
+                value: input,
+            });
         }
         self.job = Some(PacketJob::new(input, clock, &self.pool));
         Ok(())

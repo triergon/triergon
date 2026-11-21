@@ -27,18 +27,12 @@ pub use self::model::*;
 
 use self::session::{Action, Session};
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Error, Result, WorkBudget};
-
-#[derive(Debug)]
-pub struct ProvideError {
-    pub error: Error,
-    pub input: Input,
-}
+use triergon_core::{Budget, Error, Refused, Result, WorkBudget};
 
 // Failure must return the exact input even when no output budget is available.
 // The Result envelope permits one extra 16-byte alignment unit for its tag.
-const _: () = assert!(size_of::<ProvideError>() <= 432);
-const _: () = assert!(size_of::<std::result::Result<(), ProvideError>>() <= 448);
+const _: () = assert!(size_of::<Refused<Input>>() <= 432);
+const _: () = assert!(size_of::<std::result::Result<(), Refused<Input>>>() <= 448);
 
 #[derive(Debug)]
 #[expect(
@@ -93,16 +87,19 @@ impl Extractor {
 
     #[expect(
         clippy::result_large_err,
-        reason = "Rejection returns the exact source owners inline without allocating on failure; ProvideError is guarded at 432 bytes."
+        reason = "A refused input goes back to the caller inline, without an allocation; its size is guarded above."
     )]
-    pub fn provide(&mut self, input: Input) -> std::result::Result<(), ProvideError> {
+    pub fn provide(&mut self, input: Input) -> std::result::Result<(), Refused<Input>> {
         match self.check_input(&input) {
             Ok(()) => {
                 self.session = Some(Session::new(&input, &self.pool, self.iso_tx3g));
                 self.pending = Some(input);
                 Ok(())
             }
-            Err(error) => Err(ProvideError { error, input }),
+            Err(error) => Err(Refused {
+                error,
+                value: input,
+            }),
         }
     }
 
