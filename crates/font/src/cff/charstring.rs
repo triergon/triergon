@@ -11,6 +11,36 @@
 //! Arithmetic wraps at 32 bits and rounds as FreeType's does; operands are not
 //! typed, so an integer operator accepts any number and rounds it.
 //!
+//! # What a glyph observes
+//!
+//! The outline is FreeType 2.15.0's for any charstring, valid or not. Another
+//! reader of charstrings may differ in each of these:
+//!
+//! - **Numbers.** 16.16 in 32 bits: sums wrap, `mul`, `div` and `sqrt` round,
+//!   and an index or count is its operand rounded and kept to 16 bits.
+//! - **Stack.** 48 operands in CFF and 513 in CFF2, with 32 transient slots;
+//!   one operand more fails the glyph.
+//! - **Subroutines.** Numbers are biased by the INDEX's count (TN 5177 4.7).
+//!   CFF nests 16 calls, local and global together, where TN 5177 states 10;
+//!   both versions also stop at the face's `Limits::depth`.
+//! - **Work.** Each operator and operand costs a unit of the caller's
+//!   `WorkBudget`; no fixed count of operations ends a glyph.
+//! - **End.** A charstring that runs out of bytes ends as `endchar` would, a
+//!   subroutine as `return` would. A reserved two-byte operator fails a CFF
+//!   glyph and clears a CFF2 stack, as do the arithmetic, storage and
+//!   conditional operators of Type 2 in CFF2, which does not run them.
+//! - **Hints.** A mask over more than 96 stems fails the glyph.
+//! - **`seac`.** `endchar` with four operands besides a width draws the
+//!   accent, at its offset, and then the base, each found through the
+//!   standard encoding and the charset; nested, or in a CID-keyed face, it
+//!   fails the glyph.
+//! - **Points.** [`outline`] gives whole font units: a contour starts at its
+//!   first segment, a zero-length line is dropped, and closing drops a final
+//!   point equal to the first and a contour of one point. [`bounds`] gives
+//!   the box of every point drawn, control points included, in unrounded
+//!   16.16 before the FontMatrix.
+//! - **`random`** is a linear congruential sequence of this crate's own.
+//!
 //! Bytes decode into [`Token`]s first; each operator family has its own handler.
 
 use super::dict::{CFF_OPERANDS, CFF2_OPERANDS, Stack};

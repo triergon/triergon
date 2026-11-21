@@ -52,20 +52,19 @@ pub(crate) struct Hhea {
     pub(crate) metrics: u32,
 }
 
-/// A metrics header and the table of its records as FreeType's
-/// `sfnt_load_face` finds them (`tt_face_load_hhea`, `tt_face_load_hmtx`):
-/// the lower-case header (`hhea` or `vhea`) with the lower-case records, else
-/// the extended upper-case header with the upper-case records. `None` when
-/// either is missing.
+/// A metrics header and the table of its records: the lower-case header
+/// (`hhea` or `vhea`) with the lower-case records, else the extended
+/// upper-case header with the upper-case records. `None` when either is
+/// missing.
 ///
-/// FreeType reads the header's 34 bytes and its record count, 16-bit or for
-/// an extended header 32-bit, from the file at the table's offset rather than
-/// from the table: a short header reads on into the bytes after it.
+/// The header's 34 bytes and its record count, 16-bit or for an extended
+/// header 32-bit, are read from the file at the table's offset rather than
+/// from the table: a short header reads on into the bytes after it, as
+/// FreeType reads it.
 ///
 /// # Errors
 ///
-/// `Invalid` when the header runs past the end of the file, where FreeType
-/// fails to open the face.
+/// `Invalid` when the header runs past the end of the file.
 pub(crate) fn header_and_records(
     file: &[u8],
     header: [Option<Table>; 2],
@@ -225,9 +224,8 @@ pub(crate) fn underline(data: Option<&[u8]>) -> (i16, i16) {
     }
 }
 
-/// Whether `post` declares the face fixed pitch (`isFixedPitch`), which
-/// FreeType reports as `FT_FACE_FLAG_FIXED_WIDTH`; false when the table is
-/// absent or shorter than its 32-byte header.
+/// Whether `post` declares the face fixed pitch (`isFixedPitch`); false when
+/// the table is absent or shorter than its 32-byte header.
 pub(crate) fn fixed_pitch(data: Option<&[u8]>) -> bool {
     match data {
         Some(post) if post.len() >= 32 => u32_at(post, 12).is_some_and(|v| v != 0),

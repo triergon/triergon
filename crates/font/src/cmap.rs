@@ -1,11 +1,56 @@
 //! Character to glyph mapping: OpenType `cmap` formats 0, 2, 4, 6, 8, 10, 12 and
-//! 13, the two charmaps FreeType adds to a CFF face, one built from its glyph
+//! 13, the two charmaps a CFF face gets besides, one built from its glyph
 //! names and one from its encoding, and the variation sequences of formats 14
 //! and 15.
 //!
 //! Subtable headers are checked when the face is parsed; lookups read the font bytes
 //! directly, bounded by the end of the `cmap` table. A declared subtable length is
 //! not trusted, because fonts with more than 64 KiB of format 4 data overflow it.
+//!
+//! # What a lookup observes
+//!
+//! Every charmap of a face stays selectable and each code is looked up as it
+//! is given, with FreeType 2.15.0's result for well-formed and malformed
+//! tables alike. A reader that sanitises the table as a whole, picks one
+//! subtable and remaps symbol or Macintosh codes (a shaper's) differs in each
+//! of these:
+//!
+//! - **Table.** The version is not checked. Encoding records stop at the
+//!   table's end, a record at offset 0 is skipped, and a table too short for
+//!   its header has no charmaps.
+//! - **Charmaps.** Every record of a format above, on any platform, in
+//!   directory order, whose subtable passes validation; a subtable that fails
+//!   drops only the records pointing at it. Validation asks that the declared
+//!   length fits the table and holds the format's header and arrays (262
+//!   bytes for format 0); that the groups of formats 8, 12 and 13 ascend
+//!   without overlapping; that each format 4 segment starts at or before its
+//!   end, in any order, with glyph arrays inside the table; and that format
+//!   2's subheaders and glyph arrays lie inside the subtable.
+//! - **Bounds.** A lookup reads to the end of the `cmap` table, whatever the
+//!   subtable's length says; what lies beyond reads as glyph 0.
+//! - **Glyphs.** Glyph 0 and glyphs at or above the face's glyph count are
+//!   unmapped.
+//! - **Format 4.** Codes above 0xFFFF are unmapped. Segments that validation
+//!   found out of order are searched linearly, in table order, up to the
+//!   first that holds the code or starts after it; others by binary search,
+//!   which among overlapping segments takes the first in table order that
+//!   holds the code and has glyphs. An `idRangeOffset` of 0xFFFF marks a
+//!   segment without glyphs. A glyph array entry of 0 is unmapped; any other
+//!   has `idDelta` added modulo 65536. A final 0xFFFF segment whose glyph
+//!   array lies past the table maps to glyph 0.
+//! - **Format 2.** A single byte maps through the first subheader, and only
+//!   when its key is zero; a two-byte code through its high byte's
+//!   subheader, which may not be the first. Codes above 0xFFFF are unmapped.
+//! - **Format 8.** The groups are searched linearly; the `is32` bitmap is
+//!   not read.
+//! - **Formats 12 and 13.** A binary search over the groups ([`bsearch`]); a
+//!   format 12 glyph that overflows 32 bits is unmapped.
+//! - **Iteration.** [`Charmap::mappings`] documents its order, which for
+//!   formats 2, 4 and 8 is the walk from each code to the next mapped one.
+//! - **Variation sequences.** [`VariationSequences::variant`] documents the
+//!   lookup; the subtable is the first that an encoding record lists for the
+//!   Unicode platform's encoding 5 and that passes validation, and
+//!   [`VariationSequences::format14`] reads one another reader selects.
 
 use crate::GlyphId;
 use crate::cff::Encoding;
@@ -19,7 +64,7 @@ use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 /// The last Unicode scalar value; mapping iteration stops there.
 const MAX_CODE: u32 = 0x10_ffff;
 
-/// A `cmap` subtable format FreeType makes a selectable charmap of.
+/// A `cmap` subtable format that maps codes to glyphs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CmapFormat {
     /// Format 0: one byte per code 0 to 255.
@@ -69,10 +114,10 @@ impl CmapFormat {
         }
     }
 
-    /// Whether FreeType's default validation accepts the subtable, given the
-    /// bytes from its start to the end of the `cmap` table, with the flags it
-    /// finds (format 4's unsorted or overlapping segments); `steps` counts
-    /// the records read.
+    /// Whether the subtable passes validation, given the bytes from its
+    /// start to the end of the `cmap` table, with the flags validation finds
+    /// (format 4's unsorted or overlapping segments); `steps` counts the
+    /// records read.
     fn check(self, table: &[u8], steps: &mut usize) -> Option<u8> {
         let short = |at| u16_at(table, at).map(usize::from);
         let long = |at| u32_at(table, at).and_then(|n| usize::try_from(n).ok());
@@ -115,22 +160,22 @@ impl CmapFormat {
 }
 
 /// What a charmap reads codes through: a `cmap` subtable, or one of the
-/// charmaps FreeType adds to a CFF face.
+/// charmaps a CFF face gets besides.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CharmapKind {
     /// A `cmap` subtable.
     Subtable(CmapFormat),
-    /// The Unicode charmap FreeType builds from the glyph names of a CFF face
-    /// without a Unicode subtable (Windows platform, encoding 1).
+    /// The Unicode charmap built from the glyph names of a CFF face without
+    /// a Unicode subtable (Windows platform, encoding 1).
     GlyphNames,
-    /// The encoding of a name-keyed CFF face, as FreeType's Adobe charmap
-    /// (platform 7, encoding 0 Standard, 1 Expert or 2 Custom).
+    /// The encoding of a name-keyed CFF face (platform 7, encoding 0
+    /// Standard, 1 Expert or 2 Custom).
     CffEncoding,
 }
 
 impl CharmapKind {
-    /// The format `FT_Get_CMap_Format` reports: the subtable's, or `None`
-    /// (-1) for the charmaps FreeType adds.
+    /// The subtable's format number, or `None` for a charmap that is not a
+    /// `cmap` subtable.
     pub const fn format_number(self) -> Option<u16> {
         match self {
             Self::Subtable(format) => Some(format.number()),
@@ -152,9 +197,9 @@ fn ascending_groups(table: &[u8], at: usize, groups: usize, steps: &mut usize) -
     Some(())
 }
 
-/// `tt_cmap2_validate` at FreeType's default level: the keys and the
-/// subheaders they reach fit the table, and each subheader's glyph array
-/// lies within the subtable after the subheaders.
+/// Validates a format 2 subtable: the keys and the subheaders they reach fit
+/// the table, and each subheader's glyph array lies within the subtable after
+/// the subheaders.
 fn high_byte_valid(table: &[u8], steps: &mut usize) -> Option<()> {
     let fits = |ok: bool| ok.then_some(());
     fits(table.len() >= 4)?;
@@ -177,10 +222,9 @@ fn high_byte_valid(table: &[u8], steps: &mut usize) -> Option<()> {
     Some(())
 }
 
-/// `tt_cmap14_validate_internal` at FreeType's default level, for format 14
-/// or, `extended`, its format 15 with three-byte glyphs: the selector records
-/// ascend and their default and non-default tables fit and ascend below
-/// U+110000.
+/// Validates a format 14 subtable or, `extended`, a format 15 one with
+/// three-byte glyphs: the selector records ascend and their default and
+/// non-default tables fit and ascend below U+110000.
 fn variations_valid(table: &[u8], extended: bool, steps: &mut usize) -> Option<()> {
     let fits = |ok: bool| ok.then_some(());
     let long = |at: usize| u32_at(table, at).and_then(|n| usize::try_from(n).ok());
@@ -223,13 +267,14 @@ fn variations_valid(table: &[u8], extended: bool, steps: &mut usize) -> Option<(
     Some(())
 }
 
-/// `tt_cmap4_validate` at FreeType's default level: the segment arrays fit the
-/// rest of the `cmap` table, no segment starts after it ends, and glyph-array
-/// offsets stay within the table (FreeType lets a final 0xFFFF segment off).
+/// Validates a format 4 subtable: the segment arrays fit the rest of the
+/// `cmap` table, no segment starts after it ends, and glyph-array offsets
+/// stay within the table, but for a final 0xFFFF segment. Returns the
+/// [`UNSORTED`] and [`OVERLAPPING`] flags of its segments.
 fn segment_delta_valid(table: &[u8], steps: &mut usize) -> Option<u8> {
     let limit = table.len();
     let fits = |ok: bool| ok.then_some(());
-    // FreeType measures the subtable to the end of `cmap`, whatever its length says.
+    // The subtable is measured to the end of `cmap`, whatever its length says.
     fits(limit >= 16)?;
     let segments = usize::from(u16_at(table, 6)? / 2);
     fits(limit >= 16 + 8 * segments)?;
@@ -309,30 +354,30 @@ pub(crate) struct Subtable {
     end: usize,
 }
 
-/// A variation-sequence subtable FreeType keeps (format 14, or 15 with
-/// three-byte glyphs).
+/// A variation-sequence subtable that passed validation (format 14, or 15
+/// with three-byte glyphs).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Variations {
     pub(crate) table: Table,
     pub(crate) extended: bool,
 }
 
-/// The subtables of a `cmap` table FreeType makes charmaps of.
+/// The subtables of a `cmap` table that are read.
 #[derive(Debug)]
 pub(crate) struct Subtables {
     /// The subtables that map codes, in directory order.
     pub(crate) list: BudgetVec<Subtable>,
-    /// Whether a variation-sequence subtable FreeType lists (format 14 or
-    /// 15, which cannot be selected) is a Unicode-platform or Windows (3, 1)
-    /// charmap: it keeps FreeType from building one from glyph names.
+    /// Whether a variation-sequence subtable (format 14 or 15, which maps no
+    /// codes) is listed for the Unicode platform or as Windows (3, 1): a CFF
+    /// face then gets no charmap built from glyph names.
     pub(crate) unicode_variations: bool,
-    /// The first (0, 5) variation-sequence subtable FreeType keeps, which it
-    /// reads variation sequences from.
+    /// The first valid (0, 5) variation-sequence subtable, which variation
+    /// sequences are read from.
     pub(crate) variation_sequences: Option<Variations>,
 }
 
 /// What validating one subtable gave: a selectable format, a variation-sequence
-/// subtable, or nothing FreeType keeps.
+/// subtable, or nothing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Kept {
     /// A selectable format, with its validation flags.
@@ -343,11 +388,11 @@ enum Kept {
     None,
 }
 
-/// Reads the encoding records, keeping the subtables FreeType keeps, in
-/// directory order. As in FreeType, a table too short for its header has no
-/// subtables, records stop at the table's end, and a record at offset 0 is
-/// skipped. A subtable is validated once however many records point at it,
-/// and the records it reads are charged to `work`.
+/// Reads the encoding records, keeping the subtables that pass validation,
+/// in directory order. A table too short for its header has no subtables,
+/// records stop at the table's end, and a record at offset 0 is skipped. A
+/// subtable is validated once however many records point at it, and the
+/// records it reads are charged to `work`.
 pub(crate) fn parse(
     data: &[u8],
     table: Table,
@@ -509,8 +554,8 @@ impl Subtable {
         }
     }
 
-    /// `char_next` of formats 2 and 8: the first code after `code` that maps
-    /// to a glyph other than zero, and that glyph; `None` past the last.
+    /// For formats 2, 4 and 8: the first code after `code` that maps to a
+    /// glyph other than zero, and that glyph; `None` past the last.
     fn next_mapping(
         &self,
         table: &[u8],
@@ -565,9 +610,9 @@ pub(crate) enum Source<'f> {
     Encoding(&'f Encoding),
 }
 
-/// A charmap of one face, as FreeType lists it: a `cmap` subtable, or a charmap
-/// FreeType adds to a CFF face ([`CharmapKind`]). It borrows the face, so it
-/// cannot be used with another face.
+/// A charmap of one face: a `cmap` subtable, or a charmap a CFF face gets
+/// besides ([`CharmapKind`]). It borrows the face, so it cannot be used with
+/// another face.
 #[derive(Clone, Copy, Debug)]
 pub struct Charmap<'f> {
     data: &'f [u8],
@@ -591,6 +636,8 @@ impl<'f> Charmap<'f> {
         }
     }
 
+    /// The encoding record's platform; Windows for the charmap built from
+    /// glyph names, platform 7 for a CFF encoding.
     pub const fn platform(&self) -> Platform {
         match self.source {
             Source::Table(subtable) => subtable.platform,
@@ -608,10 +655,12 @@ impl<'f> Charmap<'f> {
         }
     }
 
+    /// What the platform and encoding number mean.
     pub const fn encoding(&self) -> CharEncoding {
         CharEncoding::of(self.platform(), self.encoding_id())
     }
 
+    /// What the charmap reads codes through.
     pub const fn kind(&self) -> CharmapKind {
         match self.source {
             Source::Table(subtable) => CharmapKind::Subtable(subtable.format),
@@ -635,8 +684,8 @@ impl<'f> Charmap<'f> {
         self.valid(glyph)
     }
 
-    /// `glyph` unless it is 0 or at or above the glyph count, which FreeType
-    /// reads as no glyph.
+    /// `glyph` unless it is 0 or at or above the glyph count, which is no
+    /// glyph.
     fn valid(&self, glyph: u32) -> Option<GlyphId> {
         let glyph = u16::try_from(glyph)
             .ok()
@@ -644,9 +693,9 @@ impl<'f> Charmap<'f> {
         Some(GlyphId(glyph))
     }
 
-    /// `char_next`: the first code after `code` the charmap gives a glyph
-    /// other than zero, perhaps one past the glyph count, and that glyph.
-    /// `steps` counts the records and codes it passes over.
+    /// The first code after `code` the charmap gives a glyph other than
+    /// zero, perhaps one past the glyph count, and that glyph. `steps` counts
+    /// the records and codes it passes over.
     fn next_mapping(
         &self,
         code: u32,
@@ -682,8 +731,8 @@ impl<'f> Charmap<'f> {
         }
     }
 
-    /// Whether the mappings are read as FreeType steps through them, with
-    /// `char_next`, rather than by the subtable's ranges.
+    /// Whether the mappings are read by stepping from each code to the next
+    /// mapped one, rather than by the subtable's ranges.
     const fn steps(&self) -> bool {
         !matches!(
             self.source,
@@ -698,11 +747,11 @@ impl<'f> Charmap<'f> {
         )
     }
 
-    /// Every (code, glyph) pair without glyph 0, in the order FreeType's
-    /// `FT_Get_First_Char` and `FT_Get_Next_Char` give them for formats 2 and
-    /// 8 and the charmaps it adds, and by segment or group in subtable order
-    /// and by code within each for the other formats; codes above U+10FFFF are
-    /// not visited there. Each code visited or step taken costs one unit of
+    /// Every (code, glyph) pair without glyph 0: for formats 2, 4 and 8 and
+    /// the charmaps that are not subtables, code 0 when it maps and then each
+    /// next mapped code in turn, as FreeType enumerates a charmap; for the
+    /// other formats, by range or group in subtable order and by code within
+    /// each, where codes above U+10FFFF are not visited. Each code visited or step taken costs one unit of
     /// the face's work limit; when it runs out the iterator yields
     /// `Error::Policy` once and ends.
     pub fn mappings(&self) -> Mappings<'f> {
@@ -727,15 +776,15 @@ pub struct Mappings<'f> {
     next: Option<(u32, u32)>,
     /// Stepping through the charmap: the last code given.
     stepped: Option<u32>,
-    /// Where format 4's `char_next` continues from.
+    /// Where format 4's stepping continues from.
     segments: SegmentState,
     work: WorkBudget,
     done: bool,
 }
 
 impl Mappings<'_> {
-    /// `FT_Get_First_Char` and `FT_Get_Next_Char`: code 0 when it maps, then
-    /// each next code whose glyph is below the glyph count.
+    /// Code 0 when it maps, then each next code whose glyph is below the
+    /// glyph count.
     fn step(&mut self) -> Option<Result<(u32, GlyphId)>> {
         let charmap = self.charmap;
         let mut code = match self.stepped {
@@ -815,10 +864,10 @@ pub enum Variant {
     None,
 }
 
-/// A `cmap` variation-sequence subtable: format 14, or FreeType's format 15,
+/// A `cmap` variation-sequence subtable: format 14, or the format 15 variant
 /// whose mappings name three-byte glyphs.
-/// [`Font::variation_sequences`](crate::Font::variation_sequences) gives
-/// FreeType's; [`Self::format14`] reads one another reader selects.
+/// [`Font::variation_sequences`](crate::Font::variation_sequences) gives the
+/// face's; [`Self::format14`] reads one another reader selects.
 #[derive(Clone, Copy, Debug)]
 pub struct VariationSequences<'f> {
     table: &'f [u8],
@@ -831,20 +880,19 @@ impl<'f> VariationSequences<'f> {
     }
 
     /// The sequences of the format 14 subtable starting `table`, read to the
-    /// end of the `cmap` table, for a reader that selects the subtable as
-    /// HarfBuzz does.
+    /// end of the `cmap` table, for a reader that selects the subtable by
+    /// its own rule.
     pub const fn format14(table: &'f [u8]) -> Self {
         Self::new(table, false)
     }
 
-    /// How `c` followed by `selector` maps, as FreeType's
-    /// `tt_cmap14_char_var_index` and HarfBuzz's `get_glyph_variant` read it:
-    /// the selector's record, then its default ranges, then its mappings,
-    /// where glyph 0 is none, each found with HarfBuzz's binary search, which
-    /// FreeType's agrees with on the ascending tables its validation keeps.
-    /// An offset of zero is no table, as is one whose entries run past the
-    /// end of the `cmap` table (neither FreeType's validation nor HarfBuzz's
-    /// sanitizer keeps such a subtable), and a glyph beyond 65535 is none.
+    /// How `c` followed by `selector` maps: the selector's record, then its
+    /// default ranges, then its mappings, where glyph 0 is none, each found
+    /// by binary search ([`bsearch`], whose result on the ascending tables
+    /// validation keeps does not depend on the probes). An offset of zero is
+    /// no table, as is one whose entries run past the end of the `cmap`
+    /// table, and a glyph beyond 65535 is none. FreeType 2.15.0 and HarfBuzz
+    /// 14.6.0 both read a subtable they keep this way.
     pub fn variant(&self, c: u32, selector: u32) -> Variant {
         let table = self.table;
         let u24 = |t: &[u8], at: usize| u24_at(t, at).unwrap_or(0);
@@ -904,13 +952,13 @@ fn trimmed(table: &[u8], array: usize, first: u32, count: u32, code: u32) -> Opt
     u16_at(table, at).map(u32::from)
 }
 
-/// `TT_CMAP_FLAG_UNSORTED`: format 4 segments whose starts or ends descend.
+/// Format 4 segments whose starts or ends descend.
 const UNSORTED: u8 = 1;
-/// `TT_CMAP_FLAG_OVERLAPPING`: format 4 segments that overlap in order.
+/// Format 4 segments that overlap in order.
 const OVERLAPPING: u8 = 2;
 
-/// Where FreeType's format 4 `char_next` continues from (`TT_CMap4Rec`): the
-/// last code it gave and the segment it is in.
+/// Where stepping through a format 4 subtable continues from: the last code
+/// it gave and the segment that code is in.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct SegmentState {
     charcode: u32,
@@ -937,12 +985,10 @@ impl Default for SegmentState {
     }
 }
 
-/// A format 4 subtable as FreeType reads it (`tt_cmap4_char_map_linear`,
-/// `tt_cmap4_char_map_binary`, `tt_cmap4_set_range` and `tt_cmap4_next`): a
-/// linear search through segments its validation found unsorted, else a
-/// binary search, which for overlapping segments takes the first that holds
-/// the code and has glyphs. The arrays are read to the end of the `cmap`
-/// table, which bounds glyph arrays; reads past it give zero.
+/// A format 4 subtable: a linear search through segments validation found
+/// unsorted, else a binary search, which for overlapping segments takes the
+/// first that holds the code and has glyphs. The arrays are read to the end
+/// of the `cmap` table, which bounds glyph arrays; reads past it give zero.
 #[derive(Clone, Copy, Debug)]
 struct SegmentDelta<'a> {
     table: &'a [u8],
@@ -970,8 +1016,8 @@ impl<'a> SegmentDelta<'a> {
         i32::from(self.word(at) as u16 as i16)
     }
 
-    /// FreeType's fix for a last segment 0xFFFF..0xFFFF whose glyph array
-    /// lies past the table: delta 1 and no array. `at` is its offset word.
+    /// Repairs a last segment 0xFFFF..0xFFFF whose glyph array lies past the
+    /// table: delta 1 and no array. `at` is its offset word.
     fn last_fix(
         &self,
         i: usize,
@@ -1004,7 +1050,7 @@ impl<'a> SegmentDelta<'a> {
         }
     }
 
-    /// `tt_cmap4_char_index`.
+    /// The glyph of `code`, zero for none.
     fn char_index(&self, code: u32) -> u32 {
         if code >= 0x1_0000 {
             0
@@ -1015,8 +1061,7 @@ impl<'a> SegmentDelta<'a> {
         }
     }
 
-    /// `tt_cmap4_char_next`: the code after `code` that maps, and its glyph
-    /// (zero at the end).
+    /// The code after `code` that maps, and its glyph (zero at the end).
     /// `steps` counts the segments and codes it passes over.
     fn char_next(&self, state: &mut SegmentState, code: u32, steps: &mut usize) -> (u32, u32) {
         if code >= 0xffff {
@@ -1053,7 +1098,9 @@ impl<'a> SegmentDelta<'a> {
         (if gindex != 0 { state.charcode } else { code }, gindex)
     }
 
-    /// `tt_cmap4_char_map_linear`.
+    /// Searches the segments in table order for `code`, or with `next` for
+    /// the first mapped code after it: the code found and its glyph, zero
+    /// for none.
     fn linear(&self, code: u32, next: bool, steps: &mut usize) -> (u32, u32) {
         let n = self.segments;
         if n == 0 {
@@ -1114,8 +1161,9 @@ impl<'a> SegmentDelta<'a> {
         (if next { charcode } else { code }, gindex)
     }
 
-    /// `tt_cmap4_char_map_binary` up to its `next` tail: the code, its glyph,
-    /// and the segment and end the search stopped at.
+    /// Searches the segments by bisection for `code`, or with `next` for the
+    /// code after it: the code, its glyph, and the segment and end the search
+    /// stopped at, from which stepping goes on.
     fn binary(&self, code: u32, next: bool, steps: &mut usize) -> (u32, u32, usize, u32) {
         let n = self.segments;
         if n == 0 {
@@ -1126,8 +1174,7 @@ impl<'a> SegmentDelta<'a> {
         let mut gindex = 0;
         let (mut min, mut max) = (0, n);
         let (mut mid, mut end);
-        // Reads segment `i` as FreeType's pointer walks it, leaving `p` at its
-        // offset word.
+        // Reads segment `i`, leaving `p` at its offset word.
         let read = |i: usize, p: &mut usize| {
             *p = 14 + 2 * i;
             let end = self.word(*p);
@@ -1243,8 +1290,8 @@ impl<'a> SegmentDelta<'a> {
         (charcode, gindex, mid, end)
     }
 
-    /// `tt_cmap4_set_range`: the first segment from `range` whose glyphs are
-    /// not missing, or `false` past the last.
+    /// Moves the state to the first segment from `range` whose glyphs are
+    /// not missing, or returns `false` past the last.
     fn set_range(&self, state: &mut SegmentState, mut range: usize, steps: &mut usize) -> bool {
         let n = self.segments;
         while range < n {
@@ -1269,8 +1316,8 @@ impl<'a> SegmentDelta<'a> {
         false
     }
 
-    /// `tt_cmap4_next`: the code after the state's that maps, from its
-    /// segment on.
+    /// Moves the state to the code after its own that maps, from its segment
+    /// on.
     fn next(&self, state: &mut SegmentState, steps: &mut usize) {
         let mut charcode = state.charcode.wrapping_add(1);
         if charcode < state.start {
@@ -1340,9 +1387,9 @@ impl<'a> SegmentDelta<'a> {
     }
 }
 
-/// Format 2: the subheader of `code` (`tt_cmap2_get_subheader`): the first
-/// one for a single byte whose key is zero, else the one its high byte's key
-/// names, but not the first; `None` for codes above 0xFFFF.
+/// Format 2: the subheader of `code`: the first one for a single byte whose
+/// key is zero, else the one its high byte's key names, but not the first;
+/// `None` for codes above 0xFFFF.
 fn high_byte_subheader(table: &[u8], code: u32) -> Option<usize> {
     if code >= 0x1_0000 {
         return None;
@@ -1393,7 +1440,7 @@ impl HighByteHeader {
     }
 }
 
-/// Format 2 (`tt_cmap2_char_index`).
+/// Format 2: the glyph of `code`, zero for none.
 fn high_byte(table: &[u8], code: u32) -> u16 {
     let Some(sub) = high_byte_subheader(table, code) else {
         return 0;
@@ -1406,7 +1453,8 @@ fn high_byte(table: &[u8], code: u32) -> u16 {
     header.glyph(table, index)
 }
 
-/// Format 2 (`tt_cmap2_char_next`), with its walk through the subheaders.
+/// Format 2: the first mapped code after `code` and its glyph, by a walk
+/// through the subheaders.
 fn high_byte_next(table: &[u8], code: u32, steps: &mut usize) -> Option<(u32, u32)> {
     let mut code = code.checked_add(1)?;
     while code < 0x1_0000 {
@@ -1467,7 +1515,8 @@ fn mixed_groups(table: &[u8]) -> impl Iterator<Item = (u32, u32, u32)> + '_ {
     })
 }
 
-/// Format 8 (`tt_cmap8_char_index`): a linear search of the groups.
+/// Format 8: the glyph of `code`, zero for none, by a linear search of the
+/// groups.
 fn mixed(table: &[u8], code: u32) -> u32 {
     for (start, end, first) in mixed_groups(table) {
         if code < start {
@@ -1480,9 +1529,9 @@ fn mixed(table: &[u8], code: u32) -> u32 {
     0
 }
 
-/// Format 8 (`tt_cmap8_char_next`): a group whose glyphs would overflow, or
-/// whose next glyph is at or above the glyph count, is passed over for the
-/// next one from the same code.
+/// Format 8: the first mapped code after `code` and its glyph. A group whose
+/// glyphs would overflow, or whose next glyph is at or above the glyph count,
+/// is passed over for the next one from the same code.
 fn mixed_next(table: &[u8], code: u32, glyph_count: u32, steps: &mut usize) -> Option<(u32, u32)> {
     let mut code = code.checked_add(1)?;
     for (start, end, first) in mixed_groups(table) {

@@ -55,8 +55,7 @@ Generated from FreeType 2.15.0's source files by `cargo xtask fonts tables`:
 
 Following FreeType 2.15.0's reading of the font formats: `cmap.rs`, `glyf.rs`, `kern.rs`,
 `lib.rs`, `metrics.rs`, `name.rs`, `outline.rs` and the rest of `sfnt.rs`. They reproduce
-FreeType's reading of the tables, including its repairs of malformed data, and follow the
-FreeType functions their comments name.
+FreeType's reading of the tables, including its repairs of malformed data.
 
 Following libass 0.17.5: `compat/libass.rs` (the face metrics and size request, the text
 charmap selection and lookup, the choice and strength of synthetic styles, the decoration

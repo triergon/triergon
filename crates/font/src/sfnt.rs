@@ -47,7 +47,7 @@ pub(crate) struct Tables {
     pub(crate) vhea: Option<Table>,
     pub(crate) vmtx: Option<Table>,
     /// The extended `HHEA`, `HMTX`, `VHEA` and `VMTX`, with 32-bit record
-    /// counts, which FreeType reads where the lower-case header is missing.
+    /// counts, which are read where the lower-case header is missing.
     pub(crate) extended_hhea: Option<Table>,
     pub(crate) extended_hmtx: Option<Table>,
     pub(crate) extended_vhea: Option<Table>,
@@ -66,7 +66,7 @@ pub(crate) struct Tables {
     pub(crate) prep: Option<Table>,
     pub(crate) fvar: Option<Table>,
     /// The bytes from `loca` to the next table that starts after it, or to the
-    /// end of the file: FreeType reads a short `loca` that far.
+    /// end of the file: a short `loca` is read that far.
     pub(crate) loca_room: usize,
 }
 
@@ -100,8 +100,7 @@ impl Tables {
     }
 }
 
-/// The first nonempty table `tag` among `records` that lies inside `data`, as
-/// FreeType's sanitised directory gives it.
+/// The first nonempty table `tag` among `records` that lies inside `data`.
 pub(crate) fn find(data: &[u8], records: Table, tag: [u8; 4]) -> Option<Table> {
     records
         .bytes(data)
@@ -114,8 +113,8 @@ pub(crate) fn find(data: &[u8], records: Table, tag: [u8; 4]) -> Option<Table> {
         })
 }
 
-/// The tables of advances and side bearings, which FreeType keeps when they
-/// run past the end of the file.
+/// The tables of advances and side bearings, which are kept when they run
+/// past the end of the file.
 fn is_metrics(tag: &[u8; 4]) -> bool {
     matches!(tag, b"hmtx" | b"HMTX" | b"vmtx" | b"VMTX")
 }
@@ -194,9 +193,9 @@ pub(crate) fn directory(
         if slot.is_some() || offset > data.len() {
             continue;
         }
-        // As FreeType sanitises the directory: a table past the end of the
-        // file is dropped, except the metrics tables, cut to a multiple of
-        // four bytes; the first table of a tag with a nonzero length counts.
+        // A table past the end of the file is dropped, except the metrics
+        // tables, cut to a multiple of four bytes; the first table of a tag
+        // with a nonzero length counts.
         let available = data.len() - offset;
         let len = if len <= available {
             len
@@ -231,9 +230,11 @@ pub(crate) fn directory(
     Ok((flavor, tables))
 }
 
-/// The axis count of an `fvar` table FreeType accepts as it loads a face
-/// (`sfnt_load_face`), which then gives the face a design vector at the
-/// default instance; zero for none.
+/// The axis count of an `fvar` table whose header is valid, which gives the
+/// face a design vector at the default instance; zero for none. The header
+/// is valid with version 1.0, 20-byte axis records, 1 to 0x3FFE axes, at most
+/// 0x7EFF instances of 4 or 6 bytes plus four per axis, and arrays inside the
+/// table.
 pub(crate) fn fvar_axes(data: &[u8], fvar: Option<Table>) -> u16 {
     let Some(bytes) = fvar.map(|t| t.bytes(data)).filter(|b| b.len() >= 20) else {
         return 0;

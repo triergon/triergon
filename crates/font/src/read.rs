@@ -1,26 +1,35 @@
-//! Big-endian reads over font tables.
+//! Big-endian reads over font tables: the primitives this crate's table
+//! readers are built from, for readers of the tables it leaves to others
+//! ([`Font::table`](crate::Font::table) gives their bytes).
 //!
-//! Every read is bounds-checked. Data that ends early is malformed, so it is
-//! `Error::Invalid`; `Error::Truncated` is kept for a transport that ends early.
+//! Every read is bounds-checked. A [`Reader`] is a cursor for structures read
+//! in order, whose reads past the end are errors: data that ends early is
+//! malformed, so it is `Error::Invalid`; `Error::Truncated` is kept for a
+//! transport that ends early. [`u16_at`], [`u24_at`] and [`u32_at`] read at an
+//! offset and give `None` past the end, for lookups that treat missing data
+//! as an absent entry.
 
 use triergon_core::{Error, Result};
 
 pub(crate) const TRUNCATED: Error = Error::Invalid("truncated font table");
 
-/// A cursor over a byte slice.
+/// A cursor over a byte slice. Each read returns the big-endian value at the
+/// cursor and moves past it, or fails with `Invalid("truncated font table")`
+/// when the data ends first.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Reader<'a> {
+pub struct Reader<'a> {
     data: &'a [u8],
     at: usize,
 }
 
 impl<'a> Reader<'a> {
-    pub(crate) const fn new(data: &'a [u8]) -> Self {
+    /// A reader at the start of `data`.
+    pub const fn new(data: &'a [u8]) -> Self {
         Self { data, at: 0 }
     }
 
-    /// A reader over `data[offset..]`.
-    pub(crate) fn at(data: &'a [u8], offset: usize) -> Result<Self> {
+    /// A reader over `data` at `offset`, which may be its end but not beyond.
+    pub fn at(data: &'a [u8], offset: usize) -> Result<Self> {
         if offset > data.len() {
             return Err(TRUNCATED);
         }
@@ -28,23 +37,27 @@ impl<'a> Reader<'a> {
     }
 
     /// A reader over the same data at `offset`.
-    pub(crate) fn moved_to(&self, offset: usize) -> Result<Self> {
+    pub fn moved_to(&self, offset: usize) -> Result<Self> {
         Self::at(self.data, offset)
     }
 
-    pub(crate) const fn offset(&self) -> usize {
+    /// The cursor's offset in the data.
+    pub const fn offset(&self) -> usize {
         self.at
     }
 
-    pub(crate) const fn at_end(&self) -> bool {
+    /// Whether every byte has been read.
+    pub const fn at_end(&self) -> bool {
         self.at == self.data.len()
     }
 
-    pub(crate) fn skip(&mut self, count: usize) -> Result<()> {
+    /// Moves past `count` bytes.
+    pub fn skip(&mut self, count: usize) -> Result<()> {
         self.take(count).map(|_| ())
     }
 
-    pub(crate) fn take(&mut self, count: usize) -> Result<&'a [u8]> {
+    /// The next `count` bytes.
+    pub fn take(&mut self, count: usize) -> Result<&'a [u8]> {
         let end = self.at.checked_add(count).ok_or(TRUNCATED)?;
         let bytes = self.data.get(self.at..end).ok_or(TRUNCATED)?;
         self.at = end;
@@ -58,36 +71,43 @@ impl<'a> Reader<'a> {
         Ok(bytes)
     }
 
-    pub(crate) fn u8(&mut self) -> Result<u8> {
+    /// The next byte.
+    pub fn u8(&mut self) -> Result<u8> {
         Ok(self.array::<1>()?[0])
     }
 
-    pub(crate) fn i8(&mut self) -> Result<i8> {
+    /// The next byte, signed.
+    pub fn i8(&mut self) -> Result<i8> {
         Ok(i8::from_be_bytes(self.array()?))
     }
 
-    pub(crate) fn u16(&mut self) -> Result<u16> {
+    /// The next two bytes: `uint16`, `UFWORD` or `Offset16`.
+    pub fn u16(&mut self) -> Result<u16> {
         Ok(u16::from_be_bytes(self.array()?))
     }
 
-    pub(crate) fn i16(&mut self) -> Result<i16> {
+    /// The next two bytes, signed: `int16` or `FWORD`.
+    pub fn i16(&mut self) -> Result<i16> {
         Ok(i16::from_be_bytes(self.array()?))
     }
 
-    pub(crate) fn u32(&mut self) -> Result<u32> {
+    /// The next four bytes: `uint32` or `Offset32`.
+    pub fn u32(&mut self) -> Result<u32> {
         Ok(u32::from_be_bytes(self.array()?))
     }
 
-    pub(crate) fn i32(&mut self) -> Result<i32> {
+    /// The next four bytes, signed: `int32` or `Fixed`.
+    pub fn i32(&mut self) -> Result<i32> {
         Ok(i32::from_be_bytes(self.array()?))
     }
 
-    pub(crate) fn tag(&mut self) -> Result<[u8; 4]> {
+    /// The next four bytes as a table or feature tag.
+    pub fn tag(&mut self) -> Result<[u8; 4]> {
         self.array()
     }
 
-    /// An unsigned integer of `size` bytes, 1 to 4.
-    pub(crate) fn uint(&mut self, size: u8) -> Result<u32> {
+    /// An unsigned integer of `size` bytes, at most 4; zero for none.
+    pub fn uint(&mut self, size: u8) -> Result<u32> {
         let mut value = 0_u32;
         for _ in 0..size {
             value = value << 8 | u32::from(self.u8()?);
@@ -97,29 +117,27 @@ impl<'a> Reader<'a> {
 }
 
 /// The big-endian `u16` at `at`, if `data` holds it.
-pub(crate) fn u16_at(data: &[u8], at: usize) -> Option<u16> {
+pub fn u16_at(data: &[u8], at: usize) -> Option<u16> {
     Some(u16::from_be_bytes(*data.get(at..)?.first_chunk()?))
 }
 
 /// The big-endian 24-bit value at `at`, if `data` holds it.
-pub(crate) fn u24_at(data: &[u8], at: usize) -> Option<u32> {
+pub fn u24_at(data: &[u8], at: usize) -> Option<u32> {
     let [a, b, c] = *data.get(at..)?.first_chunk()?;
     Some(u32::from_be_bytes([0, a, b, c]))
 }
 
 /// The big-endian `u32` at `at`, if `data` holds it.
-pub(crate) fn u32_at(data: &[u8], at: usize) -> Option<u32> {
+pub fn u32_at(data: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_be_bytes(*data.get(at..)?.first_chunk()?))
 }
 
-/// HarfBuzz's binary search (`hb_bsearch_impl`) over `count` items, where
-/// `compare` orders an item against the key: an index whose item compares
-/// equal. On unsorted items its probes decide which is found; on sorted ones
-/// it agrees with any binary search.
-pub(crate) fn bsearch(
-    count: usize,
-    compare: impl Fn(usize) -> std::cmp::Ordering,
-) -> Option<usize> {
+/// A binary search over `count` items, where `compare(i)` orders item `i`
+/// against the key (`Greater` for an item after it): an index whose item
+/// compares `Equal`. It probes the middle `(min + max) / 2` of the closed
+/// range still open, as HarfBuzz 14.6.0's search does, so on unsorted items
+/// both find the same one; on sorted items it agrees with any binary search.
+pub fn bsearch(count: usize, compare: impl Fn(usize) -> std::cmp::Ordering) -> Option<usize> {
     use std::cmp::Ordering;
     let (mut min, mut max) = (0_isize, isize::try_from(count).ok()? - 1);
     while min <= max {

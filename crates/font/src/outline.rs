@@ -1,5 +1,5 @@
 //! Glyph outlines: contours of on-curve and control points, in whole font
-//! units or in 26.6 fixed-point pixels at a size, as FreeType holds them.
+//! units or in 26.6 fixed-point pixels at a size.
 
 use triergon_core::{Budget, BudgetVec, Error, Result};
 
@@ -16,8 +16,8 @@ impl Point {
         Self { x, y }
     }
 
-    /// The point midway between two, rounded down, as libass implies an
-    /// on-curve point between two quadratic control points.
+    /// The point midway between two, rounded down: the on-curve point two
+    /// consecutive quadratic control points imply.
     fn midpoint(self, other: Self) -> Self {
         let half = |a: i32, b: i32| ((i64::from(a) + i64::from(b)) >> 1) as i32;
         Self::new(half(self.x, other.x), half(self.y, other.y))
@@ -55,13 +55,12 @@ pub enum Segment {
     Close,
 }
 
-/// A glyph outline: closed contours of points, in whole font units as
-/// FreeType loads them unscaled (`FT_LOAD_NO_SCALE`) or in 26.6 pixels at a
-/// size, depending on what loaded it. Contours are implicitly closed. TrueType contours keep their stored points,
-/// including single-point contours; CFF contours are built as FreeType's CFF
-/// engine builds them: a contour starts at its first segment, a final on-curve
-/// point repeating the start is dropped, and a contour left with one point is
-/// dropped.
+/// A glyph outline: closed contours of points, in whole font units or in 26.6
+/// pixels at a size, depending on what loaded it. Contours are implicitly
+/// closed. TrueType contours keep their stored points, including single-point
+/// contours; a CFF contour starts at its first segment, drops a final
+/// on-curve point repeating the start, and is dropped when left with one
+/// point.
 ///
 /// Storage is charged to the [`Budget`] the outline was created with and is reused
 /// across glyphs.
@@ -108,7 +107,7 @@ impl Outline {
     /// The outline as path segments, with TrueType's implied on-curve points made
     /// explicit. A contour that starts with control points starts at its last
     /// on-curve point, or midway between its last and first points when it has none.
-    /// Implied points round down, as libass computes them.
+    /// Implied points round down.
     pub fn segments(&self) -> impl Iterator<Item = Segment> + '_ {
         self.contours().flat_map(contour_segments)
     }

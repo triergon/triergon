@@ -62,7 +62,7 @@ impl<'a> FaceInfo<'a> {
         self.font
     }
 
-    /// The face's [`weight`](super::weight).
+    /// The face's [`weight`].
     pub const fn weight(&self) -> u32 {
         self.weight
     }
