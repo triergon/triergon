@@ -374,3 +374,67 @@ fn complete_segment_preserves_ffmpeg_cross_track_feed_order() {
         }
     }
 }
+
+#[test]
+fn segment_units_through_packet_views_keep_their_tracks_and_times() {
+    use triergon_core::container::{PacketInfo, RandomAccess};
+    let raw = include_bytes!("../../../playback/tests/fixtures/hls/baseline-stereo.ts");
+    let pool = Budget::new(8 * 1024 * 1024).unwrap();
+    let id = SourceId(42);
+    let input = InputCursor::new(
+        &pool,
+        id,
+        SourceCapabilities {
+            length: Some(raw.len() as u64),
+            random_access: false,
+        },
+        4096,
+    )
+    .unwrap();
+    let source = ByteSource::new(id, Bytes::copy_from_slice(&pool, raw).unwrap(), 4096).unwrap();
+    let mut reader = HlsSegmentReader::new(
+        input,
+        source,
+        HlsSegmentTracks::default(),
+        HlsSegmentLimits::default(),
+    )
+    .unwrap();
+    let cancel = AtomicBool::new(false);
+    let segment = loop {
+        reader.advance(&mut WorkBudget::new(4096), &cancel).unwrap();
+        if let Some(segment) = reader.take(&cancel).unwrap() {
+            break segment;
+        }
+    };
+    let (mut video, mut audio) = (Vec::new(), Vec::new());
+    for unit in segment.access_units() {
+        let packet = segment.packet(&unit).unwrap();
+        match unit {
+            HlsFeedUnit::Video(unit) => {
+                assert_eq!(packet.payload(), unit.source_bytes().as_ref());
+                assert_eq!(packet.time_base(), TimeBase::new(1, 90_000).unwrap());
+                let clock = unit.clock.unwrap();
+                assert_eq!((packet.pts(), packet.dts()), (clock.pts90, clock.dts90));
+                assert_eq!(packet.duration(), None);
+                assert_eq!(
+                    packet.random_access() == RandomAccess::Sync,
+                    unit.idr,
+                    "an IDR unit is a random-access point"
+                );
+                video.push(packet.track());
+            }
+            HlsFeedUnit::Audio(frame, clock) => {
+                assert_eq!(packet.payload(), frame.bytes.as_ref());
+                let time = |ticks| Time::from_ticks(i128::from(ticks), packet.time_base()).unwrap();
+                assert_eq!(packet.pts().map(time), Some(clock.pts));
+                assert_eq!(packet.dts().map(time), Some(clock.dts));
+                assert_eq!(packet.duration().map(time), Some(frame.duration));
+                audio.push(packet.track());
+            }
+        }
+    }
+    assert!(!video.is_empty() && !audio.is_empty());
+    assert!(video.iter().all(|track| *track == video[0]));
+    assert!(audio.iter().all(|track| *track == audio[0]));
+    assert_ne!(video[0], audio[0]);
+}

@@ -551,3 +551,49 @@ fn edit_pmt(raw: &mut [u8], carrier: usize, edit: impl FnOnce(&mut [u8])) {
     let crc = PsiCrc32::of(&pmt[..22]).to_be_bytes();
     pmt[22..].copy_from_slice(&crc);
 }
+
+#[test]
+fn progressive_units_through_packet_views_keep_their_tracks_and_times() {
+    use triergon_core::container::PacketInfo;
+    let pool = Budget::new(64 * 1024).unwrap();
+    let (mut reader, source) = reader(&pool, BASELINE, Some(BASELINE.len() as u64), 4096);
+    source.available.set(BASELINE.len());
+    source.completion.set(Some(Completion::End));
+    let (mut video, mut audio) = (Vec::new(), Vec::new());
+    loop {
+        match next(&mut reader, 4096).unwrap() {
+            TsProgressiveStep::Unit(unit) => {
+                let packet = reader.packet(&unit).unwrap();
+                match &unit {
+                    TsProgressiveUnit::Video(unit) => {
+                        assert_eq!(packet.payload(), unit.source_bytes().as_ref());
+                        let clock = unit.clock.unwrap();
+                        assert_eq!((packet.pts(), packet.dts()), (clock.pts90, clock.dts90));
+                        video.push(packet.track());
+                    }
+                    TsProgressiveUnit::Audio {
+                        frame,
+                        presentation,
+                    } => {
+                        assert_eq!(packet.payload(), frame.bytes.as_ref());
+                        let time = |ticks| {
+                            Time::from_ticks(i128::from(ticks), packet.time_base()).unwrap()
+                        };
+                        assert_eq!(packet.pts().map(time), Some(*presentation));
+                        assert_eq!(packet.dts().map(time), frame.dts);
+                        assert_eq!(packet.duration().map(time), Some(frame.duration));
+                        audio.push(packet.track());
+                    }
+                }
+                reader.reuse_unit(unit);
+            }
+            TsProgressiveStep::End => break,
+            TsProgressiveStep::NeedInput(_) | TsProgressiveStep::Yield => {}
+            TsProgressiveStep::Backpressure { .. } => panic!("unexpected backpressure"),
+        }
+    }
+    assert!(!video.is_empty() && !audio.is_empty());
+    assert!(video.iter().all(|track| *track == video[0]));
+    assert!(audio.iter().all(|track| *track == audio[0]));
+    assert_ne!(video[0], audio[0]);
+}

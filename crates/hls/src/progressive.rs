@@ -3,6 +3,7 @@
 use crate::{
     aac::{HlsAac, HlsAacFrame},
     avc::{AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
+    packet::UnitPacket,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, InputCursor, InputRequest, Result, Time, WorkBudget};
@@ -574,6 +575,27 @@ impl<S: Source> TsProgressiveReader<S> {
             _ => {}
         }
         Ok(())
+    }
+
+    /// `unit`, a unit of this reader, through [`PacketInfo`](triergon_core::container::PacketInfo)
+    /// with its track: an audio frame at its presentation time. Fails with `Overflow` for
+    /// a time its clock cannot count.
+    pub fn packet<'a>(&self, unit: &'a TsProgressiveUnit) -> Result<UnitPacket<'a>> {
+        let tracks = self
+            .tracks
+            .as_ref()
+            .ok_or(Error::Invalid("missing TS PMT"))?;
+        let pid = |track| match track {
+            TrackKey::Ts { pid, .. } => Ok(pid),
+            _ => Err(Error::Invalid("progressive TS track")),
+        };
+        match unit {
+            TsProgressiveUnit::Video(unit) => UnitPacket::video(pid(tracks.video)?, unit),
+            TsProgressiveUnit::Audio {
+                frame,
+                presentation,
+            } => UnitPacket::audio(pid(tracks.audio)?, frame, *presentation, frame.dts),
+        }
     }
 
     /// Takes back a unit the caller has finished with, so its track's reader

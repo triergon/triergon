@@ -7,6 +7,7 @@ use crate::{
         HlsAacClock, HlsAudioClockNs, ns_aac_clocks, ns_aac_pts, ns_audio_clocks,
         resolve_hls_aac_clocks,
     },
+    packet::UnitPacket,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, InputCursor, InputRequest, Result, WorkBudget};
@@ -94,6 +95,8 @@ pub enum HlsFeedUnit<'a, C = HlsAacClock, V = AvcTsAccessUnit, A = HlsAacFrame> 
 /// The access units of one complete segment, in feed order, with their clocks.
 #[derive(Debug)]
 pub struct HlsSegment<C = HlsAacClock, V = AvcTsAccessUnit, A = HlsAacFrame> {
+    /// The PIDs of the video and audio tracks.
+    pids: (u16, Option<u16>),
     video: BudgetVec<V>,
     audio: BudgetVec<A>,
     clocks: BudgetVec<C>,
@@ -117,6 +120,23 @@ impl HlsSegment {
     /// parser-only AAC reference using the ADTS header.
     pub fn audio_pts_ns(&self, cancel: &AtomicBool) -> Result<BudgetVec<i64>> {
         ns_aac_pts(&self.audio, cancel)
+    }
+
+    /// `unit`, a unit of this segment, through [`PacketInfo`](triergon_core::container::PacketInfo)
+    /// with its track: an audio frame at its segment clock. Fails with `Overflow` for a
+    /// time its clock cannot count.
+    pub fn packet<'a>(&self, unit: &HlsFeedUnit<'a>) -> Result<UnitPacket<'a>> {
+        match *unit {
+            HlsFeedUnit::Video(unit) => UnitPacket::video(self.pids.0, unit),
+            HlsFeedUnit::Audio(frame, clock) => UnitPacket::audio(
+                self.pids
+                    .1
+                    .ok_or(Error::Invalid("HLS segment has no audio track"))?,
+                frame,
+                clock.pts,
+                Some(clock.dts),
+            ),
+        }
     }
 }
 
@@ -527,8 +547,18 @@ where
         let video_tail90 = self
             .video_tail90
             .ok_or(Error::Invalid("sealed video clock"))?;
+        let pid = |track| match track {
+            TrackKey::Ts { pid, .. } => Some(pid),
+            _ => None,
+        };
+        let (video, audio, _) = self.map.ok_or(Error::Invalid("sealed segment tracks"))?;
+        let pids = (
+            pid(video).ok_or(Error::Invalid("sealed segment tracks"))?,
+            audio.and_then(pid),
+        );
         self.phase = Phase::Taken;
         Ok(Some(HlsSegment {
+            pids,
             initial_raster,
             video_tail90,
             feed_bytes: self.feed_bytes,

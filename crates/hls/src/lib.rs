@@ -14,6 +14,7 @@ pub mod avc;
 pub mod clock;
 mod dolby;
 mod hevc;
+pub mod packet;
 mod pes;
 pub mod progressive;
 pub mod segment;
