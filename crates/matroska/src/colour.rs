@@ -81,7 +81,10 @@ fn bounded_rational(value: f64) -> Result<[i64; 2]> {
     }
     // The reference's public view rounds the representable half-minimum boundary
     // toward 1/MAX. Keep this exact comparison separate from source storage.
-    #[expect(clippy::float_cmp, reason = "an exact boundary value, not a tolerance test")]
+    #[expect(
+        clippy::float_cmp,
+        reason = "an exact boundary value, not a tolerance test"
+    )]
     if value == half_minimum {
         return Ok([1, MAX as i64]);
     }

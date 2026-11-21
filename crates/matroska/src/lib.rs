@@ -110,4 +110,13 @@ mod deflate_kit;
 #[path = "../tests/support/ebml.rs"]
 mod ebml_kit;
 #[cfg(test)]
-mod tests_internal;
+#[path = "../tests/support/seek_scan.rs"]
+mod seek_scan_kit;
+#[cfg(test)]
+#[path = "../tests/support/seek_window.rs"]
+mod seek_window_kit;
+#[cfg(test)]
+#[path = "../tests/support/subtitle_recovery.rs"]
+mod subtitle_recovery_kit;
+#[cfg(test)]
+mod test_kit;

@@ -969,18 +969,4 @@ impl ElementReader {
 pub(crate) mod control;
 
 #[cfg(test)]
-mod discard_guards;
-
-#[cfg(test)]
-mod compact_envelope_regressions;
-
-#[cfg(test)]
-pub(crate) mod lazy_body_regressions;
-
-#[cfg(test)]
-mod header_loop_regressions;
-
-#[cfg(test)]
-mod header_guards;
-#[cfg(test)]
-mod input_tests;
+pub(crate) mod tests;

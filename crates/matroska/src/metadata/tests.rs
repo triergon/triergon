@@ -1,5 +1,10 @@
 use super::*;
 use crate::ebml_kit::{element as e, uint as u};
+use crate::step::ParseStep;
+use std::sync::atomic::AtomicBool;
+use triergon_core::WorkBudget;
+
+mod chapters;
 fn file(uid: u64, bytes: &[u8]) -> Vec<u8> {
     e(
         0x61a7,
@@ -323,5 +328,187 @@ fn info_preserves_signed_dates_and_exact_float_values() {
         e(0x4489, &(-1_f64).to_be_bytes()),
     ] {
         assert!(Document::parse(INFO, data, 4096, 32, 16 * 1024 * 1024, 0).is_err());
+    }
+}
+
+#[test]
+fn document_job_preserves_the_validated_preorder_source_catalogue_under_work_one() {
+    use crate::metadata::{CHAPTERS, Document, build::DocumentJob};
+    let chapter = |uid, start, end| {
+        e(
+            0xb6,
+            &[
+                u(0x73c4, uid),
+                u(0x91, start),
+                u(0x92, end),
+                e(0x80, &e(0x85, "épisode".as_bytes())),
+                e(0x4abc, b"opaque"),
+            ]
+            .concat(),
+        )
+    };
+    let raw = e(
+        0x45b9,
+        &[u(0x45bc, 99), chapter(1, 0, 20), chapter(2, 21, 40)].concat(),
+    );
+    let expected = Document::parse(CHAPTERS, raw.clone(), 4096, 32, 64 * 1024, 4096).unwrap();
+    let pool = Budget::new(128 * 1024).unwrap();
+    let baseline = pool.used();
+    let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
+    let mut job = DocumentJob::new(
+        CHAPTERS,
+        source,
+        build::DocumentLimits {
+            node_limit: 4096,
+            depth_limit: 32,
+            storage_limit: 64 * 1024,
+            attachment_limit: 4096,
+        },
+        Some(123),
+        &pool,
+    )
+    .unwrap();
+    let mut result = None;
+    for _ in 0..100_000 {
+        let mut work = WorkBudget::new(1);
+        match job.step(&mut work, &AtomicBool::new(false)).unwrap() {
+            ParseStep::Yield => (),
+            ParseStep::Event(value) => {
+                result = Some(value);
+                break;
+            }
+            other => panic!("typed document: {other:?}"),
+        }
+        assert!(work.spent() <= 1);
+    }
+    let result = result.unwrap();
+    assert_eq!(result.source_offset(), Some(123));
+    assert_eq!(result.raw(), raw.as_slice());
+    assert_eq!(result.node_count(), expected.node_count());
+    let values = |document: &Document| {
+        document
+            .elements()
+            .map(|element| {
+                (
+                    element.id(),
+                    element.raw().to_vec(),
+                    element.parent().map(Element::id),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(values(&result), values(&expected));
+    let alias = result.clone();
+    drop((result, job));
+    assert_eq!(alias.kind(), CHAPTERS);
+    assert!(pool.used() > baseline);
+    drop(alias);
+    assert_eq!(pool.used(), baseline);
+}
+
+#[test]
+fn document_job_rejects_uid_reuse_ordered_missing_end_and_nested_start_range_atomically() {
+    use crate::metadata::{CHAPTERS, build::DocumentJob};
+    let atom = |uid, start, end: &[u8], nested: &[u8]| {
+        e(
+            0xb6,
+            &[
+                u(0x73c4, uid),
+                u(0x91, start),
+                end.to_vec(),
+                nested.to_vec(),
+            ]
+            .concat(),
+        )
+    };
+    let invalids = [
+        (
+            e(
+                0x45b9,
+                &[atom(1, 0, &[], &[]), atom(1, 1, &[], &[])].concat(),
+            ),
+            "duplicate metadata UID",
+        ),
+        (
+            e(0x45b9, &[u(0x45dd, 1), atom(1, 0, &[], &[])].concat()),
+            "missing metadata field",
+        ),
+        (
+            e(
+                0x45b9,
+                &atom(1, 10, &u(0x92, 20), &atom(2, 9, &u(0x92, 11), &[])),
+            ),
+            "nested chapter time range",
+        ),
+    ];
+    for (raw, message) in invalids {
+        let pool = Budget::new(128 * 1024).unwrap();
+        let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
+        let mut job = DocumentJob::new(
+            CHAPTERS,
+            source,
+            build::DocumentLimits {
+                node_limit: 4096,
+                depth_limit: 32,
+                storage_limit: 64 * 1024,
+                attachment_limit: 4096,
+            },
+            None,
+            &pool,
+        )
+        .unwrap();
+        let mut error = None;
+        for _ in 0..100_000 {
+            match job.step(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
+                Ok(ParseStep::Yield) => (),
+                Err(value) => {
+                    error = Some(value);
+                    break;
+                }
+                other => panic!("invalid catalogue published: {other:?}"),
+            }
+        }
+        assert!(matches!(error,Some(Error::Invalid(value)) if value==message));
+    }
+}
+
+#[test]
+fn catalogue_job_keeps_cumulative_node_limits_and_prior_document_after_rejected_commit() {
+    use crate::metadata::{Catalogue, INFO, build::CatalogueJob};
+    let pool = Budget::new(128 * 1024).unwrap();
+    let mut catalogue = Catalogue::new(&pool);
+    let limits = crate::Limits {
+        metadata_nodes: 3,
+        ..crate::Limits::default()
+    };
+    let raw = u(0x2ad7b1, 1_000_000);
+    for pass in 0..2 {
+        let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
+        let mut job = CatalogueJob::new(INFO, source, 4096, Some(pass), limits, &pool).unwrap();
+        let mut accepted = false;
+        let mut rejected = false;
+        for _ in 0..100_000 {
+            match job.step(
+                &mut catalogue,
+                &mut WorkBudget::new(1),
+                &AtomicBool::new(false),
+            ) {
+                Ok(ParseStep::Yield) => (),
+                Ok(ParseStep::Event(value)) => {
+                    assert_eq!(value.structural_bytes, raw.len());
+                    accepted = true;
+                    break;
+                }
+                Err(Error::Policy("metadata nodes")) => {
+                    rejected = true;
+                    break;
+                }
+                other => panic!("catalogue transaction: {other:?}"),
+            }
+        }
+        assert_eq!(accepted, pass == 0);
+        assert_eq!(rejected, pass == 1);
+        assert_eq!(catalogue.documents().len(), 1);
+        assert_eq!(catalogue.documents()[0].source_offset(), Some(0));
     }
 }

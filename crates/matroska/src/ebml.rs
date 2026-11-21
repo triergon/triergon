@@ -216,4 +216,13 @@ mod tests {
         assert_eq!(sint(&[0xff, 0xfe]).unwrap(), -2);
         assert_eq!(sint(&[0x80]).unwrap(), -128);
     }
+
+    #[test]
+    fn finite_child_cursor_rejects_even_an_empty_span_outside_its_owner() {
+        let mut cursor = ChildCursor::new(4..4);
+        assert!(matches!(
+            cursor.step(b"abc", &mut WorkBudget::new(1), &AtomicBool::new(false)),
+            Err(Error::Truncated)
+        ));
+    }
 }

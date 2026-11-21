@@ -1,0 +1,308 @@
+//! Workspace sizes, lace modes and metadata transitions of packet batches.
+use super::*;
+use crate::packet::lace::LaceJob;
+
+#[test]
+fn packet_batch_dormant_workspace_stays_within_four_kibibytes() {
+    assert!(
+        size_of::<PacketBatchJob>() <= 4096,
+        "ordinary packets cannot carry all exclusive metadata jobs: {} bytes",
+        size_of::<PacketBatchJob>()
+    );
+}
+
+#[test]
+fn all_lace_modes_keep_empty_frames_and_last_frame_bounds_under_work_one() {
+    for quantum in [1, 7, 8192] {
+        // Xiph: 256 frames, alternating sizes 0/1; final size is inferred.
+        let lengths: Vec<usize> = (0..256).map(|i| i % 2).collect();
+        let mut xiph = vec![255];
+        xiph.extend(lengths[..255].iter().map(|n| *n as u8));
+        xiph.extend((0..128).map(|n| n as u8));
+
+        // EBML: sizes 0,1,0 and inferred 2. Signed deltas use bias 63.
+        let ebml = vec![3, 0x80, 0xc0, 0xbe, b'A', b'B', b'C'];
+        let fixed = vec![255]; // 256 valid empty frames.
+        for (mode, bytes, sizes, data_at) in [
+            (1, xiph, lengths, 256),
+            (2, fixed, vec![0; 256], 1),
+            (3, ebml, vec![0, 1, 0, 2], 4),
+        ] {
+            let pool = Budget::new(64 * 1024).unwrap();
+            let baseline = pool.used();
+            let raw = [b"prefix".as_slice(), bytes.as_slice(), b"suffix".as_slice()].concat();
+            let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
+            let before = pool.used();
+            let range = 6..6 + bytes.len();
+            let mut job = LaceJob::new(source.clone(), range, mode).unwrap();
+            assert!(job.frame_count().is_none());
+            assert!(matches!(
+                job.step_descriptors(&mut WorkBudget::new(0), &AtomicBool::new(false))
+                    .unwrap(),
+                ParseStep::Yield
+            ));
+            let mut done = false;
+            for _ in 0..4096 {
+                let mut work = WorkBudget::new(quantum);
+                let step = job
+                    .step_descriptors(&mut work, &AtomicBool::new(false))
+                    .unwrap();
+                assert!(work.spent() <= quantum);
+                assert_eq!(
+                    pool.used(),
+                    before,
+                    "descriptors need no separate allocation"
+                );
+                match step {
+                    ParseStep::Event(()) => {
+                        done = true;
+                        break;
+                    }
+                    ParseStep::Yield => assert!(job.frame_count().is_none()),
+                    other => panic!("bounded lace: {other:?}"),
+                }
+            }
+            assert!(done);
+            assert_eq!(job.frame_count(), Some(sizes.len()));
+            let mut at = 6 + data_at;
+            for (index, size) in sizes.into_iter().enumerate() {
+                let mut range = None;
+                for _ in 0..4096 {
+                    let mut work = WorkBudget::new(quantum);
+                    let step = job
+                        .frame_range(index, &mut work, &AtomicBool::new(false))
+                        .unwrap();
+                    assert!(work.spent() <= quantum);
+                    assert_eq!(pool.used(), before);
+                    if let Some(value) = step {
+                        range = Some(value);
+                        break;
+                    }
+                }
+                assert_eq!(range, Some(at..at + size));
+                let mut exhausted = WorkBudget::new(0);
+                assert!(matches!(
+                    job.frame_range(index, &mut exhausted, &AtomicBool::new(false)).unwrap(),
+                    Some(cached) if cached == (at..at + size)
+                ));
+                assert_eq!(exhausted.spent(), 0);
+                at += size;
+            }
+            assert_eq!(at, 6 + bytes.len());
+            assert!(
+                job.frame_range(
+                    job.frame_count().unwrap(),
+                    &mut WorkBudget::new(1),
+                    &AtomicBool::new(false)
+                )
+                .is_err()
+            );
+            drop(source);
+            assert_eq!(
+                pool.used(),
+                before,
+                "the job retains the whole source owner"
+            );
+            drop(job);
+            assert_eq!(pool.used(), baseline);
+        }
+    }
+}
+
+#[test]
+fn malformed_lace_and_cancellation_publish_no_partial_descriptor_plan() {
+    for (mode, raw) in [
+        (1, vec![1, 255]),
+        (2, vec![2, b'A']),
+        (3, vec![2, 0x81, 0x80]),
+    ] {
+        let pool = Budget::new(8192).unwrap();
+        let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
+        let mut job = LaceJob::new(source, 0..raw.len(), mode).unwrap();
+        let mut rejected = false;
+        for _ in 0..1024 {
+            match job.step_descriptors(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
+                Ok(ParseStep::Yield) => assert!(job.frame_count().is_none()),
+                Err(Error::Invalid(_) | Error::Truncated | Error::Overflow) => {
+                    rejected = true;
+                    break;
+                }
+                other => panic!("malformed lace cannot publish: {other:?}"),
+            }
+        }
+        assert!(rejected);
+        assert!(job.frame_count().is_none());
+    }
+    let pool = Budget::new(8192).unwrap();
+    let baseline = pool.used();
+    let source = SharedBytes::copy_from_slice(&pool, &[1, b'A', b'B']).unwrap();
+    let mut job = LaceJob::new(source, 0..3, 2).unwrap();
+    assert!(matches!(
+        job.step_descriptors(&mut WorkBudget::new(1), &AtomicBool::new(false))
+            .unwrap(),
+        ParseStep::Yield
+    ));
+    assert!(matches!(
+        job.step_descriptors(&mut WorkBudget::new(0), &AtomicBool::new(true)),
+        Err(Error::Cancelled)
+    ));
+    assert!(job.frame_count().is_none());
+    drop(job);
+    assert_eq!(pool.used(), baseline);
+}
+
+#[test]
+fn group_retry_keeps_owned_source_and_needs_work_before_parse() {
+    let pool = Budget::new(128 * 1024).unwrap();
+    let baseline = pool.used();
+    let config = seed_configuration(&pool, &[]);
+    let raw = element(0xa1, &[0x81, 0, 0, 0, b'V']);
+    let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
+    let before = pool.used();
+    let mut job = PacketBatchJob::new(
+        source,
+        false,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
+    assert_eq!(
+        pool.used(),
+        before,
+        "construction alone cannot allocate workspace"
+    );
+    assert!(matches!(
+        job.step(&mut WorkBudget::new(0), &AtomicBool::new(false))
+            .unwrap(),
+        ParseStep::Yield
+    ));
+    assert_eq!(pool.used(), before);
+    let blocker = pool.reserve(pool.available()).unwrap();
+    let mut requested = None;
+    for _ in 0..2048 {
+        let mut work = WorkBudget::new(1);
+        let step = job.step(&mut work, &AtomicBool::new(false)).unwrap();
+        assert!(work.spent() <= 1);
+        match step {
+            ParseStep::Yield => (),
+            ParseStep::Backpressure {
+                requested: bytes, ..
+            } => {
+                requested = Some(bytes);
+                break;
+            }
+            other => panic!("retained caller pressure must prevent admission: {other:?}"),
+        }
+    }
+    assert!(
+        requested.unwrap() > 0,
+        "a real retained output allocation must wait"
+    );
+    drop(blocker);
+    let mut result = None;
+    for _ in 0..10_000 {
+        let mut work = WorkBudget::new(1);
+        let step = job.step(&mut work, &AtomicBool::new(false)).unwrap();
+        assert!(work.spent() <= 1);
+        match step {
+            ParseStep::Yield => assert_owners_visible(&job, &pool),
+            ParseStep::Event(packet) => {
+                result = Some(packet);
+                break;
+            }
+            other => panic!("workspace retry must preserve the group: {other:?}"),
+        }
+    }
+    let packet = result.unwrap();
+    assert_eq!(packet.packet.data.as_ref(), b"V");
+    assert_eq!(packet.group.as_ref().unwrap().raw_body(), raw.as_slice());
+    drop(job);
+    assert_eq!(packet.packet.data.as_ref(), b"V");
+    assert!(pool.used() > baseline);
+    drop(packet);
+    assert_eq!(pool.used(), baseline);
+}
+
+#[test]
+fn exclusive_metadata_transitions_keep_owner_graph_and_configuration_atomic() {
+    let pool = Budget::new(256 * 1024).unwrap();
+    let baseline = pool.used();
+    let config = seed_configuration(&pool, &uint(0x55ee, 1));
+    let original_revision = config.revision();
+    let raw = [
+        element(0xa1, &[0x81, 0, 0, 0, b'V']),
+        element(0x75a1, &element(0xa6, &element(0xa5, b"opaque addition"))),
+        element(0xa4, b"new initialization"),
+    ]
+    .concat();
+    let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
+    let mut job = PacketBatchJob::new(
+        source,
+        false,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
+    let mut changed = None;
+    let mut result = None;
+    for _ in 0..20_000 {
+        if let Some(configuration) = job.take_configuration_change() {
+            assert!(result.is_none());
+            assert!(changed.replace(configuration).is_none());
+        }
+        let mut work = WorkBudget::new(1);
+        let step = job.step(&mut work, &AtomicBool::new(false)).unwrap();
+        assert!(work.spent() <= 1);
+        match step {
+            ParseStep::Yield => assert_owners_visible(&job, &pool),
+            ParseStep::Event(packet) => {
+                result = Some(packet);
+                break;
+            }
+            other => panic!("source metadata transaction: {other:?}"),
+        }
+    }
+    let packet = result.unwrap();
+    let changed = changed.unwrap();
+    assert_eq!(changed.revision(), original_revision + 1);
+    assert_eq!(packet.configuration.revision(), changed.revision());
+    assert_eq!(
+        packet.configuration.initialization(0).unwrap().data,
+        b"new initialization"
+    );
+    assert_eq!(packet.packet.data.as_ref(), b"V");
+    assert_eq!(packet.group.as_ref().unwrap().raw_body(), raw.as_slice());
+    drop((job, changed));
+    assert!(pool.used() > baseline);
+    drop(packet);
+    assert_eq!(pool.used(), baseline);
+}
+
+#[test]
+fn simple_direct_layout() {
+    eprintln!(
+        "SIMPLE_DIRECT_LAYOUT small={} batch={} reader={}",
+        size_of::<SimplePacketJob>(),
+        size_of::<PacketBatchJob>(),
+        size_of::<crate::Reader>()
+    );
+    assert!(size_of::<SimplePacketJob>() <= 768);
+    assert!(size_of::<PacketBatchJob>() <= 3408);
+    assert!(size_of::<crate::Reader>() <= 10048);
+}
+
+#[test]
+fn simple_progress_is_bounded_without_input_owner_or_request() {
+    assert!(size_of::<SimpleProgress>() <= 24);
+    eprintln!(
+        "SIMPLE_PROGRESS_LAYOUT progress={} result={}",
+        size_of::<SimpleProgress>(),
+        size_of::<Result<SimpleProgress>>()
+    );
+}

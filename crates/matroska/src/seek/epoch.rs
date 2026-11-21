@@ -605,3 +605,6 @@ crate::storage::usage::storage!(EpochRestoreJob, |s| [
     s.change,
     s.result
 ]);
+
+#[cfg(test)]
+mod tests;

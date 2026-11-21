@@ -102,6 +102,131 @@ pub(crate) fn cluster(time: u64, blocks: impl AsRef<[u8]>) -> Vec<u8> {
     )
 }
 
+/// A zlib stream of `abc` in one stored block.
+pub(crate) const ABC: [u8; 14] = [120, 1, 1, 3, 0, 252, 255, 97, 98, 99, 2, 77, 1, 39];
+
+/// ContentEncodings with one zlib ContentCompression of `scope`.
+pub(crate) fn zlib_encoding(scope: u64) -> Vec<u8> {
+    element(
+        0x6d80,
+        &element(
+            0x6240,
+            &[uint(0x5032, scope), element(0x5034, &uint(0x4254, 0))].concat(),
+        ),
+    )
+}
+
+/// One ContentEncoding of frames and private data (scope 3): ContentCompression
+/// with `algorithm` and `settings`, at `order`.
+pub(crate) fn content_encoding(order: u64, algorithm: u64, settings: &[u8]) -> Vec<u8> {
+    element(
+        0x6240,
+        &[
+            uint(0x5031, order),
+            uint(0x5032, 3),
+            element(
+                0x5034,
+                &[uint(0x4254, algorithm), element(0x4255, settings)].concat(),
+            ),
+        ]
+        .concat(),
+    )
+}
+
+/// A SimpleBlock body on track 1 at tick 0 with two fixed-laced frames, each
+/// [`ABC`]; `bad_last_crc` flips the last Adler-32 byte.
+pub(crate) fn abc_laces(bad_last_crc: bool) -> Vec<u8> {
+    let mut raw = vec![0x81, 0, 0, 0x84, 1];
+    raw.extend(ABC);
+    raw.extend(ABC);
+    if bad_last_crc {
+        *raw.last_mut().unwrap() ^= 1;
+    }
+    raw
+}
+
+/// A file with one encoded TrackEntry (name, language, [`ABC`] as CodecPrivate,
+/// two content encodings), a Chapters and a Tags document, a Cluster of two
+/// fixed-laced [`ABC`] frames, and Cues.
+pub(crate) fn catalogue_file() -> Vec<u8> {
+    let track = element(
+        0xae,
+        &[
+            uint(0xd7, 1),
+            uint(0x73c5, 1),
+            uint(0x83, 1),
+            element(0x86, b"V_AUTHORED/OPAQUE"),
+            element(0x536e, "épisode".as_bytes()),
+            element(0x22b59d, b"fr-CA"),
+            element(0x63a2, &ABC),
+            element(
+                0x6d80,
+                &[content_encoding(1, 0, &[]), content_encoding(0, 3, b"P")].concat(),
+            ),
+        ]
+        .concat(),
+    );
+    let tracks = element(0x1654ae6b, &track);
+    let chapter = element(
+        0x1043a770,
+        &element(
+            0x45b9,
+            &element(
+                0xb6,
+                &[
+                    uint(0x73c4, 1),
+                    uint(0x91, 0),
+                    element(0x80, &element(0x85, "épisode".as_bytes())),
+                ]
+                .concat(),
+            ),
+        ),
+    );
+    let tags = element(
+        0x1254c367,
+        &element(
+            0x7373,
+            &element(
+                0x67c8,
+                &[element(0x45a3, b"TITLE"), element(0x4487, b"source")].concat(),
+            ),
+        ),
+    );
+    let block = abc_laces(false);
+    let cluster = element(0x1f43b675, &[uint(0xe7, 0), element(0xa3, &block)].concat());
+    let cue = element(
+        0x1c53bb6b,
+        &element(
+            0xbb,
+            &[
+                uint(0xb3, 0),
+                element(
+                    0xb7,
+                    &[
+                        uint(0xf7, 1),
+                        uint(0xf1, (tracks.len() + chapter.len() + tags.len()) as u64),
+                    ]
+                    .concat(),
+                ),
+            ]
+            .concat(),
+        ),
+    );
+    mkv(&[tracks, chapter, tags, cluster, cue].concat())
+}
+
+/// The CRC-32 (IEEE 802.3, reflected) that an EBML CRC-32 element stores.
+pub(crate) fn crc32(bytes: &[u8]) -> u32 {
+    let mut value = u32::MAX;
+    for &byte in bytes {
+        value ^= u32::from(byte);
+        for _ in 0..8 {
+            value = (value >> 1) ^ (0xedb88320 & 0_u32.wrapping_sub(value & 1));
+        }
+    }
+    !value
+}
+
 /// The file shape of the BlockAdditions tests: one authored track, one Cluster.
 pub(crate) mod side_data {
     use super::{cluster, element, mkv};

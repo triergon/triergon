@@ -87,36 +87,3 @@ fn divide_ticks(numerator: i128, denominator: u64) -> i128 {
         Err(_) => numerator / i128::from(denominator),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn lace_tick_boundaries_match_wide_floor_division() {
-        for frames in [2, 3, 256, u16::MAX] {
-            for ticks in [0, 1, 2, 31, 256, u64::MAX] {
-                for frame in [0, 1, frames - 1] {
-                    let timing = BlockTiming {
-                        timestamp_ticks: 0,
-                        scale_ns: 1,
-                        codec_delay_ns: 0,
-                        default_duration_ns: None,
-                        duration_ticks: Some(ticks),
-                        frame,
-                        frames,
-                    };
-                    let boundary = |n| i128::from(ticks) * i128::from(n) / i128::from(frames);
-                    let start = boundary(frame);
-                    let duration = boundary(frame + 1) - start;
-                    let expected = PacketTiming {
-                        pts: (frame == 0 || ticks >= u64::from(frames))
-                            .then(|| ExactTime::new(start, 1).unwrap()),
-                        duration: (duration != 0).then(|| ExactTime::new(duration, 1).unwrap()),
-                    };
-                    assert_eq!(packet_timing(timing).unwrap(), expected);
-                }
-            }
-        }
-    }
-}

@@ -216,3 +216,6 @@ impl TextJob {
 
 crate::storage::usage::storage!(TextValue, |s| [s.text]);
 crate::storage::usage::storage!(TextJob, |s| [s.source, s.result]);
+
+#[cfg(test)]
+mod tests;

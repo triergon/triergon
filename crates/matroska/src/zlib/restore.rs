@@ -567,24 +567,5 @@ impl crate::storage::usage::Storage for Transform {
     }
 }
 
-#[cfg(all(test, target_pointer_width = "64"))]
-mod layout_tests {
-    use super::*;
-    #[test]
-    fn inline_transform_workspace_stays_within_the_observed_host_ceiling() {
-        let bytes = size_of::<Transform>();
-        println!(
-            "Transform={bytes} Inflater={} Stored={} Copy={}",
-            size_of::<Inflater>(),
-            size_of::<StoredJob>(),
-            size_of::<CopyJob>()
-        );
-        assert!(
-            bytes <= 3104,
-            "the observed inline transform ceiling must not grow"
-        );
-    }
-}
-
 #[cfg(test)]
-mod lazy_workspace_tests;
+mod tests;

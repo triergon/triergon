@@ -238,34 +238,6 @@ fn recovery_overlaps(timing: BlockTiming, lower: i64) -> Result<bool> {
     Ok(end > Time::new(i128::from(lower), 1)?)
 }
 
-#[cfg(test)]
-#[test]
-fn recovery_uses_the_exact_end_of_a_fractional_audio_lace() {
-    let timing = BlockTiming {
-        timestamp_ticks: 0,
-        scale_ns: 1,
-        codec_delay_ns: 0,
-        default_duration_ns: None,
-        duration_ticks: Some(40_000_001),
-        frame: 1,
-        frames: 2,
-    };
-    let packet = PacketFields::new(0, timing, true, 0)
-        .unwrap()
-        .finish(PacketData {
-            storage: SharedBytes::default(),
-            range: 0..0,
-        });
-    assert_eq!(packet.pts_ns, Some(20_000_001));
-    assert_eq!(packet.duration_ns, Some(20_000_001));
-    let cutoff = |lower_ns| RecoveryCutoff {
-        lower_ns,
-        block_start_ticks: None,
-    };
-    assert!(!keep_recovery_packet(2, &packet, cutoff(40_000_001)).unwrap());
-    assert!(keep_recovery_packet(2, &packet, cutoff(40_000_000)).unwrap());
-}
-
 /// A packet with the track configuration it was read under and the side data of
 /// its BlockGroup.
 #[derive(Clone, Debug)]
@@ -993,3 +965,6 @@ impl crate::storage::usage::Storage for BatchWork {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

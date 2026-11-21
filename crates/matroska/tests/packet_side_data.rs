@@ -1,9 +1,9 @@
-//! Additional typed-API feature guards.
-//! Opaque payloads establish wire/ownership behavior, not coded-frame decoding.
+//! BlockAdditions, codec states, track mappings and HDR10+ through the public API.
+//! Opaque payloads establish wire and ownership behaviour, not coded-frame decoding.
 #[path = "support/ebml.rs"]
-mod ebml;
-use ebml::side_data::{additions, block, file, more, track};
-use ebml::{element as e, mkv, uint as u};
+mod ebml_kit;
+use ebml_kit::side_data::{additions, block, file, more, track};
+use ebml_kit::{element as e, mkv, uint as u};
 use std::{io::Cursor, sync::atomic::AtomicBool};
 use triergon_core::Step;
 use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
@@ -1067,4 +1067,157 @@ fn implicit_vp9_hdr10_plus_admission_is_bound_to_the_webm_track() {
             HDR10_PLUS
         );
     }
+}
+
+#[test]
+fn control_ordinary_group_keeps_initial_private_and_timestamp() {
+    let raw = file(&[], &[e(0xa0, &block())]);
+    let cancel = AtomicBool::new(false);
+    let mut reader = BlockingReader::open(Cursor::new(raw), Limits::default()).unwrap();
+    let packet = reader.next_typed_packet(&cancel).unwrap().unwrap();
+    assert_eq!(packet.packet.data.as_ref(), b"V");
+    assert_eq!(packet.packet.pts_ns, Some(7_000_000));
+    assert_eq!(
+        packet.configuration.tracks()[0].codec_private.as_ref(),
+        b"initial"
+    );
+    assert!(reader.next_typed_packet(&cancel).unwrap().is_none());
+}
+#[test]
+fn unknown_addition_kind_and_default_id_do_not_discard_the_block() {
+    let mapping = e(
+        0x41e4,
+        &[
+            u(0x41f0, 4),
+            u(0x41e7, 0x11223344),
+            e(0x41ed, b"opaque-map"),
+        ]
+        .concat(),
+    );
+    let group = e(
+        0xa0,
+        &[
+            block(),
+            additions(&[more(None, b"default"), more(Some(&[4]), b"opaque-4")]),
+        ]
+        .concat(),
+    );
+    for known in [false, true] {
+        let mut events = Vec::new();
+        let result = drive(
+            &file(
+                &[u(0x55ee, 4), mapping.clone()].concat(),
+                std::slice::from_ref(&group),
+            ),
+            known,
+            &mut events,
+        );
+        assert!(
+            result.is_ok(),
+            "raw unknown additions must be carried: {result:?}"
+        );
+        let packets: Vec<_> = events
+            .iter()
+            .filter_map(|event| {
+                if let Event::Packet(packet) = event {
+                    Some(packet)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(packets.len(), 1);
+        assert_eq!(packets[0].packet.data.as_ref(), b"V");
+    }
+}
+#[test]
+fn empty_and_nonempty_codec_states_publish_configuration_before_their_packets() {
+    let groups = [
+        e(0xa0, &[block(), e(0xa4, b"new")].concat()),
+        e(0xa0, &[block(), e(0xa4, b"")].concat()),
+    ];
+    let mut events = Vec::new();
+    let result = drive(&file(&[], &groups), false, &mut events);
+    assert!(
+        result.is_ok(),
+        "written codec state needs a real typed transaction: {result:?}"
+    );
+    let order: Vec<_> = events
+        .iter()
+        .filter_map(|event| match event {
+            Event::Configuration(value) => Some((0, value.revision())),
+            Event::Packet(value) => Some((1, value.configuration.revision())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(order, [(0, 1), (0, 2), (1, 2), (0, 3), (1, 3)]);
+}
+#[test]
+fn duplicate_effective_addition_ids_are_invalid_before_publication() {
+    // Omitted and empty BlockAddID both mean one: RFC8794 §6.1 and RFC9559 §5.1.3.5.2.3.
+    let raw = file(
+        &u(0x55ee, 1),
+        &[e(
+            0xa0,
+            &[
+                block(),
+                additions(&[more(None, b"a"), more(Some(&[]), b"b")]),
+            ]
+            .concat(),
+        )],
+    );
+    let mut events = Vec::new();
+    let result = drive(&raw, true, &mut events);
+    assert!(
+        matches!(
+            result,
+            Err(Error::Invalid("duplicate effective BlockAddID"))
+        ),
+        "got {result:?}"
+    );
+    assert!(!events.iter().any(|event| matches!(event, Event::Packet(_))));
+}
+#[test]
+fn group_crc_is_checked_before_any_packet_or_state_commit() {
+    let raw = file(&[], &[e(0xa0, &[e(0xbf, &[0, 0, 0, 0]), block()].concat())]);
+    let mut events = Vec::new();
+    let result = drive(&raw, false, &mut events);
+    assert!(
+        matches!(result, Err(Error::Invalid("packet source CRC mismatch"))),
+        "the authored bad CRC must fail: {result:?}"
+    );
+    assert!(!events.iter().any(|event| matches!(event, Event::Packet(_))));
+}
+#[test]
+fn late_laced_checksum_failure_does_not_commit_a_codec_state() {
+    let encoding = e(
+        0x6d80,
+        &e(0x6240, &[u(0x5032, 1), e(0x5034, &u(0x4254, 0))].concat()),
+    );
+    let abc = [120, 1, 1, 3, 0, 252, 255, b'a', b'b', b'c', 2, 77, 1, 39];
+    let mut data = vec![0x81, 0, 0, 4, 1];
+    data.extend(abc);
+    data.extend(abc);
+    *data.last_mut().unwrap() ^= 1;
+    let raw = file(
+        &encoding,
+        &[e(
+            0xa0,
+            &[e(0xa1, &data), e(0xa4, b"must-not-commit")].concat(),
+        )],
+    );
+    let mut events = Vec::new();
+    let result = drive(&raw, true, &mut events);
+    assert!(
+        matches!(result, Err(Error::Invalid("Adler-32 mismatch"))),
+        "late frame must still validate: {result:?}"
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(event, Event::Configuration(_)))
+            .count(),
+        1
+    );
+    assert!(!events.iter().any(|event| matches!(event, Event::Packet(_))));
 }

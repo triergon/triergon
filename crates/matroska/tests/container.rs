@@ -1,7 +1,7 @@
 //! The Matroska reader through the neutral container model only.
 #[path = "support/ebml.rs"]
-mod ebml;
-use ebml::{element, mkv, uint};
+mod ebml_kit;
+use ebml_kit::{element, mkv, uint};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
     ContainerReader, Event, MediaKind, Origin, PacketInfo, RandomAccess, TrackId, TrackInfo,

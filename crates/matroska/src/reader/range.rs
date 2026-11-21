@@ -331,3 +331,6 @@ impl RangeLeafJob {
 }
 
 crate::storage::usage::storage!(RangeLeafJob, |s| [s.buffer, s.span, s.result]);
+
+#[cfg(test)]
+mod tests;

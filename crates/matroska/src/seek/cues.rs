@@ -292,4 +292,4 @@ impl CuesJob {
 crate::storage::usage::storage!(CuesJob, |s| [s.source, s.positions, s.output]);
 
 #[cfg(test)]
-mod cue_arena_regressions;
+mod tests;

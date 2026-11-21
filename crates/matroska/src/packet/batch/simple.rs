@@ -412,27 +412,3 @@ crate::storage::usage::storage!(SimplePacketJob, |s| [
 ]);
 
 const _: () = assert!(size_of::<SimplePacketJob>() <= 768);
-#[cfg(test)]
-#[test]
-fn simple_direct_layout() {
-    eprintln!(
-        "SIMPLE_DIRECT_LAYOUT small={} batch={} reader={}",
-        size_of::<SimplePacketJob>(),
-        size_of::<PacketBatchJob>(),
-        size_of::<crate::Reader>()
-    );
-    assert!(size_of::<SimplePacketJob>() <= 768);
-    assert!(size_of::<PacketBatchJob>() <= 3408);
-    assert!(size_of::<crate::Reader>() <= 10048);
-}
-
-#[cfg(test)]
-#[test]
-fn simple_progress_is_bounded_without_input_owner_or_request() {
-    assert!(size_of::<SimpleProgress>() <= 24);
-    eprintln!(
-        "SIMPLE_PROGRESS_LAYOUT progress={} result={}",
-        size_of::<SimpleProgress>(),
-        size_of::<Result<SimpleProgress>>()
-    );
-}

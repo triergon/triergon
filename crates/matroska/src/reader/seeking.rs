@@ -1058,4 +1058,4 @@ impl Reader {
 }
 
 #[cfg(test)]
-mod scan_prefix_regressions;
+mod tests;

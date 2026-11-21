@@ -861,3 +861,6 @@ crate::storage::usage::storage!(GroupJob, |s| [
     s.ids,
     s.result
 ]);
+
+#[cfg(test)]
+mod tests;

@@ -414,3 +414,6 @@ impl CueValidationJob {
 }
 
 crate::storage::usage::storage!(CueValidationJob, |s| [s.configuration, s.batch]);
+
+#[cfg(test)]
+mod tests;

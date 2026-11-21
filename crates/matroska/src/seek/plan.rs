@@ -339,3 +339,6 @@ impl SeekPlanJob {
 }
 
 crate::storage::usage::storage!(SeekPlanJob, |s| [s.configuration]);
+
+#[cfg(test)]
+mod tests;
