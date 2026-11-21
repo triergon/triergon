@@ -5,9 +5,8 @@
 /// cubic subdivision (`8 · max + 4`) stays within 32 bits.
 pub const OUTLINE_MAX: i32 = (1 << 28) - 1;
 
-/// libass's `double_to_d6`: pixels to 26.6 fixed point, rounding half to
-/// even. Beyond the `i32` range it saturates and NaN is 0, as libass gives
-/// them on 32-bit ARM with GCC.
+/// Pixels to 26.6 fixed point, rounding half to even. Beyond the `i32` range
+/// it saturates and NaN is 0, as libass gives them on 32-bit ARM with GCC.
 pub fn pixels_26_6(pixels: f64) -> i32 {
     triergon_core::round_ties_even_i32(pixels * 64.0)
 }
@@ -53,7 +52,7 @@ pub struct Rect {
 
 impl Rect {
     /// The rectangle covering nothing: minima at `i32::MAX`, maxima at
-    /// `i32::MIN`, as libass's `rectangle_reset` leaves one.
+    /// `i32::MIN`.
     pub const EMPTY: Self = Self {
         x_min: i32::MAX,
         y_min: i32::MAX,

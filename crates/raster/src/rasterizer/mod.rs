@@ -303,8 +303,7 @@ impl Rasterizer {
         (self.lines[0].capacity() + self.lines[1].capacity()) * size_of::<Line>()
     }
 
-    /// libass's `ass_outline_to_bitmap`; see
-    /// [`Raster::rasterize`](crate::Raster::rasterize).
+    /// See [`Raster::rasterize`](crate::Raster::rasterize).
     pub(crate) fn rasterize(
         &mut self,
         shape: &Shape,

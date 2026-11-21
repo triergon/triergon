@@ -87,12 +87,11 @@ impl Effects {
         EffectsKey(Filter::new(self, frame))
     }
 
-    /// Whether the run casts a shadow (libass's `FILTER_NONZERO_SHADOW` once
-    /// `render_and_combine_glyphs` has applied its rules): its offset is
-    /// nonzero, and it has a border or a shadow that keeps the fill, as an
-    /// opaque box's always does. An opaque box that is not
-    /// [`shown`](Border::OpaqueBox) is drawn only then.
-    pub fn casts_shadow(&self) -> bool {
+    /// Whether the run casts a shadow: its offset is nonzero, and it has a
+    /// border or a shadow that keeps the fill, as an opaque box's always
+    /// does. An opaque box that is not [`shown`](Border::OpaqueBox) is drawn
+    /// only then.
+    pub(crate) fn casts_shadow(&self) -> bool {
         FilterFlags::new(self).shadow
     }
 }
@@ -102,7 +101,7 @@ impl Effects {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct EffectsKey(Filter);
 
-/// libass's filter flags, from a run's effects as its renderer sets them.
+/// How a run's bitmaps are combined, from its effects.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub(crate) struct FilterFlags {
     /// `\bord` style 3: the border is an opaque box.
@@ -193,7 +192,7 @@ fn quantize_blur(radius: f64) -> (i32, i32) {
     )
 }
 
-/// libass's `((uint32_t) 1 << order) - 1`. C leaves a shift of 32 or more
+/// `(1 << order) - 1` in unsigned 32 bits. C leaves a shift of 32 or more
 /// undefined; this is what 32-bit ARM computes, whose register shifts use the
 /// low byte of the amount and give 0 from 32 on, so the mask is then all ones.
 /// AArch64 and x86 wrap the amount modulo 32 instead. Only blur radii beyond

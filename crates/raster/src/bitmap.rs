@@ -14,9 +14,9 @@ pub(crate) const ALIGNMENT: usize = 16;
 /// them so, as libass's C engine does.
 #[derive(Debug)]
 pub struct Bitmap {
-    /// The first pixel's column and row (libass's `left` and `top`), whole
-    /// pixels, y down, relative to the origin the bitmap is placed against: the
-    /// glyph's position, or the run's for a composite.
+    /// The first pixel's column and row, whole pixels, y down, relative to
+    /// the origin the bitmap is placed against: the glyph's position, or the
+    /// run's for a composite.
     pub position: Vector,
     width: usize,
     height: usize,
@@ -264,4 +264,53 @@ fn overlap(offset: i32, len: usize, extent: usize) -> Option<(usize, usize, usiz
             (end - start) as usize,
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use triergon_core::Budget;
+
+    use super::Bitmap;
+    use crate::{Limits, Vector};
+
+    fn row(budget: &Budget, values: &[u8]) -> Bitmap {
+        let mut bitmap = Bitmap::new(budget, values.len(), 1, &Limits::default()).unwrap();
+        bitmap
+            .rows_mut()
+            .for_each(|row| row.copy_from_slice(values));
+        bitmap
+    }
+
+    #[test]
+    fn blends_combine_the_overlap_only() {
+        let budget = Budget::new(1 << 16).unwrap();
+        let src = row(&budget, &[100, 128, 128]);
+        let mut sum = row(&budget, &[200, 200, 200]);
+        sum.add(&src, 1, 0);
+        assert_eq!(sum.row(0), [200, 255, 255]);
+        let mut product = row(&budget, &[255, 255, 255]);
+        product.multiply(&src, 1, 0);
+        assert_eq!(product.row(0), [255, 100, 128]);
+        let mut inverse = row(&budget, &[255, 255, 255]);
+        inverse.multiply_inverse(&src, -1, 0);
+        assert_eq!(inverse.row(0), [127, 127, 255]);
+        assert_eq!(inverse.data()[3..], [0; 13]);
+    }
+
+    #[test]
+    fn the_fill_is_taken_out_where_the_border_exceeds_it() {
+        let budget = Budget::new(1 << 16).unwrap();
+        let mut border = row(&budget, &[200, 100, 50]);
+        border.subtract_fill(&row(&budget, &[100, 150, 0]));
+        assert_eq!(border.row(0), [150, 0, 50]);
+    }
+
+    #[test]
+    fn a_shift_moves_whole_pixels_and_passes_on_the_fraction() {
+        let budget = Budget::new(1 << 16).unwrap();
+        let mut bitmap = row(&budget, &[200, 0, 0]);
+        bitmap.shift_by(Vector::new(3 * 64 + 32, -64));
+        assert_eq!(bitmap.position, Vector::new(3, -1));
+        assert_eq!(bitmap.row(0), [100, 100, 0]);
+    }
 }

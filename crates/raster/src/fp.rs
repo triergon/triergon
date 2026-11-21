@@ -4,13 +4,13 @@
 //! and grouping; these helpers cover the macros and library calls whose
 //! semantics differ from Rust's own.
 
-/// `a > b ? a : b`, the C `FFMAX` macro, including its NaN behaviour.
+/// `a > b ? a : b` in C, including its NaN behaviour.
 #[inline(always)]
 pub(crate) fn max(a: f64, b: f64) -> f64 {
     if a > b { a } else { b }
 }
 
-/// `a > b ? b : a`, the C `FFMIN` macro, including its NaN behaviour.
+/// `a > b ? b : a` in C, including its NaN behaviour.
 #[inline(always)]
 pub(crate) fn min(a: f64, b: f64) -> f64 {
     if a > b { b } else { a }

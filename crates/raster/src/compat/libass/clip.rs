@@ -1,5 +1,5 @@
-//! Rectangle clipping of a placed bitmap into the image parts libass emits
-//! (`render_glyph`), with the `\kf` karaoke split into a left and a right colour.
+//! Rectangle clipping of a placed bitmap into the image parts libass emits,
+//! with the `\kf` karaoke split into a left and a right colour.
 
 use crate::bitmap::Bitmap;
 use crate::geometry::{Rect, Vector};
@@ -7,8 +7,8 @@ use crate::geometry::{Rect, Vector};
 /// A `\clip` (or, `inverse`, `\iclip`) rectangle.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Clip {
-    /// The clip rectangle in frame pixels (libass's `clip_x0` to `clip_y1`):
-    /// columns `x_min..x_max` and rows `y_min..y_max`.
+    /// The clip rectangle in frame pixels: columns `x_min..x_max` and rows
+    /// `y_min..y_max`.
     pub rect: Rect,
     /// The bitmap is visible outside `rect` rather than inside it.
     pub inverse: bool,
@@ -88,7 +88,7 @@ impl Clip {
     /// The parts of `bitmap`, its position offset by `origin` pixels, that this
     /// clip leaves visible in `frame`, each split at frame column `split` into a
     /// part in the first colour (left) and one in the second (right): at most
-    /// eight, in the order libass emits them (`render_glyph`).
+    /// eight, in the order libass emits them.
     pub fn parts(
         &self,
         bitmap: &Bitmap,
@@ -126,8 +126,8 @@ impl Clip {
         parts.parts.into_iter().take(parts.len)
     }
 
-    /// A normal clip: the clip rectangle clamped to the frame (as `FFMINMAX`
-    /// does, the upper bound last), within the bitmap.
+    /// A normal clip: the clip rectangle clamped to the frame (the lower
+    /// bound first, then the upper), within the bitmap.
     fn inside(
         &self,
         dst_x: i64,
@@ -229,5 +229,79 @@ impl Clip {
             count += 1;
         }
         count
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use triergon_core::Budget;
+
+    use super::{Clip, ClipFrame, ClipPart, Colour};
+    use crate::{Bitmap, Limits, Rect, Vector};
+
+    const NO_SPLIT: i32 = 1_000_000;
+
+    /// The parts of a 32 × 16 bitmap placed at (10, 20) in a 100 × 100 frame.
+    fn parts(rect: Rect, inverse: bool, split: i32) -> Vec<ClipPart> {
+        let budget = Budget::new(1 << 16).unwrap();
+        let bitmap = Bitmap::new(&budget, 32, 16, &Limits::default()).unwrap();
+        let frame = ClipFrame {
+            width: 100,
+            height: 100,
+            content: Rect::new(0, 0, 100, 100),
+        };
+        Clip { rect, inverse }
+            .parts(&bitmap, Vector::new(10, 20), split, &frame)
+            .collect()
+    }
+
+    fn part(at: (i32, i32), source: (usize, usize), size: (usize, usize)) -> ClipPart {
+        ClipPart {
+            position: Vector::new(at.0, at.1),
+            source_x: source.0,
+            source_y: source.1,
+            width: size.0,
+            height: size.1,
+            colour: Colour::First,
+        }
+    }
+
+    #[test]
+    fn a_clip_keeps_the_part_of_the_bitmap_inside_it() {
+        let whole = Rect::new(0, 0, 100, 100);
+        assert_eq!(
+            parts(whole, false, NO_SPLIT),
+            [part((10, 20), (0, 0), (32, 16))]
+        );
+        assert_eq!(
+            parts(Rect::new(15, 25, 30, 30), false, NO_SPLIT),
+            [part((15, 25), (5, 5), (15, 5))]
+        );
+        assert!(parts(Rect::new(50, 50, 60, 60), false, NO_SPLIT).is_empty());
+    }
+
+    #[test]
+    fn the_karaoke_split_divides_each_part_by_colour() {
+        let second = ClipPart {
+            colour: Colour::Second,
+            ..part((26, 20), (16, 0), (16, 16))
+        };
+        assert_eq!(
+            parts(Rect::new(0, 0, 100, 100), false, 26),
+            [part((10, 20), (0, 0), (16, 16)), second]
+        );
+    }
+
+    #[test]
+    fn an_inverse_clip_keeps_the_bands_around_it() {
+        assert_eq!(
+            parts(Rect::new(18, 24, 34, 32), true, NO_SPLIT),
+            [
+                part((10, 20), (0, 0), (8, 16)),
+                part((18, 20), (8, 0), (16, 4)),
+                part((18, 32), (8, 12), (16, 4)),
+                part((34, 20), (24, 0), (8, 16)),
+            ]
+        );
     }
 }

@@ -253,3 +253,34 @@ impl BitmapTransform {
         Matrix(m)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{BitmapTransform, Matrix};
+    use crate::{Rect, Vector};
+
+    fn translation(x: f64, y: f64) -> Matrix {
+        Matrix([[1.0, 0.0, x], [0.0, 1.0, y], [0.0, 0.0, 1.0]])
+    }
+
+    #[test]
+    fn whole_pixel_moves_change_only_the_position() {
+        let cbox = Rect::new(0, 0, 640, 640);
+        let at = |x| BitmapTransform::quantize(&translation(x, 0.0), &cbox, None).unwrap();
+        let (here, there) = (at(100.0), at(100.0 + 3.0 * 64.0));
+        assert_eq!(here.placed.transform, there.placed.transform);
+        assert_eq!(
+            there.placed.position,
+            Vector::new(here.placed.position.x + 3, here.placed.position.y)
+        );
+        let nudged = at(100.0 + 8.0);
+        assert_ne!(here.placed.transform, nudged.placed.transform);
+    }
+
+    #[test]
+    fn a_transform_without_depth_is_not_quantised() {
+        let mut m = translation(0.0, 0.0);
+        m.0[2][2] = 0.0;
+        assert!(BitmapTransform::quantize(&m, &Rect::new(0, 0, 64, 64), None).is_none());
+    }
+}

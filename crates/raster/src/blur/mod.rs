@@ -54,7 +54,7 @@ impl Blur {
             + self.lines.capacity() * 2
     }
 
-    /// libass's `ass_synth_blur`; see [`Raster::blur`](crate::Raster::blur).
+    /// See [`Raster::blur`](crate::Raster::blur).
     pub(crate) fn apply(
         &mut self,
         bitmap: &mut Bitmap,
