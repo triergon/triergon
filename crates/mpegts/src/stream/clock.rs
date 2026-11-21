@@ -18,6 +18,25 @@ impl TransportStream {
             .adaptation
             .as_ref()
             .is_some_and(|field| field.pcr.is_some());
+        if !signalled && !self.clock_signal && !self.clock_pending && !self.clock_quarantined {
+            // The ordinary PCR carrier: the second sample after a new time base.
+            if has_pcr && self.clock_samples.is_some() {
+                self.clock_samples = Some(2);
+            }
+            return Ok(None);
+        }
+        self.clock_boundary(pid, signalled, has_pcr)
+    }
+
+    /// The clock stage of a carrier that raises, holds or drops the discontinuity
+    /// indicator, or of any carrier while the clock is quarantined.
+    #[cold]
+    fn clock_boundary(
+        &mut self,
+        pid: u16,
+        signalled: bool,
+        has_pcr: bool,
+    ) -> Result<Option<TraceEvent>> {
         if self.clock_quarantined {
             self.clock_signal = signalled;
             return Ok(None);
