@@ -176,10 +176,11 @@ bytes are errors; nothing is replaced with U+FFFD.
 | PGS (Blu-ray) | PCS, PDS, ODS, END in packet or SUP framing; fragmented objects; palette updates; object cache; forced flags | Every packet FFmpeg decodes, malformed ones included: indexed planes and ARGB palettes, with its refusals and `forced_subs_only` |
 | DVD SPU / VobSub | SPU reassembly, control commands (start, forced start, stop, palette, alpha, area, field offsets), interlaced 2-bit and extended 8-bit RLE; `.idx`/`.sub` pairs, program streams, Matroska and MP4 configuration | FFmpeg's crop, colours carried between units, ARGB from the idx, private-data, `palette` or IFO palette (a list's numbers as observed in FFmpeg built for 32-bit ARMv7: each wraps modulo 2³² and one beyond 32 bits is white), the canvas of the configuration's `size:` line (refused unless both sides are positive and (width + 128) × (height + 128) is below 2²⁸, the sizes FFmpeg also keeps for a PGS presentation; a number beyond ±(2³¹ − 1) refuses it, as observed there), the `.idx` `delay:` line with the values observed there (its fields saturate at 2³¹ − 1 and −2³¹), and `forced_subs_only`; FFmpeg for AArch64 keeps the low 32 bits of such numbers instead |
 
-The [DVD comparison](../../harness/features/subtitle-dvd/contract.json) folds
-the palette from the first VTS program chain, or the receiver's fallback when
-the table or chain lies beyond the file. An overflowing sector offset is an
-open case against FFmpeg on AArch64.
+`compat::dvd::ifo_palette` is compared through
+[`subtitle-dvd`](../../harness/features/subtitle-dvd/contract.json). Its rectangle
+palettes cover all 16 entries of the first VTS program chain, option precedence
+and fallback for missing, invalid or out-of-file tables. An overflowing sector
+offset is an open case against FFmpeg on AArch64.
 
 ### Closed captions and teletext
 

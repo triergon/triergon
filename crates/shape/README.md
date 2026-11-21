@@ -74,6 +74,9 @@ above) advances by its default-load vertical advance, as libass gives HarfBuzz
 that glyph, and a glyph first asked for an advance or extents stays horizontal.
 The cache's storage is charged before it grows, and a charge that fails ends the
 shaping call.
+The [ASS rendering comparison](../../harness/features/ass-render/contract.json)
+checks the placement that results when aliases of the same glyph are looked up
+in either order across U+02F1 and when a substituted glyph first loads its advance.
 
 The bidi API follows the steps libass takes to shape and reorder an event:
 `bidi::BidiClass::of` and `bidi::Bracket::of` per character, `bidi::paragraphs`,
