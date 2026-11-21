@@ -576,11 +576,12 @@ may override that count for diagnostic comparisons.
   grades are built by the dated nightly xtask pins (`NIGHTLY`, the one `cargo xtask
   check-simd` uses) with the AAC decoder's `simd` feature. The AAC workloads of
   `workloads.json` and the AAC lane's output are measured from that worker, through
-  `--candidate-for audio-aac=` and `--codec-worker-for audio-aac=`. On the 32-bit ARM
+  `--candidate-for audio-aac=` and `--codec-worker-for audio-aac=`, and so is AAC in MOV,
+  whose contract names it as the candidate. On the 32-bit ARM
   target LLVM emits no NEON float code from scalar loops, and explicit `std::simd`
   vectors are nightly-only; the decoder's SBR QMF banks need them there. Every other
   worker stays on the stable pin, `codec-worker` included: the video, AC-3, E-AC-3, DTS
-  and file-format workloads, the conformance vectors, the readers and AAC in MOV: the
+  and file-format workloads, the conformance vectors and the readers: the
   nightly compiler builds the video decoders slower on ARMv7
   ([status](status.md#32-bit-armv7)).
   One revision built by a newer compiler or with `-C target-cpu` differs from it by up
