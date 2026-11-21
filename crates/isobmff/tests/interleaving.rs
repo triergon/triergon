@@ -94,17 +94,23 @@ fn regular_movie_with_backward_chunk_preserves_decode_order_or_refuses_physical_
                 InterleaveStatus::Yield => unreachable!(),
             }
         }
-        assert_eq!(samples.len(), 12);
         assert_eq!(
-            &samples[..4],
-            &[
+            samples,
+            [
                 (1, 1, 1151, Some(0)),
                 (1, 2, 1163, Some(1000)),
                 (1, 3, 1256, Some(2000)),
-                (1, 4, 1203, Some(3000))
+                (1, 4, 1203, Some(3000)),
+                (1, 5, 1215, Some(4000)),
+                (1, 6, 1227, Some(5000)),
+                (2, 1, 1175, Some(0)),
+                (2, 2, 1182, Some(1000)),
+                (2, 3, 1196, Some(2000)),
+                (2, 4, 1239, Some(3000)),
+                (2, 5, 1244, Some(4000)),
+                (2, 6, 1250, Some(5000)),
             ]
         );
-        assert_eq!(samples[6].0, 2);
         assert_eq!(&movie[1256..1268], &original[1184..1196]);
     }
 }
