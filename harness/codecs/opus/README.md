@@ -2,7 +2,7 @@
 
 `family-2-acn.opus` is an authored 0.1-second Ogg Opus probe, encoded with
 FFmpeg 9.0.2 and libopus. It is included as the comparison input; its SHA-256 is
-recorded in `manifest.json`. Its OpusHead has four channels, family 2, four
+recorded in the [correctness manifest](../correctness-manifest.json). Its OpusHead has four channels, family 2, four
 uncoupled streams, mapping `[0, 1, 2, 3]`, 48 kHz input rate and 312 samples of
 pre-skip. The channels are first-order SN3D Ambisonics in ACN order.
 
@@ -11,8 +11,8 @@ triergon-session --example decode_audio --features codecs`, and place it at
 `DIR/audio-decode`. With the pinned FFmpeg decode build:
 
 ```sh
-CARGO_INCREMENTAL=0 cargo xtask codecs grade --manifest harness/codecs/opus/manifest.json \
-  --root . --bin DIR --ffmpeg FFMPEG --ffprobe FFPROBE \
+CARGO_INCREMENTAL=0 cargo xtask codecs grade --manifest harness/codecs/correctness-manifest.json \
+  --lanes opus-ambisonic --root . --bin DIR --ffmpeg FFMPEG --ffprobe FFPROBE \
   --codec-worker /dev/null --reference /dev/null --out result.jsonl
 CARGO_INCREMENTAL=0 cargo xtask codecs summarize result.jsonl summary.json --require-pass
 ```
@@ -45,7 +45,8 @@ a diagnostic using the same release, not the prepared pinned build or native
 qualification. The family 2 header specifies ACN component semantics; the reported
 layout is separately observed from the selected decoder, not inferred from the header.
 
-The same comparison passes with the prepared `decode` profile on macOS.
+The `codecs-audio` gate runs this comparison with the pinned `decode` profile.
+The comparison passes with that profile on macOS.
 It matches layout, frame lengths, 48 kHz, four channels and all 4,800
 samples per channel. The worst RMS error is 9.82976633815388e-9. The
 largest absolute error is 3.725290298461914e-8. Native runtime and memory

@@ -143,3 +143,33 @@ impl Summary {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ambisonic_fixture_keeps_trimmed_frame_boundaries() {
+        let file = std::fs::File::open(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../harness/codecs/opus/family-2-acn.opus"
+        ))
+        .unwrap();
+        let mut summary = Summary {
+            frame_lengths: Some(Vec::new()),
+            ..Summary::default()
+        };
+        let mut pcm = Vec::new();
+        decode(file, &mut pcm, &mut summary).unwrap();
+        let (rate, layout) = summary.format.unwrap();
+        assert_eq!((rate, layout.ambisonic_order()), (48_000, Some((1, false))));
+        assert_eq!(summary.errors, 0);
+        assert_eq!(summary.frames, 6);
+        assert_eq!(
+            summary.frame_lengths.unwrap(),
+            [648, 960, 960, 960, 960, 312]
+        );
+        assert_eq!(summary.samples, 4_800);
+        assert_eq!(pcm.len(), 4_800 * 4 * size_of::<f32>());
+    }
+}
