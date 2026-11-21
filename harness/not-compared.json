@@ -32,8 +32,8 @@
       {
         "name": "session-configuration",
         "entry_points": ["SessionConfig::gop", "SessionConfig::max_rate", "SessionConfig::vbv_bits", "SessionConfig::bit_rate", "SessionConfig::mux"],
-        "degree": "unit-tests",
-        "needs": "capture cases with GOP, rate, VBV and mux settings other than those SessionConfig::with_rate_rule gives, against the reference sequence configured alike"
+        "degree": "step",
+        "needs": "the capture qualification cases compare configured GOP, rates, VBV and multiplex settings. The one-bit VBV reference refusal and the 1920x1080 and padded 968x544 encoder quality cases are open"
       }
     ],
     "triergon-codec": [
@@ -57,18 +57,6 @@
       }
     ],
     "triergon-codec-aac": [
-      {
-        "name": "configured-access-units",
-        "entry_points": ["RawLcDecoder", "Decoder::with_priming_policy", "compat::priming::Policy", "compat::layout::Policy"],
-        "degree": "outside-gate",
-        "needs": "a gate item for the access-unit decoding that the on-demand aac-access-units feature and the aac-mov lane of cargo xtask codecs grade compare; the gate grades ADTS streams only"
-      },
-      {
-        "name": "default-build",
-        "entry_points": ["Decoder"],
-        "degree": "recorded",
-        "needs": "the aac lane and AAC workloads graded from a build without the simd feature, which is what consumers get on a stable toolchain; the gate's test step checks that build against FFmpeg float output recorded in .research/aac-references"
-      },
       {
         "name": "adts-sync-search",
         "entry_points": ["adts::find_frame"],
@@ -112,10 +100,10 @@
     ],
     "triergon-codec-flac": [
       {
-        "name": "decoding",
-        "entry_points": ["Decoder", "Decoder::decode_integer", "IntegerFrame"],
+        "name": "integer-output",
+        "entry_points": ["Decoder::decode_integer", "IntegerFrame"],
         "degree": "recorded",
-        "needs": "a gate item running the flac lane of cargo xtask codecs grade; the gate's test step checks the integer output against each file's STREAMINFO MD5, and the timed file workloads require equal work, not equal output"
+        "needs": "a gated comparison of native integer PCM, including the low bits of 32-bit samples. The test step verifies the integer output against STREAMINFO MD5. The codecs-files item grades decoded float PCM and stereo device output."
       },
       {
         "name": "crc-policy",
@@ -162,12 +150,6 @@
         "entry_points": ["nal::AccessUnitSplitter"],
         "degree": "unit-tests",
         "needs": "Annex B streams split by AccessUnitSplitter, compared with the units of the reference's HEVC parser; the codec worker splits with its own measurement splitter"
-      },
-      {
-        "name": "simd-kernels",
-        "entry_points": ["Decoder with the simd feature"],
-        "degree": "recorded",
-        "needs": "the codecs gate item run from a build with the simd feature; check-simd holds it to the FFmpeg digests the conformance tests record, where their inputs are present"
       }
     ],
     "triergon-codec-mp3": [
@@ -183,7 +165,7 @@
         "name": "encoder",
         "entry_points": ["Encoder", "Encoder::encode", "EncoderConfig"],
         "degree": "step",
-        "needs": "a worker operation encoding YUV pictures with geometries, rates, VBV sizes and GOP lengths beyond the capture profile, against the reference's mpeg1video with the same settings; compared only inside the capture session"
+        "needs": "capture qualification compares construction and encoding at additional geometries, rates, VBV sizes and GOP lengths. Encoder quality cases are open and the budget-taking entry points need separate comparison"
       }
     ],
     "triergon-codec-opus": [
@@ -200,14 +182,7 @@
         "needs": "the range decoder's final state per packet against the reference decoder's for the same vectors"
       }
     ],
-    "triergon-codec-vorbis": [
-      {
-        "name": "decoding",
-        "entry_points": ["Decoder", "Decoder::from_headers_in"],
-        "degree": "outside-gate",
-        "needs": "a gate item running the vorbis lane of cargo xtask codecs grade; the timed file workloads require equal work, not equal output"
-      }
-    ],
+    "triergon-codec-vorbis": [],
     "triergon-core": [
       {
         "name": "exact-time",
@@ -260,14 +235,7 @@
         "needs": "a corpus of files with the format the reference's probe picks for each; compared only inside the file workloads, which require equal work, not equal output"
       }
     ],
-    "triergon-font": [
-      {
-        "name": "store",
-        "entry_points": ["Store", "StoreKey", "Built"],
-        "degree": "no-reference",
-        "needs": "a worker operation whose output depends on what the store keeps under its budget; no reference exposes an equivalent cache"
-      }
-    ],
+    "triergon-font": [],
     "triergon-framing": [
       {
         "name": "nal-length-prefixed-reading",
@@ -322,30 +290,6 @@
         "entry_points": ["ac3::Eac3BsiParser"],
         "degree": "unit-tests",
         "needs": "an E-AC-3 corpus with a reference view of every bitstream information field"
-      },
-      {
-        "name": "dts-core-inspection",
-        "entry_points": ["dts::DtsCoreFrameReader", "dts::DtsHeaderInspector", "dts::inspect_header_bits"],
-        "degree": "outside-gate",
-        "needs": "a feature contract and worker operation for what the opt-in dts_packet_corpus test compares with the pinned FFmpeg outside the gate"
-      },
-      {
-        "name": "dts-core-extent",
-        "entry_points": ["dts::probe_frame_extent"],
-        "degree": "unit-tests",
-        "needs": "a reference of each core frame's declared extent over the DTS corpus"
-      },
-      {
-        "name": "dts-packings",
-        "entry_points": ["dts::Dts14BitUnpacker", "dts::DtsPackedPayloadJob", "dts::Dts14SyncReader", "dts::Dts14CarrierReader", "dts::DtsNormalSourceReader"],
-        "degree": "unit-tests",
-        "needs": "14-bit and packed DTS inputs with a reference of the normal frames they carry"
-      },
-      {
-        "name": "dts-reference-trace",
-        "entry_points": ["reference_trace::dts::ParserOperation", "reference_trace::dts::FactAssociationJob", "reference_trace::dts::ParserHints"],
-        "degree": "recorded",
-        "needs": "a worker operation that runs this comparison projection against the reference"
       }
     ],
     "triergon-isobmff": [
@@ -354,24 +298,6 @@
         "entry_points": ["index::SegmentIndex", "index::TrackFragmentRandomAccess", "index::MovieFragmentRandomAccessTail"],
         "degree": "unit-tests",
         "needs": "a worker operation reading sidx, tfra and mfro boxes, compared with the reference's segment and fragment index entries"
-      },
-      {
-        "name": "quicktime-pcm-sound",
-        "entry_points": ["quicktime::SoundDescriptionV0", "quicktime::PcmSampleReader"],
-        "degree": "unit-tests",
-        "needs": "a corpus of version 0 QuickTime sound descriptions with a reference view of their fields and PCM samples"
-      },
-      {
-        "name": "mov-pcm-packets",
-        "entry_points": ["compat::mov::pcm::PcmStream", "compat::mov::pcm::PcmCursor", "compat::mov::pcm::PcmReader"],
-        "degree": "recorded",
-        "needs": "a worker operation grouping QuickTime PCM samples into packets, folded against the reference's packets; tests check recorded reference output in tests/fixtures/pcm-v0"
-      },
-      {
-        "name": "mov-run-recovery",
-        "entry_points": ["compat::mov::recovery::RunRecoveryBuilder", "compat::mov::recovery::RunRecoveryBuilder::new_direct", "compat::mov::recovery::DirectPacketCursor", "compat::mov::recovery::PhysicalReader"],
-        "degree": "unit-tests",
-        "needs": "a worker profile running run and direct recovery and physical reads against the reference's recovered packets; --recover-regular-tables runs description recovery only"
       },
       {
         "name": "mov-track-seek",
@@ -384,18 +310,6 @@
         "entry_points": ["seek::SourceSeekPlanner", "seek::SourceCompositionLookup"],
         "degree": "step",
         "needs": "a worker operation planning seeks to a sample ordinal with a caller's preroll and looking up composition times, against the reference; compared only inside MovieSourceSeekPlanner range plans (isobmff-seek)"
-      },
-      {
-        "name": "dts-core-signalling",
-        "entry_points": ["config::check_dts_core_description"],
-        "degree": "unit-tests",
-        "needs": "a corpus of DTS sample entries with the reference's verdict on their core signalling"
-      },
-      {
-        "name": "mov-encoded-views",
-        "entry_points": ["compat::mov::encoded::EncodedMetadataProfile", "compat::mov::encoded::EncodedRecoveryProfile", "compat::mov::encoded::DependencyView"],
-        "degree": "recorded",
-        "needs": "a worker operation projecting the metadata, recovery and dependency views of encoded entries against the reference; tests check recorded reference output in tests/fixtures"
       },
       {
         "name": "mov-reference-trace",
@@ -467,7 +381,7 @@
         "name": "ycbcr-palette",
         "entry_points": ["YcbcrMatrix", "ChannelRounding"],
         "degree": "step",
-        "needs": "palette entries converted against the reference's subtitle palette conversion; compared only through the DVB, PGS and DVD subtitle decoders' output"
+        "needs": "pgs-palette-sweep and dvb-palette-sweep fold BT.601 and BT.709 nearest through the subtitle decoders; subtitle-dvd covers BT.601 half-down from MP4/DVD configuration. Confirm these paths by worker coverage and find a reference operation for the public BT.709 half-down combination."
       }
     ],
     "triergon-raster": [],
@@ -496,7 +410,7 @@
         "name": "libass-rotations",
         "entry_points": ["compat::libass::rotates", "compat::libass::GlyphRotations", "compat::libass::FaceRotations", "compat::libass::SizedMetrics::rotating"],
         "degree": "step",
-        "needs": "shape-libass cases on @ faces against libass's font functions, which shape-libass excludes; compared only through ass-render's vertical fixtures"
+        "needs": "ass-render compares vertical glyph metrics through image placement, including both lookup orders of shared glyphs in vertical-first-lookup.ass. Confirm coverage of every public entry point and a first lookup through extents."
       }
     ],
     "triergon-subtitles": [
@@ -546,7 +460,7 @@
         "name": "pgs-segments",
         "entry_points": ["pgs::SegmentIter", "pgs::Composition", "pgs::Palette", "pgs::ObjectFragment", "pgs::Windows"],
         "degree": "step",
-        "needs": "a worker operation folding each segment's parsed fields against a reference view of them; compared only as the parse inside compat::pgs::ReceiverDecoder"
+        "needs": "a worker operation folding each segment's parsed fields against a reference view. The receiver folds decoded subtitles; Matroska discovery needs a PGS-capable operation folding the probe cutoff, since matroska-startup-seek requires video and folds only selected video packets."
       },
       {
         "name": "vobsub-index-lines",
@@ -557,8 +471,8 @@
       {
         "name": "dvd-ifo-palette",
         "entry_points": ["compat::dvd::ifo_palette"],
-        "degree": "unit-tests",
-        "needs": "DVD subpictures decoded with the palette ifo_palette reads, against the reference's dvdsub decoder given the same IFO file"
+        "degree": "step",
+        "needs": "subtitle-dvd folds IFO palettes and fallbacks against dvdsub. Confirm worker coverage of ifo_palette and settle the open sector-offset overflow result on both targets."
       },
       {
         "name": "carriage-reference-trace",
