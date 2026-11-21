@@ -111,10 +111,7 @@ pub fn read_file_track(file: &Path, codec: CodecId, ordinal: usize) -> Result<Tr
 /// video track's edit list is not applied), with its codec when it is H.264 or
 /// HEVC. A transport stream's video is read packet by packet with
 /// [`ts::for_each_packet`].
-pub fn read_file_video_track(
-    file: &Path,
-    ordinal: usize,
-) -> Result<(Track, Option<CodecId>)> {
+pub fn read_file_video_track(file: &Path, ordinal: usize) -> Result<(Track, Option<CodecId>)> {
     let (track, scale, codec) = read(File::open(file)?, Selection::Video, ordinal)?;
     let track = match scale {
         Some(scale) => matroska_clock(track, scale)?,
