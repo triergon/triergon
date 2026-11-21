@@ -1010,6 +1010,27 @@
         "bytes": 23544,
         "digest": 17987967839404448802
       }
+    },
+    {
+      "id": "avc-hevc-configuration-epoch-ts188-preroll",
+      "profile": "avc-hevc-configuration-epoch-ts188-preroll",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-hevc-configuration-epoch.ts",
+      "sha256": "569daedf1cf3cc709eb12cb3d16dfb73ba68a1fe83bff04fba6959d33a2dceac",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=0:3",
+        "epoch-start=11468"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 15780,
+        "digest": 14845001645097894709
+      }
     }
   ]
 }
