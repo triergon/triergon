@@ -882,7 +882,7 @@ fn a_selection_narrows_the_plan_and_refuses_names_it_lacks() {
 fn the_index_tests_exist_by_their_names() {
     // `--exact` and `--skip` match these names; a renamed test must rename them.
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let sources: String = ["src/evidence.rs", "src/gate/tests.rs"]
+    let sources: String = ["src/evidence/tests.rs", "src/gate/tests.rs"]
         .iter()
         .map(|file| fs::read_to_string(root.join(file)).unwrap())
         .collect();
