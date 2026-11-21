@@ -464,7 +464,7 @@ fn mpeg_video_split_freeze_retries_without_duplicate_bytes_or_sources() {
     assert_eq!(available, body.len());
     assert!(requested > available);
     drop(pressure);
-    // Allow the pending source table and the AU bytes, but no byte-owner header.
+    // Allow the pending source table and AU bytes without the backing allocation header.
     let pressure = drive
         .pool
         .reserve(drive.pool.available() - body.len() - requested)
