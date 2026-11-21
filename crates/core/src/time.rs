@@ -41,11 +41,11 @@ impl TimeBase {
         if numerator == 0 || denominator == 0 {
             return Err(Error::Invalid("zero timebase"));
         }
-        let divisor = gcd(u128::from(numerator), u128::from(denominator)) as u64;
+        let [numerator, denominator] =
+            exact_quotients([numerator, denominator], gcd_u64(numerator, denominator));
         Ok(Self {
-            numerator: NonZeroU64::new(numerator / divisor).ok_or(Error::Invalid("timebase"))?,
-            denominator: NonZeroU64::new(denominator / divisor)
-                .ok_or(Error::Invalid("timebase"))?,
+            numerator: NonZeroU64::new(numerator).ok_or(Error::Invalid("timebase"))?,
+            denominator: NonZeroU64::new(denominator).ok_or(Error::Invalid("timebase"))?,
         })
     }
     pub fn numerator(self) -> u64 {
@@ -160,21 +160,112 @@ impl TickScale {
     }
 }
 
+/// Whether 64-bit `/` and `%` are library loops on this target, as on 32-bit
+/// ARMv7, each costing many times a multiplication. There the reductions below
+/// use shifts, subtractions and multiplications instead; where division is an
+/// instruction they divide.
+const SOFTWARE_DIVISION: bool = cfg!(target_pointer_width = "32");
+
 /// The greatest common divisor of two nonzero values by shifts and subtractions
-/// alone, for a stream's setup on targets that divide in software.
-fn binary_gcd(mut a: u64, mut b: u64) -> u64 {
+/// alone, in 32-bit registers when both values fit them.
+fn binary_gcd(a: u64, b: u64) -> u64 {
     debug_assert!(a != 0 && b != 0);
+    if let (Ok(a), Ok(b)) = (u32::try_from(a), u32::try_from(b)) {
+        return u64::from(binary_gcd_u32(a, b));
+    }
     let shift = (a | b).trailing_zeros();
-    a >>= a.trailing_zeros();
+    let (mut a, mut b) = (a >> a.trailing_zeros(), b);
     loop {
         b >>= b.trailing_zeros();
-        if a > b {
-            (a, b) = (b, a);
-        }
-        b -= a;
+        (a, b) = (a.min(b), a.max(b) - a.min(b));
         if b == 0 {
             return a << shift;
         }
+    }
+}
+
+/// [`binary_gcd`] of two nonzero 32-bit values.
+fn binary_gcd_u32(a: u32, b: u32) -> u32 {
+    let shift = (a | b).trailing_zeros();
+    let (mut a, mut b) = (a >> a.trailing_zeros(), b);
+    loop {
+        b >>= b.trailing_zeros();
+        (a, b) = (a.min(b), a.max(b) - a.min(b));
+        if b == 0 {
+            return a << shift;
+        }
+    }
+}
+
+/// A nonzero divisor prepared to divide its multiples without division: it is
+/// `odd · 2^shift`, and a multiple `n` is `(n >> shift) · odd⁻¹` modulo 2⁶⁴,
+/// since an odd value is invertible modulo a power of two.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ExactDivisor {
+    shift: u32,
+    odd: u64,
+    inverse: u64,
+}
+
+impl ExactDivisor {
+    fn new(divisor: NonZeroU64) -> Self {
+        let shift = divisor.trailing_zeros();
+        let odd = divisor.get() >> shift;
+        // Each Newton step x ← x · (2 − odd · x) doubles the number of correct
+        // low bits, and an odd value is its own inverse modulo 8: four steps in
+        // 32 bits give 48 ≥ 32 bits, one more in 64 bits completes the inverse.
+        let low = odd as u32;
+        let mut inverse = low;
+        for _ in 0..4 {
+            inverse = inverse.wrapping_mul(2_u32.wrapping_sub(low.wrapping_mul(inverse)));
+        }
+        let inverse = u64::from(inverse);
+        Self {
+            shift,
+            odd,
+            inverse: inverse.wrapping_mul(2_u64.wrapping_sub(odd.wrapping_mul(inverse))),
+        }
+    }
+
+    /// `dividend / divisor` for a multiple of the divisor.
+    fn quotient(self, dividend: u64) -> u64 {
+        (dividend >> self.shift).wrapping_mul(self.inverse)
+    }
+
+    /// `dividend / divisor` when the divisor divides `dividend`. The candidate
+    /// times `odd` equals `dividend >> shift` modulo 2⁶⁴, and is the true
+    /// quotient exactly when that product does not overflow.
+    fn checked_quotient(self, dividend: u64) -> Option<u64> {
+        if dividend & ((1 << self.shift) - 1) != 0 {
+            return None;
+        }
+        let quotient = self.quotient(dividend);
+        (high_product(quotient, self.odd) == 0).then_some(quotient)
+    }
+}
+
+/// Both `dividends` divided by `divisor`, a nonzero divisor of each.
+#[inline]
+fn exact_quotients(dividends: [u64; 2], divisor: u64) -> [u64; 2] {
+    debug_assert!(divisor != 0 && dividends.iter().all(|value| value % divisor == 0));
+    match NonZeroU64::new(divisor) {
+        Some(divisor) if SOFTWARE_DIVISION && divisor.get() != 1 => {
+            let divisor = ExactDivisor::new(divisor);
+            dividends.map(|value| divisor.quotient(value))
+        }
+        _ => dividends.map(|value| value / divisor),
+    }
+}
+
+/// `dividend / divisor` when the nonzero `divisor` divides `dividend`.
+#[inline]
+fn checked_exact_quotient(dividend: u64, divisor: NonZeroU64) -> Option<u64> {
+    if SOFTWARE_DIVISION {
+        ExactDivisor::new(divisor).checked_quotient(dividend)
+    } else {
+        dividend
+            .is_multiple_of(divisor.get())
+            .then(|| dividend / divisor)
     }
 }
 
@@ -241,6 +332,12 @@ pub struct Time {
 
 #[inline]
 fn gcd_u64(mut a: u64, mut b: u64) -> u64 {
+    if SOFTWARE_DIVISION {
+        return match (a, b) {
+            (0, value) | (value, 0) => value,
+            _ => binary_gcd(a, b),
+        };
+    }
     while b != 0 {
         (a, b) = (b, a % b);
     }
@@ -267,11 +364,12 @@ impl Time {
         if let (Ok(magnitude), Ok(denominator)) =
             (u64::try_from(magnitude), u64::try_from(denominator))
         {
-            let divisor = gcd_u64(magnitude, denominator);
-            let reduced = i128::from(magnitude / divisor);
+            let [reduced, denominator] =
+                exact_quotients([magnitude, denominator], gcd_u64(magnitude, denominator));
+            let reduced = i128::from(reduced);
             return Ok(Self {
                 numerator: if numerator < 0 { -reduced } else { reduced },
-                denominator: NonZeroU128::new(u128::from(denominator / divisor))
+                denominator: NonZeroU128::new(u128::from(denominator))
                     .ok_or(Error::Invalid("time denominator"))?,
             });
         }
@@ -292,12 +390,11 @@ impl Time {
         let absolute = ticks.unsigned_abs();
         let base_denominator = base.denominator();
         let (quotient, denominator) = if let Ok(narrow) = u64::try_from(absolute) {
-            // gcd is in 1..=base_denominator, so this conversion is exact.
-            let divisor = gcd(u128::from(narrow), u128::from(base_denominator)) as u64;
-            (
-                u128::from(narrow / divisor),
-                u128::from(base_denominator / divisor),
-            )
+            let [quotient, denominator] = exact_quotients(
+                [narrow, base_denominator],
+                gcd_u64(narrow, base_denominator),
+            );
+            (u128::from(quotient), u128::from(denominator))
         } else {
             let divisor = gcd(absolute, u128::from(base_denominator));
             (absolute / divisor, u128::from(base_denominator) / divisor)
@@ -326,8 +423,8 @@ impl Time {
             u64::try_from(other.denominator()),
         ) {
             // Both denominators are positive; their gcd is nonzero and fits u64.
-            let divisor = divisor as u64;
-            (u128::from(right / divisor), u128::from(left / divisor))
+            let [right, left] = exact_quotients([right, left], divisor as u64);
+            (u128::from(right), u128::from(left))
         } else {
             (other.denominator() / divisor, self.denominator() / divisor)
         };
@@ -402,13 +499,13 @@ impl Time {
     pub fn to_ticks(self, base: TimeBase, rounding: Rounding) -> Result<i128> {
         let exact_denominator = self.denominator();
         if base.numerator() == 1
-            && exact_denominator <= u128::from(u64::MAX)
-            && base.denominator().is_multiple_of(exact_denominator as u64)
+            && let Ok(denominator) = NonZeroU64::try_from(self.denominator)
+            && let Some(scale) = checked_exact_quotient(base.denominator(), denominator)
         {
             let magnitude = self
                 .numerator
                 .unsigned_abs()
-                .checked_mul(u128::from(base.denominator() / exact_denominator as u64))
+                .checked_mul(u128::from(scale))
                 .ok_or(Error::Overflow)?;
             return signed(magnitude, self.numerator < 0);
         }
@@ -629,12 +726,52 @@ mod tick_scale_tests {
         assert!(Reciprocal::new(0).is_none());
     }
 
+    fn euclid(mut a: u64, mut b: u64) -> u64 {
+        while b != 0 {
+            (a, b) = (b, a % b);
+        }
+        a
+    }
+
     #[test]
     fn binary_gcd_matches_euclid() {
         let values = values();
-        for &a in values.iter().filter(|&&v| v != 0).take(300) {
-            for &b in values.iter().filter(|&&v| v != 0).take(300) {
-                assert_eq!(binary_gcd(a, b), gcd_u64(a, b), "gcd({a}, {b})");
+        for &a in values.iter().take(300) {
+            for &b in values.iter().take(300) {
+                if a != 0 && b != 0 {
+                    assert_eq!(binary_gcd(a, b), euclid(a, b), "gcd({a}, {b})");
+                }
+                assert_eq!(gcd_u64(a, b), euclid(a, b), "gcd({a}, {b})");
+            }
+        }
+    }
+
+    #[test]
+    fn exact_division_matches_division() {
+        let values = values();
+        for &divisor in values.iter().filter(|&&d| d != 0).take(600) {
+            let exact = ExactDivisor::new(NonZeroU64::new(divisor).unwrap());
+            for &value in &values {
+                let (quotient, remainder) = (value / divisor, value % divisor);
+                assert_eq!(
+                    exact.quotient(value - remainder),
+                    quotient,
+                    "{value} / {divisor}"
+                );
+                let expected = (remainder == 0).then_some(quotient);
+                assert_eq!(
+                    exact.checked_quotient(value),
+                    expected,
+                    "{value} / {divisor}"
+                );
+                let divisor = NonZeroU64::new(divisor).unwrap();
+                assert_eq!(checked_exact_quotient(value, divisor), expected);
+                let multiple = value - remainder;
+                assert_eq!(
+                    exact_quotients([multiple, 0], divisor.get()),
+                    [quotient, 0],
+                    "{multiple} / {divisor}"
+                );
             }
         }
     }

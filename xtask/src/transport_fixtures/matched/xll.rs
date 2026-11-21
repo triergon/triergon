@@ -1,4 +1,4 @@
-//! Authored lossless-only DTS-HD recovery syntax, without coded audio samples.
+//! Authored XLL recovery syntax with an optional core, without coded XLL samples.
 use super::{Codec, Input, PID, Path, R, Transport, Value, part};
 
 struct Bits {
@@ -30,7 +30,7 @@ fn crc(bytes: &mut [u8]) {
 // ETSI TS 102 114 V1.6.1 Tables 7-2, 7-5/6/7 and 8-1. Both headers
 // have their own CRC. One complete XLL frame fills the only active asset;
 // sync is DWORD-aligned at offset zero, without buffering or decoding delay.
-fn frame(long: bool, tag: u8) -> Vec<u8> {
+fn frame(long: bool, tag: u8, core: bool) -> Vec<u8> {
     const XLL_BYTES: u32 = 400;
     let header_bytes = if long { 32 } else { 28 };
     let size_bits = if long { 20 } else { 16 };
@@ -87,7 +87,10 @@ fn frame(long: bool, tag: u8) -> Vec<u8> {
     }
     assert!(bits.at <= descriptor_end);
     bits.at = descriptor_end;
-    bits.put(1, 0); // No backward-compatible core.
+    bits.put(1, u32::from(core));
+    if core {
+        bits.put(5, 0); // External core, default extension/asset mapping.
+    }
     assert!(bits.at <= (header_bytes - 2) * 8);
     crc(&mut bits.bytes[5..header_bytes]);
     bits.at = header_bytes * 8;
@@ -129,42 +132,62 @@ pub(super) fn seek_cases(
         header: 0,
     };
     let pid = PID.to_string();
-    for (carrier, m2ts) in [("ts188", false), ("m2ts192", true)] {
-        let mut ts = Transport::new();
-        // Annex G.3.1 / Table E-2: one 24-bit stereo construction-17 asset.
-        ts.tables(&codec, &[0x7f, 8, 0x0e, 0x40, 5, 2, 0x64, 0x8c, 0, 0])?;
-        for i in 0..4 {
-            let bytes = frame(m2ts, i + 1);
-            let pts = 90_000 + u64::from(i) * 960;
-            let mut pes = part(&bytes, Some(pts), (i % 2 == 0).then_some(pts - 120));
-            pes.aligned = true;
-            ts.pes(codec.stream_id, &pes)?;
-        }
-        let input = Input {
-            name: if m2ts {
-                "dts-xll-long"
+    for core in [false, true] {
+        let name = if core { "dts-core-xll" } else { "dts-xll" };
+        for (carrier, m2ts) in [("ts188", false), ("m2ts192", true)] {
+            let mut ts = Transport::new();
+            // Annex G.3.1 / Table E-2: construction 17 or 14 with a separate core.
+            let descriptor: &[u8] = if core {
+                &[
+                    0x7f, 14, 0x0e, 0xc0, 5, 1, 0x60, 0x08, 0, 0, 5, 2, 0x64, 0x74, 0, 0,
+                ]
             } else {
-                "dts-xll-short"
-            },
-            m2ts,
-            data: ts.finish(m2ts),
-        };
-        for policy in ["previous", "preroll"] {
-            for (landing, target, repeat) in [
-                ("early", "90500", None),
-                ("late", "92500", None),
-                ("backward-indexed", "92500", Some("90500")),
-            ] {
-                let mut options = vec!["--dvb", pid.as_str(), target, policy];
-                options.extend(repeat);
-                cases.push(input.record(
-                    root,
-                    feature,
-                    &format!("dts-xll-{carrier}-{landing}-{policy}"),
-                    &options,
-                    reference,
-                    "ts-audio-seek-fold",
-                )?);
+                &[0x7f, 8, 0x0e, 0x40, 5, 2, 0x64, 0x8c, 0, 0]
+            };
+            ts.tables(&codec, descriptor)?;
+            for i in 0..4 {
+                let mut bytes = frame(m2ts, i + 1, core);
+                if core {
+                    let mut prefix =
+                        include_bytes!("../../../../harness/fixtures/mpegts/dts-core-mono.dts")
+                            [..512]
+                            .to_vec();
+                    prefix[10] &= !1; // HFLAG clear.
+                    prefix.extend(bytes);
+                    bytes = prefix;
+                }
+                let pts = 90_000 + u64::from(i) * 960;
+                let mut pes = part(&bytes, Some(pts), (i % 2 == 0).then_some(pts - 120));
+                pes.aligned = true;
+                ts.pes(codec.stream_id, &pes)?;
+            }
+            let input = Input {
+                name: match (core, m2ts) {
+                    (true, true) => "dts-core-xll-long",
+                    (true, false) => "dts-core-xll-short",
+                    (false, true) => "dts-xll-long",
+                    (false, false) => "dts-xll-short",
+                },
+                m2ts,
+                data: ts.finish(m2ts),
+            };
+            for policy in ["previous", "preroll"] {
+                for (landing, target, repeat) in [
+                    ("early", "90500", None),
+                    ("late", "92500", None),
+                    ("backward-indexed", "92500", Some("90500")),
+                ] {
+                    let mut options = vec!["--dvb", pid.as_str(), target, policy];
+                    options.extend(repeat);
+                    cases.push(input.record(
+                        root,
+                        feature,
+                        &format!("{name}-{carrier}-{landing}-{policy}"),
+                        &options,
+                        reference,
+                        "ts-audio-seek-fold",
+                    )?);
+                }
             }
         }
     }

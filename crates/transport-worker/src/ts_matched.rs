@@ -98,14 +98,9 @@ fn options(kind: Kind, arguments: &[String], length: usize, carrier: usize) -> R
         }
     }
     if follow_up.epochs.is_some() != epoch_start.is_some()
-        || (follow_up.epochs.is_some()
-            && (!matches!(kind, Kind::Seek)
-                || follow_up.repeated.is_some()
-                || follow_up.split.is_some()))
+        || (follow_up.epochs.is_some() && !matches!(kind, Kind::Seek))
     {
-        return Err(
-            "epoch and epoch-start require a single-entity picture seek without repeat".into(),
-        );
+        return Err("epoch and epoch-start require a picture seek".into());
     }
     // The physical boundary identifies the reference control only. The reader
     // selects its landing solely with the complete source epoch pair.
@@ -149,7 +144,15 @@ fn execute(
     });
     if let Some(request) = seek {
         if let Some(epochs) = follow_up.epochs {
-            reader.request_seek_in_epoch(request, epochs)?;
+            match (entities.as_ref(), follow_up.repeated.is_some()) {
+                (Some(parts), true) => reader
+                    .request_seek_in_entities_in_epoch_and_index(request, parts, epochs, 4096)?,
+                (Some(parts), false) => {
+                    reader.request_seek_in_entities_in_epoch(request, parts, epochs)?
+                }
+                (None, true) => reader.request_seek_in_epoch_and_index(request, epochs, 4096)?,
+                (None, false) => reader.request_seek_in_epoch(request, epochs)?,
+            };
         } else {
             match (entities.as_ref(), follow_up.repeated.is_some()) {
                 (Some(parts), true) => {
@@ -165,7 +168,13 @@ fn execute(
     drain(&mut reader, input, track, kind, follow_up, false, &mut out)?;
     if let (Some(mut request), Some(target)) = (seek, follow_up.repeated) {
         request.target = target;
-        if let Some(parts) = &entities {
+        if let Some(epochs) = follow_up.epochs {
+            if let Some(parts) = &entities {
+                reader.request_seek_in_entities_in_epoch(request, parts, epochs)?;
+            } else {
+                reader.request_seek_in_epoch(request, epochs)?;
+            }
+        } else if let Some(parts) = &entities {
             reader.request_seek_in_entities(request, parts)?;
         } else {
             reader.request_seek(request)?;
@@ -195,6 +204,7 @@ fn drain(
                     return Err("unexpected transport seek result".into());
                 }
                 if follow_up.epochs.is_some()
+                    && !indexed
                     && (landing.method != SeekMethod::BoundedScan
                         || landing.scanned_bytes != input.input.len() as u64)
                 {
@@ -297,7 +307,7 @@ pub(crate) fn run(kind: Kind, args: &[String]) -> Result<()> {
             args,
             kind.prefix(),
             " SIZE PROGRAM PID PTS90 POLICY [REPEAT_PTS90] [split=BYTES] | SIZE PROGRAM PID PTS90 POLICY epoch=CLOCK:CONFIG epoch-start=BYTES",
-            5..=7,
+            5..=9,
             false,
         )?,
         Kind::AudioSeek => Invocation::parse(
@@ -320,7 +330,7 @@ pub(crate) fn run(kind: Kind, args: &[String]) -> Result<()> {
         && matches!(invocation.arguments[2].as_str(), "--dvb" | "--atsc");
     let track_index = 2 + usize::from(has_namespace);
     if matches!(kind, Kind::Seek | Kind::AudioSeek)
-        && !(3..=5).contains(&(invocation.arguments.len() - track_index))
+        && !(3..=7).contains(&(invocation.arguments.len() - track_index))
     {
         return Err("expected PID PTS90 POLICY [REPEAT_PTS90] [split=BYTES]".into());
     }
@@ -399,6 +409,22 @@ mod tests {
         assert!(parsed.repeated.is_none());
         assert!(parsed.split.is_none());
         assert!(parse(Kind::Seek, &["epoch-start=564", "epoch=0:2"]).is_ok());
+        assert!(parse(Kind::Seek, &["epoch=1:2", "epoch-start=564", "90000"]).is_ok());
+        assert!(parse(Kind::Seek, &["epoch=1:2", "epoch-start=564", "split=564"]).is_ok());
+        let combined = parse(
+            Kind::Seek,
+            &["epoch=1:2", "epoch-start=564", "split=752", "103000"],
+        )
+        .unwrap();
+        assert_eq!(combined.split, Some(752));
+        assert_eq!(combined.repeated, Some(Time::new(103000, 90000).unwrap()));
+        assert_eq!(
+            combined.epochs,
+            Some(SourceEpochs {
+                clock: 1,
+                configuration: 2
+            })
+        );
     }
 
     #[test]
@@ -412,8 +438,6 @@ mod tests {
             vec!["epoch=1:2", "epoch-start=1880"],
             vec!["epoch=1:2", "epoch-start=564", "epoch=1:2"],
             vec!["epoch=1:2", "epoch-start=564", "epoch-start=564"],
-            vec!["epoch=1:2", "epoch-start=564", "90000"],
-            vec!["epoch=1:2", "epoch-start=564", "split=564"],
         ] {
             assert!(parse(Kind::Seek, &args).is_err(), "{args:?}");
         }
@@ -422,14 +446,15 @@ mod tests {
 
     #[test]
     fn repeated_audio_fixtures_read_only_the_physical_suffix() {
-        for (name, header, length, step, first, repeated) in [
+        for (name, header, length, step, first, repeated, width) in [
             (
                 "mpeg1-layer1-physical-repeated-preroll",
                 [0xff, 0xff, 0x14, 0xc0],
-                32,
+                32_usize,
                 720,
                 7,
                 1,
+                188,
             ),
             (
                 "mpeg1-layer2-physical-repeated-preroll",
@@ -438,13 +463,33 @@ mod tests {
                 2160,
                 1,
                 7,
+                188,
+            ),
+            (
+                "mpeg1-layer1-m2ts-multi-carrier-repeated-preroll",
+                [0xff, 0xff, 0x94, 0xc0],
+                288,
+                720,
+                7,
+                1,
+                192,
+            ),
+            (
+                "mpeg1-layer2-m2ts-multi-carrier-repeated-preroll",
+                [0xff, 0xfd, 0xe4, 0xc0],
+                1152,
+                2160,
+                1,
+                7,
+                192,
             ),
         ] {
             let pool = Budget::new(2 << 20).unwrap();
+            let extension = if width == 188 { "ts" } else { "m2ts" };
             let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-                "../../harness/features/mpegts-previous-audio/inputs/{name}.ts"
+                "../../harness/features/mpegts-previous-audio/inputs/{name}.{extension}"
             ));
-            let input = ts_input::parse(&pool, &path, &["188".into(), "7".into()]).unwrap();
+            let input = ts_input::parse(&pool, &path, &[width.to_string(), "7".into()]).unwrap();
             let mut caps = ts_input::capabilities(&input.input);
             caps.random_access = true;
             let track = TrackId(256);
@@ -480,7 +525,8 @@ mod tests {
             .unwrap();
 
             request.target = Time::new(90_001 + repeated * step, 90_000).unwrap();
-            let floor = (17 + 3 * repeated as u64) * 188;
+            let carriers = (length + 14).div_ceil(184);
+            let floor = (17 + (2 + carriers as u64) * repeated as u64) * width;
             let start = reader.request_seek(request).unwrap();
             assert_eq!(start.offset, floor, "{name}: physical PAT offset");
             let mut next = floor;
