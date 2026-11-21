@@ -26,13 +26,23 @@ pub enum DecodeError {
     /// The access unit does not start with the 0x0B77 syncword.
     NoSync,
     /// The access unit is shorter than its header (or the frame size it declares).
-    Truncated { needed: usize, available: usize },
+    Truncated {
+        /// Bytes the header or the declared frame size needs.
+        needed: usize,
+        /// Bytes the access unit holds.
+        available: usize,
+    },
     /// The access unit is empty.
     Empty,
     /// A header or audio-block field holds a value the specification forbids.
     InvalidData(&'static str),
     /// CRC check failed and the decoder was configured to reject such frames.
-    CrcMismatch { crc1_ok: bool, crc2_ok: bool },
+    CrcMismatch {
+        /// AC-3 crc1 (first 5/8 of the frame) checks; for E-AC-3 the frame CRC.
+        crc1_ok: bool,
+        /// AC-3 crc2 (whole frame) checks; for E-AC-3 the frame CRC.
+        crc2_ok: bool,
+    },
     /// Recognised but unimplemented bitstream feature.
     Unsupported(Feature),
     /// The output frame already holds samples with a different rate or layout.

@@ -1,6 +1,8 @@
 //! Syncframe header probing (syncinfo plus the leading bsi fields) used for framing.
 
 use crate::error::{DecodeError, Feature};
+use triergon_bitstream::BitReader;
+use triergon_bitstream::crc::crc16_a52 as crc16;
 
 /// Nominal bit rates in kbit/s per frmsizecod/2 (A/52:2018 Table 5.18).
 pub(crate) const BITRATE_KBPS: [u16; 19] = [
@@ -53,7 +55,9 @@ pub enum Syntax {
 /// E-AC-3 stream type (Annex E Table E2.1); AC-3 frames report `Independent`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StreamType {
+    /// Independent substream (strmtyp 0), or an AC-3 syncframe.
     Independent,
+    /// Dependent substream (strmtyp 1), extending the preceding independent substream.
     Dependent,
     /// Independent substream converted from AC-3 (strmtyp 2).
     Converted,
@@ -62,17 +66,25 @@ pub enum StreamType {
 /// Leading header fields of one syncframe.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FrameHeader {
+    /// Syntax of the syncframe, from its bsid.
     pub syntax: Syntax,
+    /// Bit stream identification (0..=16).
     pub bsid: u8,
     /// Total syncframe length in bytes.
     pub frame_bytes: usize,
+    /// Sample rate in Hz.
     pub sample_rate: u32,
+    /// Sample rate code (0..=2; E-AC-3 3 = reduced rate given by fscod2).
     pub fscod: u8,
     /// Audio blocks (of 256 samples) per syncframe.
     pub num_blocks: usize,
+    /// Audio coding mode (A/52 Table 5.8).
     pub acmod: u8,
+    /// The syncframe carries an LFE channel.
     pub lfeon: bool,
+    /// E-AC-3 stream type; AC-3 syncframes are independent.
     pub stream_type: StreamType,
+    /// E-AC-3 substream identification (0..=7); 0 for AC-3.
     pub substream_id: u8,
     /// AC-3 only: frmsizecod.
     pub frmsizecod: u8,
@@ -202,6 +214,52 @@ pub fn access_unit_len(data: &[u8]) -> Result<usize, DecodeError> {
         len += h.frame_bytes;
     }
     Ok(len)
+}
+
+/// Returns (crc1 ok, crc2 ok). E-AC-3 has a single CRC; it is reported in both.
+pub(crate) fn check_crc(frame: &[u8], h: &FrameHeader) -> (bool, bool) {
+    let words = frame.len() / 2;
+    match h.syntax {
+        Syntax::Ac3 => {
+            let five8 = (words >> 1) + (words >> 3);
+            let c1 = crc16(0, &frame[2..five8 * 2]) == 0;
+            let c2 = crc16(0, &frame[2..]) == 0;
+            (c1, c2)
+        }
+        Syntax::Eac3 => {
+            let c = crc16(0, &frame[2..]) == 0;
+            (c, c)
+        }
+    }
+}
+
+/// Read the custom channel map of an E-AC-3 dependent substream (Annex E Table E1.2).
+pub(crate) fn peek_chanmap(frame: &[u8]) -> Option<u16> {
+    let mut b = [0u8; 24];
+    let n = frame.len().min(16);
+    b[..n].copy_from_slice(&frame[..n]);
+    let mut r = BitReader::at(&b, 16);
+    let strmtyp = r.read(2);
+    r.skip(3 + 11);
+    let fscod = r.read(2);
+    r.skip(2); // fscod2 or numblkscod
+    let _ = fscod;
+    let acmod = r.read(3);
+    r.skip(1 + 5 + 5); // lfeon, bsid, dialnorm
+    if r.bit() {
+        r.skip(8);
+    }
+    if acmod == 0 {
+        r.skip(5);
+        if r.bit() {
+            r.skip(8);
+        }
+    }
+    if strmtyp == 1 && r.bit() {
+        Some(r.read(16) as u16)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

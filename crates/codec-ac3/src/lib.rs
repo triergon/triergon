@@ -13,6 +13,7 @@
 // adopted with an A/B timing run.
 #![allow(clippy::single_match_else)]
 mod bitalloc;
+mod downmix;
 mod error;
 mod header;
 mod imdct;
@@ -23,6 +24,7 @@ mod spec_tables;
 mod substream;
 mod tables;
 
+pub use downmix::{DownmixInfo, DownmixType};
 pub use error::{DecodeError, Feature};
 pub use header::{FrameHeader, StreamType, Syntax, access_unit_len, parse_header};
 pub use layout::{MAX_CHANNELS, layout_name};
@@ -32,10 +34,11 @@ pub use substream::{DownmixCodes, FrameFeatures, NoiseMode};
 pub use triergon_bitstream::crc::crc16_a52 as crc16;
 pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 
+use downmix::downmix_info;
+use header::{check_crc, peek_chanmap};
 use quant::GroupTables;
 use substream::{BlockSink, LFE, NCH, PlaneMap, Substream, acmod_channels};
-use triergon_bitstream::BitReader;
-use triergon_codec::{AudioDecoder, Budget, Charged, DownmixLevels, Reservation, SurroundEncoding};
+use triergon_codec::{AudioDecoder, Budget, Charged, DownmixLevels, Reservation};
 
 /// Bytes of zero padding kept after a frame in the decode buffer.
 pub(crate) const PAD: usize = 16;
@@ -54,11 +57,14 @@ pub enum CrcPolicy {
     Reject,
 }
 
-/// Decoder configuration.
-#[derive(Clone, Copy, Debug)]
+/// Decoder configuration; the default reproduces the reference decoder.
+#[derive(Clone, Copy, Debug, Default)]
 pub struct DecoderOptions {
+    /// What to do with syncframes whose CRC does not check.
     pub crc: CrcPolicy,
+    /// Whether dither, AHT zero-bin and spectral extension noise is generated.
     pub noise: NoiseMode,
+    /// Which output conventions to follow where A/52 leaves a choice.
     pub compat: Compat,
 }
 
@@ -93,27 +99,25 @@ pub enum Compat {
     Specification,
 }
 
-impl Default for DecoderOptions {
-    fn default() -> Self {
-        DecoderOptions {
-            crc: CrcPolicy::default(),
-            noise: NoiseMode::default(),
-            compat: Compat::Reference,
-        }
-    }
-}
-
 /// Summary of one decoded access unit.
 #[derive(Clone, Copy, Debug)]
 pub struct FrameInfo {
+    /// Syntax of independent substream 0.
     pub syntax: Syntax,
+    /// Bit stream identification of independent substream 0 (0..=16).
     pub bsid: u8,
+    /// Audio coding mode of independent substream 0 (A/52 Table 5.8: 0 = 1+1 ..= 7 = 3/2).
     pub acmod: u8,
+    /// Independent substream 0 carries an LFE channel.
     pub lfeon: bool,
+    /// Dialogue normalization code of independent substream 0 (1..=31 = -1..=-31 dB,
+    /// 0 reserved); reported, not applied.
     pub dialnorm: u8,
+    /// Output sample rate in Hz.
     pub sample_rate: u32,
     /// Samples per channel appended to the output frame.
     pub samples: usize,
+    /// Speakers of the output planes, in plane order.
     pub layout: ChannelLayout,
     /// A 1+1 (dual mono) program: plane 0 is Ch1, plane 1 is Ch2.
     pub dual_mono: bool,
@@ -124,132 +128,13 @@ pub struct FrameInfo {
     /// Set when some or all blocks were replaced by a repeat of the last decoded block
     /// (A/52 7.10 "block repeat" concealment, which FFmpeg 9.0.2 also applies).
     pub concealed: Option<DecodeError>,
+    /// Coding tools independent substream 0 used.
     pub features: FrameFeatures,
     /// Downmix metadata codes of independent substream 0 as transmitted.
     pub downmix_codes: DownmixCodes,
     /// Downmix levels with the semantics of FFmpeg's `AV_FRAME_DATA_DOWNMIX_INFO`
     /// (exported only for programs with more than two channels).
     pub downmix: Option<DownmixInfo>,
-}
-
-/// Preferred stereo downmix (dmixmod, Annex D Table D2.2; '11' = Pro Logic II as FFmpeg
-/// reports it).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DownmixType {
-    Unknown,
-    LoRo,
-    LtRt,
-    DplII,
-}
-
-/// Downmix levels as linear gains, mirroring FFmpeg 9.0.2's `AVDownmixInfo` export.
-/// Every field is `Some` when the info is exported.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct DownmixInfo {
-    pub preferred_downmix_type: Option<DownmixType>,
-    /// Lo/Ro center mix level.
-    pub center_mix_level: Option<f64>,
-    pub center_mix_level_ltrt: Option<f64>,
-    /// Lo/Ro surround mix level.
-    pub surround_mix_level: Option<f64>,
-    pub surround_mix_level_ltrt: Option<f64>,
-    pub lfe_mix_level: Option<f64>,
-}
-
-impl DownmixInfo {
-    /// The stereo downmix FFmpeg's resampler applies: the Lt/Rt levels and surround
-    /// encoding when the stream prefers an Lt/Rt (or Pro Logic II) downmix, else the
-    /// Lo/Ro levels; absent levels keep the defaults.
-    pub fn levels(&self) -> DownmixLevels {
-        let default = DownmixLevels::default();
-        let (center, surround, encoding) = match self.preferred_downmix_type {
-            Some(DownmixType::LtRt) => (
-                self.center_mix_level_ltrt,
-                self.surround_mix_level_ltrt,
-                SurroundEncoding::Dolby,
-            ),
-            Some(DownmixType::DplII) => (
-                self.center_mix_level_ltrt,
-                self.surround_mix_level_ltrt,
-                SurroundEncoding::ProLogicII,
-            ),
-            _ => (
-                self.center_mix_level,
-                self.surround_mix_level,
-                SurroundEncoding::None,
-            ),
-        };
-        DownmixLevels {
-            center: center.map_or(default.center, |v| v as f32),
-            surround: surround.map_or(default.surround, |v| v as f32),
-            lfe: self.lfe_mix_level.map_or(default.lfe, |v| v as f32),
-            encoding,
-        }
-    }
-}
-
-/// Annex D Tables D2.3-D2.6 gains for the 3-bit mix level codes (+3 dB .. -6 dB, -inf),
-/// i.e. powers of 2^(1/4); FFmpeg 9.0.2 also uses this table for the reserved
-/// surround codes 0..2.
-const MIX_GAINS: [f64; 8] = [
-    core::f64::consts::SQRT_2,
-    1.189_207_115_002_721,
-    1.0,
-    0.840_896_415_253_714_5,
-    core::f64::consts::FRAC_1_SQRT_2,
-    0.594_603_557_501_360_5,
-    0.5,
-    0.0,
-];
-
-/// Derive FFmpeg-compatible downmix info from one syncframe's header fields
-/// (black-box verified).
-fn downmix_info(eac3: bool, acmod: u8, c: &DownmixCodes) -> Option<DownmixInfo> {
-    if acmod <= 2 {
-        return None;
-    }
-    let g = |code: u8| MIX_GAINS[(code & 7) as usize];
-    if !eac3 {
-        // Tables 5.9 / 5.10 (reserved codes as the intermediate -4.5 / -6 dB values);
-        // absent fields default to -4.5 dB / -6 dB. Lt/Rt levels are not carried by the
-        // main-body syntax (FFmpeg ignores the Annex D xbsi1 fields) and report -3 dB.
-        let clev = match c.cmixlev {
-            Some(0) => g(4),
-            Some(2) => g(6),
-            _ => g(5),
-        };
-        let slev = match c.surmixlev {
-            Some(0) => g(4),
-            Some(2) => g(7),
-            _ => g(6),
-        };
-        return Some(DownmixInfo {
-            preferred_downmix_type: Some(DownmixType::Unknown),
-            center_mix_level: Some(clev),
-            center_mix_level_ltrt: Some(g(4)),
-            surround_mix_level: Some(slev),
-            surround_mix_level_ltrt: Some(g(4)),
-            lfe_mix_level: Some(0.0),
-        });
-    }
-    let pref = match c.dmixmod {
-        Some(1) => DownmixType::LtRt,
-        Some(2) => DownmixType::LoRo,
-        Some(3) => DownmixType::DplII,
-        _ => DownmixType::Unknown,
-    };
-    Some(DownmixInfo {
-        preferred_downmix_type: Some(pref),
-        center_mix_level: Some(g(c.lorocmixlev.unwrap_or(5))),
-        center_mix_level_ltrt: Some(g(c.ltrtcmixlev.unwrap_or(0))),
-        surround_mix_level: Some(g(c.lorosurmixlev.unwrap_or(6))),
-        surround_mix_level_ltrt: Some(g(c.ltrtsurmixlev.unwrap_or(0))),
-        // Annex E 2.3.1.11: LFE mix level (dB) = 10 - lfemixlevcod; absent = disabled.
-        lfe_mix_level: Some(match c.lfemixlevcod {
-            Some(code) => 10f64.powf((10.0 - code as f64) / 20.0),
-            None => 0.0,
-        }),
-    })
 }
 
 struct SyncframeRef {
@@ -764,52 +649,6 @@ impl AudioDecoder for Decoder {
     }
     fn reset(&mut self) {
         Decoder::reset(self);
-    }
-}
-
-/// Returns (crc1 ok, crc2 ok). E-AC-3 has a single CRC; it is reported in both.
-fn check_crc(frame: &[u8], h: &FrameHeader) -> (bool, bool) {
-    let words = frame.len() / 2;
-    match h.syntax {
-        Syntax::Ac3 => {
-            let five8 = (words >> 1) + (words >> 3);
-            let c1 = crc16(0, &frame[2..five8 * 2]) == 0;
-            let c2 = crc16(0, &frame[2..]) == 0;
-            (c1, c2)
-        }
-        Syntax::Eac3 => {
-            let c = crc16(0, &frame[2..]) == 0;
-            (c, c)
-        }
-    }
-}
-
-/// Read the custom channel map of an E-AC-3 dependent substream (Annex E Table E1.2).
-fn peek_chanmap(frame: &[u8]) -> Option<u16> {
-    let mut b = [0u8; 24];
-    let n = frame.len().min(16);
-    b[..n].copy_from_slice(&frame[..n]);
-    let mut r = BitReader::at(&b, 16);
-    let strmtyp = r.read(2);
-    r.skip(3 + 11);
-    let fscod = r.read(2);
-    r.skip(2); // fscod2 or numblkscod
-    let _ = fscod;
-    let acmod = r.read(3);
-    r.skip(1 + 5 + 5); // lfeon, bsid, dialnorm
-    if r.bit() {
-        r.skip(8);
-    }
-    if acmod == 0 {
-        r.skip(5);
-        if r.bit() {
-            r.skip(8);
-        }
-    }
-    if strmtyp == 1 && r.bit() {
-        Some(r.read(16) as u16)
-    } else {
-        None
     }
 }
 

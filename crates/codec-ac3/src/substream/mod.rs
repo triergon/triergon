@@ -102,33 +102,56 @@ impl Trace {
 /// E-AC-3: the mixmdate fields of Annex E Table E1.2 (code tables of Annex D).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct DownmixCodes {
+    /// AC-3 center mix level code (Table 5.9).
     pub cmixlev: Option<u8>,
+    /// AC-3 surround mix level code (Table 5.10).
     pub surmixlev: Option<u8>,
+    /// Preferred stereo downmix mode (Table D2.2).
     pub dmixmod: Option<u8>,
+    /// Lt/Rt center mix level code (Table D2.3).
     pub ltrtcmixlev: Option<u8>,
+    /// Lt/Rt surround mix level code (Table D2.4).
     pub ltrtsurmixlev: Option<u8>,
+    /// Lo/Ro center mix level code (Table D2.5).
     pub lorocmixlev: Option<u8>,
+    /// Lo/Ro surround mix level code (Table D2.6).
     pub lorosurmixlev: Option<u8>,
+    /// E-AC-3 LFE mix level code (Annex E 2.3.1.11: 10 - code dB).
     pub lfemixlevcod: Option<u8>,
 }
 
 /// Coding tools used by a syncframe (diagnostics).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FrameFeatures {
+    /// Channel coupling.
     pub coupling: bool,
+    /// Coupling phase flags.
     pub phase_flags: bool,
+    /// Rematrixing with a set flag.
     pub rematrix: bool,
+    /// Block switching to the short transform.
     pub block_switch: bool,
+    /// Dither for zero-bit mantissas.
     pub dither: bool,
+    /// Delta bit allocation.
     pub delta_ba: bool,
+    /// A dynamic range word.
     pub dynrng: bool,
+    /// E-AC-3 spectral extension.
     pub spx: bool,
+    /// E-AC-3 spectral extension attenuation.
     pub spx_atten: bool,
+    /// E-AC-3 adaptive hybrid transform.
     pub aht: bool,
+    /// E-AC-3 gain-adaptive quantization.
     pub gaq: bool,
+    /// E-AC-3 transient pre-noise processing data (parsed, not applied).
     pub tpnp: bool,
+    /// E-AC-3 frame exponent strategy.
     pub frame_expstr: bool,
+    /// Skip fields.
     pub skip_fields: bool,
+    /// E-AC-3 enhanced coupling (refused).
     pub ecpl: bool,
     /// Some audio block read past the end of the syncframe (corrupt or patched data).
     pub overrun: bool,
