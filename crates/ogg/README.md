@@ -118,11 +118,8 @@ where FFmpeg:
 - prints a negative last duration modulo 2^32. For example, when the final
   granule is 26,496 and FFmpeg places the last packet at 26,624, it reports
   duration 4,294,967,168 and discard padding 1,152 for a 1,024-sample packet.
-  The compatibility duration is -128; it is a signed clock result, not a
-  playback duration. The native clock keeps coded durations and distributes
-  the end trim across packets;
-- times the first packet after a page that fails its CRC from its own page
-  (`compat::clock` times it from the stream start);
+  The compatibility view keeps the signed duration of -128. The native clock
+  keeps coded durations and distributes the end trim across packets;
 - times the Vorbis packets of leading pages stating granule position 0 from the next
   page's;
 - reads a chained link that reuses the previous link's serial number as the same stream,

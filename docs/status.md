@@ -117,6 +117,9 @@ packets retain all 26,592 payload bytes through physical EOF. The combined
 case matches the pinned reference. All 36 cases meet the runtime and memory
 requirements with 30 pairs on Linux AArch64 and 32-bit ARMv7.
 
+`crc_bad.opus` matches the pinned compatibility packet fold locally after
+recovering the first surviving page clock. Native remeasurement remains open.
+
 The final Vorbis link of `b_vorbis.ogg` and `chain_vorbis.ogg` is the same
 44,100 Hz stream: its EOS page granule is 26,496. FFmpeg places its last packet
 at 26,624 in link-local ticks (81,088 in the chain), with a coded duration of
@@ -125,10 +128,9 @@ samples, while the native clock treats it as priming and starts the last packet
 at 25,600, with 128 samples of end trim. The compatibility calculation yields
 -128, printed by `ffprobe` as 4,294,967,168. `compat::clock` retains the signed
 result; the native reader keeps coded durations and applies end trims across
-packets. The wrapped value is
-not a valid amount of audio to play. The final granule denotes the end sample
-position and trailing decoded samples are discarded, as specified by the
-[Vorbis I mapping](https://xiph.org/vorbis/doc/Vorbis_I_spec.html).
+packets. The final granule denotes the end sample position. The
+[Vorbis I mapping](https://xiph.org/vorbis/doc/Vorbis_I_spec.html) describes
+discarding any trailing samples.
 
 ## Subtitle text comparisons
 
