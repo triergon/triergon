@@ -58,7 +58,7 @@ fn declared_refusals(lane: &str) -> &'static [&'static str] {
 fn disposition(key: &str) -> Option<&'static str> {
     Some(match key {
         "aac-sce-in-stereo.adts" => {
-            "FFmpeg leaves the FR plane of SCE-only frames unwritten (stale pooled buffer); ours is silent there (harness/codecs/aac/STATUS.md)"
+            "FFmpeg leaves the FR plane of SCE-only frames unwritten (stale pooled buffer); ours is silent there (harness/codecs/STATUS.md)"
         }
         "ps-open-noext-after-error.adts" => {
             "a Parametric Stereo header without the extension after an error frame while IPD/OPD was on; FFmpeg's output equals IPD/OPD indices 0 there (harness/codecs/aac/ps/README.md)"
