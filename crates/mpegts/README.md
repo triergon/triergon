@@ -174,8 +174,8 @@ Unordered times or exhausted index bounds fall back to scanning. Explicit epoch
 indexes replay from the start to reconstruct state. Timestamp-only requests never
 reuse an explicit-epoch index. Sources must remain stable between requests.
 Reader tests cover indexed epoch selection across TS188/M2TS192 entity plans,
-codec changes and exact packet suffix facts; these combinations have no matched
-reference or native runtime and memory qualification.
+codec changes and exact packet suffix facts. Codec-changing entity plans have no
+matched reference or native runtime and memory qualification.
 
 The epoch distinction follows [H.222.0 (08/2023)](https://www.itu.int/rec/T-REC-H.222.0-202308-S/en)
 §2.4.3.5 (a signalled PCR discontinuity starts a new system time base) and
@@ -191,6 +191,16 @@ stable input through EOF and replay every suffix packet, comparing the requested
 landing and discard times, PTS, effective DTS, random-access flags and all bytes.
 The candidate selects the source epoch pair; the reference selects landing
 candidates by its public packet positions over the authored physical boundary.
+One additional TS188 playback-preroll comparison changes AVC to HEVC on the same
+PID with PMT version 1 at source configuration epoch 3. Its original carriers are
+reproduced by `codec_changing_epoch_matches_the_original_carrier_suffix` in
+`tests/container_reader/seek_epochs.rs`. At target 112,000 it lands at 90,000,
+retains the in-band VPS/SPS/PPS and delivers all twelve HEVC pictures (15,780
+bytes) through physical EOF. The unchanged public-API reference and reader match
+digest 14845001645097894709, including reordered PTS and encoded DTS. Local
+functional comparison passes all 48 picture cases with every older pin unchanged.
+Codec-changing M2TS, other seek policies, indexed/entity plans and suffixes with a
+further codec change remain outside this matched case.
 After building the workers, run:
 
 ```sh
