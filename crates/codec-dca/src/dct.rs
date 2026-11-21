@@ -45,23 +45,19 @@ impl Dct4 {
         }
     }
 
-    /// Transform `x`, handing each output pair `(k, y[k], y[N-1-k])` for even `k` to
-    /// `emit`.
+    /// Transform `x` (N = 2 M, the size the transform was built for), handing each
+    /// output pair `(k, y[k], y[N-1-k])` for even `k` to `emit`.
     #[inline]
-    pub(crate) fn transform_pairs(&self, x: &[f32], emit: impl FnMut(usize, f32, f32)) {
-        match self.n {
-            32 => self.transform_n::<32, 16>(x, emit),
-            64 => self.transform_n::<64, 32>(x, emit),
-            _ => unreachable!("DCT-IV size"),
-        }
-    }
-
-    #[inline]
-    fn transform_n<const N: usize, const M: usize>(
+    #[expect(
+        clippy::expect_used,
+        reason = "N- and M-entry ranges convert to arrays"
+    )]
+    pub(crate) fn transform<const N: usize, const M: usize>(
         &self,
         x: &[f32],
         mut emit: impl FnMut(usize, f32, f32),
     ) {
+        debug_assert_eq!((self.n, 2 * M), (N, N));
         let x: &[f32; N] = x[..N].try_into().expect("DCT length");
         let pre: &[(f32, f32); M] = self.pre[..M].try_into().expect("twiddles");
         let post: &[(f32, f32); M] = self.post[..M].try_into().expect("twiddles");
@@ -116,10 +112,15 @@ mod tests {
                 .map(|i| ((i * 7919 % 97) as f32 - 48.0) / 17.0)
                 .collect();
             let src = x.clone();
-            d.transform_pairs(&src, |k, a, b| {
+            let emit = |k: usize, a, b| {
                 x[k] = a;
                 x[n - 1 - k] = b;
-            });
+            };
+            if n == 32 {
+                d.transform::<32, 16>(&src, emit);
+            } else {
+                d.transform::<64, 32>(&src, emit);
+            }
             for k in 0..n {
                 let mut acc = 0f64;
                 for (i, &v) in src.iter().enumerate() {

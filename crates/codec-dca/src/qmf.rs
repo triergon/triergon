@@ -85,6 +85,10 @@ impl<const TAPS: usize> Qmf<TAPS> {
     }
 
     #[inline]
+    #[expect(
+        clippy::expect_used,
+        reason = "N- and HALF-float ranges convert to arrays"
+    )]
     fn synth_n<const N: usize, const HALF: usize, const LEN: usize>(
         &self,
         st: &mut QmfState<LEN>,
@@ -100,7 +104,7 @@ impl<const TAPS: usize> Qmf<TAPS> {
         let w: &mut [f32; HALF] = w.try_into().expect("slot");
         // V = DCT-IV(X), the 0.25 factor of C.3.6 folded into the prototype;
         // U[i] = V[i] - V[N-1-i] and W[i] = -(V[i] + V[N-1-i]) for i < N/2.
-        self.dct.transform_pairs(input, |k, a, b| {
+        self.dct.transform::<N, HALF>(input, |k, a, b| {
             if k < HALF {
                 u[k] = a - b;
                 w[k] = -(a + b);
