@@ -553,7 +553,6 @@ impl Reader {
             mapping,
             tag,
             config,
-            0,
         );
         track.header_error = error;
         self.tracks.try_push(track).map_err(|e| e.error)?;

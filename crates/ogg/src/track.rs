@@ -40,7 +40,6 @@ impl Track {
         mapping: Mapping,
         tag: &[u8],
         config: Configuration,
-        offset: i64,
     ) -> Track {
         let mut bytes = [0; 8];
         let tag_len = tag.len().min(8);
@@ -55,7 +54,7 @@ impl Track {
             tag_len: tag_len as u8,
             time_base: config.time_base(),
             config,
-            offset,
+            offset: 0,
             configured: false,
             header_error: None,
             end: None,
