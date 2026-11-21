@@ -1,5 +1,14 @@
-//! Complex FFT, DCT-IV and (I)MDCT built on it. Own derivation (see unit tests that compare
-//! against the direct O(N^2) definitions).
+//! Complex FFT, DCT-IV and (I)MDCT built on it, for the filterbank, LTP and the SBR QMF
+//! banks. The unit tests compare each transform with its direct O(N^2) definition.
+//!
+//! The DCT-IV differs from the one of `triergon_codec::mdct`: it pre-twiddles by
+//! exp(-i pi (n + 1/4) / m) with the scale folded in and post-twiddles by exp(-i pi k / m)
+//! around a power-of-two radix-4 FFT, where the shared transform pre-twiddles by
+//! exp(-i pi (j + 1/8) / K) and scales after a mixed-radix FFT. The two round differently
+//! (about four in five outputs differ in their last bits at every size the decoder uses),
+//! and the decoder's output is compared exactly, so the decoder keeps its own. It also
+//! returns the even and odd outputs apart for the QMF banks ([`Dct4::run_split`]), has the
+//! forward MDCT that LTP needs, and has vector forms of its passes with the `simd` feature.
 
 #[cfg(any(test, not(feature = "simd")))]
 mod scalar;

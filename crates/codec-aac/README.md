@@ -60,6 +60,7 @@ caller's reserved PCM planes and reuses them on the next access unit.
 | Feature | Default | Effect |
 |---|---|---|
 | `simd` | off | `std::simd` forms of the DCT-IV passes after the input gather (pre-twiddle, radix-4 stages, post-twiddle and the last radix-2 stage fused with it, four points at a time), which serve the SBR QMF banks and the IMDCT; of the SBR QMF analysis and synthesis windowing and shuffles; of the covariance sums of HF generation (four source bands at a time); and of the Parametric Stereo hybrid filters (four slots at a time). Requires a nightly toolchain (`portable_simd`); `cargo xtask check-simd` uses the pinned one. |
+| `inspect` | off | Development aids for the research examples: per-block parse statistics (`Decoder::enable_stats`, `Decoder::stats`), the bit ranges of the SBR fill elements (`Decoder::sbr_fill_ranges`) and the QMF slots Parametric Stereo receives (`Decoder::ps_input`). |
 
 Without `simd` the crate builds on stable and uses the scalar code. Each vector lane
 performs the scalar code's operations in the same order, so output is identical where the
