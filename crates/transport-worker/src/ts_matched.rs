@@ -418,4 +418,131 @@ mod tests {
         }
         assert!(parse(Kind::AudioSeek, &["epoch=1:2", "epoch-start=564"]).is_err());
     }
+
+    #[test]
+    fn repeated_audio_fixtures_read_only_the_physical_suffix() {
+        for (name, header, length, step, first, repeated) in [
+            (
+                "mpeg1-layer1-physical-repeated-preroll",
+                [0xff, 0xff, 0x14, 0xc0],
+                32,
+                720,
+                7,
+                1,
+            ),
+            (
+                "mpeg1-layer2-physical-repeated-preroll",
+                [0xff, 0xfd, 0x14, 0xc0],
+                96,
+                2160,
+                1,
+                7,
+            ),
+        ] {
+            let pool = Budget::new(2 << 20).unwrap();
+            let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
+                "../../harness/features/mpegts-previous-audio/inputs/{name}.ts"
+            ));
+            let input = ts_input::parse(&pool, &path, &["188".into(), "7".into()]).unwrap();
+            let mut caps = ts_input::capabilities(&input.input);
+            caps.random_access = true;
+            let track = TrackId(256);
+            let mut reader = Reader::new_with_packet_tracks(
+                &pool,
+                FIRST_SOURCE,
+                caps,
+                ReaderLimits {
+                    format: input.format,
+                    program: Some(input.program),
+                    descriptor_namespace: input.namespace,
+                    ..ReaderLimits::default()
+                },
+                32 * 1024,
+                &[track],
+            )
+            .unwrap();
+            let mut request = SeekRequest {
+                track,
+                target: Time::new(90_001 + first * step, 90_000).unwrap(),
+                policy: SeekPolicy::PlaybackPreroll,
+            };
+            reader.request_seek_and_index(request, 4096).unwrap();
+            drain(
+                &mut reader,
+                &input,
+                track,
+                Kind::AudioSeek,
+                None,
+                false,
+                &mut Totals::default(),
+            )
+            .unwrap();
+
+            request.target = Time::new(90_001 + repeated * step, 90_000).unwrap();
+            let floor = (17 + 3 * repeated as u64) * 188;
+            let start = reader.request_seek(request).unwrap();
+            assert_eq!(start.offset, floor, "{name}: physical PAT offset");
+            let mut next = floor;
+            let mut landed = false;
+            let mut index = repeated;
+            let mut frame = vec![0; length];
+            frame[..4].copy_from_slice(&header);
+            let cancel = AtomicBool::new(false);
+            loop {
+                match reader.step(&mut WorkBudget::new(43), &cancel).unwrap() {
+                    Step::NeedInput(read) => {
+                        assert_eq!(read.source, FIRST_SOURCE);
+                        assert!(read.offset >= floor, "{name}: read discarded prefix");
+                        assert_eq!(read.offset, next, "{name}: contiguous suffix reads");
+                        let offset = read.offset as usize;
+                        if offset == input.input.len() {
+                            reader.finish(read.source, read.token).unwrap();
+                        } else {
+                            let end = input.input.len().min(offset + read.maximum.min(7));
+                            reader
+                                .provide(
+                                    &InputWindow::new(
+                                        read.source,
+                                        read.token,
+                                        read.offset,
+                                        input.input.slice(offset..end).unwrap(),
+                                    )
+                                    .unwrap(),
+                                )
+                                .unwrap();
+                            next = end as u64;
+                        }
+                    }
+                    Step::Ready(Event::Seek(result)) => {
+                        assert!(!landed);
+                        assert_eq!(result.method, SeekMethod::Index);
+                        assert_eq!(result.scanned_bytes, 0);
+                        assert!(!result.replays_from_start);
+                        assert_eq!(result.requested, request.target);
+                        assert_eq!(result.discard_until, request.target);
+                        assert_eq!(
+                            result.landing,
+                            Time::new(90_000 + repeated * step, 90_000).unwrap()
+                        );
+                        landed = true;
+                    }
+                    Step::Ready(Event::Packet(packet)) => {
+                        assert!(landed);
+                        let pts = (90_000 + index * step) as i64;
+                        assert_eq!(packet.track(), track);
+                        assert_eq!(packet.pts(), Some(pts));
+                        assert_eq!(packet.dts(), (index % 2 != 0).then_some(pts));
+                        assert_eq!(packet.payload(), frame);
+                        index += 1;
+                    }
+                    Step::Ready(Event::Other(_)) | Step::Yield => (),
+                    Step::End(_) => break,
+                    Step::Backpressure(pressure) => panic!("{pressure:?}"),
+                }
+            }
+            assert!(landed);
+            assert_eq!(index, 10, "{name}: every frame through EOF");
+            assert_eq!(next, input.input.len() as u64);
+        }
+    }
 }

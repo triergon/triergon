@@ -46,6 +46,29 @@ impl<const HEADER_BYTES: usize, Header: Copy> Reader<HEADER_BYTES, Header> {
         &mut self.input
     }
 
+    /// Restore the private elementary view before supplying any frame bytes.
+    pub(super) fn resume_at(&mut self, offset: u64, window: usize) -> Result<()> {
+        if self.input.position() != 0
+            || self.used != 0
+            || self.frame.is_some()
+            || !self.buffer.is_empty()
+        {
+            return Err(Error::SourceMismatch);
+        }
+        let mut input = InputCursor::new(
+            self.buffer.budget(),
+            self.input.source(),
+            SourceCapabilities {
+                length: None,
+                random_access: true,
+            },
+            window,
+        )?;
+        input.request_range(offset)?;
+        self.input = input;
+        Ok(())
+    }
+
     pub(super) fn maximum(&self) -> usize {
         self.maximum
     }

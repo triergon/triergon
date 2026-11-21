@@ -15,7 +15,8 @@
     "Repeated cases start from a fresh reader, build an index during the first seek, deliver both packet suffixes through EOF, and require an indexed second seek. The reference scans and replays independently for each target.",
     "Split cases seek across two consecutive entities cut at a carrier boundary inside a PES. The reference sees the same preloaded bytes as one logical stream and folds the same landing and complete suffix.",
     "Layer III landing requires a zero main_data_begin back-pointer. Both workers preserve the later dependent frames in the suffix, with their original timing and bytes.",
-    "A repeated-seek case also splits the transport source inside a PES. Both seeks use the same ordered, contiguous parts."
+    "A repeated-seek case also splits the transport source inside a PES. Both seeks use the same ordered, contiguous parts.",
+    "MPEG-1 Layer I and II physical-offset controls place identical CRC-checked PAT and PMT sections immediately before each timestamped single-carrier PES. After indexing, the early backward Layer I and late forward Layer II repeats read only their physical suffix, preserving every payload and source clock. The reference independently scans and replays both complete suffixes through the same public demuxer API."
   ],
   "required_profiles": [
     "adts-aac-lc-previous",
@@ -38,7 +39,9 @@
     "mpeg2-layer3-reservoir",
     "latm-in-band-preroll",
     "latm-next-configuration",
-    "adts-aac-lc-split-repeated-preroll"
+    "adts-aac-lc-split-repeated-preroll",
+    "mpeg1-layer1-physical-repeated-preroll",
+    "mpeg1-layer2-physical-repeated-preroll"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",

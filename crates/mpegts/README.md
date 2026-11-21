@@ -201,15 +201,46 @@ PES and access units. The ordinary single-entity method requires a single source
 
 Call `Reader::request_seek_and_index` to collect a bounded timestamp index
 during the first scan. Later seeks to the same track can use the index to select
-a landing with no separate scan. The index stores only landing points. Replay
-reads the entity prefix to reconstruct transport state and packet provenance,
-then streams the selected suffix. The index preserves the last
+a landing with no separate scan. The index preserves the last
 packet on tied timestamps. It falls back to scanning when anchors are out of
 order or the entry or storage limit is reached. The source must remain stable.
 Reset, close and continuation outside a seek plan discard the index.
 `Reader::request_seek_in_entities_and_index` builds the same bounded index over
 a contiguous entity plan. A later seek with exactly the same IDs, lengths and
 order can reuse it for the same selected track.
+
+For one clear TS188 entity containing a single MPEG-1/2 Layer I or II audio
+stream, the index can also retain physical restart checkpoints. Each PES must
+contain exactly one complete frame with an indexed bitrate, including its
+header and payload in one carrier. The source must have one current PAT section,
+one unchanged PMT and ordinary continuity without duplicates, discontinuities
+or transport, configuration or clock faults.
+Only PAT, its PMT, the audio PID and null carriers are admitted. The PCR PID must
+be the audio PID or absent. A checkpoint requires consecutive, complete PAT and
+PMT carriers immediately before a timestamped frame's PES carrier.
+
+The first scan validates the whole entity. Each checkpoint binds the original
+source ID and length, three complete carrier records, independently parsed PES
+header and payload ranges, the original active tables, the elementary byte
+coordinate and the preceding frame count. At most `maximum_entries` checkpoints
+are allocated under the shared budget. Later requests start at the recorded
+PAT's physical offset and read no earlier bytes. The reader compares all three
+carriers byte for byte before delivering the landing, reconstructs transport
+state from those in-band tables, and restores the original elementary/PES
+coordinates, source clocks, table provenance and output count. Layer I/II frame
+headers supply the audio configuration; the caller resets its decoder at the
+independent frame. Changed checkpoint bytes are a source mismatch.
+This bootstrap follows H.222.0 §§2.4.3.3, 2.4.3.6–7 and 2.4.4.
+
+Other landings replay the entity prefix to reconstruct transport and decoder
+framing state. This includes offsets without a local table/PES proof,
+multi-carrier PES, free-format or Layer III audio, video, M2TS and contiguous
+entity plans. Checkpoint storage refusal preserves replay; pressure during a
+direct restart drops the optional index and restarts replay. Sources must remain
+stable between requests: the bounded byte comparison does not revalidate an
+unread prefix or hash the whole entity. `InputRequest::offset` identifies the
+actual physical read; `SeekMethod::Index` and `replays_from_start` alone do not
+establish direct source access.
 
 Use `Reader::new_with_packet_tracks` when the caller has already chosen the
 elementary PIDs. Only those PIDs allocate access-unit framers and produce

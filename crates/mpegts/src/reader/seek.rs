@@ -1,4 +1,5 @@
 //! Bounded source seeks in the exact presentation clock.
+mod physical;
 mod retained;
 
 use super::{AccessUnit, MpegAudioFrame, Packet, PacketTracks, Reader, ReaderEvent, Shared};
@@ -115,6 +116,7 @@ struct Scan {
 pub(super) struct SeekIndex {
     track: TrackId,
     points: BudgetVec<Landing>,
+    physical: Option<Shared<physical::Index>>,
 }
 
 impl SeekIndex {
@@ -130,9 +132,28 @@ impl SeekIndex {
 struct IndexBuilder {
     points: BudgetVec<Landing>,
     maximum: usize,
+    physical: Option<Charged<Box<physical::Capture>>>,
 }
 
 impl IndexBuilder {
+    fn packet(&mut self, packet: &Packet) {
+        if let Some(capture) = &mut self.physical {
+            capture.packet(packet);
+            if !capture.usable() {
+                self.physical = None;
+            }
+        }
+    }
+
+    fn other(&mut self, event: &ReaderEvent) {
+        if let Some(capture) = &mut self.physical {
+            capture.other(event);
+            if !capture.usable() {
+                self.physical = None;
+            }
+        }
+    }
+
     fn record(&mut self, point: Landing) -> bool {
         if let Some(last) = self.points.as_mut_slice().last_mut() {
             match point.time.cmp(&last.time) {
@@ -165,6 +186,7 @@ pub(super) struct Seeking {
     phase: Phase,
     retain: Option<Retain>,
     full_scan: bool,
+    direct: Option<physical::Direct>,
 }
 
 #[derive(Clone, Copy)]
@@ -349,6 +371,9 @@ impl Scan {
             SeekIndex {
                 track,
                 points: index.points,
+                physical: index
+                    .physical
+                    .and_then(|capture| physical::Capture::finish(capture, pool)),
             },
             charge,
         ))
@@ -464,7 +489,8 @@ impl Reader {
     /// The caller supplies any decoder configuration needed at the landing.
     /// Requests from a previously continued entity or with unresolved clock
     /// epochs are refused. A completed index for the same track skips the
-    /// landing scan while replay still reconstructs transport state.
+    /// landing scan. Verified in-band Layer I/II checkpoints can also skip
+    /// prefix reads; other indexed landings reconstruct state by replay.
     #[cold]
     pub fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
         self.begin_seek(request, None, None, None)
@@ -625,7 +651,7 @@ impl Reader {
                     }
             })
             .cloned();
-        let (phase, retain) = if let Some(index) = &index {
+        let (mut phase, retain) = if let Some(index) = &index {
             (
                 Phase::Replay {
                     landing: index.previous(request.target)?,
@@ -650,21 +676,42 @@ impl Reader {
                     index: index_entries.map(|maximum| IndexBuilder {
                         points: BudgetVec::new(&self.pool),
                         maximum,
+                        physical: (entities.is_none()
+                            && self.limits.format == crate::PacketFormat::Ts188)
+                            .then(|| {
+                                physical::Capture::new(&self.pool, self.source, length, maximum)
+                                    .ok()
+                            })
+                            .flatten(),
                     }),
                     ..Scan::default()
                 }),
                 retain,
             )
         };
+        let direct = match (&phase, &index) {
+            (Phase::Replay { landing, .. }, Some(index)) => {
+                physical::Direct::new(index.physical.as_ref(), *landing, self.source, self.caps)
+            }
+            _ => None,
+        };
+        if direct.is_some()
+            && let Phase::Replay {
+                landing, skipped, ..
+            } = &mut phase
+        {
+            *skipped = landing.offset != 0;
+        }
         seek.try_push(Seeking {
             request,
             selected_epochs,
             phase,
             full_scan: retain.is_some(),
             retain,
+            direct,
         })
         .map_err(|rejected| rejected.error)?;
-        let input = if let Some(plan) = &entities {
+        let mut input = if let Some(plan) = &entities {
             let (source, caps) = plan.first();
             let mut next = Self::new(&self.pool, source, caps, self.limits, self.window)?;
             let input = next.request()?;
@@ -677,6 +724,13 @@ impl Reader {
         self.seek_entities = entities;
         self.seek_index = index;
         self.seek = seek;
+        if let Some(direct) = &self.seek.as_slice()[0].direct {
+            input = self
+                .input
+                .as_mut()
+                .expect("seek input")
+                .request_range(direct.offset())?;
+        }
         Ok(input)
     }
 
@@ -714,7 +768,9 @@ impl Reader {
                 self.seek = BudgetVec::new(&self.pool);
                 return Ok(Step::Ready(Event::Packet(packet)));
             }
-            let step = if seek.retain.is_some() {
+            let capturing = matches!(&seek.phase, Phase::Scan(scan)
+                if scan.index.as_ref().is_some_and(|index| index.physical.is_some()));
+            let step = if seek.retain.is_some() || capturing || seek.direct.is_some() {
                 self.advance::<false, false>(work, cancel, |_| ())
             } else {
                 self.advance::<true, true>(work, cancel, |_| ())
@@ -724,6 +780,18 @@ impl Reader {
                 step,
                 Ok(Step::Backpressure(_)) | Err(Error::Backpressure { .. })
             ) {
+                if seek.direct.is_some() {
+                    // The checkpoint is optional storage. If it prevents the
+                    // restart from progressing, release it and replay normally.
+                    let mut seeking = std::mem::replace(&mut self.seek, BudgetVec::new(&self.pool));
+                    seeking.as_mut_slice()[0].direct = None;
+                    if let Phase::Replay { skipped, .. } = &mut seeking.as_mut_slice()[0].phase {
+                        *skipped = false;
+                    }
+                    let input = self.reset()?;
+                    self.seek = seeking;
+                    return Ok(Step::NeedInput(input));
+                }
                 let dropped_index = if let Phase::Scan(scan) = &mut seek.phase {
                     scan.index.take().is_some()
                 } else {
@@ -734,7 +802,13 @@ impl Reader {
                     continue;
                 }
             }
-            let step = step?;
+            let mut step = step?;
+            if let Some(mut direct) = self.seek.as_mut_slice()[0].direct.take() {
+                let result = direct.observe(self, &mut step);
+                self.seek.as_mut_slice()[0].direct = Some(direct);
+                result?;
+            }
+            let seek = &mut self.seek.as_mut_slice()[0];
             match (&mut seek.phase, step) {
                 (Phase::Scan(scan), Step::Ready(Event::Packet(packet))) => {
                     if packet.track() == request.track
@@ -742,6 +816,9 @@ impl Reader {
                             .selected_epochs
                             .is_none_or(|epochs| epochs == packet.epochs())
                     {
+                        if let Some(index) = &mut scan.index {
+                            index.packet(&packet);
+                        }
                         let better = scan.observe(
                             packet_probe(&packet)?,
                             request.target,
@@ -755,7 +832,10 @@ impl Reader {
                         }
                     }
                 }
-                (Phase::Scan(_), Step::Ready(Event::Other(event))) => {
+                (Phase::Scan(scan), Step::Ready(Event::Other(event))) => {
+                    if let Some(index) = &mut scan.index {
+                        index.other(&event);
+                    }
                     if let Some(retain) = &mut seek.retain
                         && !retain.other(event, !self.tracks.is_empty())
                     {
@@ -798,8 +878,19 @@ impl Reader {
                             }
                             replay => replay?,
                         };
-                    let input = replay.request()?;
                     replay.seek_index = scan.finish_index(&self.pool, request.track);
+                    let direct = replay.seek_index.as_ref().and_then(|index| {
+                        physical::Direct::new(index.physical.as_ref(), landing, source, caps)
+                    });
+                    let input = if let Some(direct) = &direct {
+                        replay
+                            .input
+                            .as_mut()
+                            .expect("replay input")
+                            .request_range(direct.offset())?
+                    } else {
+                        replay.request()?
+                    };
                     let scanned = if let Some(mut plan) = self.seek_entities.take() {
                         plan.next = 1;
                         let total = plan.total;
@@ -811,8 +902,9 @@ impl Reader {
                     self.seek.as_mut_slice()[0].phase = Phase::Replay {
                         landing,
                         scanned_bytes: Some(scanned),
-                        skipped: false,
+                        skipped: direct.is_some() && landing.offset != 0,
                     };
+                    self.seek.as_mut_slice()[0].direct = direct;
                     std::mem::swap(&mut replay.packet_tracks, &mut self.packet_tracks);
                     std::mem::swap(&mut replay.seek, &mut self.seek);
                     *self = replay;
@@ -838,9 +930,17 @@ impl Reader {
                     if !probe.random_access || probe.time != Some(landing.time) {
                         return Err(Error::SourceMismatch);
                     }
-                    let receipt = seek_result(request, *landing, *scanned_bytes, *skipped);
+                    if seek
+                        .direct
+                        .as_ref()
+                        .is_some_and(|direct| !direct.verified())
+                    {
+                        return Err(Error::SourceMismatch);
+                    }
+                    let result = seek_result(request, *landing, *scanned_bytes, *skipped);
                     self.seek.as_mut_slice()[0].phase = Phase::Deliver(packet);
-                    return Ok(Step::Ready(Event::Seek(receipt)));
+                    self.seek.as_mut_slice()[0].direct = None;
+                    return Ok(Step::Ready(Event::Seek(result)));
                 }
                 (Phase::Replay { .. }, Step::Ready(Event::Other(event))) => {
                     if matches!(&event, ReaderEvent::Source(source)
@@ -907,6 +1007,7 @@ mod tests {
             SeekIndex {
                 track: TrackId(256),
                 points,
+                physical: None,
             },
             charge,
         ));
