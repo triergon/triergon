@@ -315,6 +315,44 @@
         "bytes": 1152,
         "digest": 10208139847110430602
       }
+    },
+    {
+      "id": "mpeg1-layer3-reservoir",
+      "profile": "mpeg1-layer3-reservoir",
+      "file": "harness/features/mpegts-previous-audio/inputs/mpeg1-layer3-reservoir.ts",
+      "sha256": "2c21b964ddb9bb55e4b9195605745db4a8bbaeb5c82f0c7716443f07095ff0c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "95000",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 288,
+        "digest": 16647268322138030408
+      }
+    },
+    {
+      "id": "mpeg2-layer3-reservoir",
+      "profile": "mpeg2-layer3-reservoir",
+      "file": "harness/features/mpegts-previous-audio/inputs/mpeg2-layer3-reservoir.ts",
+      "sha256": "4e9448ec2f94af65c79d59ed7594bd8f79a1a815878de501d6a19a5f5085a366",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "95000",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 288,
+        "digest": 5744551764839532241
+      }
     }
   ]
 }

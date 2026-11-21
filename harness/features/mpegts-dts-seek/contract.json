@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "mpegts-dts-seek",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "mpegts-previous-audio",
+  "candidate": "transport-worker",
+  "worker_operation": "ts-audio-seek-",
+  "reference": "ffmpeg-ts-dts-seek",
+  "contract": [
+    "Start with a preloaded DVB transport carrying canonical DTS core access units and a target in source 90 kHz ticks.",
+    "Scan for the last core frame with maximal source PTS at or before the target whose history flag is clear. The reference uses the public FFmpeg demuxer with the DTS parser and NOFILLIN, reads HFLAG from the emitted core header, and replays from the selected frame.",
+    "Compare the requested, landing and discard times and every frame of the replay suffix through EOF, including frames that need earlier predictor history."
+  ],
+  "required_profiles": [
+    "dts-core-history-preroll",
+    "dts-core-history-next-entry"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

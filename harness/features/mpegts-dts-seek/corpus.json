@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "dts-core-history-preroll",
+      "profile": "dts-core-history-preroll",
+      "file": "harness/features/mpegts-dts-seek/inputs/dts-core-history.m2ts",
+      "sha256": "5f384d383e2d8ed2ca3889f5cba69e65a5034c23550e8f8e3297e14d72dd8c54",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb",
+        "256",
+        "91500",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1536,
+        "digest": 916763261427856354
+      }
+    },
+    {
+      "id": "dts-core-history-next-entry",
+      "profile": "dts-core-history-next-entry",
+      "file": "harness/features/mpegts-dts-seek/inputs/dts-core-history.m2ts",
+      "sha256": "5f384d383e2d8ed2ca3889f5cba69e65a5034c23550e8f8e3297e14d72dd8c54",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb",
+        "256",
+        "91920",
+        "previous"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 512,
+        "digest": 2160586393382981753
+      }
+    }
+  ]
+}

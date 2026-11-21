@@ -556,27 +556,49 @@ fn a_full_or_nonmonotonic_index_falls_back_to_a_scan() {
 }
 
 #[test]
-fn layer_three_seek_requires_reservoir_preroll() {
-    let mut frame = [0; 96];
-    frame[..4].copy_from_slice(&[0xff, 0xfb, 0x14, 0xc0]);
-    let mut ts = Transport::new();
-    ts.tables(&[(0x03, PID, &[])], 0);
-    ts.pes(PID, 0xc0, &frame, Some(90_000), None);
-    let pool = Budget::new(1 << 20).unwrap();
-    let mut reader = reader(&pool, &ts.bytes, PacketFormat::Ts188);
-    reader
-        .request_seek(SeekRequest {
-            track: TrackId(PID.into()),
-            target: clock(90_000),
-            policy: SeekPolicy::PlaybackPreroll,
-        })
-        .unwrap();
-    assert!(matches!(
-        next(&mut reader, &pool, &ts.bytes, 4096, 8192),
-        Err(Error::Unsupported(
-            "MPEG-TS Layer III seek needs bit reservoir preroll"
-        ))
-    ));
+fn layer_three_seek_replays_from_the_previous_empty_reservoir() {
+    for (stream, header, length, low_bit) in [
+        (0x03, [0xff, 0xfa, 0x14, 0xc0], 96, 7),
+        (0x04, [0xff, 0xf3, 0x44, 0xc0], 96, 4),
+    ] {
+        let mut entry = vec![0; length];
+        entry[..4].copy_from_slice(&header);
+        let mut dependent = entry.clone();
+        dependent[low_bit] = if low_bit == 7 { 0x80 } else { 1 };
+
+        let mut ts = Transport::new();
+        ts.tables(&[(stream, PID, &[])], 0);
+        ts.pes(PID, 0xc0, &entry, Some(90_000), None);
+        ts.pes(PID, 0xc0, &dependent, Some(93_000), None);
+        ts.pes(PID, 0xc0, &entry, Some(96_000), None);
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut reader = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+        reader
+            .request_seek(SeekRequest {
+                track: TrackId(PID.into()),
+                target: clock(95_000),
+                policy: SeekPolicy::PlaybackPreroll,
+            })
+            .unwrap();
+        let mut landed = false;
+        let mut output = Vec::new();
+        while let Some(event) = next(&mut reader, &pool, &ts.bytes, 4096, 8192).unwrap() {
+            match event {
+                Event::Seek(result) => {
+                    assert!(!landed);
+                    assert_eq!(result.landing, clock(90_000));
+                    assert_eq!(result.discard_until, clock(95_000));
+                    landed = true;
+                }
+                Event::Packet(packet) => {
+                    assert!(landed);
+                    output.push(packet.payload().to_vec());
+                }
+                Event::Other(_) => (),
+            }
+        }
+        assert_eq!(output, [entry.clone(), dependent, entry]);
+    }
 }
 
 #[test]

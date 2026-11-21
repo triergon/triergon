@@ -87,6 +87,26 @@ static void fold_clock(TsWork *out, int64_t pts, int64_t dts)
     fold(&out->digest, (uint64_t)dts);
 }
 
+#ifdef TRIERGON_REFERENCE_AUDIO_SEEK
+/* Layer III entries need their main data to start in this frame (RFC 5219). */
+static int audio_entry(const TsReader *reader, const AVPacket *packet)
+{
+    enum AVCodecID codec = reader->format->streams[packet->stream_index]->codecpar->codec_id;
+    if (codec == AV_CODEC_ID_DTS)
+        /* TS 102 114 §5.4.2: HFLAG is the last bit of byte 11. */
+        return packet->size >= 11 && !(packet->data[10] & 1);
+    if (codec != AV_CODEC_ID_MP3 || packet->size < 4 || (packet->data[1] & 6) != 2)
+        return 1;
+    const unsigned char *bytes = packet->data;
+    int mpeg1 = ((bytes[1] >> 3) & 3) == 3;
+    int stereo = (bytes[3] >> 6) != 3;
+    int size = mpeg1 ? (stereo ? 32 : 17) : (stereo ? 17 : 9);
+    int offset = (bytes[1] & 1) ? 4 : 6;
+    return packet->size >= offset + size
+        && bytes[offset] == 0 && (!mpeg1 || !(bytes[offset+1] & 0x80));
+}
+#endif
+
 #ifndef TRIERGON_REFERENCE_MPG123
 static int match(TsReader *reader, int64_t target, int preroll, TsWork *out)
 {
@@ -100,7 +120,7 @@ static int match(TsReader *reader, int64_t target, int preroll, TsWork *out)
 #ifdef TRIERGON_REFERENCE_AUDIO_SEEK
         if (p->size <= 0)
             return AVERROR_INVALIDDATA;
-        if (p->pts != AV_NOPTS_VALUE) {
+        if (p->pts != AV_NOPTS_VALUE && audio_entry(reader, p)) {
 #else
         if (p->flags & AV_PKT_FLAG_KEY) {
             if (p->pts == AV_NOPTS_VALUE)
@@ -126,7 +146,7 @@ static int match(TsReader *reader, int64_t target, int preroll, TsWork *out)
             continue;
         const AVPacket *p = reader->packet;
 #ifdef TRIERGON_REFERENCE_AUDIO_SEEK
-        if (ordinal == chosen && p->pts != landing)
+        if (ordinal == chosen && (p->pts != landing || !audio_entry(reader, p)))
             return AVERROR_INVALIDDATA;
 #else
         int key = !!(p->flags & AV_PKT_FLAG_KEY);

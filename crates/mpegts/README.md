@@ -134,8 +134,11 @@ input-window, work, cancellation, backpressure and reset protocol.
 
 `Reader::request_seek` scans one seekable, length-known entity for the previous
 coded AVC or HEVC random-access picture, or a timestamped ADTS AAC-LC, AC-3,
-E-AC-3 or MPEG audio Layer I or II access unit. The landing is the last eligible packet with the greatest presentation
-time at or before the target. Audio frames without a source PTS are delivered
+E-AC-3, MPEG audio or DTS core access unit. Layer III requires an empty bit
+reservoir at the landing. DTS core requires a frame that needs no previous decoder
+history. Subsequent dependent frames are delivered as preroll. The landing is the
+last eligible packet with the greatest presentation time at or before the target.
+Audio frames without a source PTS are delivered
 with their original timing when they follow a landing.
 `ReaderLimits::maximum_seek_scan_bytes` limits the scan to 64 MiB by default.
 Packets retain their original bytes, clocks and source ranges. The reader retains

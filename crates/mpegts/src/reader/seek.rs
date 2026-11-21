@@ -1,7 +1,7 @@
 //! Bounded source seeks in the exact presentation clock.
 mod retained;
 
-use super::{AccessUnit, Packet, PacketTracks, Reader, ReaderEvent, Shared};
+use super::{AccessUnit, MpegAudioFrame, Packet, PacketTracks, Reader, ReaderEvent, Shared};
 use crate::{SourceEpochs, TraceEvent, clock::SourceTimePolicy};
 use retained::{Retain, RetainedOutput};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -13,7 +13,7 @@ use triergon_core::{
     Budget, BudgetVec, Charged, Error, InputRequest, Result, SourceCapabilities, SourceId, Step,
     Time, WorkBudget,
 };
-use triergon_framing::MpegLayer;
+use triergon_framing::{MpegChannelMode, MpegLayer, MpegVersion, probe_dts_core_header};
 
 /// A length-known, seekable part of the original contiguous transport stream.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -171,8 +171,31 @@ pub(super) struct SeekProbe {
 fn seekable_audio(codec: CodecId<'_>) -> bool {
     matches!(
         codec,
-        CodecId::Aac | CodecId::Ac3 | CodecId::Eac3 | CodecId::MpegAudio
+        CodecId::Aac | CodecId::Ac3 | CodecId::Eac3 | CodecId::MpegAudio | CodecId::Dts
     )
+}
+
+// MPEG Layer III side information begins with the reservoir back-pointer
+// (RFC 5219 §3). An entry point can use only bits available from its own frame.
+fn mpeg_audio_entry(frame: &MpegAudioFrame) -> Result<bool> {
+    let header = frame.header();
+    if header.layer != MpegLayer::III {
+        return Ok(true);
+    }
+    let mpeg1 = header.version == MpegVersion::Mpeg1;
+    let stereo = header.channel_mode != MpegChannelMode::Mono;
+    let side_bytes = match (mpeg1, stereo) {
+        (true, true) => 32,
+        (true, false) | (false, true) => 17,
+        (false, false) => 9,
+    };
+    let offset = if header.crc { 6 } else { 4 };
+    let side = frame
+        .bytes()
+        .as_ref()
+        .get(offset..offset + side_bytes)
+        .ok_or(Error::Invalid("MPEG Layer III side information"))?;
+    Ok(side[0] == 0 && (!mpeg1 || side[1] & 0x80 == 0))
 }
 
 fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
@@ -184,14 +207,20 @@ fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
         // E-AC-3 access units begin with the independent syncframe and
         // include its associated dependent substreams (A/52 Annex E §2.3.1).
         AccessUnit::Ac3(frame) => (frame.facts().offset, time.is_some()),
-        AccessUnit::MpegAudio(frame) => {
-            // Layer III needs bit-reservoir state from earlier source frames.
-            if frame.header().layer == MpegLayer::III {
-                return Err(Error::Unsupported(
-                    "MPEG-TS Layer III seek needs bit reservoir preroll",
-                ));
+        AccessUnit::MpegAudio(frame) => (
+            frame.elementary_range().start,
+            time.is_some() && mpeg_audio_entry(frame)?,
+        ),
+        AccessUnit::Dts(frame) => {
+            let header = probe_dts_core_header(frame.bytes().as_ref())?;
+            if header.frame_bytes != frame.bytes().len() {
+                return Err(Error::Unsupported("MPEG-TS DTS-HD seek"));
             }
-            (frame.elementary_range().start, time.is_some())
+            // DTS TS 102 114 §5.4.2, HFLAG signals prior predictor history.
+            (
+                frame.elementary_range().start,
+                time.is_some() && header.history == 0,
+            )
         }
         AccessUnit::AdtsFragment(fragment) => (fragment.source().offset, false),
         _ => {
@@ -335,8 +364,8 @@ impl Reader {
         }
     }
 
-    /// Seek a selected AVC, HEVC, ADTS AAC-LC, AC-3, E-AC-3 or MPEG audio
-    /// Layer I or II track in one length-known, seekable entity. The reader lands on the last coded
+    /// Seek a selected AVC, HEVC, ADTS AAC-LC, AC-3, E-AC-3, MPEG audio or DTS core
+    /// core track in one length-known, seekable entity. The reader lands on the last coded
     /// random-access picture or complete audio frame carrying the greatest
     /// resolved PTS at or before the target. It delivers original transport,
     /// clocks and PES provenance, including untimed frames after the landing.

@@ -524,5 +524,102 @@ pub fn author_audio_seek(root: &Path, args: &[String]) -> R<()> {
             )?);
         }
     }
+    for (name, stream_type, header, side) in [
+        ("mpeg1-layer3-reservoir", 0x03, [0xff, 0xfb, 0x14, 0xc0], 5),
+        ("mpeg2-layer3-reservoir", 0x04, [0xff, 0xf3, 0x44, 0xc0], 4),
+    ] {
+        let codec = Codec {
+            name,
+            stream_type,
+            stream_id: 0xc0,
+            dvb: false,
+            bytes: Vec::new(),
+            first: 96,
+            header: 4,
+        };
+        let entry = silence(header, codec.first);
+        let mut dependent = entry.clone();
+        dependent[side] = if stream_type == 0x03 { 0x80 } else { 1 };
+        let mut ts = Transport::new();
+        ts.tables(&codec, &[])?;
+        ts.pes(codec.stream_id, &part(&entry, Some(90_000), None))?;
+        ts.pes(codec.stream_id, &part(&dependent, Some(93_000), None))?;
+        ts.pes(codec.stream_id, &part(&entry, Some(96_000), None))?;
+        let input = Input {
+            name,
+            m2ts: false,
+            data: ts.finish(false),
+        };
+        cases.push(input.record(
+            root,
+            FEATURE,
+            name,
+            &[pid.as_str(), "95000", "preroll"],
+            Path::new(reference),
+            "ts-audio-seek-fold",
+        )?);
+    }
+    manifest(root, FEATURE, cases)
+}
+
+/// Exercise source PTS anchors around a DTS core frame using prior history.
+pub fn author_dts_seek(root: &Path, args: &[String]) -> R<()> {
+    let [record, reference] = args else {
+        return Err("usage: cargo xtask fixture transport-dts-seek --record REFERENCE".into());
+    };
+    if record != "--record" {
+        return Err("expected --record".into());
+    }
+    const FEATURE: &str = "mpegts-dts-seek";
+    const SOURCE: &str = "harness/fixtures/mpegts/dts-core-mono.dts";
+    const SHA256: &str = "a1db20abc4bce08a504108de2998337f4d906eda3373acdc3abab39fcaaf1330";
+    let bytes = fs::read(root.join(SOURCE)).map_err(|e| format!("{SOURCE}: {e}"))?;
+    if sha256::hex(&bytes) != SHA256 || bytes[4] & 2 != 0 {
+        return Err(format!(
+            "{SOURCE}: expected the checked core without optional header CRC"
+        ));
+    }
+    let name = "dts-core-history";
+    let codec = Codec {
+        name,
+        stream_type: 6,
+        stream_id: 0xbd,
+        dvb: true,
+        bytes: Vec::new(),
+        first: 512,
+        header: 15,
+    };
+    let mut entry = Vec::from(&bytes[..512]);
+    entry[10] &= !1;
+    let mut dependent = entry.clone();
+    dependent[10] |= 1;
+    let mut ts = Transport::new();
+    ts.tables(&codec, &[0x7b, 5, 0xd2, 0x87, 0x83, 0xfe, 0])?;
+    for (i, frame) in [&entry, &dependent, &entry].into_iter().enumerate() {
+        ts.pes(
+            codec.stream_id,
+            &part(frame, Some(90_000 + i as u64 * 960), None),
+        )?;
+    }
+    let input = Input {
+        name,
+        m2ts: true,
+        data: ts.finish(true),
+    };
+    let pid = PID.to_string();
+    let mut cases = Vec::new();
+    for (case, target, policy) in [
+        ("dts-core-history-preroll", "91500", "preroll"),
+        ("dts-core-history-next-entry", "91920", "previous"),
+    ] {
+        cases.push(input.record(
+            root,
+            FEATURE,
+            case,
+            &["--dvb", &pid, target, policy],
+            Path::new(reference),
+            "ts-audio-seek-fold",
+        )?);
+    }
     manifest(root, FEATURE, cases)
 }
