@@ -994,7 +994,7 @@ struct Build {
     origins: BuildOrigins,
     origin: usize,
     clock: Option<PacketClock>,
-    picture_epoch: Option<(SourceEpochs, u64)>,
+    picture_origin: Option<(SourceEpochs, u64, u64)>,
     picture_anchor: Option<usize>,
     last_anchor: u64,
     retire: usize,
@@ -1025,7 +1025,7 @@ impl Build {
             origins: BuildOrigins::Ready(origins),
             origin: 0,
             clock: None,
-            picture_epoch: None,
+            picture_origin: None,
             picture_anchor: None,
             last_anchor,
             retire: 0,
@@ -1688,10 +1688,11 @@ impl Lane {
             }
             if piece.range.start < range.end
                 && range.start < piece.range.end
-                && build.picture_epoch.is_none()
+                && build.picture_origin.is_none()
             {
                 let pes = piece.source.pes();
-                build.picture_epoch = Some((pes.epochs, pes.byte_run_epoch));
+                build.picture_origin =
+                    Some((pes.epochs, pes.byte_run_epoch, pes.elementary_offset));
             }
             if piece.range.start <= anchor_offset && piece.serial > build.last_anchor {
                 build.picture_anchor = Some(build.origin);
@@ -1714,8 +1715,8 @@ impl Lane {
         if !work.try_charge(1) {
             return Ok(LaneStep::Yield);
         }
-        let (epochs, byte_run) = build
-            .picture_epoch
+        let (epochs, byte_run, pes_offset) = build
+            .picture_origin
             .ok_or(Error::Invalid("MPEG-TS AU has no source extent"))?;
         let anchor = build.picture_anchor.map(|index| &pieces[index]);
         let (ticks, time) = if scan
@@ -1741,6 +1742,7 @@ impl Lane {
             offset: range.start,
             epochs,
             byte_run,
+            pes_offset,
             ticks,
             time,
             random_access,
@@ -1759,9 +1761,16 @@ impl Lane {
         let probing = match picture_delivery {
             PictureDelivery::Full => false,
             PictureDelivery::Scan | PictureDelivery::Discard => true,
-            PictureDelivery::Landing { offset, byte_run } => {
-                offset != range.start
-                    || !matches!(self.run, PesRun::Active(_, run) if run == byte_run)
+            PictureDelivery::Landing {
+                offset,
+                byte_run,
+                publish_headers,
+            } => {
+                let header_group = publish_headers
+                    && matches!(&build.unit, BuildUnit::Packet(AccessUnit::Video(unit)) if !unit.has_vcl);
+                !header_group
+                    && (offset != range.start
+                        || !matches!(self.run, PesRun::Active(_, run) if run == byte_run))
             }
         };
         if probing && let BuildUnit::Packet(AccessUnit::Video(unit)) = &build.unit {
