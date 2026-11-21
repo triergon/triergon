@@ -12,9 +12,6 @@ const SFREQ_HZ: [u32; 16] = [
 /// Decoded core frame header fields (Table 5-1).
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct FrameHeader {
-    /// FTYPE (1 = normal frame). Termination frames decode like normal ones.
-    #[allow(dead_code)]
-    pub normal: bool,
     pub short: u8,
     pub cpf: bool,
     /// NBLKS + 1: number of 32-sample blocks (= subband samples per band).
@@ -33,8 +30,6 @@ pub(crate) struct FrameHeader {
     pub lff: u8,
     pub hflag: bool,
     pub filts: bool,
-    pub vernum: u8,
-    pub pcmr: u8,
     pub sumf: bool,
     pub sums: bool,
 }
@@ -44,8 +39,9 @@ impl FrameHeader {
         if br.read(32) != 0x7FFE_8001 {
             return Err(DecodeError::InvalidData("core sync word"));
         }
+        // FTYPE: termination frames decode like normal ones.
+        let _ftype = br.bit();
         let mut h = FrameHeader {
-            normal: br.bit(),
             short: br.read(5) as u8,
             cpf: br.bit(),
             blocks: br.read(7) as usize + 1,
@@ -70,9 +66,9 @@ impl FrameHeader {
             let _hcrc = br.read(16);
         }
         h.filts = br.bit();
-        h.vernum = br.read(4) as u8;
+        let _vernum = br.read(4);
         let _chist = br.read(2);
-        h.pcmr = br.read(3) as u8;
+        let _pcmr = br.read(3);
         h.sumf = br.bit();
         h.sums = br.bit();
         let _dialnorm = br.read(4);

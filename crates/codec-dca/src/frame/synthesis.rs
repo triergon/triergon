@@ -2,11 +2,10 @@
 //! post-processing (X96 recombination, XCh down-mix removal, sum/difference), QMF
 //! synthesis and LFE interpolation.
 
-use super::CoreFrame;
-use crate::MAX_SLOTS;
+use super::{CoreFrame, FrameDecoder, MAX_SLOTS, X96Bank};
 use crate::qmf::{Qmf, QmfState};
 use crate::subframe::{HIST, SubBuf};
-use crate::{AudioFrame, ChannelLayout, DecodeError, FrameDecoder, Speaker, X96Bank};
+use crate::{AudioFrame, ChannelLayout, DecodeError, Speaker};
 use triergon_codec::StorageError;
 
 impl FrameDecoder {

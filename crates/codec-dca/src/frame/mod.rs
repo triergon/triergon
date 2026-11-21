@@ -6,8 +6,131 @@ mod synthesis;
 
 use crate::bits::BitReader;
 use crate::header::{FrameHeader, SetHeader};
-use crate::subframe::{self, SubBuf, SubframeParams};
-use crate::{AudioFrame, Config, DecodeError, FrameDecoder, Speaker, x96};
+use crate::lfe::{Lfe2x, LfeFir, LfeState};
+use crate::qmf::{Qmf, QmfState};
+use crate::subframe::{self, SideInfo, SubBuf, SubframeParams};
+use crate::{AudioFrame, DecodeError, Speaker, pr_table, tables, x96};
+use triergon_codec::{Budget, BudgetVec, Charged, Reservation, StorageError};
+
+/// Maximum coded primary channels (core 5 + extension channels).
+const MAX_SLOTS: usize = 8;
+/// Output scale: core PCM is 24-bit integer domain.
+const OUT_SCALE: f64 = 1.0 / 8_388_608.0;
+/// Synthesis gain applied to the C.3.6 prototype: the 0.25 of the modulation stage times
+/// 2^7.5. C.3.6 leaves its output `rScale` unspecified; 2^7.5 is the black-box
+/// calibration against FFmpeg's float output.
+const QMF_GAIN: f64 = 0.25 * 128.0 * std::f64::consts::SQRT_2;
+/// X96 64-band synthesis gain (black-box calibration).
+const QMF64_GAIN: f64 = 0.25 * 256.0 * std::f64::consts::SQRT_2;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct Config {
+    amode: u8,
+    nch: usize,
+    lff: u8,
+    filts: bool,
+    rate: u32,
+}
+
+/// 32-band synthesis history of one slot.
+type History32 = QmfState<512>;
+
+/// The X96 64-band filter bank, created when a stream first carries X96.
+#[derive(Debug)]
+struct X96Bank {
+    qmf: Qmf<1024>,
+    /// One history per coded slot.
+    state: BudgetVec<QmfState<1024>>,
+}
+
+/// Decoder state of the frame stages, apart from the normalization buffer.
+#[derive(Debug)]
+pub(crate) struct FrameDecoder {
+    sub: SubBuf,
+    side: Box<SideInfo>,
+    qmf_np: Qmf<512>,
+    qmf_pr: Qmf<512>,
+    /// One history per coded slot.
+    qstate: Box<[History32]>,
+    lfe_fir: LfeFir,
+    lfe_state: LfeState,
+    lfe_dec: [f32; 128],
+    /// Time-major synthesis input of one slot (blocks x bands).
+    tbuf: BudgetVec<f32>,
+    prev: Option<Config>,
+    prev_xch: bool,
+    prev_x96: bool,
+    max_blocks: usize,
+    x96buf: Option<SubBuf>,
+    x96side: Box<x96::X96Side>,
+    x96: Option<Charged<Box<X96Bank>>>,
+    lfe2x: Lfe2x,
+    lfe48: BudgetVec<f32>,
+    /// Pool of the stream-dependent storage above.
+    budget: Budget,
+    /// Charge of the output frame the last frame sized.
+    output_charge: Reservation,
+}
+
+impl X96Bank {
+    fn new(budget: &Budget) -> Result<Charged<Box<Self>>, StorageError> {
+        let state = BudgetVec::try_filled(budget, QmfState::new(), MAX_SLOTS)?;
+        Charged::boxed(
+            budget,
+            Self {
+                qmf: Qmf::new(&tables::X96_FIR, QMF64_GAIN * OUT_SCALE),
+                state,
+            },
+        )
+    }
+
+    fn reset(&mut self) {
+        for q in self.state.iter_mut() {
+            q.reset();
+        }
+    }
+}
+
+impl FrameDecoder {
+    pub(crate) fn new(budget: &Budget) -> Self {
+        Self {
+            sub: SubBuf::new(budget, MAX_SLOTS, 32),
+            side: Box::new(SideInfo::new()),
+            qmf_np: Qmf::new(&tables::QMF_NONPERFECT, QMF_GAIN * OUT_SCALE),
+            // FFmpeg's effective PR prototype differs from Annex D.8 (see pr_table.rs).
+            qmf_pr: Qmf::new(&pr_table::QMF_PERFECT_REF, QMF_GAIN * OUT_SCALE),
+            qstate: (0..MAX_SLOTS).map(|_| QmfState::new()).collect(),
+            lfe_fir: LfeFir::new(OUT_SCALE),
+            lfe_state: LfeState::default(),
+            lfe_dec: [0.0; 128],
+            tbuf: BudgetVec::new(budget),
+            prev: None,
+            prev_xch: false,
+            prev_x96: false,
+            max_blocks: 0,
+            x96buf: None,
+            x96side: Box::new(x96::X96Side::new()),
+            x96: None,
+            lfe2x: Lfe2x::default(),
+            lfe48: BudgetVec::new(budget),
+            budget: budget.clone(),
+            output_charge: Reservation::empty(budget),
+        }
+    }
+
+    pub(crate) fn reset(&mut self) {
+        for q in &mut self.qstate {
+            q.reset();
+        }
+        if let Some(bank) = &mut self.x96 {
+            bank.reset();
+        }
+        self.lfe_state.reset();
+        self.lfe2x.reset();
+        self.prev = None;
+        self.max_blocks = 0;
+    }
+}
 
 /// Per-frame values shared by the decoding stages.
 struct CoreFrame<'a> {
