@@ -213,7 +213,12 @@ asset layouts, mixing, speaker remapping, secondary decoding and Rev2 DRC are
 unsupported for seeking. Construction 14 additionally supports a separate canonical
 core without internal extensions, with a clear predictor-history flag and DWORD-aligned
 extension start. The extension must satisfy the same XLL recovery checks and explicitly
-map its backward-compatible core to extension zero and asset zero. Core history alone
+map its backward-compatible core to extension zero and asset zero. Coding mode 0
+is also supported for construction 14 when its component mask is exactly `0x201`:
+a separate core plus XLL, with no other coding components. The XLL size must fill
+the complete asset; core data inside the extension and other component masks remain
+unsupported. All static setup, alignment, sync, delay, checksum and core-history
+requirements still apply. Core history alone
 does not establish recovery. The same scan bound, index, original packet
 suffix and preroll discard time apply.
 
@@ -234,9 +239,15 @@ need a complete frame and checked alignment at the signalled offset. Speaker
 remapping and mixing need their full mapping and scaling dependencies checked.
 Legacy DRC and dialogue metadata are parsed within the asset descriptor; secondary
 decoding and Rev2 DRC remain unsupported. Authored construction-14 controls test
-packet suffixes and recovery metadata. The pinned transport reference has no DTS
+packet suffixes and recovery metadata. The registered mode-0 controls compare twelve
+coded suffix folds (both carriers, both policies and backward indexed seeks)
+against the ordinary pinned transport reference. Regenerate all 38 cases with
+`cargo xtask fixture transport-dts-seek --record REFERENCE`; mode 0 supports
+exactly component mask `0x201` (separate core plus XLL). All 48 core-bearing frames in
+the eight hash-pinned XLL suite originals require core history and remain refused.
+The pinned transport reference has no DTS
 decoder, so these controls do not establish decoded-PCM parity. Native runtime,
-heap and kernel-bound RSS qualification for this seek profile is unmeasured.
+heap and kernel-bound RSS qualification for the mode-0 profile is unmeasured.
 
 Use `Reader::request_seek_in_entities` for consecutive length-known, seekable
 parts of one logical transport stream. The ordered `SeekEntity` list supplies
@@ -859,8 +870,9 @@ Specification basis:
 Verification:
 
 - The [DTS seek comparison](../../harness/features/mpegts-dts-seek/contract.json)
-  contains two DTS core history cases and 24 authored XLL cases. Twelve XLL cases
-  use an extension alone and twelve carry an independently recoverable core.
+  contains two DTS core history cases and 36 authored XLL cases. Twelve XLL cases
+  use an extension alone, twelve carry an independently recoverable core with mode-1
+  navigation, and twelve carry a separate core with mode-0 mask `0x201`.
   The cases cover short extension headers in TS188 and long extension headers in M2TS192, both
   seek policies at 90,000 and 91,920 source ticks, explicit and missing source DTS,
   and an indexed backward seek after draining to EOF. Each suffix includes every
