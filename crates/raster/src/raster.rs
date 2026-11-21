@@ -11,7 +11,8 @@ use crate::shape::Shape;
 use crate::stroke::{Pen, stroke};
 
 /// libass's outline and bitmap stages with the scratch they reuse: the
-/// rasteriser's segment buffers, transformed shapes and the blur's planes, all
+/// rasteriser's segment buffers, transformed and stroked shapes and the blur's
+/// planes, all
 /// charged to one [`Budget`]. Every operation takes the [`WorkBudget`] of the
 /// frame it belongs to; running out of it, or a size beyond [`Limits`], is
 /// `Error::Policy`.
@@ -21,6 +22,8 @@ pub struct Raster {
     pub(crate) limits: Limits,
     pub(crate) rasterizer: Rasterizer,
     pub(crate) transformed: Shape,
+    /// The border being stroked, grown as the stroker goes.
+    pub(crate) stroked: Shape,
     pub(crate) blur: Blur,
     /// The unit square every opaque box is drawn from, once one is.
     pub(crate) unit_box: Option<Shape>,
@@ -34,6 +37,7 @@ impl Raster {
             limits,
             rasterizer: Rasterizer::new(budget),
             transformed: Shape::new(budget),
+            stroked: Shape::new(budget),
             blur: Blur::new(budget),
             unit_box: None,
         }
@@ -43,6 +47,7 @@ impl Raster {
     pub fn retained_bytes(&self) -> usize {
         self.rasterizer.retained_bytes()
             + self.transformed.retained_bytes()
+            + self.stroked.retained_bytes()
             + self.blur.retained_bytes()
             + self.unit_box.as_ref().map_or(0, Shape::retained_bytes)
     }

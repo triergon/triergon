@@ -76,7 +76,10 @@ binarizations and context tables. A context is one state byte; `decision_unfille
 `Engine::new` and `restart` refuse an initial offset of 510 or 511 (`InvalidOffset`),
 which the specifications forbid. Every decoding process then keeps the offset below the
 range, so `bypass_bits(n)` returns at most `n` bits on any input. The `HEADROOM`
-parameter chooses a register layout; both decode every stream the same.
+parameter chooses a register layout; both decode every stream the same. The register is a
+machine word: on 64-bit targets 64 bits refilled 32 at a time, on 32-bit targets 32 bits
+refilled to capacity from the stream's bit position, where 64-bit shifts and comparisons
+take several instructions.
 
 ```rust
 use triergon_bitstream::cabac::{Engine, InvalidOffset, init_state};

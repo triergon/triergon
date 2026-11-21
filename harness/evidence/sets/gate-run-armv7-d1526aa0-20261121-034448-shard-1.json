@@ -1,0 +1,25 @@
+{
+ "name": "gate-run-armv7-d1526aa0-20261121-034448-shard-1",
+ "path": "gate-run-armv7-d1526aa0-20261121-034448-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at d1526aa0 (CABAC in a 32-bit register on 32-bit targets and H.264 motion summaries taken at decode time, on main 41031255) on three c6g.4xlarge hosts, ARMv7, shard 1 of the codec workload items (codec-workloads timing and its memory parts codec-workloads-1 to -5), codec-aac-worker built by the pinned nightly with codec-aac's simd feature and every other worker, codec-worker included, by stable: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md.",
+ "key": "evidence/gate-runs/d1526aa04e53aa945ac80e187a9bef1fb498253b-armv7-20261121-034448/shard-1/585a6010d91c5bbcab573519f7b0f90861296ca48772fafe2f0b55bf5fc8d7bd.tar.zst",
+ "sha256": "585a6010d91c5bbcab573519f7b0f90861296ca48772fafe2f0b55bf5fc8d7bd",
+ "bytes": 898816,
+ "results": [
+  {
+   "path": "memory/codec-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "60061564c25c0e0b86d6e802d3f0c4611e1419d9cb6156543482af3b2070b538",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "39cc81398fed47104f8e5be0968ecc076cba5717079fa1facd485d5c497ee1a2",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
