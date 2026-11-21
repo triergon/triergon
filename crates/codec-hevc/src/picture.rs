@@ -272,11 +272,10 @@ pub(crate) struct ColMv {
     pub(crate) flags: u8,
 }
 
-#[allow(dead_code)]
+/// Collocated motion of a picture, `w16` blocks to a row.
 #[derive(Debug)]
 pub(crate) struct ColMotion {
     pub(crate) w16: usize,
-    pub(crate) h16: usize,
     pub(crate) data: BudgetVec<ColMv>,
 }
 
@@ -292,7 +291,6 @@ impl ColMotion {
         let len = w16.checked_mul(h16).ok_or(StorageError::Overflow)?;
         Ok(ColMotion {
             w16,
-            h16,
             data: BudgetVec::try_filled(budget, ColMv::default(), len)?,
         })
     }

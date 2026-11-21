@@ -31,21 +31,16 @@ pub(crate) struct SaoParams {
 
 /// Information about a slice segment of the current picture needed after parsing.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub(crate) struct SliceInfo {
-    pub(crate) slice_addr_rs: u32,
-    pub(crate) deblocking_disabled: bool,
     pub(crate) beta_offset_div2: i32,
     pub(crate) tc_offset_div2: i32,
     pub(crate) lf_across_slices: bool,
-    pub(crate) sao_luma: bool,
-    pub(crate) sao_chroma: bool,
     pub(crate) ref_poc: [[i32; 16]; 2],
     pub(crate) ref_lt: [[bool; 16]; 2],
 }
 
-/// The per-picture maps are `BudgetVec`s sized when a picture starts and reused (grown,
-/// never shrunk) for later pictures.
+/// Per-picture block, motion, edge and CTB maps, sized when a picture starts and reused
+/// while the picture size stays the same.
 #[derive(Debug)]
 pub(crate) struct PicState {
     pub(crate) w4: usize,

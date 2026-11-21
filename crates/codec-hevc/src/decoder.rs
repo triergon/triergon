@@ -357,13 +357,9 @@ impl Context {
         };
         // Reference picture lists (8.3.4) and SliceInfo.
         let mut info = SliceInfo {
-            slice_addr_rs: sh.slice_addr_rs,
-            deblocking_disabled: sh.deblocking_disabled,
             beta_offset_div2: sh.beta_offset_div2,
             tc_offset_div2: sh.tc_offset_div2,
             lf_across_slices: sh.loop_filter_across_slices,
-            sao_luma: sh.sao_luma,
-            sao_chroma: sh.sao_chroma,
             ref_poc: [[i32::MIN; 16]; 2],
             ref_lt: [[false; 16]; 2],
         };

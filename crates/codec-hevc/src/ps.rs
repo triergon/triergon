@@ -991,19 +991,14 @@ pub(crate) fn parse_pps(rbsp: &[u8]) -> Result<Pps> {
 
 /// Picture-level layout derived from an (SPS, PPS) pair: tile scan conversion (6.5.1) and
 /// z-scan order (6.5.2).
-#[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) struct Layout {
     pub(crate) ctb_addr_rs_to_ts: BudgetVec<u32>,
     pub(crate) ctb_addr_ts_to_rs: BudgetVec<u32>,
     pub(crate) tile_id: BudgetVec<u16>, // indexed by ts
-    /// Column and row boundaries in CTBs (cols + 1 and rows + 1 entries).
-    pub(crate) col_bd: [u32; 21],
-    pub(crate) row_bd: [u32; 23],
     /// MinTbAddrZs[y * w + x] in min TB units.
     pub(crate) min_tb_addr_zs: BudgetVec<u32>,
     pub(crate) min_tb_w: u32,
-    pub(crate) min_tb_h: u32,
 }
 
 impl Layout {
@@ -1117,11 +1112,8 @@ impl Layout {
             ctb_addr_rs_to_ts: rs_to_ts,
             ctb_addr_ts_to_rs: ts_to_rs,
             tile_id,
-            col_bd,
-            row_bd,
             min_tb_addr_zs: zs,
             min_tb_w: mtw,
-            min_tb_h: mth,
         })
     }
 }
