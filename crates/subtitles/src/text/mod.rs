@@ -8,7 +8,6 @@
 //! FFmpeg; the FFmpeg-compatible readers and conversions are in
 //! [`crate::compat::document`], [`crate::compat::ass`],
 //! [`crate::compat::charset`] and [`crate::compat::mov_text`].
-#![forbid(unsafe_code)]
 
 pub(crate) mod ass_decoder;
 pub mod charset;
