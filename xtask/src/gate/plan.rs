@@ -56,6 +56,7 @@ pub(super) const COVERED: &[(&str, Coverage)] = &[
     ("pgs-segments", Coverage::Item("oracle-compare")),
     ("text-extraction-oracle", Coverage::Item("oracle-compare")),
     ("tx3g-config-oracle", Coverage::Item("oracle-compare")),
+    ("tx3g-semantics", Coverage::Item("oracle-compare")),
     ("dts-core-header", Coverage::Item("oracle-compare")),
     ("dts-unpacking", Coverage::Item("oracle-compare")),
     (
@@ -1398,7 +1399,12 @@ impl Plan<'_> {
                 "imdct-compare",
                 Stage::Timing,
                 Placement::Free,
-                xtask(&["codecs", "dsp", "--output", &format!("{}/parity/dsp-imdct", self.out)]),
+                xtask(&[
+                    "codecs",
+                    "dsp",
+                    "--output",
+                    &format!("{}/parity/dsp-imdct", self.out),
+                ]),
             )],
             preflight: Vec::new(),
         }
