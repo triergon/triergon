@@ -47,7 +47,6 @@ pub struct ParserOperationContext {
     source: SourceId,
     source_generation: u64,
     parser_generation: u64,
-    fresh_zero_origin: bool,
 }
 impl ParserOperationContext {
     /// Cursor generation of the source-frame reader, which every source frame
@@ -378,7 +377,6 @@ impl ParserOperation {
             source,
             source_generation: facts.generation(),
             parser_generation: parser.generation(),
-            fresh_zero_origin: true,
         };
         Ok(Self {
             source: Some(facts),

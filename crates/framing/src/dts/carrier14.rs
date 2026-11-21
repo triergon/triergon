@@ -6,6 +6,7 @@
 //! packet that does not start with the pattern stays opaque: it gets no header, no
 //! unpacked payload, no claim about its audio, and no end but the end of the source.
 use crate::dts::reader::{ReaderInput, limit, retryable, source_error};
+use crate::dts::sync14::{header_payload, word};
 use crate::dts::{
     Dts14BitPayload, Dts14BitUnpacker, DtsCoreHeader, DtsPackingLimits, DtsSourceIdentity,
     DtsWordOrder, probe_core_header,
@@ -741,7 +742,7 @@ fn probe_extent(packet: &[u8], order: DtsWordOrder) -> Result<Extent> {
         return Ok(Extent::Unknown);
     }
     let prefix: [u8; 18] = packet[..18].try_into().map_err(|_| Error::Truncated)?;
-    let bits = crate::dts::sync14::header_payload(&prefix, order)?;
+    let bits = header_payload(&prefix, order)?;
     Ok(match probe_core_header(&bits) {
         Ok(header) if header.frame_bytes % 7 == 0 => Extent::Known(
             (header.frame_bytes / 7)
@@ -757,9 +758,7 @@ fn conventional_sync(b: &[u8], order: DtsWordOrder) -> bool {
     if b.len() < 6 {
         return false;
     }
-    let word = |i| match order {
-        DtsWordOrder::BigEndian => u16::from_be_bytes([b[i], b[i + 1]]),
-        DtsWordOrder::LittleEndian => u16::from_le_bytes([b[i], b[i + 1]]),
-    };
-    word(0) == 0x1fff && word(2) == 0xe800 && word(4) & 0xfff0 == 0x07f0
+    word(b, 0, order) == 0x1fff
+        && word(b, 2, order) == 0xe800
+        && word(b, 4, order) & 0xfff0 == 0x07f0
 }

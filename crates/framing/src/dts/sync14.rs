@@ -741,7 +741,8 @@ impl Dts14SyncReader {
     }
 }
 
-fn word(source: &[u8], at: usize, order: DtsWordOrder) -> u16 {
+/// The 16-bit word at byte `at` of `source`.
+pub(super) fn word(source: &[u8], at: usize, order: DtsWordOrder) -> u16 {
     let pair = [source[at], source[at + 1]];
     match order {
         DtsWordOrder::BigEndian => u16::from_be_bytes(pair),
