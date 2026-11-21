@@ -629,10 +629,7 @@ impl Dts14SyncReader {
                         return Err(Error::Invalid("DTS14 owned unpack progress"));
                     }
                 },
-                Frame::Ready(ready) => {
-                    let ready = ready.clone();
-                    return self.publish(work, ready);
-                }
+                Frame::Ready(_) => return self.publish(work),
                 Frame::Ended(end) => return Ok(Step::End(*end)),
             }
         }
@@ -690,15 +687,13 @@ impl Dts14SyncReader {
         }
     }
     /// Returns the ready frame and moves on to the next one.
-    fn publish(
-        &mut self,
-        work: &mut WorkBudget,
-        ready: Dts14SyncFrame,
-    ) -> Result<Step<Dts14SyncFrame>> {
+    fn publish(&mut self, work: &mut WorkBudget) -> Result<Step<Dts14SyncFrame>> {
         if !work.try_charge(1) {
             return Ok(Step::Yield);
         }
-        self.frame = Frame::Header;
+        let Frame::Ready(ready) = std::mem::replace(&mut self.frame, Frame::Header) else {
+            unreachable!("the frame is ready")
+        };
         self.completed = self.completed.checked_add(1).ok_or(Error::Overflow)?;
         self.interval = Some(ready.facts.physical_bytes);
         if let Some(end) = self.source_end {
