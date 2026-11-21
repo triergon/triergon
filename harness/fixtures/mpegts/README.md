@@ -1,6 +1,6 @@
 # MPEG-TS packet inputs
 
-Ten synthetic TS188 inputs for the `mpegts-pes` contract (`harness/features/mpegts-pes/`).
+Twelve synthetic TS188 inputs for the `mpegts-pes` contract (`harness/features/mpegts-pes/`).
 The contract's other inputs are the authored streams under
 [`crates/mpegts/tests/data/`](../../../crates/mpegts/tests/data/manifest.json). Like
 those, these were constructed byte by byte from ITU-T H.222.0, with no encoder, upstream
@@ -26,3 +26,41 @@ rewrap (`xtask/src/transport_fixtures/matched.rs` pins it).
 ffmpeg -f lavfi -i 'sine=frequency=523:sample_rate=48000:duration=0.128' \
   -c:a dca -strict experimental -b:a 384k -f dts dts-core-mono.dts
 ```
+
+The VVC controls `vvc-finite.ts` and `vvc-unbounded.ts` each contain five TS188
+packets (940 bytes): PAT, PMT naming stream type `0x33`, and three PES on PID
+256 with stream ID `0xe0`. The payloads are `00 00 01 00 NN 0f ff f8`, where
+NN is 00, 01, 02. PTS/DTS are (3003, 0), (6006, 3003), (9009, 6006).
+The finite PES lengths are 21; the unbounded lengths are zero, completed by
+the next PUSI or final EOF. No payload is a claim of decodable VVC.
+
+Regenerate the inputs and verify their existing pins with:
+
+```sh
+CARGO_INCREMENTAL=0 cargo xtask fixture transport-vvc --output .
+```
+
+To record against an existing pinned formats build, add
+`--record REFERENCE_ROOT --observations PRIVATE_DIR`. The recorder verifies the
+formats worker hash against that root's `target/harness/identity.json` and requires
+revision `d32b387f2b0a484599d4587d651891f0c63c4238`. It saves raw outputs outside
+git, requires actual EOF, and changes only the two VVC rows and required profiles.
+The original 97 rows and all their pins stay unchanged; the AU corpus continues
+to use exactly those original rows and 272 request associations.
+
+The two functional folds can also be reproduced directly after
+`CARGO_INCREMENTAL=0 cargo build -p transport-worker` (adjust the candidate path
+when using `CARGO_TARGET_DIR`):
+
+```sh
+for kind in finite unbounded; do
+  /tmp/triergon-ts-dts-ci/target/harness/ffmpeg-formats-worker ts-fold \
+    harness/fixtures/mpegts/vvc-$kind.ts 188 7
+  target/debug/transport-worker ts-fold harness/fixtures/mpegts/vvc-$kind.ts 188 7
+done
+```
+
+Every output must report `operation: mpegts-pes-packets`, `iterations: 1`,
+`packets: 3`, `bytes: 24`, `digest: 1768033906666164040`, and `eof: true`.
+The existing required report comparison runs all 99 cases and folds every
+packet field, payload byte and side-data byte in order.

@@ -3147,6 +3147,42 @@
         "bytes": 415,
         "digest": 13530328839282193600
       }
+    },
+    {
+      "id": "vvc-finite",
+      "profile": "vvc-finite",
+      "file": "harness/fixtures/mpegts/vvc-finite.ts",
+      "sha256": "863b0cbd5545a6448be90ad46069c559f4d8d22d6d2d9e7068e899fae2812e39",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 24,
+        "digest": 1768033906666164040
+      },
+      "reference_worker_sha256": "d56e95f3728ba426c17eb504654e032869c5d6054f88e7bf0a14c8a91dc34e48",
+      "reference_result_sha256": "6b6c51db7289ec103f361687e3bbf3a89fb8eba09a52ac80ce96fa0c029035a5"
+    },
+    {
+      "id": "vvc-unbounded",
+      "profile": "vvc-unbounded",
+      "file": "harness/fixtures/mpegts/vvc-unbounded.ts",
+      "sha256": "7c1232cfe88fffaf4583c3efb9e68e62731350abbbbaee1dac4fa3f1163bd469",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 24,
+        "digest": 1768033906666164040
+      },
+      "reference_worker_sha256": "d56e95f3728ba426c17eb504654e032869c5d6054f88e7bf0a14c8a91dc34e48",
+      "reference_result_sha256": "6b6c51db7289ec103f361687e3bbf3a89fb8eba09a52ac80ce96fa0c029035a5"
     }
   ]
 }

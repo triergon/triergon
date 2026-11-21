@@ -42,6 +42,8 @@ pub enum CodecId<'a> {
     Mpeg2Video,
     H264,
     Hevc,
+    /// ITU-T H.266 / ISO/IEC 23090-3 versatile video coding.
+    Vvc,
     Av1,
     Vp9,
     /// Theora (Xiph.Org Theora I).

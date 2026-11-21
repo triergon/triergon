@@ -299,12 +299,13 @@ fn pmt_video_descriptor_parsing_yields_cancels_and_keeps_owned_raw_source() {
 }
 
 #[test]
-fn unimplemented_video_and_enhancement_tags_stay_opaque_tracks() {
+fn video_and_enhancement_tags_preserve_source_track_data() {
     use triergon_core::container::{CodecId, MediaKind, TrackInfo};
 
-    // These tags are outside the reader's supported codec map. Keep the tag
-    // and every descriptor byte even when a caller recognizes the codec.
-    for stream_type in [0x33, 0x36] {
+    for (stream_type, codec, kind) in [
+        (0x33, CodecId::Vvc, MediaKind::Video),
+        (0x36, CodecId::Other(&[0x36]), MediaKind::Unknown),
+    ] {
         let budget = Budget::new(1 << 20).unwrap();
         let descriptors = [0xee, 4, 0, 0x47, 0xff, 1];
         let section = map_section(&[], stream_type, &descriptors, &budget);
@@ -321,8 +322,8 @@ fn unimplemented_video_and_enhancement_tags_stay_opaque_tracks() {
         };
         let stream = &map.streams.as_slice()[0];
         assert_eq!(stream.codec_tag(), &[stream_type]);
-        assert_eq!(TrackInfo::codec(stream), CodecId::Other(&[stream_type]));
-        assert_eq!(stream.kind(), MediaKind::Unknown);
+        assert_eq!(TrackInfo::codec(stream), codec);
+        assert_eq!(stream.kind(), kind);
         assert_eq!(stream.descriptor_bytes.as_ref(), descriptors);
         assert!(stream.configuration().is_empty());
     }

@@ -9,7 +9,9 @@ impl TrackInfo for ElementaryStream {
 
     fn kind(&self) -> MediaKind {
         match ElementaryStream::codec(self) {
-            Some(CodecId::Mpeg2Video | CodecId::H264 | CodecId::Hevc) => MediaKind::Video,
+            Some(CodecId::Mpeg2Video | CodecId::H264 | CodecId::Hevc | CodecId::Vvc) => {
+                MediaKind::Video
+            }
             Some(
                 CodecId::MpegAudio
                 | CodecId::Aac

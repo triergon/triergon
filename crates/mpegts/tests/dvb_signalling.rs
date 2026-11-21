@@ -120,6 +120,7 @@ fn track_classification_keeps_native_tags_and_private_codec_identity() {
             0x01 | 0x02 => (MediaKind::Video, CodecId::Mpeg2Video),
             0x1b => (MediaKind::Video, CodecId::H264),
             0x24 => (MediaKind::Video, CodecId::Hevc),
+            0x33 => (MediaKind::Video, CodecId::Vvc),
             0x03 | 0x04 => (MediaKind::Audio, CodecId::MpegAudio),
             0x0f => (MediaKind::Audio, CodecId::Aac),
             0x11 => (MediaKind::Audio, CodecId::AacLatm),

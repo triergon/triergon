@@ -2359,9 +2359,10 @@ impl TransportStream {
 }
 
 /// Video stream types, whose PES packets may leave `PES_packet_length` 0
-/// (ISO/IEC 13818-1 2.4.3.7): MPEG-1 and MPEG-2 video, H.264 and HEVC.
+/// (ISO/IEC 13818-1 2.4.3.7): MPEG-1 and MPEG-2 video, H.264, HEVC and
+/// VVC stream_type 0x33 (H.222.0 Table 2-34).
 fn is_video_stream_type(stream_type: u8) -> bool {
-    matches!(stream_type, 0x01 | 0x02 | 0x1b | 0x24)
+    matches!(stream_type, 0x01 | 0x02 | 0x1b | 0x24 | 0x33)
 }
 
 #[cfg(test)]

@@ -140,6 +140,10 @@ The probe charges bounded work, preserves the original table and PES facts
 and applies again at framing resets. A failed initial probe reports the
 route as unsupported and later PES cannot rescue it.
 
+An MPEG-TS stream with type `0x33` identifies VVC video. The source reader
+accepts finite PES and unbounded video PES for that stream and retains the
+original carrier ranges, clocks and payload bytes.
+
 ### Packets, events and timing
 
 `Packet` implements `PacketInfo` and retains its PMT, source configuration epoch,

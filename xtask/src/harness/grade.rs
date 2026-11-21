@@ -1741,7 +1741,7 @@ mod tests {
             ("mp4-forward", 51),
             ("ts-program", 36),
             ("raw-annex-b", 7),
-            ("mpegts-pes", 97),
+            ("mpegts-pes", 99),
             ("subtitle-pgs", 319),
             ("subtitle-dvb", 241),
             ("subtitle-dvd", 228),

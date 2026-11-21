@@ -8,6 +8,9 @@ from the `blocking` adapter, which reads a caller's `std::io` source, it perform
 no I/O; it owns no threads and implements no format: packet boundaries,
 codec configuration and clock epochs belong to the format crates built on it.
 
+`CodecId::Vvc` identifies ITU-T H.266 video. Codec identity alone does not
+promise access-unit framing or a decoder.
+
 ## Usage
 
 ```rust

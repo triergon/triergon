@@ -54,14 +54,17 @@ pub struct DemuxScope {
 pub enum RegisteredCarriage {
     Avc,
     Hevc,
+    Vvc,
     AacAdts,
     AacLatm,
 }
 impl RegisteredCarriage {
-    fn selected_signature(self) -> (u8, u8) {
+    /// Return the PMT stream type and PES stream ID for the selected profile.
+    pub const fn selected_signature(self) -> (u8, u8) {
         match self {
             Self::Avc => (0x1b, 0xe0),
             Self::Hevc => (0x24, 0xe0),
+            Self::Vvc => (0x33, 0xe0),
             Self::AacAdts => (0x0f, 0xc0),
             Self::AacLatm => (0x11, 0xc0),
         }
