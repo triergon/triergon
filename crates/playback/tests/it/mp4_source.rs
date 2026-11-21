@@ -73,9 +73,9 @@ fn all17_frozen_mp4_controls_keep_independent_original_source_gold() {
 fn actual_mp4_native_order_stays_distinct_from_all_source_facts() {
     let raw = include_bytes!("../fixtures/mp4/r-multitrack.mov");
     let (mut p, _) = mp4(raw, View::Demux, 7, 1).unwrap();
-    if let Some(Engine::Mp4(engine)) = p.engine() {
-        assert_eq!(engine.plan.source_rows().len(), 12);
-        assert_eq!(engine.plan.demux_rows().len(), 12);
+    if let Some(plan) = p.engine().and_then(Engine::mp4_plan) {
+        assert_eq!(plan.source_rows().len(), 12);
+        assert_eq!(plan.demux_rows().len(), 12);
     } else {
         panic!()
     }

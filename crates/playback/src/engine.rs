@@ -336,6 +336,13 @@ impl Engine {
             _ => None,
         }
     }
+    /// The plan of an MP4 engine, which seeks are planned from.
+    pub fn mp4_plan(&self) -> Option<&PreparedMp4> {
+        match self {
+            Self::Mp4(m) => Some(&m.plan),
+            _ => None,
+        }
+    }
     /// The container format.
     pub fn format(&self) -> Format {
         match self {

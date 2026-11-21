@@ -421,10 +421,8 @@ fn catalogue_all_valid_original_movies_replace_without_rewriting_source_facts() 
             ordinal += 1;
         }
         assert_eq!(ordinal, 4);
-        let Engine::Mp4(old_engine) = retired.engine().unwrap() else {
-            panic!()
-        };
-        check_plan(&old_engine.plan, &gold::CASES[0]);
+        let old_plan = retired.engine().unwrap().mp4_plan().unwrap();
+        check_plan(old_plan, &gold::CASES[0]);
         let out = collect(&mut p, 1).unwrap();
         check_outputs(&out, case, SourceId(8202));
         assert!(out.iter().all(|o| p.current(o) && o.epoch() == 1));
@@ -1014,10 +1012,8 @@ fn catalogue_progressive_replacement_keeps_future_batches_and_unknown_clocks() {
     let (mut p, old) = player(&b, SourceId(9501), &gold::CASES[0], PlayerPolicy::default());
     let case = &gold::CASES[9]; // independently authored absent-second-tfdt facts
     let (mut next, new) = progressive_candidate(&b, SourceId(9502), case.bytes);
-    let Engine::Mp4(engine) = next.as_ref().unwrap().engine() else {
-        panic!()
-    };
-    assert_eq!(engine.plan.rows(), 3);
+    let plan = next.as_ref().unwrap().engine().mp4_plan().unwrap();
+    assert_eq!(plan.rows(), 3);
     p.replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off())
         .unwrap()
         .unwrap();
@@ -1058,11 +1054,9 @@ fn catalogue_replacement_terminal_mdat_needs_actual_source_end_and_keeps_unknown
     let (mut p, old) = player(&b, SourceId(9601), &gold::CASES[0], PlayerPolicy::default());
     let raw = include_bytes!("../fixtures/open-ended/regular-terminal.mp4");
     let (mut next, _) = progressive_candidate(&b, SourceId(9602), raw);
-    let Engine::Mp4(engine) = next.as_ref().unwrap().engine() else {
-        panic!()
-    };
-    assert!(engine.plan.terminal_mdat().is_some());
-    assert_eq!(engine.plan.terminal_mdat().unwrap().header().size, None);
+    let plan = next.as_ref().unwrap().engine().mp4_plan().unwrap();
+    assert!(plan.terminal_mdat().is_some());
+    assert_eq!(plan.terminal_mdat().unwrap().header().size, None);
     p.replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off())
         .unwrap()
         .unwrap();
@@ -1081,10 +1075,8 @@ fn catalogue_replacement_terminal_mdat_needs_actual_source_end_and_keeps_unknown
         }
     }
     assert_eq!(packets, 6);
-    let Engine::Mp4(engine) = p.engine().unwrap() else {
-        panic!()
-    };
-    assert_eq!(engine.plan.terminal_mdat().unwrap().header().size, None);
+    let plan = p.engine().unwrap().mp4_plan().unwrap();
+    assert_eq!(plan.terminal_mdat().unwrap().header().size, None);
     once(&old);
 }
 

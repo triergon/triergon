@@ -5,6 +5,8 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::Error;
 use triergon_core::{SourceId, WorkBudget};
 use triergon_matroska::{Event as MkvEvent, ParseStep, Reader};
+/// The Matroska reader as an engine: the engine of
+/// [`Engine::Matroska`](crate::Engine::Matroska).
 #[derive(Debug)]
 pub struct MkvEngine {
     pub(crate) reader: Reader,

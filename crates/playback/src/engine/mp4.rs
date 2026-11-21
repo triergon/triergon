@@ -44,21 +44,32 @@ pub(crate) enum Mp4RangeLanding<'a> {
     DemuxCursor(u64),
 }
 
+/// The MP4 demuxer over one plan: the engine of [`Engine::Mp4`](crate::Engine::Mp4).
+///
+/// `skip_video_until` and `demux_seek` are alternatives a seek sets at most one
+/// of. They stay two options: `poll` and `emit_packet` test them per packet, and
+/// one enum for both cost 0.09% of the instructions of a forward read.
 #[derive(Debug)]
 pub struct Mp4Engine {
+    /// The forward continuation of a progressive source, if it is one.
     pub(crate) progressive: Option<progressive::ProgressiveState>,
+    /// The media a demux-order replay serves from memory, until it is read.
     pub(crate) media_cache_fill: Option<PendingMedia>,
+    /// The front read boundary, once a packet reached it.
     pub(crate) front_boundary: Option<FrontReadBoundary>,
+    /// The empty packet still to deliver at the boundary and how many times.
     pub(crate) empty_run: Option<(Mp4EmptyPacket, u32)>,
+    /// Whether the demux view ended at a short or missing sample.
     pub(crate) ended_short: bool,
     pub(crate) input: InputCursor,
-    pub plan: PreparedMp4,
+    pub(crate) plan: PreparedMp4,
     pub(crate) row: usize,
     /// After a sync-sample seek: rows of the video track before the sync row
     /// are skipped, as `(track_ID, sync row)`.
     pub(crate) skip_video_until: Option<(u32, usize)>,
     /// After a demux-view seek: rows come in the order the replay yields.
     pub(crate) demux_seek: Option<DemuxReplay>,
+    /// The sample being read, as `(track index, reader)`.
     pub(crate) packet: Option<(usize, SampleReader)>,
     pub(crate) configs: [Option<CachedDescription>; 64],
     pub(crate) revision: u64,

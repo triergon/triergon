@@ -45,7 +45,7 @@ impl PesTrack {
 
 #[expect(
     clippy::large_enum_variant,
-    reason = "legacy single-track playback has an inline observer and requires no extra allocation"
+    reason = "one selected track holds its observer inline, so the common case allocates no list"
 )]
 #[derive(Debug)]
 pub(crate) enum PesTracks {

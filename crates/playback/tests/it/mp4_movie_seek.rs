@@ -8,13 +8,8 @@ fn real_movie_edit_seek_maps_exact_source_point_before_playback_fence() {
     let raw = include_bytes!("../fixtures/mp4/r-edits-repeat.mov");
     let (mut p, _) = mp4(raw, View::Source, 7, 1).unwrap();
     let old = first_packet(&mut p);
-    let Some(Engine::Mp4(engine)) = p.engine() else {
-        panic!()
-    };
-    let mut job = engine
-        .plan
-        .movie_seek(1, Time::new(1, 2).unwrap(), 1024)
-        .unwrap();
+    let plan = p.engine().and_then(Engine::mp4_plan).unwrap();
+    let mut job = plan.movie_seek(1, Time::new(1, 2).unwrap(), 1024).unwrap();
     while !job.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
     let command = job.finish().unwrap();
     let triergon_isobmff::seek::MoviePoint::Media(point) = command.point() else {
@@ -52,13 +47,8 @@ fn movie_seek_command_cannot_cross_source_owner_pools() {
     let raw = include_bytes!("../fixtures/mp4/r-front-stco.mov");
     let (a, _) = mp4(raw, View::Source, 7, 1).unwrap();
     let (mut b, _) = mp4(raw, View::Source, 7, 1).unwrap();
-    let Some(Engine::Mp4(engine)) = a.engine() else {
-        panic!()
-    };
-    let mut job = engine
-        .plan
-        .movie_seek(1, Time::new(0, 1).unwrap(), 16)
-        .unwrap();
+    let plan = a.engine().and_then(Engine::mp4_plan).unwrap();
+    let mut job = plan.movie_seek(1, Time::new(0, 1).unwrap(), 16).unwrap();
     while !job.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
     let command = job.finish().unwrap();
     assert!(matches!(

@@ -65,6 +65,11 @@ impl Delivery {
 
 /// The transport stream demuxer of one program: the engine of
 /// [`Engine::Ts`](crate::Engine::Ts) and of the PES feed.
+///
+/// `bound_context` with `grid_lost`, `ended` with `draining`, and
+/// `entity_sequence` with `entity_end` are each one state in two fields on
+/// purpose: `poll` tests them per carrier, and one enum for each pair cost 0.04
+/// to 0.21% of the instructions of a program read.
 #[derive(Debug)]
 pub struct TsEngine {
     /// The startup context the observers are bound to, if any.
@@ -485,7 +490,7 @@ impl TsEngine {
                         return Ok(FeedContinuation::Emit);
                     }
                 };
-                // Leave one unit for event consumption in addition to native append.
+                // Leave one unit for event consumption in addition to the append.
                 if work.remaining() < 3 {
                     return Ok(FeedContinuation::Emit);
                 }
@@ -546,10 +551,9 @@ impl TsEngine {
         T::project(FeedStep::Packet { packet, clock })
     }
 
-    // Keep backend-specific polling workspaces out of the shared dispatcher.
+    /// The next selected track's carriage or refusal from track `at` on, if any
+    /// is waiting.
     #[inline(never)]
-    /// The next native track's configuration or refusal from track `at` on,
-    /// if any is waiting.
     #[cold]
     fn next_track_update(&mut self, at: usize) -> Option<FeedStep> {
         let (index, pid, update) = self
@@ -574,7 +578,7 @@ impl TsEngine {
     }
 
     /// Ends the current entity: a segment reports its end, and the source's
-    /// end starts draining the stream and every native track.
+    /// end starts draining the stream and every selected track.
     #[cold]
     fn end_entity<T: TsStepProjection>(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<T> {
         if self.draining {
@@ -601,7 +605,7 @@ impl TsEngine {
         T::project(FeedStep::Yield)
     }
 
-    /// Refuses every native track once an M2TS input loses its carrier grid.
+    /// Refuses every selected track once an M2TS input loses its carrier grid.
     #[cold]
     fn refuse_after_lost_grid(&mut self) {
         self.grid_lost = true;
@@ -611,6 +615,10 @@ impl TsEngine {
         self.pes_updates_from = Some(0);
     }
 
+    // One function on purpose: the measured per-carrier loop, compiled once for a
+    // player (`EngineStep`) and once for a progressive reader (`FeedStep`, in which
+    // `T::PROGRESSIVE` folds the mode tests). Its rare parts are the cold functions
+    // around it.
     pub(crate) fn poll<T: TsStepProjection>(
         &mut self,
         w: &mut WorkBudget,
@@ -735,8 +743,8 @@ impl TsEngine {
                 .pending
                 .as_ref()
                 .ok_or(Error::Invalid("TS event missing"))?;
-            // Feeds consume native payloads and the source facts needed for
-            // admission. The source parser still validates every carrier.
+            // A feed consumes the payload carriers and the source facts its
+            // observers need. The source parser still validates every carrier.
             if feed_only
                 && !matches!(
                     event,
@@ -789,7 +797,7 @@ impl TsEngine {
         }
     }
 
-    /// Adopts the pending PAT or active PMT: the program, the native tracks and
+    /// Adopts the pending PAT or active PMT: the program, the selected tracks and
     /// their observers, and the track facts. True while the PMT's next track
     /// still needs its observer, which leaves the event pending.
     #[cold]
@@ -883,8 +891,8 @@ impl TsEngine {
         Ok(false)
     }
 
-    /// Delivers the pending source event with its source and native clocks,
-    /// offering a transport packet to its native track first.
+    /// Delivers the pending source event with its source and demux clocks,
+    /// offering a transport packet to its track's observer first.
     #[inline(always)]
     fn deliver_event<T: TsStepProjection>(
         &mut self,
@@ -915,8 +923,8 @@ impl TsEngine {
                 source_pts = Some(source_timestamp(pes.header.pts_raw33, key, self.policy)?);
                 source_dts = Some(source_timestamp(pes.header.dts_raw33, key, self.policy)?);
             }
-            // Native clock work remains separately charged and may yield without taking
-            // the source event. No native time is copied into source fields.
+            // The demux clock charges its own work and may yield, which leaves the
+            // source event pending. No demux time is copied into the source fields.
             let projector = self
                 .source_pes_clock
                 .as_mut()
