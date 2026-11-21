@@ -1,6 +1,7 @@
 //! Bounded MP4 diagnostic consumer.
 //! Existing core owns input, resource charges, ranges and exact clocks.
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
+#![cfg_attr(not(test), no_main)]
 #[path = "isobmff_consumer/model.rs"]
 mod model;
 #[path = "isobmff_consumer/protocol.rs"]
@@ -12,6 +13,7 @@ use std::{
     fs::File,
     io::{self, Cursor, Read, Seek, Write},
     path::Path,
+    process::ExitCode,
     time::Instant,
 };
 use triergon_core::{Error, Time};
@@ -345,15 +347,31 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
     }
     Ok(())
 }
-fn main() {
-    if let Err(error) = main_result(env::args().collect()) {
-        eprintln!("isobmff-consumer: {error}");
-        std::process::exit(if matches!(error, Failure::Core(Error::Unsupported(_))) {
-            3
-        } else {
-            1
-        });
+#[cfg_attr(test, allow(dead_code))]
+fn worker_main() -> ExitCode {
+    match main_result(env::args().collect()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("isobmff-consumer: {error}");
+            if matches!(error, Failure::Core(Error::Unsupported(_))) {
+                ExitCode::from(3)
+            } else {
+                ExitCode::FAILURE
+            }
+        }
     }
+}
+
+/// C's entry point, the one exception to the worker's `deny(unsafe_code)`
+/// (`triergon-worker-entry`).
+#[cfg(not(test))]
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+extern "C" fn main(
+    _argc: std::ffi::c_int,
+    _argv: *const *const std::ffi::c_char,
+) -> std::ffi::c_int {
+    triergon_worker_entry::enter(worker_main)
 }
 
 #[cfg(test)]

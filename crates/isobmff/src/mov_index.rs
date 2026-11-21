@@ -537,7 +537,6 @@ enum Plain<'a> {
 pub struct SeekPlan<'a> {
     context: Context<'a>,
     landing: SeekLanding,
-    resume: Option<TrackResume<'a>>,
 }
 /// Resumes the real demux occurrence state by a bounded metadata replay from
 /// original tables. Skipped metadata causes no payload reads or caller output.
@@ -681,13 +680,10 @@ impl<'a> SeekJob<'a> {
                     if self.keep_resume {
                         let cursor = &self.index.cursor;
                         if first {
-                            self.first_resume =
-                                Some(cursor.ready_track_resume(fields.ordinal, None)?);
+                            cursor.store_track_resume(fields.ordinal, &mut self.first_resume)?;
                         }
                         if best {
-                            let previous = self.best_resume.take();
-                            self.best_resume =
-                                Some(cursor.ready_track_resume(fields.ordinal, previous)?);
+                            cursor.store_track_resume(fields.ordinal, &mut self.best_resume)?;
                         }
                     }
                     let entry = self.index.take_entry()?;
@@ -771,11 +767,18 @@ impl<'a> SeekJob<'a> {
                         }
                         CursorStatus::Ready => {}
                     }
-                    let resume = if self.keep_resume {
-                        Some(self.index.cursor.ready_track_resume(choice.ordinal, None)?)
+                    let resume = if choice.first_fallback {
+                        &mut self.first_resume
                     } else {
-                        None
+                        &mut self.best_resume
                     };
+                    if self.keep_resume {
+                        self.index
+                            .cursor
+                            .store_track_resume(choice.ordinal, resume)?;
+                    } else {
+                        *resume = None;
+                    }
                     let entry = self.index.take_entry()?;
                     if entry.ordinal != choice.ordinal
                         || (entry.flags & 1 == 0 && !choice.first_fallback)
@@ -784,10 +787,8 @@ impl<'a> SeekJob<'a> {
                     }
                     if choice.first_fallback {
                         self.first = Some(entry);
-                        self.first_resume = resume;
                     } else {
                         self.best = Some(entry);
-                        self.best_resume = resume;
                     }
                     self.scanned = choice.scanned;
                     self.plain = Plain::Off;
@@ -798,6 +799,15 @@ impl<'a> SeekJob<'a> {
         }
     }
     pub fn finish(mut self) -> Result<SeekPlan<'a>> {
+        let (landing, _) = self.take_landing()?;
+        Ok(SeekPlan {
+            context: self.context,
+            landing,
+        })
+    }
+    /// The landing of a ready seek and the track's packet state there, when
+    /// it was kept. Takes them out of the job, which is spent afterwards.
+    fn take_landing(&mut self) -> Result<(SeekLanding, Option<TrackResume<'a>>)> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -811,21 +821,18 @@ impl<'a> SeekJob<'a> {
             .or_else(|| self.first.take())
             .ok_or(Error::Invalid("missing native seek selection"))?;
         let resume = if used_first_fallback {
-            self.first_resume
+            self.first_resume.take()
         } else {
-            self.best_resume
+            self.best_resume.take()
         };
-        Ok(SeekPlan {
-            context: self.context,
-            resume,
-            landing: SeekLanding {
-                requested_timestamp: self.timestamp,
-                selected,
-                scanned_entries: self.scanned,
-                used_first_fallback,
-                opus_recovery: None,
-            },
-        })
+        let landing = SeekLanding {
+            requested_timestamp: self.timestamp,
+            selected,
+            scanned_entries: self.scanned,
+            used_first_fallback,
+            opus_recovery: None,
+        };
+        Ok((landing, resume))
     }
 }
 impl<'a> SeekPlan<'a> {
@@ -960,7 +967,9 @@ pub struct GlobalSeekJob<'a> {
     anchors: BudgetVec<ResumePoint>,
     /// Each track's packet state at its anchor, when its seek kept one.
     resumes: BudgetVec<Option<TrackResume<'a>>>,
-    child: Option<SeekJob<'a>>,
+    /// The seek of the track at hand, boxed: it is several kilobytes, and the
+    /// global job moves whole when it is built, returned and finished.
+    child: Option<Box<SeekJob<'a>>>,
     opus_track: Option<usize>,
     opus_recovery: Option<Box<OpusRecoverySeek<'a>>>,
     at: usize,
@@ -1158,7 +1167,10 @@ impl<'a> GlobalSeekJob<'a> {
             ready: false,
             failed: None,
         };
-        let mut child = SeekJob::build(job.track_context(reference_index), timestamp)?;
+        let mut child = Box::new(SeekJob::build(
+            job.track_context(reference_index),
+            timestamp,
+        )?);
         child.keep_resume = job.projection.is_all();
         job.child = Some(child);
         Ok(job)
@@ -1238,13 +1250,8 @@ impl<'a> GlobalSeekJob<'a> {
                 if !work.try_charge(1) {
                     return Ok(BuildStatus::Yield);
                 }
-                let SeekPlan {
-                    landing, resume, ..
-                } = self
-                    .child
-                    .take()
-                    .ok_or(Error::Invalid("native seek child absent"))?
-                    .finish()?;
+                let (landing, resume) = child.take_landing()?;
+                self.child = None;
                 self.scanned = self
                     .scanned
                     .checked_add(landing.scanned_entries)
@@ -1316,7 +1323,7 @@ impl<'a> GlobalSeekJob<'a> {
             };
             // If a secondary track has no preceding sync sample, replay
             // its verified non-sync prefix from the beginning.
-            let mut child = SeekJob::build(self.track_context(self.at), timestamp)?;
+            let mut child = Box::new(SeekJob::build(self.track_context(self.at), timestamp)?);
             child.allow_initial_prefix = true;
             child.keep_resume = self.projection.is_all() && !recovering_opus;
             self.child = Some(child);

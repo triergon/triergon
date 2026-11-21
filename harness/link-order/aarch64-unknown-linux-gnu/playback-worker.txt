@@ -8,19 +8,12 @@ __init_cpu_features
 __init_cpu_features_constructor
 std::sys::args::unix::imp::ARGV_INIT_ARRAY::init_wrapper
 main
-__aarch64_cas8_relax
-std::sys::pal::unix::stack_overflow::imp::make_handler
-std::sys::pal::unix::stack_overflow::thread_info::set_current_info
-__aarch64_cas4_acq
-__aarch64_cas8_acq
-__aarch64_swp4_rel
-std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> std::process::ExitCode, std::process::ExitCode>
-playback_worker::main
 std::env::args
 <std::env::Args as core::iter::traits::iterator::Iterator>::nth
 core::str::converts::from_utf8
 playback_worker::mp4_range::run
 <triergon_harness_runner::Invocation>::parse
+__aarch64_cas8_relax
 <triergon_harness_runner::Invocation>::input
 std::sys::fs::metadata
 std::sys::fs::unix::try_statx
@@ -31,8 +24,8 @@ alloc::io::read::default_read_to_end::small_probe_read::<std::fs::File>
 __aarch64_ldadd8_relax
 triergon_harness_runner::measure_dyn
 <std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>
-<std::sys::sync::once::futex::Once>::call
-<std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0}
+__aarch64_cas4_acq
+__aarch64_swp4_rel
 <std::io::stdio::StdoutLock as core::io::write::Write>::write_all
 core::slice::memchr::memrchr_aligned
 <std::sys::stdio::unix::Stdout as core::io::write::Write>::write_all
@@ -183,7 +176,8 @@ core::ptr::drop_glue::<alloc::vec::Vec<triergon_isobmff::mov_cursor::range_seek:
 <triergon_isobmff::interleave::TrackSampleCursor>::poll_inner
 <triergon_isobmff::mov_clock::SchedulingClock>::from_clock
 <triergon_isobmff::mov_cursor::PacketCursor>::record_seek_checkpoint
-<triergon_isobmff::mov_cursor::Slot>::try_clone_with_edit_storage
+__aarch64_cas8_acq
+<triergon_isobmff::mov_cursor::Slot>::try_clone
 <triergon_core::bytes::BudgetVec<triergon_isobmff::mov_cursor::range_seek::Checkpoint>>::try_push
 <triergon_core::bytes::BudgetVec<triergon_isobmff::mov_cursor::range_seek::Checkpoint>>::grow_for_push
 <triergon_core::bytes::BudgetVec<triergon_isobmff::mov_cursor::range_seek::Checkpoint>>::reallocate
@@ -250,7 +244,6 @@ core::fmt::write
 <alloc::string::String as core::fmt::Display>::fmt
 <core::io::write::default_write_fmt::Adapter<std::io::stdio::StdoutLock> as core::fmt::Write>::write_str
 <alloc::sync::Arc<triergon_core::budget::Inner>>::drop_slow
-<std::sync::once::Once>::call_once::<std::rt::cleanup::{closure#0}>::{closure#0}
 release_registered_frames
 btree_destroy
 __aarch64_swp8_acq_rel
@@ -258,10 +251,10 @@ playback_worker::mp4_range::seek_to
 <triergon_playback::player::mp4_range::Mp4RangePlayer<triergon_playback::input::ByteSource>>::prepare_range_seek
 <triergon_isobmff::mov_clock::MediaClock>::from_source
 <triergon_isobmff::mov_cursor::PacketCursor>::prepare_checked_range_seek
-<triergon_playback::player::mp4_range::Mp4RangeSeekJob>::poll
 core::ptr::drop_glue::<core::option::Option<triergon_isobmff::mov_cursor::range_seek::TrackSeek>>
 <triergon_isobmff::mov_cursor::range_seek::TrackSeek>::finish_forward
 <triergon_isobmff::mov_cursor::range_seek::TrackSeek>::restart_at
+<triergon_isobmff::mov_cursor::Slot>::try_clone_into
 <triergon_core::time::TimeBase>::rescale
 <triergon_isobmff::encoded_edits::EncodedEditPlan>::align_seek_timestamp
 <triergon_playback::player::mp4_range::Mp4RangeSeekJob>::finish
@@ -656,7 +649,7 @@ core::ptr::drop_glue::<alloc::vec::Vec<triergon_matroska::metadata::SharedDocume
 <triergon_matroska::metadata::typed_document::CatalogueJob>::start_document
 core::ptr::drop_glue::<core::option::Option<triergon_matroska::metadata::typed_document::DocumentJob>>
 <triergon_core::bytes::BudgetVec<triergon_matroska::metadata::Node>>::reallocate
-<triergon_matroska::storage::text_job::TextJob>::step
+<triergon_matroska::storage::text_job::TextCheck>::step
 triergon_matroska::metadata::typed_document::bit
 <triergon_matroska::storage::StorageVec<triergon_matroska::metadata::SharedDocument>>::push
 <triergon_matroska::matroska::typed::tracks::TracksJob>::step
@@ -793,15 +786,16 @@ core::ptr::drop_glue::<triergon_matroska::incremental::ParseStep<triergon_matros
 <triergon_matroska::matroska::typed::epoch::EpochRestoreJob>::after_group
 <triergon_matroska::matroska::typed::epoch::RestoredEpoch as core::clone::Clone>::clone
 core::ptr::drop_glue::<triergon_matroska::typed::reader::seeking::ScanBoundary>
+triergon_matroska::matroska::typed::packet::keep_recovery_packet
 <triergon_playback::matroska_feed::video_seek::MatroskaVideoSeekGate>::admits
 <triergon_matroska::incremental::ElementReader>::admit_typed_leaf
+<triergon_matroska::storage::text_job::TextJob>::step
 <triergon_framing::hevc_config::HvcConfigParser>::new
 <triergon_framing::hevc_config::HvcConfigParser>::step
 <triergon_framing::hevc_config::HvcConfigParser>::advance
 triergon_playback::raw_video::config::hevc::startup_sps
 <triergon_playback::raw_video::config::hevc::Rbsp>::bounded
 triergon_playback::raw_video::config::hevc::vps
-<triergon_framing::hevc_config::HvcConfigNal>::length_field_bytes
 core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfiguration>
 core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfigParser>
 <triergon_matroska::matroska::Track>::legacy_aac_profile
@@ -810,7 +804,7 @@ core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfigParser>
 <triergon_matroska::matroska::typed::configuration::Configuration>::initialization
 <triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>::step
 core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>
-triergon_playback::raw_video::config::hevc::vps_timing
+triergon_playback::raw_video::config::hevc::read_vps_timing
 core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbyFeed>
 core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::FeedCodec>
 playback_worker::matroska_audio::run
