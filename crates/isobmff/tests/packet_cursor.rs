@@ -214,6 +214,66 @@ fn demux_cursor_clock_context_preserves_unsigned_source_and_wire_run_distinction
 }
 
 #[test]
+fn the_composition_shift_ignores_the_last_two_ctts_rows() {
+    // The decode shift of each file's recorded reference packets (native-followup/clock.txt).
+    for (bytes, shift) in [
+        (
+            include_bytes!("fixtures/native-followup/follow-clock-uniform-two.mov").as_slice(),
+            0i128,
+        ),
+        (
+            include_bytes!("fixtures/native-followup/follow-clock-tail-minimum-three.mov")
+                .as_slice(),
+            0,
+        ),
+        (
+            include_bytes!("fixtures/native-followup/follow-clock-tail-minimum-four.mov")
+                .as_slice(),
+            -300,
+        ),
+        (
+            include_bytes!("fixtures/native-followup/follow-clock-later-minimum-four.mov")
+                .as_slice(),
+            -100,
+        ),
+        (
+            include_bytes!("fixtures/native-followup/follow-clock-later-minimum-five.mov")
+                .as_slice(),
+            -700,
+        ),
+    ] {
+        let budget = Budget::new(2 * 1024 * 1024).unwrap();
+        let (tables, media) = parse(&budget, bytes);
+        let sources = tracks(&tables);
+        let mut cursor = PacketCursor::new(
+            &budget,
+            &sources,
+            &media,
+            PacketLimits::default(),
+            DemuxProfile::NoParseNoFillin,
+        )
+        .unwrap();
+        let mut packets = 0;
+        for _ in 0..100_000 {
+            match cursor
+                .poll(&mut WorkBudget::new(1 << 16), &AtomicBool::new(false))
+                .unwrap()
+            {
+                CursorStatus::Yield => {}
+                CursorStatus::End => break,
+                CursorStatus::Ready => {
+                    let occurrence = cursor.take_occurrence().unwrap();
+                    let source = occurrence.source.dts_ticks.unwrap();
+                    assert_eq!(i128::from(occurrence.demux.dts.unwrap()), source + shift);
+                    packets += 1;
+                }
+            }
+        }
+        assert_eq!(packets, 6);
+    }
+}
+
+#[test]
 fn demux_cursor_cancellation_and_budget_failure_release_all_owned_storage() {
     let budget = Budget::new(2 * 1024 * 1024).unwrap();
     let (tables, media) = parse(&budget, include_bytes!("fixtures/r-front-stco.mov"));

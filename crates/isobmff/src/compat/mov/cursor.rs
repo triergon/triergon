@@ -8,7 +8,7 @@
 use crate::{
     CursorStatus, Next, Sample,
     compat::mov::{
-        clocks::{MediaClock, SchedulingClock},
+        clocks::{MediaClock, SchedulingClock, composition_shift_rows},
         edit_list::{DurationBasis, EditCursor, EditLimits, EmitPrepare, EmitStart},
         view::{PacketProjector, PacketView},
     },
@@ -1851,10 +1851,9 @@ impl<'a> PacketCursor<'a> {
                             .track
                             .table
                             .composition_runs()
-                            .filter(|runs| self.row < runs.count.saturating_sub(2))
+                            .filter(|runs| self.row < composition_shift_rows(runs.count))
                     {
-                        // Explicit reference demux rule, regardless of the
-                        // source ctts version. Source runs are never changed.
+                        // Signed for either `ctts` version; the source runs are unchanged.
                         let offset = i32::from_be_bytes(runs.word(self.row, 4)?.to_be_bytes());
                         slot.shift = slot.shift.min(i64::from(offset));
                         self.row += 1;

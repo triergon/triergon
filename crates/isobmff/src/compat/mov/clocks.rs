@@ -178,6 +178,14 @@ impl SchedulingClock {
     }
 }
 
+/// The leading `ctts` rows whose smallest offset moves a regular track's decode times
+/// earlier: all but the last two. The demuxer leaves a table of one or two rows
+/// unshifted and ignores a smaller offset in either of the last two rows, as the
+/// recorded packets of `tests/fixtures/native-followup/follow-clock-*` show.
+pub(crate) const fn composition_shift_rows(rows: u32) -> u32 {
+    rows.saturating_sub(2)
+}
+
 /// `value / divisor` rounded to the nearest integer, ties away from zero.
 ///
 /// A divisor below 2^32 divides in 32-bit limbs: each partial remainder is
