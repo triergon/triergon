@@ -48,6 +48,11 @@ pub use sized::{Load, SizeMetrics, SizedFont};
 pub use store::{Built, Store, StoreKey};
 pub use synthesis::Orientation;
 
+/// The CFF Standard Encoding (Adobe Technical Note 5176, Appendix B): the
+/// string ID of the glyph each code names, 0 for a code it leaves out. A
+/// CFF `seac` names its base and accent characters by these codes.
+pub static CFF_STANDARD_ENCODING: &[u16; 256] = &postscript::STANDARD_ENCODING;
+
 use cff::{Cff, Version};
 use fixed::{Scale, div_fix, mul_fix};
 use glyf::Glyf;

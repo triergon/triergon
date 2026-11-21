@@ -408,7 +408,9 @@ operations on values held in 32 bits, wrapping as the hinters need.
 
 `read` has the big-endian readers the tables are read with (`Reader`,
 `u16_at`, `u24_at`, `u32_at`) and the binary search (`bsearch`), for readers of
-tables this crate leaves to others, whose bytes `Font::table` gives.
+tables this crate leaves to others, whose bytes `Font::table` gives;
+`CFF_STANDARD_ENCODING` is the CFF Standard Encoding such a reader of `CFF `
+needs for `seac`.
 
 ## What it does not read
 
