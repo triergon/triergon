@@ -113,7 +113,7 @@ video and audio tracks.
 | Probe | `io::Probe`: Matroska, MP4, TS188 and M2TS192 |
 | Matroska | `Engine::matroska`, `Engine::matroska_reader` (an unstarted reader built with `Reader::new_with_payload_ownership`, `new_with_immutable_seek_index` or `compat::block_additions::new_reader`) |
 | MP4 / MOV | `mp4_open::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `Engine::mp4`, `Engine::mp4_progressive`, `Engine::mp4_native_terminal_v1`, `Mp4RangeOpen` / `Mp4RangePlayer` |
-| MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_native_seek` / `apply_mp4_native_seek`, progressive variants, `PreparedMp4::movie_seek` |
+| MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_demux_seek` / `apply_mp4_demux_seek`, progressive variants, `PreparedMp4::movie_seek` |
 | MP4 catalogue replacement | `catalogue::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
 | TS / M2TS | `Engine::ts`, `ts_with_namespace`, `ts_segmented`, `ts_native`, `compat::pes::open_private_audio`, `ts_native_program_v1`, `ts_native_segment_v1`; `compat::pes::startup::Startup` |
 | PES feed | `pes_feed`: the feed [`triergon-hls`](../hls/README.md) reads HLS segments and progressive TS188 input from |
@@ -144,8 +144,8 @@ storage for pool identity.
 packet clocks are explicit opt-in views (`ClockChoice::Demux`,
 `Mp4View::PinnedMov9NoParseNoFillin`, the `native_*` Matroska clocks and the
 `*_native_*` TS engines); they never overwrite source facts. Native views can
-emit events the source view does not, such as `Mp4Event::NativeShortPacket`,
-`NativeEmptyPacket`, `NativeMissingSample` and native refusals.
+emit events the source view does not, such as `Mp4Event::ShortPacket`,
+`EmptyPacket`, `MissingSample` and native refusals.
 
 **Generations.** A seek, track switch or configuration change starts a new
 generation. Check outputs with `Player::may_deliver`. `Delivery::DecodeOnly`
@@ -175,7 +175,7 @@ seeks before the first sync packet of a secondary fragment track, range
 playback replays that track from its first packet. An AAC track with a
 single initialization edit carries leading trim in the first packet's
 `Mp4Packet::encoded_skip_samples`. A recovered short first packet carries its
-leading trim in `Mp4NativeShortPacket::encoded_skip_samples`. The MPEG-4 object
+leading trim in `Mp4ShortPacket::encoded_skip_samples`. The MPEG-4 object
 type identifies AAC. An edited MP3 track has the projected clocks without AAC
 trim. Source sample
 clocks and byte ranges stay literal while the compatibility packet clocks
@@ -201,10 +201,10 @@ a front `moov` gives), it indexes with `Mp4IndexJob::new_native_terminal_v1`
 and reads with `Engine::mp4_native_terminal_v1`; otherwise it indexes with
 `Mp4View::PinnedMov9NoParseNoFillin` and reads with `Engine::mp4`. It recovers
 what FFmpeg recovers: a first sample outside the source ends the view with
-`NativeMissingSample`, a truncated sample becomes a corrupt
-`NativeShortPacket` carrying the available prefix, a zero media timescale
+`MissingSample`, a truncated sample becomes a corrupt
+`ShortPacket` carrying the available prefix, a zero media timescale
 reads in a 1/1 base, and a zero-size read ends native delivery, with a
-`NativeEmptyPacket` where FFmpeg emits one. On a seekable source the recovery
+`EmptyPacket` where FFmpeg emits one. On a seekable source the recovery
 opener refuses a zero-size fragment sample in the header, as FFmpeg does.
 `Mp4Open::new` refuses out-of-source, truncated and zero-timescale media and
 reads zero-size samples as declared. When a single track's first chunk lies

@@ -187,7 +187,7 @@ fn try_make_source_mode(
     assert!(ready);
     let plan = job.finish().unwrap();
     if native {
-        assert_eq!(plan.rows(), plan.native_rows().len());
+        assert_eq!(plan.rows(), plan.demux_rows().len());
     }
     let engine = if native && front {
         Engine::mp4_native_terminal_v1(opened.input, plan, 1 << 20, ProgressiveLimits::default())
@@ -224,7 +224,7 @@ fn make(
 fn check(out: &[Output], case: &gold::Case) {
     let got: Vec<_> = packets(out)
         .into_iter()
-        .filter(|p| p.native.is_some())
+        .filter(|p| p.occurrence.is_some())
         .collect();
     assert_eq!(got.len(), case.packets().len(), "{}", case.name);
     for (p, w) in got.into_iter().zip(case.packets()) {
@@ -234,7 +234,7 @@ fn check(out: &[Output], case: &gold::Case) {
             w.offset()..w.offset() + w.data.len() as u64
         );
         assert_eq!(p.configuration.track.track_id as usize, w.stream_index + 1);
-        let n = p.native.as_ref().expect("native occurrence required");
+        let n = p.occurrence.as_ref().expect("native occurrence required");
         assert_eq!(n.source, p.source.sample);
         assert_eq!(n.track_id, p.configuration.track.track_id);
         assert_eq!(n.demux.source_ordinal, p.source.sample.ordinal);
@@ -291,7 +291,7 @@ fn native_terminal_unknown_source_clocks_and_literal_origin_chain_are_retained()
         if at >= 6 {
             assert_eq!(p.source.sample.dts_ticks, None);
             assert_eq!(p.source.sample.cts_ticks, None);
-            let ClockOrigin::PredecessorEnd(origin) = p.native.as_ref().unwrap().clock_origin
+            let ClockOrigin::PredecessorEnd(origin) = p.occurrence.as_ref().unwrap().clock_origin
             else {
                 panic!("derived native origin required")
             };
@@ -465,15 +465,15 @@ fn native_zero_boundary_preserves_all_nine_source_records_and_requires_physical_
     check(&out, c);
     for (at, p) in source.iter().enumerate() {
         if at < 6 {
-            assert!(p.native_front_read_boundary_v1.is_none());
+            assert!(p.front_read_boundary.is_none());
         } else {
-            let boundary = p.native_front_read_boundary_v1.unwrap();
+            let boundary = p.front_read_boundary.unwrap();
             assert_eq!(boundary.source_ordinal, 7);
             assert_eq!(boundary.source_offset, c.raw.len() as u64);
             assert_eq!(boundary.track_id, 1);
             assert_eq!(p.source.sample.ordinal, at as u64 + 1);
             assert!(p.source.payload.is_empty());
-            assert_eq!(p.native.is_some(), at == 6);
+            assert_eq!(p.occurrence.is_some(), at == 6);
         }
     }
     assert_eq!(s.ends.load(Ordering::Relaxed), 0);
@@ -619,8 +619,8 @@ fn source_keeps_nonempty_bytes_beyond_native_zero_run_start_boundary() {
     }
     for packet in n.iter().skip(7) {
         assert_eq!(packet.source.payload.len(), 12);
-        assert!(packet.native.is_none());
-        assert!(packet.native_front_read_boundary_v1.is_some());
+        assert!(packet.occurrence.is_none());
+        assert!(packet.front_read_boundary.is_some());
     }
 }
 #[test]
@@ -664,7 +664,10 @@ fn native_seekable_header_rejects_zero_size_fragment_samples() {
                 let observed = packets(&pipe_output);
                 assert_eq!(literal.len(), 9);
                 assert_eq!(observed.len(), 9);
-                assert_eq!(observed.iter().filter(|p| p.native.is_some()).count(), 7);
+                assert_eq!(
+                    observed.iter().filter(|p| p.occurrence.is_some()).count(),
+                    7
+                );
                 for (a, b) in literal.iter().zip(observed) {
                     assert_eq!(a.source.sample, b.source.sample);
                     assert_eq!(a.source.payload.as_ref(), b.source.payload.as_ref());
@@ -729,7 +732,7 @@ fn native_out_of_source_first_sample_requires_a_physical_end() {
                 let [refusal] = out.as_slice() else {
                     panic!("expected one native refusal")
                 };
-                let Event::Mp4(Mp4Event::NativeMissingSample(refusal)) = refusal.event() else {
+                let Event::Mp4(Mp4Event::MissingSample(refusal)) = refusal.event() else {
                     panic!("expected a missing first sample");
                 };
                 assert_eq!(refusal.track_id, 1);
@@ -866,7 +869,7 @@ fn native_zero_timescale_keeps_the_declared_source_clock_unavailable() {
                         continue;
                     };
                     let track = &packet.configuration.track;
-                    let clock = &packet.native.as_ref().unwrap().media_clock;
+                    let clock = &packet.occurrence.as_ref().unwrap().media_clock;
                     assert_eq!(&track.raw_mdhd.payload()[12..16], &[0; 4]);
                     assert_eq!(track.base.get(), None);
                     assert_eq!(clock.source_base.get(), None);
@@ -878,7 +881,7 @@ fn native_zero_timescale_keeps_the_declared_source_clock_unavailable() {
                         clock.cause,
                         triergon_isobmff::compat::mov::clock::MediaClockCause::ObservedZeroScaleWord
                     );
-                    assert_eq!(track.native_catalogue.as_ref().unwrap().clock, *clock);
+                    assert_eq!(track.demux_stream.as_ref().unwrap().clock, *clock);
                     assert_eq!(output.event().source_pts().unwrap(), None);
                     assert_eq!(
                         output.event().demux_pts().unwrap(),
@@ -931,16 +934,16 @@ fn native_short_media_packet_requires_a_positive_prefix_at_eof() {
                     let out = collect(&mut native, work).unwrap();
                     assert_eq!(packets(&out).len(), 5);
                     let last = out.last().unwrap().event();
-                    let Event::Mp4(Mp4Event::NativeShortPacket(p)) = last else {
+                    let Event::Mp4(Mp4Event::ShortPacket(p)) = last else {
                         panic!("expected a native short packet");
                     };
-                    assert_eq!(p.prefix.declared, p.native.source);
+                    assert_eq!(p.prefix.declared, p.occurrence.source);
                     assert_eq!(p.prefix.declared.range, start..start + 12);
                     assert_eq!(p.prefix.end.offset, start + 11);
                     assert_eq!(p.prefix.payload.as_ref(), &raw[start as usize..]);
-                    assert_eq!(p.native.demux.dts, Some(5000));
-                    assert_eq!(p.native.demux.duration, 1000);
-                    assert_eq!(p.native.demux.flags, 2);
+                    assert_eq!(p.occurrence.demux.dts, Some(5000));
+                    assert_eq!(p.occurrence.demux.duration, 1000);
+                    assert_eq!(p.occurrence.demux.flags, 2);
                     assert_eq!(last.payload_bytes(), 11);
                     assert_eq!(last.source_pts().unwrap(), None);
                     assert!(signals.ends.load(Ordering::Relaxed) >= 1);
@@ -977,7 +980,7 @@ fn native_short_packet_distinguishes_pending_failure_and_empty_eof() {
         while let Some(output) = native.pop() {
             assert!(!matches!(
                 output.event(),
-                Event::Mp4(Mp4Event::NativeShortPacket(_))
+                Event::Mp4(Mp4Event::ShortPacket(_))
             ));
         }
         if native
@@ -1023,16 +1026,16 @@ fn interior_zero_read_preserves_the_native_packet_prefix_and_source() {
                     assert_eq!(n.source.sample, s.source.sample);
                     assert_eq!(n.source.payload.as_ref(), s.source.payload.as_ref());
                 }
-                assert!(got[..8].iter().all(|p| p.native.is_some()));
-                assert!(got[8].native.is_none() && !got[8].source.payload.is_empty());
-                let zero = got[7].native.as_ref().unwrap();
+                assert!(got[..8].iter().all(|p| p.occurrence.is_some()));
+                assert!(got[8].occurrence.is_none() && !got[8].source.payload.is_empty());
+                let zero = got[7].occurrence.as_ref().unwrap();
                 assert_eq!(zero.demux.dts, Some(7000));
                 assert_eq!(zero.demux.source_range, 1151..1151);
                 let empty: Vec<_> = output
                     .iter()
                     .enumerate()
                     .filter_map(|(i, e)| match e.event() {
-                        Event::Mp4(Mp4Event::NativeEmptyPacket(empty)) => Some((i, empty)),
+                        Event::Mp4(Mp4Event::EmptyPacket(empty)) => Some((i, empty)),
                         _ => None,
                     })
                     .collect();
@@ -1045,7 +1048,7 @@ fn interior_zero_read_preserves_the_native_packet_prefix_and_source() {
                 assert!(
                     matches!(output[*at + 1].event(), Event::Mp4(Mp4Event::Packet(p)) if p.source.sample.ordinal == 9)
                 );
-                assert_eq!(Some(empty.boundary), got[7].native_front_read_boundary_v1);
+                assert_eq!(Some(empty.boundary), got[7].front_read_boundary);
                 assert_eq!(empty.boundary.source_ordinal, 8);
                 assert_eq!(empty.time_base, zero.media_clock.demux_base);
                 assert_eq!(empty.handler, *b"vide");
@@ -1097,7 +1100,7 @@ fn native_empty_run_tail_uses_the_greatest_completed_run_end_once() {
         let durations: Vec<_> = output
             .iter()
             .filter_map(|e| match e.event() {
-                Event::Mp4(Mp4Event::NativeEmptyPacket(empty)) => Some(empty.duration),
+                Event::Mp4(Mp4Event::EmptyPacket(empty)) => Some(empty.duration),
                 _ => None,
             })
             .collect();
@@ -1127,7 +1130,7 @@ fn final_indexed_zero_read_preserves_the_literal_packet() {
                         expected.source.payload.as_ref()
                     );
                 }
-                let boundary = native_packets[8].native_front_read_boundary_v1.unwrap();
+                let boundary = native_packets[8].front_read_boundary.unwrap();
                 assert_eq!(
                     (
                         boundary.track_id,
@@ -1186,12 +1189,12 @@ fn final_indexed_zero_read_leaves_the_source_open_for_a_later_fragment() {
         check(&got, case);
         let observed = packets(&got);
         assert_eq!(observed.len(), 12);
-        let boundary = observed[8].native_front_read_boundary_v1.unwrap();
+        let boundary = observed[8].front_read_boundary.unwrap();
         for (packet, expected_dts) in observed[9..].iter().zip([9000, 10000, 11000]) {
             assert_eq!(packet.source.sample.dts_ticks, Some(expected_dts));
             assert_eq!(packet.source.payload.len(), 12);
-            assert!(packet.native.is_none());
-            assert_eq!(packet.native_front_read_boundary_v1, Some(boundary));
+            assert!(packet.occurrence.is_none());
+            assert_eq!(packet.front_read_boundary, Some(boundary));
         }
         signals.eof.store(true, Ordering::Relaxed);
         assert!(collect(&mut native, 1).unwrap().is_empty());
@@ -1219,15 +1222,15 @@ fn final_zero_read_at_media_end_keeps_later_indexed_payloads() {
                 source.source.payload.as_ref()
             );
         }
-        assert!(got[..9].iter().all(|p| p.native.is_some()));
-        let boundary = got[8].native_front_read_boundary_v1.unwrap();
+        assert!(got[..9].iter().all(|p| p.occurrence.is_some()));
+        let boundary = got[8].front_read_boundary.unwrap();
         assert_eq!((boundary.source_ordinal, boundary.source_offset), (9, 1311));
-        assert_eq!(got[8].native.as_ref().unwrap().demux.dts, Some(8000));
+        assert_eq!(got[8].occurrence.as_ref().unwrap().demux.dts, Some(8000));
         assert!(got[8].source.payload.is_empty());
         for p in &got[9..] {
             assert_eq!(p.source.payload.len(), 12);
-            assert!(p.native.is_none());
-            assert_eq!(p.native_front_read_boundary_v1, Some(boundary));
+            assert!(p.occurrence.is_none());
+            assert_eq!(p.front_read_boundary, Some(boundary));
         }
         assert!(signals.ends.load(Ordering::Relaxed) >= 1);
     }
@@ -1347,10 +1350,10 @@ fn native_from_start_origin_never_claims_complete_entity_or_source_clock() {
         assert_eq!(p.source.sample.cts_ticks, None);
     }
     assert_eq!(
-        format!("{:?}", samples[0].native.as_ref().unwrap().clock_origin),
+        format!("{:?}", samples[0].occurrence.as_ref().unwrap().clock_origin),
         "FrontSourceMediaStart"
     );
-    assert_eq!(samples[0].native.as_ref().unwrap().demux.dts, Some(0));
+    assert_eq!(samples[0].occurrence.as_ref().unwrap().demux.dts, Some(0));
     s.eof.store(true, Ordering::Relaxed);
     out.extend(collect(&mut p, 1).unwrap());
     assert_eq!(packets(&out).len(), 9);
@@ -1381,8 +1384,8 @@ fn regular_multiple_finite_mdats_preserve_whole_native_and_source_packets() {
                         source.source.payload.as_ref(),
                         native.source.payload.as_ref()
                     );
-                    assert!(source.native.is_none());
-                    assert!(native.native_front_read_boundary_v1.is_none());
+                    assert!(source.occurrence.is_none());
+                    assert!(native.front_read_boundary.is_none());
                 }
                 drop(native);
                 check(&output, case);
@@ -1470,7 +1473,7 @@ fn forward_tail_moov_reuses_media_consumed_during_index_discovery() {
                     assert_eq!(n.source.sample, s.source.sample);
                     assert_eq!(n.source.payload.as_ref(), s.source.payload.as_ref());
                     assert!(n.source.payload.shares_storage_with(&got[0].source.payload));
-                    assert!(s.native.is_none());
+                    assert!(s.occurrence.is_none());
                 }
                 drop(native);
                 check(&output, case);
@@ -1526,7 +1529,7 @@ fn forward_tail_moov_resolves_offsets_across_multiple_retained_mdats() {
         let offset = gold.offset() + if i < 3 { 0 } else { 8 };
         assert_eq!(packet.source.sample.range, offset..offset + 12);
         assert_eq!(packet.source.payload.as_ref(), gold.data);
-        assert_eq!(packet.native.as_ref().unwrap().demux.dts, gold.dts);
+        assert_eq!(packet.occurrence.as_ref().unwrap().demux.dts, gold.dts);
         assert!(
             packet
                 .source
@@ -1581,7 +1584,7 @@ fn regular_forward_samples_in_a_terminal_mdat_require_actual_eof() {
             if native {
                 check(&out, case);
             } else {
-                assert!(got.iter().all(|p| p.native.is_none()));
+                assert!(got.iter().all(|p| p.occurrence.is_none()));
             }
             signals.eof.store(true, Ordering::Relaxed);
             assert!(collect(&mut p, 1).unwrap().is_empty());

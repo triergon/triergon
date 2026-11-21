@@ -21,7 +21,7 @@ enum Phase {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum NativeMp4ReplayStep {
+pub(crate) enum DemuxReplayStep {
     Ready(usize),
     Yield,
     End,
@@ -30,7 +30,7 @@ pub(crate) enum NativeMp4ReplayStep {
 /// One head per track in movie catalogue order. The caller keeps the same
 /// immutable occurrence table for the lifetime of this replay and its clones.
 #[derive(Clone, Debug)]
-pub(crate) struct NativeMp4Replay {
+pub(crate) struct DemuxReplay {
     slots: [Slot; MAX_TRACKS],
     track_count: usize,
     row_count: usize,
@@ -38,7 +38,7 @@ pub(crate) struct NativeMp4Replay {
     phase: Phase,
 }
 
-impl NativeMp4Replay {
+impl DemuxReplay {
     pub(crate) fn new(
         track_ids: &[u32],
         starts: &[usize],
@@ -92,7 +92,7 @@ impl NativeMp4Replay {
         rows: &[PacketOccurrence],
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<NativeMp4ReplayStep> {
+    ) -> Result<DemuxReplayStep> {
         if rows.len() != self.row_count {
             return Err(Error::Invalid("native MP4 replay row count changed"));
         }
@@ -102,12 +102,12 @@ impl NativeMp4Replay {
             }
             match self.phase {
                 Phase::Ready { slot } => {
-                    return Ok(NativeMp4ReplayStep::Ready(self.head(slot)?));
+                    return Ok(DemuxReplayStep::Ready(self.head(slot)?));
                 }
                 Phase::Search { slot, next } => {
                     if let Some(row) = rows.get(next) {
                         if !work.try_charge(1) {
-                            return Ok(NativeMp4ReplayStep::Yield);
+                            return Ok(DemuxReplayStep::Yield);
                         }
                         if row.track_id != self.slots[slot].track_id {
                             self.phase = Phase::Search {
@@ -131,7 +131,7 @@ impl NativeMp4Replay {
                         continue;
                     }
                     if !work.try_charge(1) {
-                        return Ok(NativeMp4ReplayStep::Yield);
+                        return Ok(DemuxReplayStep::Yield);
                     }
                     if let Some(row) = self.slots[next].head {
                         let prefer = match best {
@@ -149,7 +149,7 @@ impl NativeMp4Replay {
                         best,
                     };
                 }
-                Phase::End => return Ok(NativeMp4ReplayStep::End),
+                Phase::End => return Ok(DemuxReplayStep::End),
             }
         }
     }
@@ -226,7 +226,7 @@ mod tests {
             row(1, 4_000_000, 40),
             row(2, 4_000_000, 50),
         ];
-        let mut replay = NativeMp4Replay::new(&[1, 2], &[0, 2], &rows).unwrap();
+        let mut replay = DemuxReplay::new(&[1, 2], &[0, 2], &rows).unwrap();
         assert_eq!(replay.first_row(), 2);
         let mut no_work = WorkBudget::new(0);
         assert_eq!(
@@ -237,7 +237,7 @@ mod tests {
         for _ in 0..2 {
             assert_eq!(
                 replay.poll(&rows, &mut no_work, &RUN).unwrap(),
-                NativeMp4ReplayStep::Ready(2)
+                DemuxReplayStep::Ready(2)
             );
         }
         replay.delivered(2).unwrap();
@@ -245,30 +245,30 @@ mod tests {
         let mut one = WorkBudget::new(1);
         assert_eq!(
             replay.poll(&rows, &mut one, &RUN).unwrap(),
-            NativeMp4ReplayStep::Yield
+            DemuxReplayStep::Yield
         );
         assert_eq!(one.spent(), 1);
         assert_eq!(
             replay.poll(&rows, &mut no_work, &RUN).unwrap(),
-            NativeMp4ReplayStep::Yield
+            DemuxReplayStep::Yield
         );
         let mut clone = replay.clone();
         for replay in [&mut replay, &mut clone] {
             let mut delivered = Vec::new();
             for _ in 0..32 {
                 match replay.poll(&rows, &mut WorkBudget::new(1), &RUN).unwrap() {
-                    NativeMp4ReplayStep::Yield => {}
-                    NativeMp4ReplayStep::Ready(row) => {
+                    DemuxReplayStep::Yield => {}
+                    DemuxReplayStep::Ready(row) => {
                         delivered.push(row);
                         replay.delivered(row).unwrap();
                     }
-                    NativeMp4ReplayStep::End => break,
+                    DemuxReplayStep::End => break,
                 }
             }
             assert_eq!(delivered, [0, 3, 4]);
             assert_eq!(
                 replay.poll(&rows, &mut no_work, &RUN).unwrap(),
-                NativeMp4ReplayStep::End
+                DemuxReplayStep::End
             );
         }
     }
@@ -277,7 +277,7 @@ mod tests {
     fn replay_uses_seekable_threshold_and_sticky_catalogue_order() {
         let mut rows = [row(1, 2_000_000, 50), row(2, 1_000_000, 80)];
         let first = |rows: &[PacketOccurrence]| {
-            NativeMp4Replay::new(&[1, 2], &[0, 1], rows)
+            DemuxReplay::new(&[1, 2], &[0, 1], rows)
                 .unwrap()
                 .first_row()
         };
@@ -287,7 +287,7 @@ mod tests {
         rows[1].scheduling_clock = SchedulingClock::ApiSentinel;
         assert_eq!(first(&rows), 0);
         assert_eq!(
-            NativeMp4Replay::new(&[2, 1], &[1, 0], &rows)
+            DemuxReplay::new(&[2, 1], &[1, 0], &rows)
                 .unwrap()
                 .first_row(),
             1

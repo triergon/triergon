@@ -204,7 +204,7 @@ fn actual_mp4_native_order_stays_distinct_from_all_source_facts() {
     let (mut p, _) = mp4(raw, Mp4View::PinnedMov9NoParseNoFillin, 7, 1).unwrap();
     if let Some(Engine::Mp4(engine)) = p.engine() {
         assert_eq!(engine.plan.source_rows().len(), 12);
-        assert_eq!(engine.plan.native_rows().len(), 12);
+        assert_eq!(engine.plan.demux_rows().len(), 12);
     } else {
         panic!()
     }
@@ -232,7 +232,7 @@ fn actual_mp4_native_order_stays_distinct_from_all_source_facts() {
         ]
     );
     for p in packets {
-        let n = p.native.as_ref().unwrap();
+        let n = p.occurrence.as_ref().unwrap();
         assert_eq!(n.source, p.source.sample);
         assert_eq!(n.demux.source_range, p.source.sample.range);
     }
@@ -311,7 +311,7 @@ fn source_unknown_fragment_clock_is_not_filled_from_native_projection() {
     assert!(
         unknown
             .iter()
-            .any(|p| p.native.as_ref().is_some_and(|n| n.demux.dts.is_some()))
+            .any(|p| p.occurrence.as_ref().is_some_and(|n| n.demux.dts.is_some()))
     );
 }
 #[test]
@@ -1150,7 +1150,7 @@ fn retained_real_mp4_packet_config_and_native_view_outlive_player() {
     };
     assert!(!packet.source.payload.is_empty());
     assert!(!packet.configuration.description.raw().bytes().is_empty());
-    assert!(packet.native.is_some());
+    assert!(packet.occurrence.is_some());
     assert!(b.used() > Budget::control_storage_bytes());
     drop(output);
     assert_eq!(b.used(), Budget::control_storage_bytes());
@@ -3030,13 +3030,13 @@ fn native_range_seek_matches_ffprobe_packet_order_bytes_and_clocks() {
         let (mut player, movie, calls, pool) = native_range_player(bytes);
         let old = first_packet(&mut player);
         calls.lock().unwrap().clear();
-        let request = Mp4NativeSeekRequest {
+        let request = Mp4DemuxSeekRequest {
             video: 1,
             timestamp: target,
             limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
         };
         let mut job = player
-            .prepare_mp4_native_seek(&movie, request, Selection::All)
+            .prepare_mp4_demux_seek(&movie, request, Selection::All)
             .unwrap();
         assert!(!job.poll(&mut WorkBudget::new(0), &off()).unwrap());
         assert!((0..100_000).any(|_| job.poll(&mut WorkBudget::new(1), &off()).unwrap()));
@@ -3049,18 +3049,18 @@ fn native_range_seek_matches_ffprobe_packet_order_bytes_and_clocks() {
         );
         assert!(
             !player
-                .apply_mp4_native_seek(&command, &mut WorkBudget::new(0), &off())
+                .apply_mp4_demux_seek(&command, &mut WorkBudget::new(0), &off())
                 .unwrap()
         );
         assert!(player.current(&old));
         assert!(
             player
-                .apply_mp4_native_seek(&command, &mut WorkBudget::new(1), &off())
+                .apply_mp4_demux_seek(&command, &mut WorkBudget::new(1), &off())
                 .unwrap()
         );
         assert!(!player.current(&old));
         assert!(matches!(
-            player.apply_mp4_native_seek(&command, &mut WorkBudget::new(1), &off()),
+            player.apply_mp4_demux_seek(&command, &mut WorkBudget::new(1), &off()),
             Err(C::StaleGeneration { .. })
         ));
 
@@ -3118,7 +3118,7 @@ fn assert_native_seek_packets(
                         packet.configuration.description.index
                     ))
                 );
-                let native = packet.native.as_ref().unwrap();
+                let native = packet.occurrence.as_ref().unwrap();
                 assert_eq!(native.track_id, track);
                 assert_eq!(native.demux.pts, fields[1].parse().ok());
                 assert_eq!(native.demux.dts, fields[2].parse().ok());
@@ -3163,8 +3163,8 @@ fn bounded_timing_accepts_forward_index_with_finite_media() {
         Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default()).unwrap();
     assert!((0..100_000).any(|_| job.poll(&mut WorkBudget::new(1), &off()).unwrap()));
     let plan = job.finish().unwrap();
-    assert_eq!(plan.native_rows().len(), 6);
-    for (index, row) in plan.native_rows().iter().enumerate() {
+    assert_eq!(plan.demux_rows().len(), 6);
+    for (index, row) in plan.demux_rows().iter().enumerate() {
         assert_eq!(row.source.dts_ticks, Some(index as i128 * 1000));
         assert!(row.source.range.end <= bytes.len() as u64);
     }
@@ -3216,7 +3216,14 @@ fn forward_encoded_edits_keep_aac_preroll_and_trim_in_source_order() {
         )
     };
     assert_eq!(
-        audio.first().unwrap().native.as_ref().unwrap().demux.pts,
+        audio
+            .first()
+            .unwrap()
+            .occurrence
+            .as_ref()
+            .unwrap()
+            .demux
+            .pts,
         Some(-1024)
     );
     assert_eq!(trim(audio.first().unwrap()), (1024, 0));
@@ -3295,7 +3302,7 @@ fn forward_fragment_edits_keep_source_clocks_and_trim_once() {
             );
             if packet.configuration.track.handler == *b"soun" {
                 let expected = 1024 * audio_count;
-                let occurrence = packet.native.as_ref().unwrap();
+                let occurrence = packet.occurrence.as_ref().unwrap();
                 assert_eq!(source.dts_ticks, Some(i128::from(expected)));
                 assert_eq!(occurrence.demux.dts, Some(expected - 1024));
                 assert_eq!(occurrence.demux.pts, Some(expected - 1024));
@@ -3549,7 +3556,7 @@ fn bounded_timing_range_playback_preserves_packets_and_seeks() {
         assert_eq!(packets.len(), 6);
         for (index, packet) in packets.into_iter().enumerate() {
             let dts = index as i64 * 1000;
-            let native = &packet.native.as_ref().unwrap().demux;
+            let native = &packet.occurrence.as_ref().unwrap().demux;
             assert_eq!((native.dts, native.pts), (Some(dts), Some(dts + offset)));
             let range = &packet.source.sample.range;
             assert_eq!(range.end - range.start, 12);
@@ -3561,7 +3568,7 @@ fn bounded_timing_range_playback_preserves_packets_and_seeks() {
 
         calls.lock().unwrap().clear();
         let mut seek = player
-            .prepare_seek(Mp4NativeSeekRequest {
+            .prepare_seek(Mp4DemuxSeekRequest {
                 video: track.header().track_id,
                 timestamp: 3000,
                 limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
@@ -3578,7 +3585,10 @@ fn bounded_timing_range_playback_preserves_packets_and_seeks() {
         let resumed: Vec<_> = std::iter::from_fn(|| next_range_output(&mut player)).collect();
         let packets = mp4_packets(&resumed);
         assert_eq!(packets.len(), 3);
-        assert_eq!(packets[0].native.as_ref().unwrap().demux.dts, Some(3000));
+        assert_eq!(
+            packets[0].occurrence.as_ref().unwrap().demux.dts,
+            Some(3000)
+        );
         assert!(
             calls
                 .lock()
@@ -3625,7 +3635,7 @@ fn range_playback_derives_duration_when_the_movie_header_is_unknown() {
         assert_eq!(packets.len(), 6);
         for (ordinal, packet) in packets.iter().enumerate() {
             assert_eq!(
-                packet.native.as_ref().unwrap().demux.dts,
+                packet.occurrence.as_ref().unwrap().demux.dts,
                 Some(ordinal as i64 * 1000)
             );
         }
@@ -3676,7 +3686,7 @@ fn native_range_cursor_matches_ffprobe_and_preserves_seek_lifecycle() {
         player.pause(true).unwrap();
         calls.lock().unwrap().clear();
         let mut job = player
-            .prepare_seek(Mp4NativeSeekRequest {
+            .prepare_seek(Mp4DemuxSeekRequest {
                 video: 1,
                 timestamp: target,
                 limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
@@ -3758,7 +3768,7 @@ fn repeated_range_seek_preserves_catalogue_order_with_video_second() {
         .unwrap();
     for _ in 0..2 {
         let mut seek = player
-            .prepare_seek(Mp4NativeSeekRequest {
+            .prepare_seek(Mp4DemuxSeekRequest {
                 video: 1,
                 timestamp: 3500,
                 limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
@@ -3777,7 +3787,7 @@ fn repeated_range_seek_preserves_catalogue_order_with_video_second() {
         let Event::Mp4(Mp4Event::Packet(packet)) = output.event() else {
             panic!("expected a video packet");
         };
-        assert_eq!(packet.native.as_ref().unwrap().demux.dts, Some(3000));
+        assert_eq!(packet.occurrence.as_ref().unwrap().demux.dts, Some(3000));
     }
 }
 
@@ -3823,7 +3833,7 @@ fn native_range_cursor_checks_all_extents_and_replays_after_duration_scan() {
     let end = expected
         .iter()
         .map(|packet| {
-            let row = packet.native.as_ref().unwrap();
+            let row = packet.occurrence.as_ref().unwrap();
             row.media_clock
                 .demux_base
                 .rescale(
@@ -3842,8 +3852,8 @@ fn native_range_cursor_checks_all_extents_and_replays_after_duration_scan() {
     for (actual, expected) in actual.into_iter().zip(expected) {
         assert_eq!(actual.source.sample, expected.source.sample);
         assert_eq!(
-            actual.native.as_ref().unwrap().demux,
-            expected.native.as_ref().unwrap().demux
+            actual.occurrence.as_ref().unwrap().demux,
+            expected.occurrence.as_ref().unwrap().demux
         );
         assert_eq!(
             actual.source.payload.as_ref(),
@@ -4081,7 +4091,7 @@ fn range_media_projection_keeps_packets_and_both_seek_paths() {
 
     let seek = |player: &mut Mp4RangePlayer<'_, ByteSource>| {
         let mut job = player
-            .prepare_seek(Mp4NativeSeekRequest {
+            .prepare_seek(Mp4DemuxSeekRequest {
                 video: 1,
                 timestamp: 26_880,
                 limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
@@ -4102,7 +4112,7 @@ fn range_media_projection_keeps_packets_and_both_seek_paths() {
         let mut limits = triergon_isobmff::compat::mov::seek::SeekLimits::default();
         limits.index.packets.max_tracks = 2;
         assert!(matches!(
-            player.prepare_seek(Mp4NativeSeekRequest {
+            player.prepare_seek(Mp4DemuxSeekRequest {
                 video: 1,
                 timestamp: 26_880,
                 limits,
@@ -4124,8 +4134,8 @@ fn range_media_projection_keeps_packets_and_both_seek_paths() {
     assert!(!with_checkpoints.is_empty());
     assert_eq!(with_checkpoints.len(), without_checkpoints.len());
     for (left, right) in with_checkpoints.into_iter().zip(without_checkpoints) {
-        let left_row = left.native.as_ref().unwrap();
-        let right_row = right.native.as_ref().unwrap();
+        let left_row = left.occurrence.as_ref().unwrap();
+        let right_row = right.occurrence.as_ref().unwrap();
         assert!(matches!(left_row.track_id, 1 | 2));
         assert_eq!(left_row.track_id, right_row.track_id);
         assert_eq!(left_row.demux, right_row.demux);
@@ -4155,7 +4165,7 @@ fn range_projection_does_not_admit_a_demux_clock_for_data_tracks() {
         .unwrap();
     assert!(player.discard_seek_checkpoints());
     let mut seek = player
-        .prepare_seek(Mp4NativeSeekRequest {
+        .prepare_seek(Mp4DemuxSeekRequest {
             video: 1,
             timestamp: 26_880,
             limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
@@ -4403,7 +4413,7 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
             assert_eq!(packet.configuration.revision, revision);
             assert_eq!(packet.source.sample.description_index, description);
             assert!(matches!(
-                config.track.native_catalogue,
+                config.track.demux_stream,
                 Err(C::Unsupported("native codec/carriage catalogue projection"))
             ));
             let mut children = config
@@ -4422,7 +4432,7 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
             );
             assert_eq!(packet.source.payload.as_ref(), &raw[range]);
             assert_eq!(packet.source.sample.cts_ticks, Some(i128::from(pts + 40)));
-            let clock = &packet.native.as_ref().unwrap().demux;
+            let clock = &packet.occurrence.as_ref().unwrap().demux;
             assert_eq!(
                 (clock.pts, clock.dts, clock.duration, clock.flags),
                 (Some(pts), Some(pts), 40, flags)
@@ -4556,7 +4566,7 @@ fn range_player_keeps_the_active_seek_after_refusing_opus_recovery() {
             if !checkpoints {
                 assert!(player.discard_seek_checkpoints());
             }
-            let request = Mp4NativeSeekRequest {
+            let request = Mp4DemuxSeekRequest {
                 video,
                 timestamp,
                 limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
@@ -4639,7 +4649,10 @@ fn native_range_cursor_keeps_encoded_source_clocks_and_trim() {
                 a.configuration.description.index,
                 e.configuration.description.index
             );
-            let (a, e) = (a.native.as_ref().unwrap(), e.native.as_ref().unwrap());
+            let (a, e) = (
+                a.occurrence.as_ref().unwrap(),
+                e.occurrence.as_ref().unwrap(),
+            );
             assert_eq!(a.demux, e.demux);
             assert_eq!(a.edit, e.edit);
             assert_eq!(a.clock_origin, e.clock_origin);
@@ -4700,9 +4713,9 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
     drop(linear);
     let command = {
         let mut job = player
-            .prepare_mp4_native_seek(
+            .prepare_mp4_demux_seek(
                 &movie,
-                Mp4NativeSeekRequest {
+                Mp4DemuxSeekRequest {
                     video: 1,
                     timestamp: 43_200,
                     limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
@@ -4717,7 +4730,7 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
     assert_eq!(command.start_offset(), 38_074);
     assert!(
         player
-            .apply_mp4_native_seek(&command, &mut WorkBudget::new(4096), &cancel)
+            .apply_mp4_demux_seek(&command, &mut WorkBudget::new(4096), &cancel)
             .unwrap()
     );
     let output = collect(&mut player, 4096).unwrap();
@@ -4733,7 +4746,7 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
         (2, 87_048, 87_048, 38_074, 133),
         (1, 32_000, 29_328, 38_207, 3220),
     ]) {
-        let native = &packet.native.as_ref().unwrap().demux;
+        let native = &packet.occurrence.as_ref().unwrap().demux;
         assert_eq!(packet.configuration.track.track_id, id);
         assert_eq!((native.pts, native.dts), (Some(pts), Some(dts)));
         assert_eq!(packet.source.payload.as_ref(), &raw[start..start + length]);
@@ -4754,13 +4767,13 @@ fn native_range_seek_refusals_leave_the_current_player_untouched() {
         native_range_player(include_bytes!("fixtures/mp4/r-edits-repeat.mov"));
     let current = first_packet(&mut player);
     calls.lock().unwrap().clear();
-    let request = Mp4NativeSeekRequest {
+    let request = Mp4DemuxSeekRequest {
         video: 1,
         timestamp: 3500,
         limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
     };
     let mut job = player
-        .prepare_mp4_native_seek(&movie, request, Selection::All)
+        .prepare_mp4_demux_seek(&movie, request, Selection::All)
         .unwrap();
     assert!(matches!(
         job.poll(&mut WorkBudget::new(10_000), &off()),

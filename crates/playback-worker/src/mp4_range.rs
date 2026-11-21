@@ -21,7 +21,7 @@ use triergon_isobmff::{
     config::{AacConfigurationJob, ConfigurationLimits, ObjectTypeScan},
 };
 use triergon_playback::{
-    ByteSource, Event, Format, Mp4Event, Mp4NativeSeekRequest, Mp4Packet, Mp4RangeOpen,
+    ByteSource, Event, Format, Mp4DemuxSeekRequest, Mp4Event, Mp4Packet, Mp4RangeOpen,
     Mp4RangePlayer, PlayerPolicy, Progress, Selection,
     io::{SelectedInput, SourceOwner},
     mp4_open::{Movie, MovieTrack, Mp4Open, OpenLimits, OpenProgress, OpenedMp4},
@@ -48,7 +48,10 @@ impl Work {
     }
 
     fn packet(&mut self, packet: &Mp4Packet) -> Result<()> {
-        let row = packet.native.as_ref().ok_or("missing projected packet")?;
+        let row = packet
+            .occurrence
+            .as_ref()
+            .ok_or("missing projected packet")?;
         let clock = &row.demux;
         let bytes = packet.source.payload.as_ref();
         let skip = packet.encoded_skip_samples.unwrap_or_default();
@@ -359,7 +362,7 @@ fn seek_to(
         Seek::Mov(timestamp) => (timestamp, false),
         Seek::OpusRoll(timestamp) => (timestamp, true),
     };
-    let request = Mp4NativeSeekRequest {
+    let request = Mp4DemuxSeekRequest {
         video: tracks.video,
         timestamp,
         limits: SeekLimits::default(),

@@ -838,7 +838,7 @@ fn catalogue_explicit_native_projection_keeps_literal_source_and_clock_view() {
                 Event::Mp4(Mp4Event::Packet(p)) => Some(p),
                 _ => None,
             })
-            .all(|p| p.native.is_some())
+            .all(|p| p.occurrence.is_some())
     );
 }
 
@@ -1007,7 +1007,7 @@ fn catalogue_replacement_selects_native_terminal_and_waits_for_source_end() {
     for (packet, expected) in packets.iter().zip(case.samples) {
         assert_eq!(packet.source.sample.ordinal, expected.ordinal);
         assert_eq!(packet.source.payload.as_ref(), expected.payload);
-        let native = &packet.native.as_ref().unwrap().demux;
+        let native = &packet.occurrence.as_ref().unwrap().demux;
         assert_eq!(native.dts.map(i128::from), Some(expected.dts));
         assert_eq!(native.pts.map(i128::from), Some(expected.cts));
     }
@@ -1049,7 +1049,7 @@ fn catalogue_progressive_replacement_keeps_future_batches_and_unknown_clocks() {
             })
             .all(|packet| packet.source.sample.dts_ticks.is_none()
                 && packet.source.sample.cts_ticks.is_none()
-                && packet.native.is_none())
+                && packet.occurrence.is_none())
     );
     once(&old);
     drop(p);
@@ -1088,7 +1088,7 @@ fn catalogue_replacement_terminal_mdat_needs_actual_source_end_and_keeps_unknown
                 packet.source.payload.as_ref(),
                 &raw[sample.range.start as usize..sample.range.end as usize]
             );
-            assert!(packet.native.is_none());
+            assert!(packet.occurrence.is_none());
         }
     }
     assert_eq!(packets, 6);
@@ -1711,7 +1711,7 @@ fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges
     let Event::Mp4(Mp4Event::Packet(packet)) = before.event() else {
         panic!("expected progressive native packet");
     };
-    assert!(packet.native.is_some());
+    assert!(packet.occurrence.is_some());
 
     let (complete, new) = opener(&b, id, raw, 23);
     let complete = finish_range_open(complete);
@@ -1720,18 +1720,13 @@ fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges
         Mp4Catalogue::new_with_movie(complete, plan, 1 << 20, Mp4CatalogueMode::Indexed).unwrap();
     let mut next = Some(candidate);
     let before_new = new.polls.load(Ordering::Relaxed);
-    let request = Mp4NativeSeekRequest {
+    let request = Mp4DemuxSeekRequest {
         video: 1,
         timestamp: 3500,
         limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
     };
     let mut job = p
-        .prepare_mp4_progressive_native_seek(
-            next.as_ref().unwrap(),
-            &movie,
-            request,
-            Selection::All,
-        )
+        .prepare_mp4_progressive_demux_seek(next.as_ref().unwrap(), &movie, request, Selection::All)
         .unwrap();
     assert!((0..200_000).any(|_| job.poll(&mut WorkBudget::new(1), &cancel).unwrap()));
     let command = job.finish().unwrap();
@@ -1742,7 +1737,7 @@ fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges
     p.pause(true).unwrap();
     let mut pump = pump::Pump::new(p, Consumer::default(), 1).unwrap();
     let retired = pump
-        .apply_mp4_progressive_native_seek(&mut next, &command, &mut WorkBudget::new(1), &cancel)
+        .apply_mp4_progressive_demux_seek(&mut next, &command, &mut WorkBudget::new(1), &cancel)
         .unwrap()
         .unwrap();
     assert!(next.is_none());
@@ -1785,7 +1780,7 @@ fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges
     let expected = include_str!("fixtures/mp4/f-multitrack.mp4.native-seek");
     assert_eq!(packets.len(), expected.lines().count());
     for (packet, row) in packets.iter().zip(expected.lines()) {
-        let native = packet.native.as_ref().unwrap();
+        let native = packet.occurrence.as_ref().unwrap();
         let fields: Vec<_> = row.split_ascii_whitespace().collect();
         assert_eq!(native.track_id, fields[0].parse().unwrap());
         assert_eq!(native.demux.pts, fields[1].parse().ok());

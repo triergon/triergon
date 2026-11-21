@@ -3,7 +3,7 @@ use crate::input::SourceReply;
 use crate::{
     Format, Result, SeekIntent, TrackKey, TrackKind,
     io::provide,
-    mp4_native_replay::{NativeMp4Replay, NativeMp4ReplayStep},
+    mp4_native_replay::{DemuxReplay, DemuxReplayStep},
     mp4_open::PendingMedia,
     mp4_plan::{Mp4Configuration, PreparedMp4, SourceRow},
 };
@@ -38,17 +38,17 @@ use ts::psi::{DescriptorNamespace, ProgramMap};
 pub struct Mp4Packet {
     /// Explicit native read boundary, independent of the full Source stream.
     /// Later Source packets remain present with `native == None`.
-    pub native_front_read_boundary_v1: Option<FrontReadBoundary>,
+    pub front_read_boundary: Option<FrontReadBoundary>,
     pub source: SourcePacket,
     pub configuration: Mp4Configuration,
-    pub native: Option<PacketOccurrence>,
+    pub occurrence: Option<PacketOccurrence>,
     /// Sample trim from the associated encoded edit plan, in native skip-samples layout.
     pub encoded_skip_samples: Option<[u8; 10]>,
 }
 /// An unassociated empty packet in the pinned native receiver view. Its public
 /// position is a receiver field, with no corresponding physical sample.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Mp4NativeEmptyPacket {
+pub struct Mp4EmptyPacket {
     pub boundary: FrontReadBoundary,
     pub time_base: TimeBase,
     pub handler: [u8; 4],
@@ -61,17 +61,17 @@ pub struct Mp4NativeEmptyPacket {
 /// A native corrupt packet with an actual physical prefix and a separately
 /// retained sample declaration. It is never a complete Source packet.
 #[derive(Clone, Debug)]
-pub struct Mp4NativeShortPacket {
+pub struct Mp4ShortPacket {
     pub prefix: ShortSample,
     pub configuration: Mp4Configuration,
-    pub native: PacketOccurrence,
+    pub occurrence: PacketOccurrence,
     /// Decoder trim attached to the recovered occurrence.
     pub encoded_skip_samples: Option<[u8; 10]>,
 }
 /// The first native read has a positive declaration starting at or beyond the
 /// confirmed physical end. The view ends without emitting a packet.
 #[derive(Clone, Debug)]
-pub struct Mp4NativeMissingSample {
+pub struct Mp4MissingSample {
     pub declared: triergon_isobmff::Sample,
     pub track_id: u32,
     pub end: SourceLocation,
@@ -80,9 +80,9 @@ pub struct Mp4NativeMissingSample {
 pub enum Mp4Event {
     Configuration(Mp4Configuration),
     Packet(Mp4Packet),
-    NativeEmptyPacket(Mp4NativeEmptyPacket),
-    NativeShortPacket(Mp4NativeShortPacket),
-    NativeMissingSample(Mp4NativeMissingSample),
+    EmptyPacket(Mp4EmptyPacket),
+    ShortPacket(Mp4ShortPacket),
+    MissingSample(Mp4MissingSample),
 }
 #[derive(Debug)]
 pub struct TsEvent {
@@ -173,21 +173,21 @@ pub(crate) struct Mp4SyncLanding {
 #[derive(Clone, Copy)]
 pub(crate) enum Mp4RangeLanding<'a> {
     Source(Mp4SyncLanding),
-    Native(&'a NativeMp4Replay),
-    NativeCursor(u64),
+    Demux(&'a DemuxReplay),
+    DemuxCursor(u64),
 }
 
 pub struct Mp4Engine {
     progressive: Option<crate::progressive::ProgressiveState>,
-    replay_media: Option<PendingMedia>,
-    native_boundary_observed: Option<FrontReadBoundary>,
-    native_empty_run: Option<(Mp4NativeEmptyPacket, u32)>,
-    native_recovery_end: bool,
+    media_cache_fill: Option<PendingMedia>,
+    front_boundary: Option<FrontReadBoundary>,
+    empty_run: Option<(Mp4EmptyPacket, u32)>,
+    ended_short: bool,
     pub(crate) input: InputCursor,
     pub plan: PreparedMp4,
     pub(crate) row: usize,
     indexed_sync: Option<(u32, usize)>,
-    native_seek: Option<NativeMp4Replay>,
+    demux_seek: Option<DemuxReplay>,
     packet: Option<(usize, SampleReader)>,
     configs: [Option<CachedDescription>; 64],
     revision: u64,
@@ -493,7 +493,7 @@ impl Engine {
     }
     pub fn mp4(input: InputCursor, plan: PreparedMp4, maximum_packet: usize) -> Result<Self> {
         let engine = Self::mp4_unattached(input, plan, maximum_packet)?;
-        if matches!(&engine, Self::Mp4(mp4) if mp4.plan.native_front) {
+        if matches!(&engine, Self::Mp4(mp4) if mp4.plan.demux_front) {
             return Err(Error::Unsupported(
                 "native front plan requires actual source completion",
             ));
@@ -535,22 +535,22 @@ impl Engine {
         }
         let mut engine = Mp4Engine {
             progressive: None,
-            replay_media: None,
-            native_boundary_observed: None,
-            native_empty_run: None,
-            native_recovery_end: false,
+            media_cache_fill: None,
+            front_boundary: None,
+            empty_run: None,
+            ended_short: false,
             input,
             plan,
             row: 0,
             indexed_sync: None,
-            native_seek: None,
+            demux_seek: None,
             packet: None,
             configs: [None; 64],
             revision: 0,
             maximum_packet,
         };
-        if engine.plan.replay_native_order {
-            engine.replay_media = Some(crate::progressive::prepare_media_replay(
+        if engine.plan.demux_order_replay {
+            engine.media_cache_fill = Some(crate::progressive::prepare_media_replay(
                 &engine.input,
                 &mut engine.plan,
             )?);
@@ -563,7 +563,7 @@ impl Engine {
         maximum_packet: usize,
         limits: crate::progressive::ProgressiveLimits,
     ) -> Result<Self> {
-        if plan.native_front {
+        if plan.demux_front {
             return Err(Error::Unsupported(
                 "native front plan needs explicit native attachment",
             ));
@@ -578,7 +578,7 @@ impl Engine {
         maximum_packet: usize,
         limits: crate::progressive::ProgressiveLimits,
     ) -> Result<Self> {
-        if !plan.native_front || input.capabilities().random_access {
+        if !plan.demux_front || input.capabilities().random_access {
             return Err(Error::Invalid("native front attachment context"));
         }
         Self::mp4_with_progressive(input, plan, maximum_packet, limits)
@@ -1039,7 +1039,7 @@ impl Engine {
                 if t.snapshot.handler != *b"vide" {
                     return Err(Error::Invalid("MP4 seek track is not video"));
                 }
-                let (row, offset, indexed_sync, native_seek) = match mp4_landing {
+                let (row, offset, indexed_sync, demux_seek) = match mp4_landing {
                     Some(Mp4RangeLanding::Source(landing)) => {
                         let rows = r.plan.source_rows();
                         let first = rows
@@ -1063,11 +1063,11 @@ impl Engine {
                             None,
                         )
                     }
-                    Some(Mp4RangeLanding::Native(replay)) => {
+                    Some(Mp4RangeLanding::Demux(replay)) => {
                         let first = replay.first_row();
                         let occurrence = r
                             .plan
-                            .native(first)
+                            .demux_row(first)
                             .ok_or(Error::Invalid("MP4 native seek first row"))?;
                         (
                             first,
@@ -1076,15 +1076,15 @@ impl Engine {
                             Some(replay.clone()),
                         )
                     }
-                    Some(Mp4RangeLanding::NativeCursor(offset)) => (0, offset, None, None),
+                    Some(Mp4RangeLanding::DemuxCursor(offset)) => (0, offset, None, None),
                     None => (0, 0, None, None),
                 };
                 r.input.reset(offset)?;
                 r.row = row;
                 r.indexed_sync = indexed_sync;
-                r.native_seek = native_seek;
+                r.demux_seek = demux_seek;
                 r.packet = None;
-                r.native_recovery_end = false;
+                r.ended_short = false;
                 r.configs = [None; 64];
             }
             Self::Ts(r) => {
@@ -1186,33 +1186,30 @@ impl Mp4Engine {
         cursor: Option<&mut PacketCursor<'_>>,
     ) -> Result<EngineStep> {
         let cfg = self.packet_config(at_track, source.sample.description_index)?;
-        let native = match cursor {
+        let occurrence = match cursor {
             Some(cursor) => Some(cursor.take_occurrence()?),
-            None => self.plan.native(self.row).cloned(),
+            None => self.plan.demux_row(self.row).cloned(),
         };
-        let encoded_skip_samples = native.as_ref().map_or(Ok(None), |occurrence| {
+        let encoded_skip_samples = occurrence.as_ref().map_or(Ok(None), |occurrence| {
             self.skip_samples(at_track, occurrence)
         })?;
-        if native.is_some() && source.sample.range.is_empty() {
-            self.native_boundary_observed =
-                self.plan
-                    .native_front_read_boundary_v1()
-                    .filter(|boundary| {
-                        boundary.track_id == cfg.track.track_id
-                            && boundary.source_ordinal == source.sample.ordinal
-                            && boundary.source_offset == source.sample.range.start
-                    });
+        if occurrence.is_some() && source.sample.range.is_empty() {
+            self.front_boundary = self.plan.front_read_boundary().filter(|boundary| {
+                boundary.track_id == cfg.track.track_id
+                    && boundary.source_ordinal == source.sample.ordinal
+                    && boundary.source_offset == source.sample.range.start
+            });
         }
-        if let Some(replay) = &mut self.native_seek {
+        if let Some(replay) = &mut self.demux_seek {
             replay.delivered(self.row)?;
         } else {
             self.row += 1;
         }
         Ok(EngineStep::Event(Event::Mp4(Mp4Event::Packet(Mp4Packet {
-            native_front_read_boundary_v1: self.native_boundary_observed,
+            front_read_boundary: self.front_boundary,
             source,
             configuration: cfg,
-            native,
+            occurrence,
             encoded_skip_samples,
         }))))
     }
@@ -1225,8 +1222,8 @@ impl Mp4Engine {
             input: &mut self.input,
             plan: &mut self.plan,
             row: &mut self.row,
-            replay_media: &mut self.replay_media,
-            native_empty_run: &mut self.native_empty_run,
+            media_cache_fill: &mut self.media_cache_fill,
+            empty_run: &mut self.empty_run,
         };
         state.poll(&mut continuation, w, c)
     }
@@ -1240,7 +1237,7 @@ impl Mp4Engine {
             .sample
             .range
             .start;
-        let within_source = if self.plan.native_recovery {
+        let within_source = if self.plan.demux_recovery {
             Error::Invalid("native first sample starts before physical end")
         } else {
             crate::mp4_plan::BACKWARD_LAYOUT_REFUSAL
@@ -1257,7 +1254,7 @@ impl Mp4Engine {
                 if end.offset > start {
                     return Err(within_source);
                 }
-                if !self.plan.native_recovery {
+                if !self.plan.demux_recovery {
                     return Err(Error::Invalid("sample outside media extent"));
                 }
                 if !w.try_charge(1) {
@@ -1268,14 +1265,14 @@ impl Mp4Engine {
                     .unavailable_first
                     .as_ref()
                     .ok_or(Error::Invalid("missing first sample declaration"))?;
-                self.native_recovery_end = true;
-                Ok(EngineStep::Event(Event::Mp4(
-                    Mp4Event::NativeMissingSample(Mp4NativeMissingSample {
+                self.ended_short = true;
+                Ok(EngineStep::Event(Event::Mp4(Mp4Event::MissingSample(
+                    Mp4MissingSample {
                         declared: row.sample.clone(),
                         track_id: row.track_id,
                         end,
-                    }),
-                )))
+                    },
+                ))))
             }
             Step::NeedInput(r) => Ok(EngineStep::NeedInput(r)),
             Step::Yield => Ok(EngineStep::Yield),
@@ -1294,7 +1291,7 @@ impl Mp4Engine {
             .as_mut()
             .ok_or(Error::Invalid("pending sample missing"))?;
         let at_track = *at_track;
-        let step = if self.plan.native_recovery && self.plan.native(self.row).is_some() {
+        let step = if self.plan.demux_recovery && self.plan.demux_row(self.row).is_some() {
             reader.poll_recovery(&mut self.input, w, c, RunRecoveryProfile)?
         } else {
             match reader.poll(&mut self.input, w, c)? {
@@ -1313,20 +1310,20 @@ impl Mp4Engine {
             Step::Ready(RecoverySampleRead::Short(prefix)) => {
                 let configuration =
                     self.packet_config(at_track, prefix.declared.description_index)?;
-                let mut native = self
+                let mut occurrence = self
                     .plan
-                    .native(self.row)
+                    .demux_row(self.row)
                     .ok_or(Error::Invalid("short packet needs native occurrence"))?
                     .clone();
-                native.demux.flags |= 2;
-                let encoded_skip_samples = self.skip_samples(at_track, &native)?;
+                occurrence.demux.flags |= 2;
+                let encoded_skip_samples = self.skip_samples(at_track, &occurrence)?;
                 self.packet = None;
-                self.native_recovery_end = true;
-                Ok(EngineStep::Event(Event::Mp4(Mp4Event::NativeShortPacket(
-                    Mp4NativeShortPacket {
+                self.ended_short = true;
+                Ok(EngineStep::Event(Event::Mp4(Mp4Event::ShortPacket(
+                    Mp4ShortPacket {
                         prefix,
                         configuration,
-                        native,
+                        occurrence,
                         encoded_skip_samples,
                     },
                 ))))
@@ -1345,37 +1342,35 @@ impl Mp4Engine {
         c: &AtomicBool,
         mut cursor: Option<&mut PacketCursor<'_>>,
     ) -> Result<EngineStep> {
-        if self.native_recovery_end {
+        if self.ended_short {
             self.input.read_into(&mut [], w, c)?;
             return Ok(EngineStep::End);
         }
         if self.plan.unavailable_first.is_some() {
             return self.poll_unavailable_first(w, c);
         }
-        if let Some((mut packet, remaining)) = self.native_empty_run
-            && self.native_boundary_observed == Some(packet.boundary)
+        if let Some((mut packet, remaining)) = self.empty_run
+            && self.front_boundary == Some(packet.boundary)
         {
             if !w.try_charge(1) {
                 return Ok(EngineStep::Yield);
             }
             if remaining > 1 {
-                self.native_empty_run = Some((packet, remaining - 1));
+                self.empty_run = Some((packet, remaining - 1));
                 packet.duration = 0;
             } else {
-                self.native_empty_run = None;
+                self.empty_run = None;
             }
-            return Ok(EngineStep::Event(Event::Mp4(Mp4Event::NativeEmptyPacket(
-                packet,
-            ))));
+            return Ok(EngineStep::Event(Event::Mp4(Mp4Event::EmptyPacket(packet))));
         }
-        if let Some(replay) = self.replay_media.as_mut() {
+        if let Some(replay) = self.media_cache_fill.as_mut() {
             return match replay.poll(&mut self.input, w, c)? {
                 Step::Ready(cached) => {
                     self.plan
                         .media_cache
                         .try_push(cached)
                         .map_err(|failure| failure.error)?;
-                    self.replay_media = None;
+                    self.media_cache_fill = None;
                     Ok(EngineStep::Yield)
                 }
                 Step::NeedInput(r) => Ok(EngineStep::NeedInput(r)),
@@ -1386,11 +1381,11 @@ impl Mp4Engine {
         if self.packet.is_some() {
             return self.poll_packet(w, c, cursor);
         }
-        if let Some(replay) = &mut self.native_seek {
-            match replay.poll(self.plan.native_rows(), w, c)? {
-                NativeMp4ReplayStep::Ready(row) => self.row = row,
-                NativeMp4ReplayStep::Yield => return Ok(EngineStep::Yield),
-                NativeMp4ReplayStep::End => return Ok(EngineStep::End),
+        if let Some(replay) = &mut self.demux_seek {
+            match replay.poll(self.plan.demux_rows(), w, c)? {
+                DemuxReplayStep::Ready(row) => self.row = row,
+                DemuxReplayStep::Yield => return Ok(EngineStep::Yield),
+                DemuxReplayStep::End => return Ok(EngineStep::End),
             }
         }
         if let Some((video, sync)) = self.indexed_sync {
@@ -1516,7 +1511,7 @@ impl Mp4Engine {
         } else {
             return Err(Error::Invalid("sample has no source mdat"));
         };
-        let packet = if self.plan.native_recovery && self.plan.native(self.row).is_some() {
+        let packet = if self.plan.demux_recovery && self.plan.demux_row(self.row).is_some() {
             SampleReader::new_recovery(
                 &mut self.input,
                 row.sample,
@@ -2481,7 +2476,7 @@ impl Event {
                 .get(p.packet.track)
                 .map(|t| TrackKey::Matroska(t.number)),
             Self::Mp4(Mp4Event::Packet(p)) => Some(TrackKey::Mp4(p.configuration.track.track_id)),
-            Self::Mp4(Mp4Event::NativeShortPacket(p)) => Some(TrackKey::Mp4(p.native.track_id)),
+            Self::Mp4(Mp4Event::ShortPacket(p)) => Some(TrackKey::Mp4(p.occurrence.track_id)),
             Self::Ts(TsEvent {
                 source: TraceEvent::Pes(p),
                 clock_key: Some(k),
@@ -2510,7 +2505,7 @@ impl Event {
         match self {
             Self::DemuxPes { clock, .. } => clock.pts90.map(|t| Time::new(t, 90_000)).transpose(),
             Self::Mp4(Mp4Event::Packet(p)) => p
-                .native
+                .occurrence
                 .as_ref()
                 .map(|n| {
                     n.demux
@@ -2520,11 +2515,13 @@ impl Event {
                 })
                 .transpose()
                 .map(Option::flatten),
-            Self::Mp4(Mp4Event::NativeShortPacket(p)) => p
-                .native
+            Self::Mp4(Mp4Event::ShortPacket(p)) => p
+                .occurrence
                 .demux
                 .pts
-                .map(|ticks| Time::from_ticks(i128::from(ticks), p.native.media_clock.demux_base))
+                .map(|ticks| {
+                    Time::from_ticks(i128::from(ticks), p.occurrence.media_clock.demux_base)
+                })
                 .transpose(),
             Self::Ts(e) => e
                 .demux_clock
@@ -2549,7 +2546,7 @@ impl Event {
                 ..
             })) => data.len(),
             Self::Mp4(Mp4Event::Packet(p)) => p.source.payload.len(),
-            Self::Mp4(Mp4Event::NativeShortPacket(p)) => p.prefix.payload.len(),
+            Self::Mp4(Mp4Event::ShortPacket(p)) => p.prefix.payload.len(),
             Self::Mp4Root(raw) => raw.bytes().len(),
             Self::Ts(TsEvent {
                 source: TraceEvent::Pes(p),

@@ -1,7 +1,7 @@
 //! Native range playback over borrowed MP4 sample tables and charged track heads.
 
 use super::{
-    ClockChoice, Mp4NativeSeekRequest, Output, Player, PlayerPolicy, Progress, Selection, TrackKey,
+    ClockChoice, Mp4DemuxSeekRequest, Output, Player, PlayerPolicy, Progress, Selection, TrackKey,
     mp4_native_seek::native_global_seek,
 };
 use crate::{
@@ -159,7 +159,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
 
     /// Plan a seek from the same checked tables. This reads no payload and
     /// leaves the active generation and any pending input usable until apply.
-    pub fn prepare_seek(&self, request: Mp4NativeSeekRequest) -> Result<Mp4RangeSeekJob<'a>> {
+    pub fn prepare_seek(&self, request: Mp4DemuxSeekRequest) -> Result<Mp4RangeSeekJob<'a>> {
         self.prepare_range_seek(request, None)
     }
 
@@ -168,7 +168,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
     /// discard PCM before the video presentation landing.
     pub fn prepare_seek_with_opus_recovery(
         &self,
-        request: Mp4NativeSeekRequest,
+        request: Mp4DemuxSeekRequest,
         audio: u32,
     ) -> Result<Mp4RangeSeekJob<'a>> {
         if !self.player.selection.includes(TrackKey::Mp4(audio)) {
@@ -179,7 +179,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
 
     fn prepare_range_seek(
         &self,
-        request: Mp4NativeSeekRequest,
+        request: Mp4DemuxSeekRequest,
         opus_audio: Option<u32>,
     ) -> Result<Mp4RangeSeekJob<'a>> {
         let Some(Engine::Mp4(engine)) = self.player.engine.as_ref() else {
@@ -259,7 +259,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
                 TrackKey::Mp4(scope.video),
                 scope.target,
                 self.player.selection,
-                Some(Mp4RangeLanding::NativeCursor(command.offset)),
+                Some(Mp4RangeLanding::DemuxCursor(command.offset)),
                 work,
                 cancel,
             )

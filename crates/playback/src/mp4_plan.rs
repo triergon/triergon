@@ -84,7 +84,7 @@ pub struct TrackMetadata {
     pub raw_table: BoxView,
     pub raw_edits: Option<BoxView>,
     pub raw_dref: BoxView,
-    pub native_catalogue: std::result::Result<StreamView, Error>,
+    pub demux_stream: std::result::Result<StreamView, Error>,
     _charge: Reservation,
 }
 
@@ -155,7 +155,7 @@ impl SourceRow {
 /// ```
 pub struct PreparedMp4 {
     pub(crate) read_scope: crate::mp4_open::MetadataReadScope,
-    pub(crate) native_recovery: bool,
+    pub(crate) demux_recovery: bool,
     /// A single track's first sample declared at or beyond the end of the media
     /// read while indexing. Only the physical end of the source shows whether it
     /// lies outside the source.
@@ -164,13 +164,13 @@ pub struct PreparedMp4 {
     pub(crate) opening_generation: u64,
     pub(crate) source_length: Option<u64>,
     pub(crate) view: Mp4View,
-    pub(crate) native_front: bool,
-    pub(crate) replay_native_order: bool,
-    pub(crate) native_front_boundary: Option<iso::compat::mov::front::FrontReadBoundary>,
-    pub(crate) native_empty_duration: Option<i64>,
+    pub(crate) demux_front: bool,
+    pub(crate) demux_order_replay: bool,
+    pub(crate) front_boundary: Option<iso::compat::mov::front::FrontReadBoundary>,
+    pub(crate) empty_duration: Option<i64>,
     pub(crate) front_tracks: BudgetVec<iso::compat::mov::front::FrontTrack>,
     pub(crate) source_rows: BudgetVec<SourceRow>,
-    pub(crate) native_rows: BudgetVec<PacketOccurrence>,
+    pub(crate) demux_rows: BudgetVec<PacketOccurrence>,
     pub(crate) encoded_edits: Option<BudgetVec<Option<iso::compat::mov::edits::EncodedEditPlan>>>,
     pub(crate) tracks: BudgetVec<PlanTrack>,
     pub(crate) media: BudgetVec<Range<u64>>,
@@ -216,8 +216,8 @@ impl PreparedMp4 {
     pub fn source_rows(&self) -> &[SourceRow] {
         self.source_rows.as_slice()
     }
-    pub fn native_rows(&self) -> &[PacketOccurrence] {
-        self.native_rows.as_slice()
+    pub fn demux_rows(&self) -> &[PacketOccurrence] {
+        self.demux_rows.as_slice()
     }
     pub fn tracks(&self) -> &[PlanTrack] {
         self.tracks.as_slice()
@@ -228,17 +228,15 @@ impl PreparedMp4 {
 
     /// A front-native operation continues all Source declarations even after a
     /// separately reported native read boundary. Only native occurrences stop.
-    pub fn native_front_read_boundary_v1(
-        &self,
-    ) -> Option<iso::compat::mov::front::FrontReadBoundary> {
-        self.native_front_boundary
+    pub fn front_read_boundary(&self) -> Option<iso::compat::mov::front::FrontReadBoundary> {
+        self.front_boundary
     }
     pub(crate) fn next_native_empty_duration(
         &self,
         packet: &PacketOccurrence,
         completed_run: bool,
     ) -> Option<i64> {
-        let previous = self.native_empty_duration?;
+        let previous = self.empty_duration?;
         if packet.source.composition_offset.is_some() {
             return None;
         }
@@ -252,22 +250,22 @@ impl PreparedMp4 {
         Some(previous.max(end))
     }
     pub fn rows(&self) -> usize {
-        if self.native_front && !self.replay_native_order && self.encoded_edits.is_none() {
+        if self.demux_front && !self.demux_order_replay && self.encoded_edits.is_none() {
             return self.source_rows.len();
         }
         match self.view {
             Mp4View::SourcePhysical => self.source_rows.len(),
-            Mp4View::PinnedMov9NoParseNoFillin => self.native_rows.len(),
+            Mp4View::PinnedMov9NoParseNoFillin => self.demux_rows.len(),
         }
     }
     pub fn row(&self, at: usize) -> Option<SourceRow> {
-        if self.native_front && !self.replay_native_order && self.encoded_edits.is_none() {
+        if self.demux_front && !self.demux_order_replay && self.encoded_edits.is_none() {
             return self.source_rows.as_slice().get(at).cloned();
         }
         match self.view {
             Mp4View::SourcePhysical => self.source_rows.as_slice().get(at).cloned(),
             Mp4View::PinnedMov9NoParseNoFillin => {
-                self.native_rows.as_slice().get(at).map(|n| SourceRow {
+                self.demux_rows.as_slice().get(at).map(|n| SourceRow {
                     track_id: n.track_id,
                     sample: n.source.clone(),
                 })
@@ -281,9 +279,9 @@ impl PreparedMp4 {
             .find(|t| t.snapshot.track_id == id)
             .ok_or(Error::Invalid("unknown plan track"))
     }
-    pub fn native(&self, at: usize) -> Option<&PacketOccurrence> {
+    pub fn demux_row(&self, at: usize) -> Option<&PacketOccurrence> {
         if self.view == Mp4View::PinnedMov9NoParseNoFillin {
-            self.native_rows.as_slice().get(at)
+            self.demux_rows.as_slice().get(at)
         } else {
             None
         }
@@ -450,7 +448,7 @@ impl<'a> Mp4IndexJob<'a> {
         movie: &'a Movie,
         view: Mp4View,
         limits: PlanLimits,
-        native_front: bool,
+        demux_front: bool,
         encoded_edits: Option<&'a [Option<iso::compat::mov::edits::EncodedEditPlan>]>,
         range_duration: Option<RangeDuration>,
     ) -> Result<Self> {
@@ -465,7 +463,7 @@ impl<'a> Mp4IndexJob<'a> {
                 maximum: limits.tracks.min(64),
             });
         }
-        if movie.terminal_mdat().is_some() && view != Mp4View::SourcePhysical && !native_front {
+        if movie.terminal_mdat().is_some() && view != Mp4View::SourcePhysical && !demux_front {
             return Err(Error::Unsupported(
                 "native terminal MDAT context is not established",
             ));
@@ -540,7 +538,7 @@ impl<'a> Mp4IndexJob<'a> {
                         || movie
                             .source_length()
                             .is_none_or(|length| movie.media()[0].end <= length))
-                    && (view == Mp4View::SourcePhysical || native_front)
+                    && (view == Mp4View::SourcePhysical || demux_front)
                     && movie.trex().is_empty()
                     && movie
                         .tracks()
@@ -600,7 +598,7 @@ impl<'a> Mp4IndexJob<'a> {
                     encoded_edits,
                     |index| include_media_track(movie, index),
                 )?
-            } else if let Some(plans) = encoded_edits.filter(|_| native_front) {
+            } else if let Some(plans) = encoded_edits.filter(|_| demux_front) {
                 PacketCursor::new_front_with_encoded_edits(
                     b,
                     native.as_slice(),
@@ -626,7 +624,7 @@ impl<'a> Mp4IndexJob<'a> {
                     native_limits,
                     DemuxProfile::NoParseNoFillin,
                 )?
-            } else if native_front && !movie.trex().is_empty() {
+            } else if demux_front && !movie.trex().is_empty() {
                 PacketCursor::new_front_fragmented(
                     b,
                     native.as_slice(),
@@ -635,7 +633,7 @@ impl<'a> Mp4IndexJob<'a> {
                     movie.trex(),
                     native_limits,
                 )?
-            } else if native_front {
+            } else if demux_front {
                 PacketCursor::new_front_source(
                     b,
                     native.as_slice(),
@@ -674,7 +672,7 @@ impl<'a> Mp4IndexJob<'a> {
         } else {
             None
         };
-        let native_empty_duration = if native_front
+        let empty_duration = if demux_front
             && let [track] = movie.tracks()
             && track.edits().is_none()
             && track.table().sample_count() == 0
@@ -689,19 +687,19 @@ impl<'a> Mp4IndexJob<'a> {
             movie,
             plan: Some(PreparedMp4 {
                 read_scope: movie.read_scope(),
-                native_recovery: movie.native_recovery(),
+                demux_recovery: movie.native_recovery(),
                 unavailable_first: None,
                 source: movie.source(),
                 opening_generation: movie.generation(),
                 source_length: movie.source_length(),
                 view,
-                native_front,
-                replay_native_order: false,
-                native_front_boundary: None,
-                native_empty_duration,
+                demux_front,
+                demux_order_replay: false,
+                front_boundary: None,
+                empty_duration,
                 front_tracks: BudgetVec::new(b),
                 source_rows: BudgetVec::new(b),
-                native_rows: BudgetVec::new(b),
+                demux_rows: BudgetVec::new(b),
                 encoded_edits,
                 tracks: BudgetVec::new(b),
                 media: BudgetVec::new(b),
@@ -750,7 +748,7 @@ impl<'a> Mp4IndexJob<'a> {
                             return Ok(false);
                         }
                         let h = t.header();
-                        let (base, native_catalogue) = if h.timescale == 0 {
+                        let (base, demux_stream) = if h.timescale == 0 {
                             (
                                 SourceTimeBase::UNAVAILABLE,
                                 StreamView::for_zero_scale_source(
@@ -793,7 +791,7 @@ impl<'a> Mp4IndexJob<'a> {
                                     raw_table: t.table().raw().clone(),
                                     raw_edits: t.edits().map(|e| e.raw().clone()),
                                     raw_dref: t.raw_dref().clone(),
-                                    native_catalogue,
+                                    demux_stream,
                                     _charge: TrackSnapshot::reserve(&p.pool)?,
                                 })),
                                 descriptions: BudgetVec::new(&p.pool),
@@ -930,12 +928,12 @@ impl<'a> Mp4IndexJob<'a> {
                     }
                     Err(error)
                         if match error {
-                            Error::Invalid(OUTSIDE_MEDIA) => p.native_recovery,
+                            Error::Invalid(OUTSIDE_MEDIA) => p.demux_recovery,
                             // Without a source length the strict view cannot yet
                             // tell a first sample in a later mdat from one beyond
                             // the source end; the physical end decides.
                             Error::Unsupported(BACKWARD_LAYOUT) => {
-                                p.native_recovery || p.source_length.is_none()
+                                p.demux_recovery || p.source_length.is_none()
                             }
                             _ => false,
                         } && p.source_rows.is_empty()
@@ -1009,14 +1007,14 @@ impl<'a> Mp4IndexJob<'a> {
                     {
                         row.media_clock = clock;
                     }
-                    let mut replay_native_order = p.replay_native_order;
-                    if p.native_front && p.encoded_edits.is_none() && !replay_native_order {
-                        let source = p.source_rows.as_slice().get(p.native_rows.len());
+                    let mut demux_order_replay = p.demux_order_replay;
+                    if p.demux_front && p.encoded_edits.is_none() && !demux_order_replay {
+                        let source = p.source_rows.as_slice().get(p.demux_rows.len());
                         if source
                             .is_none_or(|s| s.track_id != row.track_id || s.sample != row.source)
                         {
                             // Only a complete retained extent can serve a repeated occurrence.
-                            replay_native_order = matches!(
+                            demux_order_replay = matches!(
                                 p.media.as_slice(),
                                 [extent] if (1..=RETAINED_MEDIA_BYTES as u64)
                                     .contains(&(extent.end - extent.start))
@@ -1026,7 +1024,7 @@ impl<'a> Mp4IndexJob<'a> {
                                     .as_slice()
                                     .iter()
                                     .any(|track| track.edits.is_some());
-                            if !replay_native_order {
+                            if !demux_order_replay {
                                 let reason = if source.is_none() {
                                     "native front repeated occurrence needs seekable context"
                                 } else {
@@ -1036,9 +1034,9 @@ impl<'a> Mp4IndexJob<'a> {
                             }
                         }
                     }
-                    if p.native_rows.len() as u64 >= self.limits.occurrences {
+                    if p.demux_rows.len() as u64 >= self.limits.occurrences {
                         return Err(Error::Limit {
-                            requested: p.native_rows.len() + 1,
+                            requested: p.demux_rows.len() + 1,
                             maximum: self.limits.occurrences as usize,
                         });
                     }
@@ -1047,10 +1045,10 @@ impl<'a> Mp4IndexJob<'a> {
                     } else {
                         p.next_native_empty_duration(&row, true)
                     };
-                    match p.native_rows.try_push(row) {
+                    match p.demux_rows.try_push(row) {
                         Ok(()) => {
-                            p.replay_native_order = replay_native_order;
-                            p.native_empty_duration = duration;
+                            p.demux_order_replay = demux_order_replay;
+                            p.empty_duration = duration;
                         }
                         Err(e) => {
                             self.pending_native = Some(e.value);
@@ -1108,7 +1106,7 @@ impl<'a> Mp4IndexJob<'a> {
                     self.phase = 6;
                 }
             }
-            6 if p.native_front && self.track < p.tracks.len() => {
+            6 if p.demux_front && self.track < p.tracks.len() => {
                 if !w.try_charge(1) {
                     return Ok(false);
                 }

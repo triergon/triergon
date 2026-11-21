@@ -5,10 +5,10 @@ use triergon_core::{Budget, BudgetVec, Error, InputRequest, Time, TimeBase, Work
 use triergon_isobmff::compat::mov::packets::PacketCursor;
 use triergon_mpegts::stream::TraceEvent;
 
-mod mp4_native_seek;
+mod mp4_demux_seek;
 mod mp4_range;
 mod mp4_sync_seek;
-pub use mp4_native_seek::{Mp4NativeSeekCommand, Mp4NativeSeekJob, Mp4NativeSeekRequest};
+pub use mp4_demux_seek::{Mp4DemuxSeekCommand, Mp4DemuxSeekJob, Mp4DemuxSeekRequest};
 pub use mp4_range::{Mp4RangeOpen, Mp4RangePlayer, Mp4RangeSeek, Mp4RangeSeekJob};
 pub use mp4_sync_seek::{Mp4SyncSeekCommand, Mp4SyncSeekJob, Mp4SyncSeekRequest};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -903,7 +903,7 @@ impl<S: Source> Player<S> {
                 received: seek.candidate_generation,
             });
         }
-        if matches!(seek.landing, crate::engines::Mp4RangeLanding::Native(_))
+        if matches!(seek.landing, crate::engines::Mp4RangeLanding::Demux(_))
             && self.clock != ClockChoice::Demux
         {
             return Err(Error::Invalid("native seek clock changed"));
@@ -1379,7 +1379,7 @@ impl<S: Source> Player<S> {
                     },
                     (ClockChoice::Demux, seek, Event::Mp4(crate::Mp4Event::Packet(packet))) => {
                         match packet
-                            .native
+                            .occurrence
                             .as_ref()
                             .and_then(|n| n.demux.pts.map(|pts| (pts, n.media_clock.demux_base)))
                         {
@@ -1439,7 +1439,7 @@ impl<S: Source> Player<S> {
             && bytes != 0
             && matches!(delivery, Delivery::Present | Delivery::Unselected)
             && event.track() == Some(seek.intent.track)
-            && !matches!(&event, Event::Mp4(crate::Mp4Event::NativeShortPacket(_)))
+            && !matches!(&event, Event::Mp4(crate::Mp4Event::ShortPacket(_)))
             && !matches!(&event, Event::DemuxPes { packet, .. } if packet.flags & 2 != 0)
         {
             // Reordered packets still need the original presentation target.

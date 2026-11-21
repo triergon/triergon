@@ -184,7 +184,7 @@ fn check_regular(out: &[Output]) {
         assert_eq!(p.source.sample.description_index, w.description);
         assert_eq!(p.configuration.track.track_id, w.track);
         assert_eq!(p.source.sample.is_container_sync(), w.sync);
-        assert!(p.native.is_none());
+        assert!(p.occurrence.is_none());
     }
 }
 fn check_fragment(out: &[Output], name: &str) {
@@ -202,7 +202,7 @@ fn check_fragment(out: &[Output], name: &str) {
         assert_eq!(p.source.sample.cts_ticks, w.dts);
         assert_eq!(p.source.sample.duration_ticks, 1000);
         assert_eq!(p.source.sample.description_index, w.description);
-        assert!(p.native.is_none());
+        assert!(p.occurrence.is_none());
     }
 }
 fn parked() -> (Player<FiniteSource>, Budget, Arc<Signals>, Vec<Output>) {

@@ -79,7 +79,7 @@ fn fold<const INCLUDE_TRIM: bool>(work: &mut Work, event: &Mp4Event) -> Result<(
     let (native, payload, skip) = match event {
         Mp4Event::Packet(packet) => {
             let native = packet
-                .native
+                .occurrence
                 .as_ref()
                 .ok_or("source packet without a native occurrence")?;
             (
@@ -88,12 +88,12 @@ fn fold<const INCLUDE_TRIM: bool>(work: &mut Work, event: &Mp4Event) -> Result<(
                 packet.encoded_skip_samples,
             )
         }
-        Mp4Event::NativeShortPacket(short) => (
-            &short.native,
+        Mp4Event::ShortPacket(short) => (
+            &short.occurrence,
             short.prefix.payload.as_ref(),
             short.encoded_skip_samples,
         ),
-        Mp4Event::NativeEmptyPacket(_) | Mp4Event::NativeMissingSample(_) => {
+        Mp4Event::EmptyPacket(_) | Mp4Event::MissingSample(_) => {
             return Err("native packet without a track".into());
         }
         Mp4Event::Configuration(_) => return Ok(()),

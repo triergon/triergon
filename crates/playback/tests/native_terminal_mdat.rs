@@ -49,8 +49,8 @@ fn selected_native_plan(known: bool) {
                 .iter()
                 .find(|c| c.name == "r-front-stco")
                 .unwrap();
-            assert_eq!(plan.native_rows().len(), original.samples.len());
-            for row in plan.native_rows() {
+            assert_eq!(plan.demux_rows().len(), original.samples.len());
+            for row in plan.demux_rows() {
                 if let Some(terminal) = plan.terminal_mdat() {
                     terminal.require_sample(&row.source).unwrap();
                 }

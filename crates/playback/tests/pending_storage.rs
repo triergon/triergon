@@ -159,7 +159,7 @@ fn check(out: &[Output], case: &gold::Case) {
         assert_eq!(packet.source.sample.dts_ticks, wanted.dts);
         assert_eq!(packet.source.sample.cts_ticks, wanted.dts);
         assert_eq!(packet.source.sample.duration_ticks, 1000);
-        assert!(packet.native.is_none());
+        assert!(packet.occurrence.is_none());
     }
 }
 #[test]

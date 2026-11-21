@@ -195,7 +195,7 @@ fn project(outputs: &[Output], tracks: &[u32]) -> Vec<Object> {
         };
         match event {
             Mp4Event::Packet(p) => {
-                let Some(n) = &p.native else {
+                let Some(n) = &p.occurrence else {
                     assert!(
                         ended,
                         "source packet without a native occurrence in the native view"
@@ -208,18 +208,18 @@ fn project(outputs: &[Output], tracks: &[u32]) -> Vec<Object> {
                 let (handler, data) = (p.configuration.track.handler, p.source.payload.as_ref());
                 let native = Native::occurrence(handler, index(n.track_id), n, size, data);
                 objects.push(native.object());
-                ended = p.native_front_read_boundary_v1.is_some();
+                ended = p.front_read_boundary.is_some();
             }
-            Mp4Event::NativeShortPacket(p) => {
+            Mp4Event::ShortPacket(p) => {
                 assert!(!ended, "short packet after the end of the native view");
-                let n = &p.native;
+                let n = &p.occurrence;
                 let (handler, data) = (p.configuration.track.handler, p.prefix.payload.as_ref());
                 let native =
                     Native::occurrence(handler, index(n.track_id), n, data.len() as u64, data);
                 objects.push(native.object());
                 ended = true;
             }
-            Mp4Event::NativeEmptyPacket(e) => {
+            Mp4Event::EmptyPacket(e) => {
                 let empty = Native {
                     handler: e.handler,
                     stream_index: index(e.boundary.track_id),
@@ -235,7 +235,7 @@ fn project(outputs: &[Output], tracks: &[u32]) -> Vec<Object> {
                 objects.push(empty.object());
                 ended = true;
             }
-            Mp4Event::NativeMissingSample(_) => ended = true,
+            Mp4Event::MissingSample(_) => ended = true,
             Mp4Event::Configuration(_) => {}
         }
     }

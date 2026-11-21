@@ -3,7 +3,7 @@
 //! native Feed/Load lifetime or device behavior is inferred by this contract.
 use crate::input::Source;
 use crate::{
-    Mp4NativeSeekCommand, Mp4SyncSeekCommand, Output, Player, Progress, Result, SeekIntent,
+    Mp4DemuxSeekCommand, Mp4SyncSeekCommand, Output, Player, Progress, Result, SeekIntent,
     Selection, TrackKey,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -229,10 +229,10 @@ impl<S: Source, T: Sink> Pump<S, T> {
 
     /// Promote a progressive native-clock player to the same entity's
     /// complete native range seek while fencing any prior sink callbacks.
-    pub fn apply_mp4_progressive_native_seek(
+    pub fn apply_mp4_progressive_demux_seek(
         &mut self,
         next: &mut Option<crate::catalogue::Mp4Catalogue<S>>,
-        command: &Mp4NativeSeekCommand,
+        command: &Mp4DemuxSeekCommand,
         w: &mut WorkBudget,
         c: &AtomicBool,
     ) -> Result<Option<crate::catalogue::RetiredCatalogue>>

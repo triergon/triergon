@@ -1,7 +1,7 @@
 //! Sequential MP4 continuation through real source box/fragment/sample jobs.
 //! A drained current MDAT is a batch boundary, never an invented media EOF.
 use crate::{
-    EngineStep, Event, Mp4NativeEmptyPacket, Result,
+    EngineStep, Event, Mp4EmptyPacket, Result,
     mp4_open::{PendingMedia, RETAINED_MEDIA_BYTES, box_reader, word},
     mp4_plan::{Mp4View, PreparedMp4, SourceRow},
     sample_sort::SampleSort,
@@ -71,8 +71,8 @@ pub(crate) struct Continuation<'a> {
     pub(crate) input: &'a mut InputCursor,
     pub(crate) plan: &'a mut PreparedMp4,
     pub(crate) row: &'a mut usize,
-    pub(crate) replay_media: &'a mut Option<PendingMedia>,
-    pub(crate) native_empty_run: &'a mut Option<(Mp4NativeEmptyPacket, u32)>,
+    pub(crate) media_cache_fill: &'a mut Option<PendingMedia>,
+    pub(crate) empty_run: &'a mut Option<(Mp4EmptyPacket, u32)>,
 }
 
 pub(crate) fn prepare_media_replay(
@@ -95,7 +95,7 @@ pub(crate) fn prepare_media_replay(
     }
     let pending = PendingMedia::new(extent.start, length as usize, input.budget())?;
     plan.media_cache.try_reserve_exact(1)?;
-    plan.replay_native_order = true;
+    plan.demux_order_replay = true;
     Ok(pending)
 }
 
@@ -120,7 +120,7 @@ pub(crate) struct ProgressiveState {
     fill: usize,
     select: usize,
     best: Option<usize>,
-    native_next: [u64; 64],
+    demux_next: [u64; 64],
     cursor_tracks: [u8; 64],
     blocked_in_extent: bool,
     needs_reorder: bool,
@@ -133,7 +133,7 @@ pub(crate) struct ProgressiveState {
 }
 impl ProgressiveState {
     pub(crate) fn new(plan: &PreparedMp4, limits: ProgressiveLimits) -> Result<Self> {
-        if plan.view != Mp4View::SourcePhysical && !plan.native_front {
+        if plan.view != Mp4View::SourcePhysical && !plan.demux_front {
             return Err(Error::Unsupported(
                 "progressive native MOV context is not established",
             ));
@@ -185,7 +185,7 @@ impl ProgressiveState {
             fill: 0,
             select: 0,
             best: None,
-            native_next: [0; 64],
+            demux_next: [0; 64],
             cursor_tracks: [0; 64],
             blocked_in_extent: false,
             needs_reorder: false,
@@ -237,7 +237,7 @@ impl ProgressiveState {
                 self.reader = Some(box_reader(
                     engine.input,
                     self.limits.metadata_bytes,
-                    engine.plan.native_recovery,
+                    engine.plan.demux_recovery,
                 )?);
                 self.phase = Phase::Roots;
             }
@@ -268,7 +268,7 @@ impl ProgressiveState {
                         return Ok(EngineStep::Yield);
                     }
                     if h.kind == *b"mdat" {
-                        if engine.plan.native_recovery && reader.announced_open_mdat() {
+                        if engine.plan.demux_recovery && reader.announced_open_mdat() {
                             h.size = None;
                         }
                         if let Some(maximum) = engine.plan.forward_regular_extents
@@ -329,9 +329,9 @@ impl ProgressiveState {
                             Some(h.payload_range()?)
                         };
                         engine.plan.source_rows.clear();
-                        engine.plan.native_rows.clear();
+                        engine.plan.demux_rows.clear();
                         engine.plan.media_cache.clear();
-                        engine.plan.replay_native_order = false;
+                        engine.plan.demux_order_replay = false;
                         engine.plan.media.clear();
                         if let Some(extent) = self.extent.clone() {
                             engine.plan.media.try_push(extent).map_err(|e| e.error)?;
@@ -347,10 +347,10 @@ impl ProgressiveState {
                         self.best = None;
                         self.blocked_in_extent = false;
                         self.needs_reorder = false;
-                        self.native_next.fill(0);
-                        if engine.plan.native_front && engine.plan.native_front_boundary.is_none() {
+                        self.demux_next.fill(0);
+                        if engine.plan.demux_front && engine.plan.front_boundary.is_none() {
                             for (next, track) in self
-                                .native_next
+                                .demux_next
                                 .iter_mut()
                                 .zip(engine.plan.front_tracks.as_slice())
                             {
@@ -471,7 +471,7 @@ impl ProgressiveState {
                             .ok_or(Error::Invalid("fragment job"))?
                             .finish()?;
                         self.pending_cursor = Some(Cursor {
-                            cursor: if engine.plan.native_front {
+                            cursor: if engine.plan.demux_front {
                                 SourceCursor::Native(iso::compat::mov::front::FrontFragment::new(
                                     index,
                                 ))
@@ -615,7 +615,7 @@ impl ProgressiveState {
                     if let Some(cursor) = self.cursors.as_slice()[at].as_ref()
                         && let Some(head) = cursor.head.as_ref()
                     {
-                        let expected = self.native_next[usize::from(self.cursor_tracks[at])];
+                        let expected = self.demux_next[usize::from(self.cursor_tracks[at])];
                         if expected != 0 && head.sample.ordinal != expected {
                             self.blocked_in_extent |= self.extent.as_ref().is_none_or(|extent| {
                                 head.sample.range.start < extent.end
@@ -669,7 +669,7 @@ impl ProgressiveState {
                         native: cursor.native.take(),
                     };
                     let track = usize::from(self.cursor_tracks[at]);
-                    let next = if self.native_next[track] == 0 {
+                    let next = if self.demux_next[track] == 0 {
                         0
                     } else {
                         row.source
@@ -682,7 +682,7 @@ impl ProgressiveState {
                         let before = &last.source.sample.range;
                         let after = &row.source.sample.range;
                         after.start
-                            < if self.native_next[track] == 0 {
+                            < if self.demux_next[track] == 0 {
                                 before.start
                             } else {
                                 before.end
@@ -697,7 +697,7 @@ impl ProgressiveState {
                         self.best = Some(at);
                         return Err(error.error);
                     }
-                    self.native_next[track] = next;
+                    self.demux_next[track] = next;
                     self.needs_reorder |= backwards;
                     self.blocked_in_extent = false;
                     self.fill = at;
@@ -708,7 +708,7 @@ impl ProgressiveState {
                 }
             }
             Phase::PrepareReplay => {
-                *engine.replay_media = Some(prepare_media_replay(engine.input, engine.plan)?);
+                *engine.media_cache_fill = Some(prepare_media_replay(engine.input, engine.plan)?);
                 self.phase = Phase::CopySource;
             }
             Phase::CopySource => {
@@ -732,7 +732,7 @@ impl ProgressiveState {
                     .sort
                     .as_mut()
                     .ok_or(Error::Invalid("media order sort missing"))?;
-                let done = if engine.plan.replay_native_order {
+                let done = if engine.plan.demux_order_replay {
                     sort.poll(
                         engine.plan.source_rows.as_mut_slice(),
                         SourceRow::physical_key,
@@ -760,10 +760,10 @@ impl ProgressiveState {
                     }
                     // Reserve both owners before committing either a source row
                     // or the separate native clock. Retry keeps the exact head.
-                    if !engine.plan.replay_native_order {
+                    if !engine.plan.demux_order_replay {
                         engine.plan.source_rows.try_reserve_exact(1)?;
                     }
-                    if engine.plan.native_front && engine.plan.native_front_boundary.is_none() {
+                    if engine.plan.demux_front && engine.plan.front_boundary.is_none() {
                         let at = engine
                             .plan
                             .tracks
@@ -777,7 +777,7 @@ impl ProgressiveState {
                             .ok_or(Error::Invalid("front native head"))?;
                         let duration = engine
                             .plan
-                            .native_empty_duration
+                            .empty_duration
                             .filter(|_| head.source().composition_offset.is_none());
                         let boundary = if duration.is_some() {
                             head.zero_read_boundary()
@@ -791,20 +791,20 @@ impl ProgressiveState {
                             boundary.is_none() && head.remaining_in_run() == 0,
                         );
                         let base = native.media_clock.demux_base;
-                        engine.plan.native_rows.try_reserve_exact(1)?;
+                        engine.plan.demux_rows.try_reserve_exact(1)?;
                         engine
                             .plan
-                            .native_rows
+                            .demux_rows
                             .try_push(native)
                             .map_err(|e| e.error)?;
                         engine.plan.front_tracks.as_mut_slice()[at] = next;
-                        engine.plan.native_front_boundary = boundary;
-                        engine.plan.native_empty_duration = next_duration;
+                        engine.plan.front_boundary = boundary;
+                        engine.plan.empty_duration = next_duration;
                         if let (Some(boundary), Some(duration)) = (boundary, duration)
                             && head.remaining_in_run() != 0
                         {
-                            *engine.native_empty_run = Some((
-                                Mp4NativeEmptyPacket {
+                            *engine.empty_run = Some((
+                                Mp4EmptyPacket {
                                     boundary,
                                     time_base: base,
                                     handler: *b"vide",
@@ -818,7 +818,7 @@ impl ProgressiveState {
                             ));
                         }
                     }
-                    if !engine.plan.replay_native_order {
+                    if !engine.plan.demux_order_replay {
                         engine
                             .plan
                             .source_rows
@@ -848,7 +848,7 @@ impl ProgressiveState {
         }
         self.phase = if !self.needs_reorder {
             Phase::Admit
-        } else if plan.native_front && plan.native_front_boundary.is_none() {
+        } else if plan.demux_front && plan.front_boundary.is_none() {
             Phase::PrepareReplay
         } else {
             self.sort = Some(SampleSort::new(self.rows.len()));

@@ -6,7 +6,7 @@ use crate::{
     catalogue::{CatalogueCommit, Mp4Catalogue, RangeSeek, RetiredCatalogue},
     engines::Mp4RangeLanding,
     input::Source,
-    mp4_native_replay::NativeMp4Replay,
+    mp4_native_replay::DemuxReplay,
     mp4_open::{MetadataReadScope, Movie},
     mp4_plan::{Mp4View, PreparedMp4, include_media_track},
 };
@@ -23,7 +23,7 @@ use triergon_isobmff::{
 };
 
 #[derive(Clone, Copy, Debug)]
-pub struct Mp4NativeSeekRequest {
+pub struct Mp4DemuxSeekRequest {
     pub video: u32,
     /// Signed ticks in the reference track's native timebase.
     pub timestamp: i64,
@@ -38,11 +38,11 @@ struct Anchor {
     row: usize,
 }
 
-pub struct Mp4NativeSeekJob<'a> {
+pub struct Mp4DemuxSeekJob<'a> {
     plan: &'a PreparedMp4,
     global: Option<GlobalSeekJob<'a>>,
     receipt: Option<SeekLanding>,
-    request: Mp4NativeSeekRequest,
+    request: Mp4DemuxSeekRequest,
     target: Time,
     selection: Selection,
     generation: u64,
@@ -51,24 +51,24 @@ pub struct Mp4NativeSeekJob<'a> {
     tracks: usize,
     pending: usize,
     row: usize,
-    replay: Option<NativeMp4Replay>,
+    replay: Option<DemuxReplay>,
     failure: Option<Error>,
 }
 
 /// A generation-bound native seek with the original reference index entry.
-pub struct Mp4NativeSeekCommand {
+pub struct Mp4DemuxSeekCommand {
     pool: Budget,
     generation: u64,
     progressive_generation: Option<u64>,
     video: u32,
     target: Time,
     selection: Selection,
-    replay: NativeMp4Replay,
+    replay: DemuxReplay,
     receipt: SeekLanding,
     offset: u64,
 }
 
-impl Mp4NativeSeekCommand {
+impl Mp4DemuxSeekCommand {
     pub fn receipt(&self) -> &SeekLanding {
         &self.receipt
     }
@@ -89,7 +89,7 @@ impl Mp4NativeSeekCommand {
                 clock: ClockChoice::Demux,
                 replay_from_start: false,
             },
-            landing: Mp4RangeLanding::Native(&self.replay),
+            landing: Mp4RangeLanding::Demux(&self.replay),
         }
     }
 }
@@ -97,37 +97,37 @@ impl Mp4NativeSeekCommand {
 impl<S: Source> Player<S> {
     /// Reuse the complete Movie from the same open transaction. The seek job
     /// uses its compact sample tables and never reads payload bytes.
-    pub fn prepare_mp4_native_seek<'a>(
+    pub fn prepare_mp4_demux_seek<'a>(
         &'a self,
         movie: &'a Movie,
-        request: Mp4NativeSeekRequest,
+        request: Mp4DemuxSeekRequest,
         selection: Selection,
-    ) -> Result<Mp4NativeSeekJob<'a>> {
+    ) -> Result<Mp4DemuxSeekJob<'a>> {
         let Some(engine @ Engine::Mp4(_)) = self.engine.as_ref() else {
             return Err(Error::Invalid("native seek requires MP4"));
         };
         self.check_native_seek_clock()?;
-        Mp4NativeSeekJob::new(engine, movie, request, selection, None)
+        Mp4DemuxSeekJob::new(engine, movie, request, selection, None)
     }
 
     /// Plan native replay after switching a progressive source to an
     /// independently opened range view of the same stable byte entity.
-    pub fn prepare_mp4_progressive_native_seek<'a>(
+    pub fn prepare_mp4_progressive_demux_seek<'a>(
         &self,
         next: &'a Mp4Catalogue<S>,
         movie: &'a Movie,
-        request: Mp4NativeSeekRequest,
+        request: Mp4DemuxSeekRequest,
         selection: Selection,
-    ) -> Result<Mp4NativeSeekJob<'a>> {
+    ) -> Result<Mp4DemuxSeekJob<'a>> {
         self.check_native_seek_clock()?;
         let engine = self.progressive_seek_candidate(next)?;
-        Mp4NativeSeekJob::new(engine, movie, request, selection, Some(self.generation))
+        Mp4DemuxSeekJob::new(engine, movie, request, selection, Some(self.generation))
     }
 
-    pub fn apply_mp4_progressive_native_seek(
+    pub fn apply_mp4_progressive_demux_seek(
         &mut self,
         next: &mut Option<Mp4Catalogue<S>>,
-        command: &Mp4NativeSeekCommand,
+        command: &Mp4DemuxSeekCommand,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<RetiredCatalogue>> {
@@ -145,9 +145,9 @@ impl<S: Source> Player<S> {
         Ok(())
     }
 
-    pub fn apply_mp4_native_seek(
+    pub fn apply_mp4_demux_seek(
         &mut self,
-        command: &Mp4NativeSeekCommand,
+        command: &Mp4DemuxSeekCommand,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<bool> {
@@ -155,11 +155,11 @@ impl<S: Source> Player<S> {
     }
 }
 
-impl<'a> Mp4NativeSeekJob<'a> {
+impl<'a> Mp4DemuxSeekJob<'a> {
     fn new(
         engine: &'a Engine,
         movie: &'a Movie,
-        request: Mp4NativeSeekRequest,
+        request: Mp4DemuxSeekRequest,
         selection: Selection,
         progressive_generation: Option<u64>,
     ) -> Result<Self> {
@@ -169,7 +169,7 @@ impl<'a> Mp4NativeSeekJob<'a> {
         let plan = &mp4.plan;
         if plan.view != Mp4View::PinnedMov9NoParseNoFillin
             || plan.read_scope != MetadataReadScope::CompleteEntity
-            || plan.native_recovery
+            || plan.demux_recovery
             || !mp4.supports_range_replay()
         {
             return Err(Error::Unsupported(
@@ -223,7 +223,7 @@ impl<'a> Mp4NativeSeekJob<'a> {
 pub(super) fn native_global_seek<'a>(
     movie: &'a Movie,
     edits: Option<&'a [Option<EncodedEditPlan>]>,
-    request: Mp4NativeSeekRequest,
+    request: Mp4DemuxSeekRequest,
     media_tracks_only: bool,
 ) -> Result<GlobalSeekJob<'a>> {
     let tracks = movie.tracks();
@@ -280,7 +280,7 @@ pub(super) fn native_global_seek<'a>(
     })
 }
 
-impl Mp4NativeSeekJob<'_> {
+impl Mp4DemuxSeekJob<'_> {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -324,7 +324,7 @@ impl Mp4NativeSeekJob<'_> {
                 };
             }
         }
-        let rows = self.plan.native_rows();
+        let rows = self.plan.demux_rows();
         while self.pending != 0 {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -378,7 +378,7 @@ impl Mp4NativeSeekJob<'_> {
             tracks[i] = anchor.track;
             starts[i] = anchor.row;
         }
-        self.replay = Some(NativeMp4Replay::new(
+        self.replay = Some(DemuxReplay::new(
             &tracks[..self.tracks],
             &starts[..self.tracks],
             rows,
@@ -386,18 +386,18 @@ impl Mp4NativeSeekJob<'_> {
         Ok(true)
     }
 
-    pub fn finish(self) -> Result<Mp4NativeSeekCommand> {
+    pub fn finish(self) -> Result<Mp4DemuxSeekCommand> {
         if let Some(error) = self.failure {
             return Err(error);
         }
         let replay = self
             .replay
             .ok_or(Error::Invalid("native playback seek still pending"))?;
-        let offset = self.plan.native_rows()[replay.first_row()]
+        let offset = self.plan.demux_rows()[replay.first_row()]
             .source
             .range
             .start;
-        Ok(Mp4NativeSeekCommand {
+        Ok(Mp4DemuxSeekCommand {
             pool: self.plan.pool.clone(),
             generation: self.generation,
             progressive_generation: self.progressive_generation,
