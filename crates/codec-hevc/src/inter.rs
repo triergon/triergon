@@ -840,11 +840,8 @@ fn copy_rows<P: Pixel, const W: usize>(
     h: usize,
 ) {
     for y in 0..h {
-        let dr: &mut [P; W] = (&mut d[doff + y * ds..doff + y * ds + W])
-            .try_into()
-            .unwrap();
-        let sr: &[P; W] = s[soff + y * ss..soff + y * ss + W].try_into().unwrap();
-        *dr = *sr;
+        let dr = &mut d[doff + y * ds..doff + y * ds + W].as_chunks_mut::<W>().0[0];
+        *dr = s[soff + y * ss..soff + y * ss + W].as_chunks::<W>().0[0];
     }
 }
 

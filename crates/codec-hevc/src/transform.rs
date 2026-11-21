@@ -36,9 +36,16 @@ fn clip16(v: i32) -> i32 {
 // are zero and skipped. The even half is computed in place in out[0..N/2] and then
 // combined, so no temporary needs initialization.
 
+/// The `L` lanes of `s` from `off`.
 #[inline(always)]
 fn lane_row<const L: usize>(s: &[i32], off: usize) -> &[i32; L] {
-    s[off..off + L].try_into().unwrap()
+    &s[off..off + L].as_chunks::<L>().0[0]
+}
+
+/// The `L` lanes of `s` from `off`, writable.
+#[inline(always)]
+fn lane_row_mut<const L: usize>(s: &mut [i32], off: usize) -> &mut [i32; L] {
+    &mut s[off..off + L].as_chunks_mut::<L>().0[0]
 }
 
 #[inline(always)]
@@ -91,10 +98,8 @@ macro_rules! pass_n {
                     }
                     k += 2;
                 }
-                let e: &mut [i32; L] = (&mut lo[i * L..i * L + L]).try_into().unwrap();
-                let d: &mut [i32; L] = (&mut hi[(H - 1 - i) * L..(H - 1 - i) * L + L])
-                    .try_into()
-                    .unwrap();
+                let e: &mut [i32; L] = lane_row_mut(lo, i * L);
+                let d: &mut [i32; L] = lane_row_mut(hi, (H - 1 - i) * L);
                 for x in 0..L {
                     let ev = e[x];
                     e[x] = ev + o[x];
