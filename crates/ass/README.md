@@ -236,8 +236,9 @@ selective style overrides), in the frame and storage size and margins of its
   position by margins, `\pos`, `\move` or a scroll; and the rotation
   origin.
 - **Bitmaps.** Each glyph's fill and border or opaque box through
-  `triergon_raster::Raster::render`, quantised against its run, and each run
-  composited with its blur, `\be` and shadow by `Raster::compose`; then each
+  `triergon_raster::compat::libass::Run::render_with`, quantised against its
+  run, and each run composited with its blur, `\be` and shadow by
+  `Composite::new`; then each
   run's shadow, border and fill as images, clipped by the clip rectangle (with `\kf`'s
   split), multiplied by a vector clip, and the box of `BorderStyle` 4. A
   vector clip whose drawing has no contour empties every image of a regular
