@@ -2,6 +2,7 @@
 // Python wire oracle. Full brand/codec/presentation conformance and demux
 // parity are not covered here.
 mod common;
+use common::atom;
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
     BuildStatus, Limits, Next,
@@ -617,15 +618,6 @@ fn independent_fragment_boundaries_preserve_source_clocks_and_ranges() {
     }
 }
 
-fn atom(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
-    let mut result = u32::try_from(body.len() + 8)
-        .unwrap()
-        .to_be_bytes()
-        .to_vec();
-    result.extend_from_slice(kind);
-    result.extend_from_slice(body);
-    result
-}
 fn full_words(kind: &[u8; 4], version: u8, words: &[u32]) -> Vec<u8> {
     let mut result = vec![version, 0, 0, 0];
     for word in words {

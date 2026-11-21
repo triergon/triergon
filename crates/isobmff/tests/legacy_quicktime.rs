@@ -1,23 +1,13 @@
 //! Legacy QuickTime metadata uses the same data-reference validation as other tracks.
 mod common;
 
-use common::{child, roots};
+use common::{atom, child, roots};
 use std::{io::Cursor, sync::atomic::AtomicBool};
 use triergon_core::{
     Budget, Error, InputCursor, Result, SourceId, WorkBudget,
     blocking::{Feed, seekable_capabilities},
 };
 use triergon_isobmff::open::{Movie, MovieOpen, OpenLimits, OpenStep};
-
-fn atom(kind: &[u8; 4], payload: &[u8]) -> Vec<u8> {
-    let mut atom = u32::try_from(8 + payload.len())
-        .unwrap()
-        .to_be_bytes()
-        .to_vec();
-    atom.extend_from_slice(kind);
-    atom.extend_from_slice(payload);
-    atom
-}
 
 fn movie(data_handler: Option<&[u8]>, dependency_flags: u32, local: bool) -> Vec<u8> {
     // The authored fixture puts all media before moov, so inserting metadata

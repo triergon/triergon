@@ -8,6 +8,17 @@ use triergon_isobmff::{
     table::{SampleTable, SampleTableBuilder},
 };
 
+/// A box with a 32-bit size: the size, `kind` and `body`.
+pub fn atom(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
+    let mut raw = u32::try_from(body.len() + 8)
+        .unwrap()
+        .to_be_bytes()
+        .to_vec();
+    raw.extend_from_slice(kind);
+    raw.extend_from_slice(body);
+    raw
+}
+
 pub fn bytes(budget: &Budget, input: &[u8]) -> Bytes {
     Bytes::copy_from_slice(budget, input).expect("test fixture budget")
 }

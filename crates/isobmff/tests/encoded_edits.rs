@@ -1,5 +1,5 @@
 mod common;
-use common::{child, children, roots, table};
+use common::{atom, child, children, roots, table};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, Time, TimeBase,
@@ -666,13 +666,6 @@ fn range_playback_keeps_dolby_packets_and_reports_the_leading_sample_skip() {
 
 fn fixture_payload(raw: &[u8], kind: &[u8; 4]) -> usize {
     raw.windows(4).position(|bytes| bytes == kind).unwrap() + 4
-}
-
-fn atom(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
-    let mut raw = ((body.len() + 8) as u32).to_be_bytes().to_vec();
-    raw.extend_from_slice(kind);
-    raw.extend_from_slice(body);
-    raw
 }
 
 fn ddts(construction: u8, frequency: u32, frame_code: u8) -> Vec<u8> {
