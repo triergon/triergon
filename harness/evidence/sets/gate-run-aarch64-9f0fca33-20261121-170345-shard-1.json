@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-aarch64-9f0fca33-20261121-170345-shard-1",
+ "path": "gate-run-aarch64-9f0fca33-20261121-170345-shard-1",
+ "retention": "retained",
+ "reason": "DTS core discovery comparisons with 30 timing and 30 kernel-bound memory pairs per case on Linux AArch64.",
+ "key": "evidence/gate-runs/9f0fca339f1ed5c804b8078b92d6f5f4713d4cc2-aarch64-20261121-170345/shard-1/d17505cdcb5becfef3b22a9ba1829c1de2885e6a3bf8d127650c13a944b1d8df.tar.zst",
+ "sha256": "d17505cdcb5becfef3b22a9ba1829c1de2885e6a3bf8d127650c13a944b1d8df",
+ "bytes": 1627235,
+ "results": [
+  {
+   "path": "memory/mpegts-dts-discovery/gate-result.json",
+   "command": "report --memory",
+   "key": "f5637fc5ff214f2438938a3d06341b134ec4ca858a8406186d0cc795b1aa22d3",
+   "status": 0,
+   "report_sha256": "6249903718b7d17378c8b78e5130ce6efbd7d229de041c6c540ebecdffc8b847",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-dts-discovery/gate-result.json",
+   "command": "report --benchmark",
+   "key": "3163a8dc61da88dded5d2a998f256000036b906a076d784568cc24227291fb01",
+   "status": 0,
+   "report_sha256": "af0572d71f28703c1122db87b60bde01b3a5c3722d7830b82b817eb6e77eaa40",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mpegts-dts-discovery/gate-result.json",
+   "command": "grade",
+   "key": "a6400d621d5e646a85ec87259ad4fad988d4ba8f9f027e8fcee290ce700ea5a7",
+   "status": 0,
+   "report_sha256": "9bb67ec4b5c65dbebfa57711612bda794e0210293fa38e5b5e88788b09ea289a"
+  }
+ ]
+}

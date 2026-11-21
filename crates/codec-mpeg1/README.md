@@ -56,52 +56,31 @@ charges a caller's `Budget`.
   400 bit/s units (`Error::BitRate`). Geometry limits (even, 2–4094) are enforced by
   `Geometry::new`.
 - `encode` refuses a picture whose geometry differs from the configuration
-  (`Error::PictureGeometry`) before changing any state. A successful encode replaces the contents of `out`.
+  (`Error::PictureGeometry`) before changing any state. A successful encode replaces the
+  contents of `out`.
 - Storage sized from the configuration is charged to the encoder's budget before it
-  is allocated: the reference and reconstructed pictures, the previous source
-  picture, the macroblock and motion arrays and the coarse planes, the bit writer and the
-  caller's `out` at the bound of one picture (the VBV buffer plus one full and
-  16 bytes per further macroblock; the bit writer never grows), and the first I
-  picture's trial pass (one row). The default `Limits::live_storage_bytes` is
-  96 MiB; the largest geometry (4094x4094) at the largest signalled VBV buffer
+  is allocated: the reference, reconstructed and previous source pictures, the
+  macroblock and motion arrays, the coarse planes (reserved together on first motion
+  search; skipped while the source luma repeats), the bit writer and the caller's `out`
+  at the bound of one picture (the VBV buffer plus one full and 16 bytes per further
+  macroblock), and the first I picture's trial pass (one row). The default
+  `Limits::live_storage_bytes` is 96 MiB; 4094x4094 at the largest signalled VBV buffer
   (1023 × 16 kbit) needs about 74 MiB. A refused charge is `Error::Budget`, from the
-  constructor or before coding the picture. Motion search reserves both coarse
-  luma planes together on first use. Repeated source luma skips that reservation
-  and both downsampling passes, including when only chroma changes. After
-  backpressure, `out` still holds its previous bytes. Release space and retry
-  the same input at the same picture index.
+  constructor or before coding the picture; `out` then keeps its previous bytes, and
+  the same input can be retried at the same picture index once space is released.
 - The input must have its coded padding filled (`Picture::pad_edges`; the pixel
   `Converter` does this).
-- Every successful call encodes and advances the picture index, also for an unchanged source
-  picture (a keepalive). When the whole picture repeats, a macroblock the previous
-  picture skipped after its residual quantised to zero is skipped again without
-  computing the residual, as long as its quantiser is no finer: its residual is the
-  same, and the output is what computing it would give. The first I picture of an
-  encoder runs a trial pass to seed the intra rate model.
+- Every successful call encodes and advances the picture index, also for an unchanged
+  source picture (a keepalive). The first I picture runs a trial pass to seed the intra
+  rate model.
 - The picture rate is fixed at 30 Hz. Timestamps belong to the caller or muxer.
 - A nonzero `vbv_underflow_bits` means some picture exceeded the modelled buffer
   occupancy.
-- The `motion` module is public but hidden from the documentation; it is not a
-  supported API.
 
 ## Conformance
 
 Written from ISO/IEC 11172-2 (sequence to block layers, Table 2-D.4 picture rates,
 Annex C VBV model). The reference is FFmpeg 9.0.2 `mpeg1video` with an I/P GOP of 30,
-driven through the capture pipeline ([triergon-capture](../capture/README.md)). Per
-case the harness requires:
-
-- an error-free independent FFmpeg decode of every picture and identical picture
-  types;
-- VBV underflow no worse than the reference;
-- PSNR-Y within 0.25 dB of the reference at equal or fewer bits. When the reference
-  overspends, the encoder is re-run at 1.25–4.5× the requested rate and PSNR-Y is
-  interpolated at the reference's bit count.
-
-Unit tests cover the VLC tables (prefix-free and complete), DC differentials, escape
-levels, reconstruction oddification and saturation, half-sample rounding, motion
-search and bounds, the zero-residual shortcut against the complete transform, the
-inverse transform over a block's nonzero coefficients and the forward rows against a
-butterfly transform, and skips reused for a repeated picture against the computed
-path. `tests/encoder.rs` covers configuration, geometry refusal and exact output
-after a budget retry. See the [quality gates](../../docs/quality.md).
+driven through the capture pipeline ([triergon-capture](../capture/README.md)); the
+comparison is described in [harness/capture](../../harness/capture/README.md) and its
+results in [docs/status.md](../../docs/status.md).

@@ -16,6 +16,7 @@ type R<T> = Result<T, String>;
 const LIMIT: usize = 64 * 1024 * 1024;
 const INDEXES: [&str; 2] = ["harness/fate/index.json", "harness/fate/formats-index.json"];
 const INVENTORY: &str = "harness/fate/transport-coverage.json";
+const OBSERVATION_CONTRACT: &str = "harness/fate/transport-observations-contract.json";
 const REVISION: &str = "d32b387f2b0a484599d4587d651891f0c63c4238";
 
 fn text<'a>(value: &'a Value, key: &str) -> R<&'a str> {
@@ -276,13 +277,21 @@ fn observe(root: &Path, spec: &Value, output: &Path) -> R<()> {
     if !strings(row, "samples")?.iter().any(|s| s == sample) {
         return Err("sample is not the indexed original input".into());
     }
+    let contract = read_json(&root.join(OBSERVATION_CONTRACT))?;
+    let originals = contract
+        .get("input_sha256")
+        .ok_or("missing original input pins")?;
+    let expected_sha = text(originals, sample)?;
+    if text(input_spec, "sha256")? != expected_sha {
+        return Err("sample hash differs from the original input pin".into());
+    }
     let input_path = root.join(text(input_spec, "file")?);
     if !input_path.exists() {
         let url = format!("https://fate-suite.ffmpeg.org/{sample}");
         let bytes = crate::fetch::pinned(
             &crate::fetch::Network,
             &[crate::fetch::Source::Url(&url)],
-            text(input_spec, "sha256")?,
+            expected_sha,
             LIMIT,
             "triergon-transport-observation",
         )?;
@@ -410,6 +419,7 @@ fn observe(root: &Path, spec: &Value, output: &Path) -> R<()> {
         &Value::object([
             ("schema", Value::int(1)),
             ("specification", spec.clone()),
+            ("observation_contract", contract),
             ("coverage", coverage),
             (
                 "tool_sha256",
@@ -468,7 +478,10 @@ mod tests {
         let root = crate::walk::scratch("transport-fate-observe");
         fs::create_dir_all(root.join("harness/fate")).unwrap();
         fs::create_dir_all(root.join("xtask/src")).unwrap();
-        for file in INDEXES.into_iter().chain(["xtask/src/transport_fate.rs"]) {
+        for file in INDEXES
+            .into_iter()
+            .chain([OBSERVATION_CONTRACT, "xtask/src/transport_fate.rs"])
+        {
             fs::copy(repository.join(file), root.join(file)).unwrap();
         }
         let pin = |name: &str, bytes: &[u8]| {
@@ -513,6 +526,20 @@ printf '{"operation":"%s","iterations":1,"packets":2,"bytes":8,"digest":19,"eof"
             ("candidate_worker", candidate),
         ]);
         let output = root.join("observations");
+        assert_eq!(
+            observe(&root, &spec, &output).unwrap_err(),
+            "sample hash differs from the original input pin"
+        );
+        assert!(!output.exists());
+        let fixture_pin = spec.get("input").unwrap().get("sha256").unwrap().clone();
+        write_json(
+            &root.join(OBSERVATION_CONTRACT),
+            &Value::object([(
+                "input_sha256",
+                Value::object([("mpegts/pmtchange.ts", fixture_pin)]),
+            )]),
+        )
+        .unwrap();
         assert!(observe(&root, &spec, &output).is_err());
         let observation = read_json(&output.join("observations.json")).unwrap();
         assert_eq!(array(&observation, "operations").unwrap().len(), 5);

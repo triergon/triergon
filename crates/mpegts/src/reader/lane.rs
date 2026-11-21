@@ -1,5 +1,6 @@
 mod aligned_audio;
 mod dts_hd;
+mod dts_probe;
 mod dvb;
 mod eac3;
 mod loas;
@@ -1125,6 +1126,7 @@ pub(super) enum PesRun {
 pub(super) struct Lane {
     pub track: Track,
     pub unsupported: Option<Error>,
+    probe: Option<dts_probe::Probe>,
     framer: Option<Framer>,
     pool: Budget,
     limits: ReaderLimits,
@@ -1145,12 +1147,24 @@ pub(super) struct Lane {
 }
 
 impl Lane {
+    pub(super) fn is_probing_dts(&self) -> bool {
+        self.probe.is_some()
+    }
+
     pub(super) fn new(
         pool: &Budget,
         track: Track,
         limits: ReaderLimits,
         frame: bool,
     ) -> Result<Self> {
+        let mut track = track;
+        if limits.probe_unlabelled_dts_core
+            && !limits.unlabelled_dts_core.is_some_and(|selection| {
+                selection.program == track.program() && selection.pid == track.stream().pid
+            })
+        {
+            track.unlabelled_dts_core = false;
+        }
         let (framer, unsupported, residue) = if frame {
             match Framer::new(pool, &track, limits) {
                 Ok(framer) => (Some(framer), None, None),
@@ -1164,9 +1178,15 @@ impl Lane {
         } else {
             (None, None, None)
         };
+        let probe = (frame
+            && limits.probe_unlabelled_dts_core
+            && !track.unlabelled_dts_core
+            && dts_probe::eligible(&track))
+        .then(dts_probe::Probe::default);
         Ok(Self {
             track,
             unsupported,
+            probe,
             framer,
             pool: pool.clone(),
             limits,
@@ -1233,6 +1253,27 @@ impl Lane {
         clock: ClockContext,
         work: &mut WorkBudget,
     ) -> Result<bool> {
+        if let Some(probe) = &mut self.probe {
+            let pes = pending.as_ref().expect("queued probe PES").pes();
+            let Some(accepted) = probe.step(pes, work) else {
+                return Ok(false);
+            };
+            if accepted {
+                let mut track = self.track.clone();
+                track.unlabelled_dts_core = true;
+                // Construction can backpressure. Keep the original probe and track
+                // until the complete framer is available for this same source PES.
+                let framer = Framer::new(&self.pool, &track, self.limits)?;
+                self.track = track;
+                self.framer = Some(framer);
+                self.unsupported = None;
+            } else {
+                self.unsupported = Some(Error::Unsupported(
+                    "MPEG-TS private PES does not prove DTS core",
+                ));
+            }
+            self.probe = None;
+        }
         if self.framer.is_none() && self.residue.is_none() {
             return Ok(true);
         }

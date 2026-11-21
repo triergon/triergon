@@ -16,7 +16,7 @@
     "Split cases seek across two consecutive entities cut at a carrier boundary inside a PES. The reference sees the same preloaded bytes as one logical stream and folds the same landing and complete suffix.",
     "Layer III landing requires a zero main_data_begin back-pointer. Both workers preserve the later dependent frames in the suffix, with their original timing and bytes.",
     "A repeated-seek case also splits the transport source inside a PES. Both seeks use the same ordered, contiguous parts.",
-    "MPEG-1 Layer I and II physical-offset controls place identical CRC-checked PAT and PMT sections immediately before each timestamped single-carrier PES. After indexing, the early backward Layer I and late forward Layer II repeats read only their physical suffix, preserving every payload and source clock. The reference independently scans and replays both complete suffixes through the same public demuxer API."
+    "MPEG-1 Layer I and II physical-offset controls place identical CRC-checked PAT and PMT sections immediately before each timestamped single-carrier PES. After indexing, the early backward Layer I and late forward Layer II repeats read only their physical suffix, preserving every payload and source clock. The reference independently scans and replays both complete suffixes through the same public demuxer API. Additional M2TS192 controls carry one complete Layer I or II frame per multi-carrier PES, with opaque four-byte prefixes, an early backward or late forward repeat and the same complete suffix/count/clock fold."
   ],
   "required_profiles": [
     "adts-aac-lc-previous",
@@ -41,7 +41,9 @@
     "latm-next-configuration",
     "adts-aac-lc-split-repeated-preroll",
     "mpeg1-layer1-physical-repeated-preroll",
-    "mpeg1-layer2-physical-repeated-preroll"
+    "mpeg1-layer2-physical-repeated-preroll",
+    "mpeg1-layer1-m2ts-multi-carrier-repeated-preroll",
+    "mpeg1-layer2-m2ts-multi-carrier-repeated-preroll"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",

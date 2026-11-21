@@ -1,0 +1,9 @@
+{
+ "name": "downmix-silent-3b1c527c",
+ "path": "downmix-silent-3b1c527c",
+ "retention": "retained",
+ "reason": "Measurements behind 3b1c527c against main f0805e93 on c6g.4xlarge hosts from the gate images, ARMv7 and Linux AArch64: per-workload instruction and cycle counts of every codec workload and file workload with digest checks, for the change and for its first version that tested the bits on every target, with the scripts and the profile finding; cited by docs/status.md.",
+ "key": "evidence/downmix-silent-3b1c527c/0977f97a9ec6d861205572326357d50f14532ea5834ad4615f2cb6efddbfc75e.tar.gz",
+ "sha256": "0977f97a9ec6d861205572326357d50f14532ea5834ad4615f2cb6efddbfc75e",
+ "bytes": 25623
+}

@@ -488,7 +488,7 @@ int main(int argc, char **argv)
     int repeat = 0;
     int epoch = 0;
     long long repeat_target = 0;
-    if (argc < track + 3 || argc > track + 5
+    if (argc < track + 3 || argc > track + 7
         || !number(argv[track+1], INT64_MIN, INT64_MAX, &target))
         return 2;
     for (int i = track + 3; i < argc; ++i) {
@@ -511,7 +511,7 @@ int main(int argc, char **argv)
             repeat = 1;
         }
     }
-    if (epoch != (epoch_start >= 0) || (epoch && (repeat || split)))
+    if (epoch != (epoch_start >= 0))
         return 2;
     option = !strcmp(argv[track+2], "preroll");
     if (!option && strcmp(argv[track+2], "previous"))
