@@ -1,17 +1,14 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
-    clippy::print_stderr
+    clippy::print_stderr,
+    clippy::unwrap_used,
+    clippy::expect_used
 )]
-// Pending: `missing_docs`, `clippy::unwrap_used`, `clippy::expect_used`.
-// Channel/bin loops are written with explicit indices to mirror the A/52 pseudo code.
-#![allow(clippy::needless_range_loop)]
-// Pending: these rewrites change the generated code of measured hot paths and are
-// adopted with an A/B timing run.
-#![allow(clippy::single_match_else)]
 mod bitalloc;
 mod downmix;
 mod error;
