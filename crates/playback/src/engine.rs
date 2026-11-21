@@ -7,7 +7,7 @@ pub(crate) mod ts;
 pub(crate) use mp4::{Mp4RangeLanding, Mp4SyncLanding};
 
 use crate::engine::matroska::MkvEngine;
-use crate::engine::mp4::Mp4Engine;
+use crate::engine::mp4::{Mp4Engine, SeekReplay};
 use crate::engine::ts::{Delivery as TsDelivery, TsEngine};
 use crate::event::EngineStep;
 use crate::input::SourceReply;
@@ -117,8 +117,7 @@ impl Engine {
             input,
             plan,
             row: 0,
-            indexed_sync: None,
-            demux_seek: None,
+            seek: SeekReplay::Forward,
             packet: None,
             configs: [None; 64],
             revision: 0,
@@ -453,7 +452,7 @@ impl Engine {
                 if t.snapshot.handler != *b"vide" {
                     return Err(Error::Invalid("MP4 seek track is not video"));
                 }
-                let (row, offset, indexed_sync, demux_seek) = match mp4_landing {
+                let (row, offset, seek) = match mp4_landing {
                     Some(Mp4RangeLanding::Source(landing)) => {
                         let rows = r.plan.source_rows();
                         let first = rows
@@ -468,14 +467,15 @@ impl Engine {
                         {
                             return Err(Error::Invalid("MP4 seek landing"));
                         }
-                        let skip_video = (landing.first_row < landing.sync_row)
-                            .then_some((id, landing.sync_row));
-                        (
-                            landing.first_row,
-                            first.sample.range.start,
-                            skip_video,
-                            None,
-                        )
+                        let seek = if landing.first_row < landing.sync_row {
+                            SeekReplay::SkipVideoUntil {
+                                video: id,
+                                sync: landing.sync_row,
+                            }
+                        } else {
+                            SeekReplay::Forward
+                        };
+                        (landing.first_row, first.sample.range.start, seek)
                     }
                     Some(Mp4RangeLanding::Demux(replay)) => {
                         let first = replay.first_row();
@@ -486,17 +486,15 @@ impl Engine {
                         (
                             first,
                             occurrence.source.range.start,
-                            None,
-                            Some(replay.clone()),
+                            SeekReplay::DemuxOrder(replay.clone()),
                         )
                     }
-                    Some(Mp4RangeLanding::DemuxCursor(offset)) => (0, offset, None, None),
-                    None => (0, 0, None, None),
+                    Some(Mp4RangeLanding::DemuxCursor(offset)) => (0, offset, SeekReplay::Forward),
+                    None => (0, 0, SeekReplay::Forward),
                 };
                 r.input.reset(offset)?;
                 r.row = row;
-                r.indexed_sync = indexed_sync;
-                r.demux_seek = demux_seek;
+                r.seek = seek;
                 r.packet = None;
                 r.ended_short = false;
                 r.configs = [None; 64];

@@ -44,6 +44,25 @@ pub(crate) enum Mp4RangeLanding<'a> {
     DemuxCursor(u64),
 }
 
+/// How an MP4 engine chooses rows after a seek.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "the replay is built once per seek and polled in place"
+)]
+pub(crate) enum SeekReplay {
+    /// In plan order.
+    Forward,
+    /// After a sync-sample seek: rows of track `video` before row `sync` are skipped.
+    SkipVideoUntil {
+        /// `track_ID` of the video track.
+        video: u32,
+        /// The row of the sync sample.
+        sync: usize,
+    },
+    /// After a demux-view seek: in the order the replay yields.
+    DemuxOrder(DemuxReplay),
+}
+
 pub struct Mp4Engine {
     pub(crate) progressive: Option<progressive::ProgressiveState>,
     pub(crate) media_cache_fill: Option<PendingMedia>,
@@ -53,8 +72,7 @@ pub struct Mp4Engine {
     pub(crate) input: InputCursor,
     pub plan: PreparedMp4,
     pub(crate) row: usize,
-    pub(crate) indexed_sync: Option<(u32, usize)>,
-    pub(crate) demux_seek: Option<DemuxReplay>,
+    pub(crate) seek: SeekReplay,
     pub(crate) packet: Option<(usize, SampleReader)>,
     pub(crate) configs: [Option<CachedDescription>; 64],
     pub(crate) revision: u64,
@@ -121,7 +139,7 @@ impl Mp4Engine {
                     && boundary.source_offset == source.sample.range.start
             });
         }
-        if let Some(replay) = &mut self.demux_seek {
+        if let SeekReplay::DemuxOrder(replay) = &mut self.seek {
             replay.delivered(self.row)?;
         } else {
             self.row += 1;
@@ -302,14 +320,14 @@ impl Mp4Engine {
         if self.packet.is_some() {
             return self.poll_packet(w, c, cursor);
         }
-        if let Some(replay) = &mut self.demux_seek {
+        if let SeekReplay::DemuxOrder(replay) = &mut self.seek {
             match replay.poll(self.plan.demux_rows(), w, c)? {
                 DemuxReplayStep::Ready(row) => self.row = row,
                 DemuxReplayStep::Yield => return Ok(EngineStep::Yield),
                 DemuxReplayStep::End => return Ok(EngineStep::End),
             }
         }
-        if let Some((video, sync)) = self.indexed_sync {
+        if let SeekReplay::SkipVideoUntil { video, sync } = self.seek {
             while self.row < sync && self.plan.source_rows()[self.row].track_id == video {
                 if c.load(Ordering::Relaxed) {
                     return Err(Error::Cancelled);
@@ -320,7 +338,7 @@ impl Mp4Engine {
                 self.row += 1;
             }
             if self.row >= sync {
-                self.indexed_sync = None;
+                self.seek = SeekReplay::Forward;
             }
         }
         let row = if let Some(cursor) = cursor.as_deref_mut() {
