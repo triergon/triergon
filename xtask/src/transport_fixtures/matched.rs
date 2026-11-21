@@ -379,3 +379,58 @@ pub fn author_dts(root: &Path, args: &[String]) -> R<()> {
     }
     manifest(root, FEATURE, cases)
 }
+
+/// Rewrap pinned audio frames with independently authored PES timing.
+pub fn author_audio_seek(root: &Path, args: &[String]) -> R<()> {
+    let [record, reference] = args else {
+        return Err("usage: cargo xtask fixture transport-audio-seek --record REFERENCE".into());
+    };
+    if record != "--record" {
+        return Err("expected --record".into());
+    }
+
+    const FEATURE: &str = "mpegts-previous-audio";
+    let pid = PID.to_string();
+    let mut cases = Vec::new();
+    for (ac3, m2ts, name) in [(false, false, "adts-aac-lc"), (true, true, "dvb-ac3")] {
+        let codec = super::audio(root, ac3)?;
+        let frame = &codec.bytes[..codec.first];
+        let step = if ac3 { 2880 } else { 1920 };
+        let mut ts = Transport::new();
+        let descriptors: &[u8] = if ac3 { &[0x6a, 1, 0] } else { &[] };
+        ts.tables(&codec, descriptors)?;
+        ts.pes(codec.stream_id, &part(&codec.bytes, Some(90_000), None))?;
+        ts.pes(codec.stream_id, &part(frame, None, None))?;
+        ts.pes(
+            codec.stream_id,
+            &part(
+                &codec.bytes,
+                Some(90_000 + 3 * step),
+                Some(90_000 + 3 * step - 90),
+            ),
+        )?;
+        ts.pes(codec.stream_id, &part(frame, Some(90_000 + 5 * step), None))?;
+        let input = Input {
+            name,
+            m2ts,
+            data: ts.finish(m2ts),
+        };
+        for (policy, target) in [("previous", "90000"), ("preroll", "100000")] {
+            let id = format!("{name}-{policy}");
+            let mut options = Vec::new();
+            if ac3 {
+                options.push("--dvb");
+            }
+            options.extend([pid.as_str(), target, policy]);
+            cases.push(input.record(
+                root,
+                FEATURE,
+                &id,
+                &options,
+                Path::new(reference),
+                "ts-audio-seek-fold",
+            )?);
+        }
+    }
+    manifest(root, FEATURE, cases)
+}

@@ -132,15 +132,19 @@ opens a sequential TS188 source. Set `ReaderLimits::format` for M2TS192, and
 contain exactly one media program. `ContainerReader` supplies the normal
 input-window, work, cancellation, backpressure and reset protocol.
 
-`Reader::request_seek` scans one seekable, length-known entity for the last
-coded AVC or HEVC random-access picture at or before the requested presentation
-time. It is bounded by `ReaderLimits::maximum_seek_scan_bytes` (64 MiB by default).
-It preserves original packet bytes, clocks and source ranges by retaining a
-bounded single-track suffix or by replaying the entity. An `Event::Seek` precedes
-the landing packet and carries the requested discard time for `PlaybackPreroll`.
-Decoder setup is the caller's
-responsibility. Seek refuses unresolved random-access timestamps, changes
-of the selected track's source epoch, ambiguous clock wraps, and continued entities.
+`Reader::request_seek` scans one seekable, length-known entity for the previous
+coded AVC or HEVC random-access picture, or a timestamped ADTS AAC-LC or AC-3
+frame. The landing is the last eligible packet with the greatest presentation
+time at or before the target. Audio frames without a source PTS are delivered
+with their original timing when they follow a landing.
+`ReaderLimits::maximum_seek_scan_bytes` limits the scan to 64 MiB by default.
+Packets retain their original bytes, clocks and source ranges. The reader retains
+a bounded single-track suffix when possible and otherwise replays the entity.
+An `Event::Seek` precedes the landing packet and carries the requested
+discard time for `PlaybackPreroll`. The caller supplies decoder setup.
+The reader refuses seeks across selected-track source epochs, ambiguous clock
+wraps, and continued entities. A coded random-access picture must have resolved
+timing.
 
 Use `Reader::new_with_packet_tracks` when the caller has already chosen the
 elementary PIDs. Only those PIDs allocate access-unit framers and produce

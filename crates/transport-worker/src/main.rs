@@ -24,7 +24,7 @@ fn dispatch(args: &[String]) -> runner::Result<()> {
         ts::run(args)
     } else {
         Err(
-            "usage: transport-worker PREFIX{fold,bench,memory} FILE ...; prefixes: ts-au-, ts-, ts-seek-, ts-free-audio-"
+            "usage: transport-worker PREFIX{fold,bench,memory} FILE ...; prefixes: ts-au-, ts-, ts-seek-, ts-audio-seek-, ts-free-audio-"
                 .into(),
         )
     }

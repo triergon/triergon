@@ -15,6 +15,9 @@
 #include <mpg123.h>
 #define TS_MATCH_PREFIX "ts-free-audio-"
 #define TS_MATCH_OPERATION "mpegts-free-format-frames"
+#elif defined(TRIERGON_REFERENCE_AUDIO_SEEK)
+#define TS_MATCH_PREFIX "ts-audio-seek-"
+#define TS_MATCH_OPERATION "mpegts-previous-audio"
 #else
 #define TS_MATCH_PREFIX "ts-seek-"
 #define TS_MATCH_OPERATION "mpegts-previous-picture"
@@ -93,9 +96,15 @@ static int match(TsReader *reader, int64_t target, int preroll, TsWork *out)
     uint64_t ordinal = 0, chosen = 0;
     while ((rc = reader_next(reader)) == 0) {
         const AVPacket *p = reader->packet;
+#ifdef TRIERGON_REFERENCE_AUDIO_SEEK
+        if (p->size <= 0)
+            return AVERROR_INVALIDDATA;
+        if (p->pts != AV_NOPTS_VALUE) {
+#else
         if (p->flags & AV_PKT_FLAG_KEY) {
             if (p->pts == AV_NOPTS_VALUE)
                 return AVERROR_INVALIDDATA;
+#endif
             if (p->pts <= target && p->pts >= landing) {
                 landing = p->pts;
                 chosen = ordinal;
@@ -115,11 +124,18 @@ static int match(TsReader *reader, int64_t target, int preroll, TsWork *out)
         if (ordinal < chosen)
             continue;
         const AVPacket *p = reader->packet;
+#ifdef TRIERGON_REFERENCE_AUDIO_SEEK
+        if (ordinal == chosen && p->pts != landing)
+            return AVERROR_INVALIDDATA;
+#else
         int key = !!(p->flags & AV_PKT_FLAG_KEY);
         if (ordinal == chosen && (!key || p->pts != landing))
             return AVERROR_INVALIDDATA;
+#endif
         fold_clock(out, p->pts, p->dts == AV_NOPTS_VALUE ? p->pts : p->dts);
+#ifndef TRIERGON_REFERENCE_AUDIO_SEEK
         fold(&out->digest, (uint64_t)key);
+#endif
         fold(&out->digest, (uint64_t)p->size);
         fold_bytes(&out->digest, p->data, (size_t)p->size);
         out->packets++;
@@ -390,22 +406,26 @@ int main(int argc, char **argv)
         return 2;
     const int start = bench ? 4 : 3;
     long long iterations = 1, program, pid, target = 0;
-    int option = 0;
+    int option = 0, track = start + 2;
+#ifdef TRIERGON_REFERENCE_AUDIO_SEEK
+    if (argc == start + 6 && (!strcmp(argv[track], "--dvb") || !strcmp(argv[track], "--atsc")))
+        ++track;
+#endif
 #ifdef TRIERGON_REFERENCE_MPG123
     option = argc == start + 4 && !strcmp(argv[start+3], "layer1-padding");
     if (!option && argc != start + 3)
         return 2;
 #else
-    if (argc != start + 5 || !number(argv[start+3], INT64_MIN, INT64_MAX, &target))
+    if (argc != track + 3 || !number(argv[track+1], INT64_MIN, INT64_MAX, &target))
         return 2;
-    option = !strcmp(argv[start+4], "preroll");
-    if (!option && strcmp(argv[start+4], "previous"))
+    option = !strcmp(argv[track+2], "preroll");
+    if (!option && strcmp(argv[track+2], "previous"))
         return 2;
 #endif
     if ((bench && !number(argv[3], 1, 1000000, &iterations))
         || (strcmp(argv[start], "188") && strcmp(argv[start], "192"))
         || !number(argv[start+1], 1, 65535, &program)
-        || !number(argv[start+2], 0x10, 0x1ffe, &pid))
+        || !number(argv[track], 0x10, 0x1ffe, &pid))
         return 2;
     FILE *file = fopen(argv[2], "rb");
     if (!file)
