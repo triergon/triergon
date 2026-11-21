@@ -2,8 +2,8 @@
 
 `family-2-acn.opus` is an authored 0.1-second Ogg Opus probe, encoded with
 FFmpeg 9.0.2 and libopus. It is included as the comparison input; its SHA-256 is
-recorded in the [correctness manifest](../correctness-manifest.json). Its OpusHead has four channels, family 2, four
-uncoupled streams, mapping `[0, 1, 2, 3]`, 48 kHz input rate and 312 samples of
+recorded in the [correctness manifest](../correctness-manifest.json). Its OpusHead
+has four channels, family 2, four uncoupled streams, mapping `[0, 1, 2, 3]`, 48 kHz input rate and 312 samples of
 pre-skip. The channels are first-order SN3D Ambisonics in ACN order.
 
 Build `decode_audio` with `CARGO_INCREMENTAL=0 cargo build --release -p
@@ -13,11 +13,11 @@ triergon-session --example decode_audio --features codecs`, and place it at
 ```sh
 CARGO_INCREMENTAL=0 cargo xtask codecs grade --manifest harness/codecs/correctness-manifest.json \
   --lanes opus-ambisonic --root . --bin DIR --ffmpeg FFMPEG --ffprobe FFPROBE \
-  --codec-worker /dev/null --reference /dev/null --out result.jsonl
+  --codec-worker CODEC_WORKER --reference REFERENCE_WORKER --out result.jsonl
 CARGO_INCREMENTAL=0 cargo xtask codecs summarize result.jsonl summary.json --require-pass
 ```
 
-Use a fresh output file: `grade` appends. This lane compares native float PCM only;
+Use a fresh output file: `grade` appends. This lane compares native float PCM;
 the stereo device path is not meaningful for this layout. It requests float output
 from FFmpeg’s native Opus decoder, probes its application-facing layout, and checks rate, channel
 count, layout, each frame length, sample count and every interleaved sample using the existing audio
@@ -44,6 +44,10 @@ comparison passes its exact and numeric checks; worst channel RMS error is
 a diagnostic using the same release, not the prepared pinned build or native
 qualification. The family 2 header specifies ACN component semantics; the reported
 layout is separately observed from the selected decoder, not inferred from the header.
+
+The `codecs-audio` gate also checks every interleaved sample and the decoded
+frame count against the reference worker. The `audio-opus-ambisonic` file
+workload uses the same input and output format for timing and memory.
 
 The `codecs-audio` gate runs this comparison with the pinned `decode` profile.
 The comparison passes with that profile on macOS.

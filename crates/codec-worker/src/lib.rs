@@ -8,11 +8,12 @@
 //! KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE [SEEK] |
 //! seek ogg FILE TRACK SECONDS POLICY`, KIND-CODEC
 //! one of video-h264, video-hevc, audio-ac3, audio-eac3, audio-aac, audio-dts, audio-flac,
-//! audio-mp3, audio-vorbis, audio-opus, audio-aac-access-units. Bench prints {iterations,
-//! elapsed_ns, packets, bytes, digest} where
+//! audio-mp3, audio-vorbis, audio-opus, audio-opus-ambisonic, audio-aac-access-units.
+//! Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
 //! packets counts output pictures/audio blocks and the digest
 //! ([`triergon_harness_protocol::interleaved`]) covers the exact converted output (RGBA or
-//! interleaved stereo s16le). Configured AAC instead folds every native f32 plane.
+//! interleaved stereo s16le). Configured AAC folds native f32 planes.
+//! Ambisonic Opus folds interleaved native f32 PCM.
 //! File loading and process start are outside the timed
 //! interval.
 //!
@@ -191,10 +192,9 @@ fn audio(codec: AudioCodec, data: &[u8], out: &mut Output) {
     });
 }
 
-/// A file-format lane: the first audio track of the file, decoded with its trims and
-/// mixed to stereo s16 like the elementary lanes. The file is read sequentially, as the
-/// reference reads its piped input.
-fn file_audio(data: &[u8], out: &mut Output) {
+/// Decode the first audio track with its trims. Read the file sequentially,
+/// matching the reference's non-seekable input.
+fn file_audio<const AMBISONIC: bool>(data: &[u8], out: &mut Output) {
     let pool = Budget::new(256 << 20).expect("pool");
     let mut source = open_sequential(data, &pool).expect("open");
     let mut decoder: Option<(triergon::TrackId, TrackDecoder)> = None;
@@ -214,11 +214,48 @@ fn file_audio(data: &[u8], out: &mut Output) {
             continue;
         }
         let decoded = decoder.decode(&packet, &mut frame);
-        emit_mixed(decoded, &frame, &mut downmix, &mut pcm, &mut bytes, out);
+        if AMBISONIC {
+            emit_native(decoded, &frame, &mut bytes, out);
+        } else {
+            emit_mixed(decoded, &frame, &mut downmix, &mut pcm, &mut bytes, out);
+        }
     }
     if let Some((_, decoder)) = decoder.as_mut() {
         let flushed = decoder.flush(&mut frame).map(|()| None);
-        emit_mixed(flushed, &frame, &mut downmix, &mut pcm, &mut bytes, out);
+        if AMBISONIC {
+            emit_native(flushed, &frame, &mut bytes, out);
+        } else {
+            emit_mixed(flushed, &frame, &mut downmix, &mut pcm, &mut bytes, out);
+        }
+    }
+}
+
+/// Interleave the four ACN planes without changing their format or order.
+fn emit_native(
+    decoded: Result<Option<triergon_codec::DownmixLevels>, triergon_codec::DecodeFailure>,
+    frame: &AudioFrame,
+    bytes: &mut Vec<u8>,
+    out: &mut Output,
+) {
+    match decoded {
+        Ok(_) if frame.samples_per_channel == 0 => {}
+        Ok(_) => {
+            assert_eq!(frame.sample_rate, 48_000);
+            assert_eq!(frame.layout.ambisonic_order(), Some((1, false)));
+            assert_eq!(frame.planes.len(), 4);
+            bytes.clear();
+            bytes.reserve(frame.samples_per_channel * 4 * size_of::<f32>());
+            for i in 0..frame.samples_per_channel {
+                for plane in &frame.planes {
+                    bytes.extend_from_slice(&plane[i].to_le_bytes());
+                }
+            }
+            out.emit(bytes);
+        }
+        Err(error) => {
+            eprintln!("decode error: {}", error.0);
+            std::process::exit(2);
+        }
     }
 }
 
@@ -283,7 +320,10 @@ fn run(op: &str, data: &[u8], out: &mut Output) {
             }
         }
         "audio-dts" => audio(AudioCodec::Dts, data, out),
-        "audio-flac" | "audio-mp3" | "audio-vorbis" | "audio-opus" => file_audio(data, out),
+        "audio-flac" | "audio-mp3" | "audio-vorbis" | "audio-opus" => {
+            file_audio::<false>(data, out)
+        }
+        "audio-opus-ambisonic" => file_audio::<true>(data, out),
         _ => {
             eprintln!("unknown operation {op}");
             std::process::exit(2);
@@ -415,5 +455,35 @@ pub fn main(name: &str, operations: Operations) {
             eprintln!("unknown mode {kind}");
             std::process::exit(2);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ambisonic_native_interleaves_every_plane() {
+        let frame = AudioFrame {
+            sample_rate: 48_000,
+            layout: triergon_codec::ChannelLayout::ambisonic(1, false).unwrap(),
+            samples_per_channel: 2,
+            planes: vec![
+                vec![1.0, 2.0],
+                vec![3.0, 4.0],
+                vec![5.0, 6.0],
+                vec![7.0, 8.0],
+            ],
+            ..AudioFrame::default()
+        };
+        let mut out = Output::default();
+        let mut bytes = Vec::new();
+        emit_native(Ok(None), &frame, &mut bytes, &mut out);
+        let expected: Vec<_> = [1.0_f32, 3.0, 5.0, 7.0, 2.0, 4.0, 6.0, 8.0]
+            .into_iter()
+            .flat_map(f32::to_le_bytes)
+            .collect();
+        assert_eq!(bytes, expected);
+        assert_eq!((out.frames, out.bytes), (1, 32));
     }
 }

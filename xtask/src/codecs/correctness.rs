@@ -128,6 +128,7 @@ fn operation(lane: &str) -> Option<&'static str> {
         "mp3" | "mp2" | "mp1" => "audio-mp3",
         "vorbis" => "audio-vorbis",
         "opus" => "audio-opus",
+        "opus-ambisonic" => "audio-opus-ambisonic",
         _ => return None,
     })
 }
@@ -727,6 +728,14 @@ fn audio_decoder(
     Ok(Value::Object(row))
 }
 
+/// The authored family-2 fixture must produce all six trimmed frames and samples.
+fn complete_ambisonic_output(work: Option<&Value>, rc: i64, bytes: usize) -> bool {
+    rc == 0
+        && bytes == 4_800 * 4 * size_of::<f32>()
+        && work.and_then(|v| v.get("packets")).and_then(python::int) == Some(6)
+        && work.and_then(|v| v.get("bytes")).and_then(python::int) == Some(bytes as i128)
+}
+
 fn output_path(
     a: &Grade,
     lane: &str,
@@ -754,6 +763,38 @@ fn output_path(
     )?;
     let co = fs::read(&o).unwrap_or_default();
     let cr = fs::read(&r).unwrap_or_default();
+    if lane == "opus-ambisonic" {
+        let work = |stdout: &str| json_lines(stdout).pop();
+        let ours = work(&po.stdout);
+        let reference = work(&pr.stdout);
+        let stats = if complete_ambisonic_output(ours.as_ref(), po.code, co.len())
+            && complete_ambisonic_output(reference.as_ref(), pr.code, cr.len())
+        {
+            channel_stats(&co, &cr, 4)?
+        } else {
+            None
+        };
+        let pass = stats.as_ref().is_some_and(|(rms, abs)| {
+            python::max(rms) <= a.rules.rms && python::max(abs) <= a.rules.abs
+        });
+        let floats =
+            |values: &[f64]| Value::Array(values.iter().map(|&v| Value::float(v)).collect());
+        return Ok(Value::object([
+            ("status", Value::str(if pass { "pass" } else { "fail" })),
+            ("ours_rc", Value::int(po.code)),
+            ("reference_rc", Value::int(pr.code)),
+            ("ours_work", ours.unwrap_or(Value::Null)),
+            ("reference_work", reference.unwrap_or(Value::Null)),
+            ("ours_bytes", Value::int(co.len() as i64)),
+            ("reference_bytes", Value::int(cr.len() as i64)),
+            (
+                "stats",
+                stats.map_or(Value::Null, |(rms, abs)| {
+                    Value::object([("rms", floats(&rms)), ("abs", floats(&abs))])
+                }),
+            ),
+        ]));
+    }
     let mut row = vec![
         ("samples_ours".to_owned(), Value::int((co.len() / 4) as i64)),
         ("samples_ref".to_owned(), Value::int((cr.len() / 4) as i64)),
@@ -918,7 +959,7 @@ pub fn grade(a: &Grade) -> Result<(), String> {
                     Err(Stop::Fatal(message)) => return Err(message),
                 },
             ));
-            if lane != "aac-mov" && lane != "opus-ambisonic" {
+            if lane != "aac-mov" {
                 let output_dir = tmp.0.join("o");
                 fs::create_dir(&output_dir).map_err(|e| e.to_string())?;
                 row.push((
@@ -957,6 +998,17 @@ pub fn grade(a: &Grade) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ambisonic_worker_requires_complete_successful_output() {
+        let work = Value::object([("packets", Value::int(6)), ("bytes", Value::int(76_800))]);
+        assert!(complete_ambisonic_output(Some(&work), 0, 76_800));
+        assert!(!complete_ambisonic_output(Some(&work), 1, 76_800));
+        assert!(!complete_ambisonic_output(Some(&work), 0, 76_784));
+        assert!(!complete_ambisonic_output(None, 0, 76_800));
+        let wrong = Value::object([("packets", Value::int(5)), ("bytes", Value::int(76_800))]);
+        assert!(!complete_ambisonic_output(Some(&wrong), 0, 76_800));
+    }
 
     #[test]
     fn initialized_aac_reference_requires_the_pinned_input() {
