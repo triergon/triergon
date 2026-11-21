@@ -154,6 +154,10 @@ published. A `NalPacketSession` frames packets, records and outputs of at most
 - DTS: canonical big-endian normal frames only in `DtsCoreFrameReader`; no resync or
   termination frames. HCRC is reported, not checked.
 
+VVC inspection exposes the fixed two-byte header, including reserved values.
+The Annex B iterator borrows NAL bytes from a complete buffer under an explicit
+byte limit.
+
 ## Conformance
 
 Implemented from these specifications:
