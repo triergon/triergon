@@ -4,7 +4,7 @@
 //! box and the baseline shear.
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget, round_ties_even_i32};
-use triergon_raster::{Vector, pixels_26_6};
+use triergon_raster::{Vector, fp, pixels_26_6};
 use triergon_shape::bidi::Level;
 
 use super::fonts::Library;
@@ -16,7 +16,7 @@ use super::text::{Char, Evaluated, Text};
 use super::wrap::{Lines, WrapText, Wrapping};
 use crate::{
     EventState, HAlign, Justify, Karaoke, KaraokeGlyph, KaraokeMark, Limits, Margins, Rgba,
-    Syllables, number,
+    Syllables,
 };
 
 /// An outline and how it is scaled to the frame.
@@ -428,7 +428,7 @@ impl Layout {
         max_text_width: f64,
     ) {
         let max_width = self.lines.lines.iter().fold(0.0, |max, line| {
-            number::max(max, self.line_width(text, line.chars.clone()))
+            fp::max(max, self.line_width(text, line.chars.clone()))
         });
         for line in self.lines.lines.iter() {
             let width = self.line_width(text, line.chars.clone());

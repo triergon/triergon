@@ -6,10 +6,11 @@
 use std::ops::Range;
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
+use triergon_raster::fp;
 
 use super::from_26_6;
 use super::geometry::Scales;
-use crate::{WrapStyle, charge, number};
+use crate::{WrapStyle, charge};
 
 const SPACE: u32 = b' ' as u32;
 const NEWLINE: u32 = b'\n' as u32;
@@ -239,8 +240,8 @@ impl Lines {
                 let (a, d, border) = chars.metrics(i);
                 asc = a.max(asc);
                 desc = d.max(desc);
-                border_y = number::max(border_y, border[1]);
-                border_x = number::max(border_x, border[0]);
+                border_y = fp::max(border_y, border[1]);
+                border_x = fp::max(border_x, border[0]);
                 newlines &= chars.symbol(i) == NEWLINE;
             }
             let scale = if newlines { 0.5 / 64.0 } else { 1.0 / 64.0 };

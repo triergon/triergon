@@ -15,7 +15,7 @@
 mod bitmap;
 mod blur;
 pub mod compat;
-mod fp;
+pub mod fp;
 mod geometry;
 mod limits;
 mod outline;

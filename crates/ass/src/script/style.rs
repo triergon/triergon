@@ -3,8 +3,9 @@
 use std::ops::{Index, IndexMut};
 
 use triergon_core::{Budget, Result};
+use triergon_raster::fp;
 
-use crate::number::{self, header_int, strtod};
+use crate::number::{header_int, strtod};
 use crate::strings::Strings;
 
 /// A colour: red in the top byte, then green and blue, and alpha in the low
@@ -533,11 +534,11 @@ impl Style {
 
     /// The normalisation libass applies after reading a style line.
     pub(crate) fn finish_line(&mut self) {
-        self.scale_x = number::max(self.scale_x, 0.0) / 100.0;
-        self.scale_y = number::max(self.scale_y, 0.0) / 100.0;
-        self.spacing = number::max(self.spacing, 0.0);
-        self.outline = number::max(self.outline, 0.0);
-        self.shadow = number::max(self.shadow, 0.0);
+        self.scale_x = fp::max(self.scale_x, 0.0) / 100.0;
+        self.scale_y = fp::max(self.scale_y, 0.0) / 100.0;
+        self.spacing = fp::max(self.spacing, 0.0);
+        self.outline = fp::max(self.outline, 0.0);
+        self.shadow = fp::max(self.shadow, 0.0);
         self.bold = Bold(i32::from(self.bold.0 != 0));
         self.italic = Italic(i32::from(self.italic.0 != 0));
     }
