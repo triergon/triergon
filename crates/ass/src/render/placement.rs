@@ -40,12 +40,28 @@ pub(super) struct PlacedRun {
     /// The colours, faded.
     pub(super) colours: [Rgba; 4],
     pub(super) effect: Option<Karaoke>,
-    /// For `\kf`, the boundary from the first glyph's pen, pre-aspect 26.6.
-    pub(super) effect_timing: i32,
+    /// For a syllable, its boundary from the first glyph's pen, pre-aspect
+    /// 26.6.
+    effect_timing: i32,
     /// The effects the run is composited with.
     pub(super) effects: Effects,
     /// Its glyphs in [`Runs`].
     glyphs: Range<usize>,
+}
+
+impl PlacedRun {
+    /// The run's karaoke timing as it is drawn: for `\kf`, the frame column
+    /// the fill gives way at, its boundary stretched by `pixel_aspect` from
+    /// `leftmost_x`, the least x of its `\kf` glyphs' outlines in the frame
+    /// ([`GlyphDrawing::leftmost_x`]), 26.6; for the other kinds the
+    /// boundary.
+    pub(super) fn effect_timing(&self, leftmost_x: i32, pixel_aspect: f64) -> i32 {
+        if self.effect == Some(Karaoke::Fill) {
+            (from_26_6(leftmost_x) + from_26_6(self.effect_timing) * pixel_aspect).round() as i32
+        } else {
+            self.effect_timing
+        }
+    }
 }
 
 /// An event's drawn glyphs in the runs that are composited together, in

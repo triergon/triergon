@@ -16,7 +16,6 @@ use triergon_raster::{
 
 use super::CacheLimits;
 use super::cache::{Cache, CacheKey, Found, Kept, sizes};
-use super::from_26_6;
 use super::outlines::{KeptOutline, Outlines};
 use super::placement::{GlyphDrawing, PlacedRun, Placer, Runs};
 use crate::{Karaoke, Rgba, charge};
@@ -348,11 +347,7 @@ impl Painter {
         else {
             return Ok(());
         };
-        let mut effect_timing = placed.effect_timing;
-        if placed.effect == Some(Karaoke::Fill) {
-            effect_timing = (from_26_6(leftmost_x) + from_26_6(effect_timing) * frame.pixel_aspect)
-                .round() as i32;
-        }
+        let effect_timing = placed.effect_timing(leftmost_x, frame.pixel_aspect);
         charge(work, LOOKUP_UNITS.saturating_mul(drawn.len()))?;
         let in_run =
             |at: Vector| Vector::new(at.x.wrapping_sub(origin.x), at.y.wrapping_sub(origin.y));
