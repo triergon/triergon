@@ -5713,6 +5713,26 @@
    "path": ".research/codec-inputs/opus-5.1-256.opus",
    "bytes": 373086,
    "sha256": "0434eebcdfff1dd9d7351cada961fa8befffb03d8eaa3f1a1396f3cdb9a80e0c"
+  },
+  {
+   "lane": "opus",
+   "name": "long-preskip-1272.opus",
+   "path": ".research/codec-variants/long-preskip-1272.opus",
+   "bytes": 439465,
+   "sha256": "b27f5e56a4a19c067303ddb06aa5519cdaf876cad646e13cafc7d405b317ea25",
+   "source": ".research/codec-inputs/opus-music-128-stereo.opus",
+   "source_sha256": "80b95dcf025d636dc747b67d14d8a532f0bed4e1f1dbeb61c16591ba0fe29e6c",
+   "preskip": 1272
+  },
+  {
+   "lane": "opus",
+   "name": "long-preskip-2232.opus",
+   "path": ".research/codec-variants/long-preskip-2232.opus",
+   "bytes": 439465,
+   "sha256": "b2e61f36876bea5321498da4e73ea55fc53f547077a7f80ff360efeff015d6cc",
+   "source": ".research/codec-inputs/opus-music-128-stereo.opus",
+   "source_sha256": "80b95dcf025d636dc747b67d14d8a532f0bed4e1f1dbeb61c16591ba0fe29e6c",
+   "preskip": 2232
   }
  ]
 }
