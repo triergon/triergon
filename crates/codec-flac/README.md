@@ -86,24 +86,10 @@ channel counts that change between frames.
   FFmpeg wraps them in the 16- or 32-bit output, but the choice between 32- and 64-bit
   LPC accumulation is only known to match FFmpeg for valid streams.
 
-## Conformance
+## Standards
 
-- Specification: RFC 9639.
-- Vectors (outside git): the IETF CELLAR decoder testbench
-  (`subset`, `uncommon`, `faulty`; CC0) and streams `harness/codecs/flac/flac_vectors.py generate` makes
-  with FFmpeg's encoder and the reference `flac` encoder over bit depths 4 to 32, 1 to 8
-  channels, sample rates 1 Hz to 768 kHz, block sizes 16 to 65535, every compression level,
-  LPC type, stereo mode, partition order and prediction order 1 to 32.
-- `cargo test -p triergon-codec-flac` runs predictor, layout and hand-built frame tests
-  (every subframe type and stereo mode, the refusals, truncation at every byte, every bit
-  flipped, a too-small budget) and, when the vectors are present, checks the integer
-  output against each stream's STREAMINFO MD5 and the float output against it.
-- `cargo xtask codecs grade` decodes them through the container readers and compares the
-  output with the pinned FFmpeg's byte for byte (the `flac` lane, under the lossless
-  section of the numeric rules; [harness/codecs/STATUS.md](../../harness/codecs/STATUS.md)). On the gate
-  build 183/187 pass, bit-exact. Open: `01 - changing samplerate`, `02 - increasing
-  number of channels` and `03 - decreasing number of channels` change format mid-stream,
-  and FFmpeg's CLI converts them to the first frame's format (each decodes exactly on its
-  own); `flac_3ch_odd_mask` matches FFmpeg's decoder, but FFmpeg refuses its layout on the
-  stereo output. Runtime and memory against the [gates](../../docs/quality.md#gates):
-  [status](../../docs/status.md).
+RFC 9639. Test vectors (outside git): the IETF CELLAR decoder testbench (`subset`,
+`uncommon`, `faulty`; CC0) and the streams `harness/codecs/flac/flac_vectors.py generate`
+makes with FFmpeg's and the reference `flac` encoder. Verification:
+[harness/codecs](../../harness/codecs/STATUS.md); results in
+[docs/status.md](../../docs/status.md).
