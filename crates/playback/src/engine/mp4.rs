@@ -44,11 +44,19 @@ pub(crate) enum Mp4RangeLanding<'a> {
     DemuxCursor(u64),
 }
 
+/// How an MP4 engine chooses its rows after a seek.
+#[derive(Debug)]
+pub(crate) enum SeekReplay {
+    /// In plan order.
+    Forward,
+    /// After a sync-sample seek: rows of the video track `video` (a `track_ID`)
+    /// before row `sync` are skipped.
+    SkipVideoUntil { video: u32, sync: usize },
+    /// After a demux-view seek: in the order the replay yields.
+    DemuxOrder(DemuxReplay),
+}
+
 /// The MP4 demuxer over one plan: the engine of [`Engine::Mp4`](crate::Engine::Mp4).
-///
-/// `skip_video_until` and `demux_seek` are alternatives a seek sets at most one
-/// of. They stay two options: `poll` and `emit_packet` test them per packet, and
-/// one enum for both cost 0.09% of the instructions of a forward read.
 #[derive(Debug)]
 // Fields in the order the compiler chose for them, held by `repr(C)`.
 #[repr(C)]
@@ -61,12 +69,8 @@ pub struct Mp4Engine {
     /// The front read boundary, once a packet reached it.
     pub(crate) front_boundary: Option<FrontReadBoundary>,
     pub(crate) configs: [Option<CachedDescription>; 64],
-    /// After a demux-view seek: rows come in the order the replay yields.
-    pub(crate) demux_seek: Option<DemuxReplay>,
+    pub(crate) seek: SeekReplay,
     pub(crate) input: InputCursor,
-    /// After a sync-sample seek: rows of the video track before the sync row
-    /// are skipped, as `(track_ID, sync row)`.
-    pub(crate) skip_video_until: Option<(u32, usize)>,
     /// The media a demux-order replay serves from memory, until it is read.
     pub(crate) media_cache_fill: Option<PendingMedia>,
     /// The empty packet still to deliver at the boundary and how many times.
@@ -103,7 +107,7 @@ impl Mp4Engine {
         if t.snapshot.handler != *b"vide" {
             return Err(Error::Invalid("MP4 seek track is not video"));
         }
-        let (row, offset, skip_video_until, demux_seek) = match mp4_landing {
+        let (row, offset, seek) = match mp4_landing {
             Some(Mp4RangeLanding::Source(landing)) => {
                 let rows = self.plan.source_rows();
                 let first = rows
@@ -118,14 +122,15 @@ impl Mp4Engine {
                 {
                     return Err(Error::Invalid("MP4 seek landing"));
                 }
-                let skip_video =
-                    (landing.first_row < landing.sync_row).then_some((id, landing.sync_row));
-                (
-                    landing.first_row,
-                    first.sample.range.start,
-                    skip_video,
-                    None,
-                )
+                let seek = if landing.first_row < landing.sync_row {
+                    SeekReplay::SkipVideoUntil {
+                        video: id,
+                        sync: landing.sync_row,
+                    }
+                } else {
+                    SeekReplay::Forward
+                };
+                (landing.first_row, first.sample.range.start, seek)
             }
             Some(Mp4RangeLanding::Demux(replay)) => {
                 let first = replay.first_row();
@@ -136,17 +141,15 @@ impl Mp4Engine {
                 (
                     first,
                     occurrence.source.range.start,
-                    None,
-                    Some(replay.clone()),
+                    SeekReplay::DemuxOrder(replay.clone()),
                 )
             }
-            Some(Mp4RangeLanding::DemuxCursor(offset)) => (0, offset, None, None),
-            None => (0, 0, None, None),
+            Some(Mp4RangeLanding::DemuxCursor(offset)) => (0, offset, SeekReplay::Forward),
+            None => (0, 0, SeekReplay::Forward),
         };
         self.input.reset(offset)?;
         self.row = row;
-        self.skip_video_until = skip_video_until;
-        self.demux_seek = demux_seek;
+        self.seek = seek;
         self.packet = None;
         self.ended_short = false;
         self.configs = [None; 64];
@@ -211,7 +214,7 @@ impl Mp4Engine {
                     && boundary.source_offset == source.sample.range.start
             });
         }
-        if let Some(replay) = &mut self.demux_seek {
+        if let SeekReplay::DemuxOrder(replay) = &mut self.seek {
             replay.delivered(self.row)?;
         } else {
             self.row += 1;
@@ -435,25 +438,26 @@ impl Mp4Engine {
         if self.packet.is_some() {
             return self.poll_packet(w, c, cursor);
         }
-        if let Some(replay) = &mut self.demux_seek {
-            match replay.poll(self.plan.demux_rows(), w, c)? {
+        match &mut self.seek {
+            SeekReplay::Forward => {}
+            SeekReplay::DemuxOrder(replay) => match replay.poll(self.plan.demux_rows(), w, c)? {
                 DemuxReplayStep::Ready(row) => self.row = row,
                 DemuxReplayStep::Yield => return Ok(EngineStep::Yield),
                 DemuxReplayStep::End => return Ok(EngineStep::End),
-            }
-        }
-        if let Some((video, sync)) = self.skip_video_until {
-            while self.row < sync && self.plan.source_rows()[self.row].track_id == video {
-                if c.load(Ordering::Relaxed) {
-                    return Err(Error::Cancelled);
+            },
+            &mut SeekReplay::SkipVideoUntil { video, sync } => {
+                while self.row < sync && self.plan.source_rows()[self.row].track_id == video {
+                    if c.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
+                    }
+                    if !w.try_charge(1) {
+                        return Ok(EngineStep::Yield);
+                    }
+                    self.row += 1;
                 }
-                if !w.try_charge(1) {
-                    return Ok(EngineStep::Yield);
+                if self.row >= sync {
+                    self.seek = SeekReplay::Forward;
                 }
-                self.row += 1;
-            }
-            if self.row >= sync {
-                self.skip_video_until = None;
             }
         }
         let row = if let Some(cursor) = cursor.as_deref_mut() {

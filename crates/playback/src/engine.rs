@@ -7,7 +7,7 @@ pub(crate) mod ts;
 pub(crate) use mp4::{Mp4RangeLanding, Mp4SyncLanding};
 
 use crate::engine::matroska::MkvEngine;
-use crate::engine::mp4::Mp4Engine;
+use crate::engine::mp4::{Mp4Engine, SeekReplay};
 use crate::engine::ts::{Delivery as TsDelivery, Entities, Life, TsEngine};
 use crate::event::EngineStep;
 use crate::source::SourceReply;
@@ -197,8 +197,7 @@ impl Engine {
             input,
             plan,
             row: 0,
-            skip_video_until: None,
-            demux_seek: None,
+            seek: SeekReplay::Forward,
             packet: None,
             configs: [None; 64],
             revision: 0,
