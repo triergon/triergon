@@ -170,6 +170,7 @@ pub struct Reader {
     deferred_fragment: bool,
     storage: Option<StorageScan>,
     seek: BudgetVec<seek::Seeking>,
+    seek_index: Option<Shared<seek::SeekIndex>>,
     continued_entity: bool,
 }
 
@@ -284,6 +285,7 @@ impl Reader {
             deferred_fragment: false,
             storage: None,
             seek: BudgetVec::new(pool),
+            seek_index: None,
             continued_entity: false,
         })
     }
@@ -423,6 +425,7 @@ impl Reader {
             transition,
         });
         self.continued_entity = true;
+        self.seek_index = None;
         Ok(())
     }
     pub fn fail(
@@ -483,6 +486,7 @@ impl Reader {
         self.next_entity = None;
         self.storage = None;
         self.seek = BudgetVec::new(&self.pool);
+        self.seek_index = None;
     }
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
         self.step_observing::<false>(work, cancel, |_| ())

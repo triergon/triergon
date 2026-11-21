@@ -1,7 +1,7 @@
 //! Bounded source seeks in the exact presentation clock.
 mod retained;
 
-use super::{AccessUnit, Packet, PacketTracks, Reader, ReaderEvent};
+use super::{AccessUnit, Packet, PacketTracks, Reader, ReaderEvent, Shared};
 use crate::{SourceEpochs, TraceEvent, clock::SourceTimePolicy};
 use retained::{Retain, RetainedOutput};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -9,7 +9,7 @@ use triergon_core::container::{
     CodecId, Event, PacketInfo, ReaderStep, SeekMethod, SeekPolicy, SeekReceipt, SeekRequest,
     TrackId, TrackInfo,
 };
-use triergon_core::{BudgetVec, Error, InputRequest, Result, Step, Time, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, InputRequest, Result, Step, Time, WorkBudget};
 use triergon_framing::Ac3Family;
 
 #[derive(Clone, Copy)]
@@ -24,13 +24,50 @@ struct Scan {
     landing: Option<Landing>,
     epochs: Option<SourceEpochs>,
     previous: Option<i128>,
+    index: Option<IndexBuilder>,
+}
+
+pub(super) struct SeekIndex {
+    track: TrackId,
+    points: BudgetVec<Landing>,
+}
+
+impl SeekIndex {
+    fn previous(&self, target: Time) -> Result<Landing> {
+        let points = self.points.as_slice();
+        let after = points.partition_point(|point| point.time <= target);
+        points[..after].last().copied().ok_or(Error::Unsupported(
+            "MPEG-TS seek index has no point at or before the target",
+        ))
+    }
+}
+
+struct IndexBuilder {
+    points: BudgetVec<Landing>,
+    maximum: usize,
+}
+
+impl IndexBuilder {
+    fn record(&mut self, point: Landing) -> bool {
+        if let Some(last) = self.points.as_mut_slice().last_mut() {
+            match point.time.cmp(&last.time) {
+                std::cmp::Ordering::Less => return false,
+                std::cmp::Ordering::Equal => {
+                    *last = point;
+                    return true;
+                }
+                std::cmp::Ordering::Greater => (),
+            }
+        }
+        self.points.len() < self.maximum && self.points.try_push(point).is_ok()
+    }
 }
 
 enum Phase {
     Scan(Scan),
     Replay {
         landing: Landing,
-        scanned_bytes: u64,
+        scanned_bytes: Option<u64>,
         skipped: bool,
     },
     Deliver(Packet),
@@ -114,6 +151,18 @@ impl Seeking {
 }
 
 impl Scan {
+    fn finish_index(&mut self, pool: &Budget, track: TrackId) -> Option<Shared<SeekIndex>> {
+        let index = self.index.take()?;
+        let charge = Shared::<SeekIndex>::reserve(pool).ok()?;
+        Some(Shared::new(
+            SeekIndex {
+                track,
+                points: index.points,
+            },
+            charge,
+        ))
+    }
+
     fn observe(
         &mut self,
         probe: SeekProbe,
@@ -144,12 +193,18 @@ impl Scan {
             let time = time.ok_or(Error::Unsupported(
                 "MPEG-TS seek point without a resolved PTS",
             ))?;
+            let point = Landing {
+                time,
+                offset,
+                epochs,
+            };
+            if let Some(index) = &mut self.index
+                && !index.record(point)
+            {
+                self.index = None;
+            }
             if time <= target && self.landing.is_none_or(|old| time >= old.time) {
-                self.landing = Some(Landing {
-                    time,
-                    offset,
-                    epochs,
-                });
+                self.landing = Some(point);
                 return Ok(true);
             }
         }
@@ -160,7 +215,7 @@ impl Scan {
 fn seek_result(
     request: SeekRequest,
     landing: Landing,
-    scanned_bytes: u64,
+    scanned_bytes: Option<u64>,
     skipped: bool,
 ) -> SeekReceipt {
     SeekReceipt {
@@ -170,8 +225,12 @@ fn seek_result(
             SeekPolicy::PreviousRandomAccess => landing.time,
             SeekPolicy::PlaybackPreroll => request.target,
         },
-        method: SeekMethod::BoundedScan,
-        scanned_bytes,
+        method: if scanned_bytes.is_some() {
+            SeekMethod::BoundedScan
+        } else {
+            SeekMethod::Index
+        },
+        scanned_bytes: scanned_bytes.unwrap_or(0),
         replays_from_start: !skipped,
     }
 }
@@ -202,9 +261,40 @@ impl Reader {
     /// Short single-track suffixes can be retained as the reader scans.
     /// The caller supplies any decoder configuration needed at the landing.
     /// Requests from a previously continued entity or with unresolved clock
-    /// epochs are refused.
+    /// epochs are refused. A completed index for the same track skips the
+    /// landing scan while replay still reconstructs transport state.
     #[cold]
     pub fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
+        self.begin_seek(request, None)
+    }
+
+    /// Seek and retain an index of up to `maximum_entries` distinct landing
+    /// times for later seeks to this track in the same entity. The source must
+    /// remain stable between requests. A reset, close or continuation drops
+    /// the index. If landing times are out of order or the index exceeds its
+    /// entry or storage bound, the current seek still completes normally.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [Self::request_seek], or an invalid-limit
+    /// error if `maximum_entries` is zero.
+    #[cold]
+    pub fn request_seek_and_index(
+        &mut self,
+        request: SeekRequest,
+        maximum_entries: usize,
+    ) -> Result<InputRequest> {
+        if maximum_entries == 0 {
+            return Err(Error::Invalid("MPEG-TS seek index entry limit"));
+        }
+        self.begin_seek(request, Some(maximum_entries))
+    }
+
+    fn begin_seek(
+        &mut self,
+        request: SeekRequest,
+        index_entries: Option<usize>,
+    ) -> Result<InputRequest> {
         self.healthy()?;
         let length = self
             .caps
@@ -234,16 +324,44 @@ impl Reader {
         }
         let mut seek = BudgetVec::new(&self.pool);
         seek.try_reserve_exact(1)?;
-        let full_scan = length <= 256 * 1024
-            && matches!(&self.packet_tracks, PacketTracks::Selected(pids) if pids.len() == 1);
+        let index = self
+            .seek_index
+            .as_ref()
+            .filter(|index| index_entries.is_none() && index.track == request.track)
+            .cloned();
+        let (phase, retain) = if let Some(index) = &index {
+            (
+                Phase::Replay {
+                    landing: index.previous(request.target)?,
+                    scanned_bytes: None,
+                    skipped: false,
+                },
+                None,
+            )
+        } else {
+            let single_track =
+                matches!(&self.packet_tracks, PacketTracks::Selected(pids) if pids.len() == 1);
+            let retain = (length <= 256 * 1024 && single_track).then(|| Retain::new(&self.pool));
+            (
+                Phase::Scan(Scan {
+                    index: index_entries.map(|maximum| IndexBuilder {
+                        points: BudgetVec::new(&self.pool),
+                        maximum,
+                    }),
+                    ..Scan::default()
+                }),
+                retain,
+            )
+        };
         seek.try_push(Seeking {
             request,
-            phase: Phase::Scan(Scan::default()),
-            retain: full_scan.then(|| Retain::new(&self.pool)),
-            full_scan,
+            phase,
+            full_scan: retain.is_some(),
+            retain,
         })
         .map_err(|rejected| rejected.error)?;
         let input = self.reset()?;
+        self.seek_index = index;
         self.seek = seek;
         Ok(input)
     }
@@ -283,18 +401,26 @@ impl Reader {
                 return Ok(Step::Ready(Event::Packet(packet)));
             }
             let step = if seek.retain.is_some() {
-                match self.advance::<false, false>(work, cancel, |_| ()) {
-                    Ok(Step::Backpressure(_)) | Err(Error::Backpressure { .. }) => {
-                        self.seek.as_mut_slice()[0].retain = None;
-                        self.storage = None;
-                        continue;
-                    }
-                    step => step?,
-                }
+                self.advance::<false, false>(work, cancel, |_| ())
             } else {
-                self.advance::<true, true>(work, cancel, |_| ())?
+                self.advance::<true, true>(work, cancel, |_| ())
             };
             let seek = &mut self.seek.as_mut_slice()[0];
+            if matches!(
+                step,
+                Ok(Step::Backpressure(_)) | Err(Error::Backpressure { .. })
+            ) {
+                let dropped_index = if let Phase::Scan(scan) = &mut seek.phase {
+                    scan.index.take().is_some()
+                } else {
+                    self.seek_index.take().is_some()
+                };
+                if dropped_index || seek.retain.take().is_some() {
+                    self.storage = None;
+                    continue;
+                }
+            }
+            let step = step?;
             match (&mut seek.phase, step) {
                 (Phase::Scan(scan), Step::Ready(Event::Packet(packet))) => {
                     if packet.track() == request.track {
@@ -329,18 +455,29 @@ impl Reader {
                         })
                     })?;
                     if let Some(retain) = seek.retain.take() {
-                        let result = seek_result(request, landing, end.offset, retain.skipped);
+                        self.seek_index = scan.finish_index(&self.pool, request.track);
+                        let result =
+                            seek_result(request, landing, Some(end.offset), retain.skipped);
                         let tracks =
                             std::mem::replace(&mut self.tracks, BudgetVec::new(&self.pool));
                         seek.phase = Phase::Retained(retain.finish(result, tracks));
                         continue;
                     }
-                    let mut replay =
-                        Self::new(&self.pool, self.source, self.caps, self.limits, self.window)?;
+                    let mut replay = match Self::new(
+                        &self.pool,
+                        self.source,
+                        self.caps,
+                        self.limits,
+                        self.window,
+                    ) {
+                        Err(Error::Backpressure { .. }) if scan.index.take().is_some() => continue,
+                        replay => replay?,
+                    };
                     let input = replay.request()?;
+                    replay.seek_index = scan.finish_index(&self.pool, request.track);
                     self.seek.as_mut_slice()[0].phase = Phase::Replay {
                         landing,
-                        scanned_bytes: end.offset,
+                        scanned_bytes: Some(end.offset),
                         skipped: false,
                     };
                     std::mem::swap(&mut replay.packet_tracks, &mut self.packet_tracks);

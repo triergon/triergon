@@ -195,7 +195,7 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
     let avc = video(root, false, 1)?;
     let hevc = video(root, true, 1)?;
     let many = video(root, false, 12)?;
-    let cases = [
+    let mut cases = [
         (
             &avc,
             "avc-earliest-picture",
@@ -220,6 +220,19 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
     .into_iter()
     .map(|(input, case, options)| input.record(root, feature, case, &options, seek, "ts-seek-fold"))
     .collect::<R<Vec<_>>>()?;
+    for (input, name, first, second) in [
+        (&many, "avc-repeated-preroll", "115000", "425500"),
+        (&hevc, "hevc-m2ts-repeated-preroll", "100000", "121000"),
+    ] {
+        cases.push(input.record(
+            root,
+            feature,
+            name,
+            &[pid.as_str(), first, "preroll", second],
+            seek,
+            "ts-seek-fold",
+        )?);
+    }
     manifest(root, feature, cases)?;
 
     let raw = fs::read(root.join(AUDIO)).map_err(|e| format!("{AUDIO}: {e}"))?;
@@ -431,6 +444,19 @@ pub fn author_audio_seek(root: &Path, args: &[String]) -> R<()> {
                 "ts-audio-seek-fold",
             )?);
         }
+        let mut options = Vec::new();
+        if ac3 {
+            options.push("--dvb");
+        }
+        options.extend([pid.as_str(), "90000", "preroll", "100000"]);
+        cases.push(input.record(
+            root,
+            FEATURE,
+            &format!("{name}-repeated-preroll"),
+            &options,
+            Path::new(reference),
+            "ts-audio-seek-fold",
+        )?);
     }
     manifest(root, FEATURE, cases)
 }

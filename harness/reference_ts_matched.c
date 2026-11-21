@@ -408,7 +408,7 @@ int main(int argc, char **argv)
     long long iterations = 1, program, pid, target = 0;
     int option = 0, track = start + 2;
 #ifdef TRIERGON_REFERENCE_AUDIO_SEEK
-    if (argc == start + 6 && (!strcmp(argv[track], "--dvb") || !strcmp(argv[track], "--atsc")))
+    if (argc >= start + 6 && (!strcmp(argv[track], "--dvb") || !strcmp(argv[track], "--atsc")))
         ++track;
 #endif
 #ifdef TRIERGON_REFERENCE_MPG123
@@ -416,7 +416,10 @@ int main(int argc, char **argv)
     if (!option && argc != start + 3)
         return 2;
 #else
-    if (argc != track + 3 || !number(argv[track+1], INT64_MIN, INT64_MAX, &target))
+    const int repeat = argc == track + 4;
+    long long repeat_target = 0;
+    if ((!repeat && argc != track + 3) || !number(argv[track+1], INT64_MIN, INT64_MAX, &target)
+        || (repeat && !number(argv[track+3], INT64_MIN, INT64_MAX, &repeat_target)))
         return 2;
     option = !strcmp(argv[track+2], "preroll");
     if (!option && strcmp(argv[track+2], "previous"))
@@ -460,6 +463,12 @@ int main(int argc, char **argv)
         TsWork work = {0};
         rc = match(&reader, (int64_t)target, option, &work);
         reader_close(&reader);
+#ifndef TRIERGON_REFERENCE_MPG123
+        if (!rc && repeat) {
+            rc = match(&reader, (int64_t)repeat_target, option, &work);
+            reader_close(&reader);
+        }
+#endif
         runs++;
         fold(&totals.digest, work.digest);
         totals.packets += work.packets;

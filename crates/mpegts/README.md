@@ -146,6 +146,14 @@ The reader refuses seeks across selected-track source epochs, ambiguous clock
 wraps, and continued entities. A coded random-access picture must have resolved
 timing.
 
+Call `Reader::request_seek_and_index` to collect a bounded timestamp index
+during the first scan. Later seeks to the same track can use the index to select
+a landing with no separate scan. Replay still reads the entity prefix to
+reconstruct transport state and packet provenance. The index preserves the last
+packet on tied timestamps. It falls back to scanning when anchors are out of
+order or the entry or storage limit is reached. The source must remain stable.
+Reset, close and entity continuation discard the index.
+
 Use `Reader::new_with_packet_tracks` when the caller has already chosen the
 elementary PIDs. Only those PIDs allocate access-unit framers and produce
 packet events. Track metadata, original PES, and transport diagnostics remain

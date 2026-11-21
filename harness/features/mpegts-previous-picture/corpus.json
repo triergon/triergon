@@ -77,6 +77,46 @@
         "bytes": 27663,
         "digest": 76181891715901544
       }
+    },
+    {
+      "id": "avc-repeated-preroll",
+      "profile": "avc-repeated-preroll",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-many-pictures.ts",
+      "sha256": "b0483c8a2b1928352ef004955164321c2fd1c2e4d19dd863ebc99d4fc0d08ec8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "115000",
+        "preroll",
+        "425500"
+      ],
+      "expected": {
+        "packets": 172,
+        "bytes": 132055,
+        "digest": 5618912357401909556
+      }
+    },
+    {
+      "id": "hevc-m2ts-repeated-preroll",
+      "profile": "hevc-m2ts-repeated-preroll",
+      "file": "harness/features/mpegts-previous-picture/inputs/hevc.m2ts",
+      "sha256": "20320afc50e97b5806a556808171dcfc220747797a9133d5882616ec2ae80163",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "100000",
+        "preroll",
+        "121000"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 21303,
+        "digest": 6736888287049410993
+      }
     }
   ]
 }

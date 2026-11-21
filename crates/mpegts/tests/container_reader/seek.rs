@@ -455,3 +455,102 @@ fn audio_seek_needs_a_source_timestamp_at_or_before_the_target() {
         }
     }
 }
+
+#[test]
+fn repeated_seeks_use_the_index_and_land_on_the_last_tied_timestamp() {
+    let frame = adts(b"audio");
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    for pts in [90_000, 101_000, 101_000, 110_000] {
+        ts.pes(PID, 0xc0, &frame, Some(pts), None);
+    }
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+    let mut request = SeekRequest {
+        track: TrackId(PID.into()),
+        target: clock(92_000),
+        policy: SeekPolicy::PlaybackPreroll,
+    };
+    reader.request_seek_and_index(request, 3).unwrap();
+    for (method, time, packet_offset) in [
+        (SeekMethod::BoundedScan, clock(90_000), 0),
+        (SeekMethod::Index, clock(101_000), 2 * frame.len()),
+        (SeekMethod::BoundedScan, clock(101_000), 2 * frame.len()),
+    ] {
+        let result = loop {
+            if let Event::Seek(result) = next(&mut reader, &pool, &ts.bytes, 127, 43)
+                .unwrap()
+                .unwrap()
+            {
+                break result;
+            }
+        };
+        assert_eq!(result.method, method);
+        assert_eq!(result.landing, time);
+        assert_eq!(result.discard_until, request.target);
+        assert_eq!(
+            result.scanned_bytes,
+            if method == SeekMethod::Index {
+                0
+            } else {
+                ts.bytes.len() as u64
+            }
+        );
+        let packet = match next(&mut reader, &pool, &ts.bytes, 127, 43)
+            .unwrap()
+            .unwrap()
+        {
+            Event::Packet(packet) => packet,
+            event => panic!("expected landing packet, got {event:?}"),
+        };
+        assert_eq!(packet.elementary_range().start, packet_offset as u64);
+        assert_eq!(packet.payload(), frame);
+        if method == SeekMethod::Index {
+            reader.reset().unwrap();
+        }
+        request.target = clock(105_000);
+        reader.request_seek(request).unwrap();
+    }
+    reader.close();
+    assert_eq!(pool.used(), Budget::control_storage_bytes());
+}
+
+#[test]
+fn a_full_or_nonmonotonic_index_falls_back_to_a_scan() {
+    for (times, cap) in [
+        ([90_000, 101_000, 110_000], 2),
+        ([90_000, 110_000, 101_000], 3),
+    ] {
+        let frame = adts(b"audio");
+        let mut ts = Transport::new();
+        ts.tables(&[(0x0f, PID, &[])], 0);
+        for pts in times {
+            ts.pes(PID, 0xc0, &frame, Some(pts), None);
+        }
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut reader = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+        let request = SeekRequest {
+            track: TrackId(PID.into()),
+            target: clock(105_000),
+            policy: SeekPolicy::PreviousRandomAccess,
+        };
+        reader.request_seek_and_index(request, cap).unwrap();
+        for _ in 0..2 {
+            loop {
+                match next(&mut reader, &pool, &ts.bytes, 4096, 8192)
+                    .unwrap()
+                    .unwrap()
+                {
+                    Event::Seek(result) => {
+                        assert_eq!(result.method, SeekMethod::BoundedScan);
+                        assert_eq!(result.landing, clock(101_000));
+                        break;
+                    }
+                    Event::Other(_) => (),
+                    event @ Event::Packet(_) => panic!("unexpected {event:?}"),
+                }
+            }
+            reader.request_seek(request).unwrap();
+        }
+    }
+}
