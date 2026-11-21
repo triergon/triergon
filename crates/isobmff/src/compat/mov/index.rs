@@ -1021,6 +1021,16 @@ impl SeekCursor<'_> {
 /// rounding to nearest with ties away from zero.
 #[derive(Debug)]
 pub struct GlobalSeekJob<'a> {
+    setup: GlobalSeekSetup<'a>,
+    anchors: BudgetVec<ResumePoint>,
+    /// Each track's packet state at its anchor, when its seek kept one.
+    resumes: BudgetVec<Option<TrackResume<'a>>>,
+    scanned: u64,
+    stage: GlobalStage<'a>,
+}
+/// What a global seek works over, settled before it is polled.
+#[derive(Debug)]
+struct GlobalSeekSetup<'a> {
     pool: Budget,
     tracks: BudgetVec<DemuxTrack<'a>>,
     media: &'a [Range<u64>],
@@ -1030,31 +1040,40 @@ pub struct GlobalSeekJob<'a> {
     projection: TrackProjection,
     reference_index: usize,
     reference_base: TimeBase,
-    reference: Option<SeekLanding>,
-    anchors: BudgetVec<ResumePoint>,
-    /// Each track's packet state at its anchor, when its seek kept one.
-    resumes: BudgetVec<Option<TrackResume<'a>>>,
-    /// The seek of the track at hand, boxed: it is several kilobytes, and the
-    /// global job moves whole when it is built, returned and finished.
-    child: Option<Box<SeekJob<'a>>>,
     opus_track: Option<usize>,
-    opus_recovery: Option<Box<OpusRecoverySeek<'a>>>,
-    at: usize,
-    scanned: u64,
-    ready: bool,
-    failed: Option<Error>,
+}
+/// Where a global seek stands. A track's seek is boxed: it is several kilobytes, and
+/// the global job moves whole when it is built, returned and finished.
+// Only `Failed` is small; boxing the landing would allocate once more per seek.
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
+enum GlobalStage<'a> {
+    /// Seeking the reference track.
+    Reference(Box<SeekJob<'a>>),
+    /// The reference track has landed; the other tracks are sought from track `at` on.
+    Tracks {
+        reference: SeekLanding,
+        at: usize,
+        step: TrackStep<'a>,
+    },
+    Failed(Error),
+}
+/// What a global seek does on track `at` once the reference track has landed.
+#[derive(Debug)]
+enum TrackStep<'a> {
+    /// Starting the track's seek.
+    Start,
+    Seek(Box<SeekJob<'a>>),
+    /// Finding the decoder recovery point of the secondary Opus track.
+    OpusRecovery(Box<OpusRecoverySeek<'a>>),
+    /// Every track has landed.
+    Done,
 }
 /// A finished global seek: the reference track's landing and where each track
 /// resumes.
 #[derive(Debug)]
 pub struct GlobalSeekPlan<'a> {
-    pool: Budget,
-    tracks: BudgetVec<DemuxTrack<'a>>,
-    media: &'a [Range<u64>],
-    limits: SeekLimits,
-    profile: DemuxProfile,
-    encoded_edits: Option<EncodedEdits<'a>>,
-    projection: TrackProjection,
+    setup: GlobalSeekSetup<'a>,
     reference: SeekLanding,
     anchors: BudgetVec<ResumePoint>,
     /// Every track's packet state at its anchor, when all were kept.
@@ -1223,7 +1242,7 @@ impl<'a> GlobalSeekJob<'a> {
                 .map_err(|e| e.error)?;
             resumes.try_push(None).map_err(|e| e.error)?;
         }
-        let mut job = Self {
+        let setup = GlobalSeekSetup {
             pool: pool.clone(),
             tracks: owned,
             media,
@@ -1233,25 +1252,223 @@ impl<'a> GlobalSeekJob<'a> {
             projection,
             reference_index,
             reference_base: base,
-            reference: None,
-            anchors,
-            resumes,
-            child: None,
             opus_track: None,
-            opus_recovery: None,
-            at: 0,
-            scanned: 0,
-            ready: false,
-            failed: None,
         };
         let mut child = Box::new(SeekJob::build(
-            job.track_context(reference_index),
+            setup.track_context(reference_index),
             timestamp,
         )?);
-        child.keep_resume = job.projection.is_all();
-        job.child = Some(child);
-        Ok(job)
+        child.keep_resume = setup.projection.is_all();
+        Ok(Self {
+            setup,
+            anchors,
+            resumes,
+            scanned: 0,
+            stage: GlobalStage::Reference(child),
+        })
     }
+    /// Use a secondary regular Opus track's source roll groups for decoder
+    /// recovery. Select this before the seek lands on the reference track.
+    pub fn with_opus_recovery(mut self, track_id: u32) -> Result<Self> {
+        let setup = &mut self.setup;
+        if !matches!(self.stage, GlobalStage::Reference(_)) || setup.opus_track.is_some() {
+            return Err(Error::Invalid(
+                "Opus recovery must be selected before the seek",
+            ));
+        }
+        let at = setup
+            .tracks
+            .as_slice()
+            .iter()
+            .position(|track| track.track_id == track_id)
+            .filter(|&at| at != setup.reference_index && setup.projection.includes(at))
+            .ok_or(Error::Invalid("missing secondary Opus track"))?;
+        setup.opus_edit(at)?.opus_roll_scope()?;
+        setup.opus_track = Some(at);
+        Ok(self)
+    }
+    /// Advances the seek, track by track; failures are sticky. Fails as
+    /// [`SeekJob::poll`] does for any track, and with `Error::Limit` when the
+    /// entries read across tracks pass the index limit.
+    pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
+        if let GlobalStage::Failed(error) = self.stage {
+            return Err(error);
+        }
+        let result = self.poll_inner(work, cancel);
+        if let Err(error) = result {
+            self.stage = GlobalStage::Failed(error);
+        }
+        result
+    }
+    fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
+        let setup = &self.setup;
+        loop {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            match &mut self.stage {
+                GlobalStage::Failed(error) => return Err(*error),
+                GlobalStage::Reference(child) => {
+                    let Some((landing, resume)) =
+                        landed(child, &mut self.scanned, setup.limits, work, cancel)?
+                    else {
+                        return Ok(BuildStatus::Yield);
+                    };
+                    let at = setup.reference_index;
+                    self.anchors.as_mut_slice()[at].occurrence = landing.selected.ordinal;
+                    self.resumes.as_mut_slice()[at] = resume;
+                    self.stage = GlobalStage::Tracks {
+                        reference: landing,
+                        at: 0,
+                        step: TrackStep::Start,
+                    };
+                }
+                GlobalStage::Tracks {
+                    reference,
+                    at,
+                    step,
+                } => match step {
+                    TrackStep::Done => return Ok(BuildStatus::Ready),
+                    TrackStep::OpusRecovery(recovery) => {
+                        let Some(landing) = recovery.poll(work, cancel)? else {
+                            return Ok(BuildStatus::Yield);
+                        };
+                        self.anchors.as_mut_slice()[*at].occurrence = setup
+                            .opus_edit(*at)?
+                            .opus_occurrence(landing.first_sample)?;
+                        reference.opus_recovery = Some(landing);
+                        *at += 1;
+                        *step = TrackStep::Start;
+                    }
+                    TrackStep::Seek(child) => {
+                        let Some((landing, resume)) =
+                            landed(child, &mut self.scanned, setup.limits, work, cancel)?
+                        else {
+                            return Ok(BuildStatus::Yield);
+                        };
+                        if setup.opus_track == Some(*at) {
+                            let sample = &landing.selected.occurrence.source;
+                            let edit = setup.opus_edit(*at)?;
+                            if landing.selected.ordinal != edit.opus_occurrence(sample.ordinal)? {
+                                return Err(Error::Invalid("Opus seek occurrence order"));
+                            }
+                            *step = TrackStep::OpusRecovery(OpusRecoverySeek::new(
+                                &setup.pool,
+                                setup.tracks.as_slice()[*at],
+                                edit.opus_roll_scope()?,
+                                sample,
+                            )?);
+                        } else {
+                            self.anchors.as_mut_slice()[*at].occurrence = landing.selected.ordinal;
+                            self.resumes.as_mut_slice()[*at] = resume;
+                            *at = at.checked_add(1).ok_or(Error::Overflow)?;
+                            *step = TrackStep::Start;
+                        }
+                    }
+                    TrackStep::Start => {
+                        if !work.try_charge(1) {
+                            return Ok(BuildStatus::Yield);
+                        }
+                        if *at == setup.tracks.len() {
+                            *step = TrackStep::Done;
+                            return Ok(BuildStatus::Ready);
+                        }
+                        if *at == setup.reference_index || !setup.projection.includes(*at) {
+                            *at = at.checked_add(1).ok_or(Error::Overflow)?;
+                            continue;
+                        }
+                        let selected = &reference.selected;
+                        let recovering_opus = setup.opus_track == Some(*at);
+                        let track = setup.tracks.as_slice()[*at];
+                        let base = MediaClock::from_source(track.media_base)?.demux_base;
+                        let timestamp = if recovering_opus {
+                            let pts = selected
+                                .occurrence
+                                .demux
+                                .pts
+                                .ok_or(Error::Invalid("missing video landing PTS"))?;
+                            setup.opus_edit(*at)?.opus_seek_timestamp(
+                                pts,
+                                setup.reference_base,
+                                base,
+                            )?
+                        } else {
+                            let timestamp = setup.reference_base.rescale(
+                                selected.timestamp,
+                                base,
+                                Rounding::NearestAway,
+                            )?;
+                            match setup.encoded_edits.and_then(|plans| plans[*at].as_ref()) {
+                                Some(edit) => edit.align_seek_timestamp(timestamp, base)?,
+                                None => timestamp,
+                            }
+                        };
+                        // If a secondary track has no preceding sync sample, replay
+                        // its verified non-sync prefix from the beginning.
+                        let mut child =
+                            Box::new(SeekJob::build(setup.track_context(*at), timestamp)?);
+                        child.allow_initial_prefix = true;
+                        child.keep_resume = setup.projection.is_all() && !recovering_opus;
+                        *step = TrackStep::Seek(child);
+                    }
+                },
+            }
+        }
+    }
+    /// The plan of a ready seek; `Error::Invalid` before it is ready.
+    pub fn finish(self) -> Result<GlobalSeekPlan<'a>> {
+        let reference = match self.stage {
+            GlobalStage::Tracks {
+                reference,
+                step: TrackStep::Done,
+                ..
+            } => reference,
+            GlobalStage::Failed(error) => return Err(error),
+            _ => return Err(Error::Invalid("native global seek plan not ready")),
+        };
+        let setup = self.setup;
+        let mut anchors = self.anchors;
+        let mut resumes = self.resumes;
+        setup.projection.retain(&mut anchors);
+        let resumes = if resumes.as_slice().iter().all(Option::is_some) {
+            let mut kept = BudgetVec::new(&setup.pool);
+            kept.try_reserve_exact(resumes.len())?;
+            for resume in resumes.as_mut_slice() {
+                kept.try_push(resume.take().ok_or(Error::Invalid("native seek resume"))?)
+                    .map_err(|e| e.error)?;
+            }
+            Some(kept)
+        } else {
+            None
+        };
+        Ok(GlobalSeekPlan {
+            setup,
+            reference,
+            anchors,
+            resumes,
+        })
+    }
+}
+/// Polls `child`; once it has landed and one more work unit is charged, its landing,
+/// with the entries it read added to `scanned`.
+fn landed<'a>(
+    child: &mut SeekJob<'a>,
+    scanned: &mut u64,
+    limits: SeekLimits,
+    work: &mut WorkBudget,
+    cancel: &AtomicBool,
+) -> Result<Option<(SeekLanding, Option<TrackResume<'a>>)>> {
+    if child.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1) {
+        return Ok(None);
+    }
+    let (landing, resume) = child.take_landing()?;
+    *scanned = scanned
+        .checked_add(landing.scanned_entries)
+        .ok_or(Error::Overflow)?;
+    bound(*scanned, limits.index.max_entries)?;
+    Ok(Some((landing, resume)))
+}
+impl<'a> GlobalSeekSetup<'a> {
     fn track_context(&self, at: usize) -> Context<'a> {
         Context {
             pool: self.pool.clone(),
@@ -1262,26 +1479,6 @@ impl<'a> GlobalSeekJob<'a> {
             encoded_edits: self.encoded_edits.map(|plans| &plans[at..at + 1]),
         }
     }
-    /// Use a secondary regular Opus track's source roll groups for decoder
-    /// recovery. Select this before the seek lands on the reference track.
-    pub fn with_opus_recovery(mut self, track_id: u32) -> Result<Self> {
-        if self.reference.is_some() || self.opus_track.is_some() || self.failed.is_some() {
-            return Err(Error::Invalid(
-                "Opus recovery must be selected before the seek",
-            ));
-        }
-        let at = self
-            .tracks
-            .as_slice()
-            .iter()
-            .position(|track| track.track_id == track_id)
-            .filter(|&at| at != self.reference_index && self.projection.includes(at))
-            .ok_or(Error::Invalid("missing secondary Opus track"))?;
-        self.opus_edit(at)?.opus_roll_scope()?;
-        self.opus_track = Some(at);
-        Ok(self)
-    }
-
     fn opus_edit(
         &self,
         at: usize,
@@ -1289,163 +1486,6 @@ impl<'a> GlobalSeekJob<'a> {
         self.encoded_edits
             .and_then(|plans| plans[at].as_ref())
             .ok_or(Error::Unsupported("Opus recovery needs an Opus edit"))
-    }
-    /// Advances the seek, track by track; failures are sticky. Fails as
-    /// [`SeekJob::poll`] does for any track, and with `Error::Limit` when the
-    /// entries read across tracks pass the index limit.
-    pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
-        if let Some(error) = self.failed {
-            return Err(error);
-        }
-        let result = self.poll_inner(work, cancel);
-        if let Err(error) = result {
-            self.failed = Some(error);
-        }
-        result
-    }
-    fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
-        loop {
-            if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
-            }
-            if self.ready {
-                return Ok(BuildStatus::Ready);
-            }
-            if let Some(recovery) = &mut self.opus_recovery {
-                let Some(landing) = recovery.poll(work, cancel)? else {
-                    return Ok(BuildStatus::Yield);
-                };
-                self.anchors.as_mut_slice()[self.at].occurrence = self
-                    .opus_edit(self.at)?
-                    .opus_occurrence(landing.first_sample)?;
-                self.reference
-                    .as_mut()
-                    .ok_or(Error::Invalid("Opus recovery without a reference seek"))?
-                    .opus_recovery = Some(landing);
-                self.opus_recovery = None;
-                self.at += 1;
-                continue;
-            }
-            if let Some(child) = &mut self.child {
-                if child.poll(work, cancel)? == BuildStatus::Yield {
-                    return Ok(BuildStatus::Yield);
-                }
-                if !work.try_charge(1) {
-                    return Ok(BuildStatus::Yield);
-                }
-                let (landing, resume) = child.take_landing()?;
-                self.child = None;
-                self.scanned = self
-                    .scanned
-                    .checked_add(landing.scanned_entries)
-                    .ok_or(Error::Overflow)?;
-                bound(self.scanned, self.limits.index.max_entries)?;
-                let at = if self.reference.is_none() {
-                    self.reference_index
-                } else {
-                    self.at
-                };
-                if self.opus_track == Some(at) {
-                    let sample = &landing.selected.occurrence.source;
-                    let edit = self.opus_edit(at)?;
-                    if landing.selected.ordinal != edit.opus_occurrence(sample.ordinal)? {
-                        return Err(Error::Invalid("Opus seek occurrence order"));
-                    }
-                    self.opus_recovery = Some(OpusRecoverySeek::new(
-                        &self.pool,
-                        self.tracks.as_slice()[at],
-                        edit.opus_roll_scope()?,
-                        sample,
-                    )?);
-                } else {
-                    self.anchors.as_mut_slice()[at].occurrence = landing.selected.ordinal;
-                    self.resumes.as_mut_slice()[at] = resume;
-                    if self.reference.is_none() {
-                        self.reference = Some(landing);
-                    } else {
-                        self.at = self.at.checked_add(1).ok_or(Error::Overflow)?;
-                    }
-                }
-                continue;
-            }
-            if !work.try_charge(1) {
-                return Ok(BuildStatus::Yield);
-            }
-            if self.at == self.tracks.len() {
-                self.ready = true;
-                return Ok(BuildStatus::Ready);
-            }
-            if self.at == self.reference_index || !self.projection.includes(self.at) {
-                self.at = self.at.checked_add(1).ok_or(Error::Overflow)?;
-                continue;
-            }
-            let selected = &self
-                .reference
-                .as_ref()
-                .ok_or(Error::Invalid("native reference selection absent"))?
-                .selected;
-            let recovering_opus = self.opus_track == Some(self.at);
-            let track = self.tracks.as_slice()[self.at];
-            let base = MediaClock::from_source(track.media_base)?.demux_base;
-            let timestamp = if recovering_opus {
-                let pts = selected
-                    .occurrence
-                    .demux
-                    .pts
-                    .ok_or(Error::Invalid("missing video landing PTS"))?;
-                self.opus_edit(self.at)?
-                    .opus_seek_timestamp(pts, self.reference_base, base)?
-            } else {
-                let timestamp =
-                    self.reference_base
-                        .rescale(selected.timestamp, base, Rounding::NearestAway)?;
-                match self.encoded_edits.and_then(|plans| plans[self.at].as_ref()) {
-                    Some(edit) => edit.align_seek_timestamp(timestamp, base)?,
-                    None => timestamp,
-                }
-            };
-            // If a secondary track has no preceding sync sample, replay
-            // its verified non-sync prefix from the beginning.
-            let mut child = Box::new(SeekJob::build(self.track_context(self.at), timestamp)?);
-            child.allow_initial_prefix = true;
-            child.keep_resume = self.projection.is_all() && !recovering_opus;
-            self.child = Some(child);
-        }
-    }
-    /// The plan of a ready seek; `Error::Invalid` before it is ready.
-    pub fn finish(mut self) -> Result<GlobalSeekPlan<'a>> {
-        if let Some(error) = self.failed {
-            return Err(error);
-        }
-        if !self.ready {
-            return Err(Error::Invalid("native global seek plan not ready"));
-        }
-        self.projection.retain(&mut self.anchors);
-        let resumes = if self.resumes.as_slice().iter().all(Option::is_some) {
-            let mut kept = BudgetVec::new(&self.pool);
-            kept.try_reserve_exact(self.resumes.len())?;
-            for resume in self.resumes.as_mut_slice() {
-                kept.try_push(resume.take().ok_or(Error::Invalid("native seek resume"))?)
-                    .map_err(|e| e.error)?;
-            }
-            Some(kept)
-        } else {
-            None
-        };
-        Ok(GlobalSeekPlan {
-            resumes,
-            pool: self.pool,
-            tracks: self.tracks,
-            media: self.media,
-            limits: self.limits,
-            profile: self.profile,
-            encoded_edits: self.encoded_edits,
-            projection: self.projection,
-            reference: self
-                .reference
-                .ok_or(Error::Invalid("native reference selection absent"))?,
-            anchors: self.anchors,
-        })
     }
 }
 impl<'a> GlobalSeekPlan<'a> {
@@ -1464,39 +1504,39 @@ impl<'a> GlobalSeekPlan<'a> {
         // the beginning would reach it.
         if let Some(resumes) = &self.resumes {
             return PacketCursor::from_track_resumes(
-                &self.pool,
+                &self.setup.pool,
                 resumes.as_slice(),
-                self.media,
-                self.limits.index.packets,
+                self.setup.media,
+                self.setup.limits.index.packets,
             );
         }
-        let cursor = if !self.projection.is_all() {
+        let cursor = if !self.setup.projection.is_all() {
             PacketCursor::new_projected(
-                &self.pool,
-                self.tracks.as_slice(),
-                self.media,
-                self.limits.index.packets,
-                self.encoded_edits,
-                |index| self.projection.includes(index),
+                &self.setup.pool,
+                self.setup.tracks.as_slice(),
+                self.setup.media,
+                self.setup.limits.index.packets,
+                self.setup.encoded_edits,
+                |index| self.setup.projection.includes(index),
             )?
-        } else if let Some(plans) = self.encoded_edits {
+        } else if let Some(plans) = self.setup.encoded_edits {
             PacketCursor::new_encoded_regular(
-                &self.pool,
-                self.tracks.as_slice(),
-                self.media,
-                self.limits.index.packets,
+                &self.setup.pool,
+                self.setup.tracks.as_slice(),
+                self.setup.media,
+                self.setup.limits.index.packets,
                 plans,
                 crate::compat::mov::encoded_edits::EncodedEditProfile,
             )?
         } else {
             PacketCursor::new_complete_source(
-                &self.pool,
-                self.tracks.as_slice(),
-                self.media,
-                self.limits.index.packets,
-                self.profile,
+                &self.setup.pool,
+                self.setup.tracks.as_slice(),
+                self.setup.media,
+                self.setup.limits.index.packets,
+                self.setup.profile,
             )?
         };
-        cursor.with_resume_points(self.anchors.as_slice(), self.limits.index.packets)
+        cursor.with_resume_points(self.anchors.as_slice(), self.setup.limits.index.packets)
     }
 }
