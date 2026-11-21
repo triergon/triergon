@@ -260,7 +260,6 @@ pub struct PmtReader {
     streams: BudgetVec<ElementaryStream>,
     source_ranges: BudgetVec<SourceRange>,
     descriptor_count: usize,
-    seen: [u64; 128],
     done: bool,
 }
 
@@ -327,7 +326,6 @@ impl PmtReader {
             streams: BudgetVec::new(budget),
             source_ranges,
             descriptor_count: 0,
-            seen: [0; 128],
             done: false,
         })
     }
@@ -394,10 +392,8 @@ impl PmtReader {
             if self.program_phase {
                 self.program_phase = false;
             }
-            if let Some(stream) = self.pending.as_ref() {
+            if self.pending.is_some() {
                 self.streams.try_reserve_exact(1)?;
-                let slot = usize::from(stream.pid);
-                self.seen[slot / 64] |= 1_u64 << (slot % 64);
                 let stream = self
                     .pending
                     .take()
@@ -442,7 +438,12 @@ impl PmtReader {
                 return Err(Error::Invalid("PMT elementary PID/reserved bits"));
             }
             let pid = pid & 0x1fff;
-            if self.seen[usize::from(pid) / 64] & (1_u64 << (pid % 64)) != 0 {
+            if self
+                .streams
+                .as_slice()
+                .iter()
+                .any(|stream| stream.pid == pid)
+            {
                 return Err(Error::Invalid("duplicate PMT elementary PID"));
             }
             let info_start = self.position + 5;
