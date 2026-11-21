@@ -1,0 +1,18 @@
+[package]
+name = "triergon-hls"
+version = "0.0.0"
+description = "Access units of HLS TS188 media segments and of progressive TS188 input, over the playback engine's PES feed"
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+triergon-core = { path = "../core" }
+triergon-framing = { path = "../framing" }
+triergon-mpegts = { path = "../mpegts" }
+triergon-playback = { path = "../playback" }
+
+[lints]
+workspace = true

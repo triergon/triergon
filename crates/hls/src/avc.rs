@@ -2,11 +2,7 @@
 //! H.222.0 §2.14.1 supplies the delimiter contract. Annex B and the RBSP
 //! prefixes used for active SPS/PPS resolution follow H.264 §7.3 and Annex B.
 
-use crate::{
-    TrackKey, TsNativeCarriage, TsNativeConfiguration,
-    hls_pes::{clock_describes, lane_track},
-    ts_payload::{PesInput, SpentLists},
-};
+use crate::pes::{clock_describes, lane_track};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, BytesView, Error, Result, SourceId, WorkBudget};
 use triergon_framing::{
@@ -16,6 +12,10 @@ use triergon_framing::{
 use triergon_mpegts::compat::pes::{
     CompactDemuxPacket, DemuxPacket, DemuxPayloadKind, DemuxTimeView, PayloadCursor,
     RegisteredCarriage,
+};
+use triergon_playback::{
+    TrackKey, TsNativeCarriage, TsNativeConfiguration,
+    pes_feed::{PesInput, SpentLists},
 };
 
 pub use triergon_framing::avc::AvcRaster;

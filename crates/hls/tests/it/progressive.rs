@@ -3,15 +3,13 @@ use triergon_core::{
     Budget, Bytes, InputCursor, InputRequest, InputWindow, SourceCapabilities, SourceFailure,
     SourceId, Time, WorkBudget,
 };
-use triergon_mpegts::psi::PsiCrc32;
-use triergon_playback::{
-    Error, Source, SourceReply,
-    ts_progressive::{
-        TsProgressiveLimits, TsProgressiveReader, TsProgressiveStep, TsProgressiveUnit,
-    },
+use triergon_hls::progressive::{
+    TsProgressiveLimits, TsProgressiveReader, TsProgressiveStep, TsProgressiveUnit,
 };
+use triergon_mpegts::psi::PsiCrc32;
+use triergon_playback::{Error, Source, SourceReply};
 
-const BASELINE: &[u8] = include_bytes!("fixtures/hls/baseline-stereo.ts");
+const BASELINE: &[u8] = include_bytes!("../../../playback/tests/fixtures/hls/baseline-stereo.ts");
 // Audio and video have produced complete units by the end of the first audio PES.
 const BASELINE_PREFIX: usize = 39 * 188;
 const ID: SourceId = SourceId(31);
@@ -167,8 +165,8 @@ fn pending_source_that_spends_its_work_yields_before_waiting_for_input() {
 
 #[test]
 fn early_units_and_eof_match_retained_payload_order_and_wire_clocks() {
-    let baseline_rows = include_str!("fixtures/hls/baseline-stereo.tsv");
-    let baseline_order = include_str!("fixtures/hls/baseline-stereo.order");
+    let baseline_rows = include_str!("../../../playback/tests/fixtures/hls/baseline-stereo.tsv");
+    let baseline_order = include_str!("../../../playback/tests/fixtures/hls/baseline-stereo.order");
     // Repeat one AAC continuation on PID 257 with continuity counter 1.
     let carrier = &BASELINE[26 * 188..27 * 188];
     assert_eq!(carrier[..4], [0x47, 0x01, 0x01, 0x11]);
@@ -193,9 +191,9 @@ fn early_units_and_eof_match_retained_payload_order_and_wire_clocks() {
             false,
         ),
         (
-            include_bytes!("fixtures/hls/bframes-multislice.ts").as_slice(),
-            include_str!("fixtures/hls/bframes-multislice.tsv"),
-            include_str!("fixtures/hls/bframes-multislice.order"),
+            include_bytes!("../../../playback/tests/fixtures/hls/bframes-multislice.ts").as_slice(),
+            include_str!("../../../playback/tests/fixtures/hls/bframes-multislice.tsv"),
+            include_str!("../../../playback/tests/fixtures/hls/bframes-multislice.order"),
             55 * 188,
             48_000,
             1,
@@ -311,8 +309,8 @@ fn wire_time(ticks: &str) -> Option<Time> {
 fn continuous_mux_exceeds_the_live_budget() {
     // Consecutive FFmpeg mux sections retain continuity counters and clocks.
     let raw = [
-        include_bytes!("fixtures/hls/media-00.ts").as_slice(),
-        include_bytes!("fixtures/hls/media-01.ts").as_slice(),
+        include_bytes!("../../../playback/tests/fixtures/hls/media-00.ts").as_slice(),
+        include_bytes!("../../../playback/tests/fixtures/hls/media-01.ts").as_slice(),
     ]
     .concat();
     let pool = Budget::new(24 * 1024).unwrap();

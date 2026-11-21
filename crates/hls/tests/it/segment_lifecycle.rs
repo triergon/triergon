@@ -4,15 +4,13 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceCapabilities,
     SourceFailure, SourceId, WorkBudget,
 };
-use triergon_playback::{
-    ByteSource, Source, SourceReply,
-    hls_segment::{
-        HlsFeedUnit, HlsSegmentAudio, HlsSegmentLimits, HlsSegmentProgress, HlsSegmentReader,
-        HlsSegmentTracks,
-    },
+use triergon_hls::segment::{
+    HlsFeedUnit, HlsSegmentAudio, HlsSegmentLimits, HlsSegmentProgress, HlsSegmentReader,
+    HlsSegmentTracks,
 };
+use triergon_playback::{ByteSource, Source, SourceReply};
 
-const RAW: &[u8] = include_bytes!("fixtures/hls/bframes-multislice.ts");
+const RAW: &[u8] = include_bytes!("../../../playback/tests/fixtures/hls/bframes-multislice.ts");
 
 #[derive(Default)]
 struct Lifecycle {
@@ -240,13 +238,13 @@ fn adjacent_segments_keep_distinct_clocks_and_the_previous_feed_owner() {
     for (id, raw, expected_count, expected_pts) in [
         (
             SourceId(51),
-            include_bytes!("fixtures/hls/media-00.ts").as_slice(),
+            include_bytes!("../../../playback/tests/fixtures/hls/media-00.ts").as_slice(),
             145,
             132006,
         ),
         (
             SourceId(52),
-            include_bytes!("fixtures/hls/media-01.ts").as_slice(),
+            include_bytes!("../../../playback/tests/fixtures/hls/media-01.ts").as_slice(),
             149,
             312186,
         ),

@@ -7,15 +7,15 @@
 use crate::runner::{Invocation, MAX_INPUT, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
-use triergon_playback::{
-    ByteSource,
-    hls_clock::HlsParserOnlyAudioClock,
-    hls_segment::{
+use triergon_hls::{
+    clock::HlsParserOnlyAudioClock,
+    segment::{
         HlsAudioCodec, HlsFeedUnit, HlsMediaProfile, HlsMediaSegment, HlsMediaSegmentReader,
         HlsSegment, HlsSegmentLimits, HlsSegmentProgress, HlsSegmentReader, HlsSegmentTracks,
         HlsVideoCodec,
     },
 };
+use triergon_playback::ByteSource;
 
 pub const PREFIX: &str = "hls-";
 const OPERATION: &str = "hls-segment-feed";

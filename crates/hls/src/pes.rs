@@ -1,7 +1,7 @@
 //! Admission checks every HLS lane makes before accepting a PES.
-use crate::{TrackKey, ts_payload::PesFacts};
 use triergon_core::{Error, Result, Time};
 use triergon_mpegts::compat::pes::DemuxTimeView;
+use triergon_playback::{TrackKey, pes_feed::PesFacts};
 
 /// Whether a PES belongs to an HLS lane's track and configuration epoch.
 pub(crate) fn lane_track(track: TrackKey, configuration_epoch: u64, packet: &PesFacts<'_>) -> bool {

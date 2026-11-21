@@ -1,24 +1,24 @@
 //! Complete, bounded playback feed for one independent TS188 media segment.
 
 use crate::{
-    ClockChoice, Error, Player, PlayerPolicy, Progress, RawEvent, Result, Selection, Source,
-    SourceReply, State, TrackKey,
-    hls_aac::{HlsAac, HlsAacFrame},
-    hls_avc::{AvcRaster, AvcTsAccessUnit, AvcTsLimits, AvcTsReader},
-    hls_clock::{
+    aac::{HlsAac, HlsAacFrame},
+    avc::{AvcRaster, AvcTsAccessUnit, AvcTsLimits, AvcTsReader},
+    clock::{
         HlsAacClock, HlsParserOnlyAudioClock, parser_only_aac_clocks, parser_only_aac_pts_ns,
         parser_only_audio_clocks, resolve_hls_aac_clocks,
     },
-    io::SourceOwner,
-    ts_payload::SpentLists,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, InputCursor, InputRequest, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, InputCursor, InputRequest, Result, WorkBudget};
 use triergon_mpegts::psi::{ElementaryStream, ProgramMap};
 use triergon_mpegts::stream::{FaultKind, TraceEvent};
 use triergon_mpegts::{
     AssemblyStep, ParseLimits,
     compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors},
+};
+use triergon_playback::{
+    ClockChoice, Player, PlayerPolicy, Progress, RawEvent, Selection, Source, SourceReply, State,
+    TrackKey, io::SourceOwner, pes_feed::SpentLists,
 };
 
 mod lanes;
@@ -338,7 +338,7 @@ where
             check_extent(length, 0, limits.maximum_source_bytes)?;
         }
         let pool = input.budget().clone();
-        let engine = crate::pes_feed::open_segment_feed(
+        let engine = triergon_playback::pes_feed::open_segment_feed(
             input,
             limits.transport,
             matches!(tracks, TrackSelection::Media(_)),
@@ -925,12 +925,12 @@ fn check_extent(offset: u64, count: usize, maximum: usize) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ByteSource;
     use triergon_core::{Bytes, SourceCapabilities, SourceId};
+    use triergon_playback::ByteSource;
 
     #[test]
     fn borrowed_media_spans_match_contiguous_feed_after_reader_drop() {
-        let fixture = include_bytes!("../tests/fixtures/hls/baseline-stereo.ts");
+        let fixture = include_bytes!("../../playback/tests/fixtures/hls/baseline-stereo.ts");
         let pool = Budget::new(1024 * 1024).unwrap();
         let source = SourceId(1);
         let cursor = InputCursor::new(
@@ -985,7 +985,7 @@ mod tests {
 
     #[test]
     fn suppressed_source_events_still_charge_the_player_event_limit() {
-        let fixture = include_bytes!("../tests/fixtures/hls/baseline-stereo.ts");
+        let fixture = include_bytes!("../../playback/tests/fixtures/hls/baseline-stereo.ts");
         let pool = Budget::new(1024 * 1024).unwrap();
         let source = SourceId(1);
         let cursor = InputCursor::new(
@@ -1000,7 +1000,8 @@ mod tests {
         .unwrap();
         let bytes = Bytes::copy_from_slice(&pool, fixture).unwrap();
         let engine =
-            crate::pes_feed::open_segment_feed(cursor, ParseLimits::default(), false).unwrap();
+            triergon_playback::pes_feed::open_segment_feed(cursor, ParseLimits::default(), false)
+                .unwrap();
         let mut player = Player::new(
             engine,
             SourceOwner::new(ByteSource::new(source, bytes, 4096).unwrap()),

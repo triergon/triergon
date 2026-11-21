@@ -1,10 +1,6 @@
 //! Access units for explicitly selected TS AAC ADTS carriage (PMT stream type
 //! 0x0f). PES boundaries are transport boundaries, even inside an ADTS header.
-use crate::{
-    TrackKey, TsNativeCarriage, TsNativeConfiguration,
-    hls_pes::{clock_describes, lane_track, pes_time},
-    ts_payload::{PesInput, SpentLists},
-};
+use crate::pes::{clock_describes, lane_track, pes_time};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, Time, WorkBudget};
 use triergon_framing::aac::{self, AacAdtsHeader};
@@ -14,6 +10,10 @@ use triergon_mpegts::{
         CompactDemuxPacket, DemuxPacket, DemuxPayloadKind, DemuxTimeView, PayloadCursor,
         RegisteredCarriage,
     },
+};
+use triergon_playback::{
+    TrackKey, TsNativeCarriage, TsNativeConfiguration,
+    pes_feed::{PesInput, SpentLists},
 };
 
 const PREFIX_BYTES: usize = 7;

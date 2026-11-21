@@ -1,11 +1,9 @@
 use super::HlsSegmentLimits;
 use crate::{
-    TsNativeCarriage, TsNativeConfiguration,
-    hls_aac::{HlsAac, HlsAacFrame},
-    hls_avc::{AvcRaster, AvcTsAccessUnit, AvcTsClock, AvcTsReader, AvcTsStep},
-    hls_dolby::HlsDolby,
-    hls_hevc::{HlsHevc, HlsHevcPicture},
-    ts_payload::SpentLists,
+    aac::{HlsAac, HlsAacFrame},
+    avc::{AvcRaster, AvcTsAccessUnit, AvcTsClock, AvcTsReader, AvcTsStep},
+    dolby::HlsDolby,
+    hevc::{HlsHevc, HlsHevcPicture},
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, Time, WorkBudget};
@@ -13,6 +11,7 @@ use triergon_mpegts::{
     AssemblyStep,
     compat::pes::{DemuxPacket, DemuxTimeView, RegisteredCarriage},
 };
+use triergon_playback::{TsNativeCarriage, TsNativeConfiguration, pes_feed::SpentLists};
 
 /// The legacy AVC/AAC reader uses concrete lanes. Only the codec-negotiated
 /// reader needs the variant dispatch or larger lane and output storage.

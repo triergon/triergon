@@ -1,19 +1,20 @@
 //! Sequential TS188 feed for AVC and ADTS AAC.
 
 use crate::{
-    Error, Result, Source, SourceReply, TrackKey,
-    engines::{NativePacket, TsEngine, TsNativeConfiguration, TsPayloadStep},
-    hls_aac::{HlsAac, HlsAacFrame},
-    hls_avc::{AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
-    io::SourceOwner,
-    ts_payload::{PesInput, SpentLists},
+    aac::{HlsAac, HlsAacFrame},
+    avc::{AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{InputCursor, InputRequest, Time, WorkBudget};
+use triergon_core::{Error, InputCursor, InputRequest, Result, Time, WorkBudget};
 use triergon_mpegts::psi::{PatTable, ProgramMap};
 use triergon_mpegts::stream::{FaultKind, TraceEvent};
 use triergon_mpegts::transport::ContinuityOutcome;
 use triergon_mpegts::{AssemblyStep, ParseLimits};
+use triergon_playback::{
+    Source, SourceReply, TrackKey, TsNativeConfiguration,
+    io::SourceOwner,
+    pes_feed::{NativePacket, PesInput, SpentLists, TsEngine, TsPayloadStep},
+};
 
 const TS_CLOCK_RATE: u32 = 90_000;
 
@@ -721,8 +722,12 @@ mod tests {
             random_access: false,
         };
         let input = InputCursor::new(&pool, id, caps, 4096).unwrap();
-        let source =
-            crate::ByteSource::new(id, Bytes::copy_from_slice(&pool, &[]).unwrap(), 188).unwrap();
+        let source = triergon_playback::ByteSource::new(
+            id,
+            Bytes::copy_from_slice(&pool, &[]).unwrap(),
+            188,
+        )
+        .unwrap();
         let track = TrackKey::Ts {
             program: 7,
             pid: 257,
@@ -985,7 +990,8 @@ mod tests {
             private_audio: bool,
         ) -> Vec<(String, Vec<u8>, u64, usize)> {
             let pool = Budget::new(8 << 20).unwrap();
-            let mut wire = include_bytes!("../tests/fixtures/hls/baseline-stereo.ts").to_vec();
+            let mut wire =
+                include_bytes!("../../playback/tests/fixtures/hls/baseline-stereo.ts").to_vec();
             if private_audio {
                 // Keep ordinary private-audio discovery and its eventual
                 // progressive track refusal on the original observer path.
@@ -999,9 +1005,12 @@ mod tests {
                 length: Some(wire.len() as u64),
                 random_access: false,
             };
-            let source =
-                crate::ByteSource::new(id, Bytes::copy_from_slice(&pool, &wire).unwrap(), window)
-                    .unwrap();
+            let source = triergon_playback::ByteSource::new(
+                id,
+                Bytes::copy_from_slice(&pool, &wire).unwrap(),
+                window,
+            )
+            .unwrap();
             let input = InputCursor::new(&pool, id, caps, window).unwrap();
             let limits = TsProgressiveLimits::default();
             let mut reader = TsProgressiveReader::new(input, source, limits).unwrap();
@@ -1097,9 +1106,12 @@ mod tests {
                 length: Some(wire.len() as u64),
                 random_access: false,
             };
-            let source =
-                crate::ByteSource::new(id, Bytes::copy_from_slice(&pool, wire).unwrap(), window)
-                    .unwrap();
+            let source = triergon_playback::ByteSource::new(
+                id,
+                Bytes::copy_from_slice(&pool, wire).unwrap(),
+                window,
+            )
+            .unwrap();
             let input = InputCursor::new(&pool, id, caps, window).unwrap();
             let mut reader =
                 TsProgressiveReader::new(input, source, TsProgressiveLimits::default()).unwrap();
@@ -1151,8 +1163,8 @@ mod tests {
             }
         }
         for wire in [
-            include_bytes!("../tests/fixtures/hls/baseline-stereo.ts").as_slice(),
-            include_bytes!("../tests/fixtures/hls/bframes-multislice.ts").as_slice(),
+            include_bytes!("../../playback/tests/fixtures/hls/baseline-stereo.ts").as_slice(),
+            include_bytes!("../../playback/tests/fixtures/hls/bframes-multislice.ts").as_slice(),
         ] {
             for quantum in [1, 31, 4096] {
                 for window in [188, 4096] {

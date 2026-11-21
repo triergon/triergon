@@ -3,11 +3,8 @@
 //! synthetic byte offsets below count only PES payload, in transport order.
 
 use crate::{
-    TrackKey, TsNativeCarriage, TsNativeConfiguration,
-    hls_avc::{AvcRaster, AvcTsClock, AvcTsLimits},
-    hls_pes::{clock_describes, lane_track},
-    raw_video::RawVideoConfigTracker,
-    ts_payload::PesInput,
+    avc::{AvcRaster, AvcTsClock, AvcTsLimits},
+    pes::{clock_describes, lane_track},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -20,6 +17,10 @@ use triergon_framing::nal::{
 use triergon_mpegts::{
     AssemblyStep,
     compat::pes::{DemuxPacket, DemuxPayloadKind, DemuxSpan, DemuxTimeView, RegisteredCarriage},
+};
+use triergon_playback::{
+    TrackKey, TsNativeCarriage, TsNativeConfiguration, pes_feed::PesInput,
+    raw_video::RawVideoConfigTracker,
 };
 
 const ELEMENTARY: SourceId = SourceId(0);

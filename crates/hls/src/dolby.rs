@@ -1,9 +1,7 @@
 //! Aligned Dolby syncframes for one selected independent HLS TS segment.
 use crate::{
-    TrackKey, TsNativeCarriage, TsNativeConfiguration,
-    hls_pes::{clock_describes, lane_track, pes_time},
-    hls_segment::HlsMediaAudioUnit,
-    ts_payload::PesInput,
+    pes::{clock_describes, lane_track, pes_time},
+    segment::HlsMediaAudioUnit,
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
@@ -18,6 +16,7 @@ use triergon_mpegts::{
         PrivateAudioCarriage,
     },
 };
+use triergon_playback::{TrackKey, TsNativeCarriage, TsNativeConfiguration, pes_feed::PesInput};
 
 const PES_CORRUPT: u32 = 2;
 const MAXIMUM_SYNCFRAME_BYTES: usize = 4096;

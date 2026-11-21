@@ -5,20 +5,21 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Bytes, InputCursor, Rounding, SourceCapabilities, SourceId, Time, TimeBase, WorkBudget,
 };
+use triergon_hls::{
+    aac::{HlsAac, HlsAacFrame},
+    avc::{AvcRaster, AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
+    clock::{HlsAacClock, HlsAacPtsOrigin, resolve_hls_aac_clocks},
+    segment::{
+        HlsFeedUnit, HlsSegmentLimits, HlsSegmentProgress, HlsSegmentReader, HlsSegmentTracks,
+    },
+};
 use triergon_mpegts::{
     AssemblyStep, ParseLimits, clock::SourceTimePolicy, compat::pes::RegisteredCarriage,
     psi::DescriptorNamespace,
 };
 use triergon_playback::{
     ByteSource, ClockChoice, Engine, Player, PlayerPolicy, Progress, RawEvent, Selection, State,
-    TrackKey, TsNativeCarriage,
-    hls_aac::{HlsAac, HlsAacFrame},
-    hls_avc::{AvcRaster, AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
-    hls_clock::{HlsAacClock, HlsAacPtsOrigin, resolve_hls_aac_clocks},
-    hls_segment::{
-        HlsFeedUnit, HlsSegmentLimits, HlsSegmentProgress, HlsSegmentReader, HlsSegmentTracks,
-    },
-    io::SourceOwner,
+    TrackKey, TsNativeCarriage, io::SourceOwner,
 };
 
 fn payload(out: &mut String, bytes: &[u8]) {
@@ -114,8 +115,8 @@ fn drain_audio(reader: &mut HlsAac, out: &mut Vec<HlsAacFrame>, work: u64, end: 
 #[test]
 fn independent_ts_segment_discovers_and_reassembles_the_ffmpeg_avc_aac_outputs() {
     check_segment(
-        include_bytes!("fixtures/hls/bframes-multislice.ts"),
-        include_str!("fixtures/hls/bframes-multislice.tsv"),
+        include_bytes!("../../../playback/tests/fixtures/hls/bframes-multislice.ts"),
+        include_str!("../../../playback/tests/fixtures/hls/bframes-multislice.tsv"),
         31,
         AvcRaster {
             width: 96,
@@ -123,8 +124,8 @@ fn independent_ts_segment_discovers_and_reassembles_the_ffmpeg_avc_aac_outputs()
         },
     );
     check_segment(
-        include_bytes!("fixtures/hls/baseline-stereo.ts"),
-        include_str!("fixtures/hls/baseline-stereo.tsv"),
+        include_bytes!("../../../playback/tests/fixtures/hls/baseline-stereo.ts"),
+        include_str!("../../../playback/tests/fixtures/hls/baseline-stereo.tsv"),
         71,
         AvcRaster {
             width: 64,
@@ -256,36 +257,36 @@ fn check_segment(raw: &[u8], expected: &str, service: u16, raster: AvcRaster) {
 fn complete_segment_preserves_ffmpeg_cross_track_feed_order() {
     for (raw, packets, order, raster) in [
         (
-            include_bytes!("fixtures/hls/bframes-multislice.ts").as_slice(),
-            include_str!("fixtures/hls/bframes-multislice.tsv"),
-            include_str!("fixtures/hls/bframes-multislice.order"),
+            include_bytes!("../../../playback/tests/fixtures/hls/bframes-multislice.ts").as_slice(),
+            include_str!("../../../playback/tests/fixtures/hls/bframes-multislice.tsv"),
+            include_str!("../../../playback/tests/fixtures/hls/bframes-multislice.order"),
             AvcRaster {
                 width: 96,
                 height: 56,
             },
         ),
         (
-            include_bytes!("fixtures/hls/baseline-stereo.ts").as_slice(),
-            include_str!("fixtures/hls/baseline-stereo.tsv"),
-            include_str!("fixtures/hls/baseline-stereo.order"),
+            include_bytes!("../../../playback/tests/fixtures/hls/baseline-stereo.ts").as_slice(),
+            include_str!("../../../playback/tests/fixtures/hls/baseline-stereo.tsv"),
+            include_str!("../../../playback/tests/fixtures/hls/baseline-stereo.order"),
             AvcRaster {
                 width: 64,
                 height: 48,
             },
         ),
         (
-            include_bytes!("fixtures/hls/media-00.ts").as_slice(),
-            include_str!("fixtures/hls/media-00.tsv"),
-            include_str!("fixtures/hls/media-00.order"),
+            include_bytes!("../../../playback/tests/fixtures/hls/media-00.ts").as_slice(),
+            include_str!("../../../playback/tests/fixtures/hls/media-00.tsv"),
+            include_str!("../../../playback/tests/fixtures/hls/media-00.order"),
             AvcRaster {
                 width: 64,
                 height: 48,
             },
         ),
         (
-            include_bytes!("fixtures/hls/media-01.ts").as_slice(),
-            include_str!("fixtures/hls/media-01.tsv"),
-            include_str!("fixtures/hls/media-01.order"),
+            include_bytes!("../../../playback/tests/fixtures/hls/media-01.ts").as_slice(),
+            include_str!("../../../playback/tests/fixtures/hls/media-01.tsv"),
+            include_str!("../../../playback/tests/fixtures/hls/media-01.order"),
             AvcRaster {
                 width: 64,
                 height: 48,

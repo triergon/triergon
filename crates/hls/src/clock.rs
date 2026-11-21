@@ -1,6 +1,6 @@
 //! Segment-local AAC presentation clocks, separate from the original PES facts.
 
-use crate::hls_aac::HlsAacFrame;
+use crate::aac::HlsAacFrame;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, Time, TimeBase};
 
