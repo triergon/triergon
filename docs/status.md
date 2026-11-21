@@ -145,6 +145,14 @@ font code passed all nine cases on parity, runtime, peak heap and total RSS,
 with 30 pairs per case. All nine runtime upper bounds were below 1.00.
 NotoSansJP-Regular had the largest, ≤0.8621.
 
+The CFF1 shaping reader collects CharStrings during its Top DICT scan for ROS,
+charset and Private. In an untimed comparison that also changed font table
+lookup, all 699,045 glyph observations across the nine extents cases matched
+the previous reader and pinned reference. The Top DICT scan visited 12 instead
+of 14 tokens for authored CFF matrix and 9 instead of 11 for authored charmaps.
+The current change still needs native runtime, heap and RSS qualification on
+AArch64 and ARMv7.
+
 The linked workers at `deb6105a` cover 3,092 distinct cases per target across capture,
 framing, containers, file decoding, playback, glyph extents and subtitles. On AArch64,
 3,074 of 3,088 timed cases were as fast as their reference on the upper paired bound;

@@ -75,6 +75,9 @@ expands the inline stack to 513 slots. Subroutines share the caller's stack,
 and each accented component starts with an empty stack.
 The shaping reader decodes compact Type 2 integer operands before converting them
 to glyph coordinates. It prepares a face-wide Private DICT once. For CID-keyed
+CFF, the Top DICT scan locates both ROS and CharStrings; for name-keyed CFF,
+one scan collects CharStrings, charset and Private, retaining the first readable
+entry of each kind and stopping at unreadable operands. For CID-keyed
 CFF and CFF2 it searches complete, ordered FDSelect ranges directly in the font
 bytes. A malformed range table retains its first readable matching interval.
 The reader bounds each CFF INDEX object by its final offset. CFF2 `blend` keeps the default values. `Scale` reproduces HarfBuzz's scaling arithmetic,

@@ -122,20 +122,24 @@ impl<'a> Face<'a> {
         let (_, at) = Index::read(table, at, false)?;
         let (global, _) = Index::read(table, at, false)?;
         let top = tops.get(0)?;
-        let (charstrings, _) = Index::read(table, offset(dict_find(top, 17)?[1])?, false)?;
-        // A name-keyed face has no ROS. Its lookup already visits every readable
-        // entry, including the first Private and charset if present.
+        // A name-keyed face has no ROS. The scan that establishes this also
+        // finds CharStrings, Private and charset, without a second traversal.
+        // A CID face can stop once both ROS and CharStrings have been found.
+        let mut charstrings_offset = None;
         let mut private = None;
         let mut charset_offset = None;
-        let cid = dict_until(top, |op, operands| {
+        let mut cid = false;
+        dict_until(top, |op, operands| {
             match op {
                 15 if charset_offset.is_none() => charset_offset = Some(operands[1]),
+                17 if charstrings_offset.is_none() => charstrings_offset = Some(operands[1]),
                 18 if private.is_none() => private = Some(operands),
+                0x0C1E => cid = true,
                 _ => {}
             }
-            op == 0x0C1E
-        })
-        .is_some();
+            cid && charstrings_offset.is_some()
+        });
+        let (charstrings, _) = Index::read(table, offset(charstrings_offset?)?, false)?;
         let privates = if cid {
             Privates::FdArray {
                 select: Select::new(
@@ -1367,6 +1371,32 @@ mod tests {
             );
         }
         Ok(())
+    }
+
+    #[test]
+    fn top_dict_entries_can_precede_charstrings() {
+        let mut table = cff(&[&[14]], &[], &[]);
+        let (_, after_name) = Index::read(&table, 4, false).unwrap();
+        let (tops, end) = Index::read(&table, after_name, false).unwrap();
+        let top = tops.get(0).unwrap().to_vec();
+        let start = end - top.len();
+        let entries = [&top[..6], &top[6..12], &top[12..]];
+        for order in [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ] {
+            table[start..end].copy_from_slice(&order.map(|i| entries[i]).concat());
+            let mut work = WorkBudget::new(1);
+            assert_eq!(
+                table_extents(&table, false, 0, 16, &mut work),
+                Ok(Some([0; 4]))
+            );
+            assert_eq!(work.spent(), 1);
+        }
     }
 
     #[test]
