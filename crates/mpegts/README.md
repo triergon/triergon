@@ -208,7 +208,7 @@ Seeks across selected-track source epochs and ambiguous clock wraps are refused.
 | Method | Adds |
 | --- | --- |
 | `request_seek_in_epoch` | land only within one clock/configuration pair from `Packet::epochs()` |
-| `request_seek_in_entities` | an ordered `SeekEntity` plan of contiguous entities; the scan bound covers their total |
+| `request_seek_in_entities` | an ordered `SeekEntity` plan of contiguous entities; the scan bound covers their total, and short single-track suffixes can be retained through the cuts |
 | `request_seek_and_index` | a bounded landing index for later seeks to the same track |
 | `request_seek_in_epoch_and_index` | the same, keyed by the epoch pair |
 | `request_seek_in_entities_in_epoch`, `request_seek_in_entities_in_epoch_and_index` | both |
@@ -221,6 +221,10 @@ Sources must remain stable between requests. For one clear entity with a single
 Layer I/II, AVC or HEVC stream, the index can also hold restart checkpoints at
 in-band PAT/PMT carriers; a later seek compares those carriers byte for byte and
 reads no earlier bytes. Other landings replay the entity prefix.
+
+A LOAS envelope with an in-band version-zero AAC-LC configuration can
+be a seek entry. The reader accepts one program and layer with 1–64 nonempty
+subframes and preserves the complete envelope and its source ranges.
 
 Construction-14 DTS-HD seeking also accepts a complete core and aligned XLL
 asset with static mode-zero navigation and component mask `0x201`. The core
@@ -367,3 +371,13 @@ Integration tests use independently authored streams in `tests/data/` (listed in
 `cargo xtask fixture transport-dts-seek --record REFERENCE`. The comparison
 contracts are `harness/features/mpegts-*/contract.json`; results are in
 [docs/status.md](../../docs/status.md).
+
+The [six-block ATSC E-AC-3 comparison](../../harness/eac3-proof.md) checks the
+complete grouped operation with a separate public-parser adapter. All ten
+authored inputs match every packet field and payload through EOF. Fold and proof
+verify parser byte identity and source-header digests; timed and memory modes
+check parser coverage and source clocks without those extra passes, parsing fixed
+headers and only the opening short primary BSI. The ordinary
+parser operation differs on all ten inputs. Both comparisons are available
+through `cargo xtask worker-tests transport::eac3-experiment`. Native timing
+and memory results are in [status](../../docs/status.md).

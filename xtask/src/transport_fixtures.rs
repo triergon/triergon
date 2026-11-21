@@ -3,6 +3,7 @@
 
 pub mod dts_discovery;
 pub mod dts_hd;
+pub mod eac3_probe;
 pub mod matched;
 pub mod program;
 

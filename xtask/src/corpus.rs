@@ -68,6 +68,7 @@ pub fn generate_all(paths: &Paths) -> Result<Vec<String>, String> {
         mp4_range(paths)?,
         crate::transport_fixtures::generate(paths)?,
         crate::transport_fixtures::dts_hd::generate(paths, None)?,
+        crate::transport_fixtures::eac3_probe::generate(paths, None)?,
     ])
 }
 

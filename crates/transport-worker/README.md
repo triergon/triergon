@@ -24,8 +24,21 @@ memory window.
 | `ts-seek-` | `SIZE PROGRAM PID PTS90 POLICY` (`previous` or `preroll`), then optional `REPEAT_PTS90` and `split=BYTES`, or `epoch=CLOCK:CONFIG epoch-start=BYTES` | a seek, replaying the landing and every following packet through EOF ([picture contract](../../harness/features/mpegts-previous-picture/contract.json)) |
 | `ts-audio-seek-` | as `ts-seek-` without the epoch options, with an optional `--dvb` or `--atsc` after PROGRAM | a seek on an ADTS, LOAS, AC-3, MPEG audio or DTS PID ([contract](../../harness/features/mpegts-previous-audio/contract.json)) |
 | `ts-free-audio-` | `SIZE PROGRAM PID [layer1-padding]` | free-format MPEG audio frames from the start ([contract](../../harness/features/mpegts-free-audio/contract.json)) |
+| `ts-eac3-six-block-` (also `trace`) | `188 PROGRAM --atsc` | six-block ATSC E-AC-3 packet projection |
 | `ts-dts-hd-` (also `trace`) | `SIZE PROGRAM --dvb` | grouped single-extension DTS-HD against an explicit DTS parser applied to each aligned finite PES |
 
 `cargo xtask fixture transport-dts-hd-grouped` generates the DTS-HD inputs into
 `.research/`; add `--record REFERENCE` to record their folds from the pinned reference
 worker.
+
+`ts-au-trace` prints the projected packet fields, original payload and side data
+before the fold summary. Trace printing is selected once and absent from the
+ordinary per-packet fold.
+
+The [six-block ATSC E-AC-3 comparison](../../harness/eac3-proof.md) checks the
+complete grouped operation with a separate public-parser adapter. All ten
+authored inputs match every packet field and payload through EOF. The ordinary
+parser operation differs on all ten inputs. Both comparisons are available
+through `cargo xtask worker-tests transport::eac3-experiment`. The separate
+[six-block report](../../harness/features/mpegts-atsc-eac3-six-block/contract.json)
+pins all ten folds. Native timing and memory qualification remain open.
