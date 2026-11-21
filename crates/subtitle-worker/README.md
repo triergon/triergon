@@ -122,3 +122,21 @@ The operating system releases the lock when the recorder exits.
 `--corpus DIR` selects the input root and `--manifest FILE` selects the
 manifest to check or write. The text capsule and broadcast stream authors
 continue to generate their input bytes and enumerate their cases in Python.
+
+
+## Source views
+
+`subtitle-views-worker` compares subtitle source data independently of the
+receiver operations. Its prefixes are `text-extract-`, `renderer-context-`,
+`charset-`, `charset-packets-`, `tx3g-config-`, `tx3g-semantics-`,
+`dvb-source-`, `pgs-segments-`, `vobsub-lines-` and `carriage-`. Append
+`fold`, `trace`, `memory` or `bench` and use the trailing arguments the
+feature's corpus lists. Trace mode prints the folded values before the work
+line. The formats reference publishes its demuxer and decoder views through
+`ffmpeg-subtitle-views-worker`; the field-level oracles emit the same trace rows
+directly from their inputs.
+
+`cargo xtask subtitle-views fixtures FEATURE` verifies input hashes.
+`cargo xtask subtitle-views manifest --record FEATURE` records reference folds
+or oracle trace hashes. `cargo xtask subtitle-views fixtures --write-to DIR`
+writes authored assets and draft manifests to a separate directory.
