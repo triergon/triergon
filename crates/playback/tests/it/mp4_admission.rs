@@ -1,5 +1,4 @@
-mod common;
-use common::{byte_input, run_open};
+use crate::support::{byte_input, run_open};
 use std::ops::Range;
 use triergon_core::{Budget, Error, SourceCapabilities, SourceId};
 use triergon_playback::{
@@ -7,9 +6,9 @@ use triergon_playback::{
     mp4::{MetadataReadScope, Movie, Mp4Open, OpenLimits},
 };
 
-const ISO: &[u8] = include_bytes!("../../isobmff/tests/fixtures/encoded-edit/original.mp4");
+const ISO: &[u8] = include_bytes!("../../../isobmff/tests/fixtures/encoded-edit/original.mp4");
 const QUICKTIME: &[u8] =
-    include_bytes!("../../isobmff/tests/fixtures/encoded-metadata/qt-v1-wave.mov");
+    include_bytes!("../../../isobmff/tests/fixtures/encoded-metadata/qt-v1-wave.mov");
 const DATA_HANDLER: &[u8] =
     b"\0\0\0\x2chdlr\0\0\0\0dhlrurl \0\0\0\0\0\0\0\0\0\0\0\0\x0bDataHandler";
 

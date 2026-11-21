@@ -1,5 +1,6 @@
-mod common;
-use common::{off, packets, read, run_open};
+use crate::support::golds::mp4 as regular_gold;
+use crate::support::golds::progressive as fragment_gold;
+use crate::support::{off, packets, read, run_open};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -17,17 +18,9 @@ use triergon_playback::{
     probe::SelectedInput,
     *,
 };
-#[allow(dead_code)]
-mod regular_gold {
-    include!("fixtures/mp4_golds.rs");
-}
-#[allow(dead_code)]
-mod fragment_gold {
-    include!("fixtures/progressive/source_golds.rs");
-}
 const ID: SourceId = SourceId(6401);
-const REGULAR: &[u8] = include_bytes!("fixtures/open-ended/regular-terminal.mp4");
-const PENDING: &[u8] = include_bytes!("fixtures/open-ended/pending-terminal.mp4");
+const REGULAR: &[u8] = include_bytes!("../fixtures/open-ended/regular-terminal.mp4");
+const PENDING: &[u8] = include_bytes!("../fixtures/open-ended/pending-terminal.mp4");
 #[derive(Default)]
 struct Signals {
     allow_end: AtomicBool,
@@ -247,7 +240,7 @@ fn open_ended_required_pending_moofs_and_terminal_source_are_complete() {
 }
 #[test]
 fn open_ended_required_header_pressure_keeps_same_producer_and_header() {
-    let raw = include_bytes!("fixtures/mp4/r-front-stco.mov");
+    let raw = include_bytes!("../fixtures/mp4/r-front-stco.mov");
     let (mut open, b, signals) = opener(raw, None, true);
     let hold = b.reserve(b.available()).unwrap();
     let mut pressure = false;
@@ -413,7 +406,7 @@ fn open_ended_transport_failure_is_not_normal_source_end() {
 }
 #[test]
 fn open_ended_opaque_tail_is_payload_until_actual_end() {
-    let raw = include_bytes!("fixtures/open-ended/opaque-tail-terminal.mp4");
+    let raw = include_bytes!("../fixtures/open-ended/opaque-tail-terminal.mp4");
     let (mut p, _, signals) = make(raw, None, true);
     let mut out = Vec::new();
     read(&mut p, &mut out).unwrap();
@@ -453,7 +446,7 @@ fn open_ended_packet_pressure_retries_all_declared_samples() {
 }
 #[test]
 fn open_ended_unknown_fragment_clock_stays_unknown() {
-    let raw = include_bytes!("fixtures/open-ended/unknown-clock-terminal.mp4");
+    let raw = include_bytes!("../fixtures/open-ended/unknown-clock-terminal.mp4");
     let (mut p, _, _) = make(raw, None, true);
     let mut out = Vec::new();
     read(&mut p, &mut out).unwrap();
@@ -467,7 +460,7 @@ fn open_ended_unknown_fragment_clock_stays_unknown() {
 }
 #[test]
 fn open_ended_empty_declared_samples_are_source_facts_before_end() {
-    let raw = include_bytes!("fixtures/open-ended/empty-sample-terminal.mp4");
+    let raw = include_bytes!("../fixtures/open-ended/empty-sample-terminal.mp4");
     let (mut p, _, signals) = make(raw, None, false);
     let mut out = Vec::new();
     for _ in 0..300_000 {

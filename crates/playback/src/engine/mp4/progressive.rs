@@ -43,13 +43,13 @@ impl Default for ProgressiveLimits {
 #[derive(Debug)]
 enum SourceCursor {
     Physical(OwnedFragmentCursor),
-    Native(iso::compat::mov::front::FrontFragment),
+    Front(iso::compat::mov::front::FrontFragment),
 }
 impl SourceCursor {
     fn index(&self) -> &iso::fragment::FragmentIndex {
         match self {
             Self::Physical(c) => c.index(),
-            Self::Native(c) => c.index(),
+            Self::Front(c) => c.index(),
         }
     }
 }
@@ -515,7 +515,7 @@ impl ProgressiveState {
                     .finish()?;
                 self.pending_cursor = Some(Cursor {
                     cursor: if engine.plan.demux_front {
-                        SourceCursor::Native(iso::compat::mov::front::FrontFragment::new(index))
+                        SourceCursor::Front(iso::compat::mov::front::FrontFragment::new(index))
                     } else {
                         SourceCursor::Physical(index.into_cursor())
                     },
@@ -625,7 +625,7 @@ impl ProgressiveState {
             }
             let step = match &mut current.cursor {
                 SourceCursor::Physical(cursor) => cursor.poll(w)?,
-                SourceCursor::Native(cursor) => match cursor.poll(w, c)? {
+                SourceCursor::Front(cursor) => match cursor.poll(w, c)? {
                     iso::CursorStatus::Yield => Next::Yield,
                     iso::CursorStatus::End => Next::End,
                     iso::CursorStatus::Ready => {

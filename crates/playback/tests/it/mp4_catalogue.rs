@@ -1,5 +1,5 @@
-mod common;
-use common::{View, collect, index_job, off, run_open};
+use crate::support::golds::mp4 as gold;
+use crate::support::{View, collect, index_job, off, run_open};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -17,9 +17,6 @@ use triergon_playback::{
     probe::SelectedInput,
     *,
 };
-mod gold {
-    include!("fixtures/mp4_golds.rs");
-}
 #[derive(Default)]
 struct Signals {
     polls: AtomicUsize,
@@ -270,9 +267,7 @@ fn fill(p: &mut Player<Transport>, count: usize) {
     }
     panic!("fixture queue did not fill");
 }
-mod root_facts {
-    include!("fixtures/catalogue_root_facts.rs");
-}
+use crate::support::golds::catalogue_roots as root_facts;
 fn physical_fold(bytes: &[u8]) -> u64 {
     bytes.iter().fold(0xcbf29ce484222325, |h, b| {
         (h ^ u64::from(*b)).wrapping_mul(0x100000001b3)
@@ -947,7 +942,7 @@ fn catalogue_replacement_selects_native_terminal_and_waits_for_source_end() {
     let retained = first_packet(&mut p);
     p.pause(true).unwrap();
 
-    let raw = include_bytes!("fixtures/open-ended/regular-terminal.mp4");
+    let raw = include_bytes!("../fixtures/open-ended/regular-terminal.mp4");
     let (opened, next_signals) = open_progressive(&b, SourceId(9512), raw);
     let mut index = compat::mov::index_front(&opened.movie, PlanLimits::default()).unwrap();
     let cancel = off();
@@ -959,7 +954,7 @@ fn catalogue_replacement_selects_native_terminal_and_waits_for_source_end() {
             opened,
             plan,
             1 << 20,
-            Mp4CatalogueMode::NativeTerminalV1(mp4::ProgressiveLimits::default()),
+            Mp4CatalogueMode::Front(mp4::ProgressiveLimits::default()),
         )
         .unwrap(),
     );
@@ -1061,7 +1056,7 @@ fn catalogue_progressive_replacement_keeps_future_batches_and_unknown_clocks() {
 fn catalogue_replacement_terminal_mdat_needs_actual_source_end_and_keeps_unknown_bound() {
     let b = Budget::new(64 << 20).unwrap();
     let (mut p, old) = player(&b, SourceId(9601), &gold::CASES[0], PlayerPolicy::default());
-    let raw = include_bytes!("fixtures/open-ended/regular-terminal.mp4");
+    let raw = include_bytes!("../fixtures/open-ended/regular-terminal.mp4");
     let (mut next, _) = progressive_candidate(&b, SourceId(9602), raw);
     let Engine::Mp4(engine) = next.as_ref().unwrap().engine() else {
         panic!()
@@ -1668,7 +1663,7 @@ fn progressive_range_seek_promotes_the_same_fragmented_entity_through_the_pump()
 fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges() {
     let b = Budget::new(64 << 20).unwrap();
     let id = SourceId(10402);
-    let raw = include_bytes!("fixtures/mp4/f-multitrack.mp4");
+    let raw = include_bytes!("../fixtures/mp4/f-multitrack.mp4");
     let (front, old) = open_progressive(&b, id, raw);
     let mut job = compat::mov::index_front(&front.movie, PlanLimits::default()).unwrap();
     let cancel = off();
@@ -1758,7 +1753,7 @@ fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges
     }
     assert!(finished);
     assert_eq!(first_request, Some(command.start_offset()));
-    let expected = include_str!("fixtures/mp4/f-multitrack.mp4.native-seek");
+    let expected = include_str!("../fixtures/mp4/f-multitrack.mp4.native-seek");
     assert_eq!(packets.len(), expected.lines().count());
     for (packet, row) in packets.iter().zip(expected.lines()) {
         let native = packet.occurrence.as_ref().unwrap();

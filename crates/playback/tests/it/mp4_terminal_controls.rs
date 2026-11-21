@@ -1,5 +1,5 @@
-mod common;
-use common::{View, collect, index_job, off, packets, run_open};
+use crate::support::terminal as gold;
+use crate::support::{View, collect, index_job, off, packets, run_open};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
@@ -17,8 +17,6 @@ use triergon_playback::{
     probe::SelectedInput,
     *,
 };
-mod terminal_golds;
-use terminal_golds as gold;
 const ID: SourceId = SourceId(7611);
 #[derive(Default)]
 struct Signals {
@@ -398,7 +396,7 @@ fn ordinary_progressive_native_context_stays_refused() {
     // cannot be passed to the new native attachment to manufacture that scope.
     let b = Budget::new(64 << 20).unwrap();
     let id = ID;
-    let raw = include_bytes!("fixtures/open-ended/regular-terminal.mp4");
+    let raw = include_bytes!("../fixtures/open-ended/regular-terminal.mp4");
     let source = ByteSource::new(id, Bytes::copy_from_slice(&b, raw).unwrap(), 7).unwrap();
     let input = InputCursor::new(
         &b,
@@ -569,10 +567,10 @@ fn native_terminal_foreign_end_source_pool_and_stale_request_cannot_finish() {
 fn native_zero_run_start_boundary_independent_of_tail_and_input_geometry() {
     let original = gold::case("open-ended--empty-sample-terminal");
     let cases: [&[u8]; 4] = [
-        include_bytes!("fixtures/native-terminal-controls/empty-plus-one-byte.mp4"),
-        include_bytes!("fixtures/native-terminal-controls/empty-plus31opaque.mp4"),
-        include_bytes!("fixtures/native-terminal-controls/empty-plus32771opaque.mp4"),
-        include_bytes!("fixtures/native-terminal-controls/empty-before-two-nonempty.mp4"),
+        include_bytes!("../fixtures/native-terminal-controls/empty-plus-one-byte.mp4"),
+        include_bytes!("../fixtures/native-terminal-controls/empty-plus31opaque.mp4"),
+        include_bytes!("../fixtures/native-terminal-controls/empty-plus32771opaque.mp4"),
+        include_bytes!("../fixtures/native-terminal-controls/empty-before-two-nonempty.mp4"),
     ];
     for raw in cases {
         for chunk in [1, 7, 4096] {
@@ -595,7 +593,7 @@ fn native_zero_run_start_boundary_independent_of_tail_and_input_geometry() {
 }
 #[test]
 fn source_keeps_nonempty_bytes_beyond_native_zero_run_start_boundary() {
-    let raw = include_bytes!("fixtures/native-terminal-controls/empty-before-two-nonempty.mp4");
+    let raw = include_bytes!("../fixtures/native-terminal-controls/empty-before-two-nonempty.mp4");
     let (mut native, _b, _s) = make(raw, false, 1, 1, true);
     let got = collect(&mut native, 1).unwrap();
     let (mut source, _b, _s) = make_mode(raw, false, 1, 1, true, false);
@@ -617,8 +615,8 @@ fn source_keeps_nonempty_bytes_beyond_native_zero_run_start_boundary() {
 #[test]
 fn native_seekable_header_rejects_zero_size_fragment_samples() {
     for raw in [
-        include_bytes!("fixtures/open-ended/empty-sample-terminal.mp4").as_slice(),
-        include_bytes!("fixtures/progressive/pending-empty-endpoint.mp4").as_slice(),
+        include_bytes!("../fixtures/open-ended/empty-sample-terminal.mp4").as_slice(),
+        include_bytes!("../fixtures/progressive/pending-empty-endpoint.mp4").as_slice(),
     ] {
         for chunk in [1, 7, 4096] {
             for work in [1, 4096] {
@@ -669,7 +667,7 @@ fn native_seekable_header_rejects_zero_size_fragment_samples() {
 
 #[test]
 fn native_header_rejects_explicit_and_default_zero_size_before_first_media() {
-    let raw = include_bytes!("fixtures/open-ended/empty-sample-terminal.mp4");
+    let raw = include_bytes!("../fixtures/open-ended/empty-sample-terminal.mp4");
     let trun = raw.windows(4).position(|bytes| bytes == b"trun").unwrap() - 4;
     let trex = raw.windows(4).position(|bytes| bytes == b"trex").unwrap() - 4;
     assert_eq!(
@@ -700,7 +698,7 @@ fn native_header_rejects_explicit_and_default_zero_size_before_first_media() {
 
 #[test]
 fn native_out_of_source_first_sample_requires_a_physical_end() {
-    let raw = include_bytes!("fixtures/mp4/bad-chunk-offset-outside-source.mov");
+    let raw = include_bytes!("../fixtures/mp4/bad-chunk-offset-outside-source.mov");
     for (random, known) in [(false, false), (false, true), (true, true)] {
         for chunk in [1, 7, 4096] {
             for work in [1, 4096] {
@@ -749,7 +747,7 @@ fn native_out_of_source_first_sample_requires_a_physical_end() {
 
 #[test]
 fn native_missing_first_sample_does_not_infer_end_from_starvation_or_layout() {
-    let raw = include_bytes!("fixtures/mp4/bad-chunk-offset-outside-source.mov");
+    let raw = include_bytes!("../fixtures/mp4/bad-chunk-offset-outside-source.mov");
     let (mut native, _, signals) =
         try_make_source_mode(raw, false, 7, 1, false, TestView::NativeRecovery, false).unwrap();
     for _ in 0..30_000 {
@@ -794,7 +792,7 @@ fn native_missing_first_sample_does_not_infer_end_from_starvation_or_layout() {
 
 #[test]
 fn strict_out_of_source_first_sample_waits_for_the_physical_end() {
-    let raw = include_bytes!("fixtures/mp4/bad-chunk-offset-outside-source.mov");
+    let raw = include_bytes!("../fixtures/mp4/bad-chunk-offset-outside-source.mov");
     for view in [TestView::Source, TestView::Native] {
         let (mut strict, _, signals) =
             try_make_source_mode(raw, false, 7, 1, false, view, false).unwrap();
@@ -835,7 +833,7 @@ fn strict_out_of_source_first_sample_waits_for_the_physical_end() {
 
 #[test]
 fn native_zero_timescale_keeps_the_declared_source_clock_unavailable() {
-    let raw = include_bytes!("fixtures/mp4/bad-zero-timescale.mov");
+    let raw = include_bytes!("../fixtures/mp4/bad-zero-timescale.mov");
     for (random, known) in [(false, false), (false, true), (true, true)] {
         for chunk in [1, 7, 4096] {
             for work in [1, 4096] {
@@ -894,9 +892,9 @@ fn native_zero_timescale_keeps_the_declared_source_clock_unavailable() {
 
 #[test]
 fn native_short_media_packet_requires_a_positive_prefix_at_eof() {
-    let regular = include_bytes!("fixtures/mp4/bad-truncate-final-byte.mov").as_slice();
+    let regular = include_bytes!("../fixtures/mp4/bad-truncate-final-byte.mov").as_slice();
     let fragment =
-        include_bytes!("fixtures/native-terminal-controls/short-before-empty.mp4").as_slice();
+        include_bytes!("../fixtures/native-terminal-controls/short-before-empty.mp4").as_slice();
     for (raw, start, random) in [
         (regular, 735, false),
         (regular, 735, true),
@@ -956,7 +954,7 @@ fn native_short_media_packet_requires_a_positive_prefix_at_eof() {
 
 #[test]
 fn native_short_packet_distinguishes_pending_failure_and_empty_eof() {
-    let raw = include_bytes!("fixtures/mp4/bad-truncate-final-byte.mov");
+    let raw = include_bytes!("../fixtures/mp4/bad-truncate-final-byte.mov");
     let (mut native, _, signals) =
         try_make_source_mode(raw, false, 7, 1, false, TestView::NativeRecovery, false).unwrap();
     for _ in 0..30_000 {
@@ -997,7 +995,7 @@ fn native_short_packet_distinguishes_pending_failure_and_empty_eof() {
 
 #[test]
 fn interior_zero_read_preserves_the_native_packet_prefix_and_source() {
-    let raw = include_bytes!("fixtures/native-terminal-controls/one-empty-between-nonempty.mp4");
+    let raw = include_bytes!("../fixtures/native-terminal-controls/one-empty-between-nonempty.mp4");
     for known in [false, true] {
         for chunk in [1, 7, 4096] {
             for work in [1, 4096] {
@@ -1060,7 +1058,7 @@ fn interior_zero_read_preserves_the_native_packet_prefix_and_source() {
 
 #[test]
 fn native_empty_run_tail_uses_the_greatest_completed_run_end_once() {
-    let raw = include_bytes!("fixtures/native-terminal-controls/one-empty-between-nonempty.mp4");
+    let raw = include_bytes!("../fixtures/native-terminal-controls/one-empty-between-nonempty.mp4");
     // Extend the second run of the last fragment by one sample. Update the
     // offsets of both fragments that share the final MDAT.
     let mut extended = raw.to_vec();
@@ -1192,7 +1190,7 @@ fn final_indexed_zero_read_leaves_the_source_open_for_a_later_fragment() {
 #[test]
 fn final_zero_read_at_media_end_keeps_later_indexed_payloads() {
     let raw =
-        include_bytes!("fixtures/native-terminal-controls/later-run-zero-next-indexed-mdat.mp4");
+        include_bytes!("../fixtures/native-terminal-controls/later-run-zero-next-indexed-mdat.mp4");
     for known in [false, true] {
         let (mut source, _, _) = make_mode(raw, known, 7, 1, true, false);
         let literal = collect(&mut source, 1).unwrap();
@@ -1312,7 +1310,7 @@ fn check_reversed_fragment_source(native: &[Output], literal: &[Output]) {
 
 #[test]
 fn native_from_start_origin_never_claims_complete_entity_or_source_clock() {
-    let raw = include_bytes!("fixtures/native-terminal-controls/first-source-clock-unknown.mp4");
+    let raw = include_bytes!("../fixtures/native-terminal-controls/first-source-clock-unknown.mp4");
     let (mut p, _b, s) = make(raw, false, 1, 1, false);
     let mut out = Vec::new();
     for _ in 0..300_000 {

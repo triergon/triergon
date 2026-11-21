@@ -102,4 +102,4 @@ pub fn case(name: &str) -> &'static Case {
         .unwrap_or_else(|| panic!("no FFprobe record for {name}"))
 }
 
-include!("../fixtures/native_terminal_golds.rs");
+include!("../../fixtures/native_terminal_golds.rs");

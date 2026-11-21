@@ -1,5 +1,5 @@
-mod common;
-use common::{collect, off, packets, run_open};
+use crate::support::golds::progressive as art;
+use crate::support::{collect, off, packets, run_open};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -13,9 +13,6 @@ use triergon_playback::{
     probe::SelectedInput,
     *,
 };
-mod art {
-    include!("fixtures/progressive/source_golds.rs");
-}
 const ID: SourceId = SourceId(6301);
 struct Transport {
     bytes: ByteSource,
@@ -338,7 +335,7 @@ fn pending_moofs_nonseekable_refusal_preserves_live_source_fence() {
 
 #[test]
 fn pending_moofs_empty_samples_at_media_endpoint_keep_source_declarations() {
-    let raw = include_bytes!("fixtures/progressive/pending-empty-endpoint.mp4");
+    let raw = include_bytes!("../fixtures/progressive/pending-empty-endpoint.mp4");
     let (mut p, b, _, _) = make(raw, ProgressiveLimits::default());
     let out = collect(&mut p, 1).unwrap();
     let got = packets(&out);

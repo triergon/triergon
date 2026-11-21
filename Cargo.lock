@@ -165,6 +165,7 @@ dependencies = [
  "triergon-mpegts",
  "triergon-playback",
  "triergon-raw-video",
+ "triergon-session",
  "triergon-subtitles",
 ]
 
@@ -380,15 +381,10 @@ version = "0.0.0"
 name = "triergon-playback"
 version = "0.0.0"
 dependencies = [
- "triergon-bridge",
  "triergon-core",
- "triergon-framing",
  "triergon-isobmff",
  "triergon-matroska",
  "triergon-mpegts",
- "triergon-raw-video",
- "triergon-session",
- "triergon-subtitles",
 ]
 
 [[package]]

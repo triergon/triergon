@@ -1,0 +1,29 @@
+//! Integration tests of the playback engines, player and pump.
+#![forbid(unsafe_code)]
+mod compat_pes;
+mod compat_pes_program;
+mod compat_pes_startup;
+mod matroska;
+mod mp4_admission;
+mod mp4_catalogue;
+mod mp4_forward_edits;
+mod mp4_movie_seek;
+mod mp4_open_ended;
+mod mp4_pending_moofs;
+mod mp4_pending_storage;
+mod mp4_progressive;
+mod mp4_range;
+mod mp4_source;
+mod mp4_sync_seek;
+mod mp4_terminal_controls;
+mod mp4_terminal_mdat;
+mod native_terminal_matrix;
+mod player_lifecycle;
+mod probe;
+mod probe_retry;
+mod pump;
+mod seek_and_select;
+mod support;
+mod ts_entities;
+mod ts_source;
+mod views;

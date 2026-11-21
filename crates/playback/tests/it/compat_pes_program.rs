@@ -1,5 +1,4 @@
-mod common;
-use common::collect;
+use crate::support::collect;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, SourceCapabilities, SourceId, Time, WorkBudget,
@@ -21,9 +20,9 @@ use triergon_playback::{compat::pes::Carriage, compat::pes::PidSelection};
 const ENTITY: SourceId = SourceId(77);
 const NAMESPACE: DescriptorNamespace =
     DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile);
-const MIXED: &[u8] = include_bytes!("fixtures/ts/program-private-avc-dvb.ts");
-const RETYPE: &[u8] = include_bytes!("fixtures/ts/program-pmt-retype.ts");
-const EOF: &[u8] = include_bytes!("fixtures/ts/program-eof-avc-aac.ts");
+const MIXED: &[u8] = include_bytes!("../fixtures/ts/program-private-avc-dvb.ts");
+const RETYPE: &[u8] = include_bytes!("../fixtures/ts/program-pmt-retype.ts");
+const EOF: &[u8] = include_bytes!("../fixtures/ts/program-eof-avc-aac.ts");
 const AVC: PidSelection = PidSelection {
     pid: 256,
     carriage: Carriage::Registered(RegisteredCarriage::Avc),
@@ -166,7 +165,7 @@ fn segment_player(raw: &[u8], quantum: usize) -> (Player<ByteSource>, Budget) {
 
 #[test]
 fn independent_ts_segment_refuses_multiple_programs_or_missing_pmt() {
-    let multi = include_bytes!("../../mpegts/tests/data/pat-atomic-two-sections.ts");
+    let multi = include_bytes!("../../../mpegts/tests/data/pat-atomic-two-sections.ts");
     for (raw, expected) in [
         (
             multi.as_slice(),

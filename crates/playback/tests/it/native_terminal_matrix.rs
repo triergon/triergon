@@ -9,11 +9,9 @@
 //! delivers is projected into FFprobe's packet object and compared field by
 //! field, and where FFprobe refused the header the run must refuse while
 //! opening, before any packet.
-mod common;
-mod terminal_golds;
 
-use common::{View, byte_input, index_job, read_units, run_index, run_open};
-use terminal_golds::{CASES, Case, Packet, Probe};
+use crate::support::terminal::{CASES, Case, Packet, Probe};
+use crate::support::{View, byte_input, index_job, read_units, run_index, run_open};
 use triergon_core::{Budget, Error, SourceCapabilities, SourceId, TimeBase};
 use triergon_isobmff::compat::mov::packets::PacketOccurrence;
 use triergon_playback::{

@@ -1,5 +1,4 @@
-mod common;
-use common::{byte_input, run_open};
+use crate::support::{byte_input, run_open};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, SourceCapabilities, SourceId, WorkBudget};
 use triergon_playback::compat;
@@ -8,11 +7,8 @@ use triergon_playback::{
     mp4::{Mp4Open, OpenLimits, OpenedMp4, PlanLimits},
 };
 
-const REGULAR: &[u8] = include_bytes!("fixtures/open-ended/regular-terminal.mp4");
-#[allow(dead_code)]
-mod original_source_gold {
-    include!("fixtures/mp4_golds.rs");
-}
+const REGULAR: &[u8] = include_bytes!("../fixtures/open-ended/regular-terminal.mp4");
+use crate::support::golds::mp4 as original_source_gold;
 
 fn open(raw: &[u8], known: bool) -> (OpenedMp4<ByteSource>, Budget) {
     let pool = Budget::new(64 << 20).unwrap();
@@ -80,7 +76,7 @@ fn default_native_terminal_refusal_stays_explicit() {
 
 #[test]
 fn finite_initial_native_front_plan_cannot_use_unattached_indexed_end() {
-    let raw = include_bytes!("fixtures/open-ended/pending-terminal.mp4");
+    let raw = include_bytes!("../fixtures/open-ended/pending-terminal.mp4");
     let (opened, _pool) = open(raw, false);
     let mut job = compat::mov::index_front(&opened.movie, PlanLimits::default()).unwrap();
     while !job

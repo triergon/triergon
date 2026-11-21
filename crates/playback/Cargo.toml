@@ -13,12 +13,6 @@ triergon-matroska = { path = "../matroska" }
 triergon-isobmff = { path = "../isobmff" }
 triergon-mpegts = { path = "../mpegts" }
 
-[dev-dependencies]
-triergon-bridge = { path = "../bridge" }
-triergon-framing = { path = "../framing" }
-triergon-raw-video = { path = "../raw-video" }
-triergon-subtitles = { path = "../subtitles" }
-triergon-session = { path = "../session", features = ["codecs"] }
 
 [features]
 # Comparison-only projections the harness compares against the reference; not

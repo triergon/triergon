@@ -1,5 +1,5 @@
-mod common;
-use common::{off, packets, read};
+use crate::support::golds::progressive as gold;
+use crate::support::{off, packets, read};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -16,9 +16,6 @@ use triergon_playback::{
     probe::SelectedInput,
     *,
 };
-mod gold {
-    include!("fixtures/progressive/source_golds.rs");
-}
 const ID: SourceId = SourceId(6501);
 struct Signals {
     gate: AtomicUsize,
@@ -253,7 +250,7 @@ fn pending_storage_growth_refusal_retries_without_ordinal_commit() {
 }
 #[test]
 fn pending_storage_one_slot_recycles_across_ten_real_fragment_batches() {
-    let raw = include_bytes!("fixtures/progressive/ten-sequential-batches.mp4");
+    let raw = include_bytes!("../fixtures/progressive/ten-sequential-batches.mp4");
     let (mut p, b, _) = player(
         raw,
         ProgressiveLimits {

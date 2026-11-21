@@ -1,7 +1,7 @@
 //! PGS and teletext from TS, DVD subtitles from MP4 and closed captions from
 //! MP4 video, each through its playback bridge. Fixtures and expected values:
 //! `fixtures/subtitles/README.md`.
-use crate::common::{collect, off, run_open};
+use crate::support::{collect, off, run_open};
 use triergon_bridge::{
     bitmap::{DvdReceiver, DvdReceiverStep, PgsBridge, PgsQueueAction, PgsStep},
     caption::{CaptionBridge, CaptionStep, CaptionUnit, CaptionVideo},

@@ -18,8 +18,9 @@ pub enum Mp4CatalogueMode {
     Indexed,
     /// A progressive plan, as [`Engine::mp4_progressive`] plays it.
     Progressive(ProgressiveLimits),
-    /// Explicit native view of a nonseekable MP4 starting with front metadata.
-    NativeTerminalV1(ProgressiveLimits),
+    /// The demux view of a nonseekable MP4 whose metadata precedes its media, as
+    /// [`compat::mov::open_front`](crate::compat::mov::open_front) plays it.
+    Front(ProgressiveLimits),
 }
 
 /// Where the outputs of a replacement catalogue begin.
@@ -65,7 +66,7 @@ impl<S: Source> Mp4Catalogue<S> {
             Mp4CatalogueMode::Progressive(limits) => {
                 Engine::mp4_progressive(opened.input, plan, maximum_packet, limits)?
             }
-            Mp4CatalogueMode::NativeTerminalV1(limits) => {
+            Mp4CatalogueMode::Front(limits) => {
                 Engine::mp4_front(opened.input, plan, maximum_packet, limits)?
             }
         };

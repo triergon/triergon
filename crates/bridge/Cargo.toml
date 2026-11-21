@@ -19,6 +19,9 @@ triergon-playback = { path = "../playback" }
 triergon-raw-video = { path = "../raw-video" }
 triergon-subtitles = { path = "../subtitles" }
 
+[dev-dependencies]
+triergon-session = { path = "../session", features = ["codecs"] }
+
 [features]
 # Comparison-only projections the harness compares against the reference; not
 # shipped behaviour.
