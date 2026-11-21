@@ -218,7 +218,10 @@ impl<R: Read> InputFeeder<R> {
             false,
         )
     }
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the one feed loop behind every header, body and discard read takes its mode as arguments"
+    )]
     fn advance_with(
         &mut self,
         input: &mut InputCursor,
