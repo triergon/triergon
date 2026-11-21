@@ -159,14 +159,23 @@ preceding access unit is refused. Clock-wrap ambiguity within the selected epoch
 remains a refusal. These source facts are independent of input generations and
 PMT version numbers.
 
-This operation scans and replays one length-known, seekable entity from its
-start. Replay publishes the original PAT, PMTs and clock transitions, and
+This operation scans and replays from the start.
+`request_seek_in_entities_in_epoch` accepts an ordered `SeekEntity` plan,
+including boundaries inside a PES. Replay publishes the original PAT, PMTs and clock transitions, and
 selected-epoch `VideoHeaders` before the landing, so decoder setup retains its
 source order. The landing packet and the complete following suffix keep their
 bytes, PTS, DTS, track configuration and PES ranges, including subsequent epoch
 changes. The caller supplies any additional decoder configuration needed at the
-landing. Explicit epoch seeks do not use the timestamp-only index or retained
-suffix optimisation. The source must remain stable between scan and replay.
+landing. `request_seek_in_epoch_and_index` and
+`request_seek_in_entities_in_epoch_and_index` cache a bounded index for the
+selected pair. Reuse requires the same track, epoch pair and exact ordered source
+identities and lengths. Equal landing times select the last eligible unit.
+Unordered times or exhausted index bounds fall back to scanning. Explicit epoch
+indexes replay from the start to reconstruct state. Timestamp-only requests never
+reuse an explicit-epoch index. Sources must remain stable between requests.
+Reader tests cover indexed epoch selection across TS188/M2TS192 entity plans,
+codec changes and exact packet suffix facts; these combinations have no matched
+reference or native runtime and memory qualification.
 
 The epoch distinction follows [H.222.0 (08/2023)](https://www.itu.int/rec/T-REC-H.222.0-202308-S/en)
 §2.4.3.5 (a signalled PCR discontinuity starts a new system time base) and
@@ -174,9 +183,10 @@ The epoch distinction follows [H.222.0 (08/2023)](https://www.itu.int/rec/T-REC-
 is a reader policy; it does not alter those source facts or normalize timestamps.
 
 The required [picture comparison](../../harness/features/mpegts-previous-picture/contract.json)
-covers eight explicit-epoch AVC seeks against the pinned FFmpeg formats build:
+covers 36 explicit-epoch AVC seeks against the pinned FFmpeg formats build:
 a clock change or same-codec PMT descriptor change, each in TS188 and M2TS192,
-with both seek policies. Each picture has its own PES. Both workers scan the full
+with both seek policies, ordered entity splits and repeated indexed seeks.
+Equal-PTS controls put overlapping epochs in separate entities. Each picture has its own PES. Both workers scan the full
 stable input through EOF and replay every suffix packet, comparing the requested,
 landing and discard times, PTS, effective DTS, random-access flags and all bytes.
 The candidate selects the source epoch pair; the reference selects landing
