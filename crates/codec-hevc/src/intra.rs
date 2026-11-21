@@ -7,11 +7,16 @@
 use crate::picture::{Pixel, Plane};
 use crate::tables::{INTRA_PRED_ANGLE, INV_ANGLE};
 
-pub const MAX_REF: usize = 4 * 32 + 1;
+pub(crate) const MAX_REF: usize = 4 * 32 + 1;
 
 /// Reference sample substitution (8.4.4.2.2). `avail[i]` marks availability per sample.
 #[inline(never)]
-pub fn substitute(r: &mut [i32; MAX_REF], avail: &[bool; MAX_REF], n: usize, bit_depth: u32) {
+pub(crate) fn substitute(
+    r: &mut [i32; MAX_REF],
+    avail: &[bool; MAX_REF],
+    n: usize,
+    bit_depth: u32,
+) {
     let len = 4 * n + 1;
     let first = avail[..len].iter().position(|&a| a);
     match first {
@@ -35,7 +40,13 @@ pub fn substitute(r: &mut [i32; MAX_REF], avail: &[bool; MAX_REF], n: usize, bit
 
 /// Filtering of neighbouring samples (8.4.4.2.3), luma only (ChromaArrayType 1).
 #[inline(never)]
-pub fn filter(r: &mut [i32; MAX_REF], n: usize, mode: u32, strong_enabled: bool, bit_depth: u32) {
+pub(crate) fn filter(
+    r: &mut [i32; MAX_REF],
+    n: usize,
+    mode: u32,
+    strong_enabled: bool,
+    bit_depth: u32,
+) {
     if mode == 1 || n == 4 {
         return;
     }
@@ -90,7 +101,7 @@ fn top(r: &[i32; MAX_REF], n: usize, x: usize) -> i32 {
 
 /// Predict an NxN block into `plane` at (x0, y0).
 #[inline(never)]
-pub fn predict<P: Pixel>(
+pub(crate) fn predict<P: Pixel>(
     r: &[i32; MAX_REF],
     n: usize,
     mode: u32,

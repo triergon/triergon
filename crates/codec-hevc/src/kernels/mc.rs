@@ -189,14 +189,14 @@ use std::simd::simd_swizzle;
 
 /// Output destination for a block: (pred buffer, stride 64), (dst, offset, stride), other.
 pub(super) struct BlockOut<'a> {
-    pub pred: &'a mut [i16],
-    pub dst: &'a mut [u8],
-    pub dst_off: usize,
-    pub dst_stride: usize,
-    pub other: &'a [i16],
+    pub(crate) pred: &'a mut [i16],
+    pub(crate) dst: &'a mut [u8],
+    pub(crate) dst_off: usize,
+    pub(crate) dst_stride: usize,
+    pub(crate) other: &'a [i16],
     /// Samples stored to `dst` per 8-lane strip: 8, or 4 for the last strip of a block
     /// whose width is 4 mod 8 (prediction-buffer stores always write 8 lanes).
-    pub n: usize,
+    pub(crate) n: usize,
 }
 
 #[inline(always)]
@@ -542,11 +542,11 @@ fn sum4w(w: &[U32x8; 4], m: &[U32x8; 4]) -> I32x8 {
 }
 
 pub(super) struct BlockOut16<'a> {
-    pub pred: &'a mut [i16],
-    pub dst: &'a mut [u16],
-    pub dst_off: usize,
-    pub dst_stride: usize,
-    pub other: &'a [i16],
+    pub(crate) pred: &'a mut [i16],
+    pub(crate) dst: &'a mut [u16],
+    pub(crate) dst_off: usize,
+    pub(crate) dst_stride: usize,
+    pub(crate) other: &'a [i16],
 }
 
 #[derive(Clone, Copy)]

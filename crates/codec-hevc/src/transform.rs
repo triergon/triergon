@@ -110,13 +110,13 @@ pass_n!(pass32, 32, pass16, 1);
 
 /// Reusable transform temporaries (no per-block initialization).
 #[derive(Debug)]
-pub struct TransformScratch {
+pub(crate) struct TransformScratch {
     gt: Vec<i32>,
     out: Vec<i32>,
 }
 
 impl TransformScratch {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         TransformScratch {
             gt: vec![0; 32 * 32],
             out: vec![0; 32 * 32],
@@ -197,7 +197,7 @@ fn idst4(coef: &[i32], bd_shift: u32, res: &mut [i32]) {
 /// `coef` holds scaled coefficients d (clause 8.6.3 output).
 #[inline(never)]
 #[allow(clippy::too_many_arguments)]
-pub fn inverse_transform(
+pub(crate) fn inverse_transform(
     coef: &[i32],
     log2: u32,
     max_x: usize,
@@ -222,7 +222,7 @@ pub fn inverse_transform(
 
 /// DC-only inverse DCT value (all residual samples equal).
 #[inline]
-pub fn dc_only_value(dc: i32, bit_depth: u32) -> i32 {
+pub(crate) fn dc_only_value(dc: i32, bit_depth: u32) -> i32 {
     let bd_shift = 20 - bit_depth;
     let g = clip16((64 * dc + 64) >> 7);
     (64 * g + (1 << (bd_shift - 1))) >> bd_shift
@@ -230,7 +230,7 @@ pub fn dc_only_value(dc: i32, bit_depth: u32) -> i32 {
 
 /// Transform skip residual (8-298, 8-299) for nTbS = 4: r = (d << 7 + rnd) >> bdShift.
 #[inline(never)]
-pub fn transform_skip(coef: &[i32], log2: u32, bit_depth: u32, res: &mut [i32]) {
+pub(crate) fn transform_skip(coef: &[i32], log2: u32, bit_depth: u32, res: &mut [i32]) {
     let n = 1usize << log2;
     let ts_shift = 5 + log2;
     let bd_shift = 20 - bit_depth;
@@ -242,7 +242,7 @@ pub fn transform_skip(coef: &[i32], log2: u32, bit_depth: u32, res: &mut [i32]) 
 
 /// Add a residual block to the prediction already stored in the plane (8.6.7), clipping.
 #[inline]
-pub fn add_residual<P: Pixel>(
+pub(crate) fn add_residual<P: Pixel>(
     plane: &mut Plane<P>,
     x0: usize,
     y0: usize,
@@ -262,7 +262,7 @@ pub fn add_residual<P: Pixel>(
 }
 
 #[inline]
-pub fn add_constant<P: Pixel>(
+pub(crate) fn add_constant<P: Pixel>(
     plane: &mut Plane<P>,
     x0: usize,
     y0: usize,

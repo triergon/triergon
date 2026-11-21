@@ -5,82 +5,82 @@ use crate::error::{DecodeError, Result};
 use crate::ps::{Pps, ShortTermRps, Sps, parse_st_rps};
 use triergon_framing::hevc;
 
-pub const SLICE_B: u8 = 0;
-pub const SLICE_P: u8 = 1;
-pub const SLICE_I: u8 = 2;
+pub(crate) const SLICE_B: u8 = 0;
+pub(crate) const SLICE_P: u8 = 1;
+pub(crate) const SLICE_I: u8 = 2;
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct LongTermEntry {
-    pub poc_lsb: u32,
-    pub used_by_curr: bool,
-    pub msb_present: bool,
-    pub delta_poc_msb_cycle: u32,
+pub(crate) struct LongTermEntry {
+    pub(crate) poc_lsb: u32,
+    pub(crate) used_by_curr: bool,
+    pub(crate) msb_present: bool,
+    pub(crate) delta_poc_msb_cycle: u32,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct WeightEntry {
-    pub luma_weight: i32,
-    pub luma_offset: i32,
-    pub chroma_weight: [i32; 2],
-    pub chroma_offset: [i32; 2],
+pub(crate) struct WeightEntry {
+    pub(crate) luma_weight: i32,
+    pub(crate) luma_offset: i32,
+    pub(crate) chroma_weight: [i32; 2],
+    pub(crate) chroma_offset: [i32; 2],
     /// luma_weight_flag || chroma_weight_flag (explicit weights differ from default).
-    pub present: bool,
+    pub(crate) present: bool,
 }
 
 #[derive(Clone, Debug)]
-pub struct PredWeightTable {
-    pub luma_log2_denom: u32,
-    pub chroma_log2_denom: u32,
-    pub l: [[WeightEntry; 16]; 2],
+pub(crate) struct PredWeightTable {
+    pub(crate) luma_log2_denom: u32,
+    pub(crate) chroma_log2_denom: u32,
+    pub(crate) l: [[WeightEntry; 16]; 2],
 }
 
 #[derive(Clone, Debug)]
-pub struct SliceHeader {
-    pub nal_unit_type: u8,
-    pub temporal_id: u8,
-    pub first_slice_segment_in_pic: bool,
-    pub no_output_of_prior_pics: bool,
-    pub pps_id: u8,
-    pub dependent_slice_segment: bool,
-    pub segment_address: u32,
-    pub slice_type: u8,
-    pub pic_output_flag: bool,
-    pub poc_lsb: u32,
-    pub st_rps: ShortTermRps,
+pub(crate) struct SliceHeader {
+    pub(crate) nal_unit_type: u8,
+    pub(crate) temporal_id: u8,
+    pub(crate) first_slice_segment_in_pic: bool,
+    pub(crate) no_output_of_prior_pics: bool,
+    pub(crate) pps_id: u8,
+    pub(crate) dependent_slice_segment: bool,
+    pub(crate) segment_address: u32,
+    pub(crate) slice_type: u8,
+    pub(crate) pic_output_flag: bool,
+    pub(crate) poc_lsb: u32,
+    pub(crate) st_rps: ShortTermRps,
     /// The num_long_term_sps + num_long_term_pics entries (at most 32).
-    pub long_term: [LongTermEntry; 32],
-    pub num_long_term: usize,
-    pub num_long_term_sps: u32,
-    pub temporal_mvp: bool,
-    pub sao_luma: bool,
-    pub sao_chroma: bool,
-    pub num_ref_idx: [u32; 2],
-    pub rpl_mod: [bool; 2],
-    pub list_entry: [[u8; 16]; 2],
-    pub mvd_l1_zero: bool,
-    pub cabac_init: bool,
-    pub collocated_from_l0: bool,
-    pub collocated_ref_idx: u32,
-    pub pwt: Option<PredWeightTable>,
-    pub max_num_merge_cand: u32,
-    pub slice_qp: i32,
-    pub cb_qp_offset: i32,
-    pub cr_qp_offset: i32,
-    pub deblocking_disabled: bool,
-    pub beta_offset_div2: i32,
-    pub tc_offset_div2: i32,
-    pub loop_filter_across_slices: bool,
+    pub(crate) long_term: [LongTermEntry; 32],
+    pub(crate) num_long_term: usize,
+    pub(crate) num_long_term_sps: u32,
+    pub(crate) temporal_mvp: bool,
+    pub(crate) sao_luma: bool,
+    pub(crate) sao_chroma: bool,
+    pub(crate) num_ref_idx: [u32; 2],
+    pub(crate) rpl_mod: [bool; 2],
+    pub(crate) list_entry: [[u8; 16]; 2],
+    pub(crate) mvd_l1_zero: bool,
+    pub(crate) cabac_init: bool,
+    pub(crate) collocated_from_l0: bool,
+    pub(crate) collocated_ref_idx: u32,
+    pub(crate) pwt: Option<PredWeightTable>,
+    pub(crate) max_num_merge_cand: u32,
+    pub(crate) slice_qp: i32,
+    pub(crate) cb_qp_offset: i32,
+    pub(crate) cr_qp_offset: i32,
+    pub(crate) deblocking_disabled: bool,
+    pub(crate) beta_offset_div2: i32,
+    pub(crate) tc_offset_div2: i32,
+    pub(crate) loop_filter_across_slices: bool,
     /// Byte offset of slice_segment_data() within the RBSP (header bytes excluded).
-    pub data_offset: usize,
+    pub(crate) data_offset: usize,
     /// SliceAddrRs of the slice containing this segment.
-    pub slice_addr_rs: u32,
+    pub(crate) slice_addr_rs: u32,
 }
 
 impl SliceHeader {
-    pub fn long_term(&self) -> &[LongTermEntry] {
+    pub(crate) fn long_term(&self) -> &[LongTermEntry] {
         &self.long_term[..self.num_long_term]
     }
-    pub fn num_pic_total_curr(&self) -> u32 {
+    pub(crate) fn num_pic_total_curr(&self) -> u32 {
         let mut n = 0;
         n += self.st_rps.used[..self.st_rps.num_delta_pocs()]
             .iter()
@@ -104,7 +104,7 @@ fn ceil_log2(v: u32) -> u32 {
 }
 
 /// Peek the PPS id and first_slice_segment_in_pic_flag without full parsing.
-pub fn peek_pps_id(rbsp: &[u8], nal_unit_type: u8) -> Result<(bool, u8)> {
+pub(crate) fn peek_pps_id(rbsp: &[u8], nal_unit_type: u8) -> Result<(bool, u8)> {
     let mut r = BitCursor::new(rbsp);
     let first = r.flag()?;
     if hevc::is_irap(nal_unit_type) {
@@ -169,7 +169,7 @@ fn parse_pwt(r: &mut BitCursor<'_>, sh: &SliceHeader) -> Result<PredWeightTable>
 
 /// Parse a slice segment header. `prev` is the header of the preceding independent slice
 /// segment of the same picture (required for dependent slice segments).
-pub fn parse_slice_header(
+pub(crate) fn parse_slice_header(
     rbsp: &[u8],
     nal_unit_type: u8,
     temporal_id: u8,

@@ -40,45 +40,45 @@ const Z4: [u8; 256] = {
     t
 };
 
-pub const PART_2NX2N: u8 = 0;
-pub const PART_2NXN: u8 = 1;
-pub const PART_NX2N: u8 = 2;
-pub const PART_NXN: u8 = 3;
-pub const PART_2NXNU: u8 = 4;
-pub const PART_2NXND: u8 = 5;
-pub const PART_NLX2N: u8 = 6;
-pub const PART_NRX2N: u8 = 7;
+pub(crate) const PART_2NX2N: u8 = 0;
+pub(crate) const PART_2NXN: u8 = 1;
+pub(crate) const PART_NX2N: u8 = 2;
+pub(crate) const PART_NXN: u8 = 3;
+pub(crate) const PART_2NXNU: u8 = 4;
+pub(crate) const PART_2NXND: u8 = 5;
+pub(crate) const PART_NLX2N: u8 = 6;
+pub(crate) const PART_NRX2N: u8 = 7;
 
 #[derive(Clone, Copy)]
-pub struct RefEntry<'a, P> {
-    pub frame: Option<&'a Frame<P>>,
-    pub poc: i32,
-    pub lt: bool,
+pub(crate) struct RefEntry<'a, P> {
+    pub(crate) frame: Option<&'a Frame<P>>,
+    pub(crate) poc: i32,
+    pub(crate) lt: bool,
 }
 
-pub struct RefLists<'a, P> {
-    pub list: [[RefEntry<'a, P>; 16]; 2],
-    pub num: [usize; 2],
-    pub col: Option<&'a ColMotion>,
-    pub col_poc: i32,
-    pub no_backward_pred: bool,
+pub(crate) struct RefLists<'a, P> {
+    pub(crate) list: [[RefEntry<'a, P>; 16]; 2],
+    pub(crate) num: [usize; 2],
+    pub(crate) col: Option<&'a ColMotion>,
+    pub(crate) col_poc: i32,
+    pub(crate) no_backward_pred: bool,
 }
 
 #[derive(Debug)]
-pub struct Scratch<P> {
-    pub coeffs: Vec<i32>,
-    pub res: Vec<i32>,
-    pub pred: [Vec<i16>; 2],
-    pub mc: McScratch<P>,
-    pub tr: transform::TransformScratch,
+pub(crate) struct Scratch<P> {
+    pub(crate) coeffs: Vec<i32>,
+    pub(crate) res: Vec<i32>,
+    pub(crate) pred: [Vec<i16>; 2],
+    pub(crate) mc: McScratch<P>,
+    pub(crate) tr: transform::TransformScratch,
     /// SAO source band (deblocked samples of one CTB row plus a line above and below) and
     /// the saved last deblocked line of the previous row, per component.
-    pub band: Option<Frame<P>>,
-    pub saved: [BudgetVec<P>; 3],
+    pub(crate) band: Option<Frame<P>>,
+    pub(crate) saved: [BudgetVec<P>; 3],
 }
 
 impl<P: Pixel> Scratch<P> {
-    pub fn new(budget: &Budget) -> Self {
+    pub(crate) fn new(budget: &Budget) -> Self {
         Scratch {
             coeffs: vec![0; 32 * 32],
             res: vec![0; 32 * 32],
@@ -105,7 +105,7 @@ struct Cu {
     chroma_mode: u32,
 }
 
-pub struct SliceDecoder<'a, P: Pixel> {
+pub(crate) struct SliceDecoder<'a, P: Pixel> {
     sps: &'a Sps,
     pps: &'a Pps,
     sh: &'a SliceHeader,
@@ -151,7 +151,7 @@ pub struct SliceDecoder<'a, P: Pixel> {
 
 impl<'a, P: Pixel> SliceDecoder<'a, P> {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub(crate) fn new(
         sps: &'a Sps,
         pps: &'a Pps,
         sh: &'a SliceHeader,
@@ -317,7 +317,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
         init_contexts(&mut self.c, self.sh.slice_qp, self.init_type);
     }
 
-    pub fn decode(&mut self) -> Result<()> {
+    pub(crate) fn decode(&mut self) -> Result<()> {
         let sps = self.sps;
         let pps = self.pps;
         let layout = self.layout;

@@ -59,17 +59,17 @@ const fn ver_scan<const N: usize, const NN: usize>() -> [(u8, u8); NN] {
     out
 }
 
-pub const DIAG_SCAN_2X2: [(u8, u8); 4] = diag_scan::<2, 4>();
-pub const DIAG_SCAN_4X4: [(u8, u8); 16] = diag_scan::<4, 16>();
-pub const DIAG_SCAN_8X8: [(u8, u8); 64] = diag_scan::<8, 64>();
-pub const HOR_SCAN_2X2: [(u8, u8); 4] = hor_scan::<2, 4>();
-pub const HOR_SCAN_4X4: [(u8, u8); 16] = hor_scan::<4, 16>();
-pub const VER_SCAN_2X2: [(u8, u8); 4] = ver_scan::<2, 4>();
-pub const VER_SCAN_4X4: [(u8, u8); 16] = ver_scan::<4, 16>();
-pub const SINGLE: [(u8, u8); 1] = [(0, 0)];
+pub(crate) const DIAG_SCAN_2X2: [(u8, u8); 4] = diag_scan::<2, 4>();
+pub(crate) const DIAG_SCAN_4X4: [(u8, u8); 16] = diag_scan::<4, 16>();
+pub(crate) const DIAG_SCAN_8X8: [(u8, u8); 64] = diag_scan::<8, 64>();
+pub(crate) const HOR_SCAN_2X2: [(u8, u8); 4] = hor_scan::<2, 4>();
+pub(crate) const HOR_SCAN_4X4: [(u8, u8); 16] = hor_scan::<4, 16>();
+pub(crate) const VER_SCAN_2X2: [(u8, u8); 4] = ver_scan::<2, 4>();
+pub(crate) const VER_SCAN_4X4: [(u8, u8); 16] = ver_scan::<4, 16>();
+pub(crate) const SINGLE: [(u8, u8); 1] = [(0, 0)];
 
 /// Sub-block scans indexed by [log2TrafoSize - 2][scanIdx] (ScanOrder[log2-2][scanIdx]).
-pub fn sub_block_scan(log2_size_minus2: u32, scan_idx: u32) -> &'static [(u8, u8)] {
+pub(crate) fn sub_block_scan(log2_size_minus2: u32, scan_idx: u32) -> &'static [(u8, u8)] {
     match (log2_size_minus2, scan_idx) {
         (0, _) => &SINGLE,
         (1, 0) => &DIAG_SCAN_2X2,
@@ -81,7 +81,7 @@ pub fn sub_block_scan(log2_size_minus2: u32, scan_idx: u32) -> &'static [(u8, u8
 }
 
 /// Position-in-sub-block scans, ScanOrder[2][scanIdx], packed as (y << 2) | x.
-pub const SCAN_POS_4X4: [[u8; 16]; 3] = {
+pub(crate) const SCAN_POS_4X4: [[u8; 16]; 3] = {
     let mut out = [[0u8; 16]; 3];
     let mut i = 0;
     while i < 16 {
@@ -94,7 +94,7 @@ pub const SCAN_POS_4X4: [[u8; 16]; 3] = {
 };
 
 /// Table 7-6 default intra scaling list (matrixId 0..2), sizeId 1..3, in diagonal order.
-pub const DEFAULT_SCALING_INTRA: [u8; 64] = [
+pub(crate) const DEFAULT_SCALING_INTRA: [u8; 64] = [
     16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 16, 17, 16, 17, 18, //
     17, 18, 18, 17, 18, 21, 19, 20, 21, 20, 19, 21, 24, 22, 22, 24, //
     24, 22, 22, 24, 25, 25, 27, 30, 27, 25, 25, 29, 31, 35, 35, 31, //
@@ -102,7 +102,7 @@ pub const DEFAULT_SCALING_INTRA: [u8; 64] = [
 ];
 
 /// Table 7-6 default inter scaling list (matrixId 3..5).
-pub const DEFAULT_SCALING_INTER: [u8; 64] = [
+pub(crate) const DEFAULT_SCALING_INTER: [u8; 64] = [
     16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 18, //
     18, 18, 18, 18, 18, 20, 20, 20, 20, 20, 20, 20, 24, 24, 24, 24, //
     24, 24, 24, 24, 25, 25, 25, 25, 25, 25, 25, 28, 28, 28, 28, 28, //
@@ -111,7 +111,7 @@ pub const DEFAULT_SCALING_INTER: [u8; 64] = [
 
 /// sigCtx pattern (9-45 .. 9-48) for log2TrafoSize > 2, indexed by prevCsbf and the
 /// in-sub-block position (yP << 2) | xP.
-pub const SIG_PATTERN: [[u8; 16]; 4] = {
+pub(crate) const SIG_PATTERN: [[u8; 16]; 4] = {
     let mut t = [[0u8; 16]; 4];
     let mut p = 0;
     while p < 16 {
@@ -145,11 +145,11 @@ pub const SIG_PATTERN: [[u8; 16]; 4] = {
 };
 
 /// Table 9-50 ctxIdxMap for 4x4 sig_coeff_flag.
-pub const CTX_IDX_MAP: [u8; 16] = [0, 1, 4, 5, 2, 3, 4, 5, 6, 6, 8, 8, 7, 7, 8, 8];
+pub(crate) const CTX_IDX_MAP: [u8; 16] = [0, 1, 4, 5, 2, 3, 4, 5, 6, 6, 8, 8, 7, 7, 8, 8];
 
 /// sig_coeff_flag context increments in scan order: SIG_PATTERN[prevCsbf] looked up at
 /// ScanOrder[2][scanIdx][n], indexed by [scanIdx][prevCsbf][n].
-pub const SIG_CTX_SCAN: [[[u8; 16]; 4]; 3] = {
+pub(crate) const SIG_CTX_SCAN: [[[u8; 16]; 4]; 3] = {
     let mut t = [[[0u8; 16]; 4]; 3];
     let mut s = 0;
     while s < 3 {
@@ -168,7 +168,7 @@ pub const SIG_CTX_SCAN: [[[u8; 16]; 4]; 3] = {
 };
 
 /// CTX_IDX_MAP in scan order, indexed by [scanIdx][n] (4x4 transform blocks).
-pub const CTX_IDX_MAP_SCAN: [[u8; 16]; 3] = {
+pub(crate) const CTX_IDX_MAP_SCAN: [[u8; 16]; 3] = {
     let mut t = [[0u8; 16]; 3];
     let mut s = 0;
     while s < 3 {
@@ -183,7 +183,7 @@ pub const CTX_IDX_MAP_SCAN: [[u8; 16]; 3] = {
 };
 
 /// Inverse of SCAN_POS_4X4: scan index of in-sub-block position (yP << 2) | xP.
-pub const SCAN_INV_4X4: [[u8; 16]; 3] = {
+pub(crate) const SCAN_INV_4X4: [[u8; 16]; 3] = {
     let mut t = [[0u8; 16]; 3];
     let mut s = 0;
     while s < 3 {
@@ -214,7 +214,7 @@ const DIAG_INV_4X4: [u8; 16] = invert_scan(&DIAG_SCAN_4X4, 4);
 const DIAG_INV_8X8: [u8; 64] = invert_scan(&DIAG_SCAN_8X8, 8);
 
 /// Inverse of `sub_block_scan`: scan index of sub-block yS * width + xS.
-pub fn sub_block_scan_inv(log2_size_minus2: u32, scan_idx: u32) -> &'static [u8] {
+pub(crate) fn sub_block_scan_inv(log2_size_minus2: u32, scan_idx: u32) -> &'static [u8] {
     match (log2_size_minus2, scan_idx) {
         (0, _) => &[0],
         (1, 0) => &DIAG_INV_2X2,
@@ -226,19 +226,19 @@ pub fn sub_block_scan_inv(log2_size_minus2: u32, scan_idx: u32) -> &'static [u8]
 }
 
 /// Table 8-5 intraPredAngle indexed by predModeIntra (entries 0 and 1 unused).
-pub const INTRA_PRED_ANGLE: [i8; 35] = [
+pub(crate) const INTRA_PRED_ANGLE: [i8; 35] = [
     0, 0, 32, 26, 21, 17, 13, 9, 5, 2, 0, -2, -5, -9, -13, -17, -21, -26, //
     -32, -26, -21, -17, -13, -9, -5, -2, 0, 2, 5, 9, 13, 17, 21, 26, 32,
 ];
 
 /// Table 8-6 invAngle indexed by predModeIntra - 11 for modes 11..25.
-pub const INV_ANGLE: [i16; 15] = [
+pub(crate) const INV_ANGLE: [i16; 15] = [
     -4096, -1638, -910, -630, -482, -390, -315, -256, -315, -390, -482, -630, -910, -1638, -4096,
 ];
 
 /// Equation 8-319 transMatrixCol0to15: row k is the k-th basis function evaluated at sample
 /// positions 0..15. Positions 16..31 follow from (8-321): M[k][31 - n] = (-1)^k * M[k][n].
-pub const TRANS_MATRIX_COL0TO15: [[i8; 16]; 32] = [
+pub(crate) const TRANS_MATRIX_COL0TO15: [[i8; 16]; 32] = [
     [
         64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     ],
@@ -338,7 +338,7 @@ pub const TRANS_MATRIX_COL0TO15: [[i8; 16]; 32] = [
 ];
 
 /// Full 32x32 DCT matrix M[k][n] (frequency k, position n).
-pub const TRANS_MATRIX: [[i8; 32]; 32] = {
+pub(crate) const TRANS_MATRIX: [[i8; 32]; 32] = {
     let mut m = [[0i8; 32]; 32];
     let mut k = 0;
     while k < 32 {
@@ -355,7 +355,7 @@ pub const TRANS_MATRIX: [[i8; 32]; 32] = {
 };
 
 /// Equation 8-316 DST-VII matrix, M[k][n].
-pub const DST_MATRIX: [[i32; 4]; 4] = [
+pub(crate) const DST_MATRIX: [[i32; 4]; 4] = [
     [29, 55, 74, 84],
     [74, 74, 0, -74],
     [84, -29, -74, 55],
@@ -363,10 +363,10 @@ pub const DST_MATRIX: [[i32; 4]; 4] = [
 ];
 
 /// levelScale (clause 8.6.3).
-pub const LEVEL_SCALE: [i32; 6] = [40, 45, 51, 57, 64, 72];
+pub(crate) const LEVEL_SCALE: [i32; 6] = [40, 45, 51, 57, 64, 72];
 
 /// Table 8-12 (8.5.3.3.3.2) luma interpolation filter coefficients fL[xFrac][i].
-pub const LUMA_FILTER: [[i8; 8]; 4] = [
+pub(crate) const LUMA_FILTER: [[i8; 8]; 4] = [
     [0, 0, 0, 64, 0, 0, 0, 0],
     [-1, 4, -10, 58, 17, -5, 1, 0],
     [-1, 4, -11, 40, 40, -11, 4, -1],
@@ -374,7 +374,7 @@ pub const LUMA_FILTER: [[i8; 8]; 4] = [
 ];
 
 /// Table 8-13 (8.5.3.3.3.3) chroma interpolation filter coefficients fC[xFrac][i].
-pub const CHROMA_FILTER: [[i8; 4]; 8] = [
+pub(crate) const CHROMA_FILTER: [[i8; 4]; 8] = [
     [0, 64, 0, 0],
     [-2, 58, 10, -2],
     [-4, 54, 16, -2],
@@ -387,7 +387,7 @@ pub const CHROMA_FILTER: [[i8; 4]; 8] = [
 
 /// Table 8-10 QpC as a function of qPi for ChromaArrayType == 1 (qPi 30..43; below 30 QpC = qPi,
 /// above 43 QpC = qPi - 6).
-pub fn qpc_from_qpi(qpi: i32) -> i32 {
+pub(crate) fn qpc_from_qpi(qpi: i32) -> i32 {
     const T: [i8; 14] = [29, 30, 31, 32, 33, 33, 34, 34, 35, 35, 36, 36, 37, 37];
     if qpi < 30 {
         qpi
@@ -399,14 +399,14 @@ pub fn qpc_from_qpi(qpi: i32) -> i32 {
 }
 
 /// Table 8-12 (deblocking) beta' indexed by Q 0..51.
-pub const BETA_TABLE: [u8; 52] = [
+pub(crate) const BETA_TABLE: [u8; 52] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
     20, 22, 24, //
     26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64,
 ];
 
 /// Deblocking tC' indexed by Q 0..53.
-pub const TC_TABLE: [u8; 54] = [
+pub(crate) const TC_TABLE: [u8; 54] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
     3, //
     3, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 8, 9, 10, 11, 13, 14, 16, 18, 20, 22, 24,

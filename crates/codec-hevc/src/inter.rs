@@ -11,20 +11,20 @@
 use crate::picture::{Pixel, Plane};
 use crate::tables::{CHROMA_FILTER, LUMA_FILTER};
 
-pub const PRED_STRIDE: usize = 64;
-pub const PRED_OFFSET: i32 = 8192;
+pub(crate) const PRED_STRIDE: usize = 64;
+pub(crate) const PRED_OFFSET: i32 = 8192;
 /// Edge buffer: (64 + 7) x (64 + 7) samples.
-pub const EDGE_STRIDE: usize = 80;
-pub const EDGE_SIZE: usize = EDGE_STRIDE * 72;
+pub(crate) const EDGE_STRIDE: usize = 80;
+pub(crate) const EDGE_SIZE: usize = EDGE_STRIDE * 72;
 
 #[derive(Debug)]
-pub struct McScratch<P> {
-    pub edge: Vec<P>,
-    pub tmp: Vec<i16>,
+pub(crate) struct McScratch<P> {
+    pub(crate) edge: Vec<P>,
+    pub(crate) tmp: Vec<i16>,
 }
 
 impl<P: Pixel> McScratch<P> {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         McScratch {
             edge: vec![P::default(); EDGE_SIZE],
             tmp: vec![0; PRED_STRIDE * 72],
@@ -103,12 +103,12 @@ fn row<P>(s: &[P], start: usize, w: usize) -> &[P] {
 /// MODE 0 stores v - PRED_OFFSET into an i16 prediction buffer, MODE 1 writes the default
 /// uni-prediction pixel (8-262), MODE 2 writes the default bi-prediction pixel (8-264)
 /// combining with an earlier MODE 0 buffer.
-pub struct Out<'a, P> {
-    pub pred: &'a mut [i16],
-    pub dst: &'a mut [P],
-    pub dst_off: usize,
-    pub dst_stride: usize,
-    pub other: &'a [i16],
+pub(crate) struct Out<'a, P> {
+    pub(crate) pred: &'a mut [i16],
+    pub(crate) dst: &'a mut [P],
+    pub(crate) dst_off: usize,
+    pub(crate) dst_stride: usize,
+    pub(crate) other: &'a [i16],
 }
 
 #[derive(Clone, Copy)]
@@ -752,7 +752,7 @@ fn chroma_impl<P: Pixel, const MODE: u8>(
 /// Luma interpolation (8.5.3.3.3.2) with output stage `mode` (see [`Out`]).
 #[inline(never)]
 #[allow(clippy::too_many_arguments)]
-pub fn mc_luma<P: Pixel>(
+pub(crate) fn mc_luma<P: Pixel>(
     plane: &Plane<P>,
     sc: &mut McScratch<P>,
     xi: i32,
@@ -775,7 +775,7 @@ pub fn mc_luma<P: Pixel>(
 /// Chroma interpolation (8.5.3.3.3.3) with output stage `mode` (see [`Out`]).
 #[inline(never)]
 #[allow(clippy::too_many_arguments)]
-pub fn mc_chroma<P: Pixel>(
+pub(crate) fn mc_chroma<P: Pixel>(
     plane: &Plane<P>,
     sc: &mut McScratch<P>,
     xi: i32,
@@ -799,7 +799,7 @@ pub fn mc_chroma<P: Pixel>(
 /// ((p << shift3 + offset1) >> shift1 == p).
 #[allow(clippy::too_many_arguments)]
 #[inline(never)]
-pub fn copy_block<P: Pixel>(
+pub(crate) fn copy_block<P: Pixel>(
     dst: &mut Plane<P>,
     x0: usize,
     y0: usize,
@@ -851,7 +851,7 @@ fn copy_rows<P: Pixel, const W: usize>(
 /// Integer-position explicit weighted uni-prediction fused with the copy. Returns false if
 /// the SIMD kernel does not cover the block (caller falls back to the two-pass path).
 #[allow(clippy::too_many_arguments)]
-pub fn weighted_copy<P: Pixel>(
+pub(crate) fn weighted_copy<P: Pixel>(
     dst: &mut Plane<P>,
     x0: usize,
     y0: usize,
@@ -893,7 +893,7 @@ pub fn weighted_copy<P: Pixel>(
 /// Explicit weighted prediction, uni-directional (8-275).
 #[allow(clippy::too_many_arguments)]
 #[inline(never)]
-pub fn put_weighted_uni<P: Pixel>(
+pub(crate) fn put_weighted_uni<P: Pixel>(
     plane: &mut Plane<P>,
     x0: usize,
     y0: usize,
@@ -938,7 +938,7 @@ pub fn put_weighted_uni<P: Pixel>(
 /// Explicit weighted prediction, bi-directional (8-277).
 #[allow(clippy::too_many_arguments)]
 #[inline(never)]
-pub fn put_weighted_bi<P: Pixel>(
+pub(crate) fn put_weighted_bi<P: Pixel>(
     plane: &mut Plane<P>,
     x0: usize,
     y0: usize,

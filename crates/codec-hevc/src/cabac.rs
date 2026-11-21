@@ -4,39 +4,39 @@
 use triergon_bitstream::cabac::{Engine, init_state};
 
 /// The arithmetic decoder of a slice.
-pub type Cabac<'a> = Engine<'a, true>;
+pub(crate) type Cabac<'a> = Engine<'a, true>;
 
 /// Context offsets (one context variable per entry).
-pub mod ctx {
-    pub const SAO_MERGE: usize = 0;
-    pub const SAO_TYPE: usize = 1;
-    pub const SPLIT_CU: usize = 2; // 3
-    pub const CU_TRANSQUANT_BYPASS: usize = 5;
-    pub const CU_SKIP: usize = 6; // 3
-    pub const PRED_MODE: usize = 9;
-    pub const PART_MODE: usize = 10; // 4
-    pub const PREV_INTRA_LUMA_PRED: usize = 14;
-    pub const INTRA_CHROMA_PRED_MODE: usize = 15;
-    pub const RQT_ROOT_CBF: usize = 16;
-    pub const MERGE_FLAG: usize = 17;
-    pub const MERGE_IDX: usize = 18;
-    pub const INTER_PRED_IDC: usize = 19; // 5
-    pub const REF_IDX: usize = 24; // 2
-    pub const MVP_FLAG: usize = 26;
-    pub const SPLIT_TRANSFORM: usize = 27; // 3
-    pub const CBF_LUMA: usize = 30; // 2
-    pub const CBF_CHROMA: usize = 32; // 5
-    pub const ABS_MVD_GT0: usize = 37;
-    pub const ABS_MVD_GT1: usize = 38;
-    pub const CU_QP_DELTA_ABS: usize = 39; // 2
-    pub const TRANSFORM_SKIP: usize = 41; // 2 (luma, chroma)
-    pub const LAST_X_PREFIX: usize = 43; // 18
-    pub const LAST_Y_PREFIX: usize = 61; // 18
-    pub const CODED_SUB_BLOCK: usize = 79; // 4
-    pub const SIG_COEFF: usize = 83; // 42
-    pub const GT1: usize = 125; // 24
-    pub const GT2: usize = 149; // 6
-    pub const NUM: usize = 155;
+pub(crate) mod ctx {
+    pub(crate) const SAO_MERGE: usize = 0;
+    pub(crate) const SAO_TYPE: usize = 1;
+    pub(crate) const SPLIT_CU: usize = 2; // 3
+    pub(crate) const CU_TRANSQUANT_BYPASS: usize = 5;
+    pub(crate) const CU_SKIP: usize = 6; // 3
+    pub(crate) const PRED_MODE: usize = 9;
+    pub(crate) const PART_MODE: usize = 10; // 4
+    pub(crate) const PREV_INTRA_LUMA_PRED: usize = 14;
+    pub(crate) const INTRA_CHROMA_PRED_MODE: usize = 15;
+    pub(crate) const RQT_ROOT_CBF: usize = 16;
+    pub(crate) const MERGE_FLAG: usize = 17;
+    pub(crate) const MERGE_IDX: usize = 18;
+    pub(crate) const INTER_PRED_IDC: usize = 19; // 5
+    pub(crate) const REF_IDX: usize = 24; // 2
+    pub(crate) const MVP_FLAG: usize = 26;
+    pub(crate) const SPLIT_TRANSFORM: usize = 27; // 3
+    pub(crate) const CBF_LUMA: usize = 30; // 2
+    pub(crate) const CBF_CHROMA: usize = 32; // 5
+    pub(crate) const ABS_MVD_GT0: usize = 37;
+    pub(crate) const ABS_MVD_GT1: usize = 38;
+    pub(crate) const CU_QP_DELTA_ABS: usize = 39; // 2
+    pub(crate) const TRANSFORM_SKIP: usize = 41; // 2 (luma, chroma)
+    pub(crate) const LAST_X_PREFIX: usize = 43; // 18
+    pub(crate) const LAST_Y_PREFIX: usize = 61; // 18
+    pub(crate) const CODED_SUB_BLOCK: usize = 79; // 4
+    pub(crate) const SIG_COEFF: usize = 83; // 42
+    pub(crate) const GT1: usize = 125; // 24
+    pub(crate) const GT2: usize = 149; // 6
+    pub(crate) const NUM: usize = 155;
 }
 
 /// initValue tables per initType (0, 1, 2), laid out to match `ctx`.
@@ -186,7 +186,7 @@ fn init_values(init_type: usize) -> [u8; ctx::NUM] {
 
 /// Initialize all context variables for SliceQpY and initType (9-4 .. 9-6). State byte is
 /// (pStateIdx << 1) | valMps.
-pub fn init_contexts(states: &mut [u8; ctx::NUM], slice_qp: i32, init_type: usize) {
+pub(crate) fn init_contexts(states: &mut [u8; ctx::NUM], slice_qp: i32, init_type: usize) {
     let iv = init_values(init_type);
     for (s, &init) in states.iter_mut().zip(iv.iter()) {
         let slope = (init >> 4) as i32;
@@ -196,7 +196,7 @@ pub fn init_contexts(states: &mut [u8; ctx::NUM], slice_qp: i32, init_type: usiz
 }
 
 /// Syntax on top of the shared engine.
-pub trait Bins {
+pub(crate) trait Bins {
     /// True if decoding has read past the end of the data (corrupt stream).
     fn overrun(&self) -> bool;
     /// coeff_abs_level_remaining (9.3.3.11) with cRiceParam `rice`.

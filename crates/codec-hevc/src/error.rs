@@ -61,4 +61,4 @@ impl fmt::Display for DecodeError {
 
 impl std::error::Error for DecodeError {}
 
-pub type Result<T> = core::result::Result<T, DecodeError>;
+pub(crate) type Result<T> = core::result::Result<T, DecodeError>;

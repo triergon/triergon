@@ -5,13 +5,20 @@
 //! the u8/u16 implementations produce a leading part or the whole block; the scalar
 //! code finishes the rest. Both builds must decode bit-identically; the conformance
 //! tests run under both configurations.
+//!
+//! Inlining is part of the measured shape of the hot paths, here and in `inter`,
+//! `deblock`, `sao`, `transform`, `intra` and `ctu`: `#[inline(always)]` marks row and
+//! sample kernels, their helpers and the default hooks, so that the generic code
+//! specialises per sample type and the scalar build compiles the hooks away;
+//! `#[inline(never)]` keeps the per-block entry points out of their callers' loops. A
+//! change to either is a performance change and is measured as one.
 #[cfg(feature = "simd")]
 mod filter;
 #[cfg(feature = "simd")]
 mod mc;
 
 /// Row and block kernels used by the generic decoder through `Pixel`.
-pub trait Kernels: Sized {
+pub(crate) trait Kernels: Sized {
     // Optional explicit-SIMD row kernels (see kernels/mc.rs). Each returns the number of
     // leading columns it produced; the generic scalar code finishes the row.
     #[inline(always)]

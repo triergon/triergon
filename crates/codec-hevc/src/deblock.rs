@@ -13,11 +13,11 @@ use crate::tables::{BETA_TABLE, TC_TABLE, qpc_from_qpi};
 /// Per-lane parameters for 16 lines = four 4-line luma edge segments, for the SIMD kernels.
 /// A segment that is not filtered has tc = 0; mp / mq are -1 in lanes whose p / q samples
 /// may change (not excluded by pcm_loop_filter_disabled / cu_transquant_bypass).
-pub struct LumaLanes {
-    pub beta: [i16; 16],
-    pub tc: [i16; 16],
-    pub mp: [i16; 16],
-    pub mq: [i16; 16],
+pub(crate) struct LumaLanes {
+    pub(crate) beta: [i16; 16],
+    pub(crate) tc: [i16; 16],
+    pub(crate) mp: [i16; 16],
+    pub(crate) mq: [i16; 16],
 }
 
 impl LumaLanes {
@@ -60,14 +60,14 @@ fn chroma_tc(bp: BlkInfo, bq: BlkInfo, tc_off: i32, c_qp_off: i32, bd: u32) -> i
 }
 
 /// (beta_offset, tc_offset) of the slice containing the CTB of q0 of an edge.
-pub struct Offsets<'a> {
+pub(crate) struct Offsets<'a> {
     st: &'a PicState,
     log2: u32,
     w: usize,
 }
 
 impl<'a> Offsets<'a> {
-    pub fn new(st: &'a PicState, sps: &Sps) -> Self {
+    pub(crate) fn new(st: &'a PicState, sps: &Sps) -> Self {
         Offsets {
             st,
             log2: sps.log2_ctb,
@@ -433,7 +433,7 @@ fn filter_chroma<P: Pixel>(
 /// Deblock the luma rows [ys, ye) (multiples of 16): vertical edges in the band, then the
 /// horizontal edges with y in [ys, ye) (the edge at ys modifies the 3 rows above).
 #[allow(clippy::too_many_arguments)]
-pub fn deblock_band<P: Pixel>(
+pub(crate) fn deblock_band<P: Pixel>(
     frame: &mut Frame<P>,
     st: &PicState,
     sps: &Sps,

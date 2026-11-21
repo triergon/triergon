@@ -33,7 +33,7 @@ fn eo_offset(e: i32, t: &[i32; 5]) -> i32 {
 /// Apply SAO to CTB row `ry`. `src` holds deblocked samples of component c starting at
 /// component row `src_y0[c]` (the band plus one row above and below).
 #[allow(clippy::too_many_arguments)]
-pub fn sao_band<P: Pixel>(
+pub(crate) fn sao_band<P: Pixel>(
     dst: &mut Frame<P>,
     src: &Frame<P>,
     src_y0: [i32; 3],

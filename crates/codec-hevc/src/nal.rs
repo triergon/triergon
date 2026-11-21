@@ -11,16 +11,16 @@ use triergon_framing::{
 
 /// The decoder's view of a NAL unit header (clause 7.3.1.2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NalHeader {
-    pub nal_unit_type: u8,
-    pub nuh_layer_id: u8,
-    pub temporal_id: u8,
+pub(crate) struct NalHeader {
+    pub(crate) nal_unit_type: u8,
+    pub(crate) nuh_layer_id: u8,
+    pub(crate) temporal_id: u8,
 }
 
 impl NalHeader {
     /// `None` for a truncated header, a set forbidden_zero_bit or a zero
     /// temporal_id_plus1.
-    pub fn parse(b: &[u8]) -> Option<NalHeader> {
+    pub(crate) fn parse(b: &[u8]) -> Option<NalHeader> {
         match framing::NalHeader::parse(framing::Codec::Hevc, b).ok()? {
             framing::NalHeader::Hevc {
                 nal_unit_type,
@@ -39,7 +39,7 @@ impl NalHeader {
 /// Remove emulation prevention bytes (clause 7.3.1.1) from `src` (a NAL unit including its
 /// two header bytes) into `dst` (header bytes are dropped). `dst` is cleared first and
 /// charged for the whole payload before it grows.
-pub fn unescape_rbsp(src: &[u8], dst: &mut BudgetVec<u8>) -> Result<(), StorageError> {
+pub(crate) fn unescape_rbsp(src: &[u8], dst: &mut BudgetVec<u8>) -> Result<(), StorageError> {
     let ebsp = src.get(2..).unwrap_or(&[]);
     dst.clear();
     dst.try_reserve_exact(ebsp.len())?;
@@ -58,13 +58,16 @@ pub struct AccessUnitSplitter<'a> {
 }
 
 impl<'a> AccessUnitSplitter<'a> {
+    /// A splitter over the whole stream `data`.
     pub fn new(data: &'a [u8]) -> Self {
         AccessUnitSplitter { data, pos: 0 }
     }
 }
 
+/// How the NAL unit at the start of `nal` bounds access units: whether it is a base-layer
+/// slice, and whether it begins a new access unit once one has a slice. `None` for a
+/// unit without a valid header, which bounds nothing.
 fn starts_new_au(nal: &[u8]) -> Option<(bool, bool)> {
-    // Returns (is_vcl_base_layer, begins_new_au_if_vcl_seen)
     let h = NalHeader::parse(nal)?;
     if h.nuh_layer_id > 0 {
         return Some((false, false));
@@ -85,41 +88,28 @@ impl<'a> Iterator for AccessUnitSplitter<'a> {
         if self.pos >= self.data.len() {
             return None;
         }
-        let au_start = self.pos;
+        let start = self.pos;
         let mut seen_vcl = false;
-        let mut i = match start_code(self.data, self.pos) {
-            Some(s) => s,
-            None => {
-                self.pos = self.data.len();
-                return Some(&self.data[au_start..]);
-            }
-        };
-        loop {
-            let (sc_start, nal_start) = match start_code(self.data, i) {
-                Some(s) => (s, s + 3),
-                None => {
-                    self.pos = self.data.len();
-                    return Some(&self.data[au_start..]);
-                }
-            };
-            // Include a preceding zero_byte in the boundary.
-            let boundary = if sc_start > au_start && self.data[sc_start - 1] == 0 {
-                sc_start - 1
-            } else {
-                sc_start
-            };
-            let nal = &self.data[nal_start..];
-            if let Some((is_vcl, begins)) = starts_new_au(nal) {
+        let mut from = start;
+        while let Some(code) = start_code(self.data, from) {
+            let nal_start = code + 3;
+            if let Some((is_vcl, begins)) = starts_new_au(&self.data[nal_start..]) {
                 if seen_vcl && begins {
+                    // Include a preceding zero_byte in the boundary.
+                    let boundary = if code > start && self.data[code - 1] == 0 {
+                        code - 1
+                    } else {
+                        code
+                    };
                     self.pos = boundary;
-                    return Some(&self.data[au_start..boundary]);
+                    return Some(&self.data[start..boundary]);
                 }
-                if is_vcl {
-                    seen_vcl = true;
-                }
+                seen_vcl |= is_vcl;
             }
-            i = nal_start;
+            from = nal_start;
         }
+        self.pos = self.data.len();
+        Some(&self.data[start..])
     }
 }
 
