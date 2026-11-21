@@ -1246,7 +1246,7 @@ impl<'a> GlobalSeekJob<'a> {
                     .opus_occurrence(landing.first_sample)?;
                 self.reference
                     .as_mut()
-                    .expect("Opus recovery follows the reference seek")
+                    .ok_or(Error::Invalid("Opus recovery without a reference seek"))?
                     .opus_recovery = Some(landing);
                 self.opus_recovery = None;
                 self.at += 1;

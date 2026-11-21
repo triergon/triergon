@@ -66,11 +66,13 @@ impl<'a> OpusRecoverySeek<'a> {
             return Err(Error::Cancelled);
         }
         let minimum = Time::new(2, 25)?; // Opus in ISO BMFF, section 4.3.6.2.
-        if let Some(roll) = &mut self.roll {
-            if roll.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1) {
-                return Ok(None);
-            }
-            let selected = self.roll.take().expect("polled Opus roll group").finish()?;
+        if let Some(roll) = &mut self.roll
+            && (roll.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1))
+        {
+            return Ok(None);
+        }
+        if let Some(roll) = self.roll.take() {
+            let selected = roll.finish()?;
             let first = if selected.description.is_none() {
                 // An ungrouped sample near the beginning can decode from
                 // source start, which provides all available history.

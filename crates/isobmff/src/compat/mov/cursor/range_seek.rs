@@ -514,11 +514,11 @@ impl<'a> RangeSeekJob<'a> {
                     .ok_or(Error::Invalid("missing Opus seek edit"))?;
                 self.scan
                     .as_mut()
-                    .expect("Opus recovery follows the audio search")
+                    .ok_or(Error::Invalid("Opus recovery without an audio search"))?
                     .restart_at(points, edit.opus_occurrence(landing.first_sample)?)?;
                 self.landing
                     .as_mut()
-                    .expect("Opus recovery follows the reference seek")
+                    .ok_or(Error::Invalid("Opus recovery without a reference seek"))?
                     .opus_recovery = Some(landing);
                 self.opus_recovery = None;
                 self.opus_track = None;
@@ -554,7 +554,10 @@ impl<'a> RangeSeekJob<'a> {
                     )?);
                     continue;
                 }
-                let scan = self.scan.take().expect("polled track seek");
+                let scan = self
+                    .scan
+                    .take()
+                    .ok_or(Error::Invalid("missing track seek"))?;
                 self.finish_track(at, scan)?;
                 continue;
             }
