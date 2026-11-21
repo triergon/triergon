@@ -618,6 +618,21 @@ fn seeking_replays_the_current_audio_configurations_in_a_new_generation() {
 }
 
 #[test]
+fn a_single_selection_refuses_the_pat_and_null_pids_and_admits_the_range_between() {
+    let b = budget();
+    for pid in [0, 0x1fff] {
+        assert!(matches!(
+            engine(&b, &[PidSelection { pid, ..AVC }], NAMESPACE),
+            Err(Error::Invalid("native program selection PID"))
+        ));
+    }
+    for pid in [1, 0x1ffe] {
+        assert!(engine(&b, &[PidSelection { pid, ..AVC }], NAMESPACE).is_ok());
+    }
+    assert_eq!(b.used(), Budget::control_storage_bytes());
+}
+
+#[test]
 fn selections_reject_duplicate_and_out_of_scope_pids_and_strides() {
     let b = budget();
     assert!(matches!(
