@@ -640,13 +640,7 @@ fn audio(root: &Path, ac3: bool) -> R<Codec> {
     })
 }
 
-fn direct_audio_cases(root: &Path) -> R<[Case; 2]> {
-    let ac3 = Codec {
-        name: "atsc-ac3",
-        stream_type: 0x81,
-        dvb: false,
-        ..audio(root, true)?
-    };
+fn direct_eac3(root: &Path) -> R<Codec> {
     let eac3_pes = first_audio_pes(&source(root, ATSC_EAC3_SEED)?)?;
     let [0x0b, 0x77, size_high, size_low, flags, ..] = eac3_pes.as_slice() else {
         return Err("expected a coded E-AC-3 syncframe".into());
@@ -659,7 +653,7 @@ fn direct_audio_cases(root: &Path) -> R<[Case; 2]> {
     let frame = eac3_pes
         .get(..frame_bytes)
         .ok_or("incomplete E-AC-3 seed syncframe")?;
-    let eac3 = Codec {
+    Ok(Codec {
         name: "atsc-eac3",
         stream_type: 0x87,
         stream_id: 0xbd,
@@ -667,7 +661,17 @@ fn direct_audio_cases(root: &Path) -> R<[Case; 2]> {
         bytes: frame.repeat(2),
         first: frame_bytes,
         header: 7,
+    })
+}
+
+fn direct_audio_cases(root: &Path) -> R<[Case; 2]> {
+    let ac3 = Codec {
+        name: "atsc-ac3",
+        stream_type: 0x81,
+        dvb: false,
+        ..audio(root, true)?
     };
+    let eac3 = direct_eac3(root)?;
     Ok([
         authored_case(
             &ac3,

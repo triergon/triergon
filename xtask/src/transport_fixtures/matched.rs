@@ -405,12 +405,58 @@ pub fn author_audio_seek(root: &Path, args: &[String]) -> R<()> {
     const FEATURE: &str = "mpegts-previous-audio";
     let pid = PID.to_string();
     let mut cases = Vec::new();
-    for (ac3, m2ts, name) in [(false, false, "adts-aac-lc"), (true, true, "dvb-ac3")] {
-        let codec = super::audio(root, ac3)?;
+    let mut profiles = vec![
+        (
+            super::audio(root, false)?,
+            false,
+            &[][..],
+            &[][..],
+            1920,
+            true,
+        ),
+        (
+            super::audio(root, true)?,
+            true,
+            &[0x6a, 1, 0][..],
+            &["--dvb"][..],
+            2880,
+            true,
+        ),
+        (
+            super::direct_eac3(root)?,
+            true,
+            &[][..],
+            &["--atsc"][..],
+            2880,
+            false,
+        ),
+    ];
+    for (name, stream_type, header, frame_len, step) in [
+        ("mpeg1-layer1", 0x03, [0xff, 0xff, 0x14, 0xc0], 32, 720),
+        ("mpeg1-layer2", 0x03, [0xff, 0xfd, 0x44, 0xc0], 192, 2160),
+        ("mpeg2-layer2", 0x04, [0xff, 0xf5, 0x44, 0xc0], 192, 4320),
+    ] {
+        profiles.push((
+            Codec {
+                name,
+                stream_type,
+                stream_id: 0xc0,
+                dvb: false,
+                bytes: silence(header, frame_len).repeat(2),
+                first: frame_len,
+                header: 4,
+            },
+            false,
+            &[],
+            &[],
+            step,
+            false,
+        ));
+    }
+    for (codec, m2ts, descriptors, namespace, step, repeated) in profiles {
         let frame = &codec.bytes[..codec.first];
-        let step = if ac3 { 2880 } else { 1920 };
+        let name = codec.name;
         let mut ts = Transport::new();
-        let descriptors: &[u8] = if ac3 { &[0x6a, 1, 0] } else { &[] };
         ts.tables(&codec, descriptors)?;
         ts.pes(codec.stream_id, &part(&codec.bytes, Some(90_000), None))?;
         ts.pes(codec.stream_id, &part(frame, None, None))?;
@@ -430,10 +476,7 @@ pub fn author_audio_seek(root: &Path, args: &[String]) -> R<()> {
         };
         for (policy, target) in [("previous", "90000"), ("preroll", "100000")] {
             let id = format!("{name}-{policy}");
-            let mut options = Vec::new();
-            if ac3 {
-                options.push("--dvb");
-            }
+            let mut options = namespace.to_vec();
             options.extend([pid.as_str(), target, policy]);
             cases.push(input.record(
                 root,
@@ -444,19 +487,18 @@ pub fn author_audio_seek(root: &Path, args: &[String]) -> R<()> {
                 "ts-audio-seek-fold",
             )?);
         }
-        let mut options = Vec::new();
-        if ac3 {
-            options.push("--dvb");
+        if repeated {
+            let mut options = namespace.to_vec();
+            options.extend([pid.as_str(), "90000", "preroll", "100000"]);
+            cases.push(input.record(
+                root,
+                FEATURE,
+                &format!("{name}-repeated-preroll"),
+                &options,
+                Path::new(reference),
+                "ts-audio-seek-fold",
+            )?);
         }
-        options.extend([pid.as_str(), "90000", "preroll", "100000"]);
-        cases.push(input.record(
-            root,
-            FEATURE,
-            &format!("{name}-repeated-preroll"),
-            &options,
-            Path::new(reference),
-            "ts-audio-seek-fold",
-        )?);
     }
     manifest(root, FEATURE, cases)
 }

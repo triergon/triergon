@@ -8,10 +8,10 @@
   "worker_operation": "ts-audio-seek-",
   "reference": "ffmpeg-ts-audio-seek",
   "contract": [
-    "Start with one preloaded, seekable TS188 or M2TS192 entity, its program and an ADTS AAC-LC or AC-3 PID, the target in 90 kHz ticks and the previous-frame or playback-preroll policy.",
+    "Start with one preloaded, seekable TS188 or M2TS192 entity, its program and an ADTS AAC-LC, AC-3, E-AC-3 or MPEG audio Layer I or II PID, the target in 90 kHz ticks and the previous-frame or playback-preroll policy.",
     "Choose the last frame with maximal source presentation time at or before the target. The reference scans the parser-enabled FFmpeg demuxer with NOFILLIN, reopens it and replays to the selected frame. It makes no stream discovery or decoder calls.",
     "Both workers fold the requested, landing and discard times followed by every selected audio frame through EOF, including untimed frames. Each contributes presentation time, effective decode time (presentation time if DTS is absent), and all bytes. The source reader leaves an absent DTS absent.",
-    "Controls cover both policies and codecs, multiple frames per PES, standalone untimed PES and explicit PTS and DTS. Both landing selection and suffix delivery run within the measured operation.",
+    "Controls cover both policies and all codecs, multiple frames per PES, standalone untimed PES and explicit PTS and DTS. Both landing selection and suffix delivery run within the measured operation.",
     "Repeated cases start from a fresh reader, build an index during the first seek, deliver both packet suffixes through EOF, and require an indexed second seek. The reference scans and replays independently for each target."
   ],
   "required_profiles": [
@@ -20,7 +20,15 @@
     "dvb-ac3-previous",
     "dvb-ac3-preroll",
     "adts-aac-lc-repeated-preroll",
-    "dvb-ac3-repeated-preroll"
+    "dvb-ac3-repeated-preroll",
+    "atsc-eac3-previous",
+    "atsc-eac3-preroll",
+    "mpeg1-layer1-previous",
+    "mpeg1-layer1-preroll",
+    "mpeg1-layer2-previous",
+    "mpeg1-layer2-preroll",
+    "mpeg2-layer2-previous",
+    "mpeg2-layer2-preroll"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",

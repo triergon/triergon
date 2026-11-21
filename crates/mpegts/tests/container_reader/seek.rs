@@ -554,3 +554,27 @@ fn a_full_or_nonmonotonic_index_falls_back_to_a_scan() {
         }
     }
 }
+
+#[test]
+fn layer_three_seek_requires_reservoir_preroll() {
+    let mut frame = [0; 96];
+    frame[..4].copy_from_slice(&[0xff, 0xfb, 0x14, 0xc0]);
+    let mut ts = Transport::new();
+    ts.tables(&[(0x03, PID, &[])], 0);
+    ts.pes(PID, 0xc0, &frame, Some(90_000), None);
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+    reader
+        .request_seek(SeekRequest {
+            track: TrackId(PID.into()),
+            target: clock(90_000),
+            policy: SeekPolicy::PlaybackPreroll,
+        })
+        .unwrap();
+    assert!(matches!(
+        next(&mut reader, &pool, &ts.bytes, 4096, 8192),
+        Err(Error::Unsupported(
+            "MPEG-TS Layer III seek needs bit reservoir preroll"
+        ))
+    ));
+}

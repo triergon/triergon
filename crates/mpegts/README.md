@@ -133,8 +133,8 @@ contain exactly one media program. `ContainerReader` supplies the normal
 input-window, work, cancellation, backpressure and reset protocol.
 
 `Reader::request_seek` scans one seekable, length-known entity for the previous
-coded AVC or HEVC random-access picture, or a timestamped ADTS AAC-LC or AC-3
-frame. The landing is the last eligible packet with the greatest presentation
+coded AVC or HEVC random-access picture, or a timestamped ADTS AAC-LC, AC-3,
+E-AC-3 or MPEG audio Layer I or II access unit. The landing is the last eligible packet with the greatest presentation
 time at or before the target. Audio frames without a source PTS are delivered
 with their original timing when they follow a landing.
 `ReaderLimits::maximum_seek_scan_bytes` limits the scan to 64 MiB by default.

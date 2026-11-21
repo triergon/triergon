@@ -10,7 +10,7 @@ use triergon_core::container::{
     TrackId, TrackInfo,
 };
 use triergon_core::{Budget, BudgetVec, Error, InputRequest, Result, Step, Time, WorkBudget};
-use triergon_framing::Ac3Family;
+use triergon_framing::MpegLayer;
 
 #[derive(Clone, Copy)]
 struct Landing {
@@ -99,7 +99,10 @@ pub(super) struct SeekProbe {
 }
 
 fn seekable_audio(codec: CodecId<'_>) -> bool {
-    matches!(codec, CodecId::Aac | CodecId::Ac3)
+    matches!(
+        codec,
+        CodecId::Aac | CodecId::Ac3 | CodecId::Eac3 | CodecId::MpegAudio
+    )
 }
 
 fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
@@ -108,13 +111,22 @@ fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
     let (offset, random_access) = match packet.access_unit() {
         AccessUnit::Video(unit) => (unit.range.start, unit.random_access),
         AccessUnit::Adts(frame) => (frame.source().offset, time.is_some()),
-        AccessUnit::Ac3(frame) if frame.facts().header.family == Ac3Family::Ac3 => {
-            (frame.facts().offset, time.is_some())
+        // E-AC-3 access units begin with the independent syncframe and
+        // include its associated dependent substreams (A/52 Annex E §2.3.1).
+        AccessUnit::Ac3(frame) => (frame.facts().offset, time.is_some()),
+        AccessUnit::MpegAudio(frame) => {
+            // Layer III needs bit-reservoir state from earlier source frames.
+            if frame.header().layer == MpegLayer::III {
+                return Err(Error::Unsupported(
+                    "MPEG-TS Layer III seek needs bit reservoir preroll",
+                ));
+            }
+            (frame.elementary_range().start, time.is_some())
         }
         AccessUnit::AdtsFragment(fragment) => (fragment.source().offset, false),
         _ => {
             return Err(Error::Unsupported(
-                "MPEG-TS seek requires AVC, HEVC, ADTS AAC-LC or AC-3",
+                "MPEG-TS seek requires a supported video or audio track",
             ));
         }
     };
@@ -253,8 +265,8 @@ impl Reader {
         }
     }
 
-    /// Seek a selected AVC, HEVC, ADTS AAC-LC or AC-3 track in one
-    /// length-known, seekable entity. The reader lands on the last coded
+    /// Seek a selected AVC, HEVC, ADTS AAC-LC, AC-3, E-AC-3 or MPEG audio
+    /// Layer I or II track in one length-known, seekable entity. The reader lands on the last coded
     /// random-access picture or complete audio frame carrying the greatest
     /// resolved PTS at or before the target. It delivers original transport,
     /// clocks and PES provenance, including untimed frames after the landing.
@@ -319,7 +331,7 @@ impl Reader {
             && !seekable_audio(track.codec())
         {
             return Err(Error::Unsupported(
-                "MPEG-TS seek requires AVC, HEVC, ADTS AAC-LC or AC-3",
+                "MPEG-TS seek requires a supported video or audio track",
             ));
         }
         let mut seek = BudgetVec::new(&self.pool);

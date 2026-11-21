@@ -138,7 +138,9 @@ fn drain(
                             u64::from(packet.random_access() == RandomAccess::Sync),
                         );
                     }
-                    AccessUnit::Adts(_) | AccessUnit::Ac3(_) if matches!(kind, Kind::AudioSeek) => {
+                    AccessUnit::Adts(_) | AccessUnit::Ac3(_) | AccessUnit::MpegAudio(_)
+                        if matches!(kind, Kind::AudioSeek) =>
+                    {
                         fold(
                             &mut out.digest,
                             signed(packet.dts().or(packet.pts()).unwrap_or(missing)),

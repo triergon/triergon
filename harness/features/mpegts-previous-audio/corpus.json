@@ -120,6 +120,160 @@
         "bytes": 3456,
         "digest": 17035717296625073693
       }
+    },
+    {
+      "id": "atsc-eac3-previous",
+      "profile": "atsc-eac3-previous",
+      "file": "harness/features/mpegts-previous-audio/inputs/atsc-eac3.m2ts",
+      "sha256": "4ad1fb26be2f77b0506470574ca678485722b12026f6ac1aef6acb02c0b24713",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--atsc",
+        "256",
+        "90000",
+        "previous"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 2304,
+        "digest": 15059473706203227466
+      }
+    },
+    {
+      "id": "atsc-eac3-preroll",
+      "profile": "atsc-eac3-preroll",
+      "file": "harness/features/mpegts-previous-audio/inputs/atsc-eac3.m2ts",
+      "sha256": "4ad1fb26be2f77b0506470574ca678485722b12026f6ac1aef6acb02c0b24713",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--atsc",
+        "256",
+        "100000",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1152,
+        "digest": 10196056278700695939
+      }
+    },
+    {
+      "id": "mpeg1-layer1-previous",
+      "profile": "mpeg1-layer1-previous",
+      "file": "harness/features/mpegts-previous-audio/inputs/mpeg1-layer1.ts",
+      "sha256": "d72a61268c6ce611ef95b92fa30d0f31ed6c0f85ff7a8dbf58a41ac528652cb9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "90000",
+        "previous"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 192,
+        "digest": 12584902415758539434
+      }
+    },
+    {
+      "id": "mpeg1-layer1-preroll",
+      "profile": "mpeg1-layer1-preroll",
+      "file": "harness/features/mpegts-previous-audio/inputs/mpeg1-layer1.ts",
+      "sha256": "d72a61268c6ce611ef95b92fa30d0f31ed6c0f85ff7a8dbf58a41ac528652cb9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "100000",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 32,
+        "digest": 329410081390812556
+      }
+    },
+    {
+      "id": "mpeg1-layer2-previous",
+      "profile": "mpeg1-layer2-previous",
+      "file": "harness/features/mpegts-previous-audio/inputs/mpeg1-layer2.ts",
+      "sha256": "6919eccbe64568cbf430297084d705964bb41fb4a8101fd4dc72c0eb867ff73c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "90000",
+        "previous"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1152,
+        "digest": 16733083137388586602
+      }
+    },
+    {
+      "id": "mpeg1-layer2-preroll",
+      "profile": "mpeg1-layer2-preroll",
+      "file": "harness/features/mpegts-previous-audio/inputs/mpeg1-layer2.ts",
+      "sha256": "6919eccbe64568cbf430297084d705964bb41fb4a8101fd4dc72c0eb867ff73c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "100000",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 11942940452462048916
+      }
+    },
+    {
+      "id": "mpeg2-layer2-previous",
+      "profile": "mpeg2-layer2-previous",
+      "file": "harness/features/mpegts-previous-audio/inputs/mpeg2-layer2.ts",
+      "sha256": "7f9c1034f5129e56f9c00f041952aa6819c159c8fddb46a5f04d7d7f720551d4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "90000",
+        "previous"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1152,
+        "digest": 13309285037495586154
+      }
+    },
+    {
+      "id": "mpeg2-layer2-preroll",
+      "profile": "mpeg2-layer2-preroll",
+      "file": "harness/features/mpegts-previous-audio/inputs/mpeg2-layer2.ts",
+      "sha256": "7f9c1034f5129e56f9c00f041952aa6819c159c8fddb46a5f04d7d7f720551d4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "100000",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1152,
+        "digest": 10208139847110430602
+      }
     }
   ]
 }
