@@ -32,12 +32,14 @@ pub(crate) struct PoolId(usize);
 
 static NEXT_POOL_ID: AtomicUsize = AtomicUsize::new(0);
 
-fn allocate_pool_id(counter: &AtomicUsize) -> Result<PoolId> {
+/// Adds one to `counter` and returns the new value; at `usize::MAX` the counter
+/// stays there and every later call fails too.
+fn next_serial(counter: &AtomicUsize) -> Result<usize> {
     let mut previous = counter.load(Ordering::Relaxed);
     loop {
         let next = previous.checked_add(1).ok_or(Error::Overflow)?;
         match counter.compare_exchange_weak(previous, next, Ordering::Relaxed, Ordering::Relaxed) {
-            Ok(_) => return Ok(PoolId(next)),
+            Ok(_) => return Ok(next),
             Err(observed) => previous = observed,
         }
     }
@@ -60,7 +62,7 @@ impl Budget {
             });
         }
         Ok(Self(Arc::new(Inner {
-            id: allocate_pool_id(&NEXT_POOL_ID)?,
+            id: PoolId(next_serial(&NEXT_POOL_ID)?),
             limit,
             used: AtomicUsize::new(CONTROL_BYTES),
             peak: AtomicUsize::new(CONTROL_BYTES),
@@ -92,20 +94,7 @@ impl Budget {
     }
     /// A generation no cursor of this pool has had.
     pub(crate) fn next_generation(&self) -> Result<u64> {
-        let mut current = self.0.generation.load(Ordering::Relaxed);
-        loop {
-            let next = current.checked_add(1).ok_or(Error::Overflow)?;
-            let generation = u64::try_from(next).map_err(|_| Error::Overflow)?;
-            match self.0.generation.compare_exchange_weak(
-                current,
-                next,
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => return Ok(generation),
-                Err(value) => current = value,
-            }
-        }
+        u64::try_from(next_serial(&self.0.generation)?).map_err(|_| Error::Overflow)
     }
     /// Charges `bytes`. Fails with [`Error::Limit`] when they exceed what an
     /// empty pool could hold, and with [`Error::Backpressure`] when they fit
@@ -310,9 +299,9 @@ mod token_tests {
     #[test]
     fn exhausted_pool_identity_counter_never_wraps_or_reuses_an_id() {
         let counter = AtomicUsize::new(usize::MAX - 1);
-        assert_eq!(allocate_pool_id(&counter).unwrap(), PoolId(usize::MAX));
-        assert_eq!(allocate_pool_id(&counter), Err(Error::Overflow));
-        assert_eq!(allocate_pool_id(&counter), Err(Error::Overflow));
+        assert_eq!(next_serial(&counter), Ok(usize::MAX));
+        assert_eq!(next_serial(&counter), Err(Error::Overflow));
+        assert_eq!(next_serial(&counter), Err(Error::Overflow));
         assert_eq!(counter.load(Ordering::Relaxed), usize::MAX);
     }
 
