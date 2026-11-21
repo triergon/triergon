@@ -1150,6 +1150,7 @@ mod tests {
         reader.seek_index = Some(Shared::new(
             SeekIndex {
                 track: TrackId(256),
+                epochs: None,
                 points,
                 physical: None,
             },
