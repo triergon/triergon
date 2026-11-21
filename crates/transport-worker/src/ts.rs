@@ -1143,6 +1143,54 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires the cached original mpegts/loewe.ts"]
+    fn discovery_refuses_a_replacement_program_map() {
+        let pool = Budget::new(64 * 1024 * 1024).unwrap();
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../.research/fate-samples/mpegts/loewe.ts");
+        let mut request = parse(&pool, &path, &["188".into(), "769".into()]).unwrap();
+        let mut bytes = request.input.as_ref().to_vec();
+        let mut replacement: [u8; 188] = bytes[1..]
+            .chunks_exact(188)
+            .find(|carrier| {
+                let pid = (u16::from(carrier[1] & 31) << 8) | u16::from(carrier[2]);
+                pid == 1363 && carrier[1] & 0x40 != 0 && carrier[3] & 0x10 != 0
+            })
+            .expect("pinned program map")
+            .try_into()
+            .unwrap();
+        replacement[3] = (replacement[3] & 0xf0) | ((replacement[3] + 1) & 15);
+        let payload = if replacement[3] & 0x20 != 0 {
+            5 + usize::from(replacement[4])
+        } else {
+            4
+        };
+        let at = payload + 1 + usize::from(replacement[payload]);
+        let length =
+            3 + (usize::from(replacement[at + 1] & 15) << 8) + usize::from(replacement[at + 2]);
+        let section = &mut replacement[at..at + length];
+        assert_eq!(section[0], 2, "pinned PMT table identifier");
+        let first_es = 12 + (usize::from(section[10] & 15) << 8) + usize::from(section[11]);
+        assert_eq!(section[first_es], 0x24, "pinned HEVC stream type");
+        section[first_es] = 0x1b;
+        section[5] = (section[5] & 0xc1) | ((((section[5] >> 1) + 1) & 31) << 1);
+        let end = section.len() - 4;
+        let crc = triergon_mpegts::psi::PsiCrc32::of(&section[..end]);
+        section[end..].copy_from_slice(&crc.to_be_bytes());
+        let last_complete = bytes.len() - (bytes.len() - 1) % 188;
+        drop(bytes.splice(last_complete..last_complete, replacement));
+        request.input = Bytes::copy_from_slice(&pool, &bytes).unwrap();
+        let Err(error) = super::discovery::operation(&pool, &request, &AtomicBool::new(false))
+        else {
+            panic!("changed map must be refused");
+        };
+        assert!(
+            error.to_string().contains("discovery program map changed"),
+            "{error}"
+        );
+    }
+
+    #[test]
     fn one_packet_folds_as_the_recorded_reference() {
         // The fold harness/features/mpegts-pes/corpus.json records for this input.
         let totals = run("ts188-basic.ts", &["188", "1"]);
