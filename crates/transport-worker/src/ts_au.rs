@@ -712,6 +712,20 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                 if let Some(original) = deferred_continuity {
                     return Ok(original);
                 }
+                if request.probe_dts_core
+                    && let ReaderEvent::Unsupported { track, error } = &event
+                {
+                    return Ok(refused(
+                        totals,
+                        &format_args!(
+                            "DTS discovery refused program {} PID {} configuration {} ({error})",
+                            track.program(),
+                            track.stream().pid,
+                            track.configuration_epoch(),
+                        ),
+                        at,
+                    ));
+                }
                 let recovery = match &event {
                     ReaderEvent::Interrupted { cause, .. }
                         if single_entity
@@ -920,6 +934,51 @@ mod tests {
         let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
         assert_eq!(pool.used(), baseline);
         totals
+    }
+
+    #[test]
+    fn repeated_dts_discovery_reports_the_same_source_refusal() {
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut input = include_bytes!(
+            "../../../harness/features/mpegts-dts-core/inputs/dts-core-unlabelled-private-data.ts"
+        )
+        .to_vec();
+        let sync = input
+            .windows(4)
+            .position(|window| window == [0x7f, 0xfe, 0x80, 0x01])
+            .expect("first source DTS sync");
+        input[sync] = 0;
+        let request = Request {
+            input: Bytes::copy_from_slice(&pool, &input).unwrap(),
+            format: PacketFormat::Ts188,
+            program: 7,
+            namespace: DescriptorNamespace::Unspecified,
+            unlabelled_dts_core: None,
+            probe_dts_core: true,
+            pcr_policy: triergon_mpegts::compat::pes::PcrPolicy::IgnoreReservedBits,
+            following: BudgetVec::new(&pool),
+        };
+        let retained = pool.used();
+        let mut first = None;
+        for _ in 0..50 {
+            let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
+            assert_eq!((totals.packets, totals.bytes, totals.digest), (0, 0, 0));
+            let refusal = totals.refusal.expect("malformed DTS remains unsupported");
+            assert!(
+                refusal
+                    .reason
+                    .starts_with("DTS discovery refused program 7 PID 256 configuration "),
+                "{refusal:?}"
+            );
+            assert!(
+                refusal
+                    .reason
+                    .contains("MPEG-TS private PES does not prove DTS core")
+            );
+            let facts = (refusal.reason, refusal.cause);
+            assert_eq!(first.get_or_insert_with(|| facts.clone()), &facts);
+            assert_eq!(pool.used(), retained);
+        }
     }
 
     #[test]
