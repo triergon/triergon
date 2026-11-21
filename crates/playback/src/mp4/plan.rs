@@ -224,6 +224,7 @@ impl SourceRow {
 #[derive(Debug)]
 pub struct PreparedMp4 {
     pub(crate) read_scope: crate::mp4::open::MetadataReadScope,
+    /// Whether the demux view recovers truncated and out-of-source media.
     pub(crate) demux_recovery: bool,
     /// A single track's first sample declared at or beyond the end of the media
     /// read while indexing. Only the physical end of the source shows whether it
@@ -232,8 +233,14 @@ pub struct PreparedMp4 {
     pub(crate) source: triergon_core::SourceId,
     pub(crate) opening_generation: u64,
     pub(crate) source_length: Option<u64>,
+    // `view`, `demux_front` and `demux_recovery` take five combinations between
+    // them and stay three byte tests: `rows`, `row` and `demux_row` read them per
+    // packet, where each engine state that became one enum cost instructions.
     pub(crate) view: PlanView,
+    /// Whether the demux view is of metadata read before its media, continued forward.
     pub(crate) demux_front: bool,
+    /// Whether rows are delivered in the demux view's order from cached media; set
+    /// while a forward source is read, so not part of the view.
     pub(crate) demux_order_replay: bool,
     pub(crate) front_boundary: Option<iso::compat::mov::front::FrontReadBoundary>,
     pub(crate) empty_duration: Option<i64>,
