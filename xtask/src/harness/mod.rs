@@ -17,6 +17,7 @@ pub mod linux;
 #[cfg(test)]
 mod linux_tests;
 pub mod manifest;
+pub mod measured;
 pub mod memory;
 pub mod oracle;
 pub mod parity;

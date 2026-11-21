@@ -11,7 +11,8 @@
 //! Every upload lands under `qualification/`, which the archive expires 90 days
 //! after upload. A set moves under `evidence/`, which is kept, only when a result
 //! cites it, so nothing is kept that nothing cites. A set's index entry lists the
-//! gate results it holds, which later gate runs reuse once it is kept.
+//! gate results it holds, which later gate runs reuse once it is kept, each with
+//! its gate target and what it measured, which the status tables are rendered from.
 
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Read, Write};
@@ -19,6 +20,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::archive::{TarFiles, TarReader};
+use crate::harness::measured::{Measured, Source};
+use crate::harness::policy::Policy;
+use crate::harness::reuse;
 use crate::json::{self, Value};
 use crate::sha256;
 
@@ -425,8 +429,8 @@ fn aws_cp(from: &str, to: &str) -> Result<(), String> {
 /// `cargo xtask evidence upload SET ARCHIVE`: upload a packed set under
 /// `qualification/SET/`, where it expires 90 days after upload unless promoted,
 /// and print the entry to add to the index.
-pub fn upload(name: &str, archive: &Path) -> Result<String, String> {
-    let (key, entry) = entry(name, archive, None)?;
+pub fn upload(root: &Path, name: &str, archive: &Path) -> Result<String, String> {
+    let (key, entry) = entry(root, name, archive, None)?;
     let location = archive_location()?;
     aws_cp(&archive.display().to_string(), &format!("{location}/{key}"))?;
     Ok(entry)
@@ -436,8 +440,14 @@ pub fn upload(name: &str, archive: &Path) -> Result<String, String> {
 /// `qualification/` it goes to, without uploading: for a host that packs a set but
 /// holds no archive credentials, whose upload streams through another machine.
 /// `key` names another key under `qualification/` that the pack was or will be
-/// uploaded to, ending in the pack's SHA-256 and suffix as every key does.
-pub fn entry(name: &str, archive: &Path, key: Option<&str>) -> Result<(String, String), String> {
+/// uploaded to, ending in the pack's SHA-256 and suffix as every key does. Results
+/// are graded against `root`'s policy for what they measured.
+pub fn entry(
+    root: &Path,
+    name: &str,
+    archive: &Path,
+    key: Option<&str>,
+) -> Result<(String, String), String> {
     if name.is_empty()
         || !name
             .bytes()
@@ -473,7 +483,7 @@ pub fn entry(name: &str, archive: &Path, key: Option<&str>) -> Result<(String, S
             ));
         }
     };
-    let results = gate_results(archive, compression)?;
+    let results = gate_results(archive, compression, Policy::load(root)?)?;
     let mut entry = vec![
         ("name", Value::str(name)),
         ("path", Value::str(name)),
@@ -490,29 +500,91 @@ pub fn entry(name: &str, archive: &Path, key: Option<&str>) -> Result<(String, S
     Ok((key, json::to_python(&entry, Some(1))))
 }
 
-/// The fresh gate results a packed set holds ([`crate::harness::reuse`]), which a
-/// later gate run reuses once the set is kept.
-fn gate_results(archive: &Path, compression: Compression) -> Result<Vec<Value>, String> {
-    struct Results {
-        entries: Vec<(String, Vec<u8>)>,
+/// The fresh gate results a packed set holds ([`reuse::listed`]), which a later gate
+/// run reuses once the set is kept, each with what it measured ([`Measured`]) where
+/// its command measures, graded against `policy`. The pack is read twice: for the
+/// results, then for the reports beside them.
+fn gate_results(
+    archive: &Path,
+    compression: Compression,
+    policy: Policy,
+) -> Result<Vec<Value>, String> {
+    let results = read_pack(archive, compression, |path| {
+        path.rsplit('/').next() == Some(reuse::RESULT)
+    })?;
+    let mut listed = reuse::listed(&results)?;
+    // Each result's directory and where its command writes what it measured.
+    let sources: Vec<Option<(String, Source)>> = listed
+        .iter()
+        .map(|result| {
+            let path = result.get("path").and_then(Value::as_str)?;
+            let command = result.get("command").and_then(Value::as_str)?;
+            let directory = path.rsplit_once('/').map_or("", |(directory, _)| directory);
+            Some((directory.to_owned(), Source::of(command)?))
+        })
+        .collect();
+    if sources.iter().all(Option::is_none) {
+        return Ok(listed);
+    }
+    let reports = read_pack(archive, compression, |path| {
+        sources.iter().flatten().any(|(directory, source)| {
+            below(path, directory).is_some_and(|file| source.reads(file))
+        })
+    })?;
+    for (result, source) in listed.iter_mut().zip(&sources) {
+        let (Some((directory, source)), Value::Object(fields)) = (source, result) else {
+            continue;
+        };
+        let read: Vec<(String, Vec<u8>)> = reports
+            .iter()
+            .filter_map(|(path, data)| {
+                let file = below(path, directory).filter(|file| source.reads(file))?;
+                Some((file.to_owned(), data.clone()))
+            })
+            .collect();
+        let rows = source.rows(&read).map_err(|e| format!("{directory}/{e}"))?;
+        if let Some(measured) = Measured::of_rows(&rows, policy) {
+            fields.push(("measured".into(), measured.to_value()));
+        }
+    }
+    Ok(listed)
+}
+
+/// `path` below `directory` of a pack (the pack's root for an empty one).
+fn below<'a>(path: &'a str, directory: &str) -> Option<&'a str> {
+    if directory.is_empty() {
+        Some(path)
+    } else {
+        path.strip_prefix(directory)?.strip_prefix('/')
+    }
+}
+
+/// Every file of a pack whose path, without a leading `./`, `keep` accepts, with its
+/// bytes, in the pack's order.
+fn read_pack(
+    archive: &Path,
+    compression: Compression,
+    keep: impl Fn(&str) -> bool,
+) -> Result<Vec<(String, Vec<u8>)>, String> {
+    struct Kept<F> {
+        keep: F,
+        files: Vec<(String, Vec<u8>)>,
         current: bool,
     }
-    impl TarFiles for Results {
+    impl<F: Fn(&str) -> bool> TarFiles for Kept<F> {
         fn begin(&mut self, path: &str, _: u64) -> Result<(), String> {
-            self.current = path.rsplit('/').next() == Some(crate::harness::reuse::RESULT);
+            let path = path.trim_start_matches("./");
+            self.current = (self.keep)(path);
             if self.current {
-                self.entries
-                    .push((path.trim_start_matches("./").to_owned(), Vec::new()));
+                self.files.push((path.to_owned(), Vec::new()));
             }
             Ok(())
         }
         fn data(&mut self, chunk: &[u8]) -> Result<(), String> {
-            if self.current {
-                self.entries
-                    .last_mut()
-                    .expect("begun")
-                    .1
-                    .extend_from_slice(chunk);
+            if self.current
+                && let Some((_, data)) = self.files.last_mut()
+            {
+                data.extend_from_slice(chunk);
             }
             Ok(())
         }
@@ -521,32 +593,133 @@ fn gate_results(archive: &Path, compression: Compression) -> Result<Vec<Value>, 
             Ok(())
         }
     }
-    let mut tar = TarReader::new(Results {
-        entries: Vec::new(),
+    let mut tar = TarReader::new(Kept {
+        keep,
+        files: Vec::new(),
         current: false,
     });
     compression.unpack(archive, &mut tar)?;
-    crate::harness::reuse::listed(&tar.finish()?.entries)
+    Ok(tar.finish()?.files)
 }
 
 /// `cargo xtask evidence promote SET`: copy an indexed set from `qualification/`
 /// to `evidence/` inside the archive, then record the new key and retention in
 /// its file. Promote a set when a result cites it.
 pub fn promote(root: &Path, name: &str) -> Result<String, String> {
-    set(root, name)?;
-    let relative = set_path(name)?;
-    let path = root.join(&relative);
-    let text = fs::read_to_string(&path).map_err(|e| format!("{relative}: {e}"))?;
-    let mut set = json::parse_strict(&text).map_err(|e| format!("{relative}: {e}"))?;
-    if json::to_python(&set, Some(1)) + "\n" != text {
-        return Err(format!("{relative} is not in its canonical layout"));
-    }
+    let mut set = canonical_set(root, name)?;
     let (from, to) = promote_set(&mut set, name)?;
     let location = archive_location()?;
     aws_cp(&format!("{location}/{from}"), &format!("{location}/{to}"))?;
-    fs::write(&path, json::to_python(&set, Some(1)) + "\n")
-        .map_err(|e| format!("{relative}: {e}"))?;
+    write_set(root, name, &set)?;
     Ok(format!("{name}: {from} -> {to}"))
+}
+
+/// The set `name` of the index, read strictly from a file in its canonical layout,
+/// for a command that rewrites it.
+fn canonical_set(root: &Path, name: &str) -> Result<Value, String> {
+    set(root, name)?;
+    let relative = set_path(name)?;
+    let text = fs::read_to_string(root.join(&relative)).map_err(|e| format!("{relative}: {e}"))?;
+    let set = json::parse_strict(&text).map_err(|e| format!("{relative}: {e}"))?;
+    if json::to_python(&set, Some(1)) + "\n" != text {
+        return Err(format!("{relative} is not in its canonical layout"));
+    }
+    Ok(set)
+}
+
+fn write_set(root: &Path, name: &str, set: &Value) -> Result<(), String> {
+    let relative = set_path(name)?;
+    fs::write(root.join(&relative), json::to_python(set, Some(1)) + "\n")
+        .map_err(|e| format!("{relative}: {e}"))
+}
+
+/// `cargo xtask evidence measure [SET...]`: record in the index entries of the named
+/// sets, or of every kept set listing a result without its gate target, each result's
+/// target and what it measured, as `evidence entry` records them for a new set, read
+/// from the set's archived pack. Every other field of each result must be the one the
+/// pack holds. A pack this downloads is removed once read. Reports each set it
+/// records, then fails naming every set it could not.
+pub fn measure(root: &Path, names: &[String]) -> Result<String, String> {
+    let policy = Policy::load(root)?;
+    let names: Vec<String> = if names.is_empty() {
+        sets(root)?
+            .iter()
+            .filter(|set| s(set, "retention") == Some(Retention::Kept.label()))
+            .filter(|set| {
+                set.get("results")
+                    .and_then(Value::as_array)
+                    .unwrap_or_default()
+                    .iter()
+                    .any(|result| result.get("target").is_none())
+            })
+            .filter_map(|set| s(set, "name").map(str::to_owned))
+            .collect()
+    } else {
+        names.to_vec()
+    };
+    let mut lines = Vec::new();
+    let mut failed = Vec::new();
+    for name in &names {
+        match measure_set(root, name, policy) {
+            Ok(line) => lines.push(line),
+            Err(error) => failed.push(format!("{name}: {error}")),
+        }
+    }
+    let done = format!("{} of {} sets recorded", lines.len(), names.len());
+    lines.extend(failed.iter().cloned());
+    lines.push(done);
+    if failed.is_empty() {
+        Ok(lines.join("\n"))
+    } else {
+        Err(lines.join("\n"))
+    }
+}
+
+fn measure_set(root: &Path, name: &str, policy: Policy) -> Result<String, String> {
+    let mut set = canonical_set(root, name)?;
+    let (cached, _) = cache_path(root, &set)?;
+    let downloaded = !cached.is_file();
+    let (pack, compression) = download(root, &set)?;
+    let fresh = gate_results(&pack, compression, policy);
+    if downloaded {
+        let _ = fs::remove_file(&pack);
+    }
+    let fresh = fresh?;
+    let Some(Value::Array(results)) = members_mut(&mut set, "results") else {
+        return Err("the index lists no gate results of it".into());
+    };
+    if results.len() != fresh.len() {
+        return Err(format!(
+            "the index lists {} gate results, the pack holds {}",
+            results.len(),
+            fresh.len()
+        ));
+    }
+    let same =
+        |a: &Value, b: &Value| a.get("path") == b.get("path") && a.get("key") == b.get("key");
+    let mut measured = 0;
+    for result in results.iter_mut() {
+        let path = s(result, "path").unwrap_or_default().to_owned();
+        let read = fresh
+            .iter()
+            .find(|candidate| same(result, candidate))
+            .ok_or_else(|| format!("{path}: the pack holds no such result"))?;
+        let Value::Object(fields) = &*result else {
+            return Err(format!("{path}: not an object"));
+        };
+        for (key, value) in fields {
+            if key != "target" && key != "measured" && read.get(key) != Some(value) {
+                return Err(format!("{path}: {key} differs from the pack's"));
+            }
+        }
+        measured += usize::from(read.get("measured").is_some());
+        *result = read.clone();
+    }
+    write_set(root, name, &set)?;
+    Ok(format!(
+        "{name}: {} results, {measured} with what they measured",
+        fresh.len()
+    ))
 }
 
 /// Rewrite set `name` as kept, returning its old and new keys.
@@ -613,15 +786,13 @@ pub const ADDRESSES: &str = ".research/evidence-addresses";
 /// in [`ADDRESSES`] or else from the archive with the `aws` CLI, and checked
 /// against the SHA-256 the index records.
 fn download(root: &Path, set: &Value) -> Result<(PathBuf, Compression), String> {
+    let (download, compression) = cache_path(root, set)?;
     let (key, expected) = (
         s(set, "key").ok_or("set without key")?,
         s(set, "sha256").ok_or("set without sha256")?,
     );
-    let compression =
-        Compression::of(key).ok_or_else(|| format!("{key}: not a .tar.gz or .tar.zst"))?;
-    let cache = root.join(".research/evidence-cache");
-    fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
-    let download = cache.join(format!("{expected}{}", compression.suffix()));
+    let cache = download.parent().expect("a file of the cache");
+    fs::create_dir_all(cache).map_err(|e| e.to_string())?;
     if !download.is_file() {
         let partial = cache.join(format!("{expected}.{}.part", std::process::id()));
         let name = s(set, "name").unwrap_or_default();
@@ -640,6 +811,21 @@ fn download(root: &Path, set: &Value) -> Result<(PathBuf, Compression), String> 
         return Err(format!("{key}: SHA-256 differs from the index"));
     }
     Ok((download, compression))
+}
+
+/// Where [`download`] keeps the pack of `set`, and how it is compressed.
+fn cache_path(root: &Path, set: &Value) -> Result<(PathBuf, Compression), String> {
+    let (key, expected) = (
+        s(set, "key").ok_or("set without key")?,
+        s(set, "sha256").ok_or("set without sha256")?,
+    );
+    let compression =
+        Compression::of(key).ok_or_else(|| format!("{key}: not a .tar.gz or .tar.zst"))?;
+    let cache = root.join(".research/evidence-cache");
+    Ok((
+        cache.join(format!("{expected}{}", compression.suffix())),
+        compression,
+    ))
 }
 
 /// The address [`ADDRESSES`] gives set `name`, if the file lists it.
@@ -699,7 +885,7 @@ pub fn restorable(root: &Path) -> Result<Vec<(String, String)>, String> {
                 .and_then(Value::as_array)
                 .unwrap_or_default()
                 .iter()
-                .any(crate::harness::reuse::restored)
+                .any(reuse::restored)
         })
         .filter_map(|set| Some((s(set, "name")?.to_owned(), s(set, "key")?.to_owned())))
         .collect())

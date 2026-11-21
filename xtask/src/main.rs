@@ -104,6 +104,9 @@ commands:
                               (harness/evidence/sets/SET.json; TRIERGON_EVIDENCE_ARCHIVE)
   evidence restorable         the name and key of each kept set holding results a gate run
                               restores when it reuses them
+  evidence measure [SET]...   record each gate result's target and what it measured in the
+                              index entries of SET, or of every kept set lacking them, read
+                              from the archived packs (TRIERGON_EVIDENCE_ARCHIVE)
   playback-golds DIR [--check]
                  convert the FFprobe captures of evidence set playback-terminal-matrix-ffprobe,
                  unpacked in DIR, into the playback terminal-media records; --check compares
@@ -375,7 +378,7 @@ fn evidence(root: &Path, args: &[String]) -> Task {
             Ok(())
         }
         [command, set, archive] if command == "upload" => {
-            println!("{}", evidence::upload(set, Path::new(archive))?);
+            println!("{}", evidence::upload(root, set, Path::new(archive))?);
             Ok(())
         }
         [command, set, archive, rest @ ..] if command == "entry" => {
@@ -384,11 +387,15 @@ fn evidence(root: &Path, args: &[String]) -> Task {
                 [flag, key] if flag == "--key" => Some(key.as_str()),
                 _ => return Err("usage: evidence entry SET ARCHIVE [--key KEY]".into()),
             };
-            println!("{}", evidence::entry(set, Path::new(archive), key)?.1);
+            println!("{}", evidence::entry(root, set, Path::new(archive), key)?.1);
             Ok(())
         }
         [command, set] if command == "promote" => {
             println!("{}", evidence::promote(root, set)?);
+            Ok(())
+        }
+        [command, sets @ ..] if command == "measure" => {
+            println!("{}", evidence::measure(root, sets)?);
             Ok(())
         }
         [command] if command == "restorable" => {
@@ -400,7 +407,7 @@ fn evidence(root: &Path, args: &[String]) -> Task {
         _ => Err(
             "usage: evidence pack DIR OUT | evidence upload SET ARCHIVE \
                   | evidence entry SET ARCHIVE [--key KEY] | evidence promote SET | evidence fetch SET [DIR] \
-                  | evidence restorable"
+                  | evidence restorable | evidence measure [SET]..."
                 .into(),
         ),
     }

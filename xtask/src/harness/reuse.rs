@@ -389,16 +389,17 @@ pub fn listed(entries: &[(String, Vec<u8>)]) -> R<Vec<Value>> {
         if result.get("reused").is_some_and(|r| *r != Value::Null) {
             continue;
         }
+        let component = |name: &str| {
+            result
+                .get("components")
+                .and_then(|c| c.get(name))
+                .cloned()
+                .unwrap_or(Value::Null)
+        };
         results.push(Value::object([
             ("path", Value::str(path)),
-            (
-                "command",
-                result
-                    .get("components")
-                    .and_then(|c| c.get("command"))
-                    .cloned()
-                    .unwrap_or(Value::Null),
-            ),
+            ("command", component("command")),
+            ("target", component("target")),
             ("key", result.get("key").cloned().unwrap_or(Value::Null)),
             (
                 "status",

@@ -31,6 +31,15 @@ impl Bound {
             _ => None,
         }
     }
+
+    /// Whether a case's upper 95% bound `value` holds under `policy`.
+    pub fn holds(self, value: f64, policy: Policy) -> bool {
+        match self {
+            Bound::Runtime => value > 0.0 && value <= policy.runtime.ceiling,
+            Bound::Heap => value < policy.memory.heap,
+            Bound::TotalRss => value > 0.0 && value < policy.memory.total_rss,
+        }
+    }
 }
 
 impl fmt::Display for Bound {
@@ -50,6 +59,13 @@ impl fmt::Display for Bound {
 pub struct CaseBounds {
     pub id: String,
     values: [Option<f64>; 3],
+}
+
+impl CaseBounds {
+    /// The case's upper 95% bound of `bound`, if its row measured it.
+    pub fn value(&self, bound: Bound) -> Option<f64> {
+        self.values[bound as usize]
+    }
 }
 
 /// The bounds a case row records, or `None` for a row the bounds do not grade: an
@@ -179,11 +195,7 @@ pub fn verdict(
     for case in cases {
         for (bound, value) in Bound::ALL.into_iter().zip(case.values) {
             let Some(value) = value else { continue };
-            let holds = match bound {
-                Bound::Runtime => value > 0.0 && value <= policy.runtime.ceiling,
-                Bound::Heap => value < policy.memory.heap,
-                Bound::TotalRss => value > 0.0 && value < policy.memory.total_rss,
-            };
+            let holds = bound.holds(value, policy);
             let listed = open.contains(&(bound, case.id.clone()));
             let shown = if value.is_finite() {
                 format!("{value:.4}")

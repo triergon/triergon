@@ -254,10 +254,11 @@ fn an_entry_takes_the_key_its_pack_lies_at() {
     fs::write(dir.join("set/run.log"), b"done\n").unwrap();
     let out = dir.join("set.tar.gz");
     let sha = pack_command(&dir.join("set"), &out).unwrap();
-    let (own, _) = entry("gate-shard", &out, None).unwrap();
+    let root = crate::root();
+    let (own, _) = entry(&root, "gate-shard", &out, None).unwrap();
     assert_eq!(own, format!("qualification/gate-shard/{sha}.tar.gz"));
     let at = format!("qualification/gate-runs/run-1/shard-1/{sha}.tar.gz");
-    let (key, printed) = entry("gate-shard", &out, Some(&at)).unwrap();
+    let (key, printed) = entry(&root, "gate-shard", &out, Some(&at)).unwrap();
     assert_eq!(key, at);
     assert!(printed.contains(&format!("\"key\": \"{at}\"")), "{printed}");
     for wrong in [
@@ -266,9 +267,107 @@ fn an_entry_takes_the_key_its_pack_lies_at() {
         format!("qualification/gate-runs/run-1/shard-1/{sha}.tar.zst"),
         format!("qualification/gate-runs/run-1/x{sha}.tar.gz"),
     ] {
-        assert!(entry("gate-shard", &out, Some(&wrong)).is_err(), "{wrong}");
+        assert!(
+            entry(&root, "gate-shard", &out, Some(&wrong)).is_err(),
+            "{wrong}"
+        );
     }
     fs::remove_dir_all(dir).unwrap();
+}
+
+/// A pack of a graded feature, its report, and a test profile's result.
+fn graded_pack(dir: &Path) -> PathBuf {
+    let result = |command: &str| {
+        format!(
+            r#"{{"schema": "gate-result-v1", "key": "{command}", "status": 0, "report_sha256": null,
+                 "reused": null, "components": {{"command": "{command}", "target": "aarch64-unknown-linux-gnu"}}}}"#
+        )
+    };
+    let set = dir.join("set");
+    fs::create_dir_all(set.join("graded/f")).unwrap();
+    fs::create_dir_all(set.join("tests/checked")).unwrap();
+    fs::write(set.join("graded/f/gate-result.json"), result("grade")).unwrap();
+    fs::write(
+        set.join("graded/f/report.json"),
+        r#"{"cases": [{"id": "a", "timing": {"status": "measured", "ratio": {"upper_95": 0.5}},
+                       "memory": {"status": "qualified", "heap_ratio_upper_95": 0.25,
+                                  "total_rss_ratio_upper_95": 0.75}}]}"#,
+    )
+    .unwrap();
+    fs::write(
+        set.join("tests/checked/gate-result.json"),
+        result("gate test"),
+    )
+    .unwrap();
+    let out = dir.join("set.tar.gz");
+    pack_command(&set, &out).unwrap();
+    out
+}
+
+#[test]
+fn an_entry_records_each_results_target_and_what_it_measured() {
+    let dir = crate::walk::scratch("evidence-measured");
+    let out = graded_pack(&dir);
+    let (_, printed) = entry(&crate::root(), "graded", &out, None).unwrap();
+    let entry = json::parse(&printed).unwrap();
+    let results = entry.get("results").and_then(Value::as_array).unwrap();
+    let graded = json::parse(
+        r#"{"path": "graded/f/gate-result.json", "command": "grade",
+            "target": "aarch64-unknown-linux-gnu", "key": "grade", "status": 0,
+            "report_sha256": null, "measured": {
+              "runtime": {"upper": 0.5, "worst": "a", "passing": 1, "cases": 1},
+              "memory": {"heap": 0.25, "total_rss": 0.75, "lower": 1, "cases": 1}}}"#,
+    )
+    .unwrap();
+    assert_eq!(results[0], graded);
+    // A test profile measures nothing.
+    assert_eq!(s(&results[1], "command"), Some("gate test"));
+    assert!(results[1].get("measured").is_none());
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn measuring_an_indexed_set_records_what_its_pack_holds() {
+    let root = crate::walk::scratch("evidence-measure");
+    let out = graded_pack(&root);
+    let sha = sha256::file_hex(&out).unwrap();
+    let cache = root.join(".research/evidence-cache");
+    fs::create_dir_all(&cache).unwrap();
+    fs::copy(&out, cache.join(format!("{sha}.tar.gz"))).unwrap();
+    // The entry as indexed before results recorded their target.
+    let indexed = |key: &str| {
+        format!(
+            r#"{{"name": "graded", "retention": "retained", "key": "evidence/graded/{sha}.tar.gz",
+                 "sha256": "{sha}", "results": [
+                 {{"path": "graded/f/gate-result.json", "command": "grade", "key": "{key}", "status": 0,
+                   "report_sha256": null}},
+                 {{"path": "tests/checked/gate-result.json", "command": "gate test", "key": "gate test",
+                   "status": 0, "report_sha256": null}}]}}"#
+        )
+    };
+    let write = |key: &str| {
+        let set = json::parse(&indexed(key)).unwrap();
+        fs::create_dir_all(root.join(SETS)).unwrap();
+        write_set(&root, "graded", &set).unwrap();
+    };
+    let policy = Policy::load(&crate::root()).unwrap();
+    write("grade");
+    assert_eq!(
+        measure_set(&root, "graded", policy).unwrap(),
+        "graded: 2 results, 1 with what they measured"
+    );
+    let set = set(&root, "graded").unwrap();
+    let results = set.get("results").and_then(Value::as_array).unwrap();
+    assert_eq!(s(&results[0], "target"), Some("aarch64-unknown-linux-gnu"));
+    assert!(results[0].get("measured").is_some());
+    // A pack already cached stays; an entry the pack does not hold is refused.
+    assert!(cache.join(format!("{sha}.tar.gz")).is_file());
+    write("another");
+    assert_eq!(
+        measure_set(&root, "graded", policy).unwrap_err(),
+        "graded/f/gate-result.json: the pack holds no such result"
+    );
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
