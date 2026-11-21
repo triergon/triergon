@@ -563,6 +563,18 @@
       ],
       "unmeasured": "dts-parser-trace"
     },
+    {"area": "Subtitle extraction", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "text-extraction"},
+    {"area": "Subtitle extraction source facts", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "text-extraction-oracle"},
+    {"area": "Subtitle charset streams", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "charset-streams"},
+    {"area": "Subtitle charset packets", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "charset-packets"},
+    {"area": "tx3g decoder configuration", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "tx3g-configuration"},
+    {"area": "tx3g description fields", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "tx3g-config-oracle"},
+    {"area": "tx3g semantics", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "tx3g-semantics"},
+    {"area": "Subtitle renderer context", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "renderer-context"},
+    {"area": "DVB source packets", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "dvb-source"},
+    {"area": "PGS segment fields", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "pgs-segments"},
+    {"area": "VobSub index lines", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "vobsub-index"},
+    {"area": "Subtitle carriage traces", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "carriage-trace"},
     {
       "area": "Subtitles, text",
       "targets": [
