@@ -5310,20 +5310,6 @@
   },
   {
    "lane": "opus",
-   "name": "preskip-3840-celt_mo_2.5.opus",
-   "path": ".research/opus-generated/preskip-3840-celt_mo_2.5.opus",
-   "bytes": 59393,
-   "sha256": "ad358ed84c78d52c892da937604ffe4478dd9888d67e7ef9c9b2a4a5b367da56"
-  },
-  {
-   "lane": "opus",
-   "name": "preskip-3857-celt_st_2.5.opus",
-   "path": ".research/opus-generated/preskip-3857-celt_st_2.5.opus",
-   "bytes": 119318,
-   "sha256": "19268fa9b39d26e7902782bedbc875ee02f42e4dc9f29d693a1d87546136e05f"
-  },
-  {
-   "lane": "opus",
    "name": "celt_st_20.opus",
    "path": ".research/opus-generated/celt_st_20.opus",
    "bytes": 103572,
