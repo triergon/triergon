@@ -20,6 +20,7 @@ mod normal;
 mod packed;
 mod packed_header;
 mod packing;
+mod reader;
 pub(crate) mod sync14;
 
 pub use carrier14::{
