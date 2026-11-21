@@ -80,38 +80,50 @@ fn input_video(kind: u8, repeat: bool, body: impl Fn(usize) -> Vec<u8>) -> (Tran
 
 #[test]
 fn independent_video_reads_no_prefix_and_preserves_the_complete_suffix() {
-    for kind in [0x1b, 0x24] {
-        for (chunk, grant, aud) in [(1, 1, false), (7, 43, true), (4096, 8192, false)] {
-            let (ts, offsets) = input_video(kind, true, |_| picture(kind, aud));
-            assert!(offsets[1] - offsets[0] > 3 * 188, "multi-carrier PES");
-            let mut sequential = Source::new(&ts.bytes, chunk, grant, ReaderLimits::default());
-            let (_, expected) = sequential.suffix().unwrap();
-            assert_eq!(expected.len(), FRAMES);
-            let mut source = Source::new(&ts.bytes, chunk, grant, ReaderLimits::default());
-            source
-                .reader
-                .request_seek_and_index(request(3), FRAMES)
-                .unwrap();
-            assert_eq!(source.suffix().unwrap().1, expected[3..]);
-            for index in [7, 1, 4, 4, 9] {
-                source.reads.clear();
-                source.floor = offsets[index];
-                let start = source.reader.request_seek(request(index)).unwrap();
-                assert_eq!(start.offset, offsets[index], "kind {kind:x}");
-                let (result, actual) = source.suffix().unwrap();
-                let result = result.unwrap();
-                assert_eq!(result.method, SeekMethod::Index);
-                assert_eq!(result.scanned_bytes, 0);
-                assert!(!result.replays_from_start);
-                assert_eq!(actual, expected[index..]);
-                assert_eq!(source.reads.first().unwrap().start, offsets[index]);
-                assert_eq!(
-                    source.reads.iter().map(|r| r.end - r.start).sum::<u64>(),
-                    ts.bytes.len() as u64 - offsets[index]
-                );
+    for format in [PacketFormat::Ts188, PacketFormat::M2ts192] {
+        for kind in [0x1b, 0x24] {
+            for (chunk, grant, aud) in [(1, 1, false), (7, 43, true), (4096, 8192, false)] {
+                let (mut ts, mut offsets) = input_video(kind, true, |_| picture(kind, aud));
+                assert!(offsets[1] - offsets[0] > 3 * 188, "multi-carrier PES");
+                if format == PacketFormat::M2ts192 {
+                    ts.bytes = ts.m2ts();
+                    for offset in &mut offsets {
+                        *offset = *offset / 188 * 192;
+                    }
+                }
+                let limits = ReaderLimits {
+                    format,
+                    ..ReaderLimits::default()
+                };
+                let mut sequential = Source::new(&ts.bytes, chunk, grant, limits);
+                let (_, expected) = sequential.suffix().unwrap();
+                assert_eq!(expected.len(), FRAMES);
+                let mut source = Source::new(&ts.bytes, chunk, grant, limits);
+                source
+                    .reader
+                    .request_seek_and_index(request(3), FRAMES)
+                    .unwrap();
+                assert_eq!(source.suffix().unwrap().1, expected[3..]);
+                for index in [7, 1, 4, 4, 9] {
+                    source.reads.clear();
+                    source.floor = offsets[index];
+                    let start = source.reader.request_seek(request(index)).unwrap();
+                    assert_eq!(start.offset, offsets[index], "kind {kind:x}");
+                    let (result, actual) = source.suffix().unwrap();
+                    let result = result.unwrap();
+                    assert_eq!(result.method, SeekMethod::Index);
+                    assert_eq!(result.scanned_bytes, 0);
+                    assert!(!result.replays_from_start);
+                    assert_eq!(actual, expected[index..]);
+                    assert_eq!(source.reads.first().unwrap().start, offsets[index]);
+                    assert_eq!(
+                        source.reads.iter().map(|r| r.end - r.start).sum::<u64>(),
+                        ts.bytes.len() as u64 - offsets[index]
+                    );
+                }
+                source.reader.close();
+                assert_eq!(source.pool.used(), Budget::control_storage_bytes());
             }
-            source.reader.close();
-            assert_eq!(source.pool.used(), Budget::control_storage_bytes());
         }
     }
 }
