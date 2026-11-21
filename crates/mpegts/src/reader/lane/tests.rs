@@ -27,9 +27,9 @@ fn coalescing_freeze_and_packet_publication_retry_without_duplicate_bytes_or_ori
                 return None;
             };
             let done = if checkpoints == 0 {
-                matches!(build.coalesced, Coalesced::Copying(_)) && build.nal == unit.nals().len()
+                build.bytes.is_none() && build.nal == unit.nals().len()
             } else {
-                matches!(build.coalesced, Coalesced::Ready(_)) && build.origin == lane.pieces.len()
+                build.bytes.is_some() && build.origin == lane.pieces.len()
             };
             done.then(|| unit.segments().flatten().copied().collect::<Vec<_>>())
         });
