@@ -63,8 +63,8 @@ impl<M> NalPacketJob<'_, M> {
             if let Some(status) = plan.advance(&mut self.state, input, work, cancel)? {
                 return Ok(status);
             }
-            // Preparation scratch contains no allocations.
-            // The next emission loop performs the original Reserve cancel check.
+            // Preparation scratch holds no allocations. The emission loop checks
+            // cancellation before it reserves.
             self.phase = PacketPhase::Emit(PacketEmission::new());
         }
         match &mut self.phase {
@@ -517,7 +517,7 @@ impl PacketPlan {
 
         // Only the rest of this packet can already supply the parameter sets.
         // Charge each length and header. The regular scan still owns the input
-        // and reports malformed lengths and headers at its original boundary.
+        // and reports malformed lengths and headers where it reaches them.
         while valid.remaining_nals != 0 {
             if valid.offset == bytes.len() && valid.prefix_read == 0 {
                 break;

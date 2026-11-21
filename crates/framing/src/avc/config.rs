@@ -475,8 +475,8 @@ impl AvcConfigParser {
         self.failure
     }
 
-    // Only publication is generic: the grammar walk is shared by source and
-    // receiver slots, without an intermediate source-record publication slot.
+    // One record walk serves the strict and the receiver slot; `publish` makes the
+    // slot's value from the record directly.
     #[inline]
     pub(crate) fn step_into_with<T>(
         &mut self,
@@ -703,7 +703,7 @@ impl AvcNalDescriptor {
     };
 
     fn new(payload: &Range<usize>, kind: AvcConfigArrayKind, header: NalHeader) -> Self {
-        // The scan checked the end using the original two-byte length.
+        // The scan checked the end against the two-byte length as coded.
         let length = payload.len();
         debug_assert!(u16::try_from(length).is_ok());
         Self {

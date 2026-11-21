@@ -1,5 +1,6 @@
-//! Complete ordered hvcC NAL framing. Source configuration remains available;
-//! unknown arrays, duplicates and mismatches are never filtered or repaired.
+//! Every NAL unit of an `hvcC` record in record order, as Annex B. The record stays
+//! available; unknown arrays, duplicates and mismatched declarations are written as
+//! they are.
 use crate::nal::annexb::START_CODE;
 use crate::{BuildStep, hevc::HvcConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};

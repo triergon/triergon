@@ -1,6 +1,6 @@
-//! AV1CodecConfigurationRecord v1 facts from AOM's approved av1-isobmff v1.3.0.
-//! This parses record/framing syntax, not Sequence Header OBU payloads or their
-//! consistency with the fixed record fields and associated samples.
+//! The AV1CodecConfigurationRecord of the AV1 ISOBMFF binding v1.3.0: its fixed
+//! fields and the framing of its configuration OBUs. The payload of a Sequence
+//! Header OBU is not read, nor checked against the record's fields or samples.
 use crate::{
     BuildStep,
     av1::{Av1Obu, Av1ObuFraming, Av1ObuLimits, Av1ObuReader},

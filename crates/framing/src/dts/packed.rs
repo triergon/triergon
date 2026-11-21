@@ -1,5 +1,6 @@
-//! Original word-payload storage from ETSI TS102114 §3.4/5.3.
-//! Every source bit survives; byte-alignment zeros are labelled non-source bits.
+//! The word packings of a DTS stream (ETSI TS 102 114 §3.4, §5.3) and the payload
+//! of a record read in one of them. Every source bit is kept; the zero bits that pad
+//! the payload to whole bytes are marked as not coming from the source.
 use crate::dts::core_frame::CORE_SYNC;
 use crate::dts::reader::limit;
 use crate::dts::{DtsPackedBitLocation, DtsSourceIdentity};

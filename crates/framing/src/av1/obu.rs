@@ -1,6 +1,6 @@
-//! AV1 v1.0.0 Errata 1 framing facts, independently written from the
-//! specification. OBU payloads remain opaque; no operating-point filtering,
-//! trailing-bit removal, frame assembly, decoding or decoder-validity claim.
+//! Open bitstream units of AV1 v1.0.0 with Errata 1 (§5.3): headers, sizes and
+//! payload spans. Payloads stay unread: no operating point is selected, no
+//! trailing bits are removed and no frame is assembled.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,

@@ -349,9 +349,9 @@ impl ReceiverAvcConfigParser {
     /// and the error, once. `None` for a parser made with [`new`](Self::new),
     /// for every other failure, before a failure and on later calls.
     pub fn take_update_rejection(&mut self) -> Option<ReceiverAvcUpdateRejection> {
-        // A complete AVC record requires the six-byte prefix and a PPS count.
-        // No native result is inferred for other strict syntax/version errors,
-        // cancellation, resource refusals or failures after that header.
+        // A complete AVC record needs its six-byte prefix and a PPS count. Only a
+        // record that ends before its PPS count is rejected with its packet; every
+        // other failure is the parser's own.
         if !self.update_role || self.rejection_taken || self.raw.len() >= 7 {
             return None;
         }

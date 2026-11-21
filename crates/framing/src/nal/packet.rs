@@ -1356,7 +1356,7 @@ impl PacketPlan {
     // Known storage capacity lower bound, deduplicating raw caller aliases. A
     // larger allocator replacement peak may still require retryable pressure.
     // All terms are non-negative, so summing the job-invariant terms first
-    // overflows exactly when the original left-to-right sum overflowed.
+    // overflows exactly when a left-to-right sum of all terms would.
     #[cold]
     #[inline(never)]
     fn check_storage_bound(
@@ -1533,9 +1533,9 @@ impl<M> NalPacketJob<'_, M> {
     #[cold]
     #[inline(never)]
     fn fail(&mut self, e: Error) {
-        // A valid side-data configuration precedes payload parsing in
-        // the pinned receiver. Its change survives a physical packet
-        // error, while partial in-band availability never commits.
+        // The filters apply a valid side-data configuration before they parse the
+        // payload, so the new configuration survives a malformed packet; in-band
+        // parameter sets of a failed packet are never taken.
         if matches!(e, Error::Invalid(_) | Error::Truncated)
             && self.state.update_verified
             && let Some(configuration) = self.state.session.pending_update.take()

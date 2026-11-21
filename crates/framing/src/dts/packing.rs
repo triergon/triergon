@@ -1,6 +1,7 @@
-//! DTS low14-bit word payloads from ETSI TS102114 V1.2.1 §5.3 prose.
-//! Word order is explicit. Source words/high bits and final residual payload
-//! bits are retained; no sync autodetection, FSIZE scaling or padding is guessed.
+//! The payload of 14-bit DTS words, the low 14 bits of each 16-bit word (ETSI
+//! TS 102 114 V1.2.1 §5.3), in a byte order the caller names. The source words with
+//! their unused high bits and the payload bits after the last whole byte are kept;
+//! no sync word is searched for and no length is derived from `FSIZE`.
 use crate::dts::DtsSourceIdentity;
 use crate::dts::reader::limit;
 use std::sync::atomic::{AtomicBool, Ordering};

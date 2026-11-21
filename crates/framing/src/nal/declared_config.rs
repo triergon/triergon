@@ -1,8 +1,9 @@
-//! Validates externally declared record ranges, not ISO avcC/hvcC grammar.
+//! Parameter-set records whose layout the caller declares: the ranges of the
+//! length fields and arrays, not the `avcC` or `hvcC` grammar.
 //!
-//! Length fields are explicitly supplied generic big-endian integers. Neither
-//! field offsets nor array membership/completeness are inferred from the wire.
-//! The full record (including unknown/reserved bytes) remains authoritative.
+//! Length fields are big-endian integers of the declared widths. Neither field
+//! offsets nor which NAL units belong to an array are read from the bytes. The
+//! whole record, unknown and reserved bytes included, is kept.
 use crate::{
     BuildStep,
     nal::{Codec, ConfigInspection, LengthSize, NalHeader},

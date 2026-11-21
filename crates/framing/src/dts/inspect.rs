@@ -1,6 +1,7 @@
-//! Canonical DTS header source inspection from ETSI TS 102 114
-//! V1.6.1 clauses 3.4/5.3/5.4.2. This reports source bits and validation issues;
-//! publication is not bitstream acceptance, framing, decoder support or parity.
+//! The core frame header of a canonical DTS stream field by field (ETSI TS 102 114
+//! V1.6.1 §3.4, §5.3, §5.4.2): the source bits of each field and the constraints
+//! the header breaks. An inspection says nothing about the frame body or whether a
+//! decoder accepts the stream.
 use super::DtsSourceIdentity;
 use super::core_frame::{BITRATES, CHANNELS, CORE_SYNC, EXTENSION_SYNC, core_rate};
 use std::ops::Range;

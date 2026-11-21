@@ -1,4 +1,5 @@
-//! Original exact-bit header facts; output alignment zeros are never source bits.
+//! The core header in the first payload bits of a frame of any packing. Zero bits
+//! that pad the payload to whole bytes are never read as header bits.
 use crate::dts::core_frame::CORE_SYNC;
 use crate::dts::inspect::{required_header_bits, validate_header};
 use crate::dts::{

@@ -1,5 +1,6 @@
-//! Selected complete E-AC-3 BSI source facts, ATSC A/52:2018 Annex E Table E1.2.
-//! This opt-in inspector does not validate encoded audio, CRCs or stream groups.
+//! The complete bit stream information of an E-AC-3 frame (ATSC A/52:2018 Annex E,
+//! Table E1.2) with the source bits of each part. Coded audio, CRCs and the
+//! grouping of substreams are not checked.
 use crate::{
     BuildStep,
     ac3::{Ac3Family, Ac3Frame, Ac3FrameDetails},

@@ -1,5 +1,6 @@
-//! Version1 hvcC source-wire facts.
-//! Raw syntax, fixed NAL headers and bounded extents; no RBSP/decoder certificate.
+//! The `hvcC` record of ISO/IEC 14496-15 `configurationVersion` 1: its fixed
+//! fields, arrays and NAL unit headers, within bounded extents. NAL unit payloads
+//! are not read.
 use crate::inline_storage::InlineStorage;
 use crate::{
     BuildStep, ConfigProgress,
@@ -429,7 +430,7 @@ impl HvcConfigParser {
         self.step_into_with(work, cancel, ready, |record| record)
     }
 
-    // Share the outlined grammar walk; adapt only the final publication.
+    // One record walk serves every slot type; `publish` makes the slot's value.
     #[inline]
     pub(crate) fn step_into_with<T>(
         &mut self,

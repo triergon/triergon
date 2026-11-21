@@ -1,6 +1,6 @@
-//! Selected canonical normal DTS core bitstream headers and frame envelopes.
-//! Original implementation from ETSI TS 102 114 V1.6.1 clauses 3.4/5.3/5.4.2.
-//! Encoded audio and internal extensions remain opaque, unchanged source bytes.
+//! Normal core frame headers of a canonical DTS stream and the frames they declare
+//! (ETSI TS 102 114 V1.6.1 §3.4, §5.3, §5.4.2). Coded audio and the extensions
+//! inside a frame stay unread source bytes.
 use crate::dts::reader::{ReaderInput, retryable, source_error};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::{BitCursor, BitSource};

@@ -1,5 +1,6 @@
-//! Independent AC-3 / E-AC-3 prefix facts from ATSC A/52:2018. Complete frame
-//! envelopes are not CRC, BSI-tail, audio-block or decoder conformance proofs.
+//! AC-3 and E-AC-3 syncframe headers (ATSC A/52:2018) and the frames they declare.
+//! A frame is returned whole without further checks: its CRCs, the rest of its bit
+//! stream information and its audio blocks are not read.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::bits_at;
 use triergon_core::{
@@ -7,8 +8,8 @@ use triergon_core::{
     SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, Time, WorkBudget,
 };
 
-// ATSC Table 5.18 / ETSI Table 4.13. Numeric standard data, not implementation
-// material. The independent oracle uses sample-count/bit-rate arithmetic.
+// Nominal bit rates of the `frmsizecod` pairs, ATSC A/52 Table 5.18 (ETSI TS 102 366
+// Table 4.13).
 pub(crate) const BIT_RATES_KBPS: [u16; 19] = [
     32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 576, 640,
 ];

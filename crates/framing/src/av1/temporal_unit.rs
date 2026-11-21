@@ -1,8 +1,9 @@
-//! Section 5.2 temporal units from complete container samples.
+//! Temporal units (AV1 §5.2) from complete container samples.
 //!
-//! AV1 ISOBMFF v1.3.0 §2.4 permits an omitted size on the last OBU.
-//! The selected receiver also needs a delimiter and in-band configuration at
-//! random access. Preserve the source sample and expose the output in spans.
+//! The AV1 ISOBMFF binding v1.3.0 §2.4 lets the last OBU of a sample omit its size.
+//! A decoder fed temporal units also needs a temporal delimiter, and the
+//! configuration OBUs at random access. The source sample is kept, and the output
+//! is described as spans of it.
 use crate::av1::obu::push_leb_byte;
 use crate::{
     BuildStep,

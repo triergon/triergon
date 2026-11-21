@@ -7,6 +7,7 @@
 //! full and both are charged for. The operation does not compare their results and
 //! does not detect DTS or its word order. The reference revision is named once, on
 //! [`crate::reference_trace::dts`].
+use crate::dts::sync14::header_payload;
 use crate::dts::{
     Dts14CarrierLimits, Dts14CarrierPacket, Dts14CarrierReader, Dts14CarrierSyntax, Dts14SyncFrame,
     Dts14SyncLimits, Dts14SyncReader, DtsCoreHeader, DtsSourceIdentity, DtsWordOrder,
@@ -118,19 +119,19 @@ impl ClockState {
             profile: self.profile,
             disposition: ParserClockDisposition::OpaqueOrShort,
         };
-        // This is the literal reference core-prefix bound, not a completeness/EOF rule.
-        // An opaque carrier fails conversion; a short one never updates its clock.
+        // The reference parser reads the clock from a packet's first 18 bytes; a
+        // shorter packet, or one without the sync pattern, leaves the clock as it is.
         if packet.source_bytes().len() < 18
             || matches!(packet.syntax, Dts14CarrierSyntax::OpaqueCarrier)
         {
             return Ok(output);
         }
-        // A whole-packet conversion may refuse its tail while this complete
-        // physical prefix still supplies the public parser's clock. Retain both.
+        // A packet whose whole unpacking is refused still has a complete header in
+        // its first 18 bytes, which sets the clock.
         let prefix: [u8; 18] = packet.source_bytes().as_ref()[..18]
             .try_into()
             .map_err(|_| Error::Truncated)?;
-        let bits = crate::dts::sync14::header_payload(&prefix, self.order)?;
+        let bits = header_payload(&prefix, self.order)?;
         let header = crate::dts::probe_core_header(&bits);
         let header = match header {
             Ok(h) if h.extension == 0 => h,
@@ -141,9 +142,10 @@ impl ClockState {
                 ));
             }
         };
-        // The pinned parser's optional profile probe uses an aligned coded
-        // FSIZE offset in its actual packet, not a Source physical boundary.
-        // If that location advertises EXSS, refuse rather than invent its profile.
+        // The reference parser looks for an extension substream at the coded
+        // FSIZE offset rounded up to four bytes in its own packet, not at a source
+        // frame boundary. A substream sync there is refused: its profile is not
+        // derived.
         let at = header.frame_bytes.checked_add(3).ok_or(Error::Overflow)? / 4 * 4;
         if packet
             .source_bytes()
