@@ -404,7 +404,7 @@ impl<'g> Runner<'g> {
                 advance: gi[6].wrapping_add(gi[7]),
                 scale_fix: gr[13],
             };
-            let request = GlyphRequest::new(&shape, placement, frame, &glyph_effects);
+            let request = GlyphRequest::new(&shape, &placement, &frame, &glyph_effects);
             if bit(32) {
                 leftmost_x = shape.outlines()[0].min_transformed_x(request.matrix(), leftmost_x);
             }

@@ -214,7 +214,7 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
         be: rng.below(12) as u32,
         blur: rng.scale() * 3.0,
     };
-    let request = GlyphRequest::new(&shape, placement, frame, &effects);
+    let request = GlyphRequest::new(&shape, &placement, &frame, &effects);
     if rng.below(2) == 0 {
         let _ = shape.outlines()[0].min_transformed_x(request.matrix(), OUTLINE_MAX);
     }

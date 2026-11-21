@@ -72,8 +72,8 @@ pub struct FrameScale {
 #[derive(Clone, Copy, Debug)]
 pub struct GlyphRequest<'a> {
     shape: &'a Shape,
-    placement: Placement,
-    frame: FrameScale,
+    placement: &'a Placement,
+    frame: &'a FrameScale,
     effects: &'a Effects,
     transform: GlyphTransform,
 }
@@ -86,8 +86,8 @@ impl<'a> GlyphRequest<'a> {
     /// when it is shown or the run casts a shadow.
     pub fn new(
         shape: &'a Shape,
-        placement: Placement,
-        frame: FrameScale,
+        placement: &'a Placement,
+        frame: &'a FrameScale,
         effects: &'a Effects,
     ) -> Self {
         Self {
@@ -95,7 +95,7 @@ impl<'a> GlyphRequest<'a> {
             placement,
             frame,
             effects,
-            transform: GlyphTransform::new(&placement, &frame),
+            transform: GlyphTransform::new(placement, frame),
         }
     }
 
@@ -745,8 +745,9 @@ mod tests {
             },
             ..Effects::default()
         };
+        let at = placement(100 * 64);
         let border = |shape: &Shape| {
-            let request = GlyphRequest::new(shape, placement(100 * 64), FRAME, &effects);
+            let request = GlyphRequest::new(shape, &at, &FRAME, &effects);
             Run::default().place(&request).unwrap().border
         };
         let boxed = border(&Shape::new(&budget));
@@ -758,7 +759,8 @@ mod tests {
     fn an_unturned_glyph_is_moved_to_its_position() {
         let budget = Budget::new(1 << 20).unwrap();
         let (shape, effects) = (square(&budget), Effects::default());
-        let request = GlyphRequest::new(&shape, placement(100 * 64), FRAME, &effects);
+        let at = placement(100 * 64);
+        let request = GlyphRequest::new(&shape, &at, &FRAME, &effects);
         let left = shape.outlines()[0].min_transformed_x(request.matrix(), i32::MAX);
         assert_eq!(left, 100 * 64);
     }
@@ -770,14 +772,13 @@ mod tests {
         let mut work = WorkBudget::new(1 << 24);
         let effects = Effects::default();
         let (empty, square) = (Shape::new(&budget), square(&budget));
-        let request = |shape, x| GlyphRequest::new(shape, placement(x), FRAME, &effects);
+        let (empty_at, square_at) = (placement(100 * 64 + 13), placement(200 * 64 + 5));
+        let request = |shape, at| GlyphRequest::new(shape, at, &FRAME, &effects);
         let mut run = Run::default();
-        let nothing = run.render(&mut raster, &request(&empty, 100 * 64 + 13), &mut work);
+        let nothing = run.render(&mut raster, &request(&empty, &empty_at), &mut work);
         assert!(nothing.unwrap().is_none());
-        let after_nothing = run.place(&request(&square, 200 * 64 + 5)).unwrap();
-        let first = Run::default()
-            .place(&request(&square, 200 * 64 + 5))
-            .unwrap();
+        let after_nothing = run.place(&request(&square, &square_at)).unwrap();
+        let first = Run::default().place(&request(&square, &square_at)).unwrap();
         assert_eq!(after_nothing.fill, first.fill);
     }
 }

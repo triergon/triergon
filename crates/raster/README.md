@@ -61,7 +61,7 @@ let effects = Effects {
     blur: 1.0,
     be: 0,
 };
-let request = GlyphRequest::new(&shape, placement, frame, &effects);
+let request = GlyphRequest::new(&shape, &placement, &frame, &effects);
 let mut run = Run::default();
 let glyph = run.render(&mut raster, &request, &mut work)?.ok_or("nothing drawn")?;
 

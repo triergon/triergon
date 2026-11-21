@@ -336,8 +336,8 @@ pub(super) struct GlyphDrawing<'a> {
 impl GlyphDrawing<'_> {
     /// What [`Run::render_with`](triergon_raster::compat::libass::Run::render_with)
     /// draws.
-    pub(super) fn request(&self, frame: &FrameScale) -> GlyphRequest<'_> {
-        GlyphRequest::new(&self.outline.shape, self.placement, *frame, &self.effects)
+    pub(super) fn request<'s>(&'s self, frame: &'s FrameScale) -> GlyphRequest<'s> {
+        GlyphRequest::new(&self.outline.shape, &self.placement, frame, &self.effects)
     }
 
     /// The least of `leftmost_x` and, for a `\kf` glyph, the x of its
