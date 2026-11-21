@@ -211,7 +211,7 @@ fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
                         .early_stop(options.early_stop),
                     Some(_) => Pairs::fixed(options.pairs),
                 };
-                super::memory::collect(slot, root, workers, &path, pairs, 280, &timed)
+                super::memory::collect(slot, root, workers, &path, pairs, 280, &timed, false)
             });
             case.push(("memory", super::memory::collect_one(job)?));
         }
