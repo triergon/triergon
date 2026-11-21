@@ -75,10 +75,10 @@ pub(crate) struct SliceHeader {
 impl SliceHeader {
     /// The coded picture the slice belongs to: a frame or one of its fields.
     pub(crate) fn structure(&self) -> Structure {
-        if self.field_pic {
-            Structure::field(self.bottom_field)
-        } else {
-            Structure::Frame
+        match (self.field_pic, self.bottom_field) {
+            (false, _) => Structure::Frame,
+            (true, false) => Structure::Top,
+            (true, true) => Structure::Bottom,
         }
     }
 }

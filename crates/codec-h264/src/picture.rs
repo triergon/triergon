@@ -207,15 +207,6 @@ impl Structure {
     /// Both fields, in the order their counts and motion are kept.
     pub(crate) const FIELDS: [Structure; 2] = [Structure::Top, Structure::Bottom];
 
-    /// The bottom field when `bottom`, else the top field.
-    pub(crate) fn field(bottom: bool) -> Structure {
-        if bottom {
-            Structure::Bottom
-        } else {
-            Structure::Top
-        }
-    }
-
     pub(crate) fn is_field(self) -> bool {
         self != Structure::Frame
     }
@@ -232,15 +223,6 @@ impl Structure {
     /// A field's position in `[top, bottom]` arrays; a frame has none (it panics).
     pub(crate) fn index(self) -> usize {
         (self as u8 - 1) as usize
-    }
-
-    /// The bits of [`FrameStore::fields`] the picture fills.
-    pub(crate) fn bits(self) -> u8 {
-        if self == Structure::Frame {
-            3
-        } else {
-            self as u8
-        }
     }
 
     /// The field marking of the picture buffer that a field has (a frame: the top field's).

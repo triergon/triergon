@@ -351,7 +351,11 @@ fn keep_decoded(
     if spare_motion.len() < MAX_SPARE {
         spare_motion.push(spare);
     }
-    fs.fields |= structure.bits();
+    fs.fields |= if structure == Structure::Frame {
+        3
+    } else {
+        structure as u8
+    };
     (pic.mbs, pic.slices, pic.dbk)
 }
 
