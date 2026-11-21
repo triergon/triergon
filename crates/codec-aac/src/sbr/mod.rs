@@ -4,8 +4,16 @@
 mod freq;
 pub(crate) mod ps;
 mod qmf;
+#[cfg(any(test, not(feature = "simd")))]
+mod scalar;
 #[cfg(feature = "simd")]
 mod simd;
+// The QMF, HF generation and hybrid filter passes: the `std::simd` forms with the `simd`
+// feature, else the scalar ones.
+#[cfg(not(feature = "simd"))]
+use scalar as kernels;
+#[cfg(feature = "simd")]
+use simd as kernels;
 pub(crate) mod tables;
 
 pub(crate) use qmf::Modulation;
@@ -576,7 +584,7 @@ impl Sbr {
             let ch = &mut self.ch[c];
             // QMF analysis of the core output (float scale -> 16-bit domain)
             let mut bands = [Cpx::default(); 32];
-            for (t, input) in buf[..1024].chunks_exact(32).enumerate() {
+            for (t, input) in buf[..1024].as_chunks::<32>().0.iter().enumerate() {
                 ch.analysis.run(qmf, input, 32768.0, &mut bands);
                 for (xl, band) in ch.xl.iter_mut().zip(bands) {
                     xl[T_HFGEN + t] = band;
@@ -685,17 +693,17 @@ impl Sbr {
                         stereo.right[i] = self.x[i];
                     }
                 }
-                for (x, out) in self.x[..32].iter().zip(l.chunks_exact_mut(64)) {
+                for (x, out) in self.x[..32].iter().zip(l.as_chunks_mut::<64>().0) {
                     self.ch[0].synthesis.run(qmf, x, 1.0 / 32768.0, out);
                 }
-                for (x, out) in stereo.right[..32].iter().zip(r.chunks_exact_mut(64)) {
+                for (x, out) in stereo.right[..32].iter().zip(r.as_chunks_mut::<64>().0) {
                     self.ch[1].synthesis.run(qmf, x, 1.0 / 32768.0, out);
                 }
                 continue;
             }
             let chn = &mut self.ch[c];
             let out: &mut [f32] = if c == 0 { &mut l[..] } else { &mut r[..] };
-            for (x, out) in self.x[..32].iter().zip(out.chunks_exact_mut(64)) {
+            for (x, out) in self.x[..32].iter().zip(out.as_chunks_mut::<64>().0) {
                 chn.synthesis.run(qmf, x, 1.0 / 32768.0, out);
             }
         }
@@ -1086,7 +1094,7 @@ fn hf_generate(c: &mut Chan, ft: &FreqTables) {
         .max()
         .unwrap_or(0);
     let alpha = &mut c.alpha;
-    predictors(&c.xl[first..end], &mut alpha[first..end]);
+    kernels::predictors(&c.xl[first..end], &mut alpha[first..end]);
     let mut k = ft.kx;
     for (p, &num) in ft.patch_num.iter().enumerate() {
         for x in 0..num {
@@ -1121,24 +1129,6 @@ fn hf_generate(c: &mut Chan, ft: &FreqTables) {
     }
 }
 
-/// The prediction coefficients ([`predictor`]) of each band of `xl`, into `alpha`.
-fn predictors(xl: &[[Cpx; XL_LEN]], alpha: &mut [(Cpx, Cpx)]) {
-    #[cfg(feature = "simd")]
-    {
-        for (rows, alpha) in xl.chunks(4).zip(alpha.chunks_mut(4)) {
-            // a short last group repeats its last band in the spare lanes
-            let lanes: [&[Cpx; XL_LEN]; 4] = std::array::from_fn(|j| &rows[j.min(rows.len() - 1)]);
-            for (a, sums) in alpha.iter_mut().zip(simd::covariance4(lanes)) {
-                *a = predictor(&sums);
-            }
-        }
-    }
-    #[cfg(not(feature = "simd"))]
-    for (x, a) in xl.iter().zip(alpha) {
-        *a = predictor(&covariance(x));
-    }
-}
-
 /// The covariances phi(i, j) = sum_{n=0}^{37} x\[n + 2 - i\] conj(x\[n + 2 - j\]) of one
 /// band that the predictor needs (4.6.18.6.2).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -1148,40 +1138,6 @@ struct Covariance {
     r11: f32,
     r12: Cpx,
     r22: f32,
-}
-
-/// The covariances of one band, each summed in time order from zero.
-#[cfg_attr(
-    feature = "simd",
-    allow(dead_code, reason = "the scalar form, tested against the kernel")
-)]
-fn covariance(x: &[Cpx; XL_LEN]) -> Covariance {
-    let mut r01 = Cpx::default();
-    let mut r02 = Cpx::default();
-    let mut r11 = 0f32;
-    let mut r12 = Cpx::default();
-    let mut r22 = 0f32;
-    for n in 0..(2 * NUM_TIME_SLOTS + 6) {
-        let a = x[n + 2];
-        let b = x[n + 1];
-        let cc = x[n];
-        // phi(0,1) = sum a conj(b)
-        r01.re += a.re * b.re + a.im * b.im;
-        r01.im += a.im * b.re - a.re * b.im;
-        r02.re += a.re * cc.re + a.im * cc.im;
-        r02.im += a.im * cc.re - a.re * cc.im;
-        r11 += b.re * b.re + b.im * b.im;
-        r12.re += b.re * cc.re + b.im * cc.im;
-        r12.im += b.im * cc.re - b.re * cc.im;
-        r22 += cc.re * cc.re + cc.im * cc.im;
-    }
-    Covariance {
-        r01,
-        r02,
-        r11,
-        r12,
-        r22,
-    }
 }
 
 /// Covariance-method second order prediction coefficients (4.6.18.6.2).

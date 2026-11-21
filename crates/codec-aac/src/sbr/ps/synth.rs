@@ -363,27 +363,7 @@ impl Synth {
             let f = &lay.taps[i];
             let e = &ext[band.qmf];
             let pair = f[6].im == 0.0 && f[5].im == 0.0;
-            #[cfg(feature = "simd")]
-            crate::sbr::simd::hybrid_filter(f, e, pair, out);
-            #[cfg(not(feature = "simd"))]
-            for (t, o) in out.iter_mut().enumerate() {
-                // M[t] = sum_d f[d] X[t - d], X[t'] at e[t' + 6]
-                let w = &e[t..t + 13];
-                let mut acc = Cpx::default();
-                if pair {
-                    for (c, v) in f.iter().zip(w.iter().rev()) {
-                        acc.re += c.re * v.re;
-                        acc.im += c.re * v.im;
-                    }
-                } else {
-                    for (c, v) in f.iter().zip(w.iter().rev()) {
-                        let p = c.mul(*v);
-                        acc.re += p.re;
-                        acc.im += p.im;
-                    }
-                }
-                *o = acc;
-            }
+            crate::sbr::kernels::hybrid_filter(f, e, pair, out);
         }
     }
 

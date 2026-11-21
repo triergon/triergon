@@ -22,7 +22,7 @@ fn st(v: V, s: &mut [f32], i: usize) {
     v.copy_to_slice(&mut s[i..i + 4]);
 }
 
-/// The pre-twiddle of [`super::pre`]: (x\[2n\] + i x\[2h - 1 - 2n\]) * pre\[n\], n < h.
+/// The pre-twiddle: (x\[2n\] + i x\[2h - 1 - 2n\]) * pre\[n\], n < h.
 #[inline(never)]
 pub(super) fn pre(x: &[f32], pr: &[f32], pi: &[f32], tr: &mut [f32], ti: &mut [f32]) {
     let h = tr.len();
@@ -40,7 +40,7 @@ pub(super) fn pre(x: &[f32], pr: &[f32], pi: &[f32], tr: &mut [f32], ti: &mut [f
     }
 }
 
-/// The post-twiddle of [`super::post`]: ye = Re(z q), yo = -Im(z q).
+/// The post-twiddle: ye = Re(z q), yo = -Im(z q).
 #[inline(never)]
 pub(super) fn post(re: &[f32], im: &[f32], qr: &[f32], qi: &[f32], ye: &mut [f32], yo: &mut [f32]) {
     let h = re.len();
@@ -52,8 +52,7 @@ pub(super) fn post(re: &[f32], im: &[f32], qr: &[f32], qi: &[f32], ye: &mut [f32
     }
 }
 
-/// The last radix-2 stage fused with the post-twiddle of both halves, as
-/// [`super::last_post`].
+/// The last radix-2 stage fused with the post-twiddle of both halves.
 #[inline(never)]
 // separate slice arguments, as the scalar form takes them
 #[allow(clippy::too_many_arguments)]
@@ -88,7 +87,7 @@ pub(super) fn last_post(
     }
 }
 
-/// Four radix-4 butterflies, lane by lane as [`super::radix4`]: quarter `j` of the
+/// Four radix-4 butterflies, lane by lane: quarter `j` of the
 /// butterflies is `(r[j], i[j])`, with twiddles W^k, W^2k, W^3k as `w` (re, im pairs).
 #[inline(always)]
 fn butterflies(r: [V; 4], i: [V; 4], w: [V; 6]) -> ([V; 4], [V; 4]) {
@@ -156,14 +155,14 @@ mod tests {
             let (mut tr, mut ti) = (vec![0.0; h], vec![0.0; h]);
             let (mut sr, mut si) = (vec![0.0; h], vec![0.0; h]);
             pre(&x, &pr, &pi, &mut tr, &mut ti);
-            super::super::pre(&x, &pr, &pi, &mut sr, &mut si);
+            super::super::scalar::pre(&x, &pr, &pi, &mut sr, &mut si);
             assert_eq!((bits(&tr), bits(&ti)), (bits(&sr), bits(&si)), "pre {h}");
 
             let [re, im, qr, qi] = [4, 5, 6, 7].map(|seed| values(seed, h));
             let (mut ye, mut yo) = (vec![0.0; h], vec![0.0; h]);
             let (mut se, mut so) = (vec![0.0; h], vec![0.0; h]);
             post(&re, &im, &qr, &qi, &mut ye, &mut yo);
-            super::super::post(&re, &im, &qr, &qi, &mut se, &mut so);
+            super::super::scalar::post(&re, &im, &qr, &qi, &mut se, &mut so);
             assert_eq!((bits(&ye), bits(&yo)), (bits(&se), bits(&so)), "post {h}");
 
             let q = h / 2;
@@ -174,7 +173,7 @@ mod tests {
             let [a, b, c, d] = &mut vector;
             last_post(re.0, re.1, im.0, im.1, &wr, &wi, &qr, &qi, a, b, c, d);
             let [a, b, c, d] = &mut scalar;
-            super::super::last_post(re.0, re.1, im.0, im.1, &wr, &wi, &qr, &qi, a, b, c, d);
+            super::super::scalar::last_post(re.0, re.1, im.0, im.1, &wr, &wi, &qr, &qi, a, b, c, d);
             assert_eq!(
                 vector.map(|v| bits(&v)),
                 scalar.map(|v| bits(&v)),
@@ -191,7 +190,7 @@ mod tests {
                 let (mut re, mut im) = (values(10, n), values(11, n));
                 let (mut sr, mut si) = (re.clone(), im.clone());
                 stage(&mut re, &mut im, *h, w);
-                super::super::stage(&mut sr, &mut si, *h, w);
+                super::super::scalar::stage(&mut sr, &mut si, *h, w);
                 assert_eq!((bits(&re), bits(&im)), (bits(&sr), bits(&si)), "{n} h {h}");
             }
         }
