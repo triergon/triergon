@@ -259,6 +259,10 @@ impl DemuxObserver {
 
     /// Commit preflighted carriers from one shared window. The arena already
     /// has room for every span, including any spans moved from a full arena.
+    #[expect(
+        clippy::expect_used,
+        reason = "the views repeat exactly `count` times over complete carriers on the payload-run path"
+    )]
     pub(crate) fn append_payload_run(
         &mut self,
         bytes: Bytes,

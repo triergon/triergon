@@ -880,24 +880,24 @@ impl Reader {
             }
             let seek = &mut self.seek.as_mut_slice()[0];
             let request = seek.request;
-            if let Some(probing) = &mut seek.probing {
-                if let Some(header) = &mut probing.xll_header {
-                    let checked =
-                        header
-                            .step(probing.packet.bytes().as_ref(), work)
-                            .map_err(|error| {
-                                if matches!(seek.phase, Phase::Replay { .. }) {
-                                    Error::SourceMismatch
-                                } else {
-                                    error
-                                }
-                            })?;
-                    if !checked {
-                        return Ok(Step::Yield);
-                    }
+            if let Some(probing) = &mut seek.probing
+                && let Some(header) = &mut probing.xll_header
+            {
+                let checked =
+                    header
+                        .step(probing.packet.bytes().as_ref(), work)
+                        .map_err(|error| {
+                            if matches!(seek.phase, Phase::Replay { .. }) {
+                                Error::SourceMismatch
+                            } else {
+                                error
+                            }
+                        })?;
+                if !checked {
+                    return Ok(Step::Yield);
                 }
-                let Probing { packet, probe, .. } =
-                    seek.probing.take().expect("pending seek probe");
+            }
+            if let Some(Probing { packet, probe, .. }) = seek.probing.take() {
                 match &mut seek.phase {
                     Phase::Scan(scan) => {
                         let better = scan.observe(
@@ -940,10 +940,15 @@ impl Reader {
             }
             if matches!(seek.phase, Phase::Deliver(_)) {
                 work.try_charge(1);
-                let Phase::Deliver(packet) = self.seek.pop().expect("pending packet").phase else {
-                    unreachable!("seek delivery");
-                };
+                let delivered = self.seek.pop();
                 self.seek = BudgetVec::new(&self.pool);
+                let Some(Seeking {
+                    phase: Phase::Deliver(packet),
+                    ..
+                }) = delivered
+                else {
+                    return Err(Error::Invalid("MPEG-TS seek delivery"));
+                };
                 return Ok(Step::Ready(Event::Packet(packet)));
             }
             let capturing = matches!(&seek.phase, Phase::Scan(scan)

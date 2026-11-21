@@ -321,10 +321,9 @@ impl Reader {
                 next.capabilities(),
                 EntityTransition::Contiguous,
             )?;
-            self.seek_entities
-                .as_deref_mut()
-                .expect("active seek entity plan")
-                .advance();
+            if let Some(plan) = self.seek_entities.as_deref_mut() {
+                plan.advance();
+            }
             return Ok(());
         }
         self.finish_input(source, token)

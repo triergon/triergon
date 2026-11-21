@@ -24,6 +24,10 @@ impl Reader {
         }
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "staged frame state of a per-frame framer, kept in its measured option form"
+    )]
     pub(super) fn step(
         &mut self,
         pieces: &BudgetVec<Piece>,
@@ -217,6 +221,10 @@ impl Envelope {
         }
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "staged frame state of a per-frame framer, kept in its measured option form"
+    )]
     fn materialize(
         &mut self,
         pes: &Pes,

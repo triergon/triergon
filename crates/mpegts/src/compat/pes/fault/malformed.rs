@@ -69,6 +69,10 @@ impl MalformedInputFact {
         self.diagnostic
     }
     /// The carrier's original bytes, prefix included.
+    #[expect(
+        clippy::expect_used,
+        reason = "a recovered carrier without a parsed packet always retains its rejection"
+    )]
     pub fn source_bytes(&self) -> &Bytes {
         self.carrier.as_ref().map_or_else(
             || {

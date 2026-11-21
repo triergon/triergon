@@ -24,6 +24,10 @@ enum HeaderBytes {
 }
 
 impl HeaderBytes {
+    #[expect(
+        clippy::expect_used,
+        reason = "callers pass at most INLINE_HEADER_BYTES bytes"
+    )]
     fn inline(bytes: &[u8]) -> Self {
         let mut data = [0; INLINE_HEADER_BYTES];
         data[..bytes.len()].copy_from_slice(bytes);

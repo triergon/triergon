@@ -157,6 +157,10 @@ impl Reader {
         self.framer.finish(request.source, request.token)
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "staged frame state of a per-frame framer, kept in its measured option form"
+    )]
     pub(super) fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -319,6 +323,10 @@ impl Group {
             })
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "staged frame state of a per-frame framer, kept in its measured option form"
+    )]
     fn append(
         &mut self,
         pool: &Budget,
@@ -389,6 +397,10 @@ impl Group {
         Ok(())
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "staged frame state of a per-frame framer, kept in its measured option form"
+    )]
     fn materialize(
         &mut self,
         pool: &Budget,

@@ -114,6 +114,10 @@ impl Reader {
         self.input.finish(request)
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "staged frame state of a per-frame framer, kept in its measured option form"
+    )]
     pub(super) fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -327,6 +331,10 @@ impl ExtensionReader {
         self.input.finish(request)
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "staged frame state of a per-frame framer, kept in its measured option form"
+    )]
     pub(super) fn step(
         &mut self,
         work: &mut WorkBudget,

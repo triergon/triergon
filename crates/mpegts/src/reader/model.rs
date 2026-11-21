@@ -75,6 +75,10 @@ impl SourceEvent {
             _ => unreachable!("track owns a program map"),
         }
     }
+    #[expect(
+        clippy::expect_used,
+        reason = "pieces and payload sources are built only from PES events"
+    )]
     pub(super) fn pes(&self) -> &crate::pes::Pes {
         self.event()
             .pes_source()
@@ -167,6 +171,10 @@ impl PayloadSources {
         }
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "the closure runs once per reserved entry, in order"
+    )]
     pub(super) fn try_push(&mut self, pool: &Budget, source: PayloadSource) -> Result<()> {
         match self {
             Self::Inline(first @ None) => *first = Some(source),
@@ -587,6 +595,10 @@ impl PacketInfo for Packet {
     fn payload(&self) -> &[u8] {
         self.bytes().as_ref()
     }
+    #[expect(
+        clippy::expect_used,
+        reason = "1/90000 is a nonzero time base; core has no constant for it"
+    )]
     fn time_base(&self) -> TimeBase {
         TimeBase::new(1, 90_000).expect("nonzero TS clock")
     }

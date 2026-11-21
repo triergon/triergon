@@ -39,6 +39,10 @@ fn record_count(span: &DemuxSpan, grouped: bool) -> usize {
 }
 
 #[inline]
+#[expect(
+    clippy::expect_used,
+    reason = "stored spans and admitted carriers are complete, so these views are in range"
+)]
 fn byte_view(span: &DemuxSpan, index: usize, run: bool) -> BytesView<'_> {
     let range = if run {
         let at = index * TS188_BYTES;
@@ -236,6 +240,10 @@ impl PayloadCursor {
         self.active
     }
     /// Borrow the active range until it is explicitly retired.
+    #[expect(
+        clippy::expect_used,
+        reason = "`active` is set only together with `current` on this per-range accessor"
+    )]
     pub fn current(&self) -> Option<DemuxSpanView<'_>> {
         self.active.then(|| {
             view(
@@ -248,6 +256,10 @@ impl PayloadCursor {
     /// Borrow the active byte range without constructing its source facts.
     /// The range and backing are identical to `current().map(|span| span.bytes)`.
     #[inline]
+    #[expect(
+        clippy::expect_used,
+        reason = "`active` is set only together with `current` on this per-range accessor"
+    )]
     pub fn current_bytes(&self) -> Option<BytesView<'_>> {
         self.active.then(|| {
             let span = self.current.as_ref().expect("active payload range");

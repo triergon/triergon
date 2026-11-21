@@ -51,6 +51,10 @@ impl Reader {
         self.aligned.finish(request)
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "staged frame state of a per-frame framer, kept in its measured option form"
+    )]
     pub(super) fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -291,6 +295,10 @@ impl FreeFormat {
         Err(crate::limit(self.scan, maximum))
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "staged frame state of a per-frame framer, kept in its measured option form"
+    )]
     fn step(
         &mut self,
         input: &mut InputCursor,

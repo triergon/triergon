@@ -24,6 +24,10 @@ struct Payload {
 }
 
 impl Payload {
+    #[expect(
+        clippy::expect_used,
+        reason = "a payload is consumed only after its last read on the per-carrier path"
+    )]
     fn bytes(&self) -> &Bytes {
         self.bytes.as_ref().expect("PES payload not consumed")
     }
@@ -273,6 +277,10 @@ impl PesAssembler {
     }
 
     /// Keep a whole continuation when no span growth or PES publication is due.
+    #[expect(
+        clippy::expect_used,
+        reason = "the carrier was checked present above on the per-carrier path"
+    )]
     pub(crate) fn retain_body_carrier(
         &mut self,
         payload: &mut Option<Bytes>,
@@ -319,6 +327,10 @@ impl PesAssembler {
     }
 
     /// Commit a carrier after the complete span and work grant were checked.
+    #[expect(
+        clippy::expect_used,
+        reason = "callers check the span capacity before appending on the per-carrier path"
+    )]
     pub(crate) fn append_body_carrier(
         &mut self,
         bytes: Bytes,
@@ -582,6 +594,10 @@ impl PesAssembler {
     }
 
     #[cold]
+    #[expect(
+        clippy::expect_used,
+        reason = "the pending carrier is the only backing while a header waits for storage"
+    )]
     fn record_blocked_header_storage(&mut self, additional: usize) -> Result<()> {
         if matches!(self.span_growth, SpanGrowth::HeaderBlocked(_)) {
             return Ok(());
@@ -611,6 +627,10 @@ impl PesAssembler {
         Ok(())
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "a span growth audit runs only while a span is pending"
+    )]
     fn reserve_body_span(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         let spans = self.spans.len();
         if spans < self.spans.capacity() {
@@ -666,6 +686,10 @@ impl PesAssembler {
         }
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "the pending span is present while its body is drained in the per-carrier loop"
+    )]
     fn poll_inner<const RETAIN: bool>(
         &mut self,
         work: &mut WorkBudget,

@@ -376,6 +376,10 @@ enum StorageCursor {
 impl StorageCursor {
     // One structural edge per call, including empty tables. Checking earlier
     // entries for shared backing also consumes cooperative work.
+    #[expect(
+        clippy::expect_used,
+        reason = "the framer cursors are entered only for a lane with a framer"
+    )]
     fn step<'a>(&mut self, reader: &'a super::Reader) -> Result<Option<StorageItem<'a>>> {
         let item = match *self {
             Self::Transport(cursor) => {
@@ -858,6 +862,10 @@ impl Incomplete {
         Ok(true)
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "typing the fragment copy measured +0.04 to +0.26% more instructions (lane notes)"
+    )]
     fn prepare(
         &mut self,
         pieces: &[Piece],
@@ -901,6 +909,10 @@ impl Incomplete {
         Ok(true)
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "typing the fragment copy measured +0.04 to +0.26% more instructions (lane notes)"
+    )]
     fn copy(
         &mut self,
         pieces: &[Piece],
@@ -1044,6 +1056,10 @@ impl Build {
             recovered_adts_bytes: false,
         }
     }
+    #[expect(
+        clippy::expect_used,
+        reason = "a typed coalescing state measured +0.17 to +0.25% more instructions"
+    )]
     fn copy(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if self.bytes.is_some() {
             return Ok(true);
@@ -1232,6 +1248,10 @@ impl Lane {
     pub(super) fn has_incomplete(&self) -> bool {
         self.incomplete.is_some()
     }
+    #[expect(
+        clippy::expect_used,
+        reason = "typing the fragment copy measured +0.04 to +0.26% more instructions (lane notes)"
+    )]
     pub(super) fn set_reader_storage(&mut self, bytes: usize) {
         self.incomplete
             .as_mut()
@@ -1358,6 +1378,10 @@ impl Lane {
         }
         Ok(())
     }
+    #[expect(
+        clippy::expect_used,
+        reason = "typing the fragment copy measured +0.04 to +0.26% more instructions (lane notes)"
+    )]
     pub(super) fn step(
         &mut self,
         draining: bool,
@@ -1691,6 +1715,10 @@ impl Lane {
         Ok(())
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "moving the build out of its slot to publish measured +0.35 to +0.72% more instructions"
+    )]
     fn finish_build(&mut self, consumed_end: u64) -> Build {
         let build = self.build.take().expect("prepared publication");
         self.retire = build.retire;
@@ -1700,6 +1728,10 @@ impl Lane {
         build
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "moving the build out of its slot to publish measured +0.35 to +0.72% more instructions"
+    )]
     fn probe_picture(
         &mut self,
         range: Range<u64>,
@@ -1784,6 +1816,10 @@ impl Lane {
         }))
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "moving the build out of its slot to publish measured +0.35 to +0.72% more instructions"
+    )]
     fn publish(
         &mut self,
         picture_delivery: PictureDelivery,
