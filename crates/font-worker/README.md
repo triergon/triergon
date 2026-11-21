@@ -43,3 +43,21 @@ The dump mode prints the same values as lines, identical to the reference's
 dump, so a failing case can be diffed. The features are
 `harness/features/font-outlines/`, `font-hinting-none/`, `font-hinting-default/`
 and `font-hinting-modes/`.
+
+## Store comparisons
+
+`font-worker store-trace FILE ORACLE_ENTRY_BYTES` runs a cache access script and
+prints the build or lookup outcome, the keys evicted in order, and the retained
+entry count and charged payload bytes after each access. The script starts with
+`budget SLOTS BYTES`, then lists `get KEY SIZE`, `hold KEY` or `release KEY`.
+The budget fits `SLOTS` entry estimates plus the specified extra bytes. Holding a
+key looks it up and retains one caller handle until release.
+
+`store-overhead` prints the native zero-payload entry charge. Total used bytes
+include the pool's own charge, the charge for each retained entry and the charged
+payload bytes. The independent oracle takes the manifest's recorded estimate.
+Run the [font-store contract](../../harness/features/font-store/contract.json)
+with `cargo xtask oracle-compare --contract harness/features/font-store/contract.json`.
+`cargo xtask fonts store fixtures` regenerates the seeded scripts, and
+`cargo xtask fonts store manifest --record` records their trace hashes and those
+of the authored scripts from the oracle. Rebuild the worker identity after recording.

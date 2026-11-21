@@ -10,6 +10,7 @@
 
 mod manifest;
 pub(crate) mod probe;
+mod store;
 mod tables;
 
 pub use manifest::GENERATOR;
@@ -26,6 +27,7 @@ use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
        cargo xtask fonts fetch
+       cargo xtask fonts store fixtures | manifest --record
        cargo xtask fonts tables [--check]
        cargo xtask fonts manifest [--record] [--output DIR]
        cargo xtask fonts compare [--all] [REPORT OPTION]...
@@ -96,6 +98,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
         [command, rest @ ..] if command == "manifest" => {
             GENERATOR.manifest_command(root, rest, USAGE)
         }
+        [command, rest @ ..] if command == "store" => store::main(root, rest),
         [command, rest @ ..] if command == "tables" => tables::main(root, rest),
         [command, rest @ ..] if command == "assemble" => probe::assemble_command(root, rest),
         [command, rest @ ..] if command == "probe" => probe::probe_command(root, rest),

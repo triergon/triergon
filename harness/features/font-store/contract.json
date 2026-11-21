@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "id": "font-store",
+  "gate": "required",
+  "operation": "font-store",
+  "candidate": "font-worker",
+  "worker_operation": "store-",
+  "oracle": "store",
+  "contract": [
+    "Run single-threaded Store accesses. The budget line states how many entry estimates fit plus a byte allowance. Get supplies the builder's additional payload bytes; hold looks up a key, refreshes its recency and retains one caller handle; release drops that handle if present.",
+    "For each access compare kind 3, the command, the key, the outcome, the number and order of evicted keys, the retained entry count and the charged payload bytes.",
+    "The worker observes builds, caller and store ownership, value drops and Budget::used. Total used bytes are the empty pool charge plus the retained entry count times the native zero-payload entry charge plus the charged payload bytes.",
+    "The worker reports its native entry estimate with store-overhead. The manifest passes the reported estimate to the oracle; the worker uses the estimate it observes on its own target. The scripts use relative capacities so the policy and the charge rows can be pinned across targets."
+  ],
+  "required_profiles": [
+    "oversized",
+    "all-held",
+    "access-order",
+    "rebuild",
+    "zero-size",
+    "bookkeeping-only",
+    "multiple-victims",
+    "seeded"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 1,
+  "parity_timeout_seconds": 120,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "oversized",
+        "all-held",
+        "access-order",
+        "rebuild",
+        "zero-size",
+        "bookkeeping-only",
+        "multiple-victims",
+        "seeded-zero",
+        "seeded-one",
+        "seeded-two",
+        "seeded-four",
+        "seeded-eight",
+        "seeded-spare"
+      ],
+      "cause": "no reference implements this cache's contract"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "oversized",
+        "all-held",
+        "access-order",
+        "rebuild",
+        "zero-size",
+        "bookkeeping-only",
+        "multiple-victims",
+        "seeded-zero",
+        "seeded-one",
+        "seeded-two",
+        "seeded-four",
+        "seeded-eight",
+        "seeded-spare"
+      ],
+      "cause": "no reference implements this cache's contract"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "oversized",
+        "all-held",
+        "access-order",
+        "rebuild",
+        "zero-size",
+        "bookkeeping-only",
+        "multiple-victims",
+        "seeded-zero",
+        "seeded-one",
+        "seeded-two",
+        "seeded-four",
+        "seeded-eight",
+        "seeded-spare"
+      ],
+      "cause": "no reference implements this cache's contract"
+    }
+  ]
+}

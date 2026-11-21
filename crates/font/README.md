@@ -510,7 +510,11 @@ composites, 32 nested calls of TrueType functions, which end the program) are
 
 - `cargo test -p triergon-font`: unit tests per table, faces built in memory
   (TrueType, CFF and a collection) and a deterministic mutation test over them.
-- Four harness features (`harness/features/font-*`) run every file of the corpus
+- [`font-store`](../../harness/features/font-store/contract.json) compares the
+  shared store's budgeted admission, cache hits, held values, eviction order and
+  byte accounting against an independent policy oracle. Its authored and seeded
+  scripts run through `cargo xtask oracle-compare`.
+- Four face-loading features run every file of the corpus
   in `harness/fonts/corpus.json` through [`font-worker`](../font-worker/README.md)
   and the FreeType 2.15.0 reference worker (`harness/reference_font.h`), and require
   both to fold exactly what FreeType folds:

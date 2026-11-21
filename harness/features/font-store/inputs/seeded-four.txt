@@ -1,0 +1,97 @@
+budget 4 14
+get 3 3
+hold 7
+hold 0
+hold 4
+get 2 3
+get 0 6
+release 3
+release 7
+release 7
+release 7
+get 7 0
+get 6 4
+hold 7
+hold 5
+release 6
+release 6
+hold 7
+get 3 3
+release 1
+get 6 4
+release 6
+get 1 5
+release 6
+hold 2
+hold 3
+hold 3
+get 7 4
+release 2
+release 7
+hold 0
+get 3 3
+hold 7
+hold 2
+get 4 6
+release 5
+release 6
+release 0
+release 3
+get 2 6
+hold 6
+hold 7
+hold 4
+hold 7
+hold 3
+get 1 4
+hold 4
+release 3
+release 7
+hold 0
+get 0 3
+get 1 5
+hold 0
+hold 4
+release 7
+get 3 1
+release 1
+release 5
+hold 5
+get 2 3
+get 6 1
+release 3
+get 7 2
+get 6 6
+get 2 1
+hold 1
+get 3 4
+get 3 0
+release 5
+get 4 5
+release 5
+hold 7
+get 2 3
+get 6 1
+release 4
+get 3 3
+release 2
+get 2 5
+get 2 0
+get 7 4
+hold 1
+release 3
+get 0 0
+get 2 5
+get 6 5
+get 0 2
+hold 6
+hold 3
+hold 4
+get 0 1
+release 3
+hold 5
+get 7 6
+get 1 2
+get 4 2
+get 0 5
+hold 3

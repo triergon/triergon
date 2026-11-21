@@ -5,6 +5,7 @@
 #![cfg_attr(not(test), no_main)]
 
 mod record;
+mod store;
 
 use record::{Dump, Record, Sink, Size, Style, Work};
 use std::error::Error;
@@ -344,6 +345,9 @@ fn parse(args: &[String]) -> Result<(Invocation<'_>, Operation)> {
 }
 
 fn run(args: &[String]) -> Result<()> {
+    if args.first().is_some_and(|mode| mode.starts_with("store-")) {
+        return store::run(args);
+    }
     let (invocation, operation) = parse(args)?;
     invocation.check_iterations(|| USAGE)?;
     let Invocation {
