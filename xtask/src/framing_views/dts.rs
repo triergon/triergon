@@ -149,7 +149,7 @@ fn core_extent(bytes: &[u8]) -> Option<usize> {
     Some(code + 1)
 }
 
-fn pack_frames(mut bytes: &[u8], packing: &str) -> Vec<u8> {
+pub(crate) fn pack_frames(mut bytes: &[u8], packing: &str) -> Vec<u8> {
     let mut result = Vec::new();
     while !bytes.is_empty() {
         let len = core_extent(bytes)

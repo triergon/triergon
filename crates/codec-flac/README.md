@@ -115,3 +115,6 @@ including both timed FLAC inputs.
   own); `flac_3ch_odd_mask` matches FFmpeg's decoder, but FFmpeg refuses its layout on the
   stereo output. Runtime and memory against the [gates](../../docs/quality.md#gates):
   [status](../../docs/status.md).
+
+The `flac-crc-reject` comparison grades frame counts, block sample counts and
+decoded PCM on damaged inputs against FFmpeg with CRC checking enabled.

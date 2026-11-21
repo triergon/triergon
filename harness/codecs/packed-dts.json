@@ -1,0 +1,622 @@
+{
+  "schema": "triergon.codecs.correctness-manifest.v1",
+  "note": "Whole-stream repackings made with the independent DTS fixture packer. The coreless XLL control is retained in each requested packing as a refusal control, using its original bytes because it has no core to repack.",
+  "open_cases": [],
+  "vectors": [
+    {
+      "lane": "dts-packed",
+      "name": "core_51_24_48_768_0.core-be14.dts",
+      "path": ".research/codec-variants/core_51_24_48_768_0.core-be14.dts",
+      "sha256": "e218035397c919cdbb1dea83c06cfaf0beb24bbd5ffdf225468ddcfda768e1a1",
+      "source": ".research/codec-derived/dts/core_51_24_48_768_0.core.dts",
+      "source_sha256": "e5023922b122a661c554c6ca411bf4664b541ac33ecf53b1bc99091f029fd143",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "core_51_24_48_768_0.core-le14.dts",
+      "path": ".research/codec-variants/core_51_24_48_768_0.core-le14.dts",
+      "sha256": "6d05b91004f72d41aeadbc1577fa2d574575d34009baefcbc339db3264077537",
+      "source": ".research/codec-derived/dts/core_51_24_48_768_0.core.dts",
+      "source_sha256": "e5023922b122a661c554c6ca411bf4664b541ac33ecf53b1bc99091f029fd143",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "core_51_24_48_768_0.core-le16.dts",
+      "path": ".research/codec-variants/core_51_24_48_768_0.core-le16.dts",
+      "sha256": "e5c564cd2cfa873e2db7ab4a6953dddd19d2639675f34b39de4bc274bdb98bd2",
+      "source": ".research/codec-derived/dts/core_51_24_48_768_0.core.dts",
+      "source_sha256": "e5023922b122a661c554c6ca411bf4664b541ac33ecf53b1bc99091f029fd143",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "core_51_24_48_768_1.core-be14.dts",
+      "path": ".research/codec-variants/core_51_24_48_768_1.core-be14.dts",
+      "sha256": "20e0160bbb77009e149b8ba3896798f3df404c9b49903d8b2cad355f65a9136c",
+      "source": ".research/codec-derived/dts/core_51_24_48_768_1.core.dts",
+      "source_sha256": "4df3d0ff921105a78716c0a2cf5cf6935290719daa7469f6a0db9f4393efea00",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "core_51_24_48_768_1.core-le14.dts",
+      "path": ".research/codec-variants/core_51_24_48_768_1.core-le14.dts",
+      "sha256": "aa53797f2861d6bf25e4152d5163804101f817d427c5501065371f7eb7270092",
+      "source": ".research/codec-derived/dts/core_51_24_48_768_1.core.dts",
+      "source_sha256": "4df3d0ff921105a78716c0a2cf5cf6935290719daa7469f6a0db9f4393efea00",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "core_51_24_48_768_1.core-le16.dts",
+      "path": ".research/codec-variants/core_51_24_48_768_1.core-le16.dts",
+      "sha256": "0d004957891e272249159d6a99e596a7c08d11260cb61aa5475a7ebaf69cdb80",
+      "source": ".research/codec-derived/dts/core_51_24_48_768_1.core.dts",
+      "source_sha256": "4df3d0ff921105a78716c0a2cf5cf6935290719daa7469f6a0db9f4393efea00",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "dts.core-be14.dts",
+      "path": ".research/codec-variants/dts.core-be14.dts",
+      "sha256": "055812c9b32c490c23229b1dad06e83de6735c2945b443f8b6530fdd5fbbc230",
+      "source": ".research/codec-derived/dts/dts.core.dts",
+      "source_sha256": "a7c8f6f8df1fa822449ac7537afe75735aa858861aae3d2481e1ec14e91e5612",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "dts.core-le14.dts",
+      "path": ".research/codec-variants/dts.core-le14.dts",
+      "sha256": "aa23db6c6adca5c963a20b8af93ca65cd23745c0387e30b51006ce7543a66fd0",
+      "source": ".research/codec-derived/dts/dts.core.dts",
+      "source_sha256": "a7c8f6f8df1fa822449ac7537afe75735aa858861aae3d2481e1ec14e91e5612",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "dts.core-le16.dts",
+      "path": ".research/codec-variants/dts.core-le16.dts",
+      "sha256": "db127a95249785196da60cb5b7821b9e3e01371bc8e8b9c89e16d1e9f2db8f50",
+      "source": ".research/codec-derived/dts/dts.core.dts",
+      "source_sha256": "a7c8f6f8df1fa822449ac7537afe75735aa858861aae3d2481e1ec14e91e5612",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "dts_es.core-be14.dts",
+      "path": ".research/codec-variants/dts_es.core-be14.dts",
+      "sha256": "a5b55187b76177a5fb169036616a862641abf6bbc7450994292024e890d2987d",
+      "source": ".research/codec-derived/dts/dts_es.core.dts",
+      "source_sha256": "2e2530d220d51b914d1e7acb63badb5b2dae1578f3274116206fa1aa5e597638",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "dts_es.core-le14.dts",
+      "path": ".research/codec-variants/dts_es.core-le14.dts",
+      "sha256": "2961bb8b6c2373f0630b82cf89953fa7e444a7e70aad72e8bad952282099eaa3",
+      "source": ".research/codec-derived/dts/dts_es.core.dts",
+      "source_sha256": "2e2530d220d51b914d1e7acb63badb5b2dae1578f3274116206fa1aa5e597638",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "dts_es.core-le16.dts",
+      "path": ".research/codec-variants/dts_es.core-le16.dts",
+      "sha256": "9139258cec958d9a4c60eae26bc2d11f8af7c153d749438b4bef5b61999f2b00",
+      "source": ".research/codec-derived/dts/dts_es.core.dts",
+      "source_sha256": "2e2530d220d51b914d1e7acb63badb5b2dae1578f3274116206fa1aa5e597638",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "dtsx_7.1.4_24bit.core-be14.dts",
+      "path": ".research/codec-variants/dtsx_7.1.4_24bit.core-be14.dts",
+      "sha256": "27c0ea1033fa1e97708562b215624979fe2547fab9b0abbe2fbe6ad9afcf1eb6",
+      "source": ".research/codec-derived/dts/dtsx_7.1.4_24bit.core.dts",
+      "source_sha256": "eb5ceab778e7a5aedf0c47627b5de45858a3dd81903b12d153271f4830c09bc2",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "dtsx_7.1.4_24bit.core-le14.dts",
+      "path": ".research/codec-variants/dtsx_7.1.4_24bit.core-le14.dts",
+      "sha256": "4a53f644de5e79080191e5db3ca55cd91e92dd9405796ecd9e661bae3aad8015",
+      "source": ".research/codec-derived/dts/dtsx_7.1.4_24bit.core.dts",
+      "source_sha256": "eb5ceab778e7a5aedf0c47627b5de45858a3dd81903b12d153271f4830c09bc2",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "dtsx_7.1.4_24bit.core-le16.dts",
+      "path": ".research/codec-variants/dtsx_7.1.4_24bit.core-le16.dts",
+      "sha256": "1c6bab13426ee2005a4a9ba48f6029b50d1cb8626a2cb7e64506c0c57426f1ab",
+      "source": ".research/codec-derived/dts/dtsx_7.1.4_24bit.core.dts",
+      "source_sha256": "eb5ceab778e7a5aedf0c47627b5de45858a3dd81903b12d153271f4830c09bc2",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "master_audio_7.1_24bit.core-be14.dts",
+      "path": ".research/codec-variants/master_audio_7.1_24bit.core-be14.dts",
+      "sha256": "7d1fdd8d701affacd95f82ca4e8abaa09489a0fc19a66125bc7e8d9976ad14c0",
+      "source": ".research/codec-derived/dts/master_audio_7.1_24bit.core.dts",
+      "source_sha256": "fd230401e49b41fbc892246cf22d7b04419104e02978215b50dcba3751c8de5f",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "master_audio_7.1_24bit.core-le14.dts",
+      "path": ".research/codec-variants/master_audio_7.1_24bit.core-le14.dts",
+      "sha256": "62e353a81818e5025c1a9068aa4d7c05e4ade02d02e5b14656cf8159d6aa4e32",
+      "source": ".research/codec-derived/dts/master_audio_7.1_24bit.core.dts",
+      "source_sha256": "fd230401e49b41fbc892246cf22d7b04419104e02978215b50dcba3751c8de5f",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "master_audio_7.1_24bit.core-le16.dts",
+      "path": ".research/codec-variants/master_audio_7.1_24bit.core-le16.dts",
+      "sha256": "15180fd1a3781c2561315664f1b02314ad82f6bde577ace4ddd4ed1619d11d22",
+      "source": ".research/codec-derived/dts/master_audio_7.1_24bit.core.dts",
+      "source_sha256": "fd230401e49b41fbc892246cf22d7b04419104e02978215b50dcba3751c8de5f",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "x96_51_24_96_1509.core-be14.dts",
+      "path": ".research/codec-variants/x96_51_24_96_1509.core-be14.dts",
+      "sha256": "43d4cae82994b294aad96f110ee3f90275db905ff9059ce787ddc04ff9b0dc4c",
+      "source": ".research/codec-derived/dts/x96_51_24_96_1509.core.dts",
+      "source_sha256": "e902cc493e94aa95024a276ff0d36f5ac76d614ed8c163621d3222112e1cdb93",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "x96_51_24_96_1509.core-le14.dts",
+      "path": ".research/codec-variants/x96_51_24_96_1509.core-le14.dts",
+      "sha256": "705bab7c4e1ae34c3db2125120daeb85f3e759f676fefd4fe07bf7e7d134c493",
+      "source": ".research/codec-derived/dts/x96_51_24_96_1509.core.dts",
+      "source_sha256": "e902cc493e94aa95024a276ff0d36f5ac76d614ed8c163621d3222112e1cdb93",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "x96_51_24_96_1509.core-le16.dts",
+      "path": ".research/codec-variants/x96_51_24_96_1509.core-le16.dts",
+      "sha256": "467d39cfc932e8a85ef10eeb9b958c027503531caff851020a1eee5e9c399e4a",
+      "source": ".research/codec-derived/dts/x96_51_24_96_1509.core.dts",
+      "source_sha256": "e902cc493e94aa95024a276ff0d36f5ac76d614ed8c163621d3222112e1cdb93",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "x96_xch_61_24_96_3840.core-be14.dts",
+      "path": ".research/codec-variants/x96_xch_61_24_96_3840.core-be14.dts",
+      "sha256": "3b6e8cb4684fe20083fb79aa7993b3fdf961fbe46c00936af8fc33777bcc13e0",
+      "source": ".research/codec-derived/dts/x96_xch_61_24_96_3840.core.dts",
+      "source_sha256": "1674302b733a95f25077101dc5a18de8fe9c624c0bbf4f5d2c70b747de155a5c",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "x96_xch_61_24_96_3840.core-le14.dts",
+      "path": ".research/codec-variants/x96_xch_61_24_96_3840.core-le14.dts",
+      "sha256": "eb36783459c31b75ac0eeecf93d66af3501a2b875a7dd4714fe71fa56abea5d2",
+      "source": ".research/codec-derived/dts/x96_xch_61_24_96_3840.core.dts",
+      "source_sha256": "1674302b733a95f25077101dc5a18de8fe9c624c0bbf4f5d2c70b747de155a5c",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "x96_xch_61_24_96_3840.core-le16.dts",
+      "path": ".research/codec-variants/x96_xch_61_24_96_3840.core-le16.dts",
+      "sha256": "4ad990b287252a5d5dc3637fbcdcbdbeaa47164811dae0b4bc47cf2e1c197567",
+      "source": ".research/codec-derived/dts/x96_xch_61_24_96_3840.core.dts",
+      "source_sha256": "1674302b733a95f25077101dc5a18de8fe9c624c0bbf4f5d2c70b747de155a5c",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "x96_xxch_71_24_96_3840.core-be14.dts",
+      "path": ".research/codec-variants/x96_xxch_71_24_96_3840.core-be14.dts",
+      "sha256": "2233d7cc615374f96a651be154f94d7e11bf398aabb8b0d83166ea827c03c57d",
+      "source": ".research/codec-derived/dts/x96_xxch_71_24_96_3840.core.dts",
+      "source_sha256": "19e3f42286e7616a0c06fba72fb0af51be7eec5dfc98bcb778b921ca89ffd897",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "x96_xxch_71_24_96_3840.core-le14.dts",
+      "path": ".research/codec-variants/x96_xxch_71_24_96_3840.core-le14.dts",
+      "sha256": "7e31a19c3dccdca93821ba01936236d1fd75a5883943a4d6acea0d9a01db19a6",
+      "source": ".research/codec-derived/dts/x96_xxch_71_24_96_3840.core.dts",
+      "source_sha256": "19e3f42286e7616a0c06fba72fb0af51be7eec5dfc98bcb778b921ca89ffd897",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "x96_xxch_71_24_96_3840.core-le16.dts",
+      "path": ".research/codec-variants/x96_xxch_71_24_96_3840.core-le16.dts",
+      "sha256": "58b8eb3a9aa511b025e92c23f3fbf7185a8c3913e6bc8cce550cbb848ac617dc",
+      "source": ".research/codec-derived/dts/x96_xxch_71_24_96_3840.core.dts",
+      "source_sha256": "19e3f42286e7616a0c06fba72fb0af51be7eec5dfc98bcb778b921ca89ffd897",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xbr_51_24_48_3840.core-be14.dts",
+      "path": ".research/codec-variants/xbr_51_24_48_3840.core-be14.dts",
+      "sha256": "5116e619f45eb3a5f6887e0978a958905af7595d49e6e3e3cdff682a148f04f4",
+      "source": ".research/codec-derived/dts/xbr_51_24_48_3840.core.dts",
+      "source_sha256": "8500ec431e95f254eca8f3b6b42a2e243d52dc63526412ca3cdb709a84b1de40",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xbr_51_24_48_3840.core-le14.dts",
+      "path": ".research/codec-variants/xbr_51_24_48_3840.core-le14.dts",
+      "sha256": "72c812976b704dbf64067188101dd3633a29583d11c80b282f53538dcfdfcfdd",
+      "source": ".research/codec-derived/dts/xbr_51_24_48_3840.core.dts",
+      "source_sha256": "8500ec431e95f254eca8f3b6b42a2e243d52dc63526412ca3cdb709a84b1de40",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xbr_51_24_48_3840.core-le16.dts",
+      "path": ".research/codec-variants/xbr_51_24_48_3840.core-le16.dts",
+      "sha256": "60c5a428d4712554417fc8af0968109f91bf7c3b54f42436551ebb13d7c25bc9",
+      "source": ".research/codec-derived/dts/xbr_51_24_48_3840.core.dts",
+      "source_sha256": "8500ec431e95f254eca8f3b6b42a2e243d52dc63526412ca3cdb709a84b1de40",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xbr_xch_61_24_48_3840.core-be14.dts",
+      "path": ".research/codec-variants/xbr_xch_61_24_48_3840.core-be14.dts",
+      "sha256": "202a93ceda79020c2a8fa93dd43c4c56aba0727cda59bda7e1489bb7a4593270",
+      "source": ".research/codec-derived/dts/xbr_xch_61_24_48_3840.core.dts",
+      "source_sha256": "cfa5ec0089bd981f36b21aba617149b37299ed149055ed9bb3ab4efcee87bdac",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xbr_xch_61_24_48_3840.core-le14.dts",
+      "path": ".research/codec-variants/xbr_xch_61_24_48_3840.core-le14.dts",
+      "sha256": "c96331d3757b2af1dd375e2bcfedbbec7d334514249f8ab873b0f802eaf5bf3b",
+      "source": ".research/codec-derived/dts/xbr_xch_61_24_48_3840.core.dts",
+      "source_sha256": "cfa5ec0089bd981f36b21aba617149b37299ed149055ed9bb3ab4efcee87bdac",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xbr_xch_61_24_48_3840.core-le16.dts",
+      "path": ".research/codec-variants/xbr_xch_61_24_48_3840.core-le16.dts",
+      "sha256": "7d37f3ab1aaa08f55c62623e69b734d43771b265ba4a5ac7a142a98c6ec97908",
+      "source": ".research/codec-derived/dts/xbr_xch_61_24_48_3840.core.dts",
+      "source_sha256": "cfa5ec0089bd981f36b21aba617149b37299ed149055ed9bb3ab4efcee87bdac",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xbr_xxch_71_24_48_3840.core-be14.dts",
+      "path": ".research/codec-variants/xbr_xxch_71_24_48_3840.core-be14.dts",
+      "sha256": "358fcf2d91a9731670e7cdbd4e984752fc7dd4aa34b1e31fa7cd5cff83f9f793",
+      "source": ".research/codec-derived/dts/xbr_xxch_71_24_48_3840.core.dts",
+      "source_sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xbr_xxch_71_24_48_3840.core-le14.dts",
+      "path": ".research/codec-variants/xbr_xxch_71_24_48_3840.core-le14.dts",
+      "sha256": "22bb2c0ce2821db4f7d587ef2edeaff5fce36ca3f8b4dfc5a6957aff21c65d49",
+      "source": ".research/codec-derived/dts/xbr_xxch_71_24_48_3840.core.dts",
+      "source_sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xbr_xxch_71_24_48_3840.core-le16.dts",
+      "path": ".research/codec-variants/xbr_xxch_71_24_48_3840.core-le16.dts",
+      "sha256": "0705a01403a6d1bd68e2acd1c287fc340975aef24291fa6e772fcc483802a9f6",
+      "source": ".research/codec-derived/dts/xbr_xxch_71_24_48_3840.core.dts",
+      "source_sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xch_61_24_48_768.core-be14.dts",
+      "path": ".research/codec-variants/xch_61_24_48_768.core-be14.dts",
+      "sha256": "f41458eb3a3880af3bb5ae77cf973babf5f109a2f2c25a1e96b8ec42512cf41d",
+      "source": ".research/codec-derived/dts/xch_61_24_48_768.core.dts",
+      "source_sha256": "dc0a4caf2c2bf999772b537994d988e5b5bef316cdd01e82dac67156bbf4e2ba",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xch_61_24_48_768.core-le14.dts",
+      "path": ".research/codec-variants/xch_61_24_48_768.core-le14.dts",
+      "sha256": "1d96614f680abf20abf33b6b698653cd33b9017bd58848b00bb076e77c102847",
+      "source": ".research/codec-derived/dts/xch_61_24_48_768.core.dts",
+      "source_sha256": "dc0a4caf2c2bf999772b537994d988e5b5bef316cdd01e82dac67156bbf4e2ba",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xch_61_24_48_768.core-le16.dts",
+      "path": ".research/codec-variants/xch_61_24_48_768.core-le16.dts",
+      "sha256": "f6b9783e07a388ca2619d7ae3646bc6033655973b60f7deee1b9f850fdf3a173",
+      "source": ".research/codec-derived/dts/xch_61_24_48_768.core.dts",
+      "source_sha256": "dc0a4caf2c2bf999772b537994d988e5b5bef316cdd01e82dac67156bbf4e2ba",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_51_16_192_768_0.core-be14.dts",
+      "path": ".research/codec-variants/xll_51_16_192_768_0.core-be14.dts",
+      "sha256": "16c0143b52c87eb70e5402c2e6ef97fa1d009ea641a396e006d96d04cac9e148",
+      "source": ".research/codec-derived/dts/xll_51_16_192_768_0.core.dts",
+      "source_sha256": "e92ea6eb72e254d134b2351b4a91e6d55da7f7397825fb042b819c447805a681",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_51_16_192_768_0.core-le14.dts",
+      "path": ".research/codec-variants/xll_51_16_192_768_0.core-le14.dts",
+      "sha256": "a789f0b1686e76d698da50676962d21d29d4c68220b32c234d9d17a0f789cc66",
+      "source": ".research/codec-derived/dts/xll_51_16_192_768_0.core.dts",
+      "source_sha256": "e92ea6eb72e254d134b2351b4a91e6d55da7f7397825fb042b819c447805a681",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_51_16_192_768_0.core-le16.dts",
+      "path": ".research/codec-variants/xll_51_16_192_768_0.core-le16.dts",
+      "sha256": "f138e6c8801ac7265bacb756d8b4ab4113667f069950604f7cbea59dfe378476",
+      "source": ".research/codec-derived/dts/xll_51_16_192_768_0.core.dts",
+      "source_sha256": "e92ea6eb72e254d134b2351b4a91e6d55da7f7397825fb042b819c447805a681",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_51_16_192_768_1.core-be14.dts",
+      "path": ".research/codec-variants/xll_51_16_192_768_1.core-be14.dts",
+      "sha256": "f67eb2299a9360daafe198a06c2c93d8fde6145ad4f768342df013c616e4c73d",
+      "source": ".research/codec-derived/dts/xll_51_16_192_768_1.core.dts",
+      "source_sha256": "03d51e49c3dbfb9574c3c222b8c9d4d11daef4719882835e030becfbb8308319",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_51_16_192_768_1.core-le14.dts",
+      "path": ".research/codec-variants/xll_51_16_192_768_1.core-le14.dts",
+      "sha256": "10a2d0f0f9a14ae7059628319f10f9557fa66366d6cbc3ca158d20404e3407da",
+      "source": ".research/codec-derived/dts/xll_51_16_192_768_1.core.dts",
+      "source_sha256": "03d51e49c3dbfb9574c3c222b8c9d4d11daef4719882835e030becfbb8308319",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_51_16_192_768_1.core-le16.dts",
+      "path": ".research/codec-variants/xll_51_16_192_768_1.core-le16.dts",
+      "sha256": "2dd70d0a0b2c359a03b6d45ee5f067fd194a3d124a25345103c32046e9ef98eb",
+      "source": ".research/codec-derived/dts/xll_51_16_192_768_1.core.dts",
+      "source_sha256": "03d51e49c3dbfb9574c3c222b8c9d4d11daef4719882835e030becfbb8308319",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_51_24_48_768.core-be14.dts",
+      "path": ".research/codec-variants/xll_51_24_48_768.core-be14.dts",
+      "sha256": "de27c51ac465e8eeb494ba4cc182f0ba75e1a90ce657cd763e92cfc721f4293f",
+      "source": ".research/codec-derived/dts/xll_51_24_48_768.core.dts",
+      "source_sha256": "d168cd189728296889ed5d9fb0b1e5d2cd6a1bcfec5a8088519b4e065f4e58d3",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_51_24_48_768.core-le14.dts",
+      "path": ".research/codec-variants/xll_51_24_48_768.core-le14.dts",
+      "sha256": "4c7c6b6bdebe077ab0230646b025493251d5be71dd7f43fbf48184e01f0773a8",
+      "source": ".research/codec-derived/dts/xll_51_24_48_768.core.dts",
+      "source_sha256": "d168cd189728296889ed5d9fb0b1e5d2cd6a1bcfec5a8088519b4e065f4e58d3",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_51_24_48_768.core-le16.dts",
+      "path": ".research/codec-variants/xll_51_24_48_768.core-le16.dts",
+      "sha256": "6dffe7f59eb4b9e4641f3ebe8dc1b49e3a45ca857dd0d5f21d492cd236e7bed4",
+      "source": ".research/codec-derived/dts/xll_51_24_48_768.core.dts",
+      "source_sha256": "d168cd189728296889ed5d9fb0b1e5d2cd6a1bcfec5a8088519b4e065f4e58d3",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_51_24_48_none.core-be14.dts",
+      "path": ".research/codec-derived/dts/xll_51_24_48_none.core.dts",
+      "sha256": "d1c89e480474356e86370426052e7e389f1dec90a30473356b854b65b8c549d6",
+      "unsupported_packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_51_24_48_none.core-le14.dts",
+      "path": ".research/codec-derived/dts/xll_51_24_48_none.core.dts",
+      "sha256": "d1c89e480474356e86370426052e7e389f1dec90a30473356b854b65b8c549d6",
+      "unsupported_packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_51_24_48_none.core-le16.dts",
+      "path": ".research/codec-derived/dts/xll_51_24_48_none.core.dts",
+      "sha256": "d1c89e480474356e86370426052e7e389f1dec90a30473356b854b65b8c549d6",
+      "unsupported_packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_71_24_48_768_0.core-be14.dts",
+      "path": ".research/codec-variants/xll_71_24_48_768_0.core-be14.dts",
+      "sha256": "63d4a4490ee5505dde40d2b828e557c9b466c0434a11553685a9603616e02714",
+      "source": ".research/codec-derived/dts/xll_71_24_48_768_0.core.dts",
+      "source_sha256": "3c5497ae22b12644fdaa0661c4d203dc131271e93ea10e1b3cdbfd6edf0ba3c0",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_71_24_48_768_0.core-le14.dts",
+      "path": ".research/codec-variants/xll_71_24_48_768_0.core-le14.dts",
+      "sha256": "09742c1a525eced54aa65f4cdd840450ba42d9e6c6cd937b1e0737bf91d13ff4",
+      "source": ".research/codec-derived/dts/xll_71_24_48_768_0.core.dts",
+      "source_sha256": "3c5497ae22b12644fdaa0661c4d203dc131271e93ea10e1b3cdbfd6edf0ba3c0",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_71_24_48_768_0.core-le16.dts",
+      "path": ".research/codec-variants/xll_71_24_48_768_0.core-le16.dts",
+      "sha256": "d867a516f6f10a3ac00f5b7c3db28d4ad00d674ace18d6d35124b6a6133faa65",
+      "source": ".research/codec-derived/dts/xll_71_24_48_768_0.core.dts",
+      "source_sha256": "3c5497ae22b12644fdaa0661c4d203dc131271e93ea10e1b3cdbfd6edf0ba3c0",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_71_24_48_768_1.core-be14.dts",
+      "path": ".research/codec-variants/xll_71_24_48_768_1.core-be14.dts",
+      "sha256": "c9ef40eebdb6c111b831adeb3d42dc3d7e3a8dd20175720899b2002530cbf532",
+      "source": ".research/codec-derived/dts/xll_71_24_48_768_1.core.dts",
+      "source_sha256": "69ea01316c4322248cb02a01219c67ad2a7555b1494544630d9b3bc6b534b968",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_71_24_48_768_1.core-le14.dts",
+      "path": ".research/codec-variants/xll_71_24_48_768_1.core-le14.dts",
+      "sha256": "93aaacc1579831717e640a7ddd5be3fe6f20388826163906cc83235978527078",
+      "source": ".research/codec-derived/dts/xll_71_24_48_768_1.core.dts",
+      "source_sha256": "69ea01316c4322248cb02a01219c67ad2a7555b1494544630d9b3bc6b534b968",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_71_24_48_768_1.core-le16.dts",
+      "path": ".research/codec-variants/xll_71_24_48_768_1.core-le16.dts",
+      "sha256": "b42742580b2ad309887c39d719907db304c1abd01b9e9c1dce57b12d942583b2",
+      "source": ".research/codec-derived/dts/xll_71_24_48_768_1.core.dts",
+      "source_sha256": "69ea01316c4322248cb02a01219c67ad2a7555b1494544630d9b3bc6b534b968",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_71_24_96_768.core-be14.dts",
+      "path": ".research/codec-variants/xll_71_24_96_768.core-be14.dts",
+      "sha256": "e65f561c2be443f3a946c9b81dabd90a2543ab994fa661947341c190720be8a9",
+      "source": ".research/codec-derived/dts/xll_71_24_96_768.core.dts",
+      "source_sha256": "c4ea4e1a9cc7357656692dd1376e2a269d69a74b86c421e868cb497cd0bbf16a",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_71_24_96_768.core-le14.dts",
+      "path": ".research/codec-variants/xll_71_24_96_768.core-le14.dts",
+      "sha256": "0045fe75a2a0ee8d0c587291b707fcb6863040f90f647806772981fa8d094dea",
+      "source": ".research/codec-derived/dts/xll_71_24_96_768.core.dts",
+      "source_sha256": "c4ea4e1a9cc7357656692dd1376e2a269d69a74b86c421e868cb497cd0bbf16a",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_71_24_96_768.core-le16.dts",
+      "path": ".research/codec-variants/xll_71_24_96_768.core-le16.dts",
+      "sha256": "066abb249534be7c141de2588fd557ace1d432f766e26a395b3ac86de09c059f",
+      "source": ".research/codec-derived/dts/xll_71_24_96_768.core.dts",
+      "source_sha256": "c4ea4e1a9cc7357656692dd1376e2a269d69a74b86c421e868cb497cd0bbf16a",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_x96_51_24_96_1509.core-be14.dts",
+      "path": ".research/codec-variants/xll_x96_51_24_96_1509.core-be14.dts",
+      "sha256": "2c669d1f0ac4c1285415500805f057000d2fdb671aeea978266b8ff8e5ace7e1",
+      "source": ".research/codec-derived/dts/xll_x96_51_24_96_1509.core.dts",
+      "source_sha256": "e84b744c459a0c668668e481a16435e65facf2857a958fab90496dbab89b8956",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_x96_51_24_96_1509.core-le14.dts",
+      "path": ".research/codec-variants/xll_x96_51_24_96_1509.core-le14.dts",
+      "sha256": "d1736642da59d22001d3167347c16c91ca2718a6193666a0ab140712862c4953",
+      "source": ".research/codec-derived/dts/xll_x96_51_24_96_1509.core.dts",
+      "source_sha256": "e84b744c459a0c668668e481a16435e65facf2857a958fab90496dbab89b8956",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_x96_51_24_96_1509.core-le16.dts",
+      "path": ".research/codec-variants/xll_x96_51_24_96_1509.core-le16.dts",
+      "sha256": "02f97c4a0cfba9145cd4350ea28b5484ae1d242e6080a100a1c65fcd12e74a18",
+      "source": ".research/codec-derived/dts/xll_x96_51_24_96_1509.core.dts",
+      "source_sha256": "e84b744c459a0c668668e481a16435e65facf2857a958fab90496dbab89b8956",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_xch_61_24_48_768.core-be14.dts",
+      "path": ".research/codec-variants/xll_xch_61_24_48_768.core-be14.dts",
+      "sha256": "343a2ac8fd91a8b35090d1f57f0f90e47243e1142bf97b6a31b679305bb9e3a4",
+      "source": ".research/codec-derived/dts/xll_xch_61_24_48_768.core.dts",
+      "source_sha256": "eb8e3d2edc9cbb7ae2d45739331dd883d9e5a3be6dc335a85e14b5519d6a2fb9",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_xch_61_24_48_768.core-le14.dts",
+      "path": ".research/codec-variants/xll_xch_61_24_48_768.core-le14.dts",
+      "sha256": "a757a7851644e363379612c0eaf769b24ef9717068f85b9279ead46fa4c76bd1",
+      "source": ".research/codec-derived/dts/xll_xch_61_24_48_768.core.dts",
+      "source_sha256": "eb8e3d2edc9cbb7ae2d45739331dd883d9e5a3be6dc335a85e14b5519d6a2fb9",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xll_xch_61_24_48_768.core-le16.dts",
+      "path": ".research/codec-variants/xll_xch_61_24_48_768.core-le16.dts",
+      "sha256": "4dd7f70b74b6e6f2d630864012da8049a4608586ea925335d1fadbd1e5fbac6c",
+      "source": ".research/codec-derived/dts/xll_xch_61_24_48_768.core.dts",
+      "source_sha256": "eb8e3d2edc9cbb7ae2d45739331dd883d9e5a3be6dc335a85e14b5519d6a2fb9",
+      "packing": "le16"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xxch_71_24_48_2046.core-be14.dts",
+      "path": ".research/codec-variants/xxch_71_24_48_2046.core-be14.dts",
+      "sha256": "358fcf2d91a9731670e7cdbd4e984752fc7dd4aa34b1e31fa7cd5cff83f9f793",
+      "source": ".research/codec-derived/dts/xxch_71_24_48_2046.core.dts",
+      "source_sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4",
+      "packing": "be14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xxch_71_24_48_2046.core-le14.dts",
+      "path": ".research/codec-variants/xxch_71_24_48_2046.core-le14.dts",
+      "sha256": "22bb2c0ce2821db4f7d587ef2edeaff5fce36ca3f8b4dfc5a6957aff21c65d49",
+      "source": ".research/codec-derived/dts/xxch_71_24_48_2046.core.dts",
+      "source_sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4",
+      "packing": "le14"
+    },
+    {
+      "lane": "dts-packed",
+      "name": "xxch_71_24_48_2046.core-le16.dts",
+      "path": ".research/codec-variants/xxch_71_24_48_2046.core-le16.dts",
+      "sha256": "0705a01403a6d1bd68e2acd1c287fc340975aef24291fa6e772fcc483802a9f6",
+      "source": ".research/codec-derived/dts/xxch_71_24_48_2046.core.dts",
+      "source_sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4",
+      "packing": "le16"
+    }
+  ]
+}

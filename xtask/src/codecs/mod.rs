@@ -41,6 +41,8 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  hash every vector of each lane (h264, hevc, ac3, eac3, aac, aac-mov, dts, flac,
                  mp3, mp2, mp1, vorbis, opus; reader-ogg, reader-flac, reader-mp3,
                  reader-aac, reader-ac3, reader-eac3)
+  variant-pins --manifest F --root R --ffprobe FP --strip-dither S [--scratch DIR]
+                 record generated codec variant pins from their pinned source inputs
   grade --manifest M.json --root R --bin DIR --ffmpeg FF --ffprobe FP --codec-worker W
         [--codec-worker-for OPERATION=W2 ...] --reference R2 --out OUT.jsonl [--scratch DIR]
         [--only SUBSTR,...] [--lanes LANE,...]
@@ -400,6 +402,22 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
             let a = Args::parse(rest, &["ffmpeg"], &[])?;
             derived::run(root, &a.path("ffmpeg")?)?;
         }
+        "variant-pins" => {
+            let a = Args::parse(
+                rest,
+                &["manifest", "root", "ffprobe", "strip-dither", "scratch"],
+                &[],
+            )?;
+            damage::record(
+                &damage::FixtureTools {
+                    root: &a.path("root")?,
+                    ffprobe: a.required("ffprobe")?,
+                    strip_dither: &a.path("strip-dither")?,
+                },
+                &a.path("manifest")?,
+                a.get("scratch").map(Path::new),
+            )?;
+        }
         "manifest" => {
             let a = Args::parse(rest, &["out"], &[])?;
             if a.positional.is_empty() {
@@ -424,7 +442,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "only",
                     "lanes",
                 ],
-                &["record-variants"],
+                &[],
             )?;
             let grade = correctness::Grade {
                 manifest: a.path("manifest")?,
@@ -442,11 +460,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     .map(|l| l.split(',').map(str::to_owned).collect()),
                 rules: correctness::Rules::load(root)?,
             };
-            if a.get("record-variants").is_some() {
-                damage::record(&grade)?;
-            } else {
-                correctness::grade(&grade)?;
-            }
+            correctness::grade(&grade)?;
         }
         "compare-hevc" => {
             let a = Args::parse(rest, &["decoder", "ffmpeg", "ffprobe"], &[])?;

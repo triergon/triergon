@@ -88,6 +88,9 @@ with `AudioSession::feed_discarding` does the same for a clock-paced session.
 `examples/decode_audio.rs` decodes the first audio track of any file `triergon::open_blocking`
 opens, as the harness grades it.
 
+Call `TrackDecoder::reset()` at a discontinuity, such as a seek, to drop the
+decoder's signal history before submitting packets from the new position.
+
 The `mix` module holds the stereo downmix (`mix::Downmix`) and the s16 conversion
 (`mix::to_s16`) on their own.
 
@@ -151,6 +154,11 @@ The `codecs-files` comparison exercises track selection and packet decoding thro
 `TrackDecoder::new` and `decode`. The `aac-access-units` comparison exercises
 `TrackDecoder::aac_access_units_with_layout_in` and compares decoded sample planes and
 speaker order.
+
+The `codecs-sessions` comparison grades planar PCM and stereo s16 audio,
+RGBA video, and the output timestamps and counts. It also compares decoder
+resets at selected packet indices with FFmpeg flushing its decoder at the
+same indices.
 
 The letterbox and downmix rules are native observations of FFmpeg 9.0.2,
 recorded as `RGBA-CONTRACT.json` and `DOWNMIX-CONTRACT.json` in the research

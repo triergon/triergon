@@ -474,13 +474,20 @@ fn reader_files(root: &Path, lanes: &[String]) -> R<Vec<(PathBuf, Option<String>
 
 /// The correctness manifest's vectors of `lanes`, after the manifest.
 fn correctness_files(root: &Path, lanes: &[String]) -> R<Vec<(PathBuf, Option<String>)>> {
-    let mut seen = std::collections::BTreeSet::new();
-    let (mov, regular): (Vec<_>, Vec<_>) = lanes
-        .iter()
-        .map(|lane| crate::codecs::correctness::vector_lane(lane))
-        .filter(|lane| seen.insert(*lane))
-        .partition(|lane| *lane == "aac-mov");
+    use crate::codecs::correctness::{session_vector_lanes, variant_manifest, vector_lane};
+
+    let mut regular = std::collections::BTreeSet::new();
     let mut files = Vec::new();
+    for lane in lanes {
+        regular.extend(session_vector_lanes(lane));
+        if let Some(manifest) = variant_manifest(lane) {
+            files.extend(variant_files(root, manifest, lane)?);
+        } else {
+            regular.insert(vector_lane(lane));
+        }
+    }
+    let mov = regular.remove("aac-mov");
+    let regular = regular.into_iter().collect::<Vec<_>>();
     if !regular.is_empty() {
         files.extend(lane_files(
             root,
@@ -488,8 +495,44 @@ fn correctness_files(root: &Path, lanes: &[String]) -> R<Vec<(PathBuf, Option<St
             &regular,
         )?);
     }
-    if !mov.is_empty() {
-        files.extend(lane_files(root, AAC_MOV_MANIFEST, &mov)?);
+    if mov {
+        files.extend(lane_files(root, AAC_MOV_MANIFEST, &["aac-mov"])?);
+    }
+    Ok(files)
+}
+
+fn variant_files(root: &Path, manifest: &str, lane: &str) -> R<Vec<(PathBuf, Option<String>)>> {
+    let mut files = vec![(root.join(manifest), None)];
+    let doc = json::read(&root.join(manifest))?;
+    let vectors = doc
+        .get("vectors")
+        .and_then(Value::as_array)
+        .ok_or("variant manifest needs vectors")?;
+    for vector in vectors
+        .iter()
+        .filter(|v| v.get("lane").and_then(Value::as_str) == Some(lane))
+    {
+        let field = |key| {
+            vector
+                .get(key)
+                .and_then(Value::as_str)
+                .ok_or_else(|| format!("{manifest}: {lane} vector without {key}"))
+        };
+        let (path, pin) = if vector.get("source").is_some() {
+            ("source", "source_sha256")
+        } else {
+            ("path", "sha256")
+        };
+        files.push((root.join(field(path)?), Some(field(pin)?.to_owned())));
+        if vector.get("tail_source").is_some() {
+            files.push((
+                root.join(field("tail_source")?),
+                Some(field("tail_source_sha256")?.to_owned()),
+            ));
+        }
+    }
+    if files.len() == 1 && crate::codecs::correctness::session_vector_lanes(lane).is_empty() {
+        return Err(format!("{manifest}: no {lane} vectors"));
     }
     Ok(files)
 }

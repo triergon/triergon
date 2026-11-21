@@ -141,3 +141,33 @@ fn tone_power(samples: &[f32], frequency: f64) -> f64 {
         });
     sin * sin + cos * cos
 }
+
+#[test]
+fn reset_replays_aac_without_the_previous_packets_overlap() {
+    let fixture = include_bytes!("../../playback/tests/fixtures/mp4/avc-aac-quicktime-7-1.mov");
+    let budget = Budget::new(32 << 20).unwrap();
+    let mut source = open_blocking(std::io::Cursor::new(fixture), &budget).unwrap();
+    let first = source.next_packet().unwrap().unwrap();
+    let reader = source.reader();
+    let track = (0..reader.track_count())
+        .filter_map(|index| reader.track(index))
+        .find(|track| track.kind() == MediaKind::Audio)
+        .unwrap();
+    let id = track.id();
+    let mut reset = TrackDecoder::aac_access_units_in(track.configuration(), &budget).unwrap();
+    let mut fresh = TrackDecoder::aac_access_units_in(track.configuration(), &budget).unwrap();
+    let mut packets = std::iter::once(first)
+        .chain(std::iter::from_fn(|| source.next_packet().unwrap()))
+        .filter(|packet| packet.track() == id)
+        .skip(20);
+    let packet = packets.next().unwrap();
+    let mut frame = AudioFrame::default();
+    reset.decode(&packet, &mut frame).unwrap();
+    reset.decode(&packets.next().unwrap(), &mut frame).unwrap();
+    reset.reset();
+    reset.decode(&packet, &mut frame).unwrap();
+    let mut expected = AudioFrame::default();
+    fresh.decode(&packet, &mut expected).unwrap();
+    assert_eq!(frame.samples_per_channel, expected.samples_per_channel);
+    assert_eq!(frame.planes, expected.planes);
+}

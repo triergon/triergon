@@ -47,3 +47,7 @@ required-features = ["codecs"]
 [[example]]
 name = "session_queue"
 required-features = ["codecs"]
+
+[[example]]
+name = "session_decode"
+required-features = ["codecs"]

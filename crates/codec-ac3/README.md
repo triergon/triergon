@@ -121,3 +121,10 @@ hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
   corruption tests; FATE checks skip when the corpus is absent.
 - Derivation notes and tools: [harness/codecs/ac3](../../harness/codecs/ac3/STATUS.md).
   Project-wide gates: [docs/quality.md](../../docs/quality.md).
+
+The `ac3-crc-reject` and `eac3-crc-reject` comparisons grade Reject against
+FFmpeg with CRC checking enabled, including how many frames each decoder
+emits after damage. `ac3-nodither` verifies the trace-generated stream pins and
+compares `NoiseMode::Off` on original AC-3 and E-AC-3 without AHT or SPX to
+FFmpeg decoding the dither-stripped stream. The AHT and SPX cases use default
+decoding on the stripped streams and retain the lossy decoder rule.
