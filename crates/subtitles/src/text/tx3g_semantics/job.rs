@@ -25,8 +25,9 @@ enum Phase {
     Taken,
 }
 
-/// Composes the existing source/config parsers internally. Public Cue or
-/// Configuration values are never accepted as proof of validated wire facts.
+/// Resolves one tx3g sample and its optional sample description into
+/// [`Semantics`]. It runs the tx3g extractor and the description parser itself,
+/// so it takes no caller-built `Cue` or `Configuration`.
 #[derive(Debug)]
 pub struct SemanticJob {
     pool: Budget,
@@ -72,6 +73,16 @@ pub struct SemanticJob {
     failed: Option<Error>,
 }
 impl SemanticJob {
+    /// Starts on `input`, a tx3g sample whose `codec_private` holds the sample
+    /// description in `layout`, if one is given. `track_timescale`, in ticks
+    /// per second, converts modifier times to [`Time`]; `generation` must be
+    /// the input's.
+    ///
+    /// Fails with `Error::Unsupported` for a format other than `Format::Tx3g`,
+    /// `Error::Invalid` for a zero timescale or a layout without
+    /// `codec_private`, and as the tx3g extractor and
+    /// `ConfigJob::new_unicode_fonts` refuse the input (`Error::StaleGeneration`,
+    /// `Error::ForeignPool`, `Error::Limit`). The input is left as it was.
     pub fn new(
         input: &Input,
         layout: Option<ConfigLayout>,
@@ -314,6 +325,16 @@ impl SemanticJob {
         self.records = self.records.checked_add(1).ok_or(Error::Overflow)?;
         Ok(())
     }
+    /// Advances by at most `work` units, charged per byte, character, record
+    /// and run handled.
+    ///
+    /// A malformed sample or description fails with `Error::Invalid`,
+    /// `Error::Truncated` or `Error::Unsupported`, a modifier time past the
+    /// known sample duration with `Error::Invalid`, and too many records or
+    /// runs with `Error::Limit`. Such an error releases the job's storage and
+    /// every later call returns it; cancellation does not, and the job
+    /// resumes. After [`Self::take_output`] the call fails with
+    /// `Error::Invalid`.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<SemanticStatus> {
         cancelled(cancel)?;
         if let Some(error) = self.failed {
@@ -890,6 +911,9 @@ impl SemanticJob {
         });
         Ok(true)
     }
+    /// Hands over the semantics once [`Self::poll`] returned
+    /// [`SemanticStatus::Ready`]; `Error::Invalid` before that and on a second
+    /// call, and the job's error after a failure.
     pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<Semantics> {
         cancelled(cancel)?;
         if let Some(error) = self.failed {

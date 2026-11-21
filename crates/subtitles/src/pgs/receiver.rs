@@ -28,8 +28,12 @@ const END: u8 = 0x80;
 /// A packet's timestamps in its stream's time base.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PacketClock {
+    /// Presentation time in `timebase` ticks; `None`, or `i64::MIN`, when
+    /// unknown.
     pub pts: Option<i64>,
+    /// Decoding time in `timebase` ticks; carried to the output, not read.
     pub dts: Option<i64>,
+    /// The seconds per tick of `pts` and `dts`.
     pub timebase: TimeBase,
 }
 
@@ -45,18 +49,32 @@ impl PacketClock {
     }
 }
 
-/// Bounds on what one decoder holds and does.
+/// Bounds on what one decoder holds and does. Exceeding one fails the
+/// decoder with `Error::Limit` until [`ReceiverDecoder::reset`], except where
+/// a field says otherwise.
 #[derive(Clone, Copy, Debug)]
 pub struct DisplayLimits {
+    /// Largest area of one object a display decodes, in pixels.
     pub max_object_pixels: usize,
+    /// Largest total area of the objects one display decodes, in pixels.
     pub max_display_pixels: usize,
+    /// Most RLE bytes one object holds.
     pub max_encoded: usize,
+    /// Most fragments one object takes.
     pub max_fragments: usize,
+    /// Most objects cached at once, at most 64; an ODS for a new id is then
+    /// ignored.
     pub max_objects: usize,
+    /// Most palettes cached at once, at most 8; a PDS for a new id is then
+    /// ignored.
     pub max_palettes: usize,
+    /// Most composition objects a PCS may declare, at most 255. The receiver
+    /// presents the first two.
     pub max_references: usize,
+    /// Largest packet [`ReceiverDecoder::push`] accepts, in bytes; a larger
+    /// one is refused with `Error::Limit` and the decoder carries on.
     pub max_packet_bytes: usize,
-    /// Cumulative deterministic work until explicit reset, not wall time.
+    /// Work units the decoder spends in all until reset; work, not wall time.
     pub max_work: usize,
 }
 
@@ -92,9 +110,11 @@ impl DisplayLimits {
     }
 }
 
+/// The decoder options that change the output.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DisplayConfig {
-    /// Hide every rectangle without the forced flag (`forced_subs_only`).
+    /// Hide every rectangle without the forced flag (`forced_subs_only`): it
+    /// keeps its pixels and takes an all-zero palette.
     pub receiver_forced_only: bool,
 }
 
@@ -146,12 +166,21 @@ pub enum Refusal {
 pub struct RecoveredRect {
     /// The composition object it presents.
     pub reference: CompositionObject,
+    /// Column of the top-left corner on the canvas: the composition
+    /// object's, or 0 when its object is missing or either coordinate lies
+    /// beyond the canvas of its PCS.
     pub x: u16,
+    /// Row of the top-left corner on the canvas, placed as `x` is.
     pub y: u16,
+    /// Width in pixels; 0 when the object is missing, has no data or its RLE
+    /// does not fill it.
     pub width: u16,
+    /// Height in pixels; 0 whenever `width` is.
     pub height: u16,
-    /// The object's allocated row width, kept even when its RLE is rejected.
+    /// The object's allocated row width, kept even when its RLE is rejected;
+    /// 0 for a missing object or one without data.
     pub stride: u16,
+    /// The composition object's forced flag; false for a missing object.
     pub forced: bool,
     pixels: Bytes,
     palette: ReceiverPalette,
@@ -168,9 +197,13 @@ enum ReceiverPalette {
 const HIDDEN_PALETTE: [u32; 256] = [0; 256];
 
 impl RecoveredRect {
+    /// `height` rows of `width` palette indices, row after row; empty when
+    /// the rectangle has no pixels.
     pub fn pixels(&self) -> &Bytes {
         &self.pixels
     }
+    /// `0xAARRGGBB` colours by pixel value: the palette the composition
+    /// selects, or all zero for a rectangle forced-only output hides.
     pub fn palette(&self) -> &[u32; 256] {
         match &self.palette {
             ReceiverPalette::Hidden => &HIDDEN_PALETTE,
@@ -182,37 +215,54 @@ impl RecoveredRect {
 /// One subtitle the receiver presents.
 #[derive(Debug)]
 pub struct RecoveredEvent {
+    /// Presentation time in microseconds, ties away from zero: the PTS of the
+    /// packet whose PCS this display is the first to present (zero before
+    /// any PCS), else this packet's own; `None` when that PTS is unknown.
     pub pts_microseconds: Option<i64>,
     rectangles: BudgetVec<RecoveredRect>,
 }
 impl RecoveredEvent {
+    /// The rectangles in composition-object order, at most two; none for a
+    /// display that clears the screen.
     pub fn rectangles(&self) -> &[RecoveredRect] {
         self.rectangles.as_slice()
     }
 }
 
-/// How the receiver read a packet where its bytes run short. API padding is
-/// never included in [`ReceiverPacket::raw_packet`].
+/// How the receiver read a packet where its bytes run short. The zeros it
+/// reads past the end of the packet are never part of
+/// [`ReceiverPacket::raw_packet`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ReceiverObservations {
+    /// A segment other than END declared a body running past the end of the
+    /// packet, which ended the packet there.
     pub truncated_segment_tail: bool,
+    /// Bytes that a PDS's partial last entry read past the end of its
+    /// segment, summed over the packet.
     pub palette_cross_segment_bytes: usize,
+    /// Of those, the bytes past the end of the packet, read as zero.
     pub palette_zero_padding_bytes: usize,
 }
 
-/// One decoded packet. Later segments of a packet still update the decoder's
-/// cache and the final context canvas.
+/// One decoded packet. Segments after its first display still update the
+/// decoder's caches and `context_canvas`.
 #[derive(Debug)]
 pub struct ReceiverPacket {
     raw: Bytes,
+    /// The clock the packet was pushed with.
     pub clock: PacketClock,
     event: Option<RecoveredEvent>,
     refusal: Option<Refusal>,
+    /// Canvas width and height after the packet: the size of the latest PCS
+    /// the receiver accepted, `[0, 0]` before one or after a PCS whose size
+    /// it rejects.
     pub context_canvas: [u16; 2],
+    /// Where the receiver read past a segment or the packet.
     pub receiver_observations: ReceiverObservations,
 }
 
 impl ReceiverPacket {
+    /// The packet as pushed, unchanged.
     pub fn raw_packet(&self) -> &Bytes {
         &self.raw
     }
@@ -226,17 +276,26 @@ impl ReceiverPacket {
     }
 }
 
-/// The receiver has no delayed subtitle to publish on an empty drain call.
+/// What the receiver reports at the end of input
+/// ([`ReceiverDecoder::eof_report`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReceiverEof {
+    /// The receiver holds no delayed subtitle, so draining it outputs
+    /// nothing.
     NoDelayedSubtitle,
 }
 
+/// What [`ReceiverDecoder::poll`] reached.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RecoveryStatus {
+    /// No packet is active: push the next one, or finish the input.
     NeedPacket,
+    /// The work budget ran out; poll again with more.
     Yield,
+    /// The packet is decoded; take it with
+    /// [`take_output`](ReceiverDecoder::take_output).
     OutputReady,
+    /// The input has ended and nothing more is output.
     Ended,
 }
 
@@ -345,6 +404,12 @@ pub struct ReceiverDecoder {
 }
 
 impl ReceiverDecoder {
+    /// A decoder charging `budget`, with no stream state.
+    ///
+    /// # Errors
+    ///
+    /// `Error::Limit` when `limits` allows more than 64 objects, 8 palettes
+    /// or 255 composition objects.
     pub fn new(budget: &Budget, limits: DisplayLimits, config: DisplayConfig) -> Result<Self> {
         limits.validate()?;
         Ok(Self {
@@ -372,7 +437,18 @@ impl ReceiverDecoder {
         })
     }
 
-    /// Rejection leaves the caller's exact input owner in place.
+    /// Makes the packet in `raw`, taken from it, the active packet, with its
+    /// `clock`. A refused packet stays in `raw`.
+    ///
+    /// # Errors
+    ///
+    /// `Error::Invalid` for an absent or empty packet, while a packet is
+    /// active or its output not taken, and after
+    /// [`finish_input`](Self::finish_input); `Error::ForeignPool` for bytes
+    /// of another budget; `Error::Limit` beyond
+    /// [`DisplayLimits::max_packet_bytes`]. `Error::Cancelled` when `cancel`
+    /// is set, which fails the decoder until [`reset`](Self::reset); a failed
+    /// decoder returns its failure.
     pub fn push(
         &mut self,
         raw: &mut Option<Bytes>,
@@ -425,6 +501,7 @@ impl ReceiverDecoder {
         self.event = None;
     }
 
+    /// Work units spent since the decoder was made or last reset.
     pub fn work_spent(&self) -> usize {
         self.spent
     }
@@ -453,6 +530,16 @@ impl ReceiverDecoder {
         .pay(&mut self.credit, cost)
     }
 
+    /// Decodes the active packet, or the end of input, as far as `work`
+    /// allows, and reports what the decoder waits for.
+    ///
+    /// # Errors
+    ///
+    /// `Error::Backpressure` when the pool refuses memory: the call can be
+    /// repeated, and work already paid is not charged again. Any other error,
+    /// `Error::Cancelled` and the `Error::Limit` of [`DisplayLimits`]
+    /// included, fails the decoder: every call returns it until
+    /// [`reset`](Self::reset).
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<RecoveryStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -835,6 +922,14 @@ impl ReceiverDecoder {
         }))
     }
 
+    /// The decoded packet, once [`poll`](Self::poll) has returned
+    /// `OutputReady`; the decoder then needs the next packet.
+    ///
+    /// # Errors
+    ///
+    /// `Error::Invalid` before the output is ready; `Error::Cancelled` when
+    /// `cancel` is set, which fails the decoder; a failed decoder returns its
+    /// failure.
     pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<ReceiverPacket> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -853,6 +948,13 @@ impl ReceiverDecoder {
         Ok(result)
     }
 
+    /// Ends the input; [`poll`](Self::poll) then reaches `Ended`.
+    ///
+    /// # Errors
+    ///
+    /// `Error::Invalid` while a packet is active or its output not taken, and
+    /// once input has ended; `Error::Cancelled` when `cancel` is set, which
+    /// fails the decoder; a failed decoder returns its failure.
     pub fn finish_input(&mut self, cancel: &AtomicBool) -> Result<()> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -868,12 +970,21 @@ impl ReceiverDecoder {
         Ok(())
     }
 
+    /// What the receiver reported at the end of input, once
+    /// [`poll`](Self::poll) has reached `Ended`; `None` before.
     pub fn eof_report(&self) -> Option<ReceiverEof> {
         self.eof
     }
 
-    /// Discard receiver stream state while preserving the selected configuration.
-    /// Previously returned outputs keep their own charged storage.
+    /// Discards the stream state (caches, canvas, failure, work spent and the
+    /// end of input), keeping the limits and configuration. Outputs already
+    /// taken keep their own charged storage.
+    ///
+    /// # Errors
+    ///
+    /// `Error::Invalid` unless the decoder has failed, needs a packet or has
+    /// ended; `Error::Cancelled` when `cancel` is set, which fails the
+    /// decoder.
     pub fn reset(&mut self, cancel: &AtomicBool) -> Result<()> {
         if cancel.load(Ordering::Relaxed) {
             return Err(self.poison(Error::Cancelled));

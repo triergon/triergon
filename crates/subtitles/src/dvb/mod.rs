@@ -2,7 +2,7 @@
 //!
 //! [`SourceConfiguration`] reads a service's configuration from Matroska
 //! `CodecPrivate` or an MPEG-TS subtitling descriptor and binds each packet to
-//! it ([`DvbPacket`]) with its original clock values. The receiver that decodes
+//! it ([`DvbPacket`]) with its raw clock values. The receiver that decodes
 //! the packets as the reference does is
 //! [`compat::dvb::ReceiverDecoder`](crate::compat::dvb::ReceiverDecoder).
 mod boundary;

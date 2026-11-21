@@ -1,5 +1,6 @@
 use triergon_core::{Error, Result};
 
+/// How the segments of a byte stream are framed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Envelope {
     /// Three-byte segment header; clocks belong to the enclosing packet.
@@ -8,23 +9,37 @@ pub enum Envelope {
     Sup,
 }
 
+/// The clocks of a SUP segment header, raw: 90 kHz ticks that wrap at 2³².
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SupClock {
+    /// Presentation time stamp, in 90 kHz ticks.
     pub pts: u32,
+    /// Decoding time stamp, in 90 kHz ticks.
     pub dts: u32,
 }
 
+/// One segment, borrowed from the input.
 #[derive(Clone, Copy, Debug)]
 pub struct Segment<'a> {
+    /// Byte offset of the segment's first header byte in the input.
     pub offset: usize,
+    /// Segment type: 0x14 PDS, 0x15 ODS, 0x16 PCS, 0x17 WDS, 0x80 END; any
+    /// other value is kept as it is.
     pub kind: u8,
+    /// The SUP header's clocks; `None` in packet framing.
     pub clock: Option<SupClock>,
+    /// The whole segment, its headers included.
     pub raw: &'a [u8],
+    /// The segment body: the bytes its 16-bit length counts.
     pub payload: &'a [u8],
 }
 
-/// Borrowing, allocation-free framing. Unknown segment kinds remain source data.
-/// An error is emitted once; bytes are never scanned ahead to guess a new header.
+/// The segments of a packet or SUP stream, in order, borrowed without
+/// allocating. Segments of unknown types are returned like any other.
+///
+/// A header that does not read ends the iteration with one error:
+/// `Error::Truncated` for a segment cut short, `Error::Invalid` for a SUP
+/// header without its `PG` magic. No later header is searched for.
 #[derive(Debug)]
 pub struct SegmentIter<'a> {
     input: &'a [u8],
@@ -34,6 +49,7 @@ pub struct SegmentIter<'a> {
 }
 
 impl<'a> SegmentIter<'a> {
+    /// The segments of `input`, framed as `envelope` says.
     pub fn new(input: &'a [u8], envelope: Envelope) -> Self {
         Self {
             input,
@@ -133,23 +149,39 @@ fn body(segment: Segment<'_>, kind: u8) -> Result<Cursor<'_>> {
     })
 }
 
+/// One 5-byte entry of a PDS, as stored.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PaletteEntry {
+    /// The pixel value the entry colours.
     pub id: u8,
+    /// Luma (Y').
     pub y: u8,
+    /// Red-difference chroma.
     pub cr: u8,
+    /// Blue-difference chroma.
     pub cb: u8,
+    /// Opacity, as the PGS receiver uses it: 0 is transparent, 255 opaque.
     pub alpha: u8,
 }
 
+/// A palette definition segment (PDS).
 #[derive(Clone, Copy, Debug)]
 pub struct Palette<'a> {
+    /// The palette's id, which a composition selects.
     pub id: u8,
+    /// The palette version number, as stored.
     pub version: u8,
     entries: &'a [u8],
 }
 
 impl<'a> Palette<'a> {
+    /// Reads a PDS.
+    ///
+    /// # Errors
+    ///
+    /// `Error::Invalid` when the segment is not a PDS (type 0x14) or its
+    /// entries are not whole 5-byte records; `Error::Truncated` without the
+    /// id and version.
     pub fn parse(segment: Segment<'a>) -> Result<Self> {
         let mut c = body(segment, 0x14)?;
         let id = c.u8()?;
@@ -165,8 +197,9 @@ impl<'a> Palette<'a> {
         })
     }
 
-    /// Duplicate indices and wire order remain observable. Applying a partial
-    /// palette update is a display-state operation, not a parser-side repair.
+    /// The entries in segment order, repeated pixel values included. A PDS
+    /// may update only some entries; merging them into a palette is the
+    /// receiver's work.
     pub fn entries(&self) -> impl ExactSizeIterator<Item = PaletteEntry> + '_ {
         self.entries.chunks_exact(5).map(|b| PaletteEntry {
             id: b[0],
@@ -178,30 +211,52 @@ impl<'a> Palette<'a> {
     }
 }
 
+/// The fields that open an object's first fragment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ObjectStart {
-    /// Wire length includes the four dimension bytes, not the fragment prefix.
+    /// The object's data bytes over all its fragments, from the width on: the
+    /// four size bytes count, the 24-bit length field itself does not. At
+    /// least 4.
     pub data_length: u32,
+    /// Object width in pixels.
     pub width: u16,
+    /// Object height in pixels.
     pub height: u16,
 }
 
+/// An object definition segment (ODS): one fragment of an object's
+/// run-length coded bitmap.
 #[derive(Clone, Copy, Debug)]
 pub struct ObjectFragment<'a> {
+    /// The object's id, which composition objects refer to.
     pub id: u16,
+    /// The object version number, as stored.
     pub version: u8,
+    /// Sequence flags: 0x80 first fragment, 0x40 last; other bits as stored.
     pub flags: u8,
+    /// The object's size and data length in a first fragment; `None`
+    /// otherwise.
     pub first: Option<ObjectStart>,
+    /// Whether this is the object's last fragment (flag 0x40).
     pub last: bool,
+    /// The fragment's RLE bytes.
     pub data: &'a [u8],
 }
 
 impl<'a> ObjectFragment<'a> {
+    /// Reads an ODS.
+    ///
+    /// # Errors
+    ///
+    /// `Error::Invalid` when the segment is not an ODS (type 0x15) or a first
+    /// fragment's data length is below 4; `Error::Truncated` when a field is
+    /// cut short.
     pub fn parse(segment: Segment<'a>) -> Result<Self> {
         Self::parse_payload(body(segment, 0x15)?.input)
     }
 
-    /// Parses the ODS payload itself, without fabricating a segment envelope.
+    /// Reads an ODS body given without its segment header, failing as
+    /// [`parse`](Self::parse) does apart from the type check.
     pub fn parse_payload(payload: &'a [u8]) -> Result<Self> {
         let mut c = Cursor {
             input: payload,
@@ -235,25 +290,42 @@ impl<'a> ObjectFragment<'a> {
     }
 }
 
+/// The cropping rectangle of a composition object, as stored. The PGS
+/// receiver presents the whole object whatever its crop.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Crop {
+    /// Left column.
     pub x: u16,
+    /// Top row.
     pub y: u16,
+    /// Width in pixels.
     pub width: u16,
+    /// Height in pixels.
     pub height: u16,
 }
 
+/// One composition object of a PCS: which object a display shows, in which
+/// window and where.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CompositionObject {
+    /// The id of the object shown.
     pub id: u16,
+    /// The id of the window it is shown in.
     pub window: u8,
+    /// Flags: 0x80 cropped (a [`Crop`] follows), 0x40 forced; other bits as
+    /// stored.
     pub flags: u8,
+    /// Column of the object's top-left corner on the canvas.
     pub x: u16,
+    /// Row of the object's top-left corner on the canvas.
     pub y: u16,
+    /// The cropping rectangle, present when flag 0x80 is set.
     pub crop: Option<Crop>,
 }
 
 impl CompositionObject {
+    /// Whether the forced flag (0x40) is set: the object is shown even when
+    /// only forced subtitles are.
     pub fn forced(&self) -> bool {
         self.flags & 0x40 != 0
     }
@@ -285,20 +357,40 @@ fn composition_object(c: &mut Cursor<'_>) -> Result<CompositionObject> {
     })
 }
 
+/// A presentation composition segment (PCS): the canvas, the composition
+/// state, the palette and the composition objects of a display.
 #[derive(Clone, Copy, Debug)]
 pub struct Composition<'a> {
+    /// Canvas width in pixels.
     pub width: u16,
+    /// Canvas height in pixels.
     pub height: u16,
+    /// The frame rate code, as stored.
     pub frame_rate: u8,
+    /// The composition number, as stored.
     pub number: u16,
+    /// The composition state. Either of its two high bits marks an epoch
+    /// start or an acquisition point, at which the PGS receiver drops its
+    /// cached objects and palettes.
     pub state: u8,
+    /// The palette update flag byte, as stored; the PGS receiver does not
+    /// read it.
     pub palette_update_flags: u8,
+    /// The id of the palette the display's objects are coloured with.
     pub palette_id: u8,
+    /// The number of composition objects that follow.
     pub object_count: u8,
     objects: &'a [u8],
 }
 
 impl<'a> Composition<'a> {
+    /// Reads a PCS and checks its composition objects.
+    ///
+    /// # Errors
+    ///
+    /// `Error::Invalid` when the segment is not a PCS (type 0x16) or bytes
+    /// follow its last composition object; `Error::Truncated` when a field
+    /// or an object is cut short.
     pub fn parse(segment: Segment<'a>) -> Result<Self> {
         let mut c = body(segment, 0x16)?;
         let width = c.u16()?;
@@ -327,6 +419,8 @@ impl<'a> Composition<'a> {
         })
     }
 
+    /// The composition objects, in segment order. [`parse`](Self::parse)
+    /// has checked that each reads.
     pub fn objects(&self) -> CompositionObjects<'a> {
         CompositionObjects {
             cursor: Cursor {
@@ -338,6 +432,7 @@ impl<'a> Composition<'a> {
     }
 }
 
+/// The composition objects of a [`Composition`], in segment order.
 #[derive(Debug)]
 pub struct CompositionObjects<'a> {
     cursor: Cursor<'a>,
@@ -361,21 +456,35 @@ impl Iterator for CompositionObjects<'_> {
 
 impl ExactSizeIterator for CompositionObjects<'_> {}
 
+/// One window of a WDS: an area of the canvas that objects are shown in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Window {
+    /// The window's id, which composition objects refer to.
     pub id: u8,
+    /// Column of the window's top-left corner on the canvas.
     pub x: u16,
+    /// Row of the window's top-left corner on the canvas.
     pub y: u16,
+    /// Width in pixels.
     pub width: u16,
+    /// Height in pixels.
     pub height: u16,
 }
 
+/// A window definition segment (WDS).
 #[derive(Clone, Copy, Debug)]
 pub struct Windows<'a> {
     entries: &'a [u8],
 }
 
 impl<'a> Windows<'a> {
+    /// Reads a WDS.
+    ///
+    /// # Errors
+    ///
+    /// `Error::Invalid` when the segment is not a WDS (type 0x17) or bytes
+    /// follow its last window; `Error::Truncated` when its count or the
+    /// windows it declares are cut short.
     pub fn parse(segment: Segment<'a>) -> Result<Self> {
         let mut c = body(segment, 0x17)?;
         let count = usize::from(c.u8()?);
@@ -383,6 +492,7 @@ impl<'a> Windows<'a> {
         c.finish()?;
         Ok(Self { entries })
     }
+    /// The windows, in segment order.
     pub fn iter(&self) -> impl ExactSizeIterator<Item = Window> + '_ {
         self.entries.chunks_exact(9).map(|b| Window {
             id: b[0],

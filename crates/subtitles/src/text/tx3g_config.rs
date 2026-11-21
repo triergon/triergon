@@ -1,5 +1,7 @@
-//! Bounded source extraction of tx3g configuration. No inherited style is guessed.
-//! Layout must be supplied explicitly: a full SampleEntry body is not AVCodec extradata.
+//! Parser for a tx3g sample description (the ETSI TS 126 245 text sample
+//! entry): display defaults, default style, font table and child boxes. The
+//! caller names the layout; nothing is inferred and no inherited style is
+//! guessed.
 use super::{
     Encoding, Modifier,
     unicode::{Cursor, Poll, Probe, cancelled},
@@ -7,15 +9,25 @@ use super::{
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
+/// How the description bytes are laid out.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConfigLayout {
+    /// The sample entry body after its box header: 6 reserved zero bytes and
+    /// the data reference index, then the defaults record and child boxes.
     SampleEntryBody,
+    /// The 30-byte defaults record, from the display flags on, then child
+    /// boxes.
     DefaultsRecord,
 }
+/// Resource bounds of one [`ConfigJob`].
 #[derive(Clone, Copy, Debug)]
 pub struct ConfigLimits {
+    /// Description bytes; more is `Error::Limit` from [`ConfigJob::new`].
+    /// Default 1 MiB.
     pub maximum_bytes: usize,
+    /// `ftab` entries; more is `Error::Limit`. Default 4096.
     pub maximum_fonts: usize,
+    /// Child boxes, `ftab` included; more is `Error::Limit`. Default 4096.
     pub maximum_boxes: usize,
 }
 impl Default for ConfigLimits {
@@ -27,41 +39,70 @@ impl Default for ConfigLimits {
         }
     }
 }
+/// A style record: the style of a character range.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StyleRecord {
+    /// Start offset in characters.
     pub start: u16,
+    /// Exclusive end offset in characters.
     pub end: u16,
+    /// Font identifier, an entry of the `ftab`.
     pub font_id: u16,
+    /// Face style flags: bit 0 bold, bit 1 italic, bit 2 underline.
     pub face_flags: u8,
+    /// Font size in pixels.
     pub font_size: u8,
+    /// Text colour as red, green, blue and alpha bytes.
     pub rgba: [u8; 4],
 }
+/// The fixed fields of the sample description.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Defaults {
+    /// The sample entry's data reference index; `None` for
+    /// [`ConfigLayout::DefaultsRecord`].
     pub data_reference_index: Option<u16>,
+    /// Display flags as written.
     pub display_flags: u32,
+    /// Horizontal justification, −1 to 1: 0 left, 1 centred, −1 right.
     pub horizontal: i8,
+    /// Vertical justification, −1 to 1: 0 top, 1 centred, −1 bottom.
     pub vertical: i8,
+    /// Background colour as red, green, blue and alpha bytes.
     pub background: [u8; 4],
+    /// Default text box: top, left, bottom and right as written.
     pub text_box: [i16; 4],
+    /// Default style; its character range is always `0..0`.
     pub style: StyleRecord,
 }
+/// One `ftab` entry.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FontRecord {
+    /// Font identifier.
     pub id: u16,
+    /// Byte range of the font name in `Configuration::raw`.
     pub name_range: Range<usize>,
 }
+/// A parsed sample description.
 #[derive(Debug)]
 pub struct Configuration {
+    /// The description bytes; every range points into them.
     pub raw: Bytes,
+    /// The layout the bytes were read in.
     pub layout: ConfigLayout,
+    /// The fixed fields.
     pub defaults: Defaults,
+    /// `ftab` entries in order.
     pub fonts: BudgetVec<FontRecord>,
+    /// Child boxes after the fixed fields in order, `ftab` and unknown boxes
+    /// included, each with its whole byte range in `raw`.
     pub boxes: BudgetVec<Modifier>,
 }
+/// What a [`ConfigJob::poll`] reached.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConfigStatus {
+    /// The work budget ran out; poll again.
     Pending,
+    /// The description is parsed; take it with [`ConfigJob::take_output`].
     Ready,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -77,6 +118,7 @@ enum Phase {
     Taken,
 }
 
+/// Parses one tx3g sample description in a layout the caller names.
 #[derive(Debug)]
 pub struct ConfigJob {
     raw: Bytes,
@@ -108,8 +150,8 @@ pub struct ConfigJob {
     failed: Option<Error>,
 }
 impl ConfigJob {
-    /// Timed-text string grammar: UTF8 or FEFF-prefixed UTF16BE fonts.
-    /// The default constructor keeps its UTF8-only font-name contract.
+    /// Like [`Self::new`], but a font name may also be UTF-16BE after a FEFF
+    /// byte-order mark, as TS 126 245 strings may be.
     pub fn new_unicode_fonts(
         raw: &Bytes,
         layout: ConfigLayout,
@@ -120,6 +162,9 @@ impl ConfigJob {
         job.unicode_font_names = true;
         Ok(job)
     }
+    /// Starts on `raw` in `layout`; font names must be UTF-8. Fails with
+    /// `Error::ForeignPool` when `raw` is not charged to `budget` and
+    /// `Error::Limit` when it is longer than `limits.maximum_bytes`.
     pub fn new(
         raw: &Bytes,
         layout: ConfigLayout,
@@ -209,6 +254,16 @@ impl ConfigJob {
             style,
         })
     }
+    /// Advances by at most `work` units: one per byte read and one per box or
+    /// font stored.
+    ///
+    /// Fails with `Error::Truncated` when the bytes end inside a field, box or
+    /// font name, `Error::Invalid` when a fixed field is out of range, a box is
+    /// smaller than its header, a font name does not decode, or the `ftab` is
+    /// missing, repeated or has bytes after its entries, and `Error::Limit` past
+    /// `limits`. Every later call returns such an error; cancellation and
+    /// backpressure are not kept.
+    /// After [`Self::take_output`] the call fails with `Error::Invalid`.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ConfigStatus> {
         cancelled(cancel)?;
         if let Some(error) = self.failed {
@@ -461,6 +516,9 @@ impl ConfigJob {
             }
         }
     }
+    /// Hands over the description once [`Self::poll`] returned
+    /// [`ConfigStatus::Ready`]; `Error::Invalid` before that and on a second
+    /// call, and the job's error after a failure.
     pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<Configuration> {
         cancelled(cancel)?;
         if let Some(error) = self.failed {

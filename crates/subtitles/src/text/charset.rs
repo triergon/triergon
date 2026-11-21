@@ -1,5 +1,6 @@
-//! Explicit strict charset conversion; no track detection or lossy replacement.
-//! Original bytes and declared label remain separate owned source facts.
+//! Strict conversion of text in an explicitly selected charset to UTF-8,
+//! with no detection and no replacement characters. The source bytes and
+//! the declared label are kept beside the result.
 use super::{
     Encoding, Limits,
     unicode::{Cursor, Poll, Probe, cancelled},
@@ -11,20 +12,37 @@ mod tables;
 
 use multibyte::MultibyteCharset;
 
+/// A charset to convert from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Charset {
+    /// Strict UTF-8; the result shares the source's storage.
     Utf8,
+    /// UTF-16 in the byte order of its leading byte-order mark, which is
+    /// required and is not content.
     Utf16Bom,
+    /// Big-endian UTF-16; a leading FEFF is content.
     Utf16Be,
+    /// Little-endian UTF-16; a leading FEFF is content.
     Utf16Le,
+    /// US-ASCII; a byte above 0x7F is refused.
     Ascii,
+    /// ISO-8859-1: each byte is the scalar of its value, 0x80–0x9F the C1
+    /// controls.
     Latin1,
+    /// Windows-1251; byte 0x98, which its table leaves undefined, is refused.
     Windows1251,
+    /// Windows-1252; bytes 0x81, 0x8D, 0x8F, 0x90 and 0x9D, which its table
+    /// leaves undefined, are refused.
     Windows1252,
-    /// Explicit multibyte profile.
+    /// A multibyte profile.
     Multibyte(MultibyteCharset),
 }
 impl Charset {
+    /// The charset of `label`, matched ASCII case-insensitively: utf-8,
+    /// utf8, utf-16, utf-16be, utf-16le, us-ascii, ascii, iso-8859-1,
+    /// windows-1251, cp1251, windows-1252 or cp1252. `Error::Limit` for a
+    /// label over 256 bytes, `Error::Unsupported` for any other; multibyte
+    /// labels resolve with [`MultibyteCharset::from_label`].
     pub fn from_label(label: &[u8]) -> Result<Self> {
         if label.len() > 256 {
             return Err(Error::Limit {
@@ -74,16 +92,26 @@ impl Charset {
         char::from_u32(value).ok_or(Error::Invalid("undefined charset byte"))
     }
 }
+/// What [`CharsetJob::poll`] reports.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CharsetStatus {
+    /// The work budget ran out; poll again.
     Pending,
+    /// The conversion is complete; take it with
+    /// [`take_output`](CharsetJob::take_output).
     Ready,
 }
+/// A completed conversion.
 #[derive(Debug)]
 pub struct ConvertedText {
+    /// The source bytes, unchanged.
     pub source: Bytes,
+    /// The label the caller declared, unchanged.
     pub declared_label: Option<Bytes>,
+    /// The charset converted from.
     pub charset: Charset,
+    /// The text as UTF-8; the byte-order mark [`Charset::Utf16Bom`] reads is
+    /// not part of it.
     pub utf8: Bytes,
 }
 /// The most source bytes of a single-byte charset converted in one step.
@@ -100,9 +128,11 @@ enum Phase {
     Taken,
 }
 
-/// Two forward passes validate/count, then encode into exact bounded storage.
-/// Cancellation is resumable, matching the existing text source contract.
-/// Retained output pressure never rereads a consumed scalar or guesses a charset.
+/// Converts one byte stream from an explicit [`Charset`] to UTF-8 in two
+/// passes: the first validates the source and counts the output, the second
+/// writes it into storage of exactly that size. Cancellation and
+/// backpressure are resumable and never reread a converted character; any
+/// other error is sticky.
 #[derive(Debug)]
 pub struct CharsetJob {
     source: Bytes,
@@ -126,6 +156,10 @@ pub struct CharsetJob {
     failed: Option<Error>,
 }
 impl CharsetJob {
+    /// A job converting `source`, declared with `label`, from `charset`.
+    /// `Error::ForeignPool` when either is not charged to `budget`;
+    /// `Error::Limit` when the source exceeds `limits.max_input_bytes` or
+    /// the label `limits.max_label_bytes`.
     pub fn new(
         source: &Bytes,
         label: Option<&Bytes>,
@@ -242,6 +276,10 @@ impl CharsetJob {
         }
         Ok(())
     }
+    /// Advances the conversion, spending a unit per source byte in each pass
+    /// and one per output byte written. `Error::Invalid` or
+    /// `Error::Truncated` for a byte or sequence the charset refuses,
+    /// `Error::Limit` when the output would exceed `limits.max_decoded_bytes`.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CharsetStatus> {
         cancelled(cancel)?;
         if let Some(error) = self.failed {
@@ -378,6 +416,8 @@ impl CharsetJob {
             }
         }
     }
+    /// The conversion, once [`poll`](Self::poll) reported
+    /// [`CharsetStatus::Ready`]; `Error::Invalid` before then and once taken.
     pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<ConvertedText> {
         cancelled(cancel)?;
         if let Some(error) = self.failed {

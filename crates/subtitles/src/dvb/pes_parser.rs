@@ -1,4 +1,5 @@
-//! Stateful codec-packet projection for the observed native DVB parser.
+//! DVB PES data fields cut into the codec packets FFmpeg's demuxer hands its
+//! `dvbsub` decoder, as observed.
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
@@ -7,12 +8,17 @@ use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 // even when its segment data exceeds this ceiling and passes through.
 const MAX_GROUP_BYTES: usize = 65_536;
 
+/// How a codec packet was cut from its PES data field.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PesFraming {
+    /// The codec packet is the whole field, unchanged.
     Passthrough,
+    /// The codec packet is the complete segments the field holds or
+    /// completes, without the two bytes that open a group.
     CompleteSegments,
 }
 
+/// One codec packet cut from a PES data field.
 #[derive(Clone, Debug)]
 pub struct PesPacket {
     pes: Bytes,
@@ -21,46 +27,61 @@ pub struct PesPacket {
     /// PTS on admission and the separately projected codec timestamp.
     source_pts: Option<i128>,
     codec_pts: Option<i128>,
-    /// Previously buffered bytes included in the emitted complete segments.
+    /// Bytes buffered from earlier fields that start the emitted complete
+    /// segments.
     prior_tail: Option<Bytes>,
 }
 
 impl PesPacket {
+    /// The PES data field as provided.
     pub fn pes(&self) -> &Bytes {
         &self.pes
     }
 
+    /// The codec packet for the decoder. It shares storage with the field
+    /// unless it joins a segment split across fields.
     pub fn codec(&self) -> &Bytes {
         &self.codec
     }
 
+    /// How [`codec`](Self::codec) was cut.
     pub fn framing(&self) -> PesFraming {
         self.framing
     }
 
+    /// The PTS provided with the field, in the caller's ticks.
     pub fn source_pts(&self) -> Option<i128> {
         self.source_pts
     }
 
+    /// The PTS handed to the decoder: the field's own or, for a field without
+    /// one that the parser scans as part of a group, the last known PTS.
     pub fn codec_pts(&self) -> Option<i128> {
         self.codec_pts
     }
 
+    /// The part of a split segment earlier fields left, which starts
+    /// [`codec`](Self::codec); `None` when there was none.
     pub fn prior_tail(&self) -> Option<&Bytes> {
         self.prior_tail.as_ref()
     }
 }
 
+/// What a [`PesParser::step`] call did.
 #[derive(Debug)]
 pub enum PesProgress {
+    /// No field is pending; [`provide`](PesParser::provide) the next one.
     NeedPacket,
+    /// The work budget ran out; step again.
     Yield,
+    /// The codec packet cut from the pending field, which is consumed.
     Packet(PesPacket),
 }
 
-/// One selected service and clock epoch. The caller recreates or resets the
-/// parser on a seek or discontinuity. Within an epoch, a changed known PTS
-/// opens a new group. An incomplete segment can continue across PES calls.
+/// Cuts the PES data fields of one selected service and clock epoch into
+/// codec packets. The caller recreates or resets the parser on a seek or
+/// discontinuity. Within an epoch, a changed known PTS opens a new group. An
+/// incomplete segment can continue across PES calls.
 #[derive(Debug)]
 pub struct PesParser {
     pool: Budget,
@@ -109,6 +130,7 @@ struct ScanEnd {
 }
 
 impl PesParser {
+    /// A parser that charges the segments it joins to `pool`.
     pub fn new(pool: &Budget) -> Self {
         Self {
             pool: pool.clone(),
@@ -119,6 +141,8 @@ impl PesParser {
         }
     }
 
+    /// Drops the pending field, the buffered part of a segment and the group,
+    /// as after a seek.
     pub fn reset(&mut self) {
         self.last_pts = None;
         self.active = false;
@@ -126,6 +150,9 @@ impl PesParser {
         self.input = None;
     }
 
+    /// Hands over the next PES data field with its PTS in the caller's ticks.
+    /// `Error::Invalid` while a field is pending or for an empty one,
+    /// `Error::ForeignPool` for bytes of another pool.
     pub fn provide(&mut self, pes: &Bytes, pts: Option<i128>) -> Result<()> {
         if self.input.is_some() || pes.is_empty() {
             return Err(Error::Invalid("DVB PES parser input"));
@@ -141,6 +168,10 @@ impl PesParser {
         Ok(())
     }
 
+    /// Cuts the pending field, at one work unit per segment scanned and per
+    /// byte copied to join a split segment. `Error::Cancelled` when `cancel`
+    /// is set, which also [`reset`](Self::reset)s the parser; a pool error
+    /// keeps the field pending for the next step.
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<PesProgress> {
         if let Err(error) = cancelled(cancel) {
             self.reset();

@@ -7,8 +7,11 @@ use triergon_core::{Bytes, Error, Result, Rounding, TimeBase};
 /// duration stay distinct.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Clock {
+    /// Presentation time; `None` when unknown, as is `i64::MIN`.
     pub pts: Option<i64>,
+    /// Decoding time, carried; the subtitle's times do not use it.
     pub dts: Option<i64>,
+    /// Duration; `None` and zero both end the display at 0.
     pub duration: Option<i64>,
 }
 
@@ -16,9 +19,16 @@ pub struct Clock {
 /// whose geometry and flags are zero.
 #[derive(Debug)]
 pub struct Subtitle {
+    /// The PTS in microseconds, rounded to nearest with ties away from zero;
+    /// `None` when the PTS or the packet time base is unknown, or the result
+    /// does not fit.
     pub pts_microseconds: Option<i64>,
+    /// Display start relative to the PTS, in milliseconds: always 0.
     pub start_display_ms: u32,
+    /// The duration in milliseconds, rounded to nearest and kept to its low
+    /// 32 bits; 0 when it or the packet time base is unknown.
     pub end_display_ms: u32,
+    /// The rectangle's ASS text.
     pub ass: Bytes,
 }
 
@@ -56,12 +66,15 @@ impl Subtitle {
     pub const fn rectangle_type(&self) -> u8 {
         3
     }
+    /// The rectangle's x, y, width and height: all zero.
     pub const fn geometry(&self) -> [i32; 4] {
         [0; 4]
     }
+    /// The rectangle's flags: none.
     pub const fn flags(&self) -> u32 {
         0
     }
+    /// The rectangle's palette entries: none.
     pub const fn palette_entries(&self) -> u32 {
         0
     }

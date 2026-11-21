@@ -51,7 +51,9 @@ pub enum Format {
 /// The decoder options.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Options {
+    /// `txt_format`: plain text or ASS.
     pub format: Format,
+    /// `txt_page`: the pages that become subtitles.
     pub pages: PageSelection,
     /// `txt_default_region`: the default character set designation (0 to 87)
     /// combined with each page's national option bits; `None` is designation 16.
@@ -101,8 +103,11 @@ pub enum Refusal {
 /// The result of one decode call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Decoded<'a> {
+    /// The oldest queued subtitle, now out of the queue.
     Subtitle(Subtitle<'a>),
+    /// No subtitle is queued.
     Nothing,
+    /// The packet was refused; no subtitle is returned.
     Refused(Refusal),
 }
 
@@ -142,6 +147,9 @@ impl Decoder {
     /// Work one [`decode`](Self::decode) call may need at most.
     pub const MAX_PACKET_WORK: u64 = UNITS_PER_PACKET as u64 * (UNIT_WORK + 8 * PAGE_WORK);
 
+    /// A decoder whose page memory and output queue are charged to `pool`.
+    /// `Error::Invalid` when `default_region` is above 87; the pool's error
+    /// when it cannot hold the queue.
     pub fn new(pool: &Budget, options: Options) -> Result<Self> {
         if options.default_region.is_some_and(|r| r > 87) {
             return Err(Error::Invalid("teletext default region"));
@@ -173,7 +181,8 @@ impl Decoder {
     }
 
     /// Decodes one PES payload (an empty one drains) with its presentation
-    /// time in microseconds.
+    /// time in microseconds. `Error::Backpressure` when `work` has less than
+    /// [`MAX_PACKET_WORK`](Self::MAX_PACKET_WORK) left; nothing changes then.
     pub fn decode(
         &mut self,
         payload: &[u8],

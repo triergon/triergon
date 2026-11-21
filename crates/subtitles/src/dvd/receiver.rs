@@ -211,6 +211,7 @@ pub struct Subtitle<'a> {
     pub end_ms: u32,
     /// A forced start preceded the displayed bitmap.
     pub forced: bool,
+    /// The displayed rectangle.
     pub bitmap: Bitmap<'a>,
 }
 
@@ -234,12 +235,20 @@ impl Subtitle<'_> {
 /// pixels) and `height` rows of `width` colour indices, `stride` bytes apart.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Bitmap<'a> {
+    /// Left column on the canvas, after any transparent border is removed.
     pub x: u16,
+    /// Top row on the canvas, after any transparent border is removed.
     pub y: u16,
+    /// Width in pixels.
     pub width: u16,
+    /// Height in rows.
     pub height: u16,
+    /// `0xAARRGGBB` colours by pixel value.
     pub palette: &'a [u32],
+    /// The colour indices from the rectangle's first pixel to the end of the
+    /// decoder's plane; row `r` starts at `r * stride`.
     pub pixels: &'a [u8],
+    /// Bytes from one row to the next: the drawn area's width plus 16.
     pub stride: usize,
 }
 
@@ -366,6 +375,8 @@ impl Default for Colours {
 }
 
 impl Decoder {
+    /// A decoder with nothing buffered and no colours carried, charging its
+    /// buffers to `budget`.
     pub fn new(budget: &Budget, settings: Settings, limits: Limits) -> Self {
         Self {
             settings,
@@ -396,6 +407,7 @@ impl Decoder {
         Ok(())
     }
 
+    /// The settings the decoder was made with.
     pub fn settings(&self) -> &Settings {
         &self.settings
     }

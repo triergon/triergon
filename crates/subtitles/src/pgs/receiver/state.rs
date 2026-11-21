@@ -533,9 +533,8 @@ mod tests {
     }
 
     /// What a first fragment does to object 1 on a 16 × 4 canvas, as the
-    /// reference showed it (`ods_first` probe): `keep` leaves the object as it
-    /// was, `refuse` refuses the packet, and a replacement shows its declared
-    /// RLE length.
+    /// reference showed it: `keep` leaves the object as it was, `refuse`
+    /// refuses the packet, and a replacement shows its declared RLE length.
     fn outcome(fragment: &[u8]) -> String {
         let budget = Budget::new(1 << 20).unwrap();
         let update = Object::start(1, fragment, [16, 4], &DisplayLimits::default(), &budget);

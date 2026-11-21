@@ -1,12 +1,13 @@
-//! Bounded text source ingestion with original bytes and exact cue times.
+//! Bounded reading of demuxed text samples into cues that keep every input
+//! byte and exact times.
 //!
-//! Named profiles: Tx3gCarriage1, Utf8Packet1, MatroskaWebVttCarriage1 and
-//! OpaqueAss1. Their limits and
-//! source/semantic boundaries are documented in this module's README.md.
-//! These profiles do not establish FFmpeg compatibility; the FFmpeg-compatible
-//! readers and conversions are in [`crate::compat::document`],
-//! [`crate::compat::ass`], [`crate::compat::charset`] and
-//! [`crate::compat::mov_text`].
+//! An [`Extractor`] reads each sample by its [`Format`]: [`Format::Tx3g`],
+//! [`Format::Utf8Packet`], [`Format::MatroskaWebVtt`] or
+//! [`Format::OpaqueAss`]. Their rules and default limits are documented in
+//! this module's README.md. These operations follow the specifications, not
+//! FFmpeg; the FFmpeg-compatible readers and conversions are in
+//! [`crate::compat::document`], [`crate::compat::ass`],
+//! [`crate::compat::charset`] and [`crate::compat::mov_text`].
 #![forbid(unsafe_code)]
 
 pub(crate) mod ass_decoder;
@@ -34,24 +35,32 @@ use triergon_core::{Budget, Error, Refused, Result, WorkBudget};
 const _: () = assert!(size_of::<Refused<Input>>() <= 432);
 const _: () = assert!(size_of::<std::result::Result<(), Refused<Input>>>() <= 448);
 
+/// What [`Extractor::step`] produced.
 #[derive(Debug)]
 #[expect(
     clippy::large_enum_variant,
     reason = "Exclusive delivery states move charged output inline, preserving allocation-free UTF-8 publication; guarded at 672 bytes."
 )]
 pub enum Status {
+    /// No input is pending; provide the next.
     NeedInput,
+    /// The work budget ran out; step again.
     Yield,
+    /// The pending input's cue; the extractor takes the next input.
     Cue(Cue),
+    /// The pool could not hold the output; step again once memory is free.
     NeedOutput,
+    /// Input is finished and none is pending.
     Finished,
 }
 
 const _: () = assert!(size_of::<Status>() <= 672);
 const _: () = assert!(size_of::<Result<Status>>() <= 688);
 
-/// One complete immutable document or demuxed sample per provide operation.
-/// Transport assembly, charset selection and container discovery stay upstream.
+/// Reads one demuxed sample per [`provide`](Self::provide) into a [`Cue`]:
+/// its text range, strict character decoding, tx3g modifier boxes and WebVTT
+/// fields. Transport assembly, charset selection and container discovery
+/// stay with the caller.
 #[derive(Debug)]
 pub struct Extractor {
     pool: Budget,
@@ -65,13 +74,18 @@ pub struct Extractor {
 }
 
 impl Extractor {
-    /// ISO-box tx3g profile.
+    /// [`new`](Self::new), with tx3g modifier boxes also read in their ISO
+    /// forms: size 0 (to the end of the sample), size 1 (a 64-bit size) and
+    /// `uuid` boxes.
     pub fn tx3g_iso_boxes(pool: &Budget, limits: Limits, generation: u64) -> Self {
         let mut result = Self::new(pool, limits, generation);
         result.iso_tx3g = true;
         result
     }
 
+    /// An extractor charging `pool`, bounded by `limits`, that accepts
+    /// inputs of `generation`. A tx3g modifier box of size 0 or 1 is
+    /// `Error::Unsupported`.
     pub fn new(pool: &Budget, limits: Limits, generation: u64) -> Self {
         Self {
             pool: pool.clone(),
@@ -85,6 +99,11 @@ impl Extractor {
         }
     }
 
+    /// Takes the next input. It is handed back unchanged with
+    /// `Error::Invalid` after [`finish_input`](Self::finish_input) or while
+    /// an input is pending, `Error::StaleGeneration` for another generation,
+    /// `Error::ForeignPool` for bytes of another pool and `Error::Limit` for
+    /// bytes beyond their limit.
     #[expect(
         clippy::result_large_err,
         reason = "A refused input goes back to the caller inline, without an allocation; its size is guarded above."
@@ -142,10 +161,14 @@ impl Extractor {
         Ok(())
     }
 
+    /// Ends input: once no input is pending, [`step`](Self::step) returns
+    /// [`Status::Finished`].
     pub fn finish_input(&mut self) {
         self.finished = true;
     }
 
+    /// Drops the pending input and any sticky error, reopens input and
+    /// accepts inputs of `generation`. Cues already returned stay valid.
     pub fn reset(&mut self, generation: u64) {
         self.session = None;
         self.pending = None;
@@ -154,6 +177,9 @@ impl Extractor {
         self.finished = false;
     }
 
+    /// Reads the pending input, spending `work`. `Error::Cancelled` is
+    /// resumable; any other error is returned by every later call until
+    /// [`reset`](Self::reset).
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
         unicode::cancelled(cancel)?;
         if let Some(error) = self.failed {

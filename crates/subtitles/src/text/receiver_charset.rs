@@ -1,7 +1,9 @@
-//! Explicit receiver view for the pinned reference's Linux charset observations.
+//! ASS packets converted with the charset labels FFmpeg accepts through
+//! Linux/glibc `iconv`, re-exported as [`crate::compat::charset`].
 //!
-//! Source remains OpaqueAss and retains every byte. This opt-in operation does
-//! not render ASS, reproduce decoder return codes, or claim a universal alias.
+//! The source stays an [`Format::OpaqueAss`] cue with every byte. This
+//! operation does not render ASS or reproduce decoder return codes, and its
+//! labels hold for that repertoire only.
 use super::charset::{
     Charset, CharsetJob, CharsetStatus, ConvertedText, multibyte::MultibyteCharset as M,
 };
@@ -10,8 +12,14 @@ use super::{Cue, Encoding, Extractor, Format, Input, Limits, Status};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Error, Result, WorkBudget};
 
-/// Deliberately separate from both original strict label resolvers. Availability
-/// refers to the captured Linux/glibc receiver, not other libc installations.
+/// The charset FFmpeg with Linux/glibc `iconv` converts for `label`, matched
+/// ASCII case-insensitively: gbk, cp936, windows-936, big5, big-5,
+/// shift_jis, shift-jis, sjis, euc-kr, cp932, cp949, cp950, latin1,
+/// iso-8859-1, windows-1251 or windows-1252. `Error::Limit` for a label over
+/// 256 bytes, `Error::Unsupported` for any other. It differs from
+/// [`Charset::from_label`] and
+/// [`MultibyteCharset::from_label`](M::from_label): big5, euc-kr and cp932
+/// resolve to the `Receiver` profiles.
 pub fn receiver_charset(label: &[u8]) -> Result<Charset> {
     if label.len() > 256 {
         return Err(Error::Limit {
@@ -51,8 +59,9 @@ pub fn receiver_charset(label: &[u8]) -> Result<Charset> {
     }
     Err(Error::Unsupported("captured receiver charset label"))
 }
-/// Explicit receiver v2 adds the observed GNU EUC-KR A2E8 mapping. The
-/// v1 resolver and constructor keep their repertoire/refusals.
+/// [`receiver_charset`], with euc-kr resolved to
+/// [`MultibyteCharset::ReceiverEucKrGlibc239`](M::ReceiverEucKrGlibc239),
+/// which adds glibc's A2 E8 → U+327E.
 pub fn receiver_charset_with_glibc_euc_kr(label: &[u8]) -> Result<Charset> {
     if label.eq_ignore_ascii_case(b"euc-kr") {
         Ok(Charset::Multibyte(M::ReceiverEucKrGlibc239))
@@ -60,20 +69,31 @@ pub fn receiver_charset_with_glibc_euc_kr(label: &[u8]) -> Result<Charset> {
         receiver_charset(label)
     }
 }
+/// How a packet's conversion ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Outcome {
+    /// The packet converted to UTF-8.
     Converted,
+    /// The packet has no charset label, or one the repertoire lacks; nothing
+    /// was converted.
     UnsupportedLabel,
+    /// The conversion failed with this error, neither cancellation nor
+    /// backpressure; nothing was converted.
     ConversionRefused(Error),
 }
+/// What [`AssPacketJob::poll`] reports.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PacketStatus {
+    /// The work budget ran out, or the pool could not hold the cue; poll
+    /// again.
     Pending,
+    /// The view is ready; take it with
+    /// [`take_output`](AssPacketJob::take_output).
     Ready,
 }
-/// Full converted owner and source owner are retained even when the receiver's
-/// C-string prefix ends earlier. Text is the suffix after eight literal commas;
-/// its presence does not validate ASS fields or assert native output emission.
+/// A converted ASS packet: its source cue, the outcome, the whole converted
+/// text, the part before its first NUL, which FFmpeg keeps, and the text
+/// after the eighth comma. The ASS fields are not validated.
 #[derive(Debug)]
 pub struct PacketView {
     source: Cue,
@@ -83,29 +103,36 @@ pub struct PacketView {
     text: Option<Range<usize>>,
 }
 impl PacketView {
+    /// The cue the packet was read into, its input unchanged.
     pub fn source(&self) -> &Cue {
         &self.source
     }
+    /// How the conversion ended.
     pub fn outcome(&self) -> Outcome {
         self.outcome
     }
+    /// The whole conversion, NULs included; `None` unless converted.
     pub fn converted(&self) -> Option<&ConvertedText> {
         self.converted.as_ref()
     }
+    /// The converted text before its first NUL; `None` unless converted.
     pub fn visible(&self) -> Option<&[u8]> {
         self.converted
             .as_ref()
             .map(|c| &c.utf8.as_ref()[self.visible.clone()])
     }
+    /// The visible text after its eighth comma, the event's `Text` field;
+    /// `None` with fewer than eight commas or nothing converted.
     pub fn text(&self) -> Option<&[u8]> {
         self.text
             .as_ref()
             .and_then(|r| self.converted.as_ref().map(|c| &c.utf8.as_ref()[r.clone()]))
     }
 }
-/// One complete physical ASS packet, not a transport or a streaming document.
-/// Construction checks every source owner through Extractor; a fabricated Cue
-/// cannot act as an already-validated input. Backpressure and cancel are resumable.
+/// Converts one complete ASS packet with its charset label, as FFmpeg's
+/// `sub_charenc` conversion does, into a [`PacketView`]. The input is
+/// checked as [`Extractor::provide`] checks it. Backpressure and
+/// cancellation are resumable.
 #[derive(Debug)]
 pub struct AssPacketJob {
     extractor: Extractor,
@@ -124,6 +151,11 @@ pub struct AssPacketJob {
     taken: bool,
 }
 impl AssPacketJob {
+    /// A job converting `input`, whose label resolves with
+    /// [`receiver_charset`]. `Error::Unsupported` unless the input is
+    /// [`Format::OpaqueAss`] with [`Encoding::Opaque`]; an input that
+    /// [`Extractor::provide`] refuses for `generation` and `limits` fails
+    /// with its error.
     pub fn new(input: Input, pool: &Budget, limits: Limits, generation: u64) -> Result<Self> {
         if input.format != Format::OpaqueAss || input.encoding != Encoding::Opaque {
             return Err(Error::Unsupported("receiver requires opaque ASS packet"));
@@ -147,7 +179,8 @@ impl AssPacketJob {
             taken: false,
         })
     }
-    /// Opt-in version2; no implicit upgrade of the original receiver operation.
+    /// [`new`](Self::new), with the label resolved by
+    /// [`receiver_charset_with_glibc_euc_kr`].
     pub fn new_with_glibc_euc_kr(
         input: Input,
         pool: &Budget,
@@ -158,6 +191,9 @@ impl AssPacketJob {
         result.glibc_euc_kr = true;
         Ok(result)
     }
+    /// Reads, converts and scans the packet, spending `work`: the
+    /// conversion's units and one per converted byte scanned for commas and
+    /// NUL. `Error::Invalid` once the view is taken.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<PacketStatus> {
         cancelled(cancel)?;
         if self.taken {
@@ -272,6 +308,8 @@ impl AssPacketJob {
         });
         Ok(())
     }
+    /// The view, once [`poll`](Self::poll) reported
+    /// [`PacketStatus::Ready`]; `Error::Invalid` before then and once taken.
     pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<PacketView> {
         cancelled(cancel)?;
         let out = self

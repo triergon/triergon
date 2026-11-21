@@ -1,36 +1,52 @@
-//! Original source configuration and explicit post-demux DVB packet binding.
-//! Codec mapping draft-ietf-cellar-codec-21 5.7.1; EN300468 6.2.41;
-//! exact shared Time conversion. The codec mapping is a numbered Internet-Draft.
-//! This module performs no I/O, container demux, envelope guessing or native call.
+//! A DVB subtitle service's configuration and the packets bound to it after
+//! demux. Matroska `CodecPrivate` follows the codec mapping Internet-Draft
+//! draft-ietf-cellar-codec-21 §5.7.1, the subtitling descriptor EN 300 468
+//! §6.2.41; times convert exactly through `Time`. There is no I/O, container
+//! demux or detection of a packet's envelope.
 use triergon_core::{Budget, Bytes, Error, Result, SourceLocation, Time, TimeBase};
 
+/// One subtitle service: the pages its segments are on and its type.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Service {
+    /// The composition page id.
     pub composition_page: u16,
+    /// The ancillary page id, whose segments services may share.
     pub ancillary_page: u16,
+    /// The `subtitling_type` byte, unchecked.
     pub subtitling_type: u8,
 }
 
+/// How a packet's payload holds its segments; declared, never detected.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PacketEnvelope {
+    /// Bare subtitling segments, as a Matroska block holds them.
     Segments,
+    /// A whole PES packet data field: data identifier, stream id, segments
+    /// and end marker.
     PesDataField,
 }
 
+/// One DVB subtitle packet with its time and identity.
 #[derive(Clone, Debug)]
 pub struct DvbPacket {
+    /// The packet bytes, framed as `envelope` says.
     pub payload: Bytes,
+    /// The presentation time, converted exactly from the source clock;
+    /// `None` when unknown.
     pub pts: Option<Time>,
+    /// The reader generation the packet was read in.
     pub generation: u64,
+    /// The caller's sequence number of the packet.
     pub sequence: u64,
+    /// How `payload` holds its segments.
     pub envelope: PacketEnvelope,
-    /// Original configuration, raw clock values and container locator, when
-    /// the packet was bound by [`SourceConfiguration::packet`].
+    /// The configuration, raw clock values and container locator, when
+    /// [`SourceConfiguration::packet`] bound the packet.
     pub source: Option<PacketSourceFacts>,
 }
 
-/// Keep the declared positive ratio as well as core's exact reduced conversion
-/// base. Equivalent ratios do not erase their original numeric representation.
+/// A source time base as declared, kept beside its exact reduced
+/// `TimeBase`: 1/90000 and 2/180000 stay distinct.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourceClock {
     numerator: u64,
@@ -39,6 +55,8 @@ pub struct SourceClock {
 }
 
 impl SourceClock {
+    /// `numerator / denominator` seconds per tick. A zero in either is
+    /// `Error::Invalid`.
     pub fn new(numerator: u64, denominator: u64) -> Result<Self> {
         Ok(Self {
             numerator,
@@ -46,62 +64,85 @@ impl SourceClock {
             exact: TimeBase::new(numerator, denominator)?,
         })
     }
+    /// The numerator as declared, not reduced.
     pub fn raw_numerator(self) -> u64 {
         self.numerator
     }
+    /// The denominator as declared, not reduced.
     pub fn raw_denominator(self) -> u64 {
         self.denominator
     }
+    /// The exact reduced time base.
     pub fn time_base(self) -> TimeBase {
         self.exact
     }
 }
 
+/// Where a clock value comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClockOrigin {
+    /// Encoded in the source.
     Source,
-    /// A container/caller-derived view; never substituted for an encoded source
-    /// value or unknown source DTS without retaining this distinction.
+    /// Derived by the container or the caller; never taken for an encoded
+    /// value, or for a DTS the source does not give.
     Inferred,
 }
 
+/// A raw clock value and where it comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ClockValue {
+    /// Ticks of the [`SourceClock`].
     pub ticks: i128,
+    /// Whether the source encodes the value.
     pub origin: ClockOrigin,
 }
 
 impl ClockValue {
+    /// The exact time of `ticks` at `clock`; `Error::Overflow` when it does
+    /// not fit a `Time`.
     pub fn to_time(self, clock: SourceClock) -> Result<Time> {
         Time::from_ticks(self.ticks, clock.time_base())
     }
 }
 
-/// None means unknown. No integer is a sentinel in this independent API.
+/// A packet's raw clock values. `None` is unknown; no value is a sentinel.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PacketTiming {
+    /// The presentation time stamp.
     pub pts: Option<ClockValue>,
+    /// The decoding time stamp.
     pub dts: Option<ClockValue>,
+    /// The duration.
     pub duration: Option<ClockValue>,
 }
 
+/// Where a packet sits in the caller's reading.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PacketIdentity {
+    /// The reader generation the packet was read in.
     pub generation: u64,
+    /// The caller's sequence number of the packet.
     pub sequence: u64,
     /// A container locator, not a claim that the payload's first byte occurs
     /// here or that an assembled TS payload occupies a contiguous source range.
     pub container_position: Option<SourceLocation>,
 }
 
+/// Where a [`SourceConfiguration`] was read from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConfigurationSource {
+    /// A Matroska track's five-byte `CodecPrivate`.
     MatroskaCodecPrivate,
-    SubtitlingDescriptor { entry: u8 },
+    /// An MPEG-TS subtitling descriptor.
+    SubtitlingDescriptor {
+        /// The selected service's index among the descriptor's entries.
+        entry: u8,
+    },
 }
 
-/// Fixed-size parsed facts plus charged immutable original configuration.
-/// Parsing service metadata does not certify all features of its signalled type.
+/// One service's configuration, parsed, with the bytes it was read from.
+/// Reading a service's type does not mean every feature it signals is
+/// decoded.
 #[derive(Clone, Debug)]
 pub struct SourceConfiguration {
     original: Bytes,
@@ -112,6 +153,10 @@ pub struct SourceConfiguration {
 }
 
 impl SourceConfiguration {
+    /// Reads a Matroska `CodecPrivate`: composition page, ancillary page and
+    /// subtitling type in five bytes; its packets hold bare segments.
+    /// `Error::ForeignPool` when `original` belongs to another pool,
+    /// `Error::Truncated` below five bytes, `Error::Invalid` above.
     pub fn from_matroska_private(
         budget: &Budget,
         original: &Bytes,
@@ -140,9 +185,13 @@ impl SourceConfiguration {
         })
     }
 
-    /// Takes the complete descriptor, including tag and length, and an explicit
-    /// selected service index. Post-demux bare segments and source PES data fields
-    /// are different declared inputs; neither is autodetected from payload bytes.
+    /// Reads service `entry` of a whole subtitling descriptor, tag and length
+    /// included. Its packets hold their segments as `envelope` declares,
+    /// which is never detected from their bytes. `Error::ForeignPool` when
+    /// `original` belongs to another pool, `Error::Truncated` when it is
+    /// shorter than its length, `Error::Invalid` for another tag than 0x59,
+    /// bytes past the length, a length that is not a nonzero multiple of 8, or
+    /// an `entry` past the last service.
     pub fn from_subtitling_descriptor(
         budget: &Budget,
         original: &Bytes,
@@ -190,22 +239,29 @@ impl SourceConfiguration {
         })
     }
 
+    /// The bytes the configuration was read from.
     pub fn original(&self) -> &Bytes {
         &self.original
     }
+    /// Where the configuration was read from.
     pub fn source(&self) -> ConfigurationSource {
         self.source
     }
+    /// The selected service.
     pub fn service(&self) -> Service {
         self.service
     }
+    /// The clock of the packets' time stamps.
     pub fn clock(&self) -> SourceClock {
         self.clock
     }
+    /// How the packets hold their segments.
     pub fn envelope(&self) -> PacketEnvelope {
         self.envelope
     }
 
+    /// The service's three-byte ISO 639-2 language code from the
+    /// descriptor; `None` for a Matroska configuration.
     pub fn language_bytes(&self) -> Option<&[u8]> {
         match self.source {
             ConfigurationSource::MatroskaCodecPrivate => None,
@@ -216,8 +272,9 @@ impl SourceConfiguration {
         }
     }
 
-    /// Explicit five-byte source mapping, not an assertion that every native
-    /// codec parameter block has this representation. Raw descriptor stays intact.
+    /// The service as the five bytes of a Matroska `CodecPrivate`:
+    /// composition page, ancillary page, subtitling type. The descriptor
+    /// bytes are unchanged.
     pub fn service_private_view(&self) -> [u8; 5] {
         let composition = self.service.composition_page.to_be_bytes();
         let ancillary = self.service.ancillary_page.to_be_bytes();
@@ -230,8 +287,11 @@ impl SourceConfiguration {
         ]
     }
 
-    /// Alias payload/configuration without allocating, stripping, rescaling to
-    /// an integer output clock, filling unknown timestamps or changing order.
+    /// Binds `payload` and its timing to this configuration without
+    /// allocating, stripping or rescaling; an unknown time stays unknown.
+    /// `Error::ForeignPool` when the configuration or `payload` belongs to
+    /// another pool than `budget`; a PTS that does not convert fails as
+    /// [`ClockValue::to_time`] does.
     pub fn packet(
         &self,
         budget: &Budget,
@@ -270,6 +330,7 @@ impl SourceConfiguration {
     }
 }
 
+/// What [`SourceConfiguration::packet`] bound a packet with.
 #[derive(Clone, Debug)]
 pub struct PacketSourceFacts {
     configuration: SourceConfiguration,
@@ -278,12 +339,15 @@ pub struct PacketSourceFacts {
 }
 
 impl PacketSourceFacts {
+    /// The configuration the packet is bound to.
     pub fn configuration(&self) -> &SourceConfiguration {
         &self.configuration
     }
+    /// The raw clock values.
     pub fn timing(&self) -> PacketTiming {
         self.timing
     }
+    /// The container locator, as [`PacketIdentity::container_position`].
     pub fn container_position(&self) -> Option<SourceLocation> {
         self.container_position
     }

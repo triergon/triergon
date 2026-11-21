@@ -1,5 +1,5 @@
-//! Forward bounded modifier reader; physical box geometry is supplied only by
-//! the existing internally executed tx3g extractor/configuration parser.
+//! Reads the records of one modifier box forward, a byte at a time; the box
+//! ranges come from the tx3g extractor or the description parser.
 use super::super::{
     Encoding, Modifier,
     tx3g_config::StyleRecord,

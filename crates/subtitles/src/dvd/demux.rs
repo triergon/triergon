@@ -188,6 +188,8 @@ impl SubpictureStreams {
 pub struct ParsedUnit<'a> {
     /// The time stamp of the first PES packet since the previous unit.
     pub pts: Option<u64>,
+    /// The unit's bytes; for a packet too short for a size word, that packet
+    /// as it came.
     pub data: &'a [u8],
 }
 
@@ -209,6 +211,7 @@ pub struct SubpictureParser {
 }
 
 impl SubpictureParser {
+    /// A parser with no unit in progress, charging its buffer to `budget`.
     pub fn new(budget: &Budget) -> Self {
         Self {
             unit: BudgetVec::new(budget),

@@ -1,39 +1,53 @@
-//! Explicit, strict, version-pinned mapping profiles. No charset detection.
+//! Strict multibyte charset profiles, each bound to one mapping table, and a
+//! decoder that reads them a byte at a time. No charset is detected.
 //!
-//! Mapping DATA and licences are described in `MULTIBYTE-CONTRACT.md`.
-//! These profiles intentionally distinguish historical Unicode, Windows and
-//! restricted EUC repertoires. They do not claim universal label equivalence.
+//! The mapping data and licences are described in `MULTIBYTE-CONTRACT.md`.
+//! The profiles keep historical Unicode, Windows and restricted EUC
+//! repertoires apart; a label that names one does not name the others.
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Error, Result, WorkBudget};
 
 use super::super::unicode::cancelled;
 
+/// A multibyte charset profile: its lead and trail bytes and its mapping
+/// table. Standalone ASCII bytes decode as themselves except where noted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MultibyteCharset {
     /// Microsoft CP936 table 2.01, including its single-byte euro mapping.
     GbkCp936,
     /// Unicode historical Big5 table 2.0, with its seven NO MAPPING entries refused.
     Big5Unicode,
-    /// Unicode historical Shift-JIS table 2.0, including yen and overline.
+    /// Unicode historical Shift-JIS table 2.0, which decodes 0x5C as yen and
+    /// 0x7E as overline.
     ShiftJisUnicode,
-    /// CP949 table 2.01 restricted to A1..FE byte pairs, plus ASCII.
+    /// CP949 table 2.01 restricted to A1–FE byte pairs, plus ASCII; the UHC
+    /// extension pairs are refused.
     EucKr,
+    /// Microsoft CP932 table 2.01.
     Windows932,
+    /// Microsoft CP949 table 2.01, including the UHC extension pairs.
     Windows949,
+    /// Microsoft CP950 table 2.01.
     Windows950,
-    /// Opt-in freely distributable GNU Big5 charmap version 0.92, glibc 2.39 snapshot.
+    /// The GNU Big5 charmap 0.92 as glibc 2.39 has it, the repertoire FFmpeg
+    /// converts with glibc `iconv`.
     ReceiverBig5Glibc239,
-    /// Historical EUC-KR repertoire plus explicit single-byte C1 controls.
+    /// [`EucKr`](Self::EucKr) plus bytes 0x80–0x9F as the C1 controls.
     ReceiverEucKrC1,
-    /// Original CP932 repertoire plus Microsoft-documented 1880 user-defined scalars.
+    /// CP932 plus the 1,880 user-defined codes F040–F9FC as U+E000–U+E757.
     ReceiverWindows932Pua,
-    /// Explicit receiver v2: C1 repertoire plus the independently observed GNU A2E8/U327E mapping.
+    /// [`ReceiverEucKrC1`](Self::ReceiverEucKrC1) plus A2 E8 as U+327E,
+    /// which together equal the glibc 2.39 EUC-KR charmap.
     ReceiverEucKrGlibc239,
 }
 
 impl MultibyteCharset {
-    /// Opt-in resolver. The original `Charset::from_label` stays unchanged.
-    /// Matching is ASCII case-insensitive, with no trimming or guessed aliases.
+    /// The profile of `label`, matched ASCII case-insensitively with no
+    /// trimming: gbk, cp936, windows-936, big5, big-5, shift_jis, shift-jis,
+    /// sjis, euc-kr, euc_kr, cp932, windows-932, cp949, windows-949, cp950
+    /// or windows-950. `Error::Limit` for a label over 256 bytes,
+    /// `Error::Unsupported` for any other. The `Receiver` profiles have no
+    /// label here.
     pub fn from_label(label: &[u8]) -> Result<Self> {
         if label.len() > 256 {
             return Err(Error::Limit {
@@ -141,27 +155,33 @@ impl MultibyteCharset {
     }
 }
 
+/// A decoded character and the bytes it was decoded from.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DecodedScalar {
+    /// The Unicode scalar the bytes map to.
     pub value: char,
-    /// Exact byte range in the caller's stream, without joining or rewriting bytes.
+    /// Its byte range in the caller's stream, counted from the decoder's
+    /// origin.
     pub range: Range<usize>,
 }
 
+/// What [`MultibyteDecoder::push`] did with a byte.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DecodeStep {
-    /// The supplied byte was consumed as a lead. This is not physical EOF.
+    /// The byte was taken as a lead byte; push its trail byte. This is not
+    /// the end of input.
     NeedInput,
+    /// The byte completed a character.
     Scalar(DecodedScalar),
-    /// No byte was consumed and no state changed.
+    /// The work budget ran out: no byte was consumed and no state changed.
     Yield,
 }
 
-/// Allocation-free state machine, retaining at most one lead byte.
-/// Each consumed byte costs one work unit, including a bounded table lookup.
-/// A caller may supply bytes from any physical chunk partition without joining
-/// chunks. It retains source owners, labels, epochs and transport outcomes.
-/// Only explicit `finish` asserts final source EOF; starvation is not truncation.
+/// Decodes a multibyte profile a byte at a time, holding at most one lead
+/// byte and allocating nothing. Each byte costs one work unit, its table
+/// lookup included, and chunk boundaries do not change the result. Only
+/// [`finish`](Self::finish) ends the input: a pending lead byte is not
+/// truncation before it. Errors other than cancellation are sticky.
 #[derive(Debug)]
 pub struct MultibyteDecoder {
     profile: MultibyteCharset,
@@ -177,11 +197,12 @@ const _: () = assert!(size_of::<DecodedScalar>() <= 32);
 const _: () = assert!(size_of::<DecodeStep>() <= 48);
 
 impl MultibyteDecoder {
+    /// A decoder of `profile` whose byte positions start at 0.
     pub fn new(profile: MultibyteCharset) -> Self {
         Self::at_offset(profile, 0)
     }
 
-    /// Use an explicit caller-provided physical origin; no source ID is inferred.
+    /// A decoder of `profile` whose byte positions start at `offset`.
     pub fn at_offset(profile: MultibyteCharset, offset: usize) -> Self {
         Self {
             profile,
@@ -192,10 +213,15 @@ impl MultibyteDecoder {
         }
     }
 
+    /// The position of the next byte to push.
     pub fn position(&self) -> usize {
         self.position
     }
 
+    /// Decodes `byte`. `Error::Invalid` for input after
+    /// [`finish`](Self::finish), a trail byte the profile refuses, or a byte
+    /// or pair its table does not map; `Error::Overflow` when the position
+    /// does not fit `usize`.
     pub fn push(
         &mut self,
         byte: u8,
@@ -264,8 +290,8 @@ impl MultibyteDecoder {
         Err(Error::Invalid("unmapped multibyte byte"))
     }
 
-    /// Constant-size explicit EOF control. A partial lead is a sticky Truncated
-    /// error; cancellation is resumable. Repeated successful finish is idempotent.
+    /// Ends the input. A pending lead byte is a sticky `Error::Truncated`;
+    /// cancellation is resumable, and finishing again succeeds.
     pub fn finish(&mut self, cancel: &AtomicBool) -> Result<()> {
         cancelled(cancel)?;
         if let Some(error) = self.failed {

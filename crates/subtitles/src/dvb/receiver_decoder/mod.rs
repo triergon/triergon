@@ -55,6 +55,7 @@ pub struct Options {
     /// Present each display set at the next page composition, ending where
     /// that one starts (`compute_edt`).
     pub end_from_next: bool,
+    /// When regions take the automatic palette (`compute_clut`).
     pub automatic_palette: AutomaticPalette,
     /// Decode only the composition and ancillary pages of this service of the
     /// stream configuration, or of its first service when it has fewer
@@ -98,10 +99,12 @@ impl<'a> Status<'a> {
 pub struct Subtitle<'a> {
     /// Microseconds; `None` when unknown.
     pub pts: Option<i64>,
-    /// Milliseconds after `pts`. With [`Options::end_from_next`] the end is
-    /// one millisecond before the next display set, `u32::MAX` when that
-    /// starts within the same millisecond.
+    /// Milliseconds after `pts` the subtitle shows; always 0.
     pub start_display_ms: u32,
+    /// Milliseconds after `pts` the subtitle ends: the page's time-out, a
+    /// whole number of seconds, or with [`Options::end_from_next`] one
+    /// millisecond before the next display set, `u32::MAX` when that starts
+    /// within the same millisecond.
     pub end_display_ms: u32,
     /// The display size rectangle positions refer to, as the receiver keeps
     /// it: the first display definition's, or 720 × 576 once a packet held a
@@ -133,9 +136,15 @@ impl<'a> Subtitle<'a> {
 /// One region's bitmap on the page.
 #[derive(Clone, Copy, Debug)]
 pub struct Rect<'a> {
+    /// Left edge in display pixels: the region's place on the page plus the
+    /// display window's horizontal offset.
     pub x: i32,
+    /// Top edge in display pixels: the region's place on the page plus the
+    /// display window's vertical offset.
     pub y: i32,
+    /// Width in pixels.
     pub width: u16,
+    /// Height in pixels.
     pub height: u16,
     /// ARGB words, alpha in the top byte; `1 << depth` of them.
     pub palette: &'a [u32],

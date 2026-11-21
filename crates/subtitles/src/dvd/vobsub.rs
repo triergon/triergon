@@ -22,7 +22,10 @@ pub enum Line<'a> {
     /// `id: LANGUAGE, index: N`: the following lines describe track `N`, the
     /// subpictures in substream `0x20 + N`. A missing index is `None`.
     Track {
+        /// The language code up to the comma, without surrounding white
+        /// space.
         language: &'a [u8],
+        /// The decimal number after `index:`; one above 255 fails the line.
         index: Option<u8>,
     },
     /// `delay: [-]HH:MM:SS:mmm`: the offset of the timestamps that follow, in
@@ -30,7 +33,13 @@ pub enum Line<'a> {
     Delay(i64),
     /// `timestamp: HH:MM:SS:mmm, filepos: HEX`: a unit of the current track at
     /// this byte position of the `.sub` file.
-    Timestamp { milliseconds: i64, filepos: u64 },
+    Timestamp {
+        /// The time in milliseconds, without the delay; each field may have
+        /// any number of digits.
+        milliseconds: i64,
+        /// Byte offset of the unit's first packet in the `.sub` file.
+        filepos: u64,
+    },
     /// Any other line, such as `size:`, `palette:` or `custom colors:`.
     Setting(&'a [u8]),
 }
@@ -42,6 +51,7 @@ pub struct Lines<'a> {
 }
 
 impl<'a> Lines<'a> {
+    /// The lines of the index text `text`.
     pub fn new(text: &'a [u8]) -> Self {
         Self { rest: text }
     }

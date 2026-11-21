@@ -11,8 +11,8 @@ enum Phase {
     Resolve,
     Ready,
 }
-/// Resumable logarithmic lookup. Relative ticks are supplied explicitly in the
-/// same track units as the sample. None means unknown, never zero milliseconds.
+/// Finds the [`PointStyle`] at one character and time by binary search over the
+/// runs and karaoke entries, without allocating.
 #[derive(Debug)]
 pub struct PointQuery<'a> {
     semantic: &'a Semantics,
@@ -27,6 +27,10 @@ pub struct PointQuery<'a> {
     result: Option<PointStyle>,
 }
 impl<'a> PointQuery<'a> {
+    /// Queries `character`, an index below [`Semantics::character_count`], at
+    /// `relative_tick` track ticks from the start of the sample; `None` is an
+    /// unknown time, not zero. Fails with `Error::Invalid` when `character` is
+    /// outside the text.
     pub fn new(
         semantic: &'a Semantics,
         character: usize,
@@ -48,6 +52,9 @@ impl<'a> PointQuery<'a> {
             result: None,
         })
     }
+    /// Advances by one unit per search step; `Ok(None)` means the work ran
+    /// out, so poll again. Once found, the style is returned on every later
+    /// call without charging.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,

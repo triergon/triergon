@@ -15,6 +15,8 @@ pub(crate) const PRIVATE_STREAM_2: u8 = 0xbf;
 pub enum Unit<'a> {
     /// A pack header or a system header.
     Header,
+    /// A packet with a stream id from `0xbc` up: a PES packet, or the
+    /// program stream map or directory.
     Pes(Pes<'a>),
     /// `MPEG_program_end_code`.
     End,
@@ -23,6 +25,7 @@ pub enum Unit<'a> {
 /// One PES packet.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pes<'a> {
+    /// The `stream_id`, such as `0xbd` for `private_stream_1`.
     pub stream_id: u8,
     /// The 33-bit presentation time stamp, in 90 kHz ticks.
     pub pts: Option<u64>,
@@ -58,6 +61,7 @@ pub struct Units<'a> {
 }
 
 impl<'a> Units<'a> {
+    /// The units of `input`, from its first byte.
     pub fn new(input: &'a [u8]) -> Self {
         Self { input, at: 0 }
     }

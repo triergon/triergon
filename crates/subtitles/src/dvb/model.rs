@@ -1,7 +1,11 @@
+/// The bits per pixel of a region (EN 300 743 region depth).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Depth {
+    /// 2 bits: four colours.
     Two,
+    /// 4 bits: 16 colours.
     Four,
+    /// 8 bits: 256 colours.
     Eight,
 }
 
@@ -23,8 +27,11 @@ impl Depth {
     }
 }
 
+/// A display size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Size {
+    /// Width in pixels.
     pub width: u32,
+    /// Height in pixels.
     pub height: u32,
 }
