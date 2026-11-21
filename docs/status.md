@@ -64,7 +64,7 @@ The [session queue workloads](../harness/session-queues/README.md) cover five re
 | MPEG-TS program playback | Selected TS188 program and M2TS192 PID with packet payloads and clock projection | 35/35 packet folds | 0.7781 (35/35 pass) at `ce55904b` | heap ≤0.0880, total RSS ≤0.7993 (35/35 lower) at `ce55904b` | additional program and carriage profiles |
 | MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 0.9716 (3/3 pass) at `ce55904b` | heap ≤0.0155, total RSS ≤0.6373 (3/3 lower) at `ce55904b` | broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 0.7935 (71/71 pass) at `ce55904b` | heap ≤0.0207, total RSS ≤0.7419 (71/71 lower) at `ce55904b` | other profiles |
-| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core with consistent coded-window diagnostics from owned and packed inspectors | 135/135 AVC/HEVC reference comparisons. At `7c730ff8` on AArch64, both DTS inspectors agreed on all 27 fields and every core matched its reference length and bytes across seven inputs. [DTS corpus and instruction counts](#dts-core-header-inspection). | 0.9964 (135/135 pass for AVC/HEVC) at `217fef73` | heap ≤0.3300, total RSS ≤0.9888 (135/135 lower) at `217fef73` | ARMv7 total RSS, full AVC/HEVC/ADTS grammar |
+| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core with consistent coded-window diagnostics from owned and packed inspectors | 135/135 AVC/HEVC reference comparisons. At `7c730ff8` on AArch64, both DTS inspectors agreed on all 27 fields and every core matched its reference length and bytes across seven inputs. [DTS corpus and instruction counts](#dts-core-header-inspection). | 0.9977 (135/135 pass for AVC/HEVC) at `5ee3eba8` | heap ≤0.3300, total RSS ≤0.8114 (135/135 lower) at `5ee3eba8` | full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SubRip and WebVTT documents as FFmpeg's `srt` and `webvtt` demuxers read them, ASS packets as its `ass` decoder decodes them, with `sub_charenc` charsets including EUC-KR receiver policies, and mov_text and tx3g to ASS | 367/367 cases (`subtitle-text`: 82 captured mov_text cases, 13 authored mov_text sessions for the override tags written where a style record or the highlight starts or ends, the samples of the 79 tx3g tests, 80 charset cases, 17 ASS packets, 96 SubRip and WebVTT documents) on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7). `subtitle-text-host` matches 23/23 SubRip and WebVTT documents with oversized timestamp fields on both targets. | `subtitle-text` 1.0146 (367/367 pass)<br>`subtitle-text-host` 0.0909 (23/23 pass) at `ab677583` | `subtitle-text` heap ≤0.3361, total RSS ≤0.9297 (367/367 lower)<br>`subtitle-text-host` heap ≤0.0121, total RSS ≤0.7906 (23/23 lower) at `ab677583` | FATE coverage |
 | Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 319/319 cases (`subtitle-pgs`: TS, SUP and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.7806 (319/319 pass) at `546045db` | heap ≤0.9654, total RSS ≤0.9682 (319/319 lower) at `546045db` | FATE coverage |
 | Subtitles, PGS capsules | Recorded PGS packet sessions through `compat::pgs::ReceiverDecoder`, with raw PTS, DTS and time base, the forced-only option and hard resets that reopen the decoder | 229/229 cases (`subtitle-pgs-capsules`: capsules of up to 64 complete PGS packets against FFmpeg's `pgssub` decoder), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.7221 (229/229 pass) at `546045db` | heap ≤0.5788, total RSS ≤0.7381 (229/229 lower) at `546045db` | — |
@@ -470,13 +470,21 @@ records and logs. AAC in MOV, which the gate does not run, was measured at the s
 revision on one more c6g.4xlarge per target as the gate measures a codec workload list
 (sets `aac-access-units-4213d042-TARGET`).
 
-The packet framing rows come from the `framing` item on each target at `217fef73`.
-All 135 cases on each c6g.4xlarge host match the reference, with 30 timing pairs on
-CPU 1 and 30 kernel-bound memory pairs per case. The highest paired runtime upper
-bounds are 0.9964 on Linux AArch64 (`avc-multi_idr`) and
-0.9130 on 32-bit ARMv7 (`hevc-irap_repeat`). Peak heap is lower in every case.
-All AArch64 total RSS bounds are lower. All 135 ARMv7 total RSS bounds are open,
-from 1.0429 to 1.0840 (`rearm-type3`).
+The packet framing rows come from the `framing` item on each target at `5ee3eba8`,
+where every worker enters through C's `main` instead of the Rust standard library's
+start-up ([quality](quality.md#measuring-performance)). All 135 cases on each
+c6g.4xlarge host match the reference, with 30 timing pairs on CPU 1 and 30
+kernel-bound memory pairs per case. The highest paired runtime upper bounds are
+0.9977 on Linux AArch64 (`avc-multi_idr` and `hevc-inband_both`) and 0.9122 on 32-bit
+ARMv7 (`hevc-irap_repeat`). Peak heap is lower in every case. Total RSS is lower in
+every case on both targets: the upper bounds run from 0.8062 to 0.8114 on AArch64 and
+from 0.9292 to 0.9789 (`aud-vps`) on ARMv7, where the median of the cases' median
+ratios is 0.9316.
+
+At `217fef73`, before the entry change, the same item gave 0.9964 on AArch64 and
+0.9130 on ARMv7 as the highest runtime bounds, AArch64 total RSS up to 0.9888, and
+ARMv7 total RSS above the reference in all 135 cases, from 1.0429 to 1.0840
+(`rearm-type3`).
 
 At `f6de9851` the same `framing` item was measured on both targets. Each run measured all 135 cases on c6g.4xlarge, with 30 timing pairs of
 50 operations on CPU 1 and 30 kernel-bound memory pairs per case. All cases match the
@@ -498,6 +506,7 @@ compares the candidate's median residency before input open with the median of t
 reference's per-run maxima over three stops (before input open, operation start and
 operation end). The median excess across shared buckets is 16.25, 14.5 and 13.5 pages,
 respectively. The packet-framing gate uses the kernel-bound peaks recorded above.
+Since `5ee3eba8` no worker runs that lookup: workers enter through C's `main`.
 
 Every gated feature's contract requires both Linux AArch64 and ARMv7 since `47aa0451`
 ([quality](quality.md#reference-and-corpus)). One partial gate run at that revision on three
@@ -1193,8 +1202,10 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Playback with HEVC parameter-set repeats, Linux AArch64, shard 2 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`2ab05fbb4a99c88d03cec697104d3360ee92dd45f398fcb8949a2c3e17125d4b`](../harness/evidence/sets/gate-run-aarch64-6bbb2cb7-20261118-104943-shard-2.json) |
 | Playback with HEVC parameter-set repeats, ARMv7, shard 1 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`caa758a1e3348d4fccfdca6414ac504a39e8457a5fce1774402dce5bc645889e`](../harness/evidence/sets/gate-run-armv7-6bbb2cb7-20261118-105014-shard-1.json) |
 | Playback with HEVC parameter-set repeats, ARMv7, shard 2 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`43ee65711daba9295f1f963771cd120531eace54aba94b9032e08fb06232b470`](../harness/evidence/sets/gate-run-armv7-6bbb2cb7-20261118-105014-shard-2.json) |
-| Packet framing, Linux AArch64 | `217fef732d50953afaa89ed2b9a5422735f92936` | [`b497f5a3e66933a99802ebc821e93c680aadf9a8eec37546db0d46c85650fcfe`](../harness/evidence/sets/gate-run-aarch64-217fef73-20261119-191957-shard-5.json) |
-| Packet framing, 32-bit ARMv7 | `217fef732d50953afaa89ed2b9a5422735f92936` | [`03721d8f4223237572e1d5832315767b70bfcb220a491813768d5af80cd1ae9f`](../harness/evidence/sets/gate-run-armv7-217fef73-20261119-192042-shard-5.json) |
+| Packet framing, Linux AArch64 | `5ee3eba8ad5563ee1ccccbfdd0e9a4c023133c65` | [`13656a6d64cd61a8bb2dd23dc35acbc48ee09e53a304f3ed03bd348a3a85517e`](../harness/evidence/sets/gate-run-aarch64-5ee3eba8-20261121-011442-shard-1.json) |
+| Packet framing, 32-bit ARMv7 | `5ee3eba8ad5563ee1ccccbfdd0e9a4c023133c65` | [`d5ec5abaca96d81af2691680e3e01b9ceecf0a1734b33dd56bdc0f5f97af518c`](../harness/evidence/sets/gate-run-armv7-5ee3eba8-20261121-011502-shard-1.json) |
+| Earlier: Packet framing, Linux AArch64 | `217fef732d50953afaa89ed2b9a5422735f92936` | [`b497f5a3e66933a99802ebc821e93c680aadf9a8eec37546db0d46c85650fcfe`](../harness/evidence/sets/gate-run-aarch64-217fef73-20261119-191957-shard-5.json) |
+| Earlier: Packet framing, 32-bit ARMv7 | `217fef732d50953afaa89ed2b9a5422735f92936` | [`03721d8f4223237572e1d5832315767b70bfcb220a491813768d5af80cd1ae9f`](../harness/evidence/sets/gate-run-armv7-217fef73-20261119-192042-shard-5.json) |
 | Packet framing, Linux AArch64 | `f6de9851d99ff3ebe621c95fabf7c89cb617a329` | [`5bc206763e41494030e26cd61cfac84d66a0fad4416ac5d5f7feeb81b8d25009`](../harness/evidence/sets/gate-run-aarch64-f6de9851-20261117-230647-shard-1.json) |
 | Packet framing, ARMv7 | `f6de9851d99ff3ebe621c95fabf7c89cb617a329` | [`2c3625a5b709f4402496798fe95ddec86d59216fddf2a5e78acb12512ffac28b`](../harness/evidence/sets/gate-run-armv7-f6de9851-20261117-230647-shard-1.json) |
 | Packet framing startup mappings, ARMv7 | `f6de9851d99ff3ebe621c95fabf7c89cb617a329` | [`9941dac4835e3107d1fb9a60804ca7cd3bf552635cd8b2f91b106442e87fec1f`](../harness/evidence/sets/framing-armv7-startup-residency-f6de9851.json) |
@@ -1770,7 +1781,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | ISO BMFF / MP4 | 1,020/1,020 open and index comparisons (972 matching outputs, 48 matching refusals); the neutral reader's 648 comparison cases, as on AArch64 | 0.9747 (956/956 timed operations pass) | heap ≤0.2467, total RSS ≤0.8605 (956/956 lower) |
 | ISO BMFF seek and range plans | 476/476 (378 seeks, 94 range plans, 4 refusals) | 1.0222 (472/472 pass) | heap ≤0.8541, total RSS ≤0.8704 (472/472 lower) |
 | AAC in MOV | the configured decoder comparison: 34 clips, 3,544 access units | 1.0074 (34/34 pass) at `414b4cb5` | heap ≤0.6756, total RSS ≤0.5230 (34/34 lower, kernel-bound) at `414b4cb5` |
-| Packet framing | 135/135 AVC/HEVC reference comparisons. [DTS header instruction counts](#dts-core-header-inspection) at `7c730ff8`. | 0.9130 (135/135 pass) at `217fef73` | heap ≤0.2633 (135/135 lower), total RSS fails at 1.0840 (0/135 lower) at `217fef73` |
+| Packet framing | 135/135 AVC/HEVC reference comparisons. [DTS header instruction counts](#dts-core-header-inspection) at `7c730ff8`. | 0.9122 (135/135 pass) at `5ee3eba8` | heap ≤0.2633, total RSS ≤0.9789 (135/135 lower) at `5ee3eba8` |
 | Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the audio correctness check `codecs-audio` at `4b87991e`, as on AArch64: AAC 39/39, AC-3 6/6, E-AC-3 6/6, DTS core 22/22, and `xll_51_24_48_none` out of set (no core substream); the six video timing workloads decode to FFmpeg's digests | 20/20 pass at `81edf4c0`: the six video workloads 0.6035 to 1.0447 (`h264-high-1080p` 1.0447), the fourteen audio workloads 0.7665 to 1.0182 (worst `aac-he-5.1`; `aac-hev2-stereo` 1.0163, `aac-he-stereo` 1.0032) | heap ≤0.9421, total RSS ≤0.8384 (20/20 lower) at `81edf4c0` |
 | Audio codecs in files | the 10 workloads of `file-workloads.json`, each worker's work checked equal before it is measured. At `a875b007`, 10/10 pass both FFmpeg grades and 10/10 match main (`838a07a5`) byte for byte on stereo s16 | 0.9858 (10/10 pass, worst `vorbis-q3-5.1`) at `a875b007` | heap ≤0.8995, total RSS ≤0.7645 (10/10 lower) at `a875b007` |
 | Capture | 15/15 at `c30b9c80`. Conversion is byte-identical to FFmpeg's on all 15, and mux and encoder pass. | 0.9838 (15/15 pass, worst `c14-motion-960-rate255`, median of the cases 0.8081) at `c30b9c80` | heap ≤0.6086, total RSS ≤0.9767 (15/15 lower, kernel-bound) at `c30b9c80` |
@@ -2233,7 +2244,9 @@ stack-guard lookup reads `/proc/self/maps` through glibc's `pthread_getattr_np` 
 `sscanf`, which brings in libc's printf and scanf code, and the reference never runs
 that code. The worker's own binary is 15 pages smaller (53 resident pages against 68),
 so the two totals overlap, and a case falls below the reference when most of the
-reference's 30 runs land on an address that costs it an extra window.
+reference's 30 runs land on an address that costs it an extra window. Since `5ee3eba8` the
+workers enter through C's `main`, which leaves that lookup out, and every case is below
+the reference.
 
 The collections at `3df7ae6d` were the first ARMv7 collections with the page-cache eviction. At `22ed8232`, without
 it, how much of each executable was resident at the start of the operation varied between
