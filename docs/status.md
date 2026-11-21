@@ -49,7 +49,7 @@ The [session queue workloads](../harness/session-queues/README.md) cover five re
 | Area | Implemented | Verified against the reference | Runtime | Memory | Open |
 |---|---|---|---|---|---|
 | Core | Charged storage, exact time, input windows, work budgets, neutral container model with one codec identity | 51,235 exact-arithmetic cases against an independent oracle | via dependents | via dependents | fuzzing |
-| Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 129 workloads across six feature groups and the external HDR vector. The 21 Cues cases include 13 Opus cases for subtitle seek recovery and early indexed seeks. Four host FATE demux comparisons. | 1.0392 (129/129 pass, worst `chapters-many`) at `2fc2ebb8` | heap ≤0.6262, total RSS ≤0.8951 (129/129 lower) at `2fc2ebb8` | full EBML/Matroska scope |
+| Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 129 workloads across six feature groups and the external HDR vector. The 21 Cues cases include 13 Opus cases for subtitle seek recovery and early indexed seeks. Four host FATE demux comparisons. | 1.0392 (129/129 pass, worst `chapters-many`) at `2fc2ebb8`; segment metadata and the external HDR vector 0.9777 (49/49 pass, worst `chapters-depth`, `chapters-many` 0.7906) at `f12511e4` | heap ≤0.6262, total RSS ≤0.8951 (129/129 lower) at `2fc2ebb8`; segment metadata and the external HDR vector heap ≤0.6262, total RSS ≤0.8525 (49/49 lower) at `f12511e4` | full EBML/Matroska scope |
 | Matroska legacy AAC-LC | MPEG-2 and MPEG-4 legacy AAC-LC tags, derived initialization, ADTS feed and packet clocks | 4/4 packet folds and 32 framed packets, including a Xiph lace and declared or omitted duration (`matroska-legacy-aac`) | 0.9765 (4/4 pass, worst `mpeg2-lc-laced`) at `ce55904b` | heap ≤0.5227, total RSS ≤0.8566 (4/4 lower) at `ce55904b` | FATE coverage |
 | Matroska startup and seek | Startup and seek with lazy scan replay, including matching HEVC parameter sets in CodecPrivate and in-band | 45 cases, 1,350 packets | 0.9104 (45/45 pass, worst `seek-hevc-seek-no-cues-0-fresh`) at `ce55904b` | heap ≤0.4037, total RSS ≤0.6818 (45/45 lower), on `playback-matroska-worker`, at `ce55904b` | FATE mapping |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10/10 packet folds (`matroska-audio-clocks`) | 0.8582 (10/10 pass, worst `two-laced-before-first-known-pts`) at `ce55904b` | heap ≤0.8103, total RSS ≤0.8164 (10/10 lower), on `playback-matroska-worker`, at `ce55904b` | audio seek and FATE coverage |
@@ -255,7 +255,10 @@ above it, `rle-long-rows-sup` at 1.0591 and `state-c0-and-reserved-sup` at 1.055
 run per target at `546045db` described below puts them at 0.7256 and 0.6435, and no timed case
 there is above the ceiling on either target: the highest are `chapters-many` at 1.0377 on
 Linux AArch64 and ISO BMFF seek's `origin18-nonzero-anchor-second-absent-t1-mid-seek-tiny` at
-1.0221 on ARMv7.
+1.0221 on ARMv7. A partial run of Matroska segment metadata and the external HDR vector at
+`f12511e4`, which parses metadata documents without a source handle per text field, puts
+`chapters-many` at 0.7906 on Linux AArch64 and 0.6203 on ARMv7; the item's highest case
+there is `chapters-depth`, at 0.9777 and 0.9092.
 
 The previous ceiling, 1.10, was set on one more full sharded gate run per target
 at `1c64b775`, measured as the `a73350ca` run was, with set `codec-derived-streams` unpacked
@@ -1395,6 +1398,8 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Playback startup and continuation, Linux AArch64, shard 2 of 2 | `5514c6a0f0118bcbaecabd1e8ac35f9b8597d094` | [`39e6de5f164f2348b02f79c22ba1359691f2f390d9cafa1c4b4a658c728f2c6b`](../harness/evidence/sets/gate-run-aarch64-5514c6a0-20261119-030834-shard-2.json) |
 | Playback startup and continuation, 32-bit ARMv7, shard 1 of 2 | `5514c6a0f0118bcbaecabd1e8ac35f9b8597d094` | [`d38be11c82dfa02587f849970ce4d0822ea477ac9047ac464607183cf3bbffd2`](../harness/evidence/sets/gate-run-armv7-5514c6a0-20261119-030651-shard-1.json) |
 | Playback startup and continuation, 32-bit ARMv7, shard 2 of 2 | `5514c6a0f0118bcbaecabd1e8ac35f9b8597d094` | [`c18114051ed24c0ccfb1312bf639fe123d062bc52e07a695304692265759038b`](../harness/evidence/sets/gate-run-armv7-5514c6a0-20261119-030651-shard-2.json) |
+| Partial gate run, Matroska segment metadata and the external HDR vector, Linux AArch64 | `f12511e4f9d631c2aac50445a572a1722b3de5d3` | [`548df59e660c774f58cb2daaa73953e214e5e72b0bb071d24464baf540103999`](../harness/evidence/sets/gate-run-aarch64-f12511e4-20261120-235350-shard-1.json) |
+| Partial gate run, Matroska segment metadata and the external HDR vector, 32-bit ARMv7 | `f12511e4f9d631c2aac50445a572a1722b3de5d3` | [`6d79e0b9012f36a88c96b26d173b80c13a46cccbb85107172f4b70b94d6832b2`](../harness/evidence/sets/gate-run-armv7-f12511e4-20261120-235457-shard-1.json) |
 | Matroska and linked worker gates with the CELT changes, Linux AArch64, shard 1 of 8 | `2fc2ebb8b30ba97544c9a07a4111fecaa0695c13` | [`3554e145a92af3bedfdf0e3df38e94430cec2f3e0c4ed0834a357f8b8b8e9e27`](../harness/evidence/sets/gate-run-aarch64-2fc2ebb8-20261119-164526-shard-1.json) |
 | Matroska and linked worker gates with the CELT changes, Linux AArch64, shard 2 of 8 | `2fc2ebb8b30ba97544c9a07a4111fecaa0695c13` | [`183c439e8adcd51efe2f93be5727ea90c78bdb2b27551e2354f3841d45036df7`](../harness/evidence/sets/gate-run-aarch64-2fc2ebb8-20261119-164526-shard-2.json) |
 | Matroska and linked worker gates with the CELT changes, Linux AArch64, shard 3 of 8 | `2fc2ebb8b30ba97544c9a07a4111fecaa0695c13` | [`2ee2890c10e6ec7f8ff905c2cf39f6c02d1870c5554efcda615135a50aa19f07`](../harness/evidence/sets/gate-run-aarch64-2fc2ebb8-20261119-164526-shard-3.json) |
@@ -1776,7 +1781,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | Area | Verified against the reference | Runtime | Memory |
 |---|---|---|---|
 | Core | 51,235 exact-arithmetic cases; the workspace tests (4,719 checked, 4,718 in release) and the worker tests pass at `f8e1c4d9` | via dependents | via dependents |
-| Matroska / WebM | 129/129 across six feature groups and the external HDR vector, including 21/21 Cues cases | 0.9706 (129/129 pass, worst `cues-sparse`) at `2fc2ebb8` | heap ≤0.7747, total RSS ≤0.9463 (129/129 lower) at `2fc2ebb8`
+| Matroska / WebM | 129/129 across six feature groups and the external HDR vector, including 21/21 Cues cases | 0.9706 (129/129 pass, worst `cues-sparse`) at `2fc2ebb8`; segment metadata and the external HDR vector 0.9092 (49/49 pass, worst `chapters-depth`, `chapters-many` 0.6203) at `f12511e4` | heap ≤0.7747, total RSS ≤0.9463 (129/129 lower) at `2fc2ebb8`; segment metadata and the external HDR vector heap ≤0.7747, total RSS ≤0.9551 (49/49 lower) at `f12511e4`
 | Matroska legacy AAC-LC | 4/4 (`matroska-legacy-aac`) | 0.8394 (4/4 pass, worst `mpeg2-lc-laced`) at `ce55904b` | heap ≤0.4763, total RSS ≤0.9725 (4/4 lower) at `ce55904b`
 | Matroska startup and seek | 45/45 | 0.8406 (45/45 pass, worst `seek-hevc-seek-no-cues-0-fresh`) at `ce55904b` | heap ≤0.3956, total RSS ≤0.7831 (45/45 lower), on `playback-matroska-worker`, at `ce55904b` |
 | HLS segments | 71/71 | 0.5694 (71/71 pass) at `ce55904b` | heap ≤0.0196, total RSS ≤0.8036 (71/71 lower) at `ce55904b` |
