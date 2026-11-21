@@ -21,13 +21,19 @@ const PREFIX_BYTES: usize = 7;
 const MAXIMUM_ADTS_BYTES: usize = 0x1fff;
 const PES_CORRUPT: u32 = 2;
 
+/// One ADTS AAC frame with the timestamps of the PES it starts in.
 #[derive(Debug)]
 pub struct HlsAacFrame {
     /// Complete ADTS frame, including the original header and any CRC.
     pub bytes: Bytes,
+    /// The frame's ADTS header.
     pub header: AacAdtsHeader,
+    /// The PES presentation time, on the first frame that starts after that PES's
+    /// header; `None` on later frames.
     pub pts: Option<Time>,
+    /// The PES decode time, on the same frame as `pts`.
     pub dts: Option<Time>,
+    /// The duration of the frame's samples at the header's sampling rate.
     pub duration: Time,
 }
 
@@ -167,6 +173,9 @@ pub struct HlsAac {
 }
 
 impl HlsAac {
+    /// A reader of an admitted ADTS AAC track with frames of at most
+    /// `maximum_frame_bytes` (8 to 8,191). Fails with `Unsupported` for other carriage
+    /// and with `Invalid` for a track outside a program or a frame bound out of range.
     pub fn new(
         pool: &Budget,
         config: AdmittedCarriage,

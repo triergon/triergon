@@ -12,10 +12,14 @@ use triergon_playback::Source;
 /// and the timing information signalled in codec parameter sets.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum RawFeedClock {
+    /// No submission clock: packets carry no `submission_time`.
     #[default]
     Unspecified,
+    /// The `n`th coded picture is submitted at `start + n * picture_duration`.
     FixedSubmission {
+        /// The submission time of the first coded picture.
         start: Time,
+        /// The interval between coded pictures; positive.
         picture_duration: Time,
     },
 }
@@ -30,9 +34,13 @@ struct SubmissionClock {
 /// owner belongs to this packet and remains valid across later updates.
 #[derive(Debug)]
 pub struct RawVideoFeedPacket {
+    /// The access unit, aliasing the reader's NAL owners.
     pub unit: RawAccessUnit,
+    /// The active configuration after this unit, once one is known.
     pub configuration: Option<RawVideoConfiguration>,
+    /// The number of configuration changes so far, from 1; present with `configuration`.
     pub configuration_revision: Option<u64>,
+    /// Whether this unit changed the configuration.
     pub configuration_changed: bool,
     /// Present only for a coded picture under an explicit submission policy.
     pub submission_time: Option<Time>,
@@ -68,6 +76,8 @@ enum State<S: Source> {
     Failed(Error),
 }
 
+/// Raw access units with their active decoder configuration and optional submission
+/// clock, from [`RawVideoSource::into_feed`].
 #[derive(Debug)]
 pub struct RawVideoFeed<S: Source> {
     state: State<S>,
@@ -124,6 +134,8 @@ impl<S: Source> RawVideoSource<S> {
 }
 
 impl<S: Source> RawVideoFeed<S> {
+    /// The next access unit within `work`. A failure other than backpressure or
+    /// allocation is final: later polls return it again.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,

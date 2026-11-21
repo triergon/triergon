@@ -124,10 +124,12 @@ enum Picture {
     Hevc(HlsHevcPicture),
 }
 
+/// One AVC or HEVC picture of a media segment.
 #[derive(Debug)]
 pub struct HlsMediaVideoUnit(Picture);
 
 impl HlsMediaVideoUnit {
+    /// The PES timestamps of the picture.
     pub fn clock(&self) -> Option<AvcTsClock> {
         match &self.0 {
             Picture::Avc(unit) => unit.clock,
@@ -135,6 +137,7 @@ impl HlsMediaVideoUnit {
         }
     }
 
+    /// Whether the picture is an AVC IDR or an HEVC random access point.
     pub fn random_access(&self) -> bool {
         match &self.0 {
             Picture::Avc(unit) => unit.idr,
@@ -153,6 +156,8 @@ impl HlsMediaVideoUnit {
             .chain(hevc.into_iter().flat_map(HlsHevcPicture::feed_spans))
     }
 
+    /// The Annex B feed as one buffer, shared with the unit when nothing is inserted.
+    /// Fails with `ForeignPool` when the unit is not charged to `pool`.
     pub fn contiguous_feed(&self, pool: &Budget) -> Result<Bytes> {
         match &self.0 {
             Picture::Avc(unit) => unit.contiguous_feed(pool),
@@ -245,9 +250,14 @@ impl LaneAssembler for VideoAssembler {
 /// Complete feed bytes and the exact audio frame clock before playlist mapping.
 #[derive(Debug)]
 pub struct HlsMediaAudioUnit {
+    /// The complete ADTS frame or AC-3 or E-AC-3 syncframe.
     pub bytes: Bytes,
+    /// The PES presentation time, on the first frame that starts after that PES's
+    /// header.
     pub pts: Option<Time>,
+    /// The PES decode time, on the same frame as `pts`.
     pub dts: Option<Time>,
+    /// The frame duration.
     pub duration: Time,
 }
 

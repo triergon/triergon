@@ -13,17 +13,24 @@ use triergon_framing::{
 /// Dimensions use the AVC frame crop or HEVC conformance window.
 #[derive(Clone, Debug)]
 pub struct RawVideoConfiguration {
+    /// The codec of the parameter sets.
     pub codec: Codec,
+    /// Width in luma samples.
     pub width: u32,
+    /// Height in luma samples.
     pub height: u32,
     /// Timing fields carried by the active AVC SPS, when present.
     pub avc_timing: Option<AvcVuiTiming>,
+    /// The active HEVC video parameter set; `None` for AVC.
     pub vps: Option<Bytes>,
+    /// The active sequence parameter set.
     pub sps: Bytes,
+    /// The active picture parameter set.
     pub pps: Bytes,
 }
 
 impl RawVideoConfiguration {
+    /// The VPS (HEVC only), SPS and PPS, in that order.
     pub fn parameter_sets(&self) -> impl Iterator<Item = &Bytes> {
         self.vps.iter().chain([&self.sps, &self.pps])
     }
@@ -101,6 +108,9 @@ pub struct RawVideoConfigTracker {
 }
 
 impl RawVideoConfigTracker {
+    /// A tracker of `codec` parameter sets, retaining up to 16 VPS, 32 SPS and 256 PPS
+    /// charged to `pool`. A larger parameter set than `max_parameter_set_bytes` fails
+    /// its observation with `Limit`. Fails with `Invalid` when that bound is zero.
     pub fn new(pool: &Budget, codec: Codec, max_parameter_set_bytes: usize) -> Result<Self> {
         if max_parameter_set_bytes == 0 {
             return Err(Error::Invalid("zero raw video parameter-set limit"));

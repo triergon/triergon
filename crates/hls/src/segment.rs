@@ -25,27 +25,42 @@ mod lanes;
 use lanes::{AudioAssembler, LaneAssembler, VideoAssembler, VideoPicture};
 pub use lanes::{HlsMediaAudioUnit, HlsMediaVideoUnit};
 
+/// The AAC track an [`HlsSegmentReader`] reads.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum HlsSegmentAudio {
+    /// No audio.
     Disabled,
+    /// The program's one AAC track, if it has one.
     #[default]
     Optional,
+    /// The program's one AAC track; a segment without one fails with `Unsupported`.
     Required,
+    /// The AAC track on this PID; a segment without it fails with `Unsupported`.
     Pid(u16),
 }
 
+/// The tracks an [`HlsSegmentReader`] reads. A program with two candidate tracks
+/// needs their PID.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct HlsSegmentTracks {
+    /// The PID of the AVC track; `None` takes the program's one AVC track.
     pub video_pid: Option<u16>,
+    /// The AAC track.
     pub audio: HlsSegmentAudio,
 }
 
+/// Bounds of one segment read.
 #[derive(Clone, Copy, Debug)]
 pub struct HlsSegmentLimits {
+    /// The most source bytes (64 MiB by default); at least 188.
     pub maximum_source_bytes: usize,
+    /// The most bytes of completed units (64 MiB by default); nonzero.
     pub maximum_feed_bytes: usize,
+    /// The most access units of both tracks together (8,192 by default); nonzero.
     pub maximum_access_units: usize,
+    /// Transport stream parse bounds.
     pub transport: ParseLimits,
+    /// AVC access unit bounds.
     pub avc: AvcTsLimits,
 }
 
@@ -67,12 +82,16 @@ enum Lane {
     Audio,
 }
 
+/// One access unit of a segment.
 #[derive(Debug)]
 pub enum HlsFeedUnit<'a, C = HlsAacClock, V = AvcTsAccessUnit, A = HlsAacFrame> {
+    /// A video unit.
     Video(&'a V),
+    /// An audio frame with its segment clock.
     Audio(&'a A, &'a C),
 }
 
+/// The access units of one complete segment, in feed order, with their clocks.
 #[derive(Debug)]
 pub struct HlsSegment<C = HlsAacClock, V = AvcTsAccessUnit, A = HlsAacFrame> {
     video: BudgetVec<V>,
@@ -85,6 +104,7 @@ pub struct HlsSegment<C = HlsAacClock, V = AvcTsAccessUnit, A = HlsAacFrame> {
 }
 
 impl HlsSegment {
+    /// The 90 kHz tick of the last audio frame, if any.
     pub fn audio_tail90(&self) -> Option<i64> {
         self.clocks
             .as_slice()
@@ -101,24 +121,29 @@ impl HlsSegment {
 }
 
 impl<V, A> HlsSegment<HlsAudioClockNs, V, A> {
+    /// The presentation time of the last audio frame in nanoseconds, if any.
     pub fn audio_tail_ns(&self) -> Option<i64> {
         self.clocks.as_slice().last().map(|clock| clock.pts_ns)
     }
 }
 
 impl<C, V, A> HlsSegment<C, V, A> {
+    /// The raster of the first video unit.
     pub fn initial_raster(&self) -> AvcRaster {
         self.initial_raster
     }
 
+    /// The latest video presentation time, in 90 kHz ticks.
     pub fn video_tail90(&self) -> i64 {
         self.video_tail90
     }
 
+    /// The bytes of every unit together.
     pub fn feed_bytes(&self) -> usize {
         self.feed_bytes
     }
 
+    /// The units in feed order.
     #[expect(
         clippy::expect_used,
         reason = "the sealed lane order names exactly the stored video and audio units"
@@ -136,11 +161,22 @@ impl<C, V, A> HlsSegment<C, V, A> {
     }
 }
 
+/// One step of a segment reader.
 #[derive(Debug)]
 pub enum HlsSegmentProgress {
+    /// The work budget ran out: advance again with more work.
     Yield,
+    /// The source is pending on this request: provide a reply or advance again.
     NeedInput(InputRequest),
-    Backpressure { requested: usize, available: usize },
+    /// The pool is full of output the caller still holds: release some, then
+    /// advance again.
+    Backpressure {
+        /// Bytes the step needed.
+        requested: usize,
+        /// Bytes the pool had free.
+        available: usize,
+    },
+    /// The segment is complete: take it.
     Ready,
 }
 
@@ -173,16 +209,23 @@ pub struct HlsSegmentReader<S: Source> {
     inner: SegmentReader<S, AvcTsReader, HlsAac>,
 }
 
+/// The video codec of a media segment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HlsVideoCodec {
+    /// H.264, stream type 0x1b.
     Avc,
+    /// H.265, stream type 0x24.
     Hevc,
 }
 
+/// The audio codec of a media segment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HlsAudioCodec {
+    /// ADTS AAC.
     Aac,
+    /// AC-3.
     Ac3,
+    /// E-AC-3.
     Eac3,
 }
 
@@ -190,12 +233,17 @@ pub enum HlsAudioCodec {
 /// requires one unambiguous matching track and at least one complete frame.
 #[derive(Clone, Copy, Debug)]
 pub struct HlsMediaProfile {
+    /// The video codec; the program has one track of it.
     pub video: HlsVideoCodec,
+    /// The audio codec, or `None` to read no audio.
     pub audio: Option<HlsAudioCodec>,
 }
 
+/// The units of one media segment, with nanosecond audio clocks.
 pub type HlsMediaSegment = HlsSegment<HlsAudioClockNs, HlsMediaVideoUnit, HlsMediaAudioUnit>;
 
+/// Reads one complete media segment: AVC or HEVC video and optional AAC, AC-3 or
+/// E-AC-3 audio, as [`HlsSegmentReader`] does.
 #[derive(Debug)]
 pub struct HlsMediaSegmentReader<S: Source> {
     inner: SegmentReader<S, VideoAssembler, AudioAssembler>,
@@ -249,6 +297,9 @@ impl<S: Source, V: LaneAssembler, A: LaneAssembler> std::fmt::Debug for SegmentR
 }
 
 impl<S: Source> HlsSegmentReader<S> {
+    /// A reader of one segment from `source`. Fails with `Invalid` for a limit below its
+    /// minimum and with `Limit` when the source's known length exceeds
+    /// `maximum_source_bytes`.
     pub fn new(
         input: InputCursor,
         source: S,
@@ -260,10 +311,14 @@ impl<S: Source> HlsSegmentReader<S> {
         })
     }
 
+    /// Supplies a reply to the outstanding request, and returns whether it was the
+    /// reply to that request.
     pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
         self.inner.provide(reply)
     }
 
+    /// Reads and assembles within `work`. A failure other than backpressure retires the
+    /// reader.
     pub fn advance(
         &mut self,
         work: &mut WorkBudget,
@@ -284,6 +339,8 @@ impl<S: Source> HlsSegmentReader<S> {
         })
     }
 
+    /// The completed segment with nanosecond audio clocks; `None` until it is complete
+    /// and after it was taken. Fails with `Closed` after a failure.
     pub fn take_with_ns_clocks(
         &mut self,
         cancel: &AtomicBool,
@@ -295,6 +352,7 @@ impl<S: Source> HlsSegmentReader<S> {
 }
 
 impl<S: Source> HlsMediaSegmentReader<S> {
+    /// A reader of one segment from `source`. Fails as [`HlsSegmentReader::new`] does.
     pub fn new(
         input: InputCursor,
         source: S,
@@ -306,10 +364,14 @@ impl<S: Source> HlsMediaSegmentReader<S> {
         })
     }
 
+    /// Supplies a reply to the outstanding request, and returns whether it was the
+    /// reply to that request.
     pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
         self.inner.provide(reply)
     }
 
+    /// Reads and assembles within `work`. A failure other than backpressure retires the
+    /// reader.
     pub fn advance(
         &mut self,
         work: &mut WorkBudget,
@@ -318,6 +380,8 @@ impl<S: Source> HlsMediaSegmentReader<S> {
         self.inner.advance(work, cancel)
     }
 
+    /// The completed segment; `None` until it is complete and after it was taken. Fails
+    /// with `Closed` after a failure.
     pub fn take(&mut self, cancel: &AtomicBool) -> Result<Option<HlsMediaSegment>> {
         self.inner.take_with(cancel, |reader| {
             ns_audio_clocks(

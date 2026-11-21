@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
@@ -8,7 +9,6 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// Pending: `missing_docs`.
 
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Error, Result, SourceFailure, SourceLocation, Step, WorkBudget};
@@ -53,6 +53,7 @@ pub struct RawVideoSource<S: Source> {
 }
 
 impl<S: Source> RawVideoSource<S> {
+    /// Reads `source` through `reader`.
     pub fn new(reader: RawAnnexBReader, source: S) -> Self {
         Self {
             state: State::Active {

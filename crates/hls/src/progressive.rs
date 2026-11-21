@@ -19,18 +19,24 @@ use triergon_playback::{
 
 const TS_CLOCK_RATE: u32 = 90_000;
 
+/// Bounds of a [`TsProgressiveReader`].
 #[derive(Clone, Copy, Debug, Default)]
 pub struct TsProgressiveLimits {
+    /// Transport stream parse bounds.
     pub transport: ParseLimits,
+    /// AVC access unit bounds.
     pub avc: AvcTsLimits,
 }
 
+/// One unit of a progressive stream.
 #[derive(Debug)]
 pub enum TsProgressiveUnit {
     /// Annex B in decode order. The clock retains raw source timestamps and
     /// their native 90 kHz view, which supplies a decode tick for PTS-only PES.
     Video(AvcTsAccessUnit),
+    /// One ADTS AAC frame.
     Audio {
+        /// The frame, with the timestamps of its PES.
         frame: HlsAacFrame,
         /// Exact presentation time on this body's native PES clock. Missing anchors
         /// advance from the preceding frame by its ADTS sample duration.
@@ -39,12 +45,24 @@ pub enum TsProgressiveUnit {
     },
 }
 
+/// One step of a [`TsProgressiveReader`].
 #[derive(Debug)]
 pub enum TsProgressiveStep {
+    /// The work budget ran out: advance again with more work.
     Yield,
+    /// The source is pending on this request: provide a reply or advance again.
     NeedInput(InputRequest),
-    Backpressure { requested: usize, available: usize },
+    /// The pool is full of output the caller still holds: release some, then
+    /// advance again.
+    Backpressure {
+        /// Bytes the step needed.
+        requested: usize,
+        /// Bytes the pool had free.
+        available: usize,
+    },
+    /// A completed unit.
     Unit(TsProgressiveUnit),
+    /// The source ended and both assemblers drained.
     End,
 }
 
@@ -236,6 +254,8 @@ pub struct TsProgressiveReader<S: Source> {
 impl<S: Source> TsProgressiveReader<S> {
     const POLLS_PER_ADVANCE: usize = 8;
 
+    /// A reader of `source` from byte zero. Fails with `Invalid` unless `input` is at
+    /// offset zero of a sequential source.
     pub fn new(input: InputCursor, source: S, limits: TsProgressiveLimits) -> Result<Self> {
         let source = SourceOwner::new(source);
         if input.position() != 0 || input.capabilities().random_access {
@@ -274,6 +294,8 @@ impl<S: Source> TsProgressiveReader<S> {
         result
     }
 
+    /// Reads, demuxes and assembles within `work`. A failure other than backpressure, or
+    /// than an allocation failure after reading, retires the reader.
     pub fn advance(
         &mut self,
         work: &mut WorkBudget,

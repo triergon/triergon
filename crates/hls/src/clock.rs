@@ -4,19 +4,29 @@ use crate::aac::HlsAacFrame;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, Time, TimeBase};
 
+/// Where an AAC frame's segment presentation time comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HlsAacPtsOrigin {
+    /// The frame's own PES timestamp.
     Pes,
+    /// Counted back from the first PES timestamp by the durations of the frames before it.
     BeforeFirstPes,
+    /// Counted on from the end of the previous frame, after a PES timestamp.
     AfterPes,
+    /// Counted from zero: the segment has no AAC PES timestamp.
     SegmentLocal,
 }
 
+/// The segment presentation clock of one AAC frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HlsAacClock {
+    /// The presentation time.
     pub pts: Time,
+    /// The decode time: the PES DTS, or `pts` without one.
     pub dts: Time,
+    /// Where `pts` comes from.
     pub origin: HlsAacPtsOrigin,
+    /// The same clock in 90 kHz ticks.
     pub demux90: HlsAacDemuxClock90,
 }
 
@@ -24,14 +34,18 @@ pub struct HlsAacClock {
 /// and presentation tick for AAC. Source DTS stays available on the frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HlsAacDemuxClock90 {
+    /// The presentation and decode tick.
     pub pts_and_dts: i64,
+    /// The frame duration in ticks, rounded down.
     pub duration: i64,
 }
 
 /// Presentation and frame duration in integer nanoseconds before playlist mapping.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HlsAudioClockNs {
+    /// The presentation time in nanoseconds.
     pub pts_ns: i64,
+    /// The frame duration in nanoseconds.
     pub duration_ns: i64,
 }
 

@@ -26,9 +26,13 @@ const AUD: u8 = 9;
 const PREFIX: &[u8] = &[0, 0, 0, 1];
 const LOOKAHEAD: usize = PREFIX.len() + 1;
 
+/// Bounds of an AVC access unit reader.
 #[derive(Clone, Copy, Debug)]
 pub struct AvcTsLimits {
+    /// The largest access unit in bytes (4 MiB by default); nonzero.
     pub maximum_access_unit_bytes: usize,
+    /// The largest SPS or PPS in bytes (4,096 by default); nonzero. A larger one fails
+    /// with `Limit`.
     pub maximum_parameter_set_bytes: usize,
 }
 
@@ -41,21 +45,34 @@ impl Default for AvcTsLimits {
     }
 }
 
+/// One AVC access unit in Annex B form, with its clock and the raster of its active
+/// SPS.
 #[derive(Debug)]
 pub struct AvcTsAccessUnit {
     source: Bytes,
     sps: Option<Bytes>,
     pps: Option<Bytes>,
+    /// The clock of the latest PES header before the unit's delimiter, unless an earlier
+    /// unit already carries it.
     pub clock: Option<AvcTsClock>,
+    /// The raster of the active SPS.
     pub raster: AvcRaster,
+    /// Whether the unit holds an IDR picture.
     pub idr: bool,
 }
 
+/// The PES timestamps of an access unit, as coded and on the unwrapped 90 kHz demux
+/// clock.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AvcTsClock {
+    /// The coded 33-bit PTS.
     pub source_pts_raw33: Option<u64>,
+    /// The coded 33-bit DTS.
     pub source_dts_raw33: Option<u64>,
+    /// The presentation time on the demux clock, in 90 kHz ticks.
     pub pts90: Option<i64>,
+    /// The decode time on the demux clock, in 90 kHz ticks; a PES without DTS takes its
+    /// PTS.
     pub dts90: Option<i64>,
 }
 
@@ -85,6 +102,7 @@ impl AvcTsClock {
 }
 
 impl AvcTsAccessUnit {
+    /// The access unit as received, without inserted parameter sets.
     pub fn source_bytes(&self) -> &Bytes {
         &self.source
     }
@@ -120,11 +138,16 @@ impl AvcTsAccessUnit {
     }
 }
 
+/// One step of an [`AvcTsReader`].
 #[derive(Debug)]
 pub enum AvcTsStep {
+    /// Push the next PES, or `finish` after the last one.
     NeedInput,
+    /// The work budget ran out: step again with more work.
     Yield,
+    /// A complete access unit.
     Ready(AvcTsAccessUnit),
+    /// After `finish`, every access unit has been returned.
     End,
 }
 
@@ -280,6 +303,8 @@ pub struct AvcTsReader {
 }
 
 impl AvcTsReader {
+    /// A reader of an admitted AVC track. Fails with `Unsupported` for other carriage
+    /// and with `Invalid` for a track outside a program, a reserved PID or a zero limit.
     pub fn new(pool: &Budget, config: AdmittedCarriage, limits: AvcTsLimits) -> Result<Self> {
         if config.carriage != Carriage::Registered(RegisteredCarriage::Avc) {
             return Err(Error::Unsupported("HLS AVC needs selected AVC carriage"));
@@ -463,6 +488,9 @@ impl AvcTsReader {
         self.ended = true;
     }
 
+    /// Assembles the pushed bytes within `work`. Fails with `Truncated` when the input
+    /// ends inside a unit, and with `Limit` past a limit. A failure other than
+    /// allocation or backpressure is final: later steps return it again.
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<AvcTsStep> {
         if let Some(error) = self.failure {
             return Err(error);

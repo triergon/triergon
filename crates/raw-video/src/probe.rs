@@ -14,9 +14,14 @@ use triergon_playback::{
 
 const MAXIMUM_PROBE_WINDOW: usize = 4096;
 
+/// Bounds of a raw video probe.
 #[derive(Clone, Copy, Debug)]
 pub struct RawVideoProbeLimits {
+    /// The most prefix bytes read and retained (64 KiB by default); nonzero, and for a
+    /// [`PlaybackProbe`] at least `CONTAINER_SIGNATURE_BYTES`.
     pub maximum_bytes: usize,
+    /// The most NAL units scanned before the probe fails with `Limit` (64 by default);
+    /// nonzero.
     pub maximum_nals: usize,
 }
 
@@ -29,10 +34,14 @@ impl Default for RawVideoProbeLimits {
     }
 }
 
+/// One step of a [`RawVideoProbe`].
 #[derive(Debug)]
 pub enum RawVideoProbeStep {
+    /// The source is pending on this request: advance again once it can reply.
     NeedInput(InputRequest),
+    /// The work budget ran out: advance again with more work.
     Yield,
+    /// The prefix identifies this codec: call `finish`.
     Detected(Codec),
 }
 
@@ -45,6 +54,8 @@ pub struct RawVideoProbe<S: Source> {
 }
 
 impl<S: Source> RawVideoProbe<S> {
+    /// A probe over `source`; the selected raw reader reads with `reader_limits`. Fails
+    /// with `Invalid` when a limit is zero.
     pub fn new(
         pool: &Budget,
         id: SourceId,
@@ -67,6 +78,10 @@ impl<S: Source> RawVideoProbe<S> {
         })
     }
 
+    /// Reads and scans the prefix within `work`. Fails with `Unsupported` when no AVC
+    /// or HEVC signature appears within `maximum_bytes` or before the source ends, and
+    /// with `Limit` after `maximum_nals` NAL units. A failure other than backpressure or
+    /// allocation closes the probe.
     pub fn advance(
         &mut self,
         work: &mut WorkBudget,
@@ -93,28 +108,40 @@ impl<S: Source> RawVideoProbe<S> {
     }
 }
 
+/// The kind of input a [`PlaybackProbe`] found.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PlaybackInputKind {
+    /// A Matroska, MP4 or transport stream container.
     Container(Format),
+    /// Raw Annex B video of this codec.
     RawVideo(Codec),
 }
 
+/// One step of a [`PlaybackProbe`].
 #[derive(Debug)]
 pub enum PlaybackProbeStep {
+    /// The source is pending on this request: advance again once it can reply.
     NeedInput(InputRequest),
+    /// The work budget ran out: advance again with more work.
     Yield,
+    /// The input kind is known: call `finish`.
     Detected(PlaybackInputKind),
 }
 
+/// The selected input. It replays the probed prefix, then reads on from the source.
 #[allow(
     clippy::large_enum_variant,
     reason = "one inline selected reader avoids a separate uncharged allocation"
 )]
 #[derive(Debug)]
 pub enum PlaybackInput<S: Source> {
+    /// A container input for the playback engine.
     Container(SelectedInput<ProbeReplay<S>>),
+    /// A raw Annex B input.
     RawVideo {
+        /// The detected codec.
         codec: Codec,
+        /// The raw source, from byte zero.
         source: RawVideoSource<ProbeReplay<S>>,
     },
 }
@@ -127,6 +154,9 @@ pub struct PlaybackProbe<S: Source> {
 }
 
 impl<S: Source> PlaybackProbe<S> {
+    /// A probe over `source`; `window` is the input window of a selected container
+    /// input. Fails with `Invalid` when a limit is zero or `limits.maximum_bytes` is
+    /// below `CONTAINER_SIGNATURE_BYTES`.
     pub fn new(
         pool: &Budget,
         id: SourceId,
@@ -140,6 +170,8 @@ impl<S: Source> PlaybackProbe<S> {
         })
     }
 
+    /// Reads and scans the prefix within `work`: container signatures first, then raw
+    /// Annex B parameter sets. Fails as [`RawVideoProbe::advance`] does.
     pub fn advance(
         &mut self,
         work: &mut WorkBudget,
@@ -148,6 +180,9 @@ impl<S: Source> PlaybackProbe<S> {
         self.driver.advance(work, cancel)
     }
 
+    /// Hands over the source with the probed prefix replayed, as a container input or
+    /// as a raw source read with `raw_limits`. Fails with `Invalid` before detection
+    /// and with `Closed` after a failure or an earlier `finish`.
     pub fn finish(&mut self, raw_limits: RawAnnexBLimits) -> Result<PlaybackInput<S>> {
         let selection = self
             .driver
