@@ -376,25 +376,14 @@ impl FragmentIndex {
     }
 }
 
-/// The step a [`FragmentBuilder`] takes on its current run.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum RunStep {
-    /// Placing the run's first byte, decode time and ordinal.
-    Start,
-    /// Adding up the run's sample sizes and durations.
-    Sum,
-    /// Moving past the run.
-    Commit,
-}
-
-/// Where a build stands. The defaults are those `tfhd` and `trex` settle for the
-/// fragment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
     Boxes,
     Initialize,
-    Runs(RunStep, Trex),
-    Ready(Trex),
+    StartRun,
+    Sum,
+    Commit,
+    Ready,
 }
 
 /// Indexes one `traf` into a [`FragmentIndex`] under a work budget, reading no media.
@@ -412,6 +401,7 @@ pub struct FragmentBuilder {
     context: FragmentContext,
     limits: Limits,
     phase: Phase,
+    defaults: Option<Trex>,
     base: u64,
     byte: u64,
     decode: Option<i128>,
@@ -458,6 +448,7 @@ impl FragmentBuilder {
             context,
             limits,
             phase: Phase::Boxes,
+            defaults: None,
             base: 0,
             byte: 0,
             decode: context.decode_origin,
@@ -505,234 +496,220 @@ impl FragmentBuilder {
     }
     fn poll_inner(&mut self, work: &mut WorkBudget) -> Result<BuildStatus> {
         loop {
-            match self.phase {
-                Phase::Ready(_) => return Ok(BuildStatus::Ready),
-                Phase::Boxes => {
-                    if let Some(status) = self.poll_boxes(work)? {
-                        return Ok(status);
-                    }
-                }
-                Phase::Runs(RunStep::Start, defaults) if self.run == self.runs.len() => {
-                    self.phase = Phase::Ready(defaults);
-                }
-                Phase::Initialize => {
-                    if !work.try_charge(1) {
-                        return Ok(BuildStatus::Yield);
-                    }
-                    self.initialize()?;
-                }
-                Phase::Runs(step, defaults) => {
-                    if !work.try_charge(1) {
-                        return Ok(BuildStatus::Yield);
-                    }
-                    self.phase = Phase::Runs(self.run_step(step, defaults, work)?, defaults);
-                }
+            if self.phase == Phase::Ready {
+                return Ok(BuildStatus::Ready);
             }
-        }
-    }
-    /// Collects the `traf` children; `Some` with the status to return.
-    fn poll_boxes(&mut self, work: &mut WorkBudget) -> Result<Option<BuildStatus>> {
-        if let Some(value) = self.pending.take() {
+            if self.phase == Phase::Boxes {
+                if let Some(value) = self.pending.take() {
+                    if !work.try_charge(1) {
+                        self.pending = Some(value);
+                        return Ok(BuildStatus::Yield);
+                    }
+                    // Most fragments hold one run or a few: each of the first
+                    // four takes exactly its own slot, where a push would take
+                    // four at once. Longer lists grow geometrically.
+                    if self.runs.len() < 4
+                        && let Err(error) = self.runs.try_reserve_exact(1)
+                    {
+                        self.pending = Some(value);
+                        return Err(error);
+                    }
+                    if let Err(error) = self.runs.try_push(value) {
+                        self.pending = Some(error.value);
+                        return Err(error.error);
+                    }
+                    continue;
+                }
+                match self.boxes.poll(work)? {
+                    Next::Yield => return Ok(BuildStatus::Yield),
+                    Next::End => {
+                        self.phase = Phase::Initialize;
+                    }
+                    Next::Item(raw) => match &raw.header().kind {
+                        b"tfhd" => {
+                            if self.header.is_some() {
+                                return Err(Error::Invalid("duplicate tfhd"));
+                            }
+                            self.header = Some(Tfhd::parse(&raw)?);
+                        }
+                        b"trun" => {
+                            policy(
+                                u32::try_from(self.runs.len())
+                                    .map_err(|_| Error::Overflow)?
+                                    .checked_add(1)
+                                    .ok_or(Error::Overflow)?,
+                                self.limits.max_records,
+                            )?;
+                            self.pending = Some(IndexedRun {
+                                wire: Run::parse(raw, self.limits)?,
+                                byte: 0,
+                                decode: None,
+                                ordinal: 0,
+                                bytes: 0,
+                                duration: 0,
+                            });
+                        }
+                        b"tfdt" => {
+                            if self.decode_time.is_some() {
+                                return Err(Error::Invalid("duplicate tfdt"));
+                            }
+                            if self.header.is_none() || !self.runs.is_empty() {
+                                return Err(Error::Invalid(
+                                    "tfdt must follow tfhd and precede trun",
+                                ));
+                            }
+                            self.decode_time = Some(FragmentDecodeTime::parse(raw)?);
+                        }
+                        _ => {} // Groups/private boxes remain byte-exact in raw traf.
+                    },
+                }
+                continue;
+            }
+            let length = self.runs.len();
+            if self.phase == Phase::StartRun && self.run == length {
+                self.phase = Phase::Ready;
+                continue;
+            }
             if !work.try_charge(1) {
-                self.pending = Some(value);
-                return Ok(Some(BuildStatus::Yield));
+                return Ok(BuildStatus::Yield);
             }
-            // Most fragments hold one run or a few: each of the first
-            // four takes exactly its own slot, where a push would take
-            // four at once. Longer lists grow geometrically.
-            if self.runs.len() < 4
-                && let Err(error) = self.runs.try_reserve_exact(1)
-            {
-                self.pending = Some(value);
-                return Err(error);
-            }
-            if let Err(error) = self.runs.try_push(value) {
-                self.pending = Some(error.value);
-                return Err(error.error);
-            }
-            return Ok(None);
-        }
-        match self.boxes.poll(work)? {
-            Next::Yield => return Ok(Some(BuildStatus::Yield)),
-            Next::End => {
-                self.phase = Phase::Initialize;
-            }
-            Next::Item(raw) => match &raw.header().kind {
-                b"tfhd" => {
-                    if self.header.is_some() {
-                        return Err(Error::Invalid("duplicate tfhd"));
+            match self.phase {
+                Phase::Initialize => {
+                    let header = self.header.ok_or(Error::Invalid("missing tfhd"))?;
+                    if let Some(wire) = &self.decode_time {
+                        let origin = i128::from(wire.ticks());
+                        if self
+                            .context
+                            .decode_origin
+                            .is_some_and(|caller| caller != origin)
+                        {
+                            return Err(Error::Invalid("caller origin disagrees with tfdt"));
+                        }
+                        self.decode = Some(origin);
                     }
-                    self.header = Some(Tfhd::parse(&raw)?);
-                }
-                b"trun" => {
-                    policy(
-                        u32::try_from(self.runs.len())
-                            .map_err(|_| Error::Overflow)?
-                            .checked_add(1)
-                            .ok_or(Error::Overflow)?,
-                        self.limits.max_records,
-                    )?;
-                    self.pending = Some(IndexedRun {
-                        wire: Run::parse(raw, self.limits)?,
-                        byte: 0,
-                        decode: None,
-                        ordinal: 0,
-                        bytes: 0,
-                        duration: 0,
+                    let defaults = header.effective(self.trex)?;
+                    if defaults.description_index == 0
+                        || defaults.description_index > self.context.description_count
+                    {
+                        return Err(Error::Invalid("fragment sample description index"));
+                    }
+                    if header.empty && length != 0 {
+                        return Err(Error::Invalid("duration-is-empty with trun boxes"));
+                    }
+                    // An explicit base takes precedence. Without it the modern
+                    // bit anchors this traf independently of any predecessor.
+                    self.base = header.base.unwrap_or(if header.base_is_moof {
+                        self.context.moof_start
+                    } else {
+                        match self.context.implicit_base {
+                            ImplicitBase::FirstTraf => self.context.moof_start,
+                            ImplicitBase::PreviousTraf(end) => end,
+                        }
                     });
+                    self.byte = self.base;
+                    self.defaults = Some(defaults);
+                    self.phase = Phase::StartRun;
                 }
-                b"tfdt" => {
-                    if self.decode_time.is_some() {
-                        return Err(Error::Invalid("duplicate tfdt"));
+                Phase::StartRun => {
+                    let run = self
+                        .runs
+                        .as_mut_slice()
+                        .get_mut(self.run)
+                        .ok_or(Error::Invalid("run index"))?;
+                    run.byte = match run.wire.data_offset {
+                        Some(delta) => add_offset(self.base, delta)?,
+                        None => self.byte,
+                    };
+                    if run.wire.count == 0 || (self.run > 0 && run.byte < self.byte) {
+                        self.implicit_safe = false;
                     }
-                    if self.header.is_none() || !self.runs.is_empty() {
-                        return Err(Error::Invalid("tfdt must follow tfhd and precede trun"));
-                    }
-                    self.decode_time = Some(FragmentDecodeTime::parse(raw)?);
+                    run.decode = self.decode;
+                    run.ordinal = self.ordinal;
+                    self.sample = 0;
+                    self.total_bytes = 0;
+                    self.total_duration = 0;
+                    self.phase = Phase::Sum;
                 }
-                _ => {} // Groups/private boxes remain byte-exact in raw traf.
-            },
-        }
-        Ok(None)
-    }
-    /// Settles the defaults and the base offset from `tfhd`, `tfdt` and the context.
-    fn initialize(&mut self) -> Result<()> {
-        let header = self.header.ok_or(Error::Invalid("missing tfhd"))?;
-        if let Some(wire) = &self.decode_time {
-            let origin = i128::from(wire.ticks());
-            if self
-                .context
-                .decode_origin
-                .is_some_and(|caller| caller != origin)
-            {
-                return Err(Error::Invalid("caller origin disagrees with tfdt"));
-            }
-            self.decode = Some(origin);
-        }
-        let defaults = header.effective(self.trex)?;
-        if defaults.description_index == 0
-            || defaults.description_index > self.context.description_count
-        {
-            return Err(Error::Invalid("fragment sample description index"));
-        }
-        if header.empty && !self.runs.is_empty() {
-            return Err(Error::Invalid("duration-is-empty with trun boxes"));
-        }
-        // An explicit base takes precedence. Without it the modern
-        // bit anchors this traf independently of any predecessor.
-        self.base = header.base.unwrap_or(if header.base_is_moof {
-            self.context.moof_start
-        } else {
-            match self.context.implicit_base {
-                ImplicitBase::FirstTraf => self.context.moof_start,
-                ImplicitBase::PreviousTraf(end) => end,
-            }
-        });
-        self.byte = self.base;
-        self.phase = Phase::Runs(RunStep::Start, defaults);
-        Ok(())
-    }
-    /// Takes `step` on the current run, whose first work unit is charged; returns the
-    /// next step.
-    fn run_step(
-        &mut self,
-        step: RunStep,
-        defaults: Trex,
-        work: &mut WorkBudget,
-    ) -> Result<RunStep> {
-        Ok(match step {
-            RunStep::Start => {
-                let run = self
-                    .runs
-                    .as_mut_slice()
-                    .get_mut(self.run)
-                    .ok_or(Error::Invalid("run index"))?;
-                run.byte = match run.wire.data_offset {
-                    Some(delta) => add_offset(self.base, delta)?,
-                    None => self.byte,
-                };
-                if run.wire.count == 0 || (self.run > 0 && run.byte < self.byte) {
-                    self.implicit_safe = false;
-                }
-                run.decode = self.decode;
-                run.ordinal = self.ordinal;
-                self.sample = 0;
-                self.total_bytes = 0;
-                self.total_duration = 0;
-                RunStep::Sum
-            }
-            RunStep::Sum => {
-                let run = self
-                    .runs
-                    .as_slice()
-                    .get(self.run)
-                    .ok_or(Error::Invalid("run index"))?;
-                if run.wire.constant_extents() {
-                    if self.reject_zero_size && run.wire.count != 0 && defaults.size == 0 {
-                        return Err(Error::Invalid("zero-size fragment sample while opening"));
-                    }
-                    self.total_bytes = u64::from(run.wire.count)
-                        .checked_mul(u64::from(defaults.size))
-                        .ok_or(Error::Overflow)?;
-                    self.total_duration = u64::from(run.wire.count)
-                        .checked_mul(u64::from(defaults.duration))
-                        .ok_or(Error::Overflow)?;
-                    RunStep::Commit
-                } else if self.sample < run.wire.count {
-                    // One unit per sample: the first was charged above.
-                    loop {
-                        let value = run.wire.values(self.sample, defaults)?;
-                        if self.reject_zero_size && value.size == 0 {
+                Phase::Sum => {
+                    let run = self
+                        .runs
+                        .as_slice()
+                        .get(self.run)
+                        .ok_or(Error::Invalid("run index"))?;
+                    let defaults = self
+                        .defaults
+                        .ok_or(Error::Invalid("missing fragment defaults"))?;
+                    if run.wire.constant_extents() {
+                        if self.reject_zero_size && run.wire.count != 0 && defaults.size == 0 {
                             return Err(Error::Invalid("zero-size fragment sample while opening"));
                         }
-                        self.total_bytes = self
-                            .total_bytes
-                            .checked_add(u64::from(value.size))
+                        self.total_bytes = u64::from(run.wire.count)
+                            .checked_mul(u64::from(defaults.size))
                             .ok_or(Error::Overflow)?;
-                        self.total_duration = self
-                            .total_duration
-                            .checked_add(u64::from(value.duration))
+                        self.total_duration = u64::from(run.wire.count)
+                            .checked_mul(u64::from(defaults.duration))
                             .ok_or(Error::Overflow)?;
-                        self.sample = self.sample.checked_add(1).ok_or(Error::Overflow)?;
-                        if self.sample == run.wire.count || !work.try_charge(1) {
-                            break;
+                        self.phase = Phase::Commit;
+                    } else if self.sample < run.wire.count {
+                        // One unit per sample: the first was charged above.
+                        loop {
+                            let value = run.wire.values(self.sample, defaults)?;
+                            if self.reject_zero_size && value.size == 0 {
+                                return Err(Error::Invalid(
+                                    "zero-size fragment sample while opening",
+                                ));
+                            }
+                            self.total_bytes = self
+                                .total_bytes
+                                .checked_add(u64::from(value.size))
+                                .ok_or(Error::Overflow)?;
+                            self.total_duration = self
+                                .total_duration
+                                .checked_add(u64::from(value.duration))
+                                .ok_or(Error::Overflow)?;
+                            self.sample = self.sample.checked_add(1).ok_or(Error::Overflow)?;
+                            if self.sample == run.wire.count || !work.try_charge(1) {
+                                break;
+                            }
                         }
+                    } else {
+                        self.phase = Phase::Commit;
                     }
-                    RunStep::Sum
-                } else {
-                    RunStep::Commit
+                }
+                Phase::Commit => {
+                    let run = self
+                        .runs
+                        .as_mut_slice()
+                        .get_mut(self.run)
+                        .ok_or(Error::Invalid("run index"))?;
+                    let byte_end = run
+                        .byte
+                        .checked_add(self.total_bytes)
+                        .ok_or(Error::Overflow)?;
+                    let decode_end = run
+                        .decode
+                        .map(|d| {
+                            d.checked_add(i128::from(self.total_duration))
+                                .ok_or(Error::Overflow)
+                        })
+                        .transpose()?;
+                    let ordinal = run
+                        .ordinal
+                        .checked_add(u64::from(run.wire.count))
+                        .ok_or(Error::Overflow)?;
+                    run.bytes = self.total_bytes;
+                    run.duration = self.total_duration;
+                    self.byte = byte_end;
+                    self.decode = decode_end;
+                    self.ordinal = ordinal;
+                    self.run = self.run.checked_add(1).ok_or(Error::Overflow)?;
+                    self.phase = Phase::StartRun;
+                }
+                Phase::Boxes | Phase::Ready => {
+                    return Err(Error::Invalid("fragment phase invariant"));
                 }
             }
-            RunStep::Commit => {
-                let run = self
-                    .runs
-                    .as_mut_slice()
-                    .get_mut(self.run)
-                    .ok_or(Error::Invalid("run index"))?;
-                let byte_end = run
-                    .byte
-                    .checked_add(self.total_bytes)
-                    .ok_or(Error::Overflow)?;
-                let decode_end = run
-                    .decode
-                    .map(|d| {
-                        d.checked_add(i128::from(self.total_duration))
-                            .ok_or(Error::Overflow)
-                    })
-                    .transpose()?;
-                let ordinal = run
-                    .ordinal
-                    .checked_add(u64::from(run.wire.count))
-                    .ok_or(Error::Overflow)?;
-                run.bytes = self.total_bytes;
-                run.duration = self.total_duration;
-                self.byte = byte_end;
-                self.decode = decode_end;
-                self.ordinal = ordinal;
-                self.run = self.run.checked_add(1).ok_or(Error::Overflow)?;
-                RunStep::Start
-            }
-        })
+        }
     }
     /// The index; the error that stopped the build, or `Error::Invalid` before
     /// [`BuildStatus::Ready`].
@@ -740,14 +717,14 @@ impl FragmentBuilder {
         if let Some(error) = self.failed {
             return Err(error);
         }
-        let Phase::Ready(defaults) = self.phase else {
+        if self.phase != Phase::Ready {
             return Err(Error::Invalid("fragment builder not ready"));
-        };
+        }
         Ok(FragmentIndex {
             raw: self.raw,
             decode_time: self.decode_time,
             runs: self.runs,
-            defaults,
+            defaults: self.defaults.ok_or(Error::Invalid("missing defaults"))?,
             first_ordinal: self.context.first_ordinal,
             count: self
                 .ordinal
