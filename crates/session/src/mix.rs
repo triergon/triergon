@@ -230,7 +230,7 @@ pub fn mix_into(matrix: &StereoMatrix, planes: &[Vec<f32>], samples: usize, out:
         let start = block * LANES;
         let (mut left, mut right) = ([0.0_f32; LANES], [0.0_f32; LANES]);
         for (plane, &[gl, gr]) in planes.iter().zip(&matrix.gains) {
-            if gl == 0.0 && gr == 0.0 {
+            if silent([gl, gr]) {
                 continue;
             }
             let block: &[f32; LANES] = plane[start..start + LANES].try_into().expect("block");
@@ -254,7 +254,7 @@ pub fn mix_into(matrix: &StereoMatrix, planes: &[Vec<f32>], samples: usize, out:
     for (i, frame) in (whole..samples).zip(tail.chunks_exact_mut(2)) {
         let (mut l, mut r) = (0.0_f32, 0.0_f32);
         for (plane, &[gl, gr]) in planes.iter().zip(&matrix.gains) {
-            if gl == 0.0 && gr == 0.0 {
+            if silent([gl, gr]) {
                 continue;
             }
             l += plane[i] * gl;
@@ -281,6 +281,19 @@ pub fn mix_q15_into(matrix: &Q15Matrix, planes: &[Vec<f32>], samples: usize, out
         // Truncation wraps a full-scale overshoot, as the reference does.
         frame[0] = (l >> 15) as i16;
         frame[1] = (r >> 15) as i16;
+    }
+}
+
+/// Whether a plane's gains are both zero, of either sign, so that it adds nothing.
+/// 32-bit ARM tests the bits: there a float comparison's result has to move from the
+/// floating-point status register to the core's flags, which stalls the pipeline once
+/// per plane and block of the mixing loops. Elsewhere the float comparison is cheaper.
+#[inline]
+fn silent(gains: [f32; 2]) -> bool {
+    if cfg!(target_arch = "arm") {
+        (gains[0].to_bits() | gains[1].to_bits()) << 1 == 0
+    } else {
+        gains[0] == 0.0 && gains[1] == 0.0
     }
 }
 
@@ -634,6 +647,31 @@ mod tests {
                 }
             }
             assert_eq!(out, want, "{samples} frames");
+        }
+    }
+
+    #[test]
+    fn silent_planes_are_those_with_zero_gains() {
+        let values = [
+            0.0,
+            -0.0,
+            f32::from_bits(1),
+            -f32::from_bits(1),
+            f32::MIN_POSITIVE,
+            0.5,
+            -1.0,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            f32::NAN,
+            -f32::NAN,
+        ];
+        for left in values {
+            for right in values {
+                let zero = left == 0.0 && right == 0.0;
+                assert_eq!(silent([left, right]), zero, "{left:e} {right:e}");
+                let bits = (left.to_bits() | right.to_bits()) << 1 == 0;
+                assert_eq!(bits, zero, "{left:e} {right:e} from bits");
+            }
         }
     }
 
