@@ -671,23 +671,13 @@ impl ElementReader {
                             continue;
                         }
                         if state.id_width == 0 {
-                            if state.bytes[0] == 0 {
-                                return Err(Error::Invalid("zero VINT marker"));
-                            }
-                            state.id_width = ebml::vint_width(state.bytes[0]);
-                            if state.id_width > 4 {
-                                return Err(Error::Invalid("element ID width"));
-                            }
+                            state.id_width = ebml::id_width(state.bytes[0])?;
                             state.target = state.id_width + 1;
                             Self::check_input_cancel(&mut self.input, cancel)?;
                             continue;
                         }
                         if state.size_width == 0 {
-                            let first = state.bytes[state.id_width];
-                            if first == 0 {
-                                return Err(Error::Invalid("zero VINT marker"));
-                            }
-                            state.size_width = ebml::vint_width(first);
+                            state.size_width = ebml::size_width(state.bytes[state.id_width])?;
                             state.target = state.id_width + state.size_width;
                             Self::check_input_cancel(&mut self.input, cancel)?;
                             continue;
