@@ -517,6 +517,20 @@ impl<'a> SourceSeekPlanner<'a> {
             }
         }
     }
+    /// Advances the plan as [`poll`](Self::poll) does; its landing once planned.
+    pub(crate) fn poll_landing(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<&SourceSeekLanding>> {
+        if self.poll(work, cancel)? == BuildStatus::Yield {
+            return Ok(None);
+        }
+        self.landing
+            .as_ref()
+            .map(Some)
+            .ok_or(Error::Invalid("missing source seek receipt"))
+    }
     /// The plan, once [`poll`](Self::poll) has returned `Ready`; `Error::Invalid`
     /// before that, or the error a poll returned.
     pub fn finish(mut self) -> Result<SourceSeekPlan<'a>> {

@@ -236,6 +236,9 @@ impl<'a> MovieEditLocator<'a> {
     /// The point, once [`poll`](Self::poll) has returned `Ready`; `Error::Invalid`
     /// before that, or the error a poll returned.
     pub fn finish(mut self) -> Result<MoviePoint> {
+        self.take_point()
+    }
+    pub(crate) fn take_point(&mut self) -> Result<MoviePoint> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -404,6 +407,9 @@ impl<'a> SourceCompositionLookup<'a> {
     /// before that, or the error a poll returned. An unknown presentation time takes
     /// precedence over any selected sample.
     pub fn finish(mut self) -> Result<CompositionTarget> {
+        self.take_target()
+    }
+    pub(crate) fn take_target(&mut self) -> Result<CompositionTarget> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -522,15 +528,95 @@ pub struct MovieSeekResult<'a> {
     /// [`Planned`](MovieSeekStatus::Planned).
     pub plan: Option<SourceSeekPlan<'a>>,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Phase {
-    Edit,
-    Composition,
-    InitialSeek,
-    Scopes,
-    Recovery,
-    FinalSeek,
-    Ready,
+/// Where a plan stands. Each phase owns its job and what the phases before it found,
+/// and changes in place.
+// The seek phase is the largest; boxing it would allocate once more per plan.
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
+enum Phase<'a> {
+    /// Mapping the movie time through the edit list.
+    Edit(MovieEditLocator<'a>),
+    /// Finding the sample presented at the media point.
+    Composition {
+        point: MovieSourcePoint,
+        lookup: SourceCompositionLookup<'a>,
+    },
+    /// Seeking the sample presented at the media point.
+    Seek(TargetSeek<'a>),
+    /// Settled without a plan.
+    Unplanned {
+        status: MovieSeekStatus,
+        point: Option<MovieSourcePoint>,
+        gap: Option<MovieEmptyEdit>,
+    },
+    Failed(Error),
+}
+
+/// The seek to the target sample. Its planner stays in place: it plans once without
+/// preroll, which finds the sync sample, and again with the preroll the sync sample's
+/// recovery group entry states where that is not zero.
+#[derive(Debug)]
+struct TargetSeek<'a> {
+    planner: SourceSeekPlanner<'a>,
+    point: MovieSourcePoint,
+    target_ordinal: u64,
+    step: SeekStep<'a>,
+}
+
+#[derive(Debug)]
+enum SeekStep<'a> {
+    /// Planning without preroll.
+    Initial,
+    /// Looking for the recovery scope that holds the sync sample, from scope `next`.
+    Scopes {
+        sync_ordinal: u64,
+        next: usize,
+        saw_kind: bool,
+        chosen: Option<RecoveryScope<'a>>,
+    },
+    /// Reading the sync sample's recovery group entry.
+    Recovery(RecoveryLookup<'a>),
+    /// Planning again with the preroll `recovery` states.
+    Final(RecoverySelection),
+    /// Planned, with the preroll `recovery` states.
+    Planned(RecoverySelection),
+}
+
+impl<'a> TargetSeek<'a> {
+    /// Moves on once the recovery is known: to the plan made without preroll where it
+    /// asks for none, otherwise to planning again with the samples it states.
+    fn with_recovery(
+        &mut self,
+        context: &MovieSourceSeekContext<'a>,
+        limits: MovieSeekLimits,
+        recovery: RecoverySelection,
+    ) -> Result<()> {
+        let preceding = recovery.preceding_samples()?;
+        if preceding == 0 {
+            self.step = SeekStep::Planned(recovery);
+        } else {
+            self.planner = seek_planner(context, limits, self.target_ordinal, preceding)?;
+            self.step = SeekStep::Final(recovery);
+        }
+        Ok(())
+    }
+}
+
+fn seek_planner<'a>(
+    context: &MovieSourceSeekContext<'a>,
+    limits: MovieSeekLimits,
+    target_ordinal: u64,
+    preroll_samples: u16,
+) -> Result<SourceSeekPlanner<'a>> {
+    SourceSeekPlanner::new(
+        context.source,
+        SourceSeekRequest {
+            target_ordinal,
+            preroll_samples,
+        },
+        context.media_extents,
+        limits.source,
+    )
 }
 
 /// Plans a seek to a movie time on one track. It maps the time through the edit list,
@@ -542,21 +628,7 @@ enum Phase {
 pub struct MovieSourceSeekPlanner<'a> {
     context: MovieSourceSeekContext<'a>,
     limits: MovieSeekLimits,
-    phase: Phase,
-    edit: Option<MovieEditLocator<'a>>,
-    composition: Option<SourceCompositionLookup<'a>>,
-    seek: Option<SourceSeekPlanner<'a>>,
-    recovery_lookup: Option<RecoveryLookup<'a>>,
-    provisional: Option<SourceSeekPlan<'a>>,
-    point: Option<MovieSourcePoint>,
-    recovery: Option<RecoverySelection>,
-    target_ordinal: u64,
-    sync_ordinal: u64,
-    scope: usize,
-    saw_family: bool,
-    chosen_scope: Option<RecoveryScope<'a>>,
-    result: Option<MovieSeekResult<'a>>,
-    failed: Option<Error>,
+    phase: Phase<'a>,
 }
 impl<'a> MovieSourceSeekPlanner<'a> {
     /// A planner for the movie time `requested`. Fails with `Error::Invalid` for a
@@ -579,21 +651,7 @@ impl<'a> MovieSourceSeekPlanner<'a> {
         Ok(Self {
             context,
             limits,
-            phase: Phase::Edit,
-            edit: Some(edit),
-            composition: None,
-            seek: None,
-            recovery_lookup: None,
-            provisional: None,
-            point: None,
-            recovery: None,
-            target_ordinal: 0,
-            sync_ordinal: 0,
-            scope: 0,
-            saw_family: false,
-            chosen_scope: None,
-            result: None,
-            failed: None,
+            phase: Phase::Edit(edit),
         })
     }
     /// Advances the plan. Fails as the jobs it runs do, with `Error::Unsupported` when
@@ -601,234 +659,180 @@ impl<'a> MovieSourceSeekPlanner<'a> {
     /// positive, and with `Error::Invalid` when two such scopes hold it. An error is
     /// kept and returned by every later poll.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
-        if let Some(error) = self.failed {
+        if let Phase::Failed(error) = self.phase {
             return Err(error);
         }
         let result = self.poll_inner(work, cancel);
         if let Err(error) = result {
-            self.failed = Some(error);
+            self.phase = Phase::Failed(error);
         }
         result
-    }
-    fn settle(
-        &mut self,
-        status: MovieSeekStatus,
-        gap: Option<MovieEmptyEdit>,
-        plan: Option<SourceSeekPlan<'a>>,
-    ) {
-        self.result = Some(MovieSeekResult {
-            status,
-            point: self.point.take(),
-            gap,
-            recovery: self.recovery.take(),
-            plan,
-        });
-        self.phase = Phase::Ready;
-    }
-    fn apply_recovery(&mut self, selection: RecoverySelection) -> Result<()> {
-        let preceding = selection.preceding_samples()?;
-        self.recovery = Some(selection);
-        if preceding == 0 {
-            let plan = self
-                .provisional
-                .take()
-                .ok_or(Error::Invalid("missing provisional source plan"))?;
-            self.settle(MovieSeekStatus::Planned, None, Some(plan));
-        } else {
-            self.seek = Some(SourceSeekPlanner::new(
-                self.context.source,
-                SourceSeekRequest {
-                    target_ordinal: self.target_ordinal,
-                    preroll_samples: preceding,
-                },
-                self.context.media_extents,
-                self.limits.source,
-            )?);
-            self.provisional = None;
-            self.phase = Phase::FinalSeek;
-        }
-        Ok(())
     }
     fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            match self.phase {
-                Phase::Edit => {
-                    if self
-                        .edit
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing movie point job"))?
-                        .poll(work, cancel)?
-                        == BuildStatus::Yield
-                    {
+            match &mut self.phase {
+                Phase::Edit(locator) => {
+                    if locator.poll(work, cancel)? == BuildStatus::Yield {
                         return Ok(BuildStatus::Yield);
                     }
-                    match self
-                        .edit
-                        .take()
-                        .ok_or(Error::Invalid("missing movie point job"))?
-                        .finish()?
-                    {
-                        MoviePoint::Media(point) => {
-                            self.composition = Some(SourceCompositionLookup::new(
+                    self.phase = match locator.take_point()? {
+                        MoviePoint::Media(point) => Phase::Composition {
+                            lookup: SourceCompositionLookup::new(
                                 self.context.source,
                                 point.source_time,
                                 self.context.clocks.media_base,
                                 self.limits.max_scanned_samples,
-                            )?);
-                            self.point = Some(point);
-                            self.phase = Phase::Composition;
-                        }
-                        MoviePoint::Empty(gap) => self.settle(
-                            MovieSeekStatus::EmptyEdit {
+                            )?,
+                            point,
+                        },
+                        MoviePoint::Empty(gap) => Phase::Unplanned {
+                            status: MovieSeekStatus::EmptyEdit {
                                 edit_ordinal: gap.edit_ordinal,
                             },
-                            Some(gap),
-                            None,
-                        ),
-                        MoviePoint::Outside { .. } => {
-                            self.settle(MovieSeekStatus::OutsideTimeline, None, None);
-                        }
-                    }
+                            point: None,
+                            gap: Some(gap),
+                        },
+                        MoviePoint::Outside { .. } => Phase::Unplanned {
+                            status: MovieSeekStatus::OutsideTimeline,
+                            point: None,
+                            gap: None,
+                        },
+                    };
                 }
-                Phase::Composition => {
-                    if self
-                        .composition
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing composition job"))?
-                        .poll(work, cancel)?
-                        == BuildStatus::Yield
-                    {
+                Phase::Composition { point, lookup } => {
+                    if lookup.poll(work, cancel)? == BuildStatus::Yield {
                         return Ok(BuildStatus::Yield);
                     }
-                    match self
-                        .composition
-                        .take()
-                        .ok_or(Error::Invalid("missing composition job"))?
-                        .finish()?
-                    {
+                    let status = match lookup.take_target()? {
                         CompositionTarget::Target(sample) => {
-                            self.target_ordinal = sample.ordinal;
-                            self.seek = Some(SourceSeekPlanner::new(
-                                self.context.source,
-                                SourceSeekRequest {
-                                    target_ordinal: sample.ordinal,
-                                    preroll_samples: 0,
-                                },
-                                self.context.media_extents,
-                                self.limits.source,
-                            )?);
-                            self.phase = Phase::InitialSeek;
+                            let planner =
+                                seek_planner(&self.context, self.limits, sample.ordinal, 0)?;
+                            self.phase = Phase::Seek(TargetSeek {
+                                planner,
+                                point: point.clone(),
+                                target_ordinal: sample.ordinal,
+                                step: SeekStep::Initial,
+                            });
+                            continue;
                         }
-                        CompositionTarget::BeforeFirst => {
-                            self.settle(MovieSeekStatus::BeforeFirstSample, None, None);
-                        }
+                        CompositionTarget::BeforeFirst => MovieSeekStatus::BeforeFirstSample,
                         CompositionTarget::UnknownSourceTime { ordinal } => {
-                            self.settle(MovieSeekStatus::UnknownSourceTime { ordinal }, None, None);
+                            MovieSeekStatus::UnknownSourceTime { ordinal }
                         }
                         CompositionTarget::Ambiguous {
                             first_ordinal,
                             second_ordinal,
                             ..
-                        } => self.settle(
-                            MovieSeekStatus::AmbiguousComposition {
-                                first_ordinal,
-                                second_ordinal,
-                            },
-                            None,
-                            None,
-                        ),
-                    }
+                        } => MovieSeekStatus::AmbiguousComposition {
+                            first_ordinal,
+                            second_ordinal,
+                        },
+                    };
+                    self.phase = Phase::Unplanned {
+                        status,
+                        point: Some(point.clone()),
+                        gap: None,
+                    };
                 }
-                Phase::InitialSeek | Phase::FinalSeek => {
-                    if self
-                        .seek
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing source seek job"))?
-                        .poll(work, cancel)?
-                        == BuildStatus::Yield
-                    {
-                        return Ok(BuildStatus::Yield);
+                Phase::Seek(seek) => match &mut seek.step {
+                    SeekStep::Initial => {
+                        let Some(landing) = seek.planner.poll_landing(work, cancel)? else {
+                            return Ok(BuildStatus::Yield);
+                        };
+                        seek.step = SeekStep::Scopes {
+                            sync_ordinal: landing.sync_sample.ordinal,
+                            next: 0,
+                            saw_kind: false,
+                            chosen: None,
+                        };
                     }
-                    let plan = self
-                        .seek
-                        .take()
-                        .ok_or(Error::Invalid("missing source seek job"))?
-                        .finish()?;
-                    if self.phase == Phase::InitialSeek {
-                        self.sync_ordinal = plan.landing().sync_sample.ordinal;
-                        self.provisional = Some(plan);
-                        self.phase = Phase::Scopes;
-                    } else {
-                        self.settle(MovieSeekStatus::Planned, None, Some(plan));
+                    SeekStep::Scopes {
+                        sync_ordinal,
+                        next,
+                        saw_kind,
+                        chosen,
+                    } => {
+                        if let Some(scope) = self.context.recovery_scopes.get(*next).copied() {
+                            if !work.try_charge(1) {
+                                return Ok(BuildStatus::Yield);
+                            }
+                            if scope.kind == self.context.recovery_kind {
+                                scope.validate(self.limits.recovery)?;
+                                *saw_kind = true;
+                                if *sync_ordinal >= scope.first_ordinal
+                                    && *sync_ordinal < scope.end()?
+                                {
+                                    if chosen.is_some() {
+                                        return Err(Error::Invalid("overlapping recovery scopes"));
+                                    }
+                                    *chosen = Some(scope);
+                                }
+                            }
+                            *next = next.checked_add(1).ok_or(Error::Overflow)?;
+                        } else if let Some(scope) = *chosen {
+                            seek.step = SeekStep::Recovery(RecoveryLookup::new(
+                                scope,
+                                *sync_ordinal,
+                                self.limits.recovery,
+                            )?);
+                        } else if *saw_kind {
+                            return Err(Error::Unsupported("sync sample outside recovery scopes"));
+                        } else {
+                            seek.with_recovery(
+                                &self.context,
+                                self.limits,
+                                RecoverySelection::absent(self.context.recovery_kind),
+                            )?;
+                        }
                     }
-                }
-                Phase::Scopes => {
-                    if let Some(scope) = self.context.recovery_scopes.get(self.scope).copied() {
-                        if !work.try_charge(1) {
+                    SeekStep::Recovery(lookup) => {
+                        if lookup.poll(work, cancel)? == BuildStatus::Yield {
                             return Ok(BuildStatus::Yield);
                         }
-                        if scope.kind == self.context.recovery_kind {
-                            scope.validate(self.limits.recovery)?;
-                            self.saw_family = true;
-                            if self.sync_ordinal >= scope.first_ordinal
-                                && self.sync_ordinal < scope.end()?
-                            {
-                                if self.chosen_scope.is_some() {
-                                    return Err(Error::Invalid("overlapping recovery scopes"));
-                                }
-                                self.chosen_scope = Some(scope);
-                            }
-                        }
-                        self.scope = self.scope.checked_add(1).ok_or(Error::Overflow)?;
-                    } else if let Some(scope) = self.chosen_scope {
-                        self.recovery_lookup = Some(RecoveryLookup::new(
-                            scope,
-                            self.sync_ordinal,
-                            self.limits.recovery,
-                        )?);
-                        self.phase = Phase::Recovery;
-                    } else {
-                        if self.saw_family {
-                            return Err(Error::Unsupported("sync sample outside recovery scopes"));
-                        }
-                        self.apply_recovery(RecoverySelection::absent(self.context.recovery_kind))?;
+                        let recovery = lookup.take_selection()?;
+                        seek.with_recovery(&self.context, self.limits, recovery)?;
                     }
-                }
-                Phase::Recovery => {
-                    if self
-                        .recovery_lookup
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing recovery job"))?
-                        .poll(work, cancel)?
-                        == BuildStatus::Yield
-                    {
-                        return Ok(BuildStatus::Yield);
+                    SeekStep::Final(recovery) => {
+                        if seek.planner.poll(work, cancel)? == BuildStatus::Yield {
+                            return Ok(BuildStatus::Yield);
+                        }
+                        seek.step = SeekStep::Planned(recovery.clone());
                     }
-                    let selection = self
-                        .recovery_lookup
-                        .take()
-                        .ok_or(Error::Invalid("missing recovery job"))?
-                        .finish()?;
-                    self.apply_recovery(selection)?;
-                }
-                Phase::Ready => return Ok(BuildStatus::Ready),
+                    SeekStep::Planned(_) => return Ok(BuildStatus::Ready),
+                },
+                Phase::Unplanned { .. } => return Ok(BuildStatus::Ready),
+                Phase::Failed(error) => return Err(*error),
             }
         }
     }
     /// The result, once [`poll`](Self::poll) has returned `Ready`; `Error::Invalid`
     /// before that, or the error a poll returned.
-    pub fn finish(mut self) -> Result<MovieSeekResult<'a>> {
-        if let Some(error) = self.failed {
-            return Err(error);
+    pub fn finish(self) -> Result<MovieSeekResult<'a>> {
+        match self.phase {
+            Phase::Seek(TargetSeek {
+                planner,
+                point,
+                step: SeekStep::Planned(recovery),
+                ..
+            }) => Ok(MovieSeekResult {
+                status: MovieSeekStatus::Planned,
+                point: Some(point),
+                gap: None,
+                recovery: Some(recovery),
+                plan: Some(planner.finish()?),
+            }),
+            Phase::Unplanned { status, point, gap } => Ok(MovieSeekResult {
+                status,
+                point,
+                gap,
+                recovery: None,
+                plan: None,
+            }),
+            Phase::Failed(error) => Err(error),
+            _ => Err(Error::Invalid("movie recovery seek not ready")),
         }
-        if self.phase != Phase::Ready {
-            return Err(Error::Invalid("movie recovery seek not ready"));
-        }
-        self.result
-            .take()
-            .ok_or(Error::Invalid("missing movie recovery seek result"))
     }
 }
