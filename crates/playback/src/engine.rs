@@ -7,7 +7,7 @@ pub(crate) mod ts;
 pub(crate) use mp4::{Mp4RangeLanding, Mp4SyncLanding};
 
 use crate::engine::matroska::MkvEngine;
-use crate::engine::mp4::{Mp4Engine, SeekReplay};
+use crate::engine::mp4::Mp4Engine;
 use crate::engine::ts::{Delivery as TsDelivery, Entities, Life, TsEngine};
 use crate::event::EngineStep;
 use crate::source::SourceReply;
@@ -147,67 +147,21 @@ impl Engine {
     /// bytes. Fails with `Unsupported` for a front demux plan, which
     /// [`compat::mov::open_front`](crate::compat::mov::open_front) plays.
     pub fn mp4(input: InputCursor, plan: PreparedMp4, maximum_packet: usize) -> Result<Self> {
-        let engine = Self::mp4_unattached(input, plan, maximum_packet)?;
-        if matches!(&engine, Self::Mp4(mp4) if mp4.plan.demux_front) {
+        let engine = Mp4Engine::new(input, plan, maximum_packet)?;
+        if engine.plan.demux_front {
             return Err(Error::Unsupported(
                 "front demux plan requires progressive source completion",
             ));
         }
-        if matches!(&engine, Self::Mp4(mp4) if mp4.plan.terminal_mdat.is_some()) {
+        if engine.plan.terminal_mdat.is_some() {
             return Err(Error::Unsupported(
                 "open terminal MDAT needs progressive source completion",
             ));
         }
-        if matches!(&engine, Self::Mp4(mp4) if mp4.plan.forward_regular_extents.is_some()) {
+        if engine.plan.forward_regular_extents.is_some() {
             return Err(Error::Unsupported(
                 "forward regular MDAT needs progressive source completion",
             ));
-        }
-        Ok(engine)
-    }
-    fn mp4_unattached(
-        input: InputCursor,
-        plan: PreparedMp4,
-        maximum_packet: usize,
-    ) -> Result<Self> {
-        if !input.budget().same_pool(&plan.pool) {
-            return Err(Error::ForeignPool);
-        }
-        if input.source() != plan.source {
-            return Err(Error::SourceMismatch);
-        }
-        if input.generation() != plan.opening_generation {
-            return Err(Error::StaleGeneration {
-                expected: plan.opening_generation,
-                received: input.generation(),
-            });
-        }
-        if input.capabilities().length != plan.source_length {
-            return Err(Error::Invalid("plan source extent changed"));
-        }
-        if maximum_packet == 0 {
-            return Err(Error::Invalid("zero packet policy"));
-        }
-        let mut engine = Mp4Engine {
-            progressive: None,
-            media_cache_fill: None,
-            front_boundary: None,
-            empty_run: None,
-            ended_short: false,
-            input,
-            plan,
-            row: 0,
-            seek: SeekReplay::Forward,
-            packet: None,
-            configs: [None; 64],
-            revision: 0,
-            maximum_packet,
-        };
-        if engine.plan.demux_order_replay {
-            engine.media_cache_fill = Some(mp4::progressive::prepare_media_replay(
-                &engine.input,
-                &mut engine.plan,
-            )?);
         }
         Ok(Self::Mp4(engine))
     }
@@ -248,11 +202,9 @@ impl Engine {
         limits: mp4::progressive::ProgressiveLimits,
     ) -> Result<Self> {
         let state = mp4::progressive::ProgressiveState::new(&plan, limits)?;
-        let mut engine = Self::mp4_unattached(input, plan, maximum_packet)?;
-        if let Self::Mp4(e) = &mut engine {
-            e.progressive = Some(state);
-        }
-        Ok(engine)
+        let mut engine = Mp4Engine::new(input, plan, maximum_packet)?;
+        engine.progressive = Some(state);
+        Ok(Self::Mp4(engine))
     }
     /// Source events of one program of a transport stream: carriers, tables,
     /// PES with their source clocks, and faults. The source's end ends the stream.
@@ -357,7 +309,7 @@ impl Engine {
         {
             return Err(Error::Invalid("Matroska engine needs an unstarted reader"));
         }
-        // The four checks `mp4_unattached` makes before the engine exists. One
+        // The four checks `Mp4Engine::new` makes before the engine exists. One
         // function for both cost 26 instructions per open, which is timed.
         if let Self::Mp4(r) = self {
             if !r.input.budget().same_pool(&r.plan.pool) {

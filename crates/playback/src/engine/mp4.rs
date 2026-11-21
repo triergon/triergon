@@ -83,6 +83,55 @@ pub struct Mp4Engine {
 }
 
 impl Mp4Engine {
+    /// An engine over `plan`, which must have been indexed from `input`'s source,
+    /// pool, generation and length; packets of at most `maximum_packet` bytes.
+    pub(crate) fn new(
+        input: InputCursor,
+        plan: PreparedMp4,
+        maximum_packet: usize,
+    ) -> Result<Self> {
+        if !input.budget().same_pool(&plan.pool) {
+            return Err(Error::ForeignPool);
+        }
+        if input.source() != plan.source {
+            return Err(Error::SourceMismatch);
+        }
+        if input.generation() != plan.opening_generation {
+            return Err(Error::StaleGeneration {
+                expected: plan.opening_generation,
+                received: input.generation(),
+            });
+        }
+        if input.capabilities().length != plan.source_length {
+            return Err(Error::Invalid("plan source extent changed"));
+        }
+        if maximum_packet == 0 {
+            return Err(Error::Invalid("zero packet policy"));
+        }
+        let mut engine = Self {
+            progressive: None,
+            media_cache_fill: None,
+            front_boundary: None,
+            empty_run: None,
+            ended_short: false,
+            input,
+            plan,
+            row: 0,
+            seek: SeekReplay::Forward,
+            packet: None,
+            configs: [None; 64],
+            revision: 0,
+            maximum_packet,
+        };
+        if engine.plan.demux_order_replay {
+            engine.media_cache_fill = Some(progressive::prepare_media_replay(
+                &engine.input,
+                &mut engine.plan,
+            )?);
+        }
+        Ok(engine)
+    }
+
     /// Starts replaying the plan from the landing, or from its start without one.
     pub(crate) fn begin_seek(
         &mut self,
