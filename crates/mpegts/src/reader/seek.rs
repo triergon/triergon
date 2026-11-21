@@ -1,5 +1,6 @@
 //! Bounded source seeks in the exact presentation clock.
 mod dts_hd;
+mod latm;
 mod physical;
 mod retained;
 
@@ -7,7 +8,6 @@ use super::{AccessUnit, MpegAudioFrame, Packet, PacketTracks, Reader, ReaderEven
 use crate::{SourceEpochs, TraceEvent, clock::SourceTimePolicy};
 use retained::{Retain, RetainedOutput};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_bitstream::{BitCursor, BitSource};
 use triergon_core::container::{
     CodecId, Event, PacketInfo, ReaderStep, SeekMethod, SeekPolicy, SeekReceipt, SeekRequest,
     TrackId, TrackInfo,
@@ -16,9 +16,7 @@ use triergon_core::{
     Budget, BudgetVec, Charged, Error, InputRequest, Result, SourceCapabilities, SourceId, Step,
     Time, WorkBudget,
 };
-use triergon_framing::{
-    MpegChannelMode, MpegLayer, MpegVersion, indexed_aac_frequency, probe_dts_core_header,
-};
+use triergon_framing::{MpegChannelMode, MpegLayer, MpegVersion, probe_dts_core_header};
 
 /// A length-known, seekable part of the original contiguous transport stream.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -196,6 +194,7 @@ struct Probing {
     packet: Packet,
     probe: SeekProbe,
     xll_header: Option<dts_hd::Header>,
+    latm: Option<latm::Probe>,
 }
 
 #[derive(Clone, Copy)]
@@ -256,53 +255,20 @@ fn mpeg_audio_entry(frame: &MpegAudioFrame) -> Result<bool> {
     Ok(side[0] == 0 && (!mpeg1 || side[1] & 0x80 == 0))
 }
 
-// ISO/IEC 14496-3 §1.7.3: a LOAS AudioMuxElement can either carry its
-// StreamMuxConfig or refer to the previous one. A seek entry must carry its own
-// config. This profile has one AAC-LC program, layer and variable-size payload.
-fn latm_entry(multiplex: &[u8]) -> Option<()> {
-    let mut bits = BitCursor::new(multiplex);
-    // useSameStreamMux = 0, audioMuxVersion = 0, allStreamsSameTimeFraming = 1.
-    if bits.read(3).ok()? != 1 || bits.read(13).ok()? != 0 {
-        return None;
-    }
-    let asc = bits.read(16).ok()?;
-    if asc >> 11 != 2 || asc & 7 != 0 || !(1..=7).contains(&((asc >> 3) & 15)) {
-        return None;
-    }
-    indexed_aac_frequency(((asc >> 7) & 15) as u8)?;
-    if bits.read(3).ok()? != 0 {
-        return None;
-    }
-    bits.skip(8).ok()?; // LATM buffer fullness.
-    if bits.read(2).ok()? != 0 {
-        return None; // Other data and CRC-bearing configurations are outside this profile.
-    }
-    let mut payload = 0;
-    loop {
-        let length = bits.read(8).ok()? as usize;
-        payload += length;
-        if payload > bits.remaining() / 8 {
-            return None;
-        }
-        if length != 255 {
-            break;
-        }
-    }
-    bits.skip(payload * 8).ok()?;
-    (payload != 0 && bits.remaining() < 8).then_some(())
-}
-
 fn packet_probe(packet: Packet) -> Result<Probing> {
     let clock = packet.clock();
     let time = clock.and_then(|clock| clock.pts.exact);
     let mut xll_header = None;
+    let mut latm = None;
     let (offset, random_access) = match packet.access_unit() {
         AccessUnit::Video(unit) => (unit.range.start, unit.random_access),
         AccessUnit::Adts(frame) => (frame.source().offset, time.is_some()),
-        AccessUnit::Loas(frame) => (
-            frame.elementary_range().start,
-            time.is_some() && latm_entry(frame.multiplex_element()).is_some(),
-        ),
+        AccessUnit::Loas(frame) => {
+            if time.is_some() {
+                latm = latm::Probe::new(frame.multiplex_element());
+            }
+            (frame.elementary_range().start, latm.is_some())
+        }
         // E-AC-3 access units begin with the independent syncframe and
         // include its associated dependent substreams (A/52 Annex E §2.3.1).
         AccessUnit::Ac3(frame) => (frame.facts().offset, time.is_some()),
@@ -350,6 +316,7 @@ fn packet_probe(packet: Packet) -> Result<Probing> {
         packet,
         probe,
         xll_header,
+        latm,
     })
 }
 
@@ -788,6 +755,15 @@ impl Reader {
             let seek = &mut self.seek.as_mut_slice()[0];
             let request = seek.request;
             if let Some(probing) = &mut seek.probing {
+                if let Some(latm) = &mut probing.latm {
+                    let AccessUnit::Loas(frame) = probing.packet.access_unit() else {
+                        unreachable!("LATM probe owns a LOAS packet");
+                    };
+                    let Some(valid) = latm.step(frame.multiplex_element(), work) else {
+                        return Ok(Step::Yield);
+                    };
+                    probing.probe.random_access = valid;
+                }
                 if let Some(header) = &mut probing.xll_header {
                     let checked =
                         header

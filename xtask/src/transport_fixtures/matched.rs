@@ -642,6 +642,10 @@ pub fn author_dts(root: &Path, args: &[String]) -> R<()> {
 }
 
 fn loas_aac(payload: &[u8], configured: bool) -> R<Vec<u8>> {
+    loas_aac_subframes(payload, configured, 1)
+}
+
+fn loas_aac_subframes(payload: &[u8], configured: bool, subframes: u8) -> R<Vec<u8>> {
     let mut frame = vec![0x56, 0xe0, 0];
     let mut position = 24;
     let mut put = |value: u32, width: usize| {
@@ -656,19 +660,21 @@ fn loas_aac(payload: &[u8], configured: bool) -> R<Vec<u8>> {
     };
     put(u32::from(!configured), 1);
     if configured {
-        // audioMuxVersion 0, shared time framing, one frame, program and layer.
-        put(1 << 13, 15);
+        // Version zero, shared time framing, one program and layer.
+        put(1 << 13 | (u32::from(subframes) - 1) << 7, 15);
         put(0x1188, 16); // AAC-LC mono, 48 kHz, 1,024 samples.
         put(0, 3); // Variable payload length, one AAC layer.
         put(255, 8); // Variable-rate buffer fullness.
         put(0, 2); // No other data or header CRC.
     }
-    for _ in 0..payload.len() / 255 {
-        put(255, 8);
-    }
-    put((payload.len() % 255) as u32, 8);
-    for &byte in payload {
-        put(u32::from(byte), 8);
+    for _ in 0..subframes {
+        for _ in 0..payload.len() / 255 {
+            put(255, 8);
+        }
+        put((payload.len() % 255) as u32, 8);
+        for &byte in payload {
+            put(u32::from(byte), 8);
+        }
     }
     let size = frame.len() - 3;
     if size > 8191 {
@@ -681,9 +687,9 @@ fn loas_aac(payload: &[u8], configured: bool) -> R<Vec<u8>> {
 
 fn latm_seek_cases(root: &Path, feature: &str, reference: &Path, cases: &mut Vec<Value>) -> R<()> {
     let aac = super::audio(root, false)?;
-    let raw = &aac.bytes[aac.header..aac.first];
-    let configured = loas_aac(raw, true)?;
-    let dependent = loas_aac(raw, false)?;
+    let raw = aac.bytes[aac.header..aac.first].to_vec();
+    let configured = loas_aac(&raw, true)?;
+    let dependent = loas_aac(&raw, false)?;
     let latm = Codec {
         name: "latm-aac-lc",
         stream_type: 0x11,
@@ -717,6 +723,53 @@ fn latm_seek_cases(root: &Path, feature: &str, reference: &Path, cases: &mut Vec
             reference,
             "ts-audio-seek-fold",
         )?);
+    }
+    for (count, name, first, last) in [
+        (
+            2,
+            "latm-two-subframes",
+            "latm-two-subframes-preroll",
+            "latm-two-subframes-next",
+        ),
+        (
+            3,
+            "latm-three-subframes",
+            "latm-three-subframes-preroll",
+            "latm-three-subframes-next",
+        ),
+    ] {
+        let configured = loas_aac_subframes(&raw, true, count)?;
+        let dependent = loas_aac_subframes(&raw, false, count)?;
+        let mut ts = Transport::new();
+        ts.tables(&latm, &[])?;
+        let step = u64::from(count) * 1920;
+        for (index, frame) in [&configured, &dependent, &dependent, &configured]
+            .into_iter()
+            .enumerate()
+        {
+            ts.pes(
+                latm.stream_id,
+                &part(frame, Some(90_000 + index as u64 * step), None),
+            )?;
+        }
+        let input = Input {
+            name,
+            m2ts: false,
+            data: ts.finish(false),
+        };
+        for (id, target, policy) in [
+            (first, 90_000 + 2 * step + 1, "preroll"),
+            (last, 90_000 + 3 * step + 1, "previous"),
+        ] {
+            cases.push(input.record(
+                root,
+                feature,
+                id,
+                &[pid.as_str(), &target.to_string(), policy],
+                reference,
+                "ts-audio-seek-fold",
+            )?);
+        }
     }
     Ok(())
 }

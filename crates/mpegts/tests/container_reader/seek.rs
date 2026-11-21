@@ -7,6 +7,9 @@ mod epochs;
 #[path = "dts_hd_seek.rs"]
 mod dts_hd;
 
+#[path = "latm_seek.rs"]
+mod latm;
+
 fn sample(kind: u8, raw: &[u8], layout: &str, times: impl Fn(usize) -> u64) -> Transport {
     let mut ts = Transport::new();
     ts.tables(&[(kind, PID, &[])], 0);

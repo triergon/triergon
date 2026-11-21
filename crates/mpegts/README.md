@@ -137,8 +137,22 @@ coded AVC or HEVC random-access picture, or a timestamped AAC-LC in ADTS or
 LOAS, AC-3,
 E-AC-3, MPEG audio or DTS core access unit. Layer III requires an empty bit
 reservoir at the landing. DTS core requires a frame that needs no previous decoder
-history. LOAS requires a complete in-band LATM configuration with one AAC-LC
-payload and indexed sampling frequency. Subsequent dependent frames are
+history. LOAS requires a complete in-band version-zero LATM configuration
+with common time framing, one program, one layer and 1–64 nonempty AAC-LC
+subframes. Each subframe has a variable byte length (`frameLengthType = 0`),
+including escaped lengths. The configuration requires an indexed sampling
+frequency, channel configuration 1–7 and 1,024-sample frames without a core
+coder dependency or extension flag. Other data and configuration CRCs are not
+supported for landing. The probe follows ISO/IEC 14496-3 §1.7.3,
+Tables 1.20–1.23 (2001/Cor.2:2004).
+It validates every declared payload extent cooperatively before accepting the
+whole envelope. Truncated lengths or payloads, empty subframes and trailing
+whole bytes refuse landing. Multiple programs or layers, version-one syntax,
+configuration inheritance and unknown multiplex groups remain outside seek
+coverage. Their envelopes remain available through sequential carriage.
+The complete in-band decoder configuration stays in the original LOAS bytes;
+subframes are not split and no subframe timestamps or duration are inferred.
+Subsequent dependent frames are
 delivered as preroll. The landing is the
 last eligible packet with the greatest presentation time at or before the target.
 Audio frames without a source PTS are delivered
@@ -445,7 +459,8 @@ payload or timing, separately from the neutral packet stream.
 LATM stream type `0x11` with audio PES stream IDs `0xc0`–`0xdf` defaults to
 aligned LOAS AudioSyncStream framing (ISO/IEC 14496-3 §1.7.2). A
 `LoasFrame` retains the complete envelope and its PES ranges across carrier
-and PES boundaries. The LATM multiplex element is opaque. The reader applies
+and PES boundaries. The LATM multiplex element remains intact; only the
+bounded seek profile above is inspected for independent landing. The reader applies
 `maximum_audio_frame_bytes` and preserves available PES timestamps without
 inferring duration or decoder configuration.
 
