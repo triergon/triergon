@@ -133,9 +133,7 @@ pub struct OtMetrics<'a> {
     /// format 14.
     variations: Option<VariationSequences<'a>>,
     scale: Scale,
-    x_mult: i64,
-    x_multf: f32,
-    y_multf: f32,
+    em: EmScale,
     /// A CFF or CFF2 face's charstring tables, read once.
     cff: Option<cff::Face<'a>>,
 }
@@ -145,7 +143,6 @@ impl<'a> OtMetrics<'a> {
     /// by the font's [`Limits`](triergon_font::Limits).
     pub fn new(font: &'a Font, scale: Scale) -> Self {
         let cmap = font.table(*b"cmap").and_then(Cmap::new);
-        let upem = i64::from(font.units_per_em());
         Self {
             font,
             subtable: cmap.and_then(|c| c.best(font.table(*b"OS/2").unwrap_or_default())),
@@ -153,9 +150,7 @@ impl<'a> OtMetrics<'a> {
                 .and_then(Cmap::variation_sequences)
                 .map(VariationSequences::format14),
             scale,
-            x_mult: i64::from(scale.x) * 0x10000 / upem,
-            x_multf: scale.x as f32 / f32::from(font.units_per_em()),
-            y_multf: scale.y as f32 / f32::from(font.units_per_em()),
+            em: EmScale::new(scale, font.units_per_em()),
             cff: cff::Face::new(font),
         }
     }
@@ -216,7 +211,7 @@ impl Metrics for OtMetrics<'_> {
 
     fn h_advance(&self, glyph: GlyphId) -> Result<i32> {
         let advance = unless_unloadable(self.font.advance(glyph), 0)?;
-        Ok(((i64::from(advance) * self.x_mult + 32768) >> 16) as i32)
+        Ok(self.em.scale_x(i32::from(advance)))
     }
 
     fn extents(&self, glyph: GlyphId) -> Result<Option<Extents>> {
@@ -235,10 +230,8 @@ impl Metrics for OtMetrics<'_> {
             }));
         }
         // Scaled as HarfBuzz scales extents: outwards to whole units.
-        let x1 = x as f32 * self.x_multf;
-        let y1 = y as f32 * self.y_multf;
-        let x2 = x1 + w as f32 * self.x_multf;
-        let y2 = y1 + h as f32 * self.y_multf;
+        let (x1, y1) = (self.em.fscale_x(x), self.em.fscale_y(y));
+        let (x2, y2) = (x1 + self.em.fscale_x(w), y1 + self.em.fscale_y(h));
         let (x_bearing, y_bearing) = (x1.floor() as i32, y1.floor() as i32);
         let size = |end: f32, start: i32| (end.ceil() as i32).saturating_sub(start);
         Ok(Some(Extents {
@@ -259,25 +252,17 @@ impl Metrics for OtMetrics<'_> {
 pub(crate) struct Scaled<'a> {
     pub(crate) metrics: &'a dyn Metrics,
     pub(crate) scale: Scale,
-    x_mult: i64,
-    y_mult: i64,
-    x_multf: f32,
-    y_multf: f32,
+    pub(crate) em: EmScale,
     error: Cell<Option<Error>>,
 }
 
 impl<'a> Scaled<'a> {
     pub(crate) fn new(metrics: &'a dyn Metrics, units_per_em: u16) -> Self {
         let scale = metrics.scale();
-        let upem = f32::from(units_per_em);
-        let upem_int = i64::from(units_per_em);
         Self {
             metrics,
             scale,
-            x_mult: i64::from(scale.x) * 0x10000 / upem_int,
-            y_mult: i64::from(scale.y) * 0x10000 / upem_int,
-            x_multf: scale.x as f32 / upem,
-            y_multf: scale.y as f32 / upem,
+            em: EmScale::new(scale, units_per_em),
             error: Cell::new(None),
         }
     }
@@ -338,22 +323,46 @@ impl<'a> Scaled<'a> {
             _ => 0,
         }
     }
+}
 
-    /// A font-unit distance in scaled units, rounded as HarfBuzz's `em_mult`.
-    pub(crate) fn em_scale_x(&self, v: i32) -> i32 {
+/// HarfBuzz's arithmetic from font units to a [`Scale`]: the scale per unit in
+/// 16.16 for rounded distances and as `f32` for unrounded coordinates.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct EmScale {
+    x_mult: i64,
+    y_mult: i64,
+    x_multf: f32,
+    y_multf: f32,
+}
+
+impl EmScale {
+    fn new(scale: Scale, units_per_em: u16) -> Self {
+        let upem = i64::from(units_per_em);
+        Self {
+            x_mult: i64::from(scale.x) * 0x10000 / upem,
+            y_mult: i64::from(scale.y) * 0x10000 / upem,
+            x_multf: scale.x as f32 / f32::from(units_per_em),
+            y_multf: scale.y as f32 / f32::from(units_per_em),
+        }
+    }
+
+    /// A horizontal font-unit distance in scaled units, rounded half up.
+    pub(crate) fn scale_x(self, v: i32) -> i32 {
         ((i64::from(v) * self.x_mult + 32768) >> 16) as i32
     }
 
-    pub(crate) fn em_scale_y(&self, v: i32) -> i32 {
+    /// A vertical font-unit distance in scaled units, rounded half up.
+    pub(crate) fn scale_y(self, v: i32) -> i32 {
         ((i64::from(v) * self.y_mult + 32768) >> 16) as i32
     }
 
-    /// A font-unit coordinate in scaled units, unrounded, as `em_fscale`.
-    pub(crate) fn em_fscale_x(&self, v: i32) -> f32 {
+    /// A horizontal font-unit coordinate in scaled units, unrounded.
+    pub(crate) fn fscale_x(self, v: i32) -> f32 {
         v as f32 * self.x_multf
     }
 
-    pub(crate) fn em_fscale_y(&self, v: i32) -> f32 {
+    /// A vertical font-unit coordinate in scaled units, unrounded.
+    pub(crate) fn fscale_y(self, v: i32) -> f32 {
         v as f32 * self.y_multf
     }
 }

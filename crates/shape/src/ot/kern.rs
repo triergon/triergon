@@ -136,7 +136,7 @@ pub(crate) fn kern_machine(
         let kern = value(infos[idx].glyph, infos[j].glyph);
         if kern != 0 {
             let kern = if scale {
-                ctx.font.em_scale_x(kern)
+                ctx.font.em.scale_x(kern)
             } else {
                 kern
             };

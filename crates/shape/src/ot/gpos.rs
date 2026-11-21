@@ -47,13 +47,13 @@ impl ValueFormat {
         };
         let format = self.0;
         if let Some(v) = next(format & 0x01 != 0) {
-            pos.x_offset = pos.x_offset.saturating_add(font.em_scale_x(i32::from(v)));
+            pos.x_offset = pos.x_offset.saturating_add(font.em.scale_x(i32::from(v)));
         }
         if let Some(v) = next(format & 0x02 != 0) {
-            pos.y_offset = pos.y_offset.saturating_add(font.em_scale_y(i32::from(v)));
+            pos.y_offset = pos.y_offset.saturating_add(font.em.scale_y(i32::from(v)));
         }
         if let Some(v) = next(format & 0x04 != 0) {
-            pos.x_advance = pos.x_advance.saturating_add(font.em_scale_x(i32::from(v)));
+            pos.x_advance = pos.x_advance.saturating_add(font.em.scale_x(i32::from(v)));
         }
         let _y_advance = next(format & 0x08 != 0);
         if format & 0xf0 == 0 {
@@ -116,8 +116,8 @@ fn anchor(ctx: &Apply<'_, '_>, anchor: Data<'_>, glyph: u32) -> (f32, f32) {
     if !(1..=3).contains(&format) {
         return (0.0, 0.0);
     }
-    let mut x = font.em_fscale_x(i32::from(anchor.i16(2)));
-    let mut y = font.em_fscale_y(i32::from(anchor.i16(4)));
+    let mut x = font.em.fscale_x(i32::from(anchor.i16(2)));
+    let mut y = font.em.fscale_y(i32::from(anchor.i16(4)));
     match format {
         2 if scale.x_ppem != 0 || scale.y_ppem != 0 => {
             if let Some((cx, cy)) = font.contour_point(glyph, anchor.u16(6)) {
