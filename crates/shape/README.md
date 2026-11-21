@@ -42,36 +42,38 @@ for (glyph, position) in buffer.glyphs() {
 `shape` shapes `text[item]` with the rest of `text` as context, as
 `hb_buffer_add_utf32` does; clusters are indices into `text` and glyphs come in
 visual order, positioned in the units of the metrics' `Scale`. `Metrics` is the
-font-function interface. `compat::libass` holds what libass decides about
-shaping: `SizedMetrics` answers as libass's FreeType-backed functions do over a
-face at a size (`triergon_font::SizedFont`): the character map libass selects,
-or with `SizedMetrics::with_charmap` the one a face has been left on, read as
-libass reads it, default-load advances and `FT_KERNING_DEFAULT` kerning, at the
-size's scale and pixels per em, loading charstrings within the caller's
-`WorkBudget`. For a face of an `@` font, `SizedMetrics::rotating` takes one
-face's entries (`FaceRotations`) of libass's glyph metrics cache,
-`GlyphRotations`, which its owner keys by font, face and size as libass does and
-keeps as long as it shapes: a glyph whose first lookup is through a code point
-that `rotates` (U+02F1 and above) advances by its default-load vertical advance,
-as libass gives HarfBuzz that glyph, and a glyph first asked for an advance or
-extents stays horizontal. The cache's storage is charged before it grows, and a
-charge that fails ends the shaping call. `OtMetrics` answers as HarfBuzz's built-in
-functions do at units per em (its character map choice among the raw encoding
-records, which it sanitizes but does not validate, its `cmap` lookups, the
-last (0, 5) format 14 subtable's variation sequences, `hmtx` advances, `glyf` and CFF extents). A callback that
-cannot answer as its font would ends the shaping call with its error. CFF and
-CFF2 extents are read as HarfBuzz's own charstring reading gives them, written
-from the CFF, Type 2 charstring and CFF2 specifications and probes of HarfBuzz
-(`harness/shape/probes`, `cargo xtask shape probe`): the box holds every point
-a charstring draws, control points included, without the FontMatrix, each side
-rounded half up; arithmetic, logic, storage and reserved operators only clear
-the stack, and path operators read their operand counts as HarfBuzz does. A
-glyph has no extents when its charstring fails: more than ten nested
+font-function interface. `OtMetrics` answers as HarfBuzz's built-in functions do
+at units per em (its character map choice among the raw encoding records, which
+it sanitizes but does not validate, its `cmap` lookups, the last (0, 5) format
+14 subtable's variation sequences, `hmtx` advances, `glyf` and CFF extents). A
+callback that cannot answer as its font would ends the shaping call with its
+error. CFF and CFF2 extents are read as HarfBuzz's own charstring reading gives
+them, written from the CFF, Type 2 charstring and CFF2 specifications and probes
+of HarfBuzz (`harness/shape/probes`, `cargo xtask shape probe`): the box holds
+every point a charstring draws, control points included, without the FontMatrix,
+each side rounded half up; arithmetic, logic, storage and reserved operators
+only clear the stack, and path operators read their operand counts as HarfBuzz
+does. A glyph has no extents when its charstring fails: more than ten nested
 subroutine calls, a moveto or flex with the wrong operands, a CFF charstring
-without `endchar` or a subroutine without `return`, more than 513 operands,
-its 200,000th operation, or an accented `endchar` naming a glyph the charset
-lacks. CFF2 `blend` keeps the default values. `Scale` reproduces HarfBuzz's scaling arithmetic,
-including hinting device tables when a ppem is set.
+without `endchar` or a subroutine without `return`, more than 513 operands, its
+200,000th operation, or an accented `endchar` naming a glyph the charset lacks.
+CFF2 `blend` keeps the default values. `Scale` reproduces HarfBuzz's scaling
+arithmetic, including hinting device tables when a ppem is set.
+
+`compat::libass` holds what libass decides about shaping: `SizedMetrics` answers
+as libass's FreeType-backed functions do over a face at a size
+(`triergon_font::SizedFont`): the character map libass selects, or with
+`SizedMetrics::with_charmap` the one a face has been left on, read as libass
+reads it, default-load advances and `FT_KERNING_DEFAULT` kerning, at the size's
+scale and pixels per em, loading charstrings within the caller's `WorkBudget`.
+For a face of an `@` font, `SizedMetrics::rotating` takes one face's entries
+(`FaceRotations`) of libass's glyph metrics cache, `GlyphRotations`, which its
+owner keys by font, face and size as libass does and keeps as long as it shapes:
+a glyph whose first lookup is through a code point that `rotates` (U+02F1 and
+above) advances by its default-load vertical advance, as libass gives HarfBuzz
+that glyph, and a glyph first asked for an advance or extents stays horizontal.
+The cache's storage is charged before it grows, and a charge that fails ends the
+shaping call.
 
 The bidi API follows the steps libass takes to shape and reorder an event:
 `bidi::BidiClass::of` and `bidi::Bracket::of` per character, `bidi::paragraphs`,
