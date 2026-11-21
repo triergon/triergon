@@ -192,8 +192,10 @@ impl Reader {
             }
         }
     }
-    // The per-carrier part: only the transport poll and the inline fast return depend on the
-    // observer; admission and lane work are compiled once.
+    // One loop per observer, kept out of line so each carrier event is built in the caller's
+    // return slot. Only the transport poll and the inline fast return depend on the observer;
+    // admission and lane work are compiled once.
+    #[inline(never)]
     pub(super) fn advance<const OBSERVING: bool, const SEEKING: bool>(
         &mut self,
         work: &mut WorkBudget,
