@@ -830,13 +830,6 @@
       ]
     },
     {
-      "area": "Matroska startup and seek",
-      "targets": [
-        "aarch64-unknown-linux-gnu",
-        "thumbv7neon-unknown-linux-gnueabihf"
-      ]
-    },
-    {
       "area": "Matroska audio clocks",
       "targets": [
         "aarch64-unknown-linux-gnu",
