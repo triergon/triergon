@@ -241,6 +241,10 @@ fn mix_into(matrix: &StereoMatrix, planes: &[Vec<f32>], samples: usize, out: &mu
             if silent([gl, gr]) {
                 continue;
             }
+            #[expect(
+                clippy::expect_used,
+                reason = "a slice of `LANES` elements; measured loop"
+            )]
             let block: &[f32; LANES] = plane[start..start + LANES].try_into().expect("block");
             for (l, &v) in left.iter_mut().zip(block) {
                 *l += v * gl;

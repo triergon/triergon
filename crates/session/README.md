@@ -44,7 +44,9 @@ fn play(
 `video_decoder`, `audio_decoder` and `StreamSelection::load` need the `codecs`
 feature, which adds the nine decoder crates. `audio_decoder(codec, configuration)` takes
 the canonical configuration of FLAC, Opus and Vorbis (see `audio_configuration`) and
-ignores it for the others. Without it, implement `VideoDecoder`
+ignores it for the others. Each decoder charges its storage to a pool of its codec's
+default limit; `video_decoder_in` and `audio_decoder_in` charge the caller's `Budget`
+instead, so several decoders can share one limit. Without it, implement `VideoDecoder`
 and `AudioDecoder` (re-exported from triergon-codec) with `Error = triergon_session::Error`
 yourself, or box a decoder with another error type through `boxed()`; the tests use
 scripted decoders. The `simd` feature forwards to the HEVC decoder's nightly-only
@@ -84,8 +86,8 @@ with `AudioSession::feed_discarding` does the same for a clock-paced session.
 `examples/decode_audio.rs` decodes the first audio track of any file `triergon::open_blocking`
 opens, as the harness grades it.
 
-Supporting modules: `mix` (stereo downmix and s16 conversion), `queue` (bounded
-input).
+The `mix` module holds the stereo downmix (`mix::Downmix`) and the s16 conversion
+(`mix::to_s16`) on their own.
 
 ## Behaviour and limits
 
@@ -103,9 +105,13 @@ input).
   been reached. The caller passes the lead; `audio::DEFAULT_LEAD_NS` is 120 ms.
   A sample-rate change ends the current block.
 - **Lifecycle.** `load` starts a new stream; video `flush` restarts the timeline
-  but keeps the last picture; `stop` clears everything. Each of these advances
-  `generation()`. `end_of_stream` drains the decoder; the state then becomes
-  `SessionState::Ended`. A decoder error is `SessionState::Failed` with that
+  but keeps the last picture; video `stop` unloads the decoder and clears the picture;
+  audio `stop` discards queued input and keeps the decoder. Each of these advances
+  `generation()`. `end_of_stream` drains the decoder once every queued unit is decoded:
+  the video decoder's remaining pictures, the audio decoder's held-back samples
+  (`AudioDecoder::flush`, the Opus resampler delay), which follow the last unit's in its
+  block, or start a block without a PTS. The state becomes `SessionState::Ended` once
+  that output is delivered. A decoder error is `SessionState::Failed` with that
   error until the next load, flush or stop.
 - **Letterbox.** Each picture goes through one `triergon_pixel::letterbox::Scaler`
   into a 1920×1080 RGBA canvas; the fit, padding and conversion rules are in

@@ -1,7 +1,14 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
-#![warn(clippy::print_stdout, clippy::print_stderr, clippy::unwrap_used)]
-// Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::expect_used`.
+#![warn(
+    missing_docs,
+    missing_debug_implementations,
+    unreachable_pub,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::unwrap_used,
+    clippy::expect_used
+)]
 
 pub mod audio;
 #[cfg(feature = "codecs")]
@@ -24,10 +31,10 @@ pub mod compat {
 mod discard;
 mod lane;
 pub mod mix;
-pub mod queue;
+mod queue;
 #[cfg(feature = "codecs")]
 mod track;
-pub mod video;
+mod video;
 
 pub use audio::{AudioSession, PcmBlock};
 pub use discard::Discard;
@@ -43,8 +50,9 @@ pub use video::{Published, VideoSession};
 /// The codecs of one stream: a video lane and, optionally, an audio lane.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StreamSelection {
+    /// The video lane's codec.
     pub video: VideoCodec,
-    /// `None` plays no audio.
+    /// The audio lane's codec; `None` plays no audio.
     pub audio: Option<AudioCodec>,
 }
 

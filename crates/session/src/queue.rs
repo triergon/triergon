@@ -6,7 +6,9 @@ use std::collections::VecDeque;
 /// Capacity of one lane's pending input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct QueueLimits {
+    /// Access units queued at most.
     pub units: usize,
+    /// Bytes of access units queued at most.
     pub bytes: usize,
     /// A single access unit larger than this is refused as invalid.
     pub unit_bytes: usize,
@@ -27,6 +29,7 @@ impl QueueLimits {
     };
 }
 
+/// Why a lane refused an access unit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FeedError {
     /// The queue is full; retry the same access unit after output progresses.
@@ -39,9 +42,9 @@ pub enum FeedError {
 
 #[derive(Debug)]
 pub(crate) struct Unit {
-    pub data: Vec<u8>,
-    pub pts: Option<i64>,
-    pub discard: Discard,
+    pub(crate) data: Vec<u8>,
+    pub(crate) pts: Option<i64>,
+    pub(crate) discard: Discard,
 }
 
 #[derive(Debug)]
@@ -52,17 +55,17 @@ pub(crate) struct UnitQueue {
 }
 
 impl UnitQueue {
-    pub fn new(limits: QueueLimits) -> Self {
+    pub(crate) fn new(limits: QueueLimits) -> Self {
         Self {
             limits,
             units: VecDeque::new(),
             bytes: 0,
         }
     }
-    pub fn push(&mut self, data: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
+    pub(crate) fn push(&mut self, data: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
         self.push_discarding(data, pts, Discard::default())
     }
-    pub fn push_discarding(
+    pub(crate) fn push_discarding(
         &mut self,
         data: &[u8],
         pts: Option<i64>,
@@ -82,26 +85,26 @@ impl UnitQueue {
         });
         Ok(())
     }
-    pub fn pop(&mut self) -> Option<Unit> {
+    pub(crate) fn pop(&mut self) -> Option<Unit> {
         let unit = self.units.pop_front()?;
         self.bytes -= unit.data.len();
         Some(unit)
     }
     /// The front unit, if there is one and `due` accepts its timestamp.
-    pub fn pop_if(&mut self, due: impl FnOnce(Option<i64>) -> bool) -> Option<Unit> {
+    pub(crate) fn pop_if(&mut self, due: impl FnOnce(Option<i64>) -> bool) -> Option<Unit> {
         if !due(self.units.front()?.pts) {
             return None;
         }
         self.pop()
     }
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.units.is_empty()
     }
     #[cfg(test)]
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.units.len()
     }
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.units.clear();
         self.bytes = 0;
     }

@@ -15,9 +15,13 @@ use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
 /// never mistakes a new stream's first picture for an old one.
 #[derive(Clone, Debug)]
 pub struct Published {
+    /// Increases with every picture this session publishes.
     pub sequence: u64,
+    /// The session's [`generation`](VideoSession::generation) when it was published.
     pub generation: u64,
+    /// The caller PTS of the picture's access unit.
     pub pts: Option<i64>,
+    /// The letterboxed picture: 1920x1080 RGBA, rows top to bottom, no padding.
     pub rgba: Arc<Vec<u8>>,
 }
 
@@ -27,6 +31,8 @@ struct Ahead {
     rgba: Vec<u8>,
 }
 
+/// The video lane of a playback session: a bounded queue of Annex-B access units, a
+/// decoder, and the letterboxed picture the caller's clock has reached.
 pub struct VideoSession {
     decoder: Option<Box<DynVideoDecoder>>,
     queue: UnitQueue,
@@ -39,7 +45,18 @@ pub struct VideoSession {
     phase: Phase,
 }
 
+impl core::fmt::Debug for VideoSession {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("VideoSession")
+            .field("state", &self.state())
+            .field("generation", &self.generation)
+            .field("sequence", &self.sequence)
+            .finish_non_exhaustive()
+    }
+}
+
 impl VideoSession {
+    /// An idle lane whose queue holds at most `limits`.
     pub fn new(limits: QueueLimits) -> Self {
         Self {
             decoder: None,
@@ -81,9 +98,13 @@ impl VideoSession {
             self.latest = None;
         }
     }
+    /// Increases with every [`load`](Self::load), [`flush`](Self::flush) and
+    /// [`stop`](Self::stop).
     pub fn generation(&self) -> u64 {
         self.generation
     }
+    /// Queue one Annex-B access unit with its caller PTS (`None` when unknown). Refused as
+    /// [`AudioSession::feed`](crate::AudioSession::feed) refuses.
     pub fn feed(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
         self.phase.admit(self.decoder.is_some())?;
         self.queue.push(au, pts)
@@ -152,9 +173,11 @@ impl VideoSession {
             }
         }
     }
+    /// The picture on screen: the last one published, until a load or stop.
     pub fn latest(&self) -> Option<&Published> {
         self.latest.as_ref()
     }
+    /// Why the lane is or is not producing output.
     pub fn state(&self) -> SessionState {
         let pending = self.ahead.is_some() || !self.queue.is_empty();
         self.phase.state(self.decoder.is_some(), pending)

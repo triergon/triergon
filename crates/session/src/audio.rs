@@ -11,17 +11,23 @@ use crate::mix::Downmix;
 use crate::queue::{FeedError, QueueLimits, UnitQueue};
 use triergon_codec::{AudioFrame, DownmixLevels, DynAudioDecoder};
 
-/// Interleaved stereo s16 at `sample_rate`; `pts` is the first unit's caller PTS.
+/// One block of output: interleaved stereo s16 at one sample rate.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PcmBlock {
+    /// Samples per second per channel; meaningful while `samples` is not empty.
     pub sample_rate: u32,
+    /// The caller PTS of the first access unit in the block; `None` when that unit had
+    /// none, or when the block holds only samples the decoder released at end of stream.
     pub pts: Option<i64>,
+    /// Left and right samples in turn.
     pub samples: Vec<i16>,
 }
 
 /// The usual audio lead for [`AudioSession::pull`]: 120 ms.
 pub const DEFAULT_LEAD_NS: i64 = 120_000_000;
 
+/// The audio lane of a playback session: a bounded queue of compressed access units, a
+/// decoder, and a stereo downmix paced by the caller's clock.
 pub struct AudioSession {
     decoder: Option<Box<DynAudioDecoder>>,
     /// Samples of the decoder's start delay not discarded yet.
@@ -33,7 +39,17 @@ pub struct AudioSession {
     phase: Phase,
 }
 
+impl core::fmt::Debug for AudioSession {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("AudioSession")
+            .field("state", &self.state())
+            .field("generation", &self.generation)
+            .finish_non_exhaustive()
+    }
+}
+
 impl AudioSession {
+    /// An idle lane whose queue holds at most `limits`.
     pub fn new(limits: QueueLimits) -> Self {
         Self {
             decoder: None,
@@ -45,13 +61,15 @@ impl AudioSession {
             phase: Phase::Open,
         }
     }
-    /// A new stream; `None` plays no audio.
+    /// A new stream: queued input goes and `decoder` takes over; `None` plays no audio
+    /// ([`SessionState::Idle`]).
     pub fn load(&mut self, decoder: Option<Box<DynAudioDecoder>>) {
         self.reset();
         self.delay = decoder.as_ref().map_or(0, |decoder| decoder.delay());
         self.decoder = decoder;
     }
-    /// Flush and stop both end the fed timeline: queued audio is discarded.
+    /// Seek, flush or stop: queued audio is discarded and the decoder drops its signal
+    /// history; the lane keeps its decoder and takes input again.
     pub fn stop(&mut self) {
         self.reset();
         if let Some(decoder) = self.decoder.as_mut() {
@@ -64,9 +82,15 @@ impl AudioSession {
         self.output.carry = None;
         self.phase = Phase::Open;
     }
+    /// Increases with every [`load`](Self::load) and [`stop`](Self::stop).
     pub fn generation(&self) -> u64 {
         self.generation
     }
+    /// Queue one access unit with its caller PTS (`None` when unknown). Refused without a
+    /// decoder or after a failure ([`FeedError::Idle`]), after
+    /// [`end_of_stream`](Self::end_of_stream) or for an empty or oversized unit
+    /// ([`FeedError::Invalid`]), and while the queue is full ([`FeedError::Backpressure`]:
+    /// keep the unit and retry).
     pub fn feed(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
         self.phase.admit(self.decoder.is_some())?;
         self.queue.push(au, pts)
@@ -156,6 +180,7 @@ impl AudioSession {
             Err(error) => Phase::Failed(error),
         };
     }
+    /// Why the lane is or is not producing output.
     pub fn state(&self) -> SessionState {
         let pending = !self.queue.is_empty() || self.output.carry.is_some();
         self.phase.state(self.decoder.is_some(), pending)
