@@ -11,7 +11,8 @@ use std::process::Command;
 
 use crate::fetch::{Source, Transport};
 use crate::json::Value;
-use crate::prepare::{PinnedRelease, output, run, unpack_release, verify_xz_tree};
+use crate::prepare::{PinnedRelease, configure, unpack_release, verify_release_tree};
+use crate::process::{output, run};
 use crate::sha256;
 
 pub const CACHE: &str = ".research/harfbuzz";
@@ -73,20 +74,6 @@ fn link_libraries() -> [&'static str; 2] {
     [cxx, "-lm"]
 }
 
-/// Runs `argv` as configure in `source` unless the recorded arguments match.
-fn configure(source: &Path, argv: &[String], record: &Path) -> Result<Value, String> {
-    let wanted = Value::strings(argv.iter().cloned());
-    let configured = source.join("config.status").exists();
-    if !configured || crate::checks::read_json(record).ok().as_ref() != Some(&wanted) {
-        if configured {
-            run(Command::new("make").arg("distclean").current_dir(source))?;
-        }
-        run(Command::new(&argv[0]).args(&argv[1..]).current_dir(source))?;
-        crate::corpus::write_json(record, &wanted)?;
-    }
-    Ok(wanted)
-}
-
 /// The record of the compiled amalgamation, next to the object: the release,
 /// flags and compiler it was compiled from, and the object's hash.
 const OBJECT_RECORD: &str = "harfbuzz-object.json";
@@ -98,7 +85,7 @@ const OBJECT_RECORD: &str = "harfbuzz-object.json";
 fn compile_harfbuzz(cache: &Path, harfbuzz: &Path) -> Result<PathBuf, String> {
     let object = cache.join("harfbuzz.o");
     let record = cache.join(OBJECT_RECORD);
-    verify_xz_tree(&cache.join(HARFBUZZ.file), cache)?;
+    verify_release_tree(&cache.join(HARFBUZZ.file), cache)?;
     let compiler = output(Command::new("c++").arg("--version"))?;
     let compiled = |object: &str| {
         Value::object([
@@ -147,6 +134,7 @@ pub fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, S
     let fribidi = unpack_release(&cache, &FRIBIDI, net)?;
     let fribidi_argv = configure(
         &fribidi,
+        "config.status",
         &fribidi_argv(&prefix),
         &cache.join("fribidi-configure.json"),
     )?;
@@ -182,7 +170,7 @@ pub fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, S
     )
     .map_err(|e| e.to_string())?;
     for release in [&FRIBIDI, &HARFBUZZ] {
-        verify_xz_tree(&cache.join(release.file), &cache)?;
+        verify_release_tree(&cache.join(release.file), &cache)?;
     }
 
     let hash = |path: &Path| {

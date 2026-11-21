@@ -10,7 +10,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use crate::harness::{manifest, provenance};
 use crate::json::{self, Value};
 use crate::worker_tests::items;
-use crate::{corpus, prepare, process, python, sha256};
+use crate::{corpus, process, python, sha256};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 const USAGE: &str = "cargo xtask core-time [--output DIR] [--profiles debug release] [--toolchain NAME] [--target TRIPLE]";
@@ -108,7 +108,7 @@ fn freeze_sources(root: &Path, out: &Path, graph: &Value) -> Result<()> {
 }
 
 fn generate(root: &Path, generator: &str, dir: &Path) -> Result<()> {
-    Ok(prepare::run(
+    Ok(process::run(
         Command::new(python::interpreter())
             .current_dir(root)
             .args([generator, "--output"])
@@ -198,14 +198,14 @@ struct Compiler {
 
 impl Compiler {
     fn resolve(root: &Path, toolchain: &str, target: Option<String>) -> Result<Self> {
-        let which = prepare::output(
+        let which = process::output(
             Command::new("rustup")
                 .current_dir(root)
                 .args(["which", "--toolchain", toolchain, "rustc"])
                 .stderr(Stdio::inherit()),
         )?;
         let path = PathBuf::from(which.trim_end());
-        let version = prepare::output(Command::new(&path).arg("-vV"))?;
+        let version = process::output(Command::new(&path).arg("-vV"))?;
         let host = version
             .lines()
             .find_map(|l| l.strip_prefix("host: "))
@@ -233,7 +233,7 @@ impl Compiler {
     }
 
     fn metadata(&self, root: &Path) -> Result<Value> {
-        let output = prepare::output(self.cargo(root).args([
+        let output = process::output(self.cargo(root).args([
             "metadata",
             "--format-version",
             "1",
@@ -267,7 +267,7 @@ impl Compiler {
                 .chain(command.get_args())
                 .map(|s| s.to_string_lossy()),
         );
-        let messages = prepare::output(&mut command)?;
+        let messages = process::output(&mut command)?;
         Ok((
             artifact(&messages, &root.join("crates/core/Cargo.toml"))?,
             argv,
@@ -507,7 +507,7 @@ fn run(root: &Path, args: &[String]) -> Result<()> {
         ("platform", Value::str(text(&baseline, "platform")?)),
         (
             "machine",
-            Value::str(prepare::output(Command::new("uname").arg("-m"))?.trim_end()),
+            Value::str(process::output(Command::new("uname").arg("-m"))?.trim_end()),
         ),
         ("rustc", Value::str(compiler.version)),
         ("rustc_path", Value::str(compiler.path.to_string_lossy())),
@@ -649,7 +649,7 @@ mod tests {
         )?;
         let name = crate::harness::gate_build::pinned_release(&crate::root())?;
         let compiler = Compiler::resolve(&root, &name, None)?;
-        prepare::run(
+        process::run(
             compiler
                 .cargo(&root)
                 .args(["generate-lockfile", "--offline"]),
@@ -659,7 +659,7 @@ mod tests {
         let (probe, _) = compiler.build(&root, "core-time-test")?;
         assert!(!probe.starts_with(root.join("target")));
         assert!(probe.starts_with(target_dir));
-        let rustc = prepare::output(&mut Command::new(probe))?;
+        let rustc = process::output(&mut Command::new(probe))?;
         assert_eq!(Path::new(rustc.trim_end()), compiler.path);
         assert_eq!(
             compiler.version,

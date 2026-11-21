@@ -1,6 +1,6 @@
-//! Child processes as the codec and capture runners drive them: text-mode
-//! runs with a timeout, and fixed-size output records streamed from a child's
-//! stdout or from a pipe it opens as its output file.
+//! Child processes: commands that must succeed, text-mode runs with a timeout as
+//! the codec and capture runners drive them, and fixed-size output records streamed
+//! from a child's stdout or from a pipe it opens as its output file.
 
 use std::ffi::OsString;
 use std::io::Read;
@@ -10,6 +10,25 @@ use std::time::{Duration, Instant};
 
 use crate::harness::worker;
 use crate::python;
+
+/// Runs `command` with inherited standard streams; fails unless it exits successfully.
+pub fn run(command: &mut Command) -> Result<(), String> {
+    let status = command.status().map_err(|e| format!("{command:?}: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("{command:?}: {status}"))
+    }
+}
+
+/// The standard output of `command` as text; fails unless it exits successfully.
+pub fn output(command: &mut Command) -> Result<String, String> {
+    let out = command.output().map_err(|e| format!("{command:?}: {e}"))?;
+    if !out.status.success() {
+        return Err(format!("{command:?}: {}", out.status));
+    }
+    String::from_utf8(out.stdout).map_err(|e| e.to_string())
+}
 
 /// Why a run stopped short: a timeout (recorded with the command line) or an
 /// error that ends the whole command.

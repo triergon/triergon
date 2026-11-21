@@ -12,6 +12,7 @@ use std::process::Command;
 
 use crate::fetch::{self, Transport};
 use crate::json::{self, Value};
+use crate::process::{output, run};
 use crate::sha256;
 
 pub const REVISION: &str = "d32b387f2b0a484599d4587d651891f0c63c4238";
@@ -258,23 +259,6 @@ pub fn fate_list(listing: &str) -> String {
     names.sort_unstable();
     names.dedup();
     names.join("\n") + "\n"
-}
-
-pub fn run(command: &mut Command) -> Result<(), String> {
-    let status = command.status().map_err(|e| format!("{command:?}: {e}"))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("{command:?}: {status}"))
-    }
-}
-
-pub fn output(command: &mut Command) -> Result<String, String> {
-    let out = command.output().map_err(|e| format!("{command:?}: {e}"))?;
-    if !out.status.success() {
-        return Err(format!("{command:?}: {}", out.status));
-    }
-    String::from_utf8(out.stdout).map_err(|e| e.to_string())
 }
 
 /// Every regular file of the archive must still match the unpacked tree, so the
@@ -564,7 +548,7 @@ fn release_source(
             .arg("-C")
             .arg(cache))?;
     }
-    verify_xz_tree(&archive_path, cache)?;
+    verify_release_tree(&archive_path, cache)?;
     Ok((source, archive_sha))
 }
 
@@ -626,14 +610,31 @@ pub fn unpack_release(
     Ok(source)
 }
 
-/// Every regular file of a release archive must still match the tree
-/// unpacked under `cache`. For compressed releases, the concatenated
-/// contents of the files, in archive order as `tar` streams them, are compared
-/// with the same files on disk.
-pub fn verify_xz_tree(archive_path: &Path, cache: &Path) -> Result<(), String> {
-    verify_release_tree(archive_path, cache)
+/// Runs `argv` as configure in `source`, a release tree that `marker` shows configured,
+/// unless the arguments recorded in `record` match; a tree configured otherwise is
+/// cleaned first. Returns the arguments as recorded.
+pub fn configure(
+    source: &Path,
+    marker: &str,
+    argv: &[String],
+    record: &Path,
+) -> Result<Value, String> {
+    let wanted = Value::strings(argv.iter().cloned());
+    let configured = source.join(marker).exists();
+    if !configured || crate::checks::read_json(record).ok().as_ref() != Some(&wanted) {
+        if configured {
+            run(Command::new("make").arg("distclean").current_dir(source))?;
+        }
+        run(Command::new(&argv[0]).args(&argv[1..]).current_dir(source))?;
+        crate::corpus::write_json(record, &wanted)?;
+    }
+    Ok(wanted)
 }
 
+/// Every regular file of a release archive must still match the tree unpacked under
+/// `cache`: the concatenated contents of the files, in archive order as `tar` streams
+/// them, are compared with the same files on disk, so a compression `tar` reads but
+/// xtask does not decode is verified as well.
 pub fn verify_release_tree(archive_path: &Path, cache: &Path) -> Result<(), String> {
     let listing = output(Command::new("tar").arg("-tvf").arg(archive_path))?;
     let streamed = Command::new("tar")
@@ -709,110 +710,4 @@ fn release_manifest(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_release_is_fetched_from_its_address_then_its_mirrors() {
-        let release = PinnedRelease {
-            file: "x.tar.xz",
-            directory: "x",
-            url: "https://example.org/x.tar.xz",
-            mirrors: &[fetch::Source::GitHubAsset {
-                repo: "owner/x",
-                id: 7,
-            }],
-            sha256: "0",
-        };
-        let sources = format!("{:?}", release.sources());
-        assert_eq!(
-            sources,
-            r#"[Url("https://example.org/x.tar.xz"), GitHubAsset { repo: "owner/x", id: 7 }]"#
-        );
-    }
-
-    #[test]
-    fn lists_unique_sorted_fate_names_only() {
-        let listing = "make: noise\nfate-b\nfate-a.x_1\nfate-b\nfate-\nfate-bad name\n  fate-indented\nfate-c-d\n";
-        assert_eq!(fate_list(listing), "fate-a.x_1\nfate-b\nfate-c-d\n");
-    }
-
-    #[test]
-    fn formats_profile_extends_the_matroska_configuration() {
-        let prefix = Path::new("/p/install");
-        let matroska = configure_argv(prefix, Profile::Matroska);
-        let formats = configure_argv(prefix, Profile::Formats);
-        assert_eq!(matroska[1], "--prefix=/p/install");
-        assert_eq!(matroska.len() + 1, formats.len());
-        assert!(formats.contains(
-            &"--enable-demuxer=matroska,mov,mpegts,h264,hevc,srt,ass,webvtt,sup,vobsub".to_owned()
-        ));
-        assert_eq!(
-            formats.last().unwrap(),
-            "--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,extract_extradata"
-        );
-    }
-
-    #[test]
-    fn capture_profiles_differ_only_in_size_optimization() {
-        let prefix = Path::new("/p/install");
-        let speed = configure_argv(prefix, Profile::Capture);
-        let small = configure_argv(prefix, Profile::CaptureSmall);
-        assert!(speed.iter().any(|arg| arg == "--enable-static"));
-        assert!(speed.iter().any(|arg| arg == "--disable-shared"));
-        assert_eq!(
-            speed,
-            small
-                .into_iter()
-                .filter(|arg| arg != "--enable-small")
-                .collect::<Vec<_>>()
-        );
-    }
-
-    #[test]
-    fn verifies_the_unpacked_tree_against_the_archive() {
-        let dir = crate::walk::scratch("tree");
-        fs::create_dir_all(dir.join("src")).unwrap();
-        fs::write(dir.join("src/a.c"), b"int a;").unwrap();
-        let mut header = vec![0u8; 512];
-        header[..7].copy_from_slice(b"src/a.c");
-        header[124..135].copy_from_slice(b"00000000006");
-        header[156] = b'0';
-        let mut tar = header;
-        tar.extend(b"int a;");
-        tar.resize(1024, 0);
-        tar.extend([0; 1024]);
-        let deflated = crate::zlib::compress(&tar, 6, crate::zlib::Strategy::Default).unwrap();
-        let mut gz = vec![0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 3];
-        gz.extend_from_slice(&deflated[2..deflated.len() - 4]);
-        gz.extend(crate::zlib::crc32(&tar).to_le_bytes());
-        gz.extend((tar.len() as u32).to_le_bytes());
-        assert_eq!(verify_tree(&gz, &dir).unwrap(), 1);
-        fs::write(dir.join("src/a.c"), b"int b;").unwrap();
-        assert_eq!(
-            verify_tree(&gz, &dir).unwrap_err(),
-            "Pinned source was changed: src/a.c"
-        );
-        fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn video_profile_adds_only_the_h264_and_hevc_decoders() {
-        let prefix = Path::new("/p");
-        let matroska = configure_argv(prefix, Profile::Matroska);
-        let video = configure_argv(prefix, Profile::Video);
-        let changed: Vec<_> = matroska
-            .iter()
-            .zip(&video)
-            .filter(|(a, b)| a != b)
-            .collect();
-        assert_eq!(matroska.len(), video.len());
-        assert_eq!(
-            changed,
-            [(
-                &"--enable-decoder=pcm_s16le".to_owned(),
-                &"--enable-decoder=pcm_s16le,h264,hevc".to_owned()
-            )]
-        );
-    }
-}
+mod tests;

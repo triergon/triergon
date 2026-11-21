@@ -16,7 +16,8 @@ use std::process::Command;
 
 use crate::fetch::{Source, Transport};
 use crate::json::Value;
-use crate::prepare::{PinnedRelease, output, run, unpack_release, verify_xz_tree};
+use crate::prepare::{PinnedRelease, unpack_release, verify_release_tree};
+use crate::process::{output, run};
 use crate::sha256;
 
 pub const CACHE: &str = ".research/libass";
@@ -166,7 +167,7 @@ pub fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, S
             .args(target)
             .current_dir(&source))?;
     }
-    verify_xz_tree(&cache.join(LIBASS.file), &cache)?;
+    verify_release_tree(&cache.join(LIBASS.file), &cache)?;
 
     // The private headers and flags of the internal stages the worker calls.
     let cflags = library_cflags(&source)?;

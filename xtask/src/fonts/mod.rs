@@ -20,7 +20,8 @@ use std::process::Command;
 
 use crate::fetch::{self, Transport};
 use crate::json::Value;
-use crate::prepare::{output, run, verify_xz_tree};
+use crate::prepare::{configure, verify_release_tree};
+use crate::process::{output, run};
 use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
@@ -158,24 +159,19 @@ fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, Strin
             .arg("-C")
             .arg(&cache))?;
     }
-    verify_xz_tree(&archive_path, &cache)?;
+    verify_release_tree(&archive_path, &cache)?;
     let prefix = cache.join("install");
-    let argv = configure_argv(&prefix);
-    let wanted = Value::strings(argv.iter().cloned());
-    let record = cache.join("configure-argv.json");
-    let configured = source.join("config.mk").exists();
-    if !configured || crate::checks::read_json(&record).ok().as_ref() != Some(&wanted) {
-        if configured {
-            run(Command::new("make").arg("distclean").current_dir(&source))?;
-        }
-        run(Command::new(&argv[0]).args(&argv[1..]).current_dir(&source))?;
-        crate::corpus::write_json(&record, &wanted)?;
-    }
+    let wanted = configure(
+        &source,
+        "config.mk",
+        &configure_argv(&prefix),
+        &cache.join("configure-argv.json"),
+    )?;
     run(Command::new("make")
         .arg(format!("-j{jobs}"))
         .current_dir(&source))?;
     run(Command::new("make").arg("install").current_dir(&source))?;
-    verify_xz_tree(&archive_path, &cache)?;
+    verify_release_tree(&archive_path, &cache)?;
     let libs = output(
         Command::new("pkg-config")
             .args(["--static", "--libs", "freetype2"])

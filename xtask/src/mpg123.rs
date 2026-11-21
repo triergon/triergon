@@ -1,7 +1,8 @@
 //! Pinned static mpg123 for the free-format transport comparison.
 use crate::fetch::Network;
 use crate::json::Value;
-use crate::prepare::{PinnedRelease, output, run, unpack_release, verify_release_tree};
+use crate::prepare::{PinnedRelease, unpack_release, verify_release_tree};
+use crate::process::{output, run};
 use std::path::Path;
 use std::process::Command;
 

@@ -2,7 +2,7 @@
 use super::sha;
 use crate::harness::{build, gate_build};
 use crate::json::Value;
-use crate::{checks, corpus, json, prepare, sha256};
+use crate::{checks, corpus, json, process, sha256};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -85,14 +85,14 @@ pub(super) fn stage(root: &Path, tree: &Path, dest: &Path) -> Result<(), String>
     for name in OVERLAY {
         git.arg(format!(":(exclude){name}"));
     }
-    if !prepare::output(&mut git)?.is_empty() {
+    if !process::output(&mut git)?.is_empty() {
         return Err("worker checkout has changes outside the workload overlay".into());
     }
     let files = overlay(tree)?;
     if files != overlay(root)? {
         return Err("worker checkout has the wrong workload overlay".into());
     }
-    let revision = prepare::output(
+    let revision = process::output(
         Command::new("git")
             .current_dir(tree)
             .args(["rev-parse", "HEAD"]),
@@ -111,7 +111,7 @@ pub(super) fn stage(root: &Path, tree: &Path, dest: &Path) -> Result<(), String>
     let dir = std::path::absolute(dir).map_err(|e| e.to_string())?;
     let cache = build_dir(&dir, revision.trim(), &files);
     let argv = cargo_command(&dir)?;
-    prepare::run(
+    process::run(
         Command::new(&argv[0])
             .args(&argv[1..])
             .current_dir(tree)

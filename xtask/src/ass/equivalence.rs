@@ -21,7 +21,7 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::prepare::run;
+use crate::process::run;
 
 pub const USAGE: &str = "usage: cargo xtask ass equivalence --base REV [--seed N] [--random N]
        [--mutations N] [--jobs N] [--output DIR] [--cache OUTLINES,MEGABYTES]
