@@ -539,7 +539,6 @@ impl Core {
             .position(|e| e.kind == s.kind && e.tag == s.tag)
     }
 
-    /// Decode one raw_data_block(); appends `frame_len()` samples per plane to `planes`.
     /// Decode one raw_data_block() of the `blocks` (this one included) the access unit has
     /// left; `out` gets room for an in-band reconfiguration before it applies.
     pub(crate) fn decode_block<const RAW: bool>(
@@ -640,17 +639,7 @@ impl Core {
                     last_elem = None;
                 }
                 ElementId::Dse => {
-                    br.skip(4);
-                    let align = br.bit();
-                    let mut count = br.read(8) as usize;
-                    if count == 255 {
-                        count += br.read(8) as usize;
-                    }
-                    if align {
-                        let rel = br.position() - block_start;
-                        br.skip((8 - (rel & 7)) & 7);
-                    }
-                    br.skip(count * 8);
+                    skip_dse(br, block_start);
                     last_elem = None;
                 }
                 ElementId::Pce => {
@@ -665,62 +654,8 @@ impl Core {
                     last_elem = None;
                 }
                 ElementId::Fil => {
-                    let fil_start = br.position() - 3;
-                    let mut count = br.read(4) as usize;
-                    if count == 15 {
-                        count += br.read(8) as usize;
-                        count -= 1;
-                    }
-                    if count > 0 {
-                        let end = br.position() + count * 8;
-                        if (br.left() as usize) < count * 8 {
-                            return Err(DecodeError::InvalidData("fill element overrun"));
-                        }
-                        let ext = br.read(4);
-                        if RAW && matches!(ext, EXT_SBR_DATA | EXT_SBR_DATA_CRC) {
-                            return Err(DecodeError::Unsupported(Feature::RawSbr));
-                        }
-                        if !RAW
-                            && ext == 0
-                            && count * 8 - 4 >= 13 + 7 * 8
-                            && self.priming_policy
-                                == crate::compat::priming::Policy::EncoderSignature
-                        {
-                            // EXT_FILL carrying an encoder signature. FFmpeg skips the first
-                            // 1024 output samples when it reads "libfaac <major>.<minor>" here
-                            // (faac encoder delay compensation); replicated for output parity.
-                            let mut r = *br;
-                            r.skip(13);
-                            let mut left = count * 8 - 4 - 13;
-                            let mut txt = [0u8; 255];
-                            let mut n = 0;
-                            while left >= 8 && n < 255 {
-                                txt[n] = r.read(8) as u8;
-                                n += 1;
-                                left -= 8;
-                            }
-                            if is_libfaac_signature(&txt[..n]) {
-                                self.skip_samples = 1024;
-                            }
-                        }
-                        if let (EXT_SBR_DATA | EXT_SBR_DATA_CRC, Some(ei)) = (ext, last_elem) {
-                            self.inspect.sbr_fill(fil_start, end);
-                            let saved_end = br.end();
-                            br.set_end(end);
-                            let crc = ext == EXT_SBR_DATA_CRC;
-                            let r = self.decode_sbr_ext(br, ei, crc, count * 8 - 4, out, blocks);
-                            br.set_end(saved_end);
-                            if r? {
-                                layout_changed = true;
-                            }
-                        }
-                        // skip the remainder of the fill element
-                        let pos = br.position();
-                        if pos < end {
-                            br.skip(end - pos);
-                        } else if pos > end {
-                            return Err(DecodeError::InvalidData("extension payload overrun"));
-                        }
+                    if self.decode_fil::<RAW>(br, last_elem, out, blocks)? {
+                        layout_changed = true;
                     }
                 }
                 ElementId::End => break,
@@ -746,6 +681,61 @@ impl Core {
             ));
         }
         self.finish_frame::<RAW>(out);
+        Ok(layout_changed)
+    }
+
+    /// fill_element(): an SBR payload for `last_elem`, the element it follows, or an
+    /// encoder signature. Returns whether the payload changed the layout.
+    fn decode_fil<const RAW: bool>(
+        &mut self,
+        br: &mut CachedBitReader<'_>,
+        last_elem: Option<usize>,
+        out: &mut AudioFrame,
+        blocks: usize,
+    ) -> Result<bool> {
+        let fil_start = br.position() - 3;
+        let mut count = br.read(4) as usize;
+        if count == 15 {
+            count += br.read(8) as usize;
+            count -= 1;
+        }
+        if count == 0 {
+            return Ok(false);
+        }
+        let end = br.position() + count * 8;
+        if (br.left() as usize) < count * 8 {
+            return Err(DecodeError::InvalidData("fill element overrun"));
+        }
+        let ext = br.read(4);
+        if RAW && matches!(ext, EXT_SBR_DATA | EXT_SBR_DATA_CRC) {
+            return Err(DecodeError::Unsupported(Feature::RawSbr));
+        }
+        let bits = count * 8 - 4;
+        if !RAW
+            && ext == 0
+            && bits >= 13 + 7 * 8
+            && self.priming_policy == crate::compat::priming::Policy::EncoderSignature
+            && has_libfaac_signature(br, bits)
+        {
+            self.skip_samples = 1024;
+        }
+        let mut layout_changed = false;
+        if let (EXT_SBR_DATA | EXT_SBR_DATA_CRC, Some(ei)) = (ext, last_elem) {
+            self.inspect.sbr_fill(fil_start, end);
+            let saved_end = br.end();
+            br.set_end(end);
+            let crc = ext == EXT_SBR_DATA_CRC;
+            let r = self.decode_sbr_ext(br, ei, crc, bits, out, blocks);
+            br.set_end(saved_end);
+            layout_changed = r?;
+        }
+        // skip the remainder of the fill element
+        let pos = br.position();
+        if pos < end {
+            br.skip(end - pos);
+        } else if pos > end {
+            return Err(DecodeError::InvalidData("extension payload overrun"));
+        }
         Ok(layout_changed)
     }
 
@@ -1334,6 +1324,38 @@ fn pce_slots(p: &Pce, adts: bool) -> (Vec<Slot>, bool) {
         slots = ordered;
     }
     (slots, unordered)
+}
+
+/// data_stream_element(), skipped.
+fn skip_dse(br: &mut CachedBitReader<'_>, block_start: usize) {
+    br.skip(4);
+    let align = br.bit();
+    let mut count = br.read(8) as usize;
+    if count == 255 {
+        count += br.read(8) as usize;
+    }
+    if align {
+        let rel = br.position() - block_start;
+        br.skip((8 - (rel & 7)) & 7);
+    }
+    br.skip(count * 8);
+}
+
+/// Whether the EXT_FILL payload at `br` (`bits` bits after its extension type) carries a
+/// "libfaac <major>.<minor>" encoder signature. FFmpeg then skips the first 1024 output
+/// samples (faac's encoder delay); the decoder does the same for output parity.
+fn has_libfaac_signature(br: &CachedBitReader<'_>, bits: usize) -> bool {
+    let mut r = *br;
+    r.skip(13);
+    let mut left = bits - 13;
+    let mut txt = [0u8; 255];
+    let mut n = 0;
+    while left >= 8 && n < 255 {
+        txt[n] = r.read(8) as u8;
+        n += 1;
+        left -= 8;
+    }
+    is_libfaac_signature(&txt[..n])
 }
 
 /// sscanf("libfaac %d.%d") == 2 equivalent.
