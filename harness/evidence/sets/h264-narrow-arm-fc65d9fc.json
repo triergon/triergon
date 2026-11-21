@@ -1,0 +1,9 @@
+{
+ "name": "h264-narrow-arm-fc65d9fc",
+ "path": "h264-narrow-arm-fc65d9fc",
+ "retention": "retained",
+ "reason": "Cause, counts and tests of the narrow H.264 prediction and deblocking change, one c6g.4xlarge host (Graviton2) per target from the gate images: on 32-bit ARMv7 at main b78dab15, perf stat user-mode counts and symbol and inline-resolved source-line profiles of codec-worker and the reference on h264-high-1080p, L1D refill profiles, deblocking edge statistics and code-generation probes of the loop shapes; per-symbol cycle diffs and the stepwise counts of gate-way builds on both targets; perf stat counts of all 20 codec workloads at main 6ed706b8 and fc65d9fc on both targets with digests; the codec, pixel and H.264 crate tests including 195 conformance vectors on both targets; binaries' and inputs' SHA-256, toolchain and host details; cited by docs/status.md for the ARMv7 timing of h264-high-1080p.",
+ "key": "evidence/h264-narrow-arm-fc65d9fc/9d44bba8c94f6a6ecb0f2539c22ec5038359fe58fabd2fb555b379a2949b679e.tar.gz",
+ "sha256": "9d44bba8c94f6a6ecb0f2539c22ec5038359fe58fabd2fb555b379a2949b679e",
+ "bytes": 292907
+}

@@ -91,10 +91,19 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
 
 - Macroblock addresses split into column and row by a multiplication and a shift
   (`triergon_codec::Divisor`), so 32-bit ARM, whose baseline has no divide instruction,
-  calls no division routine per macroblock.
-- Gate timings against FFmpeg are in [docs/status.md](../../docs/status.md): at `906d0a36`
-  the three H.264 workloads' paired 95% upper bounds are 0.81 to 1.04 on ARMv7 and 0.62 to
-  0.98 on Linux AArch64.
+  calls no division routine per macroblock. Temporal direct prediction and implicit
+  weights take the reciprocal of the POC distance from a table.
+- On 32-bit ARM the code generator vectorises loops over 16 byte lanes and none over 8 or
+  4, so bi-prediction of a block narrower than 16 samples combines its two predictions in
+  scratch, 16 samples at a time over the rows laid end to end, and copies its own samples
+  out; other targets combine row by row in place. Chroma interpolation gathers a block's
+  rows end to end and runs one loop over all of its samples on every target.
+- Deblocking filters an edge's Cb and Cr lines together in one 16-lane pass, writes an
+  edge back only where a sample changed, and transposes vertical edges in u32 words on
+  32-bit targets (u64 elsewhere).
+- Gate timings against FFmpeg are in [docs/status.md](../../docs/status.md): at `fc65d9fc`
+  the three H.264 workloads' paired 95% upper bounds are 0.76 to 0.99 on ARMv7 and 0.62 to
+  0.97 on Linux AArch64.
 
 ## Conformance
 
