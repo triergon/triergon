@@ -245,3 +245,281 @@ fn latm_subframes_refuse_incomplete_or_ambiguous_landings() {
         assert_eq!(pool.used(), Budget::control_storage_bytes());
     }
 }
+
+#[derive(Debug, PartialEq, Eq)]
+struct EntityPacket {
+    payload: Vec<u8>,
+    pts: Option<i64>,
+    range: std::ops::Range<u64>,
+    sources: Vec<EntityPacketSource>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct EntityPacketSource {
+    elementary: std::ops::Range<u64>,
+    payload: std::ops::Range<usize>,
+    header_ranges: Vec<triergon_mpegts::SourceRange>,
+    payload_ranges: Vec<triergon_mpegts::SourceRange>,
+}
+
+fn entity_packet(packet: &Packet) -> EntityPacket {
+    EntityPacket {
+        payload: packet.payload().to_vec(),
+        pts: packet.pts(),
+        range: packet.elementary_range(),
+        sources: packet
+            .sources()
+            .iter()
+            .map(|source| {
+                let TraceEvent::Pes(pes) = source.pes.event() else {
+                    panic!("PES source")
+                };
+                EntityPacketSource {
+                    elementary: source.elementary_range.clone(),
+                    payload: source.payload_range.clone(),
+                    header_ranges: pes.header_source_ranges.as_slice().to_vec(),
+                    payload_ranges: pes.source_ranges().collect(),
+                }
+            })
+            .collect(),
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum EntityMode {
+    Replay,
+    Retain,
+    PressureBefore,
+    PressureAfter,
+    CancelBefore,
+    CancelAfter,
+    Multiple,
+    Epoch,
+    Indexed,
+}
+
+fn entity_run(
+    ts: &Transport,
+    split: usize,
+    mode: EntityMode,
+) -> (
+    triergon_core::container::SeekReceipt,
+    Vec<EntityPacket>,
+    usize,
+) {
+    use triergon_mpegts::SeekEntity;
+    let parts = [&ts.bytes[..split], &ts.bytes[split..]];
+    let plan = [
+        SeekEntity {
+            source: ID,
+            length: parts[0].len() as u64,
+        },
+        SeekEntity {
+            source: SourceId(99),
+            length: parts[1].len() as u64,
+        },
+    ];
+    let pool = Budget::new(1 << 20).unwrap();
+    let caps = SourceCapabilities {
+        length: Some(parts[0].len() as u64),
+        random_access: true,
+    };
+    let tracks = if matches!(mode, EntityMode::Multiple) {
+        vec![TrackId(PID.into()), TrackId(257)]
+    } else {
+        vec![TrackId(PID.into())]
+    };
+    let mut reader = if matches!(mode, EntityMode::Replay) {
+        Reader::new(&pool, ID, caps, ReaderLimits::default(), 4096).unwrap()
+    } else {
+        Reader::new_with_packet_tracks(&pool, ID, caps, ReaderLimits::default(), 4096, &tracks)
+            .unwrap()
+    };
+    let seek = SeekRequest {
+        track: TrackId(PID.into()),
+        target: clock(95_000),
+        policy: SeekPolicy::PlaybackPreroll,
+    };
+    let start = |reader: &mut Reader| {
+        if matches!(mode, EntityMode::Epoch) {
+            reader
+                .request_seek_in_entities_in_epoch(
+                    seek,
+                    &plan,
+                    triergon_mpegts::SourceEpochs {
+                        clock: 0,
+                        configuration: 2,
+                    },
+                )
+                .unwrap();
+        } else if matches!(mode, EntityMode::Indexed) {
+            reader
+                .request_seek_in_entities_and_index(seek, &plan, 8)
+                .unwrap();
+        } else {
+            reader.request_seek_in_entities(seek, &plan).unwrap();
+        }
+    };
+    start(&mut reader);
+    let mut injected = false;
+    let mut reservation = None;
+    let mut prefix = 0;
+    let mut receipt = None;
+    let mut packets = Vec::new();
+    for _ in 0..100_000 {
+        match reader.step(&mut WorkBudget::new(97), &OFF) {
+            Ok(Step::NeedInput(input)) => {
+                let part = if input.source == ID {
+                    parts[0]
+                } else {
+                    parts[1]
+                };
+                let at = input.offset as usize;
+                if input.source == ID && at == 0 && input.maximum > 0 {
+                    prefix += 1;
+                }
+                if at == part.len() {
+                    reader.finish(input.source, input.token).unwrap();
+                    continue;
+                }
+                let end = part.len().min(at + input.maximum.min(188));
+                let bytes = Bytes::copy_from_slice(&pool, &part[at..end]).unwrap();
+                reader
+                    .provide(
+                        &InputWindow::new(input.source, input.token, input.offset, bytes).unwrap(),
+                    )
+                    .unwrap();
+                let after = input.source != ID;
+                if !injected
+                    && ((matches!(mode, EntityMode::PressureBefore | EntityMode::CancelBefore)
+                        && input.source == ID
+                        && at >= 188)
+                        || (matches!(mode, EntityMode::PressureAfter | EntityMode::CancelAfter)
+                            && after))
+                {
+                    injected = true;
+                    if matches!(mode, EntityMode::CancelBefore | EntityMode::CancelAfter) {
+                        assert!(matches!(
+                            reader.step(&mut WorkBudget::new(1), &AtomicBool::new(true)),
+                            Err(Error::Cancelled)
+                        ));
+                        reader.reset().unwrap();
+                        start(&mut reader);
+                    } else {
+                        reservation =
+                            Some(pool.reserve(pool.available().saturating_sub(64)).unwrap());
+                    }
+                }
+            }
+            Ok(Step::Ready(Event::Seek(value))) => {
+                assert!(receipt.replace(value).is_none());
+            }
+            Ok(Step::Ready(Event::Packet(packet))) => {
+                assert!(receipt.is_some());
+                packets.push(entity_packet(&packet));
+            }
+            Ok(Step::Ready(Event::Other(_)) | Step::Yield) => (),
+            Ok(Step::Backpressure(_)) | Err(Error::Backpressure { .. })
+                if reservation.is_some() =>
+            {
+                reservation = None;
+            }
+            Ok(Step::End(end)) => {
+                assert_eq!(end.source, SourceId(99));
+                assert!(reservation.is_none());
+                reader.close();
+                assert_eq!(pool.used(), Budget::control_storage_bytes());
+                return (receipt.unwrap(), packets, prefix);
+            }
+            other => panic!("{mode:?}: {other:?}"),
+        }
+    }
+    panic!("{mode:?} did not finish")
+}
+
+#[test]
+fn entity_retention_matches_replay_for_split_latm_and_fallbacks() {
+    let first = envelope(1, &[&[0x11; 300]]);
+    let second = mux_envelope(1, &[&[0x22; 30]], false);
+    let third = mux_envelope(1, &[&[0x33; 31]], false);
+    let mut ts = Transport::new();
+    ts.tables(&[(0x11, PID, &[])], 0);
+    ts.pes(PID, 0xc0, &first, Some(90_000), None);
+    let split = 3 * 188;
+    ts.pes(PID, 0xc0, &second, Some(93_000), None);
+    ts.pes(PID, 0xc0, &third, None, None);
+    let (receipt, packets, reads) = entity_run(&ts, split, EntityMode::Replay);
+    assert_eq!(reads, 2);
+    assert_eq!(
+        packets
+            .iter()
+            .map(|p| p.payload.clone())
+            .collect::<Vec<_>>(),
+        [first, second, third]
+    );
+    assert_eq!(packets[0].sources.len(), 1);
+    assert_eq!(
+        packets[0].sources[0],
+        EntityPacketSource {
+            elementary: 0..311,
+            payload: 0..311,
+            header_ranges: vec![triergon_mpegts::SourceRange {
+                entity: ID,
+                offset: 380,
+                bytes: 14
+            }],
+            payload_ranges: vec![
+                triergon_mpegts::SourceRange {
+                    entity: ID,
+                    offset: 394,
+                    bytes: 170
+                },
+                triergon_mpegts::SourceRange {
+                    entity: SourceId(99),
+                    offset: 47,
+                    bytes: 141
+                }
+            ],
+        }
+    );
+    for mode in [
+        EntityMode::Retain,
+        EntityMode::PressureBefore,
+        EntityMode::PressureAfter,
+        EntityMode::CancelBefore,
+        EntityMode::CancelAfter,
+        EntityMode::Multiple,
+        EntityMode::Epoch,
+        EntityMode::Indexed,
+    ] {
+        let (actual_receipt, actual_packets, reads) = entity_run(&ts, split, mode);
+        assert_eq!(actual_receipt, receipt, "{mode:?}");
+        assert_eq!(actual_packets, packets, "{mode:?}");
+        assert_eq!(
+            reads,
+            if matches!(mode, EntityMode::Retain) {
+                1
+            } else {
+                2
+            },
+            "{mode:?}"
+        );
+    }
+}
+
+#[test]
+fn entity_retention_stays_disabled_over_size_limit() {
+    let frame = envelope(1, &[&[0x41; 300]]);
+    let mut ts = Transport::new();
+    ts.tables(&[(0x11, PID, &[])], 0);
+    ts.pes(PID, 0xc0, &frame, Some(90_000), None);
+    for _ in 0..1400 {
+        ts.payload(0x1fff, &[0]);
+    }
+    let split = 3 * 188;
+    let (expected, packets, _) = entity_run(&ts, split, EntityMode::Replay);
+    let (actual, output, reads) = entity_run(&ts, split, EntityMode::Retain);
+    assert_eq!(actual, expected);
+    assert_eq!(output, packets);
+    assert_eq!(reads, 2);
+}
