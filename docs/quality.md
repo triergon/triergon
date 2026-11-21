@@ -491,6 +491,14 @@ resolved from the repository root. Prefix comparisons verify the reference worke
 build hash and the manifest hashes of the primary input, ordered entities and
 companion files before running a case. DVD palette paths resolve inside the
 selected corpus and keep their manifest spelling in recorded traces.
+
+The references for `codec-views-worker`, `matroska-views-worker` and
+`subtitle-views-worker` link the decode, Matroska and formats profiles,
+respectively. Each pair uses the same prefix protocol as the framing and
+ISO BMFF views workers, including `PREFIXtrace`. The corresponding
+`cargo xtask codec-views`, `matroska-views` and `subtitle-views` commands verify
+fixture inputs and record reference folds or oracle trace pins.
+
 `cargo xtask worker-tests` runs the integration tests
 of the built workers: work digests, catalogue, colour, content encoding, seek, timing
 and inflate behaviour against the reference workers and the oracles. The independent

@@ -94,6 +94,17 @@ pub fn named(command: &str) -> Option<&'static Generator> {
         .find(|generator| generator.command == command)
 }
 
+/// Views commands verify or record pins in checked-in corpus manifests.
+pub fn views(command: &str, root: &Path, args: &[String]) -> Option<R<()>> {
+    let run = match command {
+        "codec-views" => crate::codec_views::main,
+        "matroska-views" => crate::matroska_views::main,
+        "subtitle-views" => crate::subtitle_views::main,
+        _ => return None,
+    };
+    Some(run(root, args))
+}
+
 fn pins_path(root: &Path, id: &str) -> PathBuf {
     root.join("harness/features").join(id).join("pins.json")
 }

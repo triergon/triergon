@@ -317,7 +317,7 @@ const MEDIA_WORKER: Candidate = Candidate {
 
 /// Measurement workers a contract may name as its candidate besides
 /// `media-worker`.
-const ADDITIONAL_CANDIDATES: [Candidate; 16] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 20] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
@@ -357,6 +357,20 @@ const ADDITIONAL_CANDIDATES: [Candidate; 16] = [
         example: None,
         features: &["aac-simd"],
         nightly: true,
+    },
+    Candidate {
+        name: "codec-hevc-worker",
+        package: "codec-worker",
+        example: None,
+        features: &["hevc-simd"],
+        nightly: true,
+    },
+    Candidate {
+        name: "codec-views-worker",
+        package: "codec-worker",
+        example: None,
+        features: &[],
+        nightly: false,
     },
     Candidate {
         name: "capture-worker",
@@ -406,6 +420,20 @@ const ADDITIONAL_CANDIDATES: [Candidate; 16] = [
         package: "subtitle-worker",
         example: None,
         features: &[],
+        nightly: false,
+    },
+    Candidate {
+        name: "subtitle-views-worker",
+        package: "subtitle-worker",
+        example: None,
+        features: &["triergon-subtitles/reference-trace"],
+        nightly: false,
+    },
+    Candidate {
+        name: "matroska-views-worker",
+        package: "triergon-matroska",
+        example: Some("matroska_views_worker"),
+        features: &["reference-trace"],
         nightly: false,
     },
     Candidate {
@@ -479,7 +507,13 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
     let features: Vec<String> = spec
         .features
         .iter()
-        .map(|feature| format!("{}/{feature}", spec.package))
+        .map(|feature| {
+            if feature.contains('/') {
+                (*feature).to_owned()
+            } else {
+                format!("{}/{feature}", spec.package)
+            }
+        })
         .collect();
     let metadata = super::provenance::cargo_metadata_with_features(root, &features)?;
     let mut inputs = shared_inputs(root)?;
@@ -516,6 +550,25 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
         }
     }
     let view_headers: &[&str] = match name {
+        "codec-views-worker" => &[
+            "harness/reference_codec_views.c",
+            "harness/reference_codec_readers.h",
+            "harness/reference_codec_video.h",
+            "harness/reference_codec_audio.h",
+            "harness/reference_codec_blocks.h",
+        ],
+        "matroska-views-worker" => &[
+            "crates/worker-entry/src/lib.rs",
+            "crates/worker-entry/README.md",
+            "harness/reference_matroska_views.c",
+            "harness/reference_matroska_side_data.h",
+            "harness/reference_matroska_metadata.h",
+        ],
+        "subtitle-views-worker" => &[
+            "harness/reference_subtitle_views.c",
+            "harness/reference_subtitle_views_text.h",
+            "harness/reference_subtitle_views_source.h",
+        ],
         "framing-views-worker" => &[
             "harness/reference_framing_views.c",
             "harness/reference_views_protocol.h",
@@ -525,6 +578,8 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             "harness/reference_adts.h",
             "harness/reference_config_views.h",
             "harness/reference_dts_frames.h",
+            "harness/dts_oracle.py",
+            "xtask/src/framing_views/dts.rs",
         ],
         "isobmff-views-worker" => &[
             "crates/framing/examples/framing_views/fold.rs",
@@ -538,6 +593,19 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
         _ => &[],
     };
     inputs.extend(view_headers.iter().map(ToString::to_string));
+    if matches!(
+        name,
+        "codec-views-worker" | "matroska-views-worker" | "subtitle-views-worker"
+    ) {
+        inputs.extend(
+            [
+                "crates/framing/examples/framing_views/fold.rs",
+                "crates/framing/examples/framing_views/protocol.rs",
+                "harness/reference_views_protocol.h",
+            ]
+            .map(str::to_owned),
+        );
+    }
     inputs.sort();
     inputs.dedup();
     selected_graph(root, &metadata, spec.package, &inputs)
@@ -828,7 +896,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 22] = [
+const PROFILE_REFERENCES: [ProfileReference; 25] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -1052,6 +1120,39 @@ const PROFILE_REFERENCES: [ProfileReference; 22] = [
         ..REFERENCE
     },
     ProfileReference {
+        profile: ".research/reference-decode",
+        binary: "ffmpeg-codec-views-worker",
+        source: "harness/reference_codec_views.c",
+        record: "ffmpeg-codec-views-native",
+        kind: "FFmpeg 9.0.2 codec public-API views",
+        libraries: "codec_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference",
+        binary: "ffmpeg-matroska-views-worker",
+        source: "harness/reference_matroska_views.c",
+        record: "ffmpeg-matroska-views-native",
+        kind: "pinned FFmpeg Matroska public-API views",
+        libraries: "matroska_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-formats",
+        binary: "ffmpeg-subtitle-views-worker",
+        source: "harness/reference_subtitle_views.c",
+        record: "ffmpeg-subtitle-views-native",
+        kind: "pinned FFmpeg subtitle public-API views",
+        libraries: "subtitle_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
         profile: ".research/freetype",
         binary: "freetype-font-worker",
         define: Some("-DTRIERGON_FONT_REFERENCE=1"),
@@ -1153,10 +1254,19 @@ fn build_selected(
     let mut candidate_command = cargo_rustc(&MEDIA_WORKER, &root.join("target"), true)?;
     candidate_command.extend(gate_build::worker_link_arguments()?);
     // The views use the media worker only to share the report's build identity.
-    // Its trained layout does not qualify a comparison-only build of either view.
+    // Its trained layout does not qualify a comparison-only build of these workers.
     let candidate_order = if comparison_build
-        && matches!(only, Some("framing-views-worker" | "isobmff-views-worker"))
-    {
+        && matches!(
+            only,
+            Some(
+                "framing-views-worker"
+                    | "isobmff-views-worker"
+                    | "codec-views-worker"
+                    | "matroska-views-worker"
+                    | "subtitle-views-worker"
+                    | "codec-hevc-worker"
+            )
+        ) {
         run(&candidate_command)?;
         None
     } else {

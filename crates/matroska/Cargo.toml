@@ -19,6 +19,56 @@ triergon-harness-protocol = { path = "../harness-protocol" }
 # shipped behaviour.
 reference-trace = []
 
-[lints]
-workspace = true
+[[example]]
+name = "matroska_views_worker"
+required-features = ["reference-trace"]
+
+# The example uses the worker C entry point. The library forbids unsafe code.
+[lints.rust]
+unsafe_code = "deny"
+rust_2018_idioms = { level = "warn", priority = -1 }
+unused_qualifications = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+needless_range_loop = "allow"
+chunks_exact_to_as_chunks = "allow"
+unreadable_literal = "allow"
+many_single_char_names = "allow"
+similar_names = "allow"
+struct_excessive_bools = "allow"
+fn_params_excessive_bools = "allow"
+too_many_lines = "allow"
+inline_always = "allow"
+trivially_copy_pass_by_ref = "allow"
+large_types_passed_by_value = "allow"
+needless_pass_by_value = "allow"
+if_not_else = "allow"
+range_plus_one = "allow"
+verbose_bit_mask = "allow"
+comparison_chain = "allow"
+manual_midpoint = "allow"
+match_same_arms = "allow"
+assert_is_empty = "allow"
+wildcard_imports = "allow"
+needless_continue = "allow"
+format_collect = "allow"
+format_push_string = "allow"
+items_after_statements = "allow"
+unnecessary_wraps = "allow"
+unused_self = "allow"
+struct_field_names = "allow"
+must_use_candidate = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_possible_wrap = "allow"
+cast_lossless = "allow"
+cast_precision_loss = "allow"
+doc_markdown = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
 

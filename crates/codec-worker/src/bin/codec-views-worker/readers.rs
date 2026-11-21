@@ -1,0 +1,15 @@
+use std::ffi::OsString;
+
+use super::protocol::Operation;
+
+pub(super) fn operation<'a>(
+    prefix: &str,
+    _input: &'a [u8],
+    _arguments: &[OsString],
+) -> Result<Operation<'a>, String> {
+    Err(format!("usage: {prefix} operation is unavailable"))
+}
+
+pub(super) fn command(command: &str, _arguments: &[OsString]) -> Result<(), String> {
+    Err(format!("usage: {command} operation is unavailable"))
+}

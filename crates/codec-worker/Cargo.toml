@@ -30,6 +30,15 @@ hevc-simd = ["triergon-session/hevc-simd"]
 # builds `codec-aac-worker` with it.
 aac-simd = ["triergon-session/aac-simd"]
 
+[[bin]]
+name = "codec-views-worker"
+path = "src/bin/codec-views-worker/main.rs"
+
+[[bin]]
+name = "codec-hevc-worker"
+path = "src/bin/codec-hevc-worker.rs"
+required-features = ["hevc-simd"]
+
 # The workspace's lints with unsafe_code denied instead of forbidden: the C entry
 # point of each worker binary is its one allowed exception (docs/quality.md).
 # `cargo xtask check` keeps the rest equal to the workspace's.

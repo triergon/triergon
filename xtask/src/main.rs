@@ -8,6 +8,7 @@ mod archive;
 mod ass;
 mod capture;
 mod checks;
+mod codec_views;
 mod codecs;
 mod core_time;
 mod corpus;
@@ -28,6 +29,7 @@ mod isobmff_bench;
 mod isobmff_seek;
 mod isobmff_views;
 mod json;
+mod matroska_views;
 mod mpg123;
 mod numpy;
 mod playback_golds;
@@ -44,6 +46,7 @@ mod shape;
 mod stats;
 mod status;
 mod subtitle_fixtures;
+mod subtitle_views;
 mod test_skips;
 mod toml;
 mod transport_fixtures;
@@ -94,6 +97,9 @@ commands:
   oracle-compare [--contract FILE] [--output DIR]  compare candidate traces with an independent oracle
   framing-views fixtures|manifest --record [FEATURE]
   isobmff-views fixtures|manifest --record [FEATURE]
+  codec-views fixtures|manifest --record [FEATURE]
+  matroska-views fixtures|manifest --record [FEATURE]
+  subtitle-views fixtures|manifest --record [FEATURE]
   prepare-mpg123 [--jobs N]   build the pinned static free-format MPEG audio reference
   references     keys|pack|fetch|upload   the keys of the pinned reference builds, and
                  their packs in .research/reference-cache and the evidence archive, which
@@ -205,6 +211,12 @@ fn main() -> ExitCode {
     let root = root();
     if let Some(generator) = args.first().and_then(|command| generators::named(command)) {
         return generator_main(&root, generator, &args[1..]);
+    }
+    if let Some(result) = args
+        .first()
+        .and_then(|command| generators::views(command, &root, &args[1..]))
+    {
+        return exit_with(result.map(|()| 0), 1);
     }
     let result = match args.first().map(String::as_str) {
         Some("check") => match &args[1..] {
@@ -1043,13 +1055,20 @@ fn shown_on_reference_path(command: &mut Command) -> Result<String, String> {
 /// The workspace tests for the worker target, as [`run`] runs them, then how many
 /// checks they left out for inputs this checkout lacks ([`test_skips`]).
 fn workspace_tests(root: &Path) -> Task {
+    tests_with_skips(root, None, &["test", "--workspace", "--locked"])
+}
+
+fn tests_with_skips(root: &Path, toolchain: Option<&str>, args: &[&str]) -> Task {
     let target = harness::gate_build::target_args()?;
-    let args: Vec<String> = with_target(&["test", "--workspace", "--locked"], &target)
+    let args: Vec<String> = with_target(args, &target)
         .into_iter()
         .map(str::to_owned)
         .collect();
     let cargo = || {
         let mut command = Command::new("cargo");
+        if let Some(toolchain) = toolchain {
+            command.arg(toolchain);
+        }
         command.env("CARGO_INCREMENTAL", "0").current_dir(root);
         command
     };
@@ -1084,6 +1103,8 @@ fn prepare_check(part: Option<Part>) -> Task {
             &["prepare-ffmpeg"],
             &["prepare-ffmpeg", "--profile", "formats"],
             &["prepare-ffmpeg", "--profile", "framing-views"],
+            &["prepare-ffmpeg", "--profile", "decode"],
+            &["framing-views", "fixtures", "dts"],
             &["prepare-ffmpeg", "--profile", "transport-dts"],
             &["prepare-mpg123"],
             &["prepare-ffmpeg", "--profile", "video"],
@@ -1153,7 +1174,7 @@ fn simd_lints(root: &Path) -> Task {
 /// SBR kernels to the scalar arithmetic bit for bit.
 fn simd_tests(root: &Path) -> Task {
     simd_toolchain()?;
-    cargo_for_workers(
+    tests_with_skips(
         root,
         Some(&format!("+{NIGHTLY}")),
         &[
