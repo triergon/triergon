@@ -421,6 +421,8 @@ impl<'a> EncodedStreamJob<'a> {
     }
     fn accept_configuration(&mut self, raw: BoxView) -> Result<()> {
         check_configuration_size(&raw, self.limits)?;
+        // A second `esds` in `wave` is one of the faults the context view reads past, the
+        // later box becoming the configuration; every other view refuses it.
         if self.view.observes_contexts()
             && self.wave_fields.is_some()
             && self.kind == EncodedEntryKind::Aac
