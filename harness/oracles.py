@@ -29,6 +29,12 @@ ORACLES = {
 }
 # Trace oracles return canonical text rows without line endings. Load each on demand.
 TRACE_ORACLES = {
+    "opus-final-range": ("harness.opus_range_oracle", "ranges"),
+    "core-budgets": ("harness.core_budget_oracle", "budget_trace"),
+    "divide": ("harness.codec_dsp_oracle", "divide"),
+    "windows": ("harness.codec_dsp_oracle", "windows"),
+    "rbsp": ("harness.bitstream_oracle", "rbsp"),
+    "bit-readers": ("harness.bitstream_oracle", "bit_readers"),
     "qt-sound-v0": ("harness.isobmff_entry_oracle", "qt_sound"),
     "ddts": ("harness.isobmff_entry_oracle", "ddts"),
     "dts-header": ("harness.dts_oracle", "header"),
