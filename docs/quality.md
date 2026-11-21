@@ -260,7 +260,7 @@ resource limit becomes an explicit, reviewed rule for that case.
   manifest` generate them from `harness/fonts/corpus.json`, the shaping texts,
   seeded random cases, the ASS fixtures and each feature's settings
   (`xtask/src/{fonts,shape,raster,ass}/manifest.rs`, registered in
-  `xtask/src/lanes.rs`), and take each case's expected work from
+  `xtask/src/generators.rs`), and take each case's expected work from
   `harness/features/<feature>/pins.json`. Pins are the reference's folds:
   re-record them with `cargo xtask fonts manifest --record`, `cargo xtask shape
   manifest --record`, `cargo xtask raster manifest --record` or `cargo xtask ass
