@@ -428,6 +428,87 @@
       }
     },
     {
+      "id": "vobsub-ifo-palette-sector-past-eof",
+      "profile": "vobsub-ifo-palette-sector-past-eof",
+      "file": "dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd",
+        "opt:ifo_palette=.research/subtitle-corpus/dvd/VTS_06_0.IFO"
+      ],
+      "companions": [
+        {
+          "file": "dvd/VTS_06_0.IFO",
+          "sha256": "2d043b1f80991e617c6f52a5a68d45e36f01bf35e43e36f3cf28658853ff627f"
+        },
+        {
+          "file": "dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 56142,
+        "digest": 15825236381441986741
+      }
+    },
+    {
+      "id": "vobsub-ifo-palette-pgc-past-eof",
+      "profile": "vobsub-ifo-palette-pgc-past-eof",
+      "file": "dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd",
+        "opt:ifo_palette=.research/subtitle-corpus/dvd/VTS_07_0.IFO"
+      ],
+      "companions": [
+        {
+          "file": "dvd/VTS_07_0.IFO",
+          "sha256": "1594c54b139bbe5ee5b27972334929f55c93fe4de17e7192acdeec82f90ec233"
+        },
+        {
+          "file": "dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 56142,
+        "digest": 15825236381441986741
+      }
+    },
+    {
+      "id": "vobsub-ifo-palette-sector-overflow",
+      "profile": "vobsub-ifo-palette-sector-overflow",
+      "file": "dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd",
+        "opt:ifo_palette=.research/subtitle-corpus/dvd/VTS_08_0.IFO"
+      ],
+      "companions": [
+        {
+          "file": "dvd/VTS_08_0.IFO",
+          "sha256": "2cc8b750f3bd42444d00267cde1ecb507ac45a409fc8fbf019465741e10690d2"
+        },
+        {
+          "file": "dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 56142,
+        "digest": 605664139747535763
+      }
+    },
+    {
       "id": "vobsub-ifo-palette-missing",
       "profile": "vobsub-ifo-palette-missing",
       "file": "dvd/basic.idx",

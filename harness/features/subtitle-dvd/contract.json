@@ -19,6 +19,21 @@
     "aarch64-unknown-linux-gnu",
     "thumbv7neon-unknown-linux-gnueabihf"
   ],
+  "pending_module_requirements": [
+    "A VTS_PGCITI sector word of 0x00200000 addresses a table at 2^32 bytes, past the file. Triergon rejects the offset. The AArch64 reference returns a different palette, consistent with a wrapped seek."
+  ],
+  "open_cases": [
+    {
+      "id": "vobsub-ifo-palette-sector-overflow",
+      "requirement": "A VTS_PGCITI sector word of 0x00200000 addresses a table at 2^32 bytes, past the file. Triergon rejects the offset. The AArch64 reference returns a different palette, consistent with a wrapped seek.",
+      "targets": ["aarch64-unknown-linux-gnu"]
+    }
+  ],
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["vobsub-ifo-palette-sector-past-eof", "vobsub-ifo-palette-pgc-past-eof", "vobsub-ifo-palette-sector-overflow"], "cause": "awaiting native gate-host measurement"},
+    {"bound": "heap", "cases": ["vobsub-ifo-palette-sector-past-eof", "vobsub-ifo-palette-pgc-past-eof", "vobsub-ifo-palette-sector-overflow"], "cause": "awaiting native gate-host measurement"},
+    {"bound": "total_rss", "cases": ["vobsub-ifo-palette-sector-past-eof", "vobsub-ifo-palette-pgc-past-eof", "vobsub-ifo-palette-sector-overflow"], "cause": "awaiting native gate-host measurement"}
+  ],
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95

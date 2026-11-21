@@ -17,6 +17,7 @@ run (the muxed copies depend on that ffmpeg build; their hashes are recorded in
 the corpus manifest).
 
 usage: dvd_streams.py [--group NAME] [OUTPUT_DIR]   (default: .research/subtitle-corpus/dvd)
+       dvd_streams.py --ifo-offset-fixtures OUTPUT_DIR
 
 `--group index` writes only the `.idx` text variants, which need no ffmpeg,
 and adds their new cases to the manifests without touching any other case;
@@ -554,6 +555,22 @@ def ifo(palette_ycrcb, pgcs=1, magic=b"DVDVIDEO-VTS", pgci_sector=1, clut_pgc=0)
     pgci = table + body
     sector = bytearray(pgci) + bytearray(-len(pgci) % SECTOR)
     return bytes(head) + bytes(SECTOR * (pgci_sector - 1)) + bytes(sector)
+
+
+def ifo_offset_cases(out):
+    """VTS IFOs whose table or first program chain is outside the file."""
+    cases = []
+    for number, label, offset, value in [
+        (6, "sector-past-eof", 0xCC, 2),
+        (7, "pgc-past-eof", SECTOR + 12, SECTOR),
+        (8, "sector-overflow", 0xCC, 0x20_0000),
+    ]:
+        data = bytearray(ifo([(200, 114, 128)] * 16))
+        struct.pack_into(">I", data, offset, value)
+        name = "VTS_%02d_0.IFO" % number
+        write(out, name, data)
+        cases.append((label, name))
+    return cases
 
 
 # ------------------------------------------------------------------- helpers
@@ -1120,6 +1137,9 @@ def generate(out):
         ifo_name = "VTS_%02d_0.IFO" % n
         case("vobsub-ifo-palette-" + label, "basic.idx", "opt:ifo_palette=" + base + ifo_name,
              companions=[ifo_name])
+    for label, ifo_name in ifo_offset_cases(out):
+        case("vobsub-ifo-palette-" + label, "basic.idx", "opt:ifo_palette=" + base + ifo_name,
+             companions=[ifo_name])
     case("vobsub-ifo-palette-missing", "basic.idx", "opt:ifo_palette=" + base + "VTS_99_0.IFO")
     case("vobsub-ifo-and-palette-option", "basic.idx", "opt:ifo_palette=" + base + "VTS_01_0.IFO",
          "opt:palette=010203,040506", companions=["VTS_01_0.IFO"])
@@ -1438,6 +1458,12 @@ def main():
     root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     corpus = os.path.join(root, ".research", "subtitle-corpus")
     arguments = sys.argv[1:]
+    if arguments[:1] == ["--ifo-offset-fixtures"]:
+        if len(arguments) != 2:
+            raise SystemExit("usage: dvd_streams.py --ifo-offset-fixtures OUTPUT_DIR")
+        os.makedirs(arguments[1], exist_ok=True)
+        ifo_offset_cases(arguments[1])
+        return
     group = None
     if arguments[:1] == ["--group"]:
         group, arguments = arguments[1], arguments[2:]
