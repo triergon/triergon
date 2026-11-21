@@ -5,9 +5,10 @@
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
-    clippy::print_stderr
+    clippy::print_stderr,
+    clippy::unwrap_used,
+    clippy::expect_used
 )]
-// Pending: `clippy::unwrap_used`, `clippy::expect_used`.
 
 mod analysis;
 mod bits;

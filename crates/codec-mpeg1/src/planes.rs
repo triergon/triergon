@@ -1,4 +1,5 @@
-//! The encoder's own pictures (reference and reconstruction) in charged planes.
+//! The encoder's own pictures (reference and reconstruction) in charged planes, and
+//! fixed-size reads of sample rows.
 
 use triergon_core::{Budget, BudgetVec, Error};
 use triergon_pixel::{Colour, Geometry, PictureView, Plane};
@@ -75,4 +76,10 @@ impl Planes {
             },
         }
     }
+}
+
+/// The `N` samples of `plane` from `at`; a range past the end panics as indexing does.
+#[inline(always)]
+pub(crate) fn samples<const N: usize>(plane: &[u8], at: usize) -> &[u8; N] {
+    &plane[at..][..N].as_chunks::<N>().0[0]
 }

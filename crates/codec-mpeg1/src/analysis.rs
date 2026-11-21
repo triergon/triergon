@@ -3,6 +3,7 @@
 //! an I picture, and the per-row activity the rate model plans with.
 
 use crate::motion::{self, Bounds, Coarse, Mv, Search};
+use crate::planes::samples;
 use crate::syntax::PictureType;
 use crate::{Encoder, Result};
 use triergon_pixel::Picture;
@@ -247,7 +248,7 @@ fn variance256(block: &[u8], stride: usize) -> u32 {
     // square formed in 16 bits.
     let (mut sum, mut squares) = ([0u16; 16], [0u32; 16]);
     for r in 0..16 {
-        let row: &[u8; 16] = block[r * stride..r * stride + 16].try_into().unwrap();
+        let row = samples::<16>(block, r * stride);
         for i in 0..16 {
             let v = u16::from(row[i]);
             sum[i] += v;

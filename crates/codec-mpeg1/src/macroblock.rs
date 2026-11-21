@@ -4,6 +4,7 @@
 
 use crate::Encoder;
 use crate::motion::{self, Mv};
+use crate::planes::samples;
 use crate::rate::VBV_GUARD_BITS;
 use crate::syntax::{PictureType, write_coefficients, write_dc, write_mv_component};
 use crate::tables::*;
@@ -263,10 +264,8 @@ impl Encoder {
                 // (a column sums at most 8 × 255).
                 let mut columns = [0u16; 8];
                 for r in 0..8 {
-                    let row: &[u8; 8] = src[(y + r) * stride + x..(y + r) * stride + x + 8]
-                        .try_into()
-                        .unwrap();
-                    let p: &[u8; 8] = pred[b][r * 8..r * 8 + 8].try_into().unwrap();
+                    let row = samples::<8>(src, (y + r) * stride + x);
+                    let p = samples::<8>(&pred[b], r * 8);
                     for c in 0..8 {
                         let d = i16::from(row[c]) - i16::from(p[c]);
                         coeffs[dct::fdct_input_index(r, c)] = i32::from(d);
