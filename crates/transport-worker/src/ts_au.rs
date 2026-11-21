@@ -1023,7 +1023,7 @@ mod tests {
         let retained = pool.used();
         let mut first = None;
         for _ in 0..50 {
-            let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
+            let totals = operation::<false>(&pool, &request, &AtomicBool::new(false)).unwrap();
             assert_eq!((totals.packets, totals.bytes, totals.digest), (0, 0, 0));
             let refusal = totals.refusal.expect("malformed DTS remains unsupported");
             assert!(
