@@ -174,6 +174,18 @@ does not scan for uncued packets. It validates the referenced block and returns
 its source clock and bytes; it does not validate or decode AAC payloads. The
 general playback and video seek operations continue to require video.
 
+The separately named `cargo xtask cued-aac-compare FFMPEG_INSTALL` compares this
+seek with a backward `av_seek_frame` and reads every packet to EOF on the authored
+two-Cue fixture. It compares the landing time, track, PTS, DTS, duration and original
+packet bytes. FFmpeg exposes the landing through the first packet rather than a seek
+receipt. On this fixture both land at 1 s and return the same packets and PTS; the
+first difference is DTS, which the reader leaves absent and FFmpeg reports as 1 s.
+The comparison reports that difference as a failure. The Matroska clock policy
+returns PTS and duration, not DTS. The playback AAC clock also projects DTS, but
+for this track it infers a duration when none is carried; FFmpeg reports no duration
+for these packets. Its complete output therefore cannot replace the compared packet
+clock. The source packet's missing DTS remains distinct from a projected DTS.
+
 **Colour.** `Track::colour` keeps every source field: bit depth, both chroma and Cb
 subsampling axes, siting, optional MaxCLL/MaxFALL and each optional mastering value as
 exact `f64`. Zero-length numbers take the schema default. Duplicates, bad widths,
