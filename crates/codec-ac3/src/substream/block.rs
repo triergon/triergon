@@ -2,6 +2,7 @@
 //! range, rematrixing and the sequence of side-information sections up to the mantissas.
 
 use super::{E, NoiseMode, Substream};
+use crate::bitalloc::BaRerun;
 use crate::noise::Rng;
 use crate::quant::GroupTables;
 use crate::trace::Trace;
@@ -43,9 +44,9 @@ impl Substream {
         }
         self.parse_exp_strategies(br, blk, cplinu)?;
         self.parse_exponents(br, blk, cplinu, new_cpl_strategy)?;
-        let mut all_dirty = self.parse_ba_info(br, blk, cplinu, new_cpl_strategy)?;
+        let mut rerun_all = self.parse_ba_info(br, blk, cplinu, new_cpl_strategy)?;
         if self.parse_delta_ba(br, blk, cplinu, trace)? {
-            all_dirty = all_dirty.max(2);
+            rerun_all = rerun_all.max(BaRerun::Mask);
         }
 
         // Skip field.
@@ -55,8 +56,8 @@ impl Substream {
             self.features.skip_fields = true;
         }
 
-        for d in &mut self.ba_dirty {
-            *d = (*d).max(all_dirty);
+        for d in &mut self.ba_rerun {
+            *d = (*d).max(rerun_all);
         }
         self.run_bit_allocation(cplinu)?;
 

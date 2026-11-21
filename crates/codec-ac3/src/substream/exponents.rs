@@ -1,6 +1,7 @@
 //! Exponent strategies, channel bandwidths and grouped exponents (5.4.3, 7.1).
 
 use super::{CPL, E, LFE, REUSE, Substream, bad};
+use crate::bitalloc::BaRerun;
 use crate::tables::spx_band_start;
 use triergon_bitstream::BitReader;
 
@@ -71,7 +72,7 @@ impl Substream {
             decode_exponents(br, &mut self.exps[CPL], cplabsexp, start, ngrps, gs)?;
             self.strtmant[CPL] = self.cplstrtmant;
             self.endmant[CPL] = self.cplendmant;
-            self.ba_dirty[CPL] = 3;
+            self.ba_rerun[CPL] = BaRerun::Psd;
         } else if cplinu && new_cpl_strategy && !eac3 && self.expstr[CPL][blk] == REUSE && blk == 0
         {
             return Err(bad("coupling exponents missing"));
@@ -86,7 +87,7 @@ impl Substream {
                 self.exps[ch][0] = absexp;
                 decode_exponents(br, &mut self.exps[ch], absexp, 1, ngrps, gs)?;
                 br.skip(2); // gainrng
-                self.ba_dirty[ch] = 3;
+                self.ba_rerun[ch] = BaRerun::Psd;
             }
         }
         if self.lfeon && self.expstr[LFE][blk] != REUSE {
@@ -95,7 +96,7 @@ impl Substream {
             decode_exponents(br, &mut self.exps[LFE], absexp, 1, 2, 1)?;
             self.strtmant[LFE] = 0;
             self.endmant[LFE] = 7;
-            self.ba_dirty[LFE] = 3;
+            self.ba_rerun[LFE] = BaRerun::Psd;
         }
         Ok(())
     }

@@ -4,6 +4,20 @@
 use crate::spec_tables::{BAPTAB, BNDSZ, BNDTAB, HEBAPTAB, HTH_0, HTH_1, HTH_2, LATAB, MASKTAB};
 use crate::tables::{DBPBTAB, FASTDEC, FLOORTAB, SLOWDEC, SLOWGAIN};
 
+/// The bit allocation stages a channel must re-run, ordered so that each includes the
+/// ones after it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum BaRerun {
+    /// The allocation is current.
+    Nothing = 0,
+    /// The SNR offsets changed: only the bit allocation pointers (7.2.2.7).
+    Bap = 1,
+    /// The parameters changed: the masking curve (7.2.2.4-6) and the pointers.
+    Mask = 2,
+    /// The exponents changed: every stage from the PSD on (7.2.2.2).
+    Psd = 3,
+}
+
 /// Bit-allocation parametric information (baie fields).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct BaParams {

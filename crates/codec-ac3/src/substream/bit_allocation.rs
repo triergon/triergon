@@ -1,7 +1,7 @@
 //! Bit allocation side information (5.4.3) and the per-channel allocation run (7.2).
 
 use super::{CPL, E, LFE, NCH, Substream, bad};
-use crate::bitalloc::{self, BaParams, MaskParams};
+use crate::bitalloc::{self, BaParams, BaRerun, MaskParams};
 use crate::tables::FASTGAIN;
 use crate::trace::{BlockTrace, Trace};
 use triergon_bitstream::BitReader;
@@ -16,10 +16,10 @@ impl Substream {
         blk: usize,
         cplinu: bool,
         new_cpl_strategy: bool,
-    ) -> Result<u8, E> {
+    ) -> Result<BaRerun, E> {
         let nfch = self.nfchans;
         let eac3 = self.eac3;
-        let mut all_dirty = 0u8;
+        let mut rerun_all = BaRerun::Nothing;
         if !eac3 || self.bamode {
             if br.bit() {
                 self.ba = BaParams {
@@ -29,7 +29,7 @@ impl Substream {
                     dbpbcod: br.read(2) as u8,
                     floorcod: br.read(3) as u8,
                 };
-                all_dirty = all_dirty.max(2);
+                rerun_all = rerun_all.max(BaRerun::Mask);
             } else if blk == 0 && !eac3 {
                 return Err(bad("bit allocation info missing in block 0"));
             }
@@ -43,7 +43,7 @@ impl Substream {
             };
             if self.ba != def {
                 self.ba = def;
-                all_dirty = all_dirty.max(2);
+                rerun_all = rerun_all.max(BaRerun::Mask);
             }
         }
         if !eac3 {
@@ -61,20 +61,20 @@ impl Substream {
                     self.fsnroffst[LFE] = br.read(4) as u8;
                     self.fgaincod[LFE] = br.read(3) as u8;
                 }
-                all_dirty = all_dirty.max(2);
+                rerun_all = rerun_all.max(BaRerun::Mask);
             } else if blk == 0 {
                 return Err(bad("SNR offsets missing in block 0"));
             }
         } else {
             if self.snroffststr == 0 {
                 if blk == 0 || self.csnroffst != self.frmcsnroffst {
-                    all_dirty = all_dirty.max(1);
+                    rerun_all = rerun_all.max(BaRerun::Bap);
                 }
                 self.csnroffst = self.frmcsnroffst;
                 let f = self.frmfsnroffst;
                 for v in &mut self.fsnroffst {
                     if *v != f {
-                        all_dirty = all_dirty.max(1);
+                        rerun_all = rerun_all.max(BaRerun::Bap);
                     }
                     *v = f;
                 }
@@ -96,7 +96,7 @@ impl Substream {
                             self.fsnroffst[LFE] = br.read(4) as u8;
                         }
                     }
-                    all_dirty = all_dirty.max(1);
+                    rerun_all = rerun_all.max(BaRerun::Bap);
                 }
             }
             let fgaincode = self.frmfgaincode && br.bit();
@@ -115,7 +115,7 @@ impl Substream {
             for ch in 0..NCH {
                 if self.fgaincod[ch] != new[ch] {
                     self.fgaincod[ch] = new[ch];
-                    self.ba_dirty[ch] = self.ba_dirty[ch].max(2);
+                    self.ba_rerun[ch] = self.ba_rerun[ch].max(BaRerun::Mask);
                 }
             }
             if self.strmtyp == 0 && br.bit() {
@@ -132,12 +132,12 @@ impl Substream {
             if cplleake {
                 self.cplfleak = br.read(3) as u8;
                 self.cplsleak = br.read(3) as u8;
-                self.ba_dirty[CPL] = self.ba_dirty[CPL].max(2);
+                self.ba_rerun[CPL] = self.ba_rerun[CPL].max(BaRerun::Mask);
             } else if !eac3 && new_cpl_strategy && blk == 0 {
                 return Err(bad("coupling leak info missing"));
             }
         }
-        Ok(all_dirty)
+        Ok(rerun_all)
     }
 
     /// Delta bit allocation; returns whether it was transmitted in this block.
@@ -214,11 +214,11 @@ impl Substream {
             } else {
                 ch < self.nfchans
             };
-            let level = self.ba_dirty[ch];
-            if !present || level == 0 {
+            let level = self.ba_rerun[ch];
+            if !present || level == BaRerun::Nothing {
                 continue;
             }
-            self.ba_dirty[ch] = 0;
+            self.ba_rerun[ch] = BaRerun::Nothing;
             // An AHT channel's allocation is fixed once its mantissas were read (block 0).
             if self.aht[ch] && self.aht_read[ch] {
                 continue;
@@ -226,20 +226,20 @@ impl Substream {
             let (start, end) = (self.strtmant[ch], self.endmant[ch]);
             if start >= end || end > 253 {
                 // E.g. reused exponents that were never transmitted (corrupt stream).
-                self.ba_dirty[ch] = 3;
+                self.ba_rerun[ch] = BaRerun::Psd;
                 return Err(bad("bit allocation range"));
             }
             if all_zero_snr {
                 self.bap[ch][start..end].fill(0);
                 // The cached stages are stale for the next block.
-                self.ba_dirty[ch] = 3;
+                self.ba_rerun[ch] = BaRerun::Psd;
                 continue;
             }
             let cache = &mut self.ba_cache[ch];
-            if level >= 3 {
+            if level >= BaRerun::Psd {
                 bitalloc::stage_psd(&self.exps[ch], start, end, cache).map_err(bad)?;
             }
-            if level >= 2 {
+            if level >= BaRerun::Mask {
                 let p = MaskParams {
                     start,
                     end,

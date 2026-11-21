@@ -10,7 +10,7 @@ mod exponents;
 mod mantissas;
 mod reconstruct;
 
-use crate::bitalloc::{BaCache, BaParams, Dba};
+use crate::bitalloc::{BaCache, BaParams, BaRerun, Dba};
 use crate::error::DecodeError;
 use crate::imdct::Imdct;
 use crate::noise::Rng;
@@ -188,8 +188,8 @@ pub(crate) struct Substream {
     endmant: [usize; NCH],
     strtmant: [usize; NCH],
     bap: [[u8; 256]; NCH],
-    /// Bit allocation stages to re-run per channel: 0 none, 1 bap, 2 mask+bap, 3 all.
-    ba_dirty: [u8; NCH],
+    /// Bit allocation stages to re-run per channel.
+    ba_rerun: [BaRerun; NCH],
     ba_cache: [BaCache; NCH],
     ba: BaParams,
     csnroffst: u8,
@@ -316,7 +316,7 @@ impl Substream {
             endmant: [0; NCH],
             strtmant: [0; NCH],
             bap: [[0; 256]; NCH],
-            ba_dirty: [3; NCH],
+            ba_rerun: [BaRerun::Psd; NCH],
             ba_cache: Default::default(),
             ba: BaParams::default(),
             csnroffst: 0,
@@ -340,7 +340,7 @@ impl Substream {
             d.fill(0.0);
         }
         self.config_key = u32::MAX;
-        self.ba_dirty = [3; NCH];
+        self.ba_rerun = [BaRerun::Psd; NCH];
     }
 
     /// Coded channel indices of this substream in coded order (fbw..., LFE).
@@ -386,10 +386,10 @@ impl Substream {
                 .map_err(|e| (0, e))?;
         }
         // Delta bit allocation and dynamic range do not persist across syncframes.
-        for (d, dirty) in self.dba.iter_mut().zip(self.ba_dirty.iter_mut()) {
+        for (d, rerun) in self.dba.iter_mut().zip(self.ba_rerun.iter_mut()) {
             if d.active {
                 d.active = false;
-                *dirty = (*dirty).max(2);
+                *rerun = (*rerun).max(BaRerun::Mask);
             }
         }
         self.dynrng = [1.0; 2];
