@@ -166,18 +166,13 @@ impl Framer {
                     && let Some(descriptor) = stream.dvb_dts_hd()?
                 {
                     if descriptor.core.is_none() {
-                        let index = descriptor
-                            .extensions
-                            .iter()
-                            .position(Option::is_some)
-                            .ok_or(Error::Invalid("DTS-HD extension substream"))?;
                         return Ok(Self::DtsExtension(dts_hd::ExtensionReader::new(
                             pool,
                             source,
                             caps,
                             limits.maximum_dts_hd_pes_bytes,
                             limits.elementary_input_window,
-                            index as u8,
+                            descriptor,
                         )?));
                     }
                     Ok(Self::DtsHd(dts_hd::Reader::new(

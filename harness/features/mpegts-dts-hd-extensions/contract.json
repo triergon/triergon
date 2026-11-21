@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "mpegts-dts-hd-extensions",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "mpegts-access-unit-packets",
+  "candidate": "transport-worker",
+  "worker_operation": "ts-au-",
+  "reference": "ffmpeg-transport-dts",
+  "contract": [
+    "Read one preloaded finite DVB DTS-HD stream with two or four extension substreams and no core. TS 102 114 V1.6.1 7.5.2 permits up to four indexed extension substreams; F.4.3 requires exactly one complete access unit per aligned finite PES when multiple substreams are present.",
+    "Compare the complete ordered packet fold with the parser-enabled FFmpeg demuxer without stream discovery. The pinned demuxer exposes this DVB extension descriptor as bin_data and preserves the PES access-unit boundary, unset duration, clear key flag and original PES position. The candidate verifies substream order, DWORD alignment, extents and every header CRC before publishing the original complete unit.",
+    "The comparison uses the existing demux-clock and packet-field projections. Public packets keep original source PTS/DTS, exact primary-extension duration and PES payload ranges. Reader tests verify these source fields separately. The explicit DTS parser splits these multi-extension units into individual substreams, so this feature compares the demuxer packets and keeps the grouped single-extension source comparison separate.",
+    "Inputs are independently authored framing controls with opaque asset bodies. They cover TS188 and M2TS192, short and long headers, zero alignment padding, inherited timing, PTS-only, PTS/DTS and untimed PES. Generate them with cargo xtask fixture transport-dts-hd-grouped or cargo xtask fixtures; no generated media is committed."
+  ],
+  "required_profiles": [
+    "two-extensions-no-core",
+    "four-extensions-no-core-long"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

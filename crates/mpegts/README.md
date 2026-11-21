@@ -292,13 +292,28 @@ reader can frame one core-bearing DTS-HD unit per aligned finite PES. It
 checks the signalled extension substream order, extents and header CRC and
 leaves the asset payloads intact. `DtsAudioFrame::core_bytes` exposes the core
 prefix, and `bytes` exposes the complete unit. The original PES supplies its
-clock. Extension-only carriage remains outside this path.
-A track with a single extension substream and no core can contain multiple
-units per aligned PES. Each `DtsExtensionFrame` retains the original bytes and
-reports the coded duration when the reference clock and frame duration are
-available. Later frames can reuse the static timing fields. Conflicting
-substream indexes and partial payloads are rejected. The aligned PES limit
-is `ReaderLimits::maximum_dts_hd_pes_bytes`.
+clock.
+A track without a core can carry one to four signalled extension substreams.
+Each `DtsExtensionFrame` contains one complete access unit, including all its
+extension headers, zero alignment padding and opaque asset bytes. The reader
+checks every extension's index, extent and header CRC before publishing the unit.
+Only a single-substream track can contain multiple access units per aligned
+finite PES; a multi-substream track requires exactly one complete unit per PES
+([TS 102 114 V1.6.1 §7.5.2 and F.4.3](https://www.etsi.org/deliver/etsi_ts/102100_102199/102114/01.06.01_60/ts_102114v010601p.pdf)).
+The lowest-index extension supplies the coded duration when its reference clock
+and frame duration are available. Later units can reuse that substream's static
+timing. `Packet::sample_duration` preserves the exact rational span; the integral
+90 kHz duration stays absent when that span is fractional. Only the first unit
+claims the original PES clock, and missing DTS remains absent. Every unit retains
+its intersection within the original PES. The aligned PES limit is
+`ReaderLimits::maximum_dts_hd_pes_bytes`.
+
+The [grouped extension comparison](../../harness/features/mpegts-dts-hd-grouped/contract.json)
+explicitly feeds original PES bytes and source clocks to FFmpeg's DTS parser.
+The [multiple-extension comparison](../../harness/features/mpegts-dts-hd-extensions/contract.json)
+compares the demuxer's complete PES access units: the explicit parser emits each
+extension separately. Both keep the existing [DTS-HD demux comparison](../../harness/features/mpegts-dts-hd/contract.json)
+intact. Comparison projections do not alter public packets.
 
 For DVB AC-3, an elementary `AC-3` registration can corroborate descriptor `0x6a`.
 
