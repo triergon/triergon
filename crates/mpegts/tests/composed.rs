@@ -351,3 +351,79 @@ fn truncated_final_transport_packet_reports_its_actual_start() {
         .unwrap();
     assert_eq!(fault.location.offset, 564);
 }
+
+#[test]
+fn active_program_borrows_the_accepted_map_until_the_stream_ends() {
+    let source = include_bytes!("data/ts188-basic.ts");
+    let budget = Budget::new(16 * 1024 * 1024).unwrap();
+    let mut input = InputCursor::new(
+        &budget,
+        SourceId(1),
+        SourceCapabilities {
+            length: Some(source.len() as u64),
+            random_access: false,
+        },
+        4096,
+    )
+    .unwrap();
+    let mut demux = TransportStream::new(
+        budget.clone(),
+        PacketFormat::Ts188,
+        ParseLimits::default(),
+        1,
+    )
+    .unwrap();
+    assert!(demux.active_program().is_none());
+    let cancel = AtomicBool::new(false);
+    let mut accepted = None;
+    for _ in 0..200_000 {
+        match demux
+            .poll(&mut input, &mut WorkBudget::new(64), &cancel)
+            .unwrap()
+        {
+            Step::Ready(TraceEvent::ProgramMap {
+                map, active: true, ..
+            }) => accepted = Some(map),
+            Step::Ready(TraceEvent::Finished) => {
+                let map = accepted.expect("an accepted PMT");
+                let program = demux.active_program().expect("the accepted map");
+                assert_eq!(program.program_number(), map.header.extension);
+                assert_eq!(program.version(), map.header.version);
+                assert_eq!(program.section().as_ref(), map.source.as_ref());
+                assert_eq!(
+                    program.pcr_pid(),
+                    (map.pcr_pid != 0x1fff).then_some(map.pcr_pid)
+                );
+                assert_eq!(program.streams().len(), map.streams.len());
+                for (stream, entry) in program.streams().zip(map.streams.iter()) {
+                    assert_eq!(stream.pid(), entry.pid);
+                    assert_eq!(stream.stream_type(), entry.stream_type);
+                    assert_eq!(
+                        stream.descriptor_bytes().as_ref(),
+                        entry.descriptor_bytes.as_ref()
+                    );
+                    assert_eq!(stream.descriptors().count(), entry.descriptors().count());
+                }
+                return;
+            }
+            Step::Ready(_) | Step::Yield => {}
+            Step::NeedInput(request) => {
+                let offset = request.offset as usize;
+                if offset == source.len() {
+                    input.finish(request.source, request.token).unwrap();
+                } else {
+                    let end = source.len().min(offset + request.maximum);
+                    let data = Bytes::copy_from_slice(&budget, &source[offset..end]).unwrap();
+                    input
+                        .provide(
+                            &InputWindow::new(request.source, request.token, request.offset, data)
+                                .unwrap(),
+                        )
+                        .unwrap();
+                }
+            }
+            Step::End(_) => demux.end_of_source().unwrap(),
+        }
+    }
+    panic!("the stream made no bounded progress");
+}

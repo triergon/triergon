@@ -38,8 +38,9 @@ Everything else lives in its module:
 - `stream`: the selected-program source operation (`TransportStream`), its events
   (`TraceEvent`, `TraceFault`, `FaultKind`, `CompactTraceEvent`,
   `CarrierObservation`), feed delivery (`FeedItem`, `FeedCarrier`,
-  `FeedPayloadRun`, `FeedContinuation`) and source witnesses (`ObservedTrace`,
-  `MediaEntityEnd`).
+  `FeedPayloadRun`, `FeedContinuation`), source witnesses (`ObservedTrace`,
+  `MediaEntityEnd`) and a borrowed view of the program map it routes by
+  (`ActiveProgram`, `ProgramStream`, from `TransportStream::active_program`).
 - `reader`: the root reader types with their policies (`AudioEofPolicy`,
   `DvbSubtitleTailPolicy`), entity plans (`EntityTransition`, `SeekEntity`),
   source events and clocks (`SourceEvent`, `PacketClock`, `PayloadSource`) and

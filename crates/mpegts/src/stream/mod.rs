@@ -6,6 +6,7 @@ mod event;
 mod feed;
 mod held;
 mod poll;
+mod program;
 mod storage;
 mod tables;
 
@@ -13,6 +14,7 @@ pub use entity::{MediaEntityEnd, ObservedTrace};
 pub use event::{CarrierObservation, CompactTraceEvent, FaultKind, TraceEvent, TraceFault};
 pub use feed::{FeedCarrier, FeedContinuation, FeedItem, FeedPayloadRun};
 use held::{Held, Stage};
+pub use program::{ActiveProgram, ProgramStream};
 use tables::PsiWork;
 
 pub(crate) use storage::{StorageItem, TransportStorageCursor};
