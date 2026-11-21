@@ -6,7 +6,7 @@ recorded in the [correctness manifest](../correctness-manifest.json). Its OpusHe
 has four channels, family 2, four uncoupled streams, mapping `[0, 1, 2, 3]`, 48 kHz input rate and 312 samples of
 pre-skip. The channels are first-order SN3D Ambisonics in ACN order.
 
-`family-2-stereo-gain.opus` is reproducibly generated with FFmpeg 9.0.2 and libopus 1.6.1 using
+Reproduce `family-2-stereo-gain.opus` with FFmpeg 9.0.2 and libopus 1.6.1 using
 `CARGO_INCREMENTAL=0 cargo xtask codecs opus-control --ffmpeg ffmpeg --out harness/codecs/opus/family-2-stereo-gain.opus`. It encodes six distinct tones and
 changes the header to six channels, family 2, mapping `[0, 1, 2, 3, 5, 4]`
 and +6 dB output gain (1536 in Q7.8). Four ACN components precede the

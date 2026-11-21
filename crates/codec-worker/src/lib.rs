@@ -270,6 +270,10 @@ fn emit_mixed(
 ) {
     match decoded {
         Ok(_) if frame.samples_per_channel == 0 => {}
+        Ok(_) if frame.layout.ambisonic_order().is_some() => {
+            eprintln!("unsupported Ambisonic stereo downmix");
+            std::process::exit(2);
+        }
         Ok(levels) => {
             pcm.clear();
             downmix.mix(frame, levels.unwrap_or_default(), pcm);

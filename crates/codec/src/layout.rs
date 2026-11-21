@@ -5,7 +5,7 @@
 //! A [`Speaker`]'s discriminant is FFmpeg's channel id (`AV_CHAN_*`), which is also
 //! the bit index of its `AV_CH_*` mask. Every decoder emits one plane per speaker in
 //! ascending discriminant order, which is the "native" order FFmpeg's own decoders
-//! use, so plane `i` corresponds to channel `i` of the reference output. The one
+//! use, so plane `i` corresponds to channel `i` of the reference output. The
 //! exceptions are an AAC program configuration FFmpeg cannot map to a known layout,
 //! Opus family 255's unspecified order, and Opus family 2's Ambisonic order.
 
