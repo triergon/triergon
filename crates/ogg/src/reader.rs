@@ -157,8 +157,11 @@ impl AsMut<Slot> for Media {
 #[derive(Debug)]
 struct Current {
     page: Page,
+    /// The page's logical stream, once looked up.
     stream: Option<usize>,
+    /// Its packets are in [`Reader::completed`].
     assembled: bool,
+    /// The first completed packet not yet handled.
     next: usize,
 }
 
@@ -192,8 +195,6 @@ pub struct Reader {
     pending: Queue<Output>,
     phase: Phase,
     landing: Option<Landing>,
-    /// The landing moved to a link being read: search it once its first media page is.
-    follow: bool,
     end_scanned: bool,
     failed: Option<Error>,
 }
@@ -225,7 +226,6 @@ impl Reader {
             pending: Queue::new(pool),
             phase: Phase::Pages,
             landing: None,
-            follow: false,
             end_scanned: false,
             failed: None,
         })
@@ -588,7 +588,7 @@ impl Reader {
             && previous.position == track.position
         {
             landing.retarget(index, track)?;
-            self.follow = true;
+            landing.followed = true;
         }
         self.pending.push(Event::Other(ReaderEvent::Track(index)))
     }
@@ -667,8 +667,12 @@ impl Reader {
             self.tracks[index].reference_shift = self.streams[stream].reference.shift();
             // A landing followed into this link searches it once the track's first page
             // of media has fixed where its reference clock starts.
-            if self.follow && delivered && self.landing.as_ref().is_some_and(|l| l.track == index) {
-                self.follow = false;
+            if delivered
+                && let Some(landing) = self.landing.as_mut()
+                && landing.followed
+                && landing.track == index
+            {
+                landing.followed = false;
                 again = true;
             }
         }
@@ -975,7 +979,6 @@ impl ContainerReader for Reader {
             .retain(|output| matches!(output, Event::Other(_)));
         self.current = None;
         self.media.clear();
-        self.follow = false;
         let next = self.search(&landing)?;
         self.landing = Some(landing);
         Ok(next)

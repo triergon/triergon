@@ -163,6 +163,9 @@ pub(crate) struct Landing {
     keyframe: Option<i64>,
     /// The threshold was moved back to the keyframe the target needs.
     rewound: bool,
+    /// The landing moved to a chain link being read: search it once the track's first
+    /// page of media is.
+    pub followed: bool,
     pub method: SeekMethod,
     pub scanned: u64,
     pub replays_from_start: bool,
@@ -202,6 +205,7 @@ impl Landing {
             offset: 0,
             keyframe: None,
             rewound: false,
+            followed: false,
             method,
             scanned: 0,
             replays_from_start: method == SeekMethod::Restart,
