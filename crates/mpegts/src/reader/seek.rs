@@ -1,21 +1,100 @@
 //! Bounded source seeks in the exact presentation clock.
 mod retained;
 
-use super::{AccessUnit, Packet, PacketTracks, Reader, ReaderEvent};
+use super::{AccessUnit, MpegAudioFrame, Packet, PacketTracks, Reader, ReaderEvent, Shared};
 use crate::{SourceEpochs, TraceEvent, clock::SourceTimePolicy};
 use retained::{Retain, RetainedOutput};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{
-    CodecId, Event, PacketInfo, RandomAccess, ReaderStep, SeekMethod, SeekPolicy, SeekReceipt,
-    SeekRequest, TrackId, TrackInfo,
+    CodecId, Event, PacketInfo, ReaderStep, SeekMethod, SeekPolicy, SeekReceipt, SeekRequest,
+    TrackId, TrackInfo,
 };
-use triergon_core::{BudgetVec, Error, InputRequest, Result, Step, Time, WorkBudget};
+use triergon_core::{
+    Budget, BudgetVec, Charged, Error, InputRequest, Result, SourceCapabilities, SourceId, Step,
+    Time, WorkBudget,
+};
+use triergon_framing::{MpegChannelMode, MpegLayer, MpegVersion, probe_dts_core_header};
+
+/// A length-known, seekable part of the original contiguous transport stream.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SeekEntity {
+    pub source: SourceId,
+    pub length: u64,
+}
+
+impl SeekEntity {
+    pub(super) const fn capabilities(self) -> SourceCapabilities {
+        SourceCapabilities {
+            length: Some(self.length),
+            random_access: true,
+        }
+    }
+}
+
+pub(super) struct EntityPlan {
+    entries: BudgetVec<SeekEntity>,
+    total: u64,
+    next: usize,
+}
+
+impl EntityPlan {
+    fn new(
+        pool: &Budget,
+        entities: &[SeekEntity],
+        maximum_bytes: u64,
+    ) -> Result<Charged<Box<Self>>> {
+        if entities.is_empty() || entities.len() > 4096 {
+            return Err(Error::Policy("MPEG-TS seek entity count"));
+        }
+        let mut total = 0_u64;
+        for (i, entity) in entities.iter().enumerate() {
+            if entity.length == 0 || (i != 0 && entity.source == entities[i - 1].source) {
+                return Err(Error::Invalid("MPEG-TS seek entity layout"));
+            }
+            total = total.checked_add(entity.length).ok_or(Error::Overflow)?;
+        }
+        if total > maximum_bytes {
+            return Err(Error::Policy("MPEG-TS seek scan bytes"));
+        }
+        let mut entries = BudgetVec::new(pool);
+        entries.try_extend_from_slice(entities)?;
+        Charged::boxed(
+            pool,
+            Self {
+                entries,
+                total,
+                next: 1,
+            },
+        )
+    }
+
+    pub(super) fn entries_bytes(&self) -> Result<usize> {
+        self.entries
+            .capacity()
+            .checked_mul(size_of::<SeekEntity>())
+            .ok_or(Error::Overflow)
+    }
+
+    fn first(&self) -> (SourceId, SourceCapabilities) {
+        let first = self.entries.as_slice()[0];
+        (first.source, first.capabilities())
+    }
+
+    pub(super) fn next(&self) -> Option<SeekEntity> {
+        self.entries.as_slice().get(self.next).copied()
+    }
+
+    pub(super) fn advance(&mut self) {
+        self.next += 1;
+    }
+}
 
 #[derive(Clone, Copy)]
 struct Landing {
     time: Time,
     offset: u64,
     epochs: SourceEpochs,
+    byte_run: u64,
 }
 
 #[derive(Default)]
@@ -23,13 +102,50 @@ struct Scan {
     landing: Option<Landing>,
     epochs: Option<SourceEpochs>,
     previous: Option<i128>,
+    index: Option<IndexBuilder>,
+}
+
+pub(super) struct SeekIndex {
+    track: TrackId,
+    points: BudgetVec<Landing>,
+}
+
+impl SeekIndex {
+    fn previous(&self, target: Time) -> Result<Landing> {
+        let points = self.points.as_slice();
+        let after = points.partition_point(|point| point.time <= target);
+        points[..after].last().copied().ok_or(Error::Unsupported(
+            "MPEG-TS seek index has no point at or before the target",
+        ))
+    }
+}
+
+struct IndexBuilder {
+    points: BudgetVec<Landing>,
+    maximum: usize,
+}
+
+impl IndexBuilder {
+    fn record(&mut self, point: Landing) -> bool {
+        if let Some(last) = self.points.as_mut_slice().last_mut() {
+            match point.time.cmp(&last.time) {
+                std::cmp::Ordering::Less => return false,
+                std::cmp::Ordering::Equal => {
+                    *last = point;
+                    return true;
+                }
+                std::cmp::Ordering::Greater => (),
+            }
+        }
+        self.points.len() < self.maximum && self.points.try_push(point).is_ok()
+    }
 }
 
 enum Phase {
     Scan(Scan),
     Replay {
         landing: Landing,
-        scanned_bytes: u64,
+        scanned_bytes: Option<u64>,
         skipped: bool,
     },
     Deliver(Packet),
@@ -48,16 +164,89 @@ pub(super) enum PictureDelivery {
     Full,
     Scan,
     Discard,
-    Landing(u64),
+    Landing { offset: u64, byte_run: u64 },
 }
 
-pub(super) struct PictureProbe {
+pub(super) struct SeekProbe {
     pub offset: u64,
     pub epochs: SourceEpochs,
+    pub byte_run: u64,
     pub ticks: Option<i128>,
     pub time: Option<Time>,
     pub random_access: bool,
     pub has_vcl: bool,
+}
+
+fn seekable_audio(codec: CodecId<'_>) -> bool {
+    matches!(
+        codec,
+        CodecId::Aac | CodecId::Ac3 | CodecId::Eac3 | CodecId::MpegAudio | CodecId::Dts
+    )
+}
+
+// MPEG Layer III side information begins with the reservoir back-pointer
+// (RFC 5219 §3). An entry point can use only bits available from its own frame.
+fn mpeg_audio_entry(frame: &MpegAudioFrame) -> Result<bool> {
+    let header = frame.header();
+    if header.layer != MpegLayer::III {
+        return Ok(true);
+    }
+    let mpeg1 = header.version == MpegVersion::Mpeg1;
+    let stereo = header.channel_mode != MpegChannelMode::Mono;
+    let side_bytes = match (mpeg1, stereo) {
+        (true, true) => 32,
+        (true, false) | (false, true) => 17,
+        (false, false) => 9,
+    };
+    let offset = if header.crc { 6 } else { 4 };
+    let side = frame
+        .bytes()
+        .as_ref()
+        .get(offset..offset + side_bytes)
+        .ok_or(Error::Invalid("MPEG Layer III side information"))?;
+    Ok(side[0] == 0 && (!mpeg1 || side[1] & 0x80 == 0))
+}
+
+fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
+    let clock = packet.clock();
+    let time = clock.and_then(|clock| clock.pts.exact);
+    let (offset, random_access) = match packet.access_unit() {
+        AccessUnit::Video(unit) => (unit.range.start, unit.random_access),
+        AccessUnit::Adts(frame) => (frame.source().offset, time.is_some()),
+        // E-AC-3 access units begin with the independent syncframe and
+        // include its associated dependent substreams (A/52 Annex E §2.3.1).
+        AccessUnit::Ac3(frame) => (frame.facts().offset, time.is_some()),
+        AccessUnit::MpegAudio(frame) => (
+            frame.elementary_range().start,
+            time.is_some() && mpeg_audio_entry(frame)?,
+        ),
+        AccessUnit::Dts(frame) => {
+            let header = probe_dts_core_header(frame.bytes().as_ref())?;
+            if header.frame_bytes != frame.bytes().len() {
+                return Err(Error::Unsupported("MPEG-TS DTS-HD seek"));
+            }
+            // DTS TS 102 114 §5.4.2, HFLAG signals prior predictor history.
+            (
+                frame.elementary_range().start,
+                time.is_some() && header.history == 0,
+            )
+        }
+        AccessUnit::AdtsFragment(fragment) => (fragment.source().offset, false),
+        _ => {
+            return Err(Error::Unsupported(
+                "MPEG-TS seek requires a supported video or audio track",
+            ));
+        }
+    };
+    Ok(SeekProbe {
+        offset,
+        epochs: packet.epochs(),
+        byte_run: packet.sources()[0].pes.pes().byte_run_epoch,
+        ticks: clock.and_then(|clock| clock.pts.ticks90),
+        time,
+        random_access,
+        has_vcl: true,
+    })
 }
 
 impl Seeking {
@@ -74,7 +263,10 @@ impl Seeking {
             Phase::Scan(_) if self.full_scan => PictureDelivery::Full,
             Phase::Scan(_) => PictureDelivery::Scan,
             Phase::Replay { landing, .. } if track == self.request.track => {
-                PictureDelivery::Landing(landing.offset)
+                PictureDelivery::Landing {
+                    offset: landing.offset,
+                    byte_run: landing.byte_run,
+                }
             }
             Phase::Replay { .. } => PictureDelivery::Discard,
             Phase::Deliver(_) | Phase::Retained(_) => PictureDelivery::Full,
@@ -83,20 +275,33 @@ impl Seeking {
 }
 
 impl Scan {
+    fn finish_index(&mut self, pool: &Budget, track: TrackId) -> Option<Shared<SeekIndex>> {
+        let index = self.index.take()?;
+        let charge = Shared::<SeekIndex>::reserve(pool).ok()?;
+        Some(Shared::new(
+            SeekIndex {
+                track,
+                points: index.points,
+            },
+            charge,
+        ))
+    }
+
     fn observe(
         &mut self,
-        picture: PictureProbe,
+        probe: SeekProbe,
         target: Time,
         policy: SourceTimePolicy,
     ) -> Result<bool> {
-        let PictureProbe {
+        let SeekProbe {
             offset,
             epochs,
+            byte_run,
             ticks,
             time,
             random_access,
             ..
-        } = picture;
+        } = probe;
         if *self.epochs.get_or_insert(epochs) != epochs {
             return Err(Error::Unsupported("MPEG-TS seek across source epochs"));
         }
@@ -113,12 +318,19 @@ impl Scan {
             let time = time.ok_or(Error::Unsupported(
                 "MPEG-TS seek point without a resolved PTS",
             ))?;
+            let point = Landing {
+                time,
+                offset,
+                epochs,
+                byte_run,
+            };
+            if let Some(index) = &mut self.index
+                && !index.record(point)
+            {
+                self.index = None;
+            }
             if time <= target && self.landing.is_none_or(|old| time >= old.time) {
-                self.landing = Some(Landing {
-                    time,
-                    offset,
-                    epochs,
-                });
+                self.landing = Some(point);
                 return Ok(true);
             }
         }
@@ -129,7 +341,7 @@ impl Scan {
 fn seek_result(
     request: SeekRequest,
     landing: Landing,
-    scanned_bytes: u64,
+    scanned_bytes: Option<u64>,
     skipped: bool,
 ) -> SeekReceipt {
     SeekReceipt {
@@ -139,14 +351,18 @@ fn seek_result(
             SeekPolicy::PreviousRandomAccess => landing.time,
             SeekPolicy::PlaybackPreroll => request.target,
         },
-        method: SeekMethod::BoundedScan,
-        scanned_bytes,
+        method: if scanned_bytes.is_some() {
+            SeekMethod::BoundedScan
+        } else {
+            SeekMethod::Index
+        },
+        scanned_bytes: scanned_bytes.unwrap_or(0),
         replays_from_start: !skipped,
     }
 }
 
 impl Reader {
-    pub(super) fn observe_seek_picture(&mut self, picture: PictureProbe) -> Result<()> {
+    pub(super) fn observe_seek_picture(&mut self, picture: SeekProbe) -> Result<()> {
         if !picture.has_vcl {
             return Ok(());
         }
@@ -163,23 +379,85 @@ impl Reader {
         }
     }
 
-    /// Seek a selected AVC or HEVC track in one length-known, seekable entity.
-    /// The reader scans for the previous coded random-access picture, then
-    /// delivers original transport, clock and PES provenance from the landing.
+    /// Seek a selected AVC, HEVC, ADTS AAC-LC, AC-3, E-AC-3, MPEG audio or DTS core
+    /// track in one length-known, seekable entity. The reader lands on the last coded
+    /// random-access picture or complete audio frame carrying the greatest
+    /// resolved PTS at or before the target. It delivers original transport,
+    /// clocks and PES provenance, including untimed frames after the landing.
     /// Short single-track suffixes can be retained as the reader scans.
     /// The caller supplies any decoder configuration needed at the landing.
     /// Requests from a previously continued entity or with unresolved clock
-    /// epochs are refused.
+    /// epochs are refused. A completed index for the same track skips the
+    /// landing scan while replay still reconstructs transport state.
     #[cold]
     pub fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
+        self.begin_seek(request, None, None)
+    }
+
+    /// Seek and retain an index of up to `maximum_entries` distinct landing
+    /// times for later seeks to this track in the same entity. The source must
+    /// remain stable between requests. A reset, close or continuation drops
+    /// the index. If landing times are out of order or the index exceeds its
+    /// entry or storage bound, the current seek still completes normally.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [Self::request_seek], or an invalid-limit
+    /// error if `maximum_entries` is zero.
+    #[cold]
+    pub fn request_seek_and_index(
+        &mut self,
+        request: SeekRequest,
+        maximum_entries: usize,
+    ) -> Result<InputRequest> {
+        if maximum_entries == 0 {
+            return Err(Error::Invalid("MPEG-TS seek index entry limit"));
+        }
+        self.begin_seek(request, Some(maximum_entries), None)
+    }
+
+    /// Seek over consecutive parts of one logical transport stream. Supply
+    /// the exact order and lengths of up to 4096 seekable entities. The reader
+    /// requests each part by its source ID, preserving parser state across
+    /// boundaries including a PES or access unit split across parts. Supply
+    /// input by source ID as usual and signal EOF for the final entity.
+    ///
+    /// # Errors
+    ///
+    /// Refuses empty parts, adjacent repeated source IDs, scan limits and
+    /// unresolved clock or configuration epochs.
+    #[cold]
+    pub fn request_seek_in_entities(
+        &mut self,
+        request: SeekRequest,
+        entities: &[SeekEntity],
+    ) -> Result<InputRequest> {
         self.healthy()?;
-        let length = self
-            .caps
-            .length
-            .filter(|_| self.caps.random_access && !self.continued_entity)
-            .ok_or(Error::Unsupported(
-                "MPEG-TS seek needs one length-known seekable entity",
-            ))?;
+        let entities = EntityPlan::new(&self.pool, entities, self.limits.maximum_seek_scan_bytes)?;
+        self.begin_seek(request, None, Some(entities))
+    }
+
+    fn begin_seek(
+        &mut self,
+        request: SeekRequest,
+        index_entries: Option<usize>,
+        entities: Option<Charged<Box<EntityPlan>>>,
+    ) -> Result<InputRequest> {
+        self.healthy()?;
+        let length = if let Some(plan) = &entities {
+            plan.total
+        } else {
+            self.caps
+                .length
+                .filter(|_| {
+                    self.caps.random_access
+                        && !self.continued_entity
+                        && self.seek_entities.is_none()
+                })
+                .ok_or(Error::Unsupported(
+                    "MPEG-TS seek needs one length-known seekable entity",
+                ))?
+        };
         if length > self.limits.maximum_seek_scan_bytes || self.limits.maximum_seek_scan_bytes == 0
         {
             return Err(Error::Policy("MPEG-TS seek scan bytes"));
@@ -191,23 +469,73 @@ impl Reader {
             .ok()
             .filter(|pid| crate::ELEMENTARY_PID_RANGE.contains(pid) && self.selected_track(*pid))
             .ok_or(Error::Invalid("MPEG-TS seek track is not selected"))?;
-        if let Some(track) = self.tracks().iter().find(|track| track.stream().pid == pid)
+        if entities.is_none()
+            && let Some(track) = self.tracks().iter().find(|track| track.stream().pid == pid)
             && !matches!(track.codec(), CodecId::H264 | CodecId::Hevc)
+            && !seekable_audio(track.codec())
         {
-            return Err(Error::Unsupported("MPEG-TS seek requires AVC or HEVC"));
+            return Err(Error::Unsupported(
+                "MPEG-TS seek requires a supported video or audio track",
+            ));
         }
         let mut seek = BudgetVec::new(&self.pool);
         seek.try_reserve_exact(1)?;
-        let full_scan = length <= 256 * 1024
-            && matches!(&self.packet_tracks, PacketTracks::Selected(pids) if pids.len() == 1);
+        let index = self
+            .seek_index
+            .as_ref()
+            .filter(|index| {
+                entities.is_none() && index_entries.is_none() && index.track == request.track
+            })
+            .cloned();
+        let (phase, retain) = if let Some(index) = &index {
+            (
+                Phase::Replay {
+                    landing: index.previous(request.target)?,
+                    scanned_bytes: None,
+                    skipped: false,
+                },
+                None,
+            )
+        } else {
+            let single_track =
+                matches!(&self.packet_tracks, PacketTracks::Selected(pids) if pids.len() == 1);
+            // An indexed scan retains landing points. Replay can then stream
+            // the suffix without keeping both the index and the output packets.
+            let retain = (index_entries.is_none()
+                && entities.is_none()
+                && length <= 256 * 1024
+                && single_track)
+                .then(|| Retain::new(&self.pool));
+            (
+                Phase::Scan(Scan {
+                    index: index_entries.map(|maximum| IndexBuilder {
+                        points: BudgetVec::new(&self.pool),
+                        maximum,
+                    }),
+                    ..Scan::default()
+                }),
+                retain,
+            )
+        };
         seek.try_push(Seeking {
             request,
-            phase: Phase::Scan(Scan::default()),
-            retain: full_scan.then(|| Retain::new(&self.pool)),
-            full_scan,
+            phase,
+            full_scan: retain.is_some(),
+            retain,
         })
         .map_err(|rejected| rejected.error)?;
-        let input = self.reset()?;
+        let input = if let Some(plan) = &entities {
+            let (source, caps) = plan.first();
+            let mut next = Self::new(&self.pool, source, caps, self.limits, self.window)?;
+            let input = next.request()?;
+            std::mem::swap(&mut next.packet_tracks, &mut self.packet_tracks);
+            *self = next;
+            input
+        } else {
+            self.reset()?
+        };
+        self.seek_entities = entities;
+        self.seek_index = index;
         self.seek = seek;
         Ok(input)
     }
@@ -247,34 +575,31 @@ impl Reader {
                 return Ok(Step::Ready(Event::Packet(packet)));
             }
             let step = if seek.retain.is_some() {
-                match self.advance::<false, false>(work, cancel, |_| ()) {
-                    Ok(Step::Backpressure(_)) | Err(Error::Backpressure { .. }) => {
-                        self.seek.as_mut_slice()[0].retain = None;
-                        self.storage = None;
-                        continue;
-                    }
-                    step => step?,
-                }
+                self.advance::<false, false>(work, cancel, |_| ())
             } else {
-                self.advance::<true, true>(work, cancel, |_| ())?
+                self.advance::<true, true>(work, cancel, |_| ())
             };
             let seek = &mut self.seek.as_mut_slice()[0];
+            if matches!(
+                step,
+                Ok(Step::Backpressure(_)) | Err(Error::Backpressure { .. })
+            ) {
+                let dropped_index = if let Phase::Scan(scan) = &mut seek.phase {
+                    scan.index.take().is_some()
+                } else {
+                    self.seek_index.take().is_some()
+                };
+                if dropped_index || seek.retain.take().is_some() {
+                    self.storage = None;
+                    continue;
+                }
+            }
+            let step = step?;
             match (&mut seek.phase, step) {
                 (Phase::Scan(scan), Step::Ready(Event::Packet(packet))) => {
                     if packet.track() == request.track {
-                        let AccessUnit::Video(unit) = packet.access_unit() else {
-                            return Err(Error::Unsupported("MPEG-TS seek requires AVC or HEVC"));
-                        };
-                        let clock = packet.clock();
                         let better = scan.observe(
-                            PictureProbe {
-                                offset: unit.range.start,
-                                epochs: packet.epochs(),
-                                ticks: clock.and_then(|clock| clock.pts.ticks90),
-                                time: clock.and_then(|clock| clock.pts.exact),
-                                random_access: unit.random_access,
-                                has_vcl: true,
-                            },
+                            packet_probe(&packet)?,
                             request.target,
                             self.limits.time_policy,
                         )?;
@@ -293,22 +618,49 @@ impl Reader {
                     }
                 }
                 (Phase::Scan(scan), Step::End(end)) => {
-                    let landing = scan.landing.ok_or(Error::Unsupported(
-                        "MPEG-TS has no random-access picture at or before the target",
-                    ))?;
+                    let landing = scan.landing.ok_or_else(|| {
+                        let audio = self.tracks.as_slice().iter().any(|track| {
+                            track.id() == request.track && seekable_audio(track.codec())
+                        });
+                        Error::Unsupported(if audio {
+                            "MPEG-TS has no timestamped audio frame at or before the target"
+                        } else {
+                            "MPEG-TS has no random-access picture at or before the target"
+                        })
+                    })?;
                     if let Some(retain) = seek.retain.take() {
-                        let result = seek_result(request, landing, end.offset, retain.skipped);
+                        self.seek_index = scan.finish_index(&self.pool, request.track);
+                        let result =
+                            seek_result(request, landing, Some(end.offset), retain.skipped);
                         let tracks =
                             std::mem::replace(&mut self.tracks, BudgetVec::new(&self.pool));
                         seek.phase = Phase::Retained(retain.finish(result, tracks));
                         continue;
                     }
+                    let (source, caps) = self
+                        .seek_entities
+                        .as_deref()
+                        .map_or((self.source, self.caps), |plan| plan.first());
                     let mut replay =
-                        Self::new(&self.pool, self.source, self.caps, self.limits, self.window)?;
+                        match Self::new(&self.pool, source, caps, self.limits, self.window) {
+                            Err(Error::Backpressure { .. }) if scan.index.take().is_some() => {
+                                continue;
+                            }
+                            replay => replay?,
+                        };
                     let input = replay.request()?;
+                    replay.seek_index = scan.finish_index(&self.pool, request.track);
+                    let scanned = if let Some(mut plan) = self.seek_entities.take() {
+                        plan.next = 1;
+                        let total = plan.total;
+                        replay.seek_entities = Some(plan);
+                        total
+                    } else {
+                        end.offset
+                    };
                     self.seek.as_mut_slice()[0].phase = Phase::Replay {
                         landing,
-                        scanned_bytes: end.offset,
+                        scanned_bytes: Some(scanned),
                         skipped: false,
                     };
                     std::mem::swap(&mut replay.packet_tracks, &mut self.packet_tracks);
@@ -327,13 +679,13 @@ impl Reader {
                     if packet.track() != request.track
                         || packet.elementary_range().start != landing.offset
                         || packet.epochs() != landing.epochs
+                        || packet.sources()[0].pes.pes().byte_run_epoch != landing.byte_run
                     {
                         *skipped = true;
                         continue;
                     }
-                    if packet.random_access() != RandomAccess::Sync
-                        || packet.clock().and_then(|clock| clock.pts.exact) != Some(landing.time)
-                    {
+                    let probe = packet_probe(&packet).map_err(|_| Error::SourceMismatch)?;
+                    if !probe.random_access || probe.time != Some(landing.time) {
                         return Err(Error::SourceMismatch);
                     }
                     let receipt = seek_result(request, *landing, *scanned_bytes, *skipped);
@@ -354,5 +706,67 @@ impl Reader {
                 _ => unreachable!("reader step during seek"),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{PacketFormat, ReaderLimits};
+    use triergon_core::{Bytes, InputWindow};
+
+    #[test]
+    fn cached_landing_index_releases_storage_after_the_seek() {
+        let bytes = include_bytes!("../../tests/data/ts188-basic.ts");
+        let pool = Budget::new(1 << 20).unwrap();
+        let source = SourceId(1);
+        let caps = SourceCapabilities {
+            length: Some(bytes.len() as u64),
+            random_access: true,
+        };
+        let mut reader = Reader::new(
+            &pool,
+            source,
+            caps,
+            ReaderLimits {
+                format: PacketFormat::Ts188,
+                ..ReaderLimits::default()
+            },
+            4096,
+        )
+        .unwrap();
+        let request = reader.request().unwrap();
+        reader
+            .provide(
+                &InputWindow::new(
+                    source,
+                    request.token,
+                    0,
+                    Bytes::copy_from_slice(&pool, bytes).unwrap(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let mut points = BudgetVec::new(&pool);
+        points.try_reserve_exact(64).unwrap();
+        let charge = Shared::<SeekIndex>::reserve(&pool).unwrap();
+        reader.seek_index = Some(Shared::new(
+            SeekIndex {
+                track: TrackId(256),
+                points,
+            },
+            charge,
+        ));
+        let occupied = pool.reserve(pool.limit() - pool.used()).unwrap();
+        let cancel = AtomicBool::new(false);
+        for _ in 0..32 {
+            reader.step(&mut WorkBudget::new(4096), &cancel).unwrap();
+            if reader.seek_index.is_none() {
+                drop(occupied);
+                assert!(reader.healthy().is_ok());
+                return;
+            }
+        }
+        panic!("transport pressure did not release the inactive index");
     }
 }

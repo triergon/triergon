@@ -350,3 +350,391 @@ fn retained_seek_matches_replay_packets_tables_and_carrier_order() {
     }
     assert_eq!(traces[0], traces[1]);
 }
+
+#[test]
+fn audio_seek_preserves_timed_and_untimed_frames() {
+    for ac3 in [false, true] {
+        let (mut ts, mut limits) = audio_eof_transport(ac3);
+        let format = if ac3 {
+            PacketFormat::M2ts192
+        } else {
+            PacketFormat::Ts188
+        };
+        limits.format = format;
+        let frame = audio_eof_frame(ac3);
+        let stream = if ac3 { 0xbd } else { 0xc0 };
+        ts.pes(PID, stream, &frame, Some(90_000), None);
+        ts.pes(PID, stream, &frame.repeat(2), Some(99_000), Some(98_910));
+        ts.pes(PID, stream, &frame, None, None);
+        ts.pes(PID, stream, &frame, Some(117_000), None);
+        let bytes = if ac3 { ts.m2ts() } else { ts.bytes };
+        for selected in [false, true] {
+            let pool = Budget::new(1 << 20).unwrap();
+            let caps = SourceCapabilities {
+                length: Some(bytes.len() as u64),
+                random_access: true,
+            };
+            let track = TrackId(PID.into());
+            let mut reader = if selected {
+                Reader::new_with_packet_tracks(&pool, ID, caps, limits, 4096, &[track])
+            } else {
+                Reader::new(&pool, ID, caps, limits, 4096)
+            }
+            .unwrap();
+            let request = SeekRequest {
+                track,
+                target: clock(100_000),
+                policy: SeekPolicy::PlaybackPreroll,
+            };
+            let generation = reader.request_seek(request).unwrap().token.generation();
+            let mut landed = false;
+            let mut clocks = Vec::new();
+            while let Some(event) = next(&mut reader, &pool, &bytes, 127, 17).unwrap() {
+                match event {
+                    Event::Seek(result) => {
+                        assert!(!landed);
+                        assert_eq!(result.landing, clock(99_000));
+                        assert_eq!(result.discard_until, request.target);
+                        assert_eq!(result.scanned_bytes, bytes.len() as u64);
+                        assert!(!result.replays_from_start);
+                        assert_eq!(
+                            reader.request().unwrap().token.generation() == generation,
+                            selected
+                        );
+                        landed = true;
+                    }
+                    Event::Packet(packet) => {
+                        assert!(landed);
+                        assert_eq!(packet.payload(), frame);
+                        let offset = ((clocks.len() + 1) * frame.len()) as u64;
+                        assert_eq!(
+                            packet.elementary_range(),
+                            offset..offset + frame.len() as u64
+                        );
+                        clocks.push((packet.pts(), packet.dts()));
+                    }
+                    Event::Other(_) => (),
+                }
+            }
+            assert_eq!(
+                clocks,
+                [
+                    (Some(99_000), Some(98_910)),
+                    (None, None),
+                    (None, None),
+                    (Some(117_000), None)
+                ]
+            );
+        }
+    }
+}
+
+#[test]
+fn audio_seek_needs_a_source_timestamp_at_or_before_the_target() {
+    let frame = adts(b"audio");
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    ts.pes(PID, 0xc0, &frame, None, None);
+    ts.pes(PID, 0xc0, &frame, Some(117_000), None);
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+    reader
+        .request_seek(SeekRequest {
+            track: TrackId(PID.into()),
+            target: clock(100_000),
+            policy: SeekPolicy::PreviousRandomAccess,
+        })
+        .unwrap();
+    loop {
+        match next(&mut reader, &pool, &ts.bytes, 4096, 8192) {
+            Ok(Some(Event::Other(_))) => (),
+            Err(Error::Unsupported(
+                "MPEG-TS has no timestamped audio frame at or before the target",
+            )) => break,
+            event => panic!("unexpected seek result {event:?}"),
+        }
+    }
+}
+
+#[test]
+fn repeated_seeks_use_the_index_and_land_on_the_last_tied_timestamp() {
+    let frame = adts(b"audio");
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    for pts in [90_000, 101_000, 101_000, 110_000] {
+        ts.pes(PID, 0xc0, &frame, Some(pts), None);
+    }
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+    let mut request = SeekRequest {
+        track: TrackId(PID.into()),
+        target: clock(92_000),
+        policy: SeekPolicy::PlaybackPreroll,
+    };
+    reader.request_seek_and_index(request, 3).unwrap();
+    for (method, time, packet_offset) in [
+        (SeekMethod::BoundedScan, clock(90_000), 0),
+        (SeekMethod::Index, clock(101_000), 2 * frame.len()),
+        (SeekMethod::BoundedScan, clock(101_000), 2 * frame.len()),
+    ] {
+        let result = loop {
+            if let Event::Seek(result) = next(&mut reader, &pool, &ts.bytes, 127, 43)
+                .unwrap()
+                .unwrap()
+            {
+                break result;
+            }
+        };
+        assert_eq!(result.method, method);
+        assert_eq!(result.landing, time);
+        assert_eq!(result.discard_until, request.target);
+        assert_eq!(
+            result.scanned_bytes,
+            if method == SeekMethod::Index {
+                0
+            } else {
+                ts.bytes.len() as u64
+            }
+        );
+        let packet = match next(&mut reader, &pool, &ts.bytes, 127, 43)
+            .unwrap()
+            .unwrap()
+        {
+            Event::Packet(packet) => packet,
+            event => panic!("expected landing packet, got {event:?}"),
+        };
+        assert_eq!(packet.elementary_range().start, packet_offset as u64);
+        assert_eq!(packet.payload(), frame);
+        if method == SeekMethod::Index {
+            reader.reset().unwrap();
+        }
+        request.target = clock(105_000);
+        reader.request_seek(request).unwrap();
+    }
+    reader.close();
+    assert_eq!(pool.used(), Budget::control_storage_bytes());
+}
+
+#[test]
+fn a_full_or_nonmonotonic_index_falls_back_to_a_scan() {
+    for (times, cap) in [
+        ([90_000, 101_000, 110_000], 2),
+        ([90_000, 110_000, 101_000], 3),
+    ] {
+        let frame = adts(b"audio");
+        let mut ts = Transport::new();
+        ts.tables(&[(0x0f, PID, &[])], 0);
+        for pts in times {
+            ts.pes(PID, 0xc0, &frame, Some(pts), None);
+        }
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut reader = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+        let request = SeekRequest {
+            track: TrackId(PID.into()),
+            target: clock(105_000),
+            policy: SeekPolicy::PreviousRandomAccess,
+        };
+        reader.request_seek_and_index(request, cap).unwrap();
+        for _ in 0..2 {
+            loop {
+                match next(&mut reader, &pool, &ts.bytes, 4096, 8192)
+                    .unwrap()
+                    .unwrap()
+                {
+                    Event::Seek(result) => {
+                        assert_eq!(result.method, SeekMethod::BoundedScan);
+                        assert_eq!(result.landing, clock(101_000));
+                        break;
+                    }
+                    Event::Other(_) => (),
+                    event @ Event::Packet(_) => panic!("unexpected {event:?}"),
+                }
+            }
+            reader.request_seek(request).unwrap();
+        }
+    }
+}
+
+#[test]
+fn layer_three_seek_replays_from_the_previous_empty_reservoir() {
+    for (stream, header, length, low_bit) in [
+        (0x03, [0xff, 0xfa, 0x14, 0xc0], 96, 7),
+        (0x04, [0xff, 0xf3, 0x44, 0xc0], 96, 4),
+    ] {
+        let mut entry = vec![0; length];
+        entry[..4].copy_from_slice(&header);
+        let mut dependent = entry.clone();
+        dependent[low_bit] = if low_bit == 7 { 0x80 } else { 1 };
+
+        let mut ts = Transport::new();
+        ts.tables(&[(stream, PID, &[])], 0);
+        ts.pes(PID, 0xc0, &entry, Some(90_000), None);
+        ts.pes(PID, 0xc0, &dependent, Some(93_000), None);
+        ts.pes(PID, 0xc0, &entry, Some(96_000), None);
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut reader = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+        reader
+            .request_seek(SeekRequest {
+                track: TrackId(PID.into()),
+                target: clock(95_000),
+                policy: SeekPolicy::PlaybackPreroll,
+            })
+            .unwrap();
+        let mut landed = false;
+        let mut output = Vec::new();
+        while let Some(event) = next(&mut reader, &pool, &ts.bytes, 4096, 8192).unwrap() {
+            match event {
+                Event::Seek(result) => {
+                    assert!(!landed);
+                    assert_eq!(result.landing, clock(90_000));
+                    assert_eq!(result.discard_until, clock(95_000));
+                    landed = true;
+                }
+                Event::Packet(packet) => {
+                    assert!(landed);
+                    output.push(packet.payload().to_vec());
+                }
+                Event::Other(_) => (),
+            }
+        }
+        assert_eq!(output, [entry.clone(), dependent, entry]);
+    }
+}
+
+#[test]
+fn seek_across_entities_replays_a_split_pes_and_continues_through_eof() {
+    use triergon_mpegts::SeekEntity;
+    let frame = adts(&[0x56; 250]);
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    let table_bytes = ts.bytes.len();
+    for pts in [90_000, 105_000, 135_000] {
+        ts.pes(PID, 0xc0, &frame, Some(pts), None);
+    }
+    let split = table_bytes + 3 * 188;
+    let segments = [&ts.bytes[..split], &ts.bytes[split..]];
+    let plan = [
+        SeekEntity {
+            source: ID,
+            length: segments[0].len() as u64,
+        },
+        SeekEntity {
+            source: SourceId(99),
+            length: segments[1].len() as u64,
+        },
+    ];
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = reader(&pool, segments[0], PacketFormat::Ts188);
+    let seek = |ticks| SeekRequest {
+        track: TrackId(PID.into()),
+        target: clock(ticks),
+        policy: SeekPolicy::PlaybackPreroll,
+    };
+    for (target, landed, count, explicit_end) in
+        [(109_000, 105_000, 2, true), (90_000, 90_000, 3, false)]
+    {
+        let request = reader
+            .request_seek_in_entities(seek(target), &plan)
+            .unwrap();
+        assert_eq!((request.source, request.offset), (ID, 0));
+        let mut read = 0;
+        let mut announced = false;
+        for _ in 0..20_000 {
+            match reader.step(&mut WorkBudget::new(39), &OFF).unwrap() {
+                Step::NeedInput(request) => {
+                    let segment = segments[usize::from(request.source == plan[1].source)];
+                    let start = usize::try_from(request.offset).unwrap();
+                    if request.maximum == 0 {
+                        assert_eq!(request.source, plan[1].source);
+                        reader.finish(request.source, request.token).unwrap();
+                    } else {
+                        let end = start + request.maximum.min(121);
+                        let bytes = Bytes::copy_from_slice(&pool, &segment[start..end]).unwrap();
+                        reader
+                            .provide(
+                                &InputWindow::new(
+                                    request.source,
+                                    request.token.clone(),
+                                    request.offset,
+                                    bytes,
+                                )
+                                .unwrap(),
+                            )
+                            .unwrap();
+                        if explicit_end && request.source == ID && end == segment.len() {
+                            reader.finish(request.source, request.token).unwrap();
+                        }
+                    }
+                }
+                Step::Ready(Event::Seek(result)) => {
+                    assert!(!announced);
+                    assert_eq!(result.landing, clock(landed));
+                    assert_eq!(result.discard_until, clock(target));
+                    assert_eq!(result.scanned_bytes, ts.bytes.len() as u64);
+                    announced = true;
+                }
+                Step::Ready(Event::Packet(packet)) => {
+                    assert!(announced);
+                    assert_eq!(packet.payload(), frame);
+                    if packet.pts() == Some(105_000) {
+                        let TraceEvent::Pes(pes) = packet.sources()[0].pes.event() else {
+                            panic!("missing source PES");
+                        };
+                        assert!(pes.source_ranges().any(|range| range.entity == ID));
+                        assert!(
+                            pes.source_ranges()
+                                .any(|range| range.entity == plan[1].source)
+                        );
+                    }
+                    read += 1;
+                }
+                Step::Ready(Event::Other(_)) | Step::Yield => (),
+                Step::End(end) => {
+                    assert_eq!(end.source, plan[1].source);
+                    break;
+                }
+                Step::Backpressure(pressure) => panic!("unexpected pressure {pressure:?}"),
+            }
+        }
+        assert!(announced);
+        assert_eq!(read, count);
+    }
+    reader.close();
+    assert_eq!(pool.used(), Budget::control_storage_bytes());
+}
+
+#[test]
+fn indexed_seek_recognises_landing_after_a_transport_byte_run_change() {
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    let first = adts(&[0x51; 17]);
+    let last = adts(&[0x52; 17]);
+    ts.pes(PID, 0xc0, &first, Some(90_000), None);
+    ts.counters[usize::from(PID)] = 3;
+    ts.pes(PID, 0xc0, &last, Some(90_000), None);
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+    let request = SeekRequest {
+        track: TrackId(PID.into()),
+        target: clock(90_000),
+        policy: SeekPolicy::PreviousRandomAccess,
+    };
+    reader.request_seek_and_index(request, 16).unwrap();
+    for method in [SeekMethod::BoundedScan, SeekMethod::Index] {
+        let mut packets = 0;
+        while let Some(event) = next(&mut reader, &pool, &ts.bytes, 127, 39).unwrap() {
+            match event {
+                Event::Seek(landing) => assert_eq!(landing.method, method),
+                Event::Packet(packet) => {
+                    assert_eq!(packet.payload(), last);
+                    packets += 1;
+                }
+                Event::Other(_) => (),
+            }
+        }
+        assert_eq!(packets, 1);
+        if method == SeekMethod::BoundedScan {
+            reader.request_seek(request).unwrap();
+        }
+    }
+}

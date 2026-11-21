@@ -96,6 +96,7 @@ assert_eq!(decoder_input, [
 | ADTS | `inspect_aac_adts_header`, `AacAdtsParser`, `AacAdtsWriter`, `AacAdtsStreamReader`, `AacAdtsCarrierReader` | 56-bit header facts; single-block AAC-LC frames; ADTS wrapping of raw access units (`AacAdtsParameters::from_asc`); aligned ADTS streams |
 | AC-3 / E-AC-3 | `probe_ac3_header`, `Ac3FrameReader`, `Ac3ConfigParser`, `Eac3BsiParser` | Header facts (bsid 0–8, 11–16), aligned syncframe reader, dac3/dec3 records, complete E-AC-3 BSI |
 | DTS core | `probe_dts_core_header`, `DtsCoreFrameReader`, `DtsHeaderInspector` | Normal core header (all fields, optional HCRC), FSIZE+1 frame acquisition |
+| DTS declared extents | `probe_dts_frame_extent`, `probe_dts_extension_substream_extent` | Bounded core and extension size fields at an established canonical sync, including the short and long extension prefixes |
 | DTS packings | `Dts14BitUnpacker`, `DtsPackedPayloadJob`, `Dts14SyncReader`, `Dts14CarrierReader`, `DtsNormalSourceReader` | 16-bit LE and 14-bit BE/LE word packings; experimental 14-bit stream acquisition |
 | DTS parser comparison | `reference_trace::dts::ParserOperation` (`reference-trace` feature) | Raw 14-bit source frames alongside the packets, clock and byte positions of FFmpeg's `dca` parser |
 
@@ -191,7 +192,7 @@ descriptors are 16 bytes.
   `Ac3FrameReader::read_frame_parts` can consume a complete aligned frame
   from several slices when the first slice contains its header prefix.
 - DTS: canonical big-endian normal frames only in `DtsCoreFrameReader`; no
-  resync, termination frames or DTS-HD extension parsing. HCRC is reported, not
+  resync or termination frames. The extension extent probes read size fields. HCRC is reported, not
   checked. `DtsHeaderInspector` and `inspect_dts_header_bits` expose the raw
   seven-bit NBLKS code once complete. Their `coded_window_samples` view is
   `32 × (NBLKS + 1)` core samples per channel for codes 5 through 127.

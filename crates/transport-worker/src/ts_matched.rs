@@ -3,20 +3,25 @@ use crate::runner::{Invocation, MAX_INPUT, Result, Totals, measure};
 use crate::ts_input::{self, FIRST_SOURCE, Request};
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
-use triergon_core::container::{Event, PacketInfo, RandomAccess, SeekPolicy, SeekRequest, TrackId};
-use triergon_core::{Budget, Error, InputWindow, Rounding, Step, Time, TimeBase, WorkBudget};
+use triergon_core::container::{
+    Event, PacketInfo, RandomAccess, SeekMethod, SeekPolicy, SeekRequest, TrackId,
+};
+use triergon_core::{
+    Budget, Error, InputWindow, Rounding, SourceId, Step, Time, TimeBase, WorkBudget,
+};
 use triergon_harness_protocol::digest::{fold, fold_framed, signed};
-use triergon_mpegts::{AccessUnit, Reader, ReaderLimits};
+use triergon_mpegts::{AccessUnit, Reader, ReaderLimits, SeekEntity};
 
 #[derive(Clone, Copy)]
 pub(crate) enum Kind {
     Seek,
+    AudioSeek,
     FreeAudio,
 }
 
 impl Kind {
     pub(crate) fn for_mode(mode: &str) -> Option<Self> {
-        [Self::Seek, Self::FreeAudio]
+        [Self::Seek, Self::AudioSeek, Self::FreeAudio]
             .into_iter()
             .find(|kind| mode.starts_with(kind.prefix()))
     }
@@ -24,6 +29,7 @@ impl Kind {
     const fn prefix(self) -> &'static str {
         match self {
             Self::Seek => "ts-seek-",
+            Self::AudioSeek => "ts-audio-seek-",
             Self::FreeAudio => "ts-free-audio-",
         }
     }
@@ -31,6 +37,7 @@ impl Kind {
     const fn operation(self) -> &'static str {
         match self {
             Self::Seek => "mpegts-previous-picture",
+            Self::AudioSeek => "mpegts-previous-audio",
             Self::FreeAudio => "mpegts-free-format-frames",
         }
     }
@@ -44,11 +51,21 @@ fn ticks(time: Time) -> Result<i64> {
     Ok(i64::try_from(ticks)?)
 }
 
+const SECOND_SOURCE: SourceId = SourceId(2);
+
+#[derive(Clone, Copy)]
+enum FollowUp {
+    Repeated(Time),
+    Split(usize),
+}
+
 fn execute(
     pool: &Budget,
     input: &Request,
     track: TrackId,
     seek: Option<SeekRequest>,
+    kind: Kind,
+    follow_up: Option<FollowUp>,
 ) -> Result<Totals> {
     let mut caps = ts_input::capabilities(&input.input);
     caps.random_access = true;
@@ -59,21 +76,62 @@ fn execute(
         ReaderLimits {
             format: input.format,
             program: Some(input.program),
+            descriptor_namespace: input.namespace,
             ..ReaderLimits::default()
         },
         32 * 1024,
         &[track],
     )?;
+    let split = match follow_up {
+        Some(FollowUp::Split(offset)) => Some(offset),
+        _ => None,
+    };
     if let Some(request) = seek {
-        reader.request_seek(request)?;
+        match follow_up {
+            Some(FollowUp::Repeated(_)) => reader.request_seek_and_index(request, 4096)?,
+            Some(FollowUp::Split(offset)) => reader.request_seek_in_entities(
+                request,
+                &[
+                    SeekEntity {
+                        source: FIRST_SOURCE,
+                        length: offset as u64,
+                    },
+                    SeekEntity {
+                        source: SECOND_SOURCE,
+                        length: (input.input.len() - offset) as u64,
+                    },
+                ],
+            )?,
+            None => reader.request_seek(request)?,
+        };
     }
-    let cancel = AtomicBool::new(false);
     let mut out = Totals::default();
+    drain(&mut reader, input, track, kind, split, false, &mut out)?;
+    if let (Some(mut request), Some(FollowUp::Repeated(target))) = (seek, follow_up) {
+        request.target = target;
+        reader.request_seek(request)?;
+        drain(&mut reader, input, track, kind, None, true, &mut out)?;
+    }
+    Ok(out)
+}
+
+fn drain(
+    reader: &mut Reader,
+    input: &Request,
+    track: TrackId,
+    kind: Kind,
+    split: Option<usize>,
+    indexed: bool,
+    out: &mut Totals,
+) -> Result<()> {
+    let cancel = AtomicBool::new(false);
+    let seek = !matches!(kind, Kind::FreeAudio);
+    let start = out.packets;
     let mut landed = false;
     loop {
         match reader.step(&mut WorkBudget::new(64 * 1024), &cancel)? {
             Step::Ready(Event::Seek(landing)) => {
-                if seek.is_none() || landed {
+                if !seek || landed || (indexed && landing.method != SeekMethod::Index) {
                     return Err("unexpected transport seek result".into());
                 }
                 for time in [landing.requested, landing.landing, landing.discard_until] {
@@ -82,15 +140,13 @@ fn execute(
                 landed = true;
             }
             Step::Ready(Event::Packet(packet)) => {
-                if packet.track() != track || (seek.is_some() && !landed) {
+                if packet.track() != track || (seek && !landed) {
                     return Err("unexpected transport packet".into());
                 }
                 let missing = i64::MIN;
                 fold(&mut out.digest, signed(packet.pts().unwrap_or(missing)));
                 match packet.access_unit() {
-                    AccessUnit::MpegAudio(frame)
-                        if seek.is_none() && frame.header().bitrate_kbps == 0 =>
-                    {
+                    AccessUnit::MpegAudio(frame) if !seek && frame.header().bitrate_kbps == 0 => {
                         fold(&mut out.digest, signed(packet.dts().unwrap_or(missing)));
                         fold(&mut out.digest, packet.elementary_range().start);
                         fold(&mut out.digest, u64::from(frame.header().sample_rate));
@@ -99,7 +155,7 @@ fn execute(
                             u64::from(frame.header().samples_per_frame()),
                         );
                     }
-                    AccessUnit::Video(_) if seek.is_some() => {
+                    AccessUnit::Video(_) if matches!(kind, Kind::Seek) => {
                         // DTS in the comparison is the effective decode clock.
                         // The source reader keeps a missing encoded DTS absent.
                         let decode_time = packet.dts().or(packet.pts()).unwrap_or(missing);
@@ -109,6 +165,17 @@ fn execute(
                             u64::from(packet.random_access() == RandomAccess::Sync),
                         );
                     }
+                    AccessUnit::Adts(_)
+                    | AccessUnit::Ac3(_)
+                    | AccessUnit::MpegAudio(_)
+                    | AccessUnit::Dts(_)
+                        if matches!(kind, Kind::AudioSeek) =>
+                    {
+                        fold(
+                            &mut out.digest,
+                            signed(packet.dts().or(packet.pts()).unwrap_or(missing)),
+                        );
+                    }
                     _ => return Err("unexpected transport carriage".into()),
                 }
                 fold_framed(&mut out.digest, packet.payload());
@@ -116,13 +183,18 @@ fn execute(
                 out.bytes += packet.payload().len() as u64;
             }
             Step::NeedInput(request) => {
-                let offset = usize::try_from(request.offset)?;
-                if offset == input.input.len() {
-                    reader.finish(FIRST_SOURCE, request.token)?;
+                let (start, end) = match (request.source, split) {
+                    (FIRST_SOURCE, split) => (0, split.unwrap_or(input.input.len())),
+                    (SECOND_SOURCE, Some(start)) => (start, input.input.len()),
+                    _ => return Err("unexpected transport entity".into()),
+                };
+                let offset = start + usize::try_from(request.offset)?;
+                if offset == end {
+                    reader.finish(request.source, request.token)?;
                 } else {
-                    let end = input.input.len().min(offset + request.maximum);
+                    let end = end.min(offset + request.maximum);
                     let window = InputWindow::new(
-                        FIRST_SOURCE,
+                        request.source,
                         request.token,
                         request.offset,
                         input.input.slice(offset..end)?,
@@ -138,7 +210,7 @@ fn execute(
                 }
                 .into());
             }
-            Step::End(_) if out.packets != 0 => return Ok(out),
+            Step::End(_) if out.packets > start => return Ok(()),
             Step::End(_) => return Err("transport comparison delivered no packets".into()),
         }
     }
@@ -149,8 +221,15 @@ pub(crate) fn run(kind: Kind, args: &[String]) -> Result<()> {
         Kind::Seek => Invocation::parse(
             args,
             kind.prefix(),
-            " SIZE PROGRAM PID PTS90 POLICY",
-            5..=5,
+            " SIZE PROGRAM PID PTS90 POLICY [REPEAT_PTS90|split=BYTES]",
+            5..=6,
+            false,
+        )?,
+        Kind::AudioSeek => Invocation::parse(
+            args,
+            kind.prefix(),
+            " SIZE PROGRAM [--dvb|--atsc] PID PTS90 POLICY [REPEAT_PTS90|split=BYTES]",
+            5..=7,
             false,
         )?,
         Kind::FreeAudio => Invocation::parse(
@@ -162,16 +241,27 @@ pub(crate) fn run(kind: Kind, args: &[String]) -> Result<()> {
         )?,
     };
     let pool = Budget::new(usize::try_from(MAX_INPUT)? + (64 << 20))?;
+    let has_namespace = matches!(kind, Kind::AudioSeek)
+        && matches!(invocation.arguments[2].as_str(), "--dvb" | "--atsc");
+    let track_index = 2 + usize::from(has_namespace);
+    if matches!(kind, Kind::Seek | Kind::AudioSeek)
+        && !(3..=4).contains(&(invocation.arguments.len() - track_index))
+    {
+        return Err("expected PID PTS90 POLICY [REPEAT_PTS90|split=BYTES]".into());
+    }
     let input = ts_input::parse(
         &pool,
         Path::new(invocation.path),
-        &invocation.arguments[..2],
+        &invocation.arguments[..track_index],
     )?;
-    let track = TrackId(invocation.arguments[2].parse()?);
+    let track = TrackId(invocation.arguments[track_index].parse()?);
     let seek = match kind {
-        Kind::Seek => {
-            let target = Time::new(i128::from(invocation.arguments[3].parse::<i64>()?), 90_000)?;
-            let policy = match invocation.arguments[4].as_str() {
+        Kind::Seek | Kind::AudioSeek => {
+            let target = Time::new(
+                i128::from(invocation.arguments[track_index + 1].parse::<i64>()?),
+                90_000,
+            )?;
+            let policy = match invocation.arguments[track_index + 2].as_str() {
                 "previous" => SeekPolicy::PreviousRandomAccess,
                 "preroll" => SeekPolicy::PlaybackPreroll,
                 _ => return Err("expected previous or preroll".into()),
@@ -193,7 +283,29 @@ pub(crate) fn run(kind: Kind, args: &[String]) -> Result<()> {
             None
         }
     };
+    let follow_up = if seek.is_some() {
+        invocation
+            .arguments
+            .get(track_index + 3)
+            .map(|argument| -> Result<FollowUp> {
+                if let Some(offset) = argument.strip_prefix("split=") {
+                    let offset = offset.parse()?;
+                    if !(1..input.input.len()).contains(&offset) {
+                        return Err("transport entity split outside input".into());
+                    }
+                    Ok(FollowUp::Split(offset))
+                } else {
+                    Ok(FollowUp::Repeated(Time::new(
+                        i128::from(argument.parse::<i64>()?),
+                        90_000,
+                    )?))
+                }
+            })
+            .transpose()?
+    } else {
+        None
+    };
     measure(&invocation, kind.operation(), Some(&pool), || {
-        execute(&pool, &input, track, seek)
+        execute(&pool, &input, track, seek, kind, follow_up)
     })
 }

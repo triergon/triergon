@@ -1,5 +1,5 @@
 //! Independently authored TS controls for selected-track seek and audio framing.
-use super::{Codec, PID, PROGRAM, R, Transport, part, source};
+use super::{Codec, PID, PROGRAM, Part, R, Transport, part, source};
 use crate::corpus::write_json;
 use crate::json::{self, Value};
 use crate::sha256;
@@ -195,7 +195,7 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
     let avc = video(root, false, 1)?;
     let hevc = video(root, true, 1)?;
     let many = video(root, false, 12)?;
-    let cases = [
+    let mut cases = [
         (
             &avc,
             "avc-earliest-picture",
@@ -220,6 +220,32 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
     .into_iter()
     .map(|(input, case, options)| input.record(root, feature, case, &options, seek, "ts-seek-fold"))
     .collect::<R<Vec<_>>>()?;
+    for (input, name, first, second) in [
+        (&many, "avc-repeated-preroll", "115000", "425500"),
+        (&hevc, "hevc-m2ts-repeated-preroll", "100000", "121000"),
+    ] {
+        cases.push(input.record(
+            root,
+            feature,
+            name,
+            &[pid.as_str(), first, "preroll", second],
+            seek,
+            "ts-seek-fold",
+        )?);
+    }
+    for (input, name, target, split) in [
+        (&avc, "avc-split-pes", "90000", "split=564"),
+        (&hevc, "hevc-m2ts-split-pes", "121000", "split=576"),
+    ] {
+        cases.push(input.record(
+            root,
+            feature,
+            name,
+            &[pid.as_str(), target, "preroll", split],
+            seek,
+            "ts-seek-fold",
+        )?);
+    }
     manifest(root, feature, cases)?;
 
     let raw = fs::read(root.join(AUDIO)).map_err(|e| format!("{AUDIO}: {e}"))?;
@@ -376,6 +402,325 @@ pub fn author_dts(root: &Path, args: &[String]) -> R<()> {
             data: ts.finish(m2ts),
         };
         cases.push(input.record(root, FEATURE, name, &["--dvb"], reference, "ts-au-fold")?);
+    }
+    manifest(root, FEATURE, cases)
+}
+
+/// Rewrap pinned audio frames with independently authored PES timing.
+pub fn author_audio_seek(root: &Path, args: &[String]) -> R<()> {
+    let [record, reference] = args else {
+        return Err("usage: cargo xtask fixture transport-audio-seek --record REFERENCE".into());
+    };
+    if record != "--record" {
+        return Err("expected --record".into());
+    }
+
+    const FEATURE: &str = "mpegts-previous-audio";
+    let pid = PID.to_string();
+    let mut cases = Vec::new();
+    let mut profiles = vec![
+        (
+            super::audio(root, false)?,
+            false,
+            &[][..],
+            &[][..],
+            1920,
+            true,
+        ),
+        (
+            super::audio(root, true)?,
+            true,
+            &[0x6a, 1, 0][..],
+            &["--dvb"][..],
+            2880,
+            true,
+        ),
+        (
+            super::direct_eac3(root)?,
+            true,
+            &[][..],
+            &["--atsc"][..],
+            2880,
+            false,
+        ),
+    ];
+    for (name, stream_type, header, frame_len, step) in [
+        ("mpeg1-layer1", 0x03, [0xff, 0xff, 0x14, 0xc0], 32, 720),
+        ("mpeg1-layer2", 0x03, [0xff, 0xfd, 0x44, 0xc0], 192, 2160),
+        ("mpeg2-layer2", 0x04, [0xff, 0xf5, 0x44, 0xc0], 192, 4320),
+    ] {
+        profiles.push((
+            Codec {
+                name,
+                stream_type,
+                stream_id: 0xc0,
+                dvb: false,
+                bytes: silence(header, frame_len).repeat(2),
+                first: frame_len,
+                header: 4,
+            },
+            false,
+            &[],
+            &[],
+            step,
+            false,
+        ));
+    }
+    for (codec, m2ts, descriptors, namespace, step, repeated) in profiles {
+        let frame = &codec.bytes[..codec.first];
+        let name = codec.name;
+        let mut ts = Transport::new();
+        ts.tables(&codec, descriptors)?;
+        ts.pes(codec.stream_id, &part(&codec.bytes, Some(90_000), None))?;
+        ts.pes(codec.stream_id, &part(frame, None, None))?;
+        ts.pes(
+            codec.stream_id,
+            &part(
+                &codec.bytes,
+                Some(90_000 + 3 * step),
+                Some(90_000 + 3 * step - 90),
+            ),
+        )?;
+        ts.pes(codec.stream_id, &part(frame, Some(90_000 + 5 * step), None))?;
+        let input = Input {
+            name,
+            m2ts,
+            data: ts.finish(m2ts),
+        };
+        for (policy, target) in [("previous", "90000"), ("preroll", "100000")] {
+            let id = format!("{name}-{policy}");
+            let mut options = namespace.to_vec();
+            options.extend([pid.as_str(), target, policy]);
+            cases.push(input.record(
+                root,
+                FEATURE,
+                &id,
+                &options,
+                Path::new(reference),
+                "ts-audio-seek-fold",
+            )?);
+        }
+        if repeated {
+            let mut options = namespace.to_vec();
+            options.extend([pid.as_str(), "90000", "preroll", "100000"]);
+            cases.push(input.record(
+                root,
+                FEATURE,
+                &format!("{name}-repeated-preroll"),
+                &options,
+                Path::new(reference),
+                "ts-audio-seek-fold",
+            )?);
+            let mut options = namespace.to_vec();
+            let split = if m2ts { "split=576" } else { "split=564" };
+            options.extend([pid.as_str(), "90000", "preroll", split]);
+            cases.push(input.record(
+                root,
+                FEATURE,
+                &format!("{name}-split-pes"),
+                &options,
+                Path::new(reference),
+                "ts-audio-seek-fold",
+            )?);
+        }
+    }
+    for (name, stream_type, header, side) in [
+        ("mpeg1-layer3-reservoir", 0x03, [0xff, 0xfb, 0x14, 0xc0], 5),
+        ("mpeg2-layer3-reservoir", 0x04, [0xff, 0xf3, 0x44, 0xc0], 4),
+    ] {
+        let codec = Codec {
+            name,
+            stream_type,
+            stream_id: 0xc0,
+            dvb: false,
+            bytes: Vec::new(),
+            first: 96,
+            header: 4,
+        };
+        let entry = silence(header, codec.first);
+        let mut dependent = entry.clone();
+        dependent[side] = if stream_type == 0x03 { 0x80 } else { 1 };
+        let mut ts = Transport::new();
+        ts.tables(&codec, &[])?;
+        ts.pes(codec.stream_id, &part(&entry, Some(90_000), None))?;
+        ts.pes(codec.stream_id, &part(&dependent, Some(93_000), None))?;
+        ts.pes(codec.stream_id, &part(&entry, Some(96_000), None))?;
+        let input = Input {
+            name,
+            m2ts: false,
+            data: ts.finish(false),
+        };
+        cases.push(input.record(
+            root,
+            FEATURE,
+            name,
+            &[pid.as_str(), "95000", "preroll"],
+            Path::new(reference),
+            "ts-audio-seek-fold",
+        )?);
+    }
+    manifest(root, FEATURE, cases)
+}
+
+/// Exercise source PTS anchors around a DTS core frame using prior history.
+pub fn author_dts_seek(root: &Path, args: &[String]) -> R<()> {
+    let [record, reference] = args else {
+        return Err("usage: cargo xtask fixture transport-dts-seek --record REFERENCE".into());
+    };
+    if record != "--record" {
+        return Err("expected --record".into());
+    }
+    const FEATURE: &str = "mpegts-dts-seek";
+    const SOURCE: &str = "harness/fixtures/mpegts/dts-core-mono.dts";
+    const SHA256: &str = "a1db20abc4bce08a504108de2998337f4d906eda3373acdc3abab39fcaaf1330";
+    let bytes = fs::read(root.join(SOURCE)).map_err(|e| format!("{SOURCE}: {e}"))?;
+    if sha256::hex(&bytes) != SHA256 || bytes[4] & 2 != 0 {
+        return Err(format!(
+            "{SOURCE}: expected the checked core without optional header CRC"
+        ));
+    }
+    let name = "dts-core-history";
+    let codec = Codec {
+        name,
+        stream_type: 6,
+        stream_id: 0xbd,
+        dvb: true,
+        bytes: Vec::new(),
+        first: 512,
+        header: 15,
+    };
+    let mut entry = Vec::from(&bytes[..512]);
+    entry[10] &= !1;
+    let mut dependent = entry.clone();
+    dependent[10] |= 1;
+    let mut ts = Transport::new();
+    ts.tables(&codec, &[0x7b, 5, 0xd2, 0x87, 0x83, 0xfe, 0])?;
+    for (i, frame) in [&entry, &dependent, &entry].into_iter().enumerate() {
+        ts.pes(
+            codec.stream_id,
+            &part(frame, Some(90_000 + i as u64 * 960), None),
+        )?;
+    }
+    let input = Input {
+        name,
+        m2ts: true,
+        data: ts.finish(true),
+    };
+    let pid = PID.to_string();
+    let mut cases = Vec::new();
+    for (case, target, policy) in [
+        ("dts-core-history-preroll", "91500", "preroll"),
+        ("dts-core-history-next-entry", "91920", "previous"),
+    ] {
+        cases.push(input.record(
+            root,
+            FEATURE,
+            case,
+            &["--dvb", &pid, target, policy],
+            Path::new(reference),
+            "ts-audio-seek-fold",
+        )?);
+    }
+    manifest(root, FEATURE, cases)
+}
+
+fn extension_substream(index: u32, long: bool) -> Vec<u8> {
+    let header_bytes = if long { 16 } else { 12 };
+    let frame_bytes = header_bytes + 8;
+    let mut bytes = vec![0; frame_bytes];
+    bytes[..5].copy_from_slice(&[0x64, 0x58, 0x20, 0x25, 0xa5]);
+    let mut position = 40;
+    for (width, value) in [
+        (2, index),
+        (1, u32::from(long)),
+        (if long { 12 } else { 8 }, header_bytes as u32 - 1),
+        (if long { 20 } else { 16 }, frame_bytes as u32 - 1),
+    ] {
+        for bit in (0..width).rev() {
+            bytes[position / 8] |= ((value >> bit) as u8 & 1) << (7 - position % 8);
+            position += 1;
+        }
+    }
+    let mut crc: u16 = 0xffff;
+    for &byte in &bytes[5..header_bytes - 2] {
+        crc ^= u16::from(byte) << 8;
+        for _ in 0..8 {
+            crc = (crc << 1) ^ if crc & 0x8000 != 0 { 0x1021 } else { 0 };
+        }
+    }
+    bytes[header_bytes - 2..header_bytes].copy_from_slice(&crc.to_be_bytes());
+    bytes[header_bytes..].copy_from_slice(&[0x11, 0x8a, 0x95, 0xe1, 0x35, 0x55, 0x8c, 0x01]);
+    bytes
+}
+
+/// Author aligned PES carrying a pinned core and opaque DTS-HD extension bodies.
+pub fn author_dts_hd(root: &Path, args: &[String]) -> R<()> {
+    let [record, reference] = args else {
+        return Err("usage: cargo xtask fixture transport-dts-hd --record REFERENCE".into());
+    };
+    if record != "--record" {
+        return Err("expected --record".into());
+    }
+    const FEATURE: &str = "mpegts-dts-hd";
+    const SEED: &str = "harness/fixtures/mpegts/dts-core-mono.dts";
+    const SHA256: &str = "a1db20abc4bce08a504108de2998337f4d906eda3373acdc3abab39fcaaf1330";
+    let core = fs::read(root.join(SEED)).map_err(|e| format!("{SEED}: {e}"))?;
+    if sha256::hex(&core) != SHA256 {
+        return Err(format!("{SEED}: pinned coded bytes changed"));
+    }
+    let codec = Codec {
+        name: "dvb-dts-hd",
+        stream_type: 0x06,
+        stream_id: 0xbd,
+        dvb: true,
+        bytes: Vec::new(),
+        first: 0,
+        header: 0,
+    };
+    let mut cases = Vec::new();
+    for (name, m2ts, long, extra) in [
+        ("dts-hd-core-extension-short", false, false, false),
+        ("dts-hd-core-extension-long", true, true, false),
+        ("dts-hd-core-two-extensions", false, false, true),
+    ] {
+        let mut ts = Transport::new();
+        let mut descriptor = vec![
+            0x7f, 14, 0x0e, 0xc0, 5, 1, 0x60, 0x08, 0, 0, 5, 1, 0x60, 0x48, 0, 0,
+        ];
+        if extra {
+            descriptor[1] += 6;
+            descriptor[3] |= 0x20;
+            descriptor.extend([5, 1, 0x60, 0x48, 0, 0]);
+        }
+        ts.tables(&codec, &descriptor)?;
+        let extension = extension_substream(0, long);
+        let second = extension_substream(1, long);
+        for (i, frame) in core.chunks_exact(512).take(3).enumerate() {
+            let mut payload = Vec::from(frame);
+            payload.extend_from_slice(&extension);
+            if extra {
+                payload.extend_from_slice(&second);
+            }
+            let pts = 90_000 + i as u64 * 960;
+            let packet = Part {
+                aligned: true,
+                ..part(&payload, Some(pts), (i == 1).then_some(pts - 90))
+            };
+            ts.pes(codec.stream_id, &packet)?;
+        }
+        let input = Input {
+            name,
+            m2ts,
+            data: ts.finish(m2ts),
+        };
+        cases.push(input.record(
+            root,
+            FEATURE,
+            name,
+            &["--dvb"],
+            Path::new(reference),
+            "ts-au-fold",
+        )?);
     }
     manifest(root, FEATURE, cases)
 }

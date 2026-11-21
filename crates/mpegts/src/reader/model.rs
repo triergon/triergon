@@ -322,18 +322,24 @@ impl MpegAudioFrame {
     }
 }
 
-/// One complete canonical DTS core frame from a DVB-signalled stream.
+/// One complete core-bearing DTS access unit from a DVB-signalled stream.
 #[derive(Debug)]
 pub struct DtsAudioFrame {
     pub(super) bytes: Bytes,
+    pub(super) core_bytes: usize,
     pub(super) offset: u64,
     pub(super) duration: Time,
 }
 
 impl DtsAudioFrame {
-    /// Complete frame, including the DTS core header.
+    /// Complete access unit, including any extension substreams.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
+    }
+
+    /// Exact source bytes of the core substream.
+    pub fn core_bytes(&self) -> &[u8] {
+        &self.bytes.as_ref()[..self.core_bytes]
     }
 
     /// Exact duration of the core coding window.

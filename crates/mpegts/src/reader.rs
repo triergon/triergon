@@ -18,11 +18,13 @@ pub use model::{
     UnframedAudio,
 };
 use model::{ClockContext, Shared};
+pub use seek::SeekEntity;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{ContainerReader, Event, ReaderStep, SeekRequest, TrackId};
 use triergon_core::{
-    Backpressure, Budget, BudgetVec, Error, InputCursor, InputRequest, InputToken, InputWindow,
-    Result, SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, WorkBudget,
+    Backpressure, Budget, BudgetVec, Charged, Error, InputCursor, InputRequest, InputToken,
+    InputWindow, Result, SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step,
+    WorkBudget,
 };
 use triergon_framing::RawAnnexBLimits;
 
@@ -86,7 +88,7 @@ pub struct ReaderLimits {
     pub maximum_access_units: usize,
     pub maximum_pes_per_access_unit: usize,
     pub elementary_input_window: usize,
-    /// Largest single entity examined by a seek. Zero disables seeking.
+    /// Largest physical byte extent examined by a seek. Zero disables seeking.
     pub maximum_seek_scan_bytes: u64,
     /// Period-zero timestamps by default. Every lifted value carries its
     /// SourceTimeStatus; no missing DTS or per-frame timestamp is synthesized.
@@ -170,6 +172,8 @@ pub struct Reader {
     deferred_fragment: bool,
     storage: Option<StorageScan>,
     seek: BudgetVec<seek::Seeking>,
+    seek_index: Option<Shared<seek::SeekIndex>>,
+    seek_entities: Option<Charged<Box<seek::EntityPlan>>>,
     continued_entity: bool,
 }
 
@@ -284,6 +288,8 @@ impl Reader {
             deferred_fragment: false,
             storage: None,
             seek: BudgetVec::new(pool),
+            seek_index: None,
+            seek_entities: None,
             continued_entity: false,
         })
     }
@@ -378,6 +384,24 @@ impl Reader {
     }
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
+        if let Some(next) = self.seek_entities.as_deref().and_then(|plan| plan.next()) {
+            self.queue_entity(
+                source,
+                token,
+                next.source,
+                next.capabilities(),
+                EntityTransition::Contiguous,
+            )?;
+            self.seek_entities
+                .as_deref_mut()
+                .expect("active seek entity plan")
+                .advance();
+            return Ok(());
+        }
+        self.finish_input(source, token)
+    }
+
+    fn finish_input(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         let input = self
             .input
             .as_mut()
@@ -404,9 +428,25 @@ impl Reader {
         transition: EntityTransition,
     ) -> Result<()> {
         self.healthy()?;
+        if self.seek_entities.is_some() {
+            return Err(Error::Invalid(
+                "MPEG-TS entity continuation is managed by seek",
+            ));
+        }
         if !self.seek.is_empty() {
             return Err(Error::Unsupported("MPEG-TS seek across entities"));
         }
+        self.queue_entity(source, token, next, capabilities, transition)
+    }
+
+    fn queue_entity(
+        &mut self,
+        source: SourceId,
+        token: InputToken,
+        next: SourceId,
+        capabilities: SourceCapabilities,
+        transition: EntityTransition,
+    ) -> Result<()> {
         if self.next_entity.is_some() || self.end.is_some() {
             return Err(Error::Invalid(
                 "MPEG-TS entity completion already specified",
@@ -416,13 +456,14 @@ impl Reader {
             return Err(Error::SourceMismatch);
         }
         token.request().checked_add(1).ok_or(Error::Overflow)?;
-        self.finish(source, token)?;
+        self.finish_input(source, token)?;
         self.next_entity = Some(NextEntity {
             source: next,
             capabilities,
             transition,
         });
         self.continued_entity = true;
+        self.seek_index = None;
         Ok(())
     }
     pub fn fail(
@@ -483,6 +524,8 @@ impl Reader {
         self.next_entity = None;
         self.storage = None;
         self.seek = BudgetVec::new(&self.pool);
+        self.seek_index = None;
+        self.seek_entities = None;
     }
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
         self.step_observing::<false>(work, cancel, |_| ())
@@ -516,13 +559,24 @@ impl Reader {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        observe: impl FnMut(CarrierObservation<'_>),
+        mut observe: impl FnMut(CarrierObservation<'_>),
     ) -> Result<ReaderStep<Self>> {
         self.healthy()?;
-        let result = if self.seek.is_empty() {
-            self.advance::<OBSERVING, false>(work, cancel, observe)
-        } else {
-            self.advance_seek(work, cancel)
+        let result = loop {
+            let result = if self.seek.is_empty() {
+                self.advance::<OBSERVING, false>(work, cancel, &mut observe)
+            } else {
+                self.advance_seek(work, cancel)
+            };
+            if matches!(
+                &result,
+                Ok(Step::Backpressure(_)) | Err(Error::Backpressure { .. })
+            ) && self.seek_index.take().is_some()
+            {
+                self.storage = None;
+                continue;
+            }
+            break result;
         };
         match result {
             Err(Error::Backpressure {
@@ -1095,7 +1149,19 @@ impl Reader {
                     self.raw = Some(event);
                     self.phase = Phase::Prepare;
                 }
-                Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
+                Step::NeedInput(request) => {
+                    if request.maximum == 0
+                        && self
+                            .seek_entities
+                            .as_deref()
+                            .and_then(|plan| plan.next())
+                            .is_some()
+                    {
+                        self.finish(request.source, request.token)?;
+                        continue;
+                    }
+                    return Ok(Step::NeedInput(request));
+                }
                 Step::Yield => return Ok(Step::Yield),
                 Step::End(location) => {
                     let stream = self.stream.as_mut().expect("active transport");
