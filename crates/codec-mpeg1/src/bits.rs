@@ -1,3 +1,5 @@
+//! The bit writer the coded pictures are written with.
+
 use triergon_core::{Budget, BudgetVec, Error};
 
 /// MSB-first bit writer over a charged byte buffer of a fixed size: the bound of

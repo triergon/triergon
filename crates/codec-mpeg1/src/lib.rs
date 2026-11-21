@@ -72,6 +72,7 @@ impl Default for Limits {
     }
 }
 
+/// The picture rate the sequence header signals (frame_rate_code 5).
 const FPS: f64 = 30.0;
 
 /// Bits one macroblock can take: an 11-bit address increment, a 6-bit type, a 5-bit
@@ -264,9 +265,9 @@ fn validate(cfg: &EncoderConfig) -> Result<()> {
 }
 
 /// Most bytes one picture can take. Rate control never plans beyond the VBV
-/// occupancy (at most `vbv_bits`), and once a picture comes within 8192 bits of
-/// it `encode_row` codes only guarded macroblocks, so one full macroblock and
-/// guarded ones are all that can follow.
+/// occupancy (at most `vbv_bits`), and once a picture comes within
+/// [`VBV_GUARD_BITS`](rate::VBV_GUARD_BITS) of it `encode_row` codes only guarded
+/// macroblocks, so one full macroblock and guarded ones are all that can follow.
 fn picture_bound(cfg: &EncoderConfig) -> Result<usize> {
     let g = cfg.geometry;
     // Geometry caps the macroblock count at 65 536.

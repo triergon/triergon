@@ -23,20 +23,20 @@ pub(crate) const VBV_GUARD_BITS: f64 = 8192.0;
 /// The plan of one picture.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Plan {
-    pub q: u32,
+    pub(crate) q: u32,
     /// Unrounded model quantiser; rows mix its two neighbours.
-    pub q_exact: f64,
+    pub(crate) q_exact: f64,
     /// Complete picture target, including the headers already emitted.
     #[cfg_attr(
         not(test),
         expect(dead_code, reason = "only the tests read the whole target")
     )]
-    pub target: f64,
+    pub(crate) target: f64,
     /// Remaining target after those actual headers; never negative.
-    pub texture_target: f64,
+    pub(crate) texture_target: f64,
     /// Physical VBV occupancy available for this picture. Any emitted
     /// overshoot is still reported by `end`, never converted into credit.
-    pub hard_limit: f64,
+    pub(crate) hard_limit: f64,
 }
 
 /// The rate controller of one sequence.
@@ -60,8 +60,8 @@ pub(crate) struct RateControl {
     plan: Plan,
     activity: f64,
     /// Total VBV underflow in bits (should stay 0).
-    pub underflow_bits: f64,
-    pub last_q: u32,
+    pub(crate) underflow_bits: f64,
+    pub(crate) last_q: u32,
     /// Mean quantiser of the I picture the next P picture follows directly; `None`
     /// after a P picture.
     intra_q: Option<f64>,

@@ -15,8 +15,8 @@ use triergon_pixel::Geometry;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Mv {
-    pub x: i32,
-    pub y: i32,
+    pub(crate) x: i32,
+    pub(crate) y: i32,
 }
 
 impl Mv {
@@ -335,22 +335,27 @@ pub(crate) fn component_bits(delta: i32, f_code: u32) -> u32 {
 
 /// Coarse-level inputs: decimated current and reference luma.
 pub(crate) struct Coarse<'a> {
-    pub cur: &'a [u8],
-    pub reference: &'a [u8],
-    pub width: usize,
+    pub(crate) cur: &'a [u8],
+    pub(crate) reference: &'a [u8],
+    pub(crate) width: usize,
 }
 
 /// Searches one 16×16 luma block of `cur` against `reference`.
 pub(crate) struct Search<'a> {
-    pub cur: &'a [u8],
-    pub reference: &'a [u8],
-    pub stride: usize,
-    pub x: usize,
-    pub y: usize,
-    pub bounds: Bounds,
-    pub pred: Mv,
-    pub lambda: u32,
-    pub f_code: u32,
+    pub(crate) cur: &'a [u8],
+    pub(crate) reference: &'a [u8],
+    /// Stride of both planes.
+    pub(crate) stride: usize,
+    /// Top-left sample of the block.
+    pub(crate) x: usize,
+    pub(crate) y: usize,
+    pub(crate) bounds: Bounds,
+    /// The vector predictor a candidate's bits are counted from.
+    pub(crate) pred: Mv,
+    /// Weight of one vector bit against one unit of SAD.
+    pub(crate) lambda: u32,
+    /// forward_f_code the vector bits are counted with.
+    pub(crate) f_code: u32,
 }
 
 /// A predictor this good (mean absolute error ≤ 1) ends the search.
