@@ -120,7 +120,7 @@ impl Font {
         if height < 0 {
             return Err(Error::Invalid("negative size"));
         }
-        let span = i64::from(face.ascender - face.descender).abs();
+        let span = (i64::from(face.ascender) - i64::from(face.descender)).abs();
         if span == 0 {
             return Err(Error::Invalid("face ascender equals its descender"));
         }
