@@ -29,9 +29,9 @@ impl Bitmap {
     ///
     /// # Errors
     ///
-    /// `Limit` when the bitmap would exceed
-    /// [`MAX_BITMAP_BYTES`](crate::MAX_BITMAP_BYTES), libass's bound; `Policy`
-    /// when it exceeds `limits.bitmap_bytes`; and the budget's errors.
+    /// `Limit` when the bitmap would exceed [`MAX_BITMAP_BYTES`], libass's
+    /// bound; `Policy` when it exceeds `limits.bitmap_bytes`; and the
+    /// budget's errors.
     pub fn new(budget: &Budget, width: usize, height: usize, limits: &Limits) -> Result<Self> {
         let stride = Self::stride_within(width, height, limits)?;
         let mut data = BudgetVec::new(budget);
