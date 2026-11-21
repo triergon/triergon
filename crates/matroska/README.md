@@ -223,6 +223,19 @@ Building a document validates every node once in resumable, work-charged steps;
 text fields are checked in place in the document's buffer, without taking a
 handle to it per field.
 
+- `Attachment::description` returns the optional FileDescription alongside the filename, MIME type, UID and data.
+- `Chapter::hidden` reports ChapterFlagHidden and defaults to false.
+- `SegmentInfo::writing_app` returns the optional WritingApp recorded by the writer.
+- `SimpleTag::is_default` reports TagDefault and defaults to true.
+- `Edition::is_default` reports EditionFlagDefault and defaults to false.
+
+The packet reader publishes a new configuration before delivering a block that
+carries CodecState. That state applies to every frame of the block, and later
+blocks on the same track retain it until another state takes effect. FFmpeg's
+Matroska demuxer ignores CodecState. The [CodecState
+oracle](../../harness/features/mkv-codec-state/contract.json) checks event
+ordering and the active state against the source elements.
+
 ## Conformance
 
 Authored from RFC 8794 §§4–7, 11 (EBML) and RFC 9559 §§5, 10–11, 22 (Matroska:
@@ -241,4 +254,9 @@ worker over the authored corpora in `harness/` plus the upstream FATE vectors
 metadata and seek landings must match exactly, with no epsilon. Where FFmpeg's
 representation differs (packet clock, colour rationals, flattened chapters,
 collapsed tag targets) the source facts and the FFmpeg view are each checked.
+The typed chapter, tag and attachment fields and raw track mappings have
+independent source comparisons. The [Matroska view
+contracts](../../harness/features/mkv-metadata-fields/contract.json) compare
+the published dictionaries, chapters, attachments, stream configuration
+and packet side-data subset against FFmpeg.
 Gates and harness: [docs/quality.md](../../docs/quality.md).

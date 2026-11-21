@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "id": "mkv-track-extensions-oracle",
+  "gate": "required",
+  "operation": "mkv-track-extensions-oracle",
+  "candidate": "matroska-views-worker",
+  "worker_operation": "mkv-track-extensions-",
+  "corpus_directory": ".",
+  "contract": [
+    "Open and parse each public TrackExtensionsJob, then verify TrackEntry bytes, maximum addition ID and its wire presence, and mapping descriptors in source order.",
+    "Descriptors cover value and type with wire presence, implicit type and conflict, complete element bytes, the decoded and raw name, and optional extra data. Unknown child rows contain the mapping index, EBML ID, complete element bytes and its payload."
+  ],
+  "required_profiles": [
+    "mapping-absent",
+    "mapping-empty-fields",
+    "mapping-value-one",
+    "mapping-t35",
+    "mapping-dvcc",
+    "mapping-dvvc",
+    "mapping-mvcc",
+    "mapping-hvce",
+    "mapping-short-hvce",
+    "mapping-unknown",
+    "mapping-duplicate-value",
+    "hevc-dolby"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "mapping-absent",
+        "mapping-empty-fields",
+        "mapping-value-one",
+        "mapping-t35",
+        "mapping-dvcc",
+        "mapping-dvvc",
+        "mapping-mvcc",
+        "mapping-hvce",
+        "mapping-short-hvce",
+        "mapping-unknown",
+        "mapping-duplicate-value",
+        "hevc-dolby"
+      ],
+      "cause": "The independent source oracle supplies correctness parity for values outside the pinned FFmpeg public interface."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "mapping-absent",
+        "mapping-empty-fields",
+        "mapping-value-one",
+        "mapping-t35",
+        "mapping-dvcc",
+        "mapping-dvvc",
+        "mapping-mvcc",
+        "mapping-hvce",
+        "mapping-short-hvce",
+        "mapping-unknown",
+        "mapping-duplicate-value",
+        "hevc-dolby"
+      ],
+      "cause": "The independent source oracle supplies correctness parity for values outside the pinned FFmpeg public interface."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "mapping-absent",
+        "mapping-empty-fields",
+        "mapping-value-one",
+        "mapping-t35",
+        "mapping-dvcc",
+        "mapping-dvvc",
+        "mapping-mvcc",
+        "mapping-hvce",
+        "mapping-short-hvce",
+        "mapping-unknown",
+        "mapping-duplicate-value",
+        "hevc-dolby"
+      ],
+      "cause": "The independent source oracle supplies correctness parity for values outside the pinned FFmpeg public interface."
+    }
+  ],
+  "oracle": "mkv-track-extensions"
+}

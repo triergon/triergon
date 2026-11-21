@@ -1,0 +1,411 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "hdr-webm-00",
+      "profile": "hdr-webm-00",
+      "file": ".research/matroska-views/hdr-webm-00.mkv",
+      "sha256": "7d5029810e7198eb9ba19aff5f1b7edcc25ec2a6bc155605ee2b5f6cdc8e9c7c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "webm"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 12941406681041795600
+      }
+    },
+    {
+      "id": "hdr-matroska-01",
+      "profile": "hdr-matroska-01",
+      "file": ".research/matroska-views/hdr-matroska-01.mkv",
+      "sha256": "fad0c87b6f747f0ec5ba1f519678cbd527f562f55076b23fa311bb604d9ba462",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 3219812127223659839
+      }
+    },
+    {
+      "id": "hdr-webm-02",
+      "profile": "hdr-webm-02",
+      "file": ".research/matroska-views/hdr-webm-02.mkv",
+      "sha256": "43a41008ca99afd359a68b9c44abbbee12ea527c910bb5f36a50954f1576e259",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "webm"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 12663483515127558430
+      }
+    },
+    {
+      "id": "hdr-matroska-03",
+      "profile": "hdr-matroska-03",
+      "file": ".research/matroska-views/hdr-matroska-03.mkv",
+      "sha256": "c97e07893aa9ea8b25bec5963cbc3d35179ba7baa969165179fe793051a85d32",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 15496361771302155606
+      }
+    },
+    {
+      "id": "hdr-webm-04",
+      "profile": "hdr-webm-04",
+      "file": ".research/matroska-views/hdr-webm-04.mkv",
+      "sha256": "6cf432c1f682c960819b950d9de223621b38f1327b28753677da762dffb29b93",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "webm"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 7526363370678624353
+      }
+    },
+    {
+      "id": "hdr-matroska-05",
+      "profile": "hdr-matroska-05",
+      "file": ".research/matroska-views/hdr-matroska-05.mkv",
+      "sha256": "7c96147e4b5a6cf03b35e41c575896d624ea42c1f4e83b5619ef8916b8e747a1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 17079043980772256796
+      }
+    },
+    {
+      "id": "hdr-webm-06",
+      "profile": "hdr-webm-06",
+      "file": ".research/matroska-views/hdr-webm-06.mkv",
+      "sha256": "3c0a15be7bbe72ce00f5db26d859975ccd12c36ba540b97662361f5522d3edf0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "webm"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 17320615662103224472
+      }
+    },
+    {
+      "id": "hdr-matroska-07",
+      "profile": "hdr-matroska-07",
+      "file": ".research/matroska-views/hdr-matroska-07.mkv",
+      "sha256": "626a7b2838ed996a12758e11bd5bf506b03128a432ba2c47ff1174a350904a41",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 12836711831672103659
+      }
+    },
+    {
+      "id": "hdr-webm-08",
+      "profile": "hdr-webm-08",
+      "file": ".research/matroska-views/hdr-webm-08.mkv",
+      "sha256": "5bc9c7b8394888034be5dfc3b0efcd71137d0a61e1a603a0583a6f30a67ffb32",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "webm"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 10266725382536622974
+      }
+    },
+    {
+      "id": "hdr-matroska-09",
+      "profile": "hdr-matroska-09",
+      "file": ".research/matroska-views/hdr-matroska-09.mkv",
+      "sha256": "2f8735870752e6534c0aba50a3fecf283a72c0072a226467bb6544ec90525287",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 3241727550363315478
+      }
+    },
+    {
+      "id": "hdr-webm-10",
+      "profile": "hdr-webm-10",
+      "file": ".research/matroska-views/hdr-webm-10.mkv",
+      "sha256": "9773f6c59368adb74e4823a2e26387431f2d869ca8e9ebab4bda286ef8631b27",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "webm"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 8440354082673395881
+      }
+    },
+    {
+      "id": "hdr-matroska-11",
+      "profile": "hdr-matroska-11",
+      "file": ".research/matroska-views/hdr-matroska-11.mkv",
+      "sha256": "eabc6cd94714a265d30993a0d8d0a5e8a4055d4f8ba5a43892a6dda79f87bef5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 5527351300497175516
+      }
+    },
+    {
+      "id": "hdr-webm-12",
+      "profile": "hdr-webm-12",
+      "file": ".research/matroska-views/hdr-webm-12.mkv",
+      "sha256": "73061af78dc731bedb6cf64543186cff51a73218a9f619370500f4051dbba0bb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "webm"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 217718944840924536
+      }
+    },
+    {
+      "id": "hdr-matroska-13",
+      "profile": "hdr-matroska-13",
+      "file": ".research/matroska-views/hdr-matroska-13.mkv",
+      "sha256": "b4984761bab772dc042b538a6c3e064401c9ea829c4cbd67e58b9b159f80dfa9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 12854475711700028199
+      }
+    },
+    {
+      "id": "hdr-webm-14",
+      "profile": "hdr-webm-14",
+      "file": ".research/matroska-views/hdr-webm-14.mkv",
+      "sha256": "f32d733e69a51e631cb13b9cb1e48d1d78913c6f60f414498cb7e17c909d7f06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "webm"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 10957229061470355846
+      }
+    },
+    {
+      "id": "hdr-matroska-15",
+      "profile": "hdr-matroska-15",
+      "file": ".research/matroska-views/hdr-matroska-15.mkv",
+      "sha256": "8bdec8c918dca69144973db9d6031af05d1ba8dbdc330a418dd35bd1e8963a0d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 3546803580429269462
+      }
+    },
+    {
+      "id": "hdr-truncated",
+      "profile": "hdr-truncated",
+      "file": ".research/matroska-views/hdr-truncated.mkv",
+      "sha256": "88332a3a1f93b41b729c1840e750acbcf2c01bcaeef54174493bc99ad19656f6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 968
+      }
+    },
+    {
+      "id": "lcevc",
+      "profile": "lcevc",
+      "file": ".research/matroska-views/lcevc.mkv",
+      "sha256": "78d4b70df3baa0c4b507e28248a36f410ce01ccae00305d407645f94bee128dc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2,
+        "digest": 25435028419461088
+      }
+    },
+    {
+      "id": "mixed-hdr-opaque",
+      "profile": "mixed-hdr-opaque",
+      "file": ".research/matroska-views/mixed-hdr-opaque.mkv",
+      "sha256": "0e04c3c3093682ac4dd971237a4f346fe7941bf392233d5caadcf579935f2d82",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 14,
+        "digest": 1719208932448561581
+      }
+    },
+    {
+      "id": "laced-opaque-lcevc",
+      "profile": "laced-opaque-lcevc",
+      "file": ".research/matroska-views/laced-opaque-lcevc.mkv",
+      "sha256": "221f28ed2573eb5a9b1bceb64fbad0d44a05b9980b7cc06468329d3dbf0ceecd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 28,
+        "digest": 14476217614626119115
+      }
+    },
+    {
+      "id": "laced-valid-opaque-lcevc",
+      "profile": "laced-valid-opaque-lcevc",
+      "file": ".research/matroska-views/laced-valid-opaque-lcevc.mkv",
+      "sha256": "6abbb8e89dcfa801dfa6baf99a56fb34627c0062842a6b3b40cbd3502fcbf1d2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 32,
+        "digest": 16523386108515236773
+      }
+    },
+    {
+      "id": "opaque-mapped",
+      "profile": "opaque-mapped",
+      "file": ".research/matroska-views/opaque-mapped.mkv",
+      "sha256": "3b4228d960e18ab984d43eb2c591103f551beeca7c7c0d327b43a260c783c613",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 14,
+        "digest": 965121527837362515
+      }
+    },
+    {
+      "id": "opaque-identity",
+      "profile": "opaque-identity",
+      "file": ".research/matroska-views/opaque-identity.mkv",
+      "sha256": "e8d42149c4d5e5ef17349b16a35fd6acacf14da91be68aef128e110cfd741e75",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 23,
+        "digest": 15220198400503410734
+      }
+    },
+    {
+      "id": "opaque-default",
+      "profile": "opaque-default",
+      "file": ".research/matroska-views/opaque-default.mkv",
+      "sha256": "71148231b4c0cbc08e58e1f2da4faab7cb75fd47ded35a33fa689a37bb82cad5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 15,
+        "digest": 493755086933719452
+      }
+    },
+    {
+      "id": "opaque-empty",
+      "profile": "opaque-empty",
+      "file": ".research/matroska-views/opaque-empty.mkv",
+      "sha256": "d6758aa32a50adfe22aa8e1c389c072debd474ffccd0fb373ecea3990fd0344d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 0,
+        "digest": 888428170
+      }
+    },
+    {
+      "id": "opaque-webm",
+      "profile": "opaque-webm",
+      "file": ".research/matroska-views/opaque-webm.mkv",
+      "sha256": "c73586a7087a23b9e5d7003095cd624bb7d61e7f1c7815b7e5245097039925db",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "webm"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 13,
+        "digest": 1087962419659025107
+      }
+    },
+    {
+      "id": "opaque-unmapped",
+      "profile": "opaque-unmapped",
+      "file": ".research/matroska-views/opaque-unmapped.mkv",
+      "sha256": "0155a807c55a2cb16358cdc2111ba249d5ee69ccfd42e3bb9551df20b8737938",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 0,
+        "digest": 888428170
+      }
+    }
+  ]
+}

@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "mapping-absent",
+      "profile": "mapping-absent",
+      "file": ".research/matroska-views/mapping-absent.mkv",
+      "sha256": "3d120a22e96a73da2c9a1a9db92301d3c89822ad399a48906285fa62f700b106",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "source"
+      ],
+      "expected": {
+        "trace_sha256": "10cf485aa6b824b7132fb21ffc2dabff98fbec2b9b6c483e2dc5a0d673d7725b"
+      }
+    },
+    {
+      "id": "mapping-empty-fields",
+      "profile": "mapping-empty-fields",
+      "file": ".research/matroska-views/mapping-empty-fields.mkv",
+      "sha256": "d1a9bc3cc07853ad2fa17d589734d686dc1d70f607be5d99fd04022cef3070d4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "source"
+      ],
+      "expected": {
+        "trace_sha256": "592e1c6c35596314aa4a96144a6f8dd471a31fee8994f74a687f9328f4e3eaa3"
+      }
+    },
+    {
+      "id": "mapping-value-one",
+      "profile": "mapping-value-one",
+      "file": ".research/matroska-views/mapping-value-one.mkv",
+      "sha256": "1f87a931f335f411abff032702f76e06112c0f38477ecbf726849ea547587d7b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "source"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mapping-t35",
+      "profile": "mapping-t35",
+      "file": ".research/matroska-views/mapping-t35.mkv",
+      "sha256": "5f9ededcec57ebdeb51d53c43b8d5b185294ddf77a0e5a0ec7743dc6547978a0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "source"
+      ],
+      "expected": {
+        "trace_sha256": "d963acbf7f42bddf878061856e98510236b0dbc50b00f64d94e95c8c01d5be38"
+      }
+    },
+    {
+      "id": "mapping-dvcc",
+      "profile": "mapping-dvcc",
+      "file": ".research/matroska-views/mapping-dvcc.mkv",
+      "sha256": "16a1059de1f7d2cffa1bb99cb08c8be64ddd040142af007ca7d12ebad5063803",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "source"
+      ],
+      "expected": {
+        "trace_sha256": "29ea5a7d3814abbadd63d6c97004f6f46e7c166c73b9413dce85f30a4708f5fd"
+      }
+    },
+    {
+      "id": "mapping-dvvc",
+      "profile": "mapping-dvvc",
+      "file": ".research/matroska-views/mapping-dvvc.mkv",
+      "sha256": "6defb4f37632030e7c6a24e202febd9b6572950672ae17d49d79ecd747ab8083",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "source"
+      ],
+      "expected": {
+        "trace_sha256": "22ef6f49a6f1eba8bcb7823361a3d1c103068213427778d1fd811fabc36d917f"
+      }
+    },
+    {
+      "id": "mapping-mvcc",
+      "profile": "mapping-mvcc",
+      "file": ".research/matroska-views/mapping-mvcc.mkv",
+      "sha256": "8c7c887486096d585edceb481c4261cbbd60b9fae8ff6119b76d45c33f82ab6a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "source"
+      ],
+      "expected": {
+        "trace_sha256": "a39180655396524b3db2e433accfcbb1fac554de71b46e46c4e895b97eb544d2"
+      }
+    },
+    {
+      "id": "mapping-hvce",
+      "profile": "mapping-hvce",
+      "file": ".research/matroska-views/mapping-hvce.mkv",
+      "sha256": "9e8a1a2c400fcb21a4678236a7accd139b089bed5583ad3f7c3cf7269585a82e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "source"
+      ],
+      "expected": {
+        "trace_sha256": "95ab194bd3888283636fb1049948215e5aefa5d254524a173d471331eddeac42"
+      }
+    },
+    {
+      "id": "mapping-short-hvce",
+      "profile": "mapping-short-hvce",
+      "file": ".research/matroska-views/mapping-short-hvce.mkv",
+      "sha256": "1729adf129eb65c14ea95bf66ed4e2efabdf512a036fb50b6995896c5cb49337",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "source"
+      ],
+      "expected": {
+        "trace_sha256": "156a065cfb34c5b9c6c8a3bc04f48313377443f1455e00b800fc02b20ecc68d0"
+      }
+    },
+    {
+      "id": "mapping-unknown",
+      "profile": "mapping-unknown",
+      "file": ".research/matroska-views/mapping-unknown.mkv",
+      "sha256": "17e8552ce0d9b9a110a04564475ccef8d7c19a60c63ee28679af0f4adc67627a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "source"
+      ],
+      "expected": {
+        "trace_sha256": "3312b2e53b4acdabfaa0f0760b2036468acdf252a4bc36feeee4601cd7a9b471"
+      }
+    },
+    {
+      "id": "mapping-duplicate-value",
+      "profile": "mapping-duplicate-value",
+      "file": ".research/matroska-views/mapping-duplicate-value.mkv",
+      "sha256": "10cba7d6ac563f7e360919b6dac6a0c1a45d7dbb2b96b283fcf21cc09bbf82be",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "source"
+      ],
+      "expected": {
+        "trace_sha256": "7a9f5f4ec26466dba89ffabf24c7211be6f2b2d22d294c67ac03f1948eef5390"
+      }
+    },
+    {
+      "id": "hevc-dolby",
+      "profile": "hevc-dolby",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-dolby.mkv",
+      "sha256": "319b3ee94fe7c67a6f1cfde4d1f3e0238f9ac51c6c7cda1140acb44f2cdcb39a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "source"
+      ],
+      "expected": {
+        "trace_sha256": "e0e16b205510743cd8f9d64e99245277f5376212af2f7e1e213722b101f382d1"
+      }
+    }
+  ]
+}

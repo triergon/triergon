@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "id": "mkv-track-extensions",
+  "gate": "required",
+  "operation": "mkv-track-extensions",
+  "candidate": "matroska-views-worker",
+  "worker_operation": "mkv-track-extensions-",
+  "corpus_directory": ".",
+  "contract": [
+    "Open the same preloaded seekable input and enumerate tracks in stream order.",
+    "Project dvcC and dvvC mapping data to version major and minor, profile, level, RPU, EL and BL flags, base-signal compatibility and metadata compression. Compare those fields with the public DOVI configuration side data.",
+    "Compare hvcE mapping bytes with HEVC enhancement-layer configuration side data. Raw mapping descriptors and their unknown fields use the source oracle. Packet addition selection is compared by mkv-side-data."
+  ],
+  "required_profiles": [
+    "mapping-absent",
+    "mapping-empty-fields",
+    "mapping-value-one",
+    "mapping-t35",
+    "mapping-dvcc",
+    "mapping-dvvc",
+    "mapping-mvcc",
+    "mapping-hvce",
+    "mapping-short-hvce",
+    "mapping-unknown",
+    "mapping-duplicate-value",
+    "hevc-dolby"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "mapping-absent",
+        "mapping-empty-fields",
+        "mapping-value-one",
+        "mapping-t35",
+        "mapping-dvcc",
+        "mapping-dvvc",
+        "mapping-mvcc",
+        "mapping-hvce",
+        "mapping-short-hvce",
+        "mapping-unknown",
+        "mapping-duplicate-value",
+        "hevc-dolby"
+      ],
+      "cause": "Runtime, heap and total RSS have not yet been collected on the gate hosts."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "mapping-absent",
+        "mapping-empty-fields",
+        "mapping-value-one",
+        "mapping-t35",
+        "mapping-dvcc",
+        "mapping-dvvc",
+        "mapping-mvcc",
+        "mapping-hvce",
+        "mapping-short-hvce",
+        "mapping-unknown",
+        "mapping-duplicate-value",
+        "hevc-dolby"
+      ],
+      "cause": "Runtime, heap and total RSS have not yet been collected on the gate hosts."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "mapping-absent",
+        "mapping-empty-fields",
+        "mapping-value-one",
+        "mapping-t35",
+        "mapping-dvcc",
+        "mapping-dvvc",
+        "mapping-mvcc",
+        "mapping-hvce",
+        "mapping-short-hvce",
+        "mapping-unknown",
+        "mapping-duplicate-value",
+        "hevc-dolby"
+      ],
+      "cause": "Runtime, heap and total RSS have not yet been collected on the gate hosts."
+    }
+  ],
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-matroska-views-native",
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "pending_module_requirements": [
+    "RFC 9559 sets the BlockAddIDValue minimum to 2. Triergon refuses 1. FFmpeg opens the track and emits no coded side data.",
+    "FFmpeg refuses the short hvcE decoder record during open. The source mapping view retains its private bytes without validating the embedded codec record."
+  ],
+  "open_cases": [
+    {
+      "id": "mapping-value-one",
+      "requirement": "RFC 9559 sets the BlockAddIDValue minimum to 2. Triergon refuses 1. FFmpeg opens the track and emits no coded side data."
+    },
+    {
+      "id": "mapping-short-hvce",
+      "requirement": "FFmpeg refuses the short hvcE decoder record during open. The source mapping view retains its private bytes without validating the embedded codec record."
+    }
+  ]
+}

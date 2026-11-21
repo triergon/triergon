@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "state-first",
+      "profile": "state-first",
+      "file": ".research/matroska-views/state-first.mkv",
+      "sha256": "a29ce0e733509b513bfe559ac617e5300bf752793796fa0ca97157895d722436",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "98290d780620750ea77c4eee57c7940299ccbfe41845a10ea9b39d310f2f1bd7"
+      }
+    },
+    {
+      "id": "state-late",
+      "profile": "state-late",
+      "file": ".research/matroska-views/state-late.mkv",
+      "sha256": "e646b0c37247ce9c6b310159177a6ab7beeefa8ce2b3e77127417054f7a17009",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "64ae62918ffd7e36f9f33f5afb2348bb01ac4d00b4e8794fa2b2625eb7157792"
+      }
+    },
+    {
+      "id": "state-two",
+      "profile": "state-two",
+      "file": ".research/matroska-views/state-two.mkv",
+      "sha256": "13745cfb0a76e1ea3515a874b8d2b11323d72b47fafd815359952de61165da1c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "1ca29460c85edee2611118e7e330de91d92e189a1bfab3e8ce076157fc67cdcb"
+      }
+    },
+    {
+      "id": "state-empty",
+      "profile": "state-empty",
+      "file": ".research/matroska-views/state-empty.mkv",
+      "sha256": "a96bca8e079cc987c8adb5b44b03e1ba76b9038357eb095338fec3398001a78b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "b34bd6b8510f5c78876ef551b01c5a07eb2efc59156e83df56b66e233b1ea41c"
+      }
+    },
+    {
+      "id": "state-limit",
+      "profile": "state-limit",
+      "file": ".research/matroska-views/state-limit.mkv",
+      "sha256": "a420368fbd8861eaf7e0e1f0aee2e5f12096cef705b87255fb443cc54c487ab7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "24605e88d2233120efd25ebd6c413810f7ebbc1e99fa497e10f11bd4bd2b71b9"
+      }
+    }
+  ]
+}

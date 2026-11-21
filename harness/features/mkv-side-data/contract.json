@@ -1,0 +1,180 @@
+{
+  "schema": 1,
+  "id": "mkv-side-data",
+  "gate": "required",
+  "operation": "mkv-side-data",
+  "candidate": "matroska-views-worker",
+  "worker_operation": "mkv-side-data-",
+  "corpus_directory": ".",
+  "contract": [
+    "Each side opens the same preloaded seekable file, reads every packet, folds the stream index and its published additions, and tears the reader down.",
+    "Kind 4 subtypes are opaque BlockAdditional wire bytes (including the 8-byte big-endian ID), LCEVC NAL bytes and HDR10+ fields, in that order.",
+    "HDR10+ rows contain application version, window count, targeted display luminance, targeted and mastering grids, and each window in order.",
+    "A grid contributes presence, dimensions and row-major samples over 15. A window contributes geometry presence, corners over 1 and ellipse fields when present, MaxSCL and average over 100000, then count and ordered percentile pairs, and bright-pixel fraction over 1000.",
+    "Tone-curve presence precedes both knee coordinates over 4095 and counted anchors over 1023. Saturation presence precedes weight over 8. Rationals fold numerator and denominator in that order.",
+    "Triergon derives the side data from each typed packet and checks the HDR result against the direct T.35 entry point. A terminal row distinguishes EOF from an input refusal."
+  ],
+  "required_profiles": [
+    "hdr-webm-00",
+    "hdr-matroska-01",
+    "hdr-webm-02",
+    "hdr-matroska-03",
+    "hdr-webm-04",
+    "hdr-matroska-05",
+    "hdr-webm-06",
+    "hdr-matroska-07",
+    "hdr-webm-08",
+    "hdr-matroska-09",
+    "hdr-webm-10",
+    "hdr-matroska-11",
+    "hdr-webm-12",
+    "hdr-matroska-13",
+    "hdr-webm-14",
+    "hdr-matroska-15",
+    "hdr-truncated",
+    "lcevc",
+    "mixed-hdr-opaque",
+    "laced-opaque-lcevc",
+    "laced-valid-opaque-lcevc",
+    "opaque-mapped",
+    "opaque-identity",
+    "opaque-default",
+    "opaque-empty",
+    "opaque-webm",
+    "opaque-unmapped"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "hdr-webm-00",
+        "hdr-matroska-01",
+        "hdr-webm-02",
+        "hdr-matroska-03",
+        "hdr-webm-04",
+        "hdr-matroska-05",
+        "hdr-webm-06",
+        "hdr-matroska-07",
+        "hdr-webm-08",
+        "hdr-matroska-09",
+        "hdr-webm-10",
+        "hdr-matroska-11",
+        "hdr-webm-12",
+        "hdr-matroska-13",
+        "hdr-webm-14",
+        "hdr-matroska-15",
+        "hdr-truncated",
+        "lcevc",
+        "mixed-hdr-opaque",
+        "laced-opaque-lcevc",
+        "laced-valid-opaque-lcevc",
+        "opaque-mapped",
+        "opaque-identity",
+        "opaque-default",
+        "opaque-empty",
+        "opaque-webm",
+        "opaque-unmapped"
+      ],
+      "cause": "Runtime, heap and total RSS have not yet been collected on the gate hosts."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "hdr-webm-00",
+        "hdr-matroska-01",
+        "hdr-webm-02",
+        "hdr-matroska-03",
+        "hdr-webm-04",
+        "hdr-matroska-05",
+        "hdr-webm-06",
+        "hdr-matroska-07",
+        "hdr-webm-08",
+        "hdr-matroska-09",
+        "hdr-webm-10",
+        "hdr-matroska-11",
+        "hdr-webm-12",
+        "hdr-matroska-13",
+        "hdr-webm-14",
+        "hdr-matroska-15",
+        "hdr-truncated",
+        "lcevc",
+        "mixed-hdr-opaque",
+        "laced-opaque-lcevc",
+        "laced-valid-opaque-lcevc",
+        "opaque-mapped",
+        "opaque-identity",
+        "opaque-default",
+        "opaque-empty",
+        "opaque-webm",
+        "opaque-unmapped"
+      ],
+      "cause": "Runtime, heap and total RSS have not yet been collected on the gate hosts."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "hdr-webm-00",
+        "hdr-matroska-01",
+        "hdr-webm-02",
+        "hdr-matroska-03",
+        "hdr-webm-04",
+        "hdr-matroska-05",
+        "hdr-webm-06",
+        "hdr-matroska-07",
+        "hdr-webm-08",
+        "hdr-matroska-09",
+        "hdr-webm-10",
+        "hdr-matroska-11",
+        "hdr-webm-12",
+        "hdr-matroska-13",
+        "hdr-webm-14",
+        "hdr-matroska-15",
+        "hdr-truncated",
+        "lcevc",
+        "mixed-hdr-opaque",
+        "laced-opaque-lcevc",
+        "laced-valid-opaque-lcevc",
+        "opaque-mapped",
+        "opaque-identity",
+        "opaque-default",
+        "opaque-empty",
+        "opaque-webm",
+        "opaque-unmapped"
+      ],
+      "cause": "Runtime, heap and total RSS have not yet been collected on the gate hosts."
+    }
+  ],
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-matroska-views-native",
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "pending_module_requirements": [
+    "Triergon refuses the truncated HDR10+ body. FFmpeg stops before emitting the affected packet and reports EOF.",
+    "FFmpeg emits opaque BlockAdditional alongside HDR10+. Triergon's packet_side_data call refuses dynamic HDR, so only the HDR10+ view can report this packet's additions.",
+    "Triergon refuses duplicate effective BlockAddID 1 per RFC 9559. FFmpeg keeps the last opaque entry and attaches it with LCEVC to both laces.",
+    "Triergon's implicit WebM VP9 rule permits ID 4. FFmpeg also admits undeclared IDs 2, 3 and 8 here, ignoring the track maximum and exporting the final opaque addition."
+  ],
+  "open_cases": [
+    {
+      "id": "hdr-truncated",
+      "requirement": "Triergon refuses the truncated HDR10+ body. FFmpeg stops before emitting the affected packet and reports EOF."
+    },
+    {
+      "id": "mixed-hdr-opaque",
+      "requirement": "FFmpeg emits opaque BlockAdditional alongside HDR10+. Triergon's packet_side_data call refuses dynamic HDR, so only the HDR10+ view can report this packet's additions."
+    },
+    {
+      "id": "laced-opaque-lcevc",
+      "requirement": "Triergon refuses duplicate effective BlockAddID 1 per RFC 9559. FFmpeg keeps the last opaque entry and attaches it with LCEVC to both laces."
+    },
+    {
+      "id": "opaque-webm",
+      "requirement": "Triergon's implicit WebM VP9 rule permits ID 4. FFmpeg also admits undeclared IDs 2, 3 and 8 here, ignoring the track maximum and exporting the final opaque addition."
+    }
+  ]
+}
