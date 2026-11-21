@@ -2,6 +2,7 @@
 //! PES requests remain separate rows; their input bytes never change.
 
 pub mod dts_hd;
+pub mod eac3_probe;
 pub mod matched;
 
 use std::ffi::OsString;

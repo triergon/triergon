@@ -341,13 +341,54 @@ retaining the original PMT and stream type.
 
 For ATSC, set `ReaderLimits::descriptor_namespace` to `DescriptorNamespace::Atsc`
 to interpret `0x81` as AC-3 and `0x87` as E-AC-3. Both require PES stream ID
-`0xbd`. ATSC E-AC-3 supports a six-block independent syncframe with its
-dependents within one PES. Shorter independent syncframes, which require
-assembling multiple groups into one ATSC access unit, are unsupported.
-Tracks report the codec signalled by the selected namespace and preserve the
-original stream type as the codec tag. The PMT retains the descriptor bytes.
-See [A/53 Part 3 §5.5.2 and §5.7](https://www.atsc.org/wp-content/uploads/2023/02/A53-Part-3-2023-02.pdf)
-and [A/52 Annex G §3.3](https://www.atsc.org/wp-content/uploads/2021/04/A52-2018.pdf).
+`0xbd`. ATSC E-AC-3 accumulates six blocks from primary independent
+syncframes and their immediately following dependents within one PES.
+Short first independent frames require the BSI `convsync` flag. Each interval
+must have the same ordered dependent IDs, matching its primary block count
+and sample rate; primary sample rates remain constant across the access unit.
+The reader preserves every syncframe's original facts and bytes. Packet duration
+counts primary blocks only, and source PTS/DTS remain unchanged. Incomplete
+six-block groups, block overflow, changed dependent layouts and groups crossing
+PES boundaries are refused. Other independent services and converted streams
+remain unsupported. Authored reader tests exercise one-, two- and three-block
+frames, mixed block sizes, up to eight dependents and bounded work grants;
+the exact parser-enabled comparison described below differs in grouping and
+duration. Native runtime and memory qualification for short groups remain
+unmeasured.
+The Rust fixture command `cargo xtask fixture transport-eac3-probe OUTPUT`
+authors ten opaque framing controls: one-, two-, three-, mixed one/two/three-
+and six-block primaries, each with zero or two dependents. Every input has two
+six-block access units in one PES followed by one in a separately timestamped
+PES. These controls exercise coded packet framing.
+Against the pinned parser-enabled FFmpeg formats worker, exact packet folds
+match **0/10**: FFmpeg emits one primary interval with its dependents per
+packet, rather than collecting short intervals into six blocks. For three
+access units, its packet counts are 18, 9, 6, 9 and 3 respectively; the reader
+emits three in every case. All 5,760 ordered payload bytes agree. The first
+primary of each access unit has matching projected clocks, position and flags;
+the reference's durations are zero throughout, while the reader derives 2,880
+90 kHz ticks per access unit. Even the two six-block controls therefore differ.
+The existing parser-packet comparison and all its expectations are unchanged.
+
+An exact dependent-group reproduction, after building `transport-worker` and
+locating the pinned formats worker, is:
+
+```sh
+CARGO_INCREMENTAL=0 cargo xtask fixture transport-eac3-probe /tmp/eac3-probe
+"$FFMPEG_FORMATS_WORKER" ts-au-fold /tmp/eac3-probe/au-atsc-eac3-three-block-dep2.ts 188 7 --atsc
+"$TRANSPORT_WORKER" ts-au-fold /tmp/eac3-probe/au-atsc-eac3-three-block-dep2.ts 188 7 --atsc
+```
+
+The input SHA-256 is
+`635b3eac87fed4b3dd7f612e5c13dfeea4c3417ae4d504472360c7b84183965a`.
+The reference emits six 96-byte packets with digest `12293967231248272940`;
+the reader emits three 192-byte packets with digest `9836296303524275752`,
+both totalling 576 bytes. The macOS AArch64 reference worker SHA-256 is
+`394d53ca4a5e5c9d1b33f575066971588f3e801c9a41688fa0503ad0bd93cf54`
+(FFmpeg revision `d32b387f2b0a484599d4587d651891f0c63c4238`). Source PTS/DTS are 90,000/80,000 on the
+first access unit, absent on the second, and PTS 180,000 with absent source
+DTS on the third. The comparison clock projection supplies DTS 180,000 on
+the third in both workers. The worker's parser-packet folds are unequal.
 
 Existing framers delimit the complete source bytes before decoder-feed conversion.
 MPEG-1/2 video, other subtitle carriages and ambiguous private streams currently emit
@@ -455,6 +496,23 @@ PES as `ReaderEvent::LatmPes`. This follows the pinned demuxer's packet
 boundaries even for a PES with several or incomplete LOAS envelopes.
 The observation retains the original PES spans and stays outside the neutral
 packet stream.
+
+Seek entry validation currently accepts a complete LATM configuration with
+`useSameStreamMux = 0`, `audioMuxVersion = 0`, one program and layer, one
+subframe, common time framing, AAC-LC with an indexed sample rate,
+`frameLengthType = 0`, and no other data or configuration CRC. Other LOAS
+multiplex bytes remain opaque to the normal reader. Additional subframes,
+programs/layers, versioned or reused configurations, other frame length types,
+other data and CRC-bearing configurations remain outside the seek entry
+profile. ADTS access units still require one raw data block; multiple raw data
+blocks, including their CRC and position layouts, remain unsupported.
+
+A separate next implementation is bounded LATM seek entry validation for
+`numSubFrames > 0`, retaining the existing single AAC-LC program/layer and
+in-band configuration restrictions. It would validate each subframe's payload
+length and extent within the LOAS envelope before accepting the entry, with
+complete, truncated, oversized and boundary-split controls. This needs no
+change to ATSC grouping or to the LATM PES observation policy.
 
 DVB subtitle carriage uses the PMT's `0x06` stream type and subtitling
 descriptor (`0x59`) in the declared DVB namespace. One `AccessUnit::DvbSubtitle`
