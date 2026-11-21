@@ -372,4 +372,4 @@ check parser coverage and source clocks without those extra passes, parsing fixe
 headers and only the opening short primary BSI. The ordinary
 parser operation differs on all ten inputs. Both comparisons are available
 through `cargo xtask worker-tests transport::eac3-experiment`. Native timing
-and memory qualification remain open.
+and memory results are in [status](../../docs/status.md).
