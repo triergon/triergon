@@ -56,7 +56,8 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 |---|---|
 | `VideoDecoder` | `send(au, pts) -> Result<(), Self::Error>`, `receive() -> Option<PictureView>`, `flush`, `reset`; `Send` |
 | `AudioDecoder` | `decode(au, &mut AudioFrame) -> Result<Option<DownmixLevels>, Self::Error>`, `reset`; `delay()` (samples a stream starts with that carry no signal, 0 by default) and `flush(&mut AudioFrame)` (samples held back at the end, none by default); `Send` |
-| `Error` (associated) | the decoder's own error type; each decoder crate's `DecodeError` is `Copy` and converts to `triergon_core::Error` without formatting or allocating |
+| `Error` (associated) | the decoder's error type: `DecodeError`, or a codec crate's own `DecodeError` with the same classes and more detail; each is `Copy` and converts to `triergon_core::Error` without formatting or allocating |
+| `DecodeError` | `Unsupported`, `Invalid`, `Policy` (each with a `&'static str` naming the feature, check or cap) and `Budget` (a refused storage charge): the error of the H.264, DTS, MPEG audio, Opus and Vorbis decoders |
 | `boxed::<E>()` | the decoder behind a box with its errors converted to `E` |
 | `DynVideoDecoder`, `DynAudioDecoder` | `dyn VideoDecoder<Error = Error>` and `dyn AudioDecoder<Error = Error>`: a decoder of a codec chosen at run time |
 | `Error`, `StorageError` | `triergon_core::Error`; the second name is the one decoders use for a refused storage charge |
@@ -111,12 +112,14 @@ then keeps the element order of the PCE, and so does the AAC decoder.
   −3 dB centre and surrounds (1/√2) with LFE omitted and no surround encoding, for
   streams that carry none.
 - **Errors.** A refused access unit leaves the decoder usable. Each decoder reports
-  its crate's own `DecodeError` through the trait. Converted to `triergon_core::Error`
-  it keeps its class and detail text: invalid data is `Invalid`, a feature outside the
-  decoder's set `Unsupported`, a resource cap of the codec `Policy`, a short access unit
-  `Truncated`, and a refused storage charge the budget's own error (`Limit`,
-  `Allocation`, `Overflow`). What only the decoder's type can say (byte counts, a
-  feature's number) stays with that type.
+  `DecodeError` through the trait, or, where it has more to say, its crate's own
+  `DecodeError`, whose variants of the same classes have the same names and texts
+  (AAC, AC-3, FLAC, HEVC). Converted to `triergon_core::Error` it keeps its class and
+  detail text: invalid data is `Invalid`, a feature outside the decoder's set
+  `Unsupported`, a resource cap of the codec `Policy`, a short access unit `Truncated`,
+  and a refused storage charge the budget's own error (`Limit`, `Allocation`,
+  `Overflow`). What only the decoder's type can say (byte counts, a feature's number)
+  stays with that type.
 
 ## Conformance
 

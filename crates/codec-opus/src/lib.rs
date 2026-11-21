@@ -21,9 +21,9 @@ use celt::Emphasis;
 use multistream::Mapping;
 use packet::Packet;
 use stream::{Staging, StreamDecoder, Workspace};
+pub use triergon_codec::DecodeError;
 use triergon_codec::{
-    AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, Charged, DownmixLevels,
-    Reservation, StorageError,
+    AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, Charged, DownmixLevels, Reservation,
 };
 use triergon_framing::opus::{self, OpusHead};
 
@@ -43,47 +43,6 @@ impl Default for Limits {
         }
     }
 }
-
-/// Why a decoder refused a configuration or an access unit.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DecodeError {
-    /// A feature this decoder does not implement.
-    Unsupported(&'static str),
-    /// Malformed data.
-    Invalid(&'static str),
-    /// The storage budget refused an allocation.
-    Budget(StorageError),
-}
-
-impl From<StorageError> for DecodeError {
-    fn from(error: StorageError) -> Self {
-        DecodeError::Budget(error)
-    }
-}
-
-impl From<DecodeError> for triergon_codec::Error {
-    /// The workspace error of the same class; a refused storage charge is the budget's
-    /// own error.
-    fn from(error: DecodeError) -> Self {
-        match error {
-            DecodeError::Unsupported(feature) => Self::Unsupported(feature),
-            DecodeError::Invalid(detail) => Self::Invalid(detail),
-            DecodeError::Budget(error) => error,
-        }
-    }
-}
-
-impl core::fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            DecodeError::Unsupported(what) => write!(f, "unsupported: {what}"),
-            DecodeError::Invalid(what) => write!(f, "invalid data: {what}"),
-            DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
-        }
-    }
-}
-
-impl std::error::Error for DecodeError {}
 
 /// An Opus decoder for one logical stream: a single Opus stream or a multistream
 /// (RFC 7845 section 5.1.1), decoding to 48 kHz.

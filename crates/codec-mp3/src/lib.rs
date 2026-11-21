@@ -16,9 +16,9 @@ mod layer3;
 mod subband;
 mod synthesis;
 
+pub use triergon_codec::DecodeError;
 use triergon_codec::{
     AudioDecoder, AudioFrame, Budget, ChannelLayout, Charged, DownmixLevels, Reservation, Speaker,
-    StorageError,
 };
 use triergon_framing::mpeg_audio::{MpegAudioHeader, MpegLayer};
 
@@ -41,47 +41,6 @@ impl Default for Limits {
         }
     }
 }
-
-/// Why a decoder refused a configuration or an access unit.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DecodeError {
-    /// A feature this decoder does not implement.
-    Unsupported(&'static str),
-    /// Malformed data.
-    Invalid(&'static str),
-    /// The storage budget refused an allocation.
-    Budget(StorageError),
-}
-
-impl From<StorageError> for DecodeError {
-    fn from(error: StorageError) -> Self {
-        DecodeError::Budget(error)
-    }
-}
-
-impl From<DecodeError> for triergon_codec::Error {
-    /// The workspace error of the same class; a refused storage charge is the budget's
-    /// own error.
-    fn from(error: DecodeError) -> Self {
-        match error {
-            DecodeError::Unsupported(feature) => Self::Unsupported(feature),
-            DecodeError::Invalid(detail) => Self::Invalid(detail),
-            DecodeError::Budget(error) => error,
-        }
-    }
-}
-
-impl core::fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            DecodeError::Unsupported(what) => write!(f, "unsupported: {what}"),
-            DecodeError::Invalid(what) => write!(f, "invalid data: {what}"),
-            DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
-        }
-    }
-}
-
-impl std::error::Error for DecodeError {}
 
 /// An MPEG-1/2 audio Layer I, II and III decoder. Each access unit is one frame,
 /// header included.
