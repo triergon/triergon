@@ -56,9 +56,11 @@ pub struct Packet {
     /// Index of the track in [`Configuration::tracks`](crate::Configuration::tracks),
     /// not its TrackNumber.
     pub track: usize,
-    /// Later laced frames are unknown unless the container supplies their duration.
+    /// Presentation time in nanoseconds, rounded once from the exact source time;
+    /// `None` for a later laced frame when neither BlockDuration nor DefaultDuration
+    /// gives the frames' duration.
     pub pts_ns: Option<i64>,
-    /// Matroska supplies presentation time, not a codec-derived decode timestamp.
+    /// Always `None`: Matroska carries presentation times, not decode times.
     pub dts_ns: Option<i64>,
     /// Frame duration in nanoseconds, rounded once from the exact source duration;
     /// `None` when neither BlockDuration nor DefaultDuration is known.

@@ -100,6 +100,8 @@ enum AdmitPhase {
     Catalogue,
     Admit,
 }
+// Flat fields, each read by some phases only: with the lookup index, the bound and
+// the catalogue job inside the phases, every workload ran 0.2 to 0.3% more instructions.
 #[derive(Debug)]
 struct Admission {
     header: ElementHeader,
