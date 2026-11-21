@@ -2,6 +2,7 @@
 //! Word order is explicit. Source words/high bits and final residual payload
 //! bits are retained; no sync autodetection, FSIZE scaling or padding is guessed.
 use crate::dts::DtsSourceIdentity;
+use crate::dts::reader::limit;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
 
@@ -217,13 +218,13 @@ impl Dts14BitUnpacker {
         if !source.belongs_to(pool) {
             return Err(Error::ForeignPool);
         }
-        check_limit(source.len(), limits.maximum_source_bytes)?;
+        limit(source.len(), limits.maximum_source_bytes)?;
         if !source.len().is_multiple_of(2) {
             return Err(Error::Truncated);
         }
         let payload_bits = (source.len() / 2).checked_mul(14).ok_or(Error::Overflow)?;
         let output_bytes = payload_bits / 8;
-        check_limit(output_bytes, limits.maximum_output_bytes)?;
+        limit(output_bytes, limits.maximum_output_bytes)?;
         let end = identity
             .offset
             .checked_add(u64::try_from(source.len()).map_err(|_| Error::Overflow)?)
@@ -236,7 +237,7 @@ impl Dts14BitUnpacker {
             .and_then(|bytes| bytes.checked_add(Bytes::owner_overhead_bytes()))
             .and_then(|bytes| bytes.checked_add(Budget::control_storage_bytes()))
             .ok_or(Error::Overflow)?;
-        check_limit(minimum, pool.limit())?;
+        limit(minimum, pool.limit())?;
         Ok(Self {
             pool: pool.clone(),
             source: Some(source),
@@ -389,13 +390,5 @@ impl Dts14BitUnpacker {
                 Phase::Complete => return Ok(Step::End(self.record_end)),
             }
         }
-    }
-}
-
-fn check_limit(requested: usize, maximum: usize) -> Result<()> {
-    if requested > maximum {
-        Err(Error::Limit { requested, maximum })
-    } else {
-        Ok(())
     }
 }

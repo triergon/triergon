@@ -1,5 +1,6 @@
 //! Original word-payload storage from ETSI TS102114 §3.4/5.3.
 //! Every source bit survives; byte-alignment zeros are labelled non-source bits.
+use crate::dts::reader::limit;
 use crate::dts::{DtsPackedBitLocation, DtsSourceIdentity};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
@@ -488,12 +489,5 @@ impl DtsPackedPayloadJob {
                 Phase::Complete => return Ok(Step::End(self.end)),
             }
         }
-    }
-}
-pub(crate) fn limit(requested: usize, maximum: usize) -> Result<()> {
-    if requested > maximum {
-        Err(Error::Limit { requested, maximum })
-    } else {
-        Ok(())
     }
 }
