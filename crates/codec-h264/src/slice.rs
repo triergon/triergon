@@ -3,6 +3,7 @@
 
 use crate::DecodeError;
 use crate::nal::NalHeader;
+use crate::picture::Structure;
 use crate::ps::{Pps, R, Sps};
 use triergon_bitstream::BitReader;
 
@@ -69,6 +70,17 @@ pub(crate) struct SliceHeader {
     pub(crate) mbaff: bool,
     /// Bit position of slice_data() in the RBSP.
     pub(crate) data_bit_pos: usize,
+}
+
+impl SliceHeader {
+    /// The coded picture the slice belongs to: a frame or one of its fields.
+    pub(crate) fn structure(&self) -> Structure {
+        if self.field_pic {
+            Structure::field(self.bottom_field)
+        } else {
+            Structure::Frame
+        }
+    }
 }
 
 fn inval(what: &'static str) -> DecodeError {

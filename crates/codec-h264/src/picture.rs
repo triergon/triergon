@@ -2,6 +2,7 @@
 //! buffer, and fixed-size views of their rows.
 
 use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_framing::picture_output::Parity;
 
 /// The `N` elements of `s` from `at`; a range past the end panics as indexing does.
 #[inline(always)]
@@ -189,6 +190,69 @@ impl Motion {
     }
 }
 
+/// A coded or reference picture: a frame or one of its fields. The discriminants are the
+/// field bits of [`FrameStore::fields`] (a frame fills both). Per-macroblock state (the
+/// current picture, reference list entries, block geometry) keeps the code (`as u8`): read
+/// there per block, the bare code measured faster than the enum.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum Structure {
+    #[default]
+    Frame = 0,
+    Top = 1,
+    Bottom = 2,
+}
+
+impl Structure {
+    /// Both fields, in the order their counts and motion are kept.
+    pub(crate) const FIELDS: [Structure; 2] = [Structure::Top, Structure::Bottom];
+
+    /// The bottom field when `bottom`, else the top field.
+    pub(crate) fn field(bottom: bool) -> Structure {
+        if bottom {
+            Structure::Bottom
+        } else {
+            Structure::Top
+        }
+    }
+
+    pub(crate) fn is_field(self) -> bool {
+        self != Structure::Frame
+    }
+
+    /// The field of the other parity; a frame stays a frame.
+    pub(crate) fn opposite(self) -> Structure {
+        match self {
+            Structure::Frame => Structure::Frame,
+            Structure::Top => Structure::Bottom,
+            Structure::Bottom => Structure::Top,
+        }
+    }
+
+    /// A field's position in `[top, bottom]` arrays; a frame has none (it panics).
+    pub(crate) fn index(self) -> usize {
+        (self as u8 - 1) as usize
+    }
+
+    /// The bits of [`FrameStore::fields`] the picture fills.
+    pub(crate) fn bits(self) -> u8 {
+        if self == Structure::Frame {
+            3
+        } else {
+            self as u8
+        }
+    }
+
+    /// The field marking of the picture buffer that a field has (a frame: the top field's).
+    pub(crate) fn parity(self) -> Parity {
+        if self == Structure::Bottom {
+            Parity::Bottom
+        } else {
+            Parity::Top
+        }
+    }
+}
+
 /// How a frame store's content was coded (Table 8-7 PicCodingStruct).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub(crate) enum Coding {
@@ -250,6 +314,10 @@ impl FrameStore {
             idr: false,
         }
     }
+    /// The field `field` is decoded.
+    pub(crate) fn has_field(&self, field: Structure) -> bool {
+        self.fields & field as u8 != 0
+    }
     /// PicOrderCnt of the frame / complementary field pair (8-1): min of the decoded fields.
     pub(crate) fn frame_poc(&self) -> i32 {
         match self.fields {
@@ -260,17 +328,19 @@ impl FrameStore {
     }
 }
 
-/// An entry of RefPicList0/1: a frame (parity 0) or a field (1 top, 2 bottom) of a DPB entry.
+/// An entry of RefPicList0/1: a frame or a field of a DPB entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct RefPic {
     pub(crate) idx: usize,
+    /// The [`Structure`] code.
     pub(crate) parity: u8,
     pub(crate) poc: i32,
     pub(crate) long: bool,
-    /// Identity used to compare reference pictures (uid << 2 | structure code).
+    /// Identity used to compare reference pictures (uid << 2 | field bits).
     pub(crate) id: i32,
 }
 
+/// The identity of field or frame `parity` ([`Structure`] code) of the store `uid`.
 pub(crate) fn ref_id(uid: u32, parity: u8) -> i32 {
     ((uid as i32) << 2) | if parity == 0 { 3 } else { parity as i32 }
 }

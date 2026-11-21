@@ -67,7 +67,7 @@ pub(crate) struct CurPic {
     /// Width in MBs and height in MBs of this picture (field: half the frame height).
     pub(crate) w: MbWidth,
     pub(crate) h: usize,
-    /// 0 frame, 1 top field, 2 bottom field.
+    /// The picture's [`Structure`] code.
     pub(crate) structure: u8,
     pub(crate) mbaff: bool,
     pub(crate) poc: [i32; 2],

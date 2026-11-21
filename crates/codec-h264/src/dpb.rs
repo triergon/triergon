@@ -6,34 +6,28 @@ use crate::DecodeError;
 use crate::picture::*;
 use crate::ps::Sps;
 use crate::slice::{SliceHeader, SliceType};
-use triergon_framing::picture_output::{Entry, Marking, Parity, View};
-
-/// The field of structure code `par` (1 top, 2 bottom).
-pub(crate) fn parity(par: u8) -> Parity {
-    if par == 2 {
-        Parity::Bottom
-    } else {
-        Parity::Top
-    }
-}
+use triergon_framing::picture_output::{Entry, Marking, View};
 
 /// A stored frame store and its marking, read for reference lists and marking.
 pub(crate) trait Stored {
     fn store(&self) -> &FrameStore;
-    /// The marking of field `par` (1 top, 2 bottom).
-    fn mark(&self, par: u8) -> Marking;
+    /// The marking of field `par`.
+    fn mark(&self, par: Structure) -> Marking;
     fn is_ref(&self) -> bool {
-        self.mark(1) != Marking::Unused || self.mark(2) != Marking::Unused
+        self.mark(Structure::Top) != Marking::Unused
+            || self.mark(Structure::Bottom) != Marking::Unused
     }
     /// Either field is marked `marking`.
     fn has(&self, marking: Marking) -> bool {
-        self.mark(1) == marking || self.mark(2) == marking
+        self.mark(Structure::Top) == marking || self.mark(Structure::Bottom) == marking
     }
     fn is_short_frame(&self) -> bool {
-        self.mark(1) == Marking::ShortTerm && self.mark(2) == Marking::ShortTerm
+        self.mark(Structure::Top) == Marking::ShortTerm
+            && self.mark(Structure::Bottom) == Marking::ShortTerm
     }
     fn is_long_frame(&self) -> bool {
-        self.mark(1) == Marking::LongTerm && self.mark(2) == Marking::LongTerm
+        self.mark(Structure::Top) == Marking::LongTerm
+            && self.mark(Structure::Bottom) == Marking::LongTerm
     }
     /// Non-existing frames (frame_num gaps) are excluded from B-slice lists when POC is
     /// unknown.
@@ -54,8 +48,8 @@ impl Stored for View<'_, FrameStore> {
     fn store(&self) -> &FrameStore {
         self.picture()
     }
-    fn mark(&self, par: u8) -> Marking {
-        self.marking(parity(par))
+    fn mark(&self, par: Structure) -> Marking {
+        self.marking(par.parity())
     }
 }
 
@@ -63,8 +57,8 @@ impl Stored for Entry<'_, FrameStore> {
     fn store(&self) -> &FrameStore {
         self.picture()
     }
-    fn mark(&self, par: u8) -> Marking {
-        self.marking(parity(par))
+    fn mark(&self, par: Structure) -> Marking {
+        self.marking(par.parity())
     }
 }
 
@@ -176,20 +170,19 @@ pub(crate) fn compute_poc(sps: &Sps, sh: &SliceHeader, st: &PocState) -> ([i32; 
 pub(crate) struct PicNums {
     pub(crate) frame_num: u32,
     pub(crate) max_frame_num: u32,
-    /// 0 frame, 1 top, 2 bottom.
-    pub(crate) structure: u8,
+    pub(crate) structure: Structure,
 }
 
 impl PicNums {
     pub(crate) fn curr_pic_num(&self) -> i32 {
-        if self.structure == 0 {
+        if self.structure == Structure::Frame {
             self.frame_num as i32
         } else {
             2 * self.frame_num as i32 + 1
         }
     }
     pub(crate) fn max_pic_num(&self) -> i32 {
-        if self.structure == 0 {
+        if self.structure == Structure::Frame {
             self.max_frame_num as i32
         } else {
             2 * self.max_frame_num as i32
@@ -202,10 +195,10 @@ impl PicNums {
             fs.frame_num as i32
         }
     }
-    /// PicNum of field `par` (1 top 2 bottom) or frame (0) of a store.
-    pub(crate) fn pic_num(&self, fs: &FrameStore, par: u8) -> i32 {
+    /// PicNum of field or frame `par` of a store.
+    pub(crate) fn pic_num(&self, fs: &FrameStore, par: Structure) -> i32 {
         let w = self.frame_num_wrap(fs);
-        if self.structure == 0 {
+        if self.structure == Structure::Frame {
             w
         } else if par == self.structure {
             2 * w + 1
@@ -213,10 +206,10 @@ impl PicNums {
             2 * w
         }
     }
-    pub(crate) fn long_term_pic_num(&self, fs: &FrameStore, par: u8) -> i32 {
+    pub(crate) fn long_term_pic_num(&self, fs: &FrameStore, par: Structure) -> i32 {
         // long_term_frame_idx is not range checked: the field numbers wrap.
         let i = fs.long_term_frame_idx as i32;
-        if self.structure == 0 {
+        if self.structure == Structure::Frame {
             i
         } else if par == self.structure {
             i.wrapping_mul(2).wrapping_add(1)
@@ -226,14 +219,14 @@ impl PicNums {
     }
 }
 
-fn field_ref(dpb: &[View<'_, FrameStore>], idx: usize, par: u8) -> RefPic {
+fn field_ref(dpb: &[View<'_, FrameStore>], idx: usize, par: Structure) -> RefPic {
     let fs = dpb[idx].store();
     RefPic {
         idx,
-        parity: par,
-        poc: fs.poc[(par - 1) as usize],
+        parity: par as u8,
+        poc: fs.poc[par.index()],
         long: dpb[idx].mark(par) == Marking::LongTerm,
-        id: ref_id(fs.uid, par),
+        id: ref_id(fs.uid, par as u8),
     }
 }
 
@@ -241,10 +234,10 @@ fn frame_ref(dpb: &[View<'_, FrameStore>], idx: usize) -> RefPic {
     let fs = dpb[idx].store();
     RefPic {
         idx,
-        parity: 0,
+        parity: Structure::Frame as u8,
         poc: fs.frame_poc(),
         long: dpb[idx].is_long_frame(),
-        id: ref_id(fs.uid, 0),
+        id: ref_id(fs.uid, Structure::Frame as u8),
     }
 }
 
@@ -252,12 +245,12 @@ fn frame_ref(dpb: &[View<'_, FrameStore>], idx: usize) -> RefPic {
 fn fields_from_frames(
     dpb: &[View<'_, FrameStore>],
     frames: &[usize],
-    cur_par: u8,
+    cur_par: Structure,
     kind: Marking,
     out: &mut Vec<RefPic>,
 ) {
-    let has = |i: usize, par: u8| -> bool {
-        dpb[i].store().fields & par != 0 && dpb[i].mark(par) == kind
+    let has = |i: usize, par: Structure| -> bool {
+        dpb[i].store().has_field(par) && dpb[i].mark(par) == kind
     };
     let mut same: Vec<usize> = frames
         .iter()
@@ -267,7 +260,7 @@ fn fields_from_frames(
     let mut opp: Vec<usize> = frames
         .iter()
         .copied()
-        .filter(|&i| has(i, 3 - cur_par))
+        .filter(|&i| has(i, cur_par.opposite()))
         .collect();
     same.reverse();
     opp.reverse();
@@ -277,16 +270,16 @@ fn fields_from_frames(
             if let Some(i) = same.pop() {
                 out.push(field_ref(dpb, i, cur_par));
             } else if let Some(i) = opp.pop() {
-                out.push(field_ref(dpb, i, 3 - cur_par));
+                out.push(field_ref(dpb, i, cur_par.opposite()));
                 while let Some(i) = opp.pop() {
-                    out.push(field_ref(dpb, i, 3 - cur_par));
+                    out.push(field_ref(dpb, i, cur_par.opposite()));
                 }
                 break;
             } else {
                 break;
             }
         } else if let Some(i) = opp.pop() {
-            out.push(field_ref(dpb, i, 3 - cur_par));
+            out.push(field_ref(dpb, i, cur_par.opposite()));
         } else {
             while let Some(i) = same.pop() {
                 out.push(field_ref(dpb, i, cur_par));
@@ -309,7 +302,7 @@ pub(crate) fn init_ref_lists(
     let mut l0 = Vec::new();
     let mut l1 = Vec::new();
     let is_b = st == SliceType::B;
-    let field = nums.structure != 0;
+    let field = nums.structure.is_field();
     if !field {
         let short: Vec<usize> = (0..dpb.len())
             .filter(|&i| dpb[i].is_short_frame() && !dpb[i].non_existing_bframe(is_b))
@@ -318,7 +311,7 @@ pub(crate) fn init_ref_lists(
         long.sort_by_key(|&i| dpb[i].store().long_term_frame_idx);
         if !is_b {
             let mut s = short.clone();
-            s.sort_by_key(|&i| -nums.pic_num(dpb[i].store(), 0));
+            s.sort_by_key(|&i| -nums.pic_num(dpb[i].store(), Structure::Frame));
             l0.extend(s.iter().map(|&i| frame_ref(dpb, i)));
             l0.extend(long.iter().map(|&i| frame_ref(dpb, i)));
         } else {
@@ -355,7 +348,9 @@ pub(crate) fn init_ref_lists(
         // Either decoded field is marked `kind`.
         let any = |i: usize, kind: Marking| -> bool {
             let d = &dpb[i];
-            (1..=2u8).any(|par| d.store().fields & par != 0 && d.mark(par) == kind)
+            Structure::FIELDS
+                .into_iter()
+                .any(|par| d.store().has_field(par) && d.mark(par) == kind)
         };
         let short: Vec<usize> = (0..dpb.len())
             .filter(|&i| any(i, Marking::ShortTerm) && !dpb[i].non_existing_bframe(is_b))
@@ -367,9 +362,9 @@ pub(crate) fn init_ref_lists(
         let entry_poc = |i: usize| -> i32 {
             let d = &dpb[i];
             let mut v = i32::MAX;
-            for par in 1..=2u8 {
-                if d.store().fields & par != 0 && d.mark(par) == Marking::ShortTerm {
-                    v = v.min(d.store().poc[(par - 1) as usize]);
+            for par in Structure::FIELDS {
+                if d.store().has_field(par) && d.mark(par) == Marking::ShortTerm {
+                    v = v.min(d.store().poc[par.index()]);
                 }
             }
             v
@@ -414,10 +409,10 @@ pub(crate) fn modify_ref_list(
     mods: &[(u32, u32)],
     num_active: usize,
 ) -> Result<(), DecodeError> {
-    let field = nums.structure != 0;
+    let field = nums.structure.is_field();
     // Find a picture by PicNum (`kind` short-term) or LongTermPicNum among stored references.
     let find = |pn: i32, kind: Marking| -> Option<RefPic> {
-        let num = |fs: &FrameStore, par: u8| {
+        let num = |fs: &FrameStore, par: Structure| {
             if kind == Marking::LongTerm {
                 nums.long_term_pic_num(fs, par)
             } else {
@@ -427,12 +422,15 @@ pub(crate) fn modify_ref_list(
         for (i, d) in dpb.iter().enumerate() {
             let fs = d.store();
             if !field {
-                if d.mark(1) == kind && d.mark(2) == kind && num(fs, 0) == pn {
+                if d.mark(Structure::Top) == kind
+                    && d.mark(Structure::Bottom) == kind
+                    && num(fs, Structure::Frame) == pn
+                {
                     return Some(frame_ref(dpb, i));
                 }
             } else {
-                for par in 1..=2u8 {
-                    if fs.fields & par != 0 && d.mark(par) == kind && num(fs, par) == pn {
+                for par in Structure::FIELDS {
+                    if fs.has_field(par) && d.mark(par) == kind && num(fs, par) == pn {
                         return Some(field_ref(dpb, i, par));
                     }
                 }
@@ -497,9 +495,9 @@ pub(crate) fn modify_ref_list(
 
 /// Unmarks every field of `entry` marked `marking`.
 fn unmark(entry: &mut Entry<'_, FrameStore>, marking: Marking) {
-    for par in 1..=2u8 {
+    for par in Structure::FIELDS {
         if entry.mark(par) == marking {
-            entry.set_marking(Some(parity(par)), Marking::Unused);
+            entry.set_marking(Some(par.parity()), Marking::Unused);
         }
     }
 }
@@ -561,12 +559,12 @@ impl Current<'_> {
         matches!(*self, Current::Stored(at) if at == i)
     }
 
-    /// Marks the current picture, of structure `structure` (0 frame, 1 top, 2 bottom), and
-    /// gives it `long_term_frame_idx` when that is some.
+    /// Marks the current picture, of structure `structure`, and gives it
+    /// `long_term_frame_idx` when that is some.
     pub(crate) fn mark(
         &mut self,
         dpb: &mut [Entry<'_, FrameStore>],
-        structure: u8,
+        structure: Structure,
         marking: Marking,
         long_term_frame_idx: Option<u32>,
     ) {
@@ -579,7 +577,7 @@ impl Current<'_> {
             }
             Current::Stored(at) => {
                 let d = &mut dpb[*at];
-                d.set_marking(Some(parity(structure)), marking);
+                d.set_marking(Some(structure.parity()), marking);
                 if let Some(idx) = long_term_frame_idx {
                     d.picture_mut().long_term_frame_idx = idx;
                 }
@@ -597,7 +595,7 @@ pub(crate) fn apply_mmcos(
     sh: &SliceHeader,
     max_lt_idx: &mut Option<u32>,
 ) -> bool {
-    let field = nums.structure != 0;
+    let field = nums.structure.is_field();
     let curr = nums.curr_pic_num();
     let mut mmco5 = false;
     for m in &sh.mmcos {
@@ -609,12 +607,15 @@ pub(crate) fn apply_mmcos(
                 for (i, d) in dpb.iter().enumerate() {
                     let fs = d.store();
                     if !field {
-                        if !cur.is(i) && d.is_short_frame() && nums.pic_num(fs, 0) == pn {
-                            found = Some((i, 0u8));
+                        if !cur.is(i)
+                            && d.is_short_frame()
+                            && nums.pic_num(fs, Structure::Frame) == pn
+                        {
+                            found = Some((i, Structure::Frame));
                         }
                     } else {
-                        for par in 1..=2u8 {
-                            if fs.fields & par != 0
+                        for par in Structure::FIELDS {
+                            if fs.has_field(par)
                                 && d.mark(par) == Marking::ShortTerm
                                 && nums.pic_num(fs, par) == pn
                                 && !(cur.is(i) && par == nums.structure)
@@ -626,10 +627,10 @@ pub(crate) fn apply_mmcos(
                 }
                 let Some((i, par)) = found else { continue };
                 if m.op == 1 {
-                    if par == 0 {
+                    if par == Structure::Frame {
                         dpb[i].set_marking(None, Marking::Unused);
                     } else {
-                        dpb[i].set_marking(Some(parity(par)), Marking::Unused);
+                        dpb[i].set_marking(Some(par.parity()), Marking::Unused);
                     }
                 } else {
                     let idx = m.long_term_frame_idx;
@@ -650,14 +651,14 @@ pub(crate) fn apply_mmcos(
                     }
                     // A frame whose other field is long-term with a different index loses it.
                     let d = &mut dpb[i];
-                    if par != 0 {
-                        let other = 3 - par;
+                    if par.is_field() {
+                        let other = par.opposite();
                         if d.mark(other) == Marking::LongTerm
                             && d.store().long_term_frame_idx != idx
                         {
-                            d.set_marking(Some(parity(other)), Marking::Unused);
+                            d.set_marking(Some(other.parity()), Marking::Unused);
                         }
-                        d.set_marking(Some(parity(par)), Marking::LongTerm);
+                        d.set_marking(Some(par.parity()), Marking::LongTerm);
                     } else {
                         d.set_marking(None, Marking::LongTerm);
                     }
@@ -670,18 +671,18 @@ pub(crate) fn apply_mmcos(
                     if !field {
                         if !cur.is(i)
                             && d.is_long_frame()
-                            && nums.long_term_pic_num(d.store(), 0) == lpn
+                            && nums.long_term_pic_num(d.store(), Structure::Frame) == lpn
                         {
                             d.set_marking(None, Marking::Unused);
                         }
                     } else {
-                        for par in 1..=2u8 {
-                            if d.store().fields & par != 0
+                        for par in Structure::FIELDS {
+                            if d.store().has_field(par)
                                 && d.mark(par) == Marking::LongTerm
                                 && nums.long_term_pic_num(d.store(), par) == lpn
                                 && !(cur.is(i) && par == nums.structure)
                             {
-                                d.set_marking(Some(parity(par)), Marking::Unused);
+                                d.set_marking(Some(par.parity()), Marking::Unused);
                             }
                         }
                     }
@@ -733,13 +734,13 @@ pub(crate) fn apply_mmcos(
                     Current::Stored(at) => {
                         // The second field of a frame store whose first field is stored.
                         let d = &mut dpb[*at];
-                        let other = 3 - nums.structure;
+                        let other = nums.structure.opposite();
                         if d.mark(other) == Marking::LongTerm
                             && d.store().long_term_frame_idx != idx
                         {
-                            d.set_marking(Some(parity(other)), Marking::Unused);
+                            d.set_marking(Some(other.parity()), Marking::Unused);
                         }
-                        d.set_marking(Some(parity(nums.structure)), Marking::LongTerm);
+                        d.set_marking(Some(nums.structure.parity()), Marking::LongTerm);
                         d.picture_mut().long_term_frame_idx = idx;
                     }
                 }

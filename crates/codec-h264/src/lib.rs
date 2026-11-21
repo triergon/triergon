@@ -247,8 +247,8 @@ pub struct Decoder {
     uid: u32,
     rbsp: BudgetVec<u8>,
     /// The last decoded first field, held from output while it waits for its second
-    /// field: its stored picture, structure (1 top, 2 bottom) and frame_num.
-    pending_field: Option<(PictureId, u8, u32)>,
+    /// field: its stored picture, field and frame_num.
+    pending_field: Option<(PictureId, Structure, u32)>,
     /// Dimensions of the active SPS (to flush on change).
     cur_dims: Option<(u32, u32)>,
     pending_pts: Option<i64>,
@@ -336,12 +336,12 @@ fn output_picture(poc: i32, fs: &FrameStore) -> Option<Picture> {
 fn keep_decoded(
     fs: &mut FrameStore,
     pic: CurPic,
+    structure: Structure,
     reference: bool,
     compact: bool,
     spare_motion: &mut Vec<Motion>,
 ) -> (BudgetVec<MbInfo>, BudgetVec<SliceDbk>, deblock::Progress) {
-    let structure = pic.structure;
-    let slot = usize::from(structure == 2);
+    let slot = usize::from(structure == Structure::Bottom);
     fs.buf = Some(std::sync::Arc::new(pic.buf));
     let spare = if reference && !(compact && fs.motion[slot].compact_from(&pic.motion).is_ok()) {
         std::mem::replace(&mut fs.motion[slot], pic.motion)
@@ -351,7 +351,7 @@ fn keep_decoded(
     if spare_motion.len() < MAX_SPARE {
         spare_motion.push(spare);
     }
-    fs.fields |= if structure == 0 { 3 } else { structure };
+    fs.fields |= structure.bits();
     (pic.mbs, pic.slices, pic.dbk)
 }
 
@@ -644,19 +644,13 @@ impl Decoder {
             // An IDR picture's frame_num starts the count again: no gap to fill.
             self.handle_frame_num_gap(sps, sh)?;
         }
-        let structure: u8 = if !sh.field_pic {
-            0
-        } else if sh.bottom_field {
-            2
-        } else {
-            1
-        };
+        let structure = sh.structure();
         // The second field of the pending first field: opposite parity, same frame_num; the
         // second field of an IDR frame may be IDR too.
         let first = self
             .pending_field
             .filter(|&(id, par, frame_num)| {
-                structure != 0
+                structure.is_field()
                     && structure != par
                     && frame_num == sh.frame_num
                     && (!sh.idr || self.dpb.entries().any(|e| e.id() == id && e.picture().idr))
@@ -697,7 +691,7 @@ impl Decoder {
         &mut self,
         sps: &Sps,
         sh: &SliceHeader,
-        structure: u8,
+        structure: Structure,
         poc: [i32; 2],
         target: &mut Target,
     ) -> Result<CurPic, DecodeError> {
@@ -708,7 +702,11 @@ impl Decoder {
             // The buffer's room for the picture once it is finished.
             self.dpb.try_reserve(1)?;
         }
-        let h = if structure == 0 { fh } else { fh / 2 };
+        let h = if structure == Structure::Frame {
+            fh
+        } else {
+            fh / 2
+        };
         let (mut mbs, mut slices, mut dbk) = self.pic_scratch.take().unwrap_or_else(|| {
             let budget = &self.budget;
             (
@@ -754,7 +752,7 @@ impl Decoder {
             None => recycle_buf(&mut self.spare_bufs, w * 16, fh * 16, &self.budget)?,
         };
         if second_field {
-            fs.poc[(structure - 1) as usize] = poc[(structure - 1) as usize];
+            fs.poc[structure.index()] = poc[structure.index()];
         } else {
             fs.fields = 0;
             fs.coding = if sh.field_pic {
@@ -792,7 +790,7 @@ impl Decoder {
             mbs,
             w: MbWidth::new(w),
             h,
-            structure,
+            structure: structure as u8,
             mbaff: sh.mbaff,
             poc,
             slices,
@@ -884,7 +882,7 @@ impl Decoder {
             let nums = PicNums {
                 frame_num: unused,
                 max_frame_num: max,
-                structure: 0,
+                structure: Structure::Frame,
             };
             let mut entries = dpb::by_number(self.dpb.entries_mut().collect());
             dpb::sliding_window(&mut entries, None, &nums, sps.max_num_ref_frames);
@@ -961,11 +959,10 @@ impl Decoder {
             return Err(DecodeError::Invalid("slice without picture"));
         };
         let pic = &mut active.pic;
-        let structure = pic.structure;
         let nums = PicNums {
             frame_num: sh.frame_num,
             max_frame_num: sps.max_frame_num(),
-            structure,
+            structure: sh.structure(),
         };
         // The stored frame stores: while a second field is decoded, the first field of its
         // frame is one of them, visible to it.
@@ -1094,7 +1091,7 @@ impl Decoder {
         };
         // Conceal undecoded macroblocks minimalistically (keep prediction-free content).
         deblock::finish(&mut a.pic);
-        let structure = a.pic.structure;
+        let structure = a.sh.structure();
         let is_ref = a.sh.nal.nal_ref_idc != 0;
         let compact = a.sps.frame_mbs_only && a.sps.direct_8x8_inference;
         let mut target = a.target;
@@ -1104,6 +1101,7 @@ impl Decoder {
         self.pic_scratch = Some(keep_decoded(
             fs,
             a.pic,
+            structure,
             is_ref,
             compact,
             &mut self.spare_motion,
@@ -1151,8 +1149,9 @@ impl Decoder {
                         dpb::apply_mmcos(&mut entries, &mut cur, &nums, sh, &mut self.max_lt_idx);
                     marked_long = sh.mmcos.iter().any(|m| m.op == 6);
                 } else {
-                    let first_is_short = first
-                        .is_some_and(|at| entries[at].mark(3 - structure) == Marking::ShortTerm);
+                    let first_is_short = first.is_some_and(|at| {
+                        entries[at].mark(structure.opposite()) == Marking::ShortTerm
+                    });
                     if !first_is_short {
                         dpb::sliding_window(&mut entries, first, &nums, sps.max_num_ref_frames);
                     }
@@ -1166,16 +1165,16 @@ impl Decoder {
         let mut poc = a.poc;
         if mmco5 && let Some(fs) = target_store(&mut self.dpb, &mut target) {
             let temp = match structure {
-                0 => poc[0].min(poc[1]),
-                1 => poc[0],
-                _ => poc[1],
+                Structure::Frame => poc[0].min(poc[1]),
+                Structure::Top => poc[0],
+                Structure::Bottom => poc[1],
             };
             poc[0] = poc[0].wrapping_sub(temp);
             poc[1] = poc[1].wrapping_sub(temp);
             match structure {
-                0 => fs.poc = poc,
-                1 => fs.poc[0] = poc[0],
-                _ => fs.poc[1] = poc[1],
+                Structure::Frame => fs.poc = poc,
+                Structure::Top => fs.poc[0] = poc[0],
+                Structure::Bottom => fs.poc[1] = poc[1],
             }
             // After mmco 5 the picture is treated as having frame_num 0 (7.4.3).
             fs.frame_num = 0;
@@ -1183,7 +1182,11 @@ impl Decoder {
         if is_ref {
             if mmco5 {
                 self.poc_state.prev_poc_msb = 0;
-                self.poc_state.prev_poc_lsb = if structure != 2 { poc[0] } else { 0 };
+                self.poc_state.prev_poc_lsb = if structure != Structure::Bottom {
+                    poc[0]
+                } else {
+                    0
+                };
             } else {
                 self.poc_state.prev_poc_msb = a.poc_base;
                 self.poc_state.prev_poc_lsb = sh.poc_lsb as i32;
@@ -1206,7 +1209,7 @@ impl Decoder {
         );
         // Storage (C.4.5.1, C.4.5.2): every picture waits for output; a first field is
         // held from bumping until its second field joins it or none comes.
-        let field = (structure != 0).then(|| dpb::parity(structure));
+        let field = structure.is_field().then(|| structure.parity());
         self.pending_field = None;
         match target {
             Target::New(mut fs) => {
@@ -1233,9 +1236,9 @@ impl Decoder {
             Target::SecondField(id) => {
                 if let Some(mut first) = self.dpb.entry(id) {
                     let second = NewPicture {
-                        poc: first.picture().poc[(structure - 1) as usize],
+                        poc: first.picture().poc[structure.index()],
                         output: true,
-                        marking: first.marking(dpb::parity(structure)),
+                        marking: first.marking(structure.parity()),
                         field,
                         hold: false,
                     };
