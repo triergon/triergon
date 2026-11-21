@@ -1,4 +1,5 @@
 mod aligned_audio;
+mod dts_hd;
 mod dvb;
 mod eac3;
 mod loas;
@@ -43,6 +44,7 @@ enum Framer {
     Loas(aligned_audio::Reader<3, ()>),
     MpegAudio(mpeg_audio::Reader),
     Dts(aligned_audio::Reader<15, Time>),
+    DtsHd(dts_hd::Reader),
     LatmPes,
     Ac3(Ac3FrameReader),
     Eac3(eac3::Reader),
@@ -58,6 +60,7 @@ impl Framer {
             Self::Loas(reader) => reader.input_wait_buffer_capacity(),
             Self::MpegAudio(reader) => reader.input_wait_buffer_capacity()?,
             Self::Dts(reader) => reader.input_wait_buffer_capacity(),
+            Self::DtsHd(reader) => reader.input_wait_buffer_capacity(),
             Self::Ac3(reader) => reader.input_wait_buffer_capacity(),
             Self::Eac3(reader) => reader.input_wait_storage()?,
             // Direct PES carriages do not keep a pending unit between inputs.
@@ -84,6 +87,7 @@ impl Framer {
                 | Self::Loas(_)
                 | Self::MpegAudio(_)
                 | Self::Dts(_)
+                | Self::DtsHd(_)
                 | Self::Ac3(_)
                 | Self::Eac3(_)
         )
@@ -154,13 +158,26 @@ impl Framer {
                 Ok(Self::Dvb(dvb::Reader::new(limits.dvb_subtitle_tail_policy)))
             }
             0x06 if stream.codec() == Some(CodecId::Dts) => {
-                Ok(Self::Dts(aligned_audio::Reader::new(
-                    pool,
-                    source,
-                    caps,
-                    limits.maximum_audio_frame_bytes,
-                    limits.elementary_input_window,
-                )?))
+                if stream.dvb_descriptor_codec() != Some(CodecId::Dts)
+                    && let Some(descriptor) = stream.dvb_dts_hd()?
+                {
+                    Ok(Self::DtsHd(dts_hd::Reader::new(
+                        pool,
+                        source,
+                        caps,
+                        limits.maximum_audio_frame_bytes,
+                        limits.elementary_input_window,
+                        descriptor,
+                    )?))
+                } else {
+                    Ok(Self::Dts(aligned_audio::Reader::new(
+                        pool,
+                        source,
+                        caps,
+                        limits.maximum_audio_frame_bytes,
+                        limits.elementary_input_window,
+                    )?))
+                }
             }
             0x06 if matches!(namespace, DescriptorNamespace::Dvb(_)) => {
                 let descriptors = PrivateAudioDescriptors {
@@ -240,12 +257,14 @@ impl Framer {
                 })?,
                 |frame| {
                     AccessUnit::Dts(DtsAudioFrame {
+                        core_bytes: frame.bytes.len(),
                         bytes: frame.bytes,
                         offset: frame.offset,
                         duration: frame.header,
                     })
                 },
             ),
+            Self::DtsHd(reader) => map(reader.step(work, cancel)?, AccessUnit::Dts),
             Self::AdtsFragments(reader) => map(reader.step(work, cancel)?, |carrier| match carrier
                 .into_selected_frame()
             {
@@ -266,6 +285,7 @@ impl Framer {
             Self::Loas(reader) => reader.provide(window),
             Self::MpegAudio(reader) => reader.provide(window),
             Self::Dts(reader) => reader.provide(window),
+            Self::DtsHd(reader) => reader.provide(window),
             Self::AdtsFragments(reader) => reader.provide_owned(window),
             Self::Ac3(reader) => reader.provide_owned(window),
             Self::Eac3(reader) => reader.provide(window),
@@ -279,6 +299,7 @@ impl Framer {
             Self::Loas(reader) => reader.finish(request),
             Self::MpegAudio(reader) => reader.finish(request),
             Self::Dts(reader) => reader.finish(request),
+            Self::DtsHd(reader) => reader.finish(request),
             Self::AdtsFragments(reader) => reader.finish(request.source, request.token),
             Self::Ac3(reader) => reader.finish(request.source, request.token),
             Self::Eac3(reader) => reader.finish(request),
@@ -1166,6 +1187,10 @@ impl Lane {
         }
         let source = pending.as_ref().expect("queued PES");
         let pes = source.pes();
+        let payload_len = pes.payload_len;
+        if let Some(Framer::DtsHd(reader)) = &self.framer {
+            reader.check_pes(pes)?;
+        }
         let stream_type = self.track.stream().stream_type;
         if !(0xc0..=0xdf).contains(&pes.header.stream_id) {
             match stream_type {
@@ -1223,6 +1248,9 @@ impl Lane {
         }) {
             *pending = Some(rejected.value.source);
             return Err(rejected.error);
+        }
+        if let Some(Framer::DtsHd(reader)) = &mut self.framer {
+            reader.begin_pes(payload_len);
         }
         self.serial = serial;
         self.run = run;

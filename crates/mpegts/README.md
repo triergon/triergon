@@ -230,6 +230,16 @@ and [A/52 Annex G §3.3](https://www.atsc.org/wp-content/uploads/2021/04/A52-201
 Existing framers delimit the complete source bytes before decoder-feed conversion.
 MPEG-1/2 video, other subtitle carriages and ambiguous private streams currently emit
 `ReaderEvent::Unsupported`. Their original PMTs and PES remain available as source events.
+For DVB DTS-HD signalling, `psi::Descriptor::dvb_dts_hd` reads Annex G.3
+substream and asset information from the original descriptor bytes.
+`ElementaryStream::dvb_dts_hd` looks up the descriptor on a DVB private-data
+track and rejects conflicting DTS core and DTS-HD descriptors. The access-unit
+reader can frame one core-bearing DTS-HD unit per aligned finite PES. It
+checks the signalled extension substream order, extents and header CRC and
+leaves the asset payloads intact. `DtsAudioFrame::core_bytes` exposes the core
+prefix, and `bytes` exposes the complete unit. The original PES supplies its
+clock. Extension-only carriage remains outside this path.
+
 For DVB AC-3, an elementary `AC-3` registration can corroborate descriptor `0x6a`.
 
 The DVB E-AC-3 carriage requires PMT stream type `0x06`, an elementary

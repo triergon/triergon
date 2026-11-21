@@ -334,7 +334,7 @@ impl Transport {
             stream_id,
             (length >> 8) as u8,
             length as u8,
-            0x80,
+            if part.aligned { 0x84 } else { 0x80 },
             if part.dts.is_some() {
                 0xc0
             } else if part.pts.is_some() {
@@ -396,6 +396,7 @@ struct Part<'a> {
     pts: Option<u64>,
     dts: Option<u64>,
     unbounded: bool,
+    aligned: bool,
 }
 
 fn part(body: &[u8], pts: Option<u64>, dts: Option<u64>) -> Part<'_> {
@@ -404,6 +405,7 @@ fn part(body: &[u8], pts: Option<u64>, dts: Option<u64>) -> Part<'_> {
         pts,
         dts,
         unbounded: false,
+        aligned: false,
     }
 }
 

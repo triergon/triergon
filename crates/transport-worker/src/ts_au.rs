@@ -219,6 +219,9 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
             AccessUnit::DvbSubtitle(_) => (1, PositionSource::FirstPes),
             // A PES beginning inside an aligned audio frame stamps the next
             // frame, including that PES's carrier position.
+            AccessUnit::Dts(frame) if frame.core_bytes().len() < frame.bytes().len() => {
+                (0, PositionSource::FirstPes)
+            }
             AccessUnit::MpegAudio(_) | AccessUnit::Dts(_) => (1, PositionSource::ClockAnchor),
             AccessUnit::Adts(_)
             | AccessUnit::AdtsFragment(_)
@@ -517,7 +520,11 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                                     / i64::from(header.sample_rate)
                             }
                         }
-                        AccessUnit::Dts(frame) => {
+                        // In the parser-enabled comparison without stream discovery,
+                        // the DVB DTS-HD extension descriptor leaves PES duration unset.
+                        AccessUnit::Dts(frame)
+                            if frame.core_bytes().len() == frame.bytes().len() =>
+                        {
                             let span = frame.sample_span();
                             i64::try_from(span.numerator() * 90_000 / span.denominator() as i128)?
                         }

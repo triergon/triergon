@@ -858,6 +858,7 @@ families and options:
   transport-access-units --output ROOT [--record --reference-worker FILE --observations DIR]
            regenerate MPEG-TS access-unit inputs and their reference-pinned corpus
   transport-dts --record REFERENCE   regenerate DVB DTS core transport inputs and pins
+  transport-dts-hd --record REFERENCE   regenerate DTS-HD transport inputs and pins
   transport-dts-seek --record REFERENCE   regenerate DTS core seek inputs and pins
   transport-audio-seek --record REFERENCE   regenerate additional MPEG-TS audio seek inputs and pins
   transport-matched --record SEEK_REFERENCE AUDIO_REFERENCE
@@ -877,6 +878,9 @@ fn fixture(root: &Path, args: &[String]) -> Task {
     }
     if family == "transport-access-units" {
         return transport_fixtures::main(root, &args[1..]);
+    }
+    if family == "transport-dts-hd" {
+        return transport_fixtures::matched::author_dts_hd(root, &args[1..]);
     }
     if family == "transport-dts-seek" {
         return transport_fixtures::matched::author_dts_seek(root, &args[1..]);

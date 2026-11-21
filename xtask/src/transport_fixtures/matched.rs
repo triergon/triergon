@@ -1,5 +1,5 @@
 //! Independently authored TS controls for selected-track seek and audio framing.
-use super::{Codec, PID, PROGRAM, R, Transport, part, source};
+use super::{Codec, PID, PROGRAM, Part, R, Transport, part, source};
 use crate::corpus::write_json;
 use crate::json::{self, Value};
 use crate::sha256;
@@ -619,6 +619,107 @@ pub fn author_dts_seek(root: &Path, args: &[String]) -> R<()> {
             &["--dvb", &pid, target, policy],
             Path::new(reference),
             "ts-audio-seek-fold",
+        )?);
+    }
+    manifest(root, FEATURE, cases)
+}
+
+fn extension_substream(index: u32, long: bool) -> Vec<u8> {
+    let header_bytes = if long { 16 } else { 12 };
+    let frame_bytes = header_bytes + 8;
+    let mut bytes = vec![0; frame_bytes];
+    bytes[..5].copy_from_slice(&[0x64, 0x58, 0x20, 0x25, 0xa5]);
+    let mut position = 40;
+    for (width, value) in [
+        (2, index),
+        (1, u32::from(long)),
+        (if long { 12 } else { 8 }, header_bytes as u32 - 1),
+        (if long { 20 } else { 16 }, frame_bytes as u32 - 1),
+    ] {
+        for bit in (0..width).rev() {
+            bytes[position / 8] |= ((value >> bit) as u8 & 1) << (7 - position % 8);
+            position += 1;
+        }
+    }
+    let mut crc: u16 = 0xffff;
+    for &byte in &bytes[5..header_bytes - 2] {
+        crc ^= u16::from(byte) << 8;
+        for _ in 0..8 {
+            crc = (crc << 1) ^ if crc & 0x8000 != 0 { 0x1021 } else { 0 };
+        }
+    }
+    bytes[header_bytes - 2..header_bytes].copy_from_slice(&crc.to_be_bytes());
+    bytes[header_bytes..].copy_from_slice(&[0x11, 0x8a, 0x95, 0xe1, 0x35, 0x55, 0x8c, 0x01]);
+    bytes
+}
+
+/// Author aligned PES carrying a pinned core and opaque DTS-HD extension bodies.
+pub fn author_dts_hd(root: &Path, args: &[String]) -> R<()> {
+    let [record, reference] = args else {
+        return Err("usage: cargo xtask fixture transport-dts-hd --record REFERENCE".into());
+    };
+    if record != "--record" {
+        return Err("expected --record".into());
+    }
+    const FEATURE: &str = "mpegts-dts-hd";
+    const SEED: &str = "harness/fixtures/mpegts/dts-core-mono.dts";
+    const SHA256: &str = "a1db20abc4bce08a504108de2998337f4d906eda3373acdc3abab39fcaaf1330";
+    let core = fs::read(root.join(SEED)).map_err(|e| format!("{SEED}: {e}"))?;
+    if sha256::hex(&core) != SHA256 {
+        return Err(format!("{SEED}: pinned coded bytes changed"));
+    }
+    let codec = Codec {
+        name: "dvb-dts-hd",
+        stream_type: 0x06,
+        stream_id: 0xbd,
+        dvb: true,
+        bytes: Vec::new(),
+        first: 0,
+        header: 0,
+    };
+    let mut cases = Vec::new();
+    for (name, m2ts, long, extra) in [
+        ("dts-hd-core-extension-short", false, false, false),
+        ("dts-hd-core-extension-long", true, true, false),
+        ("dts-hd-core-two-extensions", false, false, true),
+    ] {
+        let mut ts = Transport::new();
+        let mut descriptor = vec![
+            0x7f, 14, 0x0e, 0xc0, 5, 1, 0x60, 0x08, 0, 0, 5, 1, 0x60, 0x48, 0, 0,
+        ];
+        if extra {
+            descriptor[1] += 6;
+            descriptor[3] |= 0x20;
+            descriptor.extend([5, 1, 0x60, 0x48, 0, 0]);
+        }
+        ts.tables(&codec, &descriptor)?;
+        let extension = extension_substream(0, long);
+        let second = extension_substream(1, long);
+        for (i, frame) in core.chunks_exact(512).take(3).enumerate() {
+            let mut payload = Vec::from(frame);
+            payload.extend_from_slice(&extension);
+            if extra {
+                payload.extend_from_slice(&second);
+            }
+            let pts = 90_000 + i as u64 * 960;
+            let packet = Part {
+                aligned: true,
+                ..part(&payload, Some(pts), (i == 1).then_some(pts - 90))
+            };
+            ts.pes(codec.stream_id, &packet)?;
+        }
+        let input = Input {
+            name,
+            m2ts,
+            data: ts.finish(m2ts),
+        };
+        cases.push(input.record(
+            root,
+            FEATURE,
+            name,
+            &["--dvb"],
+            Path::new(reference),
+            "ts-au-fold",
         )?);
     }
     manifest(root, FEATURE, cases)

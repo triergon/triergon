@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "dts-hd-core-extension-short",
+      "profile": "dts-hd-core-extension-short",
+      "file": "harness/features/mpegts-dts-hd/inputs/dts-hd-core-extension-short.ts",
+      "sha256": "a8df9641c24becc813f833fff51fc1a674c16d3c321c49ca4d09a087d3a59b94",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1596,
+        "digest": 4493985863035782715
+      }
+    },
+    {
+      "id": "dts-hd-core-extension-long",
+      "profile": "dts-hd-core-extension-long",
+      "file": "harness/features/mpegts-dts-hd/inputs/dts-hd-core-extension-long.m2ts",
+      "sha256": "dccb21fa8a6d2c359730535db585a4f100a9ac80deb97a4088197bc1e9f5c563",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1608,
+        "digest": 18391310660024958001
+      }
+    },
+    {
+      "id": "dts-hd-core-two-extensions",
+      "profile": "dts-hd-core-two-extensions",
+      "file": "harness/features/mpegts-dts-hd/inputs/dts-hd-core-two-extensions.ts",
+      "sha256": "8aaaa3eb08b60171d87744ed52288c9bd07ac0692272239553d20b90ad6f1176",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1656,
+        "digest": 4146184786426843139
+      }
+    }
+  ]
+}
