@@ -10,6 +10,7 @@
     clippy::expect_used
 )]
 pub mod aac;
+pub mod access;
 pub mod av1;
 pub mod bitmap;
 pub mod caption;
