@@ -384,3 +384,28 @@ fn a_sample_rate_change_starts_a_new_block_and_surround_is_downmixed() {
         "no audio lane for unknown codecs"
     );
 }
+
+#[cfg(feature = "codecs")]
+#[test]
+fn a_video_decoder_charges_the_callers_budget() {
+    use triergon_codec::Budget;
+    use triergon_session::{VideoCodec, video_decoder_in};
+
+    // 80x48, one IDR and one P picture.
+    let stream = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../playback/tests/fixtures/raw-video/avc-80x48.h264"
+    ))
+    .unwrap();
+    let budget = Budget::new(16 << 20).unwrap();
+    let idle = budget.used();
+    let mut decoder = video_decoder_in(VideoCodec::H264, &budget);
+    decoder.send(&stream, None).unwrap();
+    assert!(budget.used() > idle);
+    let frame_bytes = 80 * 48 * 3 / 2;
+    let small = Budget::new(Budget::control_storage_bytes() + frame_bytes / 2).unwrap();
+    let error = video_decoder_in(VideoCodec::H264, &small)
+        .send(&stream, None)
+        .unwrap_err();
+    assert!(matches!(error, Error::Limit { .. }), "{error:?}");
+}

@@ -78,6 +78,19 @@ pub fn video_decoder(codec: VideoCodec) -> Box<DynVideoDecoder> {
     }
 }
 
+/// [`video_decoder`] charging the decoder's storage, its decoded pictures included, to
+/// `budget` instead of a pool of the codec's default limit.
+#[cfg(feature = "codecs")]
+pub fn video_decoder_in(
+    codec: VideoCodec,
+    budget: &triergon_codec::Budget,
+) -> Box<DynVideoDecoder> {
+    match codec {
+        VideoCodec::H264 => triergon_codec_h264::Decoder::new_in(budget).boxed(),
+        VideoCodec::Hevc => triergon_codec_hevc::Decoder::new_in(budget).boxed(),
+    }
+}
+
 /// The decoder lane for a container track's codec, if this crate decodes it.
 pub fn audio_codec(codec: triergon_core::container::CodecId) -> Option<AudioCodec> {
     use triergon_core::container::CodecId;
