@@ -23,7 +23,7 @@ PART`: `cargo xtask check lint`, `test`, `variants` and `parity`. Each part runs
 locally the same way. The jobs restore the packed reference builds (`cargo xtask
 references`) and the target directory of an earlier run; `tools/target-cache.py` marks
 every tracked file whose content differs from that run's as new, so cargo rebuilds
-whatever reads it. Beside them, a job runs the tests of `triergon-framing`,
+whatever reads it. Beside them, the `armv7 tests` job runs the tests of `triergon-framing`,
 `triergon-isobmff` and `triergon-mpegts` in the `checked` profile for the 32-bit gate
 target `thumbv7neon-unknown-linux-gnueabihf` under user-mode QEMU, where smaller
 pointers change the storage sizes their budget tests pin. The required `check` status passes
@@ -32,17 +32,19 @@ only when the four parts and this job pass.
 A pull request that changes only `docs/`, `harness/evidence/sets/` or Markdown files
 no code reads runs `cargo xtask check docs` instead: formatting, check-design,
 check-links, check-revisions and the evidence index tests. `tools/ci-scope.py` decides
-this against the merge base; any other change, and every push to main, runs all four
-parts.
+this against the merge base; any other change, and every push to main, runs the full
+check.
 
 Set `CARGO_INCREMENTAL=0` for direct cargo commands; the reference builds and
 benchmarks assume it.
 
 ## Ground rules
 
-- **Safe Rust only.** Every crate has `unsafe_code = "forbid"`. There is no exception
-  for performance. Worker packages deny it instead, so that each worker binary's C
-  entry point is its one allowed exception
+- **Safe Rust only.** Every library crate forbids `unsafe_code`. There is no exception
+  for performance. Packages that build a worker binary (the worker crates, and
+  `triergon-framing` and `triergon-isobmff` for their worker examples) deny it at
+  package level instead, so that each worker binary's C entry point is its one allowed
+  exception
   ([quality](docs/quality.md#measuring-performance)).
 - **No dependencies by default.** A third-party crate is admitted only if its whole
   dependency graph is safe Rust, it fits the exact contract (timing, bounds, errors,
@@ -88,30 +90,24 @@ benchmarks assume it.
 3. Implement it. Keep worker traces byte-identical for everything you did not mean to
    change.
 4. Run `cargo xtask report --fate-cache .research/fate-samples`, and the same with
-   `--benchmark --memory --require-acceptance` on an isolated AArch64 Linux machine when
-   the change touches parsing or decoding hot paths; for `triergon-font`,
+   `--benchmark --memory --require-acceptance` on an isolated Linux machine of each gate
+   target (AArch64 and 32-bit ARMv7) when the change touches parsing or decoding hot
+   paths; for `triergon-font`,
    `cargo xtask fonts compare --all` with the same options, for `triergon-shape`
    `cargo xtask shape compare --all`, for `triergon-raster`
    `cargo xtask raster compare --all`, for `triergon-ass` `cargo xtask ass compare`,
-   and
-   `cargo xtask fuzz --contract harness/features/<feature>/contract.json --output DIR`.
-   When a reference or a fixture changes, re-record its pins with `cargo xtask fonts
-   manifest --record`, `cargo xtask shape manifest --record`, `cargo xtask raster
-   manifest --record` or `cargo xtask ass manifest --record`; pins are never
-   edited by hand. Put the
+   and `cargo xtask fuzz --contract harness/features/<feature>/contract.json --output
+   DIR`. When a reference or a fixture changes, re-record its pins with `cargo xtask
+   <fonts|shape|raster|ass> manifest --record`; pins are never edited by hand. Put the
    per-case results in the pull request and update [docs/status.md](docs/status.md).
 
-Register comparisons in `harness/features/<id>/contract.json`. The contract
-selects the candidate, reference and operation. Set its `gate` to `required`
-to include the comparison in `cargo xtask check`. Set `runner` to
-`cargo xtask report` for a gate item using the standard report command. Its
-`corpus_directory` supplies the input directory when the manifest omits it.
-Worker identities bind the
-registered contracts and their corpus inputs. Generated manifests record and
-verify their pins against the reference named in the contract. A generated
-feature can set `pin_note` to describe those pins. Required comparisons check
-manifest profiles and expected folds before running. Set `compare_order` to
-order a generator's reports. Unranked features follow in ID order.
+Register comparisons in `harness/features/<id>/contract.json`: it selects the
+candidate, reference and operation; `"gate": "required"` includes it in `cargo xtask
+check`; `"runner": "cargo xtask report"` runs it with the standard report command, with
+`corpus_directory` as the input directory when the manifest omits it. Generated
+manifests record and verify their pins against the contract's reference (`pin_note`
+describes them), and `compare_order` orders a generator's reports. Worker identities
+bind the registered contracts and their corpus inputs.
 
 See [docs/quality.md](docs/quality.md) for the gates and the measurement rules, and
 [docs/architecture.md](docs/architecture.md) for where code belongs.

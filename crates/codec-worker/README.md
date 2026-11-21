@@ -1,15 +1,12 @@
 # codec-worker
 
-Decoder measurement workers for the harness. It decodes an elementary stream through
-the [triergon-session](../session/README.md) decoders, letterboxes video with
-[`triergon_pixel::letterbox`](../pixel/README.md) and downmixes audio with
-`triergon_session::mix::Downmix`, performing the same operations as the FFmpeg
-reference decode worker in `harness/`. It is tooling (`publish = false`), not part of
-the library. `codec-worker` serves every operation below. `codec-aac-worker` serves
-the AAC decode operations alone (`audio-aac`, `audio-aac-access-units` and
-`audio-aac-access-units-compat`), so that a build of the AAC decoder with other
-features or another compiler measures nothing else: the gate build builds it with the
-`aac-simd` feature (the AAC decoder's `simd`) by the pinned nightly.
+Decoder measurement workers for the harness (`publish = false`, not part of the library).
+They decode an elementary stream through the [triergon-session](../session/README.md)
+decoders, letterbox video with [`triergon_pixel::letterbox`](../pixel/README.md) and
+downmix audio with `triergon_session::mix::Downmix`, performing the same operations as the
+FFmpeg reference decode worker in `harness/`. `codec-worker` serves every operation below;
+`codec-aac-worker` serves the AAC decode operations alone (`audio-aac`,
+`audio-aac-access-units` and `audio-aac-access-units-compat`).
 
 ## Command line
 
@@ -17,79 +14,55 @@ features or another compiler measures nothing else: the gate build builds it wit
 codec-worker KIND-CODEC-bench  FILE ITERATIONS
 codec-worker KIND-CODEC-memory FILE
 codec-worker KIND-CODEC-raw    FILE OUT
+codec-worker KIND-CODEC-fold   FILE
 codec-worker packets FORMAT FILE
 codec-worker packets mov FILE [TRACK_ID@MICROSECONDS]
 codec-worker seek ogg FILE TRACK SECONDS exact|preroll
 ```
 
 `KIND-CODEC` is one of `video-h264`, `video-hevc`, `audio-ac3`, `audio-eac3`,
-`audio-aac`, `audio-aac-access-units`, `audio-aac-access-units-compat`, `audio-dts`, `audio-flac`, `audio-mp3`,
-`audio-vorbis` or `audio-opus`. The `simd` feature enables the HEVC decoder's nightly-only
-SIMD kernels, and `aac-simd` the AAC decoder's; output is identical.
+`audio-aac`, `audio-aac-access-units`, `audio-aac-access-units-compat`, `audio-dts`,
+`audio-flac`, `audio-mp3`, `audio-vorbis` or `audio-opus`. The nightly-only `simd` and
+`aac-simd` features enable the HEVC and AAC decoders' SIMD kernels; output is identical.
+Decode errors are printed to stderr and decoding continues.
 
-Video is split into Annex B access units and audio into frames (AC-3/E-AC-3 by
-`access_unit_len`, AAC by the ADTS header, DTS by the core FSIZE) the same way the
-reference worker's parser does, so both decode the same units. This is measurement
-framing; playback frames access units through `triergon-framing`. Decode errors are
-printed to stderr and decoding continues.
-
-For configured AAC, `cargo xtask codecs aac-access-units --out DIR` extracts the
-original packets and AudioSpecificConfig with the pinned `ffprobe`. Each input
-starts with four little-endian 32-bit words for the sample rate, channel count,
-packet count and configuration length. The configuration precedes the packets,
-each with a little-endian 32-bit length and 64 zero padding bytes. Both workers
-cap the preloaded input at 64 MiB and require 1024 samples per plane per packet.
-The `raw` mode writes little-endian floats in frame and plane order and reports
-the ordered speaker IDs. The command compares every sample with the AAC
-accuracy bounds and checks the speaker order. The comparison's candidate is
-`codec-aac-worker`, as its contract names. Pass its `workloads.json` to
-`cargo xtask codecs time` and `cargo xtask codecs memory` with the same input
-directory, and that worker as `--candidate`. Both commands require the matching
-`parity.json`.
-`audio-aac-access-units` uses the specification mapping.
-`audio-aac-access-units-compat` uses the conventional surround mapping.
+The `audio-aac-access-units` inputs, made by `cargo xtask codecs aac-access-units --out
+DIR`, start with four little-endian 32-bit words (sample rate, channel count, packet
+count, configuration length), then the AudioSpecificConfig, then each packet with a
+little-endian 32-bit length and 64 zero padding bytes; at most 64 MiB, and every packet
+must give 1024 samples per plane. `audio-aac-access-units` uses the specification channel
+mapping, `-compat` the conventional surround mapping.
 
 ## Outputs
 
-The output is 1920×1080 RGBA per picture, interleaved stereo s16le per mixed
-audio frame, or all native PCM planes per configured AAC frame. `packets` counts
-pictures or audio frames.
+The output is 1920×1080 RGBA per picture, interleaved stereo s16le per mixed audio frame,
+or all native PCM planes per configured AAC frame. `packets` counts pictures or audio
+frames.
 
 | Mode | stdout |
 |---|---|
 | `bench` | `{"schema":1, "iterations", "elapsed_ns", "packets", "bytes", "digest"}`; reading the file is outside the timed interval |
 | `memory` | `TRIERGON_BEGIN_V1` and `TRIERGON_END_V1` around one run, then `{"packets", "bytes"}`; the digest goes to stderr |
 | `raw` | writes the converted output to `OUT`, then `{"packets", "bytes", "digest"}` |
+| `fold` | `{"packets", "bytes", "digest"}` of one untimed run |
 
-`digest` is `triergon_harness_protocol::interleaved::InterleavedDigest` over the
-exact converted output: a fingerprint of equal output, not a cryptographic hash.
+`digest` is `triergon_harness_protocol::interleaved::InterleavedDigest` over the exact
+converted output: a fingerprint of equal output, not a cryptographic hash.
 
 ## Reader packets
 
-`packets FORMAT FILE` prints one JSON line per packet a container reader emits, for
-`cargo xtask codecs readers`: `ogg` reads through `triergon_ogg::BlockingReader`, `flac`,
-`mp3`, `aac`, `ac3` and `eac3` through the `triergon_elementary` reader of that format.
-Each line holds the track index, `time_base`, `pts`, `dts`, `duration`, `trim_start` and
-`trim_end` as the reader reports them, the payload `size`, the source `position` (Ogg:
-the page that completes the packet; elementary streams: the first byte) and `complete`.
-Ogg packets also carry `compat`, the reader's FFmpeg-compatible view
-(`triergon_ogg::compat::clock`), and the reader's `resync` and `lost` events are lines
-of their own. The last line lists the tracks and how reading ended (`eof`, or `error` with the
-reader's message).
-
-`seek ogg FILE TRACK SECONDS POLICY` opens an Ogg file the same way, seeks track TRACK
-(its index once the reader is open) to SECONDS (a decimal number) with POLICY (`exact`:
-`SeekPolicy::PreviousRandomAccess`; `preroll`: `SeekPolicy::PlaybackPreroll`), prints the
-receipt as a `{"event":"seek",...}` line (`requested`, `landing` and `discard_until` as
-`[numerator, denominator]` seconds, the method and the bytes scanned) and then every
-packet to the end of the file as `packets` does, Ogg packets that end a page with their
-`granule`. `cargo xtask codecs readers --seeks` compares it with FFmpeg.
-
-`packets mov FILE [TRACK_ID@MICROSECONDS]` reads through the neutral ISO BMFF reader
-(`triergon_isobmff::Reader`), for `cargo xtask codecs isobmff-reader`. Each line holds
-the track index and `track_id`, `time_base`, `pts`, `dts`, `duration`, the payload
-`size`, the sample's source `position`, `sync` (1, 0, or `null` where the source states
-nothing), the payload's MD5 as `hash`, the sample `ordinal` and its `description`.
-With a seek, `request_seek` asks for that track's time once the movie is open and the
-receipt is a line of its own (`{"event":"seek", ...}`). The last line lists the tracks,
-with their edit lists and the movie timescale, and how reading ended.
+- `packets FORMAT FILE` prints one JSON line per packet a container reader emits (`ogg`
+  through `triergon_ogg::BlockingReader`; `flac`, `mp3`, `aac`, `ac3` and `eac3` through
+  the `triergon_elementary` reader): track index, `time_base`, `pts`, `dts`, `duration`,
+  `trim_start`, `trim_end`, `size`, source `position` and `complete`. Ogg packets also
+  carry `compat` (`triergon_ogg::compat::clock`), and `resync` and `lost` events are lines
+  of their own. The last line lists the tracks and how reading ended (`eof`, or `error`
+  with the reader's message).
+- `seek ogg FILE TRACK SECONDS POLICY` seeks track TRACK to SECONDS (`exact`:
+  `SeekPolicy::PreviousRandomAccess`; `preroll`: `SeekPolicy::PlaybackPreroll`), prints the
+  receipt as a `{"event":"seek",...}` line and then every packet to the end as `packets`
+  does.
+- `packets mov FILE [TRACK_ID@MICROSECONDS]` reads through `triergon_isobmff::Reader`:
+  each line holds the track index and `track_id`, `time_base`, `pts`, `dts`, `duration`,
+  `size`, `position`, `sync`, the payload's MD5 as `hash`, `ordinal` and `description`;
+  a seek is requested once the movie is open and its receipt is a line of its own.
