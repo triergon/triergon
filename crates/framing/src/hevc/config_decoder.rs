@@ -112,48 +112,49 @@ impl HvcDecoderConfigWriter {
         }
         result
     }
-    /// Takes the state for one step; every arm that does not finish leaves the next.
     fn advance(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<HvcDecoderConfigOutput>> {
         loop {
-            match std::mem::replace(&mut self.state, State::Complete) {
-                State::Failed(error) => return Err(error),
+            match &mut self.state {
+                &mut State::Failed(error) => return Err(error),
                 State::Complete => return Ok(BuildStep::Complete),
-                State::Writing(mut writer) => {
+                State::Writing(writer) => {
                     if cancel.load(Ordering::Relaxed) {
                         return Err(Error::Cancelled);
                     }
-                    return match writer.step(work, cancel) {
-                        Ok(BuildStep::Ready(o)) => {
-                            Ok(BuildStep::Ready(HvcDecoderConfigOutput::Converted(o)))
+                    let result = writer.step(work, cancel);
+                    if let Ok(BuildStep::Ready(_) | BuildStep::Complete) = result {
+                        self.state = State::Complete;
+                    }
+                    return result.map(|step| match step {
+                        BuildStep::Ready(o) => {
+                            BuildStep::Ready(HvcDecoderConfigOutput::Converted(o))
                         }
-                        Ok(BuildStep::Complete) => Ok(BuildStep::Complete),
-                        Ok(BuildStep::Yield) => {
-                            self.state = State::Writing(writer);
-                            Ok(BuildStep::Yield)
-                        }
-                        Err(error) => {
-                            self.state = State::Writing(writer);
-                            Err(error)
-                        }
-                    };
+                        BuildStep::Yield => BuildStep::Yield,
+                        BuildStep::Complete => BuildStep::Complete,
+                    });
                 }
                 State::Checking(input) => {
                     if cancel.load(Ordering::Relaxed) {
                         return Err(Error::Cancelled);
                     }
                     if !work.try_charge(1) {
-                        self.state = State::Checking(input);
                         return Ok(BuildStep::Yield);
                     }
-                    match input.array(self.array).map(|a| a.declared_nal_type()) {
-                        Some(32 | 33 | 34 | 39 | 40) => {
-                            self.array += 1;
-                            self.state = State::Checking(input);
-                        }
+                    let declared = input.array(self.array).map(|a| a.declared_nal_type());
+                    if let Some(32 | 33 | 34 | 39 | 40) = declared {
+                        self.array += 1;
+                        continue;
+                    }
+                    let State::Checking(input) =
+                        std::mem::replace(&mut self.state, State::Complete)
+                    else {
+                        unreachable!("the writer is checking")
+                    };
+                    match declared {
                         Some(declared_nal_type) => {
                             return Ok(BuildStep::Ready(HvcDecoderConfigOutput::Refused {
                                 configuration: input,

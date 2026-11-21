@@ -2,8 +2,8 @@
 //! available; unknown arrays, duplicates and mismatched declarations are written as
 //! they are.
 use crate::nal::annexb::START_CODE;
+use crate::retryable;
 use crate::{BuildStep, hevc::HvcConfiguration};
-use crate::{freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
@@ -116,41 +116,26 @@ impl HvcAnnexBWriter {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<HvcAnnexBOutput>> {
-        let mut writing = match std::mem::replace(&mut self.state, State::Complete) {
-            State::Writing(writing) => writing,
-            State::Complete => return Ok(BuildStep::Complete),
-            State::Failed(error) => {
-                self.state = State::Failed(error);
-                return Err(error);
-            }
-        };
-        match self.write(&mut writing, work, cancel) {
-            Ok(Some(bytes)) => Ok(BuildStep::Ready(HvcAnnexBOutput {
-                bytes,
-                configuration: writing.input,
-            })),
-            Ok(None) => {
-                self.state = State::Writing(writing);
-                Ok(BuildStep::Yield)
-            }
-            Err(error) => {
-                self.state = if retryable(error) {
-                    State::Writing(writing)
-                } else {
-                    State::Failed(error)
-                };
-                Err(error)
-            }
+        let result = self.write(work, cancel);
+        if let Err(error) = result
+            && !retryable(error)
+        {
+            self.state = State::Failed(error);
         }
+        result
     }
-    /// Writes for as long as `work` lasts; the output once it is frozen.
+    /// Writes for as long as `work` lasts, and publishes the output once it is
+    /// frozen.
     fn write(
         &mut self,
-        writing: &mut Writing,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<Bytes>> {
-        let Writing { input, output } = writing;
+    ) -> Result<BuildStep<HvcAnnexBOutput>> {
+        let Writing { input, output } = match &mut self.state {
+            State::Writing(writing) => writing,
+            State::Complete => return Ok(BuildStep::Complete),
+            State::Failed(error) => return Err(*error),
+        };
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -158,7 +143,7 @@ impl HvcAnnexBWriter {
             match self.phase {
                 Phase::Count => {
                     if !work.try_charge(1) {
-                        return Ok(None);
+                        return Ok(BuildStep::Yield);
                     }
                     if let Some(nal) = input.nal(self.index) {
                         let total = self
@@ -192,7 +177,7 @@ impl HvcAnnexBWriter {
                 }
                 Phase::Reserve => {
                     if !work.try_charge(1) {
-                        return Ok(None);
+                        return Ok(BuildStep::Yield);
                     }
                     output.try_reserve_exact(self.total)?;
                     self.phase = Phase::Copy;
@@ -209,7 +194,7 @@ impl HvcAnnexBWriter {
                         .ok_or(Error::Overflow)?;
                     if self.nal_offset == end {
                         if !work.try_charge(1) {
-                            return Ok(None);
+                            return Ok(BuildStep::Yield);
                         }
                         self.index += 1;
                         self.nal_offset = 0;
@@ -225,7 +210,7 @@ impl HvcAnnexBWriter {
                     )
                     .map_err(|_| Error::Overflow)?;
                     if count == 0 {
-                        return Ok(None);
+                        return Ok(BuildStep::Yield);
                     }
                     if self.nal_offset < 4 {
                         output.try_extend_from_slice(
@@ -239,12 +224,29 @@ impl HvcAnnexBWriter {
                 }
                 Phase::Freeze => {
                     if !work.try_charge(1) {
-                        return Ok(None);
+                        return Ok(BuildStep::Yield);
                     }
                     if output.len() != self.total {
                         return Err(Error::Invalid("hvcC framing byte count"));
                     }
-                    return freeze_whole(output).map(Some);
+                    let State::Writing(Writing { input, output }) =
+                        std::mem::replace(&mut self.state, State::Complete)
+                    else {
+                        unreachable!("the writer is writing")
+                    };
+                    return match output.freeze() {
+                        Ok(bytes) => Ok(BuildStep::Ready(HvcAnnexBOutput {
+                            bytes,
+                            configuration: input,
+                        })),
+                        Err(refused) => {
+                            self.state = State::Writing(Writing {
+                                input,
+                                output: refused.value,
+                            });
+                            Err(refused.error)
+                        }
+                    };
                 }
             }
         }
