@@ -338,6 +338,8 @@ struct Bits {
 }
 
 impl Bits {
+    // Every field goes through here; a call per field costs more than the read.
+    #[inline(always)]
     fn read(&mut self, raw: &[u8], count: usize) -> Result<u32> {
         if count > 24 {
             return Err(Error::Invalid("AAC scalar bit width"));
@@ -367,6 +369,32 @@ impl Bits {
     fn remaining(self) -> usize {
         self.end - self.position
     }
+    /// A sampling frequency index, or the 24-bit frequency after the escape index 15
+    /// when `explicit`. `None` when that frequency follows.
+    #[inline]
+    fn frequency(&mut self, raw: &[u8], explicit: bool) -> Result<Option<AacFrequency>> {
+        if explicit {
+            let hz = self.read(raw, 24)?;
+            if hz == 0 {
+                return Err(Error::Invalid("zero AAC explicit frequency"));
+            }
+            return Ok(Some(AacFrequency {
+                index: 15,
+                explicit_hz: Some(hz),
+                hz,
+            }));
+        }
+        let index = self.read(raw, 4)? as u8;
+        if index == 15 {
+            return Ok(None);
+        }
+        let hz = indexed_frequency(index).ok_or(Error::Invalid("AAC reserved sampling index"))?;
+        Ok(Some(AacFrequency {
+            index,
+            explicit_hz: None,
+            hz,
+        }))
+    }
 }
 
 /// The fields before the core object type that the rest of the record depends on.
@@ -385,17 +413,22 @@ struct Head {
 }
 
 /// The next field to read, with the earlier ones it depends on.
+// This and the field enums inside it have byte tags: decoding a niche tag on every
+// round of the walk costs more than the bytes it saves.
+#[repr(u8)]
 enum Phase {
+    /// AudioSpecificConfig before GASpecificConfig.
     Config(ConfigField),
-    Ga(Head, GaField),
-    PceIdentity(Head),
+    /// GASpecificConfig and the sync extensions after it, with the program config
+    /// element once it is read.
+    Body(Head, BodyField, Option<AacProgramConfig>),
+    /// The program config element of channel configuration 0 after its identity.
     Pce(Head, PceBuild, PceField),
-    Sync(Head, SyncField),
-    Publish(Head),
 }
 
 /// AudioSpecificConfig before GASpecificConfig (ISO/IEC 14496-3, 1.6.2.1).
 #[derive(Clone, Copy)]
+#[repr(u8)]
 enum ConfigField {
     /// `audioObjectType`.
     Object,
@@ -416,13 +449,21 @@ enum ConfigField {
     CoreObject(Opening),
 }
 
-/// GASpecificConfig (ISO/IEC 14496-3, 4.4.1).
+/// GASpecificConfig (ISO/IEC 14496-3, 4.4.1) and the sync extensions after it.
 #[derive(Clone, Copy)]
-enum GaField {
+#[repr(u8)]
+enum BodyField {
     /// `frameLengthFlag` through `extensionFlag`.
-    Leading,
+    Ga,
+    /// The identity fields that open the program config element of channel
+    /// configuration 0.
+    PceIdentity,
     /// `extensionFlag3`, after any program config element.
-    Extension,
+    GaExtension,
+    /// The sync extensions after the GASpecificConfig of a first object type of 2.
+    Sync(SyncField),
+    /// Every field is read.
+    Publish,
 }
 
 /// `program_config_element()` (ISO/IEC 14496-3, 4.4.1.1) after its identity.
@@ -437,6 +478,7 @@ enum PceField {
 
 /// The sync extensions after the GASpecificConfig of a first object type of 2.
 #[derive(Clone, Copy)]
+#[repr(u8)]
 enum SyncField {
     /// `syncExtensionType` `0x2b7`.
     Sbr,
@@ -464,17 +506,18 @@ struct PceBuild {
 struct Walk {
     raw: Bytes,
     phase: Phase,
+    fields: Fields,
+}
+
+/// The fields read so far that the output takes as they are.
+struct Fields {
     extension: Option<AacFrequency>,
     sbr: AacExtensionSignal,
     ps: AacExtensionSignal,
     ga: AacGaSpecific,
-    program: Option<AacProgramConfig>,
 }
 
-#[expect(
-    clippy::large_enum_variant,
-    reason = "one read per parser; boxing it would allocate outside the pool"
-)]
+/// Where a parse stands. The walk is held only while the record is read.
 enum State {
     Reading(Walk),
     Complete,
@@ -522,7 +565,7 @@ impl AacAscParser {
                 ..
             }) => build.elements.capacity(),
             State::Reading(Walk {
-                program: Some(program),
+                phase: Phase::Body(_, _, Some(program)),
                 ..
             }) => program.elements.capacity(),
             State::Reading(_) | State::Complete | State::Failed(_) => 0,
@@ -575,16 +618,17 @@ impl AacAscParser {
             state: State::Reading(Walk {
                 raw,
                 phase: Phase::Config(ConfigField::Object),
-                extension: None,
-                sbr: AacExtensionSignal::Unsignalled,
-                ps: AacExtensionSignal::Unsignalled,
-                ga: AacGaSpecific {
-                    frame_length_flag: false,
-                    core_coder_delay: None,
-                    extension_flag: false,
-                    extension_flag3: None,
+                fields: Fields {
+                    extension: None,
+                    sbr: AacExtensionSignal::Unsignalled,
+                    ps: AacExtensionSignal::Unsignalled,
+                    ga: AacGaSpecific {
+                        frame_length_flag: false,
+                        core_coder_delay: None,
+                        extension_flag: false,
+                        extension_flag3: None,
+                    },
                 },
-                program: None,
             }),
         })
     }
@@ -608,100 +652,133 @@ impl AacAscParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<AacAudioSpecificConfig>> {
-        let mut walk = match std::mem::replace(&mut self.state, State::Complete) {
+        let walk = match &mut self.state {
             State::Reading(walk) => walk,
             State::Complete => return Ok(BuildStep::Complete),
-            State::Failed(error) => {
-                self.state = State::Failed(error);
-                return Err(error);
-            }
+            State::Failed(error) => return Err(*error),
         };
-        let result = match self.read(&mut walk, work, cancel) {
-            Ok(Some(head)) => self.publish(walk, head).map(BuildStep::Ready),
-            Ok(None) => {
-                self.state = State::Reading(walk);
-                Ok(BuildStep::Yield)
-            }
-            Err(error) => {
-                if retryable(error) {
-                    self.state = State::Reading(walk);
-                }
-                Err(error)
-            }
-        };
-        if let Err(error) = result
-            && !retryable(error)
-        {
-            self.state = State::Failed(error);
+        let result = walk.read(
+            &mut self.bits,
+            &self.pool,
+            &self.limits,
+            self.source,
+            work,
+            cancel,
+        );
+        match result {
+            Ok(BuildStep::Ready(_)) => self.state = State::Complete,
+            Ok(BuildStep::Yield | BuildStep::Complete) => {}
+            Err(error) if !retryable(error) => self.state = State::Failed(error),
+            Err(_) => {}
         }
         result
     }
+}
 
+impl Walk {
     /// Reads one group of fields per unit of `work` until the record is read, then
-    /// returns its opening fields.
+    /// publishes the configuration.
     fn read(
         &mut self,
-        walk: &mut Walk,
+        bits: &mut Bits,
+        pool: &Budget,
+        limits: &AacConfigLimits,
+        source: AacSource,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<Head>> {
+    ) -> Result<BuildStep<AacAudioSpecificConfig>> {
+        let raw = self.raw.as_ref();
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             if !work.try_charge(1) {
-                return Ok(None);
+                return Ok(BuildStep::Yield);
             }
-            walk.phase = match &mut walk.phase {
-                &mut Phase::Config(field) => self.audio_specific_config(walk, field)?,
-                &mut Phase::Ga(head, field) => self.ga_specific_config(walk, head, field)?,
-                &mut Phase::PceIdentity(head) => {
-                    Phase::Pce(head, self.pce_identity(&walk.raw)?, PceField::Counts)
+            match &mut self.phase {
+                Phase::Config(field) => {
+                    if let Some(head) = self.fields.audio_specific_config(bits, raw, field)? {
+                        self.phase = Phase::Body(head, BodyField::Ga, None);
+                    }
                 }
+                Phase::Body(head, field, program) => match field {
+                    BodyField::Ga => {
+                        self.fields.ga_specific_config(bits, raw)?;
+                        if head.opening.channel == 0 {
+                            *field = BodyField::PceIdentity;
+                        } else {
+                            *field = BodyField::GaExtension;
+                        }
+                    }
+                    BodyField::PceIdentity => {
+                        let build = PceBuild::identity(bits, raw, pool)?;
+                        self.phase = Phase::Pce(*head, build, PceField::Counts);
+                    }
+                    BodyField::GaExtension => {
+                        self.fields.ga_extension(bits, raw)?;
+                        if head.opening.outer.code == 2 {
+                            *field = BodyField::Sync(SyncField::Sbr);
+                        } else {
+                            *field = BodyField::Publish;
+                        }
+                    }
+                    BodyField::Sync(sync) => match self.fields.sync_extension(bits, raw, *sync)? {
+                        Some(next) => *sync = next,
+                        None => *field = BodyField::Publish,
+                    },
+                    BodyField::Publish => {
+                        return self
+                            .fields
+                            .publish(&self.raw, head, program.take(), source, *bits);
+                    }
+                },
                 Phase::Pce(head, build, field) => {
-                    let head = *head;
-                    let Some(program) = self.program_config_element(&walk.raw, build, field)?
-                    else {
-                        continue;
-                    };
-                    walk.program = Some(program);
-                    Phase::Ga(head, GaField::Extension)
+                    if let Some(program) = build.read(field, bits, &self.raw, pool, limits)? {
+                        self.phase = Phase::Body(*head, BodyField::GaExtension, Some(program));
+                    }
                 }
-                &mut Phase::Sync(head, field) => self.sync_extension(walk, head, field)?,
-                &mut Phase::Publish(head) => return Ok(Some(head)),
-            };
+            }
         }
     }
+}
 
-    /// One field of AudioSpecificConfig before GASpecificConfig.
-    fn audio_specific_config(&mut self, walk: &mut Walk, field: ConfigField) -> Result<Phase> {
-        let raw = walk.raw.as_ref();
-        Ok(match field {
+impl Fields {
+    /// One field of AudioSpecificConfig before GASpecificConfig; the fields
+    /// GASpecificConfig depends on once the last of them is read.
+    fn audio_specific_config(
+        &mut self,
+        bits: &mut Bits,
+        raw: &[u8],
+        field: &mut ConfigField,
+    ) -> Result<Option<Head>> {
+        match *field {
             ConfigField::Object => {
-                let outer = self.bits.object_type(raw)?;
+                let outer = bits.object_type(raw)?;
                 if !matches!(outer.code, 2 | 5 | 29) {
                     return Err(Error::Unsupported("AAC outer audio object type"));
                 }
                 if outer.code != 2 {
-                    walk.sbr = AacExtensionSignal::Explicit(true);
+                    self.sbr = AacExtensionSignal::Explicit(true);
                     if outer.code == 29 {
-                        walk.ps = AacExtensionSignal::Explicit(true);
+                        self.ps = AacExtensionSignal::Explicit(true);
                     }
                 }
-                Phase::Config(ConfigField::Frequency {
+                *field = ConfigField::Frequency {
                     outer,
                     explicit: false,
-                })
+                };
             }
-            ConfigField::Frequency { outer, explicit } => match self.frequency(raw, explicit)? {
-                Some(frequency) => Phase::Config(ConfigField::Channel { outer, frequency }),
-                None => Phase::Config(ConfigField::Frequency {
-                    outer,
-                    explicit: true,
-                }),
-            },
+            ConfigField::Frequency { outer, explicit } => {
+                *field = match bits.frequency(raw, explicit)? {
+                    Some(frequency) => ConfigField::Channel { outer, frequency },
+                    None => ConfigField::Frequency {
+                        outer,
+                        explicit: true,
+                    },
+                };
+            }
             ConfigField::Channel { outer, frequency } => {
-                let channel = self.bits.read(raw, 4)? as u8;
+                let channel = bits.read(raw, 4)? as u8;
                 if channel != 0 && fixed_channel_count(channel).is_none() {
                     return Err(Error::Unsupported("AAC channel configuration"));
                 }
@@ -711,109 +788,163 @@ impl AacAscParser {
                     channel,
                 };
                 if outer.code == 2 {
-                    let head = Head {
+                    return Ok(Some(Head {
                         opening,
                         core: outer,
-                    };
-                    Phase::Ga(head, GaField::Leading)
-                } else {
-                    Phase::Config(ConfigField::ExtensionFrequency {
-                        opening,
-                        explicit: false,
-                    })
+                    }));
                 }
+                *field = ConfigField::ExtensionFrequency {
+                    opening,
+                    explicit: false,
+                };
             }
             ConfigField::ExtensionFrequency { opening, explicit } => {
-                match self.frequency(raw, explicit)? {
+                *field = match bits.frequency(raw, explicit)? {
                     Some(frequency) => {
-                        walk.extension = Some(frequency);
-                        Phase::Config(ConfigField::CoreObject(opening))
+                        self.extension = Some(frequency);
+                        ConfigField::CoreObject(opening)
                     }
-                    None => Phase::Config(ConfigField::ExtensionFrequency {
+                    None => ConfigField::ExtensionFrequency {
                         opening,
                         explicit: true,
-                    }),
-                }
+                    },
+                };
             }
             ConfigField::CoreObject(opening) => {
-                let core = self.bits.object_type(raw)?;
+                let core = bits.object_type(raw)?;
                 if core.code != 2 {
                     return Err(Error::Unsupported("AAC extension core audio object type"));
                 }
-                Phase::Ga(Head { opening, core }, GaField::Leading)
+                return Ok(Some(Head { opening, core }));
             }
-        })
+        }
+        Ok(None)
     }
 
-    /// A sampling frequency index, or the 24-bit frequency after the escape index 15
-    /// when `explicit`. `None` when that frequency follows.
-    fn frequency(&mut self, raw: &[u8], explicit: bool) -> Result<Option<AacFrequency>> {
-        if explicit {
-            let hz = self.bits.read(raw, 24)?;
-            if hz == 0 {
-                return Err(Error::Invalid("zero AAC explicit frequency"));
-            }
-            return Ok(Some(AacFrequency {
-                index: 15,
-                explicit_hz: Some(hz),
-                hz,
-            }));
-        }
-        let index = self.bits.read(raw, 4)? as u8;
-        if index == 15 {
-            return Ok(None);
-        }
-        let hz = indexed_frequency(index).ok_or(Error::Invalid("AAC reserved sampling index"))?;
-        Ok(Some(AacFrequency {
-            index,
-            explicit_hz: None,
-            hz,
-        }))
+    /// GASpecificConfig from `frameLengthFlag` through `extensionFlag`.
+    fn ga_specific_config(&mut self, bits: &mut Bits, raw: &[u8]) -> Result<()> {
+        self.ga.frame_length_flag = bits.read(raw, 1)? != 0;
+        let depends = bits.read(raw, 1)? != 0;
+        self.ga.core_coder_delay = if depends {
+            Some(bits.read(raw, 14)? as u16)
+        } else {
+            None
+        };
+        self.ga.extension_flag = bits.read(raw, 1)? != 0;
+        Ok(())
     }
 
-    /// The fields of GASpecificConfig around its program config element.
-    fn ga_specific_config(&mut self, walk: &mut Walk, head: Head, field: GaField) -> Result<Phase> {
-        let raw = walk.raw.as_ref();
+    /// `extensionFlag3` when `extensionFlag` is set.
+    fn ga_extension(&mut self, bits: &mut Bits, raw: &[u8]) -> Result<()> {
+        if self.ga.extension_flag {
+            let flag = bits.read(raw, 1)? != 0;
+            self.ga.extension_flag3 = Some(flag);
+            if flag {
+                return Err(Error::Unsupported("AAC GASpecific version3 extension"));
+            }
+        }
+        Ok(())
+    }
+
+    /// One field of the SBR and PS sync extensions: the next one, or `None` when the
+    /// record has none, or no more.
+    fn sync_extension(
+        &mut self,
+        bits: &mut Bits,
+        raw: &[u8],
+        field: SyncField,
+    ) -> Result<Option<SyncField>> {
         Ok(match field {
-            GaField::Leading => {
-                walk.ga.frame_length_flag = self.bits.read(raw, 1)? != 0;
-                let depends = self.bits.read(raw, 1)? != 0;
-                walk.ga.core_coder_delay = if depends {
-                    Some(self.bits.read(raw, 14)? as u16)
+            SyncField::Sbr => {
+                let mut probe = *bits;
+                if probe.remaining() >= 11 && probe.read(raw, 11)? == 0x2b7 {
+                    *bits = probe;
+                    Some(SyncField::SbrObject)
                 } else {
                     None
-                };
-                walk.ga.extension_flag = self.bits.read(raw, 1)? != 0;
-                if head.opening.channel == 0 {
-                    Phase::PceIdentity(head)
-                } else {
-                    Phase::Ga(head, GaField::Extension)
                 }
             }
-            GaField::Extension => {
-                if walk.ga.extension_flag {
-                    let flag = self.bits.read(raw, 1)? != 0;
-                    walk.ga.extension_flag3 = Some(flag);
-                    if flag {
-                        return Err(Error::Unsupported("AAC GASpecific version3 extension"));
-                    }
+            SyncField::SbrObject => {
+                if bits.object_type(raw)?.code != 5 {
+                    return Err(Error::Unsupported("AAC sync extension object type"));
                 }
-                if head.opening.outer.code == 2 {
-                    Phase::Sync(head, SyncField::Sbr)
+                Some(SyncField::SbrPresent)
+            }
+            SyncField::SbrPresent => {
+                let present = bits.read(raw, 1)? != 0;
+                self.sbr = AacExtensionSignal::Sync(present);
+                present.then_some(SyncField::Frequency { explicit: false })
+            }
+            SyncField::Frequency { explicit } => match bits.frequency(raw, explicit)? {
+                Some(frequency) => {
+                    self.extension = Some(frequency);
+                    Some(SyncField::Ps)
+                }
+                None => Some(SyncField::Frequency { explicit: true }),
+            },
+            SyncField::Ps => {
+                let mut probe = *bits;
+                if probe.remaining() >= 11 && probe.read(raw, 11)? == 0x548 {
+                    *bits = probe;
+                    Some(SyncField::PsPresent)
                 } else {
-                    Phase::Publish(head)
+                    None
                 }
+            }
+            SyncField::PsPresent => {
+                self.ps = AacExtensionSignal::Sync(bits.read(raw, 1)? != 0);
+                None
             }
         })
     }
+    /// The configuration of a walk that read the whole record, sharing its bytes, as
+    /// the step that returns it.
+    fn publish(
+        &self,
+        raw: &Bytes,
+        head: &Head,
+        program: Option<AacProgramConfig>,
+        source: AacSource,
+        bits: Bits,
+    ) -> Result<BuildStep<AacAudioSpecificConfig>> {
+        let channel = head.opening.channel;
+        let core_channels = match &program {
+            Some(program) => program.facts.channel_count,
+            None => u16::from(
+                fixed_channel_count(channel)
+                    .ok_or(Error::Unsupported("AAC channel configuration"))?,
+            ),
+        };
+        let facts = AacAscFacts {
+            outer_object_type: head.opening.outer,
+            core_object_type: head.core,
+            core_frequency: head.opening.frequency,
+            channel_configuration: channel,
+            extension_frequency: self.extension,
+            sbr: self.sbr,
+            ps: self.ps,
+            ga: self.ga,
+            core_channels,
+            understood_end_bit: bits.position,
+            source_bit_length: bits.end,
+        };
+        Ok(BuildStep::Ready(AacAudioSpecificConfig {
+            raw: raw.clone(),
+            source,
+            facts,
+            pce: program,
+        }))
+    }
+}
 
+impl PceBuild {
     /// The identity fields that open a program config element.
-    fn pce_identity(&mut self, raw: &Bytes) -> Result<PceBuild> {
-        let start = self.bits.position;
-        let tag = self.bits.read(raw.as_ref(), 4)? as u8;
-        let profile = self.bits.read(raw.as_ref(), 2)? as u8;
-        let frequency = self.bits.read(raw.as_ref(), 4)? as u8;
-        Ok(PceBuild {
+    fn identity(bits: &mut Bits, raw: &[u8], pool: &Budget) -> Result<Self> {
+        let start = bits.position;
+        let tag = bits.read(raw, 4)? as u8;
+        let profile = bits.read(raw, 2)? as u8;
+        let frequency = bits.read(raw, 4)? as u8;
+        Ok(Self {
             facts: AacPceFacts {
                 element_instance_tag: tag,
                 profile_code: profile,
@@ -830,27 +961,29 @@ impl AacAscParser {
                     bit_count: 0,
                 },
             },
-            elements: BudgetVec::new(&self.pool),
+            elements: BudgetVec::new(pool),
             group: 0,
             in_group: 0,
         })
     }
 
-    /// One group of fields of a program config element after its identity, one list
-    /// entry per unit; the element once its comment is read.
-    fn program_config_element(
+    /// One group of fields after the identity, one list entry per unit; the element
+    /// once its comment is read.
+    fn read(
         &mut self,
-        raw: &Bytes,
-        p: &mut PceBuild,
         field: &mut PceField,
+        bits: &mut Bits,
+        raw: &Bytes,
+        pool: &Budget,
+        limits: &AacConfigLimits,
     ) -> Result<Option<AacProgramConfig>> {
         match field {
             PceField::Counts => {
-                for (count, width) in p.facts.counts.iter_mut().zip([4, 4, 4, 2, 3, 4]) {
-                    *count = self.bits.read(raw.as_ref(), width)? as u8;
+                for (count, width) in self.facts.counts.iter_mut().zip([4, 4, 4, 2, 3, 4]) {
+                    *count = bits.read(raw.as_ref(), width)? as u8;
                 }
-                let total: usize = p.facts.counts.iter().map(|n| usize::from(*n)).sum();
-                check_limit(total, self.limits.maximum_pce_elements)?;
+                let total: usize = self.facts.counts.iter().map(|n| usize::from(*n)).sum();
+                check_limit(total, limits.maximum_pce_elements)?;
                 let bytes = total
                     .checked_mul(size_of::<AacPceElement>())
                     .ok_or(Error::Overflow)?;
@@ -858,24 +991,24 @@ impl AacAscParser {
                     .checked_add(raw.retained_storage_bytes())
                     .and_then(|n| n.checked_add(bytes))
                     .ok_or(Error::Overflow)?;
-                check_limit(minimum, self.pool.limit())?;
+                check_limit(minimum, pool.limit())?;
                 *field = PceField::Mixdown;
             }
             PceField::Mixdown => {
-                p.facts.mono_mixdown = if self.bits.read(raw.as_ref(), 1)? != 0 {
-                    Some(self.bits.read(raw.as_ref(), 4)? as u8)
+                self.facts.mono_mixdown = if bits.read(raw.as_ref(), 1)? != 0 {
+                    Some(bits.read(raw.as_ref(), 4)? as u8)
                 } else {
                     None
                 };
-                p.facts.stereo_mixdown = if self.bits.read(raw.as_ref(), 1)? != 0 {
-                    Some(self.bits.read(raw.as_ref(), 4)? as u8)
+                self.facts.stereo_mixdown = if bits.read(raw.as_ref(), 1)? != 0 {
+                    Some(bits.read(raw.as_ref(), 4)? as u8)
                 } else {
                     None
                 };
-                p.facts.matrix_mixdown = if self.bits.read(raw.as_ref(), 1)? != 0 {
+                self.facts.matrix_mixdown = if bits.read(raw.as_ref(), 1)? != 0 {
                     Some((
-                        self.bits.read(raw.as_ref(), 2)? as u8,
-                        self.bits.read(raw.as_ref(), 1)? != 0,
+                        bits.read(raw.as_ref(), 2)? as u8,
+                        bits.read(raw.as_ref(), 1)? != 0,
                     ))
                 } else {
                     None
@@ -883,28 +1016,28 @@ impl AacAscParser {
                 *field = PceField::Reserve;
             }
             PceField::Reserve => {
-                let count = p.facts.counts.iter().map(|n| usize::from(*n)).sum();
-                p.elements.try_reserve_exact(count)?;
+                let count = self.facts.counts.iter().map(|n| usize::from(*n)).sum();
+                self.elements.try_reserve_exact(count)?;
                 *field = PceField::Elements;
             }
             PceField::Elements => {
                 // At most six zero-count groups are skipped. No unbounded scan, source
                 // read or allocation hides behind this unit.
-                while p.group < 6 && p.in_group == p.facts.counts[p.group] {
-                    p.group += 1;
-                    p.in_group = 0;
+                while self.group < 6 && self.in_group == self.facts.counts[self.group] {
+                    self.group += 1;
+                    self.in_group = 0;
                 }
-                if p.group == 6 {
+                if self.group == 6 {
                     *field = PceField::Comment;
                     return Ok(None);
                 }
-                let start = self.bits.position;
-                let flag = if p.group < 3 || p.group == 5 {
-                    Some(self.bits.read(raw.as_ref(), 1)? != 0)
+                let start = bits.position;
+                let flag = if self.group < 3 || self.group == 5 {
+                    Some(bits.read(raw.as_ref(), 1)? != 0)
                 } else {
                     None
                 };
-                let tag = self.bits.read(raw.as_ref(), 4)? as u8;
+                let tag = bits.read(raw.as_ref(), 4)? as u8;
                 let kind = [
                     AacPceElementKind::Front,
                     AacPceElementKind::Side,
@@ -912,139 +1045,55 @@ impl AacAscParser {
                     AacPceElementKind::Lfe,
                     AacPceElementKind::AssociatedData,
                     AacPceElementKind::Coupling,
-                ][p.group];
-                p.elements
+                ][self.group];
+                self.elements
                     .try_push(AacPceElement {
                         kind,
                         tag_select: tag,
-                        channel_pair: if p.group < 3 { flag } else { None },
-                        independent_switch: if p.group == 5 { flag } else { None },
+                        channel_pair: if self.group < 3 { flag } else { None },
+                        independent_switch: if self.group == 5 { flag } else { None },
                         source_bits: AacBitRange {
                             start_bit: start,
-                            bit_count: self.bits.position - start,
+                            bit_count: bits.position - start,
                         },
                     })
                     .map_err(|e| e.error)?;
-                let channels = if p.group < 3 {
+                let channels = if self.group < 3 {
                     if flag == Some(true) { 2 } else { 1 }
                 } else {
-                    u16::from(p.group == 3)
+                    u16::from(self.group == 3)
                 };
-                p.facts.channel_count = p
+                self.facts.channel_count = self
                     .facts
                     .channel_count
                     .checked_add(channels)
                     .ok_or(Error::Overflow)?;
-                p.in_group += 1;
+                self.in_group += 1;
             }
             PceField::Comment => {
-                let alignment = (8 - self.bits.position % 8) % 8;
-                p.facts.alignment_value = self.bits.read(raw.as_ref(), alignment)? as u8;
-                p.facts.alignment_bits = alignment as u8;
-                let count = self.bits.read(raw.as_ref(), 8)? as usize;
-                check_limit(count, self.limits.maximum_comment_bytes)?;
-                let end = self
-                    .bits
+                let alignment = (8 - bits.position % 8) % 8;
+                self.facts.alignment_value = bits.read(raw.as_ref(), alignment)? as u8;
+                self.facts.alignment_bits = alignment as u8;
+                let count = bits.read(raw.as_ref(), 8)? as usize;
+                check_limit(count, limits.maximum_comment_bytes)?;
+                let end = bits
                     .position
                     .checked_add(count.checked_mul(8).ok_or(Error::Overflow)?)
                     .ok_or(Error::Overflow)?;
-                if end > self.bits.end {
+                if end > bits.end {
                     return Err(Error::Truncated);
                 }
-                let comment = raw.slice(self.bits.position / 8..end / 8)?;
-                self.bits.position = end;
-                p.facts.source_bits.bit_count = end - p.facts.source_bits.start_bit;
+                let comment = raw.slice(bits.position / 8..end / 8)?;
+                bits.position = end;
+                self.facts.source_bits.bit_count = end - self.facts.source_bits.start_bit;
                 return Ok(Some(AacProgramConfig {
-                    facts: p.facts,
-                    elements: std::mem::replace(&mut p.elements, BudgetVec::new(&self.pool)),
+                    facts: self.facts,
+                    elements: std::mem::replace(&mut self.elements, BudgetVec::new(pool)),
                     comment,
                 }));
             }
         }
         Ok(None)
-    }
-
-    /// One field of the SBR and PS sync extensions; publication when the record has
-    /// none, or no more.
-    fn sync_extension(&mut self, walk: &mut Walk, head: Head, field: SyncField) -> Result<Phase> {
-        let raw = walk.raw.as_ref();
-        let next = match field {
-            SyncField::Sbr => {
-                let mut probe = self.bits;
-                if probe.remaining() >= 11 && probe.read(raw, 11)? == 0x2b7 {
-                    self.bits = probe;
-                    SyncField::SbrObject
-                } else {
-                    return Ok(Phase::Publish(head));
-                }
-            }
-            SyncField::SbrObject => {
-                if self.bits.object_type(raw)?.code != 5 {
-                    return Err(Error::Unsupported("AAC sync extension object type"));
-                }
-                SyncField::SbrPresent
-            }
-            SyncField::SbrPresent => {
-                let present = self.bits.read(raw, 1)? != 0;
-                walk.sbr = AacExtensionSignal::Sync(present);
-                if !present {
-                    return Ok(Phase::Publish(head));
-                }
-                SyncField::Frequency { explicit: false }
-            }
-            SyncField::Frequency { explicit } => match self.frequency(raw, explicit)? {
-                Some(frequency) => {
-                    walk.extension = Some(frequency);
-                    SyncField::Ps
-                }
-                None => SyncField::Frequency { explicit: true },
-            },
-            SyncField::Ps => {
-                let mut probe = self.bits;
-                if probe.remaining() >= 11 && probe.read(raw, 11)? == 0x548 {
-                    self.bits = probe;
-                    SyncField::PsPresent
-                } else {
-                    return Ok(Phase::Publish(head));
-                }
-            }
-            SyncField::PsPresent => {
-                walk.ps = AacExtensionSignal::Sync(self.bits.read(raw, 1)? != 0);
-                return Ok(Phase::Publish(head));
-            }
-        };
-        Ok(Phase::Sync(head, next))
-    }
-
-    /// The configuration of a walk that read the whole record.
-    fn publish(&self, walk: Walk, head: Head) -> Result<AacAudioSpecificConfig> {
-        let channel = head.opening.channel;
-        let core_channels = match &walk.program {
-            Some(program) => program.facts.channel_count,
-            None => u16::from(
-                fixed_channel_count(channel)
-                    .ok_or(Error::Unsupported("AAC channel configuration"))?,
-            ),
-        };
-        let facts = AacAscFacts {
-            outer_object_type: head.opening.outer,
-            core_object_type: head.core,
-            core_frequency: head.opening.frequency,
-            channel_configuration: channel,
-            extension_frequency: walk.extension,
-            sbr: walk.sbr,
-            ps: walk.ps,
-            ga: walk.ga,
-            core_channels,
-            understood_end_bit: self.bits.position,
-            source_bit_length: self.bits.end,
-        };
-        Ok(AacAudioSpecificConfig {
-            raw: walk.raw,
-            source: self.source,
-            facts,
-            pce: walk.program,
-        })
     }
 }
 
