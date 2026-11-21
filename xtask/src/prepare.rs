@@ -186,7 +186,7 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
                 "--enable-decoder=pcm_s16le" => {
                     "--enable-decoder=pcm_s16le,pgssub,dvdsub,dvbsub,ass,srt,subrip,text,movtext,webvtt"
                 }
-                "--enable-parser=h264,hevc,aac,ac3,vorbis" => "--enable-parser=h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub",
+                "--enable-parser=h264,hevc,aac,ac3,vorbis" => "--enable-parser=h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub,mpegaudio",
                 other => other,
             }
             .to_owned();
@@ -596,28 +596,32 @@ pub fn unpack_release(
     let source = cache.join(release.directory);
     if !source.exists() {
         run(Command::new("tar")
-            .arg("-xJf")
+            .arg("-xf")
             .arg(&archive_path)
             .arg("-C")
             .arg(cache))?;
     }
-    verify_xz_tree(&archive_path, cache)?;
+    verify_release_tree(&archive_path, cache)?;
     Ok(source)
 }
 
-/// Every regular file of an xz-compressed release archive must still match the tree
-/// unpacked under `cache`. xtask does not decode xz itself, so the concatenated
+/// Every regular file of a release archive must still match the tree
+/// unpacked under `cache`. For compressed releases, the concatenated
 /// contents of the files, in archive order as `tar` streams them, are compared
 /// with the same files on disk.
 pub fn verify_xz_tree(archive_path: &Path, cache: &Path) -> Result<(), String> {
-    let listing = output(Command::new("tar").arg("-tvJf").arg(archive_path))?;
+    verify_release_tree(archive_path, cache)
+}
+
+pub fn verify_release_tree(archive_path: &Path, cache: &Path) -> Result<(), String> {
+    let listing = output(Command::new("tar").arg("-tvf").arg(archive_path))?;
     let streamed = Command::new("tar")
-        .arg("-xJOf")
+        .arg("-xOf")
         .arg(archive_path)
         .output()
         .map_err(|e| format!("tar: {e}"))?;
     if !streamed.status.success() {
-        return Err(format!("tar -xJOf: {}", streamed.status));
+        return Err(format!("tar -xOf: {}", streamed.status));
     }
     let mut unpacked = Vec::with_capacity(streamed.stdout.len());
     for line in listing.lines().filter(|line| line.starts_with('-')) {

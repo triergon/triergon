@@ -36,7 +36,7 @@ resource limit becomes an explicit, reviewed rule for that case.
   refused. With `TRIERGON_DOWNLOAD_CACHE` set, verified downloads are also kept in that
   directory under their hash and reused before any network access. CI keeps this
   cache between runs.
-- **Reference builds.** Each prepare command (`prepare-ffmpeg`, `fonts prepare`,
+- **Reference builds.** Each prepare command (`prepare-ffmpeg`, `prepare-mpg123`, `fonts prepare`,
   `shape prepare`, `raster prepare`, `ass prepare`) keys its build by the SHA-256 of
   what the build depends on besides its own directory: the xtask code that defines it
   (with its pinned source hashes, configure flags and link steps) and the worker link

@@ -15,8 +15,12 @@ mod eac3;
 mod entities;
 #[path = "container_reader/latm.rs"]
 mod latm;
+#[path = "container_reader/mpeg_audio.rs"]
+mod mpeg_audio;
 #[path = "container_reader/opaque_video.rs"]
 mod opaque_video;
+#[path = "container_reader/seek.rs"]
+mod seek;
 #[path = "container_reader/unframed_audio.rs"]
 mod unframed_audio;
 

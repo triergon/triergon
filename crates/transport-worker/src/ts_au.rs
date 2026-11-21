@@ -12,7 +12,7 @@ use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputWindow, Rounding, SourceCapabilities, SourceId,
     SourceLocation, Step, TimeBase, WorkBudget,
 };
-use triergon_framing::Ac3Family;
+use triergon_framing::{Ac3Family, MpegLayer};
 use triergon_harness_protocol::digest::signed;
 use triergon_mpegts::compat::adts::{PacketPolicy, PesPolicy};
 use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, ContinuityResidue};
@@ -43,6 +43,7 @@ struct TrackProjection {
     id: TrackId,
     pending_ac3: Option<Packet>,
     ac3_duration_known: bool,
+    mpeg_audio_seen: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -182,11 +183,18 @@ fn refused(mut totals: Totals, error: &dyn std::fmt::Display, at: SourceLocation
     totals
 }
 
+#[derive(Clone, Copy)]
+enum PositionSource {
+    AlignedPayload,
+    FirstPes,
+    ClockAnchor,
+}
+
 enum Payload<'a> {
     Framed {
         sources: &'a [PayloadSource],
         bytes: &'a [u8],
-        pes_position: bool,
+        position: PositionSource,
     },
     PreservedPes(&'a latm::PesPacket),
 }
@@ -201,14 +209,21 @@ struct PacketProjection<'a> {
 
 impl<'a> From<&'a Packet> for PacketProjection<'a> {
     fn from(packet: &'a Packet) -> Self {
-        let flags = match packet.access_unit() {
-            AccessUnit::Video(unit) => u64::from(unit.random_access),
-            AccessUnit::Loas(_) => 0,
+        let (flags, position) = match packet.access_unit() {
+            AccessUnit::Video(unit) => (
+                u64::from(unit.random_access),
+                PositionSource::AlignedPayload,
+            ),
+            AccessUnit::Loas(_) => (0, PositionSource::AlignedPayload),
+            // DVB subtitle bytes start after the two-byte PES wrapper.
+            AccessUnit::DvbSubtitle(_) => (1, PositionSource::FirstPes),
+            // A PES beginning inside an MPEG audio frame stamps the next
+            // frame, including that PES's carrier position.
+            AccessUnit::MpegAudio(_) => (1, PositionSource::ClockAnchor),
             AccessUnit::Adts(_)
             | AccessUnit::AdtsFragment(_)
             | AccessUnit::Ac3(_)
-            | AccessUnit::DvbSubtitle(_)
-            | AccessUnit::IncompleteAudio { .. } => 1,
+            | AccessUnit::IncompleteAudio { .. } => (1, PositionSource::AlignedPayload),
         };
         Self {
             pid: packet.track_info().stream().pid,
@@ -217,8 +232,7 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
             payload: Payload::Framed {
                 sources: packet.sources(),
                 bytes: packet.payload(),
-                // DVB subtitle bytes start after the two-byte PES wrapper.
-                pes_position: matches!(packet.access_unit(), AccessUnit::DvbSubtitle(_)),
+                position,
             },
             flags,
         }
@@ -234,7 +248,7 @@ impl<'a> From<&'a IncompleteVideo> for PacketProjection<'a> {
             payload: Payload::Framed {
                 sources: video.sources(),
                 bytes: video.bytes().as_ref(),
-                pes_position: false,
+                position: PositionSource::AlignedPayload,
             },
             flags: 0,
         }
@@ -263,7 +277,7 @@ impl<'a> From<&'a UnframedAudio> for PacketProjection<'a> {
             payload: Payload::Framed {
                 sources: audio.sources(),
                 bytes: audio.bytes().as_ref(),
-                pes_position: false,
+                position: PositionSource::AlignedPayload,
             },
             flags: 1,
         }
@@ -302,11 +316,11 @@ fn fold_packet(
     let ticks = |value: Option<i128>| -> Result<i64> {
         Ok(value.map(i64::try_from).transpose()?.unwrap_or(i64::MIN))
     };
-    let (pes, at_start, bytes) = match packet.payload {
+    let (pes, position_pes, bytes) = match packet.payload {
         Payload::Framed {
             sources,
             bytes,
-            pes_position,
+            position: source,
         } => {
             let first = sources.first().ok_or("packet has no source PES")?;
             let pes = first
@@ -314,18 +328,21 @@ fn fold_packet(
                 .event()
                 .pes_source()
                 .ok_or("packet payload has no PES")?;
-            (
-                pes,
-                first.payload_range.start == 0 || pes_position,
-                bytes.len(),
-            )
+            let position_pes = match source {
+                PositionSource::AlignedPayload => (first.payload_range.start == 0).then_some(pes),
+                PositionSource::FirstPes => Some(pes),
+                PositionSource::ClockAnchor => packet
+                    .clock
+                    .and_then(|clock| clock.pes.event().pes_source()),
+            };
+            (pes, position_pes, bytes.len())
         }
         Payload::PreservedPes(packet) => {
             let pes = packet.pes();
-            (pes, true, pes.payload_len)
+            (pes, Some(pes), pes.payload_len)
         }
     };
-    let position = if at_start {
+    let position = if let Some(pes) = position_pes {
         let range = pes
             .header_source_ranges
             .as_slice()
@@ -485,7 +502,24 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     let duration = ac3_duration(&previous, track.ac3_duration_known)?;
                     (previous, duration)
                 } else {
-                    (packet, 0)
+                    let duration = match packet.access_unit() {
+                        AccessUnit::MpegAudio(frame) => {
+                            let first = !std::mem::replace(&mut track.mpeg_audio_seen, true);
+                            // The reference reports no initial Layer I/II duration
+                            // before it has a parsed sample rate for this track.
+                            if first && frame.header().layer != MpegLayer::III {
+                                0
+                            } else {
+                                // The parser's duration is truncated to whole
+                                // 90 kHz ticks. The source packet keeps its exact span.
+                                let header = frame.header();
+                                i64::from(header.samples_per_frame()) * 90_000
+                                    / i64::from(header.sample_rate)
+                            }
+                        }
+                        _ => 0,
+                    };
+                    (packet, duration)
                 };
                 if let Err(error) = fold_packet(
                     &mut totals,
@@ -631,6 +665,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                                         id,
                                         pending_ac3: None,
                                         ac3_duration_known: false,
+                                        mpeg_audio_seen: false,
                                     })
                                     .map_err(|error| error.error)?;
                             }

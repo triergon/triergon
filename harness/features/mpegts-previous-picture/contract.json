@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "mpegts-previous-picture",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "mpegts-previous-picture",
+  "candidate": "transport-worker",
+  "worker_operation": "ts-seek-",
+  "reference": "ffmpeg-ts-seek",
+  "contract": [
+    "Start with one preloaded, seekable TS188 or M2TS192 entity, its program and AVC or HEVC PID, the target in 90 kHz ticks and the previous-picture or playback-preroll policy.",
+    "Choose the last coded random-access picture with maximal presentation time at or before the requested time. The FFmpeg reference scans the parser-enabled demuxer with NOFILLIN, reopens it, and replays to the selected picture. It makes no stream discovery or decoder calls.",
+    "Both workers fold the requested, landing and discard times, followed by every selected video packet through EOF. Each contributes presentation time, effective decode time (presentation time if DTS is absent), random-access flag and all bytes. The source reader does not fill in an absent DTS.",
+    "Controls include a seek to the first picture, between access points, and preroll near the end of a longer stream. Both the scan and replay run within the measured operation."
+  ],
+  "required_profiles": [
+    "avc-earliest-picture",
+    "avc-between-keyframes",
+    "hevc-m2ts-preroll",
+    "avc-late-preroll"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}
