@@ -17,8 +17,8 @@ use std::path::Path;
 use triergon::{CodecId, TimeBase};
 use triergon_core::{Budget, BudgetVec, WorkBudget};
 use triergon_subtitles::compat::dvd::{
-    Decoder, Limits, Settings, Status, SubpictureParser, SubpictureStreams, VobSubIndex,
-    mp4_configuration,
+    Decoder, IntegerConversionWidth, Limits, Settings, Status, SubpictureParser, SubpictureStreams,
+    VobSubIndex, mp4_configuration,
 };
 use triergon_subtitles::dvd::program_stream::{Pes, Unit, Units};
 
@@ -42,12 +42,18 @@ impl Options {
     /// The receiver's settings, as opening the reference decoder makes them:
     /// the configuration's palette, then the IFO file's, then the option's.
     fn settings(&self, configuration: &[u8]) -> Result<Settings> {
-        let mut settings = Settings::from_configuration(configuration)?;
+        let mut settings = Settings::from_configuration_with_integer_conversion_width(
+            configuration,
+            integer_width(),
+        )?;
         if let Some(path) = &self.ifo_palette {
             settings.apply_ifo(std::fs::read(path).ok().as_deref());
         }
         if let Some(text) = &self.palette {
-            settings.apply_palette_option(text.as_bytes());
+            settings.apply_palette_option_with_integer_conversion_width(
+                text.as_bytes(),
+                integer_width(),
+            );
         }
         settings.forced_only = self.forced_only;
         Ok(settings)
@@ -184,7 +190,11 @@ fn packet(pts: Option<i64>, data: &[u8]) -> Packet {
 /// `.sub` file, on the index's millisecond clock.
 fn read_vobsub(file: &Path, stream: usize) -> Result<Track> {
     let pool = Budget::new(1 << 30)?;
-    let index = VobSubIndex::parse(&pool, &std::fs::read(file)?)?;
+    let index = VobSubIndex::parse_with_integer_conversion_width(
+        &pool,
+        &std::fs::read(file)?,
+        integer_width(),
+    )?;
     if stream >= index.streams().len() {
         return Err("dvd: no such stream".into());
     }
@@ -269,4 +279,13 @@ fn read_program_stream(file: &Path, stream: usize) -> Result<Track> {
         time_base: TimeBase::new(1, 90_000)?,
         packets,
     })
+}
+
+/// Match the native reference profile's long width.
+fn integer_width() -> IntegerConversionWidth {
+    if cfg!(target_pointer_width = "32") {
+        IntegerConversionWidth::Bits32
+    } else {
+        IntegerConversionWidth::Bits64
+    }
 }

@@ -62,6 +62,7 @@ pub mod dvd {
     //! palette text.
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+    pub use crate::dvd::c_text::IntegerConversionWidth;
     pub use crate::dvd::demux::{
         ParsedUnit, SubpictureParser, SubpictureStreams, VobSubEntry, VobSubIndex,
         mp4_configuration,

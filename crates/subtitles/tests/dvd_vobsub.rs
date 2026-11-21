@@ -130,14 +130,19 @@ fn delays_are_read_as_32_bit_arm_reads_them() {
         (" 1193:0:0:0", 4_294_800_000),
         (" 0:35791394:0:0", 2_147_483_640_000),
         (" 0:0:0:2147483648", 2_147_483_647),
+        (" 0:0:0:4294968296", 2_147_483_647),
         (" 0:0:0:4294967296", 2_147_483_647),
         (" 0:0:0:99999999999999999999", 2_147_483_647),
         (" 0:0:0:-2147483649", -2_147_483_648),
         (" -0:0:0:2147483648", -2_147_483_647),
         (" -0:0:0:-2147483649", 2_147_483_648),
         (" 4294967296:0:0:0", 7_730_941_129_200_000),
+        (" 4294967297:0:0:0", 7_730_941_129_200_000),
         (" -2147483648:0:0:0", -7_730_941_129_200_000),
+        (" -2147483649:0:0:0", -7_730_941_129_200_000),
         (" -4294967297:0:0:0", -7_730_941_129_200_000),
+        (" 0:4294967296:0:0", 128_849_018_820_000),
+        (" 0:0:4294967296:0", 2_147_483_647_000),
     ] {
         assert_eq!(delay(value), milliseconds, "{value:?}");
     }
@@ -233,4 +238,96 @@ fn reading_from_inside_a_packet_starts_at_the_next_start_code() {
         Some([vec![1; 100], vec![2; 50]].concat())
     );
     assert_eq!(read(entry(None), &file[200..]), Some(vec![2; 50]));
+}
+
+#[test]
+fn aarch64_integer_width_matches_observed_delays_and_settings() {
+    use triergon_subtitles::compat::dvd::{IntegerConversionWidth, Settings};
+    use triergon_subtitles::dvd::vobsub::Lines;
+    let width = IntegerConversionWidth::Bits64;
+    for (value, expected) in [
+        ("0:0:0:2147483648", -2_147_483_648),
+        ("0:0:0:4294968296", 1000),
+        ("0:0:0:99999999999999999999", -1),
+        ("4294967296:0:0:0", 0),
+        ("4294967297:0:0:0", 3_600_000),
+        ("-0:0:0:2147483648", 2_147_483_648),
+        ("-2147483649:0:0:0", 7_730_941_129_200_000),
+        ("0:0:0:-2147483649", 2_147_483_647),
+        ("-0:0:0:-2147483649", -2_147_483_647),
+        ("-4294967297:0:0:0", -3_600_000),
+        ("0:4294967296:0:0", 0),
+        ("0:0:4294967296:0", 0),
+        ("0:0:0:-99999999999999999999", 0),
+    ] {
+        let text = format!("delay: {value}");
+        let (_, line) = Lines::with_integer_conversion_width(text.as_bytes(), width)
+            .next()
+            .unwrap();
+        assert_eq!(line.unwrap(), Line::Delay(expected), "{value}");
+    }
+    let delays = [
+        "0:0:0:2147483648",
+        "0:0:0:4294968296",
+        "0:0:0:99999999999999999999",
+        "4294967296:0:0:0",
+        "4294967297:0:0:0",
+        "-0:0:0:2147483648",
+        "-2147483649:0:0:0",
+        "0:0:0:-2147483649",
+        "-0:0:0:-2147483649",
+        "-4294967297:0:0:0",
+        "0:4294967296:0:0",
+        "0:0:4294967296:0",
+    ];
+    let mut index_text = String::from("id: en, index: 0\n");
+    for (i, delay) in delays.iter().enumerate() {
+        use std::fmt::Write;
+        writeln!(
+            index_text,
+            "delay: {delay}\ntimestamp: 0:0:{}:0, filepos: {:x}",
+            i + 1,
+            i * 2048
+        )
+        .unwrap();
+    }
+    let budget = Budget::new(1 << 16).unwrap();
+    let index =
+        VobSubIndex::parse_with_integer_conversion_width(&budget, index_text.as_bytes(), width)
+            .unwrap();
+    let clocks: Vec<_> = index.entries(0).map(|entry| entry.milliseconds).collect();
+    assert_eq!(
+        clocks,
+        [
+            -2147482648,
+            3000,
+            2999,
+            4000,
+            3605000,
+            2147489648,
+            7730941129207000,
+            2147491647,
+            -2147474647,
+            -3590000,
+            11000,
+            12000
+        ]
+    );
+    for text in [b"size: 4294968016x480".as_slice(), b"size: 720x-4294966816"] {
+        assert_eq!(
+            Settings::from_configuration_with_integer_conversion_width(text, width)
+                .unwrap()
+                .canvas,
+            Some([720, 480])
+        );
+    }
+    let mut settings = Settings::default();
+    settings.apply_palette_option_with_integer_conversion_width(
+        b"1122334455,10000000000000000,-100000001",
+        width,
+    );
+    assert_eq!(
+        &settings.palette.unwrap()[..3],
+        &[0x334455, 0xffffff, 0xffffff]
+    );
 }

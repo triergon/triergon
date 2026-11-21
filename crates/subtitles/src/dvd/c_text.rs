@@ -1,7 +1,15 @@
-//! Numbers in DVD configuration and index text. Each reader implements a C string-to-integer
-//! conversion (C17 7.22.1.4) with 32-bit ARM's widths (AAPCS, ILP32: `long` has 32 bits), so
-//! the decoder gives the values observed in FFmpeg built for 32-bit ARMv7, which it follows where
-//! the targets differ (probes in evidence set `subtitles-armv7-arm64-f2634911`, `clean-room/`).
+//! Bounded C-style integer conversions in DVD configuration and index text.
+//! Width-dependent results follow black-box observations of the reference.
+
+/// Width of the reference's long integer conversions in DVD text.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum IntegerConversionWidth {
+    /// 32-bit long, as on ARMv7. This is the default.
+    #[default]
+    Bits32,
+    /// 64-bit long, as on Linux AArch64, narrowed to the destination field.
+    Bits64,
+}
 
 /// C's `isspace` in the C locale.
 pub(super) fn is_space(b: u8) -> bool {
@@ -80,4 +88,78 @@ pub(super) fn scan_int(text: &[u8], start: usize) -> Option<(i32, usize)> {
         i32::try_from(magnitude).unwrap_or(i32::MAX)
     };
     Some((value, at))
+}
+
+/// Select the reference long width before narrowing to the signed field.
+pub(super) fn scan_field(
+    text: &[u8],
+    start: usize,
+    width: IntegerConversionWidth,
+) -> Option<(i32, usize)> {
+    if width == IntegerConversionWidth::Bits32 {
+        return scan_int(text, start);
+    }
+    let mut at = start;
+    while text.get(at).copied().is_some_and(is_space) {
+        at += 1;
+    }
+    let negative = text.get(at) == Some(&b'-');
+    if matches!(text.get(at), Some(b'-' | b'+')) {
+        at += 1;
+    }
+    let digits = at;
+    let mut magnitude = 0_u64;
+    while let Some(&byte @ b'0'..=b'9') = text.get(at) {
+        magnitude = magnitude
+            .saturating_mul(10)
+            .saturating_add(u64::from(byte - b'0'));
+        at += 1;
+    }
+    if at == digits {
+        return None;
+    }
+    let value = if negative {
+        0_i64.saturating_sub_unsigned(magnitude)
+    } else {
+        i64::try_from(magnitude).unwrap_or(i64::MAX)
+    };
+    Some((value as i32, at))
+}
+
+pub(super) fn hex_field(text: &[u8], start: usize, width: IntegerConversionWidth) -> (u32, usize) {
+    if width == IntegerConversionWidth::Bits32 {
+        return strtoul16(text, start);
+    }
+    let mut at = start;
+    while text.get(at).copied().is_some_and(is_space) {
+        at += 1;
+    }
+    let negative = text.get(at) == Some(&b'-');
+    if matches!(text.get(at), Some(b'-' | b'+')) {
+        at += 1;
+    }
+    let hex = |b: &u8| char::from(*b).to_digit(16);
+    if text.get(at) == Some(&b'0')
+        && matches!(text.get(at + 1), Some(b'x' | b'X'))
+        && text.get(at + 2).and_then(hex).is_some()
+    {
+        at += 2;
+    }
+    let digits = at;
+    let mut value = 0_u64;
+    let mut overflow = false;
+    while let Some(digit) = text.get(at).and_then(hex) {
+        overflow |= value > (u64::MAX - u64::from(digit)) / 16;
+        value = value.wrapping_mul(16).wrapping_add(u64::from(digit));
+        at += 1;
+    }
+    if at == digits {
+        (0, start)
+    } else if overflow {
+        (u32::MAX, at)
+    } else if negative {
+        (value.wrapping_neg() as u32, at)
+    } else {
+        (value as u32, at)
+    }
 }

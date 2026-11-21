@@ -1210,19 +1210,18 @@ caption and teletext rows are timed and measured against `ffmpeg-subtitles-plain
 the subtitles reference built without the wrappers that flag target-dependent results, so
 no flagging code runs in the reference's timed span or memory window.
 
-The DVD decoder gives the numbers of a VobSub configuration and of the `palette` option the
-values observed in FFmpeg built for ARMv7: a colour list's numbers (the `palette` option and
+The DVD decoder defaults to the numbers observed in FFmpeg built for ARMv7 in VobSub
+configuration and the `palette` option: a colour list's numbers (the `palette` option and
 a `palette:` line) wrap modulo 2³², and one beyond 32 bits is white (`0xffffff`); a `size:`
 number beyond 2³¹ − 1 or below −2³¹ refuses the size; and a `.idx` `delay:` line is a `-`
 after spaces negating the whole delay, then up to four fields that saturate at 2³¹ − 1 and
-−2³¹, missing fields zero. FFmpeg built for AArch64 keeps the low 32 bits of such numbers, or
-all 64 for a colour, instead. The probes these values come from are in the raw samples of
-`8513398b`. `subtitle-dvd-host` pins the cases
-that reach them per target and holds four of them open on AArch64, each target-dependent
-by design: `vobsub-palette-option`, which `subtitle-dvd` held before and which passed there,
-and the cases `vobsub-idx-size-beyond-32-bits`, `vobsub-idx-size-negative-beyond-32-bits`
-and `vobsub-idx-delay-beyond-32-bits`; its fifth, `vobsub-idx-size-int-min`, both targets
-refuse. A decoder that refuses to open is a result both workers fold and compare.
+−2³¹, missing fields zero. `IntegerConversionWidth::Bits64` saturates decimal fields at
+signed 64-bit bounds before narrowing and reads colours with unsigned 64-bit conversion.
+The subtitle worker selects the width of the target reference. A local comparison of the
+candidate folds against the pinned AArch64 results matches all five `subtitle-dvd-host`
+cases and all 220 authored `subtitle-dvd` cases. Native parity, runtime and memory for the
+width selection remain open. A decoder that refuses to open is a result both workers fold
+and compare.
 
 Median ARMv7 packet-framing time in ns per operation (Triergon / FFmpeg) on a
 c6g.4xlarge from the gate image, for the three HEVC cases whose runtime bounds were above

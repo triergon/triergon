@@ -4,7 +4,7 @@
 //! control sequence table, expands the interlaced 2-bit or 8-bit pixels,
 //! resolves the colours and removes transparent borders, with the reference's
 //! tolerances at every step (see [`Decoder`]).
-use super::c_text::{is_space, scan_int, strtoul16};
+use super::c_text::{IntegerConversionWidth, hex_field, is_space, scan_field};
 use super::wire::{Command, Commands, DvdArea};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 use triergon_pixel::{ChannelRounding, YcbcrMatrix};
@@ -37,6 +37,14 @@ impl Settings {
     /// `Error::Invalid` for a size the reference refuses to open a decoder
     /// with: a dimension of zero or less, or a picture too large to address.
     pub fn from_configuration(text: &[u8]) -> Result<Self> {
+        Self::from_configuration_with_integer_conversion_width(text, IntegerConversionWidth::Bits32)
+    }
+
+    /// Read configuration using the selected reference integer conversion width.
+    pub fn from_configuration_with_integer_conversion_width(
+        text: &[u8],
+        width: IntegerConversionWidth,
+    ) -> Result<Self> {
         // Every `palette:` line replaces the whole palette, so only the last
         // one is read. The scans stop at a NUL by themselves.
         let mut palette = None;
@@ -46,7 +54,10 @@ impl Settings {
             match rest.first() {
                 Some(b'p') => palette = rest.strip_prefix(b"palette:").or(palette),
                 Some(b's') => {
-                    if let Some(size) = rest.strip_prefix(b"size:").and_then(scan_size) {
+                    if let Some(size) = rest
+                        .strip_prefix(b"size:")
+                        .and_then(|text| scan_size(text, width))
+                    {
                         canvas = Some(checked_canvas(size)?);
                     }
                 }
@@ -71,7 +82,7 @@ impl Settings {
                 if matches!(byte, b'\n' | b'\r' | 0) {
                     line(start)?;
                     if byte == 0 {
-                        return Ok(Self::configured(palette, canvas));
+                        return Ok(Self::configured(palette, canvas, width));
                     }
                     start = at + offset + 1;
                 }
@@ -79,12 +90,16 @@ impl Settings {
             at = end;
         }
         line(start)?;
-        Ok(Self::configured(palette, canvas))
+        Ok(Self::configured(palette, canvas, width))
     }
 
-    fn configured(palette: Option<&[u8]>, canvas: Option<[u32; 2]>) -> Self {
+    fn configured(
+        palette: Option<&[u8]>,
+        canvas: Option<[u32; 2]>,
+        width: IntegerConversionWidth,
+    ) -> Self {
         Self {
-            palette: palette.map(parse_colour_list),
+            palette: palette.map(|text| parse_colour_list(text, width)),
             canvas,
             forced_only: false,
         }
@@ -97,7 +112,19 @@ impl Settings {
     /// for 32-bit ARMv7 (FFmpeg for AArch64 keeps the low bits of a number up to 64 bits).
     /// A `palette:` line of the configuration is read the same way.
     pub fn apply_palette_option(&mut self, text: &[u8]) {
-        self.palette = Some(parse_colour_list(text));
+        self.apply_palette_option_with_integer_conversion_width(
+            text,
+            IntegerConversionWidth::Bits32,
+        );
+    }
+
+    /// Apply a palette using the selected reference integer conversion width.
+    pub fn apply_palette_option_with_integer_conversion_width(
+        &mut self,
+        text: &[u8],
+        width: IntegerConversionWidth,
+    ) {
+        self.palette = Some(parse_colour_list(text, width));
     }
 
     /// The `ifo_palette` option, given the IFO file's bytes, or `None` when it
@@ -124,12 +151,12 @@ fn below_0e(word: u64) -> u64 {
 /// in FFmpeg built for 32-bit ARMv7.
 /// An entry without digits is black and leaves the text where it was, so once
 /// the skip cannot move either, the rest are black.
-fn parse_colour_list(text: &[u8]) -> [u32; 16] {
+fn parse_colour_list(text: &[u8], width: IntegerConversionWidth) -> [u32; 16] {
     let mut colours = [0; 16];
     let mut at = 0;
     for colour in &mut colours {
         let start = at;
-        let (value, end) = strtoul16(text, at);
+        let (value, end) = hex_field(text, at, width);
         *colour = value & 0x00ff_ffff;
         at = end;
         while text.get(at).is_some_and(|&b| b == b',' || is_space(b)) {
@@ -144,14 +171,14 @@ fn parse_colour_list(text: &[u8]) -> [u32; 16] {
 }
 
 /// Two decimal numbers separated by an `x` right after the first, each after
-/// optional white space and with an optional sign ([`scan_int`]).
-fn scan_size(text: &[u8]) -> Option<[i32; 2]> {
-    let (width, end) = scan_int(text, 0)?;
+/// optional white space and with an optional sign .
+fn scan_size(text: &[u8], width: IntegerConversionWidth) -> Option<[i32; 2]> {
+    let (w, end) = scan_field(text, 0, width)?;
     if text.get(end) != Some(&b'x') {
         return None;
     }
-    let (height, _) = scan_int(text, end + 1)?;
-    Some([width, height])
+    let (height, _) = scan_field(text, end + 1, width)?;
+    Some([w, height])
 }
 
 /// A `size:` line's canvas, refused unless both numbers are positive and the
