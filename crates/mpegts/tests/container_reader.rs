@@ -7,6 +7,8 @@ mod adts_header_growth;
 mod adts_unbounded;
 #[path = "container_reader/direct_audio.rs"]
 mod direct_audio;
+#[path = "container_reader/dts.rs"]
+mod dts;
 #[path = "container_reader/dvb.rs"]
 mod dvb;
 #[path = "container_reader/eac3.rs"]

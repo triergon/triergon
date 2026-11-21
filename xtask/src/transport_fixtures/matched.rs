@@ -37,7 +37,6 @@ impl Input {
         let mut args = vec![
             if self.m2ts { "192" } else { "188" }.into(),
             PROGRAM.to_string(),
-            PID.to_string(),
         ];
         args.extend(options.iter().copied().map(str::to_owned));
         let output = Command::new(reference)
@@ -191,15 +190,32 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
     }
     let seek = Path::new(seek);
     let mpeg = Path::new(audio_argv);
+    let pid = PID.to_string();
     let feature = "mpegts-previous-picture";
     let avc = video(root, false, 1)?;
     let hevc = video(root, true, 1)?;
     let many = video(root, false, 12)?;
     let cases = [
-        (&avc, "avc-earliest-picture", ["90000", "previous"]),
-        (&avc, "avc-between-keyframes", ["112000", "previous"]),
-        (&hevc, "hevc-m2ts-preroll", ["121000", "preroll"]),
-        (&many, "avc-late-preroll", ["425500", "preroll"]),
+        (
+            &avc,
+            "avc-earliest-picture",
+            [pid.as_str(), "90000", "previous"],
+        ),
+        (
+            &avc,
+            "avc-between-keyframes",
+            [pid.as_str(), "112000", "previous"],
+        ),
+        (
+            &hevc,
+            "hevc-m2ts-preroll",
+            [pid.as_str(), "121000", "preroll"],
+        ),
+        (
+            &many,
+            "avc-late-preroll",
+            [pid.as_str(), "425500", "preroll"],
+        ),
     ]
     .into_iter()
     .map(|(input, case, options)| input.record(root, feature, case, &options, seek, "ts-seek-fold"))
@@ -276,9 +292,9 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
         .into_iter()
         .map(|(input, layer_one_slots)| {
             let options: &[&str] = if layer_one_slots {
-                &["layer1-padding"]
+                &[pid.as_str(), "layer1-padding"]
             } else {
-                &[]
+                &[pid.as_str()]
             };
             input.record(
                 root,
@@ -291,4 +307,75 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
         })
         .collect::<R<Vec<_>>>()?;
     manifest(root, feature, cases)
+}
+
+/// Rewrap the checked DTS core frames with literal DVB descriptors and PES clocks.
+pub fn author_dts(root: &Path, args: &[String]) -> R<()> {
+    let [record, reference] = args else {
+        return Err("usage: cargo xtask fixture transport-dts --record REFERENCE".into());
+    };
+    if record != "--record" {
+        return Err("expected --record".into());
+    }
+    let reference = Path::new(reference);
+    const FEATURE: &str = "mpegts-dts-core";
+    const SOURCE: &str = "harness/fixtures/mpegts/dts-core-mono.dts";
+    const SHA256: &str = "a1db20abc4bce08a504108de2998337f4d906eda3373acdc3abab39fcaaf1330";
+    let bytes = fs::read(root.join(SOURCE)).map_err(|e| format!("{SOURCE}: {e}"))?;
+    if sha256::hex(&bytes) != SHA256 {
+        return Err(format!("{SOURCE}: pinned coded bytes changed"));
+    }
+    let codec = Codec {
+        name: "dvb-dts",
+        stream_type: 0x06,
+        stream_id: 0xbd,
+        dvb: true,
+        bytes: Vec::new(),
+        first: 0,
+        header: 15,
+    };
+    let inputs = [
+        (
+            "dts-core-single-frame",
+            false,
+            vec![part(&bytes[..512], Some(90_000), None)],
+        ),
+        (
+            "dts-core-multiple-per-pes",
+            false,
+            vec![part(&bytes, Some(90_000), Some(89_760))],
+        ),
+        (
+            "dts-core-header-across-pes",
+            true,
+            vec![
+                part(&bytes[..7], Some(90_000), None),
+                part(&bytes[7..], None, None),
+            ],
+        ),
+        (
+            "dts-core-body-across-pes",
+            false,
+            vec![
+                part(&bytes[..1221], Some(90_000), None),
+                part(&bytes[1221..], Some(92_880), Some(92_640)),
+            ],
+        ),
+    ];
+    let mut cases = Vec::new();
+    for (name, m2ts, parts) in inputs {
+        let mut ts = Transport::new();
+        // EN 300 468 Table G.1. The flags describe the checked mono source.
+        ts.tables(&codec, &[0x7b, 5, 0xd2, 0x87, 0x83, 0xfe, 0x00])?;
+        for p in &parts {
+            ts.pes(codec.stream_id, p)?;
+        }
+        let input = Input {
+            name,
+            m2ts,
+            data: ts.finish(m2ts),
+        };
+        cases.push(input.record(root, FEATURE, name, &["--dvb"], reference, "ts-au-fold")?);
+    }
+    manifest(root, FEATURE, cases)
 }
