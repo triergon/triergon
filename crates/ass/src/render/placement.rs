@@ -14,7 +14,7 @@ use triergon_raster::{Vector, pixels_26_6};
 use super::collisions;
 use super::from_26_6;
 use super::geometry::{Geometry, Scales};
-use super::layout::{LaidChar, Layout, TextBox, Timing};
+use super::layout::{LaidChar, Layout, Shows, TextBox, Timing};
 use super::outlines::KeptOutline;
 use super::shaping::Shaped;
 use super::text::{Char, GlyphStyle, Text};
@@ -100,7 +100,7 @@ impl Runs {
             .zip(&*layout.chars);
         for (char, ((c, cluster), laid)) in chars.enumerate() {
             new_run |= laid.starts_run;
-            if !laid.drawn {
+            if laid.shows != Shows::Drawn {
                 continue;
             }
             if new_run {

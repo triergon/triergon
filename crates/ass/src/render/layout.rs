@@ -79,14 +79,28 @@ impl Timing {
 /// A character laid out.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct LaidChar {
-    /// Shaping gave it a glyph and trimming kept it: it takes space on its
-    /// line.
-    pub(super) shown: bool,
-    /// Shown, and not scaled to nothing: it is drawn.
-    pub(super) drawn: bool,
+    pub(super) shows: Shows,
     /// A run starts here: a style run, or after a line's leading whitespace.
     pub(super) starts_run: bool,
     pub(super) karaoke: Timing,
+}
+
+/// Whether a laid-out character shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Shows {
+    /// Shaping gave it no glyph, or trimming hid it: it takes no space.
+    Hidden,
+    /// It takes space on its line, but is scaled to nothing.
+    Flat,
+    /// It takes space and is drawn.
+    Drawn,
+}
+
+impl Shows {
+    /// It takes space on its line.
+    pub(super) fn is_shown(self) -> bool {
+        self != Self::Hidden
+    }
 }
 
 /// The text box in pre-aspect pixels.
@@ -336,11 +350,16 @@ impl Layout {
                 },
                 _ => Timing::untimed(c.karaoke),
             };
-            let shown = !k.skip;
+            let shows = if k.skip {
+                Shows::Hidden
+            } else if text.style(c).is_flat() {
+                Shows::Flat
+            } else {
+                Shows::Drawn
+            };
             self.chars
                 .try_push(LaidChar {
-                    shown,
-                    drawn: shown && !text.style(c).is_flat(),
+                    shows,
                     starts_run: k.starts_new_run,
                     karaoke,
                 })
@@ -364,7 +383,7 @@ impl Layout {
             }
             for &i in &self.order[line.chars.clone()] {
                 let i = i as usize;
-                if !self.chars[i].shown {
+                if !self.chars[i].shows.is_shown() {
                     continue;
                 }
                 let mut cluster = pen;
@@ -393,7 +412,7 @@ impl Layout {
         let mut width = 0.0;
         for i in range {
             let symbol = text.chars()[i].symbol;
-            if self.chars[i].shown && symbol != u32::from(b'\n') && symbol != 0 {
+            if self.chars[i].shows.is_shown() && symbol != u32::from(b'\n') && symbol != 0 {
                 width += from_26_6(self.advances[i].x);
             }
         }
@@ -450,7 +469,7 @@ impl Layout {
             .zip(&*shaped.clusters)
             .zip(&*self.advances)
         {
-            if laid.shown {
+            if laid.shows.is_shown() {
                 let s = from_26_6(self.glyphs[cluster.glyphs.start].pos.x);
                 x_min = x_min.min(s);
                 x_max = x_max.max(s + from_26_6(advance.x));
@@ -475,7 +494,7 @@ impl Layout {
                     shear = 0;
                 }
                 let at = self.order[i] as usize;
-                if !self.chars[at].drawn {
+                if self.chars[at].shows != Shows::Drawn {
                     continue;
                 }
                 let style = text.style(&text.chars()[at]);
