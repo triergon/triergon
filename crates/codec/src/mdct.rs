@@ -7,11 +7,23 @@
 //! ```
 //!
 //! which is the IMDCT of Vorbis I section 1.3.2 and RFC 6716 section 4.3.7 before
-//! windowing. It runs as a DCT-IV of size `K` through an `N / 4`-point complex FFT with
-//! pre- and post-twiddles. The FFT is mixed radix, so `N / 4` may be any product of 2, 3
-//! and 5: the power-of-two Vorbis blocks and the 120 · 2^j-sample CELT frames both fit.
-//! Windowing and overlap-add stay with each codec. Every table is charged to the budget
-//! the transform is built in.
+//! windowing. It runs as a DCT-IV of size `K` ([`Imdct::dct4`]) through an `N / 4`-point
+//! complex FFT with pre- and post-twiddles.
+//!
+//! What it guarantees:
+//!
+//! - **Lengths.** `N` is a multiple of 4 whose quarter is a product of 2, 3 and 5
+//!   ([`Imdct::supports`]): the power-of-two Vorbis blocks and the 120 · 2^j-sample CELT
+//!   frames. [`Imdct::new`] refuses any other length with `Error::Invalid("IMDCT length")`.
+//! - **Arithmetic.** `f32` throughout, with every twiddle computed in `f64` and rounded
+//!   once. The operation order is fixed: the FFT's stages run radix 4 innermost, then 2,
+//!   then 3 and 5 outermost, each in one order of additions on every target. The Vorbis
+//!   and Opus decoders' output is gated bit for bit on that order, so it is part of the
+//!   contract, not an implementation detail.
+//! - **Storage.** Every table and scratch plane is charged to the budget the transform is
+//!   built in; [`Imdct::dct4`] and [`Imdct::imdct`] do not allocate.
+//! - **Scope.** Windowing and overlap-add stay with each codec. AAC, AC-3 and DTS keep
+//!   transforms of their own, whose operation orders differ from this one.
 
 use core::f64::consts::PI;
 

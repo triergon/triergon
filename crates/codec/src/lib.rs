@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
@@ -8,7 +9,6 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// Pending: `missing_docs`.
 
 use core::marker::PhantomData;
 
@@ -26,20 +26,31 @@ pub use triergon_core::{Budget, BudgetVec, Charged, Error, Reservation};
 pub use triergon_pixel::{Colour, PictureView, Plane};
 pub use window::{kbd_window, vorbis_window};
 
+/// A video codec a workspace decoder decodes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VideoCodec {
+    /// H.264 / AVC.
     H264,
+    /// H.265 / HEVC.
     Hevc,
 }
 
+/// An audio codec a workspace decoder decodes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AudioCodec {
+    /// AC-3 (Dolby Digital).
     Ac3,
+    /// E-AC-3 (Dolby Digital Plus).
     Eac3,
+    /// AAC.
     Aac,
+    /// DTS (the core substream).
     Dts,
+    /// FLAC.
     Flac,
+    /// Opus.
     Opus,
+    /// Vorbis.
     Vorbis,
     /// MPEG-1/2 audio Layer I, II or III.
     MpegAudio,
@@ -50,6 +61,7 @@ pub enum AudioCodec {
 /// fixed point.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SampleFormat {
+    /// 32-bit float; the planes hold the decoder's samples as they are.
     #[default]
     Float,
     /// Signed 16-bit; each sample is exactly `x / 2^15`.
@@ -62,8 +74,11 @@ pub enum SampleFormat {
 /// Decoded audio of one access unit: planar `f32` at full scale 1.0.
 #[derive(Clone, Debug, Default)]
 pub struct AudioFrame {
+    /// Samples per second per channel.
     pub sample_rate: u32,
+    /// The speaker of each plane.
     pub layout: ChannelLayout,
+    /// Samples in each plane; 0 when the access unit produced none.
     pub samples_per_channel: usize,
     /// What the planes are images of.
     pub sample_format: SampleFormat,
@@ -142,9 +157,13 @@ impl AudioFrame {
 /// -3 dB centre and surrounds with LFE omitted, used when a stream carries none.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DownmixLevels {
+    /// Linear gain of the centre channel into each side.
     pub center: f32,
+    /// Linear gain of the surround channels.
     pub surround: f32,
+    /// Linear gain of the LFE channel, before its -3 dB into each side; 0 omits it.
     pub lfe: f32,
+    /// How the surround channels are matrixed into the stereo pair.
     pub encoding: SurroundEncoding,
 }
 
@@ -159,10 +178,15 @@ impl Default for DownmixLevels {
     }
 }
 
+/// How a stereo downmix carries the surround channels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SurroundEncoding {
+    /// Each surround channel to its own side.
     None,
+    /// Dolby Surround: the surrounds summed out of phase into both sides.
     Dolby,
+    /// Dolby Pro Logic II: the surrounds out of phase into both sides, weighted to
+    /// their own side.
     ProLogicII,
 }
 
@@ -187,13 +211,17 @@ pub trait VideoDecoder: Send {
 
     /// This decoder boxed, its errors converted to `E`: the form for a caller that
     /// chooses the codec at run time. With [`Error`] for `E` it is a
-    /// [`DynVideoDecoder`].
+    /// [`DynVideoDecoder`]. Every call forwards to this decoder unchanged; only a
+    /// refusal changes type, through `Into`.
     fn boxed<E: 'static>(self) -> Box<dyn VideoDecoder<Error = E>>
     where
         Self: Sized + 'static,
         Self::Error: Into<E>,
     {
-        Box::new(Converting::new(self))
+        Box::new(Converting {
+            decoder: self,
+            error: PhantomData,
+        })
     }
 }
 
@@ -229,13 +257,18 @@ pub trait AudioDecoder: Send {
 
     /// This decoder boxed, its errors converted to `E`: the form for a caller that
     /// chooses the codec at run time. With [`Error`] for `E` it is a
-    /// [`DynAudioDecoder`].
+    /// [`DynAudioDecoder`]. Every call forwards to this decoder unchanged, the provided
+    /// [`delay`](Self::delay) and [`flush`](Self::flush) included; only a refusal changes
+    /// type, through `Into`.
     fn boxed<E: 'static>(self) -> Box<dyn AudioDecoder<Error = E>>
     where
         Self: Sized + 'static,
         Self::Error: Into<E>,
     {
-        Box::new(Converting::new(self))
+        Box::new(Converting {
+            decoder: self,
+            error: PhantomData,
+        })
     }
 }
 
@@ -247,20 +280,12 @@ pub type DynVideoDecoder = dyn VideoDecoder<Error = Error>;
 /// [`Error`]; [`AudioDecoder::boxed`] makes one from a codec crate's decoder.
 pub type DynAudioDecoder = dyn AudioDecoder<Error = Error>;
 
-/// A decoder whose errors convert to `E` on the way out.
+/// The decoder behind [`VideoDecoder::boxed`] and [`AudioDecoder::boxed`]: every method
+/// forwards, and a refusal converts to `E` on the way out.
 struct Converting<D, E> {
     decoder: D,
     // `fn() -> E`: the wrapper holds no `E`, so it is `Send` whenever the decoder is.
     error: PhantomData<fn() -> E>,
-}
-
-impl<D, E> Converting<D, E> {
-    fn new(decoder: D) -> Self {
-        Converting {
-            decoder,
-            error: PhantomData,
-        }
-    }
 }
 
 impl<D: VideoDecoder, E> VideoDecoder for Converting<D, E>

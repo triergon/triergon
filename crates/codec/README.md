@@ -63,7 +63,7 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 | `AudioFrame` | `sample_rate`, `layout`, `samples_per_channel`, `planes`: planar `f32`, full scale 1.0; `sample_format` (`SampleFormat::Float`, `S16`, `S32`): the decoder's native format, for mixing as FFmpeg mixes it |
 | `ChannelLayout` | speaker of each plane in plane order; `new`, `unspecified(n)` (no positions), `default_for(n)` (FFmpeg's default), `speakers`, `channels`, `position`, `mask`, `name` (FFmpeg's layout name), `EMPTY`, `CAPACITY` |
 | `layout::{vorbis_order, flac_order, native_order}` | the Vorbis/Opus and FLAC coded channel orders, and the plane each coded channel goes to |
-| `mdct::Imdct` | inverse MDCT and DCT-IV for any `N` with `N / 4` a product of 2, 3 and 5: an iterative mixed-radix FFT over split real and imaginary planes; `table_bytes` charges a budget first |
+| `mdct::Imdct` | the Vorbis and Opus inverse MDCT and DCT-IV for any `N` with `N / 4` a product of 2, 3 and 5: an iterative mixed-radix FFT over split real and imaginary planes in `f32`, in a fixed operation order the decoders' bit-exact output depends on; its tables are charged to a budget when it is built |
 | `Speaker` | loudspeaker position; `name()` gives FFmpeg's short name, `mask()` its `AV_CH_*` bit |
 | `DownmixLevels` | `center`, `surround`, `lfe` gains and `SurroundEncoding` (`None`, `Dolby`, `ProLogicII`) |
 | `AudioFrame::try_resize` | sizes the planes, charging the frame's capacity to a decoder's `Reservation` first |

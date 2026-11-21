@@ -13,33 +13,61 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 pub enum Speaker {
+    /// Front left (`FL`).
     FrontLeft = 0,
+    /// Front right (`FR`).
     FrontRight = 1,
+    /// Front centre (`FC`).
     FrontCenter = 2,
+    /// Low-frequency effects (`LFE`).
     LowFrequency = 3,
+    /// Back left (`BL`).
     BackLeft = 4,
+    /// Back right (`BR`).
     BackRight = 5,
+    /// Front left of centre (`FLC`).
     FrontLeftOfCenter = 6,
+    /// Front right of centre (`FRC`).
     FrontRightOfCenter = 7,
+    /// Back centre (`BC`).
     BackCenter = 8,
+    /// Side left (`SL`).
     SideLeft = 9,
+    /// Side right (`SR`).
     SideRight = 10,
+    /// Top centre, above the listener (`TC`).
     TopCenter = 11,
+    /// Top front left (`TFL`).
     TopFrontLeft = 12,
+    /// Top front centre (`TFC`).
     TopFrontCenter = 13,
+    /// Top front right (`TFR`).
     TopFrontRight = 14,
+    /// Top back left (`TBL`).
     TopBackLeft = 15,
+    /// Top back centre (`TBC`).
     TopBackCenter = 16,
+    /// Top back right (`TBR`).
     TopBackRight = 17,
+    /// Wide left, between front left and side left (`WL`).
     WideLeft = 31,
+    /// Wide right, between front right and side right (`WR`).
     WideRight = 32,
+    /// Surround direct left (`SDL`).
     SurroundDirectLeft = 33,
+    /// Surround direct right (`SDR`).
     SurroundDirectRight = 34,
+    /// Second low-frequency effects (`LFE2`).
     LowFrequency2 = 35,
+    /// Top side left (`TSL`).
     TopSideLeft = 36,
+    /// Top side right (`TSR`).
     TopSideRight = 37,
+    /// Bottom front centre (`BFC`).
     BottomFrontCenter = 38,
+    /// Bottom front left (`BFL`).
     BottomFrontLeft = 39,
+    /// Bottom front right (`BFR`).
     BottomFrontRight = 40,
 }
 
