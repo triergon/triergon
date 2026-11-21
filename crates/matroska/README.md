@@ -44,6 +44,13 @@ Typed configurations expose their allocation accounting through `Configuration::
 
 `examples/matroska_packets.rs FILE` prints the tracks and packets of a file.
 
+The crate root holds the readers, their events and packets, tracks, configurations,
+seek requests and receipts, block-group side data, HDR10+ and the shared byte types.
+`metadata` holds segment-metadata documents and their views, `colour` the source
+colour fields, `timing` exact block and packet time, `compat` the reference-compatible
+policies and, with the `reference-trace` feature, `reference_trace` the
+comparison-only projections.
+
 Push / poll reader (no I/O; the caller supplies bytes):
 
 ```rust
@@ -121,7 +128,7 @@ and seeking on a non-video track.
 | Field | Default | Bounds |
 |---|---:|---|
 | `live_storage_bytes` | 128 MiB | all live reader-owned storage, including packets the caller still holds |
-| `metadata_bytes` | 1 MiB | one structural metadata element; also each decoded CodecPrivate |
+| `metadata_bytes` | 1 MiB | all structural metadata held since opening or `reset` (EBML header and level-one metadata elements, attachment payloads excepted); also each TrackEntry and decoded CodecPrivate |
 | `block_bytes` | 16 MiB | one block, and all decoded frames of one lace together |
 | `tracks` | 64 | tracks per Segment |
 | `metadata_storage_bytes` | 16 MiB | all segment-metadata documents incl. validation workspace |
@@ -152,10 +159,10 @@ Segment ticks that reproduces FFmpeg's packet clock, including its omissions.
 **Content encoding.** The reader validates lace sizes against the block before
 delivery and walks the checked header with a fixed-size cursor under the caller's
 work budget. Encodings apply in descending `ContentEncodingOrder`, and each laced
-frame is decoded separately. `zlib::decompress` reads one complete RFC 1950
-stream (stored, fixed and dynamic blocks), checks Adler-32 before returning
-anything and rejects trailing bytes. Cancellation is checked between blocks,
-symbols and checksum chunks.
+frame is decoded separately. Each zlib value is one complete RFC 1950 stream
+(stored, fixed and dynamic blocks); its Adler-32 is checked before any decoded
+byte is delivered, and trailing bytes are rejected. Cancellation is checked
+between blocks, symbols and checksum chunks.
 
 **Seeking.** Requests name a track index (must be video) and a presentation time in
 nanoseconds. `seek_previous` lands on the latest video keyframe at or before the
@@ -202,8 +209,10 @@ frames so a decoder can apply the block-wide trim using their sample counts.
 ITU-T T.35 addition (BlockAddID 4 without a declared MaxBlockAdditionID), and
 projects block additions to the packet side data and HDR10+ events FFmpeg attaches
 to packets. The `reference-trace` feature exposes comparison projections.
-`Colour::trace_fields` returns the colour fields and `seek_initial_trim` reports
-when the block-start seek comparison reapplies initial audio padding.
+`Colour::trace_fields` returns the colour fields, `seek_initial_trim` reports
+when the block-start seek comparison reapplies initial audio padding, and
+`reference_trace::zlib` exposes the inflater and a one-shot decoder for comparison
+with an independent zlib.
 
 **Segment metadata.** Each `metadata::SharedDocument` owns one source buffer
 plus a compact node arena; `Edition`, `Chapter`, `Tag`, `SimpleTag`,
