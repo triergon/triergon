@@ -12,6 +12,7 @@ mod tables;
 pub use entity::{MediaEntityEnd, ObservedTrace};
 pub use event::{CarrierObservation, CompactTraceEvent, FaultKind, TraceEvent, TraceFault};
 pub use feed::{FeedCarrier, FeedContinuation, FeedItem, FeedPayloadRun};
+use held::Stage;
 use tables::{Job, MapBuild};
 
 pub(crate) use storage::{StorageItem, TransportStorageCursor};
@@ -92,7 +93,7 @@ pub struct TransportStream {
     clock_epoch: u64,
     config_epoch: u64,
     packet: Option<TransportPacket>,
-    phase: u8,
+    stage: Stage,
     route: Route,
     outcome: Option<ContinuityOutcome>,
     fault: Option<TraceFault>,
@@ -233,7 +234,7 @@ impl TransportStream {
             clock_epoch: 0,
             config_epoch: 0,
             packet: None,
-            phase: 0,
+            stage: Stage::Read,
             route: Route::Ignore,
             outcome: None,
             fault: None,

@@ -1,7 +1,7 @@
 //! The entry points and the carrier loop.
 use super::event::{CarrierObservation, CompactTraceEvent, FaultKind, TraceEvent, TraceFault};
 use super::feed::{FeedCarrier, FeedContinuation, FeedItem};
-use super::{Route, TransportStream};
+use super::{Route, Stage, TransportStream};
 use crate::SourceEpochs;
 use crate::pes::Pes;
 use crate::transport::carrier::{PlainContinuation, TransportObservation};
@@ -18,8 +18,6 @@ enum ObservedContinuation {
     Retained,
     Completed(Pes),
 }
-
-const FEED_FALLBACK_PHASE: u8 = 8;
 
 // Select the returned event type before entering the shared parser loop. Ordinary
 // feeds never construct a compact event just to unpack its source event again.
@@ -346,7 +344,7 @@ impl TransportStream {
                 return Err(Error::Cancelled);
             }
             if FEED && self.deferred_feed_events != 0 {
-                if self.phase == FEED_FALLBACK_PHASE {
+                if self.stage == Stage::Refused {
                     if work.remaining() == 0 {
                         return Ok(Step::Yield);
                     }
@@ -354,7 +352,7 @@ impl TransportStream {
                         .packet
                         .take()
                         .ok_or(Error::Invalid("TS packet missing"))?;
-                    self.phase = 0;
+                    self.stage = Stage::Read;
                     return Ok(ready(TraceEvent::Transport(packet)));
                 }
                 self.omit_feed_events(self.deferred_feed_events)?;
@@ -386,8 +384,8 @@ impl TransportStream {
                 return Ok(Step::Yield);
             }
             if self.packet.is_some() {
-                match self.phase {
-                    1 => {
+                match self.stage {
+                    Stage::Continuity => {
                         if !self.observe(work)? {
                             return Ok(Step::Yield);
                         }
@@ -399,7 +397,8 @@ impl TransportStream {
                                 .ok_or(Error::Invalid("TS packet missing"))?;
                             match outcome {
                                 Some(ContinuityOutcome::First | ContinuityOutcome::Continuous)
-                                    if matches!(self.route, Route::Pes(_)) && self.phase == 2 =>
+                                    if matches!(self.route, Route::Pes(_))
+                                        && self.stage == Stage::Clock =>
                                 {
                                     // Count the hidden continuity event after the
                                     // carrier so its full-trace ordinal is retained.
@@ -441,23 +440,24 @@ impl TransportStream {
                             observe(CarrierObservation::Continuity { pid, outcome });
                         }
                     }
-                    2 => {
-                        self.phase = 5;
+                    Stage::Clock => {
+                        self.stage = Stage::Payload;
                         if let Some(event) = self.clock_transition()? {
                             return Ok(ready(event));
                         }
                     }
-                    5 => self.feed::<FEED>(work)?,
-                    6 => {
+                    Stage::Payload => self.feed::<FEED>(work)?,
+                    Stage::Assemble => {
                         if let Some(event) = self.drain::<FEED>(work, cancel)? {
                             return Ok(ready(event));
                         }
                     }
-                    7 => {
+                    Stage::Release => {
                         self.packet = None;
-                        self.phase = 0;
+                        self.stage = Stage::Read;
                     }
-                    _ => return Err(Error::Invalid("TS packet stage")),
+                    // A refused carrier is published only by a feed poll.
+                    Stage::Read | Stage::Refused => return Err(Error::Invalid("TS packet stage")),
                 }
                 continue;
             }
@@ -535,14 +535,14 @@ impl TransportStream {
                                 }
                                 Err(error) => {
                                     self.packet = Some(carrier.into_packet()?);
-                                    self.phase = FEED_FALLBACK_PHASE;
+                                    self.stage = Stage::Refused;
                                     return Err(error);
                                 }
                             }
                             return Ok(ready(TraceEvent::Transport(carrier.into_packet()?)));
                         }
                         let packet = carrier.into_packet()?;
-                        self.phase = 1;
+                        self.stage = Stage::Continuity;
                         if FEED && self.feed_validated_carriers {
                             self.packet = Some(packet);
                             continue 'events;

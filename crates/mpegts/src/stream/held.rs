@@ -11,6 +11,26 @@ use crate::transport::{SCRAMBLED_PAYLOAD, TRANSPORT_ERROR_INDICATOR};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Error, Result, SourceLocation, WorkBudget};
 
+/// What happens next to the carrier in hand.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub(super) enum Stage {
+    /// No carrier is in hand.
+    Read = 0,
+    /// Check its continuity counter on its route.
+    Continuity = 1,
+    /// Apply a clock discontinuity or PCR if it is on the PCR PID.
+    Clock = 2,
+    /// Hand its payload to the route's assembler.
+    Payload = 5,
+    /// Poll the route's assembler until it wants more payload.
+    Assemble = 6,
+    /// Drop it.
+    Release = 7,
+    /// A feed consumer refused it as a validated continuation: publish it whole.
+    Refused = 8,
+}
+
 impl TransportStream {
     pub(super) fn observe(&mut self, work: &mut WorkBudget) -> Result<bool> {
         if !work.try_charge(1) {
@@ -80,18 +100,18 @@ impl TransportStream {
                 error,
                 rejected: None,
             });
-            self.phase = if kind == FaultKind::Continuity
+            self.stage = if kind == FaultKind::Continuity
                 && start
                 && outcome != Some(ContinuityOutcome::ExcessDuplicate)
             {
-                2
+                Stage::Clock
             } else {
-                7
+                Stage::Release
             };
         } else if outcome == Some(ContinuityOutcome::Duplicate) {
-            self.phase = 7;
+            self.stage = Stage::Release;
         } else {
-            self.phase = 2;
+            self.stage = Stage::Clock;
         }
         self.outcome = outcome;
         Ok(true)
@@ -103,7 +123,7 @@ impl TransportStream {
             .as_ref()
             .ok_or(Error::Invalid("TS packet missing"))?;
         let Some(payload) = packet.payload.as_ref() else {
-            self.phase = 7;
+            self.stage = Stage::Release;
             return Ok(());
         };
         let entity = packet.source_id.ok_or(Error::SourceMismatch)?;
@@ -138,7 +158,7 @@ impl TransportStream {
                 )?);
             }
             work.take(length);
-            self.phase = 7;
+            self.stage = Stage::Release;
             return Ok(());
         }
         let payload = &mut self.packet.as_mut().expect("TS packet present").payload;
@@ -176,7 +196,7 @@ impl TransportStream {
                         work,
                     )
                 {
-                    self.phase = 7;
+                    self.stage = Stage::Release;
                     return Ok(());
                 }
                 assembler.push(
@@ -187,7 +207,7 @@ impl TransportStream {
                 )
             }
             Route::Clock | Route::Ignore => {
-                self.phase = 7;
+                self.stage = Stage::Release;
                 return Ok(());
             }
         };
@@ -196,7 +216,7 @@ impl TransportStream {
             rejected.error
         });
         match pushed {
-            Ok(()) => self.phase = 6,
+            Ok(()) => self.stage = Stage::Assemble,
             Err(error)
                 if matches!(self.route, Route::Pat | Route::Pmt)
                     && error == Error::Invalid(POINTER_FIELD) =>
@@ -212,7 +232,7 @@ impl TransportStream {
                     error,
                     rejected: None,
                 });
-                self.phase = 7;
+                self.stage = Stage::Release;
             }
             Err(error) => return Err(error),
         }
@@ -227,7 +247,7 @@ impl TransportStream {
             FaultKind::Psi
         };
         self.discard_route(self.route);
-        self.phase = 7;
+        self.stage = Stage::Release;
         self.diagnostic(kind, pid, error)
     }
 
@@ -306,7 +326,7 @@ impl TransportStream {
         };
         match result {
             Ok(true) => {
-                self.phase = 7;
+                self.stage = Stage::Release;
                 Ok(None)
             }
             Ok(false) => Ok(None),

@@ -1,7 +1,7 @@
 //! The transport storage pinned while a PES range or span replacement is refused.
 
 use super::event::TraceEvent;
-use super::{Route, TransportStream};
+use super::{Route, Stage, TransportStream};
 use crate::pes::PesAssembler;
 use crate::table_storage;
 use triergon_core::{Bytes, Error, Result};
@@ -40,12 +40,12 @@ pub(crate) enum TransportStorageCursor {
 
 impl TransportStorageCursor {
     // Each advance visits at most one section, route, or backing. At this
-    // transport phase PSI jobs have drained and the framer owns only its carry.
+    // transport stage PSI jobs have drained and the framer owns only its carry.
     pub(crate) fn step<'a>(
         &mut self,
         stream: &'a TransportStream,
     ) -> Result<Option<StorageItem<'a>>> {
-        debug_assert_eq!(stream.phase, 6);
+        debug_assert_eq!(stream.stage, Stage::Assemble);
         let Route::Pes(blocked) = stream.route else {
             return Err(Error::Invalid("PES storage audit outside drain"));
         };
@@ -172,7 +172,7 @@ impl TransportStream {
         let Route::Pes(index) = self.route else {
             return Ok(None);
         };
-        if self.phase != 6 {
+        if self.stage != Stage::Assemble {
             return Ok(None);
         }
         let Some(span_floor) = self.routes.as_slice()[index]

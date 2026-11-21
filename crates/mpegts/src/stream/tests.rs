@@ -651,7 +651,7 @@ fn rejected_pes_payload_stays_available_for_a_drained_retry() {
     let address = packet.payload.as_ref().unwrap().storage_address();
     let expected = packet.payload.as_ref().unwrap().as_ref().to_vec();
     feed.stream.packet = Some(packet);
-    feed.stream.phase = 5;
+    feed.stream.stage = Stage::Payload;
     let mut work = WorkBudget::new(limits.pes_bytes as u64);
     assert_eq!(
         feed.stream.feed::<true>(&mut work),
@@ -667,7 +667,7 @@ fn rejected_pes_payload_stays_available_for_a_drained_retry() {
         .unwrap();
     assert_eq!(payload.storage_address(), address);
     assert_eq!(payload.as_ref(), expected);
-    assert_eq!(feed.stream.phase, 5);
+    assert_eq!(feed.stream.stage, Stage::Payload);
     assert!(matches!(
         feed.stream.routes.as_mut_slice()[0]
             .assembler
@@ -678,7 +678,7 @@ fn rejected_pes_payload_stays_available_for_a_drained_retry() {
         AssemblyStep::NeedPayload
     ));
     feed.stream.feed::<true>(&mut work).unwrap();
-    assert_eq!(feed.stream.phase, 6);
+    assert_eq!(feed.stream.stage, Stage::Assemble);
     assert!(feed.stream.packet.as_ref().unwrap().payload.is_none());
 }
 
@@ -700,9 +700,9 @@ fn invalid_psi_pointer_restores_payload_before_diagnostic_recovery() {
     let address = packet.payload.as_ref().unwrap().storage_address();
     stream.packet = Some(packet);
     stream.route = Route::Pat;
-    stream.phase = 5;
+    stream.stage = Stage::Payload;
     stream.feed::<false>(&mut WorkBudget::new(1)).unwrap();
-    assert_eq!(stream.phase, 7);
+    assert_eq!(stream.stage, Stage::Release);
     assert_eq!(
         stream.fault.as_ref().unwrap().error,
         Error::Invalid(POINTER_FIELD)
