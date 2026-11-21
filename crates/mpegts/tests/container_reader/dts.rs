@@ -1,6 +1,6 @@
 use super::{
-    AccessUnit, CodecId, Drive, Error, Event, MediaKind, PID, PacketInfo, ReaderEvent,
-    ReaderLimits, Time, TrackInfo, Transport, audio_eof_namespace,
+    AccessUnit, AudioEofPolicy, CodecId, Drive, Error, Event, MediaKind, PID, PacketInfo,
+    ReaderEvent, ReaderLimits, Time, TrackInfo, Transport, audio_eof_namespace,
 };
 
 // EN 300 468 G.2, corresponding to a 48 kHz, 512-sample mono core.
@@ -189,6 +189,47 @@ fn aligned_dts_hd_keeps_the_complete_unit_and_original_core() {
                     Err(Error::Invalid("DTS-HD extension header CRC")) if corrupt => break,
                     other => panic!("unexpected DTS-HD result {other:?}"),
                 }
+            }
+        }
+    }
+}
+
+#[test]
+fn short_dts_hd_extension_keeps_truncation_and_original_bytes() {
+    let hd = &[
+        0x7f, 14, 0x0e, 0xc0, 5, 1, 0x60, 0x08, 0, 0, 5, 1, 0x60, 0x48, 0, 0,
+    ];
+    let extension = dts_hd_extension();
+    let payload = [&BYTES[..FRAME], &extension[..15]].concat();
+    let mut ts = Transport::new();
+    ts.tables(&[(0x06, PID, hd)], 0);
+    let pes_at = ts.bytes.len() + 4;
+    ts.pes(PID, 0xbd, &payload, Some(90_000), Some(89_900));
+    ts.bytes[pes_at + 6] |= 4;
+    for report in [false, true] {
+        let settings = ReaderLimits {
+            audio_eof_policy: if report {
+                AudioEofPolicy::ReportIncomplete
+            } else {
+                AudioEofPolicy::RejectIncomplete
+            },
+            ..limits()
+        };
+        let mut drive = Drive::new(&ts.bytes, settings, 7, 1);
+        let mut fragment = false;
+        loop {
+            match drive.next() {
+                Ok(Some(Event::Other(ReaderEvent::IncompleteAudio(packet)))) => {
+                    assert!(report && !fragment);
+                    assert_eq!(packet.payload(), payload);
+                    assert_eq!(packet.pts(), Some(90_000));
+                    assert_eq!(packet.sources()[0].payload_range, 0..payload.len());
+                    fragment = true;
+                }
+                Ok(Some(Event::Other(_))) => (),
+                Ok(None) if report && fragment => break,
+                Err(Error::Truncated) if !report => break,
+                result => panic!("unexpected short extension result {result:?}"),
             }
         }
     }

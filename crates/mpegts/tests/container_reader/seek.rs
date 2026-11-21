@@ -630,13 +630,15 @@ fn seek_across_entities_replays_a_split_pes_and_continues_through_eof() {
         target: clock(ticks),
         policy: SeekPolicy::PlaybackPreroll,
     };
-    for (target, landed, count) in [(109_000, 105_000, 2), (90_000, 90_000, 3)] {
+    for (target, landed, count, explicit_end) in
+        [(109_000, 105_000, 2, true), (90_000, 90_000, 3, false)]
+    {
         let request = reader
             .request_seek_in_entities(seek(target), &plan)
             .unwrap();
         assert_eq!((request.source, request.offset), (ID, 0));
         let mut read = 0;
-        let mut receipt = false;
+        let mut announced = false;
         for _ in 0..20_000 {
             match reader.step(&mut WorkBudget::new(39), &OFF).unwrap() {
                 Step::NeedInput(request) => {
@@ -652,24 +654,27 @@ fn seek_across_entities_replays_a_split_pes_and_continues_through_eof() {
                             .provide(
                                 &InputWindow::new(
                                     request.source,
-                                    request.token,
+                                    request.token.clone(),
                                     request.offset,
                                     bytes,
                                 )
                                 .unwrap(),
                             )
                             .unwrap();
+                        if explicit_end && request.source == ID && end == segment.len() {
+                            reader.finish(request.source, request.token).unwrap();
+                        }
                     }
                 }
                 Step::Ready(Event::Seek(result)) => {
-                    assert!(!receipt);
+                    assert!(!announced);
                     assert_eq!(result.landing, clock(landed));
                     assert_eq!(result.discard_until, clock(target));
                     assert_eq!(result.scanned_bytes, ts.bytes.len() as u64);
-                    receipt = true;
+                    announced = true;
                 }
                 Step::Ready(Event::Packet(packet)) => {
-                    assert!(receipt);
+                    assert!(announced);
                     assert_eq!(packet.payload(), frame);
                     if packet.pts() == Some(105_000) {
                         let TraceEvent::Pes(pes) = packet.sources()[0].pes.event() else {
@@ -691,9 +696,45 @@ fn seek_across_entities_replays_a_split_pes_and_continues_through_eof() {
                 Step::Backpressure(pressure) => panic!("unexpected pressure {pressure:?}"),
             }
         }
-        assert!(receipt);
+        assert!(announced);
         assert_eq!(read, count);
     }
     reader.close();
     assert_eq!(pool.used(), Budget::control_storage_bytes());
+}
+
+#[test]
+fn indexed_seek_recognises_landing_after_a_transport_byte_run_change() {
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    let first = adts(&[0x51; 17]);
+    let last = adts(&[0x52; 17]);
+    ts.pes(PID, 0xc0, &first, Some(90_000), None);
+    ts.counters[usize::from(PID)] = 3;
+    ts.pes(PID, 0xc0, &last, Some(90_000), None);
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+    let request = SeekRequest {
+        track: TrackId(PID.into()),
+        target: clock(90_000),
+        policy: SeekPolicy::PreviousRandomAccess,
+    };
+    reader.request_seek_and_index(request, 16).unwrap();
+    for method in [SeekMethod::BoundedScan, SeekMethod::Index] {
+        let mut packets = 0;
+        while let Some(event) = next(&mut reader, &pool, &ts.bytes, 127, 39).unwrap() {
+            match event {
+                Event::Seek(landing) => assert_eq!(landing.method, method),
+                Event::Packet(packet) => {
+                    assert_eq!(packet.payload(), last);
+                    packets += 1;
+                }
+                Event::Other(_) => (),
+            }
+        }
+        assert_eq!(packets, 1);
+        if method == SeekMethod::BoundedScan {
+            reader.request_seek(request).unwrap();
+        }
+    }
 }

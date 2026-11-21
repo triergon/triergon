@@ -582,8 +582,17 @@ impl StorageScan {
             super::PacketTracks::Selected(tracks) => table_storage(tracks)?,
             _ => 0,
         };
+        let entities = if let Some(plan) = &reader.seek_entities {
+            plan.charged_bytes()
+                .checked_add(plan.entries_bytes()?)
+                .ok_or(Error::Overflow)?
+        } else {
+            0
+        };
         let total = total
-            .checked_add(table_storage(&reader.lanes)?)
+            .checked_add(table_storage(&reader.seek)?)
+            .and_then(|n| n.checked_add(entities))
+            .and_then(|n| n.checked_add(table_storage(&reader.lanes).ok()?))
             .and_then(|n| n.checked_add(table_storage(&reader.tracks).ok()?))
             .and_then(|n| n.checked_add(table_storage(&reader.staged_tracks).ok()?))
             .and_then(|n| n.checked_add(selection))
@@ -968,7 +977,7 @@ struct Build {
     origins: BuildOrigins,
     origin: usize,
     clock: Option<PacketClock>,
-    picture_epoch: Option<SourceEpochs>,
+    picture_epoch: Option<(SourceEpochs, u64)>,
     picture_anchor: Option<usize>,
     last_anchor: u64,
     retire: usize,
@@ -1628,7 +1637,8 @@ impl Lane {
                 && range.start < piece.range.end
                 && build.picture_epoch.is_none()
             {
-                build.picture_epoch = Some(piece.source.pes().epochs);
+                let pes = piece.source.pes();
+                build.picture_epoch = Some((pes.epochs, pes.byte_run_epoch));
             }
             if piece.range.start <= anchor_offset && piece.serial > build.last_anchor {
                 build.picture_anchor = Some(build.origin);
@@ -1651,7 +1661,7 @@ impl Lane {
         if !work.try_charge(1) {
             return Ok(LaneStep::Yield);
         }
-        let epochs = build
+        let (epochs, byte_run) = build
             .picture_epoch
             .ok_or(Error::Invalid("MPEG-TS AU has no source extent"))?;
         let anchor = build.picture_anchor.map(|index| &pieces[index]);
@@ -1677,6 +1687,7 @@ impl Lane {
         Ok(LaneStep::PictureProbe(SeekProbe {
             offset: range.start,
             epochs,
+            byte_run,
             ticks,
             time,
             random_access,
@@ -1695,7 +1706,10 @@ impl Lane {
         let probing = match picture_delivery {
             PictureDelivery::Full => false,
             PictureDelivery::Scan | PictureDelivery::Discard => true,
-            PictureDelivery::Landing(offset) => offset != range.start,
+            PictureDelivery::Landing { offset, byte_run } => {
+                offset != range.start
+                    || !matches!(self.run, PesRun::Active(_, run) if run == byte_run)
+            }
         };
         if probing && let BuildUnit::Packet(AccessUnit::Video(unit)) = &build.unit {
             let flags = (unit.has_vcl, unit.random_access);

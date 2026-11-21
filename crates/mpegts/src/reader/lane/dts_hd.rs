@@ -29,6 +29,7 @@ pub(super) struct Reader {
     extensions: u8,
     pes_bytes: usize,
     validation: Option<Validation>,
+    incomplete: bool,
 }
 
 impl Reader {
@@ -55,10 +56,14 @@ impl Reader {
             extensions,
             pes_bytes: 0,
             validation: None,
+            incomplete: false,
         })
     }
 
     pub(super) fn check_pes(&self, pes: &Pes) -> Result<()> {
+        if self.incomplete {
+            return Err(Error::Truncated);
+        }
         if pes.header.stream_id != 0xbd
             || pes.header.declared_packet_length == 0
             || !pes.header.data_alignment_indicator
@@ -93,6 +98,9 @@ impl Reader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<DtsAudioFrame>> {
+        if self.incomplete {
+            return self.await_logical_end(work, cancel);
+        }
         if self.validation.is_none() {
             let size = self.pes_bytes;
             let frame = match self.input.step(work, cancel, |prefix| {
@@ -112,8 +120,18 @@ impl Reader {
             });
         }
         let validation = self.validation.as_mut().expect("complete DTS-HD PES bytes");
-        if !validation.check(work, cancel)? {
-            return Ok(Step::Yield);
+        match validation.check(self.input.maximum(), work, cancel) {
+            Ok(false) => return Ok(Step::Yield),
+            Err(Error::Truncated) => {
+                // Confirm logical EOF so the lane can report an incomplete
+                // audio fragment. A further PES cannot extend an aligned AU.
+                self.validation = None;
+                self.incomplete = true;
+                return self.await_logical_end(work, cancel);
+            }
+            result => {
+                result?;
+            }
         }
         let frame = self.validation.take().expect("validated DTS-HD PES").frame;
         Ok(Step::Ready(DtsAudioFrame {
@@ -123,10 +141,29 @@ impl Reader {
             duration: frame.header.window,
         }))
     }
+
+    fn await_logical_end(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<DtsAudioFrame>> {
+        match self.input.input().read_discard(1, work, cancel)? {
+            Step::NeedInput(request) => Ok(Step::NeedInput(request)),
+            Step::Yield => Ok(Step::Yield),
+            Step::End(_) => Err(Error::Truncated),
+            Step::Ready(_) => Err(Error::Invalid("DTS-HD bytes beyond aligned PES")),
+            Step::Backpressure(never) => match never {},
+        }
+    }
 }
 
 impl Validation {
-    fn check(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
+    fn check(
+        &mut self,
+        maximum: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
         let bytes = self.frame.bytes.as_ref();
         loop {
             if cancel.load(Ordering::Relaxed) {
@@ -176,9 +213,12 @@ impl Validation {
                 tail,
                 DtsFrameExtentLimits {
                     maximum_header_bytes: 4096,
-                    maximum_frame_bytes: tail.len(),
+                    maximum_frame_bytes: maximum,
                 },
             )?;
+            if ext.frame_bytes > tail.len() {
+                return Err(Error::Truncated);
+            }
             if u32::from(ext.substream_index) != self.remaining.trailing_zeros() {
                 return Err(Error::Invalid("DTS-HD extension substream order"));
             }

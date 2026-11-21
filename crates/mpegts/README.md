@@ -151,8 +151,9 @@ wraps. A coded random-access picture must have resolved timing.
 Use `Reader::request_seek_in_entities` for consecutive length-known, seekable
 parts of one logical transport stream. The ordered `SeekEntity` list supplies
 source IDs and lengths, and the scan bound applies to their combined size. Feed
-input by the requested source ID and finish the final entity. The reader advances
-the intermediate boundaries during scan, replay and delivery, preserving in-flight
+input by the requested source ID and finish the final entity. It is also safe to
+finish an intermediate entity as soon as all its bytes are supplied. The reader
+advances those boundaries during scan, replay and delivery, preserving in-flight
 PES and access units. The ordinary single-entity method requires a single source.
 
 Call `Reader::request_seek_and_index` to collect a bounded timestamp index

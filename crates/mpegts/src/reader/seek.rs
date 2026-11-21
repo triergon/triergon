@@ -68,6 +68,13 @@ impl EntityPlan {
         )
     }
 
+    pub(super) fn entries_bytes(&self) -> Result<usize> {
+        self.entries
+            .capacity()
+            .checked_mul(size_of::<SeekEntity>())
+            .ok_or(Error::Overflow)
+    }
+
     fn first(&self) -> (SourceId, SourceCapabilities) {
         let first = self.entries.as_slice()[0];
         (first.source, first.capabilities())
@@ -87,6 +94,7 @@ struct Landing {
     time: Time,
     offset: u64,
     epochs: SourceEpochs,
+    byte_run: u64,
 }
 
 #[derive(Default)]
@@ -156,12 +164,13 @@ pub(super) enum PictureDelivery {
     Full,
     Scan,
     Discard,
-    Landing(u64),
+    Landing { offset: u64, byte_run: u64 },
 }
 
 pub(super) struct SeekProbe {
     pub offset: u64,
     pub epochs: SourceEpochs,
+    pub byte_run: u64,
     pub ticks: Option<i128>,
     pub time: Option<Time>,
     pub random_access: bool,
@@ -232,6 +241,7 @@ fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
     Ok(SeekProbe {
         offset,
         epochs: packet.epochs(),
+        byte_run: packet.sources()[0].pes.pes().byte_run_epoch,
         ticks: clock.and_then(|clock| clock.pts.ticks90),
         time,
         random_access,
@@ -253,7 +263,10 @@ impl Seeking {
             Phase::Scan(_) if self.full_scan => PictureDelivery::Full,
             Phase::Scan(_) => PictureDelivery::Scan,
             Phase::Replay { landing, .. } if track == self.request.track => {
-                PictureDelivery::Landing(landing.offset)
+                PictureDelivery::Landing {
+                    offset: landing.offset,
+                    byte_run: landing.byte_run,
+                }
             }
             Phase::Replay { .. } => PictureDelivery::Discard,
             Phase::Deliver(_) | Phase::Retained(_) => PictureDelivery::Full,
@@ -283,6 +296,7 @@ impl Scan {
         let SeekProbe {
             offset,
             epochs,
+            byte_run,
             ticks,
             time,
             random_access,
@@ -308,6 +322,7 @@ impl Scan {
                 time,
                 offset,
                 epochs,
+                byte_run,
             };
             if let Some(index) = &mut self.index
                 && !index.record(point)
@@ -664,6 +679,7 @@ impl Reader {
                     if packet.track() != request.track
                         || packet.elementary_range().start != landing.offset
                         || packet.epochs() != landing.epochs
+                        || packet.sources()[0].pes.pes().byte_run_epoch != landing.byte_run
                     {
                         *skipped = true;
                         continue;
@@ -690,5 +706,67 @@ impl Reader {
                 _ => unreachable!("reader step during seek"),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{PacketFormat, ReaderLimits};
+    use triergon_core::{Bytes, InputWindow};
+
+    #[test]
+    fn cached_landing_index_releases_storage_after_the_seek() {
+        let bytes = include_bytes!("../../tests/data/ts188-basic.ts");
+        let pool = Budget::new(1 << 20).unwrap();
+        let source = SourceId(1);
+        let caps = SourceCapabilities {
+            length: Some(bytes.len() as u64),
+            random_access: true,
+        };
+        let mut reader = Reader::new(
+            &pool,
+            source,
+            caps,
+            ReaderLimits {
+                format: PacketFormat::Ts188,
+                ..ReaderLimits::default()
+            },
+            4096,
+        )
+        .unwrap();
+        let request = reader.request().unwrap();
+        reader
+            .provide(
+                &InputWindow::new(
+                    source,
+                    request.token,
+                    0,
+                    Bytes::copy_from_slice(&pool, bytes).unwrap(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let mut points = BudgetVec::new(&pool);
+        points.try_reserve_exact(64).unwrap();
+        let charge = Shared::<SeekIndex>::reserve(&pool).unwrap();
+        reader.seek_index = Some(Shared::new(
+            SeekIndex {
+                track: TrackId(256),
+                points,
+            },
+            charge,
+        ));
+        let occupied = pool.reserve(pool.limit() - pool.used()).unwrap();
+        let cancel = AtomicBool::new(false);
+        for _ in 0..32 {
+            reader.step(&mut WorkBudget::new(4096), &cancel).unwrap();
+            if reader.seek_index.is_none() {
+                drop(occupied);
+                assert!(reader.healthy().is_ok());
+                return;
+            }
+        }
+        panic!("transport pressure did not release the inactive index");
     }
 }

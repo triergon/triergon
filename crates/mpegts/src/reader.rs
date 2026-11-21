@@ -384,6 +384,24 @@ impl Reader {
     }
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
+        if let Some(next) = self.seek_entities.as_deref().and_then(|plan| plan.next()) {
+            self.queue_entity(
+                source,
+                token,
+                next.source,
+                next.capabilities(),
+                EntityTransition::Contiguous,
+            )?;
+            self.seek_entities
+                .as_deref_mut()
+                .expect("active seek entity plan")
+                .advance();
+            return Ok(());
+        }
+        self.finish_input(source, token)
+    }
+
+    fn finish_input(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         let input = self
             .input
             .as_mut()
@@ -438,7 +456,7 @@ impl Reader {
             return Err(Error::SourceMismatch);
         }
         token.request().checked_add(1).ok_or(Error::Overflow)?;
-        self.finish(source, token)?;
+        self.finish_input(source, token)?;
         self.next_entity = Some(NextEntity {
             source: next,
             capabilities,
@@ -541,13 +559,24 @@ impl Reader {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        observe: impl FnMut(CarrierObservation<'_>),
+        mut observe: impl FnMut(CarrierObservation<'_>),
     ) -> Result<ReaderStep<Self>> {
         self.healthy()?;
-        let result = if self.seek.is_empty() {
-            self.advance::<OBSERVING, false>(work, cancel, observe)
-        } else {
-            self.advance_seek(work, cancel)
+        let result = loop {
+            let result = if self.seek.is_empty() {
+                self.advance::<OBSERVING, false>(work, cancel, &mut observe)
+            } else {
+                self.advance_seek(work, cancel)
+            };
+            if matches!(
+                &result,
+                Ok(Step::Backpressure(_)) | Err(Error::Backpressure { .. })
+            ) && self.seek_index.take().is_some()
+            {
+                self.storage = None;
+                continue;
+            }
+            break result;
         };
         match result {
             Err(Error::Backpressure {
@@ -1122,20 +1151,13 @@ impl Reader {
                 }
                 Step::NeedInput(request) => {
                     if request.maximum == 0
-                        && let Some(next) =
-                            self.seek_entities.as_deref().and_then(|plan| plan.next())
+                        && self
+                            .seek_entities
+                            .as_deref()
+                            .and_then(|plan| plan.next())
+                            .is_some()
                     {
-                        self.queue_entity(
-                            request.source,
-                            request.token,
-                            next.source,
-                            next.capabilities(),
-                            EntityTransition::Contiguous,
-                        )?;
-                        self.seek_entities
-                            .as_deref_mut()
-                            .expect("active entity plan")
-                            .advance();
+                        self.finish(request.source, request.token)?;
                         continue;
                     }
                     return Ok(Step::NeedInput(request));
