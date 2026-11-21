@@ -33,13 +33,11 @@ A default-load value the crate declares `Unsupported` is not a value: the
 `advances`, `vertical` and `default` modes then exit with an error naming the
 face, size and glyph.
 
-The fold, bench and memory modes print the harness protocol's one JSON line:
-`packets` counts outlines (or glyphs in the `advances`, `vertical` and `default`
-modes), `bytes` outline points and
-`digest` folds every value above in a fixed order (`src/record.rs`). The bench
-mode adds the elapsed time of the timed loop and the memory mode brackets one
-operation with the allocation-window markers; reading the file is outside both.
-The dump mode prints the same values as lines, identical to the reference's
-dump, so a failing case can be diffed. The features are
+The fold, bench and memory modes print the harness protocol's one JSON line: `packets`
+counts outlines (or glyphs in the `advances`, `vertical` and `default` modes), `bytes`
+outline points and `digest` folds every value above in a fixed order. The bench mode
+adds the elapsed time and the memory mode brackets one operation with the
+allocation-window markers. The dump mode prints the same values as lines, identical to
+the reference's dump. The features are
 `harness/features/font-outlines/`, `font-hinting-none/`, `font-hinting-default/`
 and `font-hinting-modes/`.
