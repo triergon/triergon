@@ -140,6 +140,9 @@ The probe charges bounded work, preserves the original table and PES facts
 and applies again at framing resets. A failed initial probe reports the
 route as unsupported and later PES cannot rescue it.
 
+LCEVC video and linkage descriptors have bounded typed readers. They retain
+the original descriptor bytes and validate profile, reserved and linkage fields.
+
 ### Packets, events and timing
 
 `Packet` implements `PacketInfo` and retains its PMT, source configuration epoch,
