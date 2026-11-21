@@ -411,8 +411,10 @@ impl CharsetJob {
                         }
                     }
                 }
-                // The loop's head returns in these phases.
-                Phase::Ready | Phase::Taken => continue,
+                // The loop's head returns in these phases; returning here as well,
+                // not looping, keeps the per-character dispatch short.
+                Phase::Ready => return Ok(CharsetStatus::Ready),
+                Phase::Taken => return Err(Error::Invalid("charset output already taken")),
             }
         }
     }
