@@ -4,9 +4,8 @@ use triergon_codec::{
     AudioDecoder, AudioFrame, ChannelLayout, Colour, DownmixLevels, Error, PictureView, Plane,
     Speaker, VideoDecoder,
 };
-use triergon_pixel::letterbox::CANVAS_BYTES;
 use triergon_session::{
-    AudioSession, FeedError, OnRefusal, PcmBlock, QueueLimits, SessionState, VideoSession,
+    AudioSession, Canvas, FeedError, OnRefusal, PcmBlock, QueueLimits, SessionState, VideoSession,
 };
 
 /// A reordering decoder: access unit `[luma, display_order]`, delay of two.
@@ -79,7 +78,7 @@ impl VideoDecoder for Script {
 }
 
 fn centre(rgba: &[u8]) -> u8 {
-    rgba[CANVAS_BYTES / 2 + 1920 * 2]
+    rgba[Canvas::default().bytes() / 2 + 1920 * 2]
 }
 
 #[test]
@@ -174,6 +173,22 @@ fn decoder_failure_is_explicit_and_backpressure_bounds_input() {
     video.flush();
     assert_eq!((video.refusals(), video.last_refusal()), (0, None));
     video.feed(&[1, 0], None).unwrap();
+}
+
+#[test]
+fn a_video_lane_letterboxes_into_its_own_canvas() {
+    let canvas = Canvas::new(64, 48).unwrap();
+    let mut video = VideoSession::with_canvas(QueueLimits::VIDEO, canvas);
+    assert_eq!(video.canvas(), canvas);
+    video.load(Box::<Script>::default());
+    video.feed(&[20, 0], None).unwrap();
+    video.end_of_stream();
+    assert!(video.step(None));
+    let rgba = &video.latest().unwrap().rgba;
+    assert_eq!(rgba.len(), canvas.bytes());
+    // The 4x2 picture fills 64x32 rows between two bands of 8 black ones.
+    assert_eq!(rgba[..4], [0, 0, 0, 255]);
+    assert_eq!(rgba[(24 * 64 + 32) * 4..][..4], [20, 20, 20, 255]);
 }
 
 #[test]

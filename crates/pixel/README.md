@@ -3,9 +3,9 @@
 Picture types and the fixed pixel conversions shared by the capture, playback and
 subtitle sides: borrowed views of decoded pictures, a macroblock-aligned YUV 4:2:0
 picture, RGBA → YUV 4:2:0 with ITU-R BT.601 coefficients, a letterbox that converts a
-decoded 4:2:0 picture into a 1920×1080 RGBA canvas exactly as FFmpeg's scale/pad
-chain does, and the Y'CbCr → RGB of subtitle palette entries. It is the pixel layer below the codec crates and depends only on `std`.
-It does no general scaling, colour management or other canvas sizes.
+decoded 4:2:0 picture into an RGBA canvas (1920×1080 by default) exactly as FFmpeg's
+scale/pad chain does, and the Y'CbCr → RGB of subtitle palette entries. It is the pixel layer below the codec crates and depends only on `std`.
+It does no general scaling or colour management.
 
 ## Usage
 
@@ -32,7 +32,7 @@ comparisons.
 Decoded picture in, letterboxed RGBA out:
 
 ```rust
-use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler, fit};
+use triergon_pixel::letterbox::{Canvas, Scaler};
 use triergon_pixel::{Colour, PictureView, Plane};
 
 // A 64x36 8-bit 4:2:0 picture, lent the way a decoder lends its output.
@@ -50,10 +50,11 @@ let view = PictureView {
     sar: (1, 1),
     colour: Colour { matrix: 1, full_range: false },
 };
-let mut scaler = Scaler::default();                 // caches per-geometry filter plans
-let mut canvas = vec![0u8; CANVAS_BYTES];
-scaler.letterbox(&view, &mut canvas);               // writes the whole canvas
-let placed = fit(view.width, view.height);          // Fit { width, height, x, y }
+let canvas = Canvas::default();                     // 1920x1080; Canvas::new(w, h) for others
+let mut scaler = Scaler::new(canvas);               // caches per-geometry filter plans
+let mut rgba = vec![0u8; canvas.bytes()];
+scaler.letterbox(&view, &mut rgba);                 // writes the whole canvas
+let placed = canvas.fit(view.width, view.height);   // Fit { width, height, x, y }
 assert_eq!((placed.width, placed.height, placed.x, placed.y), (1920, 1080, 0, 0));
 ```
 
@@ -113,12 +114,14 @@ to nearest or half a step below, and clamped to 0–255. This is how FFmpeg's DV
 and PGS subtitle decoders convert palette entries, and how its MP4 demuxer converts
 a DVD colour table (half a step below).
 
-**Letterbox.** `Scaler::letterbox` writes the complete canvas: opaque black padding
-and the fitted picture. It reproduces FFmpeg's
-`scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=rgba`
-bit for bit:
+**Letterbox.** `Scaler::letterbox` writes the complete canvas of the scaler's `Canvas`
+(`Scaler::new`; the default is 1920×1080): opaque black padding and the fitted
+picture. It reproduces FFmpeg's
+`scale=W:H:force_original_aspect_ratio=decrease,pad=W:H:(ow-iw)/2:(oh-ih)/2,format=rgba`
+bit for bit. The reference comparisons cover the 1920×1080 canvas; other sizes follow the
+same rules.
 
-- `fit` scales the display size to fit, rounded to nearest; the offset is
+- `Canvas::fit` scales the display size to fit, rounded to nearest; the offset is
   `(canvas − fitted) / 2` rounded down. Only `width` and `height` are used; `sar` is
   not applied.
 - Same-size 8-bit pictures take a direct converter: luma at 15 fractional bits, each
@@ -133,7 +136,7 @@ bit for bit:
   32-byte aligned; the scaler widens the picture by the part of a left crop FFmpeg
   keeps, read from the plane `offset`.
 
-`letterbox` panics if the canvas is not exactly `CANVAS_BYTES` long. Plane data must
+`letterbox` panics if the canvas is not exactly `Canvas::bytes` long. Plane data must
 cover the declared size and offsets. Filter plans are cached per width, height and
 bit depth.
 
@@ -149,7 +152,8 @@ impulses, ramps and constant fields through its public filter API).
   tall 528×4216 picture (`tests/fixtures/rgba-reference-digests.txt`).
 - A unit test pins the BT.601 palette conversion, in both roundings, against
   FFmpeg's DVD palettes.
-- Unit tests pin the fit rule, taps against reference measurements (including
+- Unit tests pin the fit rule, that another canvas size holds the same fitted picture
+  (direct and separable paths), taps against reference measurements (including
   near ties), the left-crop alignment rule, filter normalisation, the BT.601
   coefficients against their derivation, primaries and extremes, centre-sited
   chroma, bottom-up input and edge padding.

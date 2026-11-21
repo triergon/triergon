@@ -35,7 +35,7 @@ use triergon_codec::{
     AudioCodec, AudioDecoder, AudioFrame, DownmixLevels, VideoCodec, VideoDecoder,
 };
 use triergon_harness_protocol::interleaved::InterleavedDigest;
-use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
+use triergon_pixel::letterbox::{Canvas, Scaler};
 use triergon_session::TrackDecoder;
 use triergon_session::mix::Downmix;
 
@@ -128,7 +128,7 @@ fn video(codec: VideoCodec, data: &[u8], out: &mut Output) {
         VideoCodec::Hevc => triergon_codec_hevc::Decoder::new().boxed(),
     };
     let mut scaler = Scaler::default();
-    let mut rgba = vec![0_u8; CANVAS_BYTES];
+    let mut rgba = vec![0_u8; Canvas::default().bytes()];
     let mut n = 0;
     access_units(data, codec == VideoCodec::Hevc, |unit| {
         if let Err(error) = decoder.send(unit, Some(n)) {

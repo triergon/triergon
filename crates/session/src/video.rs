@@ -1,4 +1,5 @@
-//! Video lane: Annex-B access units in, one clock-gated 1920x1080 RGBA picture out.
+//! Video lane: Annex-B access units in, one clock-gated RGBA picture out, letterboxed into
+//! the lane's canvas (1920x1080 unless chosen otherwise).
 //!
 //! Each picture keeps the timestamp its access unit carried through the
 //! decoder's reordering. The lane holds at most one converted picture ahead of
@@ -8,7 +9,7 @@ use crate::lane::{OnRefusal, Phase, Refusals};
 use crate::queue::{FeedError, QueueLimits, UnitQueue};
 use std::sync::Arc;
 use triergon_codec::{DynVideoDecoder, Error};
-use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
+use triergon_pixel::letterbox::{Canvas, Scaler};
 
 /// The current picture for the compositor. `sequence` increases for every
 /// publication of this session object, across generations, so a texture cache
@@ -21,7 +22,8 @@ pub struct Published {
     pub generation: u64,
     /// The caller PTS of the picture's access unit.
     pub pts: Option<i64>,
-    /// The letterboxed picture: 1920x1080 RGBA, rows top to bottom, no padding.
+    /// The letterboxed picture: the session's [`Canvas`] of RGBA, rows top to bottom, no
+    /// padding.
     pub rgba: Arc<Vec<u8>>,
 }
 
@@ -58,13 +60,17 @@ impl core::fmt::Debug for VideoSession {
 }
 
 impl VideoSession {
-    /// An idle lane whose queue holds at most `limits`. A refused access unit fails it
-    /// ([`OnRefusal::Fail`]).
+    /// An idle lane whose queue holds at most `limits`, publishing pictures on the
+    /// default 1920x1080 canvas. A refused access unit fails it ([`OnRefusal::Fail`]).
     pub fn new(limits: QueueLimits) -> Self {
+        Self::with_canvas(limits, Canvas::default())
+    }
+    /// [`new`](Self::new) with pictures letterboxed into `canvas`.
+    pub fn with_canvas(limits: QueueLimits, canvas: Canvas) -> Self {
         Self {
             decoder: None,
             queue: UnitQueue::new(limits),
-            scaler: Scaler::default(),
+            scaler: Scaler::new(canvas),
             ahead: None,
             spare: None,
             latest: None,
@@ -108,6 +114,10 @@ impl VideoSession {
         if clear_picture {
             self.latest = None;
         }
+    }
+    /// The canvas its pictures are letterboxed into.
+    pub fn canvas(&self) -> Canvas {
+        self.scaler.canvas()
     }
     /// Increases with every [`load`](Self::load), [`flush`](Self::flush) and
     /// [`stop`](Self::stop).
@@ -161,7 +171,7 @@ impl VideoSession {
         while self.ahead.is_none() && !matches!(self.phase, Phase::Failed(_)) {
             if let Some(view) = decoder.receive() {
                 let mut rgba = self.spare.take().unwrap_or_default();
-                rgba.resize(CANVAS_BYTES, 0);
+                rgba.resize(self.scaler.canvas().bytes(), 0);
                 self.scaler.letterbox(&view, &mut rgba);
                 self.ahead = Some(Ahead {
                     pts: view.pts,

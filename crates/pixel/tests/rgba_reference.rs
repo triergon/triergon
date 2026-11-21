@@ -1,7 +1,7 @@
 //! Letterbox output against digests captured from the reference converter
 //! (the same pseudo-random pictures through FFmpeg 9.0.2's `scale,pad,format=rgba`
 //! chain).
-use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
+use triergon_pixel::letterbox::{Canvas, Scaler};
 use triergon_pixel::{Colour, PictureView, Plane};
 
 const FIXTURES: &str = include_str!("fixtures/rgba-reference-digests.txt");
@@ -65,7 +65,7 @@ fn letterbox(
         sar: (1, 1),
         colour,
     };
-    let mut rgba = vec![0_u8; CANVAS_BYTES];
+    let mut rgba = vec![0_u8; Canvas::default().bytes()];
     scaler.letterbox(&view, &mut rgba);
     rgba
 }
@@ -138,7 +138,7 @@ fn raw_letterbox() {
     let samples = cw * ch + 2 * ccw * cch;
     let bytes = if bits > 8 { 2 } else { 1 };
     let mut scaler = Scaler::default();
-    let mut rgba = vec![0_u8; CANVAS_BYTES];
+    let mut rgba = vec![0_u8; Canvas::default().bytes()];
     let mut out = Vec::new();
     let mut timings = Vec::new();
     let reps: usize = std::env::var("RGBA_BENCH")

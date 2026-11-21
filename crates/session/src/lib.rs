@@ -46,6 +46,7 @@ pub use triergon_codec::{
     AudioCodec, AudioDecoder, DynAudioDecoder, DynVideoDecoder, VideoCodec, VideoDecoder,
 };
 pub use triergon_core::Error;
+pub use triergon_pixel::letterbox::Canvas;
 pub use video::{Published, VideoSession};
 
 /// The codecs of one stream: a video lane and, optionally, an audio lane.

@@ -3,7 +3,8 @@
 A decode-session layer for desktop playback. It takes AVC/HEVC Annex B access
 units and AC-3, E-AC-3, ADTS AAC, DTS core, FLAC, Opus, Vorbis or MPEG audio frames, drives the pure-Rust codec
 crates through the [triergon-codec](../codec/README.md) traits, and publishes
-clock-gated 1920×1080 RGBA pictures and interleaved stereo s16 PCM. It is a
+clock-gated RGBA pictures (1920×1080 unless the caller picks another canvas) and
+interleaved stereo s16 PCM. It is a
 composition-layer crate over triergon-codec and
 [triergon-pixel](../pixel/README.md). The caller owns the clock, packet framing,
 output devices and GPU upload. Nothing here spawns a process or links a native
@@ -68,7 +69,7 @@ also builds a decoder for an audio session.
 
 | Stream | Input | Output |
 |---|---|---|
-| Video | H.264, HEVC Annex B access units with optional PTS | 1920×1080 RGBA, letterboxed, 8- and 10-bit 4:2:0 sources |
+| Video | H.264, HEVC Annex B access units with optional PTS | RGBA letterboxed into a `Canvas` (1920×1080 by default), 8- and 10-bit 4:2:0 sources |
 | Audio | AC-3, E-AC-3, AAC (ADTS or configured raw LC), DTS core, FLAC, Opus, Vorbis, MPEG audio Layer I-III | interleaved stereo s16 at the decoder's rate |
 | Container track | any `TrackInfo` of a supported codec, its packets | `TrackDecoder`: decoded frames with the container's trims applied |
 
@@ -119,7 +120,8 @@ The `mix` module holds the stereo downmix (`mix::Downmix`) and the s16 conversio
   `refusals()` counts the refusals since the lane last restarted and `last_refusal()`
   holds the latest.
 - **Letterbox.** Each picture goes through one `triergon_pixel::letterbox::Scaler`
-  into a 1920×1080 RGBA canvas; the fit, padding and conversion rules are in
+  into the lane's RGBA canvas: 1920×1080 for `VideoSession::new`, any `Canvas` for
+  `VideoSession::with_canvas`. The fit, padding and conversion rules are in
   [triergon-pixel](../pixel/README.md).
 - **Downmix.** `mix::Downmix`: front pair at unity, centre and surrounds at −3 dB,
   LFE dropped, normalised so no output exceeds full scale; mono goes to both sides
