@@ -4,7 +4,8 @@
   "01 - changing samplerate.flac",
   "02 - increasing number of channels.flac",
   "03 - decreasing number of channels.flac",
-  "flac_3ch_odd_mask.flac"
+  "flac_3ch_odd_mask.flac",
+  "he_mode.bit"
  ],
  "vectors": [
   {
