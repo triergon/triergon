@@ -1,11 +1,34 @@
 //! Self-contained ADTS tests with synthetic (self-authored) bitstreams.
 use triergon_codec::Budget;
 use triergon_codec_aac::{
-    AudioFrame, DecodeError, Decoder, Feature, Limits, RawLcDecoder, Speaker,
+    AudioFrame, DecodeError, Decoder, Feature, Limits, RawLcDecoder, RawSbrDecoder, Speaker,
 };
 
 struct Bw {
     bits: Vec<u8>,
+}
+
+#[test]
+fn raw_sbr_refuses_unsupported_configuration_and_missing_initial_extension() {
+    let budget = Budget::new(4 << 20).unwrap();
+    for (rate, channels) in [(2, 2), (13, 2), (6, 1), (6, 6)] {
+        assert!(RawSbrDecoder::new_in(rate, channels, &budget).is_err());
+    }
+    let mut decoder = RawSbrDecoder::new_in(6, 2, &budget).unwrap();
+    let mut bits = Bw::new();
+    bits.put(1, 3);
+    bits.put(0, 4);
+    bits.put(0, 1);
+    silent_ics(&mut bits);
+    silent_ics(&mut bits);
+    bits.put(7, 3);
+    let mut frame = AudioFrame::default();
+    assert_eq!(
+        decoder.decode(&bits.bytes(), &mut frame),
+        Err(DecodeError::InvalidData("missing initial raw SBR"))
+    );
+    assert_eq!(frame.samples_per_channel, 0);
+    decoder.reset();
 }
 
 impl Bw {

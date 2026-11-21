@@ -179,6 +179,7 @@ pub(crate) struct Core {
     pub random: u32,
     /// SBR has been seen (implicit signalling): output at twice the core rate.
     pub sbr_active: bool,
+    pub raw_sbr: bool,
     /// PS has been seen on a mono element: output stereo.
     pub ps_active: bool,
     pub pce: Option<Pce>,
@@ -223,6 +224,7 @@ impl Core {
             fb: Filterbank::new(),
             random: PNS_INITIAL_STATE,
             sbr_active: false,
+            raw_sbr: false,
             ps_active: false,
             pce: None,
             unordered: false,
@@ -256,6 +258,17 @@ impl Core {
         for c in &mut self.cce {
             c.reset(self.aot);
         }
+    }
+
+    pub(crate) fn reset_raw_sbr(&mut self) {
+        self.reset_history();
+        for element in &mut self.elements {
+            if let Some(sbr) = &mut element.sbr {
+                sbr.renew();
+            }
+        }
+        self.sbr_active = false;
+        self.frames_out = 0;
     }
 
     pub(crate) fn output_rate(&self) -> u32 {
@@ -654,7 +667,7 @@ impl Core {
                             return Err(DecodeError::InvalidData("fill element overrun"));
                         }
                         let ext = br.read(4);
-                        if RAW && matches!(ext, EXT_SBR_DATA | EXT_SBR_DATA_CRC) {
+                        if RAW && !self.raw_sbr && matches!(ext, EXT_SBR_DATA | EXT_SBR_DATA_CRC) {
                             return Err(DecodeError::Unsupported(Feature::RawSbr));
                         }
                         if !RAW
@@ -724,7 +737,14 @@ impl Core {
                 "no channel configuration (missing PCE)",
             ));
         }
-        self.finish_frame::<RAW>(out);
+        if RAW && self.raw_sbr {
+            if !self.sbr_active {
+                return Err(DecodeError::InvalidData("missing initial raw SBR"));
+            }
+            self.finish_frame::<false>(out);
+        } else {
+            self.finish_frame::<RAW>(out);
+        }
         Ok(layout_changed)
     }
 
