@@ -92,8 +92,7 @@ impl AudioSession {
     /// ([`FeedError::Invalid`]), and while the queue is full ([`FeedError::Backpressure`]:
     /// keep the unit and retry).
     pub fn feed(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
-        self.phase.admit(self.decoder.is_some())?;
-        self.queue.push(au, pts)
+        self.feed_discarding(au, pts, Discard::default())
     }
     /// [`feed`](Self::feed) a container packet's payload, whose decoded output then drops
     /// the samples its container marks for discarding ([`Discard::of`]).
