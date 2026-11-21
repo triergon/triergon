@@ -200,15 +200,7 @@ fn main() -> ExitCode {
             _ => Err(USAGE.to_owned()),
         },
         Some("session-queues") => session_queues::main(&root, &args[1..]),
-        Some("progressive") => {
-            return match progressive_bench::main(&root, &args[1..]) {
-                Ok(code) => ExitCode::from(code as u8),
-                Err(message) => {
-                    eprintln!("{message}");
-                    ExitCode::from(2)
-                }
-            };
-        }
+        Some("progressive") => return exit(progressive_bench::main(&root, &args[1..])),
         Some("check-simd") => simd_lints(&root).and_then(|()| simd_tests(&root)),
         Some("prepare-check") => match &args[1..] {
             [] => prepare_check(None),
@@ -315,13 +307,7 @@ fn main() -> ExitCode {
         }
         _ => Err(USAGE.to_owned()),
     };
-    match result {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(message) => {
-            eprintln!("{message}");
-            ExitCode::FAILURE
-        }
-    }
+    exit_with(result.map(|()| 0), 1)
 }
 
 /// `cargo run` (and the rustup proxy in front of it) prepends build and
@@ -467,40 +453,35 @@ fn fixtures(root: &Path) -> Task {
     Ok(())
 }
 
-fn exit(result: Result<i32, String>) -> ExitCode {
+/// A command's exit code, clamped to a byte; an error is printed and exits `error`.
+fn exit_with(result: Result<i32, String>, error: u8) -> ExitCode {
     match result {
         Ok(code) => ExitCode::from(code.clamp(0, 255) as u8),
         Err(message) => {
             eprintln!("{message}");
-            ExitCode::from(2)
+            ExitCode::from(error)
         }
     }
 }
 
+/// A measuring command's exit code; an error is printed and exits 2.
+fn exit(result: Result<i32, String>) -> ExitCode {
+    exit_with(result, 2)
+}
+
 /// Success when a check holds; failure when it does not, or an error is printed.
 fn passing(result: Result<bool, String>) -> ExitCode {
-    match result {
-        Ok(true) => ExitCode::SUCCESS,
-        Ok(false) => ExitCode::FAILURE,
-        Err(message) => {
-            eprintln!("{message}");
-            ExitCode::FAILURE
-        }
-    }
+    exit_with(result.map(|holds| i32::from(!holds)), 1)
 }
 
 /// A runner's exit code; an error is printed and exits 1, `--help` prints `usage`.
 fn failing(result: Result<i32, String>, usage: &str) -> ExitCode {
     match result {
-        Ok(code) => ExitCode::from(code.clamp(0, 255) as u8),
         Err(message) if message == usage => {
             println!("{usage}");
             ExitCode::from(2)
         }
-        Err(message) => {
-            eprintln!("{message}");
-            ExitCode::FAILURE
-        }
+        result => exit_with(result, 1),
     }
 }
 
@@ -736,14 +717,7 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
         };
         Ok(())
     })();
-    let result = parsed.and_then(|()| harness::report::run(root, &options));
-    match result {
-        Ok(code) => ExitCode::from(code as u8),
-        Err(message) => {
-            eprintln!("{message}");
-            ExitCode::from(2)
-        }
-    }
+    exit(parsed.and_then(|()| harness::report::run(root, &options)))
 }
 
 fn compare(root: &Path, args: &[String]) -> Task {
@@ -1148,13 +1122,7 @@ fn generator_main(root: &Path, generator: &generators::Generator, args: &[String
         }
         _ => (generator.main)(root, args),
     };
-    match result {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(message) => {
-            eprintln!("{message}");
-            ExitCode::FAILURE
-        }
-    }
+    exit_with(result.map(|()| 0), 1)
 }
 
 /// The reports `COMMAND compare` stands for; exits with the first failing one's
