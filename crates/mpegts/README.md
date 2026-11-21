@@ -363,3 +363,13 @@ Integration tests use independently authored streams in `tests/data/` (listed in
 `cargo xtask fixture transport-dts-seek --record REFERENCE`. The comparison
 contracts are `harness/features/mpegts-*/contract.json`; results are in
 [docs/status.md](../../docs/status.md).
+
+The [six-block ATSC E-AC-3 comparison](../../harness/eac3-proof.md) checks the
+complete grouped operation with a separate public-parser adapter. All ten
+authored inputs match every packet field and payload through EOF. Fold and proof
+verify parser byte identity and source-header digests; timed and memory modes
+check parser coverage and source clocks without those extra passes, parsing fixed
+headers and only the opening short primary BSI. The ordinary
+parser operation differs on all ten inputs. Both comparisons are available
+through `cargo xtask worker-tests transport::eac3-experiment`. Native timing
+and memory results are in [status](../../docs/status.md).

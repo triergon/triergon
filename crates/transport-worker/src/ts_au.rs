@@ -29,6 +29,7 @@ use triergon_mpegts::{
 mod malformed;
 
 pub const PREFIX: &str = "ts-au-";
+pub const EAC3_PREFIX: &str = "ts-eac3-six-block-";
 const OPERATION: &str = "mpegts-access-unit-packets";
 const WINDOW: usize = 64 * 1024;
 const WORK: u64 = 4096;
@@ -47,12 +48,12 @@ struct TrackProjection {
 }
 
 #[derive(Clone, Copy)]
-struct PacketPosition<'a> {
+struct PacketPosition<'a, const TRACE: bool> {
     request: &'a Request,
     basis: PositionBasis,
 }
 
-impl PacketPosition<'_> {
+impl<const TRACE: bool> PacketPosition<'_, TRACE> {
     fn at(self, entity: SourceId, offset: u64) -> Result<i64> {
         let carrier = match self.request.format {
             PacketFormat::Ts188 => offset / 188 * 188,
@@ -296,11 +297,11 @@ impl<'a> From<&'a UnframedAudio> for PacketProjection<'a> {
     }
 }
 
-fn fold_packet(
+fn fold_packet<const TRACE: bool>(
     totals: &mut Totals,
     packet: PacketProjection<'_>,
     index: usize,
-    position: PacketPosition<'_>,
+    position: PacketPosition<'_, TRACE>,
     duration: i64,
     clock: &mut DemuxClock,
     cancel: &AtomicBool,
@@ -375,6 +376,39 @@ fn fold_packet(
         bytes as u64,
     ];
     let stream_id = pes.header.stream_id;
+    if TRACE {
+        use std::io::Write;
+        let mut out = std::io::stdout().lock();
+        write!(
+            out,
+            "{{\"stream\":{},\"pid\":{},\"pts\":{},\"dts\":{},\"duration\":{},\"pos\":{},\"flags\":{},\"hex\":\"",
+            fields[0],
+            fields[1],
+            fields[2] as i64,
+            fields[3] as i64,
+            fields[4] as i64,
+            fields[5] as i64,
+            fields[6]
+        )?;
+        let mut hex = |bytes: &[u8]| -> Result<()> {
+            for byte in bytes {
+                write!(out, "{byte:02x}")?;
+            }
+            Ok(())
+        };
+        match &packet.payload {
+            Payload::Framed { bytes, .. } => hex(bytes)?,
+            Payload::PreservedPes(_) => {
+                for span in pes.payload() {
+                    hex(span)?;
+                }
+            }
+        }
+        writeln!(
+            out,
+            "\",\"side_data\":[{{\"type\":19,\"hex\":\"{stream_id:02x}\"}}]}}"
+        )?;
+    }
     match packet.payload {
         Payload::Framed { bytes, .. } => {
             fold_payload(totals, fields, stream_id, std::iter::once(bytes))
@@ -393,7 +427,10 @@ fn diagnostic_refusal(fault: &triergon_mpegts::TraceFault) -> Refusal {
     }
 }
 
-fn fold_continuity(residue: &ContinuityResidue, position: PacketPosition<'_>) -> Result<Totals> {
+fn fold_continuity<const TRACE: bool>(
+    residue: &ContinuityResidue,
+    position: PacketPosition<'_, TRACE>,
+) -> Result<Totals> {
     let first = residue
         .chunks()
         .first()
@@ -423,7 +460,11 @@ fn fold_continuity(residue: &ContinuityResidue, position: PacketPosition<'_>) ->
     Ok(totals)
 }
 
-fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<Totals> {
+fn operation<const TRACE: bool>(
+    pool: &Budget,
+    request: &Request,
+    cancel: &AtomicBool,
+) -> Result<Totals> {
     let mut totals = Totals::default();
     let mut at = SourceLocation {
         source: FIRST_SOURCE,
@@ -433,7 +474,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
         Ok(basis) => basis,
         Err(error) => return Ok(refused(totals, error.as_ref(), at)),
     };
-    let position = PacketPosition { request, basis };
+    let position = PacketPosition::<TRACE> { request, basis };
     let limits = ReaderLimits {
         format: request.format,
         program: Some(request.program),
@@ -878,16 +919,37 @@ fn prove_source(
 }
 
 pub fn run(args: &[String]) -> Result<()> {
+    let eac3 = args
+        .first()
+        .is_some_and(|mode| mode.starts_with(EAC3_PREFIX));
     let invocation = Invocation::parse(
         args,
-        PREFIX,
+        if eac3 { EAC3_PREFIX } else { PREFIX },
         " SIZE PROGRAM [--dvb|--atsc] [[--discontinuity] ENTITY]... [--dts-core=PID|--probe-dts-core] [--ignore-pcr-reserved-bits]",
         2..=usize::MAX,
-        false,
+        true,
     )?;
+    if eac3
+        && (invocation.arguments.len() != 3
+            || invocation.arguments[0] != "188"
+            || invocation.arguments[2] != "--atsc")
+    {
+        return Err("six-block comparison requires SIZE 188, PROGRAM and --atsc".into());
+    }
     let pool = Budget::new(256 * 1024 * 1024)?;
     let request =
         ts_input::parse_access_units(&pool, Path::new(invocation.path), invocation.arguments)?;
+    // Select a monomorphization before measurement; ordinary folds carry no trace flag.
+    let operation = if invocation.mode == triergon_harness_runner::Mode::Trace {
+        operation::<true>
+    } else {
+        operation::<false>
+    };
+    let name = if eac3 {
+        "mpegts-atsc-eac3-six-block"
+    } else {
+        OPERATION
+    };
     let run = || {
         operation(
             &pool,
@@ -898,7 +960,7 @@ pub fn run(args: &[String]) -> Result<()> {
     if request.probe_dts_core {
         measure_repeated(&invocation, OPERATION, Some(&pool), run)
     } else {
-        measure(&invocation, OPERATION, Some(&pool), run)
+        measure(&invocation, name, Some(&pool), run)
     }
 }
 
@@ -931,7 +993,7 @@ mod tests {
             following: BudgetVec::new(&pool),
         };
         let baseline = pool.used();
-        let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
+        let totals = operation::<false>(&pool, &request, &AtomicBool::new(false)).unwrap();
         assert_eq!(pool.used(), baseline);
         totals
     }
@@ -961,7 +1023,7 @@ mod tests {
         let retained = pool.used();
         let mut first = None;
         for _ in 0..50 {
-            let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
+            let totals = operation::<false>(&pool, &request, &AtomicBool::new(false)).unwrap();
             assert_eq!((totals.packets, totals.bytes, totals.digest), (0, 0, 0));
             let refusal = totals.refusal.expect("malformed DTS remains unsupported");
             assert!(
@@ -1017,7 +1079,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
+        let totals = operation::<false>(&pool, &request, &AtomicBool::new(false)).unwrap();
         assert_eq!(totals.packets, 0);
         assert_eq!(totals.refusal.unwrap().reason, "source diagnostic: Psi");
     }
