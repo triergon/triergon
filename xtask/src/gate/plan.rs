@@ -53,6 +53,9 @@ const REPORT_WEIGHTS: &[(&str, u32)] = &[
 /// `gate plan` and `gate summary` fail on a registered feature that is neither here
 /// nor registered with the report runner.
 pub(super) const COVERED: &[(&str, Coverage)] = &[
+    ("pgs-segments", Coverage::Item("oracle-compare")),
+    ("text-extraction-oracle", Coverage::Item("oracle-compare")),
+    ("tx3g-config-oracle", Coverage::Item("oracle-compare")),
     ("dts-core-header", Coverage::Item("oracle-compare")),
     ("dts-unpacking", Coverage::Item("oracle-compare")),
     (
@@ -78,6 +81,13 @@ pub(super) const COVERED: &[(&str, Coverage)] = &[
         Coverage::Item("oracle-compare"),
     ),
     ("font-store", Coverage::Item("oracle-compare")),
+    ("bit-readers", Coverage::Item("oracle-compare")),
+    ("rbsp-unescape", Coverage::Item("oracle-compare")),
+    ("core-budgets", Coverage::Item("oracle-compare")),
+    ("dsp-windows", Coverage::Item("oracle-compare")),
+    ("dsp-divide", Coverage::Item("oracle-compare")),
+    ("opus-final-range", Coverage::Item("oracle-compare")),
+    ("dsp-imdct", Coverage::Item("codecs dsp")),
     ("shape-libass", Coverage::Item("shape compare")),
     ("shape-text", Coverage::Item("shape compare")),
     ("shape-bidi", Coverage::Item("shape compare")),
@@ -411,6 +421,7 @@ pub(super) fn items(
         plan.ogg_readers(),
         plan.file_codecs(),
         plan.elementary_readers(),
+        plan.codec_dsp(),
         plan.aac_access_units(),
     ]);
     for list in &WORKLOAD_LISTS {
@@ -1374,6 +1385,21 @@ impl Plan<'_> {
                 ),
                 step("core-time", Stage::Timing, Placement::Free, core_time),
             ],
+            preflight: Vec::new(),
+        }
+    }
+
+    /// Standalone transform parity with av_tx and the transform definition.
+    fn codec_dsp(&self) -> Item {
+        Item {
+            name: "codec-dsp".into(),
+            weight: 1,
+            steps: vec![step(
+                "imdct-compare",
+                Stage::Timing,
+                Placement::Free,
+                xtask(&["codecs", "dsp", "--output", &format!("{}/parity/dsp-imdct", self.out)]),
+            )],
             preflight: Vec::new(),
         }
     }
