@@ -46,9 +46,9 @@ CARGO_INCREMENTAL=0 cargo xtask report \
   --manifest harness/features/mpegts-mpeg-video/corpus.json --corpus .
 ```
 
-Local packet folds match on all fourteen inputs. Native qualification follows the
-[shared acceptance policy](../../../docs/quality.md) on AArch64 and ARMv7 and
-remains open for this profile.
+All fourteen inputs match the packet folds and meet the runtime, peak heap and
+total RSS requirements on Linux AArch64 and 32-bit ARMv7 with 30 pairs. See the
+[measured results](../../../docs/status.md).
 
 Syntax references: ITU-T H.262 (02/2000), Table 6-1, §§6.2.2.1, 6.2.2.3, 6.2.3,
 6.2.3.1, 6.2.4 and 6.3.3; ITU-T H.222.0 (10/2014), §2.4.3.6 and Table 2-34.
