@@ -1222,10 +1222,12 @@ impl Lane {
         match &self.framer {
             Some(Framer::DtsHd(reader)) => reader.check_pes(pes)?,
             Some(Framer::DtsExtension(reader)) => reader.check_pes(pes)?,
+            Some(Framer::Dts(_))
+                if self.track.unlabelled_dts_core && pes.header.stream_id != 0xbd =>
+            {
+                return Err(Error::Invalid("unlabelled DTS core PES stream ID"));
+            }
             _ => (),
-        }
-        if self.track.unlabelled_dts_core && pes.header.stream_id != 0xbd {
-            return Err(Error::Invalid("unlabelled DTS core PES stream ID"));
         }
         let stream_type = self.track.stream().stream_type;
         if !(0xc0..=0xdf).contains(&pes.header.stream_id) {
