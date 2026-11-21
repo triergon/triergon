@@ -61,7 +61,7 @@ let effects = Effects {
     blur: 1.0,
     be: 0,
 };
-let request = GlyphRequest { shape: &shape, placement, frame, effects: &effects, karaoke: false };
+let request = GlyphRequest::new(&shape, placement, frame, &effects);
 let mut run = Run::default();
 let glyph = run.render(&mut raster, &request, &mut work)?.ok_or("nothing drawn")?;
 
@@ -166,9 +166,11 @@ saturate, NaN converts to 0 and such shifts give 0, so a coordinate rounds
 out of range as libass does there.
 
 Not covered: glyph loading, hinting, synthetic styles and decoration lines
-(`triergon-font` and the renderer); drawing parsing and the image list,
-including where vector clips overlap and how their images are allocated,
-which belong to the renderer. The large-tile build of libass
+(`triergon-font` and the renderer); drawing parsing, karaoke timing and the
+image list, including where vector clips overlap and how their images are
+allocated, which belong to the renderer. A renderer times `\kf` karaoke by
+the least x of a glyph's outline under `GlyphRequest::matrix`
+(`Outline::min_transformed_x`). The large-tile build of libass
 (`--enable-large-tiles`) is not matched.
 
 ## Verification

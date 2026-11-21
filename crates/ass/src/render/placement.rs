@@ -323,12 +323,17 @@ impl GlyphDrawing<'_> {
     /// What [`Run::render_with`](triergon_raster::compat::libass::Run::render_with)
     /// draws.
     pub(super) fn request(&self, frame: &FrameScale) -> GlyphRequest<'_> {
-        GlyphRequest {
-            shape: &self.outline.shape,
-            placement: self.placement,
-            frame: *frame,
-            effects: &self.effects,
-            karaoke: self.karaoke,
+        GlyphRequest::new(&self.outline.shape, self.placement, *frame, &self.effects)
+    }
+
+    /// The least of `leftmost_x` and, for a `\kf` glyph, the x of its
+    /// outline under `request`'s transform, 26.6: what its run's `\kf` fill
+    /// is timed from.
+    pub(super) fn leftmost_x(&self, request: &GlyphRequest<'_>, leftmost_x: i32) -> i32 {
+        if self.karaoke {
+            request.shape().outlines()[0].min_transformed_x(request.matrix(), leftmost_x)
+        } else {
+            leftmost_x
         }
     }
 }

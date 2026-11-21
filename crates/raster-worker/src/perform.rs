@@ -377,6 +377,7 @@ impl<'g> Runner<'g> {
             be: case.be,
         };
         let mut run = Run::default();
+        let mut leftmost_x = OUTLINE_MAX;
         let mut drawn = Vec::new();
         for glyph in &case.glyphs {
             let outline = match self.convert(&glyph.source) {
@@ -390,25 +391,23 @@ impl<'g> Runner<'g> {
             let shape = Shape::from_outlines(outline, Outline::new(&self.budget));
             let (gr, gi) = (&glyph.reals, &glyph.ints);
             let glyph_effects = effects([gr[11], gr[12]]);
-            let request = GlyphRequest {
-                shape: &shape,
-                placement: Placement {
-                    rotation: [gr[0], gr[1], gr[2]],
-                    shear: [gr[3], gr[4]],
-                    scale: [gr[5], gr[6]],
-                    outline_scale: [gr[7], gr[8]],
-                    outline_offset: [gr[9], gr[10]],
-                    shift: Vector::new(gi[0], gi[1]),
-                    ascender: gi[2],
-                    descender: gi[3],
-                    position: Vector::new(gi[4], gi[5]),
-                    advance: gi[6].wrapping_add(gi[7]),
-                    scale_fix: gr[13],
-                },
-                frame,
-                effects: &glyph_effects,
-                karaoke: bit(32),
+            let placement = Placement {
+                rotation: [gr[0], gr[1], gr[2]],
+                shear: [gr[3], gr[4]],
+                scale: [gr[5], gr[6]],
+                outline_scale: [gr[7], gr[8]],
+                outline_offset: [gr[9], gr[10]],
+                shift: Vector::new(gi[0], gi[1]),
+                ascender: gi[2],
+                descender: gi[3],
+                position: Vector::new(gi[4], gi[5]),
+                advance: gi[6].wrapping_add(gi[7]),
+                scale_fix: gr[13],
             };
+            let request = GlyphRequest::new(&shape, placement, frame, &glyph_effects);
+            if bit(32) {
+                leftmost_x = shape.outlines()[0].min_transformed_x(request.matrix(), leftmost_x);
+            }
             let bitmaps = match run.render(&mut self.raster, &request, &mut self.work) {
                 Ok(bitmaps) => bitmaps,
                 Err(error) => return sink.value(refused(&error)),
@@ -425,7 +424,7 @@ impl<'g> Runner<'g> {
             }
             drawn.extend(bitmaps);
         }
-        sink.value(run.leftmost_x().into())?;
+        sink.value(leftmost_x.into())?;
         if drawn.is_empty() {
             for _ in 0..3 {
                 sink.absent()?;

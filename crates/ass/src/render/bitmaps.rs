@@ -7,10 +7,12 @@ use std::ops::Deref;
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 use triergon_raster::compat::libass::{
-    BorderStroke, Composite, EffectsKey, FrameScale, GlyphBitmaps, GlyphPlacement, GlyphSource,
-    PlacedBitmap, Run,
+    BorderStroke, Composite, EffectsKey, FrameScale, GlyphBitmaps, GlyphPlacement, GlyphRequest,
+    GlyphSource, PlacedBitmap, Run,
 };
-use triergon_raster::{Bitmap, BitmapTransform, Limits, Matrix, Quantized, Raster, Shape, Vector};
+use triergon_raster::{
+    Bitmap, BitmapTransform, Limits, Matrix, OUTLINE_MAX, Quantized, Raster, Shape, Vector,
+};
 
 use super::CacheLimits;
 use super::cache::{Cache, CacheKey, Kept, sizes};
@@ -278,12 +280,15 @@ impl Painter {
         for (placed, glyphs) in runs.iter() {
             self.drawn.clear();
             let mut run = Run::default();
+            let mut leftmost_x = OUTLINE_MAX;
             for glyph in glyphs.iter().filter_map(|g| placer.glyph(g)) {
-                if let Some(drawn) = self.draw_glyph(&glyph, frame, outlines, &mut run, work)? {
+                let request = glyph.request(frame);
+                leftmost_x = glyph.leftmost_x(&request, leftmost_x);
+                if let Some(drawn) = self.draw_glyph(&glyph, &request, outlines, &mut run, work)? {
                     self.drawn.try_push(drawn).map_err(|e| e.error)?;
                 }
             }
-            self.finish(placed, &run, frame, out, work)?;
+            self.finish(placed, leftmost_x, frame, out, work)?;
             // The run's glyph bitmaps are let go once it is composited.
             self.drawn.clear();
             self.bitmaps.cache.settle();
@@ -297,7 +302,7 @@ impl Painter {
     fn draw_glyph(
         &mut self,
         glyph: &GlyphDrawing<'_>,
-        frame: &FrameScale,
+        request: &GlyphRequest<'_>,
         outlines: &mut Outlines,
         run: &mut Run,
         work: &mut WorkBudget,
@@ -309,8 +314,7 @@ impl Painter {
             fill: None,
             border: None,
         };
-        let request = glyph.request(frame);
-        let Some(bitmaps) = run.render_with(&mut self.raster, &request, &mut source, work)? else {
+        let Some(bitmaps) = run.render_with(&mut self.raster, request, &mut source, work)? else {
             return Ok(None);
         };
         // A border that rounds to nothing is the fill's own bitmap.
@@ -331,7 +335,7 @@ impl Painter {
     fn finish(
         &mut self,
         placed: &PlacedRun,
-        run: &Run,
+        leftmost_x: i32,
         frame: &FrameScale,
         out: &mut BudgetVec<Combined>,
         work: &mut WorkBudget,
@@ -346,7 +350,7 @@ impl Painter {
         };
         let mut effect_timing = placed.effect_timing;
         if placed.effect == Some(Karaoke::Fill) {
-            effect_timing = (d6_to_double(run.leftmost_x())
+            effect_timing = (d6_to_double(leftmost_x)
                 + d6_to_double(effect_timing) * frame.pixel_aspect)
                 .round() as i32;
         }

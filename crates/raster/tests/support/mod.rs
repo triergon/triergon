@@ -7,7 +7,8 @@ use triergon_raster::compat::libass::{
     Border, Clip, ClipFrame, Composite, Effects, FrameScale, GlyphRequest, Placement, Run, Shadow,
 };
 use triergon_raster::{
-    Bitmap, Limits, Matrix, Outline, Pen, Projection, Quantized, Raster, Rect, Shape, Vector,
+    Bitmap, Limits, Matrix, OUTLINE_MAX, Outline, Pen, Projection, Quantized, Raster, Rect, Shape,
+    Vector,
 };
 
 /// xorshift64.
@@ -213,13 +214,10 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
         be: rng.below(12) as u32,
         blur: rng.scale() * 3.0,
     };
-    let request = GlyphRequest {
-        shape: &shape,
-        placement,
-        frame,
-        effects: &effects,
-        karaoke: rng.below(2) == 0,
-    };
+    let request = GlyphRequest::new(&shape, placement, frame, &effects);
+    if rng.below(2) == 0 {
+        let _ = shape.outlines()[0].min_transformed_x(request.matrix(), OUTLINE_MAX);
+    }
     let mut run = Run::default();
     let mut rendered = Vec::new();
     for _ in 0..2 {

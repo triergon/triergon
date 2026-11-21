@@ -199,13 +199,7 @@ fn composition_work_follows_the_summed_area() {
             outline_scale: [1.0; 2],
             outline_offset: [0.0; 2],
         };
-        let request = GlyphRequest {
-            shape: &square,
-            placement,
-            frame,
-            effects: &effects,
-            karaoke: false,
-        };
+        let request = GlyphRequest::new(&square, placement, frame, &effects);
         glyphs.extend(run.render(&mut raster, &request, &mut work).unwrap());
     }
     assert_eq!(glyphs.len(), 2);

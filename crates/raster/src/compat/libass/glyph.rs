@@ -1,6 +1,6 @@
 //! One glyph's bitmaps: the 3D transform of `\frx` `\fry` `\frz` `\fax` `\fay`,
 //! its quantisation against the glyph's run, the border or opaque box, and their
-//! rasterisation, as libass's `get_bitmap_glyph` draws them.
+//! rasterisation, as libass draws them.
 
 use std::ops::Deref;
 use std::sync::Arc;
@@ -42,7 +42,7 @@ pub struct Placement {
     /// The width of the opaque box before its border, 26.6: the glyph's
     /// advance plus the scaled `\fsp` letter spacing.
     pub advance: i32,
-    /// The font scale correction (libass's `scale_fix`): `scale` times it is
+    /// The font scale correction: `scale` times it is
     /// the scale the style asks for, which the opaque box is scaled by again,
     /// as VSFilter does. 1 for a drawing.
     pub scale_fix: f64,
@@ -67,26 +67,54 @@ pub struct FrameScale {
     pub pixel_aspect: f64,
 }
 
-/// What [`Run::render`] draws: a glyph or drawing shape, where and how.
+/// What [`Run::render`] draws: a glyph or drawing shape, where and how, with
+/// the transform that places it.
 #[derive(Clone, Copy, Debug)]
 pub struct GlyphRequest<'a> {
-    /// The glyph or drawing in outline units, y down; its first outline is
-    /// the one stroked for a border.
-    pub shape: &'a Shape,
-    /// Where and how the glyph is placed.
-    pub placement: Placement,
-    /// The renderer's frame-wide scales.
-    pub frame: FrameScale,
-    /// The effects of the glyph's run, whose border is drawn alongside the
-    /// glyph: the stroked outline, or the opaque box when it is shown or the
-    /// run casts a shadow.
-    pub effects: &'a Effects,
-    /// The glyph is timed by `\kf` karaoke, so its run tracks the least x of
-    /// its transformed outline.
-    pub karaoke: bool,
+    shape: &'a Shape,
+    placement: Placement,
+    frame: FrameScale,
+    effects: &'a Effects,
+    transform: GlyphTransform,
 }
 
-/// The matrices of libass's glyph transform (`calc_transform_matrix`).
+impl<'a> GlyphRequest<'a> {
+    /// The glyph or drawing `shape`, in outline units, y down, whose first
+    /// outline is the one stroked for a border; placed by `placement` in a
+    /// frame scaled by `frame`, with the `effects` of its run, whose border
+    /// is drawn alongside the glyph: the stroked outline, or the opaque box
+    /// when it is shown or the run casts a shadow.
+    pub fn new(
+        shape: &'a Shape,
+        placement: Placement,
+        frame: FrameScale,
+        effects: &'a Effects,
+    ) -> Self {
+        Self {
+            shape,
+            placement,
+            frame,
+            effects,
+            transform: GlyphTransform::new(&placement, &frame),
+        }
+    }
+
+    /// The glyph or drawing.
+    pub fn shape(&self) -> &'a Shape {
+        self.shape
+    }
+
+    /// The glyph's transform from outline units to frame 26.6, before it is
+    /// quantised. A renderer times `\kf` karaoke by the least x of the first
+    /// outline under it ([`Outline::min_transformed_x`]).
+    ///
+    /// [`Outline::min_transformed_x`]: crate::Outline::min_transformed_x
+    pub fn matrix(&self) -> &Matrix {
+        self.transform.matrix()
+    }
+}
+
+/// The matrices of a glyph's transform.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct GlyphTransform {
     /// From 26.6 glyph space to the frame: shear, the three rotations about the
@@ -296,23 +324,11 @@ impl BorderStroke {
 }
 
 /// The state of one run of glyphs composited together: the sub-pixel origin
-/// its first drawn glyph sets, how many glyphs it has drawn, and the least
-/// transformed x of its karaoke glyphs.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// its first drawn glyph sets, and how many glyphs it has drawn.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Run {
     offset: RunOffset,
     drawn: usize,
-    leftmost_x: i32,
-}
-
-impl Default for Run {
-    fn default() -> Self {
-        Self {
-            offset: RunOffset::default(),
-            drawn: 0,
-            leftmost_x: OUTLINE_MAX,
-        }
-    }
 }
 
 /// Where a glyph's border bitmap comes from once the glyph is placed.
@@ -356,11 +372,10 @@ impl GlyphPlacement {
 }
 
 impl Run {
-    /// Places one glyph of the run as libass's `get_bitmap_glyph` does
-    /// (`ass_render.c:1383-1542` in 0.17.5), without drawing it: a `\kf` glyph moves the run's karaoke leftmost x,
-    /// its transform is quantised against the run's sub-pixel origin (a glyph
-    /// that comes before any drawn one sets that origin), and its border is
-    /// placed against the same origin. `None` when the glyph's transform is
+    /// Places one glyph of the run without drawing it: its transform is
+    /// quantised against the run's sub-pixel origin (a glyph that comes
+    /// before any drawn one sets that origin), and its border is placed
+    /// against the same origin. `None` when the glyph's transform is
     /// degenerate or out of range: nothing of it is drawn, as in libass.
     ///
     /// Draw its bitmaps, then [`add`](Run::add) them before placing the next
@@ -371,13 +386,8 @@ impl Run {
             placement,
             frame,
             effects,
-            karaoke,
+            transform,
         } = request;
-        let transform = GlyphTransform::new(placement, frame);
-        if *karaoke {
-            self.leftmost_x =
-                shape.outlines()[0].min_transformed_x(transform.matrix(), self.leftmost_x);
-        }
         let starts = self.drawn == 0;
         let continued = (!starts).then_some(self.offset);
         let quantized = BitmapTransform::quantize(transform.matrix(), shape.cbox(), continued)?;
@@ -423,10 +433,9 @@ impl Run {
 
     /// Adds a placed glyph's drawn bitmaps to the run: its fill, and its
     /// border (the fill's own bitmap for [`PlacedBorder::Fill`]). `None`
-    /// when neither draws anything: libass takes a bitmap without pixels as
-    /// none (`ass_render.c:1412-1414`, `1536-1541`), and
-    /// `render_and_combine_glyphs` leaves a glyph without bitmaps out of the
-    /// run (`2548-2549`), so the next glyph sets the run's sub-pixel origin.
+    /// when neither draws anything: a bitmap without pixels counts as none,
+    /// and a glyph without bitmaps is left out of the run, so the next glyph
+    /// sets the run's sub-pixel origin.
     pub(crate) fn add<B>(
         &mut self,
         fill: Option<PlacedBitmap<B>>,
@@ -437,12 +446,6 @@ impl Run {
         }
         self.drawn += 1;
         Some(GlyphBitmaps { fill, border })
-    }
-
-    /// The least x, 26.6, of the transformed outlines of the run's karaoke
-    /// glyphs; [`OUTLINE_MAX`] without any.
-    pub fn leftmost_x(&self) -> i32 {
-        self.leftmost_x
     }
 }
 
@@ -481,7 +484,7 @@ impl<B> GlyphBitmaps<B> {
     }
 
     /// The glyph's place in its run: the fill's origin, or the border's
-    /// without a fill (libass's `pos`).
+    /// without a fill.
     pub fn origin(&self) -> Vector {
         match (&self.fill, &self.border) {
             (Some(placed), _) | (None, Some(placed)) => placed.origin,
@@ -489,8 +492,7 @@ impl<B> GlyphBitmaps<B> {
         }
     }
 
-    /// The border's origin, or the fill's without a border (libass's
-    /// `pos_o`).
+    /// The border's origin, or the fill's without a border.
     pub fn border_origin(&self) -> Vector {
         self.border
             .as_ref()
@@ -744,18 +746,21 @@ mod tests {
             ..Effects::default()
         };
         let border = |shape: &Shape| {
-            let request = GlyphRequest {
-                shape,
-                placement: placement(100 * 64),
-                frame: FRAME,
-                effects: &effects,
-                karaoke: false,
-            };
+            let request = GlyphRequest::new(shape, placement(100 * 64), FRAME, &effects);
             Run::default().place(&request).unwrap().border
         };
         let boxed = border(&Shape::new(&budget));
         assert!(matches!(boxed, PlacedBorder::Box(Some(_))));
         assert_eq!(boxed, border(&square(&budget)));
+    }
+
+    #[test]
+    fn an_unturned_glyph_is_moved_to_its_position() {
+        let budget = Budget::new(1 << 20).unwrap();
+        let (shape, effects) = (square(&budget), Effects::default());
+        let request = GlyphRequest::new(&shape, placement(100 * 64), FRAME, &effects);
+        let left = shape.outlines()[0].min_transformed_x(request.matrix(), i32::MAX);
+        assert_eq!(left, 100 * 64);
     }
 
     #[test]
@@ -765,13 +770,7 @@ mod tests {
         let mut work = WorkBudget::new(1 << 24);
         let effects = Effects::default();
         let (empty, square) = (Shape::new(&budget), square(&budget));
-        let request = |shape, x| GlyphRequest {
-            shape,
-            placement: placement(x),
-            frame: FRAME,
-            effects: &effects,
-            karaoke: false,
-        };
+        let request = |shape, x| GlyphRequest::new(shape, placement(x), FRAME, &effects);
         let mut run = Run::default();
         let nothing = run.render(&mut raster, &request(&empty, 100 * 64 + 13), &mut work);
         assert!(nothing.unwrap().is_none());
