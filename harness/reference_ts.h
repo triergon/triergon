@@ -146,6 +146,11 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
     /* The demuxer already ignores the six reserved bits. */
     if (access_units && argc > at + 2 && !strcmp(argv[argc - 1], "--ignore-pcr-reserved-bits"))
         --argc;
+#ifdef TRIERGON_TS188_DISCOVERY
+    /* The ordinary demuxer already detects carrier alignment. */
+    if (!access_units && argc > at + 2 && !strcmp(argv[argc - 1], "--discover-ts188"))
+        --argc;
+#endif
     int probe_dts_core = 0;
     if (access_units && argc > at + 2 && !strcmp(argv[argc - 1], "--probe-dts-core")) {
         probe_dts_core = 1;

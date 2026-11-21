@@ -351,6 +351,16 @@ On a seekable input, the TS188 startup probe checks a bounded prefix for a
 unique carrier grid. Subsequent events retain their original source offsets.
 The probe yields when its work budget is spent.
 
+For a seekable source, callers can discover a late program map and replay the
+original transport packets through `compat::pes::PesCutter`. Its explicit EOF
+completion retains the data of an unfinished PES; the strict PES assembler
+instead reports truncation. The cutter retains missing source DTS as missing and
+does not project packet corruption flags.
+`DemuxClock` provides a separate demux timestamp view, including DTS fallback
+to PTS when source DTS is absent. Registered HEVC and AAC observers with
+`TransportFaultRecovery` also expose packet extents, stream-ID side data and
+corruption flags for compatibility replay.
+
 ## Verification
 
 Integration tests use independently authored streams in `tests/data/` (listed in
@@ -358,3 +368,6 @@ Integration tests use independently authored streams in `tests/data/` (listed in
 `cargo xtask fixture transport-dts-seek --record REFERENCE`. The comparison
 contracts are `harness/features/mpegts-*/contract.json`; results are in
 [docs/status.md](../../docs/status.md).
+
+The transport worker’s opt-in TS188 discovery replay refuses changes to the selected
+program map or clock interval and unsupported source faults.
