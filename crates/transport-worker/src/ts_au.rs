@@ -22,12 +22,13 @@ use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, Contin
 use triergon_mpegts::compat::input::{InputBootstrap, InputStep};
 use triergon_mpegts::compat::latm;
 use triergon_mpegts::compat::pes::{DemuxClock, UnframedAudioPolicy};
-use triergon_mpegts::reference_trace::input::PositionBasis;
-use triergon_mpegts::{
-    AccessUnit, AudioEofPolicy, DvbSubtitleTailPolicy, EntityTransition, FaultKind,
-    IncompleteVideo, Packet, PacketClock, PacketFormat, PayloadSource, ReaderEvent, ReaderLimits,
-    SourceEpochs, TraceEvent, UnframedAudio,
+use triergon_mpegts::reader::{
+    AudioEofPolicy, DvbSubtitleTailPolicy, EntityTransition, IncompleteVideo, PacketClock,
+    PayloadSource, UnframedAudio,
 };
+use triergon_mpegts::reference_trace::input::PositionBasis;
+use triergon_mpegts::stream::{FaultKind, TraceEvent};
+use triergon_mpegts::{AccessUnit, Packet, PacketFormat, ReaderEvent, ReaderLimits, SourceEpochs};
 
 mod malformed;
 
@@ -386,7 +387,7 @@ fn fold_packet(
     }
 }
 
-fn diagnostic_refusal(fault: &triergon_mpegts::TraceFault) -> Refusal {
+fn diagnostic_refusal(fault: &triergon_mpegts::stream::TraceFault) -> Refusal {
     Refusal {
         reason: format!("source diagnostic: {:?}", fault.kind),
         cause: format!(

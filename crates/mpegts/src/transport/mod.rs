@@ -4,4 +4,9 @@ pub(crate) mod continuity;
 pub(crate) mod framer;
 pub(crate) mod packet;
 
+pub use carrier::{
+    RejectedTransport, TransportInspection, TransportInspector, TransportObservation,
+};
+pub use continuity::{Continuity, ContinuityOutcome};
+pub use framer::{FrameState, FrameStep, NullCarrierRun, TransportFramer};
 pub use packet::{Adaptation, PacketFormat, Pcr, TransportPacket, parse_transport};

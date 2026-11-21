@@ -7,7 +7,8 @@ use triergon_mpegts::compat::input::{InputBootstrap, InputContext, InputStep};
 use triergon_mpegts::compat::pes::{DemuxObserver, DemuxProfile, DemuxScope, SourceContext};
 #[cfg(feature = "reference-trace")]
 use triergon_mpegts::reference_trace::input::PositionBasis;
-use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, parse_transport};
+use triergon_mpegts::transport::parse_transport;
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 
 const LONG: &[u8] = include_bytes!("data/native-input-v1/original-valid-rebind-192.m2ts");
 #[cfg(feature = "reference-trace")]
@@ -410,8 +411,8 @@ fn selected_transport_fault_admission_keeps_the_validated_input_cursor() {
         ));
         recovery
             .confirm_source_fault(
-                &triergon_mpegts::TraceFault {
-                    kind: triergon_mpegts::FaultKind::Transport,
+                &triergon_mpegts::stream::TraceFault {
+                    kind: triergon_mpegts::stream::FaultKind::Transport,
                     pid: Some(256),
                     location: triergon_core::SourceLocation {
                         source: SourceId(1),

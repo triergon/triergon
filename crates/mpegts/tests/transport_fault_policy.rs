@@ -5,13 +5,12 @@ use triergon_core::{
 };
 use triergon_mpegts::compat::pes::{
     DemuxClock, DemuxObserver, DemuxProfile, DemuxScope, PesFaultCarrier, PesFaultKind,
-    PesFaultPolicy, SourceContext, TransportFaultKind, TransportFaultPacket,
-    TransportFaultRecovery, TransportObservation,
+    PesFaultPolicy, RecoveredPes, SourceContext, TransportFaultKind, TransportFaultPacket,
+    TransportFaultRecovery,
 };
-use triergon_mpegts::{
-    AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, TraceEvent, TraceFault, TransportPacket,
-    TransportStream,
-};
+use triergon_mpegts::stream::{TraceEvent, TraceFault, TransportStream};
+use triergon_mpegts::transport::TransportPacket;
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 
 const TEI: &[u8] = include_bytes!("data/transport-tei.ts");
 const SCRAMBLED: &[u8] = include_bytes!("data/transport-scrambled.ts");
@@ -129,7 +128,7 @@ fn staged(budget: &Budget) -> (TransportFaultRecovery, TransportPacket, TraceFau
 fn idle_after_valid_packet(
     budget: &Budget,
 ) -> (DemuxObserver, triergon_mpegts::compat::pes::DemuxPacket) {
-    let mut packet = triergon_mpegts::parse_transport(
+    let mut packet = triergon_mpegts::transport::parse_transport(
         Bytes::copy_from_slice(budget, &include_bytes!("data/ts188-basic.ts")[376..564]).unwrap(),
         PacketFormat::Ts188,
         376,
@@ -150,7 +149,7 @@ fn following_fault(budget: &Budget, capacity: usize) -> TransportPacket {
     let mut data = Vec::with_capacity(capacity);
     data.extend_from_slice(&TEI[376..564]);
     data[3] = (data[3] & 0xf0) | 1;
-    let mut packet = triergon_mpegts::parse_transport(
+    let mut packet = triergon_mpegts::transport::parse_transport(
         Bytes::try_from_vec(budget, data).unwrap(),
         PacketFormat::Ts188,
         564,
@@ -159,7 +158,7 @@ fn following_fault(budget: &Budget, capacity: usize) -> TransportPacket {
     packet.source_id = Some(SourceId(1));
     packet
 }
-fn drain(policy: &mut TransportFaultRecovery) -> triergon_core::Result<Vec<TransportObservation>> {
+fn drain(policy: &mut TransportFaultRecovery) -> triergon_core::Result<Vec<RecoveredPes>> {
     let mut packets = Vec::new();
     for _ in 0..4096 {
         let mut work = WorkBudget::new(1);
@@ -176,7 +175,7 @@ fn drain(policy: &mut TransportFaultRecovery) -> triergon_core::Result<Vec<Trans
 fn one(policy: &mut TransportFaultRecovery) -> TransportFaultPacket {
     let mut packets = drain(policy).unwrap();
     assert_eq!(packets.len(), 1);
-    let TransportObservation::Faulted(packet) = packets.pop().unwrap() else {
+    let RecoveredPes::Faulted(packet) = packets.pop().unwrap() else {
         panic!("faulted result must stay distinct");
     };
     packet
@@ -221,7 +220,7 @@ fn wire_flags_keep_raw_bytes_faults_and_unknown_source_dts() {
             outputs.extend(drain(&mut policy).unwrap());
         }
         assert_eq!(outputs.len(), 1);
-        let TransportObservation::Faulted(packet) = outputs.pop().unwrap() else {
+        let RecoveredPes::Faulted(packet) = outputs.pop().unwrap() else {
             panic!();
         };
         assert_eq!(packet.kind, kind);
@@ -392,7 +391,8 @@ fn unavoidable_carrier_and_descriptor_storage_returns_limit_when_one_byte_short(
             let budget = Budget::new(minimum - usize::from(short)).unwrap();
             let backing = Bytes::try_from_vec(&budget, data).unwrap();
             let mut packet =
-                triergon_mpegts::parse_transport(backing, PacketFormat::Ts188, 376).unwrap();
+                triergon_mpegts::transport::parse_transport(backing, PacketFormat::Ts188, 376)
+                    .unwrap();
             packet.source_id = Some(SourceId(1));
             let mut policy =
                 TransportFaultRecovery::new(observer(&budget, ParseLimits::default())).unwrap();
@@ -426,7 +426,7 @@ fn unavoidable_carrier_and_descriptor_storage_returns_limit_when_one_byte_short(
                     error
                 );
             } else {
-                let AssemblyStep::Output(TransportObservation::Faulted(packet)) = policy
+                let AssemblyStep::Output(RecoveredPes::Faulted(packet)) = policy
                     .poll(&mut WorkBudget::new(10), &AtomicBool::new(false))
                     .unwrap()
                 else {
@@ -673,7 +673,7 @@ fn faulted_then_valid_preserves_counter_order_and_shared_clock_interval() {
         }
         for packet in drain(&mut policy).unwrap() {
             let time = match packet {
-                TransportObservation::Faulted(packet) => {
+                RecoveredPes::Faulted(packet) => {
                     let time = clock
                         .project_transport_fault(
                             &packet,
@@ -684,7 +684,7 @@ fn faulted_then_valid_preserves_counter_order_and_shared_clock_interval() {
                         .unwrap();
                     (time.pts90, time.origin)
                 }
-                TransportObservation::Accepted(packet) => {
+                RecoveredPes::Accepted(packet) => {
                     assert_eq!(packet.source_header.dts_raw33, None);
                     let time = clock
                         .project_header(
@@ -698,7 +698,7 @@ fn faulted_then_valid_preserves_counter_order_and_shared_clock_interval() {
                         .unwrap();
                     (time.pts90.unwrap(), time.origin.unwrap())
                 }
-                TransportObservation::PesFault(packet) => {
+                RecoveredPes::PesFault(packet) => {
                     panic!("default policy admitted another source fault: {packet:?}")
                 }
             };
@@ -861,7 +861,7 @@ fn finite_header_and_rejected_clock_policies_keep_strict_source_facts() {
             packets.extend(drain(&mut policy).unwrap());
         }
         assert_eq!(packets.len(), count);
-        let TransportObservation::PesFault(packet) = packets.remove(0) else {
+        let RecoveredPes::PesFault(packet) = packets.remove(0) else {
             panic!("source refusal became accepted PES");
         };
         assert_eq!(packet.kind, kind);
@@ -1044,7 +1044,7 @@ fn finite_fault_jobs_preserve_each_work_cancel_and_pressure_boundary() {
             let mut output = drain(&mut policy).unwrap();
             assert_eq!(output.len(), 1);
             drop(policy);
-            let TransportObservation::PesFault(packet) = output.pop().unwrap() else {
+            let RecoveredPes::PesFault(packet) = output.pop().unwrap() else {
                 panic!();
             };
             assert_eq!(packet.payload_len, ORIGINAL.len());
@@ -1126,7 +1126,7 @@ fn finite_timing_variants_keep_absence_and_following_packet_order() {
             packets.extend(drain(&mut policy).unwrap());
         }
         assert_eq!(packets.len(), count);
-        let TransportObservation::PesFault(packet) = packets.remove(0) else {
+        let RecoveredPes::PesFault(packet) = packets.remove(0) else {
             panic!();
         };
         assert_eq!(packet.encoded_header.encoded_pts_raw33(), pts);
@@ -1142,7 +1142,7 @@ fn finite_timing_variants_keep_absence_and_following_packet_order() {
             .unwrap()
             .unwrap();
         assert_eq!(time.pts90, pts.map(i128::from));
-        if let Some(TransportObservation::Accepted(next)) = packets.pop() {
+        if let Some(RecoveredPes::Accepted(next)) = packets.pop() {
             assert_eq!(next.source_origin.offset, 564);
             assert_eq!(next.source_header.pts_raw33, Some(270000));
             assert_eq!(next.source_header.dts_raw33, None);
@@ -1164,7 +1164,7 @@ fn finite_timing_variants_keep_absence_and_following_packet_order() {
 #[test]
 fn finite_fault_budget_limits_count_rejected_aliases_and_full_width_ranges() {
     use triergon_core::SourceLocation;
-    use triergon_mpegts::{TransportInspection, TransportInspector};
+    use triergon_mpegts::transport::{TransportInspection, TransportInspector};
     for (data, kind, _, _) in FINITE_CASES {
         let proof_budget = Budget::new(1 << 20).unwrap();
         let (mut fault, _) = source(data, &proof_budget)
@@ -1228,8 +1228,7 @@ fn finite_fault_budget_limits_count_rejected_aliases_and_full_width_ranges() {
                     "{kind:?}"
                 );
             } else {
-                let AssemblyStep::Output(TransportObservation::PesFault(packet)) = result.unwrap()
-                else {
+                let AssemblyStep::Output(RecoveredPes::PesFault(packet)) = result.unwrap() else {
                     panic!();
                 };
                 assert_eq!(packet.source_origin.offset, offset);
@@ -1304,7 +1303,7 @@ fn rejected_opcr_carriers_retain_every_raw_counter_without_source_continuity_cla
             packets.extend(drain(&mut policy).unwrap());
         }
         assert_eq!(packets.len(), 2);
-        let TransportObservation::PesFault(second) = packets.pop().unwrap() else {
+        let RecoveredPes::PesFault(second) = packets.pop().unwrap() else {
             panic!();
         };
         assert_eq!(second.kind, PesFaultKind::OpcrWithoutPcr);

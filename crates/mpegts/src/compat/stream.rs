@@ -9,13 +9,14 @@
 //!
 //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
 //!
-//! [`TransportStream`]: crate::TransportStream
+//! [`TransportStream`]: crate::stream::TransportStream
 //! [`ElementaryStream::codec`]: crate::psi::ElementaryStream::codec
 //!
 //! The demuxer's programs and streams: the PAT and PMT sections it accepts,
 //! and its reading of a PMT entry (codec, video, decoder configuration).
 use crate::psi::{Descriptor, ElementaryStream, PES_PRIVATE_DATA, Section, SectionAssembler};
-use crate::{AssemblyStep, ParseLimits, TransportPacket, limit};
+use crate::transport::TransportPacket;
+use crate::{AssemblyStep, ParseLimits, limit};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::CodecId;
 use triergon_core::{Budget, BudgetVec, Error, Result, SourceId, WorkBudget};

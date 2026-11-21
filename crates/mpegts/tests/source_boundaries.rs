@@ -5,13 +5,11 @@ use triergon_core::{
     Step, WorkBudget,
 };
 use triergon_mpegts::compat::pes::{
-    DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, PesFaultPolicy,
-    SourceContext, TransportFaultRecovery, TransportObservation,
+    DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, PesFaultPolicy, RecoveredPes,
+    SourceContext, TransportFaultRecovery,
 };
-use triergon_mpegts::{
-    AssemblyStep, MediaEntityEnd, ObservedTrace, PacketFormat, ParseLimits, SourceEpochs,
-    TraceEvent, TransportStream,
-};
+use triergon_mpegts::stream::{MediaEntityEnd, ObservedTrace, TraceEvent, TransportStream};
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 
 const TIMELINE: &[u8] = include_bytes!("data/pcr-timeline-discontinuity.ts");
 const THREE: &[u8] = include_bytes!("data/selected-faults-v1/pcr-discontinuity-three.ts");
@@ -158,7 +156,7 @@ fn drain(
     let mut packets = Vec::new();
     for _ in 0..100_000 {
         match observer.poll(&mut WorkBudget::new(grant), &RUN)? {
-            AssemblyStep::Output(TransportObservation::Accepted(packet)) => packets.push(packet),
+            AssemblyStep::Output(RecoveredPes::Accepted(packet)) => packets.push(packet),
             AssemblyStep::Yield => {}
             AssemblyStep::NeedPayload | AssemblyStep::Finished => return Ok(packets),
             output @ AssemblyStep::Output(_) => panic!("unexpected fault extraction: {output:?}"),

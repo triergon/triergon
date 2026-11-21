@@ -2,7 +2,8 @@
 
 use super::event::TraceEvent;
 use super::{Route, TransportStream};
-use crate::{PesAssembler, table_storage};
+use crate::pes::PesAssembler;
+use crate::table_storage;
 use triergon_core::{Bytes, Error, Result};
 
 pub(crate) enum StorageItem<'a> {

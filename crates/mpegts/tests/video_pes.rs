@@ -4,9 +4,10 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Bytes, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
+use triergon_mpegts::ParseLimits;
 use triergon_mpegts::mux::{MuxConfig, Muxer};
 use triergon_mpegts::psi::{DescriptorNamespace, PsiCrc32};
-use triergon_mpegts::{ParseLimits, TraceEvent, TransportStream};
+use triergon_mpegts::stream::{TraceEvent, TransportStream};
 
 /// A PES packet's PTS and payload.
 type Pes = (Option<u64>, Vec<u8>);

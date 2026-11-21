@@ -1,6 +1,6 @@
 //! Explicit finite AVC diagnostic view.
 use super::*;
-use crate::{FaultKind, TraceFault};
+use crate::stream::{FaultKind, TraceFault};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SelectedFault {

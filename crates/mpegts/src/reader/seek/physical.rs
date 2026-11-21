@@ -7,8 +7,10 @@
 mod video;
 
 use super::{Landing, Reader, ReaderEvent, Shared};
+use crate::SourceEpochs;
 use crate::reader::{AccessUnit, Packet, SourceEvent};
-use crate::{ContinuityOutcome, SourceEpochs, TraceEvent, TransportPacket};
+use crate::stream::TraceEvent;
+use crate::transport::{ContinuityOutcome, TransportPacket};
 use triergon_core::container::{Event, PacketInfo, ReaderStep};
 use triergon_core::{
     Budget, BudgetVec, Charged, Error, Result, SourceCapabilities, SourceId, Step,

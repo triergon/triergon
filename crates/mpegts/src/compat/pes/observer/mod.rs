@@ -5,10 +5,10 @@
 //! boundaries; no complete source/demux output is split, repeated or repaired.
 use crate::compat::pes::clock::DemuxProfile;
 use crate::pes::HEADER_MAX;
+use crate::pes::PesHeader;
 use crate::psi::ElementaryStream;
-use crate::{
-    AssemblyStep, ParseLimits, PesHeader, SourceEpochs, SourceRange, TransportPacket, checked_pid,
-};
+use crate::transport::TransportPacket;
+use crate::{AssemblyStep, ParseLimits, SourceEpochs, SourceRange, checked_pid};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{CodecId, MediaKind, TrackInfo};
 use triergon_core::{
@@ -784,7 +784,7 @@ mod tests {
             carrier[..4].copy_from_slice(&[0x47, 0, 7, 0x10]);
         }
         let backing = Bytes::copy_from_slice(&pool, &data).unwrap();
-        let mut packet = crate::parse_transport(
+        let mut packet = crate::transport::parse_transport(
             backing.slice(0..width).unwrap(),
             crate::PacketFormat::Ts188,
             0,
@@ -873,7 +873,7 @@ mod tests {
             0,
             0,
         ]);
-        let mut packet = crate::parse_transport(
+        let mut packet = crate::transport::parse_transport(
             Bytes::copy_from_slice(pool, &raw).unwrap(),
             crate::PacketFormat::Ts188,
             offset,
@@ -947,7 +947,7 @@ mod tests {
                     let prefix = if format == crate::PacketFormat::M2ts192 {
                         let mut raw = vec![0, 0, 0, 1];
                         raw.extend_from_slice(packet.source.as_ref());
-                        packet = crate::parse_transport(
+                        packet = crate::transport::parse_transport(
                             Bytes::copy_from_slice(&pool, &raw).unwrap(),
                             format,
                             564,
@@ -1375,7 +1375,7 @@ mod tests {
         let [hi, lo] = length.to_be_bytes();
         let mut raw = [0xff; TS188_BYTES];
         raw[..13].copy_from_slice(&[0x47, 0x41, 0, 0x10, 0, 0, 1, 0xe0, hi, lo, 0x80, 0, 0]);
-        let mut carrier = crate::parse_transport(
+        let mut carrier = crate::transport::parse_transport(
             Bytes::copy_from_slice(&pool, &raw).unwrap(),
             crate::PacketFormat::Ts188,
             0,

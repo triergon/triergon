@@ -2,7 +2,8 @@ use super::{Drive, PID, Transport};
 use triergon_core::Error;
 use triergon_core::container::Event;
 use triergon_mpegts::compat::annex_b::VideoEofPolicy;
-use triergon_mpegts::{ReaderEvent, ReaderLimits, TraceEvent};
+use triergon_mpegts::stream::TraceEvent;
+use triergon_mpegts::{ReaderEvent, ReaderLimits};
 
 const LEADING_BYTES: Error = Error::Invalid("Annex B leading bytes");
 

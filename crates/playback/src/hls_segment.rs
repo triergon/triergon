@@ -14,10 +14,11 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, InputCursor, InputRequest, WorkBudget};
+use triergon_mpegts::psi::{ElementaryStream, ProgramMap};
+use triergon_mpegts::stream::{FaultKind, TraceEvent};
 use triergon_mpegts::{
-    AssemblyStep, FaultKind, ParseLimits, TraceEvent,
+    AssemblyStep, ParseLimits,
     compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors},
-    psi::{ElementaryStream, ProgramMap},
 };
 
 mod lanes;

@@ -194,7 +194,8 @@ pub(crate) fn parse_header(budget: &Budget, bytes: &[u8]) -> Result<PesHeader> {
 mod timed_header_tests {
     use super::*;
     use crate::pes::HEADER_MAX;
-    use crate::{AssemblyStep, ParseLimits, PesAssembler, SourceEpochs, SourceRange};
+    use crate::pes::PesAssembler;
+    use crate::{AssemblyStep, ParseLimits, SourceEpochs, SourceRange};
     use std::sync::atomic::AtomicBool;
     use triergon_core::SourceId;
 

@@ -8,9 +8,9 @@ use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::latm;
 use crate::compat::pes::UnframedAudioPolicy;
 use crate::psi::DescriptorNamespace;
-use crate::{
-    CarrierObservation, ContinuityOutcome, PacketFormat, ParseLimits, TraceEvent, TransportStream,
-};
+use crate::stream::{CarrierObservation, TraceEvent, TransportStream};
+use crate::transport::ContinuityOutcome;
+use crate::{PacketFormat, ParseLimits};
 use lane::{Lane, LaneStep, PesRun, StorageScan};
 pub use model::{
     Ac3AccessUnit, AccessUnit, DtsAudioFrame, DtsExtensionFrame, DvbSubtitleUnit, IncompleteVideo,
@@ -706,7 +706,7 @@ impl Reader {
                             Shared::<TraceEvent>::reserve(&self.pool).map_err(|error| {
                                 if matches!(error, Error::Backpressure { .. } | Error::Limit { .. })
                                     && let TraceEvent::Diagnostic(fault) = raw
-                                    && fault.kind == crate::FaultKind::Pes
+                                    && fault.kind == crate::stream::FaultKind::Pes
                                     && matches!(fault.error, Error::Limit { .. })
                                 {
                                     // Return the permanent limit directly when a
@@ -800,7 +800,7 @@ impl Reader {
                                     };
                                 } else { self.phase = Phase::Publish; }
                             }
-                            TraceEvent::Diagnostic(fault) if matches!(fault.kind, crate::FaultKind::Pes | crate::FaultKind::Continuity | crate::FaultKind::Transport) => {
+                            TraceEvent::Diagnostic(fault) if matches!(fault.kind, crate::stream::FaultKind::Pes | crate::stream::FaultKind::Continuity | crate::stream::FaultKind::Transport) => {
                                 if let Some(index) = self.lanes.as_slice().iter().position(|lane| Some(lane.track.stream().pid) == fault.pid) {
                                     self.phase = Phase::FaultLane(index);
                                 } else if fault.pid.is_none() {
@@ -808,7 +808,7 @@ impl Reader {
                                     self.phase = Phase::DrainAll { index: 0, retained: 0 };
                                 } else { self.phase = Phase::Publish; }
                             }
-                            TraceEvent::Diagnostic(fault) if fault.kind == crate::FaultKind::Program => {
+                            TraceEvent::Diagnostic(fault) if fault.kind == crate::stream::FaultKind::Program => {
                                 self.rebuild = self.map.clone();
                                 self.phase = Phase::DrainAll { index: 0, retained: 0 };
                             }

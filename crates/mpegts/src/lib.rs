@@ -14,31 +14,14 @@ pub mod compat;
 pub mod mux;
 pub mod pes;
 pub mod psi;
-mod reader;
+pub mod reader;
 #[cfg(feature = "reference-trace")]
 pub mod reference_trace;
-mod stream;
-mod transport;
+pub mod stream;
+pub mod transport;
 
-pub use pes::{Pes, PesAssembler, PesHeader, PesSpan};
-pub use psi::SectionAssembler;
-pub use reader::{
-    Ac3AccessUnit, AccessUnit, AudioEofPolicy, DtsAudioFrame, DtsExtensionFrame,
-    DvbSubtitleTailPolicy, DvbSubtitleUnit, EntityTransition, IncompleteVideo, LoasFrame,
-    MpegAudioFrame, Packet, PacketClock, PayloadSource, Reader, ReaderEvent, ReaderLimits,
-    SeekEntity, SourceEvent, Track, UnframedAudio,
-};
-pub use stream::entity::{MediaEntityEnd, ObservedTrace};
-pub use stream::{
-    CarrierObservation, CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem,
-    FeedPayloadRun, TraceEvent, TraceFault, TransportStream,
-};
-pub use transport::carrier::{
-    RejectedTransport, TransportInspection, TransportInspector, TransportObservation,
-};
-pub use transport::continuity::{Continuity, ContinuityOutcome};
-pub use transport::framer::{FrameState, FrameStep, NullCarrierRun, TransportFramer};
-pub use transport::{Adaptation, PacketFormat, Pcr, TransportPacket, parse_transport};
+pub use reader::{AccessUnit, Packet, Reader, ReaderEvent, ReaderLimits, Track};
+pub use transport::PacketFormat;
 
 use triergon_core::{BudgetVec, Error, Result, SourceId};
 

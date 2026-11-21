@@ -33,14 +33,14 @@ use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_mpegts::compat::pes::{
     DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, DvbSubtitlesDescriptors,
     MalformedInputCompletion, MalformedSourceDisposition, NoMediaConfirmation, PacketCompletion,
-    PesFaultPolicy, PrivateAudioCarriage, PrivateAudioDescriptors, RegisteredCarriage,
-    SourceContext, TransportFaultRecovery, TransportObservation,
+    PesFaultPolicy, PrivateAudioCarriage, PrivateAudioDescriptors, RecoveredPes,
+    RegisteredCarriage, SourceContext, TransportFaultRecovery,
 };
 use triergon_mpegts::psi::{DescriptorNamespace, Descriptors, ProgramMap};
-use triergon_mpegts::{
-    AssemblyStep, FaultKind, MediaEntityEnd, ObservedTrace, ParseLimits, SourceEpochs, SourceRange,
-    TraceEvent, TransportStream,
+use triergon_mpegts::stream::{
+    FaultKind, MediaEntityEnd, ObservedTrace, TraceEvent, TransportStream,
 };
+use triergon_mpegts::{AssemblyStep, ParseLimits, SourceEpochs, SourceRange};
 
 pub(crate) mod au_recovery;
 
@@ -476,7 +476,7 @@ impl Session {
         let position = |offset| base.checked_add(offset).ok_or(Error::Overflow);
         loop {
             match observer.poll(&mut WorkBudget::new(WORK), cancel)? {
-                AssemblyStep::Output(TransportObservation::Accepted(packet)) => {
+                AssemblyStep::Output(RecoveredPes::Accepted(packet)) => {
                     let time = self
                         .clock
                         .project_header(
@@ -495,7 +495,7 @@ impl Session {
                         position(packet.position)?,
                     )?;
                 }
-                AssemblyStep::Output(TransportObservation::Faulted(packet)) => {
+                AssemblyStep::Output(RecoveredPes::Faulted(packet)) => {
                     let time = self
                         .clock
                         .project_transport_fault(&packet, &mut WorkBudget::new(1), cancel)?
@@ -516,7 +516,7 @@ impl Session {
                         packet.payload(),
                     )?;
                 }
-                AssemblyStep::Output(TransportObservation::PesFault(packet)) => {
+                AssemblyStep::Output(RecoveredPes::PesFault(packet)) => {
                     let time = self
                         .clock
                         .project_pes_fault(&packet, &mut WorkBudget::new(1), cancel)?

@@ -1,5 +1,6 @@
 //! Owned strict transport inspection. Work advances actual bounded fields/bytes.
-use crate::{Adaptation, AssemblyStep, PacketFormat, Pcr, SourceRange, TransportPacket};
+use crate::transport::{Adaptation, Pcr, TransportPacket};
+use crate::{AssemblyStep, PacketFormat, SourceRange};
 use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},

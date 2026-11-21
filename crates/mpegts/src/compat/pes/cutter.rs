@@ -7,7 +7,8 @@
 //! a repeated or missing transport packet changes the data as it arrives.
 use super::observer::DemuxBoundary;
 use crate::pes::HEADER_MAX;
-use crate::{ParseLimits, TransportPacket, checked_pid, limit};
+use crate::transport::TransportPacket;
+use crate::{ParseLimits, checked_pid, limit};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};
 
 /// How far after the last PCR the demuxer lets a teletext PTS lie, in 90 kHz

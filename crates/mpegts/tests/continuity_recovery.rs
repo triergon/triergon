@@ -5,10 +5,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
-use triergon_mpegts::{
-    Continuity, ContinuityOutcome, FaultKind, PacketFormat, ParseLimits, Pes, TraceEvent,
-    TransportStream, parse_transport,
-};
+use triergon_mpegts::pes::Pes;
+use triergon_mpegts::stream::{FaultKind, TraceEvent, TransportStream};
+use triergon_mpegts::transport::{Continuity, ContinuityOutcome, parse_transport};
+use triergon_mpegts::{PacketFormat, ParseLimits};
 
 const MARKER: &[u8] = b"lane-ts-original-payload\x00\x47\xff";
 const CLEAN: &[u8] = b"after-loss-clean";

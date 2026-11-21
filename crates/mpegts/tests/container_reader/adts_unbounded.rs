@@ -5,7 +5,8 @@ use super::{
 };
 use triergon_core::InputRequest;
 use triergon_mpegts::compat::adts::{PacketPolicy, PesPolicy};
-use triergon_mpegts::{FaultKind, TransportPacket};
+use triergon_mpegts::stream::FaultKind;
+use triergon_mpegts::transport::TransportPacket;
 
 fn recovery() -> ReaderLimits {
     ReaderLimits {
@@ -351,7 +352,7 @@ fn finite_pes_span_growth_refuses_a_permanent_limit() {
     ts.pes(PID, 0xc0, &frame, Some(90_000), None);
     assert_eq!(ts.bytes.len(), 7 * 188);
     let (drive, _) = before_last_span(&ts.bytes, 1 << 20, 188, false);
-    let minimum = drive.pool.used() + 5 * size_of::<triergon_mpegts::PesSpan>();
+    let minimum = drive.pool.used() + 5 * size_of::<triergon_mpegts::pes::PesSpan>();
     let maximum = minimum - 1;
     let (mut drive, _) = before_last_span(&ts.bytes, maximum, 188, false);
     assert_eq!(
@@ -377,7 +378,7 @@ fn finite_pes_limit_can_be_returned_without_allocating_a_diagnostic() {
     let maximum = drive.pool.used() + size_of::<triergon_mpegts::SourceRange>();
     let (mut drive, _) = before_span(&ts.bytes, maximum, window, false, offset);
     let error = Error::Limit {
-        requested: maximum + size_of::<triergon_mpegts::PesSpan>(),
+        requested: maximum + size_of::<triergon_mpegts::pes::PesSpan>(),
         maximum,
     };
     assert_eq!(grow_last_span(&mut drive.reader).unwrap_err(), error);

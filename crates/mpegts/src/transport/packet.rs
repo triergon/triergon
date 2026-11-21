@@ -131,14 +131,17 @@ pub fn parse_transport(
     format: PacketFormat,
     source_offset: u64,
 ) -> Result<TransportPacket> {
-    let mut inspector = crate::TransportInspector::detached(source, format, source_offset, None)
-        .map_err(|failure| failure.error)?;
+    let mut inspector =
+        crate::transport::TransportInspector::detached(source, format, source_offset, None)
+            .map_err(|failure| failure.error)?;
     match inspector.poll(
         &mut triergon_core::WorkBudget::new(u64::MAX),
         &std::sync::atomic::AtomicBool::new(false),
     )? {
-        crate::AssemblyStep::Output(crate::TransportInspection::Accepted(packet)) => Ok(packet),
-        crate::AssemblyStep::Output(crate::TransportInspection::Rejected(rejected)) => {
+        crate::AssemblyStep::Output(crate::transport::TransportInspection::Accepted(packet)) => {
+            Ok(packet)
+        }
+        crate::AssemblyStep::Output(crate::transport::TransportInspection::Rejected(rejected)) => {
             Err(rejected.error())
         }
         _ => Err(Error::Invalid("detached transport inspection incomplete")),

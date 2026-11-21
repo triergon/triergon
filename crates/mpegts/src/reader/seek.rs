@@ -4,7 +4,8 @@ mod physical;
 mod retained;
 
 use super::{AccessUnit, MpegAudioFrame, Packet, PacketTracks, Reader, ReaderEvent, Shared};
-use crate::{SourceEpochs, TraceEvent, clock::SourceTimePolicy};
+use crate::stream::TraceEvent;
+use crate::{SourceEpochs, clock::SourceTimePolicy};
 use retained::{Retain, RetainedOutput};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::{BitCursor, BitSource};

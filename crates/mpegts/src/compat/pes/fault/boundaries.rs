@@ -2,11 +2,11 @@
 // H.222.0 (08/2023) 2.4.3.5: DI signals a source clock discontinuity;
 // the strict source Timeline, rather than compatibility timestamps, binds it.
 use super::{SourceContext, TransportFaultRecovery};
+use crate::PacketFormat;
 use crate::compat::pes::observer::{DemuxBoundary, DemuxPacket};
 use crate::stream::entity::TraceOrigin;
-use crate::{
-    FaultKind, MediaEntityEnd, ObservedTrace, PacketFormat, TraceEvent, TraceFault, TransportPacket,
-};
+use crate::stream::{FaultKind, MediaEntityEnd, ObservedTrace, TraceEvent, TraceFault};
+use crate::transport::TransportPacket;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Error, InputCursor, InputToken, Refused, Result, SourceLocation, Step, WorkBudget,

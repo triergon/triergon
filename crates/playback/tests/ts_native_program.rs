@@ -4,11 +4,12 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, SourceCapabilities, SourceId, Time, WorkBudget,
 };
+use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence};
+use triergon_mpegts::stream::TraceEvent;
 use triergon_mpegts::{
-    PacketFormat, ParseLimits, TraceEvent,
+    PacketFormat, ParseLimits,
     clock::SourceTimePolicy,
     compat::pes::{DemuxBoundary, DemuxPacket, PrivateAudioCarriage, RegisteredCarriage},
-    psi::{DescriptorNamespace, DvbNamespaceEvidence},
 };
 use triergon_playback::{
     ByteSource, ClockChoice, Delivery, Engine, Player, PlayerPolicy, Progress, RawEvent, Selection,

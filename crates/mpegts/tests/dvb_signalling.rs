@@ -14,9 +14,8 @@ use triergon_mpegts::psi::{
 };
 #[cfg(feature = "reference-trace")]
 use triergon_mpegts::reference_trace::dvb::DvbViewProfile;
-use triergon_mpegts::{
-    AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, TraceEvent, TransportStream,
-};
+use triergon_mpegts::stream::{TraceEvent, TransportStream};
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 
 const DVB: DescriptorNamespace =
     DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile);

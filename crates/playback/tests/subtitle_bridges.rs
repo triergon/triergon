@@ -7,11 +7,9 @@ use triergon_core::{
     Budget, Bytes, InputCursor, Result, SourceCapabilities, SourceId, Time, WorkBudget,
 };
 use triergon_isobmff::{Limits, Next, config::ConfigurationLimits, movie::EntryLayout};
-use triergon_mpegts::{
-    PacketFormat, ParseLimits, TraceEvent,
-    clock::SourceTimePolicy,
-    psi::{DescriptorNamespace, DvbNamespaceEvidence},
-};
+use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence};
+use triergon_mpegts::stream::TraceEvent;
+use triergon_mpegts::{PacketFormat, ParseLimits, clock::SourceTimePolicy};
 use triergon_playback::{
     bitmap_bridge::{DvdReceiver, DvdReceiverStep, PgsBridge, PgsQueueAction, PgsStep},
     caption_bridge::{CaptionBridge, CaptionStep, CaptionUnit, CaptionVideo},

@@ -17,8 +17,11 @@ use crate::{Output, RawEvent, TsEvent};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::CodecId;
 use triergon_core::{Bytes, Error, Result, Rounding, Time, TimeBase, WorkBudget};
+use triergon_mpegts::clock::SourceTimestamp;
 use triergon_mpegts::compat::pes::pcr_bounded_pts;
-use triergon_mpegts::{Pes, TraceEvent, TransportPacket, clock::SourceTimestamp};
+use triergon_mpegts::pes::Pes;
+use triergon_mpegts::stream::TraceEvent;
+use triergon_mpegts::transport::TransportPacket;
 use triergon_subtitles::compat::teletext::{Decoded, Decoder, Options, Refusal};
 
 /// Drain calls after the last packet, as the reference makes at most.

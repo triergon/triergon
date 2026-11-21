@@ -528,10 +528,10 @@ const TIMESTAMP: &str = "HLS AAC PES timestamp representative";
 mod tests {
     use super::*;
     use triergon_core::SourceId;
+    use triergon_mpegts::transport::parse_transport;
     use triergon_mpegts::{
         PacketFormat, ParseLimits, SourceEpochs,
         compat::pes::{DemuxClock, DemuxObserver, DemuxProfile, DemuxScope, SourceContext},
-        parse_transport,
     };
 
     const TRACK: TrackKey = TrackKey::Ts {

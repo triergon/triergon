@@ -3,7 +3,8 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
-use triergon_mpegts::{FaultKind, PacketFormat, ParseLimits, TraceEvent, TransportStream};
+use triergon_mpegts::stream::{FaultKind, TraceEvent, TransportStream};
+use triergon_mpegts::{PacketFormat, ParseLimits};
 
 fn collect(resources: &[&[u8]], format: PacketFormat) -> Vec<TraceEvent> {
     let budget = Budget::new(16 * 1024 * 1024).unwrap();

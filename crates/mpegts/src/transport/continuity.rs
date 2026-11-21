@@ -1,5 +1,6 @@
 //! Per-PID continuity, including H.222.0's whole-packet/PCR duplicate exception.
-use crate::{TransportPacket, checked_pid};
+use crate::checked_pid;
+use crate::transport::TransportPacket;
 use triergon_core::{Error, Result};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -4,15 +4,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
+use triergon_mpegts::compat::pes::PacketCompletion;
 use triergon_mpegts::compat::pes::SourceContext;
 use triergon_mpegts::psi::DescriptorNamespace;
 use triergon_mpegts::reference_trace::catalogue::{
     Catalogue, CatalogueCodec, PsiCompatibilityPolicies,
 };
-use triergon_mpegts::reference_trace::packet_completion::PacketCompletion;
-use triergon_mpegts::{
-    MediaEntityEnd, ObservedTrace, PacketFormat, ParseLimits, TraceEvent, TransportStream,
-};
+use triergon_mpegts::stream::{MediaEntityEnd, ObservedTrace, TraceEvent, TransportStream};
+use triergon_mpegts::{PacketFormat, ParseLimits};
 
 const BASIC: &[u8] = include_bytes!("data/ts188-basic.ts");
 const M2TS: &[u8] = include_bytes!("data/m2ts192-opaque-prefix.m2ts");
@@ -208,7 +207,7 @@ fn selected_m2ts_keeps_prefixes_and_real_eof() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = parsed(M2TS, &b, PacketFormat::M2ts192, 1);
     let mut v = catalogue(&b, PacketFormat::M2ts192);
-    v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL_OBSERVED)
+    v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL)
         .unwrap();
     for (e, c) in run.events() {
         if let TraceEvent::Transport(p) = e {
@@ -401,7 +400,7 @@ fn complete_pat_repetition_preserves_pcr_and_source_table_events() {
         1
     );
     let mut v = catalogue(&b, PacketFormat::Ts188);
-    v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL_OBSERVED)
+    v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL)
         .unwrap();
     for (e, c) in run.events() {
         let n = v.required_psi_compatibility_work(e).unwrap();
@@ -442,7 +441,7 @@ fn plain_repeated_pat_end_refusal_remains_literal() {
     let data = repeated_pat_source();
     let run = parsed(&data, &b, PacketFormat::Ts188, 7);
     let mut v = Catalogue::new(b, ParseLimits::default(), 1).unwrap();
-    v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL_OBSERVED)
+    v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL)
         .unwrap();
     for (e, c) in run.events() {
         let n = v.required_psi_compatibility_work(e).unwrap();

@@ -1,6 +1,7 @@
 //! DVB DTS-HD access units in aligned PES (TS 102 114 F.4.3).
 use super::{DtsAudioFrame, DtsExtensionFrame, aligned_audio};
-use crate::{Pes, psi::DvbDtsHd};
+use crate::pes::Pes;
+use crate::psi::DvbDtsHd;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::{BitCursor, BitSource};
 use triergon_core::{

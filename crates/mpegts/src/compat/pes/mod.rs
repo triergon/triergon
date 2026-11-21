@@ -10,7 +10,7 @@
 //! [`PrivateAudioCarriage`] for AC-3 and E-AC-3, and
 //! [`DvbSubtitlesDescriptors`] for DVB subtitles.
 //! [`TransportFaultRecovery`] adds opt-in extraction from finite TS188 AVC
-//! carriers with TEI or scrambling. Its [`TransportObservation::Faulted`]
+//! carriers with TEI or scrambling. Its [`RecoveredPes::Faulted`]
 //! result retains the actual source diagnostic and opaque bytes separately
 //! from validated source PES.
 //! [`PesFaultPolicy`] separately opts into isolated timing-header faults and
@@ -56,9 +56,9 @@ pub use fault::{
     MalformedSourceEvent, NoPacketsConfirmation,
 };
 pub use fault::{
-    PesFaultCarrier, PesFaultHeader, PesFaultKind, PesFaultPacket, PesFaultPolicy,
+    PesFaultCarrier, PesFaultHeader, PesFaultKind, PesFaultPacket, PesFaultPolicy, RecoveredPes,
     TransportFaultHeader, TransportFaultKind, TransportFaultPacket, TransportFaultRecovery,
-    TransportObservation, TransportTailConfirmation,
+    TransportTailConfirmation,
 };
 pub use observer::{
     CompactDemuxPacket, CompactPayload, DemuxBoundary, DemuxObserver, DemuxPacket,

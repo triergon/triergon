@@ -8,7 +8,8 @@ use triergon_mpegts::psi::{
     DescriptorNamespace, DvbNamespaceEvidence, ElementaryStream, PmtReader, PsiCrc32,
     SectionAssembler, TableStep,
 };
-use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, parse_transport};
+use triergon_mpegts::transport::parse_transport;
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits};
 
 const DVB: DescriptorNamespace =
     DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile);

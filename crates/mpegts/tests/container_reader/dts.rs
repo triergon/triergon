@@ -2,9 +2,9 @@ use super::{
     AccessUnit, AudioEofPolicy, CodecId, Drive, Error, Event, MediaKind, PID, PROGRAM, PacketInfo,
     ReaderEvent, ReaderLimits, Time, TrackInfo, Transport, audio_eof_namespace,
 };
-use triergon_mpegts::TraceEvent;
 use triergon_mpegts::compat::dts::UnlabelledCore;
 use triergon_mpegts::compat::pes::PcrPolicy;
+use triergon_mpegts::stream::TraceEvent;
 
 // EN 300 468 G.2, corresponding to a 48 kHz, 512-sample mono core.
 const DESCRIPTOR: &[u8] = &[0x7b, 5, 0xd2, 0x87, 0x83, 0xfe, 0x00];

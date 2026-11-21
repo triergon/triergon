@@ -385,7 +385,7 @@ impl StorageCursor {
                     .as_ref()
                     .map(|source| {
                         let map = source.map();
-                        Shared::<crate::TraceEvent>::allocation_bytes()?
+                        Shared::<crate::stream::TraceEvent>::allocation_bytes()?
                             .checked_add(table_storage(&map.streams)?)
                             .and_then(|n| n.checked_add(table_storage(&map.source_ranges).ok()?))
                             .map(StorageItem::Fixed)
@@ -427,7 +427,7 @@ impl StorageCursor {
             Self::Boundary => {
                 *self = Self::BoundaryBacking;
                 if let Some(boundary) = &reader.boundary {
-                    if let crate::TraceEvent::ProgramMap { .. } = boundary.event() {
+                    if let crate::stream::TraceEvent::ProgramMap { .. } = boundary.event() {
                         // Publishing the PMT commits the same event as the map.
                         debug_assert!(
                             reader
@@ -438,7 +438,7 @@ impl StorageCursor {
                         None
                     } else {
                         Some(StorageItem::Fixed(
-                            Shared::<crate::TraceEvent>::allocation_bytes()?,
+                            Shared::<crate::stream::TraceEvent>::allocation_bytes()?,
                         ))
                     }
                 } else {
@@ -451,7 +451,7 @@ impl StorageCursor {
                     .boundary
                     .as_ref()
                     .and_then(|boundary| match boundary.event() {
-                        crate::TraceEvent::Diagnostic(fault) => fault
+                        crate::stream::TraceEvent::Diagnostic(fault) => fault
                             .rejected
                             .as_ref()
                             .map(|rejected| StorageItem::Bytes(rejected.backing_bytes())),
@@ -521,7 +521,7 @@ impl StorageCursor {
                         .source
                         .pes()
                         .table_storage()?
-                        .checked_add(Shared::<crate::TraceEvent>::allocation_bytes()?)
+                        .checked_add(Shared::<crate::stream::TraceEvent>::allocation_bytes()?)
                         .ok_or(Error::Overflow)?;
                     *self = Self::Span {
                         lane,
@@ -577,12 +577,12 @@ impl StorageScan {
             || !reader
                 .pending
                 .as_ref()
-                .is_some_and(|source| matches!(source.event(), crate::TraceEvent::Finished))
+                .is_some_and(|source| matches!(source.event(), crate::stream::TraceEvent::Finished))
         {
             return Err(Error::Invalid("MPEG-TS fragment audit before source EOF"));
         }
         let total = Budget::control_storage_bytes()
-            .checked_add(Shared::<crate::TraceEvent>::allocation_bytes()?)
+            .checked_add(Shared::<crate::stream::TraceEvent>::allocation_bytes()?)
             .ok_or(Error::Overflow)?;
         Self::start(reader, StorageCursor::Map, total)
     }
@@ -1834,8 +1834,10 @@ impl Lane {
                         pes: piece.source.clone(),
                     },
                 )?;
-                build.recovered_adts_bytes |=
-                    matches!(piece.source.event(), crate::TraceEvent::UnboundedAdtsPes(_));
+                build.recovered_adts_bytes |= matches!(
+                    piece.source.event(),
+                    crate::stream::TraceEvent::UnboundedAdtsPes(_)
+                );
             }
             if piece.range.start <= anchor_offset && piece.serial > build.last_anchor {
                 let pes = piece.source.pes();
@@ -1916,7 +1918,10 @@ impl Lane {
         let build = self.finish_build(consumed_end);
         let recovered_adts = build.recovered_adts_bytes
             || build.clock.as_ref().is_some_and(|clock| {
-                matches!(clock.pes.event(), crate::TraceEvent::UnboundedAdtsPes(_))
+                matches!(
+                    clock.pes.event(),
+                    crate::stream::TraceEvent::UnboundedAdtsPes(_)
+                )
             });
         let track = self.track.clone();
         let BuildOrigins::Ready(origins) = build.origins else {
@@ -2283,7 +2288,7 @@ mod incomplete_audio_tests {
             match step {
                 Ok(Step::NeedInput(request)) => provide(&mut reader, &pool, &raw, request),
                 Ok(Step::Ready(Event::Other(ReaderEvent::Source(source)))) => {
-                    if matches!(source.event(), crate::TraceEvent::Pes(_)) {
+                    if matches!(source.event(), crate::stream::TraceEvent::Pes(_)) {
                         sources += 1;
                     }
                     // Every original source event is discarded here.

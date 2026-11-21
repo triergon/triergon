@@ -7,9 +7,10 @@ use triergon_core::{
 use triergon_mpegts::compat::pes::{
     DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, MalformedInputCompletion,
     MalformedInputFact, MalformedInputKind, MalformedSourceDisposition, NoPacketsConfirmation,
-    TransportFaultRecovery, TransportObservation,
+    RecoveredPes, TransportFaultRecovery,
 };
-use triergon_mpegts::{AssemblyStep, MediaEntityEnd, PacketFormat, ParseLimits, TraceEvent};
+use triergon_mpegts::stream::{MediaEntityEnd, TraceEvent};
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits};
 
 static RUN: AtomicBool = AtomicBool::new(false);
 static CANCEL: AtomicBool = AtomicBool::new(true);
@@ -83,7 +84,7 @@ impl Run {
         };
         for _ in 0..100_000 {
             match observer.poll(&mut WorkBudget::new(1), &RUN).unwrap() {
-                AssemblyStep::Output(TransportObservation::Accepted(packet)) => {
+                AssemblyStep::Output(RecoveredPes::Accepted(packet)) => {
                     self.packets.push(packet);
                 }
                 AssemblyStep::Yield => (),

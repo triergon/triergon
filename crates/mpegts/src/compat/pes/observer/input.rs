@@ -2,7 +2,8 @@
 #[cfg(feature = "reference-trace")]
 use super::DemuxScope;
 use super::{CarrierLayout, DemuxObserver, DemuxSpan, Pending, SourceContext};
-use crate::{SourceRange, TransportPacket};
+use crate::SourceRange;
+use crate::transport::TransportPacket;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Refused, Result, WorkBudget};
 
@@ -49,7 +50,7 @@ impl DemuxObserver {
     /// A false result is a work yield; every rejection leaves assembly intact.
     pub fn continue_media_entity(
         &mut self,
-        end: &crate::MediaEntityEnd,
+        end: &crate::stream::MediaEntityEnd,
         input: &mut triergon_core::InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -224,7 +225,7 @@ impl DemuxObserver {
 
     pub(crate) fn rejected_fault_input(
         &self,
-        packet: &crate::RejectedTransport,
+        packet: &crate::transport::RejectedTransport,
         context: SourceContext,
     ) -> Result<&Budget> {
         self.validate_input(None)?;

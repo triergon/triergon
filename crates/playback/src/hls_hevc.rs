@@ -499,10 +499,10 @@ fn picture_entry(unit: &RawAccessUnit, entry: Entry) -> Result<Entry> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use triergon_mpegts::transport::parse_transport;
     use triergon_mpegts::{
         PacketFormat, ParseLimits, SourceEpochs,
         compat::pes::{DemuxClock, DemuxObserver, DemuxProfile, DemuxScope, SourceContext},
-        parse_transport,
     };
 
     static NO: AtomicBool = AtomicBool::new(false);

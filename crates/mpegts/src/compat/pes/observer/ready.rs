@@ -3,10 +3,11 @@ use super::{
     Arena, DEFAULT_PACKET_CAP, DemuxObserver, DemuxSpan, Growth, ListGrowth, ReadyContinuation,
     SourceContext,
 };
+use crate::SourceRange;
+use crate::transport::TransportPacket;
 use crate::transport::carrier::{
     PLAIN_PAYLOAD_BYTES, PlainContinuation, TS_PAYLOAD_START, TS188_BYTES,
 };
-use crate::{SourceRange, TransportPacket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Bytes, Error, Result, SourceId, SourceLocation, WorkBudget};
 

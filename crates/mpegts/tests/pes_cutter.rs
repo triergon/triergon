@@ -2,7 +2,8 @@
 //! ([`DemuxClock::place`]) and packet format detection.
 use triergon_core::{Budget, Bytes};
 use triergon_mpegts::compat::pes::{CutPes, DemuxBoundary, DemuxClock, PesCutter};
-use triergon_mpegts::{PacketFormat, ParseLimits, TransportPacket, parse_transport};
+use triergon_mpegts::transport::{TransportPacket, parse_transport};
+use triergon_mpegts::{PacketFormat, ParseLimits};
 
 const PID: u16 = 0x100;
 const PCR_PID: u16 = 0x1ff;

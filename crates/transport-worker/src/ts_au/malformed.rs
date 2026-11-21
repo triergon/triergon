@@ -11,7 +11,8 @@ use triergon_mpegts::compat::pes::{
     NoPacketsConfirmation, RegisteredCarriage, SourceContext, TransportFaultRecovery,
 };
 use triergon_mpegts::psi::ProgramMap;
-use triergon_mpegts::{FaultKind, PacketFormat, ParseLimits, TraceEvent, TraceFault};
+use triergon_mpegts::stream::{FaultKind, TraceEvent, TraceFault};
+use triergon_mpegts::{PacketFormat, ParseLimits};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) struct Diagnostic {
@@ -170,8 +171,9 @@ mod tests {
     use crate::ts_input::{FIRST_SOURCE, Request};
     use std::sync::atomic::AtomicBool;
     use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceLocation};
+    use triergon_mpegts::PacketFormat;
     use triergon_mpegts::psi::DescriptorNamespace;
-    use triergon_mpegts::{FaultKind, PacketFormat};
+    use triergon_mpegts::stream::FaultKind;
 
     #[test]
     fn a_different_diagnostic_cannot_prove_empty_completion() {

@@ -1,6 +1,7 @@
 use super::*;
+use crate::SourceEpochs;
 use crate::compat::pes::PacketCompletion;
-use crate::{SourceEpochs, TransportStream};
+use crate::stream::TransportStream;
 use triergon_core::{InputWindow, SourceCapabilities, SourceFailure};
 const BAD_CRC: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -132,7 +133,7 @@ fn first(run: &Run) -> (&TransportPacket, SourceContext) {
 }
 #[test]
 fn compact_null_runs_keep_physical_bytes_order_and_completion() {
-    use crate::CompactTraceEvent;
+    use crate::stream::CompactTraceEvent;
 
     let mut data = BAD_CRC.to_vec();
     for cc in 0..19 {

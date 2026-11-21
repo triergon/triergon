@@ -6,10 +6,8 @@ use triergon_mpegts::compat::pes::{
     DemuxBoundary, DemuxClock, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxProfile,
     DemuxScope, RegisteredCarriage, SourceContext, TimestampOrigin,
 };
-use triergon_mpegts::{
-    AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, SourceRange, TransportPacket,
-    parse_transport,
-};
+use triergon_mpegts::transport::{TransportPacket, parse_transport};
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, SourceRange};
 
 const EPOCHS: SourceEpochs = SourceEpochs {
     clock: 0,

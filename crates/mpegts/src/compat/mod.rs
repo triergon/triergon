@@ -16,7 +16,7 @@ pub mod adts {
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
 
-    use crate::Pes;
+    use crate::pes::Pes;
     use triergon_core::Error;
 
     /// Select how a transport reader handles bytes outside complete ADTS frames.
@@ -75,8 +75,11 @@ pub mod dts {
 pub mod latm {
     //! Packet boundaries for LATM in MPEG-TS, as observed with FFmpeg git
     //! revision `d32b387f` on the 9.0 branch with parsers and NOFILLIN.
+    use crate::Track;
     use crate::clock::ClockKey;
-    use crate::{Pes, SourceEvent, TraceEvent, Track};
+    use crate::pes::Pes;
+    use crate::reader::SourceEvent;
+    use crate::stream::TraceEvent;
 
     /// Choose LOAS envelope framing or the demuxer's unsplit PES boundaries.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

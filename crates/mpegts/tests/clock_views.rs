@@ -10,10 +10,9 @@ use triergon_mpegts::clock::{
     source_timestamp,
 };
 use triergon_mpegts::compat::pes::{DemuxClock, DemuxProfile, TimestampOrigin};
-use triergon_mpegts::{
-    AssemblyStep, PacketFormat, ParseLimits, Pes, PesAssembler, SourceEpochs, TraceEvent,
-    TransportStream,
-};
+use triergon_mpegts::pes::{Pes, PesAssembler};
+use triergon_mpegts::stream::{TraceEvent, TransportStream};
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 
 const M: i128 = 8_589_934_592;
 const KEY: ClockKey = ClockKey {

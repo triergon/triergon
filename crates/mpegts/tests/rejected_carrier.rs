@@ -10,10 +10,9 @@ use triergon_mpegts::compat::pes::{
 use triergon_mpegts::reference_trace::recovery::{
     DemuxObservation, RecoveredPacket, RecoveryObserver, RejectedPolicy,
 };
-use triergon_mpegts::{
-    AssemblyStep, PacketFormat, ParseLimits, RejectedTransport, SourceEpochs, TraceEvent,
-    TransportInspection, TransportInspector, TransportStream,
-};
+use triergon_mpegts::stream::{TraceEvent, TransportStream};
+use triergon_mpegts::transport::{RejectedTransport, TransportInspection, TransportInspector};
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 
 const INPUT: &[u8] = include_bytes!("data/native-pes-v1/opcr-without-pcr-invalid.ts");
 const EPOCHS: SourceEpochs = SourceEpochs {
@@ -567,7 +566,7 @@ fn rejected_entity_mismatch_does_not_become_a_clock_reset() {
 
 #[test]
 fn framer_freeze_pressure_preserves_final_chunk_and_real_rejection() {
-    use triergon_mpegts::{FrameState, TransportFramer};
+    use triergon_mpegts::transport::{FrameState, TransportFramer};
     let budget = Budget::new(4096).unwrap();
     let mut framer = TransportFramer::new(budget.clone(), PacketFormat::Ts188);
     let raw = &INPUT[376..564];

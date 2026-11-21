@@ -230,7 +230,10 @@ fn same_packets(actual: &[Packet], expected: &[Packet]) {
     }
 }
 
-fn same_pes(actual: &triergon_mpegts::SourceEvent, expected: &triergon_mpegts::SourceEvent) {
+fn same_pes(
+    actual: &triergon_mpegts::reader::SourceEvent,
+    expected: &triergon_mpegts::reader::SourceEvent,
+) {
     let (TraceEvent::Pes(actual), TraceEvent::Pes(expected)) = (actual.event(), expected.event())
     else {
         panic!("expected original PES");

@@ -3,7 +3,7 @@ use crate::{BackendStep, Engine, RawEvent, Result, io::SourceOwner};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, InputRequest, Time, TimeBase, WorkBudget};
 use triergon_isobmff::compat::mov::packets::PacketCursor;
-use triergon_mpegts::TraceEvent;
+use triergon_mpegts::stream::TraceEvent;
 
 mod mp4_native_seek;
 mod mp4_range;

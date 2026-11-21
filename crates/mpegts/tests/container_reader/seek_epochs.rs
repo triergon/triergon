@@ -662,7 +662,7 @@ fn entity_suffix(
     reader: &mut Reader,
     pool: &Budget,
     parts: &[&[u8]],
-    plan: &[triergon_mpegts::SeekEntity],
+    plan: &[triergon_mpegts::reader::SeekEntity],
 ) -> (SeekMethod, Vec<Snapshot>) {
     let mut method = None;
     let mut packets = Vec::new();
@@ -715,7 +715,7 @@ fn entity_suffix(
 
 #[test]
 fn entity_epoch_indexes_preserve_codec_changes_ties_and_exact_suffixes() {
-    use triergon_mpegts::SeekEntity;
+    use triergon_mpegts::reader::SeekEntity;
     for configuration in [false, true] {
         let ts = changed_video(configuration);
         for format in [PacketFormat::Ts188, PacketFormat::M2ts192] {
@@ -859,7 +859,7 @@ fn explicit_epoch_index_bounds_and_ties_match_the_full_scan() {
 
 #[test]
 fn indexed_epoch_landing_keeps_a_pes_split_between_entities() {
-    use triergon_mpegts::SeekEntity;
+    use triergon_mpegts::reader::SeekEntity;
     let mut ts = Transport::new();
     ts.tables(&[(0x0f, PID, &[])], 0);
     ts.pes(PID, 0xc0, &adts(b"old epoch"), Some(90_000), None);

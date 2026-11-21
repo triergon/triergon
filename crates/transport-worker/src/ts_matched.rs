@@ -10,7 +10,8 @@ use triergon_core::{
     Budget, Error, InputWindow, Rounding, SourceId, Step, Time, TimeBase, WorkBudget,
 };
 use triergon_harness_protocol::digest::{fold, fold_framed, signed};
-use triergon_mpegts::{AccessUnit, Reader, ReaderLimits, SeekEntity, SourceEpochs};
+use triergon_mpegts::reader::SeekEntity;
+use triergon_mpegts::{AccessUnit, Reader, ReaderLimits, SourceEpochs};
 
 #[derive(Clone, Copy)]
 pub(crate) enum Kind {

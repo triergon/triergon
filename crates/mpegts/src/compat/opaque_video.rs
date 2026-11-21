@@ -7,14 +7,14 @@
 
 use super::pes::{
     DemuxBoundary, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxProfile, DemuxScope,
-    DemuxSpan, PesFaultPolicy, RegisteredCarriage, SourceContext, TransportFaultRecovery,
-    TransportObservation,
+    DemuxSpan, PesFaultPolicy, RecoveredPes, RegisteredCarriage, SourceContext,
+    TransportFaultRecovery,
 };
 use crate::psi::{DescriptorNamespace, ProgramMap};
-use crate::{
-    AssemblyStep, FaultKind, MediaEntityEnd, ObservedTrace, PacketFormat, ParseLimits, TraceEvent,
-    TraceFault, TransportStream,
+use crate::stream::{
+    FaultKind, MediaEntityEnd, ObservedTrace, TraceEvent, TraceFault, TransportStream,
 };
+use crate::{AssemblyStep, PacketFormat, ParseLimits};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputToken, Result, SourceLocation, Step, WorkBudget,
@@ -81,7 +81,7 @@ pub struct RecoveredOpaque {
     diagnostic: SourceContext,
     end: MediaEntityEnd,
     finished: SourceContext,
-    observations: BudgetVec<TransportObservation>,
+    observations: BudgetVec<RecoveredPes>,
     bytes: usize,
 }
 
@@ -108,7 +108,7 @@ impl RecoveredOpaque {
 
     /// Original typed observations in demux order. The first supplies the
     /// compatibility position and clock for this unframed run.
-    pub fn observations(&self) -> &[TransportObservation] {
+    pub fn observations(&self) -> &[RecoveredPes] {
         self.observations.as_slice()
     }
 
@@ -126,17 +126,17 @@ impl RecoveredOpaque {
     }
 }
 
-fn spans(packet: &TransportObservation) -> &[DemuxSpan] {
+fn spans(packet: &RecoveredPes) -> &[DemuxSpan] {
     match packet {
-        TransportObservation::Accepted(packet) => packet.spans.as_slice(),
-        TransportObservation::Faulted(packet) => packet.spans.as_slice(),
-        TransportObservation::PesFault(packet) => packet.spans.as_slice(),
+        RecoveredPes::Accepted(packet) => packet.spans.as_slice(),
+        RecoveredPes::Faulted(packet) => packet.spans.as_slice(),
+        RecoveredPes::PesFault(packet) => packet.spans.as_slice(),
     }
 }
 
 #[derive(Debug)]
 struct Scan {
-    packet: TransportObservation,
+    packet: RecoveredPes,
     span: usize,
     offset: usize,
     retain_work: u64,
@@ -216,7 +216,7 @@ pub struct OpaqueRecovery {
     fault_count: usize,
     end: Option<MediaEntityEnd>,
     finished: Option<SourceContext>,
-    observations: BudgetVec<TransportObservation>,
+    observations: BudgetVec<RecoveredPes>,
     bytes: usize,
     zeros: u8,
 }
@@ -367,7 +367,7 @@ impl OpaqueRecovery {
                             let len = self.observations.len();
                             // Pay for retained records that move if this append grows storage.
                             let copy_bytes = if len == self.observations.capacity() {
-                                len.checked_mul(size_of::<TransportObservation>())
+                                len.checked_mul(size_of::<RecoveredPes>())
                                     .ok_or(Error::Overflow)?
                             } else {
                                 0
@@ -614,11 +614,11 @@ impl OpaqueRecovery {
         Ok(())
     }
 
-    fn check_observation(&self, packet: &TransportObservation) -> Result<()> {
+    fn check_observation(&self, packet: &RecoveredPes) -> Result<()> {
         let fault = match packet {
-            TransportObservation::Faulted(packet) => Some(&packet.source_fault),
-            TransportObservation::PesFault(packet) => Some(&packet.source_fault),
-            TransportObservation::Accepted(_) => None,
+            RecoveredPes::Faulted(packet) => Some(&packet.source_fault),
+            RecoveredPes::PesFault(packet) => Some(&packet.source_fault),
+            RecoveredPes::Accepted(_) => None,
         };
         let admitted = match (self.trigger.proof, fault) {
             (Proof::PacketFault, Some(fault)) if self.observations.is_empty() => {
@@ -649,7 +649,7 @@ impl OpaqueRecovery {
             Proof::FinalCarrier => true,
             Proof::FiniteEof => matches!(
                 packets,
-                [TransportObservation::Accepted(DemuxPacket {
+                [RecoveredPes::Accepted(DemuxPacket {
                     boundary: DemuxBoundary::LogicalEof,
                     payload_kind: DemuxPayloadKind::DeclaredIncomplete,
                     ..
@@ -657,17 +657,17 @@ impl OpaqueRecovery {
             ),
             Proof::FiniteOverrun => matches!(
                 packets,
-                [TransportObservation::Accepted(DemuxPacket {
+                [RecoveredPes::Accepted(DemuxPacket {
                     boundary: DemuxBoundary::FiniteLength,
                     payload_kind: DemuxPayloadKind::DeclaredComplete,
                     ..
                 })] | [
-                    TransportObservation::Accepted(DemuxPacket {
+                    RecoveredPes::Accepted(DemuxPacket {
                         boundary: DemuxBoundary::FiniteOverrun,
                         payload_kind: DemuxPayloadKind::DeclaredIncomplete,
                         ..
                     }),
-                    TransportObservation::Accepted(DemuxPacket {
+                    RecoveredPes::Accepted(DemuxPacket {
                         payload_kind: DemuxPayloadKind::HeaderlessContinuation,
                         ..
                     })
@@ -725,7 +725,9 @@ fn check_cancel(cancel: &AtomicBool) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{OpaqueRecovery, RecoveryTrigger};
-    use crate::{FaultKind, ParseLimits, TraceFault, psi::DescriptorNamespace};
+    use crate::ParseLimits;
+    use crate::psi::DescriptorNamespace;
+    use crate::stream::{FaultKind, TraceFault};
     use std::sync::atomic::AtomicBool;
     use triergon_core::{
         Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure,

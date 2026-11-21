@@ -1,9 +1,9 @@
 //! Format-specific <=192-byte carry, not an I/O cursor/token framework.
 use crate::transport::carrier::{PlainCarrier, PlainContinuation, TS188_BYTES};
-use crate::{
-    AssemblyStep, PacketFormat, RejectedTransport, TransportInspection, TransportInspector,
-    TransportPacket,
+use crate::transport::{
+    RejectedTransport, TransportInspection, TransportInspector, TransportPacket,
 };
+use crate::{AssemblyStep, PacketFormat};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, ByteStorageAddress, Bytes, Error, InputCursor, InputToken, Result, SourceId,
@@ -52,7 +52,8 @@ impl NullCarrierRun {
         let stride = self.format.bytes();
         let at = index * stride;
         let bytes = self.bytes.slice(at..at + stride)?;
-        let mut packet = crate::parse_transport(bytes, self.format, self.start.offset + at as u64)?;
+        let mut packet =
+            crate::transport::parse_transport(bytes, self.format, self.start.offset + at as u64)?;
         packet.source_id = Some(self.start.source);
         Ok(packet)
     }
@@ -827,7 +828,7 @@ mod tests {
                 assert_eq!(packet.pcr_range, Some(6..12));
                 assert_eq!(
                     packet.adaptation.as_ref().unwrap().pcr,
-                    Some(crate::Pcr {
+                    Some(crate::transport::Pcr {
                         base: 0,
                         extension: 0
                     })

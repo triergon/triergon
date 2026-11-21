@@ -11,10 +11,9 @@ use triergon_mpegts::compat::pes::{
 use triergon_mpegts::reference_trace::recovery::{
     DemuxObservation, DiagnosticPacket, RecoveryObserver, RejectedPolicy, SelectedFault,
 };
-use triergon_mpegts::{
-    AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, TraceEvent, TraceFault,
-    TransportInspection, TransportInspector, TransportStream,
-};
+use triergon_mpegts::stream::{TraceEvent, TraceFault, TransportStream};
+use triergon_mpegts::transport::{TransportInspection, TransportInspector};
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 
 const EPOCHS: SourceEpochs = SourceEpochs {
     clock: 0,
@@ -527,7 +526,7 @@ fn hidden_backing_deduplicates_and_output_outlives_parser() {
     o.push_accepted(p, context(8)).unwrap();
     assert_eq!(b.used(), initial + retained);
     let f = TraceFault {
-        kind: triergon_mpegts::FaultKind::Transport,
+        kind: triergon_mpegts::stream::FaultKind::Transport,
         pid: Some(256),
         location: SourceLocation {
             source: SourceId(1),

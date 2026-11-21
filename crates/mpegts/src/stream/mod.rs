@@ -9,17 +9,18 @@ mod poll;
 mod storage;
 mod tables;
 
+pub use entity::{MediaEntityEnd, ObservedTrace};
 pub use event::{CarrierObservation, CompactTraceEvent, FaultKind, TraceEvent, TraceFault};
 pub use feed::{FeedCarrier, FeedContinuation, FeedItem, FeedPayloadRun};
 use tables::{Job, MapBuild};
 
 pub(crate) use storage::{StorageItem, TransportStorageCursor};
 
+use crate::pes::PesAssembler;
+use crate::psi::SectionAssembler;
 use crate::psi::{DescriptorNamespace, PatCollector, Section};
-use crate::{
-    Continuity, ContinuityOutcome, PacketFormat, ParseLimits, PesAssembler, SectionAssembler,
-    SourceEpochs, TransportFramer, TransportPacket,
-};
+use crate::transport::{Continuity, ContinuityOutcome, TransportFramer, TransportPacket};
+use crate::{PacketFormat, ParseLimits, SourceEpochs};
 use std::sync::atomic::AtomicUsize;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation};
 

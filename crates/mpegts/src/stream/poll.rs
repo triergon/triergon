@@ -2,9 +2,11 @@
 use super::event::{CarrierObservation, CompactTraceEvent, FaultKind, TraceEvent, TraceFault};
 use super::feed::{FeedCarrier, FeedContinuation, FeedItem};
 use super::{Route, TransportStream};
+use crate::SourceEpochs;
+use crate::pes::Pes;
 use crate::transport::carrier::{PlainContinuation, TransportObservation};
 use crate::transport::framer::FramedCarrier;
-use crate::{ContinuityOutcome, Pes, SourceEpochs, TransportFramer, TransportPacket};
+use crate::transport::{ContinuityOutcome, TransportFramer, TransportPacket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, InputCursor, Result, SourceLocation, Step, WorkBudget};
 

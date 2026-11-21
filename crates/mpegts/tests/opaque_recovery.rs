@@ -3,10 +3,11 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, SourceLocation,
     Step, WorkBudget,
 };
+use triergon_mpegts::ParseLimits;
 use triergon_mpegts::compat::opaque_video::{OpaqueRecovery, RecoveredOpaque, RecoveryTrigger};
-use triergon_mpegts::compat::pes::TransportObservation;
+use triergon_mpegts::compat::pes::RecoveredPes;
 use triergon_mpegts::psi::DescriptorNamespace;
-use triergon_mpegts::{FaultKind, ParseLimits, TraceFault};
+use triergon_mpegts::stream::{FaultKind, TraceFault};
 
 const SOURCE: SourceId = SourceId(1);
 const SYNC_TAIL: &[u8] = include_bytes!("data/transport-sync-loss.ts");
@@ -141,10 +142,7 @@ fn one_byte_windows_keep_the_bound_fault_and_retained_payload() {
             .as_ref(),
         &SYNC_TAIL[564..]
     );
-    assert!(matches!(
-        output.observations(),
-        [TransportObservation::Accepted(_)]
-    ));
+    assert!(matches!(output.observations(), [RecoveredPes::Accepted(_)]));
     assert_eq!(output.payload_len(), 27);
     assert_eq!(
         output.payload().flatten().copied().collect::<Vec<_>>(),

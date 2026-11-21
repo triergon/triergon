@@ -1,8 +1,9 @@
 //! Shared admission facts for owned and borrowed-range PES delivery.
 
 use triergon_core::{Budget, BudgetVec, SourceLocation};
+use triergon_mpegts::pes::PesHeader;
 use triergon_mpegts::{
-    PesHeader, SourceEpochs, SourceRange,
+    SourceEpochs, SourceRange,
     compat::pes::{
         CompactDemuxPacket, CompactPayload, DemuxPacket, DemuxPayloadKind, DemuxProfile, DemuxSpan,
     },

@@ -6,10 +6,10 @@ use triergon_core::{
 };
 use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader};
 use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence};
-use triergon_mpegts::{
-    CarrierObservation, ContinuityOutcome, EntityTransition, FaultKind, ReaderEvent, ReaderLimits,
-    TraceEvent,
-};
+use triergon_mpegts::reader::EntityTransition;
+use triergon_mpegts::stream::{CarrierObservation, FaultKind, TraceEvent};
+use triergon_mpegts::transport::ContinuityOutcome;
+use triergon_mpegts::{ReaderEvent, ReaderLimits};
 
 const ID: SourceId = SourceId(9);
 const THIRD: &[u8] = include_bytes!("data/cc-third-copy.ts");

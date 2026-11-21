@@ -22,8 +22,9 @@ use triergon_isobmff::{
     payload::{SampleReader, SourcePacket},
 };
 use triergon_matroska::{Event as MkvEvent, ParseStep, Reader};
+use triergon_mpegts::stream::{FeedContinuation, FeedItem, TraceEvent, TransportStream};
 use triergon_mpegts::{
-    self as ts, FeedContinuation, FeedItem, TraceEvent, TransportStream,
+    self as ts,
     clock::{ClockKey, SourceTimePolicy, SourceTimestamp, source_timestamp},
 };
 use ts::compat::pes::{
@@ -93,7 +94,7 @@ pub struct TsEvent {
 #[derive(Debug)]
 pub enum RawEvent {
     Mp4Root(triergon_isobmff::boxes::BoxView),
-    EntityEnd(ts::MediaEntityEnd),
+    EntityEnd(ts::stream::MediaEntityEnd),
     NativeTs {
         packet: DemuxPacket,
         clock: DemuxTimeView,
@@ -326,7 +327,7 @@ pub struct TsEngine {
     native_update_at: Option<usize>,
     segment_discovery: Option<SegmentDiscovery>,
     segmented: bool,
-    boundary: Option<ts::MediaEntityEnd>,
+    boundary: Option<ts::stream::MediaEntityEnd>,
 }
 
 #[derive(Debug)]
@@ -352,7 +353,7 @@ pub(crate) enum TsPayloadStep {
         packet: NativePacket,
         clock: DemuxTimeView,
     },
-    EntityEnd(ts::MediaEntityEnd),
+    EntityEnd(ts::stream::MediaEntityEnd),
     NeedInput(InputRequest),
     Yield,
     End,
@@ -1879,7 +1880,7 @@ impl TsEngine {
     fn offer_native_transport(
         &mut self,
         index: usize,
-        mut packet: ts::TransportPacket,
+        mut packet: ts::transport::TransportPacket,
         context: SourceContext,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -2209,7 +2210,7 @@ impl TsEngine {
                 return T::project(TsPayloadStep::Yield);
             }
             if let Some(TraceEvent::Diagnostic(fault)) = &self.pending
-                && fault.kind == ts::FaultKind::Transport
+                && fault.kind == ts::stream::FaultKind::Transport
                 && matches!(
                     fault.error,
                     Error::Invalid("TS sync byte") | Error::Truncated

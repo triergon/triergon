@@ -1,6 +1,7 @@
 #![cfg(feature = "mpegts")]
 use std::sync::atomic::AtomicBool;
-use triergon::mpegts::{AccessUnit, ReaderEvent, TraceEvent};
+use triergon::mpegts::stream::TraceEvent;
+use triergon::mpegts::{AccessUnit, ReaderEvent};
 use triergon::{
     AnyOther, AnyPacket, AnyReader, Budget, Bytes, ContainerReader, Event, InputWindow, PacketInfo,
     Probe, SourceCapabilities, SourceId, Step, WorkBudget, probe,

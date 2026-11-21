@@ -10,10 +10,10 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{InputCursor, InputRequest, Time, WorkBudget};
-use triergon_mpegts::{
-    AssemblyStep, ContinuityOutcome, FaultKind, ParseLimits, TraceEvent,
-    psi::{PatTable, ProgramMap},
-};
+use triergon_mpegts::psi::{PatTable, ProgramMap};
+use triergon_mpegts::stream::{FaultKind, TraceEvent};
+use triergon_mpegts::transport::ContinuityOutcome;
+use triergon_mpegts::{AssemblyStep, ParseLimits};
 
 const TS_CLOCK_RATE: u32 = 90_000;
 

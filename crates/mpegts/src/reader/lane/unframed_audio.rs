@@ -1,7 +1,7 @@
 //! Bounded admission for a private-audio PES with no syncframe start.
 use super::Track;
-use crate::Pes;
 use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors, UnframedAudioPolicy};
+use crate::pes::Pes;
 use crate::psi::DescriptorNamespace;
 use crate::reader::ReaderLimits;
 use std::sync::atomic::{AtomicBool, Ordering};

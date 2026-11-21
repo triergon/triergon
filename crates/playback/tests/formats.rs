@@ -8,8 +8,9 @@ use triergon_core::{
     Budget, Bytes, Error as C, InputCursor, InputRequest, InputWindow, SourceCapabilities,
     SourceId, Time, WorkBudget,
 };
+use triergon_mpegts::stream::TraceEvent;
 use triergon_mpegts::{
-    PacketFormat, TraceEvent,
+    PacketFormat,
     clock::{SourceTimePolicy, SourceTimeStatus},
 };
 use triergon_playback::{ByteSource, Source, SourceReply};

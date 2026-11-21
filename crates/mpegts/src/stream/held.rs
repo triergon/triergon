@@ -1,8 +1,10 @@
 //! The stages of the carrier in hand.
 use super::event::{FaultKind, TraceEvent, TraceFault};
 use super::{Route, TransportStream, retryable};
+use crate::AssemblyStep;
+use crate::pes::{Pes, PesAssembler};
 use crate::psi::Section;
-use crate::{AssemblyStep, ContinuityOutcome, Pes, PesAssembler};
+use crate::transport::ContinuityOutcome;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Error, Result, SourceLocation, WorkBudget};
 

@@ -16,16 +16,13 @@ use crate::compat::pes::observer::{
     DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, PrivateAudioCarriage,
     PrivateAudioDescriptors, RegisteredCarriage, SourceContext,
 };
-use crate::{
-    AssemblyStep, PacketFormat, ParseLimits, RejectedTransport, SourceEpochs, SourceRange,
-    TransportPacket,
-};
+use crate::transport::{RejectedTransport, TransportPacket};
+use crate::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, SourceRange};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Refused, Result, SourceLocation, WorkBudget};
 
 mod lifecycle;
 mod selected;
-pub use crate::compat::pes::clock::{DiagnosticTimeView, EncodedTimeView};
 pub use lifecycle::{PatRoute, PatSelection, PmtBinding, PmtBindingJob};
 pub use selected::{DiagnosticCarrier, DiagnosticHeader, DiagnosticPacket, SelectedFault};
 
@@ -239,7 +236,7 @@ impl RecoveryObserver {
     /// Explicit contiguous media transaction; plain pushes stay single-entity.
     pub fn continue_media_entity(
         &mut self,
-        end: &crate::MediaEntityEnd,
+        end: &crate::stream::MediaEntityEnd,
         input: &mut triergon_core::InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,

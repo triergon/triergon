@@ -1,11 +1,13 @@
 //! Explicit flags48 PSI compatibility. No Source PatTable, active ProgramMap
 //! event, source diagnostic or epoch is synthesized by this optional operation.
 use super::*;
+use crate::AssemblyStep;
 use crate::compat::pes::observer::{DemuxObserver, SourceContext};
 use crate::psi::{
     Descriptors, PatReader, PmtReader, Section, SectionAssembler, SectionHeader, TableStep,
 };
-use crate::{AssemblyStep, FaultKind, NullCarrierRun, TraceFault, TransportPacket};
+use crate::stream::{FaultKind, TraceFault};
+use crate::transport::{NullCarrierRun, TransportPacket};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PsiCompatibility {
@@ -36,7 +38,7 @@ impl PsiCompatibility {
 pub struct PsiCompatibilityPolicies(u8);
 impl PsiCompatibilityPolicies {
     pub const NONE: Self = Self(0);
-    pub const ALL_OBSERVED: Self = Self(7);
+    pub const ALL: Self = Self(7);
     pub fn one(policy: PsiCompatibility) -> Self {
         Self(policy.bit())
     }

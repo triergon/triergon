@@ -14,12 +14,11 @@ use triergon_mpegts::psi::{CodecIdentification, DescriptorNamespace};
 use triergon_mpegts::reference_trace::recovery::{
     DemuxObservation, RecoveryObserver, RejectedPolicy,
 };
-use triergon_mpegts::{
-    AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, SourceRange, TraceEvent,
-    TransportPacket, TransportStream, parse_transport,
-};
+use triergon_mpegts::stream::{TraceEvent, TransportStream};
 #[cfg(feature = "reference-trace")]
-use triergon_mpegts::{TransportInspection, TransportInspector};
+use triergon_mpegts::transport::{TransportInspection, TransportInspector};
+use triergon_mpegts::transport::{TransportPacket, parse_transport};
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, SourceRange};
 
 const PAYLOAD: &[u8] = b"lane-ts-original-payload\x00\x47\xff";
 const EPOCHS: SourceEpochs = SourceEpochs {

@@ -1,10 +1,8 @@
 //! Spec-derived signalling regressions. These tests do not claim codec/AU conformance.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
-use triergon_mpegts::{
-    AssemblyStep, ParseLimits, SectionAssembler,
-    psi::{Descriptor, Descriptors, PmtReader, TableStep},
-};
+use triergon_mpegts::psi::{Descriptor, Descriptors, PmtReader, SectionAssembler, TableStep};
+use triergon_mpegts::{AssemblyStep, ParseLimits};
 
 const HEVC: [u8; 13] = [
     0xa2, 0x80, 0, 0, 1, 0xda, 0xbc, 0x12, 0x34, 0x56, 0x78, 120, 0x7e,

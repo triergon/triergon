@@ -5,7 +5,8 @@ use super::{
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::Bytes;
-use triergon_mpegts::{DvbSubtitleTailPolicy, DvbSubtitleUnit, Pes};
+use triergon_mpegts::pes::Pes;
+use triergon_mpegts::reader::{DvbSubtitleTailPolicy, DvbSubtitleUnit};
 
 const COMPLETE: &[u8] = include_bytes!("../data/dvb/dvb-default-clut2.pes-data");
 const TRUNCATED: &[u8] = include_bytes!("../data/dvb/dvb-truncated-segment.pes-data");

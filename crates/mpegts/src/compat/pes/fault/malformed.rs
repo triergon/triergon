@@ -4,10 +4,11 @@
 use super::{SourceContext, TransportFaultRecovery};
 use crate::compat::pes::observer::DemuxScope;
 use crate::psi::DescriptorNamespace;
-use crate::{
-    FaultKind, MediaEntityEnd, ObservedTrace, PacketFormat, ParseLimits, TraceEvent, TraceFault,
-    TransportPacket, TransportStream,
+use crate::stream::{
+    FaultKind, MediaEntityEnd, ObservedTrace, TraceEvent, TraceFault, TransportStream,
 };
+use crate::transport::TransportPacket;
+use crate::{PacketFormat, ParseLimits};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputToken, Result, SourceLocation, Step, WorkBudget,

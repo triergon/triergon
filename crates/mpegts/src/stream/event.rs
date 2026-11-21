@@ -1,8 +1,10 @@
 //! The events a transport stream returns.
+use crate::SourceEpochs;
 use crate::compat::adts::UnboundedPes;
+use crate::pes::Pes;
 use crate::psi::{PatTable, ProgramMap, Section};
 use crate::transport::carrier::TransportObservation;
-use crate::{ContinuityOutcome, NullCarrierRun, Pes, SourceEpochs, TransportPacket};
+use crate::transport::{ContinuityOutcome, NullCarrierRun, TransportPacket};
 use triergon_core::{Error, SourceLocation};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -20,7 +22,7 @@ pub struct TraceFault {
     pub location: SourceLocation,
     pub error: Error,
     /// Original owned rejected carrier; absent for non-carrier/operational faults.
-    pub rejected: Option<crate::RejectedTransport>,
+    pub rejected: Option<crate::transport::RejectedTransport>,
 }
 
 /// A carrier or ordinary continuity event that can be inspected in place.

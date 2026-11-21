@@ -24,7 +24,8 @@ use triergon_core::{
 use triergon_mpegts::compat::pes::{CutPes, DemuxClock, PesCutter};
 use triergon_mpegts::compat::stream::{self, Program, ProgramReader};
 use triergon_mpegts::psi::ElementaryStream;
-use triergon_mpegts::{PacketFormat, ParseLimits, TransportFramer};
+use triergon_mpegts::transport::TransportFramer;
+use triergon_mpegts::{PacketFormat, ParseLimits};
 use triergon_subtitles::compat::dvb::{PesParser, PesProgress};
 
 /// The largest window handed to the framer at once.

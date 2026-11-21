@@ -1,12 +1,11 @@
 use crate::compat::pes::{
     DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, DemuxTimeView,
-    PesFaultPolicy, RegisteredCarriage, SourceContext, TransportFaultRecovery,
-    TransportObservation,
+    PesFaultPolicy, RecoveredPes, RegisteredCarriage, SourceContext, TransportFaultRecovery,
 };
-use crate::{
-    AssemblyStep, ContinuityOutcome, FaultKind, Reader, ReaderEvent, ReaderLimits, SourceEvent,
-    TraceEvent, TransportPacket, TransportStream,
-};
+use crate::reader::SourceEvent;
+use crate::stream::{FaultKind, TraceEvent, TransportStream};
+use crate::transport::{ContinuityOutcome, TransportPacket};
+use crate::{AssemblyStep, Reader, ReaderEvent, ReaderLimits};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     BudgetVec, Charged, Error, InputCursor, InputToken, Result, SourceLocation, WorkBudget,
@@ -609,7 +608,7 @@ impl Run {
                 return Ok(Progress::Yield);
             }
             match self.observer.poll(work, cancel)? {
-                AssemblyStep::Output(TransportObservation::Accepted(packet)) => {
+                AssemblyStep::Output(RecoveredPes::Accepted(packet)) => {
                     let end = self
                         .bytes
                         .checked_add(packet.payload_len)

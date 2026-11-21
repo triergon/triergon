@@ -4,10 +4,9 @@ use triergon_core::{
     Budget, Bytes, Error, InputToken, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
 use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, VideoEofPolicy};
-use triergon_mpegts::{
-    AudioEofPolicy, EntityTransition, FaultKind, Packet, Reader, ReaderEvent, ReaderLimits,
-    TraceEvent,
-};
+use triergon_mpegts::reader::{AudioEofPolicy, EntityTransition};
+use triergon_mpegts::stream::{FaultKind, TraceEvent};
+use triergon_mpegts::{Packet, Reader, ReaderEvent, ReaderLimits};
 
 struct Entity<'a> {
     source: SourceId,

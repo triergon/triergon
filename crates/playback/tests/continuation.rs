@@ -661,7 +661,7 @@ fn native_m2ts_context_uses_real_complete_window_and_positive_eof_reply() {
     assert!(out.iter().any(|o| matches!(
         o.event(),
         RawEvent::Ts(TsEvent {
-            source: triergon_mpegts::TraceEvent::Pes(_),
+            source: triergon_mpegts::stream::TraceEvent::Pes(_),
             ..
         })
     )));
@@ -2032,7 +2032,7 @@ fn native_m2ts_prefix_grid_loss_preserves_source_and_refuses_native_tail() {
             .filter(|o| matches!(
                 o.event(),
                 RawEvent::Ts(TsEvent {
-                    source: triergon_mpegts::TraceEvent::Pes(_),
+                    source: triergon_mpegts::stream::TraceEvent::Pes(_),
                     ..
                 })
             ))

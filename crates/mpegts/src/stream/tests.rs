@@ -639,7 +639,7 @@ fn rejected_pes_payload_stays_available_for_a_drained_retry() {
         .unwrap()
         .push(blocker, false, SOURCE, 188)
         .unwrap();
-    let mut packet = crate::parse_transport(
+    let mut packet = crate::transport::parse_transport(
         Bytes::copy_from_slice(&pool, &carrier(1, false)).unwrap(),
         PacketFormat::Ts188,
         376,
@@ -688,7 +688,7 @@ fn invalid_psi_pointer_restores_payload_before_diagnostic_recovery() {
     let mut raw = carrier(0, true);
     raw[1] = 0x40;
     raw[4] = 0xff;
-    let mut packet = crate::parse_transport(
+    let mut packet = crate::transport::parse_transport(
         Bytes::copy_from_slice(&pool, &raw).unwrap(),
         PacketFormat::Ts188,
         0,

@@ -615,7 +615,8 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Bytes, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
-use triergon_mpegts::{PacketFormat, ParseLimits, TraceEvent, TransportStream};
+use triergon_mpegts::{PacketFormat, ParseLimits};
+use triergon_mpegts::stream::{TraceEvent, TransportStream};
 
 # let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../playback/tests/fixtures/hls/media-00.ts");
 let stream = std::fs::read(path)?; // any transport; the parser does no I/O

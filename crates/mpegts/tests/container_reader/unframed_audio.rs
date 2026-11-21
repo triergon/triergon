@@ -6,9 +6,9 @@ use triergon_core::{
 };
 use triergon_mpegts::compat::pes::{PrivateAudioCarriage, UnframedAudioPolicy};
 use triergon_mpegts::psi::DescriptorNamespace;
-use triergon_mpegts::{
-    AccessUnit, EntityTransition, ReaderEvent, ReaderLimits, SourceEvent, TraceEvent,
-};
+use triergon_mpegts::reader::{EntityTransition, SourceEvent};
+use triergon_mpegts::stream::TraceEvent;
+use triergon_mpegts::{AccessUnit, ReaderEvent, ReaderLimits};
 
 const PAYLOAD: &[u8] = b"lane-ts-original-payload\0\x47\xff";
 const NEED_PES: Error = Error::Unsupported("unframed audio requires one finite PES");

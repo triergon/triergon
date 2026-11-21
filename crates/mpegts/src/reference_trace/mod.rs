@@ -17,21 +17,6 @@ pub mod recovery;
 
 pub mod catalogue;
 
-pub mod packet_completion {
-    //! Whether an input held any media.
-    //!
-    //! [`PacketCompletion`] classifies every physical carrier of an input with no
-    //! selected PES scope and confirms that none carried media
-    //! ([`NoMediaConfirmation`]), which is when FFmpeg's demuxer ends without a
-    //! packet.
-    //!
-    //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
-    pub use crate::compat::pes::completion::{
-        ControlCarrierKind, ControlPatFact, NoMediaConfirmation, PacketCompletion, PhysicalCarrier,
-        PhysicalNullRun,
-    };
-}
-
 pub mod dvb {
     //! The demuxer's codec parameters for one DVB subtitling service.
     //!

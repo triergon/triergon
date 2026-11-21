@@ -111,7 +111,7 @@ pub(crate) struct InputBinding {
 impl InputBinding {
     pub(crate) fn continued_media_entity(
         &self,
-        end: &crate::MediaEntityEnd,
+        end: &crate::stream::MediaEntityEnd,
         input: &InputCursor,
     ) -> Result<Self> {
         if self.source != end.location.source

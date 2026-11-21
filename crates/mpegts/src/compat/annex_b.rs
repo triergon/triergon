@@ -4,10 +4,9 @@
 
 mod continuity;
 
-use crate::{
-    CarrierObservation, EntityTransition, Packet, Reader, ReaderEvent, ReaderLimits, TraceEvent,
-    Track,
-};
+use crate::reader::EntityTransition;
+use crate::stream::{CarrierObservation, TraceEvent};
+use crate::{Packet, Reader, ReaderEvent, ReaderLimits, Track};
 use continuity::{EofStep, Proof, SourceJob};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{ContainerReader, Event, ReaderStep, SeekRequest};

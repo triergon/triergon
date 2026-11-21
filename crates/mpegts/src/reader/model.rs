@@ -1,7 +1,9 @@
+use crate::SourceEpochs;
 use crate::clock::{ClockKey, SourceTimestamp};
 use crate::compat::pes::PrivateAudioCarriage;
 use crate::psi::{ElementaryStream, ProgramMap};
-use crate::{CarrierObservation, ContinuityOutcome, SourceEpochs, TraceEvent, TransportPacket};
+use crate::stream::{CarrierObservation, TraceEvent};
+use crate::transport::{ContinuityOutcome, TransportPacket};
 use std::alloc::Layout;
 use std::ops::{Deref, Range};
 use std::sync::{Arc, atomic::AtomicUsize};
@@ -72,7 +74,7 @@ impl SourceEvent {
             _ => unreachable!("track owns a program map"),
         }
     }
-    pub(super) fn pes(&self) -> &crate::Pes {
+    pub(super) fn pes(&self) -> &crate::pes::Pes {
         self.event()
             .pes_source()
             .expect("payload source owns a PES")

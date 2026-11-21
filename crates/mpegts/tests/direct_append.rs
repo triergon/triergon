@@ -5,7 +5,8 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure, SourceId,
     Step, WorkBudget,
 };
-use triergon_mpegts::{PacketFormat, TransportFramer};
+use triergon_mpegts::PacketFormat;
+use triergon_mpegts::transport::TransportFramer;
 
 fn cursor(pool: &Budget, length: Option<u64>) -> InputCursor {
     InputCursor::new(

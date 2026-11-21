@@ -14,10 +14,9 @@ use triergon_mpegts::psi::{
 use triergon_mpegts::reference_trace::recovery::{
     DemuxObservation, RecoveryObserver, RejectedPolicy,
 };
-use triergon_mpegts::{
-    AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, TraceEvent, TransportPacket,
-    TransportStream, parse_transport,
-};
+use triergon_mpegts::stream::{TraceEvent, TransportStream};
+use triergon_mpegts::transport::{TransportPacket, parse_transport};
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 
 const EPOCH: SourceEpochs = SourceEpochs {
     clock: 0,

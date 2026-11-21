@@ -5,7 +5,9 @@
 use crate::compat::pes::observer::{
     DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, SourceContext,
 };
-use crate::{AssemblyStep, FaultKind, SourceEpochs, SourceRange, TraceFault, TransportPacket};
+use crate::stream::{FaultKind, TraceFault};
+use crate::transport::TransportPacket;
+use crate::{AssemblyStep, SourceEpochs, SourceRange};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Bytes, Error, Refused, Result, SourceLocation, WorkBudget};
 
@@ -74,7 +76,7 @@ impl PesFaultKind {
 )]
 pub enum PesFaultCarrier {
     Transport(TransportPacket),
-    Rejected(crate::RejectedTransport),
+    Rejected(crate::transport::RejectedTransport),
 }
 impl PesFaultCarrier {
     pub fn backing_bytes(&self) -> &Bytes {
@@ -226,7 +228,7 @@ impl TransportFaultPacket {
     clippy::large_enum_variant,
     reason = "charged inputs and outputs stay inline"
 )]
-pub enum TransportObservation {
+pub enum RecoveredPes {
     Accepted(DemuxPacket),
     Faulted(TransportFaultPacket),
     PesFault(PesFaultPacket),
@@ -393,12 +395,12 @@ impl TransportFaultRecovery {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<AssemblyStep<TransportObservation>> {
+    ) -> Result<AssemblyStep<RecoveredPes>> {
         if let Some(error) = self.fault {
             return Err(error);
         }
         let result = self.poll_inner(work, cancel);
-        if let Ok(AssemblyStep::Output(TransportObservation::Accepted(packet))) = &result {
+        if let Ok(AssemblyStep::Output(RecoveredPes::Accepted(packet))) = &result {
             self.boundaries.note_packet(packet);
         }
         if let Err(error) = result
@@ -415,11 +417,11 @@ impl TransportFaultRecovery {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<AssemblyStep<TransportObservation>> {
+    ) -> Result<AssemblyStep<RecoveredPes>> {
         let Some(job) = self.pending.as_mut() else {
             return self.inner.poll(work, cancel).map(|step| match step {
                 AssemblyStep::Output(packet) => {
-                    AssemblyStep::Output(TransportObservation::Accepted(packet))
+                    AssemblyStep::Output(RecoveredPes::Accepted(packet))
                 }
                 AssemblyStep::Yield => AssemblyStep::Yield,
                 AssemblyStep::NeedPayload => AssemblyStep::NeedPayload,
@@ -437,9 +439,9 @@ impl TransportFaultRecovery {
                         job.kind,
                         PesFaultKind::TransportError | PesFaultKind::Scrambling
                     ) {
-                        TransportObservation::Faulted(job.finish(&mut self.inner)?)
+                        RecoveredPes::Faulted(job.finish(&mut self.inner)?)
                     } else {
-                        TransportObservation::PesFault(job.finish_source(&mut self.inner)?)
+                        RecoveredPes::PesFault(job.finish_source(&mut self.inner)?)
                     },
                 )
             }

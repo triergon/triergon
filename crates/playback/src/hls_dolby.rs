@@ -283,13 +283,13 @@ const TIMESTAMP: &str = "HLS Dolby PES timestamp representative";
 mod tests {
     use super::*;
     use triergon_core::Bytes;
+    use triergon_mpegts::transport::parse_transport;
     use triergon_mpegts::{
         PacketFormat, ParseLimits, SourceEpochs,
         compat::pes::{
             DemuxClock, DemuxObserver, DemuxProfile, DemuxScope, PrivateAudioDescriptors,
             SourceContext,
         },
-        parse_transport,
     };
 
     const SOURCE: SourceId = SourceId(5);

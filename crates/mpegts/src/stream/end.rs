@@ -50,7 +50,7 @@ impl TransportStream {
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<crate::MediaEntityEnd>> {
+    ) -> Result<Option<crate::stream::MediaEntityEnd>> {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
@@ -77,7 +77,7 @@ impl TransportStream {
             return Ok(None);
         }
         match input.read_into(&mut [0_u8; 1], work, cancel)? {
-            Step::End(actual) if actual == location => Ok(Some(crate::MediaEntityEnd {
+            Step::End(actual) if actual == location => Ok(Some(crate::stream::MediaEntityEnd {
                 location,
                 issuer: self.trace_issuer()?,
                 token: input.token(),

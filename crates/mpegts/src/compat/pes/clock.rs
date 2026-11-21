@@ -1,8 +1,9 @@
 //! The demuxer's clock, beside the source clock in [`crate::clock`].
 //! Source raw33/None values, epochs and payloads remain authoritative. This view
 //! uses its own fixed interval and never replaces a source timestamp.
+use crate::SourceEpochs;
 use crate::clock::{PERIOD90, check_raw33};
-use crate::{Pes, PesHeader, SourceEpochs};
+use crate::pes::{Pes, PesHeader};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 

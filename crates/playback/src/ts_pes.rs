@@ -3,7 +3,10 @@
 //! gathered into one data field under a work budget.
 use crate::{Delivery, Output, RawEvent, TrackKey, TsEvent};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget};
-use triergon_mpegts::{Pes, TraceEvent, clock::SourceTimestamp, psi::ElementaryStream};
+use triergon_mpegts::clock::SourceTimestamp;
+use triergon_mpegts::pes::Pes;
+use triergon_mpegts::psi::ElementaryStream;
+use triergon_mpegts::stream::TraceEvent;
 
 /// `stream_id` of PES private data: DVB subtitles, teletext and HDMV PGS.
 const PRIVATE_STREAM_1: u8 = 0xbd;

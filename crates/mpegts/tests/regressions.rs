@@ -4,11 +4,12 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure, SourceId,
     Step, Time, WorkBudget,
 };
-use triergon_mpegts::{
-    AssemblyStep, Continuity, ContinuityOutcome, FrameState, PacketFormat, ParseLimits,
-    PesAssembler, SectionAssembler, SourceEpochs, TransportFramer, parse_transport,
-    psi::{PatReader, PmtReader, PsiCrc32, TableStep},
+use triergon_mpegts::pes::PesAssembler;
+use triergon_mpegts::psi::{PatReader, PmtReader, PsiCrc32, SectionAssembler, TableStep};
+use triergon_mpegts::transport::{
+    Continuity, ContinuityOutcome, FrameState, TransportFramer, parse_transport,
 };
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 
 const PID: u16 = 0x100;
 const PAT: &[u8] = &[

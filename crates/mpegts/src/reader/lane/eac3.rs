@@ -1,5 +1,5 @@
 //! Group complete E-AC-3 syncframes in a single private audio stream.
-use crate::Pes;
+use crate::pes::Pes;
 use crate::reader::model::{DependentSyncframe, Shared};
 use crate::reader::{Ac3AccessUnit, ReaderLimits, Track};
 use std::sync::atomic::{AtomicBool, Ordering};

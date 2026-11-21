@@ -14,7 +14,8 @@
 //! compatibility view supplies demux stream order, absent-PCR zero and language
 //! tags. It does not activate incomplete PATs or rejected PMTs.
 use crate::psi::{PatTable, ProgramMap, PsiCrc32};
-use crate::{MediaEntityEnd, PacketFormat, ParseLimits, SourceRange, TraceEvent};
+use crate::stream::{MediaEntityEnd, TraceEvent};
+use crate::{PacketFormat, ParseLimits, SourceRange};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, InputCursor, Result, SourceId, WorkBudget};
 
@@ -313,7 +314,7 @@ impl Catalogue {
                 map, active: true, ..
             } => self.pmt(map, cancel)?,
             TraceEvent::Diagnostic(f)
-                if f.kind == crate::FaultKind::Psi
+                if f.kind == crate::stream::FaultKind::Psi
                     && matches!(
                         f.error,
                         Error::Invalid("descriptor length" | "PMT single-section program identity")
@@ -644,7 +645,7 @@ impl Catalogue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TransportStream;
+    use crate::stream::TransportStream;
     use triergon_core::{InputWindow, SourceCapabilities, Step};
     fn fixture(budget: &Budget) -> (PatTable, MediaEntityEnd, InputCursor) {
         let data = include_bytes!("../../tests/data/ts188-basic.ts");

@@ -7,9 +7,8 @@ use triergon_mpegts::compat::pes::{
     DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, SourceContext,
     TimestampOrigin,
 };
-use triergon_mpegts::{
-    AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, TransportPacket, parse_transport,
-};
+use triergon_mpegts::transport::{TransportPacket, parse_transport};
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 
 const EPOCHS: SourceEpochs = SourceEpochs {
     clock: 0,
@@ -712,7 +711,7 @@ fn check_rejected_original(source: &[u8]) {
     use triergon_mpegts::reference_trace::recovery::{
         DemuxObservation, RecoveryObserver, RejectedPolicy,
     };
-    use triergon_mpegts::{TransportInspection, TransportInspector};
+    use triergon_mpegts::transport::{TransportInspection, TransportInspector};
     let budget = Budget::new(1 << 20).unwrap();
     let backing = Bytes::copy_from_slice(&budget, source).unwrap();
     let mut observer = RecoveryObserver::new(

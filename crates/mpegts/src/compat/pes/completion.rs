@@ -7,10 +7,9 @@
 use crate::compat::pes::observer::SourceContext;
 use crate::psi::{PatReader, PatSection, Section, SectionAssembler, TableStep};
 use crate::stream::entity::{ObservedTrace, TraceOrigin};
-use crate::{
-    AssemblyStep, CompactTraceEvent, FaultKind, MediaEntityEnd, NullCarrierRun, PacketFormat,
-    ParseLimits, TraceEvent, TraceFault, TransportInspection, TransportInspector, TransportPacket,
-};
+use crate::stream::{CompactTraceEvent, FaultKind, MediaEntityEnd, TraceEvent, TraceFault};
+use crate::transport::{NullCarrierRun, TransportInspection, TransportInspector, TransportPacket};
+use crate::{AssemblyStep, PacketFormat, ParseLimits};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, Result, SourceId, SourceLocation, Step,

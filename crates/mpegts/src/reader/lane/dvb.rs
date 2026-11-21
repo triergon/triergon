@@ -1,8 +1,9 @@
 //! DVB subtitle PES envelopes (EN 300 743, §§6.2 and 7.2).
 use super::{Piece, table_storage};
+use crate::pes::{Pes, PesSpan};
 use crate::reader::model::{PacketData, Shared};
 use crate::reader::{DvbSubtitleTailPolicy, DvbSubtitleUnit, PayloadSource};
-use crate::{Pes, PesSpan, TraceEvent};
+use crate::stream::TraceEvent;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 

@@ -1,5 +1,6 @@
 use super::*;
-use crate::{SourceEpochs, TransportStream};
+use crate::SourceEpochs;
+use crate::stream::TransportStream;
 use triergon_core::{InputWindow, SourceCapabilities, Step};
 const BAD_DESC: &[u8] = include_bytes!("../../../../tests/data/pmt-descriptor-overrun.ts");
 const BAD_NUMBER: &[u8] = include_bytes!("../../../../tests/data/pmt-multi-section-forbidden.ts");
@@ -154,7 +155,7 @@ fn default_observe_still_refuses_the_rejected_pmt() {
 fn enabling_does_not_change_the_default_entry_point() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(BAD_DESC, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     let mut error = None;
     for item in &run.items {
         if let Err(e) = v.observe(
@@ -173,7 +174,7 @@ fn enabling_does_not_change_the_default_entry_point() {
 fn zero_work_does_not_consume_a_source_event() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(PARTIAL_PAT, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     let item = &run.items[0];
     assert!(
         !v.observe_psi_compatibility(
@@ -192,7 +193,7 @@ fn zero_work_does_not_consume_a_source_event() {
 fn cancelled_event_does_not_consume_source_or_allocate_evidence() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(PARTIAL_PAT, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     let item = &run.items[0];
     assert_eq!(
         v.observe_psi_compatibility(
@@ -213,7 +214,7 @@ fn foreign_pool_actual_carrier_is_refused() {
     let a = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(PARTIAL_PAT, &a);
     let b = Budget::new(8 * 1024 * 1024).unwrap();
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     assert_eq!(feed(&mut v, &run.items[0]), Err(Error::ForeignPool));
     assert!(v.fault().is_some());
 }
@@ -221,7 +222,7 @@ fn foreign_pool_actual_carrier_is_refused() {
 fn repeated_source_ordinal_is_sticky() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(PARTIAL_PAT, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     assert!(feed(&mut v, &run.items[0]).unwrap());
     assert!(feed(&mut v, &run.items[0]).is_err());
     assert!(v.fault().is_some());
@@ -230,7 +231,7 @@ fn repeated_source_ordinal_is_sticky() {
 fn changed_entity_cannot_reuse_a_source_context() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(PARTIAL_PAT, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     let item = &run.items[0];
     assert!(
         v.observe_psi_compatibility(
@@ -247,7 +248,7 @@ fn changed_entity_cannot_reuse_a_source_context() {
 fn actual_raw_carrier_cannot_have_its_decoded_pid_replaced() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(PARTIAL_PAT, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     let TraceEvent::Transport(original) = &run.items[0].event else {
         panic!("carrier fixture")
     };
@@ -269,7 +270,7 @@ fn actual_raw_carrier_cannot_have_its_decoded_pid_replaced() {
 fn a_different_real_source_error_is_not_the_enabled_policy() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(BAD_DESC, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     let index = before_rejection(&mut v, &run);
     let TraceEvent::Diagnostic(f) = &run.items[index].event else {
         panic!("diagnostic")
@@ -293,7 +294,7 @@ fn a_different_real_source_error_is_not_the_enabled_policy() {
 fn a_rejection_from_another_carrier_is_not_accepted() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(BAD_DESC, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     let index = before_rejection(&mut v, &run);
     let TraceEvent::Diagnostic(f) = &run.items[index].event else {
         panic!("diagnostic")
@@ -316,7 +317,7 @@ fn a_rejection_from_another_carrier_is_not_accepted() {
 fn epoch_change_does_not_relabel_the_rejected_source_section() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(BAD_DESC, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     let index = before_rejection(&mut v, &run);
     let mut changed = run.items[index].context;
     changed.epochs = SourceEpochs {
@@ -338,7 +339,7 @@ fn epoch_change_does_not_relabel_the_rejected_source_section() {
 fn future_diagnostic_ordinal_is_not_an_actual_consecutive_rejection() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(BAD_DESC, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     let index = before_rejection(&mut v, &run);
     let mut changed = run.items[index].context;
     changed.source_event_ordinal += 10;
@@ -369,7 +370,7 @@ fn unsupported_source_policy_remains_a_refusal() {
 fn a_source_section_without_its_real_transports_cannot_be_admitted() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(PARTIAL_PAT, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     let item = run
         .items
         .iter()
@@ -382,7 +383,7 @@ fn a_source_section_without_its_real_transports_cannot_be_admitted() {
 fn partial_pat_retains_source_incompleteness_and_real_demux_metadata() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(PARTIAL_PAT, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     for item in &run.items {
         if !matches!(item.event, TraceEvent::Finished) {
             assert!(feed(&mut v, item).unwrap());
@@ -417,7 +418,7 @@ fn partial_pat_retains_source_incompleteness_and_real_demux_metadata() {
 fn original_nonzero_section_numbers_are_not_rewritten() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(BAD_NUMBER, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     for item in &run.items {
         if !matches!(item.event, TraceEvent::Finished) {
             assert!(feed(&mut v, item).unwrap());
@@ -443,7 +444,7 @@ fn original_nonzero_section_numbers_are_not_rewritten() {
 fn original_descriptor_tail_and_actual_error_location_are_retained() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(BAD_DESC, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     for item in &run.items {
         if !matches!(item.event, TraceEvent::Finished) {
             assert!(feed(&mut v, item).unwrap());
@@ -467,7 +468,7 @@ fn original_descriptor_tail_and_actual_error_location_are_retained() {
 fn end_with_unconfirmed_actual_source_diagnostic_is_not_eof() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(BAD_DESC, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     let _ = before_rejection(&mut v, &run);
     let cost = v.required_psi_compatibility_finish_work().unwrap();
     assert!(
@@ -485,7 +486,7 @@ fn end_with_unconfirmed_actual_source_diagnostic_is_not_eof() {
 fn cancelled_end_cannot_publish_a_successful_object() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(BAD_DESC, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     for item in &run.items {
         if !matches!(item.event, TraceEvent::Finished) {
             assert!(feed(&mut v, item).unwrap());
@@ -506,7 +507,7 @@ fn cancelled_end_cannot_publish_a_successful_object() {
 fn wrong_core_cursor_cannot_supply_the_demux_terminal_witness() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(BAD_DESC, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     for item in &run.items {
         if !matches!(item.event, TraceEvent::Finished) {
             assert!(feed(&mut v, item).unwrap());
@@ -543,7 +544,7 @@ fn exhausted_retained_history_is_explicit_and_releases_its_backings() {
         ..ParseLimits::default()
     };
     let mut v = Catalogue::new(b.clone(), limits, 1).unwrap();
-    v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL_OBSERVED)
+    v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL)
         .unwrap();
     let mut rejected = false;
     for item in &run.items {
@@ -563,7 +564,7 @@ fn invalid_crc_never_activates_a_compatibility_fact() {
     *bytes.last_mut().unwrap() ^= 1;
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(&bytes, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     for item in &run.items {
         if !matches!(item.event, TraceEvent::Finished) {
             assert!(feed(&mut v, item).unwrap());
@@ -577,7 +578,7 @@ fn invalid_crc_never_activates_a_compatibility_fact() {
 fn zero_terminal_work_keeps_the_witness_retryable() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(PARTIAL_PAT, &b);
-    let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
+    let mut v = view(&b, PsiCompatibilityPolicies::ALL);
     for item in &run.items {
         if !matches!(item.event, TraceEvent::Finished) {
             assert!(feed(&mut v, item).unwrap());
@@ -623,7 +624,7 @@ fn compatibility_cannot_be_enabled_after_a_source_fact() {
         .unwrap()
     );
     assert!(
-        v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL_OBSERVED)
+        v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL)
             .is_err()
     );
 }

@@ -8,10 +8,8 @@ use triergon_mpegts::psi::{DescriptorNamespace, PatTable, ProgramMap, TableStep}
 use triergon_mpegts::reference_trace::recovery::{
     DemuxObservation, PatRoute, PatSelection, PmtBinding, RecoveryObserver,
 };
-use triergon_mpegts::{
-    AssemblyStep, FeedContinuation, PacketFormat, ParseLimits, SourceEpochs, TraceEvent,
-    TransportStream,
-};
+use triergon_mpegts::stream::{FeedContinuation, TraceEvent, TransportStream};
+use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 #[path = "support/selected_lifecycle_fixture.rs"]
 mod fixtures;
 use fixtures::Case;
@@ -245,7 +243,7 @@ fn maps(events: &Events) -> Vec<(usize, &ProgramMap, SourceEpochs, bool)> {
         })
         .collect()
 }
-fn pes(events: &Events) -> Vec<(usize, &triergon_mpegts::Pes)> {
+fn pes(events: &Events) -> Vec<(usize, &triergon_mpegts::pes::Pes)> {
     events
         .iter()
         .enumerate()
@@ -746,7 +744,7 @@ fn feature_retained_old_output_keeps_its_full_backing_and_epoch() {
     let mut storage = Vec::with_capacity(4096);
     storage.extend_from_slice(&fixtures::bytes(Case::Retype188));
     let carrier_backing = Bytes::try_from_vec(&b, storage).unwrap();
-    let mut input = triergon_mpegts::parse_transport(
+    let mut input = triergon_mpegts::transport::parse_transport(
         carrier_backing.slice(376..564).unwrap(),
         PacketFormat::Ts188,
         376,
@@ -866,7 +864,7 @@ fn feature_hevc_cannot_inherit_avc_tei_recovery() {
     rebind(&mut o, r, &e);
     let mut raw = fixtures::bytes(Case::Retype188)[752..940].to_vec();
     raw[1] |= 0x80;
-    let mut p = triergon_mpegts::parse_transport(
+    let mut p = triergon_mpegts::transport::parse_transport(
         Bytes::copy_from_slice(&b, &raw).unwrap(),
         PacketFormat::Ts188,
         752,

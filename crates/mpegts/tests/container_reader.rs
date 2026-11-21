@@ -38,9 +38,9 @@ use triergon_core::{
     Budget, Bytes, Error, InputWindow, SourceCapabilities, SourceFailure, SourceId, Step, Time,
     WorkBudget,
 };
-use triergon_mpegts::{
-    AccessUnit, AudioEofPolicy, Packet, PacketFormat, Reader, ReaderEvent, ReaderLimits, TraceEvent,
-};
+use triergon_mpegts::reader::AudioEofPolicy;
+use triergon_mpegts::stream::TraceEvent;
+use triergon_mpegts::{AccessUnit, Packet, PacketFormat, Reader, ReaderEvent, ReaderLimits};
 
 const ID: SourceId = SourceId(77);
 const PROGRAM: u16 = 7;
@@ -1615,7 +1615,7 @@ fn signalled_counter_break_before_eof_interrupts_an_incomplete_avc_au() {
                 assert!(
                     matches!(cause.event(), TraceEvent::Continuity { pid, outcome }
                     if *pid == PID
-                        && *outcome == triergon_mpegts::ContinuityOutcome::SignalledDiscontinuity)
+                        && *outcome == triergon_mpegts::transport::ContinuityOutcome::SignalledDiscontinuity)
                 );
                 assert!(interruption.replace(cause).is_none());
             }
@@ -1623,7 +1623,7 @@ fn signalled_counter_break_before_eof_interrupts_an_incomplete_avc_au() {
                 TraceEvent::Continuity { pid, outcome }
                     if *pid == PID
                         && *outcome
-                            == triergon_mpegts::ContinuityOutcome::SignalledDiscontinuity =>
+                            == triergon_mpegts::transport::ContinuityOutcome::SignalledDiscontinuity =>
                 {
                     let cause = interruption
                         .as_ref()

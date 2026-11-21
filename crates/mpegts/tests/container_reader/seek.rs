@@ -609,7 +609,7 @@ fn layer_three_seek_replays_from_the_previous_empty_reservoir() {
 
 #[test]
 fn seek_across_entities_replays_a_split_pes_and_continues_through_eof() {
-    use triergon_mpegts::SeekEntity;
+    use triergon_mpegts::reader::SeekEntity;
     let frame = adts(&[0x56; 250]);
     let mut ts = Transport::new();
     ts.tables(&[(0x0f, PID, &[])], 0);

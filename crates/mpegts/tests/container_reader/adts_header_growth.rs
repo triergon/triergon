@@ -3,8 +3,10 @@ use super::{
     SourceCapabilities, Step, TraceEvent, Transport, WorkBudget, adts, timestamp,
 };
 use triergon_core::{InputRequest, SourceLocation, container::TrackId};
+use triergon_mpegts::SourceRange;
 use triergon_mpegts::compat::adts::PesPolicy;
-use triergon_mpegts::{FaultKind, SourceRange, TransportPacket};
+use triergon_mpegts::stream::FaultKind;
+use triergon_mpegts::transport::TransportPacket;
 
 const CARRIER: usize = 188;
 const HEADER_BYTES: usize = 65;
