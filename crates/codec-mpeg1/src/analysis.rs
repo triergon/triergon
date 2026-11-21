@@ -3,6 +3,7 @@
 //! an I picture, and the per-row activity the rate model plans with.
 
 use crate::motion::{self, Bounds, Coarse, Mv, Search};
+use crate::syntax::PictureType;
 use crate::{Encoder, Result};
 use triergon_pixel::Picture;
 
@@ -22,7 +23,56 @@ pub(crate) struct Decision {
     pub(crate) intra: bool,
 }
 
+/// How a source picture repeats the previous one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Repetition {
+    /// The luma differs, or the picture was not compared.
+    None,
+    /// The luma repeats and the chroma differs.
+    Luma,
+    /// Every plane repeats.
+    Picture,
+}
+
 impl Encoder {
+    /// How `input` repeats the previous source picture.
+    pub(crate) fn repetition(&self, input: &Picture) -> Repetition {
+        if input.y() != &self.previous_luma[..] {
+            return Repetition::None;
+        }
+        let (previous_cb, previous_cr) = self.previous_chroma.split_at(input.cb().len());
+        if input.cb() == previous_cb && input.cr() == previous_cr {
+            Repetition::Picture
+        } else {
+            Repetition::Luma
+        }
+    }
+
+    /// Keep `input` as the previous source picture, copying the planes that changed.
+    pub(crate) fn remember_source(&mut self, input: &Picture, repetition: Repetition) {
+        if repetition == Repetition::None {
+            self.previous_luma.copy_from_slice(input.y());
+        }
+        if repetition != Repetition::Picture {
+            let (cb, cr) = self.previous_chroma.split_at_mut(input.cb().len());
+            cb.copy_from_slice(input.cb());
+            cr.copy_from_slice(input.cr());
+        }
+    }
+
+    /// Keep the coded picture's vectors as the temporal predictors of the next
+    /// search: zero for intra macroblocks and after an I picture.
+    pub(crate) fn remember_vectors(&mut self, picture_type: PictureType) {
+        match picture_type {
+            PictureType::Predicted => {
+                for (prev, a) in self.previous_mvs.iter_mut().zip(self.analysis.iter()) {
+                    *prev = if a.intra { Mv::ZERO } else { a.mv };
+                }
+            }
+            PictureType::Intra => self.previous_mvs.fill(Mv::ZERO),
+        }
+    }
+
     /// Motion analysis for a P picture; returns the forward f_code covering
     /// every chosen vector and whether the picture is a scene change.
     ///

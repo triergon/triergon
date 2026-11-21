@@ -4,8 +4,8 @@
 
 use crate::Encoder;
 use crate::motion::{self, Mv};
-use crate::rate::PictureType;
-use crate::syntax::{write_coefficients, write_dc, write_mv_component};
+use crate::rate::VBV_GUARD_BITS;
+use crate::syntax::{PictureType, write_coefficients, write_dc, write_mv_component};
 use crate::tables::*;
 use crate::{block, dct};
 use triergon_pixel::{Geometry, Picture};
@@ -39,6 +39,20 @@ pub(crate) struct SliceState {
     pub(crate) skipped: usize,
 }
 
+impl SliceState {
+    /// The state at a slice start with quantizer_scale `q`.
+    pub(crate) fn new(q: u32) -> SliceState {
+        SliceState {
+            q,
+            target_q: q,
+            dc_pred: [128; 3],
+            pmv: Mv::ZERO,
+            last_intra: None,
+            skipped: 0,
+        }
+    }
+}
+
 impl Encoder {
     /// Code one macroblock row. `picture` carries the picture's `f_code` and
     /// whether it repeats the previous source; each macroblock sets the rest.
@@ -61,7 +75,7 @@ impl Encoder {
             // The first and last macroblock of a slice are never skipped.
             let edge = address == 0 || address == last;
             // Hard VBV guard: past this point only the cheapest legal codes.
-            let tight = economy || self.writer.bit_len() as f64 > hard_limit - 8192.0;
+            let tight = economy || self.writer.bit_len() as f64 > hard_limit - VBV_GUARD_BITS;
             censored |= tight;
             match kind {
                 PictureType::Intra => {

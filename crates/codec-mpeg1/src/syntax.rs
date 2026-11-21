@@ -3,10 +3,9 @@
 //! DC differentials and run/level coefficients of the block layer. The variable-length
 //! codes are those of Annex B ([`tables`](crate::tables)).
 
-use crate::Encoder;
+use crate::EncoderConfig;
 use crate::bits::BitWriter;
 use crate::block::bits;
-use crate::rate::PictureType;
 use crate::tables::{
     COEFFICIENTS, DC_SIZE_CHROMA, DC_SIZE_LUMA, DCT_ESCAPE, END_OF_BLOCK, MOTION_CODE, SCAN_BIT,
     ZIGZAG,
@@ -15,52 +14,75 @@ use crate::tables::{
 /// Picture rate 30 Hz: frame_rate_code 5 in Table 2-D.4.
 const FRAME_RATE_CODE: u32 = 5;
 
-impl Encoder {
-    pub(crate) fn write_sequence_header(&mut self) {
-        let g = self.cfg.geometry;
-        let w = &mut self.writer;
-        w.start_code(0xB3);
-        w.put(g.width() as u32, 12);
-        w.put(g.height() as u32, 12);
-        w.put(1, 4); // pel_aspect_ratio: 1.0 (square)
-        w.put(FRAME_RATE_CODE, 4);
-        w.put(self.cfg.max_rate.div_ceil(400), 18);
-        w.put(1, 1); // marker
-        w.put(self.cfg.vbv_bits.div_ceil(16384).clamp(1, 1023), 10);
-        w.put(0, 1); // constrained_parameters_flag
-        w.put(0, 1); // load_intra_quantizer_matrix
-        w.put(0, 1); // load_non_intra_quantizer_matrix
-    }
+/// The coding types of the pictures the encoder writes (picture_coding_type, §2.4.3.4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PictureType {
+    Intra,
+    Predicted,
+}
 
-    pub(crate) fn write_gop_header(&mut self) {
-        let n = self.index;
-        let w = &mut self.writer;
-        w.start_code(0xB8);
-        w.put(0, 1); // drop_frame_flag
-        w.put(((n / (30 * 3600)) % 24) as u32, 5);
-        w.put(((n / 1800) % 60) as u32, 6);
-        w.put(1, 1); // marker
-        w.put(((n / 30) % 60) as u32, 6);
-        w.put((n % 30) as u32, 6);
-        // closed_gop: set on the session's first GOP only, as the reference
-        // does; with no B pictures the flag has no decoding consequence.
-        w.put((n == 0) as u32, 1);
-        w.put(0, 1); // broken_link
-    }
+/// The sequence header of `cfg` (§2.4.2.3): square samples at 30 Hz, the default
+/// quantiser matrices, and the configured rate and VBV buffer in their units.
+pub(crate) fn write_sequence_header(w: &mut BitWriter, cfg: &EncoderConfig) {
+    let g = cfg.geometry;
+    w.start_code(0xB3);
+    w.put(g.width() as u32, 12);
+    w.put(g.height() as u32, 12);
+    w.put(1, 4); // pel_aspect_ratio: 1.0 (square)
+    w.put(FRAME_RATE_CODE, 4);
+    w.put(cfg.max_rate.div_ceil(400), 18);
+    w.put(1, 1); // marker
+    w.put(cfg.vbv_bits.div_ceil(16384), 10);
+    w.put(0, 1); // constrained_parameters_flag
+    w.put(0, 1); // load_intra_quantizer_matrix
+    w.put(0, 1); // load_non_intra_quantizer_matrix
+}
 
-    pub(crate) fn write_picture_header(&mut self, kind: PictureType, f_code: u32) {
-        let temporal = ((self.index - self.gop_start) % 1024) as u32;
-        let w = &mut self.writer;
-        w.start_code(0x00);
-        w.put(temporal, 10);
-        w.put(if kind == PictureType::Intra { 1 } else { 2 }, 3);
-        w.put(0xFFFF, 16); // vbv_delay: variable bit rate
-        if kind == PictureType::Predicted {
-            w.put(0, 1); // full_pel_forward_vector
-            w.put(f_code, 3);
-        }
-        w.put(0, 1); // extra_bit_picture
+/// The group of pictures header (§2.4.2.4) of a GOP starting at picture `index`:
+/// its time code at 30 Hz.
+pub(crate) fn write_gop_header(w: &mut BitWriter, index: u64) {
+    let n = index;
+    w.start_code(0xB8);
+    w.put(0, 1); // drop_frame_flag
+    w.put(((n / (30 * 3600)) % 24) as u32, 5);
+    w.put(((n / 1800) % 60) as u32, 6);
+    w.put(1, 1); // marker
+    w.put(((n / 30) % 60) as u32, 6);
+    w.put((n % 30) as u32, 6);
+    // closed_gop: set on the session's first GOP only, as the reference
+    // does; with no B pictures the flag has no decoding consequence.
+    w.put((n == 0) as u32, 1);
+    w.put(0, 1); // broken_link
+}
+
+/// The picture header (§2.4.2.5), with vbv_delay 0xFFFF (variable rate); `f_code` is
+/// the forward_f_code of a P picture.
+pub(crate) fn write_picture_header(
+    w: &mut BitWriter,
+    temporal_reference: u32,
+    picture_type: PictureType,
+    f_code: u32,
+) {
+    w.start_code(0x00);
+    w.put(temporal_reference, 10);
+    let picture_coding_type = match picture_type {
+        PictureType::Intra => 0b001,
+        PictureType::Predicted => 0b010,
+    };
+    w.put(picture_coding_type, 3);
+    w.put(0xFFFF, 16); // vbv_delay: variable bit rate
+    if picture_type == PictureType::Predicted {
+        w.put(0, 1); // full_pel_forward_vector
+        w.put(f_code, 3);
     }
+    w.put(0, 1); // extra_bit_picture
+}
+
+/// The slice header (§2.4.2.6) of a slice starting in the first macroblock row.
+pub(crate) fn write_slice_header(w: &mut BitWriter, quantizer_scale: u32) {
+    w.start_code(1);
+    w.put(quantizer_scale, 5);
+    w.put(0, 1); // extra_bit_slice
 }
 
 /// motion_code, sign and motion_r for one differential component, wrapped

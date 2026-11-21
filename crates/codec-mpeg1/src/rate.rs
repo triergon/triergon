@@ -2,7 +2,7 @@
 //!
 //! Bit allocation across a GOP follows the published MPEG-2 Test Model 5
 //! complexity rule (I/P only, I quantiser ≈ 0.8× the P quantiser). Each
-//! picture then uses ONE quantiser, chosen from a per-type model
+//! picture then uses one quantiser, chosen from a per-type model
 //! `bits ≈ α · activity / q` whose α is learned from the previous picture of
 //! the same type; a uniform quantiser within a picture is what keeps the
 //! distortion low for a given size. Rows only deviate from it by a bounded
@@ -14,18 +14,23 @@
 //! is removed whole at its decode time; a picture larger than the occupancy
 //! is an underflow.
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum PictureType {
-    Intra,
-    Predicted,
-}
+use crate::syntax::PictureType;
 
+/// Bits short of a picture's VBV occupancy from which only the cheapest codes are
+/// written: DC-only intra and coefficient-free inter macroblocks.
+pub(crate) const VBV_GUARD_BITS: f64 = 8192.0;
+
+/// The plan of one picture.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Plan {
     pub q: u32,
     /// Unrounded model quantiser; rows mix its two neighbours.
     pub q_exact: f64,
     /// Complete picture target, including the headers already emitted.
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "only the tests read the whole target")
+    )]
     pub target: f64,
     /// Remaining target after those actual headers; never negative.
     pub texture_target: f64,
@@ -34,6 +39,7 @@ pub(crate) struct Plan {
     pub hard_limit: f64,
 }
 
+/// The rate controller of one sequence.
 #[derive(Debug)]
 pub(crate) struct RateControl {
     frame_bits: f64,
@@ -56,10 +62,9 @@ pub(crate) struct RateControl {
     /// Total VBV underflow in bits (should stay 0).
     pub underflow_bits: f64,
     pub last_q: u32,
-    /// Mean quantiser of the latest I picture and whether the next P picture
-    /// is the first after it.
-    intra_q: f64,
-    after_intra: bool,
+    /// Mean quantiser of the I picture the next P picture follows directly; `None`
+    /// after a P picture.
+    intra_q: Option<f64>,
 }
 
 /// TM5 K_p, expressed as FFmpeg's default I/P quantiser ratio 1/0.8.
@@ -69,6 +74,8 @@ const KP: f64 = 1.25;
 const TARGET_VBV_SHARE: f64 = 0.96;
 /// Lower bound of the first P quantiser relative to the preceding I picture.
 const FIRST_P_RATIO: f64 = 0.75;
+/// Share of the VBV occupancy beyond which a row's quantiser escalates.
+const ESCALATION_SHARE: f64 = 0.97;
 
 impl RateControl {
     pub(crate) fn new(
@@ -102,8 +109,7 @@ impl RateControl {
             activity: 1.0,
             underflow_bits: 0.0,
             last_q: 8,
-            intra_q: 8.0,
-            after_intra: false,
+            intra_q: None,
         }
     }
 
@@ -156,10 +162,11 @@ impl RateControl {
         // The first P picture after an I picture predicts from a reference
         // quantised at the intra step; refining it far below that step
         // re-spends bits the next I picture discards anyway.
-        let q_exact = if kind == PictureType::Predicted && self.after_intra {
-            q_exact.max(FIRST_P_RATIO * self.intra_q).min(31.0)
-        } else {
-            q_exact
+        let q_exact = match (kind, self.intra_q) {
+            (PictureType::Predicted, Some(intra_q)) => {
+                q_exact.max(FIRST_P_RATIO * intra_q).min(31.0)
+            }
+            _ => q_exact,
         };
         let q = q_exact.round() as u32;
         self.kind = kind;
@@ -194,20 +201,37 @@ impl RateControl {
             .round() as u32
     }
 
-    /// Record a coded picture: `texture_bits` excludes picture/sequence headers.
-    pub(crate) fn end(&mut self, bits: f64, texture_bits: f64, mean_q: f64) {
-        self.record_end(bits, texture_bits, mean_q, true);
+    /// The quantiser of the next row, and whether the rest of the picture must take
+    /// the cheapest codes. `written` is the picture's bits so far, headers included,
+    /// and `floor` the least the remaining rows can cost.
+    ///
+    /// The quantiser escalates by 4 above the picture's once the remainder, at the
+    /// planned pace or at its least cost (whichever is larger), would no longer fit
+    /// the VBV; the cheapest codes start once even the least cost comes within
+    /// [`VBV_GUARD_BITS`] of it.
+    pub(crate) fn row(
+        &self,
+        written: usize,
+        header_bits: usize,
+        floor: f64,
+        activity_done: f64,
+    ) -> (u32, bool) {
+        let mut q = self.row_q((written - header_bits) as f64, activity_done);
+        let planned_rest = self.plan.texture_target * (1.0 - activity_done / self.activity);
+        let written = written as f64;
+        if written + floor.max(planned_rest) > self.plan.hard_limit * ESCALATION_SHARE {
+            q = q.max(self.plan.q + 4).min(31);
+        }
+        (q, written + floor > self.plan.hard_limit - VBV_GUARD_BITS)
     }
 
-    /// Emergency DC-only/empty-residual coding did not measure the ordinary
-    /// quantizer's texture cost. Keep that model unknown or at its last real
-    /// observation, while debiting all emitted bytes and physical underflow.
-    pub(crate) fn end_censored(&mut self, bits: f64, mean_q: f64) {
-        self.record_end(bits, 0.0, mean_q, false);
-    }
-
-    fn record_end(&mut self, bits: f64, texture_bits: f64, mean_q: f64, learn_model: bool) {
-        if learn_model {
+    /// Record a coded picture of `bits`, of which `texture_bits` code its
+    /// macroblocks. `texture_bits` is `None` when the VBV guard cut the picture's
+    /// coefficients: its texture cost was not measured, so the model keeps its last
+    /// real observation (or stays unknown). The bits and any underflow are debited
+    /// either way.
+    pub(crate) fn end(&mut self, bits: f64, texture_bits: Option<f64>, mean_q: f64) {
+        if let Some(texture_bits) = texture_bits {
             let complexity = bits * mean_q;
             let measured = texture_bits.max(1.0) * mean_q / self.activity;
             let smooth =
@@ -224,12 +248,9 @@ impl RateControl {
             }
         }
         match self.kind {
-            PictureType::Intra => {
-                self.intra_q = mean_q;
-                self.after_intra = true;
-            }
+            PictureType::Intra => self.intra_q = Some(mean_q),
             PictureType::Predicted => {
-                self.after_intra = false;
+                self.intra_q = None;
                 self.left_p = self.left_p.saturating_sub(1);
             }
         }

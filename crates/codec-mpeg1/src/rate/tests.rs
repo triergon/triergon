@@ -14,11 +14,7 @@ fn seeded(gop: u32) -> RateControl {
 }
 
 fn finish(rc: &mut RateControl, bits: f64, texture: f64, q: f64, censored: bool) {
-    if censored {
-        rc.end_censored(bits, q);
-    } else {
-        rc.end(bits, texture, q);
-    }
+    rc.end(bits, (!censored).then_some(texture), q);
 }
 
 /// A 16×16 encoder at 30 kbit/s with a VBV buffer of `vbv_bits`.
@@ -82,7 +78,7 @@ fn without_headers_the_texture_target_is_the_picture_target() {
 fn headers_never_create_reservoir_or_average_rate_credit() {
     let mut rc = seeded(1);
     let before = rc.begin(PictureType::Intra, 1.0, 200);
-    rc.end(1000.0, 800.0, 4.0);
+    rc.end(1000.0, Some(800.0), 4.0);
     let after = rc.begin(PictureType::Intra, 1.0, 200);
     assert_eq!(rc.bank, 0.0);
     assert_eq!(rc.fullness, 30_000.0);
@@ -96,8 +92,8 @@ fn a_predicted_picture_plans_with_its_own_headers() {
     let mut b = seeded(2);
     a.begin(PictureType::Intra, 1.0, 100);
     b.begin(PictureType::Intra, 1.0, 100);
-    a.end(1000.0, 900.0, 4.0);
-    b.end(1000.0, 900.0, 4.0);
+    a.end(1000.0, Some(900.0), 4.0);
+    b.end(1000.0, Some(900.0), 4.0);
     let without = a.begin(PictureType::Predicted, 1.0, 0);
     let with = b.begin(PictureType::Predicted, 1.0, 200);
     assert_eq!(without.target, with.target);
@@ -165,7 +161,7 @@ fn a_censored_predicted_picture_advances_the_gop_without_learning() {
     assert_eq!(rc.alpha_p, model);
     assert_eq!(rc.x_p, complexity);
     assert_eq!(rc.left_p, before - 1);
-    assert!(!rc.after_intra);
+    assert_eq!(rc.intra_q, None);
 }
 
 #[test]
@@ -176,8 +172,7 @@ fn measured_pictures_smooth_the_model_by_halves() {
     assert_eq!(rc.alpha_i, Some(2400.0));
     assert_eq!(rc.x_i, 2400.0);
     assert_eq!(rc.bank, 400.0);
-    assert_eq!(rc.intra_q, 4.0);
-    assert!(rc.after_intra);
+    assert_eq!(rc.intra_q, Some(4.0));
 }
 
 #[test]
