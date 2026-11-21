@@ -15,12 +15,19 @@ use triergon_framing::flac::{self, FlacBlocking, FlacFrameHeader, FlacStreamInfo
 /// The kind of a metadata block (RFC 9639 section 8.1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FlacBlockKind {
+    /// STREAMINFO (type 0).
     StreamInfo,
+    /// PADDING (type 1).
     Padding,
+    /// APPLICATION (type 2).
     Application,
+    /// SEEKTABLE (type 3).
     SeekTable,
+    /// VORBIS_COMMENT (type 4).
     VorbisComment,
+    /// CUESHEET (type 5).
     CueSheet,
+    /// PICTURE (type 6).
     Picture,
     /// Types 7 to 126.
     Reserved(u8),
@@ -44,6 +51,7 @@ impl FlacBlockKind {
 /// One metadata block.
 #[derive(Clone, Debug)]
 pub struct FlacMetadata {
+    /// The block type.
     pub kind: FlacBlockKind,
     /// Body length in bytes.
     pub len: u32,
@@ -86,6 +94,7 @@ pub struct Flac {
 }
 
 impl Flac {
+    /// The STREAMINFO block, once read; `None` for a stream without the `fLaC` marker.
     pub fn stream_info(&self) -> Option<&FlacStreamInfo> {
         self.stream_info.as_ref()
     }

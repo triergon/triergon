@@ -219,6 +219,7 @@ impl AnyReader {
                 source,
                 capabilities,
                 triergon_elementary::Limits::default(),
+                WINDOW,
             )?)),
             #[cfg(feature = "elementary")]
             Probe::MpegAudio => Ok(Self::MpegAudio(triergon_elementary::Reader::new(
@@ -226,6 +227,7 @@ impl AnyReader {
                 source,
                 capabilities,
                 triergon_elementary::Limits::default(),
+                WINDOW,
             )?)),
             #[cfg(feature = "elementary")]
             Probe::Adts => Ok(Self::Adts(triergon_elementary::Reader::new(
@@ -233,6 +235,7 @@ impl AnyReader {
                 source,
                 capabilities,
                 triergon_elementary::Limits::default(),
+                WINDOW,
             )?)),
             #[cfg(feature = "elementary")]
             Probe::Ac3 => Ok(Self::Ac3(triergon_elementary::Reader::new(
@@ -240,6 +243,7 @@ impl AnyReader {
                 source,
                 capabilities,
                 triergon_elementary::Limits::default(),
+                WINDOW,
             )?)),
             #[cfg(feature = "mpegts")]
             kind @ (Probe::Ts | Probe::M2ts) => Ok(Self::MpegTs(triergon_mpegts::Reader::new(

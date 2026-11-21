@@ -475,6 +475,7 @@ fn readers_are_concrete_container_readers() {
         triergon_core::SourceId(1),
         capabilities(&[], false),
         Limits::default(),
+        64 << 10,
     )
     .unwrap();
     assert_eq!(tracks(&reader), 0);

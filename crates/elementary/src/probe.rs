@@ -9,9 +9,13 @@ use triergon_framing::{
 /// The elementary stream formats this crate reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Kind {
+    /// Native FLAC, read by [`crate::FlacReader`].
     Flac,
+    /// MPEG audio, read by [`crate::MpegAudioReader`].
     MpegAudio,
+    /// AAC in ADTS, read by [`crate::AdtsReader`].
     Adts,
+    /// AC-3 or E-AC-3, read by [`crate::Ac3Reader`].
     Ac3,
 }
 

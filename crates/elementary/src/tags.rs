@@ -16,6 +16,7 @@ pub enum TagKind {
 /// A tag found in the source.
 #[derive(Clone, Debug)]
 pub struct Tag {
+    /// Which tag it is.
     pub kind: TagKind,
     /// Source offset of the first byte.
     pub offset: u64,

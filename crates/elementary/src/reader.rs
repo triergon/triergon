@@ -232,16 +232,19 @@ pub struct Reader<F: Format> {
 }
 
 impl<F: Format> Reader<F> {
+    /// A reader for one source, requesting windows of at most `window` bytes. Fails when
+    /// `window` or [`Limits::frame_bytes`] is zero.
     pub fn new(
         pool: &Budget,
         source: SourceId,
         capabilities: SourceCapabilities,
         limits: Limits,
+        window: usize,
     ) -> Result<Reader<F>> {
-        if limits.frame_bytes == 0 || limits.input_window == 0 {
+        if limits.frame_bytes == 0 {
             return Err(Error::Invalid("zero elementary stream limit"));
         }
-        let cursor = InputCursor::new(pool, source, capabilities, limits.input_window)?;
+        let cursor = InputCursor::new(pool, source, capabilities, window)?;
         let view = limits
             .frame_bytes
             .saturating_add(usize::try_from(limits.sync_scan_bytes).unwrap_or(usize::MAX))
@@ -269,6 +272,7 @@ impl<F: Format> Reader<F> {
     pub fn format(&self) -> &F {
         &self.format
     }
+    /// The stream's track, once its first frame is confirmed.
     pub fn stream(&self) -> Option<&Track> {
         self.track.as_ref()
     }
@@ -284,6 +288,7 @@ impl<F: Format> Reader<F> {
     pub fn audio_end(&self) -> Option<u64> {
         self.audio_end
     }
+    /// What the last completed seek did.
     pub fn last_seek(&self) -> Option<SeekDetail> {
         self.last_seek
     }
@@ -319,7 +324,8 @@ impl<F: Format> Reader<F> {
             .is_none_or(|reference| self.format.continues(&reference, header))
     }
 
-    pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
+    /// The next event, or why there is none yet.
+    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
         loop {
             let next = match self.phase {
                 Phase::Leading => self.leading(work, cancel)?,
@@ -1150,9 +1156,25 @@ impl<F: Format> Reader<F> {
         self.phase = self.keep(len, Owner::Tag(kind), Then::End);
         Ok(Flow::Ready(None))
     }
+}
 
-    /// Restart from the start of the source, forgetting the stream.
-    pub fn reset(&mut self) -> Result<InputRequest> {
+impl<F: Format> ContainerReader for Reader<F> {
+    type Packet = Packet;
+    type Track = Track;
+    /// The track is known.
+    type Other = ReaderEvent;
+
+    fn provide(&mut self, window: &InputWindow) -> Result<()> {
+        self.input.cursor_mut().provide(window)
+    }
+    fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
+        self.input.cursor_mut().finish(source, token)
+    }
+    fn fail(&mut self, source: SourceId, token: InputToken, failure: SourceFailure) -> Result<()> {
+        self.input.cursor_mut().fail(source, token, failure)
+    }
+    /// Keeps nothing: the stream is found again from the source start.
+    fn reset(&mut self) -> Result<InputRequest> {
         self.phase = Phase::Leading;
         self.reference = None;
         self.last = None;
@@ -1167,31 +1189,14 @@ impl<F: Format> Reader<F> {
         self.format.reset();
         self.input.reset(0)
     }
-}
-
-impl<F: Format> ContainerReader for Reader<F> {
-    type Packet = Packet;
-    type Track = Track;
-    type Other = ReaderEvent;
-
-    fn provide(&mut self, window: &InputWindow) -> Result<()> {
-        self.input.cursor_mut().provide(window)
-    }
-    fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
-        self.input.cursor_mut().finish(source, token)
-    }
-    fn fail(&mut self, source: SourceId, token: InputToken, failure: SourceFailure) -> Result<()> {
-        self.input.cursor_mut().fail(source, token, failure)
-    }
-    fn reset(&mut self) -> Result<InputRequest> {
-        Reader::reset(self)
-    }
     #[inline]
     fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
-        Reader::step(self, work, cancel)
+        self.advance(work, cancel)
     }
+    /// Seek the stream's track; a [`Event::Seek`] receipt arrives before the first packet
+    /// at the landing point.
     fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
-        Reader::request_seek(self, request)
+        self.start_seek(request)
     }
     fn track_count(&self) -> usize {
         usize::from(self.track.is_some())

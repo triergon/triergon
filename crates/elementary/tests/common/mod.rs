@@ -54,6 +54,7 @@ pub fn open<F: Format>(pool: &Budget, file: &[u8], known: bool) -> Reader<F> {
         SourceId(1),
         capabilities(file, known),
         Limits::default(),
+        64 << 10,
     )
     .unwrap()
 }

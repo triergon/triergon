@@ -30,6 +30,7 @@ const DECODER_DELAY: u32 = 528 + 1;
 /// The information frame a stream starts with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InfoFrame {
+    /// What the frame states.
     pub frame: MpegInfoFrame,
     /// Source offset of the frame.
     pub offset: u64,

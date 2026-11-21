@@ -6,6 +6,9 @@ use triergon_core::blocking::{Blocking, seekable_capabilities};
 use triergon_core::container::{Event, SeekReceipt, SeekRequest};
 use triergon_core::{Budget, Error, Result, SourceId};
 
+/// Bytes the reader requests per window.
+const WINDOW: usize = 64 * 1024;
+
 /// Drives a [`Reader`] from a seekable byte source.
 #[derive(Debug)]
 pub struct BlockingReader<F: Format, S> {
@@ -22,16 +25,18 @@ impl<F: Format, S: Read + Seek> BlockingReader<F, S> {
     /// Open `source` charging everything to `pool`.
     pub fn open_in(mut source: S, limits: Limits, pool: &Budget) -> Result<Self> {
         let capabilities = seekable_capabilities(&mut source)?;
-        let reader = Reader::new(pool, SourceId(1), capabilities, limits)?;
+        let reader = Reader::new(pool, SourceId(1), capabilities, limits, WINDOW)?;
         Ok(BlockingReader {
             driver: Blocking::seekable(reader, source, pool),
         })
     }
 
+    /// The underlying reader, for its track, tags and format facts.
     pub fn reader(&self) -> &Reader<F> {
         self.driver.reader()
     }
 
+    /// The source, at whatever offset the last read left it.
     pub fn into_inner(self) -> S {
         self.driver.into_inner()
     }
@@ -47,7 +52,7 @@ impl<F: Format, S: Read + Seek> BlockingReader<F, S> {
     }
 
     /// Read until the track is known.
-    pub fn open_stream(&mut self) -> Result<()> {
+    fn open_track(&mut self) -> Result<()> {
         while self.reader().stream().is_none() {
             if self.next_event()?.is_none() {
                 return Err(Error::Invalid("no frame in the source"));
@@ -58,7 +63,7 @@ impl<F: Format, S: Read + Seek> BlockingReader<F, S> {
 
     /// Seek and return the receipt; packets from the landing point follow.
     pub fn seek(&mut self, request: SeekRequest) -> Result<SeekReceipt> {
-        self.open_stream()?;
+        self.open_track()?;
         self.driver.seek(request)?;
         loop {
             match self.next_event()? {

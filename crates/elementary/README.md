@@ -67,8 +67,8 @@ FLAC).
 
 `Limits` bounds the largest access unit (4 MiB: a verbatim FLAC frame of 65535 samples
 of eight 32-bit channels is about 2.2 MB), retained tags and metadata (4 MiB in all),
-sync search (1 MiB), input window (64 KiB), SEEKTABLE points (65536) and bisection
-jumps (64). Every input-dependent allocation is charged to the reader's `Budget`;
+sync search (1 MiB), SEEKTABLE points (65536) and bisection jumps (64). `Reader::new`
+takes the largest input window it requests; `BlockingReader` asks for 64 KiB. Every input-dependent allocation is charged to the reader's `Budget`;
 exceeding a limit is a typed error.
 
 ## Comparison with FFmpeg

@@ -158,9 +158,8 @@ impl<F: Format> Reader<F> {
         Ok(receipt)
     }
 
-    /// Start a seek; the reader delivers a [`Event::Seek`] receipt before the first
-    /// packet at the landing point.
-    pub fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
+    /// Plan a seek and make its first jump.
+    pub(super) fn start_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
         if request.track != TRACK {
             return Err(Error::Invalid("seek track is not the stream's"));
         }
