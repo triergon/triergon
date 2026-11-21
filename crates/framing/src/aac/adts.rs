@@ -1,11 +1,11 @@
 //! ADTS: the header, complete AAC LC frames of one raw data block, and the writer
 //! that wraps a raw access unit. Payload and CRC are kept as bytes, neither decoded
 //! nor checked. No timing is derived.
-use crate::retryable;
 use crate::{
     BuildStep,
     aac::{AacAscFacts, AacSource, indexed_frequency},
 };
+use crate::{freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
@@ -223,29 +223,44 @@ impl AacAdtsFrame {
     }
 }
 
+/// The next fields to check, with the header once it is read.
 enum ParsePhase {
     Header,
-    Extent,
-    Publish,
-    Complete,
+    Extent(AacAdtsHeader),
+    Publish {
+        header: AacAdtsHeader,
+        crc: Option<u16>,
+    },
 }
+
+/// Where a parse stands. The buffer is held only until the frame is returned.
+enum ParseState {
+    Parsing { raw: Bytes, phase: ParsePhase },
+    Complete,
+    Failed(Error),
+}
+
 /// Parses a buffer that holds exactly one ADTS frame of a single AAC LC raw data
 /// block. The frame shares the buffer's bytes.
 pub struct AacAdtsParser {
-    raw: Option<Bytes>,
     source: AacSource,
-    header: Option<AacAdtsHeader>,
-    crc: Option<u16>,
-    phase: ParsePhase,
-    failure: Option<Error>,
+    state: ParseState,
 }
 impl std::fmt::Debug for AacAdtsParser {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (header, failure) = match &self.state {
+            ParseState::Parsing {
+                phase: ParsePhase::Extent(header) | ParsePhase::Publish { header, .. },
+                ..
+            } => (Some(*header), None),
+            ParseState::Parsing { .. } | ParseState::Complete => (None, None),
+            &ParseState::Failed(error) => (None, Some(error)),
+        };
         formatter
             .debug_struct("AacAdtsParser")
             .field("source", &self.source)
-            .field("header", &self.header)
-            .field("failure", &self.failure)
+            .field("header", &header)
+            .field("failure", &failure)
             .finish_non_exhaustive()
     }
 }
@@ -265,12 +280,11 @@ impl AacAdtsParser {
             .checked_add(u64::try_from(raw.len()).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
         Ok(Self {
-            raw: Some(raw),
             source,
-            header: None,
-            crc: None,
-            phase: ParsePhase::Header,
-            failure: None,
+            state: ParseState::Parsing {
+                raw,
+                phase: ParsePhase::Header,
+            },
         })
     }
     /// Parses for as long as `work` lasts; the frame costs three units.
@@ -290,13 +304,12 @@ impl AacAdtsParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<AacAdtsFrame>> {
-        if let Some(e) = self.failure {
+        if let ParseState::Failed(e) = self.state {
             return Err(e);
         }
         let result = self.advance(work, cancel);
         if let Err(e) = result {
-            self.failure = Some(e);
-            self.raw = None;
+            self.state = ParseState::Failed(e);
         }
         result
     }
@@ -306,28 +319,22 @@ impl AacAdtsParser {
         cancel: &AtomicBool,
     ) -> Result<BuildStep<AacAdtsFrame>> {
         loop {
-            if matches!(self.phase, ParsePhase::Complete) {
+            let ParseState::Parsing { raw, phase } = &mut self.state else {
                 return Ok(BuildStep::Complete);
-            }
+            };
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             if !work.try_charge(1) {
                 return Ok(BuildStep::Yield);
             }
-            let raw = self
-                .raw
-                .as_ref()
-                .ok_or(Error::Invalid("missing ADTS source"))?;
-            match self.phase {
+            match *phase {
                 ParsePhase::Header => {
                     let h = inspect_adts_header(raw.as_ref())?;
                     validate_selected_header(h)?;
-                    self.header = Some(h);
-                    self.phase = ParsePhase::Extent;
+                    *phase = ParsePhase::Extent(h);
                 }
-                ParsePhase::Extent => {
-                    let h = self.header.ok_or(Error::Invalid("missing ADTS header"))?;
+                ParsePhase::Extent(h) => {
                     let size = usize::from(h.frame_length());
                     let header_size = h
                         .single_block_header_bytes()
@@ -344,31 +351,24 @@ impl AacAdtsParser {
                     if size < raw.len() {
                         return Err(Error::Invalid("trailing bytes after one ADTS frame"));
                     }
-                    if !h.protection_absent() {
-                        self.crc = Some(u16::from_be_bytes([raw[7], raw[8]]));
-                    }
-                    self.phase = ParsePhase::Publish;
+                    let crc =
+                        (!h.protection_absent()).then(|| u16::from_be_bytes([raw[7], raw[8]]));
+                    *phase = ParsePhase::Publish { header: h, crc };
                 }
-                ParsePhase::Publish => {
-                    let header = self.header.ok_or(Error::Invalid("missing ADTS header"))?;
+                ParsePhase::Publish { header, crc } => {
                     let header_size = header
                         .single_block_header_bytes()
                         .ok_or(Error::Unsupported("ADTS block layout"))?;
-                    let payload = raw.slice(header_size..raw.len())?;
                     let output = AacAdtsFrame {
-                        raw: self
-                            .raw
-                            .take()
-                            .ok_or(Error::Invalid("missing ADTS source"))?,
-                        payload,
+                        payload: raw.slice(header_size..raw.len())?,
+                        raw: raw.clone(),
                         source: self.source,
                         header,
-                        crc: self.crc,
+                        crc,
                     };
-                    self.phase = ParsePhase::Complete;
+                    self.state = ParseState::Complete;
                     return Ok(BuildStep::Ready(output));
                 }
-                ParsePhase::Complete => return Ok(BuildStep::Complete),
             }
         }
     }
@@ -515,16 +515,27 @@ impl AacAdtsOutput {
 #[derive(Debug)]
 pub struct AacAdtsWriter {
     pool: Budget,
-    input: Option<Bytes>,
     source: AacSource,
     header: [u8; 7],
     total: usize,
     copied: usize,
-    output: Option<BudgetVec<u8>>,
+    /// The frame, empty until it is reserved.
+    output: BudgetVec<u8>,
     reserved: bool,
-    complete: bool,
-    failure: Option<Error>,
+    state: WriteState,
 }
+
+/// Where a write stands.
+#[derive(Debug)]
+enum WriteState {
+    /// The header and the payload are copied.
+    Copying(Bytes),
+    /// Every byte is copied and the payload released; the frame is frozen.
+    Freezing,
+    Complete,
+    Failed(Error),
+}
+
 impl AacAdtsWriter {
     /// A writer for `payload`, the access unit that starts at `source`, with a
     /// header of `params`.
@@ -568,15 +579,13 @@ impl AacAdtsWriter {
         }
         Ok(Self {
             pool: pool.clone(),
-            input: Some(payload),
             source,
             header,
             total,
             copied: 0,
-            output: None,
+            output: BudgetVec::new(pool),
             reserved: false,
-            complete: false,
-            failure: None,
+            state: WriteState::Copying(payload),
         })
     }
     /// Writes for as long as `work` lasts: one unit for the allocation, one per
@@ -595,16 +604,15 @@ impl AacAdtsWriter {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<AacAdtsOutput>> {
-        if let Some(e) = self.failure {
+        if let WriteState::Failed(e) = self.state {
             return Err(e);
         }
         let result = self.advance(work, cancel);
         if let Err(e) = result
             && !retryable(e)
         {
-            self.failure = Some(e);
-            self.input = None;
-            self.output = None;
+            self.state = WriteState::Failed(e);
+            self.output = BudgetVec::new(&self.pool);
         }
         result
     }
@@ -613,7 +621,7 @@ impl AacAdtsWriter {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<AacAdtsOutput>> {
-        if self.complete {
+        if matches!(self.state, WriteState::Complete) {
             return Ok(BuildStep::Complete);
         }
         if cancel.load(Ordering::Relaxed) {
@@ -623,65 +631,45 @@ impl AacAdtsWriter {
             if !work.try_charge(1) {
                 return Ok(BuildStep::Yield);
             }
-            if self.output.is_none() {
-                self.output = Some(BudgetVec::new(&self.pool));
-            }
-            self.output
-                .as_mut()
-                .ok_or(Error::Invalid("missing ADTS output"))?
-                .try_reserve_exact(self.total)?;
+            self.output.try_reserve_exact(self.total)?;
             self.reserved = true;
         }
-        while self.copied < self.total {
-            if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
+        if let WriteState::Copying(input) = &self.state {
+            while self.copied < self.total {
+                if cancel.load(Ordering::Relaxed) {
+                    return Err(Error::Cancelled);
+                }
+                let available = if self.copied < 7 {
+                    7 - self.copied
+                } else {
+                    (self.total - self.copied).min(4096)
+                };
+                let count = usize::try_from(
+                    work.take(u64::try_from(available).map_err(|_| Error::Overflow)?),
+                )
+                .map_err(|_| Error::Overflow)?;
+                if count == 0 {
+                    return Ok(BuildStep::Yield);
+                }
+                if self.copied < 7 {
+                    self.output
+                        .try_extend_from_slice(&self.header[self.copied..self.copied + count])?;
+                } else {
+                    let start = self.copied - 7;
+                    self.output
+                        .try_extend_from_slice(&input[start..start + count])?;
+                }
+                self.copied += count;
             }
-            let available = if self.copied < 7 {
-                7 - self.copied
-            } else {
-                (self.total - self.copied).min(4096)
-            };
-            let count =
-                usize::try_from(work.take(u64::try_from(available).map_err(|_| Error::Overflow)?))
-                    .map_err(|_| Error::Overflow)?;
-            if count == 0 {
-                return Ok(BuildStep::Yield);
-            }
-            let output = self
-                .output
-                .as_mut()
-                .ok_or(Error::Invalid("missing ADTS output"))?;
-            if self.copied < 7 {
-                output.try_extend_from_slice(&self.header[self.copied..self.copied + count])?;
-            } else {
-                let start = self.copied - 7;
-                output.try_extend_from_slice(
-                    &self
-                        .input
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing ADTS payload"))?[start..start + count],
-                )?;
-            }
-            self.copied += count;
+            // Every source byte has been copied. Release our source owner before
+            // adding the frozen output's owner header; retries retain real output.
+            self.state = WriteState::Freezing;
         }
-        // Every source byte has been copied. Release our source owner before
-        // adding the frozen output's owner header; retries retain real output.
-        self.input = None;
         if !work.try_charge(1) {
             return Ok(BuildStep::Yield);
         }
-        let buffer = self
-            .output
-            .take()
-            .ok_or(Error::Invalid("missing ADTS output"))?;
-        let bytes = match buffer.freeze() {
-            Ok(b) => b,
-            Err(e) => {
-                self.output = Some(e.value);
-                return Err(e.error);
-            }
-        };
-        self.complete = true;
+        let bytes = freeze_whole(&mut self.output)?;
+        self.state = WriteState::Complete;
         Ok(BuildStep::Ready(AacAdtsOutput {
             bytes,
             source: self.source,
