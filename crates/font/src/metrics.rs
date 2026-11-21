@@ -1,6 +1,7 @@
 //! The face-wide tables: `head`, `hhea` and `vhea`, `maxp`, `OS/2`, and `hmtx`
 //! and `vmtx` (OpenType).
 
+use crate::Bounds;
 use crate::read::{Reader, u16_at, u32_at};
 use crate::sfnt::Table;
 use triergon_core::{Error, Result};
@@ -11,7 +12,7 @@ pub(crate) struct Head {
     /// Bit 3: scale by integer pixels per em.
     pub(crate) flags: u16,
     pub(crate) units_per_em: u16,
-    pub(crate) bounds: [i16; 4],
+    pub(crate) bounds: Bounds,
     pub(crate) mac_style: MacStyle,
     /// `indexToLocFormat` is not 0: 32-bit `loca` offsets.
     pub(crate) long_offsets: bool,
@@ -26,7 +27,7 @@ pub(crate) fn head(data: &[u8]) -> Result<Head> {
         return Err(Error::Invalid("unitsPerEm outside 16..16384"));
     }
     r.skip(16)?; // created, modified
-    let bounds = [r.i16()?, r.i16()?, r.i16()?, r.i16()?];
+    let bounds = Bounds::read(&mut r)?;
     let mac_style = MacStyle(r.u16()?);
     r.skip(4)?; // lowestRecPPEM, fontDirectionHint
     // FreeType reads every format other than 0 as long offsets.

@@ -222,6 +222,18 @@ pub struct Bounds {
     pub y_max: i16,
 }
 
+impl Bounds {
+    /// Reads a box as the tables store it: `xMin`, `yMin`, `xMax`, `yMax`.
+    fn read(r: &mut read::Reader<'_>) -> Result<Self> {
+        Ok(Self {
+            x_min: r.i16()?,
+            y_min: r.i16()?,
+            x_max: r.i16()?,
+            y_max: r.i16()?,
+        })
+    }
+}
+
 /// A glyph's control box before scaling, as its outline format records or draws
 /// it: [`Font::control_box`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -469,13 +481,7 @@ impl Font {
 
     /// The `head` box of all glyphs.
     pub const fn bounds(&self) -> Bounds {
-        let [x_min, y_min, x_max, y_max] = self.head.bounds;
-        Bounds {
-            x_min,
-            y_min,
-            x_max,
-            y_max,
-        }
+        self.head.bounds
     }
 
     /// `head.macStyle`.

@@ -270,12 +270,7 @@ impl Glyf {
         };
         let mut r = Reader::new(slice(data, self.glyf.offset + start, end - start)?);
         let contours = r.i16()?;
-        let bounds = Bounds {
-            x_min: r.i16()?,
-            y_min: r.i16()?,
-            x_max: r.i16()?,
-            y_max: r.i16()?,
-        };
+        let bounds = Bounds::read(&mut r)?;
         Ok((contours != 0).then_some((Header { contours, bounds }, r)))
     }
 
