@@ -4,8 +4,10 @@ Shared vocabulary for every Triergon format and codec crate: exact rational
 time, capacity-accounted byte storage, a poll-based input cursor, resumable
 steps, per-step work budgets, one error type and the format-neutral container
 model. It is the bottom layer of the workspace and depends only on `std`. It
-performs no I/O, owns no threads and implements no format: packet boundaries,
-codec configuration and clock epochs belong to the format crates built on it.
+owns no threads and implements no format: packet boundaries, codec configuration
+and clock epochs belong to the format crates built on it. Parsers never read a
+source themselves; the `blocking` adapters do it for a caller that has a
+`std::io` one.
 
 ## Usage
 
@@ -56,9 +58,10 @@ assert_eq!(base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?, 203
 
 | Area | Items |
 |---|---|
-| Time | `Time` (reduced `i128`/`u128` seconds), `TimeBase` (reduced positive `u64` ratio), `Rounding` |
-| Storage | `Budget`, `Reservation`, `Charged<T>`, `Bytes`, `BytesWriter`, `BudgetVec<T>`, `BudgetVecIntoIter`, `OwnedInputBytes`, `ByteStorageAddress`, `nonzero_prefix_len` |
+| Time | `Time` (reduced `i128`/`u128` seconds), `TimeBase` (reduced positive `u64` ratio), `TickScale` (a conversion between two bases, prepared once), `Rounding`, `round_ties_even_i32` |
+| Storage | `Budget`, `Reservation`, `Charged<T>`, `Bytes`, `BytesView`, `BytesWriter`, `BudgetVec<T>`, `BudgetVecIntoIter`, `OwnedInputBytes`, `ByteStorageAddress`, `nonzero_prefix_len` |
 | Input | `InputCursor`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure` |
+| Blocking sources | Module `blocking`: `Blocking` drives any `ContainerReader` from a `std::io::Read` source, seeking when it is also `Seek`; `Feed` answers the requests of an `InputCursor`; `seekable_capabilities` measures a seekable source. |
 | Source signatures | Module `signature` exposes the EBML and Ogg markers, the opening box type and the three sync bytes for each transport packet spacing. Each caller chooses its accepted boxes and how to resolve ambiguous transport. |
 | Steps | `Step<T, B>`, `Backpressure` |
 | Work | `WorkBudget` |
@@ -82,6 +85,8 @@ terms uses a binary greatest common divisor and divides by it exactly through
 the divisor's inverse modulo 2⁶⁴, and a tick base that is a multiple of the time's
 denominator is recognised the same way; 64-bit targets divide.
 Use `TimeBase::MICROSECONDS` and `TimeBase::NANOSECONDS` for those fixed clocks.
+`TickScale::new(from, to)` prepares one conversion for a stream: its `rescale`
+returns what `TimeBase::rescale` returns, dividing by a reciprocal computed once.
 
 **Budget and storage.** `Budget::new(limit)` creates one accounting pool; clones
 share it. Its limit includes its own fixed control block
