@@ -222,17 +222,33 @@ impl SourceRow {
 /// }
 /// ```
 #[derive(Debug)]
+// Fields in the order the compiler chose for them, held by `repr(C)`.
+#[repr(C)]
 pub struct PreparedMp4 {
-    pub(crate) read_scope: crate::mp4::open::MetadataReadScope,
-    /// Whether the demux view recovers truncated and out-of-source media.
-    pub(crate) demux_recovery: bool,
     /// A single track's first sample declared at or beyond the end of the media
     /// read while indexing. Only the physical end of the source shows whether it
     /// lies outside the source.
     pub(crate) unavailable_first: Option<SourceRow>,
+    pub(crate) source_length: Option<u64>,
+    pub(crate) front_boundary: Option<iso::compat::mov::front::FrontReadBoundary>,
+    pub(crate) empty_duration: Option<i64>,
+    pub(crate) forward_regular_extents: Option<usize>,
+    pub(crate) read_scope: crate::mp4::open::MetadataReadScope,
+    pub(crate) movie_base: TimeBase,
+    pub(crate) terminal_mdat: Option<iso::payload::TerminalMdat>,
+    pub(crate) front_tracks: BudgetVec<iso::compat::mov::front::FrontTrack>,
+    pub(crate) source_rows: BudgetVec<SourceRow>,
+    pub(crate) demux_rows: BudgetVec<PacketOccurrence>,
+    pub(crate) tracks: BudgetVec<PlanTrack>,
+    pub(crate) media: BudgetVec<Range<u64>>,
+    pub(crate) media_cache: BudgetVec<CachedMedia>,
+    pub(crate) raw_roots: BudgetVec<BoxView>,
+    pub(crate) encoded_edits: Option<BudgetVec<Option<iso::compat::mov::edits::EncodedEditPlan>>>,
+    pub(crate) pool: Budget,
     pub(crate) source: triergon_core::SourceId,
     pub(crate) opening_generation: u64,
-    pub(crate) source_length: Option<u64>,
+    /// Whether the demux view recovers truncated and out-of-source media.
+    pub(crate) demux_recovery: bool,
     // `view`, `demux_front` and `demux_recovery` take five combinations between
     // them and stay three byte tests: `rows`, `row` and `demux_row` read them per
     // packet, where each engine state that became one enum cost instructions.
@@ -242,20 +258,6 @@ pub struct PreparedMp4 {
     /// Whether rows are delivered in the demux view's order from cached media; set
     /// while a forward source is read, so not part of the view.
     pub(crate) demux_order_replay: bool,
-    pub(crate) front_boundary: Option<iso::compat::mov::front::FrontReadBoundary>,
-    pub(crate) empty_duration: Option<i64>,
-    pub(crate) front_tracks: BudgetVec<iso::compat::mov::front::FrontTrack>,
-    pub(crate) source_rows: BudgetVec<SourceRow>,
-    pub(crate) demux_rows: BudgetVec<PacketOccurrence>,
-    pub(crate) encoded_edits: Option<BudgetVec<Option<iso::compat::mov::edits::EncodedEditPlan>>>,
-    pub(crate) tracks: BudgetVec<PlanTrack>,
-    pub(crate) media: BudgetVec<Range<u64>>,
-    pub(crate) media_cache: BudgetVec<CachedMedia>,
-    pub(crate) forward_regular_extents: Option<usize>,
-    pub(crate) terminal_mdat: Option<iso::payload::TerminalMdat>,
-    pub(crate) raw_roots: BudgetVec<BoxView>,
-    pub(crate) movie_base: TimeBase,
-    pub(crate) pool: Budget,
 }
 impl PreparedMp4 {
     pub(crate) fn cached_payload(&self, range: &Range<u64>) -> Result<Option<Bytes>> {
