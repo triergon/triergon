@@ -29,7 +29,7 @@ pub struct AacPacketJob {
 /// One MP4 packet framed as ADTS.
 #[derive(Debug)]
 pub struct AacPacketOutput {
-    /// The source packet.
+    /// The MP4 packet the frame was made from, with its clocks and configuration.
     pub source: Mp4Packet,
     /// The ADTS header and the packet's payload.
     pub adts: AacAdtsOutput,

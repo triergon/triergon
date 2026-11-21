@@ -52,7 +52,7 @@ pub enum Submission {
     Blocked(Feed),
     /// The sink failed; the feed comes back.
     Failed {
-        /// The feed.
+        /// The feed the sink did not take.
         feed: Feed,
         /// Why the sink failed.
         error: Error,

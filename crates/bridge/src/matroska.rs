@@ -402,7 +402,7 @@ impl<'a> MatroskaFeedJob<'a> {
 pub struct MatroskaFeedPacket<'a> {
     /// The source packet, with its container clocks.
     pub source: &'a Packet,
-    /// The framed payload.
+    /// The access unit the packet frames to, borrowed from it where it can be.
     pub payload: MatroskaFeedPayload<'a>,
 }
 
@@ -413,7 +413,7 @@ pub enum MatroskaFeedPayload<'a> {
     Avc(AvcAnnexBAccessUnit<'a>),
     /// An AAC access unit behind its ADTS header.
     Aac {
-        /// The ADTS header.
+        /// The seven-byte ADTS header, without CRC, for the unit's length.
         header: [u8; 7],
         /// The raw access unit, borrowed from the packet.
         raw: &'a [u8],

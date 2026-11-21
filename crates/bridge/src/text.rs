@@ -46,7 +46,7 @@ pub(crate) fn receiver_timing(start_us: Option<i64>, display_ms: Option<u32>) ->
 /// An output without a text packet, returned with the reason.
 #[derive(Debug)]
 pub struct RejectedOutput {
-    /// The output.
+    /// The player output as it was handed in.
     pub output: Output,
     /// Why it was refused.
     pub error: Error,
@@ -139,7 +139,7 @@ impl TextSource {
 pub struct TextOutput {
     /// The packet or document the cue came from.
     pub source: TextSource,
-    /// The cue.
+    /// The cue's text, decoded where it can be, with its input and exact times.
     pub cue: text::Cue,
 }
 /// One step of a [`TextBridge`].
@@ -161,7 +161,7 @@ pub enum TextStep {
 /// A refused source, returned with the reason.
 #[derive(Debug)]
 pub struct TextRejection {
-    /// The source.
+    /// The packet or document as it was handed in.
     pub source: TextSource,
     /// Why it was refused.
     pub error: Error,

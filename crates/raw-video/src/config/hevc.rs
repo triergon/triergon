@@ -25,13 +25,13 @@ pub(super) fn sps(payload: &[u8]) -> Result<(u8, Sps)> {
 /// One active single-layer VPS, SPS and PPS, as NAL payloads after their headers.
 #[derive(Debug)]
 pub struct StartupChain<'a> {
-    /// The VPS payload.
+    /// The video parameter set the SPS names.
     pub vps: &'a [u8],
-    /// The SPS payload.
+    /// The sequence parameter set the PPS names.
     pub sps: &'a [u8],
-    /// The PPS payload.
+    /// The record's one picture parameter set.
     pub pps: &'a [u8],
-    /// The PPS ID.
+    /// The PPS's `pps_pic_parameter_set_id`, 0 to 63.
     pub pps_id: u8,
     /// The SPS's highest-sublayer reorder depth.
     pub reorder: u8,

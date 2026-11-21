@@ -139,7 +139,7 @@ pub enum PlaybackInput<S: Source> {
     Container(SelectedInput<ProbeReplay<S>>),
     /// A raw Annex B input.
     RawVideo {
-        /// The detected codec.
+        /// The codec its first parameter sets and slice belong to.
         codec: Codec,
         /// The raw source, from byte zero.
         source: RawVideoSource<ProbeReplay<S>>,

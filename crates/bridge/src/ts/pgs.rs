@@ -17,7 +17,7 @@ const STREAM_TYPE_PGS: u8 = 0x90;
 /// The source facts of a TS bitmap packet.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TsPesFacts {
-    /// The PID.
+    /// The PID the PES was carried on.
     pub pid: u16,
     /// Where the PES payload starts in the elementary stream.
     pub elementary_offset: u64,

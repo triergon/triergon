@@ -17,9 +17,9 @@ pub struct BitmapScope {
     pub source: SourceId,
     /// The source track number.
     pub track: u64,
-    /// The playback generation.
+    /// The player's input generation ([`Output::generation`](triergon_playback::Output::generation)).
     pub generation: u64,
-    /// The configuration revision.
+    /// The track's configuration revision; a packet of another revision is refused.
     pub configuration: u64,
 }
 /// One bitmap subtitle packet for a receiver, with caller metadata.
@@ -65,7 +65,7 @@ impl<M> BitmapOwner<M> {
 /// A refused packet, returned with the reason.
 #[derive(Debug)]
 pub struct BitmapRejection<M> {
-    /// The packet.
+    /// The packet as it was handed in, metadata included.
     pub input: BitmapInput<M>,
     /// Why it was refused.
     pub error: Error,
@@ -169,7 +169,7 @@ pub struct PgsBridge<M> {
 /// One decoded packet with the receiver's output for it.
 #[derive(Debug)]
 pub struct PgsOutput<M> {
-    /// The packet.
+    /// The packet, owned until the output is dropped.
     pub packet: BitmapOwner<M>,
     /// The receiver's output for it.
     pub decoded: compat::pgs::ReceiverPacket,
@@ -386,9 +386,10 @@ impl<M> PgsBridge<M> {
 /// The settings and bounds of a [`DvdReceiver`]'s decoder.
 #[derive(Clone, Debug, Default)]
 pub struct DvdBridgeConfig {
-    /// The decoder settings.
+    /// The palette, canvas and forced-only choice, usually read from the track's
+    /// VobSub configuration text.
     pub settings: compat::dvd::Settings,
-    /// The decoder bounds.
+    /// The largest subpicture unit in bytes and decoded area in pixels.
     pub limits: compat::dvd::Limits,
 }
 
@@ -466,7 +467,7 @@ pub struct DvdDisplayBoundary {
 /// A picture placed on its packet's timeline.
 #[derive(Clone, Copy, Debug)]
 pub struct DvdPresentation<'a> {
-    /// The picture.
+    /// The decoded subpicture.
     pub picture: &'a DvdPicture,
     /// When it appears.
     pub show: DvdDisplayBoundary,
@@ -481,14 +482,14 @@ pub struct DvdQueuePicture<'a> {
     pub start_ns: i64,
     /// The configuration's canvas, when each side lies within 160 to 8,192.
     pub canvas: Option<[u32; 2]>,
-    /// The picture.
+    /// The decoded subpicture.
     pub picture: &'a DvdPicture,
 }
 
 /// One decoded packet and what it presents.
 #[derive(Debug)]
 pub struct DvdOutput<M> {
-    /// The packet.
+    /// The packet, owned until the output is dropped.
     pub packet: BitmapOwner<M>,
     /// The subpicture the packet completes, if any.
     pub picture: Option<DvdPicture>,

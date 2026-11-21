@@ -260,7 +260,7 @@ pub struct HlsMediaAudioUnit {
     pub pts: Option<Time>,
     /// The PES decode time, on the same frame as `pts`.
     pub dts: Option<Time>,
-    /// The frame duration.
+    /// How long the frame plays: its sample count at the stream's sample rate.
     pub duration: Time,
 }
 

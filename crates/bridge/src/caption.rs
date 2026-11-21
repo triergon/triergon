@@ -46,7 +46,7 @@ pub struct CaptionUnit {
 /// A refused unit, returned with the reason.
 #[derive(Debug)]
 pub struct CaptionRejection {
-    /// The unit.
+    /// The unit as it was handed in.
     pub unit: CaptionUnit,
     /// Why it was refused.
     pub error: Error,

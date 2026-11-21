@@ -84,7 +84,7 @@ pub struct TrackSnapshot(Arc<TrackMetadata>);
 /// The metadata of one track, shared by the plan and its packets.
 #[derive(Debug)]
 pub struct TrackMetadata {
-    /// The track ID.
+    /// The `track_ID` of the track header, nonzero.
     pub track_id: u32,
     /// The media time base, when the media header states a usable one.
     pub base: SourceTimeBase,
@@ -130,7 +130,7 @@ impl Deref for TrackSnapshot {
 pub struct Mp4Configuration {
     /// The track's metadata.
     pub track: TrackSnapshot,
-    /// The sample description.
+    /// The sample entry the packets are coded with: its format, fields and boxes.
     pub description: SampleDescription,
     /// The configuration revision; each change the engine publishes increases it.
     pub revision: u64,
@@ -204,7 +204,7 @@ impl TrackInfo for PlanTrack {
 /// One sample of a track, in the plan's order.
 #[derive(Clone, Debug)]
 pub struct SourceRow {
-    /// The track ID.
+    /// The `track_ID` of the sample's track.
     pub track_id: u32,
     /// The sample's table facts: byte range, clocks and flags.
     pub sample: Sample,
@@ -1432,7 +1432,7 @@ pub enum MovieSeekOutcome {
     Empty(iso::seek::MovieEmptyEdit),
     /// The movie time lies outside the edits.
     Outside {
-        /// The requested movie time.
+        /// The movie time asked for, which no edit covers.
         requested_movie_time: Time,
     },
 }

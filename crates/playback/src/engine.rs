@@ -51,9 +51,9 @@ pub enum Track<'a> {
     Mp4(&'a PlanTrack),
     /// An elementary stream of the transport stream's active program map.
     Ts {
-        /// The program number.
+        /// The program number of the map.
         program: u16,
-        /// The stream.
+        /// The stream's PID, type and descriptors.
         stream: ProgramStream<'a>,
     },
 }

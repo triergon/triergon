@@ -26,9 +26,9 @@ pub enum Mp4CatalogueMode {
 /// Where the outputs of a replacement catalogue begin.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CatalogueBoundary {
-    /// The new source.
+    /// The replacement's source, which its outputs carry.
     pub source: SourceId,
-    /// Its input generation.
+    /// The input generation its outputs carry.
     pub input_generation: u64,
     /// The player's delivery epoch of its outputs.
     pub delivery_epoch: u64,

@@ -33,9 +33,9 @@ pub struct MatroskaHevcDolbyLimits {
 /// Bounds of one AC-3 or E-AC-3 packet.
 #[derive(Clone, Copy, Debug)]
 pub struct MatroskaDolbyLimits {
-    /// The largest packet in bytes.
+    /// The largest packet accepted, in bytes.
     pub maximum_packet_bytes: usize,
-    /// The most syncframes in one packet.
+    /// The most syncframes accepted in one packet.
     pub maximum_syncframes: usize,
 }
 
@@ -265,7 +265,7 @@ impl<'a> MatroskaHevcDolbyJob<'a> {
 pub struct MatroskaHevcDolbyPacket<'a> {
     /// The source packet, with its container clocks.
     pub source: &'a Packet,
-    /// The framed payload.
+    /// The access unit or syncframes the packet frames to.
     pub payload: MatroskaHevcDolbyPayload<'a>,
 }
 

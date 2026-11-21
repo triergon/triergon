@@ -14,9 +14,9 @@ use triergon_mpegts::{
 /// owned and compact payloads.
 #[derive(Debug)]
 pub struct PesFacts<'a> {
-    /// Program number.
+    /// The program number of the PMT that declared the stream.
     pub program: u16,
-    /// Elementary stream PID.
+    /// The PID the PES was carried on.
     pub pid: u16,
     /// The observer profile that cut the PES.
     pub profile: DemuxProfile,
@@ -26,7 +26,7 @@ pub struct PesFacts<'a> {
     pub source_epochs: SourceEpochs,
     /// Demux packet flags.
     pub flags: u32,
-    /// PES `stream_id`.
+    /// The PES header's `stream_id` byte, such as 0xe0 for video.
     pub stream_id: u8,
     /// How the payload is carried.
     pub payload_kind: DemuxPayloadKind,
@@ -38,9 +38,9 @@ pub struct PesFacts<'a> {
     pub payload_len: usize,
     /// Whether the payload is empty.
     pub empty: bool,
-    /// Budget of the payload storage.
+    /// The pool the payload's storage is charged to.
     pub payload_budget: &'a Budget,
-    /// Budget of the header range list.
+    /// The pool the header range list is charged to.
     pub header_budget: &'a Budget,
 }
 
@@ -149,7 +149,7 @@ pub enum FeedStep {
     Configuration(AdmittedCarriage),
     /// A track stopped: its carriage or one of its packets was refused.
     Refusal {
-        /// The refused track.
+        /// The program and PID of the refused track.
         track: TrackKey,
         /// Why it was refused.
         error: Error,
@@ -158,7 +158,7 @@ pub enum FeedStep {
     },
     /// A completed PES with its demux clock.
     Packet {
-        /// The PES.
+        /// The PES, with an owned or a compact payload as the feed was made.
         packet: FeedPacket,
         /// Its timestamps on the demux clock.
         clock: DemuxTimeView,

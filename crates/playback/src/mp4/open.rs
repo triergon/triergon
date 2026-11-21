@@ -19,7 +19,7 @@ pub struct OpenedMp4<S: Source> {
     pub movie: Movie,
     /// The input cursor, after the metadata.
     pub input: InputCursor,
-    /// The source.
+    /// The source, which the player of this movie takes over.
     pub source: SourceOwner<S>,
 }
 /// One step of an [`Mp4Open`].

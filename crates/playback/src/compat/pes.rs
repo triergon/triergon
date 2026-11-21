@@ -93,7 +93,7 @@ pub enum Carriage {
 /// Snapshot of a track's admitted carriage for one active source PMT.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AdmittedCarriage {
-    /// The track.
+    /// The program and PID of the admitted track.
     pub track: TrackKey,
     /// The PMT epoch the carriage was admitted in.
     pub configuration_epoch: u64,

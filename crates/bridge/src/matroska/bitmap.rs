@@ -27,7 +27,7 @@ pub enum MatroskaBitmapCodec {
 /// The Matroska packet behind a bitmap input, kept as its metadata.
 #[derive(Debug)]
 pub struct MatroskaBitmapSource {
-    /// The source packet.
+    /// The Matroska packet, with its container clocks.
     pub packet: Packet,
     /// How the player delivered it.
     pub delivery: Delivery,

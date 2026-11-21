@@ -19,9 +19,9 @@ use triergon_core::{
 pub struct SelectedInput<S: Source> {
     /// The input cursor, at offset zero.
     pub input: InputCursor,
-    /// The source.
+    /// The source, replaying the probed prefix before it reads on.
     pub source: SourceOwner<S>,
-    /// The container format.
+    /// The container format the prefix selected.
     pub format: Format,
 }
 /// One step of a [`Probe`].

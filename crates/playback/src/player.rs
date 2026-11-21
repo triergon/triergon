@@ -20,9 +20,9 @@ pub enum TrackKey {
     Mp4(u32),
     /// A transport stream track.
     Ts {
-        /// The program number.
+        /// The program number of the PMT that declares the stream.
         program: u16,
-        /// The elementary stream PID.
+        /// The PID the elementary stream is carried on.
         pid: u16,
     },
 }
@@ -45,11 +45,11 @@ pub enum Selection {
     All,
     /// At most one track of each kind; each must exist, be enabled and be of its kind.
     Tracks {
-        /// The video track.
+        /// The video track to deliver, if any.
         video: Option<TrackKey>,
-        /// The audio track.
+        /// The audio track to deliver, if any.
         audio: Option<TrackKey>,
-        /// The subtitle track.
+        /// The subtitle track to deliver, if any.
         subtitle: Option<TrackKey>,
     },
 }
@@ -98,7 +98,8 @@ impl Selection {
 pub struct SeekIntent {
     /// The video track the target is on.
     pub track: TrackKey,
-    /// The target time.
+    /// The time on `clock` presentation starts at; packets before it are
+    /// delivered for decoding only.
     pub target: Time,
     /// Whether the engine reads the source again from its start to reach the target.
     pub replay_from_start: bool,
@@ -273,7 +274,7 @@ pub struct MatroskaReplayOutput {
     // Packet configurations already retain the pool. Other events carry the
     // same explicit budget handle as their original output.
     scope: OutputScope<Option<Budget>>,
-    /// The Matroska event.
+    /// The Matroska reader's event, as the player read it.
     pub event: triergon_matroska::Event,
     /// How the output was to be delivered.
     pub delivery: Delivery,

@@ -67,7 +67,7 @@ pub struct Mp4ShortPacket {
     pub configuration: Mp4Configuration,
     /// The demux view's occurrence of the declared sample.
     pub occurrence: PacketOccurrence,
-    /// As [`Mp4Packet::encoded_skip_samples`].
+    /// The leading samples a decoder skips, as in [`Mp4Packet::encoded_skip_samples`].
     pub encoded_skip_samples: Option<[u8; 10]>,
 }
 
@@ -101,7 +101,7 @@ pub enum Mp4Event {
 /// A transport stream source event with its clocks.
 #[derive(Debug)]
 pub struct TsEvent {
-    /// The source event.
+    /// The transport stream's own event: a packet, table, PES or fault.
     pub source: TraceEvent,
     /// The PES presentation time, as coded and on the source clock.
     pub source_pts: Option<SourceTimestamp>,
