@@ -1,6 +1,12 @@
 use super::*;
 use triergon_core::container::{SeekMethod, SeekPolicy, SeekRequest};
 
+#[path = "seek_epochs.rs"]
+mod epochs;
+
+#[path = "dts_hd_seek.rs"]
+mod dts_hd;
+
 fn sample(kind: u8, raw: &[u8], layout: &str, times: impl Fn(usize) -> u64) -> Transport {
     let mut ts = Transport::new();
     ts.tables(&[(kind, PID, &[])], 0);
@@ -630,12 +636,18 @@ fn seek_across_entities_replays_a_split_pes_and_continues_through_eof() {
         target: clock(ticks),
         policy: SeekPolicy::PlaybackPreroll,
     };
-    for (target, landed, count, explicit_end) in
-        [(109_000, 105_000, 2, true), (90_000, 90_000, 3, false)]
-    {
-        let request = reader
-            .request_seek_in_entities(seek(target), &plan)
-            .unwrap();
+    for (target, landed, count, explicit_end, collect_index, method) in [
+        (109_000, 105_000, 2, true, false, SeekMethod::BoundedScan),
+        (90_000, 90_000, 3, false, false, SeekMethod::BoundedScan),
+        (109_000, 105_000, 2, true, true, SeekMethod::BoundedScan),
+        (90_000, 90_000, 3, false, false, SeekMethod::Index),
+    ] {
+        let request = if collect_index {
+            reader.request_seek_in_entities_and_index(seek(target), &plan, 16)
+        } else {
+            reader.request_seek_in_entities(seek(target), &plan)
+        }
+        .unwrap();
         assert_eq!((request.source, request.offset), (ID, 0));
         let mut read = 0;
         let mut announced = false;
@@ -670,7 +682,13 @@ fn seek_across_entities_replays_a_split_pes_and_continues_through_eof() {
                     assert!(!announced);
                     assert_eq!(result.landing, clock(landed));
                     assert_eq!(result.discard_until, clock(target));
-                    assert_eq!(result.scanned_bytes, ts.bytes.len() as u64);
+                    let scanned = if method == SeekMethod::BoundedScan {
+                        ts.bytes.len() as u64
+                    } else {
+                        0
+                    };
+                    assert_eq!(result.method, method);
+                    assert_eq!(result.scanned_bytes, scanned);
                     announced = true;
                 }
                 Step::Ready(Event::Packet(packet)) => {
@@ -736,5 +754,59 @@ fn indexed_seek_recognises_landing_after_a_transport_byte_run_change() {
         if method == SeekMethod::BoundedScan {
             reader.request_seek(request).unwrap();
         }
+    }
+}
+
+#[test]
+fn latm_seek_requires_a_complete_in_band_configuration() {
+    // Version zero, one AAC-LC stereo layer at 48 kHz, frameLengthType zero.
+    let configured = [0x56, 0xe0, 8, 0x20, 0, 0x11, 0x90, 0x1f, 0xe0, 0x0f, 0];
+    let mut bad_length = configured;
+    bad_length[9] = 0x27;
+    // One payload using the previous StreamMuxConfig.
+    let dependent = [0x56, 0xe0, 3, 0x80, 0xf0, 0];
+    let mut ts = Transport::new();
+    ts.tables(&[(0x11, PID, &[])], 0);
+    ts.pes(PID, 0xc0, &configured, Some(90_000), None);
+    ts.pes(PID, 0xc0, &dependent, Some(91_920), None);
+    ts.pes(PID, 0xc0, &bad_length, Some(93_840), None);
+    ts.pes(PID, 0xc0, &configured, Some(95_760), None);
+    let pool = Budget::new(1 << 20).unwrap();
+    for (target, landing, expected) in [(94_000, 90_000, 4), (96_000, 95_760, 1)] {
+        let mut reader = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+        reader
+            .request_seek(SeekRequest {
+                track: TrackId(PID.into()),
+                target: clock(target),
+                policy: SeekPolicy::PlaybackPreroll,
+            })
+            .unwrap();
+        let mut announced = false;
+        let mut packets = 0;
+        while let Some(event) = next(&mut reader, &pool, &ts.bytes, 7, 5).unwrap() {
+            match event {
+                Event::Seek(result) => {
+                    assert!(!announced);
+                    assert_eq!(result.landing, clock(landing));
+                    assert_eq!(result.discard_until, clock(target));
+                    announced = true;
+                }
+                Event::Packet(packet) => {
+                    assert!(announced);
+                    assert_eq!(packet.track_info().codec(), CodecId::AacLatm);
+                    if packets == 0 {
+                        assert_eq!(packet.payload(), configured);
+                        assert_eq!(packet.pts(), Some(landing as i64));
+                    }
+                    if packets == 1 {
+                        assert_eq!(packet.payload(), dependent);
+                    }
+                    packets += 1;
+                }
+                Event::Other(_) => (),
+            }
+        }
+        assert!(announced);
+        assert_eq!(packets, expected);
     }
 }

@@ -81,13 +81,14 @@ impl SourceEvent {
 #[derive(Clone, Debug)]
 pub struct Track {
     pub(super) source: SourceEvent,
-    pub(super) index: usize,
+    pub(super) index: u16,
     pub(super) epoch: u64,
+    pub(super) unlabelled_dts_core: bool,
 }
 
 impl Track {
     pub fn stream(&self) -> &ElementaryStream {
-        &self.source.map().streams.as_slice()[self.index]
+        &self.source.map().streams.as_slice()[usize::from(self.index)]
     }
     pub fn program_map(&self) -> &ProgramMap {
         self.source.map()
@@ -108,13 +109,21 @@ impl TrackInfo for Track {
         self.stream().id()
     }
     fn kind(&self) -> MediaKind {
-        self.stream().kind()
+        if self.unlabelled_dts_core {
+            MediaKind::Audio
+        } else {
+            self.stream().kind()
+        }
     }
     fn codec_tag(&self) -> &[u8] {
         self.stream().codec_tag()
     }
     fn codec(&self) -> CodecId<'_> {
-        TrackInfo::codec(self.stream())
+        if self.unlabelled_dts_core {
+            CodecId::Dts
+        } else {
+            TrackInfo::codec(self.stream())
+        }
     }
     fn configuration(&self) -> &[u8] {
         self.stream().configuration()
@@ -353,6 +362,31 @@ impl DtsAudioFrame {
     }
 }
 
+/// One DTS-HD access unit containing extension substreams without a DTS core.
+#[derive(Debug)]
+pub struct DtsExtensionFrame {
+    pub(super) bytes: Bytes,
+    pub(super) offset: u64,
+    pub(super) duration: Option<Time>,
+}
+
+impl DtsExtensionFrame {
+    /// Original extension headers, alignment bytes and asset payloads.
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+
+    /// Duration from the lowest-index extension's current static metadata, if known.
+    pub const fn sample_span(&self) -> Option<Time> {
+        self.duration
+    }
+
+    /// Frame extent in the track's concatenated PES payload.
+    pub fn elementary_range(&self) -> Range<u64> {
+        self.offset..self.offset + self.bytes.len() as u64
+    }
+}
+
 /// Original framed bytes and syntax facts, before decoder-feed conversion.
 /// Framer offsets use a private concatenated elementary view (`SourceId(0)`);
 /// physical transport provenance is retained by [`Packet::sources`].
@@ -363,6 +397,7 @@ pub enum AccessUnit {
     Loas(LoasFrame),
     MpegAudio(MpegAudioFrame),
     Dts(DtsAudioFrame),
+    DtsExtension(DtsExtensionFrame),
     /// An opaque ADTS parser observation with its original source diagnostic.
     AdtsFragment(AacAdtsCarrier),
     Ac3(Ac3AccessUnit),
@@ -383,6 +418,7 @@ impl AccessUnit {
             Self::Loas(frame) => frame.bytes(),
             Self::MpegAudio(frame) => frame.bytes(),
             Self::Dts(frame) => frame.bytes(),
+            Self::DtsExtension(frame) => frame.bytes(),
             Self::Ac3(frame) => frame.bytes(),
             Self::DvbSubtitle(unit) => unit.bytes(),
             Self::IncompleteAudio { bytes, .. } => bytes,
@@ -403,6 +439,7 @@ impl AccessUnit {
             Self::Loas(frame) => frame.elementary_range(),
             Self::MpegAudio(frame) => frame.elementary_range(),
             Self::Dts(frame) => frame.elementary_range(),
+            Self::DtsExtension(frame) => frame.elementary_range(),
             Self::Ac3(frame) => {
                 frame.facts().offset..frame.facts().offset + frame.bytes().len() as u64
             }
@@ -441,6 +478,7 @@ impl AccessUnit {
             }
             Self::Ac3(frame) => Ok(Some(frame.facts().header.sample_span()?)),
             Self::Dts(frame) => Ok(Some(frame.sample_span())),
+            Self::DtsExtension(frame) => Ok(frame.sample_span()),
             Self::MpegAudio(frame) => Ok(Some(Time::new(
                 i128::from(frame.header.samples_per_frame()),
                 u128::from(frame.header.sample_rate),

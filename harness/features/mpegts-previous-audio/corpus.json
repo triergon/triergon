@@ -81,6 +81,27 @@
       }
     },
     {
+      "id": "adts-aac-lc-split-repeated-preroll",
+      "profile": "adts-aac-lc-split-repeated-preroll",
+      "file": "harness/features/mpegts-previous-audio/inputs/adts-aac-lc.ts",
+      "sha256": "de2b5c9b1482ea65e3edaa15e1a13f91554d2962acd5ea55788caf61162ba5dd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "90000",
+        "preroll",
+        "split=564",
+        "100000"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 1365,
+        "digest": 12642569711709793592
+      }
+    },
+    {
       "id": "dvb-ac3-previous",
       "profile": "dvb-ac3-previous",
       "file": "harness/features/mpegts-previous-audio/inputs/dvb-ac3.m2ts",
@@ -352,6 +373,84 @@
         "packets": 3,
         "bytes": 288,
         "digest": 5744551764839532241
+      }
+    },
+    {
+      "id": "latm-in-band-preroll",
+      "profile": "latm-in-band-preroll",
+      "file": "harness/features/mpegts-previous-audio/inputs/latm-aac-lc.ts",
+      "sha256": "2c791fb2461ad0533c55fae8e91e8c44784ec1f8673b5e75bf0abc03e97521b1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "94000",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 782,
+        "digest": 10391062714438619022
+      }
+    },
+    {
+      "id": "latm-next-configuration",
+      "profile": "latm-next-configuration",
+      "file": "harness/features/mpegts-previous-audio/inputs/latm-aac-lc.ts",
+      "sha256": "2c791fb2461ad0533c55fae8e91e8c44784ec1f8673b5e75bf0abc03e97521b1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "96000",
+        "previous"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 198,
+        "digest": 10019071087705066079
+      }
+    },
+    {
+      "id": "mpeg1-layer1-physical-repeated-preroll",
+      "profile": "mpeg1-layer1-physical-repeated-preroll",
+      "file": "harness/features/mpegts-previous-audio/inputs/mpeg1-layer1-physical-repeated-preroll.ts",
+      "sha256": "402afd9cd90fc987f5aec5d06d1062fec30d830684192901be755f121dc7eea5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "95041",
+        "preroll",
+        "90721"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 384,
+        "digest": 16085678907190984756
+      }
+    },
+    {
+      "id": "mpeg1-layer2-physical-repeated-preroll",
+      "profile": "mpeg1-layer2-physical-repeated-preroll",
+      "file": "harness/features/mpegts-previous-audio/inputs/mpeg1-layer2-physical-repeated-preroll.ts",
+      "sha256": "04587fc90fccbcc1fdd0679c7a7e6fb1ce1a4954a6b838ee5e7f875620171ac5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "92161",
+        "preroll",
+        "105121"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 1152,
+        "digest": 1784093346565104
       }
     }
   ]

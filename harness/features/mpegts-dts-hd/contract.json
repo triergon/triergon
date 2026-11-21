@@ -8,14 +8,16 @@
   "worker_operation": "ts-au-",
   "reference": "ffmpeg-transport-dts",
   "contract": [
-    "Read a DVB private stream with a DTS-HD extension descriptor and one complete access unit per aligned finite PES. Controls cover TS188, M2TS192, short and long size fields, one or two extension substreams, and both PTS-only and PTS/DTS PES.",
-    "The candidate verifies the signalled substream order, declared extents and extension header CRC, and emits each original core-bearing access unit. The source view preserves the DTS core coding-window duration and the original source clocks.",
+    "Read a DVB private stream with a DTS-HD extension descriptor and one complete access unit per aligned finite PES. Controls cover TS188, M2TS192, short and long size fields, one or two extension substreams with a core, one extension substream without a core, and both PTS-only and PTS/DTS PES.",
+    "The candidate verifies the signalled substream order, declared extents and extension header CRC, and emits each original access unit. The source view preserves original clocks and available coded duration.",
     "Compare the full ordered packet fold with the pinned demuxer in parser mode without stream discovery. Its DTS-HD extension descriptor packets have an unset duration, a clear key flag, and the original PES position. The comparison projects those fields; the public source packet remains unchanged."
   ],
   "required_profiles": [
     "dts-hd-core-extension-short",
     "dts-hd-core-extension-long",
-    "dts-hd-core-two-extensions"
+    "dts-hd-core-two-extensions",
+    "dts-hd-extension-only-short",
+    "dts-hd-extension-only-long"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",

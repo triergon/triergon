@@ -13,7 +13,12 @@
     "Both workers fold the requested, landing and discard times, followed by every selected video packet through EOF. Each contributes presentation time, effective decode time (presentation time if DTS is absent), random-access flag and all bytes. The source reader does not fill in an absent DTS.",
     "Controls include a seek to the first picture, between access points, and preroll near the end of a longer stream. Both the scan and replay run within the measured operation.",
     "Repeated cases start from a fresh reader, build an index during the first seek, deliver both packet suffixes through EOF, and require an indexed second seek. The reference scans and replays independently for each target.",
-    "Split cases seek across two consecutive entities cut at a carrier boundary inside a PES. The reference sees the same preloaded bytes as one logical stream and folds the same landing and complete suffix."
+    "Split cases seek across two consecutive entities cut at a carrier boundary inside a PES. The reference sees the same preloaded bytes as one logical stream and folds the same landing and complete suffix.",
+    "A repeated-seek case also splits the transport source inside a PES. Both seeks use the same ordered, contiguous parts.",
+    "Explicit epoch cases supply epoch=CLOCK:CONFIG and epoch-start=BYTES. Only the candidate interprets the complete source epoch pair. The physical offset identifies the carrier containing the final epoch's first PES, including the M2TS prefix, and selects the reference's landing candidates by public AVPacket.pos at or beyond that boundary. The reference checks that the boundary identifies a packet and retains its position during replay; it does not infer source epochs from timestamps or use FFmpeg internals.",
+    "Authored AVC controls carry one complete picture per PES with overlapping, reordered presentation clocks and increasing encoded decode clocks in each epoch. A signalled PCR discontinuity changes the clock epoch, or a same-codec PMT descriptor change changes the configuration epoch, in TS188 and M2TS192. The earlier epoch has a later eligible keyframe, so ignoring the supplied boundary changes the landing and suffix. Each carrier and change has both previous-picture and playback-preroll controls.",
+    "Both explicit-epoch workers scan the same full stable input from its start through EOF, then reopen or restart that full input and replay through EOF. They keep the existing seek-control and complete-suffix fold without timestamp normalization, packet filtering after the landing, or changes to existing case pins. Explicit epoch cases do not combine with repeated or split seeks.",
+    "Physical repeated-seek controls carry ten self-contained AVC IDR or base-layer HEVC IDR_N_LP pictures, each with its referenced in-band parameter sets in one aligned finite multi-carrier PES and immediately repeated PAT/PMT. A null prefix has no elementary coordinate. Both workers fold the exact landing and complete suffix for forward or backward repeated targets; separate reader tests prohibit prefix reads on the indexed restart. SEI, other HEVC IRAP types and prior decoder state are outside this direct profile."
   ],
   "required_profiles": [
     "avc-earliest-picture",
@@ -23,7 +28,18 @@
     "avc-repeated-preroll",
     "hevc-m2ts-repeated-preroll",
     "avc-split-pes",
-    "hevc-m2ts-split-pes"
+    "hevc-m2ts-split-pes",
+    "avc-split-repeated-preroll",
+    "avc-clock-epoch-ts188-previous",
+    "avc-clock-epoch-ts188-preroll",
+    "avc-clock-epoch-m2ts-previous",
+    "avc-clock-epoch-m2ts-preroll",
+    "avc-configuration-epoch-ts188-previous",
+    "avc-configuration-epoch-ts188-preroll",
+    "avc-configuration-epoch-m2ts-previous",
+    "avc-configuration-epoch-m2ts-preroll",
+    "avc-physical-repeated-preroll",
+    "hevc-physical-repeated-preroll"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",

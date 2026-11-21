@@ -1,6 +1,7 @@
 //! MPEG-TS AU controls, authored independently of the container and codec crates.
 //! PES requests remain separate rows; their input bytes never change.
 
+pub mod dts_hd;
 pub mod matched;
 
 use std::ffi::OsString;
@@ -258,6 +259,10 @@ impl Transport {
     }
 
     fn tables_for(&mut self, streams: &[(&Codec, u16, &[u8])]) -> R<()> {
+        self.tables_for_version(streams, 0)
+    }
+
+    fn tables_for_version(&mut self, streams: &[(&Codec, u16, &[u8])], version: u8) -> R<()> {
         for (codec, _, descriptors) in streams {
             if codec.name == "dvb-ac3"
                 && (descriptors.len() < 3
@@ -277,7 +282,7 @@ impl Transport {
             (13 + streams.iter().map(|(_, _, d)| 5 + d.len()).sum::<usize>()) as u8,
             0,
             PROGRAM as u8,
-            0xc1,
+            0xc1 | (version << 1),
             0,
             0,
             0xe1,
@@ -297,6 +302,27 @@ impl Transport {
         }
         self.section(4096, pmt);
         Ok(())
+    }
+
+    fn pcr(&mut self, base: u64, discontinuity: bool) {
+        let mut packet = [0xff; 188];
+        packet[..6].copy_from_slice(&[
+            0x47,
+            (PID >> 8) as u8,
+            PID as u8,
+            0x20 | (self.counters[usize::from(PID)].wrapping_sub(1) & 15),
+            183,
+            0x10 | if discontinuity { 0x80 } else { 0 },
+        ]);
+        packet[6..12].copy_from_slice(&[
+            (base >> 25) as u8,
+            (base >> 17) as u8,
+            (base >> 9) as u8,
+            (base >> 1) as u8,
+            ((base & 1) as u8) << 7 | 0x7e,
+            0,
+        ]);
+        self.bytes.extend_from_slice(&packet);
     }
 
     fn pes(&mut self, stream_id: u8, part: &Part<'_>) -> R<()> {

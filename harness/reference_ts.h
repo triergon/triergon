@@ -10,7 +10,8 @@
  * caller-declared descriptor namespace, so the size and namespace arguments describe
  * the candidate's request only. Both modes use the same AVIO adapter for ordered
  * media entities and the same program filter and packet fold. The ts-au modes
- * enable codec parsing and retain NOFILLIN. */
+ * enable codec parsing and retain NOFILLIN. An explicit DTS core selection
+ * supplies the codec identity when an unlabelled PID is reported as data. */
 #include <libavformat/avformat.h>
 
 #define TS_OPERATION "mpegts-pes-packets"
@@ -42,10 +43,26 @@ static void ts_fold_packet(const AVFormatContext *format, const AVPacket *packet
     work->bytes += (uint64_t)packet->size;
 }
 
+static int ts_declare_dts_core(AVFormatContext *format, int program, int pid)
+{
+    for (unsigned i = 0; i < format->nb_streams; ++i) {
+        AVStream *stream = format->streams[i];
+        if (stream->id != pid || !ts_in_program(format, (int)i, program))
+            continue;
+        if (stream->codecpar->codec_type != AVMEDIA_TYPE_DATA
+            || stream->codecpar->codec_id != AV_CODEC_ID_BIN_DATA)
+            return AVERROR_INVALIDDATA;
+        stream->codecpar->codec_type = AVMEDIA_TYPE_AUDIO;
+        stream->codecpar->codec_id = AV_CODEC_ID_DTS;
+        return 0;
+    }
+    return AVERROR_STREAM_NOT_FOUND;
+}
+
 /* One operation. Returns 1 at AVERROR_EOF, or the negative error that stopped the
  * demuxer before it. */
 static int ts_operation(const uint8_t *bytes, size_t size, int program,
-                        int access_units, TsWork *work)
+                        int access_units, int unlabelled_dts_core, TsWork *work)
 {
     TsInput in = {bytes, size, 0};
     AVFormatContext *format = avformat_alloc_context();
@@ -69,6 +86,11 @@ static int ts_operation(const uint8_t *bytes, size_t size, int program,
     rc = avformat_open_input(&format, NULL, av_find_input_format("mpegts"), NULL);
     if (rc < 0)
         goto done;
+    if (unlabelled_dts_core) {
+        rc = ts_declare_dts_core(format, program, unlabelled_dts_core);
+        if (rc < 0)
+            goto done;
+    }
     packet = av_packet_alloc();
     if (!packet) {
         rc = AVERROR(ENOMEM);
@@ -93,7 +115,8 @@ done:
 
 /* ts-fold FILE SIZE PROGRAM [OPTIONS] | ts-bench FILE N SIZE PROGRAM [OPTIONS] |
  * ts-memory FILE SIZE PROGRAM [OPTIONS]; OPTIONS are --dvb or --atsc and further entities.
- * ts-au-fold, ts-au-bench and ts-au-memory use the same arguments with parsing. */
+ * ts-au-fold, ts-au-bench and ts-au-memory enable parsing and accept an optional
+ * trailing --dts-core=PID for a single entity, then --ignore-pcr-reserved-bits. */
 static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
 {
     const int access_units = !strncmp(argv[1], "ts-au-", 6);
@@ -119,10 +142,23 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
     long program = strtol(argv[at + 1], &end, 10);
     if (*end || program < 1 || program > 65535)
         return 2;
+    /* The demuxer already ignores the six reserved bits. */
+    if (access_units && argc > at + 2 && !strcmp(argv[argc - 1], "--ignore-pcr-reserved-bits"))
+        --argc;
+    int unlabelled_dts_core = 0;
+    if (access_units && argc > at + 2 && !strncmp(argv[argc - 1], "--dts-core=", 11)) {
+        long pid = strtol(argv[argc - 1] + 11, &end, 10);
+        if (*end || pid < 0x10 || pid >= 0x1fff)
+            return 2;
+        unlabelled_dts_core = (int)pid;
+        --argc;
+    }
     int first_entity = at + 2;
     if (first_entity < argc
         && (!strcmp(argv[first_entity], "--dvb") || !strcmp(argv[first_entity], "--atsc")))
         ++first_entity;
+    if (unlabelled_dts_core && first_entity < argc)
+        return 2;
     TsEntities source = {0};
     int result = 2;
     if (first_entity < argc
@@ -137,7 +173,7 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
     for (unsigned long i = 0; i < iterations; ++i) {
         TsWork work = {0, 0, 0};
         rc = source.count ? ts_entities_operation(&source, (int)program, access_units, &work)
-            : ts_operation(bytes, (size_t)size, (int)program, access_units, &work);
+            : ts_operation(bytes, (size_t)size, (int)program, access_units, unlabelled_dts_core, &work);
         fold(&total.digest, work.digest);
         total.packets += work.packets;
         total.bytes += work.bytes;

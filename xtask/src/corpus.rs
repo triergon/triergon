@@ -67,6 +67,7 @@ pub fn generate_all(paths: &Paths) -> Result<Vec<String>, String> {
         playback_capsules(paths)?,
         mp4_range(paths)?,
         crate::transport_fixtures::generate(paths)?,
+        crate::transport_fixtures::dts_hd::generate(paths, None)?,
     ])
 }
 
