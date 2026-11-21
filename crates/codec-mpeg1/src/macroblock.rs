@@ -34,9 +34,14 @@ pub(crate) struct SliceState {
     /// quantizer_scale wanted for the current row; sent with the next
     /// macroblock that carries coefficients.
     pub(crate) target_q: u32,
+    /// DC predictors of Y, Cb and Cr.
     pub(crate) dc_pred: [i32; 3],
+    /// Forward motion vector predictor.
     pub(crate) pmv: Mv,
+    /// Address of the last intra macroblock: the DC predictors reset unless it is
+    /// the one before.
     pub(crate) last_intra: Option<usize>,
+    /// Macroblocks skipped since the last coded one.
     pub(crate) skipped: usize,
 }
 
@@ -55,9 +60,15 @@ impl SliceState {
 }
 
 impl Encoder {
-    /// Code one macroblock row. `picture` carries the picture's `f_code` and
-    /// whether it repeats the previous source; each macroblock sets the rest.
-    #[allow(clippy::too_many_arguments)]
+    /// Code one macroblock row and return whether the VBV guard held for any of
+    /// it. `picture` carries the picture's `f_code` and whether it repeats the
+    /// previous source; each macroblock sets the rest. From `economy` on, or once
+    /// the row comes within [`VBV_GUARD_BITS`] of `hard_limit`, macroblocks take the
+    /// cheapest codes.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the row's coding state stays in arguments, as the macroblock path was measured"
+    )]
     pub(crate) fn encode_row(
         &mut self,
         input: &Picture,
@@ -103,6 +114,8 @@ impl Encoder {
         censored
     }
 
+    /// macroblock_address_increment (with escapes) over the macroblocks skipped
+    /// since the last coded one.
     fn write_address(&mut self, s: &mut SliceState) {
         let mut increment = s.skipped + 1;
         while increment > 33 {
@@ -114,7 +127,12 @@ impl Encoder {
         s.skipped = 0;
     }
 
-    #[allow(clippy::too_many_arguments)]
+    /// Code an intra macroblock of an I or P picture and reconstruct it; `dc_only`
+    /// drops every AC coefficient (the VBV guard).
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "a per-macroblock call whose arguments a struct would pass through memory"
+    )]
     pub(crate) fn intra_mb(
         &mut self,
         input: &Picture,
@@ -185,6 +203,8 @@ impl Encoder {
         s.pmv = Mv::ZERO;
     }
 
+    /// Code a P macroblock with forward prediction, as a skipped macroblock where
+    /// that is allowed and exact, and reconstruct it.
     pub(crate) fn inter_mb(
         &mut self,
         input: &Picture,
@@ -345,9 +365,10 @@ impl Encoder {
             }
         }
         self.store_prediction(mb_x, mb_y, &pred);
-        let _ = address;
     }
 
+    /// The forward motion vector as differences to the slice's predictor, which
+    /// it then replaces.
     fn write_mv(&mut self, s: &mut SliceState, mv: Mv, f_code: u32) {
         for (v, p) in [(mv.x, s.pmv.x), (mv.y, s.pmv.y)] {
             write_mv_component(&mut self.writer, v - p, f_code);
@@ -373,6 +394,8 @@ impl Encoder {
         }
     }
 
+    /// Write a macroblock's six predicted (or reconstructed) blocks to the
+    /// reconstruction.
     fn store_prediction(&mut self, mb_x: usize, mb_y: usize, blocks: &[[u8; 64]; 6]) {
         let g = self.cfg.geometry;
         for (b, block) in blocks.iter().enumerate() {

@@ -232,7 +232,6 @@ pub(crate) fn sse16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride:
 /// Predict a `N`×`N` block at half-sample vector `(vx, vy)` relative to
 /// sample position `(x, y)` of `plane`. Averages round half up (MPEG-1).
 #[inline]
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn predict<const N: usize>(
     plane: &[u8],
     stride: usize,
