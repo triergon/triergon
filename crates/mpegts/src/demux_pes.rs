@@ -59,7 +59,8 @@ pub enum RegisteredCarriage {
     AacLatm,
 }
 impl RegisteredCarriage {
-    fn selected_signature(self) -> (u8, u8) {
+    /// Return the PMT stream type and PES stream ID for the selected profile.
+    pub const fn selected_signature(self) -> (u8, u8) {
         match self {
             Self::Avc => (0x1b, 0xe0),
             Self::Hevc => (0x24, 0xe0),

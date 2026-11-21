@@ -1818,12 +1818,7 @@ impl TsEngine {
         let pool = self.input.budget().clone();
         let mut observer = match carriage {
             TsNativeCarriage::Registered(carriage) => {
-                let (stream_type, stream_id) = match carriage {
-                    RegisteredCarriage::Avc => (0x1b, 0xe0),
-                    RegisteredCarriage::Hevc => (0x24, 0xe0),
-                    RegisteredCarriage::AacAdts => (0x0f, 0xc0),
-                    RegisteredCarriage::AacLatm => (0x11, 0xc0),
-                };
+                let (stream_type, stream_id) = carriage.selected_signature();
                 if stream.stream_type != stream_type {
                     return Err(mismatch);
                 }
