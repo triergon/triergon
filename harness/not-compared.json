@@ -9,6 +9,186 @@
         "needs": "ass-render fixtures rendered with each setting changed from its default, against libass configured with the same values"
       }
     ],
+    "triergon-capture": [
+      {
+        "name": "session-configuration",
+        "entry_points": ["SessionConfig::gop", "SessionConfig::max_rate", "SessionConfig::vbv_bits", "SessionConfig::bit_rate", "SessionConfig::mux"],
+        "degree": "unit-tests",
+        "needs": "capture cases with GOP, rate, VBV and mux settings other than those SessionConfig::with_rate_rule gives, against the reference sequence configured alike"
+      }
+    ],
+    "triergon-codec": [
+      {
+        "name": "channel-layouts",
+        "entry_points": ["ChannelLayout", "Speaker", "ChannelLayout::name", "ChannelLayout::mask", "layout::native_order", "layout::vorbis_order"],
+        "degree": "step",
+        "needs": "each decoder output folded with its layout name and mask against the reference's channel layout; compared only through the channel order of the graded output"
+      },
+      {
+        "name": "downmix-levels",
+        "entry_points": ["DownmixLevels", "SurroundEncoding"],
+        "degree": "step",
+        "needs": "each frame's downmix levels folded against the reference's downmix side data; compared only through the stereo mix"
+      },
+      {
+        "name": "dsp-kernels",
+        "entry_points": ["mdct::Imdct", "kbd_window", "vorbis_window", "Divisor", "divide"],
+        "degree": "step",
+        "needs": "a worker operation running the transforms and windows on test vectors against the reference's; compared only through the AAC, AC-3, Opus and Vorbis outputs, of which Opus and Vorbis are graded outside the gate"
+      }
+    ],
+    "triergon-codec-aac": [
+      {
+        "name": "configured-access-units",
+        "entry_points": ["RawLcDecoder", "Decoder::with_priming_policy", "compat::priming::Policy", "compat::layout::Policy"],
+        "degree": "outside-gate",
+        "needs": "a gate item for the access-unit decoding that the on-demand aac-access-units feature and the aac-mov lane of cargo xtask codecs grade compare; the gate grades ADTS streams only"
+      },
+      {
+        "name": "default-build",
+        "entry_points": ["Decoder"],
+        "degree": "recorded",
+        "needs": "the aac lane and AAC workloads graded from a build without the simd feature, which is what consumers get on a stable toolchain; the gate's test step checks that build against FFmpeg float output recorded in .research/aac-references"
+      },
+      {
+        "name": "adts-sync-search",
+        "entry_points": ["adts::find_frame"],
+        "degree": "unit-tests",
+        "needs": "ADTS streams with junk and damaged headers, with the frame offsets the reference's parser finds"
+      },
+      {
+        "name": "inspection-aids",
+        "entry_points": ["Decoder::enable_stats", "Decoder::stats", "Decoder::sbr_fill_ranges", "Decoder::ps_input"],
+        "degree": "no-reference",
+        "needs": "none: per-frame statistics of the decoder's own state behind the inspect feature, which no reference reports"
+      }
+    ],
+    "triergon-codec-ac3": [
+      {
+        "name": "decoder-options",
+        "entry_points": ["DecoderOptions", "Decoder::with_options", "Compat::Specification", "CrcPolicy::Reject", "NoiseMode::Off"],
+        "degree": "unit-tests",
+        "needs": "the ac3 and eac3 lanes graded with each option against the reference decoder configured alike; the gate grades the default options only"
+      },
+      {
+        "name": "frame-info",
+        "entry_points": ["parse_header", "FrameHeader", "FrameInfo", "DownmixInfo", "FrameFeatures"],
+        "degree": "step",
+        "needs": "a worker operation folding each frame's header, downmix and feature fields against the reference's stream parameters and downmix side data; compared only through the decoded and mixed output"
+      },
+      {
+        "name": "bit-position-trace",
+        "entry_points": ["Decoder::set_trace", "Decoder::trace", "Trace"],
+        "degree": "no-reference",
+        "needs": "none: bit positions of syntax elements for the stream tools behind the reference-trace feature, which no reference reports; the derived streams they produce are pinned"
+      }
+    ],
+    "triergon-codec-dca": [
+      {
+        "name": "packed-input",
+        "entry_points": ["Packing", "Packing::detect", "Packing::is_14bit"],
+        "degree": "unit-tests",
+        "needs": "14-bit and little-endian DTS streams in the dts lane, against the reference decoding the same streams; every dts vector is 16-bit big-endian"
+      }
+    ],
+    "triergon-codec-flac": [
+      {
+        "name": "decoding",
+        "entry_points": ["Decoder", "Decoder::decode_integer", "IntegerFrame"],
+        "degree": "recorded",
+        "needs": "a gate item running the flac lane of cargo xtask codecs grade; the gate's test step checks the integer output against each file's STREAMINFO MD5, and the timed file workloads require equal work, not equal output"
+      },
+      {
+        "name": "crc-policy",
+        "entry_points": ["CrcPolicy", "Decoder::with_crc_policy"],
+        "degree": "unit-tests",
+        "needs": "damaged FLAC files decoded with CrcPolicy::Reject, against the reference with CRC checking enabled"
+      }
+    ],
+    "triergon-codec-h264": [
+      {
+        "name": "picture-properties",
+        "entry_points": ["Picture::colour", "Picture::sar", "Picture::interlaced", "ColourDescription"],
+        "degree": "unit-tests",
+        "needs": "each picture's sample aspect ratio, colour description and field flag folded against the reference's frames; the h264 lane compares planes, size and pixel format"
+      },
+      {
+        "name": "nal-input",
+        "entry_points": ["Decoder::send_nal", "Decoder::send_nals"],
+        "degree": "step",
+        "needs": "a worker operation feeding NAL units one at a time, folded against the same reference pictures; compared only through Decoder::send of whole access units"
+      },
+      {
+        "name": "stream-inspection",
+        "entry_points": ["inspect::inspect", "inspect::StreamFeatures"],
+        "degree": "unit-tests",
+        "needs": "a reference view of the parameter-set and slice-header features each stream uses"
+      }
+    ],
+    "triergon-codec-hevc": [
+      {
+        "name": "picture-properties",
+        "entry_points": ["Picture::colour", "Picture::sar", "ColourDescription"],
+        "degree": "unit-tests",
+        "needs": "each picture's sample aspect ratio and colour description folded against the reference's frames; the hevc lane compares planes, size and pixel format"
+      },
+      {
+        "name": "nal-input",
+        "entry_points": ["Decoder::send_nal"],
+        "degree": "step",
+        "needs": "a worker operation feeding NAL units one at a time, folded against the same reference pictures; compared only through Decoder::send of whole access units"
+      },
+      {
+        "name": "access-unit-splitting",
+        "entry_points": ["nal::AccessUnitSplitter"],
+        "degree": "unit-tests",
+        "needs": "Annex B streams split by AccessUnitSplitter, compared with the units of the reference's HEVC parser; the codec worker splits with its own measurement splitter"
+      },
+      {
+        "name": "simd-kernels",
+        "entry_points": ["Decoder with the simd feature"],
+        "degree": "recorded",
+        "needs": "the codecs gate item run from a build with the simd feature; check-simd holds it to the FFmpeg digests the conformance tests record, where their inputs are present"
+      }
+    ],
+    "triergon-codec-mp3": [
+      {
+        "name": "decoding",
+        "entry_points": ["Decoder"],
+        "degree": "outside-gate",
+        "needs": "a gate item running the mp3, mp2 and mp1 lanes of cargo xtask codecs grade; the timed file workloads require equal work, not equal output"
+      }
+    ],
+    "triergon-codec-mpeg1": [
+      {
+        "name": "encoder",
+        "entry_points": ["Encoder", "Encoder::encode", "EncoderConfig"],
+        "degree": "step",
+        "needs": "a worker operation encoding YUV pictures with geometries, rates, VBV sizes and GOP lengths beyond the capture profile, against the reference's mpeg1video with the same settings; compared only inside the capture session"
+      }
+    ],
+    "triergon-codec-opus": [
+      {
+        "name": "decoding",
+        "entry_points": ["Decoder"],
+        "degree": "outside-gate",
+        "needs": "a gate item running the opus lane of cargo xtask codecs grade; the timed file workloads require equal work, not equal output"
+      },
+      {
+        "name": "final-range",
+        "entry_points": ["Decoder::final_range"],
+        "degree": "unit-tests",
+        "needs": "the range decoder's final state per packet against the reference decoder's for the same vectors"
+      }
+    ],
+    "triergon-codec-vorbis": [
+      {
+        "name": "decoding",
+        "entry_points": ["Decoder", "Decoder::from_headers_in"],
+        "degree": "outside-gate",
+        "needs": "a gate item running the vorbis lane of cargo xtask codecs grade; the timed file workloads require equal work, not equal output"
+      }
+    ],
     "triergon-elementary": [
       {
         "name": "packet-reading",
@@ -238,6 +418,26 @@
       }
     ],
     "triergon-raster": [],
+    "triergon-session": [
+      {
+        "name": "track-decoding",
+        "entry_points": ["TrackDecoder", "TrackDecoder::aac_access_units_with_layout_in", "audio_decoder", "video_decoder"],
+        "degree": "outside-gate",
+        "needs": "a gate item grading the lanes that decode through TrackDecoder (flac, mp3, mp2, mp1, vorbis, opus, aac-mov) and aac-access-units; the timed file workloads require equal work, not equal output"
+      },
+      {
+        "name": "audio-session",
+        "entry_points": ["AudioSession", "PcmBlock", "StreamSelection", "QueueLimits", "Discard", "OnRefusal"],
+        "degree": "unit-tests",
+        "needs": "a worker operation feeding demuxed packets through AudioSession and folding its PCM blocks and times against the reference's decoded frames; cargo xtask session-queues compares two revisions only"
+      },
+      {
+        "name": "video-session",
+        "entry_points": ["VideoSession", "VideoSession::latest", "VideoSession::canvas"],
+        "degree": "unit-tests",
+        "needs": "a worker operation feeding demuxed packets through VideoSession and folding its published pictures and times against the reference's decoded frames; cargo xtask session-queues compares two revisions only"
+      }
+    ],
     "triergon-shape": [],
     "triergon-subtitles": [
       {
