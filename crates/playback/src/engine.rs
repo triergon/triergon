@@ -503,7 +503,7 @@ impl Engine {
                 if r.delivery.discovers_tracks() {
                     return Err(Error::Unsupported("seek needs a fresh TS segment"));
                 }
-                if matches!(r.binding, ts::Binding::Bound { .. }) {
+                if r.bound_context.is_some() {
                     return Err(Error::Unsupported(
                         "bound native startup needs a fresh observed context after seek",
                     ));
