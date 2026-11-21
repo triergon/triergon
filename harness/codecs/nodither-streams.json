@@ -1,7 +1,15 @@
 {
   "schema": "triergon.codecs.correctness-manifest.v1",
   "note": "The trace rewrites dither flags and CRCs. The candidate decodes the original with noise Off when the stripped stream is an equivalent computation. AHT/SPX cases compare both default decoders on the stripped stream.",
-  "open_cases": [],
+  "open_cases": [
+    "nodither-diatonis.ac3",
+    "nodither-millers_crossing_4.0.ac3",
+    "nodither-monsters_inc_2.0_192_small.ac3",
+    "nodither-monsters_inc_5.1_448_small.ac3",
+    "nodither-mp3ac325_a0.ac3",
+    "nodither-mp3ac325_a1.ac3",
+    "nodither-csi_miami_stereo_128_spx.eac3"
+  ],
   "vectors": [
     {
       "lane": "ac3-nodither",
@@ -123,5 +131,14 @@
       "format": "eac3",
       "noise_off": true
     }
-  ]
+  ],
+  "open_case_readings": {
+    "nodither-diatonis.ac3": "Matching dither-free computation and sample count, with a nonzero float difference under the exact rule.",
+    "nodither-millers_crossing_4.0.ac3": "Matching dither-free computation and sample count, with a nonzero float difference under the exact rule.",
+    "nodither-monsters_inc_2.0_192_small.ac3": "The strip preserves an incomplete final syncframe. FFmpeg reports it even when concealment delivers the same sample count.",
+    "nodither-monsters_inc_5.1_448_small.ac3": "The strip preserves an incomplete final syncframe. FFmpeg reports it even when concealment delivers the same sample count.",
+    "nodither-mp3ac325_a0.ac3": "The strip preserves an incomplete final syncframe. FFmpeg reports it even when concealment delivers the same sample count.",
+    "nodither-mp3ac325_a1.ac3": "The strip preserves an incomplete final syncframe. FFmpeg reports it even when concealment delivers the same sample count.",
+    "nodither-csi_miami_stereo_128_spx.eac3": "FFmpeg reports an invalid E-AC-3 packet on this AHT and SPX stream. The bit product and the numeric comparison remain recorded."
+  }
 }
