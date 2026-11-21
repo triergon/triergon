@@ -65,7 +65,7 @@ The [session queue workloads](../harness/session-queues/README.md) cover five re
 | MPEG-TS DTS core | Canonical normal DTS frames in DVB private-data PES, with original bytes, source clocks and exact duration | 4/4 packet folds in the [DVB DTS core comparison](../harness/features/mpegts-dts-core/contract.json) | 0.4299 (4/4 pass, worst `dts-core-header-across-pes`) | heap ≤0.0649, total RSS ≤0.7678 (4/4 lower) | DTS-HD and other descriptor namespaces |
 | MPEG-TS previous picture | Bounded seek and preroll for AVC and HEVC in one length-known TS188 or M2TS192 entity | 4/4 landing, discard and packet folds against [FFmpeg scan and replay](../harness/features/mpegts-previous-picture/contract.json) | 0.9521 (4/4 pass, worst `avc-late-preroll`) | heap ≤0.4949, total RSS ≤0.6792 (4/4 lower) | indexed seeks, audio-only seeks and continued entities |
 | MPEG-TS program playback | Selected TS188 program and M2TS192 PID with packet payloads and clock projection | 35/35 packet folds | 0.7796 (35/35 pass, worst `m2ts-entry-hevc-aac-44100-01-video`) | heap ≤0.0880, total RSS ≤0.6980 (35/35 lower) | additional program and carriage profiles |
-| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.0006 (2/3 pass, worst `reordered-48000`, median 0.9996) | heap ≤0.0155, total RSS ≤0.5562 (3/3 lower) | `reordered-48000`'s runtime bound, above the [ceiling](quality.md#gates); broader transport and codec profiles |
+| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 0.9800 at `4ec296c5` (3/3 pass, worst `reordered-48000`, median 0.9710) | heap ≤0.0155, total RSS ≤0.4444 (3/3 lower) at `4ec296c5` | broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 0.7859 (71/71 pass, worst `dvb-hevc-eac3-32000`) | heap ≤0.0207, total RSS ≤0.6592 (71/71 lower) | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core with consistent coded-window diagnostics from owned and packed inspectors | 135/135 AVC/HEVC reference comparisons. At `7c730ff8` on AArch64, both DTS inspectors agreed on all 27 fields and every core matched its reference length and bytes across seven inputs. [DTS corpus and instruction counts](#dts-core-header-inspection). | 0.9579 (135/135 pass for AVC/HEVC, worst `hevc-irap_repeat`) | heap ≤0.3367, total RSS ≤0.8143 (135/135 lower) | full AVC/HEVC/ADTS grammar; on [32-bit ARMv7](#32-bit-armv7), the test `spill_pressure_keeps_a_verified_update_until_resume_or_cancellation` in `crates/framing/tests/nal_packet.rs` fails |
 | Subtitles, text | SubRip and WebVTT documents as FFmpeg's `srt` and `webvtt` demuxers read them, ASS packets as its `ass` decoder decodes them, with `sub_charenc` charsets including EUC-KR receiver policies, and mov_text and tx3g to ASS | 367/367 cases (`subtitle-text`: 82 captured mov_text cases, 13 authored mov_text sessions for the override tags written where a style record or the highlight starts or ends, the samples of the 79 tx3g tests, 80 charset cases, 17 ASS packets, 96 SubRip and WebVTT documents) on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7). `subtitle-text-host` matches 23/23 SubRip and WebVTT documents with oversized timestamp fields on both targets. | `subtitle-text` 0.8008 (367/367 pass, worst `mov-text-tags-highlight-style-colour`)<br>`subtitle-text-host` 0.0840 (23/23 pass, worst `vtt-seconds-9223372036854775808`) | `subtitle-text` heap ≤0.3360, total RSS ≤0.8121 (367/367 lower)<br>`subtitle-text-host` heap ≤0.0120, total RSS ≤0.7342 (23/23 lower) | FATE coverage |
@@ -650,6 +650,22 @@ shards of runs `061623` and `064649`, hold the outputs, build identities, plans,
 records and logs. AAC in MOV, which the gate does not run, was measured at the same
 revision on one more c6g.4xlarge per target as the gate measures a codec workload list
 (sets `aac-access-units-4213d042-TARGET`).
+
+The MPEG-TS progressive playback rows come from the `progressive` item on each target at
+`4ec296c5`, one c6g.4xlarge host per target: the three cases match the reference and the
+five functional inputs give their ten outcomes, and the early stop ended every case at 20
+of its 30 timing pairs and 20 kernel-bound memory pairs. `reordered-48000` has runtime upper
+bounds of 0.9800 on Linux AArch64 (median 0.9710) and 0.7367 on 32-bit ARMv7 (median
+0.7265), from 1.0006 and 0.7550 in the full run at `5b8dd88f`; `later-entry-48000` has
+0.8495 and 0.6498, and `continuous-44100` 0.4461 and 0.3292. Peak heap is at most 0.0155,
+and total RSS at most 0.4444 on AArch64 and 0.6639 on ARMv7. At this revision the
+progressive reader's table, failure and end-of-stream paths are out of line, and the
+playback worker's AArch64 order lays out the code of its progressive training operations
+first ([measuring performance](quality.md#measuring-performance)). On a host from the
+AArch64 gate image the 50-session `reordered-48000` bench then takes 3.5% fewer user-mode
+cycles than at `a0aede6d`, 1.7% fewer instructions and 17% fewer L1i refills (6.2 million
+against 7.5 million; the reference takes 1.8 million). The other playback items were not
+measured at this revision, although the AArch64 order of their worker changed with it.
 
 The packet framing rows come from the `framing` item on each target at `c2bffebc`. All
 135 cases on each c6g.4xlarge host match the reference, with 30 timing pairs on CPU 1
@@ -1456,6 +1472,8 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Playback with HEVC parameter-set repeats, Linux AArch64, shard 2 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`2ab05fbb4a99c88d03cec697104d3360ee92dd45f398fcb8949a2c3e17125d4b`](../harness/evidence/sets/gate-run-aarch64-6bbb2cb7-20261118-104943-shard-2.json) |
 | Playback with HEVC parameter-set repeats, ARMv7, shard 1 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`caa758a1e3348d4fccfdca6414ac504a39e8457a5fce1774402dce5bc645889e`](../harness/evidence/sets/gate-run-armv7-6bbb2cb7-20261118-105014-shard-1.json) |
 | Playback with HEVC parameter-set repeats, ARMv7, shard 2 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`43ee65711daba9295f1f963771cd120531eace54aba94b9032e08fb06232b470`](../harness/evidence/sets/gate-run-armv7-6bbb2cb7-20261118-105014-shard-2.json) |
+| MPEG-TS progressive playback, Linux AArch64 | `4ec296c5c0be3cc519864de8d8d1b1e1b91132ee` | [`0e2e9af49367f7788036fa6eee4155b65fc060cad5bbf9e1ad94e9bd98f409cf`](../harness/evidence/sets/gate-run-aarch64-4ec296c5-20261121-145820-shard-1.json) |
+| MPEG-TS progressive playback, 32-bit ARMv7 | `4ec296c5c0be3cc519864de8d8d1b1e1b91132ee` | [`092a96ab91474982207b7db3adf02862aff0557b4bb1a98a0ed5a9a1bdd3f4d0`](../harness/evidence/sets/gate-run-armv7-4ec296c5-20261121-145957-shard-1.json) |
 | Packet framing, Linux AArch64 | `c2bffebc3d7e2d6a0443119e1cfbdeff6b4d89cb` | [`b0395c11d63e47794ed80fe28403a2ef6693bfe161f363fa16b05e2b8595ff50`](../harness/evidence/sets/gate-run-aarch64-c2bffebc-20261121-080236-shard-1.json) |
 | Packet framing, 32-bit ARMv7 | `c2bffebc3d7e2d6a0443119e1cfbdeff6b4d89cb` | [`8ffa541c814f6a70d3eb0a78c42977886652e1b5a9284b24a1ba5793525b2908`](../harness/evidence/sets/gate-run-armv7-c2bffebc-20261121-080056-shard-1.json) |
 | Earlier: Packet framing, Linux AArch64 | `5ee3eba8ad5563ee1ccccbfdd0e9a4c023133c65` | [`13656a6d64cd61a8bb2dd23dc35acbc48ee09e53a304f3ed03bd348a3a85517e`](../harness/evidence/sets/gate-run-aarch64-5ee3eba8-20261121-011442-shard-1.json) |
@@ -2091,7 +2109,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | Playback: MP4 forward | 46/46 packet folds (`mp4-forward`) | 0.9089 (51/51 pass, worst `progressive-ten-sequential-batches`) | heap ≤0.5920, total RSS ≤0.8879 (51/51 lower) |
 | Playback: MP4 range | 51/51 open and backward-seek comparisons (`mp4-range`) | 0.9772 (64/64 pass, worst `fragmented-before-sync`) | heap ≤0.7849, total RSS ≤0.8800 (64/64 lower) |
 | Playback: TS program | 35/35 packet folds (`ts-program`) | 0.7635 (35/35 pass, worst `entry-hevc-aac-44100-00`) | heap ≤0.1179, total RSS ≤0.8266 (35/35 lower) |
-| MPEG-TS progressive playback | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 0.7550 (3/3 pass, worst `reordered-48000`) | heap ≤0.0154, total RSS ≤0.6667 (3/3 lower) |
+| MPEG-TS progressive playback | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 0.7367 at `4ec296c5` (3/3 pass, worst `reordered-48000`) | heap ≤0.0154, total RSS ≤0.6639 (3/3 lower) at `4ec296c5` |
 | Playback: raw Annex B | 7/7 packet folds (`raw-annex-b`) | 0.5037 (7/7 pass, worst `hevc-aud1`) | heap ≤0.1265, total RSS ≤0.7430 (7/7 lower) |
 | Rasterising | `raster-glyphs` 12/12, `raster-outlines` 2/2 and `raster-bitmaps` 2/2 pass; `raster-sweep` 301/303 (below); the crate's tests pass | not measured | not measured |
 | ASS parsing | `ass-parse-scripts` 48/48, `ass-parse-chunks` 4/4 and `ass-parse-events` 21/21 pass; `ass-parse-host` 13/15 (2 open); the crate's tests pass | not measured | not measured |
