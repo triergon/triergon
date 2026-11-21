@@ -1,19 +1,19 @@
 # Decoder timing and memory: equivalent work
 
 Timing (`cargo xtask codecs time`) and correctness (`cargo xtask codecs grade`)
-compare two workers on the same input, on native Linux ARM64, one run at a time. Pairing,
-seeds, confidence bounds and gate thresholds are defined in
-[docs/quality.md](../../docs/quality.md).
+compare two workers on the same input, on native Linux AArch64 or in the 32-bit ARMv7
+user space, one run at a time. Pairing, seeds, confidence bounds and gate thresholds are
+defined in [docs/quality.md](../../docs/quality.md).
 
 ## Workers
 
 - Reference: `harness/reference.c` built with `-DTRIERGON_DECODE_REFERENCE`, linked
-  statically against the pinned FFmpeg 9.0.2 libraries. It runs the same filter chains as the FFmpeg command line:
-  video `scale=1920:1080:force_original_aspect_ratio=decrease`, centred `pad`,
-  `format=rgba`; audio `aformat` to stereo s16 at the decoder rate. Its output is
-  byte-identical to the command line's.
-- Candidate: `crates/codec-worker`, with the same
-  access-unit split, operations and outputs. It streams access units from the file.
+  statically against the pinned FFmpeg 9.0.2 libraries. It runs the FFmpeg command
+  line's filter chains (video `scale=1920:1080:force_original_aspect_ratio=decrease`,
+  centred `pad`, `format=rgba`; audio `aformat` to stereo s16 at the decoder rate), and
+  its output is byte-identical to the command line's.
+- Candidate: `crates/codec-worker`, with the same access-unit split, operations and
+  outputs. It streams access units from the file.
 
 ## Equal work
 
@@ -25,10 +25,10 @@ seeds, confidence bounds and gate thresholds are defined in
   probed, so neither side has decoder code resident before the measured window.
 - File loading and process start are outside the timed interval on both sides.
 - Both workers fold every output byte into the same 8-way word digest
-  (`Digest` / `struct fold`). Every pair must produce identical output unit and byte
-  counts, and each worker the same digest in every run; whether the two digests agree
-  is recorded (they differ where the rules allow a 1 LSB audio difference).
+  (`InterleavedDigest` / `struct fold`). Every pair must produce identical output unit
+  and byte counts, and each worker the same digest in every run; whether the two digests
+  agree is recorded (they differ where the rules allow a 1 LSB audio difference).
 - Memory runs report `{packets, bytes}` on stdout and the digest on stderr, so work
   records are identical on both sides. Output exactness is graded only by the
-  correctness run under `NUMERIC-RULES.json`.
+  correctness run under `numeric-rules.json`.
 - Development timings are never measurement evidence.
