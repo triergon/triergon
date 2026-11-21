@@ -201,6 +201,16 @@ pub mod pes {
         PhysicalNullRun,
     };
 
+    /// How to handle the reserved bits of a program clock reference.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum PcrPolicy {
+        #[default]
+        Strict,
+        /// Retain the original bits while accepting a valid PCR base and
+        /// extension. Other adaptation-field checks still apply.
+        IgnoreReservedBits,
+    }
+
     /// Reporting of unframed payload in a private-audio carriage at logical EOF.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum UnframedAudioPolicy {

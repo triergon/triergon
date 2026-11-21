@@ -411,22 +411,37 @@ pub fn author_dts(root: &Path, args: &[String]) -> R<()> {
         };
         cases.push(input.record(root, FEATURE, name, &["--dvb"], reference, "ts-au-fold")?);
     }
-    let name = "dts-core-unlabelled-private-data";
-    let mut ts = Transport::new();
-    ts.tables(&codec, &[])?;
-    for index in 0..4 {
-        ts.pes(
-            codec.stream_id,
-            &part(&bytes, Some(90_000 + 11_520 * index), None),
-        )?;
-    }
-    let input = Input {
-        name,
-        m2ts: false,
-        data: ts.finish(false),
-    };
     let selection = format!("--dts-core={PID}");
-    cases.push(input.record(root, FEATURE, name, &[&selection], reference, "ts-au-fold")?);
+    for (name, reserved_bits_valid) in [
+        ("dts-core-unlabelled-private-data", true),
+        ("dts-core-pcr-reserved-bits", false),
+    ] {
+        let mut ts = Transport::new();
+        ts.tables(&codec, &[])?;
+        let mut options = vec![selection.as_str()];
+        if !reserved_bits_valid {
+            // A PCR-only carrier with a base of 80,000, extension zero and
+            // the six reserved bits cleared. Its counter precedes the first PES.
+            let mut carrier = [0xff; 188];
+            carrier[..12].copy_from_slice(&[
+                0x47, 0x01, 0x00, 0x2f, 183, 0x10, 0x00, 0x00, 0x9c, 0x40, 0x00, 0x00,
+            ]);
+            ts.bytes.extend_from_slice(&carrier);
+            options.push("--ignore-pcr-reserved-bits");
+        }
+        for index in 0..4 {
+            ts.pes(
+                codec.stream_id,
+                &part(&bytes, Some(90_000 + 11_520 * index), None),
+            )?;
+        }
+        let input = Input {
+            name,
+            m2ts: false,
+            data: ts.finish(false),
+        };
+        cases.push(input.record(root, FEATURE, name, &options, reference, "ts-au-fold")?);
+    }
     manifest(root, FEATURE, cases)
 }
 

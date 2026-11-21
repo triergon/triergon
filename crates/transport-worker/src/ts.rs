@@ -1133,6 +1133,7 @@ mod tests {
             program: 1,
             namespace: DescriptorNamespace::Unspecified,
             unlabelled_dts_core: None,
+            pcr_policy: triergon_mpegts::compat::pes::PcrPolicy::Strict,
             input: Bytes::copy_from_slice(&pool, &data).unwrap(),
             following: BudgetVec::new(&pool),
         };

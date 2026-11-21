@@ -86,6 +86,24 @@
         "bytes": 24576,
         "digest": 282797149400285436
       }
+    },
+    {
+      "id": "dts-core-pcr-reserved-bits",
+      "profile": "dts-core-pcr-reserved-bits",
+      "file": "harness/features/mpegts-dts-core/inputs/dts-core-pcr-reserved-bits.ts",
+      "sha256": "b316bc11f3cfe7954c56d3d7c2921028650299d0db35f4ed617c8c88563e8e35",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dts-core=256",
+        "--ignore-pcr-reserved-bits"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 24576,
+        "digest": 10625325230334478316
+      }
     }
   ]
 }

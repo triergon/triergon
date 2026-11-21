@@ -673,7 +673,10 @@ pipeline ([triergon-capture](../capture/README.md#conformance)).
   (`Unanchored`, `RelativeEpochZero`, or `Bounded` by a PCR/PTS anchor) and
   reports ambiguous or out-of-bound values instead of guessing a wrap.
   Invalid PCR signalling sets `clock_is_quarantined()` until an explicit
-  `discontinuity()`.
+  `discontinuity()`. For legacy streams with incorrect PCR reserved bits,
+  select `compat::pes::PcrPolicy::IgnoreReservedBits` in `ReaderLimits`.
+  The clock still requires a valid extension and adaptation field.
+  `Adaptation::pcr_reserved_bits()` exposes the encoded bits.
 - **Discontinuities and segments.** A signalled PCR discontinuity followed
   by a new PCR starts a new clock epoch (`TraceEvent::Timeline`) and drops
   partial PES. A caller `discontinuity()` (for example an HLS discontinuity

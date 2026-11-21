@@ -1,7 +1,12 @@
 {
   "schema": 1,
-  "note": "Upstream regression samples, and local remuxes of them, that subtitle corpora measure: fetched into the ignored corpus cache by these hashes and compared locally, never redistributed. Their redistribution rights are unreviewed.",
+  "note": "Upstream regression samples and local remuxes used by the comparison corpora. Samples are fetched into the ignored corpus cache by these hashes and never redistributed. Their redistribution rights are unreviewed.",
   "samples": [
+    {
+      "path": "fate/dts/dts.ts",
+      "sha256": "749561299cf838d55f52d5697f78c273a6c381c5e6c8300f859dfe23252ae2c2",
+      "source": "https://fate-suite.ffmpeg.org/dts/dts.ts"
+    },
     {
       "path": "fate/filter/242_4.mkv",
       "sha256": "b5e175e331d02f7479771eb890e32fce7dbdae55ac48ab6e00c69e8459567253",
