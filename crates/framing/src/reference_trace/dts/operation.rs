@@ -331,29 +331,70 @@ pub enum ParserOperationStep {
 /// [`provide`](Self::provide), [`finish`](Self::finish) or [`fail`](Self::fail) for
 /// that lane, and give both readers the same bytes.
 pub struct ParserOperation {
-    source: Option<Dts14SyncReader>,
-    parser: Option<Dts14CarrierReader>,
+    source: Lane<Dts14SyncReader>,
+    parser: Lane<Dts14CarrierReader>,
     context: ParserOperationContext,
     turn: ParserOperationLane,
     dispatch_paid: bool,
+    /// A parser packet whose clock is projected next, `clock_charge` work units of
+    /// it paid.
     pending_packet: Option<Dts14CarrierPacket>,
     ready_event: Option<ParserOperationEvent>,
     clock_charge: u16,
     clock_state: ClockState,
-    source_end: Option<ParserOperationTerminal>,
-    parser_end: Option<ParserOperationTerminal>,
     failure: Option<Error>,
 }
 const _: () = assert!(size_of::<ParserOperation>() <= 4096);
 const _: () = assert!(size_of::<ParserOperationStep>() <= 256);
+
+/// One reader of a [`ParserOperation`].
+enum Lane<R> {
+    /// The reader, still reading.
+    Reading(R),
+    /// How the reader stopped.
+    Stopped(ParserOperationTerminal),
+    /// The operation failed and dropped the reader.
+    Dropped,
+}
+
+impl<R> Lane<R> {
+    const fn terminal(&self) -> Option<ParserOperationTerminal> {
+        match self {
+            Self::Stopped(terminal) => Some(*terminal),
+            Self::Reading(_) | Self::Dropped => None,
+        }
+    }
+}
+
+/// The reader of one lane, borrowed.
+enum LaneReader<'a> {
+    Source(&'a mut Dts14SyncReader),
+    Parser(&'a mut Dts14CarrierReader),
+}
+
+/// What the reader of one lane returned.
+enum LaneOutput {
+    Frame(Dts14SyncFrame),
+    Packet(Dts14CarrierPacket),
+}
+
+/// `step` with its value made a lane output.
+fn lane_step<T>(step: Step<T>, output: fn(T) -> LaneOutput) -> Step<LaneOutput> {
+    match step {
+        Step::Ready(value) => Step::Ready(output(value)),
+        Step::NeedInput(request) => Step::NeedInput(request),
+        Step::Yield => Step::Yield,
+        Step::End(end) => Step::End(end),
+    }
+}
 
 impl std::fmt::Debug for ParserOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ParserOperation")
             .field("context", &self.context)
             .field("turn", &self.turn)
-            .field("source_end", &self.source_end)
-            .field("parser_end", &self.parser_end)
+            .field("source_end", &self.source.terminal())
+            .field("parser_end", &self.parser.terminal())
             .field("failure", &self.failure)
             .finish_non_exhaustive()
     }
@@ -381,8 +422,8 @@ impl ParserOperation {
             parser_generation: parser.generation(),
         };
         Ok(Self {
-            source: Some(facts),
-            parser: Some(parser),
+            source: Lane::Reading(facts),
+            parser: Lane::Reading(parser),
             context,
             turn: ParserOperationLane::Source,
             dispatch_paid: false,
@@ -390,8 +431,6 @@ impl ParserOperation {
             ready_event: None,
             clock_charge: 0,
             clock_state: ClockState::new(order),
-            source_end: None,
-            parser_end: None,
             failure: None,
         })
     }
@@ -424,11 +463,24 @@ impl ParserOperation {
         self.failure.map_or(Ok(()), Err)
     }
     fn abort(&mut self, error: Error) {
-        self.source = None;
-        self.parser = None;
+        self.source = Lane::Dropped;
+        self.parser = Lane::Dropped;
         self.pending_packet = None;
         self.ready_event = None;
         self.failure = Some(error);
+    }
+    /// The reader of `lane` while it reads.
+    fn reader(&mut self, lane: ParserOperationLane) -> Result<LaneReader<'_>> {
+        self.healthy()?;
+        match (lane, &mut self.source, &mut self.parser) {
+            (ParserOperationLane::Source, Lane::Reading(reader), _) => {
+                Ok(LaneReader::Source(reader))
+            }
+            (ParserOperationLane::ParserProjection, _, Lane::Reading(reader)) => {
+                Ok(LaneReader::Parser(reader))
+            }
+            _ => Err(Error::Invalid("DTS operation view is terminal")),
+        }
     }
     /// The input request of one reader.
     ///
@@ -438,16 +490,13 @@ impl ParserOperation {
     /// its earlier error.
     pub fn request(&self, lane: ParserOperationLane) -> Result<InputRequest> {
         self.healthy()?;
-        match lane {
-            ParserOperationLane::Source if self.source_end.is_none() => {
-                self.source.as_ref().map(Dts14SyncReader::request)
+        match (lane, &self.source, &self.parser) {
+            (ParserOperationLane::Source, Lane::Reading(reader), _) => Ok(reader.request()),
+            (ParserOperationLane::ParserProjection, _, Lane::Reading(reader)) => {
+                Ok(reader.request())
             }
-            ParserOperationLane::ParserProjection if self.parser_end.is_none() => {
-                self.parser.as_ref().map(Dts14CarrierReader::request)
-            }
-            _ => None,
+            _ => Err(Error::Invalid("DTS operation view is terminal")),
         }
-        .ok_or(Error::Invalid("DTS operation view is terminal"))
     }
     /// Answers the current request of one reader with `window`.
     ///
@@ -456,18 +505,9 @@ impl ParserOperation {
     /// As [`request`](Self::request), or the reader's refusal of a window that does
     /// not answer its request, which leaves the operation as it was.
     pub fn provide(&mut self, lane: ParserOperationLane, window: &InputWindow) -> Result<()> {
-        self.request(lane)?;
-        match lane {
-            ParserOperationLane::Source => self
-                .source
-                .as_mut()
-                .ok_or(Error::Invalid("DTS source cursor absent"))?
-                .provide(window),
-            ParserOperationLane::ParserProjection => self
-                .parser
-                .as_mut()
-                .ok_or(Error::Invalid("DTS parser cursor absent"))?
-                .provide(window),
+        match self.reader(lane)? {
+            LaneReader::Source(reader) => reader.provide(window),
+            LaneReader::Parser(reader) => reader.provide(window),
         }
     }
     /// Answers the current request of one reader with the end of the source. Each
@@ -485,18 +525,9 @@ impl ParserOperation {
         source: SourceId,
         token: InputToken,
     ) -> Result<()> {
-        self.request(lane)?;
-        match lane {
-            ParserOperationLane::Source => self
-                .source
-                .as_mut()
-                .ok_or(Error::Invalid("DTS source cursor absent"))?
-                .finish(source, token),
-            ParserOperationLane::ParserProjection => self
-                .parser
-                .as_mut()
-                .ok_or(Error::Invalid("DTS parser cursor absent"))?
-                .finish(source, token),
+        match self.reader(lane)? {
+            LaneReader::Source(reader) => reader.finish(source, token),
+            LaneReader::Parser(reader) => reader.finish(source, token),
         }
     }
     /// Answers the current request of one reader with a source failure, which fails
@@ -515,18 +546,9 @@ impl ParserOperation {
         token: InputToken,
         failure: SourceFailure,
     ) -> Result<()> {
-        self.request(lane)?;
-        match lane {
-            ParserOperationLane::Source => self
-                .source
-                .as_mut()
-                .ok_or(Error::Invalid("DTS source cursor absent"))?
-                .fail(source, token, failure)?,
-            ParserOperationLane::ParserProjection => self
-                .parser
-                .as_mut()
-                .ok_or(Error::Invalid("DTS parser cursor absent"))?
-                .fail(source, token, failure)?,
+        match self.reader(lane)? {
+            LaneReader::Source(reader) => reader.fail(source, token, failure)?,
+            LaneReader::Parser(reader) => reader.fail(source, token, failure)?,
         }
         self.abort(match failure {
             SourceFailure::Transport => Error::Transport,
@@ -541,6 +563,13 @@ impl ParserOperation {
             ParserOperationLane::ParserProjection => ParserOperationLane::Source,
         };
     }
+    /// Stops the reader of `lane` with `terminal`.
+    fn stop(&mut self, lane: ParserOperationLane, terminal: ParserOperationTerminal) {
+        match lane {
+            ParserOperationLane::Source => self.source = Lane::Stopped(terminal),
+            ParserOperationLane::ParserProjection => self.parser = Lane::Stopped(terminal),
+        }
+    }
     fn refused(&mut self, lane: ParserOperationLane, error: Error) -> Result<ParserOperationStep> {
         let request = self.request(lane)?;
         let terminal = ParserOperationTerminal::Refused {
@@ -550,16 +579,7 @@ impl ParserOperation {
                 offset: request.offset,
             },
         };
-        match lane {
-            ParserOperationLane::Source => {
-                self.source = None;
-                self.source_end = Some(terminal);
-            }
-            ParserOperationLane::ParserProjection => {
-                self.parser = None;
-                self.parser_end = Some(terminal);
-            }
-        }
+        self.stop(lane, terminal);
         self.next_turn();
         self.publish(ParserOperationEvent::ViewRefusal {
             lane,
@@ -594,8 +614,8 @@ impl ParserOperation {
         }
         loop {
             if self.pending_packet.is_some() {
-                // Conservative bound for the fixed120-bit probe and arithmetic.
-                // Accumulate across calls so WorkBudget(1) makes real progress.
+                // A bound for the 120-bit header probe and the clock arithmetic,
+                // paid across calls so that a budget of one unit still progresses.
                 while self.clock_charge < 128 {
                     if !work.try_charge(1) {
                         return Ok(ParserOperationStep::Yield);
@@ -618,7 +638,7 @@ impl ParserOperation {
                 self.next_turn();
                 return self.publish(ParserOperationEvent::ParserPacket(packet));
             }
-            if let (Some(source), Some(parser)) = (self.source_end, self.parser_end) {
+            if let (Some(source), Some(parser)) = (self.source.terminal(), self.parser.terminal()) {
                 if let (ParserOperationTerminal::End(a), ParserOperationTerminal::End(b)) =
                     (source, parser)
                     && a != b
@@ -631,78 +651,57 @@ impl ParserOperation {
             if work.remaining() == 0 {
                 return Ok(ParserOperationStep::Yield);
             }
-            if (self.turn == ParserOperationLane::Source && self.source_end.is_some())
-                || (self.turn == ParserOperationLane::ParserProjection && self.parser_end.is_some())
-            {
-                self.next_turn();
-                continue;
-            }
+            let lane = self.turn;
+            let reader = match (lane, &mut self.source, &mut self.parser) {
+                (ParserOperationLane::Source, Lane::Reading(reader), _) => {
+                    LaneReader::Source(reader)
+                }
+                (ParserOperationLane::ParserProjection, _, Lane::Reading(reader)) => {
+                    LaneReader::Parser(reader)
+                }
+                _ => {
+                    self.next_turn();
+                    continue;
+                }
+            };
             if !self.dispatch_paid {
                 if !work.try_charge(1) {
                     return Ok(ParserOperationStep::Yield);
                 }
                 self.dispatch_paid = true;
             }
-            let lane = self.turn;
-            match lane {
-                ParserOperationLane::Source => {
-                    match self
-                        .source
-                        .as_mut()
-                        .ok_or(Error::Invalid("DTS source cursor absent"))?
-                        .step(work, cancel)
-                    {
-                        Ok(Step::Ready(frame)) => {
-                            self.next_turn();
-                            return self.publish(ParserOperationEvent::SourceFrame(frame));
-                        }
-                        Ok(Step::NeedInput(request)) => {
-                            self.next_turn();
-                            return Ok(ParserOperationStep::NeedInput { lane, request });
-                        }
-                        Ok(Step::Yield) => return Ok(ParserOperationStep::Yield),
-                        Ok(Step::End(end)) => {
-                            self.source_end = Some(ParserOperationTerminal::End(end));
-                            self.source = None;
-                            self.next_turn();
-                        }
-                        Err(e @ (Error::Backpressure { .. } | Error::Allocation)) => return Err(e),
-                        Err(Error::Cancelled) => {
-                            self.abort(Error::Cancelled);
-                            return Err(Error::Cancelled);
-                        }
-                        Err(error) => return self.refused(lane, error),
-                    }
+            let result = match reader {
+                LaneReader::Source(reader) => reader
+                    .step(work, cancel)
+                    .map(|step| lane_step(step, LaneOutput::Frame)),
+                LaneReader::Parser(reader) => reader
+                    .step(work, cancel)
+                    .map(|step| lane_step(step, LaneOutput::Packet)),
+            };
+            match result {
+                Ok(Step::Ready(LaneOutput::Frame(frame))) => {
+                    self.next_turn();
+                    return self.publish(ParserOperationEvent::SourceFrame(frame));
                 }
-                ParserOperationLane::ParserProjection => {
-                    match self
-                        .parser
-                        .as_mut()
-                        .ok_or(Error::Invalid("DTS parser cursor absent"))?
-                        .step(work, cancel)
-                    {
-                        Ok(Step::Ready(packet)) => {
-                            self.pending_packet = Some(packet);
-                            self.clock_charge = 0;
-                        }
-                        Ok(Step::NeedInput(request)) => {
-                            self.next_turn();
-                            return Ok(ParserOperationStep::NeedInput { lane, request });
-                        }
-                        Ok(Step::Yield) => return Ok(ParserOperationStep::Yield),
-                        Ok(Step::End(end)) => {
-                            self.parser_end = Some(ParserOperationTerminal::End(end));
-                            self.parser = None;
-                            self.next_turn();
-                        }
-                        Err(e @ (Error::Backpressure { .. } | Error::Allocation)) => return Err(e),
-                        Err(Error::Cancelled) => {
-                            self.abort(Error::Cancelled);
-                            return Err(Error::Cancelled);
-                        }
-                        Err(error) => return self.refused(lane, error),
-                    }
+                Ok(Step::Ready(LaneOutput::Packet(packet))) => {
+                    self.pending_packet = Some(packet);
+                    self.clock_charge = 0;
                 }
+                Ok(Step::NeedInput(request)) => {
+                    self.next_turn();
+                    return Ok(ParserOperationStep::NeedInput { lane, request });
+                }
+                Ok(Step::Yield) => return Ok(ParserOperationStep::Yield),
+                Ok(Step::End(end)) => {
+                    self.stop(lane, ParserOperationTerminal::End(end));
+                    self.next_turn();
+                }
+                Err(e @ (Error::Backpressure { .. } | Error::Allocation)) => return Err(e),
+                Err(Error::Cancelled) => {
+                    self.abort(Error::Cancelled);
+                    return Err(Error::Cancelled);
+                }
+                Err(error) => return self.refused(lane, error),
             }
         }
     }
