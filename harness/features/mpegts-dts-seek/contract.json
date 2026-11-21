@@ -8,10 +8,11 @@
   "worker_operation": "ts-audio-seek-",
   "reference": "ffmpeg-ts-dts-seek",
   "contract": [
-    "Start with a preloaded DVB transport carrying canonical DTS core access units or aligned, finite PES containing one self-contained lossless-only XLL access unit each, and a target in source 90 kHz ticks.",
+    "Start with a preloaded DVB transport carrying canonical DTS core access units or aligned, finite PES containing one self-contained XLL access unit each, either lossless-only or construction 14 with a separate core, and a target in source 90 kHz ticks.",
     "Scan for the last core frame with maximal source PTS at or before the target whose history flag is clear. The reference uses the public FFmpeg demuxer with the DTS parser and NOFILLIN, reads HFLAG from the emitted core header, and replays from the selected frame.",
     "For the authored XLL inputs every access unit has static setup, one extension-zero construction-17 asset, complete checksummed headers and immediate XLL sync at asset offset zero without smoothing. FFmpeg identifies this DVB extension descriptor as data and preserves each full PES payload; it does not validate XLL recovery. Reader tests check recovery navigation and refusals independently.",
     "Compare the requested, landing and discard times and every source PTS, effective DTS and payload byte of the replay suffix through EOF, including core frames that need earlier predictor history. Both previous-entry and playback-preroll policies land early and late in each XLL stream. Repeated cases drain the late suffix to EOF, then seek backward with the candidate index and compare both complete suffixes.",
+    "Construction-14 controls carry a separate canonical core without internal extensions and one mode-1 XLL asset. Every compared entry has clear core HFLAG, explicit static setup, default backward-compatible core mapping and immediate XLL sync with a checked common header. The public reference preserves the complete DVB PES and verifies packet suffixes; reader tests independently verify recovery refusals. These authored bodies do not claim decoded-audio parity.",
     "Each measured iteration constructs the reader, scans, selects the landing and replays and folds the complete suffix, including the second seek where declared. Input loading and output serialisation stay outside timing; the standard report observers measure peak live heap and total resident peak RSS for the complete operation."
   ],
   "required_profiles": [
@@ -28,7 +29,19 @@
     "dts-xll-m2ts192-backward-indexed-previous",
     "dts-xll-m2ts192-early-preroll",
     "dts-xll-m2ts192-late-preroll",
-    "dts-xll-m2ts192-backward-indexed-preroll"
+    "dts-xll-m2ts192-backward-indexed-preroll",
+    "dts-core-xll-ts188-early-previous",
+    "dts-core-xll-ts188-late-previous",
+    "dts-core-xll-ts188-backward-indexed-previous",
+    "dts-core-xll-ts188-early-preroll",
+    "dts-core-xll-ts188-late-preroll",
+    "dts-core-xll-ts188-backward-indexed-preroll",
+    "dts-core-xll-m2ts192-early-previous",
+    "dts-core-xll-m2ts192-late-previous",
+    "dts-core-xll-m2ts192-backward-indexed-previous",
+    "dts-core-xll-m2ts192-early-preroll",
+    "dts-core-xll-m2ts192-late-preroll",
+    "dts-core-xll-m2ts192-backward-indexed-preroll"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",
