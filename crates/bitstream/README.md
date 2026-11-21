@@ -38,6 +38,10 @@ partition can use [`RiceReader::rice_in_partition`] and call [`RiceReader::past_
 once before accepting any of its values. On 32-bit targets, a code contained in the upper
 word of the cache can be extracted using a single machine word.
 
+[`LsbReader`] reads LSB-first bits, as Vorbis I packs them, and also yields zeros past
+the end ([`LsbReader::overrun`]). [`LsbWindow`] lends its next 32 bits to a run of short
+reads, such as consecutive codewords, which then cost a shift and a mask each.
+
 ## Checked reads
 
 [`BitCursor`] reads MSB-first bits of a slice and fails at its end. Headers and parameter
@@ -95,7 +99,7 @@ assert_eq!(Engine::<true>::new(&[0xff, 0x80], 0).err(), Some(InvalidOffset));
 
 ## Checksums
 
-[`crc`] holds the three checksums the workspace uses. Each function continues from a
+[`crc`] holds the four checksums the workspace uses. Each function continues from a
 register value, so a message can arrive in pieces.
 
 ```rust

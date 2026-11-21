@@ -352,7 +352,10 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
     #[inline(always)]
     #[must_use]
     pub fn peek_bypass(&self, count: u32) -> u32 {
-        #[allow(clippy::unnecessary_cast)] // a u64 register on 64-bit targets
+        #[allow(
+            clippy::unnecessary_cast,
+            reason = "the register is already a u64 on 64-bit targets"
+        )]
         let bins = ((self.value >> (Self::OFFSET_SHIFT - count)) / Word::from(self.range)) as u32;
         bins
     }
