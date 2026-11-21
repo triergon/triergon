@@ -472,7 +472,7 @@ mod tests {
                 &input,
                 track,
                 Kind::AudioSeek,
-                None,
+                FollowUp::default(),
                 false,
                 &mut Totals::default(),
             )
