@@ -12,8 +12,9 @@ use crate::fp;
 use crate::geometry::{Rect, Vector};
 use crate::shape::Shape;
 
-/// Transform error estimate, in 1/64 pixel.
-const POSITION_PRECISION: f64 = 8.0;
+/// Transform error estimate, in 1/64 pixel: the error quantised transforms,
+/// border strokes and blurs are sized to.
+pub(crate) const POSITION_PRECISION: f64 = 8.0;
 /// The largest perspective magnification relative to the box centre.
 pub(crate) const MAX_PERSP_SCALE: f64 = 16.0;
 /// log2 of the sub-pixel steps per pixel: 1/8 pixel.
@@ -87,7 +88,7 @@ pub struct Quantized {
 
 impl Quantized {
     /// `shape` under `matrix` (outline units to frame 26.6) quantised on its
-    /// own, without a run, as libass quantises the drawing of a vector clip.
+    /// own, without a run: how the drawing of a vector clip is quantised.
     /// `None` when the transform is degenerate or out of range.
     pub fn standalone(shape: &Shape, matrix: &Matrix) -> Option<Self> {
         BitmapTransform::quantize(matrix, shape.cbox(), None).map(|q| q.placed)

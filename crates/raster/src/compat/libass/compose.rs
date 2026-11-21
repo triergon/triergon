@@ -5,17 +5,16 @@ use std::ops::Deref;
 
 use triergon_core::{Error, Result, WorkBudget, round_ties_even_i32};
 
+use super::glyph::{FrameScale, GlyphBitmaps, PlacedBitmap};
 use crate::bitmap::Bitmap;
 use crate::fp;
 use crate::geometry::{Vector, pixels_26_6};
-use crate::glyph::{FrameScale, GlyphBitmaps, PlacedBitmap};
 use crate::limits::{charge, row_work};
 use crate::raster::Raster;
+use crate::transform::POSITION_PRECISION;
 
 /// Blur error as a fraction of the full range.
 const BLUR_PRECISION: f64 = 1.0 / 256.0;
-/// Transform error estimate, in 1/64 pixel.
-const POSITION_PRECISION: f64 = 8.0;
 /// Quantised blur steps per (64 · radius) unit.
 const BLUR_SCALE: f64 = 64.0 * BLUR_PRECISION / POSITION_PRECISION;
 
@@ -40,7 +39,7 @@ pub enum Border {
         keeps_fill: bool,
     },
     /// Opaque boxes (`\bord` style 3) around each glyph's
-    /// [`advance`](crate::Placement::advance) and height, `size` beyond them,
+    /// [`advance`](super::Placement::advance) and height, `size` beyond them,
     /// which cover the fill's area. With `shown` (a nonzero `\bord`) the box
     /// is the border and the shadow is a copy of it; otherwise the box is the
     /// shadow alone, drawn only when the run casts one.
@@ -237,20 +236,19 @@ pub struct Composite {
     pub shadow: Option<Bitmap>,
 }
 
-impl Raster {
-    /// Combines the glyphs of a run, in order as [`Raster::render`] drew
-    /// them, under `effects` in a frame scaled by `frame`, as libass's
-    /// composite cache builds a run (`ass_composite_construct`): fills and
-    /// borders summed (one bitmap without `\be` is copied), blurred, the fill
-    /// taken out of the border where it shows through, and the shadow copied
-    /// from the border or fill and moved. Without glyphs the composite is
-    /// empty.
+impl Composite {
+    /// Combines the glyphs of a run, in the order
+    /// [`Run::render`](super::Run::render) drew them, under `effects` in a
+    /// frame scaled by `frame`, as libass composites a run: fills and borders
+    /// summed (one bitmap without `\be` is copied), blurred, the fill taken
+    /// out of the border where it shows through, and the shadow copied from
+    /// the border or fill and moved. Without glyphs the composite is empty.
     ///
     /// # Errors
     ///
     /// `Policy` when `work` or the limits run out, and the budget's errors.
-    pub fn compose<'g, I, B>(
-        &mut self,
+    pub fn new<'g, I, B>(
+        raster: &mut Raster,
         effects: &Effects,
         frame: &FrameScale,
         glyphs: I,
@@ -281,19 +279,21 @@ impl Raster {
                 Some((&*placed.bitmap, at))
             })
         };
-        let mut fill = self.combine(placed(GlyphBitmaps::fill), pad, work)?;
-        let mut border = self.combine(placed(GlyphBitmaps::border), pad, work)?;
+        let mut fill = combine(raster, placed(GlyphBitmaps::fill), pad, work)?;
+        let mut border = combine(raster, placed(GlyphBitmaps::border), pad, work)?;
         let flags = filter.flags;
         let variance = filter.variances();
         if (!flags.border || flags.opaque_box)
             && let Some(fill) = &mut fill
         {
-            self.blur
-                .apply(fill, filter.be, variance, &self.limits, work)?;
+            raster
+                .blur
+                .apply(fill, filter.be, variance, &raster.limits, work)?;
         }
         if let Some(border) = &mut border {
-            self.blur
-                .apply(border, filter.be, variance, &self.limits, work)?;
+            raster
+                .blur
+                .apply(border, filter.be, variance, &raster.limits, work)?;
         }
         let subtract = |border: &mut Option<Bitmap>, fill: &Option<Bitmap>| {
             if let (Some(border), Some(fill)) = (border.as_mut(), fill) {
@@ -306,7 +306,7 @@ impl Raster {
         let mut shadow = None;
         if flags.shadow {
             let clone =
-                |b: &Option<Bitmap>| b.as_ref().map(|b| b.try_clone(&self.budget)).transpose();
+                |b: &Option<Bitmap>| b.as_ref().map(|b| b.try_clone(&raster.budget)).transpose();
             if flags.border {
                 shadow = clone(&border)?;
                 if flags.fill_in_border && !flags.fill_in_shadow {
@@ -331,70 +331,71 @@ impl Raster {
             shadow,
         })
     }
+}
 
-    /// Sums the placed bitmaps into one, padded by `pad` pixels. The sum's
-    /// rows and those of every bitmap added into it are charged to `work`
-    /// before the sum is allocated; a sum beyond libass's bound is not drawn.
-    fn combine<'b>(
-        &self,
-        parts: impl Iterator<Item = (&'b Bitmap, Vector)> + Clone,
-        pad: u32,
-        work: &mut WorkBudget,
-    ) -> Result<Option<Bitmap>> {
-        // Positions are the run's own, so they fit; 64 bits keep hostile ones
-        // from overflowing.
-        let (mut x_min, mut y_min, mut x_max, mut y_max) = (i64::MAX, i64::MAX, i64::MIN, i64::MIN);
-        let mut count = 0;
-        let mut added = 0u64;
-        let mut last = None;
-        for (bitmap, pos) in parts.clone() {
-            let x = i64::from(pos.x) + i64::from(bitmap.position.x);
-            let y = i64::from(pos.y) + i64::from(bitmap.position.y);
-            (x_min, y_min) = (x_min.min(x), y_min.min(y));
-            x_max = x_max.max(x + bitmap.width() as i64);
-            y_max = y_max.max(y + bitmap.height() as i64);
-            count += 1;
-            added = added.saturating_add(row_work(bitmap.width(), bitmap.height()));
-            last = Some((bitmap, pos));
-        }
-        let Some((last, last_pos)) = last else {
-            return Ok(None);
-        };
-        if pad == 0 && count == 1 {
-            charge(work, added)?;
-            let mut copy = last.try_clone(&self.budget)?;
-            copy.position.x = copy.position.x.wrapping_add(last_pos.x);
-            copy.position.y = copy.position.y.wrapping_add(last_pos.y);
-            return Ok(Some(copy));
-        }
-        let pad = i64::from(pad);
-        let (left, top) = (x_min - pad, y_min - pad);
-        let (Ok(left), Ok(top)) = (i32::try_from(left), i32::try_from(top)) else {
-            return Ok(None);
-        };
-        let width = usize::try_from(x_max - x_min + 2 * pad).unwrap_or(usize::MAX);
-        let height = usize::try_from(y_max - y_min + 2 * pad).unwrap_or(usize::MAX);
-        match Bitmap::stride_within(width, height, &self.limits) {
-            Ok(_) => {}
-            Err(Error::Limit { .. }) => return Ok(None),
-            Err(error) => return Err(error),
-        }
-        charge(work, row_work(width, height).saturating_add(added))?;
-        let mut out = Bitmap::new(&self.budget, width, height, &self.limits)?;
-        out.position = Vector::new(left, top);
-        for (bitmap, pos) in parts {
-            let x = i64::from(pos.x) + i64::from(bitmap.position.x) - i64::from(left);
-            let y = i64::from(pos.y) + i64::from(bitmap.position.y) - i64::from(top);
-            out.add(bitmap, x as i32, y as i32);
-        }
-        Ok(Some(out))
+/// Sums the placed bitmaps into one, padded by `pad` pixels. The sum's
+/// rows and those of every bitmap added into it are charged to `work`
+/// before the sum is allocated; a sum beyond libass's bound is not drawn.
+fn combine<'b>(
+    raster: &Raster,
+    parts: impl Iterator<Item = (&'b Bitmap, Vector)> + Clone,
+    pad: u32,
+    work: &mut WorkBudget,
+) -> Result<Option<Bitmap>> {
+    // Positions are the run's own, so they fit; 64 bits keep hostile ones
+    // from overflowing.
+    let (mut x_min, mut y_min, mut x_max, mut y_max) = (i64::MAX, i64::MAX, i64::MIN, i64::MIN);
+    let mut count = 0;
+    let mut added = 0u64;
+    let mut last = None;
+    for (bitmap, pos) in parts.clone() {
+        let x = i64::from(pos.x) + i64::from(bitmap.position.x);
+        let y = i64::from(pos.y) + i64::from(bitmap.position.y);
+        (x_min, y_min) = (x_min.min(x), y_min.min(y));
+        x_max = x_max.max(x + bitmap.width() as i64);
+        y_max = y_max.max(y + bitmap.height() as i64);
+        count += 1;
+        added = added.saturating_add(row_work(bitmap.width(), bitmap.height()));
+        last = Some((bitmap, pos));
     }
+    let Some((last, last_pos)) = last else {
+        return Ok(None);
+    };
+    if pad == 0 && count == 1 {
+        charge(work, added)?;
+        let mut copy = last.try_clone(&raster.budget)?;
+        copy.position.x = copy.position.x.wrapping_add(last_pos.x);
+        copy.position.y = copy.position.y.wrapping_add(last_pos.y);
+        return Ok(Some(copy));
+    }
+    let pad = i64::from(pad);
+    let (left, top) = (x_min - pad, y_min - pad);
+    let (Ok(left), Ok(top)) = (i32::try_from(left), i32::try_from(top)) else {
+        return Ok(None);
+    };
+    let width = usize::try_from(x_max - x_min + 2 * pad).unwrap_or(usize::MAX);
+    let height = usize::try_from(y_max - y_min + 2 * pad).unwrap_or(usize::MAX);
+    match Bitmap::stride_within(width, height, &raster.limits) {
+        Ok(_) => {}
+        Err(Error::Limit { .. }) => return Ok(None),
+        Err(error) => return Err(error),
+    }
+    charge(work, row_work(width, height).saturating_add(added))?;
+    let mut out = Bitmap::new(&raster.budget, width, height, &raster.limits)?;
+    out.position = Vector::new(left, top);
+    for (bitmap, pos) in parts {
+        let x = i64::from(pos.x) + i64::from(bitmap.position.x) - i64::from(left);
+        let y = i64::from(pos.y) + i64::from(bitmap.position.y) - i64::from(top);
+        out.add(bitmap, x as i32, y as i32);
+    }
+    Ok(Some(out))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Effects, be_padding, quantize_blur, restore_blur, shadow_mask};
-    use crate::{Bitmap, FrameScale, GlyphBitmaps, Limits, Raster, Vector};
+    use super::{Composite, Effects, be_padding, quantize_blur, restore_blur, shadow_mask};
+    use crate::compat::libass::{FrameScale, GlyphBitmaps};
+    use crate::{Bitmap, Limits, Raster, Vector};
     use triergon_core::{Budget, WorkBudget};
 
     #[test]
@@ -410,14 +411,14 @@ mod tests {
             border: [1.0, 1.0],
             pixel_aspect: 1.0,
         };
-        let composite = Raster::new(&budget, Limits::default())
-            .compose(
-                &Effects::default(),
-                &frame,
-                &[glyph(i32::MIN), glyph(i32::MAX)],
-                &mut WorkBudget::new(1 << 20),
-            )
-            .unwrap();
+        let composite = Composite::new(
+            &mut Raster::new(&budget, Limits::default()),
+            &Effects::default(),
+            &frame,
+            &[glyph(i32::MIN), glyph(i32::MAX)],
+            &mut WorkBudget::new(1 << 20),
+        )
+        .unwrap();
         assert!(composite.fill.is_none());
     }
 

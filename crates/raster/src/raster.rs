@@ -1,6 +1,6 @@
 //! The rasterising context: the scratch every stage reuses.
 
-use triergon_core::{Budget, Result, WorkBudget};
+use triergon_core::{Budget, Error, Result, WorkBudget};
 
 use crate::bitmap::Bitmap;
 use crate::blur::Blur;
@@ -9,11 +9,11 @@ use crate::outline::Outline;
 use crate::rasterizer::Rasterizer;
 use crate::shape::Shape;
 use crate::stroke::{Pen, stroke};
+use crate::transform::BitmapTransform;
 
-/// libass's outline and bitmap stages with the scratch they reuse: the
-/// rasteriser's segment buffers, transformed and stroked shapes and the blur's
-/// planes, all
-/// charged to one [`Budget`]. Every operation takes the [`WorkBudget`] of the
+/// The stroker, the rasteriser and the blur with the scratch they reuse: the
+/// rasteriser's segment buffers, transformed and stroked shapes and the
+/// blur's planes, all charged to one [`Budget`]. Every operation takes the [`WorkBudget`] of the
 /// frame it belongs to; running out of it, or a size beyond [`Limits`], is
 /// `Error::Policy`.
 #[derive(Debug)]
@@ -52,9 +52,8 @@ impl Raster {
             + self.unit_box.as_ref().map_or(0, Shape::retained_bytes)
     }
 
-    /// Strokes `outline` with `pen`, as libass strokes borders
-    /// (`ass_outline_stroke`), writing the outer (+offset) and inner (−offset)
-    /// border outlines into `border`, which is cleared first.
+    /// Strokes `outline` with `pen`, writing the outer (+offset) and inner
+    /// (−offset) border outlines into `border`, which is cleared first.
     ///
     /// # Errors
     ///
@@ -73,12 +72,12 @@ impl Raster {
     }
 
     /// Rasterises `shape`, the union of its outlines each filled with the
-    /// nonzero rule, as libass does (`ass_outline_to_bitmap`, 16×16 tiles),
-    /// into a bitmap of whole tiles placed at its pixel origin. The bitmap
-    /// covers the polyline's bounds widened by 1/64 pixel on the top-left and a
-    /// pixel on the bottom-right. Returns `None` when there is nothing to draw,
-    /// or the bitmap would exceed [`MAX_BITMAP_BYTES`](crate::MAX_BITMAP_BYTES),
-    /// as libass draws nothing then.
+    /// nonzero rule, in 16×16 tiles, into a bitmap of whole tiles placed at
+    /// its pixel origin. The bitmap covers the polyline's bounds widened by
+    /// 1/64 pixel on the top-left and a pixel on the bottom-right. Returns
+    /// `None` when there is nothing to draw, or the bitmap would exceed
+    /// [`MAX_BITMAP_BYTES`](crate::MAX_BITMAP_BYTES), as libass draws nothing
+    /// then.
     ///
     /// # Errors
     ///
@@ -87,10 +86,40 @@ impl Raster {
         self.rasterizer.rasterize(shape, &self.limits, work)
     }
 
-    /// Blurs `bitmap` as libass does (`ass_synth_blur`): with the Gaussian of
-    /// `variance` (x and y, in pixels²) when either exceeds 0.001, which
-    /// replaces the bitmap by a larger one covering the blur's reach, then with
-    /// `be` passes of the 3×3 box blur in place.
+    /// Rasterises `shape` under the quantised `transform`, as
+    /// [`Raster::rasterize`] does, into a bitmap placed against the
+    /// transform's [`position`](crate::Quantized::position). An outline that
+    /// leaves the coordinate range under the transform is dropped. `None`
+    /// when nothing is drawn.
+    ///
+    /// # Errors
+    ///
+    /// `Policy` when `work` or the limits run out, and the budget's errors.
+    pub fn draw(
+        &mut self,
+        shape: &Shape,
+        transform: &BitmapTransform,
+        work: &mut WorkBudget,
+    ) -> Result<Option<Bitmap>> {
+        let m = transform.restore(shape.cbox());
+        let projection = transform.projection();
+        self.transformed.rebuild(|outputs| {
+            for (source, out) in shape.outlines().iter().zip(outputs) {
+                match source.transform_into(&m, projection, out) {
+                    Ok(()) | Err(Error::Invalid(_)) => {}
+                    Err(error) => return Err(error),
+                }
+            }
+            Ok(())
+        })?;
+        self.rasterizer
+            .rasterize(&self.transformed, &self.limits, work)
+    }
+
+    /// Blurs `bitmap`: with the Gaussian of `variance` (x and y, in pixels²)
+    /// when either exceeds 0.001, which replaces the bitmap by a larger one
+    /// covering the blur's reach, then with `be` passes of the 3×3 box blur
+    /// in place.
     ///
     /// # Errors
     ///

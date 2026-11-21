@@ -3,9 +3,11 @@
 
 use triergon_core::{Budget, WorkBudget};
 use triergon_font::{OutlinePoint, Point, PointKind};
+use triergon_raster::compat::libass::{
+    Border, Clip, ClipFrame, Composite, Effects, FrameScale, GlyphRequest, Placement, Run, Shadow,
+};
 use triergon_raster::{
-    Bitmap, Border, Clip, ClipFrame, Effects, FrameScale, GlyphRequest, Limits, Matrix, Outline,
-    Pen, Placement, Projection, Quantized, Raster, Rect, Run, Shadow, Shape, Vector,
+    Bitmap, Limits, Matrix, Outline, Pen, Projection, Quantized, Raster, Rect, Shape, Vector,
 };
 
 /// xorshift64.
@@ -221,7 +223,7 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
     let mut run = Run::default();
     let mut rendered = Vec::new();
     for _ in 0..2 {
-        match raster.render(&request, &mut run, &mut work) {
+        match run.render(&mut raster, &request, &mut work) {
             Ok(Some(bitmaps)) => rendered.push(bitmaps),
             Ok(None) => {}
             Err(_) => return,
@@ -235,7 +237,7 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
     }
 
     let _ = effects.key(&frame);
-    let composite = raster.compose(&effects, &frame, &rendered, &mut work);
+    let composite = Composite::new(&mut raster, &effects, &frame, &rendered, &mut work);
 
     if let Ok(mut plain) = Bitmap::new(
         &budget,

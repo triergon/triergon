@@ -32,9 +32,9 @@ impl Shape {
         shape
     }
 
-    /// The unit square (0, 0)–(64, 64), which the transform of
-    /// [`PlacedBorder::Box`](crate::PlacedBorder::Box) scales into the opaque
-    /// box of `\bord` style 3.
+    /// The unit square (0, 0)–(64, 64), which an opaque box's transform
+    /// scales into the box of `\bord` style 3
+    /// ([`GlyphSource::opaque_box`](crate::compat::libass::GlyphSource::opaque_box)).
     ///
     /// # Errors
     ///
@@ -51,9 +51,9 @@ impl Shape {
         &self.outlines
     }
 
-    /// The control box of both outlines, as libass keeps it with an outline:
-    /// the bounds of all their points, on- and off-curve, and all zero when
-    /// both are empty. A renderer lays glyphs out by it.
+    /// The control box of both outlines: the bounds of all their points, on-
+    /// and off-curve, and all zero when both are empty. A renderer lays
+    /// glyphs out by it.
     pub fn cbox(&self) -> &Rect {
         &self.cbox
     }

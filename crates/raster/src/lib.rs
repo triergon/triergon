@@ -14,11 +14,9 @@
 
 mod bitmap;
 mod blur;
-mod clip;
-mod compose;
+pub mod compat;
 mod fp;
 mod geometry;
-mod glyph;
 mod limits;
 mod outline;
 mod raster;
@@ -29,13 +27,7 @@ mod stroke;
 mod transform;
 
 pub use bitmap::Bitmap;
-pub use clip::{Clip, ClipFrame, ClipPart, Colour};
-pub use compose::{Border, Composite, Effects, EffectsKey, Shadow};
 pub use geometry::{OUTLINE_MAX, Rect, Vector, pixels_26_6};
-pub use glyph::{
-    BorderStroke, FrameScale, GlyphBitmaps, GlyphPlacement, GlyphRequest, GlyphSource,
-    PlacedBitmap, PlacedBorder, Placement, Run,
-};
 pub use limits::{Limits, MAX_BITMAP_BYTES};
 pub use outline::{Outline, Segment, SegmentKind};
 pub use raster::Raster;

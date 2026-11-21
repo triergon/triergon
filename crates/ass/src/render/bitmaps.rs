@@ -6,10 +6,11 @@
 use std::ops::Deref;
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
-use triergon_raster::{
-    Bitmap, BitmapTransform, BorderStroke, EffectsKey, FrameScale, GlyphBitmaps, GlyphPlacement,
-    GlyphSource, Limits, Matrix, PlacedBitmap, Quantized, Raster, Run, Shape, Vector,
+use triergon_raster::compat::libass::{
+    BorderStroke, Composite, EffectsKey, FrameScale, GlyphBitmaps, GlyphPlacement, GlyphSource,
+    PlacedBitmap, Run,
 };
+use triergon_raster::{Bitmap, BitmapTransform, Limits, Matrix, Quantized, Raster, Shape, Vector};
 
 use super::CacheLimits;
 use super::cache::{Cache, CacheKey, Kept, sizes};
@@ -309,7 +310,7 @@ impl Painter {
             border: None,
         };
         let request = glyph.request(frame);
-        let Some(bitmaps) = self.raster.render_with(&request, run, &mut source, work)? else {
+        let Some(bitmaps) = run.render_with(&mut self.raster, &request, &mut source, work)? else {
             return Ok(None);
         };
         // A border that rounds to nothing is the fill's own bitmap.
@@ -376,7 +377,8 @@ impl Painter {
             composite
         } else {
             let bitmaps = drawn.iter().map(|d| &d.bitmaps);
-            let composite = self.raster.compose(&placed.effects, frame, bitmaps, work)?;
+            let composite =
+                Composite::new(&mut self.raster, &placed.effects, frame, bitmaps, work)?;
             let parts = [&composite.fill, &composite.border, &composite.shadow];
             let size = sizes::composite(
                 drawn.len(),
@@ -554,7 +556,8 @@ fn pixels(bitmap: &Bitmap) -> usize {
 #[cfg(test)]
 mod tests {
     use triergon_core::{Budget, BudgetVec};
-    use triergon_raster::{Border, Effects, FrameScale, Shadow, Vector};
+    use triergon_raster::Vector;
+    use triergon_raster::compat::libass::{Border, Effects, FrameScale, Shadow};
 
     use super::{CacheKey, EffectsKey, GlyphRef, RunKey};
 

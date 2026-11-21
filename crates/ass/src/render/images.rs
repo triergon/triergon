@@ -7,7 +7,8 @@
 use std::sync::Arc;
 
 use triergon_core::{Budget, BudgetVec, Result};
-use triergon_raster::{Bitmap, Clip, ClipFrame, Colour, Limits, PlacedBitmap, Rect};
+use triergon_raster::compat::libass::{Clip, ClipFrame, Colour, PlacedBitmap};
+use triergon_raster::{Bitmap, Limits, Rect};
 
 use super::bitmaps::{Combined, Composited, SharedBitmap};
 use super::cache::Kept;

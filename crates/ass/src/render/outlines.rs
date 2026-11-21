@@ -10,7 +10,8 @@ use std::ops::Deref;
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 use triergon_font::compat::libass;
 use triergon_font::{Font, GlyphId, Orientation};
-use triergon_raster::{BorderStroke, OUTLINE_MAX, Outline, Raster, Shape, Vector, pixels_26_6};
+use triergon_raster::compat::libass::BorderStroke;
+use triergon_raster::{OUTLINE_MAX, Outline, Raster, Shape, Vector, pixels_26_6};
 
 use super::cache::{Cache, CacheKey, Kept};
 use super::fonts::{FontId, RequestedFont};
@@ -220,8 +221,8 @@ impl Outlines {
             return Ok(KeptOutline::built(found));
         }
         // A stroked border holds only what it needs, as a kept outline should.
-        let value = raster
-            .stroke_border(&glyph.shape, &stroke, work)?
+        let value = stroke
+            .stroke(raster, &glyph.shape, work)?
             .map(OutlineValue::of_shape);
         let key = BorderKey {
             glyph: glyph.clone(),

@@ -25,7 +25,8 @@ mod wrap;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
-use triergon_raster::{Clip as ClipRect, ClipFrame, FrameScale, Matrix, Rect};
+use triergon_raster::compat::libass::{Clip as ClipRect, ClipFrame, FrameScale};
+use triergon_raster::{Matrix, Rect};
 
 use crate::{Context, EventState, Script, charge};
 use bitmaps::{Combined, Painter};

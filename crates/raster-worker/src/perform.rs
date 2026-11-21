@@ -4,10 +4,11 @@
 use std::io;
 
 use triergon_core::{Budget, Error, Result as CoreResult, WorkBudget};
-use triergon_raster::{
-    Bitmap, Border, Clip, ClipFrame, Colour, Effects, FrameScale, GlyphBitmaps, GlyphRequest,
-    Limits, OUTLINE_MAX, Outline, Pen, Placement, Raster, Rect, Run, Shadow, Shape, Vector,
+use triergon_raster::compat::libass::{
+    Border, Clip, ClipFrame, Colour, Composite, Effects, FrameScale, GlyphBitmaps, GlyphRequest,
+    Placement, Run, Shadow,
 };
+use triergon_raster::{Bitmap, Limits, OUTLINE_MAX, Outline, Pen, Raster, Rect, Shape, Vector};
 
 use crate::case::{Case, Glyph, Random, RunCase, Source};
 use crate::record::{Kind, Sink};
@@ -408,7 +409,7 @@ impl<'g> Runner<'g> {
                 effects: &glyph_effects,
                 karaoke: bit(32),
             };
-            let bitmaps = match self.raster.render(&request, &mut run, &mut self.work) {
+            let bitmaps = match run.render(&mut self.raster, &request, &mut self.work) {
                 Ok(bitmaps) => bitmaps,
                 Err(error) => return sink.value(refused(&error)),
             };
@@ -431,14 +432,16 @@ impl<'g> Runner<'g> {
             }
             return Ok(());
         }
-        let composite =
-            match self
-                .raster
-                .compose(&effects([0.0; 2]), &frame, &drawn, &mut self.work)
-            {
-                Ok(composite) => composite,
-                Err(error) => return sink.value(refused(&error)),
-            };
+        let composite = match Composite::new(
+            &mut self.raster,
+            &effects([0.0; 2]),
+            &frame,
+            &drawn,
+            &mut self.work,
+        ) {
+            Ok(composite) => composite,
+            Err(error) => return sink.value(refused(&error)),
+        };
         for bitmap in [&composite.fill, &composite.border, &composite.shadow] {
             sink.bitmap(bitmap.as_ref())?;
         }

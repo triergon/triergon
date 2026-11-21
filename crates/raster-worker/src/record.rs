@@ -4,7 +4,8 @@
 
 use std::io::{self, Write};
 use triergon_harness_protocol::digest::{fold, signed};
-use triergon_raster::{Bitmap, Outline, PlacedBitmap, SegmentKind, Vector};
+use triergon_raster::compat::libass::PlacedBitmap;
+use triergon_raster::{Bitmap, Outline, SegmentKind, Vector};
 
 /// The digest value of an absent outline or bitmap.
 const ABSENT: u64 = u64::MAX;

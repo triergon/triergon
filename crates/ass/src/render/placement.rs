@@ -8,9 +8,10 @@
 use std::ops::Range;
 
 use triergon_core::{Budget, BudgetVec, Result};
-use triergon_raster::{
-    Border, Effects, FrameScale, GlyphRequest, Placement, Shadow, Vector, pixels_26_6,
+use triergon_raster::compat::libass::{
+    Border, Effects, FrameScale, GlyphRequest, Placement, Shadow,
 };
+use triergon_raster::{Vector, pixels_26_6};
 
 use super::collisions;
 use super::geometry::{Geometry, Scales};
@@ -319,7 +320,8 @@ pub(super) struct GlyphDrawing<'a> {
 }
 
 impl GlyphDrawing<'_> {
-    /// What [`Run::place`](triergon_raster::Run::place) places.
+    /// What [`Run::render_with`](triergon_raster::compat::libass::Run::render_with)
+    /// draws.
     pub(super) fn request(&self, frame: &FrameScale) -> GlyphRequest<'_> {
         GlyphRequest {
             shape: &self.outline.shape,
