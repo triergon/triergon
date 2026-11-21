@@ -159,9 +159,26 @@ enum Mixer {
     Q15(Q15Matrix),
 }
 
+impl Mixer {
+    fn new(layout: ChannelLayout, levels: DownmixLevels, format: SampleFormat) -> Self {
+        // FFmpeg's resampler mixes an unspecified order as its default layout.
+        let layout = Some(layout)
+            .filter(|layout| layout.mask() != 0 || layout.channels() < 2)
+            .or_else(|| ChannelLayout::default_for(layout.channels()))
+            .unwrap_or(layout);
+        let matrix = StereoMatrix::with_levels(layout.speakers(), levels);
+        // A 16-bit stereo pair passes through exactly on either path.
+        if format == SampleFormat::S16 && !matrix.is_identity_stereo() {
+            Mixer::Q15(Q15Matrix::with_levels(layout.speakers(), levels))
+        } else {
+            Mixer::Float(matrix)
+        }
+    }
+}
+
 /// Stereo downmix of decoded frames; the matrix is rebuilt only when the layout,
 /// the stream's levels or the sample format change.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Downmix {
     cached: Option<(ChannelLayout, DownmixLevels, SampleFormat, Mixer)>,
 }
@@ -170,25 +187,19 @@ impl Downmix {
     /// Append `frame` to `out` as interleaved stereo s16.
     pub fn mix(&mut self, frame: &AudioFrame, levels: DownmixLevels, out: &mut Vec<i16>) {
         let format = frame.sample_format;
-        if !self.cached.as_ref().is_some_and(|(layout, cached, f, _)| {
-            *layout == frame.layout && *cached == levels && *f == format
-        }) {
-            // FFmpeg's resampler mixes an unspecified order as its default layout.
-            let layout = Some(frame.layout)
-                .filter(|layout| layout.mask() != 0 || layout.channels() < 2)
-                .or_else(|| ChannelLayout::default_for(frame.layout.channels()))
-                .unwrap_or(frame.layout);
-            let matrix = StereoMatrix::with_levels(layout.speakers(), levels);
-            // A 16-bit stereo pair passes through exactly on either path.
-            let mixer = if format == SampleFormat::S16 && !matrix.is_identity_stereo() {
-                Mixer::Q15(Q15Matrix::with_levels(layout.speakers(), levels))
-            } else {
-                Mixer::Float(matrix)
-            };
-            self.cached = Some((frame.layout, levels, format, mixer));
-        }
+        let mixer = match &mut self.cached {
+            Some((layout, cached, f, mixer))
+                if *layout == frame.layout && *cached == levels && *f == format =>
+            {
+                mixer
+            }
+            slot => {
+                let mixer = Mixer::new(frame.layout, levels, format);
+                &mut slot.insert((frame.layout, levels, format, mixer)).3
+            }
+        };
         let samples = frame.samples_per_channel;
-        match &self.cached.as_ref().expect("matrix").3 {
+        match mixer {
             Mixer::Float(matrix) => mix_into(matrix, &frame.planes, samples, out),
             Mixer::Q15(matrix) => mix_q15_into(matrix, &frame.planes, samples, out),
         }
