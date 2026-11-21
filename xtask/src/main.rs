@@ -82,7 +82,7 @@ commands:
   subtitle-fixtures record|verify FEATURE REFERENCE [options]   record or verify subtitle folds
   prepare-ffmpeg [--jobs N] [--profile PROFILE]
                  build a pinned FFmpeg reference into .research/reference[-PROFILE]:
-                 matroska (default), formats, video, subtitles, transport-dts (git revision on the 9.0 branch);
+                 matroska (default), formats, video, subtitles, transport-dts, transport-mpeg-video (git revision on the 9.0 branch);
                  decode, capture, capture-small (the 9.0.2 release)
   prepare-mpg123 [--jobs N]   build the pinned static free-format MPEG audio reference
   references     keys|pack|fetch|upload   the keys of the pinned reference builds, and
@@ -865,9 +865,12 @@ families and options:
   transport-dts --record REFERENCE   regenerate DVB DTS core transport inputs and pins
   transport-dts-discovery FATE_DTS_TS [--record REFERENCE]   generate automatic DTS controls
   transport-dts-hd --record REFERENCE   regenerate DTS-HD transport inputs and pins
+  transport-eac3-six-block [--record REFERENCE]   generate and pin E-AC-3 controls
+  transport-eac3-probe OUTPUT   generate ATSC short-group packet-boundary probes
   transport-dts-hd-grouped [--record REFERENCE]   generate DTS-HD source AU controls
   transport-dts-seek --record REFERENCE   regenerate DTS core seek inputs and pins
   transport-audio-seek --record REFERENCE   regenerate additional MPEG-TS audio seek inputs and pins
+  transport-mpeg-video --record REFERENCE [--reference-library PATH]   generate MPEG video picture inputs and observations
   transport-matched --record SEEK_REFERENCE AUDIO_REFERENCE
            regenerate MPEG-TS seek and free-format audio controls and pins
   zlib     [--kind stored|fixed|dynamic] [--scope N] [--lace 0-3] [--aac] [--mixed] [--empty]
@@ -892,6 +895,12 @@ fn fixture(root: &Path, args: &[String]) -> Task {
         };
         return transport_fixtures::program_m2ts(Path::new(source), Path::new(target));
     }
+    if family == "transport-eac3-six-block" {
+        return transport_fixtures::eac3_probe::report_main(root, &args[1..]);
+    }
+    if family == "transport-eac3-probe" {
+        return transport_fixtures::eac3_probe::main(root, &args[1..]);
+    }
     if family == "transport-access-units" {
         return transport_fixtures::main(root, &args[1..]);
     }
@@ -912,6 +921,9 @@ fn fixture(root: &Path, args: &[String]) -> Task {
     }
     if family == "transport-audio-seek" {
         return transport_fixtures::matched::author_audio_seek(root, &args[1..]);
+    }
+    if family == "transport-mpeg-video" {
+        return transport_fixtures::matched::author_mpeg_video(root, &args[1..]);
     }
     if family == "transport-matched" {
         return transport_fixtures::matched::author(root, &args[1..]);
@@ -1054,6 +1066,7 @@ fn prepare_check(part: Option<Part>) -> Task {
             &["prepare-ffmpeg"],
             &["prepare-ffmpeg", "--profile", "formats"],
             &["prepare-ffmpeg", "--profile", "transport-dts"],
+            &["prepare-ffmpeg", "--profile", "transport-mpeg-video"],
             &["prepare-mpg123"],
             &["prepare-ffmpeg", "--profile", "video"],
             &["fixtures"],
