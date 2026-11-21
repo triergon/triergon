@@ -54,7 +54,7 @@ The [session queue workloads](../harness/session-queues/README.md) cover five re
 | Matroska startup and seek | Startup and seek with lazy scan replay, including matching HEVC parameter sets in CodecPrivate and in-band | 45 cases, 1,350 packets | 0.9104 (45/45 pass, worst `seek-hevc-seek-no-cues-0-fresh`) at `ce55904b` | heap ≤0.4037, total RSS ≤0.6818 (45/45 lower), on `playback-matroska-worker`, at `ce55904b` | FATE mapping |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10/10 packet folds (`matroska-audio-clocks`) | 0.8582 (10/10 pass, worst `two-laced-before-first-known-pts`) at `ce55904b` | heap ≤0.8103, total RSS ≤0.8164 (10/10 lower), on `playback-matroska-worker`, at `ce55904b` | audio seek and FATE coverage |
 | ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, neutral `ContainerReader` over seekable sources, shared buffered cursor for transport traces, QuickTime compatibility including legacy data handlers and dependency flags in recovery mode, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 and Dolby Vision sample entry identification | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies); the neutral `Reader` against the formats `ffprobe` (`cargo xtask codecs isobmff-reader`): 648 cases, 522 inputs read through and 126 seeks, 333 identical, 3 refused by both, 312 differing only by 17 reviewed dispositions, 12 of them FFmpeg behaviours and 5 the reader's own documented refusals of inputs that break ISO/IEC 14496-12 ([rules](../harness/features/isobmff-reader/rules.json), [frozen differences](../harness/features/isobmff-reader/differences.json)) | 0.7978 (956/956 timed operations pass) | heap ≤0.2841, total RSS ≤0.7415 (956/956 lower) | neutral reader: FATE mov/mp4 coverage beyond one sample, codec metadata not compared; seeks and range plans in their own row |
-| ISO BMFF seek and range plans | Backward seek on one track after open or after reading to the end, a bounded read after it; recovery-aware source range plans read from their decode start | 476 cases (`isobmff-seek`): 378 seeks with byte-identical traces, 94 range plans with the same source packets, 4 matching refusals, over 8 authored movies of up to 1,800 samples per track and 36 open and index inputs | 0.9062 (472/472 pass) | heap ≤0.9032, total RSS ≤0.7541 (472/472 lower) | seeks the compatibility seek refuses (unequal clocks, overlapping or null index clocks) and those that differ from FFmpeg on 47 open and index inputs (decode times below the presentation start, trimmed edits); range plans on multi-track inputs or where movie-time planning selects other samples |
+| ISO BMFF seek and range plans | Backward seek on one track after open or after reading to the end, a bounded read after it; recovery-aware source range plans read from their decode start | 476 cases (`isobmff-seek`): 378 seeks with byte-identical traces, 94 range plans with the same source packets, 4 matching refusals, over 8 authored movies of up to 1,800 samples per track and 36 open and index inputs | 0.9136 (472/472 pass) at `f8661cb0` | heap ≤0.9032, total RSS ≤0.7444 (472/472 lower) at `f8661cb0` | seeks the compatibility seek refuses (unequal clocks, overlapping or null index clocks) and those that differ from FFmpeg on 47 open and index inputs (decode times below the presentation start, trimmed edits); range plans on multi-track inputs or where movie-time planning selects other samples |
 | MP4 range playback | Regular AVC/AAC and AVC/Opus startup and backward seek, including regular AVC with an initial non-sync prefix or a leading empty edit, fragmented AVC/AAC with open-ended edits, timed text and DVD subpictures including a leading empty subpicture edit, dedicated HEVC and AV1 sample entries, source-declared Opus seek preroll, QuickTime AAC with fixed and program configurations, including regular version-2 descriptions and fragmented version-1 descriptions, and media playback in the presence of RTP hint tracks | 64 matching open and backward-seek comparisons (`mp4-range`), 9,229 packets on AArch64 Linux | 0.9162 (64/64 pass) at `ce55904b` | heap ≤0.8877, total RSS ≤0.8193 (64/64 lower) at `ce55904b` | Additional range playback profiles |
 | AAC in MOV | Raw AAC-LC access units with 1024 samples per plane and all thirteen indexed rates. Supports fixed configurations 1–7, 11, 12 and 14 and out-of-band programs assigning up to eight distinct speaker positions. | The [configured decoder comparison](../harness/features/aac-access-units/contract.json) covers 34 clips, 3,544 access units and 15,575,040 PCM samples. Two fixed-layout QuickTime clips compare the surround pair in the same plane positions with side or back labels. Every other clip compares exact speaker order. | 0.8695 (34/34 pass) at `414b4cb5` | heap ≤0.6721, total RSS ≤0.4513 (34/34 lower, kernel-bound) at `414b4cb5` | 960-sample frames and SBR in raw access units |
 | Ogg | Pages with CRC and resync, multiplexed and chained streams, Vorbis, Opus, FLAC, Theora and Speex mappings with canonical configurations, granule timing (Theora split granules, keyframe random access), pre-skip and end trims, bisection seeking across chain links (Theora to the keyframe) | Packets against the pinned `ffprobe` (`cargo xtask codecs readers`, gate item `ogg-readers`, at `4d31df88` on both targets) on 45 files (21 FATE Vorbis, 3 FATE Theora, 3 FATE chained, 13 generated Opus, Vorbis and FLAC, 5 generated Speex: multiplexed, chained, damaged, truncated, with Skeleton), in two views: `compat::clock` 40/45 pass, 5 differ only by reviewed FFmpeg behaviours; the reader's own timing 10/45 pass, 31 differ only where `compat::clock` reproduces FFmpeg, 4 by reviewed behaviours; and 26 seeks (each link of chained files, each track of multiplexed ones, both policies): `compat::clock` 11/26 pass, 15 differ only by FFmpeg seeking within one link of a chained file ([reader rules](../harness/codecs/reader-rules.json), [seek cases](../harness/codecs/reader-seeks.json), [frozen differences](../harness/codecs/reader-differences.json)) | within the codec workloads | within the codec workloads | `b_vorbis.ogg`, `chain_vorbis.ogg`: a negative last duration FFmpeg prints modulo 2^32; `crc_bad.opus`: the first packet after a page that fails its CRC, which FFmpeg times from its own page and `compat::clock` from the stream start; `bear.ogv`: leading Vorbis pages stating granule position 0, which FFmpeg times from the next page; `chain_speex.spx`: a chained link reusing its predecessor's serial, which FFmpeg reads as the same stream; chained seeks: FFmpeg delivers one link only; VP8, Daala and Kate in Ogg untimed |
@@ -306,7 +306,9 @@ there is `chapters-depth`, at 0.9777 and 0.9092. A partial run of subtitle text 
 `f13dcaf3`, which converts single-byte charsets in runs and stages mov_text event prefixes in
 64 bytes, puts `charset-windows-1251-text` at 0.5442 on Linux AArch64 and
 `mov-text-tags-ranges` at 0.8471 on ARMv7; the item's highest case there is
-`mov-text-tags-ranges` on both targets, at 0.7966 and 0.8471.
+`mov-text-tags-ranges` on both targets, at 0.7966 and 0.8471. The partial run of ISO BMFF seek
+at `f8661cb0` described below puts `origin18-nonzero-anchor-second-absent-t1-mid-seek-tiny` at
+0.9258 and no case of that item at or above 1.0 on either target.
 
 The previous ceiling, 1.10, was set on one more full sharded gate run per target
 at `1c64b775`, measured as the `a73350ca` run was, with set `codec-derived-streams` unpacked
@@ -441,6 +443,41 @@ runtime upper bounds of 0.7256 and 0.6435 (medians 0.7123 and 0.6352), and the h
 bound is 0.7775 there and 0.7806 on Linux AArch64. Heap and kernel-bound total RSS are lower
 than the reference in every case except ARMv7 packet framing, whose total RSS stays open at
 1.0800. The PGS run fill archives hold the per-case results and build identities.
+
+At `f8661cb0`, a global ISO BMFF seek keeps the seek of the track at hand boxed and takes its
+landing and packet state out of it in place, and a track seek that finds a better sync entry
+refreshes the packet state it keeps there in place, so no seek moves its several kilobytes
+of state whole; checked range seeks refresh their best checkpoint the same way. The box scan
+checks its input binding and sticky failure once per event instead of on every poll, which
+with one-byte windows is once per byte. On ARMv7 the seven tiny-schedule seek cases that were
+above 1.0 at `546045db` run 7.4 to 7.9% fewer user-mode instructions and about 8% fewer
+cycles per seek (`order27-MIN-next-scale1000-cat12` 208k cycles against the reference's 224k,
+`origin18` 129k against 140k). Over every case of the ISO BMFF worker's open and index set
+it runs 0.954 of main's instructions in sum on ARMv7 and 0.948 on Linux AArch64, and over its
+seeks 0.991 and 0.992. Cases with 64 KiB windows run up to 0.8% more instructions, where
+`BudgetVec::freeze` and `BoxView::new` are no longer inlined into the box scan. MP4 forward and
+MP4 range playback, which link the same code, run 0.996 to 0.9996 of main's instructions in sum
+on both targets; the two `fate-shorter-track` cases were not counted. Traces are byte-identical
+on all 476 seek and all 1020 open and index comparisons. One partial gate run of the item per
+target on one c6g.4xlarge passed both steps: on ARMv7 the seven cases have runtime upper bounds
+of 0.9258 to 0.9310 (medians 0.9157 to 0.9208; 1.0029 to 1.0221 at `546045db`), and the highest
+bound of the item is 0.9546 there (`fragmented-two-gops-t1-start-eof-seek-ordinary`, 0.9543 at
+`546045db`) and 0.9136 on Linux AArch64, where the seven run at 0.7569 to 0.7723. Heap and
+kernel-bound total RSS stay lower than the reference in every case. Sets
+`gate-run-TARGET-f8661cb0-*-shard-1` hold the runs.
+
+The playback worker links the same seek code, and its trained orders named the function the
+change replaces. Linked by the stale order on ARMv7, its start-up resident set grew by 64 to
+88 KiB, and `progressive-pending-reverse-ranges` peaked one 64 KiB window higher (median
+2,084 to 2,174 KiB of kernel-bound resident memory over 8 pairs). Both playback orders are
+retrained at `e1ad28b3`, on main's start-up through C's `main`, and `cargo xtask link-order
+check` passes on both targets there. One partial gate run of MP4 forward and MP4 range on
+ARMv7 at `e1ad28b3`, on one c6g.4xlarge, passed every step: the highest runtime upper bounds
+are 0.9045 (`progressive-ten-sequential-batches`) and 0.9763 (`fragmented-before-sync`),
+and the highest total RSS bounds 0.8926 and 0.8844. On Linux AArch64 the playback worker at
+`e1ad28b3` runs 0.9993 of main's instructions in sum over MP4 forward and 0.9967 over MP4
+range (main at `e61dd1db`). Set `gate-run-armv7-e1ad28b3-20261121-024034-shard-1` holds the
+run.
 
 The Matroska / WebM and subtitle rows, earlier capture comparisons and ARMv7 workspace
 tests at `f8e1c4d9` come from one partial gate run per target of 33 items: the
@@ -1248,6 +1285,9 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | PES list and unit reuse, 32-bit ARMv7, shard 6 of 8 | `31d2994522f116b4404916cb51f82b03a29c158f` | [`df45e5dec57be8214116c988d726215f8269af6d0a921e75a47a53bca8203f9b`](../harness/evidence/sets/gate-run-armv7-31d29945-20261119-061148-shard-6.json) |
 | PES list and unit reuse, 32-bit ARMv7, shard 7 of 8 | `31d2994522f116b4404916cb51f82b03a29c158f` | [`1aa5e28305f4991a29de7745afacd7cbedb33cc2b749f95e62f9c011d60ce7f5`](../harness/evidence/sets/gate-run-armv7-31d29945-20261119-061148-shard-7.json) |
 | PES list and unit reuse, 32-bit ARMv7, shard 8 of 8 | `31d2994522f116b4404916cb51f82b03a29c158f` | [`25231e5c43054ebc0585162903f9d564e182b83dbda7240c41758104aadfce60`](../harness/evidence/sets/gate-run-armv7-31d29945-20261119-061148-shard-8.json) |
+| ISO BMFF seek state moves, 32-bit ARMv7: MP4 forward and range with the retrained playback order | `e1ad28b333349c79231cba3567c4612c2454fae7` | [`131d824d5b9f1b5ca059618c959a296abdbadb56db47de20ece75a43d582af56`](../harness/evidence/sets/gate-run-armv7-e1ad28b3-20261121-024034-shard-1.json) |
+| ISO BMFF seek state moves, Linux AArch64: ISO BMFF seeks and range plans | `f8661cb08b7a67b6f52aedbd15d3237c0ba85ede` | [`5aa8f78be5d925e31c2c5a16f67556145c764720fca289695fd5479868a5051e`](../harness/evidence/sets/gate-run-aarch64-f8661cb0-20261121-001945-shard-1.json) |
+| ISO BMFF seek state moves, 32-bit ARMv7: ISO BMFF seeks and range plans | `f8661cb08b7a67b6f52aedbd15d3237c0ba85ede` | [`ea54c25233dcefe4200057f6f2bf12ce2b9cb9c08abfe1851bc3dfb5b7533c5f`](../harness/evidence/sets/gate-run-armv7-f8661cb0-20261121-001842-shard-1.json) |
 | PGS run fills, Linux AArch64, shard 1 of 8 | `546045db0473d0e39d70f67ec0e247e21e18e68b` | [`829049b804ee25b9da4231683749fe8a838e705c21223ed4d52a0e0646d783aa`](../harness/evidence/sets/gate-run-aarch64-546045db-20261119-143720-shard-1.json) |
 | PGS run fills, Linux AArch64, shard 2 of 8 | `546045db0473d0e39d70f67ec0e247e21e18e68b` | [`079bee7b498f36331dfc2a2e8a457e5e7ba97ee4e9e24ba66a7cc46112f70512`](../harness/evidence/sets/gate-run-aarch64-546045db-20261119-143720-shard-2.json) |
 | PGS run fills, Linux AArch64, shard 3 of 8 | `546045db0473d0e39d70f67ec0e247e21e18e68b` | [`3e25d4bf6b5d1334bbf150a32a52326d2f6154b29f9bac6167997ae97b49798e`](../harness/evidence/sets/gate-run-aarch64-546045db-20261119-143720-shard-3.json) |
@@ -1891,7 +1931,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | Matroska startup and seek | 45/45 | 0.8406 (45/45 pass, worst `seek-hevc-seek-no-cues-0-fresh`) at `ce55904b` | heap ≤0.3956, total RSS ≤0.7831 (45/45 lower), on `playback-matroska-worker`, at `ce55904b` |
 | HLS segments | 71/71 | 0.5694 (71/71 pass) at `ce55904b` | heap ≤0.0196, total RSS ≤0.8036 (71/71 lower) at `ce55904b` |
 | ISO BMFF / MP4 | 1,020/1,020 open and index comparisons (972 matching outputs, 48 matching refusals); the neutral reader's 648 comparison cases, as on AArch64 | 0.9747 (956/956 timed operations pass) | heap ≤0.2467, total RSS ≤0.8605 (956/956 lower) |
-| ISO BMFF seek and range plans | 476/476 (378 seeks, 94 range plans, 4 refusals) | 1.0222 (472/472 pass) | heap ≤0.8541, total RSS ≤0.8704 (472/472 lower) |
+| ISO BMFF seek and range plans | 476/476 (378 seeks, 94 range plans, 4 refusals) | 0.9546 (472/472 pass) at `f8661cb0` | heap ≤0.8541, total RSS ≤0.8455 (472/472 lower) at `f8661cb0` |
 | AAC in MOV | the configured decoder comparison: 34 clips, 3,544 access units | 1.0074 (34/34 pass) at `414b4cb5` | heap ≤0.6756, total RSS ≤0.5230 (34/34 lower, kernel-bound) at `414b4cb5` |
 | Packet framing | 135/135 AVC/HEVC reference comparisons. [DTS header instruction counts](#dts-core-header-inspection) at `7c730ff8`. | 0.9122 (135/135 pass) at `5ee3eba8` | heap ≤0.2633, total RSS ≤0.9789 (135/135 lower) at `5ee3eba8` |
 | Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the audio correctness check `codecs-audio` at `4b87991e`, as on AArch64: AAC 39/39, AC-3 6/6, E-AC-3 6/6, DTS core 22/22, and `xll_51_24_48_none` out of set (no core substream); the six video timing workloads decode to FFmpeg's digests | 20/20 pass at `d1526aa0`: the six video workloads 0.6032 to 0.9837 (`h264-high-1080p` 0.9837), the fourteen audio workloads 0.7375 to 0.9692 (worst `eac3-stereo-spx`; `eac3-7.1` 0.9644, `aac-hev2-stereo` 0.9396) | heap ≤0.9434, total RSS ≤0.8411 (20/20 lower) at `d1526aa0` |
@@ -1903,8 +1943,8 @@ gated as on AArch64, and no codec workload is open on this target.
 | MPEG-TS DTS core | 4/4 packet folds (`mpegts-dts-core`) | 0.4951 (4/4 pass) at `861201e3` | heap ≤0.0849, total RSS ≤0.9060 (4/4 lower) at `861201e3` |
 | MPEG-TS free-format audio | 8/8 frame folds (`mpegts-free-audio`) | 0.8843 (8/8 pass) at `861201e3` | heap ≤0.0800, total RSS ≤0.7408 (8/8 lower) at `861201e3`
 | MPEG-TS previous picture | 4/4 landing, discard and packet folds (`mpegts-previous-picture`) | 0.4731 (4/4 pass) at `861201e3` | heap ≤0.4896, total RSS ≤0.7877 (4/4 lower) at `861201e3`
-| Playback: MP4 forward | 46/46 packet folds (`mp4-forward`) | 0.9055 (51/51 pass, worst `progressive-ten-sequential-batches`) at `ce55904b` | heap ≤0.5920, total RSS ≤0.9671 (51/51 lower) at `ce55904b` |
-| Playback: MP4 range | 51/51 open and backward-seek comparisons (`mp4-range`) | 0.9942 (64/64 pass) at `ce55904b` | heap ≤0.7849, total RSS ≤0.9197 (64/64 lower) at `ce55904b` |
+| Playback: MP4 forward | 46/46 packet folds (`mp4-forward`) | 0.9045 (51/51 pass, worst `progressive-ten-sequential-batches`) at `e1ad28b3` | heap ≤0.5920, total RSS ≤0.8926 (51/51 lower) at `e1ad28b3` |
+| Playback: MP4 range | 51/51 open and backward-seek comparisons (`mp4-range`) | 0.9763 (64/64 pass, worst `fragmented-before-sync`) at `e1ad28b3` | heap ≤0.7849, total RSS ≤0.8844 (64/64 lower) at `e1ad28b3` |
 | Playback: TS program | 35/35 packet folds (`ts-program`) | 0.7645 (35/35 pass) at `ce55904b` | heap ≤0.1179, total RSS ≤0.8723 (35/35 lower) at `ce55904b` |
 | MPEG-TS progressive playback | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 0.7374 (3/3 pass) at `ce55904b` | heap ≤0.0154, total RSS ≤0.6934 (3/3 lower) at `ce55904b` |
 | Playback: raw Annex B | 7/7 packet folds (`raw-annex-b`) | 0.7526 (7/7 pass) at `ce55904b` | heap ≤0.1265, total RSS ≤0.7967 (7/7 lower) at `ce55904b` |
