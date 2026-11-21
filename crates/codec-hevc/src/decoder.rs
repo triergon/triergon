@@ -9,7 +9,7 @@ use std::sync::Arc;
 use crate::ctu::{RefEntry, RefLists, Scratch, SliceDecoder};
 use crate::error::{DecodeError, Result};
 use crate::nal::{self, NalHeader};
-use crate::output::{ColourDescription, OutInfo, Picture};
+use crate::output::{OutInfo, Picture};
 use crate::picture::{AnyFrame, ColMotion, ColMv, Frame, FramePool, Pixel, SharedFrame};
 use crate::ps::{self, Layout, Pps, Shared, Sps};
 use crate::slice::{self, SLICE_B, SLICE_I, SliceHeader};
@@ -355,7 +355,6 @@ impl Context {
         let Some(cur) = self.cur.as_mut() else {
             return Ok(());
         };
-        // Reference picture lists (8.3.4) and SliceInfo.
         let mut info = SliceInfo {
             beta_offset_div2: sh.beta_offset_div2,
             tc_offset_div2: sh.tc_offset_div2,
@@ -363,51 +362,8 @@ impl Context {
             ref_poc: [[i32::MIN; 16]; 2],
             ref_lt: [[false; 16]; 2],
         };
-        let mut lists: [[Option<usize>; 16]; 2] = [[None; 16]; 2];
         let dpb: Vec<View<'_, DpbPic>> = self.dpb.entries().collect();
-        if sh.slice_type != SLICE_I {
-            let mut temp: Vec<(usize, bool)> = Vec::with_capacity(32);
-            let total = cur.st_before.len() + cur.st_after.len() + cur.lt_curr.len();
-            if total == 0 {
-                return Err(DecodeError::InvalidData("no reference pictures"));
-            }
-            for l in 0..(if sh.slice_type == SLICE_B { 2 } else { 1 }) {
-                temp.clear();
-                let n = (sh.num_ref_idx[l] as usize).max(total);
-                while temp.len() < n {
-                    let (a, b) = if l == 0 {
-                        (&cur.st_before, &cur.st_after)
-                    } else {
-                        (&cur.st_after, &cur.st_before)
-                    };
-                    for &i in a {
-                        if temp.len() < n {
-                            temp.push((i, false));
-                        }
-                    }
-                    for &i in b {
-                        if temp.len() < n {
-                            temp.push((i, false));
-                        }
-                    }
-                    for &i in &cur.lt_curr {
-                        if temp.len() < n {
-                            temp.push((i, true));
-                        }
-                    }
-                }
-                for r in 0..sh.num_ref_idx[l] as usize {
-                    let e = if sh.rpl_mod[l] {
-                        temp[sh.list_entry[l][r] as usize]
-                    } else {
-                        temp[r]
-                    };
-                    lists[l][r] = Some(e.0);
-                    info.ref_poc[l][r] = dpb[e.0].poc();
-                    info.ref_lt[l][r] = e.1;
-                }
-            }
-        }
+        let lists = ref_pic_lists(cur, &sh, &dpb, &mut info)?;
         // A slice counts once its state is recorded, so a refused slice leaves nothing,
         // neither an index nor a header, that later slices of the picture could reach.
         let slice_idx = u16::try_from(self.st.slices.len())
@@ -452,6 +408,9 @@ impl Context {
         }
     }
 
+    /// Starts the picture whose first slice segment header is `sh`: its order count,
+    /// reference marking, the output the buffer owes before it, its storage and its
+    /// references. On an error nothing of the decoder's POC and IRAP state has changed.
     fn start_picture(
         &mut self,
         sh: &SliceHeader,
@@ -479,137 +438,18 @@ impl Context {
                 l
             }
         };
-        // POC (8.3.1)
+        let poc = self.picture_order_count(&sps, sh, irap);
         let max_lsb = 1i32 << sps.log2_max_poc_lsb;
-        let lsb = sh.poc_lsb as i32;
-        let poc_msb = if irap && self.no_rasl_output {
-            0
-        } else {
-            let prev_lsb = self.prev_tid0_poc & (max_lsb - 1);
-            let prev_msb = self.prev_tid0_poc - prev_lsb;
-            if lsb < prev_lsb && prev_lsb - lsb >= max_lsb / 2 {
-                prev_msb + max_lsb
-            } else if lsb > prev_lsb && lsb - prev_lsb > max_lsb / 2 {
-                prev_msb - max_lsb
-            } else {
-                prev_msb
-            }
-        };
-        let poc = poc_msb + lsb;
-        // RPS (8.3.2)
         if irap && self.no_rasl_output {
             self.dpb.mark_unused();
         }
-        let mut st_before_poc = Vec::new();
-        let mut st_after_poc = Vec::new();
-        let mut st_foll_poc = Vec::new();
-        let mut lt_curr_poc: Vec<(i32, bool)> = Vec::new();
-        let mut lt_foll_poc: Vec<(i32, bool)> = Vec::new();
-        if !hevc::is_idr(t) {
-            let rps = &sh.st_rps;
-            for i in 0..rps.num_negative as usize {
-                let (d, u) = rps.s0(i);
-                if u {
-                    st_before_poc.push(poc + d);
-                } else {
-                    st_foll_poc.push(poc + d);
-                }
-            }
-            for i in 0..rps.num_positive as usize {
-                let (d, u) = rps.s1(i);
-                if u {
-                    st_after_poc.push(poc + d);
-                } else {
-                    st_foll_poc.push(poc + d);
-                }
-            }
-            for lt in sh.long_term() {
-                let mut p = lt.poc_lsb as i32;
-                if lt.msb_present {
-                    p += poc
-                        - (lt.delta_poc_msb_cycle as i32).wrapping_mul(max_lsb)
-                        - (poc & (max_lsb - 1));
-                }
-                if lt.used_by_curr {
-                    lt_curr_poc.push((p, lt.msb_present));
-                } else {
-                    lt_foll_poc.push((p, lt.msb_present));
-                }
-            }
-        }
-        let mut keep = vec![false; self.dpb.len()];
-        // A long-term entry names a reference picture by its order count or its LSBs.
-        let lt_poc = |d: &View<'_, DpbPic>, p: i32, msb: bool| {
-            if msb {
-                d.poc() == p
-            } else {
-                (d.poc() & (max_lsb - 1)) == p
-            }
+        let rps = if hevc::is_idr(t) {
+            Rps::default()
+        } else {
+            Rps::new(sh, poc, max_lsb)
         };
-        let find_lt = |dpb: &DecodedPictures<DpbPic>, p: i32, msb: bool| {
-            position(dpb, |d| d.is_reference() && lt_poc(d, p, msb))
-        };
-        let lt_curr_idx: Vec<Option<usize>> = lt_curr_poc
-            .iter()
-            .map(|&(p, m)| find_lt(&self.dpb, p, m))
-            .collect();
-        let lt_foll_idx: Vec<Option<usize>> = lt_foll_poc
-            .iter()
-            .map(|&(p, m)| find_lt(&self.dpb, p, m))
-            .collect();
-        for &i in lt_curr_idx.iter().chain(lt_foll_idx.iter()).flatten() {
-            keep[i] = true;
-        }
-        for (keep, mut d) in keep.iter().zip(self.dpb.entries_mut()) {
-            if *keep {
-                d.set_marking(None, Marking::LongTerm);
-            }
-        }
-        let find_st = |dpb: &DecodedPictures<DpbPic>, p: i32| {
-            position(dpb, |d| {
-                d.marking(Parity::Top) == Marking::ShortTerm && d.poc() == p
-            })
-        };
-        let st_before_idx: Vec<Option<usize>> = st_before_poc
-            .iter()
-            .map(|&p| find_st(&self.dpb, p))
-            .collect();
-        let st_after_idx: Vec<Option<usize>> = st_after_poc
-            .iter()
-            .map(|&p| find_st(&self.dpb, p))
-            .collect();
-        let st_foll_idx: Vec<Option<usize>> =
-            st_foll_poc.iter().map(|&p| find_st(&self.dpb, p)).collect();
-        for &i in st_before_idx
-            .iter()
-            .chain(st_after_idx.iter())
-            .chain(st_foll_idx.iter())
-            .flatten()
-        {
-            keep[i] = true;
-        }
-        for (keep, mut d) in keep.iter().zip(self.dpb.entries_mut()) {
-            if !*keep {
-                d.set_marking(None, Marking::Unused);
-            }
-        }
-        // Picture output info.
-        let vui = &sps.vui;
-        let info = Arc::new(OutInfo {
-            crop: sps.conf_win,
-            width: sps.width,
-            height: sps.height,
-            bit_depth: sps.bit_depth_luma,
-            sar: vui.sar,
-            colour: ColourDescription {
-                primaries: vui.colour_primaries,
-                transfer: vui.transfer_characteristics,
-                matrix: vui.matrix_coeffs,
-                full_range: vui.full_range,
-                video_signal_type_present: vui.video_signal_type_present,
-                colour_description_present: vui.colour_description_present,
-            },
-        });
+        let found = self.mark_references(&rps, max_lsb);
+        let info = Arc::new(OutInfo::new(&sps));
         // C.5.2.2 output and removal of pictures before decoding the current picture.
         self.dpb.hevc_remove(
             HevcPicture {
@@ -625,63 +465,13 @@ impl Context {
         // can (into the frame pool), and before the missing references and the POC state:
         // the buffer's room for the references generated below and the picture first.
         self.dpb
-            .try_reserve(st_before_poc.len() + st_after_poc.len() + lt_curr_poc.len() + 1)?;
+            .try_reserve(rps.st_before.len() + rps.st_after.len() + rps.lt_curr.len() + 1)?;
+        let frame = self.take_frame(&sps)?;
         let (w, hgt) = (sps.width as usize, sps.height as usize);
-        let frame = if sps.high_bit_depth() {
-            AnyFrame::U16(match self.pool.take(w, hgt) {
-                Some(f) => f,
-                None => Frame::try_new(&self.budget, w, hgt, 0)?,
-            })
-        } else {
-            AnyFrame::U8(match self.pool.take(w, hgt) {
-                Some(f) => f,
-                None => Frame::try_new(&self.budget, w, hgt, 0)?,
-            })
-        };
-        let ctb = sps.ctb_size as usize;
-        match &frame {
-            AnyFrame::U8(_) => prepare_band(&mut self.scratch8, w, ctb, &self.budget)?,
-            AnyFrame::U16(_) => prepare_band(&mut self.scratch16, w, ctb, &self.budget)?,
-        }
         let col = ColMotion::try_new(&self.budget, w, hgt)?;
         self.st
             .reset(w, hgt, sps.pic_size_ctb() as usize, sps.pic_h_ctb as usize)?;
-        // The indices computed above are invalid if the DPB changed; recompute by POC.
-        let resolve = |dpb: &DecodedPictures<DpbPic>, p: i32| {
-            position(dpb, |d| d.is_reference() && d.poc() == p)
-        };
-        let mut st_before = Vec::new();
-        let mut st_after = Vec::new();
-        let mut lt_curr = Vec::new();
-        // Generate missing references (8.3.3-style, also used for lost pictures).
-        for (k, &p) in st_before_poc.iter().enumerate() {
-            let i = match resolve(&self.dpb, p) {
-                Some(i) if st_before_idx[k].is_some() => i,
-                _ => self.generate_missing(&sps, p, Marking::ShortTerm, info.clone())?,
-            };
-            st_before.push(i);
-        }
-        for (k, &p) in st_after_poc.iter().enumerate() {
-            let i = match resolve(&self.dpb, p) {
-                Some(i) if st_after_idx[k].is_some() => i,
-                _ => self.generate_missing(&sps, p, Marking::ShortTerm, info.clone())?,
-            };
-            st_after.push(i);
-        }
-        for (k, &(p, msb)) in lt_curr_poc.iter().enumerate() {
-            let found = if lt_curr_idx[k].is_some() {
-                position(&self.dpb, |d| {
-                    d.marking(Parity::Top) == Marking::LongTerm && lt_poc(d, p, msb)
-                })
-            } else {
-                None
-            };
-            let i = match found {
-                Some(i) => i,
-                None => self.generate_missing(&sps, p, Marking::LongTerm, info.clone())?,
-            };
-            lt_curr.push(i);
-        }
+        let [st_before, st_after, lt_curr] = self.current_references(&sps, &rps, &found, &info)?;
         // Commit the POC and IRAP state.
         if h.temporal_id == 0
             && !hevc::is_rasl(t)
@@ -708,6 +498,146 @@ impl Context {
             col,
         });
         Ok(())
+    }
+
+    /// PicOrderCntVal of a picture starting with `sh` (8.3.1).
+    fn picture_order_count(&self, sps: &Sps, sh: &SliceHeader, irap: bool) -> i32 {
+        let max_lsb = 1i32 << sps.log2_max_poc_lsb;
+        let lsb = sh.poc_lsb as i32;
+        let poc_msb = if irap && self.no_rasl_output {
+            0
+        } else {
+            let prev_lsb = self.prev_tid0_poc & (max_lsb - 1);
+            let prev_msb = self.prev_tid0_poc - prev_lsb;
+            if lsb < prev_lsb && prev_lsb - lsb >= max_lsb / 2 {
+                prev_msb + max_lsb
+            } else if lsb > prev_lsb && lsb - prev_lsb > max_lsb / 2 {
+                prev_msb - max_lsb
+            } else {
+                prev_msb
+            }
+        };
+        poc_msb + lsb
+    }
+
+    /// Marks the stored pictures the reference picture set names as long-term or keeps
+    /// them short-term, and every other one unused for reference (8.3.2). Returns which
+    /// entries of `rps.st_before`, `rps.st_after` and `rps.lt_curr` were found.
+    fn mark_references(&mut self, rps: &Rps, max_lsb: i32) -> [Vec<bool>; 3] {
+        let mut keep = vec![false; self.dpb.len()];
+        let find_lt = |dpb: &DecodedPictures<DpbPic>, &(p, msb): &(i32, bool)| {
+            position(dpb, |d| {
+                d.is_reference() && names_long_term(d, p, msb, max_lsb)
+            })
+        };
+        let lt_curr: Vec<Option<usize>> =
+            rps.lt_curr.iter().map(|e| find_lt(&self.dpb, e)).collect();
+        let lt_foll: Vec<Option<usize>> =
+            rps.lt_foll.iter().map(|e| find_lt(&self.dpb, e)).collect();
+        for &i in lt_curr.iter().chain(&lt_foll).flatten() {
+            keep[i] = true;
+        }
+        for (keep, mut d) in keep.iter().zip(self.dpb.entries_mut()) {
+            if *keep {
+                d.set_marking(None, Marking::LongTerm);
+            }
+        }
+        let find_st = |dpb: &DecodedPictures<DpbPic>, &p: &i32| {
+            position(dpb, |d| {
+                d.marking(Parity::Top) == Marking::ShortTerm && d.poc() == p
+            })
+        };
+        let st_before: Vec<Option<usize>> = rps
+            .st_before
+            .iter()
+            .map(|p| find_st(&self.dpb, p))
+            .collect();
+        let st_after: Vec<Option<usize>> =
+            rps.st_after.iter().map(|p| find_st(&self.dpb, p)).collect();
+        let st_foll: Vec<Option<usize>> =
+            rps.st_foll.iter().map(|p| find_st(&self.dpb, p)).collect();
+        for &i in st_before.iter().chain(&st_after).chain(&st_foll).flatten() {
+            keep[i] = true;
+        }
+        for (keep, mut d) in keep.iter().zip(self.dpb.entries_mut()) {
+            if !*keep {
+                d.set_marking(None, Marking::Unused);
+            }
+        }
+        let found = |v: Vec<Option<usize>>| v.iter().map(Option::is_some).collect();
+        [found(st_before), found(st_after), found(lt_curr)]
+    }
+
+    /// A frame for the current picture, from the pool or newly charged, with the SAO band
+    /// buffer of its sample type sized for it.
+    fn take_frame(&mut self, sps: &Sps) -> Result<AnyFrame> {
+        let (w, h) = (sps.width as usize, sps.height as usize);
+        let ctb = sps.ctb_size as usize;
+        Ok(if sps.high_bit_depth() {
+            let frame = match self.pool.take(w, h) {
+                Some(f) => f,
+                None => Frame::try_new(&self.budget, w, h, 0)?,
+            };
+            prepare_band(&mut self.scratch16, w, ctb, &self.budget)?;
+            AnyFrame::U16(frame)
+        } else {
+            let frame = match self.pool.take(w, h) {
+                Some(f) => f,
+                None => Frame::try_new(&self.budget, w, h, 0)?,
+            };
+            prepare_band(&mut self.scratch8, w, ctb, &self.budget)?;
+            AnyFrame::U8(frame)
+        })
+    }
+
+    /// The buffer positions of RefPicSetStCurrBefore, StCurrAfter and LtCurr. A reference
+    /// `mark_references` did not find, or that is no longer stored, is generated (8.3.3,
+    /// also for lost pictures).
+    fn current_references(
+        &mut self,
+        sps: &Sps,
+        rps: &Rps,
+        [st_before_found, st_after_found, lt_curr_found]: &[Vec<bool>; 3],
+        info: &Arc<OutInfo>,
+    ) -> Result<[Vec<usize>; 3]> {
+        let max_lsb = 1i32 << sps.log2_max_poc_lsb;
+        // Positions found before the picture was charged may have moved; look up again.
+        let resolve = |dpb: &DecodedPictures<DpbPic>, p: i32| {
+            position(dpb, |d| d.is_reference() && d.poc() == p)
+        };
+        let mut st_before = Vec::new();
+        let mut st_after = Vec::new();
+        let mut lt_curr = Vec::new();
+        for (&p, &found) in rps.st_before.iter().zip(st_before_found) {
+            let i = match resolve(&self.dpb, p) {
+                Some(i) if found => i,
+                _ => self.generate_missing(sps, p, Marking::ShortTerm, info.clone())?,
+            };
+            st_before.push(i);
+        }
+        for (&p, &found) in rps.st_after.iter().zip(st_after_found) {
+            let i = match resolve(&self.dpb, p) {
+                Some(i) if found => i,
+                _ => self.generate_missing(sps, p, Marking::ShortTerm, info.clone())?,
+            };
+            st_after.push(i);
+        }
+        for (&(p, msb), &found) in rps.lt_curr.iter().zip(lt_curr_found) {
+            let stored = if found {
+                position(&self.dpb, |d| {
+                    d.marking(Parity::Top) == Marking::LongTerm
+                        && names_long_term(d, p, msb, max_lsb)
+                })
+            } else {
+                None
+            };
+            let i = match stored {
+                Some(i) => i,
+                None => self.generate_missing(sps, p, Marking::LongTerm, info.clone())?,
+            };
+            lt_curr.push(i);
+        }
+        Ok([st_before, st_after, lt_curr])
     }
 
     /// Stores a generated reference picture (8.3.3), not needed for output, and returns
@@ -828,6 +758,121 @@ impl Context {
             .map_err(|refused| refused.error)?;
         Ok(())
     }
+}
+
+/// The order counts of a picture's reference picture set (8.3.2); long-term entries
+/// carry whether they name the full order count or only its LSBs.
+#[derive(Debug, Default)]
+struct Rps {
+    st_before: Vec<i32>,
+    st_after: Vec<i32>,
+    st_foll: Vec<i32>,
+    lt_curr: Vec<(i32, bool)>,
+    lt_foll: Vec<(i32, bool)>,
+}
+
+impl Rps {
+    /// The set of a non-IDR picture of order count `poc` starting with `sh`.
+    fn new(sh: &SliceHeader, poc: i32, max_lsb: i32) -> Self {
+        let mut rps = Rps::default();
+        let st = &sh.st_rps;
+        for i in 0..st.num_negative as usize {
+            let (d, used) = st.s0(i);
+            if used {
+                rps.st_before.push(poc + d);
+            } else {
+                rps.st_foll.push(poc + d);
+            }
+        }
+        for i in 0..st.num_positive as usize {
+            let (d, used) = st.s1(i);
+            if used {
+                rps.st_after.push(poc + d);
+            } else {
+                rps.st_foll.push(poc + d);
+            }
+        }
+        for lt in sh.long_term() {
+            let mut p = lt.poc_lsb as i32;
+            if lt.msb_present {
+                p += poc
+                    - (lt.delta_poc_msb_cycle as i32).wrapping_mul(max_lsb)
+                    - (poc & (max_lsb - 1));
+            }
+            if lt.used_by_curr {
+                rps.lt_curr.push((p, lt.msb_present));
+            } else {
+                rps.lt_foll.push((p, lt.msb_present));
+            }
+        }
+        rps
+    }
+}
+
+/// A long-term entry names a stored picture by its order count, or by its LSBs when the
+/// MSBs are not present.
+fn names_long_term(d: &View<'_, DpbPic>, poc: i32, msb: bool, max_lsb: i32) -> bool {
+    if msb {
+        d.poc() == poc
+    } else {
+        (d.poc() & (max_lsb - 1)) == poc
+    }
+}
+
+/// The reference picture lists of a P or B slice (8.3.4), as buffer positions, and the
+/// order counts and long-term flags of their entries in `info`.
+fn ref_pic_lists(
+    cur: &CurPic,
+    sh: &SliceHeader,
+    dpb: &[View<'_, DpbPic>],
+    info: &mut SliceInfo,
+) -> Result<[[Option<usize>; 16]; 2]> {
+    let mut lists = [[None; 16]; 2];
+    if sh.slice_type == SLICE_I {
+        return Ok(lists);
+    }
+    let total = cur.st_before.len() + cur.st_after.len() + cur.lt_curr.len();
+    if total == 0 {
+        return Err(DecodeError::InvalidData("no reference pictures"));
+    }
+    let mut temp: Vec<(usize, bool)> = Vec::with_capacity(32);
+    for l in 0..(if sh.slice_type == SLICE_B { 2 } else { 1 }) {
+        temp.clear();
+        let n = (sh.num_ref_idx[l] as usize).max(total);
+        let (a, b) = if l == 0 {
+            (&cur.st_before, &cur.st_after)
+        } else {
+            (&cur.st_after, &cur.st_before)
+        };
+        while temp.len() < n {
+            for &i in a {
+                if temp.len() < n {
+                    temp.push((i, false));
+                }
+            }
+            for &i in b {
+                if temp.len() < n {
+                    temp.push((i, false));
+                }
+            }
+            for &i in &cur.lt_curr {
+                if temp.len() < n {
+                    temp.push((i, true));
+                }
+            }
+        }
+        for r in 0..sh.num_ref_idx[l] as usize {
+            let (i, lt) = if sh.rpl_mod[l] {
+                temp[sh.list_entry[l][r] as usize]
+            } else {
+                temp[r]
+            };
+            lists[l][r] = Some(i);
+            info.ref_poc[l][r] = dpb[i].poc();
+            info.ref_lt[l][r] = lt;
+        }
+    }
+    Ok(lists)
 }
 
 /// The output limits of the highest temporal sub-layer of `sps` (C.5.2.2).

@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use crate::picture::{AnyFrame, SharedFrame};
+use crate::ps::Sps;
 use triergon_codec::{Colour, PictureView};
 
 /// Colour description from the VUI (Annex E.2.1). Code points follow Rec. ITU-T H.273;
@@ -150,6 +151,28 @@ pub(crate) struct OutInfo {
     pub(crate) bit_depth: u32,
     pub(crate) sar: (u32, u32),
     pub(crate) colour: ColourDescription,
+}
+
+impl OutInfo {
+    /// The output description of the pictures of `sps`.
+    pub(crate) fn new(sps: &Sps) -> Self {
+        let vui = &sps.vui;
+        OutInfo {
+            crop: sps.conf_win,
+            width: sps.width,
+            height: sps.height,
+            bit_depth: sps.bit_depth_luma,
+            sar: vui.sar,
+            colour: ColourDescription {
+                primaries: vui.colour_primaries,
+                transfer: vui.transfer_characteristics,
+                matrix: vui.matrix_coeffs,
+                full_range: vui.full_range,
+                video_signal_type_present: vui.video_signal_type_present,
+                colour_description_present: vui.colour_description_present,
+            },
+        }
+    }
 }
 
 impl Picture {
