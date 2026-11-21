@@ -114,6 +114,8 @@ impl Encoder {
                 width,
             })
         };
+        // One pass per macroblock: the search, the intra decision and the scene
+        // score share its blocks, and the codegen of this loop is sensitive to splits.
         for mb_y in 0..g.macroblock_height() {
             let mut row = 0.0;
             for mb_x in 0..g.macroblock_width() {

@@ -10,6 +10,7 @@ use crate::{EncodedPicture, Encoder, Result};
 use triergon_pixel::Picture;
 
 impl Encoder {
+    /// Code `input`, of the configured geometry, as the next picture into `out`.
     pub(crate) fn encode_picture(
         &mut self,
         input: &Picture,

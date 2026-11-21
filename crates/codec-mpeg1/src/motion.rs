@@ -330,7 +330,7 @@ pub(crate) fn component_bits(delta: i32, f_code: u32) -> u32 {
         return 1;
     }
     let code = (((delta.abs() - 1) >> r_size) + 1).min(16) as usize;
-    super::tables::MOTION_CODE[code].1 + 1 + r_size
+    crate::tables::MOTION_CODE[code].1 + 1 + r_size
 }
 
 /// Coarse-level inputs: decimated current and reference luma.
