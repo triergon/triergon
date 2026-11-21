@@ -18,6 +18,9 @@
 ///   overlap with the long block, so that packet starts `(long - short) / 4` late and
 ///   is as much shorter. The first packet after a page that ends a packet takes that
 ///   page's granule position, even when pages were lost between them.
+///   The first nonterminal Opus audio page starts at the later of the header
+///   anchor and its granule-derived start. This preserves an initial offset in
+///   cropped streams and after loss before the first surviving audio page.
 /// - The first Vorbis audio packet lasts as long as it states instead of completing no
 ///   samples, so the stream starts before zero.
 /// - The last page is timed forwards from its first packet; the excess over its
@@ -153,6 +156,16 @@ impl ReferenceClock {
                 self.anchor = None;
             } else if let Some(anchor) = self.anchor.take() {
                 pts = Some(anchor);
+                // The first surviving Opus page can start after the header anchor.
+                // Use its bounded granule-derived start. Once started, retain
+                // the previous page's anchor across losses.
+                if !self.started && !end_of_stream && matches!(timeline, Timeline::Opus { .. }) {
+                    pts = granule
+                        .zip(from_here[index])
+                        .and_then(|(end, rest)| end.checked_sub(rest))
+                        .map(|start| anchor.max(start))
+                        .or(pts);
+                }
                 if end_of_stream && trims {
                     self.last_page = Some((anchor, 0));
                 }

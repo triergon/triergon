@@ -78,6 +78,9 @@ point; of Theora, the intra frames. DTS equals PTS.
 
 `compat::clock::packet_timing` reports FFmpeg's clock instead (skip samples, discard
 padding and FFmpeg's Vorbis durations); its documentation lists the differences.
+For the first nonterminal Opus audio page, it uses the granule-derived start
+if later than the header anchor. This includes cropped streams and the first
+surviving page after initial audio loss.
 
 ## Seeking
 
@@ -112,9 +115,11 @@ page from the page rather than the granule position, and reports no Speex trims,
 shortening the last packet instead. `compat::clock` reproduces those, and still differs
 where FFmpeg:
 
-- prints a negative last duration modulo 2^32;
-- times the first packet after a page that fails its CRC from its own page
-  (`compat::clock` times it from the stream start);
+- prints a negative last duration modulo 2^32. For example, when the final
+  granule is 26,496 and FFmpeg places the last packet at 26,624, it reports
+  duration 4,294,967,168 and discard padding 1,152 for a 1,024-sample packet.
+  The compatibility view keeps the signed duration of -128. The native clock
+  keeps coded durations and distributes the end trim across packets;
 - times the Vorbis packets of leading pages stating granule position 0 from the next
   page's;
 - reads a chained link that reuses the previous link's serial number as the same stream,
