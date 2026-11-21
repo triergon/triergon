@@ -20,10 +20,15 @@ fn worker_main() -> std::process::ExitCode {
     std::process::ExitCode::SUCCESS
 }
 
+/// C's entry point, the one exception to the worker's `deny(unsafe_code)`
+/// (`triergon-worker-entry`).
 #[cfg(not(test))]
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
-extern "C" fn main(_argc: std::ffi::c_int, _argv: *const *const std::ffi::c_char) -> std::ffi::c_int {
+extern "C" fn main(
+    _argc: std::ffi::c_int,
+    _argv: *const *const std::ffi::c_char,
+) -> std::ffi::c_int {
     triergon_worker_entry::enter(worker_main)
 }
 ```
