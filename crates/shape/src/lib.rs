@@ -6,9 +6,9 @@
     unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr,
-    clippy::unwrap_used
+    clippy::unwrap_used,
+    clippy::expect_used
 )]
-// Pending: `clippy::expect_used`.
 
 pub mod bidi;
 mod buffer;
