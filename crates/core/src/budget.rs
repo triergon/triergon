@@ -270,19 +270,18 @@ mod token_tests {
     use super::*;
     use crate::{InputCursor, SourceCapabilities, SourceId};
 
+    fn cursor(pool: &Budget) -> InputCursor {
+        let capabilities = SourceCapabilities {
+            length: None,
+            random_access: true,
+        };
+        InputCursor::new(pool, SourceId(1), capabilities, 16).unwrap()
+    }
+
     #[test]
     fn request_tokens_do_not_retain_the_allocation_pool() {
         let pool = Budget::new(4096).unwrap();
-        let cursor = InputCursor::new(
-            &pool,
-            SourceId(1),
-            SourceCapabilities {
-                length: None,
-                random_access: true,
-            },
-            16,
-        )
-        .unwrap();
+        let cursor = cursor(&pool);
         let owners = Arc::strong_count(&pool.0);
         let first = cursor.request();
         let second = first.clone();
@@ -309,30 +308,11 @@ mod token_tests {
     fn tokens_outlive_a_dropped_pool_without_matching_replacement_pools() {
         let token = {
             let pool = Budget::new(4096).unwrap();
-            InputCursor::new(
-                &pool,
-                SourceId(1),
-                SourceCapabilities {
-                    length: None,
-                    random_access: true,
-                },
-                16,
-            )
-            .unwrap()
-            .token()
+            cursor(&pool).token()
         };
         for _ in 0..256 {
             let pool = Budget::new(4096).unwrap();
-            let mut cursor = InputCursor::new(
-                &pool,
-                SourceId(1),
-                SourceCapabilities {
-                    length: None,
-                    random_access: true,
-                },
-                16,
-            )
-            .unwrap();
+            let mut cursor = cursor(&pool);
             let before = cursor.position();
             assert_eq!(
                 cursor.provide_inline(SourceId(1), token.clone(), 0, &[1]),
