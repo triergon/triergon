@@ -3,10 +3,9 @@
 The separately compiled `reference_ts_eac3_worker.c` accepts `ts-eac3-proof FILE` and
 `ts-eac3-proof-trace FILE`. These opt-in commands use the existing formats
 reference link inputs through the existing xtask formats profile as
-`ffmpeg-ts-eac3-worker`. Ordinary reference sources and registered workers do not
-include this adapter. These commands have no benchmark or memory mode and are not a
-registered comparison. The ordinary reference workers' `ts-au-fold` continues to
-return ordinary FFmpeg results.
+`ffmpeg-ts-eac3-worker`. The adapter also accepts `ts-eac3-six-block-{fold,bench,memory}` with
+`FILE [ITERATIONS] 188 PROGRAM --atsc`; each mode performs the same complete
+operation. The required [report contract](features/mpegts-atsc-eac3-six-block/contract.json) pins its ten folds. The ordinary reference workers' `ts-au-fold` continues to return ordinary FFmpeg results.
 
 The operation starts with the same preloaded original entity as the existing
 transport harness, creates fresh demuxer/parser state, and includes demuxing,
@@ -109,6 +108,5 @@ EOF and successful exits, and checks the ordinary candidate fold against its
 trace summary. It displays each of the ten adapter outcomes and each of the ten
 stock `ts-au-fold` outcomes separately. The expected functional result is 10/10
 adapter matches and 0/10 stock matches. A stock difference remains a difference;
-it is not counted as six-block agreement. This experiment is excluded from the
-default worker tests and does not register or replace an authoritative gate.
+it is not counted as six-block agreement. This experiment is excluded from the default worker tests. The separate required report covers the ten accepting controls; it does not replace the ordinary comparison.
 Generated inputs and worker output are not stored in git.

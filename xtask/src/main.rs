@@ -859,6 +859,7 @@ families and options:
            regenerate MPEG-TS access-unit inputs and their reference-pinned corpus
   transport-dts --record REFERENCE   regenerate DVB DTS core transport inputs and pins
   transport-dts-hd --record REFERENCE   regenerate DTS-HD transport inputs and pins
+  transport-eac3-six-block [--record REFERENCE]   generate and pin E-AC-3 controls
   transport-eac3-probe OUTPUT   generate ATSC short-group packet-boundary probes
   transport-dts-hd-grouped [--record REFERENCE]   generate DTS-HD source AU controls
   transport-dts-seek --record REFERENCE   regenerate DTS core seek inputs and pins
@@ -877,6 +878,9 @@ fn fixture(root: &Path, args: &[String]) -> Task {
             return Err(FIXTURE_USAGE.into());
         };
         return transport_fixtures::program_m2ts(Path::new(source), Path::new(target));
+    }
+    if family == "transport-eac3-six-block" {
+        return transport_fixtures::eac3_probe::report_main(root, &args[1..]);
     }
     if family == "transport-eac3-probe" {
         return transport_fixtures::eac3_probe::main(root, &args[1..]);

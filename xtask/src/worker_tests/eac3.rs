@@ -79,6 +79,18 @@ pub(super) fn run(root: &Path) -> Outcome {
             &file,
             &[&188, &7, &"--atsc"],
         ))?;
+        let matched_candidate = output(&argv(
+            &candidate,
+            "ts-eac3-six-block-fold",
+            &file,
+            &[&188, &7, &"--atsc"],
+        ))?;
+        let matched_reference = output(&argv(
+            &scratch.path().join("proof"),
+            "ts-eac3-six-block-fold",
+            &file,
+            &[&188, &7, &"--atsc"],
+        ))?;
         let summary = c.last().ok_or("missing candidate summary")?;
         let reference = r.last().ok_or("missing adapter summary")?;
         let same_fold = |other: &Value| {
@@ -86,7 +98,8 @@ pub(super) fn run(root: &Path) -> Outcome {
                 .iter()
                 .all(|key| summary.get(key) == other.get(key))
         };
-        let ok = c.len() == 4
+        let ok = matched_candidate == matched_reference
+            && c.len() == 4
             && r.len() == 4
             && c[..3] == r[..3]
             && same_fold(reference)
@@ -113,6 +126,11 @@ pub(super) fn run(root: &Path) -> Outcome {
     println!(
         "six-block experiment: {matched}/10; stock ts-au-fold: {stock_matches}/10 exact matches (distinct operation)"
     );
+    if stock_matches != 0 {
+        failures.push(format!(
+            "ordinary stock comparison changed: {stock_matches}/10 matches"
+        ));
+    }
     if failures.is_empty() {
         Ok(())
     } else {

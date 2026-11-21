@@ -177,9 +177,9 @@ static const char *ec_source_clock(const uint8_t *bytes, size_t size, AVPacket *
     fold(digest, 9u + p[8]); fold_bytes(digest, p, 9u + p[8]);
     return NULL;
 }
-static int ec_proof(const uint8_t *bytes, size_t size, int program, int trace)
+static int ec_operation(const uint8_t *bytes, size_t size, int program, EcState *result)
 {
-    TsInput input = {bytes, size, 0}; EcState state = {.trace = trace};
+    TsInput input = {bytes, size, 0}; EcState state = {.trace = result->trace};
     AVFormatContext *fmt = avformat_alloc_context();
     AVIOContext *io = NULL; AVPacket *packet = av_packet_alloc();
     AVCodecContext *codec = avcodec_alloc_context3(NULL);
@@ -242,6 +242,15 @@ static int ec_proof(const uint8_t *bytes, size_t size, int program, int trace)
     avformat_close_input(&fmt); av_free(buffer);
     if (io) { av_freep(&io->buffer); avio_context_free(&io); }
     int eof = !state.refusal && rc == AVERROR_EOF;
+    if (!state.refusal && !eof) state.refusal = "demux-or-allocation";
+    *result = state;
+    return eof;
+}
+
+static int ec_proof(const uint8_t *bytes, size_t size, int program, int trace)
+{
+    EcState state = {.trace = trace};
+    int eof = ec_operation(bytes, size, program, &state);
     printf("{\"operation\":\"atsc-eac3-six-block-proof\",\"packets\":%"PRIu64
            ",\"bytes\":%"PRIu64",\"digest\":%"PRIu64",\"eof\":%s,\"refusal\":",
            state.work.packets, state.work.bytes, state.work.digest, eof ? "true" : "false");

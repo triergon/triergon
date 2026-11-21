@@ -29,6 +29,7 @@ use triergon_mpegts::{
 mod malformed;
 
 pub const PREFIX: &str = "ts-au-";
+pub const EAC3_PREFIX: &str = "ts-eac3-six-block-";
 const OPERATION: &str = "mpegts-access-unit-packets";
 const WINDOW: usize = 64 * 1024;
 const WORK: u64 = 4096;
@@ -903,13 +904,23 @@ fn prove_source(
 }
 
 pub fn run(args: &[String]) -> Result<()> {
+    let eac3 = args
+        .first()
+        .is_some_and(|mode| mode.starts_with(EAC3_PREFIX));
     let invocation = Invocation::parse(
         args,
-        PREFIX,
+        if eac3 { EAC3_PREFIX } else { PREFIX },
         " SIZE PROGRAM [--dvb|--atsc] [[--discontinuity] ENTITY]... [--dts-core=PID] [--ignore-pcr-reserved-bits]",
         2..=usize::MAX,
         true,
     )?;
+    if eac3
+        && (invocation.arguments.len() != 3
+            || invocation.arguments[0] != "188"
+            || invocation.arguments[2] != "--atsc")
+    {
+        return Err("six-block comparison requires SIZE 188, PROGRAM and --atsc".into());
+    }
     let pool = Budget::new(256 * 1024 * 1024)?;
     let request =
         ts_input::parse_access_units(&pool, Path::new(invocation.path), invocation.arguments)?;
@@ -919,7 +930,12 @@ pub fn run(args: &[String]) -> Result<()> {
     } else {
         operation::<false>
     };
-    measure(&invocation, OPERATION, Some(&pool), || {
+    let name = if eac3 {
+        "mpegts-atsc-eac3-six-block"
+    } else {
+        OPERATION
+    };
+    measure(&invocation, name, Some(&pool), || {
         operation(
             &pool,
             std::hint::black_box(&request),

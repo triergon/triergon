@@ -22,7 +22,7 @@ fn dispatch(args: &[String]) -> runner::Result<()> {
         ts_dts_hd::run(args)
     } else if let Some(kind) = ts_matched::Kind::for_mode(mode) {
         ts_matched::run(kind, args)
-    } else if mode.starts_with(ts_au::PREFIX) {
+    } else if mode.starts_with(ts_au::PREFIX) || mode.starts_with(ts_au::EAC3_PREFIX) {
         ts_au::run(args)
     } else if mode.starts_with(ts::PREFIX) {
         ts::run(args)

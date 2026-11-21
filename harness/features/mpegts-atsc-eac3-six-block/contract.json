@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "id": "mpegts-atsc-eac3-six-block",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "mpegts-atsc-eac3-six-block",
+  "candidate": "transport-worker",
+  "worker_operation": "ts-eac3-six-block-",
+  "reference": "ffmpeg-ts-eac3",
+  "contract": [
+    "Read one preloaded TS188 entity with an ATSC E-AC-3 elementary stream. Assemble six audio blocks and their dependent syncframes into each access unit within a finite PES.",
+    "The reference uses the pinned FFmpeg public MPEG-TS demuxer and AC-3 parser, then groups complete primary intervals and their dependents. Both workers fold each packet payload, stream and PID, projected timestamps, duration, position, flags and side data through EOF. The adapter verifies parser output against source bytes and inspects original PES headers during the operation.",
+    "Ten authored controls cover one, two, three, mixed and six block primary syncframes, each with zero or two dependents. Two complete access units share one PES and a third is timestamped separately. Opaque bodies establish framing, not decoded audio validity.",
+    "Generate with cargo xtask fixture transport-eac3-six-block; record reference folds with --record REFERENCE. Ordinary FFmpeg parser output is a separate operation and differs on all ten controls."
+  ],
+  "required_profiles": [
+    "au-atsc-eac3-one-block-dep0",
+    "au-atsc-eac3-one-block-dep2",
+    "au-atsc-eac3-two-block-dep0",
+    "au-atsc-eac3-two-block-dep2",
+    "au-atsc-eac3-three-block-dep0",
+    "au-atsc-eac3-three-block-dep2",
+    "au-atsc-eac3-mixed-block-dep0",
+    "au-atsc-eac3-mixed-block-dep2",
+    "au-atsc-eac3-six-block-dep0",
+    "au-atsc-eac3-six-block-dep2"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}
