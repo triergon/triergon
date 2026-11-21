@@ -142,8 +142,10 @@ writers use the validated parameter-set ranges from these records.
 one unit always progresses and zero units consume nothing. Copies are at most
 4096 bytes between cancel checks. Allocation pressure returns retryable
 `Backpressure` at the exact checkpoint; no partial output is published.
-Stateful packet jobs charge heap segment storage to the caller's pool and
-share the original payload for passthrough packets. A packet or configuration
+Stateful packet jobs keep up to seven segment descriptors inline, enough for an
+access unit with in-band parameter sets and several slices, and charge heap
+segment storage for more to the caller's pool; they share the original payload
+for passthrough packets. A packet or configuration
 output is sized before it is written and charged once, with the shared owner it
 is published in; one of at most 4096 bytes that the remaining work covers is
 copied in one pass, charged as its NAL-by-NAL copy is. A `NalPacketSession`

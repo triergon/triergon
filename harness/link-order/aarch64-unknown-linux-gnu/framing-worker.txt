@@ -45,6 +45,7 @@ triergon_framing::nal_packet::freeze_annex_b_output
 <triergon_framing::nal_packet::PacketState>::config
 triergon_framing::nal_packet::copy_annex_b_segment
 framing_worker::worker::operation::packet_digest
+<framing_worker::worker::operation::Retained>::spill
 <triergon_core::bytes::BudgetVec<triergon_framing::nal_packet::NalPacketOutput>>::reallocate
 triergon_core::bytes::charge_replacement
 triergon_core::bytes::settle_replacement

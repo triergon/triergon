@@ -22,7 +22,8 @@
 use std::collections::HashMap;
 use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher, RandomState};
 use std::ops::Deref;
-use std::sync::{Arc, Mutex, PoisonError, Weak};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 
 use triergon_core::{Budget, BudgetVec, Error, Reservation, Result};
 
@@ -73,14 +74,50 @@ struct Node<T> {
 }
 
 /// The entries whose values were let go since the cache last looked, by
-/// slot and generation.
-type ReleaseLog = Arc<Mutex<Vec<(u32, u32)>>>;
+/// slot and generation: only values the cache lent, cut while held, since
+/// the cache lets go of the others itself.
+#[derive(Debug, Default)]
+struct ReleaseLog {
+    records: Mutex<Vec<(u32, u32)>>,
+    /// Whether `records` holds any, kept with them, so that the cache looks
+    /// without locking the log.
+    pending: AtomicBool,
+}
+
+impl ReleaseLog {
+    /// The records, locked. A poisoned log only means a holder panicked
+    /// while pushing, which leaves the records whole.
+    fn lock(&self) -> MutexGuard<'_, Vec<(u32, u32)>> {
+        self.records.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn push(&self, record: (u32, u32)) {
+        let mut records = self.lock();
+        // The cache keeps room for a record per entry, so this does not
+        // allocate.
+        records.push(record);
+        self.pending.store(true, Ordering::Relaxed);
+    }
+
+    fn pop(&self) -> Option<(u32, u32)> {
+        if !self.pending.load(Ordering::Relaxed) {
+            return None;
+        }
+        let mut records = self.lock();
+        let record = records.pop();
+        self.pending.store(!records.is_empty(), Ordering::Relaxed);
+        record
+    }
+}
 
 #[derive(Debug)]
 struct Released {
-    log: ReleaseLog,
+    log: Arc<ReleaseLog>,
     slot: u32,
     generation: u32,
+    /// Whether the cache holds the value only weakly, cut while held: its
+    /// last holder then tells the cache.
+    lent: AtomicBool,
 }
 
 impl<T> Drop for Node<T> {
@@ -89,17 +126,12 @@ impl<T> Drop for Node<T> {
             log,
             slot,
             generation,
+            lent,
         } = &self.released;
-        // The cache keeps room for a record per entry, so this does not
-        // allocate.
-        lock(log).push((*slot, *generation));
+        if lent.load(Ordering::Relaxed) {
+            log.push((*slot, *generation));
+        }
     }
-}
-
-/// The release log, locked. A poisoned log only means a holder panicked
-/// while pushing, which leaves the records whole.
-fn lock(log: &ReleaseLog) -> std::sync::MutexGuard<'_, Vec<(u32, u32)>> {
-    log.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 /// A key of a cache, looked up through a borrowed view: a drawing by the
@@ -255,7 +287,9 @@ pub(super) struct Cache<K, T> {
     /// The use queue, oldest and newest.
     oldest: u32,
     newest: u32,
-    released: ReleaseLog,
+    released: Arc<ReleaseLog>,
+    /// The release records the log has room for.
+    records: usize,
     /// The entries, each with a shared allocation for its value that lives
     /// until it goes.
     len: usize,
@@ -286,6 +320,7 @@ impl<K: CacheKey, T> Cache<K, T> {
             oldest: NONE,
             newest: NONE,
             released: Arc::default(),
+            records: 0,
             len: 0,
             size: 0,
             limit: usize::MAX,
@@ -306,6 +341,7 @@ impl<K: CacheKey, T> Cache<K, T> {
                     self.remove(at);
                     return None;
                 };
+                node.released.lent.store(false, Ordering::Relaxed);
                 entry.value = Value::Kept(Arc::clone(&node));
                 node
             }
@@ -356,6 +392,7 @@ impl<K: CacheKey, T> Cache<K, T> {
                 log: Arc::clone(&self.released),
                 slot: at,
                 generation,
+                lent: AtomicBool::new(false),
             },
         }));
         let chain = self.index.insert(hash, at).unwrap_or(NONE);
@@ -409,7 +446,12 @@ impl<K: CacheKey, T> Cache<K, T> {
             self.unqueue(at);
             let entry = self.entry_mut(at);
             let held = match &entry.value {
-                Value::Kept(node) if Arc::strong_count(node) > 1 => Some(Arc::downgrade(node)),
+                Value::Kept(node) if Arc::strong_count(node) > 1 => {
+                    // Lent before the cache lets go, so that the last holder
+                    // tells it.
+                    node.released.lent.store(true, Ordering::Relaxed);
+                    Some(Arc::downgrade(node))
+                }
                 _ => None,
             };
             match held {
@@ -427,11 +469,7 @@ impl<K: CacheKey, T> Cache<K, T> {
 
     /// Takes out the entries whose values were let go, cut while held.
     fn take_released(&mut self) {
-        loop {
-            let record = lock(&self.released).pop();
-            let Some((at, generation)) = record else {
-                break;
-            };
+        while let Some((at, generation)) = self.released.pop() {
             if let Some(Slot::Used {
                 entry,
                 generation: current,
@@ -465,13 +503,13 @@ impl<K: CacheKey, T> Cache<K, T> {
         }
         self.index.try_reserve(1).map_err(|_| Error::Allocation)?;
         let records = self.slots.capacity() + 1;
-        let mut log = lock(&self.released);
-        if log.capacity() < records {
+        if self.records < records {
+            let mut log = self.released.lock();
             let len = log.len();
             log.try_reserve_exact(records - len)
                 .map_err(|_| Error::Allocation)?;
+            self.records = log.capacity();
         }
-        drop(log);
         // One value more than kept.
         let bytes = self.charged_bytes().saturating_add(Self::NODE_BYTES);
         self.charge.resize_to(bytes)
@@ -481,9 +519,7 @@ impl<K: CacheKey, T> Cache<K, T> {
     /// the map lays them out; its values' shared allocations; and its
     /// release log.
     fn charged_bytes(&self) -> usize {
-        let log = lock(&self.released)
-            .capacity()
-            .saturating_mul(size_of::<(u32, u32)>());
+        let log = self.records.saturating_mul(size_of::<(u32, u32)>());
         // The map's buckets are a power of two, all but an eighth of them
         // usable past eight, all but one below.
         let capacity = self.index.capacity();
