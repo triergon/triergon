@@ -1,17 +1,17 @@
-# Text ingestion profiles
+# Text samples
 
 Exact rules for `triergon_subtitles::text`. The crate overview is in
 [../../README.md](../../README.md).
 
-## Profiles
+## Formats
 
-| Profile | `Format` | Rules |
-| --- | --- | --- |
-| `Tx3gCarriage1` | `Tx3g` | Big-endian u16 text length (the 2048-byte recommendation is not enforced); UTF-8 or FEFF-prefixed UTF-16BE; modifier boxes kept whole and in order. Byte-reversed UTF-16 is rejected. |
-| ISO-box tx3g | `Tx3g` | Selected with `Extractor::tx3g_iso_boxes`: additionally reads ISO size-0 (to end of sample), size-1 (64-bit) and `uuid` modifier boxes. `Extractor::new` reports them as unsupported. |
-| `Utf8Packet1` | `Utf8Packet` | Strict UTF-8; the payload is aliased, not copied; no document framing. |
-| `MatroskaWebVttCarriage1` | `MatroskaWebVtt` | Raw cue text; BlockAddition ID 1 split into settings, identifier and comments; other additions and `CodecPrivate` kept opaque. Inline timestamps stay block-relative. Not WebM carriage. |
-| `OpaqueAss1` | `OpaqueAss` | Packet, configuration, charset label and timing carried unchanged. No ASS validation and no charset assertion. |
+| `Format` | Rules |
+| --- | --- |
+| `Tx3g` | Big-endian u16 text length (the 2048-byte recommendation is not enforced); UTF-8 or FEFF-prefixed UTF-16BE; modifier boxes kept whole and in order. Byte-reversed UTF-16 is rejected. |
+| `Tx3g` with ISO boxes | Selected with `Extractor::tx3g_iso_boxes`: additionally reads ISO size-0 (to end of sample), size-1 (64-bit) and `uuid` modifier boxes. `Extractor::new` reports them as unsupported. |
+| `Utf8Packet` | Strict UTF-8; the payload is aliased, not copied; no document framing. |
+| `MatroskaWebVtt` | Raw cue text; BlockAddition ID 1 split into settings, identifier and comments; other additions and `CodecPrivate` kept opaque. Inline timestamps stay block-relative. Not WebM carriage. |
+| `OpaqueAss` | Packet, configuration, charset label and timing carried unchanged. No ASS validation and no charset assertion. |
 
 Every `Cue` keeps its complete `Input`, the raw and text byte ranges, and
 `decoded_utf8` when the encoding is known. Whole-input character validation
@@ -50,11 +50,11 @@ PTS are distinct.
 
 `reference_trace::carriage::Session` (with the `reference-trace` feature)
 publishes an immutable `Snapshot` per input, a sample `Input` or a whole
-`DocumentInput` (`Source`), with the FFmpeg-compatible packet view (`Snapshot::reader_view()` returns `ReaderView::Reference`): millisecond
-document timing
-that keeps zero or negative intervals, and the reference's UTF-16 SubRip
-line-entry byte behaviour. `recover_pending` returns inputs after cancellation
-or a resource failure.
+`DocumentInput` (`Source`), in the form of FFmpeg's demuxer API: its stream,
+its packets with their positions, and for a document the format and the return
+codes of opening and reading it. A document's packets are the cues
+`compat::document::Reader` reads. `recover_pending` returns an input after
+cancellation or a resource failure.
 
 ## Default limits
 

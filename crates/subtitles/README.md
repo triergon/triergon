@@ -114,9 +114,10 @@ and the receiver repertoire, so a cue the charset refuses has no text and the
 others keep theirs.
 
 **Comparison-only projections.** The non-default `reference-trace` feature adds
-`reference_trace`: the text `carriage` session that reproduces FFmpeg's demuxer
-packets. It exists so tests can compare it with recorded FFmpeg output, and is
-absent from default builds.
+`reference_trace::carriage`: a text sample, or the cues `compat::document::Reader`
+reads from a document, in the form of FFmpeg's demuxer API (stream fields, packet
+positions, return codes). It exists so tests can compare the reader with recorded
+FFmpeg output, and is absent from default builds.
 
 ### Text
 
