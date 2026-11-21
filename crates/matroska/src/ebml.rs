@@ -168,12 +168,11 @@ impl ChildCursor {
         }
         // At most twelve VINT bytes.
         let header = self.at;
-        let (id, a, _) = vint(&raw[header..self.end], true)?;
-        let (size, b, unknown) = vint(&raw[header + a..self.end], false)?;
-        if unknown {
+        let head = self::header(&raw[header..self.end])?;
+        let Some(size) = head.size else {
             return Err(Error::Invalid("unknown size inside metadata"));
-        }
-        let start = header.checked_add(a + b).ok_or(Error::Overflow)?;
+        };
+        let start = header.checked_add(head.len).ok_or(Error::Overflow)?;
         let end = start
             .checked_add(usize::try_from(size).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
@@ -182,7 +181,7 @@ impl ChildCursor {
         }
         self.at = end;
         Ok(ParseStep::Event(Some(Child {
-            id,
+            id: head.id,
             header,
             payload: start..end,
         })))
