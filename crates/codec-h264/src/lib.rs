@@ -941,7 +941,9 @@ impl Decoder {
             drop(entries);
             // POC for type != 0 follows frame_num; FrameNumOffset update.
             let fno = if self.poc_state.prev_frame_num > unused {
-                self.poc_state.prev_frame_num_offset + max as i32
+                self.poc_state
+                    .prev_frame_num_offset
+                    .wrapping_add(max as i32)
             } else {
                 self.poc_state.prev_frame_num_offset
             };
@@ -1222,8 +1224,8 @@ impl Decoder {
                 1 => poc[0],
                 _ => poc[1],
             };
-            poc[0] -= temp;
-            poc[1] -= temp;
+            poc[0] = poc[0].wrapping_sub(temp);
+            poc[1] = poc[1].wrapping_sub(temp);
             match structure {
                 0 => fs.poc = poc,
                 1 => fs.poc[0] = poc[0],

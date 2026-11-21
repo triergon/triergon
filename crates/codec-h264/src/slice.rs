@@ -117,7 +117,10 @@ pub(crate) fn parse_slice_header(
     }
     let mbaff = sps.mb_adaptive_frame_field && !field_pic;
     let pic_size_in_mbs = sps.pic_width_in_mbs * sps.frame_height_in_mbs() / (1 + field_pic as u32);
-    if first_mb * (1 + mbaff as u32) >= pic_size_in_mbs {
+    if first_mb
+        .checked_mul(1 + mbaff as u32)
+        .is_none_or(|first| first >= pic_size_in_mbs)
+    {
         return Err(inval("first_mb_in_slice"));
     }
     let mut idr_pic_id = 0;
@@ -280,10 +283,11 @@ pub(crate) fn parse_slice_header(
             return Err(inval("cabac_init_idc"));
         }
     }
-    let slice_qp = pps.pic_init_qp + r.se();
-    if !(0..=51).contains(&slice_qp) {
-        return Err(inval("slice_qp_delta"));
-    }
+    let slice_qp = pps
+        .pic_init_qp
+        .checked_add(r.se())
+        .filter(|qp| (0..=51).contains(qp))
+        .ok_or(inval("slice_qp_delta"))?;
     if matches!(slice_type, SliceType::SP | SliceType::SI) {
         if slice_type == SliceType::SP {
             r.bit();

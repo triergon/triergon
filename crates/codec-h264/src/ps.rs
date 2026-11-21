@@ -465,8 +465,9 @@ pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<P
     }
     let weighted_pred = r.bit();
     let weighted_bipred_idc = r.read(2);
-    let pic_init_qp = 26 + r.se();
-    let pic_init_qs = 26 + r.se();
+    // Unchecked here: the slice header checks SliceQPY.
+    let pic_init_qp = r.se().wrapping_add(26);
+    let pic_init_qs = r.se().wrapping_add(26);
     let chroma_qp_index_offset = r.se();
     if !(-12..=12).contains(&chroma_qp_index_offset) {
         return Err(inval("chroma_qp_index_offset"));

@@ -81,7 +81,8 @@ pub(crate) struct PocState {
 }
 
 /// Compute TopFieldOrderCnt / BottomFieldOrderCnt for the current picture (8.2.1).
-/// Returns ([top, bottom], frame_num_offset).
+/// Returns ([top, bottom], frame_num_offset). The offsets and counts come from
+/// unbounded Exp-Golomb values, so the sums wrap as two's complement.
 pub(crate) fn compute_poc(sps: &Sps, sh: &SliceHeader, st: &PocState) -> ([i32; 2], i32) {
     let max_frame_num = sps.max_frame_num() as i32;
     let fnum = sh.frame_num as i32;
@@ -95,21 +96,21 @@ pub(crate) fn compute_poc(sps: &Sps, sh: &SliceHeader, st: &PocState) -> ([i32; 
             };
             let lsb = sh.poc_lsb as i32;
             let msb = if lsb < prev_lsb && (prev_lsb - lsb) >= max_lsb / 2 {
-                prev_msb + max_lsb
+                prev_msb.wrapping_add(max_lsb)
             } else if lsb > prev_lsb && (lsb - prev_lsb) > max_lsb / 2 {
-                prev_msb - max_lsb
+                prev_msb.wrapping_sub(max_lsb)
             } else {
                 prev_msb
             };
             let mut poc = [0; 2];
             if !sh.field_pic {
-                poc[0] = msb + lsb;
-                poc[1] = poc[0] + sh.delta_poc_bottom;
+                poc[0] = msb.wrapping_add(lsb);
+                poc[1] = poc[0].wrapping_add(sh.delta_poc_bottom);
             } else if !sh.bottom_field {
-                poc[0] = msb + lsb;
+                poc[0] = msb.wrapping_add(lsb);
                 poc[1] = poc[0];
             } else {
-                poc[1] = msb + lsb;
+                poc[1] = msb.wrapping_add(lsb);
                 poc[0] = poc[1];
             }
             (poc, msb)
@@ -118,14 +119,14 @@ pub(crate) fn compute_poc(sps: &Sps, sh: &SliceHeader, st: &PocState) -> ([i32; 
             let offset = if sh.idr {
                 0
             } else if st.prev_frame_num as i32 > fnum {
-                st.prev_frame_num_offset + max_frame_num
+                st.prev_frame_num_offset.wrapping_add(max_frame_num)
             } else {
                 st.prev_frame_num_offset
             };
             let nonref = sh.nal.nal_ref_idc == 0;
             if sps.poc_type == 1 {
                 let n = sps.offset_for_ref_frame.len() as i32;
-                let mut abs = if n != 0 { offset + fnum } else { 0 };
+                let mut abs = if n != 0 { offset.wrapping_add(fnum) } else { 0 };
                 if nonref && abs > 0 {
                     abs -= 1;
                 }
@@ -133,24 +134,27 @@ pub(crate) fn compute_poc(sps: &Sps, sh: &SliceHeader, st: &PocState) -> ([i32; 
                 if abs > 0 {
                     let cycle = (abs - 1) / n;
                     let in_cycle = (abs - 1) % n;
-                    let delta_cycle: i32 = sps.offset_for_ref_frame.iter().sum();
-                    expected = cycle * delta_cycle;
-                    expected += sps.offset_for_ref_frame[..=in_cycle as usize]
-                        .iter()
-                        .sum::<i32>();
+                    let sum = |o: &[i32]| o.iter().fold(0i32, |s, &v| s.wrapping_add(v));
+                    let delta_cycle = sum(&sps.offset_for_ref_frame);
+                    expected = cycle.wrapping_mul(delta_cycle);
+                    expected =
+                        expected.wrapping_add(sum(&sps.offset_for_ref_frame[..=in_cycle as usize]));
                 }
                 if nonref {
-                    expected += sps.offset_for_non_ref_pic;
+                    expected = expected.wrapping_add(sps.offset_for_non_ref_pic);
                 }
+                let to_bottom = sps.offset_for_top_to_bottom_field;
                 let mut poc = [0; 2];
                 if !sh.field_pic {
-                    poc[0] = expected + sh.delta_poc[0];
-                    poc[1] = poc[0] + sps.offset_for_top_to_bottom_field + sh.delta_poc[1];
+                    poc[0] = expected.wrapping_add(sh.delta_poc[0]);
+                    poc[1] = poc[0].wrapping_add(to_bottom).wrapping_add(sh.delta_poc[1]);
                 } else if !sh.bottom_field {
-                    poc[0] = expected + sh.delta_poc[0];
+                    poc[0] = expected.wrapping_add(sh.delta_poc[0]);
                     poc[1] = poc[0];
                 } else {
-                    poc[1] = expected + sps.offset_for_top_to_bottom_field + sh.delta_poc[0];
+                    poc[1] = expected
+                        .wrapping_add(to_bottom)
+                        .wrapping_add(sh.delta_poc[0]);
                     poc[0] = poc[1];
                 }
                 (poc, offset)
@@ -158,9 +162,9 @@ pub(crate) fn compute_poc(sps: &Sps, sh: &SliceHeader, st: &PocState) -> ([i32; 
                 let temp = if sh.idr {
                     0
                 } else if nonref {
-                    2 * (offset + fnum) - 1
+                    offset.wrapping_add(fnum).wrapping_mul(2).wrapping_sub(1)
                 } else {
-                    2 * (offset + fnum)
+                    offset.wrapping_add(fnum).wrapping_mul(2)
                 };
                 ([temp, temp], offset)
             }
@@ -210,13 +214,14 @@ impl PicNums {
         }
     }
     pub(crate) fn long_term_pic_num(&self, fs: &FrameStore, par: u8) -> i32 {
+        // long_term_frame_idx is not range checked: the field numbers wrap.
         let i = fs.long_term_frame_idx as i32;
         if self.structure == 0 {
             i
         } else if par == self.structure {
-            2 * i + 1
+            i.wrapping_mul(2).wrapping_add(1)
         } else {
-            2 * i
+            i.wrapping_mul(2)
         }
     }
 }
@@ -444,17 +449,14 @@ pub(crate) fn modify_ref_list(
         for &(idc, v) in mods {
             let pic = match idc {
                 0 | 1 => {
-                    let abs = v as i32 + 1;
+                    // abs_diff_pic_num_minus1 is not range checked: the sums wrap.
+                    let abs = (v as i32).wrapping_add(1);
                     let no_wrap = if idc == 0 {
-                        if pred - abs < 0 {
-                            pred - abs + maxp
-                        } else {
-                            pred - abs
-                        }
-                    } else if pred + abs >= maxp {
-                        pred + abs - maxp
+                        let d = pred.wrapping_sub(abs);
+                        if d < 0 { d.wrapping_add(maxp) } else { d }
                     } else {
-                        pred + abs
+                        let s = pred.wrapping_add(abs);
+                        if s >= maxp { s.wrapping_sub(maxp) } else { s }
                     };
                     pred = no_wrap;
                     let pn = if no_wrap > curr {
@@ -601,7 +603,7 @@ pub(crate) fn apply_mmcos(
     for m in &sh.mmcos {
         match m.op {
             1 | 3 => {
-                let pn = curr - (m.diff_pic_nums_minus1 as i32 + 1);
+                let pn = curr.wrapping_sub((m.diff_pic_nums_minus1 as i32).wrapping_add(1));
                 // Locate the short-term picture/field with PicNum pn.
                 let mut found = None;
                 for (i, d) in dpb.iter().enumerate() {
