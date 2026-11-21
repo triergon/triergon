@@ -5,8 +5,10 @@ mod header;
 
 pub use assembler::PesAssembler;
 pub(crate) use assembler::UNBOUNDED_NON_VIDEO;
+#[cfg(feature = "reference-trace")]
+pub(crate) use header::timestamp;
 pub(crate) use header::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS};
-pub(crate) use header::{parse_header, parse_timed_header, timestamp_bits};
+pub(crate) use header::{parse_header, parse_timed_header, timestamp_bits, timestamp_markers};
 
 use crate::{SourceEpochs, SourceRange};
 use triergon_core::{BudgetVec, Bytes, Error, Result, Time};

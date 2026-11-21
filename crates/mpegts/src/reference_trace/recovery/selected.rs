@@ -606,20 +606,14 @@ impl RecoveryObserver {
                 4 => {
                     if p.header_len == 14 {
                         let t = &body[9..14];
-                        let valid = t[0] & 1 != 0 && t[2] & 1 != 0 && t[4] & 1 != 0;
+                        let valid = crate::pes::timestamp_markers(t);
                         if t[0] >> 4 != 2 || valid == (p.kind == SelectedFault::TimestampMarkers) {
                             return Err(Error::Unsupported(
                                 "selected diagnostic additional timestamp fault/prefix",
                             ));
                         }
                         if p.kind != SelectedFault::ForbiddenTimeFlags {
-                            p.pts = Some(
-                                (u64::from((t[0] >> 1) & 7) << 30)
-                                    | (u64::from(t[1]) << 22)
-                                    | (u64::from(t[2] >> 1) << 15)
-                                    | (u64::from(t[3]) << 7)
-                                    | u64::from(t[4] >> 1),
-                            );
+                            p.pts = Some(crate::pes::timestamp_bits(t));
                         }
                     }
                 }

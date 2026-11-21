@@ -933,7 +933,7 @@ impl TransportFaultJob {
                 4 => {
                     if self.header_len == 14 {
                         let time = &body[9..14];
-                        let markers = time[0] & 1 != 0 && time[2] & 1 != 0 && time[4] & 1 != 0;
+                        let markers = crate::pes::timestamp_markers(time);
                         if time[0] >> 4 != 2
                             || markers == (self.kind == PesFaultKind::TimestampMarkers)
                         {

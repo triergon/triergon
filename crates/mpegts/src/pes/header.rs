@@ -38,6 +38,11 @@ pub(crate) fn timestamp_bits(bytes: &[u8]) -> u64 {
         | u64::from(bytes[4] >> 1)
 }
 
+/// Whether the three marker bits of a five-byte timestamp field are set.
+pub(crate) fn timestamp_markers(bytes: &[u8]) -> bool {
+    bytes[0] & 1 != 0 && bytes[2] & 1 != 0 && bytes[4] & 1 != 0
+}
+
 /// Parse a complete timestamp-only header without stepping its three stages.
 /// Refusal leaves the caller free to use the ordinary parser and diagnostics.
 pub(crate) fn parse_timed_header(

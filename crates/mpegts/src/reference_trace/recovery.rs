@@ -622,19 +622,9 @@ impl RecoveryObserver {
                     }
                 }
                 3 => {
-                    let t = &body[9..14];
-                    if t[0] >> 4 != 2 || t[0] & 1 == 0 || t[2] & 1 == 0 || t[4] & 1 == 0 {
-                        return Err(Error::Invalid(
-                            "invalid PTS prefix or marker bits in rejected PES",
-                        ));
-                    }
-                    p.pts = Some(
-                        (u64::from((t[0] >> 1) & 7) << 30)
-                            | (u64::from(t[1]) << 22)
-                            | (u64::from(t[2] >> 1) << 15)
-                            | (u64::from(t[3]) << 7)
-                            | u64::from(t[4] >> 1),
-                    );
+                    p.pts = Some(crate::pes::timestamp(&body[9..14], 2).map_err(|_| {
+                        Error::Invalid("invalid PTS prefix or marker bits in rejected PES")
+                    })?);
                 }
                 4 => p.header_ranges.try_reserve_exact(1)?,
                 5 => {
