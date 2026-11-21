@@ -6,7 +6,7 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::signature::{
-    self,
+    self, Container, Selection,
     TransportSync::{M2ts192, Ts188},
     TransportTie,
 };
@@ -222,30 +222,23 @@ pub const SELECTION: signature::Policy = signature::Policy {
 /// The container format a prefix starts with under [`SELECTION`]; `None` when it
 /// matches none or is too short to say. Fails with `Invalid` for a prefix that fits
 /// both transport packet sizes.
-// `triergon_core::signature::select` under `SELECTION`, written out: a probe calls
-// this for every window it reads, the raw video probe inside a timed operation,
-// where the shared walk cost 0.04 to 0.07% of its instructions. A test holds the
-// two to the same answers.
+// Out of line: a probe calls it for its first few windows only, and inlined into
+// the raw video probe's loop it cost that loop 0.07 to 0.10% of its instructions.
+#[inline(never)]
 pub fn detect_container(prefix: &[u8]) -> Result<Option<Format>> {
-    if signature::ebml(prefix) {
-        return Ok(Some(Format::Matroska));
-    }
-    if matches!(
-        signature::opening_box(prefix),
-        Some(b"ftyp" | b"styp" | b"moov" | b"free" | b"wide" | b"mdat")
-    ) {
-        return Ok(Some(Format::Mp4));
-    }
-    // Playback requires the full ambiguity window, even for a shorter prefix
-    // that already has all three TS188 sync bytes.
-    if prefix.len() < CONTAINER_SIGNATURE_BYTES {
-        return Ok(None);
-    }
-    match (Ts188.observed(prefix), M2ts192.observed(prefix)) {
-        (Some(true), Some(false)) => Ok(Some(Format::Ts(triergon_mpegts::PacketFormat::Ts188))),
-        (Some(false), Some(true)) => Ok(Some(Format::Ts(triergon_mpegts::PacketFormat::M2ts192))),
-        (Some(true), Some(true)) => Err(Error::Invalid("ambiguous transport signature")),
-        _ => Ok(None),
+    match signature::select(prefix, &SELECTION) {
+        Selection::Container(Container::Matroska) => Ok(Some(Format::Matroska)),
+        Selection::Container(Container::Isobmff) => Ok(Some(Format::Mp4)),
+        Selection::Container(Container::Transport(Ts188)) => {
+            Ok(Some(Format::Ts(triergon_mpegts::PacketFormat::Ts188)))
+        }
+        Selection::Container(Container::Transport(M2ts192)) => {
+            Ok(Some(Format::Ts(triergon_mpegts::PacketFormat::M2ts192)))
+        }
+        Selection::Ambiguous => Err(Error::Invalid("ambiguous transport signature")),
+        Selection::Container(Container::Ogg) | Selection::Need(_) | Selection::Unrecognised => {
+            Ok(None)
+        }
     }
 }
 
@@ -316,60 +309,12 @@ impl<S: Source> Source for ReplaySource<S> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Format, SELECTION, detect_container};
+    use super::{Format, detect_container};
     use triergon_core::Error;
-    use triergon_core::signature::{Container, Selection, TransportSync, select};
     use triergon_mpegts::PacketFormat;
 
     #[test]
-    fn detection_is_the_shared_selection_walk_under_the_playback_policy() {
-        let mut prefixes = vec![
-            Vec::new(),
-            vec![0; 3],
-            vec![0; 389],
-            vec![0x1a, 0x45, 0xdf, 0xa3],
-            b"OggS\0".to_vec(),
-        ];
-        for kind in [
-            b"ftyp", b"styp", b"moov", b"free", b"wide", b"mdat", b"moof", b"sidx", b"skip",
-        ] {
-            prefixes.push([b"\0\0\0\x10".as_slice(), kind].concat());
-            prefixes.push([b"\0\0\0\x10".as_slice(), &kind[..2]].concat());
-        }
-        for syncs in [
-            &[0, 188, 376][..],
-            &[4, 196, 388],
-            &[0, 188, 376, 4, 196, 388],
-            &[0, 188],
-        ] {
-            let mut bytes = vec![0; 389];
-            for &at in syncs {
-                bytes[at] = 0x47;
-            }
-            prefixes.push(bytes[..377].to_vec());
-            prefixes.push(bytes);
-        }
-        for prefix in &prefixes {
-            let shared = match select(prefix, &SELECTION) {
-                Selection::Container(Container::Matroska) => Ok(Some(Format::Matroska)),
-                Selection::Container(Container::Isobmff) => Ok(Some(Format::Mp4)),
-                Selection::Container(Container::Transport(TransportSync::Ts188)) => {
-                    Ok(Some(Format::Ts(PacketFormat::Ts188)))
-                }
-                Selection::Container(Container::Transport(TransportSync::M2ts192)) => {
-                    Ok(Some(Format::Ts(PacketFormat::M2ts192)))
-                }
-                Selection::Ambiguous => Err(Error::Invalid("ambiguous transport signature")),
-                Selection::Container(Container::Ogg)
-                | Selection::Need(_)
-                | Selection::Unrecognised => Ok(None),
-            };
-            assert_eq!(detect_container(prefix), shared, "{prefix:?}");
-        }
-    }
-
-    #[test]
-    fn playback_opening_boxes_and_transport_window() {
+    fn detection_takes_playback_boxes_and_one_transport_spacing_on_the_whole_window() {
         for kind in [b"ftyp", b"styp", b"moov", b"mdat", b"free", b"wide"] {
             let bytes = [b"\0\0\0\x10".as_slice(), kind].concat();
             assert_eq!(detect_container(&bytes), Ok(Some(Format::Mp4)));
@@ -387,5 +332,24 @@ mod tests {
             detect_container(&bytes),
             Ok(Some(Format::Ts(PacketFormat::Ts188)))
         );
+        for at in [4, 196, 388] {
+            bytes[at] = 0x47;
+        }
+        assert_eq!(
+            detect_container(&bytes),
+            Err(Error::Invalid("ambiguous transport signature"))
+        );
+        for at in [0, 188, 376] {
+            bytes[at] = 0;
+        }
+        assert_eq!(
+            detect_container(&bytes),
+            Ok(Some(Format::Ts(PacketFormat::M2ts192)))
+        );
+        assert_eq!(
+            detect_container(&[0x1a, 0x45, 0xdf, 0xa3]),
+            Ok(Some(Format::Matroska))
+        );
+        assert_eq!(detect_container(b"OggS\0"), Ok(None));
     }
 }
