@@ -73,7 +73,7 @@ its 200,000th operation, or an accented `endchar` naming a glyph the charset
 lacks. CFF2 `blend` keeps the default values. `Scale` reproduces HarfBuzz's scaling arithmetic,
 including hinting device tables when a ppem is set.
 
-The bidi API mirrors libass's `ass_shaper_shape` and `ass_shaper_reorder`:
+The bidi API follows the steps libass takes to shape and reorder an event:
 `bidi::BidiClass::of` and `bidi::Bracket::of` per character, `bidi::paragraphs`,
 `bidi::Resolver::resolve` per paragraph (base direction left-to-right,
 right-to-left or automatic, with or without bracket pairing), `bidi::reorder_line`
@@ -112,7 +112,7 @@ position bookkeeping; feature variations at the default instance; the legacy
 `kern` table (format 0) when GPOS has no kerning; fallback mark positioning by
 combining class when the font has no GPOS.
 
-**Shapers**, chosen as `hb_ot_shaper_categorize` chooses them:
+**Shapers**, chosen for a script as HarfBuzz chooses them:
 
 | Shaper | Scripts | Notes |
 |---|---|---|

@@ -63,7 +63,8 @@ pub(crate) enum ZeroMarks {
 }
 
 impl Shaper {
-    /// `hb_ot_shaper_categorize`.
+    /// The shaper HarfBuzz gives `script` in `direction`, with the GSUB script
+    /// tag the plan chose.
     pub(crate) fn categorize(script: Script, direction: Direction, gsub: Option<Tag>) -> Self {
         let dflt = gsub == Some(Tag::new(b"DFLT"));
         let latn = gsub == Some(Tag::new(b"latn"));

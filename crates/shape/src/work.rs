@@ -16,10 +16,8 @@ use triergon_core::{Error, Result, WorkBudget};
 /// Limits of one shaping call: its work is bounded by `work_per_char` units for
 /// each character of the item, and at least `minimum_work` in all, and its
 /// buffer by `glyphs_per_char` glyphs for each character, and at least
-/// `minimum_glyphs`. The defaults are HarfBuzz's operation and length limits
-/// (`HB_BUFFER_MAX_OPS_FACTOR`, `HB_BUFFER_MAX_OPS_MIN`,
-/// `HB_BUFFER_MAX_LEN_FACTOR` and `HB_BUFFER_MAX_LEN_MIN`); the work limit
-/// covers more of the steps than HarfBuzz's.
+/// `minimum_glyphs`. The defaults are HarfBuzz's operation and length limits;
+/// the work limit covers more of the steps than HarfBuzz's.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     /// Work units per character of the item.
