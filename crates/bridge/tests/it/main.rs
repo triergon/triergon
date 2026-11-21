@@ -1,4 +1,5 @@
 //! Integration tests of the packet and subtitle bridges.
+#![forbid(unsafe_code)]
 #[path = "../../../playback/tests/common/mod.rs"]
 mod common;
 mod dvb_ts;
