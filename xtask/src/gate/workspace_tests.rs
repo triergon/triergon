@@ -10,10 +10,11 @@ use crate::{sha256, test_skips};
 use super::{R, git, owned, status};
 
 /// The test inputs outside the repository that crate tests read when present.
-const TEST_INPUTS: [&str; 3] = [
+const TEST_INPUTS: [&str; 4] = [
     ".research/fate-samples",
     ".research/flac-generated",
     ".research/flac-test-files",
+    test_skips::AAC_REFERENCES,
 ];
 
 /// Runs the workspace tests in one profile, or takes the result of a kept set
@@ -21,7 +22,8 @@ const TEST_INPUTS: [&str; 3] = [
 /// files that are not ignored, the test inputs of [`TEST_INPUTS`], and what every
 /// gate key holds (the measuring code, toolchains, target and host class). A gate
 /// host holds the test inputs, so a check a suite reports it left out for an absent
-/// input fails the step ([`test_skips::gate_failures`]).
+/// input fails the step ([`test_skips::gate_failures`]); `AAC_REF_DIR` names the AAC
+/// numeric comparison's ([`test_skips::AAC_REFERENCES`]).
 ///
 /// Release tests build in [`RELEASE_TESTS_TARGET_DIR`]: in the gate build's own
 /// directory, their feature set would rebuild its workers, and steps measured after
@@ -59,7 +61,11 @@ pub(super) fn test(root: &Path, output: &Path, profile: &str, full: bool) -> R<i
         cargo
     };
     let reused = crate::harness::reuse::step(root, output, &key, full, || {
-        let (code, skips) = test_skips::run(cargo().args(&command))?;
+        let (code, skips) = test_skips::run(
+            cargo()
+                .env("AAC_REF_DIR", root.join(test_skips::AAC_REFERENCES))
+                .args(&command),
+        )?;
         if skips.is_empty() {
             return Ok(code);
         }

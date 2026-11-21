@@ -5,8 +5,8 @@
 //! through and keeps those lines by the test binary that wrote them, which cargo names in
 //! the `Running SOURCE (EXECUTABLE)` line it prints before each binary runs.
 //!
-//! The gate's test step runs on a gate host, which holds the inputs of the suites
-//! [`SUITES`] marks, so a check those suites left out fails it ([`gate_failures`]); CI
+//! The gate's test step runs on a gate host, which holds the inputs of every suite
+//! [`SUITES`] lists, so any check a suite left out fails it ([`gate_failures`]); CI
 //! fetches none of them, and its test run says how many checks it left out
 //! ([`summary`]).
 
@@ -21,62 +21,56 @@ use crate::json::{self, Value};
 pub struct Suite {
     /// Its test source, from the repository root.
     pub source: &'static str,
-    /// The directories it reads its inputs from, from the repository root.
+    /// The directories it reads its inputs from, from the repository root, each of
+    /// which the evidence sets a gate image is built with ([`IMAGE_INPUTS`]) hold.
     pub inputs: &'static [&'static str],
-    /// Whether a gate host holds them: whether the evidence sets a gate image is built
-    /// with ([`IMAGE_INPUTS`]) list files below each.
-    pub on_gate_hosts: bool,
 }
 
-/// Every suite that reports checks it leaves out. A gate host lacks the inputs of the
-/// AAC, DTS and FLAC vector suites too, so their checks run nowhere; the gate compares
-/// those decoders through its codec lanes and workloads instead.
+/// The ADTS streams of the AAC numeric comparison beside the decode profile's float
+/// output of each, which the gate's test step names in `AAC_REF_DIR`.
+pub const AAC_REFERENCES: &str = ".research/aac-references";
+
+/// Every suite that reports checks it leaves out.
 pub const SUITES: [Suite; 7] = [
     Suite {
         source: "crates/codec-aac/tests/fate_vectors.rs",
-        inputs: &[".research/fate-samples/aac"],
-        on_gate_hosts: false,
+        inputs: &[".research/fate-samples/aac", AAC_REFERENCES],
     },
     Suite {
         source: "crates/codec-ac3/tests/vectors.rs",
         inputs: &[".research/fate-samples/ac3", ".research/fate-samples/eac3"],
-        on_gate_hosts: true,
     },
     Suite {
         source: "crates/codec-dca/tests/vectors.rs",
         inputs: &[".research/fate-samples/dts"],
-        on_gate_hosts: false,
     },
     Suite {
         source: "crates/codec-flac/tests/vectors.rs",
         inputs: &[".research/flac-test-files", ".research/flac-generated"],
-        on_gate_hosts: false,
     },
     Suite {
         source: "crates/codec-h264/tests/conformance.rs",
         inputs: &[".research/fate-samples/h264-conformance"],
-        on_gate_hosts: true,
     },
     Suite {
         source: "crates/codec-h264/tests/fuzz_regressions.rs",
         inputs: &[".research/fate-samples/h264-conformance"],
-        on_gate_hosts: true,
     },
     Suite {
         source: "crates/codec-hevc/tests/conformance.rs",
         inputs: &[".research/fate-samples/hevc-conformance"],
-        on_gate_hosts: true,
     },
 ];
 
 /// The evidence sets of media inputs a gate image is built with (docs/quality.md,
 /// "Gate hosts").
-const IMAGE_INPUTS: [&str; 5] = [
+const IMAGE_INPUTS: [&str; 6] = [
     "gate-media-inputs",
     "codec-file-workload-inputs",
     "ogg-reader-inputs",
     "subtitle-cc-inputs",
     "codec-derived-streams",
+    "codec-vector-inputs",
 ];
 
 /// One check a test binary reported it did not run.
@@ -180,32 +174,28 @@ fn suite<'a>(skip: &'a Skip, sources: &'a BTreeMap<String, String>) -> &'a str {
         .map_or(skip.executable.as_str(), String::as_str)
 }
 
-/// One line for each check the gate's test step left out that a gate host's inputs
-/// should have run, naming its suite and what it lacks: every check of a suite whose
-/// inputs a gate host holds, and of a suite [`SUITES`] does not list.
+/// One line for each check the gate's test step left out, naming its suite and what it
+/// lacks: a gate host holds the inputs of every suite [`SUITES`] lists, and a suite it
+/// does not list says nothing of its inputs.
 pub fn gate_failures(skips: &[Skip], sources: &BTreeMap<String, String>) -> Vec<String> {
     skips
         .iter()
-        .filter_map(|skip| {
+        .map(|skip| {
             let source = suite(skip, sources);
-            match SUITES.iter().find(|suite| suite.source == source) {
-                Some(suite) if !suite.on_gate_hosts => None,
-                Some(_) => Some(format!(
-                    "{source}: did not run on a gate host: {}",
+            if SUITES.iter().any(|suite| suite.source == source) {
+                format!("{source}: did not run on a gate host: {}", skip.what)
+            } else {
+                format!(
+                    "{source}: did not run, and test_skips::SUITES does not list its inputs: {}",
                     skip.what
-                )),
-                None => Some(format!(
-                    "{source}: did not run, and test_skips::SUITES does not say whether a gate \
-                     host holds its inputs: {}",
-                    skip.what
-                )),
+                )
             }
         })
         .collect()
 }
 
-/// Why [`SUITES`] misstates which inputs a gate host holds, by the kept sets of
-/// [`IMAGE_INPUTS`] in `data`, the parsed JSON files under `harness/`.
+/// Why a gate host lacks an input of [`SUITES`], by the kept sets of [`IMAGE_INPUTS`]
+/// in `data`, the parsed JSON files under `harness/`.
 pub fn design_errors(data: &[(String, Value)]) -> Vec<String> {
     let mut errors = Vec::new();
     let mut listed: Vec<&str> = Vec::new();
@@ -230,11 +220,10 @@ pub fn design_errors(data: &[(String, Value)]) -> Vec<String> {
                 path.strip_prefix(input)
                     .is_some_and(|rest| rest.starts_with('/'))
             });
-            if held != suite.on_gate_hosts {
+            if !held {
                 errors.push(format!(
-                    "test_skips::SUITES: {}: a gate image {} {input}",
-                    suite.source,
-                    if held { "holds" } else { "lacks" }
+                    "test_skips::SUITES: {}: a gate image lacks {input}",
+                    suite.source
                 ));
             }
         }
@@ -328,8 +317,10 @@ exit 3";
             [
                 "crates/codec-ac3/tests/vectors.rs: did not run on a gate host: \
                  the AC-3 vector checks: x absent",
-                "target/debug/deps/other-3d: did not run, and test_skips::SUITES does not say \
-                 whether a gate host holds its inputs: the Y check: z absent",
+                "crates/codec-aac/tests/fate_vectors.rs: did not run on a gate host: \
+                 the AAC numeric comparison: AAC_REF_DIR is not set",
+                "target/debug/deps/other-3d: did not run, and test_skips::SUITES does not list \
+                 its inputs: the Y check: z absent",
             ]
         );
         assert_eq!(
@@ -364,11 +355,10 @@ exit 3";
             .collect()
     }
 
-    /// The inputs of the suites a gate host holds.
+    /// The inputs of every suite, which a gate host holds.
     pub(crate) fn held() -> Vec<&'static str> {
         SUITES
             .iter()
-            .filter(|suite| suite.on_gate_hosts)
             .flat_map(|suite| suite.inputs.iter().copied())
             .collect()
     }
@@ -376,13 +366,13 @@ exit 3";
     #[test]
     fn the_suites_say_which_inputs_a_gate_image_holds() {
         assert_eq!(design_errors(&image_sets(&held())), Vec::<String>::new());
-        let mut more = held();
-        more.push(".research/fate-samples/aac");
+        let mut fewer = held();
+        fewer.retain(|input| *input != ".research/fate-samples/dts");
         assert_eq!(
-            design_errors(&image_sets(&more)),
+            design_errors(&image_sets(&fewer)),
             [
-                "test_skips::SUITES: crates/codec-aac/tests/fate_vectors.rs: a gate image holds \
-              .research/fate-samples/aac"
+                "test_skips::SUITES: crates/codec-dca/tests/vectors.rs: a gate image lacks \
+              .research/fate-samples/dts"
             ]
         );
         let mut sets = image_sets(&held());

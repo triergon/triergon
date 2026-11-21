@@ -1138,15 +1138,15 @@ target and is reused the same way. Its key holds the profile and adds every trac
 file as the working tree holds it and the untracked files git does not ignore, but the
 evidence index (which a promotion changes) and `docs/`, and the test inputs the crate
 tests read when present (`.research/fate-samples`, `.research/flac-generated`,
-`.research/flac-test-files`). The few tests that read the evidence index skip the reused
+`.research/flac-test-files`, `.research/aac-references`, which `gate test` names in
+`AAC_REF_DIR`). The few tests that read the evidence index skip the reused
 run and run on every `gate test`, so a failing index is never reused as a pass. A vector
 suite whose inputs are absent passes and writes one `skipped: ...` line to its own
-standard error for each check it left out; `gate test` fails on such a line from a suite
-whose inputs a gate image holds (the AC-3, H.264 and HEVC vector and conformance
-suites), naming the suite and the input, and lists the others, whose inputs no gate image
-holds (the AAC, DTS and FLAC vector suites). `cargo xtask check-design` checks that
-division against the evidence sets gate images are built with, and the test part of
-`cargo xtask check` prints how many checks its run left out, by suite. The gate
+standard error for each check it left out; `gate test` fails on such a line, naming the
+suite and the input, since a gate image holds the inputs of every vector and
+conformance suite (AAC, AC-3, DTS, FLAC, H.264 and HEVC). `cargo xtask check-design`
+checks that the evidence sets gate images are built with hold them, and the test part
+of `cargo xtask check` prints how many checks its run left out, by suite. The gate
 runs each profile once. The release tests build in `target/gate-tests`, so they never
 rebuild the gate build's workers that later steps on the same host time. The `checked` profile
 is the release optimisation with every overflow check and every `debug_assert!` and
@@ -1236,13 +1236,17 @@ and manifests, and the workers; and each INPUT, an archive of media inputs the
 repository does not generate, with repository-relative paths: evidence set
 `gate-media-inputs` holds the FATE samples, the codec workload inputs and the
 subtitle corpus the gate reads, set `codec-file-workload-inputs` the inputs of
-[file-workloads.json](../harness/codecs/file-workloads.json), and set
+[file-workloads.json](../harness/codecs/file-workloads.json), set
 `ogg-reader-inputs` the inputs of the Ogg reader comparison, set
-`subtitle-cc-inputs` the closed caption streams `gate-media-inputs` lacks, and set
+`subtitle-cc-inputs` the closed caption streams `gate-media-inputs` lacks, set
 `codec-derived-streams` the 71 elementary streams of the audio correctness lanes that
-`cargo xtask codecs derive` makes from FATE samples
+`cargo xtask codecs derive` makes from FATE samples, and set `codec-vector-inputs`
+the inputs of the AAC, DTS and FLAC vector suites: the FATE AAC and DTS samples they
+read, the IETF CELLAR FLAC test files, the FLAC streams
+`harness/codecs/flac/flac_vectors.py` encodes, and the ADTS streams of the AAC numeric
+comparison beside the decode profile's float output of each
 (`s3:evidence/SET/SHA.tar.gz`, their keys in the
-[index](../harness/evidence/sets/)); a gate image is built with all five. The image
+[index](../harness/evidence/sets/)); a gate image is built with all six. The image
 is tagged `Name=triergon-gate-TARGET`, and the earlier images of the target and
 their snapshots are removed. Run it again when the reference builds' keys or the media inputs change,
 or to take a new base image.
