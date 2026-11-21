@@ -34,7 +34,13 @@ fn upper_bands_are_plain_delays() {
         let band = layouts()[0].bands.iter().find(|b| b.qmf == start).unwrap();
         let mut line = Line::default();
         let mut y = [Cpx::default(); SLOTS];
-        decorrelate(band.kind, &mut line, &x, &mut y);
+        decorrelate(
+            band.kind,
+            &mut line,
+            &x,
+            &mut y,
+            &mut [Cpx::default(); SECTION_BUFFER],
+        );
         assert_eq!(y[3 + n], x[3]);
         assert_eq!(y.iter().filter(|v| **v != Cpx::default()).count(), 1);
     }
@@ -54,7 +60,13 @@ fn all_pass_bands_keep_the_energy_of_an_impulse() {
             let mut y = [Cpx::default(); SLOTS];
             let mut energy = 0f64;
             for _ in 0..40 {
-                decorrelate(band.kind, &mut line, &x, &mut y);
+                decorrelate(
+                    band.kind,
+                    &mut line,
+                    &x,
+                    &mut y,
+                    &mut [Cpx::default(); SECTION_BUFFER],
+                );
                 energy += y
                     .iter()
                     .map(|v| f64::from(v.re * v.re + v.im * v.im))
@@ -108,7 +120,13 @@ fn the_sections_keep_lattice_state() {
     // after the lead delay the impulse enters the first section at slot 29 of 32
     x[27] = Cpx::new(1.0, 0.0);
     let mut y = [Cpx::default(); SLOTS];
-    decorrelate(band.kind, &mut line, &x, &mut y);
+    decorrelate(
+        band.kind,
+        &mut line,
+        &x,
+        &mut y,
+        &mut [Cpx::default(); SECTION_BUFFER],
+    );
     let a = decay[0];
     let s: Vec<f32> = line.sections[..3]
         .iter()
