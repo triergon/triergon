@@ -177,7 +177,7 @@ The boundary semantics follow [RFC 8216 sections 3 and 4.3.2.3](https://www.rfc-
 
 The admitted carriages are AVC and HEVC Annex B, MPEG-1 and MPEG-2 audio,
 single-block ADTS AAC-LC, LATM in LOAS, AC-3 and E-AC-3 with explicitly
-declared DVB or ATSC signalling, and DVB subtitle segments.
+declared DVB or ATSC signalling, DVB-signalled DTS core, and DVB subtitle segments.
 
 For MPEG audio, PMT stream types `0x03` and `0x04` select Layer I, II and III
 frame parsing in audio PES packets (`0xc0`–`0xdf`). The reader can assemble a
@@ -189,6 +189,13 @@ and sample rate. It accounts for the original padding slots and bounds each
 frame by `ReaderLimits::maximum_audio_frame_bytes`. The header exposed to the
 caller retains the zero bitrate index. MPEG-2.5 rates are unsupported.
 See [H.222.0 Tables 2-22 and 2-34](https://www.itu.int/rec/T-REC-H.222.0-201808-S/en).
+
+For DTS core, select a DVB descriptor namespace and carry the DTS descriptor
+(`0x7b`) on a private-data PMT entry (`0x06`). The reader frames canonical normal
+DTS core packets, including headers and bodies split across PES packets.
+`DtsAudioFrame` carries the exact sample span and original frame bytes. The
+packet retains its source clocks and PES ranges.
+See [ETSI EN 300 468 Annex G](https://www.etsi.org/deliver/etsi_en/300400_300499/300468/01.18.01_60/en_300468v011801p.pdf).
 For ATSC, set `ReaderLimits::descriptor_namespace` to `DescriptorNamespace::Atsc`
 to interpret `0x81` as AC-3 and `0x87` as E-AC-3. Both require PES stream ID
 `0xbd`. ATSC E-AC-3 supports a six-block independent syncframe with its

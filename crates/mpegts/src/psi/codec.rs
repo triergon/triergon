@@ -35,7 +35,7 @@ impl ElementaryStream {
 
     /// The codec named by the first EN 300 468 descriptor in this entry's loop
     /// that names one: teletext (0x56), subtitling (0x59), AC-3 (0x6a) or
-    /// E-AC-3 (0x7a), whatever the namespace and stream type. Outside DVB these
+    /// E-AC-3 (0x7a) or DTS core (0x7b), whatever the namespace and stream type. Outside DVB these
     /// tags are user private; the loop is read up to its first malformed
     /// descriptor.
     pub fn dvb_descriptor_codec(&self) -> Option<CodecId<'static>> {
@@ -46,6 +46,7 @@ impl ElementaryStream {
                 0x59 => Some(CodecId::DvbSubtitle),
                 0x6a => Some(CodecId::Ac3),
                 0x7a => Some(CodecId::Eac3),
+                0x7b if descriptor.data.len() >= 5 => Some(CodecId::Dts),
                 _ => None,
             })
     }

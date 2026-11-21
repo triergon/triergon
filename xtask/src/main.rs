@@ -81,7 +81,7 @@ commands:
   subtitle-fixtures record|verify FEATURE REFERENCE [options]   record or verify subtitle folds
   prepare-ffmpeg [--jobs N] [--profile PROFILE]
                  build a pinned FFmpeg reference into .research/reference[-PROFILE]:
-                 matroska (default), formats, video, subtitles (git revision on the 9.0 branch);
+                 matroska (default), formats, video, subtitles, transport-dts (git revision on the 9.0 branch);
                  decode, capture, capture-small (the 9.0.2 release)
   prepare-mpg123 [--jobs N]   build the pinned static free-format MPEG audio reference
   references     keys|pack|fetch|upload   the keys of the pinned reference builds, and
@@ -857,6 +857,7 @@ families and options:
   m2ts INPUT.ts OUTPUT.m2ts   wrap TS188 packets for the program fixtures
   transport-access-units --output ROOT [--record --reference-worker FILE --observations DIR]
            regenerate MPEG-TS access-unit inputs and their reference-pinned corpus
+  transport-dts --record REFERENCE   regenerate DVB DTS core transport inputs and pins
   transport-matched --record SEEK_REFERENCE AUDIO_REFERENCE
            regenerate MPEG-TS seek and free-format audio controls and pins
   zlib     [--kind stored|fixed|dynamic] [--scope N] [--lace 0-3] [--aac] [--mixed] [--empty]
@@ -874,6 +875,9 @@ fn fixture(root: &Path, args: &[String]) -> Task {
     }
     if family == "transport-access-units" {
         return transport_fixtures::main(root, &args[1..]);
+    }
+    if family == "transport-dts" {
+        return transport_fixtures::matched::author_dts(root, &args[1..]);
     }
     if family == "transport-matched" {
         return transport_fixtures::matched::author(root, &args[1..]);
@@ -1015,6 +1019,7 @@ fn prepare_check(part: Option<Part>) -> Task {
         None | Some(Part::Parity) => &[
             &["prepare-ffmpeg"],
             &["prepare-ffmpeg", "--profile", "formats"],
+            &["prepare-ffmpeg", "--profile", "transport-dts"],
             &["prepare-mpg123"],
             &["prepare-ffmpeg", "--profile", "video"],
             &["fixtures"],
