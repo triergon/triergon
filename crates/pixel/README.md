@@ -152,6 +152,10 @@ impulses, ramps and constant fields through its public filter API).
   tall 528×4216 picture (`tests/fixtures/rgba-reference-digests.txt`).
 - A unit test pins the BT.601 palette conversion, in both roundings, against
   FFmpeg's DVD palettes.
+- The [PGS palette sweep](../../harness/features/pgs-palette-sweep/contract.json)
+  compares the nearest-rounded BT.601 and BT.709 colours against FFmpeg at four
+  canvas heights. The [DVB palette sweep](../../harness/features/dvb-palette-sweep/contract.json)
+  compares full-width and reduced-width CLUT entries at 2, 4 and 8 bits.
 - Unit tests pin the fit rule, that another canvas size holds the same fitted picture
   (direct and separable paths), taps against reference measurements (including
   near ties), the left-crop alignment rule, filter normalisation, the BT.601

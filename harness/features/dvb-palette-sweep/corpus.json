@@ -1,0 +1,1925 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "dvb-2bit-full-00",
+      "profile": "dvb-2bit-full-00",
+      "file": "dvb-2bit-full-00.ts",
+      "sha256": "bc70d3d92b357eb5a3dd2aedcd5bb47e07d8b476307381f4efe1a1e6b03d810e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 7748071383133041928
+      }
+    },
+    {
+      "id": "dvb-2bit-full-01",
+      "profile": "dvb-2bit-full-01",
+      "file": "dvb-2bit-full-01.ts",
+      "sha256": "afdf06cc8972e04a5f650f98773430fb0a172fe44a44490a10331dec86d631a6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 9983357079284644872
+      }
+    },
+    {
+      "id": "dvb-2bit-full-02",
+      "profile": "dvb-2bit-full-02",
+      "file": "dvb-2bit-full-02.ts",
+      "sha256": "708ccfd7fe604bd2bf63f802e9d73fb31b8830154aa059a26b8841b4148d687b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 3890204719674167304
+      }
+    },
+    {
+      "id": "dvb-2bit-full-03",
+      "profile": "dvb-2bit-full-03",
+      "file": "dvb-2bit-full-03.ts",
+      "sha256": "327406b951007eef52addbf07c434cc6a594701dd7dfbe0a69ed4445ad50a5c1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 16004678515168952328
+      }
+    },
+    {
+      "id": "dvb-2bit-full-04",
+      "profile": "dvb-2bit-full-04",
+      "file": "dvb-2bit-full-04.ts",
+      "sha256": "da2d53fcda1b4cda1e95bc78359b333e2de5491ed4caec35659c3d93cf9458c4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 8823496414062772488
+      }
+    },
+    {
+      "id": "dvb-2bit-full-05",
+      "profile": "dvb-2bit-full-05",
+      "file": "dvb-2bit-full-05.ts",
+      "sha256": "a89257873b316ea424bdc0b5340a2f8fd60a1e3958190b6b4dfd6e4f3ff787de",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 2856611629955520264
+      }
+    },
+    {
+      "id": "dvb-2bit-full-06",
+      "profile": "dvb-2bit-full-06",
+      "file": "dvb-2bit-full-06.ts",
+      "sha256": "2ddb47c781b1792b2e4c97c72cd73b2fab6bc10cb660b0228632e3e9e109c76e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 15609913535174530312
+      }
+    },
+    {
+      "id": "dvb-2bit-full-07",
+      "profile": "dvb-2bit-full-07",
+      "file": "dvb-2bit-full-07.ts",
+      "sha256": "86d61623dfcde7169a8e5ae35f99f85a70c0b3d6c618628b861a8ae35cbd0225",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 5216978024974341640
+      }
+    },
+    {
+      "id": "dvb-2bit-full-08",
+      "profile": "dvb-2bit-full-08",
+      "file": "dvb-2bit-full-08.ts",
+      "sha256": "72bf67b186b30c19143f21cc368ca33cecdff2f0cc819e21b157891625c837dd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 18092751212828595720
+      }
+    },
+    {
+      "id": "dvb-2bit-full-09",
+      "profile": "dvb-2bit-full-09",
+      "file": "dvb-2bit-full-09.ts",
+      "sha256": "bf57050f321e566732e26febfeefc2c10d139c67aaeee2381fa4117610b331ae",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 1481156541899386888
+      }
+    },
+    {
+      "id": "dvb-2bit-full-10",
+      "profile": "dvb-2bit-full-10",
+      "file": "dvb-2bit-full-10.ts",
+      "sha256": "b44070b9a0131af9d8116edb03d286d5a28acb0357fe83768109a574b2cd59cd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 2324072552980421640
+      }
+    },
+    {
+      "id": "dvb-2bit-full-11",
+      "profile": "dvb-2bit-full-11",
+      "file": "dvb-2bit-full-11.ts",
+      "sha256": "deea4d51713308a3f434ceb75a3df34d38f9cc1bd6fb05cdcf4076b54d91b0bd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 6108694959418299912
+      }
+    },
+    {
+      "id": "dvb-2bit-full-12",
+      "profile": "dvb-2bit-full-12",
+      "file": "dvb-2bit-full-12.ts",
+      "sha256": "0883d357080609715ce686f2e0dea5d36066a76a6a12d536c9d67b4c324561b3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 10970793932992189960
+      }
+    },
+    {
+      "id": "dvb-2bit-full-13",
+      "profile": "dvb-2bit-full-13",
+      "file": "dvb-2bit-full-13.ts",
+      "sha256": "33368dc6410cbaf69394c7212f6a19a71125b46e57fe18fb4145aefdfe1558db",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 11394362357418546696
+      }
+    },
+    {
+      "id": "dvb-2bit-full-14",
+      "profile": "dvb-2bit-full-14",
+      "file": "dvb-2bit-full-14.ts",
+      "sha256": "ada6b0dcc5135c06b0e5273d98ad68c656dcc34db0738a509612554fdc5a198b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 8074777972003287560
+      }
+    },
+    {
+      "id": "dvb-2bit-full-15",
+      "profile": "dvb-2bit-full-15",
+      "file": "dvb-2bit-full-15.ts",
+      "sha256": "4c3102c0172bab8b73421e01fbd9248a656154b427d45da335692477859deb87",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 3706456809801905160
+      }
+    },
+    {
+      "id": "dvb-2bit-full-16",
+      "profile": "dvb-2bit-full-16",
+      "file": "dvb-2bit-full-16.ts",
+      "sha256": "9426adcd8563476816670ef2f5567a5acfe920653651eab28834d69ae0e8d74d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 8144935792467062792
+      }
+    },
+    {
+      "id": "dvb-2bit-full-17",
+      "profile": "dvb-2bit-full-17",
+      "file": "dvb-2bit-full-17.ts",
+      "sha256": "38420e7915f533d3801885650b9beec8e36f39175e344ac2cdd9f3cc11d390c9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 225521351799002632
+      }
+    },
+    {
+      "id": "dvb-2bit-full-18",
+      "profile": "dvb-2bit-full-18",
+      "file": "dvb-2bit-full-18.ts",
+      "sha256": "93bff08041d2151a31baa98694cd2daa724da0fcf4e2b7be9b026fddf2e39a2a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 6551311648428201480
+      }
+    },
+    {
+      "id": "dvb-2bit-full-19",
+      "profile": "dvb-2bit-full-19",
+      "file": "dvb-2bit-full-19.ts",
+      "sha256": "bdbcfce09f8d9c378f66c5289ac2f81d6187533507be856298f8975dd029a262",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 1990189192312423176
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-00",
+      "profile": "dvb-2bit-reduced-00",
+      "file": "dvb-2bit-reduced-00.ts",
+      "sha256": "da5d05cb22a8b8cd43aea5e215764fcff9ecfaf6500ec992adcbd989d2d30437",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 1122394992119267336
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-01",
+      "profile": "dvb-2bit-reduced-01",
+      "file": "dvb-2bit-reduced-01.ts",
+      "sha256": "3fe57ae5bc53854da909bd17d5377d6c79dc8818985fa073c17e94db80f07235",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 3848161555422805768
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-02",
+      "profile": "dvb-2bit-reduced-02",
+      "file": "dvb-2bit-reduced-02.ts",
+      "sha256": "d977a57dda4b411b0224d6d435de76c8b1bb02e641ef89d9c963a398784be50c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 13722957282006812168
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-03",
+      "profile": "dvb-2bit-reduced-03",
+      "file": "dvb-2bit-reduced-03.ts",
+      "sha256": "ee507c39ecfd2158b4d99658f07d54637a037c6694e2c1b5eb652d4d3f17f864",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 2060028836714358024
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-04",
+      "profile": "dvb-2bit-reduced-04",
+      "file": "dvb-2bit-reduced-04.ts",
+      "sha256": "a68a7b10c17e8b2aa211378f7c2ca529cf15d347b005ee82faaabf85fe9a9b8a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 13985731687248139016
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-05",
+      "profile": "dvb-2bit-reduced-05",
+      "file": "dvb-2bit-reduced-05.ts",
+      "sha256": "90af6b35e61bd4ce20194adf0b8588b483bf0c73d087088dd1e511eb15d2b271",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 1678484166685957896
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-06",
+      "profile": "dvb-2bit-reduced-06",
+      "file": "dvb-2bit-reduced-06.ts",
+      "sha256": "8a7aebff580672247542b4c1ca68eff4dfb42b03428af13da76a5a6a54896a34",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 13713546499450453256
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-07",
+      "profile": "dvb-2bit-reduced-07",
+      "file": "dvb-2bit-reduced-07.ts",
+      "sha256": "ef660ed2e73941be31a7a50dc10a72a440186be79b9bbb0ba095e1a15e231bdc",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 12784585146344075784
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-08",
+      "profile": "dvb-2bit-reduced-08",
+      "file": "dvb-2bit-reduced-08.ts",
+      "sha256": "e94b03ca09bb8f42b6e487696f73991ac0d75a5b6cdfb95ececafa58695c8e54",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 10559204983042532872
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-09",
+      "profile": "dvb-2bit-reduced-09",
+      "file": "dvb-2bit-reduced-09.ts",
+      "sha256": "97c906924e502a7348f92cf0acaffa68cda27ff05d2dcc209498221390acdf4d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 10680939789763273736
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-10",
+      "profile": "dvb-2bit-reduced-10",
+      "file": "dvb-2bit-reduced-10.ts",
+      "sha256": "64bdff1af0d034dff79cf824c9d39ef8f135ac538d6f6a638f0fed6268d31adc",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 9914277995183344136
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-11",
+      "profile": "dvb-2bit-reduced-11",
+      "file": "dvb-2bit-reduced-11.ts",
+      "sha256": "8cbd71ee46121859d1b0f646b8fe04e833490b6456f06e2cf5e3bacbe8581fca",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 14271923182146437128
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-12",
+      "profile": "dvb-2bit-reduced-12",
+      "file": "dvb-2bit-reduced-12.ts",
+      "sha256": "002fff952cb6d25d434b07bb61eb6891c023202e74e22420082f61080f944c55",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 10410360487531766792
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-13",
+      "profile": "dvb-2bit-reduced-13",
+      "file": "dvb-2bit-reduced-13.ts",
+      "sha256": "bb60bbff314a918663029c804281ed43074b50209517ee73c14fe2dceb807b25",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 685361622808117000
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-14",
+      "profile": "dvb-2bit-reduced-14",
+      "file": "dvb-2bit-reduced-14.ts",
+      "sha256": "5818beed25585442f2968367fa0bbf468ad2ea20a52d496026e4034cbbdd56ac",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 6115009490916235016
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-15",
+      "profile": "dvb-2bit-reduced-15",
+      "file": "dvb-2bit-reduced-15.ts",
+      "sha256": "f1fb9fbff520bb49410c7c35ebaa4be9d113857f3a3722297b31ffb88ab6e0bb",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 2661910997312989448
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-16",
+      "profile": "dvb-2bit-reduced-16",
+      "file": "dvb-2bit-reduced-16.ts",
+      "sha256": "c4856ba94dd6ea51a54ee6425b015a0216d18b2d0dc1a370321f183fd2042dda",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 6868413449436446472
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-17",
+      "profile": "dvb-2bit-reduced-17",
+      "file": "dvb-2bit-reduced-17.ts",
+      "sha256": "f1aa5cd6f615c3f5aed2b765ea9688734b8aaf5f3e0182bda0e46014a9853f54",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 6933485070512709384
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-18",
+      "profile": "dvb-2bit-reduced-18",
+      "file": "dvb-2bit-reduced-18.ts",
+      "sha256": "21bd3202c8928f17a3772c1aa4e20c75edf4992bc2a47cbcae8d3ebd56201101",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 11344712199221665544
+      }
+    },
+    {
+      "id": "dvb-2bit-reduced-19",
+      "profile": "dvb-2bit-reduced-19",
+      "file": "dvb-2bit-reduced-19.ts",
+      "sha256": "da1f19520f56f5f32843a43cd52527e8ad199d304cc492aef2ab57d633c4664c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 384,
+        "digest": 3837943928148039944
+      }
+    },
+    {
+      "id": "dvb-4bit-full-00",
+      "profile": "dvb-4bit-full-00",
+      "file": "dvb-4bit-full-00.ts",
+      "sha256": "e15df523a538342baace40e1f6ad986758149ebad4c0c483e772ff86610e9773",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 12611174732778466180
+      }
+    },
+    {
+      "id": "dvb-4bit-full-01",
+      "profile": "dvb-4bit-full-01",
+      "file": "dvb-4bit-full-01.ts",
+      "sha256": "bb99daa832c7194f120c8727dd1ec1adc3d7f69eb9af4da9b1e871b34f9a4e20",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 4943782636551879428
+      }
+    },
+    {
+      "id": "dvb-4bit-full-02",
+      "profile": "dvb-4bit-full-02",
+      "file": "dvb-4bit-full-02.ts",
+      "sha256": "3c0d84a17bb35f28fd5003944553b351c89b9e626eaacf689fb6a5a3ba0a50a3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 12661196362891138692
+      }
+    },
+    {
+      "id": "dvb-4bit-full-03",
+      "profile": "dvb-4bit-full-03",
+      "file": "dvb-4bit-full-03.ts",
+      "sha256": "b25a2c8e597facdcd1c14f5a58928c428a785c7de4ec4407cbf62392f491d86e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 15803976384348102788
+      }
+    },
+    {
+      "id": "dvb-4bit-full-04",
+      "profile": "dvb-4bit-full-04",
+      "file": "dvb-4bit-full-04.ts",
+      "sha256": "6e81169e1a8cf612ef2bf401f02c8c467a6010e310d1745b1ce630ac337d085e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 13366762073282049028
+      }
+    },
+    {
+      "id": "dvb-4bit-full-05",
+      "profile": "dvb-4bit-full-05",
+      "file": "dvb-4bit-full-05.ts",
+      "sha256": "8243528bccf29619a03cb10b7a0a6879a333824ac4bfd277879af04dc29ad56d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 1036781588768244484
+      }
+    },
+    {
+      "id": "dvb-4bit-full-06",
+      "profile": "dvb-4bit-full-06",
+      "file": "dvb-4bit-full-06.ts",
+      "sha256": "8dcdf826264a3d0a64e65589e34d56434997fc5d750c94e14c76b3471642778c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 3918968531560799236
+      }
+    },
+    {
+      "id": "dvb-4bit-full-07",
+      "profile": "dvb-4bit-full-07",
+      "file": "dvb-4bit-full-07.ts",
+      "sha256": "67e2ab5fd23208a97f767956da537fb2d8b46dc8558428044bdd11dfdcbe5eed",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 4060035927780473092
+      }
+    },
+    {
+      "id": "dvb-4bit-full-08",
+      "profile": "dvb-4bit-full-08",
+      "file": "dvb-4bit-full-08.ts",
+      "sha256": "c0cb3e8b22bbc34c9cb1664dd22732671690ca99375ce608d2d94d8e81db50b7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 14435781071332553860
+      }
+    },
+    {
+      "id": "dvb-4bit-full-09",
+      "profile": "dvb-4bit-full-09",
+      "file": "dvb-4bit-full-09.ts",
+      "sha256": "559d038b650f284386214db11563adf37f62e266ee761a3c8fadea4e56f16266",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 10669196340574432644
+      }
+    },
+    {
+      "id": "dvb-4bit-full-10",
+      "profile": "dvb-4bit-full-10",
+      "file": "dvb-4bit-full-10.ts",
+      "sha256": "3f4c4573cd07e788308b8850c1e8b7dbbaf299bdacde0bbcc4dabd598bb8d313",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 18180529980798031620
+      }
+    },
+    {
+      "id": "dvb-4bit-full-11",
+      "profile": "dvb-4bit-full-11",
+      "file": "dvb-4bit-full-11.ts",
+      "sha256": "af541534669b793b571e7d2ae3983610a9dea37d473c6563f144542bb21a3a7b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 12548568640119825668
+      }
+    },
+    {
+      "id": "dvb-4bit-full-12",
+      "profile": "dvb-4bit-full-12",
+      "file": "dvb-4bit-full-12.ts",
+      "sha256": "c52ab1b4ee0e8e37ab38098c1a77c9a6fca13d2271a38cbfb61e91cd90e658c4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 14480685483026967428
+      }
+    },
+    {
+      "id": "dvb-4bit-full-13",
+      "profile": "dvb-4bit-full-13",
+      "file": "dvb-4bit-full-13.ts",
+      "sha256": "f4ebbbc698439ca877fe05085523f2420c84f255d8e7895a3806e4982ea4fb2a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 878982984284728196
+      }
+    },
+    {
+      "id": "dvb-4bit-full-14",
+      "profile": "dvb-4bit-full-14",
+      "file": "dvb-4bit-full-14.ts",
+      "sha256": "d7a0a80da8751d38921b2f6dce8edf6e4d6dc2476a66c65c2e4ef50bde4728e4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 11181406923831852420
+      }
+    },
+    {
+      "id": "dvb-4bit-full-15",
+      "profile": "dvb-4bit-full-15",
+      "file": "dvb-4bit-full-15.ts",
+      "sha256": "4842870096202893e3684610155f9df35bc5ceb9239e82cf6e8f7210b202f3f5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 12078679446918904068
+      }
+    },
+    {
+      "id": "dvb-4bit-full-16",
+      "profile": "dvb-4bit-full-16",
+      "file": "dvb-4bit-full-16.ts",
+      "sha256": "551e59fd39bb5a55a1011d3b675daa20308770bbf962a0805f1dc964c21cb801",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 8663119675801118980
+      }
+    },
+    {
+      "id": "dvb-4bit-full-17",
+      "profile": "dvb-4bit-full-17",
+      "file": "dvb-4bit-full-17.ts",
+      "sha256": "34738be9decd021147807cf47dcd9cf3d19baafe19967a54ba510521559a0720",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 12475957937892364420
+      }
+    },
+    {
+      "id": "dvb-4bit-full-18",
+      "profile": "dvb-4bit-full-18",
+      "file": "dvb-4bit-full-18.ts",
+      "sha256": "039d9e0e19abe5ba0e00926ed1927924579be702cb4a664ca6ecae4db913df51",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 10765793807154201732
+      }
+    },
+    {
+      "id": "dvb-4bit-full-19",
+      "profile": "dvb-4bit-full-19",
+      "file": "dvb-4bit-full-19.ts",
+      "sha256": "a824b9f5cf7248315ba91fba346def69ad95991da24d7de7536300490587fa06",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 866681188030468
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-00",
+      "profile": "dvb-4bit-reduced-00",
+      "file": "dvb-4bit-reduced-00.ts",
+      "sha256": "0985431250e36bf773bdaefb1d80108d6c5c832ac6331b7ddea9e39df5b0f183",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 17966372735812483844
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-01",
+      "profile": "dvb-4bit-reduced-01",
+      "file": "dvb-4bit-reduced-01.ts",
+      "sha256": "64d80f46a180912391743fda472f792ca8471b574f9f2550fc98767ed342948e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 6307772163864372228
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-02",
+      "profile": "dvb-4bit-reduced-02",
+      "file": "dvb-4bit-reduced-02.ts",
+      "sha256": "607e8cc1d1c3350adbaf961ee2d0285fe03ba03d0740bc838e5f58683271f6b4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 2889188569524533636
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-03",
+      "profile": "dvb-4bit-reduced-03",
+      "file": "dvb-4bit-reduced-03.ts",
+      "sha256": "488380bec45a42d133e672aaaafef7b8657264aa594920922e37b6e292b5f701",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 6739895482815407364
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-04",
+      "profile": "dvb-4bit-reduced-04",
+      "file": "dvb-4bit-reduced-04.ts",
+      "sha256": "9435154ff827b65419031f27de51d98689deff0a510cc8e0ebf04474c138e192",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 7390221034390426884
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-05",
+      "profile": "dvb-4bit-reduced-05",
+      "file": "dvb-4bit-reduced-05.ts",
+      "sha256": "5cddf08599744f9b478f775cd06cde6ef3acc075f5a5e7eecbd1437b8ede5995",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 4624205830974416132
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-06",
+      "profile": "dvb-4bit-reduced-06",
+      "file": "dvb-4bit-reduced-06.ts",
+      "sha256": "101b22c3fed583d67afa1f180194838aa1a7663054d87bf0694724fe87c8b805",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 13182323727649146884
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-07",
+      "profile": "dvb-4bit-reduced-07",
+      "file": "dvb-4bit-reduced-07.ts",
+      "sha256": "3e5e2a4d87f513d5b3799cd7a5bd8e4b87286a554a9f6630bc2de29245b36391",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 7593704408002508932
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-08",
+      "profile": "dvb-4bit-reduced-08",
+      "file": "dvb-4bit-reduced-08.ts",
+      "sha256": "2740d76994923f8323852dddaf06aba9b42dceb99a88f0c36f4d36a508da5f88",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 13975610955400643972
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-09",
+      "profile": "dvb-4bit-reduced-09",
+      "file": "dvb-4bit-reduced-09.ts",
+      "sha256": "bea918d69090c97d7d4096a68148a2957bb4870a4d82004f18aa7aa762bb9991",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 15875221728110893572
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-10",
+      "profile": "dvb-4bit-reduced-10",
+      "file": "dvb-4bit-reduced-10.ts",
+      "sha256": "413c924a2106632f22ad6774c416c8fa402d6d110bd750e6fdc3d1b37fa9a491",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 8999741963104525828
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-11",
+      "profile": "dvb-4bit-reduced-11",
+      "file": "dvb-4bit-reduced-11.ts",
+      "sha256": "1465eeecddcb73e93ccf2d7d349a0afad763892ebf48e7fc2dcff0a15be43327",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 12434884784265894404
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-12",
+      "profile": "dvb-4bit-reduced-12",
+      "file": "dvb-4bit-reduced-12.ts",
+      "sha256": "dd0cdc02c7e4c76759308d91c74d705e3425246715a1b8cd4a5867b1e74ea74c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 14223402047836557828
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-13",
+      "profile": "dvb-4bit-reduced-13",
+      "file": "dvb-4bit-reduced-13.ts",
+      "sha256": "011830e652d2dfe5674fbc80713d4abf5fd69d420ed6cb3e1de284fc6c768b8d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 2371441796124910212
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-14",
+      "profile": "dvb-4bit-reduced-14",
+      "file": "dvb-4bit-reduced-14.ts",
+      "sha256": "cc3b69ce1b4664ef662f7095e536ce9a9097d1b9f20650791071246144bfb8c8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 8958599659819292292
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-15",
+      "profile": "dvb-4bit-reduced-15",
+      "file": "dvb-4bit-reduced-15.ts",
+      "sha256": "304868bcd408a321c4d31df994e7b9dd9cf9dcc13dec5b7222a6d44b98e8d474",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 14465403010150530052
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-16",
+      "profile": "dvb-4bit-reduced-16",
+      "file": "dvb-4bit-reduced-16.ts",
+      "sha256": "a2f5ac8043d7ec0ad9b055237b1e901991decd2bb98636448e2b3727f465a502",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 10912140532610233604
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-17",
+      "profile": "dvb-4bit-reduced-17",
+      "file": "dvb-4bit-reduced-17.ts",
+      "sha256": "3100861f28956cf549e87ad46a978ee37d04d54e1c2b5bcf5385a2b91dc544e7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 9951990931990259588
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-18",
+      "profile": "dvb-4bit-reduced-18",
+      "file": "dvb-4bit-reduced-18.ts",
+      "sha256": "d1e687b2f32bedf187732c96372c965b53fed479fafc7bfaae769011ae74a497",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 3109979191211799812
+      }
+    },
+    {
+      "id": "dvb-4bit-reduced-19",
+      "profile": "dvb-4bit-reduced-19",
+      "file": "dvb-4bit-reduced-19.ts",
+      "sha256": "1661e75804fb6034371bdd2e4609811451dc7f724a7c6a547cd54ce6fc08eb21",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 768,
+        "digest": 16335971231584267524
+      }
+    },
+    {
+      "id": "dvb-8bit-full-00",
+      "profile": "dvb-8bit-full-00",
+      "file": "dvb-8bit-full-00.ts",
+      "sha256": "49a87bce443d0350d360a29abda5d74f6532e5317b9eb1177a41d306bb7efc6e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 3574295708662110785
+      }
+    },
+    {
+      "id": "dvb-8bit-full-01",
+      "profile": "dvb-8bit-full-01",
+      "file": "dvb-8bit-full-01.ts",
+      "sha256": "809b0d720790ec579fbfce71159b802506c0ff120a4ecbb138d059fb2bc97ce4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 14720374266884720449
+      }
+    },
+    {
+      "id": "dvb-8bit-full-02",
+      "profile": "dvb-8bit-full-02",
+      "file": "dvb-8bit-full-02.ts",
+      "sha256": "aea2bbcff73182125b92ce593f9b49964221535cb8576141b8abe69247225378",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 1131752592143302881
+      }
+    },
+    {
+      "id": "dvb-8bit-full-03",
+      "profile": "dvb-8bit-full-03",
+      "file": "dvb-8bit-full-03.ts",
+      "sha256": "b936f4a74e35dde4538ac0c59cf34181b1a10193d702f82fa90ebc1babb4e7ee",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 11397232248935441057
+      }
+    },
+    {
+      "id": "dvb-8bit-full-04",
+      "profile": "dvb-8bit-full-04",
+      "file": "dvb-8bit-full-04.ts",
+      "sha256": "5665a76dc8afb1be79a71d159b1841b375f3adc59cba2c5e7a9b455955181269",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 6534981195472521089
+      }
+    },
+    {
+      "id": "dvb-8bit-full-05",
+      "profile": "dvb-8bit-full-05",
+      "file": "dvb-8bit-full-05.ts",
+      "sha256": "fa1273d85162783a9595333201fea52f3a2725d977b9bb6f2b29359ff5cfe324",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 2935824743834793441
+      }
+    },
+    {
+      "id": "dvb-8bit-full-06",
+      "profile": "dvb-8bit-full-06",
+      "file": "dvb-8bit-full-06.ts",
+      "sha256": "506237cceda6652527a488a45aeeb59fdf5f8b84c26bf6b22bb9d1bd624e2b0b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 1293034719567608353
+      }
+    },
+    {
+      "id": "dvb-8bit-full-07",
+      "profile": "dvb-8bit-full-07",
+      "file": "dvb-8bit-full-07.ts",
+      "sha256": "8358bcdd9347a43f51688cf86f2d55e43a26f715efdea1768b803f30875986c5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 4368127072940738881
+      }
+    },
+    {
+      "id": "dvb-8bit-full-08",
+      "profile": "dvb-8bit-full-08",
+      "file": "dvb-8bit-full-08.ts",
+      "sha256": "a5072ad08ad1b098b2e0e806ee600a6757ad0fc65fed5824c314cc1aa149a9af",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 17294857959153093025
+      }
+    },
+    {
+      "id": "dvb-8bit-full-09",
+      "profile": "dvb-8bit-full-09",
+      "file": "dvb-8bit-full-09.ts",
+      "sha256": "62ae009f270651b24a73ea9894306386e448e8811591b9137ef283c8c87b3131",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 8363553035317661089
+      }
+    },
+    {
+      "id": "dvb-8bit-full-10",
+      "profile": "dvb-8bit-full-10",
+      "file": "dvb-8bit-full-10.ts",
+      "sha256": "2273e0d50981977463ea631b37ff9f213ac9167c108297c80bc7c8d9db8e5078",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 4022616362834701761
+      }
+    },
+    {
+      "id": "dvb-8bit-full-11",
+      "profile": "dvb-8bit-full-11",
+      "file": "dvb-8bit-full-11.ts",
+      "sha256": "d13bc84307850c1a9fd35aec50b4937abd7b11f3e77f1917268296da5d723e74",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 17769398985308811681
+      }
+    },
+    {
+      "id": "dvb-8bit-full-12",
+      "profile": "dvb-8bit-full-12",
+      "file": "dvb-8bit-full-12.ts",
+      "sha256": "50a9eaec3084c6f3eb95b99d8969b082e49d42af23d8862d9a9009430ede3aee",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 14324968367501959681
+      }
+    },
+    {
+      "id": "dvb-8bit-full-13",
+      "profile": "dvb-8bit-full-13",
+      "file": "dvb-8bit-full-13.ts",
+      "sha256": "5f475ad59bf14a576d24daf7741b26187f4e0286332332822755a6aab0cfe8a1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 8178821816558082177
+      }
+    },
+    {
+      "id": "dvb-8bit-full-14",
+      "profile": "dvb-8bit-full-14",
+      "file": "dvb-8bit-full-14.ts",
+      "sha256": "00a11a7554c37550163424491896fa7783dd3aac251c4a1eff89c4e9c4eb0701",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 4713253094114762945
+      }
+    },
+    {
+      "id": "dvb-8bit-full-15",
+      "profile": "dvb-8bit-full-15",
+      "file": "dvb-8bit-full-15.ts",
+      "sha256": "fbc9c6bc806c4321a96d3cc6421ed1470b12cd5a31c91e2870721dd3c55d0639",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 7799307381444313313
+      }
+    },
+    {
+      "id": "dvb-8bit-full-16",
+      "profile": "dvb-8bit-full-16",
+      "file": "dvb-8bit-full-16.ts",
+      "sha256": "fe48fec3b009550ac0c351f3a9dc61faadbc1625e4af4fe9a0d86d0059f110dc",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 2321486096010803297
+      }
+    },
+    {
+      "id": "dvb-8bit-full-17",
+      "profile": "dvb-8bit-full-17",
+      "file": "dvb-8bit-full-17.ts",
+      "sha256": "91e03e3aaf7807c886d29c511af8bbc8547ac46698853ac0597fcc945aea4751",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 2012051069043870497
+      }
+    },
+    {
+      "id": "dvb-8bit-full-18",
+      "profile": "dvb-8bit-full-18",
+      "file": "dvb-8bit-full-18.ts",
+      "sha256": "d99a226ee745000ab3d63915dd2b7bfc3f3101753d24b73db9910f6eaa90fffa",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 544474872746636161
+      }
+    },
+    {
+      "id": "dvb-8bit-full-19",
+      "profile": "dvb-8bit-full-19",
+      "file": "dvb-8bit-full-19.ts",
+      "sha256": "9f1d480c90b01a430871f452893742ac6e29227dbb081bb4492493890b2c8ea0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 7024466511938633729
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-00",
+      "profile": "dvb-8bit-reduced-00",
+      "file": "dvb-8bit-reduced-00.ts",
+      "sha256": "b00eefbc81503eda45d08bba5ecaff91231188b3ba05390feb76dd9bd67474a5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 9533404690515240865
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-01",
+      "profile": "dvb-8bit-reduced-01",
+      "file": "dvb-8bit-reduced-01.ts",
+      "sha256": "ff82a31cd86b9da0e253347884e39da84939d1900bdc1b36d4bb24948d1d7a8d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 10381931047656059329
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-02",
+      "profile": "dvb-8bit-reduced-02",
+      "file": "dvb-8bit-reduced-02.ts",
+      "sha256": "92ac1ae4fba1e8db479feb2dd86075ea95d144a1e4cf9d0318ad61b87ac6c0a1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 9068876137579929217
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-03",
+      "profile": "dvb-8bit-reduced-03",
+      "file": "dvb-8bit-reduced-03.ts",
+      "sha256": "86b065f9102b69b379185f564f464a3b5e0e097f4af4efa0cf6e51bd912906c6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 5700555925777964769
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-04",
+      "profile": "dvb-8bit-reduced-04",
+      "file": "dvb-8bit-reduced-04.ts",
+      "sha256": "1832cb42d053d4d60b23ded6a8436d2add4aee891a8fba501e66c89b5de44631",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 17865909260266993345
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-05",
+      "profile": "dvb-8bit-reduced-05",
+      "file": "dvb-8bit-reduced-05.ts",
+      "sha256": "ef0ad7fc7a0d9581f377ffb6db85bc040dfdafdd6bbdb9cb02370c51254ce717",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 11028455396727284769
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-06",
+      "profile": "dvb-8bit-reduced-06",
+      "file": "dvb-8bit-reduced-06.ts",
+      "sha256": "657d7c5b19a91c1451085c4ed650d80a9bd7427ee51fbc1d93dd073ba119b77c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 13265263278378167521
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-07",
+      "profile": "dvb-8bit-reduced-07",
+      "file": "dvb-8bit-reduced-07.ts",
+      "sha256": "2739c3a2c371a6c75b2568fd09f20b7a40909a5a9a7e6e36ade5549cb249211a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 16882400024113210209
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-08",
+      "profile": "dvb-8bit-reduced-08",
+      "file": "dvb-8bit-reduced-08.ts",
+      "sha256": "2e736dc0164929af6f0c48a47edfb18960ba27580557c527c6cb9476ae2b8335",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 3221326934752112417
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-09",
+      "profile": "dvb-8bit-reduced-09",
+      "file": "dvb-8bit-reduced-09.ts",
+      "sha256": "2373db80e6afa3cadaa0af22fe32a8668594a233ffbf54d0bd8090e93999dbde",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 11765599514001790721
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-10",
+      "profile": "dvb-8bit-reduced-10",
+      "file": "dvb-8bit-reduced-10.ts",
+      "sha256": "3f88fafa2f7740342ee9d9234bd666043358545c3302fad78b66096affeadf4c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 11461519145620278753
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-11",
+      "profile": "dvb-8bit-reduced-11",
+      "file": "dvb-8bit-reduced-11.ts",
+      "sha256": "3a55cabdad2049a559743e1bec08bcb10a6090165b6eb8fec280271814ec7b27",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 3031264886996930753
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-12",
+      "profile": "dvb-8bit-reduced-12",
+      "file": "dvb-8bit-reduced-12.ts",
+      "sha256": "46ce31bacbe78088f3e9e49bd77ca825a2dfb283857017a60d62789280ef2e70",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 11958304143540441633
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-13",
+      "profile": "dvb-8bit-reduced-13",
+      "file": "dvb-8bit-reduced-13.ts",
+      "sha256": "b49e4a021d0053e6bc0915f648a5b3fcb2eaf8d4b05c520c10d3f3d7ff25677c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 15139570718267981185
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-14",
+      "profile": "dvb-8bit-reduced-14",
+      "file": "dvb-8bit-reduced-14.ts",
+      "sha256": "1f2d3b9a7c87f6da0d7c97bb152a85186cb017244c205a512aeaa1d4f690af55",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 17534223797741787585
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-15",
+      "profile": "dvb-8bit-reduced-15",
+      "file": "dvb-8bit-reduced-15.ts",
+      "sha256": "efa8d74685bdd0ec9bcbd6184cd5badaa3eae8ed023855af003a83c026f36472",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 5444117115188988609
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-16",
+      "profile": "dvb-8bit-reduced-16",
+      "file": "dvb-8bit-reduced-16.ts",
+      "sha256": "9b1e5d894e350f3ae45e4b2c3a70140470d5cd33a6966b3b7b53893fb02a48a8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 8110327180960316353
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-17",
+      "profile": "dvb-8bit-reduced-17",
+      "file": "dvb-8bit-reduced-17.ts",
+      "sha256": "e1cc75882f70b7d6ec3e9af96292dee412fe8aedc5c5e9314d0e526f9dcf71a8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 18444869821888387521
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-18",
+      "profile": "dvb-8bit-reduced-18",
+      "file": "dvb-8bit-reduced-18.ts",
+      "sha256": "15f30929c55f048331604ddb1056dfbad64377e882a0b15e026f8e81fde6e0c9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 5191180114523755201
+      }
+    },
+    {
+      "id": "dvb-8bit-reduced-19",
+      "profile": "dvb-8bit-reduced-19",
+      "file": "dvb-8bit-reduced-19.ts",
+      "sha256": "493c7d715b1e52bc91187bb8fa02420a00542548a60d23f2144b5c17d70d92b0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/palette_sweep.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3072,
+        "digest": 1342385868383763489
+      }
+    }
+  ]
+}
