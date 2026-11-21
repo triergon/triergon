@@ -1,0 +1,12 @@
+{
+ "schema": "triergon.codecs.correctness-manifest.v1",
+ "vectors": [
+  {
+   "lane": "opus-ambisonic",
+   "name": "family-2-acn.opus",
+   "path": "harness/codecs/opus/family-2-acn.opus",
+   "bytes": 5733,
+   "sha256": "0271602f7eef4c181f2f50a68dd8cd73f96cefa1e7d6e85ef2f204ce51d604df"
+  }
+ ]
+}

@@ -22,6 +22,7 @@ of `harness/reference.c` with the decode profile's `ffmpeg` and `ffprobe`, drive
 | `rgba-*.json` | Observed letterbox scaling and RGBA conversion rules |
 | `aac/`, `ac3/`, `dca/`, `h264/`, `hevc/` | Per-codec tools and derivation notes |
 | `flac/`, `mp3/`, `ogg/` | Generators of the FLAC, MPEG audio, Ogg and Speex vectors |
+| `opus/` | Authored family 2 probe and its float PCM, frame length and layout comparison with FFmpeg native Opus |
 | `codec-comparison`, `audio-review-linux-arm64`, `audio-quick-check-linux-arm64` evidence sets | Recorded comparison runs: correctness rows, timing and memory records, identity hashes; `cargo xtask evidence fetch SET` unpacks one into `.research/evidence/SET/` |
 | `codec-reference-binary`, `codec-reference-reproduction` evidence sets | The reference worker, and the proof that `prepare-ffmpeg --profile decode` rebuilds it (byte-identical output on every vector and workload) |
 

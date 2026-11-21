@@ -107,3 +107,7 @@ Constant tables are taken from RFC 6716; see [THIRD-PARTY.md](THIRD-PARTY.md).
 RFC 6716 with the RFC 8251 updates, RFC 7845 for the identification header, and RFC 8486
 for Ambisonic channel mapping. Verification: [harness/codecs](../../harness/codecs/STATUS.md); results
 in [docs/status.md](../../docs/status.md).
+
+A four-channel family 2 comparison against FFmpeg's native Opus decoder checks
+layout, frame lengths and float PCM. A diagnostic comparison with FFmpeg's libopus
+decoder reports `quad` where this decoder reports `ambisonic 1`.

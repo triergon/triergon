@@ -19,25 +19,38 @@ struct Summary {
     samples: u64,
     errors: u64,
     last_error: String,
+    frame_lengths: Option<Vec<usize>>,
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let [_, input, output] = args.as_slice() else {
-        eprintln!("usage: decode_audio INPUT OUTPUT.f32");
+    let [_, input, output, rest @ ..] = args.as_slice() else {
+        eprintln!("usage: decode_audio INPUT OUTPUT.f32 [--frame-lengths]");
         std::process::exit(2);
     };
+    if !rest.is_empty() && rest != ["--frame-lengths"] {
+        std::process::exit(2);
+    }
     let file = std::fs::File::open(input).expect("input");
     let mut out = std::io::BufWriter::new(std::fs::File::create(output).expect("output"));
     let mut summary = Summary::default();
+    if !rest.is_empty() {
+        summary.frame_lengths = Some(Vec::new());
+    }
     if let Err(error) = decode(file, &mut out, &mut summary) {
         summary.errors += 1;
         summary.last_error = error;
     }
     out.flush().expect("flush");
     let (rate, layout) = summary.format.unwrap_or_default();
+    let lengths = summary
+        .frame_lengths
+        .as_ref()
+        .map_or_else(String::new, |lengths| {
+            format!(",\"frame_lengths\":{lengths:?}")
+        });
     eprintln!(
-        "{{\"sample_rate\":{rate},\"channels\":{},\"layout\":\"{}\",\"frames\":{},\"samples_per_channel\":{},\"errors\":{},\"last_error\":{:?}}}",
+        "{{\"sample_rate\":{rate},\"channels\":{},\"layout\":\"{}\",\"frames\":{},\"samples_per_channel\":{},\"errors\":{},\"last_error\":{:?}{lengths}}}",
         layout.channels(),
         if summary.format.is_some() {
             layout.name()
@@ -108,6 +121,9 @@ impl Summary {
         match decoded {
             Ok(_) if frame.samples_per_channel == 0 => {}
             Ok(_) => {
+                if let Some(lengths) = &mut self.frame_lengths {
+                    lengths.push(frame.samples_per_channel);
+                }
                 self.frames += 1;
                 self.samples += frame.samples_per_channel as u64;
                 self.format.get_or_insert((frame.sample_rate, frame.layout));

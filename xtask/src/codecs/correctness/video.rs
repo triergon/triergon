@@ -190,7 +190,7 @@ pub(super) fn decoder(
     lane: &str,
     path: &str,
 ) -> Result<Value, Stop> {
-    let (probe_rc, stream) = probe(ffprobe, path, None, false)?;
+    let (probe_rc, stream) = probe(ffprobe, path, None, false, None)?;
     let ours_argv = vec![
         example.to_owned(),
         path.to_owned(),

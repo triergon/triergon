@@ -36,7 +36,7 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  check each against its correctness manifest pin
   manifest --out M.json LANE=DIR[,DIR...]...
                  hash every vector of each lane (h264, hevc, ac3, eac3, aac, aac-mov, dts, flac,
-                 mp3, mp2, mp1, vorbis, opus; reader-ogg, reader-flac, reader-mp3,
+                 mp3, mp2, mp1, vorbis, opus, opus-ambisonic; reader-ogg, reader-flac, reader-mp3,
                  reader-aac, reader-ac3, reader-eac3)
   grade --manifest M.json --root R --bin DIR --ffmpeg FF --ffprobe FP --codec-worker W
         [--codec-worker-for OPERATION=W2 ...] --reference R2 --out OUT.jsonl [--scratch DIR]

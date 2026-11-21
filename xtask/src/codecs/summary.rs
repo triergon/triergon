@@ -162,7 +162,7 @@ fn classify(row: &Value, lane: &str) -> String {
     let ds = get(decoder, "status").or_else(|| get(row, "status"));
     let os = get(output, "status");
     let is = |v: Option<&Value>, s: &str| text(v) == Some(s);
-    if lane == "aac-mov" {
+    if lane == "aac-mov" || lane == "opus-ambisonic" {
         return if is(ds, "pass") { "pass" } else { "FAIL" }.into();
     }
     let os_none = matches!(os, None | Some(Value::Null));
