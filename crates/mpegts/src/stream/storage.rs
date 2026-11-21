@@ -107,8 +107,8 @@ impl TransportStorageCursor {
                 }
             }
             Self::PatSection(version, index) => {
-                let table =
-                    stream.collector.retained_sections()[version].expect("retained PAT version");
+                let table = stream.collector.retained_sections()[version]
+                    .ok_or(Error::Invalid("PAT storage audit version"))?;
                 if let Some(section) = table.as_slice().get(index) {
                     *self = Self::PatBacking(version, index);
                     let bytes = table_storage(&section.programs)?
@@ -122,8 +122,8 @@ impl TransportStorageCursor {
             }
             Self::PatBacking(version, index) => {
                 *self = Self::PatSection(version, index + 1);
-                let table =
-                    stream.collector.retained_sections()[version].expect("retained PAT version");
+                let table = stream.collector.retained_sections()[version]
+                    .ok_or(Error::Invalid("PAT storage audit version"))?;
                 Some(StorageItem::Bytes(&table.as_slice()[index].source))
             }
             Self::Route(index) => {
@@ -150,7 +150,7 @@ impl TransportStorageCursor {
                 let assembler = routes[route]
                     .assembler
                     .as_ref()
-                    .expect("retained PES route");
+                    .ok_or(Error::Invalid("PES storage audit route"))?;
                 if let Some(bytes) = assembler.span_backing(index) {
                     *self = Self::Span(route, index + 1);
                     Some(StorageItem::Bytes(bytes))

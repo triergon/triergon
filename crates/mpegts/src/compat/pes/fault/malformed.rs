@@ -568,7 +568,11 @@ impl MalformedInputCompletion {
                 ));
             }
             let observer = self.observer(observer, context)?;
-            let pending = self.pending.take().expect("matching malformed diagnostic");
+            let Some(pending) = self.pending.take() else {
+                return Err(Error::Invalid(
+                    "malformed completion source diagnostic mismatch",
+                ));
+            };
             observer.inner.note_recovered(
                 pending.packet.continuity_counter,
                 pending.packet.source_offset,

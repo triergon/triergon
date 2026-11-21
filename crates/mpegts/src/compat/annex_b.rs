@@ -192,7 +192,9 @@ impl ContinuityReader {
                         false
                     }
                 };
-                let job = self.pending.take().expect("processed source");
+                let Some(job) = self.pending.take() else {
+                    return Err(Error::Invalid("Annex B source job missing"));
+                };
                 if job.published {
                     continue;
                 }

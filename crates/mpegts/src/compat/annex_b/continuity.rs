@@ -344,7 +344,7 @@ impl Proof {
         else {
             return Ok(EofStep::Yield);
         };
-        let run = route.run.take().expect("finished continuity run");
+        let run = route.run.take().ok_or(UNOBSERVED)?;
         let pool = run.chunks.budget().clone();
         let residue = Charged::boxed(
             &pool,
@@ -452,7 +452,7 @@ impl Route {
                 return Ok(Effect::Evidence(context));
             }
             TraceEvent::Diagnostic(_) if self.matches(event) && self.unresolved_diagnostic() => {
-                self.last.as_mut().expect("matching carrier").confirmed = true;
+                self.last.as_mut().ok_or(UNOBSERVED)?.confirmed = true;
                 return Ok(Effect::Evidence(context));
             }
             TraceEvent::Timeline { .. } if self.matches(event) => {
@@ -652,7 +652,7 @@ impl Run {
     }
 
     fn scan(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
-        let scan = self.scan.as_mut().expect("pending continuity scan");
+        let scan = self.scan.as_mut().ok_or(UNOBSERVED)?;
         while let Some(span) = scan.packet.spans.as_slice().get(scan.span) {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -699,7 +699,7 @@ impl Run {
         if !work.try_charge(1) {
             return Ok(false);
         }
-        let scan = self.scan.take().expect("complete continuity scan");
+        let scan = self.scan.take().ok_or(UNOBSERVED)?;
         self.chunks
             .try_push(scan.packet)
             .map_err(|error| error.error)?;

@@ -201,15 +201,22 @@ impl<'a> PatSelection<'a> {
                     }
                 }
                 4 => {
-                    let route = self.selected.map(|pmt_pid| PatRoute {
-                        entity: self.entity.expect("validated PAT range"),
-                        tsid: self.table.header.extension,
-                        program: self.requested,
-                        pmt_pid,
-                        version: self.table.header.version,
-                        context: self.context,
-                        programs: self.programs,
-                    });
+                    let route = self
+                        .selected
+                        .map(|pmt_pid| -> Result<PatRoute> {
+                            Ok(PatRoute {
+                                entity: self.entity.ok_or(Error::Invalid(
+                                    "selected PAT must be a complete current source table",
+                                ))?,
+                                tsid: self.table.header.extension,
+                                program: self.requested,
+                                pmt_pid,
+                                version: self.table.header.version,
+                                context: self.context,
+                                programs: self.programs,
+                            })
+                        })
+                        .transpose()?;
                     if cancel.load(Ordering::Relaxed) {
                         return Err(Error::Cancelled);
                     }
