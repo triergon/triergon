@@ -178,6 +178,46 @@ pub fn measure_with(
     measure_dyn(invocation, name, held, fields, &mut operation)
 }
 
+/// Measure a workload whose required outcome may be a deterministic refusal.
+/// Execute every planned repetition and retain the first refusal for reporting.
+///
+/// # Errors
+///
+/// When the outcome changes between repetitions, the operation fails, retains
+/// charged storage, or stdout fails.
+pub fn measure_repeated(
+    invocation: &Invocation<'_>,
+    name: &str,
+    held: Option<&Budget>,
+    mut operation: impl FnMut() -> Result<Totals>,
+) -> Result<()> {
+    let retained = held.map(Budget::used);
+    let mut runs = 0;
+    let mut first_refusal = None::<Box<Refusal>>;
+    measure(invocation, name, held, || {
+        let mut totals = operation()?;
+        let refusal = totals.refusal.take();
+        if runs == 0 {
+            first_refusal = refusal;
+        } else {
+            match (&first_refusal, refusal) {
+                (None, None) => {}
+                (Some(first), Some(next))
+                    if first.reason == next.reason && first.cause == next.cause => {}
+                _ => return Err("operation outcome changed across repetitions".into()),
+            }
+        }
+        runs += 1;
+        if runs == invocation.iterations && first_refusal.is_some() {
+            if held.map(Budget::used) != retained {
+                return Err("operation retained charged storage".into());
+            }
+            totals.refusal = first_refusal.take();
+        }
+        Ok(totals)
+    })
+}
+
 /// [`measure_with`] with the operation behind a reference, so each worker binary
 /// holds one copy of the loop and of the result line.
 fn measure_dyn(
@@ -233,4 +273,32 @@ fn measure_dyn(
     writeln!(out, "{line}")?;
     out.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repeated_refusals_execute_every_operation() -> Result<()> {
+        let invocation = Invocation {
+            mode: Mode::Fold,
+            path: "",
+            iterations: 50,
+            arguments: &[],
+        };
+        let mut executed = 0;
+        measure_repeated(&invocation, "test-refusal", None, || {
+            executed += 1;
+            Ok(Totals {
+                refusal: Some(Box::new(Refusal {
+                    reason: "control refusal".into(),
+                    cause: "{}".into(),
+                })),
+                ..Totals::default()
+            })
+        })?;
+        assert_eq!(executed, invocation.iterations);
+        Ok(())
+    }
 }

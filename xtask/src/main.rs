@@ -41,6 +41,7 @@ mod shape;
 mod stats;
 mod subtitle_fixtures;
 mod toml;
+mod transport_fate;
 mod transport_fixtures;
 mod walk;
 mod worker_tests;
@@ -165,6 +166,8 @@ commands:
                  fails above the quick-check limit
   screen         REPORTS   grade one paired timing round, with each contract's report
                  under REPORTS/<contract>, against the quick-check tolerances
+  transport-fate check | inventory OUTPUT | observe SPEC OUTPUT_DIR
+                 check TS identity coverage or record pinned original-input observations
   fate-inventory --source DIR --output FILE [--configured-list FILE]
                  index FATE definitions as data; nothing is executed
   codecs         aac-access-units|manifest|grade|summarize|time|equivalence
@@ -223,6 +226,7 @@ fn main() -> ExitCode {
         Some("fixture") => fixture(&root, &args[1..]),
         Some("subtitle-fixtures") => subtitle_fixtures::main(&root, &args[1..]),
         Some("fate-inventory") => fate_inventory(&args[1..]),
+        Some("transport-fate") => transport_fate::main(&root, &args[1..]),
         Some("compare") => compare(&root, &args[1..]),
         Some("link-order") => link_order(&root, &args[1..]),
         Some("same-code") => match &args[1..] {
@@ -858,6 +862,7 @@ families and options:
   transport-access-units --output ROOT [--record --reference-worker FILE --observations DIR]
            regenerate MPEG-TS access-unit inputs and their reference-pinned corpus
   transport-dts --record REFERENCE   regenerate DVB DTS core transport inputs and pins
+  transport-dts-discovery FATE_DTS_TS [--record REFERENCE]   generate automatic DTS controls
   transport-dts-hd --record REFERENCE   regenerate DTS-HD transport inputs and pins
   transport-dts-hd-grouped [--record REFERENCE]   generate DTS-HD source AU controls
   transport-dts-seek --record REFERENCE   regenerate DTS core seek inputs and pins
@@ -879,6 +884,9 @@ fn fixture(root: &Path, args: &[String]) -> Task {
     }
     if family == "transport-access-units" {
         return transport_fixtures::main(root, &args[1..]);
+    }
+    if family == "transport-dts-discovery" {
+        return transport_fixtures::dts_discovery::main(root, &args[1..]);
     }
     if family == "transport-dts-hd-grouped" {
         return transport_fixtures::dts_hd::main(root, &args[1..]);

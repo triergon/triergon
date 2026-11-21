@@ -1,0 +1,27 @@
+{
+ "name": "gate-run-aarch64-6de1193f-20261121-153915-shard-1",
+ "path": "gate-run-aarch64-6de1193f-20261121-153915-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at 6de1193f, the merge of main 6ca0098d into 4ec296c5, one c6g.4xlarge host (Graviton2) from the gate image, Linux AArch64: the progressive item (MPEG-TS progressive playback: parity, timing on CPU 1 and kernel-bound memory on CPUs 1-15, no result reused); the shard outputs, build identities, plan, step records and logs; archived by hand after the run's credentials expired, with the gate's own pack, upload check and index entry",
+ "key": "evidence/gate-runs/6de1193fbc8dd0676d09cd4ee36cf295cec84b9a-aarch64-20261121-153915/shard-1/aa36b628d6313a7cfd91c1fffa5c5274ed0abbbf12d66df114263ab74587f491.tar.zst",
+ "sha256": "aa36b628d6313a7cfd91c1fffa5c5274ed0abbbf12d66df114263ab74587f491",
+ "bytes": 5323609,
+ "results": [
+  {
+   "path": "memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "ea2c2bf11afdab9c87c1fec5d01ca2c1e20fe41ab7f4304a70063f1660a33d6e",
+   "status": 0,
+   "report_sha256": "7e07c9f49ac8078e2a66148f13e715605f8c9676cf37c5026ac8a9c47784c1c7",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "25ec30d5172afadb1247ec75c6f16e7c6110354dacae31b900dc927dd4a74c10",
+   "status": 0,
+   "report_sha256": "0725719b5d2c8dbbb0889582715b333a4563ca53fb9c8c7a5bbc7bc26e47eede",
+   "cases_checked": true
+  }
+ ]
+}

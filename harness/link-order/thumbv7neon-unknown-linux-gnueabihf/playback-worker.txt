@@ -377,6 +377,7 @@ core::ptr::drop_glue::<core::option::Option<triergon_mpegts::stream::Job>>
 <triergon_core::bytes::BudgetVec<triergon_mpegts::psi::pat_table::PatSourceRange>>::reallocate
 <triergon_mpegts::stream::TransportStream>::apply_pat
 core::ptr::drop_glue::<alloc::vec::Vec<triergon_mpegts::stream::PesRoute>>
+<triergon_playback::engines::TsEngine>::adopt_table
 core::ptr::drop_glue::<triergon_mpegts::psi::pat_table::PatTable>
 <triergon_core::bytes::BudgetVec<triergon_mpegts::psi::tables::ElementaryStream>>::reallocate
 <triergon_mpegts::stream::TransportStream>::poll_map
@@ -449,6 +450,7 @@ playback_worker::hls::run::{closure#1}
 <triergon_mpegts::stream::TransportStream>::feed::<true>
 <triergon_mpegts::stream::TransportStream>::drain::<true>
 <triergon_playback::engines::TsEngine>::discover_tracks
+<triergon_playback::engines::TsEngine>::deliver_feed_event::<triergon_playback::engines::BackendStep>
 <triergon_playback::player::Player<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>::accept_event::<true>
 <triergon_playback::player::Player<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>::admit
 <triergon_playback::hls_segment::SegmentReader<triergon_playback::input::ByteSource, triergon_playback::hls_avc::AvcTsReader, triergon_playback::hls_aac::HlsAac>>::on_event
@@ -578,7 +580,6 @@ core::ptr::drop_glue::<triergon_playback::raw_video::config::RawVideoConfigTrack
 core::ptr::drop_glue::<triergon_playback::hls_segment::HlsSegment<triergon_playback::hls_clock::HlsParserOnlyAudioClock, triergon_playback::hls_segment::lanes::HlsMediaVideoUnit, triergon_playback::hls_segment::lanes::HlsMediaAudioUnit>>
 playback_worker::raw_video::run
 playback_worker::packet_fold::drive::<playback_worker::raw_video::operate>::{closure#1}
-<triergon_playback::raw_video::probe::Head>::header
 <triergon_playback::raw_video::RawVideoSource<triergon_playback::raw_video::probe::ProbeReplay<triergon_playback::input::ByteSource>>>::into_feed
 <triergon_framing::raw_annex_b::RawAnnexBReader>::provide
 <triergon_framing::avc_picture::Rbsp>::unsigned
@@ -596,7 +597,6 @@ core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_framing::reader:
 core::ptr::drop_glue::<triergon_playback::io::SourceOwner<triergon_playback::raw_video::probe::ProbeReplay<triergon_playback::input::ByteSource>>>
 core::ptr::drop_glue::<triergon_playback::raw_video::feed::State<triergon_playback::raw_video::probe::ProbeReplay<triergon_playback::input::ByteSource>>>
 core::ptr::drop_glue::<triergon_playback::raw_video::probe::RawVideoProbe<triergon_playback::input::ByteSource>>
-<triergon_playback::raw_video::probe::Head>::hevc_base_header
 <triergon_playback::raw_video::config::RawVideoConfiguration>::hevc_timing
 triergon_playback::raw_video::config::hevc::sps_timing
 <triergon_playback::raw_video::config::hevc::Rbsp>::flag
