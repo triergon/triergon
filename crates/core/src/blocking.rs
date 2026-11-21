@@ -59,14 +59,17 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
         }
     }
 
+    /// The reader, for its tracks and format detail.
     pub fn reader(&self) -> &R {
         &self.reader
     }
 
+    /// The reader, mutably.
     pub fn reader_mut(&mut self) -> &mut R {
         &mut self.reader
     }
 
+    /// The source, at whatever offset the last read left it.
     pub fn into_inner(self) -> S {
         self.source
     }
@@ -208,10 +211,13 @@ impl<S: Read + Seek> Feed<S> {
         })
     }
 
+    /// The source. The feed seeks only when a request does not continue its
+    /// last answer, so a caller that moves the source moves it back.
     pub fn source_mut(&mut self) -> &mut S {
         &mut self.source
     }
 
+    /// The source, at whatever offset the last read left it.
     pub fn into_inner(self) -> S {
         self.source
     }

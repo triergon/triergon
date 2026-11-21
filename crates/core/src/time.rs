@@ -6,15 +6,23 @@ use std::{
     num::{NonZeroU64, NonZeroU128},
 };
 
+/// How a conversion to whole ticks treats a value between two of them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Rounding {
+    /// The tick nearer to zero.
     TowardZero,
+    /// The tick farther from zero.
     AwayFromZero,
+    /// The lower tick.
     Floor,
+    /// The upper tick.
     Ceil,
+    /// The nearest tick; halfway, the one farther from zero.
     NearestAway,
 }
 
+/// The length of one clock tick in seconds, as a reduced fraction of two
+/// non-zero `u64`: 1/90000 for an MPEG clock.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TimeBase {
     numerator: NonZeroU64,
@@ -22,21 +30,20 @@ pub struct TimeBase {
 }
 
 impl TimeBase {
-    /// A clock tick lasting one microsecond.
+    /// One microsecond per tick.
     pub const MICROSECONDS: Self = Self {
         numerator: NonZeroU64::MIN,
         denominator: NonZeroU64::new(1_000_000).unwrap(),
     };
 
-    /// One nanosecond, the Matroska packet clock after TimestampScale.
+    /// One nanosecond per tick.
     pub const NANOSECONDS: Self = Self {
         numerator: NonZeroU64::MIN,
-        denominator: match NonZeroU64::new(1_000_000_000) {
-            Some(value) => value,
-            None => unreachable!(),
-        },
+        denominator: NonZeroU64::new(1_000_000_000).unwrap(),
     };
 
+    /// `numerator / denominator` seconds per tick, reduced. A zero in either
+    /// is [`Error::Invalid`].
     pub fn new(numerator: u64, denominator: u64) -> Result<Self> {
         if numerator == 0 || denominator == 0 {
             return Err(Error::Invalid("zero timebase"));
@@ -48,12 +55,16 @@ impl TimeBase {
             denominator: NonZeroU64::new(denominator).ok_or(Error::Invalid("timebase"))?,
         })
     }
+    /// The reduced numerator.
     pub fn numerator(self) -> u64 {
         self.numerator.get()
     }
+    /// The reduced denominator.
     pub fn denominator(self) -> u64 {
         self.denominator.get()
     }
+    /// `ticks` of this base in ticks of `to`, rounded as asked.
+    /// [`Error::Overflow`] when the result does not fit `i64`.
     pub fn rescale(self, ticks: i64, to: Self, rounding: Rounding) -> Result<i64> {
         if self == to || ticks == 0 {
             return Ok(ticks);
@@ -98,6 +109,7 @@ pub struct TickScale {
 }
 
 impl TickScale {
+    /// The conversion of ticks of `from` into ticks of `to`.
     pub fn new(from: TimeBase, to: TimeBase) -> Self {
         // Both bases are reduced, so the ratio `(a · d) / (b · c)` of `a/b` in
         // `c/d` reduces by `gcd(a, c) · gcd(b, d)`.
@@ -114,15 +126,18 @@ impl TickScale {
         Self { from, to, reduced }
     }
 
+    /// The base converted from.
     pub fn from(&self) -> TimeBase {
         self.from
     }
 
+    /// The base converted to.
     pub fn to(&self) -> TimeBase {
         self.to
     }
 
-    /// `ticks` of `from` in ticks of `to`, rounded as asked.
+    /// `ticks` of `from` in ticks of `to`, rounded as asked: the result of
+    /// [`TimeBase::rescale`], error included.
     pub fn rescale(&self, ticks: i64, rounding: Rounding) -> Result<i64> {
         let Some((quotient, remainder, at_least_half)) = self.divide(ticks.unsigned_abs()) else {
             return self.from.rescale(ticks, self.to, rounding);
@@ -321,9 +336,12 @@ fn high_product(a: u64, b: u64) -> u64 {
     a_high * b_high + (middle_a >> 32) + (middle_b >> 32) + carry
 }
 
-/// Canonical exact source time. Unknown time is `Option<Time>`; no value is a
-/// sentinel. Arithmetic reduces before checking the public representation's
-/// bounds; a wider intermediate alone is not a reason to reject valid time.
+/// An exact time in seconds, possibly negative: an `i128` over a positive
+/// `u128`, always reduced, so equal times compare equal.
+///
+/// No value means "unknown"; that is `Option<Time>`. Arithmetic fails with
+/// [`Error::Overflow`] only when the reduced result does not fit, never because
+/// an intermediate product did not.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Time {
     numerator: i128,
@@ -356,6 +374,8 @@ fn gcd(mut a: u128, mut b: u128) -> u128 {
 }
 
 impl Time {
+    /// `numerator / denominator` seconds, reduced. A zero denominator is
+    /// [`Error::Invalid`].
     pub fn new(numerator: i128, denominator: u128) -> Result<Self> {
         if denominator == 0 {
             return Err(Error::Invalid("zero time denominator"));
@@ -386,6 +406,7 @@ impl Time {
                 .ok_or(Error::Invalid("time denominator"))?,
         })
     }
+    /// The time of `ticks` ticks of `base`.
     pub fn from_ticks(ticks: i128, base: TimeBase) -> Result<Self> {
         let absolute = ticks.unsigned_abs();
         let base_denominator = base.denominator();
@@ -410,9 +431,11 @@ impl Time {
             denominator: NonZeroU128::new(denominator).ok_or(Error::Invalid("time denominator"))?,
         })
     }
+    /// The reduced numerator, which carries the sign.
     pub fn numerator(self) -> i128 {
         self.numerator
     }
+    /// The reduced denominator, at least 1.
     pub fn denominator(self) -> u128 {
         self.denominator.get()
     }
@@ -490,12 +513,15 @@ impl Time {
             .ok_or(Error::Overflow)?;
         Self::new(signed(numerator, negative)?, denominator)
     }
+    /// The exact sum.
     pub fn checked_add(self, other: Self) -> Result<Self> {
         self.combine(other, false)
     }
+    /// The exact difference.
     pub fn checked_sub(self, other: Self) -> Result<Self> {
         self.combine(other, true)
     }
+    /// This time in ticks of `base`, rounded as asked.
     pub fn to_ticks(self, base: TimeBase, rounding: Rounding) -> Result<i128> {
         let exact_denominator = self.denominator();
         if base.numerator() == 1
@@ -547,9 +573,12 @@ impl Time {
             rounding,
         )
     }
+    /// [`to_ticks`](Self::to_ticks) as an `i64`; [`Error::Overflow`] when it
+    /// does not fit.
     pub fn to_i64_ticks(self, base: TimeBase, rounding: Rounding) -> Result<i64> {
         i64::try_from(self.to_ticks(base, rounding)?).map_err(|_| Error::Overflow)
     }
+    /// This time in nanoseconds, rounded as asked.
     pub fn to_nanoseconds(self, rounding: Rounding) -> Result<i64> {
         self.to_i64_ticks(TimeBase::NANOSECONDS, rounding)
     }

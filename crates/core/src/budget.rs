@@ -1,4 +1,4 @@
-//! Live capacity reservations shared by storage owners, including caller retention.
+//! The accounting pool every input-dependent allocation is charged to.
 use crate::{Error, Result};
 use std::sync::{
     Arc,
@@ -14,7 +14,12 @@ struct Inner {
     generation: AtomicUsize,
 }
 
-/// One live allocation pool. Clones share accounting rather than multiplying limits.
+/// A pool with a fixed byte limit that every live allocation is charged to.
+///
+/// Clones share one account. A charge is a [`Reservation`] and lasts until it
+/// drops, wherever the storage it covers has travelled: output a caller keeps
+/// stays charged. The counters are requested capacity, not allocator overhead
+/// or process memory.
 #[derive(Clone, Debug)]
 pub struct Budget(Arc<Inner>);
 
@@ -39,13 +44,14 @@ fn allocate_pool_id(counter: &AtomicUsize) -> Result<PoolId> {
 }
 
 impl Budget {
-    /// Fixed tracked charge for this pool's shared control allocation. Cloning
-    /// the pool does not create or charge another control allocation.
+    /// Bytes every pool charges itself for its own shared state: what
+    /// [`used`](Self::used) reports for an empty pool.
     pub const fn control_storage_bytes() -> usize {
         CONTROL_BYTES
     }
-    /// Includes the pool's own fixed Arc/control storage. Allocator overhead is
-    /// measured separately; these counters track requested/retained capacity.
+    /// A pool that holds at most `limit` bytes, its own
+    /// [`control_storage_bytes`](Self::control_storage_bytes) included. Fails
+    /// with [`Error::Limit`] when `limit` is below those.
     pub fn new(limit: usize) -> Result<Self> {
         if limit < CONTROL_BYTES {
             return Err(Error::Limit {
@@ -61,25 +67,30 @@ impl Budget {
             generation: AtomicUsize::new(0),
         })))
     }
+    /// The limit the pool was made with, in bytes.
     pub fn limit(&self) -> usize {
         self.0.limit
     }
+    /// Bytes charged now.
     pub fn used(&self) -> usize {
         self.0.used.load(Ordering::Relaxed)
     }
-    /// High-water charged capacity, including pending reservations, not process RSS.
+    /// The most bytes that were ever charged at once.
     pub fn peak(&self) -> usize {
         self.0.peak.load(Ordering::Relaxed)
     }
+    /// Bytes still free: [`limit`](Self::limit) less [`used`](Self::used).
     pub fn available(&self) -> usize {
         self.limit() - self.used()
     }
+    /// Whether `other` is a clone of this pool.
     pub fn same_pool(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
     }
     pub(crate) fn identity(&self) -> PoolId {
         self.0.id
     }
+    /// A generation no cursor of this pool has had.
     pub(crate) fn next_generation(&self) -> Result<u64> {
         let mut current = self.0.generation.load(Ordering::Relaxed);
         loop {
@@ -96,6 +107,9 @@ impl Budget {
             }
         }
     }
+    /// Charges `bytes`. Fails with [`Error::Limit`] when they exceed what an
+    /// empty pool could hold, and with [`Error::Backpressure`] when they fit
+    /// only once other charges are released; neither changes the pool.
     pub fn reserve(&self, bytes: usize) -> Result<Reservation> {
         self.claim(bytes)?;
         Ok(Reservation {
@@ -144,8 +158,10 @@ impl Budget {
     }
 }
 
-/// Linear charge. Keep it inside the allocation owner until that allocation drops.
-/// It intentionally cannot be cloned independently of the storage it protects.
+/// A charge of some bytes on a [`Budget`], returned to it on drop.
+///
+/// It is not `Clone`: one charge covers one allocation, and lives in that
+/// allocation's owner so both end together.
 #[derive(Debug)]
 pub struct Reservation {
     pub(crate) budget: Budget,
@@ -153,13 +169,14 @@ pub struct Reservation {
 }
 
 impl Reservation {
+    /// Bytes charged.
     pub fn bytes(&self) -> usize {
         self.bytes
     }
-    /// Charges exactly `bytes`, for an owner that keeps its storage in plain
-    /// containers. Growth claims the difference with the pool's limit and
-    /// pressure checks and leaves the charge unchanged on failure; shrinking
-    /// returns the difference to the pool.
+    /// Changes the charge to exactly `bytes`, for an owner that keeps its
+    /// storage in plain containers. Growth claims the difference as
+    /// [`Budget::reserve`] would and leaves the charge unchanged on failure;
+    /// shrinking returns the difference to the pool and cannot fail.
     pub fn resize_to(&mut self, bytes: usize) -> Result<()> {
         if bytes < self.bytes {
             self.shrink_by(self.bytes - bytes);
@@ -184,13 +201,14 @@ impl Reservation {
             self.bytes -= bytes;
         }
     }
-    /// Claims `extra` more bytes, with the pool's own limit and pressure checks.
+    /// Claims `extra` more bytes, as [`Budget::reserve`] would.
     pub(crate) fn grow_by(&mut self, extra: usize) -> Result<()> {
         self.budget.claim(extra)?;
         // Both terms are bounded by the pool limit after a successful claim.
         self.bytes += extra;
         Ok(())
     }
+    /// Grows the charge to `bytes`, which must not be less than it holds.
     pub(crate) fn grow_to(&mut self, bytes: usize) -> Result<()> {
         if bytes < self.bytes {
             return Err(Error::Invalid("reservation growth shrinks"));
@@ -203,8 +221,9 @@ impl Reservation {
     }
 }
 
-/// A value whose storage stays charged for as long as it lives: state a stream
-/// creates per element, such as a substream, channel element or extension decoder.
+/// A value with the charge for its storage, released together: state a stream
+/// creates per element, such as a substream, channel element or extension
+/// decoder. It dereferences to the value.
 #[derive(Debug)]
 pub struct Charged<T> {
     value: T,
@@ -212,7 +231,8 @@ pub struct Charged<T> {
 }
 
 impl<T> Charged<T> {
-    /// Charges `bytes` to `budget`, then builds the value.
+    /// Charges `bytes` to `budget`, then builds the value; `make` does not run
+    /// when the charge is refused.
     pub fn try_new(budget: &Budget, bytes: usize, make: impl FnOnce() -> T) -> Result<Self> {
         let charge = budget.reserve(bytes)?;
         Ok(Self {
@@ -220,12 +240,13 @@ impl<T> Charged<T> {
             charge,
         })
     }
-    /// `value` in a box charged for its size: state of fixed size that a stream
-    /// creates. Storage the value owns elsewhere charges itself (`BudgetVec`).
+    /// `value` in a box charged `size_of::<T>()` bytes. Storage the value owns
+    /// elsewhere is not counted; it charges itself, as a
+    /// [`BudgetVec`](crate::BudgetVec) does.
     pub fn boxed(budget: &Budget, value: T) -> Result<Charged<Box<T>>> {
         Charged::try_new(budget, size_of::<T>(), || Box::new(value))
     }
-    /// The bytes charged for this value.
+    /// Bytes charged for this value.
     pub fn charged_bytes(&self) -> usize {
         self.charge.bytes()
     }

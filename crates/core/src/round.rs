@@ -1,9 +1,9 @@
 //! Rounding of floating-point values to integers.
 
-/// C `lrint` in the default rounding mode, narrowed to `i32`: the nearest
-/// integer, ties to even. Values beyond the `i32` range saturate and NaN is 0,
-/// as 32-bit ARM's conversion gives them. libass rounds its 26.6 coordinates
-/// this way (`double_to_d6` is `round_ties_even_i32(x * 64.0)`).
+/// The integer nearest to `x`, ties to even: C `lrint` in the default rounding
+/// mode, narrowed to `i32`. Values beyond the `i32` range saturate and NaN is 0,
+/// on every target. A coordinate in 26.6 fixed point is
+/// `round_ties_even_i32(x * 64.0)`.
 #[inline]
 pub fn round_ties_even_i32(x: f64) -> i32 {
     x.round_ties_even() as i32

@@ -1,43 +1,77 @@
 use std::{fmt, io};
 
-/// The one error type of every format, playback and core operation. Variants
-/// keep their typed detail; nothing converts it away.
+/// The error of every format, codec, playback and core operation.
+///
+/// It is `Copy` and small: a class, with the numbers or the `&'static str` that
+/// tell one cause from another. Building one allocates and formats nothing.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Error {
+    /// The input breaks its format's syntax or a caller broke a precondition;
+    /// the text names what.
     Invalid(&'static str),
-    /// Live capacity request above the budget policy.
+    /// A request for `requested` bytes exceeds the `maximum` a pool or window
+    /// policy allows. It can never succeed for this input.
     Limit {
+        /// Bytes asked for.
         requested: usize,
+        /// The most a single request may take.
         maximum: usize,
     },
-    /// A named format policy limit (element count, depth, scan bytes, ...).
+    /// A named format limit was exceeded (element count, nesting depth, scan
+    /// distance). Like [`Error::Limit`], permanent for this input.
     Policy(&'static str),
+    /// The pool has only `available` of the `requested` bytes free because the
+    /// caller still holds earlier output. Nothing changed: release output and
+    /// repeat the call.
     Backpressure {
+        /// Bytes asked for.
         requested: usize,
+        /// Bytes the pool had free.
         available: usize,
     },
+    /// The allocator refused memory the pool had granted.
     Allocation,
+    /// A size, offset or time does not fit its integer type.
     Overflow,
+    /// The source ended inside a structure, or before its declared length.
     Truncated,
+    /// The caller reported a failed source ([`SourceFailure::Transport`](crate::SourceFailure)).
     Transport,
+    /// The cancellation flag was set, or the caller reported
+    /// [`SourceFailure::Cancelled`](crate::SourceFailure).
     Cancelled,
+    /// An input response carries the token of an earlier
+    /// [`InputCursor::reset`](crate::InputCursor::reset) or of another cursor of
+    /// the same pool.
     StaleGeneration {
+        /// The cursor's generation.
         expected: u64,
+        /// The response's generation.
         received: u64,
     },
+    /// An input response answers a range request the cursor has since replaced.
     StaleRequest {
+        /// The cursor's request number.
         expected: u64,
+        /// The response's request number.
         received: u64,
     },
+    /// An input response's token or bytes belong to another [`Budget`](crate::Budget).
     ForeignPool,
+    /// An input response names another [`SourceId`](crate::SourceId) than the
+    /// cursor reads.
     SourceMismatch,
+    /// Valid input that uses a feature this implementation does not have; the
+    /// text names it.
     Unsupported(&'static str),
-    /// A blocking adapter's reader failed; end of file is [`Error::Truncated`].
+    /// A [`blocking`](crate::blocking) adapter's source failed. An unexpected
+    /// end of file is [`Error::Truncated`] instead.
     Io(io::ErrorKind),
-    /// The owner was closed or poisoned by an earlier failure.
+    /// The owner was closed, or an earlier failure left it unusable.
     Closed,
 }
 
+/// A result whose error is [`Error`].
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl fmt::Display for Error {
