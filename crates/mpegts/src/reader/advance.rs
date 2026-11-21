@@ -383,8 +383,9 @@ impl Reader {
         }
     }
 
-    /// Shares a transport event that needs storage, or moves an inline one through its begin and
-    /// publish work units. The event is back in flight unless it was returned.
+    /// Shares a transport event that needs storage and begins admitting it, or moves an inline one
+    /// through its begin and publish work units. The event is back in flight unless it was
+    /// returned.
     fn share_raw(
         &mut self,
         event: TraceEvent,
