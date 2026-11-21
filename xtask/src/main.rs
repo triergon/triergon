@@ -1123,7 +1123,8 @@ fn simd_tests(root: &Path) -> Task {
 }
 
 /// Crates whose comparison-only projections sit behind the `reference-trace` feature.
-const REFERENCE_TRACE_CRATES: [&str; 5] = [
+const REFERENCE_TRACE_CRATES: [&str; 6] = [
+    "triergon-font",
     "triergon-framing",
     "triergon-isobmff",
     "triergon-matroska",
@@ -1548,9 +1549,31 @@ fn rustdoc(root: &Path, args: &[&str]) -> Task {
 
 #[cfg(test)]
 mod tests {
-    use super::{shell_library_path, with_target};
+    use super::{REFERENCE_TRACE_CRATES, shell_library_path, with_target};
     use std::ffi::OsStr;
     use std::path::Path;
+
+    #[test]
+    fn every_crate_with_a_reference_trace_feature_is_checked_with_it() {
+        let mut declaring = Vec::new();
+        for entry in std::fs::read_dir(super::root().join("crates")).unwrap() {
+            let manifest = entry.unwrap().path().join("Cargo.toml");
+            let Ok(text) = std::fs::read_to_string(&manifest) else {
+                continue;
+            };
+            let toml = crate::toml::parse(&text).unwrap();
+            if toml
+                .get("features")
+                .and_then(|f| f.get("reference-trace"))
+                .is_some()
+            {
+                let name = toml.get("package").and_then(|p| p.get("name"));
+                declaring.push(name.and_then(|n| n.as_str()).unwrap().to_owned());
+            }
+        }
+        declaring.sort();
+        assert_eq!(declaring, REFERENCE_TRACE_CRATES);
+    }
 
     #[test]
     fn the_worker_target_follows_the_subcommand() {
