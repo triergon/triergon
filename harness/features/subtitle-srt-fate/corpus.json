@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "directory": ".research/fate-samples",
+  "cases": [
+    {
+      "id": "fate-sub-srt-badsyntax",
+      "profile": "fate-sub-srt-badsyntax",
+      "file": "sub/badsyntax.srt",
+      "source": "fate-suite/sub/badsyntax.srt",
+      "sha256": "49d15287dc75d54bbb495c51eb10ecec0f1418b00cfce188d83b01dbdaf3c13e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 477,
+        "digest": 5871408056704504355
+      }
+    },
+    {
+      "id": "fate-sub-srt-empty-events",
+      "profile": "fate-sub-srt-empty-events",
+      "file": "sub/empty-events-2167.srt",
+      "source": "fate-suite/sub/empty-events-2167.srt",
+      "sha256": "743067ac7eb3444b0099a04b924c4558ab654b1b7c7eee07d9f38a15fbcbb955",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 167,
+        "digest": 5525326815213483903
+      }
+    }
+  ]
+}

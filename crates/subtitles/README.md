@@ -86,6 +86,10 @@ pinned FFmpeg build (9.0 branch; teletext with libzvbi 0.2.46), including its
 tolerances of malformed input. Text packets also have operations
 that follow the specification and keep every original byte.
 
+The document comparison also includes the original FATE SubRip `badsyntax.srt` and
+`empty-events-2167.srt` inputs, fetched by hash without redistribution. It compares
+each complete cue fold against the pinned SubRip demuxer.
+
 `compat::document::Reader` reads a SubRip or WebVTT document as FFmpeg's demuxers do,
 which is not what the specifications say: SubRip cue numbers are optional and recognised
 by position, cue text runs to the next timing line with its empty lines left out, time
