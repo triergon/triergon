@@ -508,7 +508,7 @@ pub(crate) struct Sps {
     pub(crate) log2_max_tb: u32,
     pub(crate) max_th_depth_inter: u32,
     pub(crate) max_th_depth_intra: u32,
-    pub(crate) scaling_list_enabled: bool,
+    /// The scaling factors when scaling_list_enabled_flag is set.
     pub(crate) scaling_list: Option<ScalingList>,
     pub(crate) amp: bool,
     pub(crate) sao: bool,
@@ -652,9 +652,8 @@ pub(crate) fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
         log2_ctb - log2_min_tb,
         "max_transform_hierarchy_depth_intra",
     )?;
-    let scaling_list_enabled = r.flag()?;
     let mut scaling_list = None;
-    if scaling_list_enabled {
+    if r.flag()? {
         if r.flag()? {
             scaling_list = Some(ScalingListRaw::parse(&mut r)?.expand());
         } else {
@@ -770,7 +769,6 @@ pub(crate) fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
         log2_max_tb,
         max_th_depth_inter,
         max_th_depth_intra,
-        scaling_list_enabled,
         scaling_list,
         amp,
         sao,
