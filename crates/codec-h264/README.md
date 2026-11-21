@@ -103,6 +103,8 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   32-bit targets (u64 elsewhere). An inter macroblock's uniform-motion summary, which the
   edge strengths start from, is taken as the macroblock decodes, while its motion is in
   cache.
+- The macroblock layer is compiled once per entropy mode, so no syntax element tests
+  whether the slice is CAVLC or CABAC.
 - CABAC decodes in a 32-bit register on 32-bit targets (`triergon_bitstream::cabac`).
 - Gate timings against FFmpeg are in [docs/status.md](../../docs/status.md): at `fc65d9fc`
   the three H.264 workloads' paired 95% upper bounds are 0.76 to 0.99 on ARMv7 and 0.62 to
