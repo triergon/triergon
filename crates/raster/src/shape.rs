@@ -94,6 +94,20 @@ impl Shape {
         };
     }
 
+    /// A copy whose storage holds exactly what the outlines do, charged to
+    /// the same budget.
+    ///
+    /// # Errors
+    ///
+    /// The budget's errors.
+    pub fn try_clone(&self) -> Result<Self> {
+        let [first, second] = &self.outlines;
+        Ok(Self {
+            outlines: [first.try_clone()?, second.try_clone()?],
+            cbox: self.cbox,
+        })
+    }
+
     /// Gives back the storage beyond what its outlines hold, for a shape
     /// kept once built.
     ///

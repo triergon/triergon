@@ -1,0 +1,28 @@
+{
+ "name": "aac-access-units-d66c90dd-aarch64",
+ "path": "aac-access-units-d66c90dd-aarch64",
+ "retention": "retained",
+ "reason": "Configured AAC access-unit parity, paired runtime and kernel-bound memory at d66c90dd.",
+ "key": "evidence/aac-access-units/d66c90dd-aarch64/a87d3c3c6d36746e35bc4be613ef7516f23dd1b1f5ab1d33c15a56724aaf60ac.tar.zst",
+ "sha256": "a87d3c3c6d36746e35bc4be613ef7516f23dd1b1f5ab1d33c15a56724aaf60ac",
+ "bytes": 69077048,
+ "results": [
+  {
+   "path": "benchmark/gate-result.json",
+   "command": "codecs time",
+   "key": "3368780b57a8c81165802334d505c3bd936325870538db92c2eb22b083460b94",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/gate-result.json",
+   "command": "codecs memory",
+   "key": "4067c2ed3e568e3bde2e18cbdc7d8768c3e7a8fd16ea9feb3e4131761b0c3cc4",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "d66c90dd6796b8251969c3c0f57d8703eed27ae5"
+ ]
+}
