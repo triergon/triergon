@@ -1,6 +1,6 @@
 use crate::BuildStep;
 use crate::nal::{NalFacts, NalUnit};
-use crate::{freeze_whole, retryable};
+use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
@@ -146,11 +146,22 @@ impl AnnexBWriter {
         if !work.try_charge(1) {
             return Ok(BuildStep::Yield);
         }
-        let bytes = freeze_whole(output)?;
-        self.state = State::Complete;
-        Ok(BuildStep::Ready(AnnexBOutput {
-            bytes,
-            source_facts: self.facts,
-        }))
+        let State::Writing { input, output } = std::mem::replace(&mut self.state, State::Complete)
+        else {
+            unreachable!("the writer is writing")
+        };
+        match output.freeze() {
+            Ok(bytes) => Ok(BuildStep::Ready(AnnexBOutput {
+                bytes,
+                source_facts: self.facts,
+            })),
+            Err(refused) => {
+                self.state = State::Writing {
+                    input,
+                    output: refused.value,
+                };
+                Err(refused.error)
+            }
+        }
     }
 }
