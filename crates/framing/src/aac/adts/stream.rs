@@ -59,6 +59,8 @@ pub struct AacAdtsStreamReader {
     /// The frame being built, taken at each freeze: replacing a vector there instead
     /// costs more instructions per frame.
     buffer: Option<BudgetVec<u8>>,
+    /// The envelope's header in carrier mode, once one is found; a selected frame's
+    /// header is `prefix`.
     header: Option<AacAdtsHeader>,
     selected_error: Option<Error>,
     pool: Budget,

@@ -177,7 +177,6 @@ impl AacAdtsStreamReader {
         {
             return Err(Error::Truncated);
         }
-        self.header = Some(h);
         self.frame_bytes = frame_bytes;
         self.phase = Phase::ReserveHeader;
         Ok(NEXT)
@@ -458,9 +457,10 @@ impl AacAdtsStreamReader {
                 },
             ))));
         }
-        let h = self
-            .header
-            .ok_or(Error::Invalid("missing ADTS stream header"))?;
+        // A selected frame's header stays in the prefix it was read into.
+        let h = AacAdtsHeader {
+            prefix: self.prefix,
+        };
         let frame = AacAdtsFrame::from_envelope(raw, source, h)?;
         self.completed = self.completed.checked_add(1).ok_or(Error::Overflow)?;
         self.phase = Phase::Start;
