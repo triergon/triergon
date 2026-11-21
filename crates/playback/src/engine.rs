@@ -197,7 +197,7 @@ impl Engine {
     ) -> Result<Self> {
         let engine = TsEngine::program(input, format, program, limits, policy, namespace)?;
         Ok(Self::Ts(TsEngine {
-            segmented: true,
+            entities: ts::Entities::Sequence(None),
             ..engine
         }))
     }
@@ -236,10 +236,9 @@ impl Engine {
         let Self::Ts(t) = self else {
             return Err(Error::Invalid("entity continuation requires TS source"));
         };
-        let end = t
-            .boundary
-            .as_ref()
-            .ok_or(Error::Invalid("actual entity End required"))?;
+        let ts::Entities::Sequence(Some(end)) = &t.entities else {
+            return Err(Error::Invalid("actual entity End required"));
+        };
         if source == end.location().source {
             return Err(Error::SourceMismatch);
         }
@@ -248,18 +247,18 @@ impl Engine {
         }
         t.input.continue_source(source, caps)?;
         end.validate_continuation(&t.input)?;
-        t.boundary = None;
+        t.entities = ts::Entities::Sequence(None);
         Ok(())
     }
     pub(crate) fn finish_logical_source(&mut self) -> Result<()> {
         let Self::Ts(t) = self else {
             return Err(Error::Invalid("logical TS End required"));
         };
-        if t.boundary.is_none() {
+        if !matches!(t.entities, ts::Entities::Sequence(Some(_))) {
             return Err(Error::Invalid("actual source entity End required"));
         }
         t.stream.end_of_source()?;
-        t.boundary = None;
+        t.entities = ts::Entities::Sequence(None);
         t.draining = true;
         Ok(())
     }
@@ -549,7 +548,9 @@ impl Engine {
                 r.pes_clock = Some(DemuxClock::new(r.program)?);
                 r.event_ordinal = 0;
                 r.pes_updates_from = None;
-                r.boundary = None;
+                if let ts::Entities::Sequence(end) = &mut r.entities {
+                    *end = None;
+                }
             }
         }
         Ok(())

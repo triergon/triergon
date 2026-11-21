@@ -63,6 +63,15 @@ impl Delivery {
     }
 }
 
+/// How a TS engine's source entities end.
+pub(crate) enum Entities {
+    /// One entity: its end ends the stream.
+    One,
+    /// A sequence. `Some` from an entity's reported end until the caller
+    /// continues with the next entity or finishes the logical source.
+    Sequence(Option<ts::stream::MediaEntityEnd>),
+}
+
 /// Whether a TS engine's observers are bound to a startup context of its input.
 pub(crate) enum Binding {
     /// They take carrier positions from the events alone.
@@ -120,8 +129,7 @@ pub struct TsEngine {
     pub(crate) suppressed_events: u64,
     pub(crate) pes_updates_from: Option<usize>,
     pub(crate) delivery: Delivery,
-    pub(crate) segmented: bool,
-    pub(crate) boundary: Option<ts::stream::MediaEntityEnd>,
+    pub(crate) entities: Entities,
 }
 
 impl TsEngine {
@@ -164,8 +172,7 @@ impl TsEngine {
             suppressed_events: 0,
             pes_updates_from: None,
             delivery: Delivery::Program,
-            segmented: false,
-            boundary: None,
+            entities: Entities::One,
         })
     }
 
@@ -561,9 +568,9 @@ impl TsEngine {
         if self.draining {
             return Err(Error::Invalid("TS repeated undrained entity End"));
         }
-        if self.segmented {
+        if let Entities::Sequence(boundary) = &mut self.entities {
             if let Some(end) = self.stream.media_entity_end(&mut self.input, w, c)? {
-                self.boundary = Some(end.clone());
+                *boundary = Some(end.clone());
                 return T::project(FeedStep::EntityEnd(end));
             }
             return T::project(FeedStep::Yield);
@@ -664,7 +671,7 @@ impl TsEngine {
         if self.ended {
             return T::project(FeedStep::End);
         }
-        if self.boundary.is_some() {
+        if matches!(self.entities, Entities::Sequence(Some(_))) {
             return T::project(FeedStep::AwaitEntity);
         }
         loop {
