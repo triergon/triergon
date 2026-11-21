@@ -183,6 +183,22 @@ fn control_box(outline: &Outline) -> [i32; 4] {
     })
 }
 
+/// The name IDs a family name is read from, the WWS family first.
+const FAMILY_NAMES: [NameId; 3] = [NameId::WwsFamily, NameId::TypographicFamily, NameId::Family];
+
+/// The preferred record of the first of `ids` that has one, skipping the
+/// first (the WWS name) when `fsSelection` sets the WWS bit.
+fn first_name<'d>(
+    names: Names,
+    data: &'d [u8],
+    os2: Option<Os2>,
+    ids: &[NameId; 3],
+) -> Option<NameRecord<'d>> {
+    let wws_only = os2.is_some_and(|o| o.selection.wws());
+    let ids = if wws_only { &ids[1..] } else { &ids[..] };
+    ids.iter().find_map(|&id| names.preferred(data, id))
+}
+
 /// A glyph's advances at a scale, before any grid fitting: horizontal and
 /// vertical, and the vertical one in font units.
 #[derive(Clone, Copy, Debug)]
@@ -235,9 +251,12 @@ pub struct HorizontalHeader {
     pub advance_max: u16,
 }
 
+/// A face's glyph outlines: `glyf`, with how the default load hints it, or
+/// CFF and CFF2 charstrings.
 #[derive(Debug)]
+#[expect(clippy::large_enum_variant, reason = "one per face, read in place by every load")]
 enum Outlines {
-    Glyf(Glyf),
+    Glyf(Glyf, sized::TrueTypeHinting),
     Cff(Box<Cff>),
 }
 
@@ -271,12 +290,6 @@ pub struct Font {
     kern: Kern,
     /// `post` underline position and thickness.
     underline: (i16, i16),
-    /// How the default load treats the face's advances.
-    default_load: sized::Hinting,
-    /// The auto-hinter's state, for an auto-hinted face.
-    autofit: Option<autofit::Autofit>,
-    /// The TrueType interpreter, for a face whose programs it runs.
-    bytecode: Option<bytecode::Bytecode>,
     limits: Limits,
 }
 
@@ -340,7 +353,14 @@ impl Font {
                     maxp_glyphs,
                     tables.loca_room,
                 )?;
-                (Outlines::Glyf(glyf), count)
+                let program = |t: Option<sfnt::Table>| t.map(|t| t.bytes(bytes));
+                let hinting = sized::TrueTypeHinting::new(
+                    program(tables.fpgm),
+                    program(tables.prep),
+                    first_name(names, bytes, os2, &FAMILY_NAMES),
+                    budget,
+                );
+                (Outlines::Glyf(glyf, hinting), count)
             }
             Flavor::Cff => {
                 let (table, version) = match (tables.cff, tables.cff2) {
@@ -384,7 +404,7 @@ impl Font {
             }
             _ => None,
         };
-        let mut font = Self {
+        Ok(Self {
             data,
             index,
             tables,
@@ -401,20 +421,8 @@ impl Font {
             outlines,
             kern,
             underline,
-            default_load: sized::Hinting::Unhinted,
-            autofit: None,
-            bytecode: None,
             limits,
-        };
-        font.default_load = font.hinting();
-        match font.default_load {
-            sized::Hinting::Auto => font.autofit = Some(autofit::Autofit::new(budget.clone())),
-            sized::Hinting::Unhinted if matches!(font.outlines, Outlines::Glyf(_)) => {
-                font.bytecode = Some(bytecode::Bytecode::new(budget.clone()));
-            }
-            _ => {}
-        }
-        Ok(font)
+        })
     }
 
     /// The font bytes.
@@ -475,7 +483,7 @@ impl Font {
     /// The outline technology of the face's glyphs.
     pub fn outline_format(&self) -> OutlineFormat {
         match &self.outlines {
-            Outlines::Glyf(_) => OutlineFormat::TrueType,
+            Outlines::Glyf(..) => OutlineFormat::TrueType,
             Outlines::Cff(cff) if cff.version() == Version::Cff1 => OutlineFormat::Cff,
             Outlines::Cff(_) => OutlineFormat::Cff2,
         }
@@ -575,23 +583,18 @@ impl Font {
     /// `fsSelection` WWS bit skips ID 21. Each ID's record is chosen as
     /// [`Self::preferred_name`] does.
     pub fn family_name(&self) -> Option<NameRecord<'_>> {
-        self.first_name(&[NameId::WwsFamily, NameId::TypographicFamily, NameId::Family])
+        first_name(self.names, self.data.as_ref(), self.os2, &FAMILY_NAMES)
     }
 
     /// The style name, by the rule of [`Self::family_name`] over IDs 22, 17
     /// and 2.
     pub fn style_name(&self) -> Option<NameRecord<'_>> {
-        self.first_name(&[
+        let ids = [
             NameId::WwsSubfamily,
             NameId::TypographicSubfamily,
             NameId::Subfamily,
-        ])
-    }
-
-    fn first_name(&self, ids: &[NameId; 3]) -> Option<NameRecord<'_>> {
-        let wws_only = self.os2.is_some_and(|o| o.selection.wws());
-        let ids = if wws_only { &ids[1..] } else { &ids[..] };
-        ids.iter().find_map(|&id| self.preferred_name(id))
+        ];
+        first_name(self.names, self.data.as_ref(), self.os2, &ids)
     }
 
     /// The PostScript name record (ID 6): among Windows records (encoding 0
@@ -646,7 +649,7 @@ impl Font {
         let charmap = move |source| Charmap::new(data, glyphs, source, work);
         let encoding = match &self.outlines {
             Outlines::Cff(cff) => cff.encoding(),
-            Outlines::Glyf(_) => None,
+            Outlines::Glyf(..) => None,
         };
         self.subtables
             .as_slice()
@@ -760,7 +763,7 @@ impl Font {
         let index = self.check(glyph)?;
         let data = self.data.as_ref();
         let advances = match &self.outlines {
-            Outlines::Glyf(table) => {
+            Outlines::Glyf(table, _) => {
                 outline.begin(self.limits.points);
                 let m = table.outline(
                     &self.glyf_context(),
@@ -789,7 +792,7 @@ impl Font {
     fn unscaled_advances(&self, glyph: GlyphId, work: &mut WorkBudget) -> Result<Advances> {
         let index = self.check(glyph)?;
         match &self.outlines {
-            Outlines::Glyf(table) => {
+            Outlines::Glyf(table, _) => {
                 let m = table.walk(&self.glyf_context(), index, work, &mut |_| Ok(()))?;
                 Ok(self.glyf_advances(m, Scale::UNITS).1)
             }
@@ -889,7 +892,7 @@ impl Font {
     ) -> Result<reference_trace::OperatorSet> {
         self.check(glyph)?;
         match &self.outlines {
-            Outlines::Glyf(_) => Ok(reference_trace::OperatorSet::default()),
+            Outlines::Glyf(..) => Ok(reference_trace::OperatorSet::default()),
             Outlines::Cff(cff) => {
                 let mut work = WorkBudget::new(self.limits.work);
                 cff.operators(self.data.as_ref(), glyph, scratch, &self.limits, &mut work)
@@ -910,7 +913,7 @@ impl Font {
         self.check(glyph)?;
         let data = self.data.as_ref();
         match &self.outlines {
-            Outlines::Glyf(table) => Ok(table
+            Outlines::Glyf(table, _) => Ok(table
                 .header(data, glyph.0)?
                 .map_or(ControlBox::Empty, |header| ControlBox::Glyf(header.bounds))),
             Outlines::Cff(cff) => {

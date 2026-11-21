@@ -4,12 +4,14 @@
 //! A size is requested, scaled and rounded as FreeType 2.15.0 does it, so the
 //! outlines and metrics are the ones a renderer built on FreeType draws with.
 
-use crate::bytecode::{GlyphPoints, Hinter, Phantoms, Programs, Tables};
+use crate::autofit::Autofit;
+use crate::bytecode::{Bytecode, GlyphPoints, Hinter, Phantoms, Programs, Tables};
 use crate::fixed::{Scale, div_fix, mul_div, mul_fix, pix_ceil, pix_floor, pix_round, wrap32};
 use crate::glyf::{self, Glyf};
+use crate::name::NameRecord;
 use crate::outline::{Outline, Point};
 use crate::{Font, GlyphId, GlyphMetrics, Outlines, VerticalMetrics};
-use triergon_core::{BudgetVec, Error, Result, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 /// The metrics of a size: the scales from font units to 26.6 pixels, the
 /// pixels per em, and the vertical metrics the size was requested with and
@@ -47,15 +49,17 @@ pub enum Load {
     Default,
 }
 
-/// How the default (hinted) load treats the face's advances.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Hinting {
-    /// The unhinted advance, fitted to the size's grid: CFF, TrueType whose
-    /// programs keep the interpreter in backward compatibility mode, and any
-    /// face at zero pixels per em, which loads unhinted.
-    Unhinted,
-    /// The auto-hinter's: TrueType without bytecode.
-    Auto,
+/// How the default (hinted) load hints a TrueType face, with what that
+/// hinting keeps between loads. CFF faces need nothing: their hinter keeps
+/// no state, and their advances are the unhinted ones.
+#[derive(Debug)]
+#[expect(clippy::large_enum_variant, reason = "one per face, read in place by every load")]
+pub(crate) enum TrueTypeHinting {
+    /// Programs that keep the interpreter in backward compatibility mode,
+    /// which leaves the advances unhinted: the interpreter.
+    Instructed(Bytecode),
+    /// No bytecode: the auto-hinter, which gives the advances too.
+    Auto(Autofit),
     /// Advances that depend on what this crate does not run.
     Unsupported(&'static str),
 }
@@ -72,11 +76,6 @@ pub struct SizedFont<'f> {
     /// that ask for integer pixels per em (`head.flags` bit 3), which scale by
     /// the rounded ppem on both axes.
     hinted_scale: Scale,
-    /// The grid hinted loading fits advances to, as the mask of a 26.6
-    /// value's fraction: whole pixels (63), or none (0) at zero pixels per
-    /// em.
-    grid: i64,
-    hinting: Hinting,
 }
 
 /// A linear advance in font units as 16.16 pixels at the 16.16 `scale`:
@@ -142,7 +141,7 @@ impl Font {
                 scale,
             )),
         };
-        if let Some(bytecode) = &self.bytecode {
+        if let Outlines::Glyf(_, TrueTypeHinting::Instructed(bytecode)) = &self.outlines {
             bytecode.request();
         }
         if ppem == 0 {
@@ -151,11 +150,9 @@ impl Font {
                 metrics,
                 scale: Scale::UNITS,
                 hinted_scale: Scale::UNITS,
-                grid: 0,
-                hinting: Hinting::Unhinted,
             });
         }
-        let integer_ppem = matches!(self.outlines, Outlines::Glyf(_)) && self.head.flags & 8 != 0;
+        let integer_ppem = matches!(self.outlines, Outlines::Glyf(..)) && self.head.flags & 8 != 0;
         let hinted_scale = if integer_ppem {
             div_fix(i64::from(ppem) << 6, upem)
         } else {
@@ -169,79 +166,77 @@ impl Font {
                 x: hinted_scale,
                 y: hinted_scale,
             },
-            grid: 63,
-            hinting: self.default_load,
         })
     }
+}
 
-    /// How the default load treats this face's advances, found once when
-    /// the face is opened: it reads every `fpgm` and `prep` instruction and
-    /// the family name.
-    pub(crate) fn hinting(&self) -> Hinting {
-        if !matches!(self.outlines, Outlines::Glyf(_)) {
-            return Hinting::Unhinted;
+impl TrueTypeHinting {
+    /// How the default load hints a TrueType face whose font and control
+    /// value programs are `fpgm` and `prep` and whose family name is
+    /// `family`, decided once when the face is opened by reading every
+    /// instruction of the two programs. The hinter's storage is charged to
+    /// `budget`.
+    pub(crate) fn new(
+        fpgm: Option<&[u8]>,
+        prep: Option<&[u8]>,
+        family: Option<NameRecord<'_>>,
+        budget: &Budget,
+    ) -> Self {
+        if family.is_some_and(is_tricky) {
+            return Self::Unsupported("hinted advances of a tricky TrueType font");
         }
-        if self.is_tricky() {
-            return Hinting::Unsupported("hinted advances of a tricky TrueType font");
-        }
-        let data = self.data.as_ref();
-        let table = |t: Option<crate::sfnt::Table>| t.map(|t| t.bytes(data));
-        let (fpgm, prep) = (table(self.tables.fpgm), table(self.tables.prep));
         // A TrueType face without bytecode is auto-hinted.
         if fpgm.is_none_or(<[u8]>::is_empty) && prep.is_none_or(|p| p.len() <= 7) {
-            return Hinting::Auto;
+            return Self::Auto(Autofit::new(budget.clone()));
         }
         if [fpgm, prep].into_iter().flatten().all(keeps_compatibility) {
-            Hinting::Unhinted
+            Self::Instructed(Bytecode::new(budget.clone()))
         } else {
-            Hinting::Unsupported("hinted advances under a TrueType instruction control")
+            Self::Unsupported("hinted advances under a TrueType instruction control")
         }
     }
+}
 
-    /// Whether the family name is one of the fonts FreeType knows to need
-    /// their bytecode to render at all.
-    fn is_tricky(&self) -> bool {
-        const NAMES: [&str; 20] = [
-            "cpop",
-            "DFGirl-W6-WIN-BF",
-            "DFGothic-EB",
-            "DFGyoSho-Lt",
-            "DFHei",
-            "DFHSGothic-W5",
-            "DFHSMincho-W3",
-            "DFHSMincho-W7",
-            "DFKaiSho-SB",
-            "DFKaiShu",
-            "DFKai-SB",
-            "DFMing",
-            "DLC",
-            "HuaTianKaiTi?",
-            "HuaTianSongTi?",
-            "Ming(for ISO10646)",
-            "MingLiU",
-            "MingMedium",
-            "PMingLiU",
-            "MingLi43",
-        ];
-        let Some(name) = self.family_name() else {
-            return false;
-        };
-        // The first 128 characters of the name's ASCII form are enough.
-        let mut ascii = [0_u8; 128];
-        let mut len = 0;
-        for c in name.ascii().take(ascii.len()) {
-            ascii[len] = c as u8;
-            len += 1;
-        }
-        let mut family = &ascii[..len];
-        // A PDF subset tag ("ABCDEF+") precedes the name in subsetted fonts.
-        if family.len() > 7 && family[..6].iter().all(u8::is_ascii_uppercase) && family[6] == b'+' {
-            family = &family[7..];
-        }
-        NAMES
-            .iter()
-            .any(|n| family.windows(n.len()).any(|w| w == n.as_bytes()))
+/// Whether a family name is one of the fonts FreeType knows to need their
+/// bytecode to render at all.
+fn is_tricky(name: NameRecord<'_>) -> bool {
+    const NAMES: [&str; 20] = [
+        "cpop",
+        "DFGirl-W6-WIN-BF",
+        "DFGothic-EB",
+        "DFGyoSho-Lt",
+        "DFHei",
+        "DFHSGothic-W5",
+        "DFHSMincho-W3",
+        "DFHSMincho-W7",
+        "DFKaiSho-SB",
+        "DFKaiShu",
+        "DFKai-SB",
+        "DFMing",
+        "DLC",
+        "HuaTianKaiTi?",
+        "HuaTianSongTi?",
+        "Ming(for ISO10646)",
+        "MingLiU",
+        "MingMedium",
+        "PMingLiU",
+        "MingLi43",
+    ];
+    // The first 128 characters of the name's ASCII form are enough.
+    let mut ascii = [0_u8; 128];
+    let mut len = 0;
+    for c in name.ascii().take(ascii.len()) {
+        ascii[len] = c as u8;
+        len += 1;
     }
+    let mut family = &ascii[..len];
+    // A PDF subset tag ("ABCDEF+") precedes the name in subsetted fonts.
+    if family.len() > 7 && family[..6].iter().all(u8::is_ascii_uppercase) && family[6] == b'+' {
+        family = &family[7..];
+    }
+    NAMES
+        .iter()
+        .any(|n| family.windows(n.len()).any(|w| w == n.as_bytes()))
 }
 
 /// The metrics of a `glyf` glyph without loading its points, passing each
@@ -362,7 +357,7 @@ impl<'f> SizedFont<'f> {
         outline: &mut Outline,
         work: &mut WorkBudget,
     ) -> Result<GlyphMetrics> {
-        if load == Load::Unhinted || self.grid == 0 {
+        if load == Load::Unhinted || self.unscaled() {
             let mut metrics = self.font.load(glyph, self.scale, outline, work)?;
             // The linear advance scales by the size even when the glyph loads
             // unscaled.
@@ -370,18 +365,21 @@ impl<'f> SizedFont<'f> {
                 linear_advance(metrics.linear_vertical_advance, self.metrics.y_scale);
             return Ok(metrics);
         }
-        if let Hinting::Unsupported(what) = self.hinting {
-            return Err(Error::Unsupported(what));
-        }
         let font = self.font;
-        if let Some(autofit) = &font.autofit {
-            return autofit.load(font, glyph, self.scaler(), outline, work);
-        }
-        let index = font.check(glyph)?;
         let cff = match &font.outlines {
-            Outlines::Glyf(table) => return self.load_instructed(table, glyph, outline, work),
+            Outlines::Glyf(_, TrueTypeHinting::Unsupported(what)) => {
+                return Err(Error::Unsupported(what));
+            }
+            Outlines::Glyf(_, TrueTypeHinting::Auto(autofit)) => {
+                return autofit.load(font, glyph, self.scaler(), outline, work);
+            }
+            Outlines::Glyf(table, TrueTypeHinting::Instructed(bytecode)) => {
+                font.check(glyph)?;
+                return self.load_instructed(table, bytecode, glyph, outline, work);
+            }
             Outlines::Cff(cff) => cff,
         };
+        let index = font.check(glyph)?;
         cff.load_hinted(
             font.data.as_ref(),
             glyph,
@@ -395,8 +393,8 @@ impl<'f> SizedFont<'f> {
         metrics.linear_vertical_advance =
             linear_advance(metrics.linear_vertical_advance, self.metrics.y_scale);
         self.fit_box(&mut metrics);
-        metrics.advance = glyf::narrow(self.fit(i64::from(metrics.advance)))?;
-        metrics.vertical_advance = glyf::narrow(self.fit(i64::from(metrics.vertical_advance)))?;
+        metrics.advance = glyf::narrow(pix_round(i64::from(metrics.advance)))?;
+        metrics.vertical_advance = glyf::narrow(pix_round(i64::from(metrics.vertical_advance)))?;
         Ok(metrics)
     }
 
@@ -409,16 +407,12 @@ impl<'f> SizedFont<'f> {
     fn load_instructed(
         &self,
         table: &Glyf,
+        bytecode: &Bytecode,
         glyph: GlyphId,
         outline: &mut Outline,
         work: &mut WorkBudget,
     ) -> Result<GlyphMetrics> {
         let font = self.font;
-        let Some(bytecode) = &font.bytecode else {
-            return Err(Error::Unsupported(
-                "hinted outlines without the TrueType interpreter",
-            ));
-        };
         let data = font.data.as_ref();
         let bytes = |t: Option<crate::sfnt::Table>| t.map_or(&[][..], |t| t.bytes(data));
         let programs = Programs {
@@ -472,17 +466,17 @@ impl<'f> SizedFont<'f> {
         metrics.linear_vertical_advance =
             linear_advance(metrics.linear_vertical_advance, self.metrics.y_scale);
         self.fit_box(&mut metrics);
-        metrics.advance = glyf::narrow(self.fit(i64::from(metrics.advance)))?;
-        metrics.vertical_advance = glyf::narrow(self.fit(i64::from(metrics.vertical_advance)))?;
+        metrics.advance = glyf::narrow(pix_round(i64::from(metrics.advance)))?;
+        metrics.vertical_advance = glyf::narrow(pix_round(i64::from(metrics.vertical_advance)))?;
         Ok(metrics)
     }
 
-    /// Fits the box of a default load to the grid, for horizontal layout:
-    /// the left and top edges floored and ceiled to pixels, the right and
+    /// Fits the box of a default load to whole pixels, for horizontal
+    /// layout: the left and top edges floored and ceiled, the right and
     /// bottom ceiled and floored.
     fn fit_box(&self, m: &mut GlyphMetrics) {
-        let floor = |v: i32| v & !(self.grid as i32);
-        let ceil = |v: i32| floor(v.wrapping_add(self.grid as i32));
+        let floor = |v: i32| v & !63;
+        let ceil = |v: i32| floor(v.wrapping_add(63));
         let right = ceil(m.bearing_x.wrapping_add(m.width));
         let bottom = floor(m.bearing_y.wrapping_sub(m.height));
         m.bearing_x = floor(m.bearing_x);
@@ -527,23 +521,38 @@ impl<'f> SizedFont<'f> {
     /// The horizontal and vertical advances of the default load of `glyph`,
     /// fitted to the grid.
     fn default_advances(&self, glyph: GlyphId) -> Result<(i64, i64)> {
-        if let Hinting::Unsupported(what) = self.hinting {
-            return Err(Error::Unsupported(what));
-        }
         let font = self.font;
-        if let Some(autofit) = font.autofit.as_ref().filter(|_| self.grid != 0) {
-            let mut work = WorkBudget::new(font.limits.work);
-            return autofit.advances(font, glyph, self.scaler(), &mut work);
+        let unscaled = self.unscaled();
+        match &font.outlines {
+            Outlines::Glyf(_, TrueTypeHinting::Unsupported(what)) if !unscaled => {
+                return Err(Error::Unsupported(what));
+            }
+            Outlines::Glyf(_, TrueTypeHinting::Auto(autofit)) if !unscaled => {
+                let mut work = WorkBudget::new(font.limits.work);
+                return autofit.advances(font, glyph, self.scaler(), &mut work);
+            }
+            _ => {}
         }
         let index = font.check(glyph)?;
         let advances = match &font.outlines {
-            Outlines::Glyf(table) => {
+            Outlines::Glyf(table, _) => {
                 let m = self.hinted_glyf_metrics(table, index)?;
                 font.glyf_advances(m, self.hinted_scale).1
             }
             Outlines::Cff(cff) => font.cff_advances(cff, glyph, index, self.hinted_scale)?,
         };
-        Ok((self.fit(advances.horizontal), self.fit(advances.vertical)))
+        let (horizontal, vertical) = (advances.horizontal, advances.vertical);
+        Ok(if unscaled {
+            (horizontal, vertical)
+        } else {
+            (pix_round(horizontal), pix_round(vertical))
+        })
+    }
+
+    /// Whether glyphs load unscaled and unhinted, in font units: at zero
+    /// pixels per em.
+    const fn unscaled(&self) -> bool {
+        self.metrics.y_ppem == 0
     }
 
     /// The auto-hinter's scaler for the size: its scales and pixels per em.
@@ -564,18 +573,12 @@ impl<'f> SizedFont<'f> {
             Ok(())
         })?;
         // Unhinted loading runs no program.
-        if !compatible && self.grid != 0 {
+        if !compatible && !self.unscaled() {
             return Err(Error::Unsupported(
                 "hinted advances under a TrueType instruction control",
             ));
         }
         Ok(m)
-    }
-
-    /// A hinted 26.6 value fitted to the grid as the default load fits
-    /// advances: rounded to a whole pixel, halves up.
-    const fn fit(&self, value: i64) -> i64 {
-        (value + (self.grid + 1) / 2) & !self.grid
     }
 
     /// The `kern` value for the pair in 26.6 pixels, as FreeType's default
