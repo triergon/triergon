@@ -29,7 +29,7 @@ it, prints what the operation folds before the result.
 | `progressive-` | CLOCK (`pts-only`, `pts-dts`) and PROGRESS (`before-eof`, `at-eof`) | a forward-only AVC/AAC TS188 session in 4 KiB windows; `bench` runs 50 sessions | `progressive-ts188` |
 | `mkv-audio-` | `aac`, `dolby` or `all` | Matroska discovery and the AAC-LC, AC-3 and E-AC-3 track clocks | `matroska-audio-clocks` |
 | `mp4-forward-` | `regular` or `progressive` | `Mp4Open` and `Mp4IndexJob` in the native MOV view, through `Engine::mp4` or a front-`moov` native plan | `mp4-forward` |
-| `ts-program-` | `ts188:PID=CARRIAGE,...` or `m2ts192:PID=CARRIAGE` | explicit PIDs of program 1, or one M2TS192 PID; native 90 kHz clocks | `ts-program` |
+| `ts-program-` | `ts188:PID=CARRIAGE,...` or `m2ts192:PID=CARRIAGE,...` | explicit PIDs of program 1 in TS188 or M2TS192; native 90 kHz clocks | `ts-program` |
 | `raw-video-` | `avc` or `hevc` | `RawVideoProbe`, `RawVideoSource` and `RawVideoFeed` over forward-only Annex B | `raw-annex-b` |
 
 A capsule is `SMVCL001`, one operation byte (0 startup, 1 seek after discovery,
