@@ -87,7 +87,7 @@ charges a caller's `Budget`.
 ## Conformance
 
 Written from ISO/IEC 11172-2 (sequence to block layers, Table 2-D.4 picture rates,
-Annex C VBV model). The reference is FFmpeg 9.0.2 `mpeg1video` with an I/P GOP of 30,
+Annex C VBV model). The reference is FFmpeg 9.0.2 `mpeg1video` with I/P pictures,
 driven through the capture pipeline ([triergon-capture](../capture/README.md)). Per
 case the harness requires:
 
@@ -97,6 +97,11 @@ case the harness requires:
 - PSNR-Y within 0.25 dB of the reference at equal or fewer bits. When the reference
   overspends, the encoder is re-run at 1.25–4.5× the requested rate and PSNR-Y is
   interpolated at the reference's bit count.
+
+The capture comparison includes GOP lengths 1, 2, 12 and 300, rates with the
+average and maximum set equal, and alternate VBV sizes. It checks the visible
+dimensions and the signalled maximum rate and VBV size in the sequence headers.
+The capture worker reaches the encoder through `Encoder::new` and `Encoder::encode`.
 
 Unit tests cover the VLC tables (prefix-free and complete), DC differentials, escape
 levels, reconstruction oddification and saturation, half-sample rounding, motion

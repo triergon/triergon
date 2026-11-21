@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "capture contract v1",
   "frozen_utc": "2026-11-02",
-  "status": "The comparison covers RGBA conversion, MPEG-1 encoding and MPEG-TS muxing against FFmpeg 9.0.2. Both targets require all 15 cases. The reference emits one fewer picture in each case because it delays output by one frame.",
+  "status": "The comparison covers RGBA conversion, MPEG-1 encoding and MPEG-TS muxing against FFmpeg 9.0.2. Both targets require the original 15 cases and 12 short configuration cases. On accepted configurations FFmpeg outputs one fewer picture because it delays output by one frame.",
   "operation_source": "The capture call sequence of an application that streams its interface as MPEG-1 video in MPEG-TS: RGBA converted to NV12 by swscale (SWS_BILINEAR, negative stride for bottom-up rows), NV12 split into YUV420P planes, mpeg1video with time base 1/30, GOP 30, no B-pictures and fastint DCT, frame pts 0, 1, 2, ..., mpegts muxed through a 32,768-byte custom AVIO, av_write_frame and avio_flush per frame, no trailer. A rate byte times 100 kbps selects the bit rate (0 selects 2.5 Mbps); a width of at least 720 (or 0) selects 960x540, otherwise 480x270. harness/reference_capture.h reproduces this sequence.",
   "reference": {
     "ffmpeg_release": "9.0.2",
@@ -15,7 +15,13 @@
     "pixel_format": "RGBA, 8 bits per channel, byte order R,G,B,A, tightly packed rows (stride = 4*width)",
     "geometries": [
       "960x540",
-      "480x270"
+      "480x270",
+      "16x16",
+      "176x144",
+      "352x288",
+      "720x576",
+      "1920x1080",
+      "968x544"
     ],
     "orientation": "top-down or bottom-up (the application's `flip`); bottom-up is read with a negative stride, no CPU flip pass",
     "alpha": "ignored (observed: alpha 0 and 255 give identical YUV)",
@@ -35,7 +41,7 @@
   "encoder": {
     "standard": "ISO/IEC 11172-2 (MPEG-1 video); normative syntax evidence from freely available ITU-T H.262 (MPEG-1 compatibility) plus public descriptions; no specification purchased",
     "picture_types": "I and P only (bf 0); no B, no D pictures",
-    "gop": "intra period 30 frames (g 30); sequence header and GOP header before every I picture; closed GOP",
+    "gop": "intra period 30 frames by default; configured periods of 1, 2, 12 and 300. A sequence header and GOP header precede each I picture",
     "frame_rate_code": "30 fps table entry (time_base 1/30)",
     "aspect": "pel aspect ratio code 1 (square), matching FFmpeg's default sample_aspect_ratio 0/1 -> 1:1",
     "bit_rate": {
@@ -102,6 +108,21 @@
     "encoder_revision_reason": "Exploratory local runs showed FFmpeg's short-session rate control lands far from the requested rate in both directions (content-limited UI pictures at qmin underspend; motion at 0.1-1 Mbps overspends up to 1.2x; noise exceeds the VBV by 26 Mbit), so v1's fixed '<= 1.03x reference bytes' made quality comparisons at unequal rates. v2 compares at equal bits where the reference overspent and permits spending within the client's requested budget where the reference underspent; clause (b) is a policy choice, approved under decisions, and results under it are labelled 'within-requested-budget'."
   },
   "required_cases": "harness/capture/cases.json",
+  "configuration_cases": "Per case, bitrate sets the average; optional gop, max_rate and vbv_bits override defaults. Parse both sequence headers and check visible size, signalled rate, signalled VBV and I/P cadence. In configured mux cases check the declared IDs, PIDs, names and stream type in PAT, PMT, SDT and PES, and PCR on every picture. FFmpeg receives pcr_period=33 ms and chooses MPEG-1 video stream type 0x02.",
+  "configuration_pins": "The RGBA generator produces authored inputs pinned by input_sha256. Reference conversion and TS output are pinned by SHA-256 per recorded target, or by the encoder refusal for the minimum VBV case.",
+  "open_cases": [
+    {"id": "c21-vbv-min-16", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "parts": ["mux", "encoder"], "reference_refusal": "VBV buffer too small for bitrate", "cause": "The session accepts a one-bit buffer and emits decodable pictures with one signalled VBV unit. FFmpeg refuses encoder open at the same rate settings."},
+    {"id": "c22-vbv-16x-1080", "targets": ["aarch64-unknown-linux-gnu"], "parts": ["encoder"], "quality_only": true, "cause": "PSNR-Y 45.430 versus 53.366 dB at 1.3380 times the reference bits within the requested budget. Decode, picture types, VBV and sequence headers match."},
+    {"id": "c23-padded-968", "targets": ["aarch64-unknown-linux-gnu"], "parts": ["encoder"], "quality_only": true, "cause": "PSNR-Y 50.479 versus 51.182 dB at 1.0012 times the reference bits. The padded stream decodes and the difference exceeds the quality tolerance."}
+  ],
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["c16-gop1-16", "c17-gop2-176", "c18-gop12-352", "c19-gop300-176", "c20-max-rate-720", "c22-vbv-16x-1080", "c23-padded-968", "c24-mux-program-42", "c25-mux-program-65535", "c26-vbv-ref-floor-16", "c27-gop12-low-rate"], "cause": "Awaiting paired measurements on isolated gate hosts."},
+    {"bound": "heap", "cases": ["c16-gop1-16", "c17-gop2-176", "c18-gop12-352", "c19-gop300-176", "c20-max-rate-720", "c22-vbv-16x-1080", "c23-padded-968", "c24-mux-program-42", "c25-mux-program-65535", "c26-vbv-ref-floor-16", "c27-gop12-low-rate"], "cause": "Awaiting paired measurements on isolated gate hosts."},
+    {"bound": "total_rss", "cases": ["c16-gop1-16", "c17-gop2-176", "c18-gop12-352", "c19-gop300-176", "c20-max-rate-720", "c22-vbv-16x-1080", "c23-padded-968", "c24-mux-program-42", "c25-mux-program-65535", "c26-vbv-ref-floor-16", "c27-gop12-low-rate"], "cause": "Awaiting paired measurements on isolated gate hosts."},
+    {"bound": "runtime", "cases": ["c21-vbv-min-16"], "cause": "FFmpeg refuses encoder open at this buffer size, so there is no equivalent session to measure."},
+    {"bound": "heap", "cases": ["c21-vbv-min-16"], "cause": "FFmpeg refuses encoder open at this buffer size, so there is no equivalent session to measure."},
+    {"bound": "total_rss", "cases": ["c21-vbv-min-16"], "cause": "FFmpeg refuses encoder open at this buffer size, so there is no equivalent session to measure."}
+  ],
   "decisions": {
     "date_utc": "2026-11-02",
     "status": "approved",

@@ -131,16 +131,51 @@ impl Operation {
     }
 }
 
+#[cold]
+#[inline(never)]
+fn configure(cfg: &mut SessionConfig, options: &[String]) -> Result<(), &'static str> {
+    if !options.len().is_multiple_of(2) {
+        return Err("options");
+    }
+    for pair in options.chunks_exact(2) {
+        let value = &pair[1];
+        let number = || value.parse::<u32>().map_err(|_| "option value");
+        let short = || u16::try_from(number()?).map_err(|_| "option value");
+        match pair[0].as_str() {
+            "--gop" => cfg.gop = number()?,
+            "--max-rate" => cfg.max_rate = number()?,
+            "--vbv-bits" => cfg.vbv_bits = number()?,
+            "--transport-stream-id" => cfg.mux.transport_stream_id = short()?,
+            "--original-network-id" => cfg.mux.original_network_id = short()?,
+            "--program-number" => cfg.mux.program_number = short()?,
+            "--pmt-pid" => cfg.mux.pmt_pid = short()?,
+            "--video-pid" => cfg.mux.video_pid = short()?,
+            "--stream-type" => {
+                cfg.mux.stream_type = u8::try_from(number()?).map_err(|_| "option value")?;
+            }
+            "--provider-name" => cfg.mux.provider_name.clone_from(value),
+            "--service-name" => cfg.mux.service_name.clone_from(value),
+            _ => return Err("option name"),
+        }
+    }
+    Ok(())
+}
+
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> ExitCode {
     let mut args: Vec<String> = std::env::args().collect();
+    let positional = match args.get(1).map(String::as_str) {
+        Some("bench" | "pipeline" | "recon") => 9,
+        Some("memory") => 8,
+        _ => args.len(),
+    };
     let operation = args
         .get(1)
-        .and_then(|name| Operation::parse(name, args.len()));
+        .and_then(|name| Operation::parse(name, args.len().min(positional)));
     if operation == Some(Operation::Bench) {
         // The timing command line, input and iterations first, in the order of
         // the other modes: <w> <h> <flip> <frames> <bitrate> <in.rgba> <iterations>.
-        args[2..].rotate_left(2);
+        args[2..positional].rotate_left(2);
     }
     if args.len() < 7 {
         return fail("usage");
@@ -164,6 +199,14 @@ fn worker_main() -> ExitCode {
     let Some(operation) = operation else {
         return fail("usage");
     };
+    let options = &args[positional..];
+    let config = |bitrate| {
+        let mut cfg = SessionConfig::with_rate_rule(w, h, bitrate);
+        if !options.is_empty() {
+            configure(&mut cfg, options)?;
+        }
+        Ok(cfg)
+    };
     match operation {
         Operation::Convert => {
             let Some(rgba) = load(&args[6]) else {
@@ -184,7 +227,10 @@ fn worker_main() -> ExitCode {
             let (Some(bitrate), Some(rgba)) = (parse(6), load(&args[7])) else {
                 return fail("input");
             };
-            let cfg = SessionConfig::with_rate_rule(w, h, bitrate);
+            let cfg = match config(bitrate) {
+                Ok(cfg) => cfg,
+                Err(error) => return fail(error),
+            };
             let reconstructed =
                 |s: &Session, out: &mut Vec<u8>| visible_yuv420(&s.reconstruction(), out);
             if let Err(step) =
@@ -197,7 +243,10 @@ fn worker_main() -> ExitCode {
             let (Some(bitrate), Some(rgba)) = (parse(6), load(&args[7])) else {
                 return fail("input");
             };
-            let cfg = SessionConfig::with_rate_rule(w, h, bitrate);
+            let cfg = match config(bitrate) {
+                Ok(cfg) => cfg,
+                Err(error) => return fail(error),
+            };
             let mut ts: Vec<u8> = Vec::new();
             let underflow = match session(&cfg, orientation, &rgba, count, &mut ts) {
                 Ok(u) => u,
@@ -224,7 +273,10 @@ fn worker_main() -> ExitCode {
             else {
                 return fail("input");
             };
-            let cfg = SessionConfig::with_rate_rule(w, h, bitrate);
+            let cfg = match config(bitrate) {
+                Ok(cfg) => cfg,
+                Err(error) => return fail(error),
+            };
             let mut stream = None;
             let start = Timer::start(true);
             for _ in 0..iterations {
@@ -255,7 +307,10 @@ fn worker_main() -> ExitCode {
             let (Some(bitrate), Some(rgba)) = (parse(6), load(&args[7])) else {
                 return fail("input");
             };
-            let cfg = SessionConfig::with_rate_rule(w, h, bitrate);
+            let cfg = match config(bitrate) {
+                Ok(cfg) => cfg,
+                Err(error) => return fail(error),
+            };
             let mut sink = HashSink::new();
             let mut stdout = std::io::stdout();
             if Boundary::Begin.mark(&mut stdout).is_err() {

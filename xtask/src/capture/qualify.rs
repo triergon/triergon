@@ -27,7 +27,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
+use super::config::Config;
 use crate::codecs::correctness::file_sha;
+use crate::harness::bounds::Unmeasured;
 use crate::harness::gate_build;
 use crate::harness::memory;
 use crate::harness::policy;
@@ -69,10 +71,10 @@ pub struct Options {
     pub stage: Stage,
 }
 
-/// `capture qualify --stage`: correctness and timing, the memory of cases a
-/// timing run recorded, or both in one run.
+/// `capture qualify --stage`: correctness, timing and memory collection.
 pub enum Stage {
     Both,
+    Parity,
     Timing,
     Memory { timing: PathBuf },
 }
@@ -81,6 +83,7 @@ impl Stage {
     fn name(&self) -> &'static str {
         match self {
             Self::Both => "both",
+            Self::Parity => "parity",
             Self::Timing => "timing",
             Self::Memory { .. } => "memory",
         }
@@ -174,20 +177,19 @@ fn case_args(case: &Value, keys: &[&str]) -> Vec<String> {
 
 /// `bench IN.RGBA ITERATIONS W H FLIP FRAMES BITRATE`: frames are the shared
 /// work, the stream's byte count and digest each encoder's own.
-fn operation(case: &Value, iterations: u32) -> Operation {
-    Operation {
+fn operation(case: &Value, iterations: u32) -> Result<Operation, String> {
+    let mut arguments = case_args(case, &SESSION);
+    arguments.extend(Config::read(case)?.arguments());
+    Ok(Operation {
         prefix: String::new(),
-        arguments: case_args(case, &SESSION)
-            .into_iter()
-            .map(OsString::from)
-            .collect(),
+        arguments: arguments.into_iter().map(OsString::from).collect(),
         candidate_options: vec![],
         work: Work {
             fields: vec![],
             own: vec!["bytes".to_owned(), "digest".to_owned()],
         },
         timeout: SESSION_TIMEOUT * iterations,
-    }
+    })
 }
 
 /// Whether each worker's warm-up printed the stream of that worker's
@@ -256,7 +258,7 @@ fn runtime(
         pairs,
         iterations,
         seed,
-        &operation(case, iterations),
+        &operation(case, iterations)?,
     )?;
     let deterministic = graded.interval.is_ok()
         && expected_outputs.is_none_or(|outputs| outputs_match(&graded.record, outputs));
@@ -358,11 +360,17 @@ impl MeasuredCase {
     }
 
     /// The observed worker arguments of the case's memory runs, reading `input`.
-    fn memory_arguments(&self, input: &Path) -> Vec<String> {
+    fn memory_arguments(&self, input: &Path) -> Result<Vec<String>, String> {
         let mut arguments = vec!["memory".to_owned()];
         arguments.extend(case_args(self.field("case"), &SESSION));
         arguments.push(python::path(input));
-        arguments
+        arguments.extend(Config::read(self.field("case"))?.arguments());
+        Ok(arguments)
+    }
+
+    fn memory_deferred(&self) -> bool {
+        let deferred = self.field("not_measured");
+        deferred.get("heap").is_some() && deferred.get("total_rss").is_some()
     }
 
     /// A copy of the case's input at `directory`, with the hash its timing recorded.
@@ -471,6 +479,7 @@ fn correctness_and_timing(
     gate: policy::Runtime,
     refusals: &[String],
     case: &Value,
+    unmeasured: &Unmeasured<'_>,
 ) -> Result<MeasuredCase, String> {
     let id = python::str(case.get("id").unwrap_or(&Value::Null));
     let directory = a.out.join(&id);
@@ -516,6 +525,22 @@ fn correctness_and_timing(
         )])
     };
     record.push(("correctness_summary".into(), correctness.clone()));
+    let deferred = unmeasured.annotation(&id);
+    if deferred.truthy() {
+        record.push(("not_measured".into(), deferred));
+    }
+    if matches!(a.stage, Stage::Parity) || unmeasured.skips(&id, "timing") {
+        record.push((
+            "runtime".into(),
+            Value::object([("status", Value::str("not-measured"))]),
+        ));
+        println!("capture: {id}: {}", json::to_python(&correctness, None));
+        return Ok(MeasuredCase {
+            id,
+            input: path,
+            record,
+        });
+    }
     let outputs = correctness.get("outputs");
     let iterations = u32::try_from(a.iterations).map_err(|e| e.to_string())?;
     let mut timed = runtime(
@@ -575,6 +600,7 @@ fn finish_case(
         .and_then(|ratio| ratio.get("upper_95"))
         .and_then(Value::as_f64)
         .filter(|bound| bound.is_finite());
+    let deferred = case.field("not_measured").clone();
     let MeasuredCase { id, mut record, .. } = case;
     let memory_status = measured
         .get("status")
@@ -599,7 +625,7 @@ fn finish_case(
     record.push(("memory".into(), measured));
     let flag = |key: &str| correctness.get(key).is_some_and(Value::truthy);
     let pipeline = flag("pipeline");
-    let verdict = vec![
+    let mut verdict = vec![
         ("conversion".to_owned(), Value::Bool(flag("conversion"))),
         ("mux".to_owned(), Value::Bool(flag("mux"))),
         ("encoder".to_owned(), Value::Bool(flag("encoder"))),
@@ -618,6 +644,9 @@ fn finish_case(
             Value::Bool(pipeline && runtime_gate && heap_gate && rss_gate),
         ),
     ];
+    if deferred.truthy() {
+        verdict.push(("not_measured".into(), deferred));
+    }
     record.push(("verdict".into(), Value::Object(verdict.clone())));
     let directory = a.out.join(&id);
     fs::create_dir_all(&directory).map_err(|e| format!("{}: {e}", directory.display()))?;
@@ -641,32 +670,34 @@ fn finish_case(
 /// records of its timing run.
 struct Prepared {
     refusals: Vec<String>,
-    open: Vec<String>,
+    open: Vec<OpenCase>,
     cases: Vec<MeasuredCase>,
 }
 
 impl Prepared {
+    fn open_case(&self, id: &str) -> Option<&OpenCase> {
+        self.open.iter().find(|entry| entry.id == id)
+    }
+
     fn parity_failures(&self) -> Vec<String> {
         self.cases
             .iter()
-            .flat_map(|case| {
-                failing_parity(&case.id, case.correctness(), self.open.contains(&case.id))
-            })
+            .flat_map(|case| failing_parity(&case.id, case.correctness(), self.open_case(&case.id)))
             .collect()
     }
 
-    /// A listed open case whose conversion now passes fails the run once every
+    /// A listed open comparison that now passes fails the run once every
     /// case is measured, so the list cannot go stale.
     fn still_open(&self) -> Result<(), String> {
         let now_passing: Vec<&str> = self
             .cases
             .iter()
             .filter(|case| {
-                self.open.contains(&case.id)
-                    && case
-                        .correctness()
-                        .get("conversion")
-                        .is_some_and(Value::truthy)
+                self.open_case(&case.id).is_some_and(|open| {
+                    open.parts
+                        .iter()
+                        .any(|part| case.correctness().get(part).is_some_and(Value::truthy))
+                })
             })
             .map(|case| case.id.as_str())
             .collect();
@@ -715,7 +746,9 @@ fn memory_stage(
         let mut inputs = Vec::new();
         for measured in &prepared.cases {
             inputs.push(match (&copies, measured.correctness().get("outputs")) {
-                (Some(copies), Some(_)) => measured.copy_input(&copies.0)?,
+                (Some(copies), Some(_)) if !measured.memory_deferred() => {
+                    measured.copy_input(&copies.0)?
+                }
                 _ => measured.input.clone(),
             });
         }
@@ -724,7 +757,7 @@ fn memory_stage(
             .iter()
             .zip(&inputs)
             .map(|(measured, input)| measured.memory_arguments(input))
-            .collect();
+            .collect::<Result<_, _>>()?;
         setups.push(MemorySetup {
             workers: memory::WorkerPaths {
                 candidate: Path::new(&a.candidate),
@@ -754,6 +787,9 @@ fn memory_stage(
             .zip(&setup.inputs)
             .enumerate()
         {
+            if measured.memory_deferred() {
+                continue;
+            }
             let Some(outputs) = measured.correctness().get("outputs") else {
                 continue;
             };
@@ -777,7 +813,13 @@ fn memory_stage(
         .iter()
         .map(|(_, prepared)| prepared.cases.iter().map(|_| None).collect())
         .collect();
-    for ((run, case), memory) in collected.into_iter().zip(memory::collect_all(jobs)?) {
+    let results = if jobs.is_empty() {
+        drop(jobs);
+        Vec::new()
+    } else {
+        memory::collect_all(jobs)?
+    };
+    for ((run, case), memory) in collected.into_iter().zip(results) {
         memories[run][case] = Some(memory);
     }
     drop(setups);
@@ -792,9 +834,14 @@ fn memory_stage(
                 .zip(memories)
                 .map(|(measured, memory)| {
                     let memory = memory.transpose()?.unwrap_or_else(|| {
-                        Value::object([("status", Value::str("missing-correctness-output"))])
+                        let status = if measured.memory_deferred() {
+                            "not-measured"
+                        } else {
+                            "missing-correctness-output"
+                        };
+                        Value::object([("status", Value::str(status))])
                     });
-                    let open_on_target = open.contains(&measured.id);
+                    let open_on_target = open.iter().any(|entry| entry.id == measured.id);
                     finish_case(a, measured, memory, open_on_target, ceilings)
                 })
                 .collect()
@@ -841,7 +888,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     let prepared = prepare(root, a)?;
     let failing = prepared.parity_failures();
     let still_open = prepared.still_open();
-    if matches!(a.stage, Stage::Timing) {
+    if matches!(a.stage, Stage::Timing | Stage::Parity) {
         return finish_requirements(&failing, still_open);
     }
     let summary = memory_stage(root, vec![(a, prepared)])?
@@ -883,14 +930,26 @@ fn prepare(root: &Path, a: &Options) -> Result<Prepared, String> {
     for dir in [&a.out, &a.inputs] {
         fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
-    let cases = json::read(&a.cases).map_err(|e| format!("{}: {e}", a.cases.display()))?;
-    let mut cases: Vec<Value> = cases
+    let manifest = json::read(&a.cases).map_err(|e| format!("{}: {e}", a.cases.display()))?;
+    let contract = json::read(&root.join("harness/capture/contract.json"))?;
+    let target = gate_build::worker_target()?;
+    let registered_path = root.join("harness/capture/cases.json");
+    let registered_manifest = (a.cases != registered_path)
+        .then(|| json::read(&registered_path))
+        .transpose()?;
+    let registered = registered_manifest.as_ref().unwrap_or(&manifest);
+    let unmeasured = Unmeasured::read(&contract, registered, target)?;
+    let registered_cases = registered
+        .get("cases")
+        .and_then(Value::as_array)
+        .ok_or("registered capture corpus without cases")?;
+    let mut cases: Vec<Value> = manifest
         .get("cases")
         .and_then(Value::as_array)
         .ok_or("cases file without cases")?
         .to_vec();
     let open = {
-        let ids: Vec<&str> = cases
+        let ids: Vec<&str> = registered_cases
             .iter()
             .map(|case| {
                 case.get("id")
@@ -898,18 +957,35 @@ fn prepare(root: &Path, a: &Options) -> Result<Prepared, String> {
                     .ok_or("case without id")
             })
             .collect::<Result<_, _>>()?;
-        open_cases(root, &ids)?
+        let mut open = listed_open(&contract, target, &ids)?;
+        if registered_manifest.is_some() {
+            open.retain(|entry| {
+                cases.iter().any(|case| {
+                    case.get("id").and_then(Value::as_str) == Some(entry.id.as_str())
+                        && registered_cases.contains(case)
+                })
+            });
+        }
+        open
     };
     if !a.only.is_empty() {
+        for id in &a.only {
+            if !cases
+                .iter()
+                .any(|case| case.get("id").and_then(Value::as_str) == Some(id))
+            {
+                return Err(format!("unknown capture case {id}"));
+            }
+        }
         cases.retain(|c| {
             c.get("id")
                 .and_then(Value::as_str)
                 .is_some_and(|id| a.only.iter().any(|o| o == id))
         });
     }
-    let manifest = source_manifest(root)?;
+    let source = source_manifest(root)?;
     let digest = sha256::hex(
-        json::to_python(&python::sort_keys(&Value::Object(manifest.clone())), None).as_bytes(),
+        json::to_python(&python::sort_keys(&Value::Object(source.clone())), None).as_bytes(),
     );
     let sha = |path: &str| file_sha(Path::new(path)).map(Value::str);
     let observer = sha(&a.observer)?;
@@ -919,12 +995,19 @@ fn prepare(root: &Path, a: &Options) -> Result<Prepared, String> {
     let gate = policy::Runtime::load(root)?;
     let refusals =
         gate_build::pair_refusals(root, Path::new(&a.candidate), Path::new(&a.reference));
+    if matches!(a.stage, Stage::Parity)
+        && let Some(reason) = refusals.iter().find(|reason| {
+            reason.starts_with("no build identity:") || reason.ends_with("of the recorded build")
+        })
+    {
+        return Err(reason.clone());
+    }
     for reason in &refusals {
         println!("no gate result: {reason}");
     }
     let identity = Value::object([
         ("source_digest", Value::str(digest)),
-        ("source_manifest", Value::Object(manifest)),
+        ("source_manifest", Value::Object(source)),
         ("build_refusals", Value::strings(refusals.clone())),
         ("cpus", gate_build::cpus()),
         ("candidate_sha256", sha(&a.candidate)?),
@@ -952,11 +1035,17 @@ fn prepare(root: &Path, a: &Options) -> Result<Prepared, String> {
     // half alone: timing on one CPU, memory on the CPUs its slots may use.
     let measured_cases = match &a.stage {
         Stage::Memory { timing } => timed_cases(root, a, timing, &identity, &cases)?,
-        Stage::Timing | Stage::Both => {
+        Stage::Parity | Stage::Timing | Stage::Both => {
             let mut measured = Vec::new();
+            let no_deferrals = Unmeasured::default();
             for case in &cases {
-                let case = correctness_and_timing(root, a, &exe, gate, &refusals, case)?;
-                if matches!(a.stage, Stage::Timing) {
+                let bounds = if registered_manifest.is_none() || registered_cases.contains(case) {
+                    &unmeasured
+                } else {
+                    &no_deferrals
+                };
+                let case = correctness_and_timing(root, a, &exe, gate, &refusals, case, bounds)?;
+                if matches!(a.stage, Stage::Parity | Stage::Timing) {
                     write(
                         &a.out.join(&case.id).join(TIMING_RECORD),
                         json::to_python(&Value::Object(case.record.clone()), Some(1)),
@@ -1041,17 +1130,43 @@ fn timed_cases(
         .collect()
 }
 
-/// A listed open conversion still requires mux and encoder parity.
+const PARITY_PARTS: [&str; 3] = ["conversion", "mux", "encoder"];
+
+#[derive(Debug)]
+struct OpenCase {
+    id: String,
+    parts: Vec<String>,
+    refusal: Option<String>,
+    quality_only: bool,
+}
+
+impl OpenCase {
+    fn admits(&self, part: &str, correctness: &Value) -> bool {
+        correctness.get(part) == Some(&Value::Bool(false))
+            && self.parts.iter().any(|name| name == part)
+            && (!self.quality_only
+                || correctness.get("encoder_quality_only") == Some(&Value::Bool(true)))
+            && self.refusal.as_ref().is_none_or(|reason| {
+                correctness.get("candidate_valid") == Some(&Value::Bool(true))
+                    && correctness
+                        .get("reference_refusal")
+                        .and_then(Value::as_str)
+                        .is_some_and(|diagnostic| diagnostic.contains(reason))
+            })
+    }
+}
+
+/// A listed open comparison leaves all other parts required.
 fn failing_parity<'a>(
     id: &'a str,
     correctness: &'a Value,
-    open_conversion: bool,
+    open: Option<&'a OpenCase>,
 ) -> impl Iterator<Item = String> + 'a {
-    ["conversion", "mux", "encoder"]
+    PARITY_PARTS
         .into_iter()
         .filter(move |part| {
             let passes = matches!(correctness.get(part), Some(Value::Bool(true)));
-            let exception = open_conversion && *part == "conversion";
+            let exception = open.is_some_and(|entry| entry.admits(part, correctness));
             !(passes || exception)
         })
         .map(move |part| format!("capture: {id}: {part} parity fails"))
@@ -1063,16 +1178,21 @@ fn failing_bounds(summary: &[Value]) -> Vec<String> {
     let mut lines = Vec::new();
     for line in summary {
         let verdict = |key: &str| line.get(key).is_some_and(Value::truthy);
-        if verdict("open_on_target") {
+        let quality_only = line
+            .get("correctness")
+            .and_then(|comparison| comparison.get("encoder_quality_only"))
+            .is_some_and(Value::truthy);
+        if verdict("open_on_target") && !quality_only {
             continue;
         }
         let id = line.get("id").and_then(Value::as_str).unwrap_or_default();
-        for (gate, bound) in [
-            ("runtime_gate", "runtime"),
-            ("heap_gate", "heap"),
-            ("rss_gate", "total RSS"),
+        for (gate, key, bound) in [
+            ("runtime_gate", "runtime", "runtime"),
+            ("heap_gate", "heap", "heap"),
+            ("rss_gate", "total_rss", "total RSS"),
         ] {
-            if !verdict(gate) {
+            let deferred = line.get("not_measured").and_then(|bounds| bounds.get(key));
+            if !verdict(gate) && deferred.is_none() {
                 let at = match line.get("runtime_upper95").and_then(Value::as_f64) {
                     Some(upper) if gate == "runtime_gate" => format!(" at {upper:.4}"),
                     _ => String::new(),
@@ -1084,17 +1204,9 @@ fn failing_bounds(summary: &[Value]) -> Vec<String> {
     lines
 }
 
-/// The cases `harness/capture/contract.json` lists in `open_cases` for this
-/// host's worker target: their conversion is compared and reported, and fails.
-fn open_cases(root: &Path, ids: &[&str]) -> Result<Vec<String>, String> {
-    let path = root.join("harness/capture/contract.json");
-    let contract = json::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    listed_open(&contract, gate_build::worker_target()?, ids)
-}
-
 /// The `open_cases` of `contract` listed for `target`. Every listed id must be a
 /// case in `ids`.
-fn listed_open(contract: &Value, target: &str, ids: &[&str]) -> Result<Vec<String>, String> {
+fn listed_open(contract: &Value, target: &str, ids: &[&str]) -> Result<Vec<OpenCase>, String> {
     let Some(entries) = contract.get("open_cases") else {
         return Ok(Vec::new());
     };
@@ -1112,8 +1224,47 @@ fn listed_open(contract: &Value, target: &str, ids: &[&str]) -> Result<Vec<Strin
             .get("targets")
             .and_then(Value::as_array)
             .ok_or("open case without targets")?;
+        let parts = match entry.get("parts") {
+            None => vec!["conversion".to_owned()],
+            Some(parts) => parts
+                .as_array()
+                .filter(|parts| !parts.is_empty())
+                .ok_or_else(|| format!("open case {id} has no comparison parts"))?
+                .iter()
+                .map(|part| {
+                    part.as_str()
+                        .filter(|part| PARITY_PARTS.contains(part))
+                        .map(str::to_owned)
+                        .ok_or_else(|| format!("open case {id}: invalid part"))
+                })
+                .collect::<Result<_, _>>()?,
+        };
+        let refusal = entry
+            .get("reference_refusal")
+            .map(|value| {
+                value
+                    .as_str()
+                    .filter(|reason| !reason.is_empty())
+                    .map(str::to_owned)
+                    .ok_or_else(|| format!("open case {id}: invalid reference refusal"))
+            })
+            .transpose()?;
+        let quality_only = match entry.get("quality_only") {
+            None => false,
+            Some(Value::Bool(true)) if parts == ["encoder"] => true,
+            _ => {
+                return Err(format!(
+                    "open case {id}: quality_only requires the encoder part"
+                ));
+            }
+        };
         if targets.iter().any(|t| t.as_str() == Some(target)) {
-            open.push(id.to_owned());
+            open.push(OpenCase {
+                id: id.to_owned(),
+                parts,
+                refusal,
+                quality_only,
+            });
         }
     }
     Ok(open)

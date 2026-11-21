@@ -155,6 +155,7 @@ pub fn run(
         ];
         let rate = python::str(&field("bitrate")?);
         let input = python::path(&path);
+        let arguments = super::config::Config::read(case)?.arguments();
         let out = |kind: &str| scratch.0.join(format!("{id}.{kind}"));
         let job = |kind: &str, operation: &str, with_rate: bool, extension: &str| {
             let mut argv = vec![worker.clone(), operation.to_owned()];
@@ -163,6 +164,9 @@ pub fn run(
                 argv.push(rate.clone());
             }
             argv.extend([input.clone(), python::path(&out(extension))]);
+            if with_rate {
+                argv.extend(arguments.iter().cloned());
+            }
             Job {
                 name: format!("{id}/{kind}"),
                 argv,

@@ -22,6 +22,7 @@
 use std::fs;
 use std::path::Path;
 
+use super::config::{Config, Mux};
 use super::ts::{self, Facts};
 use crate::codecs::correctness::file_sha;
 use crate::json::{self, Value};
@@ -230,6 +231,177 @@ struct Encoded {
     decoded: String,
 }
 
+fn mux_matches(facts: &Facts, mux: &Mux<'_>, candidate: bool) -> bool {
+    let tables_match = |pid, fields: &[(usize, String)]| {
+        let mut sections = facts
+            .tables
+            .iter()
+            .filter(|table| table.pid == pid)
+            .peekable();
+        sections.peek().is_some()
+            && sections.all(|table| {
+                fields.iter().all(|(offset, hex)| {
+                    table.section.get(*offset..*offset + hex.len()) == Some(hex.as_str())
+                })
+            })
+    };
+    let hex = |bytes: &str| {
+        bytes
+            .bytes()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>()
+    };
+    let names = format!(
+        "{:02x}{}{:02x}{}",
+        mux.provider_name.len(),
+        hex(mux.provider_name),
+        mux.service_name.len(),
+        hex(mux.service_name)
+    );
+    facts.pes.iter().all(|pes| pes.pid == mux.video_pid)
+        && tables_match(
+            0,
+            &[
+                (6, format!("{:04x}", mux.transport_stream_id)),
+                (
+                    16,
+                    format!("{:04x}{:04x}", mux.program_number, 0xe000 | mux.pmt_pid),
+                ),
+            ],
+        )
+        && tables_match(
+            mux.pmt_pid,
+            &[
+                (6, format!("{:04x}", mux.program_number)),
+                (16, format!("{:04x}", 0xe000 | mux.video_pid)),
+                (
+                    24,
+                    format!(
+                        "{:02x}{:04x}",
+                        if candidate { mux.stream_type } else { 2 },
+                        0xe000 | mux.video_pid
+                    ),
+                ),
+            ],
+        )
+        && tables_match(
+            0x11,
+            &[
+                (6, format!("{:04x}", mux.transport_stream_id)),
+                (16, format!("{:04x}", mux.original_network_id)),
+                (22, format!("{:04x}", mux.program_number)),
+                (38, names),
+            ],
+        )
+}
+
+/// The visible size, maximum rate (400 bit/s units) and VBV size (16,384-bit units).
+fn sequence_fields(facts: &Facts) -> Vec<[i64; 4]> {
+    facts
+        .pes
+        .iter()
+        .filter_map(|pes| {
+            let offset = pes
+                .data
+                .windows(4)
+                .position(|head| head == [0, 0, 1, 0xb3])?
+                + 4;
+            let word = u64::from_be_bytes(pes.data.get(offset..offset + 8)?.try_into().ok()?);
+            Some([
+                (word >> 52) as i64,
+                ((word >> 40) & 0xfff) as i64,
+                ((word >> 14) & 0x3_ffff) as i64,
+                ((word >> 3) & 0x3ff) as i64,
+            ])
+        })
+        .collect()
+}
+
+fn verify_reference_pin(
+    case: &Value,
+    conversion: &[u8],
+    stream: &str,
+    refusal: Option<&str>,
+) -> Result<(), String> {
+    let Some(pins) = case.get("reference_pins") else {
+        return Ok(());
+    };
+    let target = crate::harness::gate_build::worker_target()?;
+    let Some(pin) = pins.get(target) else {
+        return Ok(());
+    };
+    let expected = |field| pin.get(field).and_then(Value::as_str);
+    if expected("conversion_sha256") != Some(&crate::sha256::hex(conversion)) {
+        return Err(format!(
+            "reference conversion SHA-256 differs from its {target} pin"
+        ));
+    }
+    let matched = match (refusal, expected("refusal")) {
+        (Some(actual), Some(expected)) => actual.contains(expected),
+        (None, None) => expected("stream_sha256") == Some(&file_sha(Path::new(stream))?),
+        _ => false,
+    };
+    if !matched {
+        return Err(format!("reference pipeline differs from its {target} pin"));
+    }
+    Ok(())
+}
+
+/// Keep the precise reference refusal together with the independently decoded
+/// candidate stream and the conversion verdict.
+fn report_refusal(
+    a: &Options,
+    report: &mut Vec<(String, Value)>,
+    refusal: &str,
+    conversion: bool,
+    frames: i64,
+    expected_sequence: [i64; 4],
+    pmt_pid: u16,
+) -> Result<(), String> {
+    let [width, height, ..] = expected_sequence;
+    let frame_size = (width * height * 3 / 2) as usize;
+    let stream = join(&a.out, "candidate.ts");
+    let output = join(&a.out, "candidate.decoded.yuv");
+    let (code, stderr) = decode(&join(&a.ffmpeg_bin, "ffmpeg"), &stream, &output)?;
+    let facts = ts::parse(&read(&stream)?, pmt_pid)?;
+    let headers = sequence_fields(&facts);
+    let decoded = fs::metadata(output).map_err(|e| e.to_string())?.len() as usize;
+    let valid = code == 0
+        && stderr.is_empty()
+        && decoded == frames as usize * frame_size
+        && facts.pes.len() == frames as usize
+        && !headers.is_empty()
+        && headers.iter().all(|header| *header == expected_sequence)
+        && ts::check_mux(&facts, pmt_pid)?.is_empty();
+    let outcome = Value::object([
+        ("conversion", Value::Bool(conversion)),
+        ("mux", Value::Bool(false)),
+        ("encoder", Value::Bool(false)),
+        ("pipeline", Value::Bool(false)),
+        ("candidate_valid", Value::Bool(valid)),
+        (
+            "candidate_frames",
+            Value::int((decoded / frame_size) as u64),
+        ),
+        ("candidate_decode_exit", Value::int(code)),
+        ("candidate_decode_stderr", Value::str(stderr)),
+        (
+            "candidate_sequence",
+            Value::Array(headers.iter().map(|row| ints(row)).collect()),
+        ),
+        ("reference_refusal", Value::str(refusal)),
+    ]);
+    report.push(("refusal".into(), outcome.clone()));
+    let path = join(&a.out, "report.json");
+    fs::write(
+        &path,
+        json::to_python(&Value::Object(std::mem::take(report)), Some(1)),
+    )
+    .map_err(|e| format!("{path}: {e}"))?;
+    println!("{}", json::to_python(&outcome, None));
+    Ok(())
+}
+
 pub fn run(a: &Options) -> Result<(), String> {
     let case = if Path::new(&a.case).exists() {
         json::read(Path::new(&a.case))?
@@ -241,16 +413,29 @@ pub fn run(a: &Options) -> Result<(), String> {
     let (_, flip_text) = int_field(&case, "flip")?;
     let (n, n_text) = int_field(&case, "frames")?;
     let (rate, rate_text) = int_field(&case, "bitrate")?;
+    let config = Config::read(&case)?;
+    let extra_args = config.arguments();
+    let pmt_pid = config.mux.as_ref().map_or(0x1000, |mux| mux.pmt_pid);
+    let max_rate = config.max_rate.map_or(rate * 7 / 5, i64::from);
+    let vbv_bits = config.vbv_bits.map_or(rate / 7, i64::from);
+    let configuration_case = !extra_args.is_empty() || case.get("input_sha256").is_some();
+    let expected_sequence = [w, h, (max_rate + 399) / 400, (vbv_bits + 16383) / 16384];
     let (wu, hu, nu) = (w as usize, h as usize, n as usize);
     fs::create_dir_all(&a.out).map_err(|e| format!("{}: {e}", a.out))?;
     let ffmpeg = join(&a.ffmpeg_bin, "ffmpeg");
     let ffprobe = join(&a.ffmpeg_bin, "ffprobe");
+    let input_hash = file_sha(Path::new(&a.input))?;
+    if let Some(expected) = case.get("input_sha256")
+        && expected.as_str() != Some(&input_hash)
+    {
+        return Err(format!(
+            "{}: input SHA-256 differs from the capture case",
+            a.input
+        ));
+    }
     let mut report = vec![
         ("case".to_owned(), case.clone()),
-        (
-            "input_sha256".to_owned(),
-            Value::str(file_sha(Path::new(&a.input))?),
-        ),
+        ("input_sha256".to_owned(), Value::str(input_hash)),
         (
             "candidate_sha256".to_owned(),
             Value::str(file_sha(Path::new(&a.candidate))?),
@@ -268,6 +453,7 @@ pub fn run(a: &Options) -> Result<(), String> {
     ];
     let mut roles = Vec::new();
     let mut outputs = Vec::new();
+    let mut reference_refusal = None;
     for (role, worker) in [("candidate", &a.candidate), ("reference", &a.reference)] {
         let yuv = join(&a.out, &format!("{role}.convert.yuv"));
         let mut argv = vec![worker.clone(), "convert".into()];
@@ -278,7 +464,22 @@ pub fn run(a: &Options) -> Result<(), String> {
         let mut argv = vec![worker.clone(), "pipeline".into()];
         argv.extend(geometry.iter().cloned());
         argv.extend([rate_text.clone(), a.input.clone(), ts_path.clone()]);
-        let out = check_output(&argv)?;
+        argv.extend(extra_args.iter().cloned());
+        let out = match check_output(&argv) {
+            Ok(out) => out,
+            Err(error)
+                if role == "reference"
+                    && config.vbv_bits.is_some()
+                    && error.contains("returned non-zero exit status 2.")
+                    && error.contains("VBV buffer too small for bitrate")
+                    && error.lines().last() == Some("reference_capture: avcodec_open2") =>
+            {
+                reference_refusal = Some(error);
+                roles.push((role, yuv, ts_path));
+                break;
+            }
+            Err(error) => return Err(error),
+        };
         let result = json::parse(&out).map_err(|e| format!("{role} pipeline output: {e}"))?;
         let bytes = result.get("bytes").and_then(python::int).filter(|&n| n > 0);
         let digest = result
@@ -302,6 +503,7 @@ pub fn run(a: &Options) -> Result<(), String> {
     // Conversion rule.
     let cand = read(&roles[0].1)?;
     let reference = read(&roles[1].1)?;
+    verify_reference_pin(&case, &reference, &roles[1].2, reference_refusal.as_deref())?;
     let mut conv = vec![("bytes_equal".to_owned(), Value::Bool(cand == reference))];
     let (conv_pass, conv_max, conv_exact) = if cand.len() != reference.len() {
         conv.push(("error".into(), Value::str("size")));
@@ -325,13 +527,25 @@ pub fn run(a: &Options) -> Result<(), String> {
     };
     conv.push(("pass".into(), Value::Bool(conv_pass)));
     report.push(("conversion".into(), Value::Object(conv)));
+    if let Some(refusal) = reference_refusal {
+        report.push(("outputs".into(), Value::Object(outputs)));
+        return report_refusal(
+            a,
+            &mut report,
+            &refusal,
+            conv_pass,
+            n,
+            expected_sequence,
+            pmt_pid,
+        );
+    }
     // Mux rule.
     let mut mux: Vec<(String, Value)> = Vec::new();
     let mut parsed: Vec<Role> = Vec::new();
     let mut table_sets = Vec::new();
     for (role, _, ts_path) in &roles {
-        let facts = ts::parse(&read(ts_path)?)?;
-        let problems = ts::check_mux(&facts)?;
+        let facts = ts::parse(&read(ts_path)?, pmt_pid)?;
+        let problems = ts::check_mux(&facts, pmt_pid)?;
         let mut tables: Vec<(u16, String)> = facts
             .tables
             .iter()
@@ -366,8 +580,8 @@ pub fn run(a: &Options) -> Result<(), String> {
     };
     let (ct, rt) = (&table_sets[0], &table_sets[1]);
     let pat_equal = lookup(rt, 0) == lookup(ct, 0);
-    let pmt_r = lookup(rt, 0x1000).unwrap_or_default();
-    let pmt_c = lookup(ct, 0x1000).unwrap_or_default();
+    let pmt_r = lookup(rt, pmt_pid).unwrap_or_default();
+    let pmt_c = lookup(ct, pmt_pid).unwrap_or_default();
     let pmt_equal = format!(
         "{}{}",
         slice(&pmt_r, 0, Some(24)),
@@ -437,11 +651,32 @@ pub fn run(a: &Options) -> Result<(), String> {
         .get("problem_count")
         .and_then(python::int)
         .unwrap_or(1);
+    let configured_mux_pass = config.mux.as_ref().is_none_or(|configuration| {
+        let candidate = mux_matches(&parsed[0].facts, configuration, true);
+        let reference = mux_matches(&parsed[1].facts, configuration, false);
+        let pcr = parsed[1]
+            .facts
+            .pes
+            .iter()
+            .all(|pes| pes.pcr == pes.dts.map(|dts| dts * 300));
+        let sdt_equal = sdt(ct) == sdt(rt);
+        mux.push((
+            "configured_fields".into(),
+            Value::object([
+                ("candidate", Value::Bool(candidate)),
+                ("reference", Value::Bool(reference)),
+                ("reference_pcr", Value::Bool(pcr)),
+                ("sdt_equal", Value::Bool(sdt_equal)),
+            ]),
+        ));
+        candidate && reference && pcr && sdt_equal && timing_ok[1] == (true, nu - 1)
+    });
     let mux_pass = candidate_problems == 0
         && pat_equal
         && pmt_equal
         && timing_ok[0].0
-        && timing_ok[0].1 as i64 == n;
+        && timing_ok[0].1 as i64 == n
+        && configured_mux_pass;
     mux.push(("pass".into(), Value::Bool(mux_pass)));
     report.push(("mux".into(), Value::Object(mux)));
     // Encoder rule.
@@ -484,7 +719,7 @@ pub fn run(a: &Options) -> Result<(), String> {
         let y_own = series(0, own);
         let mean = mean_psnr(&y_own);
         let bits: i64 = e.es_bits[..common.min(e.es_bits.len())].iter().sum();
-        let under = vbv(&e.es_bits, rate * 7 / 5, (rate / 7 + 16383) / 16384 * 16384);
+        let under = vbv(&e.es_bits, max_rate, (vbv_bits + 16383) / 16384 * 16384);
         enc.push((
             ["candidate", "reference"][index].to_owned(),
             Value::object([
@@ -518,11 +753,47 @@ pub fn run(a: &Options) -> Result<(), String> {
     let delta = means[0] - means[1];
     let prefix = |t: &str| t.chars().take(common).collect::<String>();
     let types_equal = prefix(&c.types) == prefix(&r.types);
+    let configured_encoder_pass = !configuration_case || {
+        let configured = |role: &Role, encoded: &Encoded| {
+            let headers = sequence_fields(&role.facts);
+            let gop = config.gop.unwrap_or(30) as usize;
+            let intra_period = encoded.types.starts_with('I')
+                && encoded
+                    .types
+                    .split('I')
+                    .skip(1)
+                    .all(|predictive| predictive.len() < gop);
+            let pass = headers.len() == encoded.types.bytes().filter(|b| *b == b'I').count()
+                && headers.iter().all(|header| *header == expected_sequence)
+                && intra_period;
+            (headers, intra_period, pass)
+        };
+        let (c_headers, c_period, c_pass) = configured(&parsed[0], c);
+        let (r_headers, r_period, r_pass) = configured(&parsed[1], r);
+        enc.push((
+            "configured_fields".into(),
+            Value::object([
+                ("expected_sequence_header", ints(&expected_sequence)),
+                (
+                    "candidate_sequence_headers",
+                    Value::Array(c_headers.iter().map(|row| ints(row)).collect()),
+                ),
+                (
+                    "reference_sequence_headers",
+                    Value::Array(r_headers.iter().map(|row| ints(row)).collect()),
+                ),
+                ("candidate_intra_period", Value::Bool(c_period)),
+                ("reference_intra_period", Value::Bool(r_period)),
+            ]),
+        ));
+        c_pass && r_pass && r.frames + 1 == nu && r.decode_exit == 0 && r.decode_stderr.is_empty()
+    };
     let base_ok = c.decode_exit == 0
         && c.frames as i64 == n
         && c.decode_stderr.is_empty()
         && types_equal
-        && underflow[0] <= underflow[1];
+        && underflow[0] <= underflow[1]
+        && configured_encoder_pass;
     let pass_v1 = base_ok && delta >= -0.25 && bits_ratio <= 1.03;
     let budget = (rate * common as i64) as f64 / 30.0;
     let (mut mode, mut quality) = if cb as f64 <= 1.03 * rb as f64 {
@@ -541,6 +812,7 @@ pub fn run(a: &Options) -> Result<(), String> {
             let mut argv = vec![a.candidate.clone(), "pipeline".into()];
             argv.extend(geometry.iter().cloned());
             argv.extend([extra.to_string(), a.input.clone(), ts_path.clone()]);
+            argv.extend(extra_args.iter().cloned());
             check_output(&argv)?;
             let out = format!("{ts_path}.yuv");
             decode(&ffmpeg, &ts_path, &out)?;
@@ -553,7 +825,7 @@ pub fn run(a: &Options) -> Result<(), String> {
             if mse <= 0.0 {
                 return Err("math domain error".into());
             }
-            let bits: i64 = ts::parse(&read(&ts_path)?)?
+            let bits: i64 = ts::parse(&read(&ts_path)?, pmt_pid)?
                 .pes
                 .iter()
                 .take(common)
@@ -622,7 +894,7 @@ pub fn run(a: &Options) -> Result<(), String> {
     let path = join(&a.out, "report.json");
     fs::write(&path, json::to_python(&Value::Object(report), Some(1)))
         .map_err(|e| format!("{path}: {e}"))?;
-    let summary = Value::object([
+    let mut summary = Value::object([
         ("conversion", Value::Bool(conv_pass)),
         (
             "conversion_max_abs",
@@ -655,6 +927,13 @@ pub fn run(a: &Options) -> Result<(), String> {
         ("pipeline", Value::Bool(pipeline)),
         ("outputs", outputs),
     ]);
+    if configuration_case {
+        push(
+            &mut summary,
+            "encoder_quality_only",
+            Value::Bool(base_ok && !quality),
+        );
+    }
     println!("{}", json::to_python(&summary, None));
     Ok(())
 }

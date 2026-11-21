@@ -3,19 +3,49 @@ use super::*;
 #[test]
 fn only_an_open_conversion_may_fail_capture_parity() {
     let verdict = json::parse(r#"{"conversion": false, "mux": true, "encoder": true}"#).unwrap();
+    let open = OpenCase {
+        id: "picture".into(),
+        parts: vec!["conversion".into()],
+        refusal: None,
+        quality_only: false,
+    };
     assert_eq!(
-        failing_parity("picture", &verdict, false).collect::<Vec<_>>(),
+        failing_parity("picture", &verdict, None).collect::<Vec<_>>(),
         ["capture: picture: conversion parity fails"]
     );
-    assert_eq!(failing_parity("picture", &verdict, true).count(), 0);
+    assert_eq!(failing_parity("picture", &verdict, Some(&open)).count(), 0);
 
     let invalid = json::parse(r#"{"conversion": false, "mux": false, "encoder": false}"#).unwrap();
     assert_eq!(
-        failing_parity("picture", &invalid, true).collect::<Vec<_>>(),
+        failing_parity("picture", &invalid, Some(&open)).collect::<Vec<_>>(),
         [
             "capture: picture: mux parity fails",
             "capture: picture: encoder parity fails",
         ]
+    );
+}
+
+#[test]
+fn a_quality_exception_requires_the_rest_of_the_encoder_comparison_to_pass() {
+    let open = OpenCase {
+        id: "picture".into(),
+        parts: vec!["encoder".into()],
+        refusal: None,
+        quality_only: true,
+    };
+    let verdict = |quality_only| {
+        json::parse(&format!(
+            r#"{{"conversion": true, "mux": true, "encoder": false, "encoder_quality_only": {quality_only}}}"#
+        ))
+        .unwrap()
+    };
+    assert_eq!(
+        failing_parity("picture", &verdict(true), Some(&open)).count(),
+        0
+    );
+    assert_eq!(
+        failing_parity("picture", &verdict(false), Some(&open)).collect::<Vec<_>>(),
+        ["capture: picture: encoder parity fails"]
     );
 }
 
@@ -98,7 +128,7 @@ fn a_memory_run_reads_only_the_cases_its_timing_run_recorded() {
     let read = MeasuredCase::read(&dir.join("timing"), &case, &input).unwrap();
     assert_eq!(read.input, input);
     assert_eq!(
-        read.memory_arguments(&input).last(),
+        read.memory_arguments(&input).unwrap().last(),
         Some(&python::path(&input))
     );
     let copies = InputCopies(dir.join("copies"));
@@ -261,7 +291,10 @@ fn a_memory_run_measures_the_cases_of_a_reused_timing_run() {
         Some(&Value::Bool(true))
     );
     assert_eq!(
-        measured[0].memory_arguments(&measured[0].input).last(),
+        measured[0]
+            .memory_arguments(&measured[0].input)
+            .unwrap()
+            .last(),
         Some(&python::path(&inputs.join("noise-64x48-2.rgba")))
     );
     // Other workers, another kernel, or other input bytes are refused.
@@ -326,7 +359,11 @@ fn open_cases_are_listed_per_target_and_must_be_cases() {
     .unwrap();
     let ids = ["c01", "c02", "c03"];
     assert_eq!(
-        listed_open(&contract, "aarch64-unknown-linux-gnu", &ids).unwrap(),
+        listed_open(&contract, "aarch64-unknown-linux-gnu", &ids)
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.id)
+            .collect::<Vec<_>>(),
         ["c01"]
     );
     assert!(

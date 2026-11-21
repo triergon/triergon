@@ -23,7 +23,14 @@ The comparison runs on native Linux AArch64 and in the 32-bit ARMv7 user space
 For Linux AArch64 the capture worker opens the session with
 `Session::open_filtered`, which uses the centre-sited filter at every width.
 For ARMv7 it uses `Session::open`, whose policy depends on the width.
-Conversion, encoding and muxing are compared on all 15 cases on both targets.
+Conversion, encoding and muxing are compared on the original 15 cases and 12
+short configuration cases. The latter use the same quality rule and add
+sequence-header and service-configuration checks. Their generated inputs and
+recorded reference results are hash-pinned.
+
+Use `capture qualify --stage parity` to compare the outputs without measuring
+performance. The contract lists bounds awaiting an isolated gate-host run and
+cases where the comparison records a known difference.
 
 The gate times and measures memory in separate runs: the same command with
 `--stage timing --out TIMING` under `taskset -c 1`, then with `--stage memory --timing

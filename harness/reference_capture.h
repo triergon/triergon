@@ -16,6 +16,7 @@
  *   reference pipeline <w> <h> <flip> <frames> <bitrate> <in.rgba> <out.ts>
  *   reference memory   <w> <h> <flip> <frames> <bitrate> <in.rgba>
  *   reference bench    <in.rgba> <iterations> <w> <h> <flip> <frames> <bitrate>
+ * The encoding modes accept trailing capture configuration options.
  *
  * `bench` takes the harness's timing command line (input and iterations first)
  * and times `iterations` complete sessions (open, every frame
@@ -84,6 +85,58 @@ static void set(AVCodecContext *ctx, const char *name, const char *value) {
     if (av_opt_set(ctx, name, value, 0) < 0) die(name);
 }
 
+static const char *gop, *max_rate, *vbv_bits;
+static const char *provider_name, *service_name;
+static struct {
+    const char *flag, *option, *value;
+} mux_options[] = {
+    {"--transport-stream-id", "mpegts_transport_stream_id", NULL},
+    {"--original-network-id", "mpegts_original_network_id", NULL},
+    {"--program-number", "mpegts_service_id", NULL},
+    {"--pmt-pid", "mpegts_pmt_start_pid", NULL},
+    {"--video-pid", "mpegts_start_pid", NULL},
+};
+static int configured_mux;
+
+static void configure(int count, char **args) {
+    if (count % 2) die("options");
+    for (int i = 0; i < count; i += 2) {
+        const char *flag = args[i], *value = args[i + 1];
+        if (!strcmp(flag, "--gop")) gop = value;
+        else if (!strcmp(flag, "--max-rate")) max_rate = value;
+        else if (!strcmp(flag, "--vbv-bits")) vbv_bits = value;
+        else {
+            configured_mux = 1;
+            if (!strcmp(flag, "--provider-name")) provider_name = value;
+            else if (!strcmp(flag, "--service-name")) service_name = value;
+            else if (!strcmp(flag, "--stream-type")) {
+                /* The reference selects the stream type from the codec. */
+                if (strcmp(value, "1") && strcmp(value, "2")) die(flag);
+            } else {
+                size_t j = 0;
+                while (j < sizeof mux_options / sizeof *mux_options &&
+                       strcmp(flag, mux_options[j].flag)) j++;
+                if (j == sizeof mux_options / sizeof *mux_options) die("option name");
+                mux_options[j].value = value;
+            }
+        }
+    }
+}
+
+static void configure_mux(AVFormatContext *ctx) {
+    for (size_t i = 0; i < sizeof mux_options / sizeof *mux_options; i++) {
+        if (mux_options[i].value &&
+            av_opt_set(ctx->priv_data, mux_options[i].option, mux_options[i].value, 0) < 0)
+            die(mux_options[i].option);
+    }
+    /* One PCR per 30 Hz picture, as in a capture session. */
+    if (av_opt_set(ctx->priv_data, "pcr_period", "33", 0) < 0) die("pcr_period");
+    if (av_dict_set(&ctx->metadata, "service_provider", provider_name, 0) < 0)
+        die("service_provider");
+    if (av_dict_set(&ctx->metadata, "service_name", service_name, 0) < 0)
+        die("service_name");
+}
+
 static void venc_open(Venc *v, int w, int h, int64_t bitrate, Sink *sink) {
     char buf[64];
     memset(v, 0, sizeof *v);
@@ -100,10 +153,10 @@ static void venc_open(Venc *v, int w, int h, int64_t bitrate, Sink *sink) {
     snprintf(buf, sizeof buf, "%" PRId64, bitrate);
     set(v->ctx, "b", buf);
     snprintf(buf, sizeof buf, "%" PRId64, bitrate * 7 / 5);
-    set(v->ctx, "maxrate", buf);
+    set(v->ctx, "maxrate", max_rate ? max_rate : buf);
     snprintf(buf, sizeof buf, "%" PRId64, bitrate / 7);
-    set(v->ctx, "bufsize", buf);
-    set(v->ctx, "g", "30");
+    set(v->ctx, "bufsize", vbv_bits ? vbv_bits : buf);
+    set(v->ctx, "g", gop ? gop : "30");
     set(v->ctx, "bf", "0");
     set(v->ctx, "dct", "fastint");
     if (avcodec_open2(v->ctx, codec, NULL) < 0) die("avcodec_open2");
@@ -120,6 +173,7 @@ static void venc_open(Venc *v, int w, int h, int64_t bitrate, Sink *sink) {
     if (!v->nv12_uv) die("nv12 scratch");
     if (avformat_alloc_output_context2(&v->oc, NULL, "mpegts", NULL) < 0 || !v->oc)
         die("mpegts muxer");
+    if (configured_mux) configure_mux(v->oc);
     uint8_t *iobuf = av_malloc(32768);
     if (!iobuf) die("avio buffer");
     v->avio = avio_alloc_context(iobuf, 32768, 1, sink, NULL, sink_write, NULL);
@@ -217,6 +271,13 @@ static void write_marker(const char *text) {
 }
 
 int main(int argc, char **argv) {
+    if (argc > 1) {
+        int positional = !strcmp(argv[1], "memory") ? 8 : 9;
+        if (strcmp(argv[1], "convert") && argc > positional) {
+            configure(argc - positional, argv + positional);
+            argc = positional;
+        }
+    }
     if (argc == 9 && !strcmp(argv[1], "bench")) {
         /* The timing command line, input and iterations first, in the order of
          * the other modes: <w> <h> <flip> <frames> <bitrate> <in.rgba> <iterations>. */
