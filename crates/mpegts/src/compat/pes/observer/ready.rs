@@ -261,7 +261,7 @@ impl DemuxObserver {
     /// has room for every span, including any spans moved from a full arena.
     #[expect(
         clippy::expect_used,
-        reason = "the views repeat exactly `count` times over complete carriers on the payload-run path"
+        reason = "try_extend_with takes an infallible closure; pushing span by span keeps try_push out of line, which measured +0.08% where tried"
     )]
     pub(crate) fn append_payload_run(
         &mut self,
