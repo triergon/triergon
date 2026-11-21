@@ -155,17 +155,8 @@ impl AacAccessUnitConfig {
         })
     }
 
-    /// Build the decoder with the default track-decoder storage budget.
-    pub fn decoder(self) -> Result<Box<DynAudioDecoder>, Error> {
-        self.decoder_in(&Budget::new(TrackDecoder::DEFAULT_STORAGE_BYTES)?)
-    }
-
-    /// Build a decoder for one raw AAC-LC access unit per packet.
-    pub fn decoder_in(self, budget: &Budget) -> Result<Box<DynAudioDecoder>, Error> {
-        self.decoder_with_layout_in(Policy::Specification, budget)
-    }
-
-    /// Build the configured decoder with an explicit speaker mapping.
+    /// A decoder of one raw AAC-LC access unit per packet, charging `budget`, with the
+    /// speaker mapping `layout` (the specification's: [`Policy::Specification`]).
     pub fn decoder_with_layout_in(
         self,
         layout: Policy,
@@ -242,7 +233,9 @@ mod tests {
             frequency_index: 4,
             channel_configuration: 2,
         };
-        let decoder = config.decoder_in(&wide).unwrap();
+        let decoder = config
+            .decoder_with_layout_in(Policy::Specification, &wide)
+            .unwrap();
         let storage = wide.used();
         drop(decoder);
         let exact = Budget::new(storage).unwrap();
