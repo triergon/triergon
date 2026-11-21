@@ -1187,10 +1187,11 @@ fn build_selected(
     ];
     command.extend(gate_build::reference_link_flags(shell_words(&flags)?)?);
     command.extend(["-o".into(), worker.display().to_string()]);
-    run(&command)?;
     let mut combined_command = vec![command[0].clone(), "-DTRIERGON_COMBINED_REFERENCE=1".into()];
     combined_command.extend(command[1..].iter().cloned());
     *combined_command.last_mut().expect("output path") = combined.display().to_string();
+    command.insert(1, "-DTRIERGON_CUED_AAC_REFERENCE=1".into());
+    run(&command)?;
     run(&combined_command)?;
     // Operations that need another pinned profile get their own build of the same
     // source, made only when that profile exists, so the other references and

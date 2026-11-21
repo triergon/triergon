@@ -180,6 +180,20 @@ It compares the landing time and every packet's track, PTS, DTS, duration and
 bytes through EOF. On the authored two-Cue fixture both land at 1 s with
 matching PTS, unknown durations and absent DTS.
 
+The `media-worker` and public libavformat reference also expose a separate
+`cued-aac-` worker protocol. `trace`, `fold` and `memory` take a file and a
+seek target in nanoseconds; `bench` additionally takes an iteration count before
+the target. Both preload the file and perform open, seek, complete packet
+traversal and teardown inside each operation. The fold includes the landing,
+track, presence and value of each timestamp and duration, payload length and
+bytes, and successful EOF. The [cued AAC contract](../../harness/features/matroska-cued-aac/contract.json)
+registers this operation on both targets. To regenerate the authored input:
+
+```sh
+CARGO_INCREMENTAL=0 cargo run -p triergon-matroska --example cued_aac_comparison -- \
+  harness/features/matroska-cued-aac/inputs/two-cues.mkv
+```
+
 The `--projected` comparison enables stream-information probing and FFmpeg's
 clock projection. In that view FFmpeg reports DTS equal to PTS for both packets.
 A fresh playback AAC clock fed the same suffix projects those DTS values and

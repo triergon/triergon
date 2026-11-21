@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "two-cues",
+      "profile": "two-cues",
+      "file": "harness/features/matroska-cued-aac/inputs/two-cues.mkv",
+      "sha256": "52ab8f29366d3910f38d2a1eac9380f05e197ace1547605086ccad7a6cdd2871",
+      "rights": "authored-synthetic",
+      "arguments": ["1010000000"],
+      "expected": {
+        "packets": 2,
+        "bytes": 11,
+        "digest": 14086002072218715579,
+        "eof": true
+      }
+    }
+  ]
+}

@@ -484,6 +484,9 @@ fn entry() -> Outcome {
             println!("{{\"input_bytes\":{}}}", data.len());
             Ok(())
         }
+        "cued-aac-trace" | "cued-aac-fold" | "cued-aac-bench" | "cued-aac-memory" => {
+            cued_aac(mode, &data, words)
+        }
         "seek-trace" => seek_trace(data, words, false),
         "playback-seek-trace" => seek_trace(data, words, true),
         "inflate" => inflate(&data, words),
@@ -499,6 +502,91 @@ fn entry() -> Outcome {
             _ => Err("unknown operation".into()),
         },
     }
+}
+
+// Separate source-view record: landing, then each packet's fields and bytes, then EOF.
+#[inline(never)]
+fn cued_aac(mode: &str, data: &[u8], words: &[String]) -> Outcome {
+    use std::io::Write;
+    let bench = mode == "cued-aac-bench";
+    let memory = mode == "cued-aac-memory";
+    let trace = mode == "cued-aac-trace";
+    let n: u32 = if bench {
+        words.first().ok_or("missing iterations")?.parse()?
+    } else {
+        1
+    };
+    if n == 0 || n > 1_000_000 {
+        return Err("invalid iteration count".into());
+    }
+    let target = seek_target(words, usize::from(bench))?;
+    if memory {
+        println!("TRIERGON_BEGIN_V1");
+        io::stdout().flush()?;
+    }
+    let start = bench.then(Instant::now);
+    let (mut packets, mut bytes, mut digest) = (0_u64, 0_u64, 0_u64);
+    for _ in 0..n {
+        let mut reader = Demuxer::open_seekable(Cursor::new(data), Limits::default())?;
+        let cancel = AtomicBool::new(false);
+        let landing = reader.seek_cued_aac(0, target, &cancel)?;
+        fold(&mut digest, landing.actual_ns as u64);
+        if trace {
+            print!("{{\"landing_ns\":{},\"packets\":[", landing.actual_ns);
+        }
+        let mut first = true;
+        while let Some(p) = reader.next_packet(&cancel)? {
+            packets += 1;
+            bytes += p.data.len() as u64;
+            fold(&mut digest, p.track as u64);
+            for v in [
+                p.pts_ns.map(|v| v as u64),
+                p.dts_ns.map(|v| v as u64),
+                p.duration_ns,
+            ] {
+                fold(&mut digest, u64::from(v.is_some()));
+                if let Some(value) = v {
+                    fold(&mut digest, value);
+                }
+            }
+            fold(&mut digest, p.data.len() as u64);
+            fold_bytes(&mut digest, &p.data);
+            if trace {
+                if !first {
+                    print!(",");
+                }
+                print!(
+                    "{{\"track\":{},\"pts_ns\":{},\"dts_ns\":{},\"duration_ns\":{},\"payload\":{}}}",
+                    p.track,
+                    p.pts_ns.map_or("null".into(), |v| v.to_string()),
+                    p.dts_ns.map_or("null".into(), |v| v.to_string()),
+                    p.duration_ns.map_or("null".into(), |v| v.to_string()),
+                    quoted(&hex(&p.data))
+                );
+            }
+            first = false;
+        }
+        if first {
+            return Err("EOF before landing packet".into());
+        }
+        fold(&mut digest, 1); // successful EOF
+        if trace {
+            println!("],\"eof\":true}}");
+        }
+    }
+    if memory {
+        println!("TRIERGON_END_V1");
+        io::stdout().flush()?;
+    }
+    if let Some(start) = start {
+        println!(
+            "{{\"schema\":1,\"iterations\":{n},\"elapsed_ns\":{},\"packets\":{packets},\"bytes\":{bytes},\"digest\":{digest},\"eof\":true}}",
+            start.elapsed().as_nanos()
+        );
+    } else if !trace {
+        println!("{{\"packets\":{packets},\"bytes\":{bytes},\"digest\":{digest},\"eof\":true}}");
+    }
+    Ok(())
 }
 
 // Every mode below runs out of line, so that the dispatch's frame holds none of
