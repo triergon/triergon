@@ -1,12 +1,12 @@
 //! One forward-only M2TS program retains physical carrier provenance.
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
+use triergon_core::{Budget, Bytes, Error, InputCursor, SourceCapabilities, SourceId, WorkBudget};
 use triergon_mpegts::{
     PacketFormat, ParseLimits, TraceEvent, clock::SourceTimePolicy,
     compat::pes::RegisteredCarriage, psi::DescriptorNamespace,
 };
 use triergon_playback::{
-    ByteSource, ClockChoice, Format, PlayerPolicy, Progress, RawEvent, TsNativeCarriage,
+    ByteSource, ClockChoice, Format, Player, PlayerPolicy, Progress, RawEvent, TsNativeCarriage,
     TsNativeTrackSelection,
     io::{SelectedInput, SourceOwner},
     native_startup::{NativeStartup, StartupStep},
@@ -14,62 +14,70 @@ use triergon_playback::{
 
 const RAW: &[u8] = include_bytes!("../../../harness/fixtures/ts-program/replay-avc-aac-00.m2ts");
 
+const SOURCE: SourceId = SourceId(42);
+
+fn open_program(pool: &Budget, raw: &[u8], length: usize, quantum: usize) -> Player<ByteSource> {
+    let input = InputCursor::new(
+        pool,
+        SOURCE,
+        SourceCapabilities {
+            length: Some(length as u64),
+            random_access: false,
+        },
+        32768,
+    )
+    .unwrap();
+    let source =
+        ByteSource::new(SOURCE, Bytes::copy_from_slice(pool, raw).unwrap(), quantum).unwrap();
+    let mut startup = NativeStartup::new_m2ts_prefix_v2(SelectedInput {
+        input,
+        source: SourceOwner::new(source),
+        format: Format::Ts(PacketFormat::M2ts192),
+    })
+    .unwrap();
+    for _ in 0..100_000 {
+        if startup
+            .advance(&mut WorkBudget::new(1), &AtomicBool::new(false))
+            .unwrap()
+            == StartupStep::Ready
+        {
+            let mut player = startup
+                .finish()
+                .unwrap()
+                .into_program_player(
+                    1,
+                    ParseLimits::default(),
+                    SourceTimePolicy::Unanchored,
+                    DescriptorNamespace::Unspecified,
+                    &[
+                        TsNativeTrackSelection {
+                            pid: 257,
+                            carriage: TsNativeCarriage::Registered(RegisteredCarriage::AacAdts),
+                        },
+                        TsNativeTrackSelection {
+                            pid: 256,
+                            carriage: TsNativeCarriage::Registered(RegisteredCarriage::Avc),
+                        },
+                    ],
+                    PlayerPolicy::default(),
+                )
+                .unwrap();
+            player
+                .set_clock_view(ClockChoice::ExplicitNativeProjection)
+                .unwrap();
+            return player;
+        }
+    }
+    panic!("M2TS startup exhausted its work allowance");
+}
+
 #[test]
 fn combined_program_keeps_carriers_clocks_and_order_through_physical_eof() {
     for quantum in [23, 32768] {
         let pool = Budget::new(16 << 20).unwrap();
-        let id = SourceId(42);
-        let input = InputCursor::new(
-            &pool,
-            id,
-            SourceCapabilities {
-                length: Some(RAW.len() as u64),
-                random_access: false,
-            },
-            32768,
-        )
-        .unwrap();
-        let source =
-            ByteSource::new(id, Bytes::copy_from_slice(&pool, RAW).unwrap(), quantum).unwrap();
+        let id = SOURCE;
         let cancel = AtomicBool::new(false);
-        let mut startup = NativeStartup::new_m2ts_prefix_v2(SelectedInput {
-            input,
-            source: SourceOwner::new(source),
-            format: Format::Ts(PacketFormat::M2ts192),
-        })
-        .unwrap();
-        let mut ready = false;
-        for _ in 0..100_000 {
-            if startup.advance(&mut WorkBudget::new(1), &cancel).unwrap() == StartupStep::Ready {
-                ready = true;
-                break;
-            }
-        }
-        assert!(ready);
-        let mut player = startup
-            .finish()
-            .unwrap()
-            .into_program_player(
-                1,
-                ParseLimits::default(),
-                SourceTimePolicy::Unanchored,
-                DescriptorNamespace::Unspecified,
-                &[
-                    TsNativeTrackSelection {
-                        pid: 257,
-                        carriage: TsNativeCarriage::Registered(RegisteredCarriage::AacAdts),
-                    },
-                    TsNativeTrackSelection {
-                        pid: 256,
-                        carriage: TsNativeCarriage::Registered(RegisteredCarriage::Avc),
-                    },
-                ],
-                PlayerPolicy::default(),
-            )
-            .unwrap();
-        player
-            .set_clock_view(ClockChoice::ExplicitNativeProjection)
-            .unwrap();
+        let mut player = open_program(&pool, RAW, RAW.len(), quantum);
         let mut carriers = 0;
         let mut packets = Vec::new();
         let mut finished = false;
@@ -139,4 +147,68 @@ fn combined_program_keeps_carriers_clocks_and_order_through_physical_eof() {
         drop(player);
         assert_eq!(pool.used(), Budget::control_storage_bytes());
     }
+}
+
+#[test]
+fn combined_program_reports_a_short_finite_source() {
+    let pool = Budget::new(16 << 20).unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut player = open_program(&pool, &RAW[..RAW.len() - 1], RAW.len(), 97);
+    let fault = (0..200_000).find_map(|_| {
+        let progress = player.advance(&mut WorkBudget::new(8), &cancel);
+        assert!(!matches!(progress, Ok(Progress::Ended)));
+        while player.pop().is_some() {}
+        progress.err()
+    });
+    assert_eq!(fault, Some(Error::Truncated));
+    drop(player);
+    assert_eq!(pool.used(), Budget::control_storage_bytes());
+}
+
+#[test]
+fn combined_program_retries_pressure_and_cancels_with_retained_packets() {
+    let pool = Budget::new(16 << 20).unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut player = open_program(&pool, RAW, RAW.len(), 113);
+    let full = pool.reserve(pool.available()).unwrap();
+    let pressure = (0..2_000).find_map(|_| {
+        let progress = player.advance(&mut WorkBudget::new(16), &cancel).unwrap();
+        matches!(progress, Progress::Backpressure { .. }).then_some(progress)
+    });
+    assert!(pressure.is_some());
+    drop(full);
+
+    let mut video = None;
+    let mut audio = None;
+    for _ in 0..200_000 {
+        let progress = player.advance(&mut WorkBudget::new(8), &cancel).unwrap();
+        assert!(!matches!(progress, Progress::Ended));
+        while let Some(output) = player.pop() {
+            if let RawEvent::NativeTs { packet, .. } = output.event() {
+                match packet.pid {
+                    256 if video.is_none() => video = Some(output),
+                    257 if audio.is_none() => audio = Some(output),
+                    _ => {}
+                }
+            }
+        }
+        if video.is_some() && audio.is_some() {
+            break;
+        }
+    }
+    assert!(video.is_some() && audio.is_some());
+    assert_eq!(
+        player
+            .advance(&mut WorkBudget::new(1), &AtomicBool::new(true))
+            .err(),
+        Some(Error::Cancelled)
+    );
+    assert!(matches!(
+        player.advance(&mut WorkBudget::new(1), &cancel).unwrap(),
+        Progress::Stopped
+    ));
+    drop(player);
+    assert!(pool.used() > Budget::control_storage_bytes());
+    drop((video, audio));
+    assert_eq!(pool.used(), Budget::control_storage_bytes());
 }
