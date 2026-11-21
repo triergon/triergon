@@ -48,11 +48,14 @@ pub struct FrameMargins {
 
 /// How much a [`Renderer`](super::Renderer) keeps between frames: outlines
 /// and font descriptions by count, glyph bitmaps and composited runs by
-/// bytes. [`CacheLimits::LIBASS`], the default, is libass's;
-/// [`CacheLimits::new`] gives what `ass_set_cache_limits` sets. The caches
-/// are cut to them as libass cuts its caches, never what the last frame's
-/// images were drawn from, which stays until nothing holds it, and hold at
-/// most them beyond what a frame is using.
+/// bytes. The default is libass's limits before `ass_set_cache_limits`:
+/// 10,000 outlines, 128 MiB of glyph bitmaps, 64 MiB of composites, and
+/// [`CacheLimits::FONTS`] font descriptions;
+/// [`compat::libass::cache_limits`](crate::compat::libass::cache_limits)
+/// gives what that call sets. The caches are cut to them as libass cuts its
+/// caches, never what the last frame's images were drawn from, which stays
+/// until nothing holds it, and hold at most them beyond what a frame is
+/// using.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CacheLimits {
     /// Outlines kept, at most: glyphs, drawings, stroked borders and the
@@ -73,44 +76,22 @@ pub struct CacheLimits {
 }
 
 impl CacheLimits {
-    /// The share of the megabytes that composites get: one part in
-    /// `COMPOSITE_RATIO + 1` (`COMPOSITE_CACHE_RATIO`).
-    const COMPOSITE_RATIO: usize = 2;
-
-    /// The font descriptions kept, which libass does not bound: far more
-    /// than a script names.
+    /// The font descriptions kept by default, which libass does not bound:
+    /// far more than a script names.
     pub const FONTS: usize = 10_000;
 
-    /// libass's limits before `ass_set_cache_limits`: 10,000 outlines
-    /// (`GLYPH_CACHE_MAX`), 128 MiB of glyph bitmaps and 64 MiB of
-    /// composites, and [`CacheLimits::FONTS`] font descriptions.
-    pub const LIBASS: Self = Self {
+    /// libass's limits before `ass_set_cache_limits`.
+    const DEFAULT: Self = Self {
         outlines: 10_000,
         bitmap_bytes: 128 << 20,
-        composite_bytes: (128 << 20) / Self::COMPOSITE_RATIO,
+        composite_bytes: 64 << 20,
         fonts: Self::FONTS,
     };
-
-    /// The limits `ass_set_cache_limits(glyphs, megabytes)` sets: `glyphs`
-    /// outlines, and `megabytes` MiB split two thirds to glyph bitmaps and
-    /// one third to composites. libass reads 0 as its default for either
-    /// value; here 0 keeps nothing beyond what the last frame holds. Font
-    /// descriptions keep their bound, [`CacheLimits::FONTS`].
-    pub const fn new(glyphs: usize, megabytes: usize) -> Self {
-        let total = megabytes.saturating_mul(1 << 20);
-        let composite_bytes = total / (Self::COMPOSITE_RATIO + 1);
-        Self {
-            outlines: glyphs,
-            bitmap_bytes: total - composite_bytes,
-            composite_bytes,
-            fonts: Self::FONTS,
-        }
-    }
 }
 
 impl Default for CacheLimits {
     fn default() -> Self {
-        Self::LIBASS
+        Self::DEFAULT
     }
 }
 
@@ -179,7 +160,7 @@ impl Settings {
             font_scale: 1.0,
             line_spacing: 0.0,
             line_position: 0.0,
-            cache: CacheLimits::LIBASS,
+            cache: CacheLimits::DEFAULT,
             work: Self::DEFAULT_WORK,
         }
     }
@@ -443,25 +424,6 @@ impl Geometry<'_> {
 #[cfg(test)]
 mod tests {
     use super::{Canvas, Settings, Size};
-
-    #[test]
-    fn cache_limits_split_as_libass_splits_them() {
-        use super::CacheLimits;
-        let default = CacheLimits::default();
-        assert_eq!(
-            (
-                default.outlines,
-                default.bitmap_bytes,
-                default.composite_bytes
-            ),
-            (10_000, 128 << 20, 64 << 20)
-        );
-        let player = CacheLimits::new(1000, 24);
-        assert_eq!(
-            (player.outlines, player.bitmap_bytes, player.composite_bytes),
-            (1000, 16 << 20, 8 << 20)
-        );
-    }
 
     #[test]
     fn frames_fit_their_content_and_reject_empty_sides() {

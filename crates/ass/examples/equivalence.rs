@@ -17,7 +17,7 @@
 //! its change, its images' digest (kind, place, size, colour and pixels),
 //! and the work it spent with the `work-probe` feature, or its error; then
 //! the peak of the case's budget. CACHE, `OUTLINES,MEGABYTES`, gives every
-//! case those cache limits (`CacheLimits::new`) instead of its own, so that
+//! case those cache limits (`compat::libass::cache_limits`) instead of its own, so that
 //! small limits make the caches cut on every frame.
 
 #[path = "../../ass-worker/src/fixture.rs"]
@@ -33,6 +33,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use fixture::{Command, Fixture};
 use triergon_ass::{
     CacheLimits, Change, FrameMargins, Image, Options, Renderer, Script, Settings, Size,
+    compat::libass::cache_limits,
 };
 use triergon_core::{Budget, Bytes};
 
@@ -207,7 +208,7 @@ impl Setup {
         settings.font_scale = self.font_scale;
         settings.line_spacing = self.line_spacing;
         settings.line_position = self.line_position;
-        settings.cache = CacheLimits::new(self.cache.0, self.cache.1);
+        settings.cache = cache_limits(self.cache.0, self.cache.1);
         settings.cache.fonts = self.cache.2;
         settings.work = self.work;
         settings

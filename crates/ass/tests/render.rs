@@ -8,6 +8,7 @@ mod fonts;
 
 use triergon_ass::{
     CacheLimits, Change, Fonts, Image, ImageKind, Options, Renderer, Script, Settings, Size,
+    compat::libass::cache_limits,
 };
 use triergon_core::{Budget, Bytes, Error};
 
@@ -213,7 +214,7 @@ fn caches_without_room_keep_what_the_last_frame_shows() {
     };
     let mut settings = Settings::new(Size::new(1280, 720));
     settings.storage = Some(Size::new(640, 360));
-    settings.cache = CacheLimits::new(0, 0);
+    settings.cache = cache_limits(0, 0);
     let mut renderer = Renderer::new(&budget, &settings, &fonts).unwrap();
     let mut script = script(
         &budget,
@@ -237,7 +238,7 @@ fn images_outlive_the_renderer_and_move_between_threads() {
     };
     let mut settings = Settings::new(Size::new(1280, 720));
     settings.storage = Some(Size::new(640, 360));
-    settings.cache = CacheLimits::new(0, 0);
+    settings.cache = cache_limits(0, 0);
     let mut renderer = Renderer::new(&budget, &settings, &fonts).unwrap();
     let mut script = script(
         &budget,
@@ -276,7 +277,7 @@ fn caches_hold_at_most_their_limits_beyond_the_frame() {
     let limits = CacheLimits {
         bitmap_bytes: 64 << 10,
         composite_bytes: 32 << 10,
-        ..CacheLimits::new(1000, 0)
+        ..cache_limits(1000, 0)
     };
     let rendered = |limits: CacheLimits| {
         let budget = Budget::new(64 << 20).unwrap();
@@ -300,13 +301,13 @@ fn caches_hold_at_most_their_limits_beyond_the_frame() {
             })
             .collect::<Vec<_>>()
     };
-    let bare = rendered(CacheLimits::new(1000, 0));
+    let bare = rendered(cache_limits(1000, 0));
     let bound = limits.bitmap_bytes + limits.composite_bytes;
     let most = |kept: Vec<usize>| kept.iter().zip(&bare).map(|(k, b)| k - b).max();
     // Kept whole, the frames' bitmaps and composites outgrow the limits;
     // cut to them, they stay within them, a little scratch aside. libass
     // counts its records with each entry, more than a kept entry is charged.
-    let unbounded = most(rendered(CacheLimits::new(1000, 24))).unwrap();
+    let unbounded = most(rendered(cache_limits(1000, 24))).unwrap();
     assert!(unbounded > 2 * bound, "{unbounded} {bound}");
     let kept = most(rendered(limits)).unwrap();
     assert!(kept > bound / 4 && kept <= bound + 4096, "{kept} {bound}");
@@ -371,7 +372,7 @@ fn zero_limits_still_find_what_the_last_frame_shows() {
     let run = |work: u64, frames: &[i64]| {
         let mut settings = Settings::new(Size::new(1280, 720));
         settings.storage = Some(Size::new(640, 360));
-        settings.cache = CacheLimits::new(0, 0);
+        settings.cache = cache_limits(0, 0);
         settings.work = work;
         let fonts = Fonts {
             attached: vec![test_sans(&budget)],

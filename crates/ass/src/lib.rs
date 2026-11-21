@@ -11,6 +11,7 @@
 )]
 
 mod c_long;
+pub mod compat;
 mod drawing;
 mod effect;
 mod evaluate;

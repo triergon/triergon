@@ -17,7 +17,8 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use triergon_ass::{
-    CacheLimits, Change, Fonts, Image, ImageKind, Options, Renderer, Script, Settings,
+    Change, Fonts, Image, ImageKind, Options, Renderer, Script, Settings,
+    compat::libass::cache_limits,
 };
 use triergon_core::{Budget, Bytes};
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
@@ -216,7 +217,7 @@ impl Case<'_> {
             self.storage.height,
         ));
         // A player's cache limits, as the libass worker sets them.
-        settings.cache = CacheLimits::new(1000, 24);
+        settings.cache = cache_limits(1000, 24);
         settings
     }
 
