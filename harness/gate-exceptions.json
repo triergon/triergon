@@ -2,14 +2,21 @@
   "schema": 1,
   "about": "What the gates require and every exception to them, counted from the feature contracts, the gate plan, every list under harness/ whose name starts with open_ (an entry counts once for each case it names, under each gate target it is open on) and the public features of each crate in harness/not-compared.json that no contract compares. `cargo xtask check-design` counts them again: a change that drops a requirement or adds an exception must change this file too.",
   "counts": {
-    "features": 63,
-    "required_by_check": 33,
-    "on_demand": 4,
+    "features": 78,
+    "required_by_check": 47,
+    "on_demand": 3,
     "diagnostic": 1,
-    "gated_by_report": 37,
-    "gated_by_another_command": 22,
-    "not_gated": 4,
+    "gated_by_report": 47,
+    "gated_by_another_command": 28,
+    "not_gated": 3,
     "open": {
+      "harness/features/ass-render/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 6, "thumbv7neon-unknown-linux-gnueabihf": 6}},
+      "harness/features/dvb-palette-sweep/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 360, "thumbv7neon-unknown-linux-gnueabihf": 360}},
+      "harness/features/pgs-palette-sweep/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 708, "thumbv7neon-unknown-linux-gnueabihf": 708}},
+      "harness/features/subtitle-dvd/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 1}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 9, "thumbv7neon-unknown-linux-gnueabihf": 9}},
+      "harness/codecs/correctness-manifest.json": {"open_cases": {"aarch64-unknown-linux-gnu": 4, "thumbv7neon-unknown-linux-gnueabihf": 4}},
+      "harness/capture/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 3, "thumbv7neon-unknown-linux-gnueabihf": 1}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 36, "thumbv7neon-unknown-linux-gnueabihf": 36}},
+      "harness/codecs/gate-lanes.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 18, "thumbv7neon-unknown-linux-gnueabihf": 18}},
       "harness/codecs/aac/ps-open-manifest.json": {
         "open_cases": {
           "aarch64-unknown-linux-gnu": 4,
@@ -33,6 +40,58 @@
           "thumbv7neon-unknown-linux-gnueabihf": 399
         }
       },
+      "harness/features/font-store/contract.json": {
+        "open_unmeasured": {
+          "aarch64-unknown-linux-gnu": 39,
+          "thumbv7neon-unknown-linux-gnueabihf": 39
+        }
+      },
+      "harness/features/dts-core-frames/contract.json": {
+        "open_cases": {
+          "aarch64-unknown-linux-gnu": 102,
+          "thumbv7neon-unknown-linux-gnueabihf": 102
+        },
+        "open_unmeasured": {
+          "aarch64-unknown-linux-gnu": 810,
+          "thumbv7neon-unknown-linux-gnueabihf": 810
+        }
+      },
+      "harness/features/dts-core-header/contract.json": {
+        "open_cases": {
+          "aarch64-unknown-linux-gnu": 9,
+          "thumbv7neon-unknown-linux-gnueabihf": 9
+        },
+        "open_unmeasured": {
+          "aarch64-unknown-linux-gnu": 1917,
+          "thumbv7neon-unknown-linux-gnueabihf": 1917
+        }
+      },
+      "harness/features/dts-packed-frames/contract.json": {
+        "open_cases": {
+          "aarch64-unknown-linux-gnu": 266,
+          "thumbv7neon-unknown-linux-gnueabihf": 266
+        },
+        "open_unmeasured": {
+          "aarch64-unknown-linux-gnu": 2628,
+          "thumbv7neon-unknown-linux-gnueabihf": 2628
+        }
+      },
+      "harness/features/dts-parser-trace/contract.json": {
+        "open_cases": {
+          "aarch64-unknown-linux-gnu": 9,
+          "thumbv7neon-unknown-linux-gnueabihf": 9
+        },
+        "open_unmeasured": {
+          "aarch64-unknown-linux-gnu": 342,
+          "thumbv7neon-unknown-linux-gnueabihf": 342
+        }
+      },
+      "harness/features/dts-unpacking/contract.json": {
+        "open_unmeasured": {
+          "aarch64-unknown-linux-gnu": 2400,
+          "thumbv7neon-unknown-linux-gnueabihf": 2400
+        }
+      },
       "harness/features/raster-sweep/contract.json": {
         "open_cases": {
           "thumbv7neon-unknown-linux-gnueabihf": 2
@@ -43,9 +102,71 @@
           "aarch64-unknown-linux-gnu": 4
         }
       },
+      "harness/features/isobmff-dts-entry-source/contract.json": {
+        "open_unmeasured": {
+          "aarch64-unknown-linux-gnu": 150,
+          "thumbv7neon-unknown-linux-gnueabihf": 150
+        }
+      },
+      "harness/features/isobmff-dts-signalling/contract.json": {
+        "open_unmeasured": {
+          "aarch64-unknown-linux-gnu": 150,
+          "thumbv7neon-unknown-linux-gnueabihf": 150
+        },
+        "open_cases": {
+          "aarch64-unknown-linux-gnu": 30,
+          "thumbv7neon-unknown-linux-gnueabihf": 30
+        }
+      },
+      "harness/features/mov-encoded-views/contract.json": {
+        "open_unmeasured": {
+          "aarch64-unknown-linux-gnu": 159,
+          "thumbv7neon-unknown-linux-gnueabihf": 159
+        },
+        "open_cases": {
+          "aarch64-unknown-linux-gnu": 19,
+          "thumbv7neon-unknown-linux-gnueabihf": 19
+        }
+      },
+      "harness/features/mov-pcm-packets/contract.json": {
+        "open_unmeasured": {
+          "aarch64-unknown-linux-gnu": 63,
+          "thumbv7neon-unknown-linux-gnueabihf": 63
+        },
+        "open_cases": {
+          "aarch64-unknown-linux-gnu": 14,
+          "thumbv7neon-unknown-linux-gnueabihf": 14
+        }
+      },
+      "harness/features/mov-run-recovery/contract.json": {
+        "open_unmeasured": {
+          "aarch64-unknown-linux-gnu": 462,
+          "thumbv7neon-unknown-linux-gnueabihf": 462
+        },
+        "open_cases": {
+          "aarch64-unknown-linux-gnu": 44,
+          "thumbv7neon-unknown-linux-gnueabihf": 44
+        }
+      },
+      "harness/features/quicktime-pcm-samples/contract.json": {
+        "open_unmeasured": {
+          "aarch64-unknown-linux-gnu": 63,
+          "thumbv7neon-unknown-linux-gnueabihf": 63
+        },
+        "open_cases": {
+          "aarch64-unknown-linux-gnu": 14,
+          "thumbv7neon-unknown-linux-gnueabihf": 14
+        }
+      },
+      "harness/features/quicktime-sound-description/contract.json": {
+        "open_unmeasured": {
+          "aarch64-unknown-linux-gnu": 63,
+          "thumbv7neon-unknown-linux-gnueabihf": 63
+        }
+      },
       "harness/status-rows.json": {
         "open_cells": {
-          "aarch64-unknown-linux-gnu": 32,
+          "aarch64-unknown-linux-gnu": 30,
           "thumbv7neon-unknown-linux-gnueabihf": 31
         }
       }
@@ -55,21 +176,21 @@
       "triergon-bitstream": 4,
       "triergon-capture": 1,
       "triergon-codec": 3,
-      "triergon-codec-aac": 4,
+      "triergon-codec-aac": 2,
       "triergon-codec-ac3": 3,
       "triergon-codec-dca": 1,
       "triergon-codec-flac": 2,
       "triergon-codec-h264": 3,
-      "triergon-codec-hevc": 4,
+      "triergon-codec-hevc": 3,
       "triergon-codec-mp3": 1,
       "triergon-codec-mpeg1": 1,
       "triergon-codec-opus": 2,
-      "triergon-codec-vorbis": 1,
+      "triergon-codec-vorbis": 0,
       "triergon-core": 4,
       "triergon-elementary": 4,
-      "triergon-font": 1,
-      "triergon-framing": 13,
-      "triergon-isobmff": 9,
+      "triergon-font": 0,
+      "triergon-framing": 9,
+      "triergon-isobmff": 4,
       "triergon-matroska": 5,
       "triergon-ogg": 4,
       "triergon-pixel": 1,
