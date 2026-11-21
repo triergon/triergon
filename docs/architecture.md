@@ -137,9 +137,10 @@ performance gates where it touches hot code.
    the original packet suffix. Additional carriages and broader direct access
    are open.
 2. **Reference compatibility.** `triergon-framing`, `triergon-matroska`,
-   `triergon-subtitles`, `triergon-mpegts` and `triergon-isobmff` follow the convention
-   in [reference-compatible behaviour](#reference-compatible-behaviour). Playback moves
-   to it next.
+   `triergon-subtitles`, `triergon-mpegts`, `triergon-isobmff` and `triergon-font` follow
+   the convention in [reference-compatible behaviour](#reference-compatible-behaviour).
+   `triergon-font` reads and hints fonts at its root, with FreeType's results, and keeps
+   what libass decides about a font in `compat::libass`. Playback moves to it next.
 3. **Composition.** HLS and codec bridges become separate crates. Playback keeps its own
    container engines: it carries source and native clocks, range plans and per-step
    parsing that `ContainerReader` does not.
