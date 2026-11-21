@@ -369,7 +369,7 @@ const ADDITIONAL_CANDIDATES: [Candidate; 20] = [
         name: "codec-views-worker",
         package: "codec-worker",
         example: None,
-        features: &[],
+        features: &["views"],
         nightly: false,
     },
     Candidate {
@@ -579,7 +579,11 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             "harness/reference_config_views.h",
             "harness/reference_dts_frames.h",
             "harness/dts_oracle.py",
+            "harness/codec_stream_oracle.py",
+            "xtask/src/framing_views/obu.rs",
+            "xtask/src/framing_views/adts.rs",
             "xtask/src/framing_views/dts.rs",
+            "xtask/src/framing_views/nal.rs",
         ],
         "isobmff-views-worker" => &[
             "crates/framing/examples/framing_views/fold.rs",
