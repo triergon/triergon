@@ -4,7 +4,7 @@
 use crate::dts::core_frame::CORE_SYNC;
 use crate::dts::reader::limit;
 use crate::dts::{DtsPackedBitLocation, DtsSourceIdentity};
-use crate::{freeze_whole, retryable};
+use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
 
@@ -399,19 +399,22 @@ impl DtsPackedPayloadJob {
                     builder,
                     phase,
                 } => (raw, builder, phase),
-                State::Frozen { raw, storage } => {
+                State::Frozen { .. } => {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    let payload = DtsPackedPayload {
-                        raw: raw.clone(),
-                        storage: storage.clone(),
+                    let State::Frozen { raw, storage } =
+                        std::mem::replace(&mut self.state, State::Complete)
+                    else {
+                        unreachable!("the payload is frozen")
+                    };
+                    return Ok(Step::Ready(DtsPackedPayload {
+                        raw,
+                        storage,
                         identity: self.identity,
                         packing: self.packing,
                         valid_bits: self.valid_bits,
-                    };
-                    self.state = State::Complete;
-                    return Ok(Step::Ready(payload));
+                    }));
                 }
                 State::Complete => return Ok(Step::End(self.end)),
                 &mut State::Failed(error) => return Err(error),
@@ -455,11 +458,22 @@ impl DtsPackedPayloadJob {
                     *phase = Phase::Bits;
                 }
                 Phase::Freeze => {
-                    let storage = freeze_whole(builder)?;
-                    self.state = State::Frozen {
-                        raw: raw.clone(),
-                        storage,
+                    let State::Unpacking { raw, builder, .. } =
+                        std::mem::replace(&mut self.state, State::Complete)
+                    else {
+                        unreachable!("the payload is unpacking")
                     };
+                    match builder.freeze() {
+                        Ok(storage) => self.state = State::Frozen { raw, storage },
+                        Err(refused) => {
+                            self.state = State::Unpacking {
+                                raw,
+                                builder: refused.value,
+                                phase: Phase::Freeze,
+                            };
+                            return Err(refused.error);
+                        }
+                    }
                 }
             }
         }

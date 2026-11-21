@@ -4,7 +4,7 @@
 //! no sync word is searched for and no length is derived from `FSIZE`.
 use crate::dts::DtsSourceIdentity;
 use crate::dts::reader::limit;
-use crate::{freeze_whole, retryable};
+use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
 
@@ -304,21 +304,24 @@ impl Dts14BitUnpacker {
                     output,
                     phase,
                 } => (source, output, phase),
-                State::Frozen { source, canonical } => {
+                State::Frozen { .. } => {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    let output = Dts14BitPayload {
-                        source: source.clone(),
-                        canonical: canonical.clone(),
+                    let State::Frozen { source, canonical } =
+                        std::mem::replace(&mut self.state, State::Complete)
+                    else {
+                        unreachable!("the payload is frozen")
+                    };
+                    return Ok(Step::Ready(Dts14BitPayload {
+                        source,
+                        canonical,
                         identity: self.identity,
                         order: self.order,
                         payload_bits: self.payload_bits,
                         residual_bits: self.partial_bits,
                         residual_value: self.partial,
-                    };
-                    self.state = State::Complete;
-                    return Ok(Step::Ready(output));
+                    }));
                 }
                 State::Complete => return Ok(Step::End(self.record_end)),
                 &mut State::Failed(error) => return Err(error),
@@ -364,11 +367,22 @@ impl Dts14BitUnpacker {
                     if output.len() != self.output_bytes {
                         return Err(Error::Invalid("DTS packed output length"));
                     }
-                    let canonical = freeze_whole(output)?;
-                    self.state = State::Frozen {
-                        source: source.clone(),
-                        canonical,
+                    let State::Unpacking { source, output, .. } =
+                        std::mem::replace(&mut self.state, State::Complete)
+                    else {
+                        unreachable!("the payload is unpacking")
                     };
+                    match output.freeze() {
+                        Ok(canonical) => self.state = State::Frozen { source, canonical },
+                        Err(refused) => {
+                            self.state = State::Unpacking {
+                                source,
+                                output: refused.value,
+                                phase: Phase::Freeze,
+                            };
+                            return Err(refused.error);
+                        }
+                    }
                 }
             }
         }
