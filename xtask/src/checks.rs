@@ -110,6 +110,7 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
         root,
         document(crate::exceptions::NOT_COMPARED),
     ));
+    errors.extend(crate::status::check(root, &data));
     // Generated manifests: the case ids and the pins match, in the recorded form.
     for generator in crate::generators::GENERATORS {
         errors.extend(generator.check(root));
@@ -533,7 +534,7 @@ fn table_pipes(line: &str) -> impl Iterator<Item = usize> + '_ {
         .filter_map(move |(at, _)| (!line[..at].ends_with('\\')).then_some(at))
 }
 
-fn pipe_cells(line: &str) -> impl Iterator<Item = &str> {
+pub(crate) fn pipe_cells(line: &str) -> impl Iterator<Item = &str> {
     let line = line.trim();
     let row = line
         .strip_suffix('|')

@@ -36,6 +36,12 @@
         "open_cases": {
           "aarch64-unknown-linux-gnu": 4
         }
+      },
+      "harness/status-rows.json": {
+        "open_cells": {
+          "aarch64-unknown-linux-gnu": 32,
+          "thumbv7neon-unknown-linux-gnueabihf": 31
+        }
       }
     },
     "not_compared": {

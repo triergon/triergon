@@ -1,0 +1,908 @@
+{
+  "about": "The rows of the status tables in docs/status.md: each table's heading, gate target and default run; each row's area, the targets whose tables show it, and the gate results its Runtime and Memory cells show, by the directory each lies in (in a gate run, the item whose timing, memory and grade share it), from the runs it names or else its table's; or a text for both cells of a row with no measurement of its own. A run is the evidence set named so, or the sets named so followed by -shard-N. `cargo xtask check-design` renders the cells from the results' measured records and fails on any difference; `cargo xtask status` prints or writes them. open_cells lists the rows whose cells stay as written until `cargo xtask evidence measure` records what their results measured; it only shrinks.",
+  "tables": [
+    {
+      "heading": "Linux AArch64",
+      "target": "aarch64-unknown-linux-gnu",
+      "run": "gate-run-aarch64-5b8dd88f-20261121-085805"
+    },
+    {
+      "heading": "32-bit ARMv7",
+      "target": "thumbv7neon-unknown-linux-gnueabihf",
+      "run": "gate-run-armv7-5b8dd88f-20261121-085846"
+    }
+  ],
+  "runs": {
+    "gate-run-aarch64-5b8dd88f-20261121-085805": {
+      "target": "aarch64-unknown-linux-gnu",
+      "revision": "5b8dd88f"
+    },
+    "gate-run-armv7-5b8dd88f-20261121-085846": {
+      "target": "thumbv7neon-unknown-linux-gnueabihf",
+      "revision": "5b8dd88f"
+    },
+    "aac-access-units-5b8dd88f-aarch64": {
+      "target": "aarch64-unknown-linux-gnu",
+      "revision": "5b8dd88f"
+    },
+    "aac-access-units-5b8dd88f-armv7": {
+      "target": "thumbv7neon-unknown-linux-gnueabihf",
+      "revision": "5b8dd88f"
+    },
+    "gate-run-aarch64-f1fabdc3-20261121-122538": {
+      "target": "aarch64-unknown-linux-gnu",
+      "revision": "f1fabdc3"
+    },
+    "gate-run-armv7-f1fabdc3-20261121-122538": {
+      "target": "thumbv7neon-unknown-linux-gnueabihf",
+      "revision": "f1fabdc3"
+    },
+    "gate-run-aarch64-964b36cb-20261121-142623": {
+      "target": "aarch64-unknown-linux-gnu",
+      "revision": "964b36cb"
+    },
+    "gate-run-armv7-964b36cb-20261121-142713": {
+      "target": "thumbv7neon-unknown-linux-gnueabihf",
+      "revision": "964b36cb"
+    },
+    "gate-run-aarch64-6de1193f-20261121-153915": {
+      "target": "aarch64-unknown-linux-gnu",
+      "revision": "6de1193f"
+    },
+    "gate-run-armv7-6de1193f-20261121-154133": {
+      "target": "thumbv7neon-unknown-linux-gnueabihf",
+      "revision": "6de1193f"
+    },
+    "gate-run-armv7-c1ace6c8-20261121-125023": {
+      "target": "thumbv7neon-unknown-linux-gnueabihf",
+      "revision": "c1ace6c8"
+    },
+    "gate-run-armv7-3b1c527c-20261121-140206": {
+      "target": "thumbv7neon-unknown-linux-gnueabihf",
+      "revision": "3b1c527c"
+    }
+  },
+  "rows": [
+    {
+      "area": "Core",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "via dependents"
+    },
+    {
+      "area": "Matroska / WebM",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "results": [
+        "matroska-demux",
+        "matroska-header-removal",
+        "matroska-zlib",
+        "matroska-cues-preroll",
+        "matroska-colour",
+        "matroska-segment-metadata",
+        "external-vector"
+      ]
+    },
+    {
+      "area": "Matroska legacy AAC-LC",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "results": [
+        "matroska-legacy-aac"
+      ]
+    },
+    {
+      "area": "Matroska startup and seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "results": [
+        "matroska-startup-seek"
+      ]
+    },
+    {
+      "area": "Matroska audio clocks",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "results": [
+        "matroska-audio-clocks"
+      ]
+    },
+    {
+      "area": "ISO BMFF / MP4",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "results": [
+        "isobmff-1",
+        "isobmff-2",
+        "isobmff-3"
+      ]
+    },
+    {
+      "area": "ISO BMFF seek and range plans",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "results": [
+        "isobmff-seek"
+      ]
+    },
+    {
+      "area": "MP4 range playback",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "results": [
+        "mp4-range"
+      ]
+    },
+    {
+      "area": "AAC in MOV",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "runs": [
+        "aac-access-units-5b8dd88f-aarch64",
+        "aac-access-units-5b8dd88f-armv7"
+      ],
+      "results": [
+        "benchmark",
+        "memory"
+      ]
+    },
+    {
+      "area": "Ogg",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ],
+      "text": "within the codec workloads"
+    },
+    {
+      "area": "Audio elementary streams",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ],
+      "text": "within the codec workloads"
+    },
+    {
+      "area": "MPEG-TS",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "runs": [
+        "gate-run-aarch64-f1fabdc3-20261121-122538",
+        "gate-run-armv7-f1fabdc3-20261121-122538"
+      ],
+      "results": [
+        "mpegts-pes"
+      ]
+    },
+    {
+      "area": "MPEG-TS access units",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "runs": [
+        "gate-run-aarch64-f1fabdc3-20261121-122538",
+        "gate-run-armv7-c1ace6c8-20261121-125023"
+      ],
+      "results": [
+        "mpegts-access-units"
+      ]
+    },
+    {
+      "area": "MPEG-TS free-format audio",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "runs": [
+        "gate-run-aarch64-f1fabdc3-20261121-122538",
+        "gate-run-armv7-f1fabdc3-20261121-122538"
+      ],
+      "results": [
+        "mpegts-free-audio"
+      ]
+    },
+    {
+      "area": "MPEG-TS DTS core",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "runs": [
+        "gate-run-aarch64-f1fabdc3-20261121-122538",
+        "gate-run-armv7-f1fabdc3-20261121-122538"
+      ],
+      "results": [
+        "mpegts-dts-core",
+        "mpegts-dts-legacy"
+      ]
+    },
+    {
+      "area": "MPEG-TS DTS-HD",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "runs": [
+        "gate-run-aarch64-f1fabdc3-20261121-122538",
+        "gate-run-armv7-f1fabdc3-20261121-122538"
+      ],
+      "results": [
+        "mpegts-dts-hd",
+        "mpegts-dts-hd-grouped",
+        "mpegts-dts-hd-extensions"
+      ]
+    },
+    {
+      "area": "MPEG-TS previous picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "runs": [
+        "gate-run-aarch64-964b36cb-20261121-142623",
+        "gate-run-armv7-964b36cb-20261121-142713"
+      ],
+      "results": [
+        "mpegts-previous-picture"
+      ]
+    },
+    {
+      "area": "MPEG-TS previous audio",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "runs": [
+        "gate-run-aarch64-964b36cb-20261121-142623",
+        "gate-run-armv7-964b36cb-20261121-142713"
+      ],
+      "results": [
+        "mpegts-previous-audio"
+      ]
+    },
+    {
+      "area": "MPEG-TS additional audio seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "with MPEG-TS previous audio"
+    },
+    {
+      "area": "MPEG-TS Layer III seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "with MPEG-TS previous audio"
+    },
+    {
+      "area": "MPEG-TS DTS core seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "runs": [
+        "gate-run-aarch64-964b36cb-20261121-142623",
+        "gate-run-armv7-964b36cb-20261121-142713"
+      ],
+      "results": [
+        "mpegts-dts-seek"
+      ]
+    },
+    {
+      "area": "MPEG-TS lossless DTS-HD seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "with MPEG-TS DTS core seek"
+    },
+    {
+      "area": "MPEG-TS core-bearing XLL seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "with MPEG-TS DTS core seek"
+    },
+    {
+      "area": "MPEG-TS LATM seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "with MPEG-TS previous audio"
+    },
+    {
+      "area": "MPEG-TS indexed seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "with MPEG-TS previous picture and previous audio"
+    },
+    {
+      "area": "MPEG-TS physical-offset audio seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "with MPEG-TS previous audio"
+    },
+    {
+      "area": "MPEG-TS M2TS physical restart",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "with MPEG-TS previous audio"
+    },
+    {
+      "area": "MPEG-TS physical-offset video seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "with MPEG-TS previous picture"
+    },
+    {
+      "area": "MPEG-TS contiguous entity seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "with MPEG-TS previous picture and previous audio"
+    },
+    {
+      "area": "MPEG-TS explicit epoch seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "with MPEG-TS previous picture"
+    },
+    {
+      "area": "MPEG-TS ordered-entity epoch seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "with MPEG-TS previous picture"
+    },
+    {
+      "area": "MPEG-TS program playback",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ],
+      "results": [
+        "ts-program"
+      ]
+    },
+    {
+      "area": "MPEG-TS progressive playback",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "runs": [
+        "gate-run-aarch64-6de1193f-20261121-153915",
+        "gate-run-armv7-6de1193f-20261121-154133"
+      ],
+      "results": [
+        "progressive"
+      ]
+    },
+    {
+      "area": "HLS segments",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "results": [
+        "hls-segments"
+      ]
+    },
+    {
+      "area": "Packet framing",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "runs": [
+        "gate-run-aarch64-964b36cb-20261121-142623",
+        "gate-run-armv7-964b36cb-20261121-142713"
+      ],
+      "results": [
+        "framing"
+      ]
+    },
+    {
+      "area": "Subtitles, text",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "parts": [
+        {
+          "label": "`subtitle-text`",
+          "results": [
+            "subtitle-text"
+          ]
+        },
+        {
+          "label": "`subtitle-text-host`",
+          "results": [
+            "subtitle-text-host"
+          ]
+        }
+      ]
+    },
+    {
+      "area": "Subtitles, PGS",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "results": [
+        "subtitle-pgs"
+      ]
+    },
+    {
+      "area": "Subtitles, PGS capsules",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "results": [
+        "subtitle-pgs-capsules"
+      ]
+    },
+    {
+      "area": "Subtitles, DVB",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "results": [
+        "subtitle-dvb"
+      ]
+    },
+    {
+      "area": "Subtitles, DVD",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "parts": [
+        {
+          "label": "`subtitle-dvd`",
+          "results": [
+            "subtitle-dvd"
+          ]
+        },
+        {
+          "label": "`subtitle-dvd-host`",
+          "results": [
+            "subtitle-dvd-host"
+          ],
+          "targets": [
+            "thumbv7neon-unknown-linux-gnueabihf"
+          ]
+        }
+      ]
+    },
+    {
+      "area": "Closed captions",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "results": [
+        "subtitle-cc"
+      ]
+    },
+    {
+      "area": "Teletext",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "results": [
+        "subtitle-teletext"
+      ]
+    },
+    {
+      "area": "Playback",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "parts": [
+        {
+          "label": "MP4 forward",
+          "results": [
+            "mp4-forward"
+          ]
+        },
+        {
+          "label": "TS program",
+          "results": [
+            "ts-program"
+          ]
+        },
+        {
+          "label": "raw Annex B",
+          "results": [
+            "raw-annex-b"
+          ]
+        }
+      ]
+    },
+    {
+      "area": "Codecs",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "runs": [
+        "gate-run-armv7-3b1c527c-20261121-140206"
+      ],
+      "results": [
+        "codec-workloads",
+        "codec-workloads-1",
+        "codec-workloads-2",
+        "codec-workloads-3",
+        "codec-workloads-4",
+        "codec-workloads-5"
+      ]
+    },
+    {
+      "area": "Audio codecs in files",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "runs": [
+        "gate-run-armv7-3b1c527c-20261121-140206"
+      ],
+      "results": [
+        "codec-file-workloads",
+        "codec-file-workloads-1",
+        "codec-file-workloads-2",
+        "codec-file-workloads-3"
+      ]
+    },
+    {
+      "area": "Decode sessions",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ],
+      "text": "with the codecs"
+    },
+    {
+      "area": "Fonts",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "not measured"
+    },
+    {
+      "area": "Shaping",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "not measured"
+    },
+    {
+      "area": "Rasterising",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "not measured"
+    },
+    {
+      "area": "ASS parsing",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "text": "not measured"
+    },
+    {
+      "area": "ASS rendering",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "parts": [
+        {
+          "label": "`ass-render`",
+          "results": [
+            "ass-render"
+          ]
+        },
+        {
+          "label": "`ass-render-host`",
+          "results": [
+            "ass-render-host"
+          ],
+          "targets": [
+            "thumbv7neon-unknown-linux-gnueabihf"
+          ]
+        }
+      ]
+    },
+    {
+      "area": "Capture",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "results": [
+        "capture-c01-ui-static-960",
+        "capture-c02-ui-scroll-960",
+        "capture-c03-ui-transition-960",
+        "capture-c04-motion-960",
+        "capture-c05-noise-960",
+        "capture-c06-ui-scroll-960-bottomup",
+        "capture-c07-ui-static-480-bottomup",
+        "capture-c08-ui-scroll-480-bottomup",
+        "capture-c09-motion-480-bottomup",
+        "capture-c10-ui-transition-480-topdown",
+        "capture-c11-motion-960-rate1",
+        "capture-c12-motion-960-1m",
+        "capture-c13-motion-960-6m",
+        "capture-c14-motion-960-rate255",
+        "capture-c15-noise-480-bottomup"
+      ]
+    }
+  ],
+  "open_cells": [
+    {
+      "area": "Matroska / WebM",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Matroska legacy AAC-LC",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Matroska startup and seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Matroska audio clocks",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "ISO BMFF / MP4",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "ISO BMFF seek and range plans",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "MP4 range playback",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "AAC in MOV",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "MPEG-TS",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "MPEG-TS access units",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "MPEG-TS free-format audio",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "MPEG-TS DTS core",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "MPEG-TS DTS-HD",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "MPEG-TS previous picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "MPEG-TS previous audio",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "MPEG-TS DTS core seek",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "MPEG-TS program playback",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "area": "MPEG-TS progressive playback",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "HLS segments",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Packet framing",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Subtitles, text",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Subtitles, PGS",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Subtitles, PGS capsules",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Subtitles, DVB",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Subtitles, DVD",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Closed captions",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Teletext",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Playback",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Codecs",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Audio codecs in files",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "ASS rendering",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "area": "Capture",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
+    }
+  ]
+}

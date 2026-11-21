@@ -16,7 +16,14 @@ when it passes all three gates on every case in its corpus.
 | Memory | Peak live heap and total resident peak RSS both strictly lower than the reference, each at the upper bound of a paired 95% interval ([early stop](#early-stop)). |
 
 The harness reads these limits from `harness/policy.json`. Each feature's contract and
-corpus manifest live in `harness/features/<feature>/`.
+corpus manifest live in `harness/features/<feature>/`. What the gates require and every
+exception to them are counted in `harness/gate-exceptions.json`: the contracts by gate
+and runner, the features the gate plan leaves out, every list under `harness/` whose
+name starts with `open_` and, per library crate, the public features its README
+describes that no contract compares
+([harness/not-compared.json](../harness/not-compared.json), each with what a comparison
+would need). `cargo xtask check-design` counts them again, so a change that loosens a
+gate or leaves a feature uncompared changes that file too.
 RSS growth from the start of the operation is reported separately when every pair
 has positive growth bounds.
 
@@ -458,8 +465,9 @@ side. The observer does not guard `mprotect`: a private file mapping made writab
 holds memory the heap figure misses, though total RSS still counts it. Receipts of this observer (`linux-glibc-v4`) list eight hooks in `symbol_order`,
 so a worker's `strdup` and `strndup` move from the `malloc` counters to their own; v2
 and v3 receipts list six and still validate when re-graded. The report records the build identity, source provenance digest and input
-hashes it was measured with; when a result is cited, its source revision and raw-sample
-SHA-256 go in the [measured revisions](status.md#measured-revisions) table. `cargo xtask compare` compares a single input, `cargo xtask external-vector`
+hashes it was measured with; when a result is cited, its set is kept and the status row
+showing it names its run in [harness/status-rows.json](../harness/status-rows.json)
+([evidence](#evidence)). `cargo xtask compare` compares a single input, `cargo xtask external-vector`
 qualifies the mandatory external vector and `cargo xtask fate-run` runs one supported
 upstream FATE case. `cargo xtask build-workers` builds the workers and records the build
 identity every collection is checked against. `cargo xtask trace-identities` records the
@@ -582,8 +590,9 @@ may override that count for diagnostic comparisons.
   vectors are nightly-only; the decoder's SBR QMF banks need them there. Every other
   worker stays on the stable pin, `codec-worker` included: the video, AC-3, E-AC-3, DTS
   and file-format workloads, the conformance vectors and the readers: the
-  nightly compiler builds the video decoders slower on ARMv7
-  ([status](status.md#32-bit-armv7)).
+  nightly compiler builds the video decoders slower on ARMv7 (with the whole codec
+  worker on the nightly at `7f32411b`, the six video workloads' worst bound was 1.1694,
+  against 1.1198 on stable at `c68c9667`).
   One revision built by a newer compiler or with `-C target-cpu` differs from it by up
   to 0.04 on a worst bound, more than a case's margin to the ceiling, so results from
   different builds are not comparable. `cargo xtask build-workers` refuses a `rustc`
@@ -643,7 +652,7 @@ may override that count for diagnostic comparisons.
   `"z"`), the ordered workers' images are 12 to 23% smaller, yet linked without the
   order they keep most of the resident memory the order saves: per worker and target,
   the median training operation recovers 21 to 64% of it, and some recover none
-  ([status](status.md#32-bit-armv7)).
+  (evidence set `link-order-code-size`).
   - The trained order of a worker for a target, `harness/link-order/TARGET/WORKER.txt`,
     lists by demangled name the functions a training corpus runs in the release
     worker, in the order the operations first run them, and names in its header the
@@ -673,8 +682,9 @@ may override that count for diagnostic comparisons.
     progressive TS188 operations, which run on Linux AArch64 only: the code the
     progressive reader runs for every packet, PES and access unit then lies in one
     stretch rather than among the code the other playback operations ran first, and
-    a Graviton2 core's 64 KiB instruction cache misses it less often
-    ([status](status.md#measured-revisions)). ARMv7 has no progressive operation, so
+    a Graviton2 core's 64 KiB instruction cache misses it less often (with this order
+    at `4ec296c5`, the 50-session `reordered-48000` bench took 17% fewer L1i refills
+    than at `a0aede6d`). ARMv7 has no progressive operation, so
     this does not change its order.
   - `cargo xtask link-order BINARY [OUT] --trained FILE` writes a binary's symbol
     ordering file: the functions the trained order lists, in its order, then every
@@ -802,8 +812,8 @@ may override that count for diagnostic comparisons.
   Linux AArch64 rows measured first on c8g (Graviton4) and again on a c6g.4xlarge at
   `79e0ae13`, each candidate's user-mode instruction count stayed within -0.4% to +0.3%
   of the earlier build's (one row's code got 9% cheaper) while the runtime upper bounds
-  moved by -0.31 to +0.18 (`cargo xtask count`, below). Every row of
-  [status](status.md) names the class it was measured on.
+  moved by -0.31 to +0.18 (`cargo xtask count`, below). [Status](status.md) names the
+  class its results were measured on.
 
 ### Running the gates
 
@@ -1278,15 +1288,15 @@ and edit recipe.
 
 A result names its exact source revision, worker binaries, reference build, corpus and
 input hashes, platform and all per-case outcomes. Summaries and identities are kept
-in the pull request that changes the result and in [status](status.md), whose
-[measured revisions](status.md#measured-revisions) table names the revision and
-raw-sample SHA-256 behind each cited result. Raw samples are archived by content hash,
+in the pull request that changes the result. Raw samples are archived by content hash,
 outside the repository. The evidence index lists every archived set, one file per set,
 [harness/evidence/sets/SET.json](../harness/evidence/sets/):
 
 - its key and SHA-256;
 - whether it is kept (cited results) or expires after 90 days;
-- each file it holds, by path and SHA-256.
+- each file it holds, by path and SHA-256, or the gate results it holds: each one's
+  path, command, gate target, key and status, and its [measured
+  record](#measured-records), which the [status](status.md) tables are rendered from.
 
 Where a set lives decides how long it is kept: sets under `qualification/` expire 90
 days after upload, and sets under `evidence/` are kept. With `TRIERGON_EVIDENCE_ARCHIVE`
@@ -1308,6 +1318,49 @@ set to the archive location:
    unpacks it into `.research/evidence/SET/`; a `.tar.zst` set is decompressed with the
    system `zstd`. Packing and fetching stream, hashing and writing each file as it
    passes, so a set larger than memory unpacks on a 32-bit host.
+5. `cargo xtask evidence measure [SET]...` records each gate result's target and
+   measured record in the entries of sets indexed before results recorded them: the
+   sets named, or every kept set with a result that records no target. It downloads
+   each set's pack as `evidence fetch` does (through the addresses `tools/gate-aws.sh`
+   writes, or with the archive's credentials), reads the gate results and the reports
+   beside them, refuses a set whose entry lists a result the pack does not hold or with
+   another field than the pack's, rewrites the set's file and removes the pack it
+   downloaded. Run it on a build host that reaches the archive, not on a workstation;
+   commit the set files with the status tables it changes (`cargo xtask status
+   --write`), taking the rows whose results it recorded out of `open_cells`.
+
+### Measured records
+
+A gate result's measured record is what the status tables show of it, read from the
+report its command wrote beside it and graded against `harness/policy.json` when the set
+is indexed:
+
+- `runtime`: the largest valid runtime upper bound (`upper`) and its case (`worst`),
+  the cases whose bound holds (`passing`) and the cases timed (`cases`);
+- `memory`: the largest valid peak heap and total RSS upper bounds (`heap`,
+  `total_rss`), the cases below both ceilings (`lower`) and the cases measured
+  (`cases`).
+
+A collection records the part it measured, a grade both, and `gate test` nothing. The
+report is `report.json` for the report runner, `grade`, the ISO BMFF suites and the
+external vector, each workload's record for `codecs time`, `summary.json` for `codecs
+memory`, and each case's `result.json` for `capture qualify`'s memory stage; its rows
+are the ones the bounds are graded on ([`harness/bounds.rs`](../xtask/src/harness/bounds.rs)),
+open cases, refusals and ISO BMFF aliases left out.
+
+[harness/status-rows.json](../harness/status-rows.json) maps each row of the status
+tables to the results it shows, by the directory each lies in (in a gate run, the item
+whose timing, memory and grade share it, such as `matroska-demux` for
+`graded/matroska-demux/`), from a run: the evidence set named so, or the sets named so
+followed by `-shard-N`, at one revision on one target. A directory's runtime and memory
+come from its grade where it has one, else from its one collection of each kind; a row
+joins its directories by their largest bounds and summed counts, and its cells round
+each bound up to four decimals and name the run's revision. `cargo xtask check-design`
+renders every cell and fails on a difference, on a cited run that is not kept or whose
+sets record another source revision, and on a cited directory its run does not hold.
+`open_cells` lists the rows whose cells are written by hand: a row may be listed only
+while none of its results records its target, and `harness/gate-exceptions.json`
+counts the list, so it only shrinks.
 
 [harness/evidence/index.json](../harness/evidence/index.json) records where keys lie
 and how identifiers were renamed. A result key is listed by one kept set at most, so

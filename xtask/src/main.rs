@@ -40,6 +40,7 @@ mod session_queues;
 mod sha256;
 mod shape;
 mod stats;
+mod status;
 mod subtitle_fixtures;
 mod toml;
 mod transport_fixtures;
@@ -74,6 +75,9 @@ commands:
   check-revisions
                  every commit docs/status.md cites is reachable from HEAD (needs the
                  full history)
+  status         [--write]   docs/status.md's tables with their Runtime and Memory cells
+                 rendered from the evidence index as harness/status-rows.json maps them;
+                 --write writes them into the page
   core-time      compare exact arithmetic against the independent fraction oracle
   fixtures       generate the authored Matroska corpus into .research/ and its manifests
   session-queues compare baseline and candidate session queues; --help for usage
@@ -214,6 +218,12 @@ fn main() -> ExitCode {
         Some("check-design") => check_design(&root),
         Some("check-safety") => check_safety(&root),
         Some("check-revisions") => check_revisions(&root),
+        Some("status") => match &args[1..] {
+            [] => status::tables(&root, false),
+            [flag] if flag == "--write" => status::tables(&root, true),
+            _ => Err("usage: cargo xtask status [--write]".into()),
+        }
+        .map(|text| println!("{text}")),
         Some("core-time") => core_time::main(&root, &args[1..]),
         Some("fixtures") => fixtures(&root),
         Some("fixture") => fixture(&root, &args[1..]),

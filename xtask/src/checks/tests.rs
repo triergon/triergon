@@ -214,6 +214,7 @@ fn design_reports_invalid_json_and_gate_changes() {
         r#"{"crates": {}}"#,
     )
     .unwrap();
+    stated_status(&root);
     let missing = design(&root).unwrap_err();
     assert_eq!(
         missing,
@@ -227,7 +228,7 @@ fn design_reports_invalid_json_and_gate_changes() {
     .unwrap();
     let ok = design(&root).unwrap();
     assert!(
-        ok.starts_with("Design integrity OK: 4 harness data files, 1 unmapped FATE identities.")
+        ok.starts_with("Design integrity OK: 7 harness data files, 1 unmapped FATE identities.")
     );
     fs::write(root.join("harness/sub/bad.json"), "{").unwrap();
     fs::write(
@@ -246,6 +247,42 @@ fn design_reports_invalid_json_and_gate_changes() {
     assert!(errors.contains(&"docs/quality.md: does not state the policy value 1.25".into()));
     assert!(errors.contains(&"FATE index misrepresents coverage/rights".into()));
     fs::remove_dir_all(root).unwrap();
+}
+
+/// Status tables for both gate targets, empty, each from a kept run.
+fn stated_status(root: &Path) {
+    let sets = root.join(crate::evidence::SETS);
+    fs::create_dir_all(&sets).unwrap();
+    let mut tables = Vec::new();
+    let mut runs = Vec::new();
+    for (index, target) in crate::gate::TARGETS.iter().enumerate() {
+        let run = format!("run-{index}");
+        fs::write(
+            sets.join(format!("{run}.json")),
+            format!(r#"{{"name": "{run}", "retention": "retained"}}"#),
+        )
+        .unwrap();
+        tables.push(format!(
+            r#"{{"heading": "{target}", "target": "{target}", "run": "{run}"}}"#
+        ));
+        runs.push(format!(
+            r#""{run}": {{"target": "{target}", "revision": "0123abcd"}}"#
+        ));
+    }
+    fs::write(
+        root.join(crate::status::ROWS),
+        format!(
+            r#"{{"tables": [{}], "runs": {{{}}}, "rows": [], "open_cells": []}}"#,
+            tables.join(", "),
+            runs.join(", ")
+        ),
+    )
+    .unwrap();
+    let page: String = crate::gate::TARGETS
+        .iter()
+        .map(|target| format!("## {target}\n\n| Area | Runtime | Memory |\n|---|---|---|\n\n"))
+        .collect();
+    fs::write(root.join(crate::status::PAGE), page).unwrap();
 }
 
 /// The quality guide stating the policy of 1.20 and 0.80, and one passing status row.
