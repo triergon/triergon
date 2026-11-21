@@ -153,7 +153,7 @@ impl<const HEADER_BYTES: usize, Header: Copy> Reader<HEADER_BYTES, Header> {
         let bytes = match std::mem::replace(&mut self.buffer, buffer).freeze() {
             Ok(bytes) => bytes,
             Err(error) => {
-                self.buffer = error.buffer;
+                self.buffer = error.value;
                 return Err(error.error);
             }
         };

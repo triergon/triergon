@@ -206,10 +206,10 @@ impl<R: Read> BlockingReader<R> {
             ParseStep::Backpressure {
                 requested,
                 available,
-            } => Err(Error::Backpressure {
+            } => Err(Error::Backpressure(Backpressure {
                 requested,
                 available,
-            }),
+            })),
             other => Ok(other),
         }
     }

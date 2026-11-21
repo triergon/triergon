@@ -9,7 +9,7 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Error, InputCursor, InputToken, PushError, Result, SourceLocation, Step, WorkBudget,
+    Error, InputCursor, InputToken, Refused, Result, SourceLocation, Step, WorkBudget,
 };
 
 /// A final unusable carrier was excluded after nonempty finite packet output.
@@ -198,7 +198,7 @@ impl TransportFaultRecovery {
         &mut self,
         packet: TransportPacket,
         context: SourceContext,
-    ) -> std::result::Result<(), PushError<TransportPacket>> {
+    ) -> std::result::Result<(), Refused<TransportPacket>> {
         let boundary = self.policy.source_pcr_pid == Some(packet.pid)
             && packet.discontinuity_indicator()
             && packet.adaptation.as_ref().is_some_and(|a| a.pcr.is_some());
@@ -218,7 +218,7 @@ impl TransportFaultRecovery {
                     ))
             });
             if let Some(error) = error {
-                return Err(PushError {
+                return Err(Refused {
                     error,
                     value: packet,
                 });

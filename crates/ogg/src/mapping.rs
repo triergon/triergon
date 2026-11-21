@@ -96,15 +96,15 @@ impl Mapping {
         }
     }
 
-    /// The neutral codec; `tag` is the track's codec tag.
-    pub fn codec(self, tag: &[u8]) -> CodecId<'_> {
+    /// The neutral codec.
+    pub fn codec(self) -> CodecId {
         match self {
             Mapping::Vorbis => CodecId::Vorbis,
             Mapping::Opus => CodecId::Opus,
             Mapping::Flac => CodecId::Flac,
             Mapping::Theora => CodecId::Theora,
             Mapping::Speex => CodecId::Speex,
-            Mapping::Other(_) => CodecId::Other(tag),
+            Mapping::Other(_) => CodecId::Other,
         }
     }
 }
@@ -736,14 +736,14 @@ mod tests {
         assert_eq!(Mapping::identify(b"\x7fFLAC\x01\0").0, Mapping::Flac);
         let (theora, tag) = Mapping::identify(b"\x80theora\x03\x02");
         assert_eq!((theora.kind(), tag), (MediaKind::Video, &b"\x80theora"[..]));
-        assert_eq!(theora.codec(tag), CodecId::Theora);
-        let (speex, tag) = Mapping::identify(b"Speex   1.2");
+        assert_eq!(theora.codec(), CodecId::Theora);
+        let (speex, _) = Mapping::identify(b"Speex   1.2");
         assert_eq!(
-            (speex.kind(), speex.codec(tag)),
+            (speex.kind(), speex.codec()),
             (MediaKind::Audio, CodecId::Speex)
         );
         let (daala, tag) = Mapping::identify(b"\x80daala\0");
-        assert_eq!(daala.codec(tag), CodecId::Other(b"\x80daala"));
+        assert_eq!((daala.codec(), tag), (CodecId::Other, &b"\x80daala"[..]));
         let (unknown, tag) = Mapping::identify(b"abcdefghijkl");
         assert_eq!(
             (unknown, tag),

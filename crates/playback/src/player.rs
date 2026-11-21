@@ -1141,10 +1141,10 @@ impl<S: Source> Player<S> {
             return Err(Error::Cancelled);
         }
         let result = self.inner::<READY>(w, slot, cursor);
-        if let Err(Error::Backpressure {
+        if let Err(Error::Backpressure(triergon_core::Backpressure {
             requested,
             available,
-        }) = result
+        })) = result
         {
             return Ok(Progress::Backpressure {
                 requested,
@@ -1288,10 +1288,10 @@ impl<S: Source> Player<S> {
         }
         let available = self.policy.queued_payload_bytes - self.bytes;
         if bytes > available {
-            return Err(Error::Backpressure {
+            return Err(Error::Backpressure(triergon_core::Backpressure {
                 requested: bytes,
                 available,
-            });
+            }));
         }
         if !w.try_charge(1) {
             return Ok(None);

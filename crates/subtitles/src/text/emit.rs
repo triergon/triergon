@@ -184,7 +184,7 @@ impl Emitter {
                 match builder.freeze() {
                     Ok(bytes) => self.decoded = Some(bytes),
                     Err(rejection) => {
-                        self.builder = Some(rejection.buffer);
+                        self.builder = Some(rejection.value);
                         return Err(rejection.error);
                     }
                 }

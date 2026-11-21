@@ -89,12 +89,7 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
                 Step::Ready(event) => return Ok(Some(event)),
                 Step::Yield => {}
                 Step::NeedInput(request) => self.serve(request)?,
-                Step::Backpressure(pressure) => {
-                    return Err(Error::Backpressure {
-                        requested: pressure.requested,
-                        available: pressure.available,
-                    });
-                }
+                Step::Backpressure(pressure) => return Err(pressure.into()),
                 Step::End(_) => return Ok(None),
             }
         }
@@ -153,7 +148,7 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
             }
             self.window = None;
             let buffer = BudgetVec::try_filled(&self.pool, 0, maximum)?;
-            self.window = Some(buffer.freeze().map_err(|refused| refused.error)?);
+            self.window = Some(buffer.freeze()?);
         }
     }
 

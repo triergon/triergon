@@ -441,10 +441,10 @@ impl ReceiverDecoder {
             Some(if requested > maximum {
                 Error::Limit { requested, maximum }
             } else {
-                Error::Backpressure {
+                Error::Backpressure(triergon_core::Backpressure {
                     requested,
                     available,
-                }
+                })
             })
         } else {
             self.held_packet.clear();

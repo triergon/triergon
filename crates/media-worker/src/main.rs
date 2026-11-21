@@ -36,7 +36,7 @@ fn open_owned(
 ) -> triergon_matroska::Result<Demuxer<Cursor<triergon_matroska::storage::OwnedInputBytes>>> {
     let pool = triergon_matroska::storage::Budget::new(limits.live_storage_bytes)?;
     let source = triergon_matroska::storage::OwnedInputBytes::try_from_vec(&pool, data)
-        .map_err(|error| error.error())?;
+        .map_err(|error| error.error)?;
     Demuxer::open_owned_seekable_in(
         source,
         limits,

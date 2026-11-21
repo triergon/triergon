@@ -199,7 +199,10 @@ fn an_unknown_sample_entry_is_reported_and_its_samples_still_read() {
     let mut reader = open(&pool, &file);
     let reading = read(&mut reader, &pool, &file, 1 << 20, 1 << 16).unwrap();
     let track = reader.track(0).unwrap();
-    assert_eq!(track.codec(), CodecId::Other(b"xyz1"));
+    assert_eq!(
+        (track.codec(), track.codec_tag()),
+        (CodecId::Other, &b"xyz1"[..])
+    );
     assert_eq!(track.codec_tag(), b"xyz1");
     assert_eq!(track.kind(), MediaKind::Video);
     assert_eq!(
@@ -266,7 +269,7 @@ fn an_unknown_handler_is_not_given_a_kind() {
     read(&mut reader, &pool, &file, 1 << 20, 1 << 16).unwrap();
     let track = reader.track(0).unwrap();
     assert_eq!(track.kind(), MediaKind::Unknown);
-    assert_eq!(track.codec(), CodecId::Other(track.codec_tag()));
+    assert_eq!(track.codec(), CodecId::Other);
 }
 
 #[test]

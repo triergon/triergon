@@ -62,7 +62,7 @@ pub fn prepare(file: &Path, args: &Args) -> Result<Box<dyn Prepared>> {
                 timebase: track.time_base,
             };
             Ok((
-                Bytes::try_from_vec(&pool, packet.data).map_err(|e| e.error())?,
+                Bytes::try_from_vec(&pool, packet.data).map_err(|e| e.error)?,
                 clock,
             ))
         })

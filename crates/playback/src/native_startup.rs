@@ -317,7 +317,7 @@ impl PrefixRead {
         let bytes = match builder.freeze() {
             Ok(bytes) => bytes,
             Err(rejected) => {
-                self.bytes = rejected.buffer;
+                self.bytes = rejected.value;
                 return Err(rejected.error);
             }
         };

@@ -1,5 +1,5 @@
 //! The accounting pool every input-dependent allocation is charged to.
-use crate::{Error, Result};
+use crate::{Backpressure, Error, Result};
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
@@ -121,10 +121,10 @@ impl Budget {
         loop {
             let available = self.limit() - used;
             if bytes > available {
-                return Err(Error::Backpressure {
+                return Err(Error::Backpressure(Backpressure {
                     requested: bytes,
                     available,
-                });
+                }));
             }
             let total = used + bytes; // bounded by limit above; cannot overflow
             match self.0.used.compare_exchange_weak(

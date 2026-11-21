@@ -28,7 +28,7 @@ fn inline_headers_copy_caller_bytes_and_preserve_work_and_entity_end() {
     provide(&mut input, &caller);
     caller.fill(99);
     assert_eq!(pool.used(), base);
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     let mut output = [0; 4];
     assert!(matches!(
         input
@@ -159,7 +159,7 @@ fn range_and_logical_reset_invalidate_inline_data_and_old_tokens() {
     provide(&mut input, &[9, 8]);
     assert_eq!(read(&mut input, &mut out, 1), 1);
     assert_eq!(out[0], 9);
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
 }
 
 #[test]
@@ -190,7 +190,7 @@ fn empty_availability_does_not_mean_eof_and_transport_failure_stays_sticky() {
             .unwrap_err(),
         Error::Transport
     );
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     assert_eq!(pool.used(), base);
     input.reset(0).unwrap();
     input.finish(SOURCE, input.token()).unwrap();
@@ -252,7 +252,7 @@ fn zero_work_does_not_promote_inline_storage_or_hide_a_later_limit() {
             .unwrap(),
         Step::Yield
     ));
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     assert_eq!(pool.used(), base);
     assert!(matches!(
         input.read_span(6, &mut WorkBudget::new(1), &AtomicBool::new(false)),
@@ -280,7 +280,7 @@ fn span_promotion_retries_pressure_and_retains_the_whole_original_owner() {
     ));
     assert_eq!(work.spent(), 0);
     assert_eq!(input.position(), 3);
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     drop(hold);
     let head = match input
         .read_span(4, &mut work, &AtomicBool::new(false))
@@ -291,7 +291,7 @@ fn span_promotion_retries_pressure_and_retains_the_whole_original_owner() {
     };
     assert_eq!(head.as_ref(), &raw[3..7]);
     assert_eq!(work.spent(), 4);
-    let owner = input.retained_window().unwrap();
+    let owner = input.buffered_owner().cloned().unwrap();
     assert_eq!(owner.as_ref(), raw);
     assert!(head.shares_storage_with(&owner));
     assert!(owner.retained_capacity() >= raw.len());
@@ -311,7 +311,7 @@ fn span_promotion_retries_pressure_and_retains_the_whole_original_owner() {
     };
     assert_eq!(tail.as_ref(), &raw[7..]);
     assert!(tail.shares_storage_with(&head));
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     drop(input);
     drop(owner);
     drop(tail);
@@ -373,7 +373,7 @@ fn continued_entities_can_switch_between_inline_and_owned_windows() {
     assert_eq!(read(&mut input, &mut out, 3), 3);
     assert_eq!(&out, b"new");
     assert_eq!(span.as_ref(), b"xy");
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
 }
 
 #[test]

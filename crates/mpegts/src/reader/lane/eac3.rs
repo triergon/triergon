@@ -193,7 +193,11 @@ impl Reader {
                         continue;
                     }
                     Ok(Step::Backpressure(never)) => match never {},
-                    Err(error @ Error::Backpressure { requested, .. }) => {
+                    Err(
+                        error @ Error::Backpressure(triergon_core::Backpressure {
+                            requested, ..
+                        }),
+                    ) => {
                         if let Some(group) = &self.group {
                             require(&self.pool, group.storage()?, requested)?;
                         }
@@ -470,7 +474,7 @@ impl Group {
                 }))
             }
             Err(error) => {
-                self.joined = Some(error.buffer);
+                self.joined = Some(error.value);
                 Err(error.error)
             }
         }
@@ -587,10 +591,10 @@ mod tests {
             group
                 .append(&pool, &mut pending, 0, GROUP_BYTES)
                 .unwrap_err(),
-            Error::Backpressure {
+            Error::Backpressure(triergon_core::Backpressure {
                 requested: size_of::<DependentSyncframe>(),
                 available: 0,
-            }
+            })
         );
         assert_eq!(pending.as_ref().unwrap().facts(), facts);
         assert_eq!(pool.available(), 0);
@@ -643,10 +647,10 @@ mod tests {
                 group
                     .materialize(&pool, Some(&staged), &mut WorkBudget::new(1), &cancel)
                     .unwrap_err(),
-                Error::Backpressure {
+                Error::Backpressure(triergon_core::Backpressure {
                     requested: GROUP_BYTES,
                     available: GROUP_BYTES - 1
-                }
+                })
             );
             assert!(group.joined.is_none());
         }
@@ -697,10 +701,10 @@ mod tests {
             group
                 .materialize(&pool, Some(&staged), &mut WorkBudget::new(1), &cancel)
                 .unwrap_err(),
-            Error::Backpressure {
+            Error::Backpressure(triergon_core::Backpressure {
                 requested: Bytes::owner_overhead_bytes(),
                 available: 0
-            }
+            })
         );
         drop(pressure);
         let joined = group

@@ -743,7 +743,7 @@ impl PcmReader {
                 let payload = match buffer.freeze() {
                     Ok(b) => b,
                     Err(failure) => {
-                        self.buffer = Some(failure.buffer);
+                        self.buffer = Some(failure.value);
                         return Err(failure.error);
                     }
                 };

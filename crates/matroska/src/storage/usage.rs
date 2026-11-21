@@ -272,7 +272,7 @@ impl Storage for triergon_core::InputCursor {
     }
     fn storage_owner(&self, index: usize) -> Result<Option<Owner>> {
         Ok(if index == 0 {
-            self.retained_window().map(Owner::Bytes)
+            self.buffered_owner().cloned().map(Owner::Bytes)
         } else {
             None
         })

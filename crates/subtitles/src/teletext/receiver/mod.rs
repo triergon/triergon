@@ -181,10 +181,10 @@ impl Decoder {
         work: &mut WorkBudget,
     ) -> Result<Decoded<'_>> {
         if work.remaining() < Self::MAX_PACKET_WORK {
-            return Err(Error::Backpressure {
+            return Err(Error::Backpressure(triergon_core::Backpressure {
                 requested: usize::try_from(Self::MAX_PACKET_WORK).unwrap_or(usize::MAX),
                 available: usize::try_from(work.remaining()).unwrap_or(usize::MAX),
-            });
+            }));
         }
         if let Some(field) = DataField::new(payload) {
             // The payload and the 45-byte PES header fill whole transport packets.

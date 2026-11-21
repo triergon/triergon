@@ -82,7 +82,7 @@ fn ignored_inline_body_emits_exact_skipped_header_with_no_available_pool() {
         assert_eq!(reader.request().token, token);
         assert_eq!(work.spent(), 1);
         assert_eq!(pool.used(), held);
-        assert!(reader.input.retained_window().is_none());
+        assert!(reader.input.buffered_owner().is_none());
     }
     let mut work = WorkBudget::new(1);
     assert!(
@@ -129,7 +129,7 @@ fn ignored_owned_hidden_window_releases_cursor_charge_but_preserves_alias() {
     assert_eq!(reader.position(), 15);
     assert_eq!(work.spent(), 4);
     assert_eq!(pool.used(), held);
-    assert!(reader.input.retained_window().is_none());
+    assert!(reader.input.buffered_owner().is_none());
     drop(blocker);
     drop(reader);
     assert_eq!(pool.used(), baseline + charge);
@@ -216,7 +216,7 @@ fn ignored_body_cancellation_releases_input_without_emitting_skipped() {
     ));
     assert_eq!(reader.position(), 12);
     assert_eq!(work.spent(), 0);
-    assert!(reader.input.retained_window().is_none());
+    assert!(reader.input.buffered_owner().is_none());
     assert!(matches!(
         reader.step(&mut work, &AtomicBool::new(false)),
         Err(Error::Cancelled)

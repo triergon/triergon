@@ -31,7 +31,8 @@ use std::sync::atomic::AtomicBool;
 use triergon::elementary::{self, Ac3, Adts, Flac, Format, MpegAudio};
 use triergon::ogg::{self, compat::clock};
 use triergon::{
-    Event, PacketInfo, SeekMethod, SeekPolicy, SeekReceipt, SeekRequest, Time, TimeBase, TrackInfo,
+    CodecId, Event, PacketInfo, SeekMethod, SeekPolicy, SeekReceipt, SeekRequest, Time, TimeBase,
+    TrackInfo,
 };
 
 /// One packet as the reader reports it.
@@ -132,9 +133,14 @@ pub(super) fn string(text: &str) -> String {
 }
 
 pub(super) fn track_line(index: usize, track: &dyn TrackInfo, extra: &str) -> String {
+    // An unnamed codec prints with its tag.
+    let codec = match track.codec() {
+        CodecId::Other => format!("Other({:?})", track.codec_tag()),
+        codec => format!("{codec:?}"),
+    };
     format!(
         "{{\"index\":{index},\"codec\":{},\"codec_tag\":{}{extra}}}",
-        string(&format!("{:?}", track.codec())),
+        string(&codec),
         string(&String::from_utf8_lossy(track.codec_tag())),
     )
 }

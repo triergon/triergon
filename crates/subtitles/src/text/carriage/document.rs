@@ -307,7 +307,7 @@ impl Document {
             match buffer.freeze() {
                 Ok(bytes) => bytes,
                 Err(error) => {
-                    self.body = error.buffer;
+                    self.body = error.value;
                     return Err(error.error);
                 }
             }

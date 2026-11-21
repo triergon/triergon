@@ -505,7 +505,7 @@ impl HlsAac {
             match frame.freeze() {
                 Ok(bytes) => bytes,
                 Err(error) => {
-                    self.frame = error.buffer;
+                    self.frame = error.value;
                     return Err(error.error);
                 }
             }

@@ -279,10 +279,7 @@ impl<'a> Drive<'a> {
                 }
                 Step::Yield => self.assert_catalogue(),
                 Step::Backpressure(p) => {
-                    return Err(Error::Backpressure {
-                        requested: p.requested,
-                        available: p.available,
-                    });
+                    return Err(Error::Backpressure(p));
                 }
                 Step::NeedInput(r) => {
                     let at = usize::try_from(r.offset).unwrap();
@@ -595,7 +592,7 @@ fn unknown_and_private_carriages_keep_every_source_fact_and_report_a_gap() {
         match event {
             Event::Packet(_) => panic!("PES must not be exposed as an AU"),
             Event::Other(ReaderEvent::Unsupported { track, .. }) => {
-                assert!(matches!(track.codec(), CodecId::Other(_)));
+                assert_eq!(track.codec(), CodecId::Other);
                 gaps += 1;
             }
             Event::Other(ReaderEvent::Source(source))
@@ -610,7 +607,10 @@ fn unknown_and_private_carriages_keep_every_source_fact_and_report_a_gap() {
     let track = drive.reader.track(0).unwrap();
     assert_eq!(track.stream().descriptor_bytes.as_ref(), descriptors);
     assert_eq!(track.kind(), MediaKind::Unknown);
-    assert_eq!(track.codec(), CodecId::Other(&[0x99]));
+    assert_eq!(
+        (track.codec(), track.codec_tag()),
+        (CodecId::Other, &[0x99][..])
+    );
     let pes = pes.unwrap();
     let TraceEvent::Pes(body) = pes.event() else {
         unreachable!()

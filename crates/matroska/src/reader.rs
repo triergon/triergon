@@ -526,7 +526,7 @@ impl Reader {
                 result
             };
             match result {
-                Err(Error::Backpressure { requested, .. })
+                Err(Error::Backpressure(Backpressure { requested, .. }))
                 | Ok(ParseStep::Backpressure { requested, .. }) => {
                     self.allocation_blocked(requested);
                     D::progress(self.step_pressure(work, cancel, source))

@@ -132,10 +132,10 @@ impl RangeLeafJob {
         }
         let result = self.advance(input, work, cancel);
         match result {
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => Ok(ParseStep::Backpressure {
+            })) => Ok(ParseStep::Backpressure {
                 requested,
                 available,
             }),
@@ -310,7 +310,7 @@ impl RangeLeafJob {
                             self.phase = Phase::Done;
                         }
                         Err(error) => {
-                            self.buffer = Some(error.buffer);
+                            self.buffer = Some(error.value);
                             return Err(error.error);
                         }
                     }

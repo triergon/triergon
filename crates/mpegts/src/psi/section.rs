@@ -2,7 +2,7 @@ use crate::{
     AssemblyStep, ParseLimits, SourceRange, checked_pid, commit_range, limit, prepare_range,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Bytes, Error, PushError, Result, SourceId, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, Refused, Result, SourceId, WorkBudget};
 
 pub use triergon_bitstream::crc::Crc32Mpeg as PsiCrc32;
 
@@ -126,7 +126,7 @@ impl SectionAssembler {
         pusi: bool,
         entity: SourceId,
         offset: u64,
-    ) -> std::result::Result<(), PushError<Bytes>> {
+    ) -> std::result::Result<(), Refused<Bytes>> {
         let failure = if self.payload.is_some() {
             Some(Error::Invalid("PSI payload not drained"))
         } else if self.ended {
@@ -143,7 +143,7 @@ impl SectionAssembler {
             None
         };
         if let Some(error) = failure {
-            return Err(PushError {
+            return Err(Refused {
                 error,
                 value: bytes,
             });
@@ -228,7 +228,7 @@ impl SectionAssembler {
                 let source = match builder.freeze() {
                     Ok(source) => source,
                     Err(rejected) => {
-                        self.buffer = Some(rejected.buffer);
+                        self.buffer = Some(rejected.value);
                         return Err(rejected.error);
                     }
                 };

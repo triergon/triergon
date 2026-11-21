@@ -126,7 +126,7 @@ pub fn drive(
         return Err("input must be a bounded non-empty file".into());
     }
     let pool = Budget::new(256 * 1024 * 1024)?;
-    let raw = Bytes::try_from_vec(&pool, raw).map_err(|error| error.error())?;
+    let raw = Bytes::try_from_vec(&pool, raw).map_err(|error| error.error)?;
     let trace = invocation.mode == Mode::Trace;
     measure(&invocation, operation_name, Some(&pool), || {
         let start = Work {

@@ -83,10 +83,10 @@ fn collect_stream(
                 &mut |packet, omitted, epochs, _| {
                     if std::mem::take(&mut captured.reject_next) {
                         retry_offset = Some(packet.source_offset);
-                        return Err(Error::Backpressure {
+                        return Err(Error::Backpressure(triergon_core::Backpressure {
                             requested: 1,
                             available: 0,
-                        });
+                        }));
                     }
                     out.push((TraceEvent::Transport(packet.clone()), epochs));
                     ordinals.push(ordinal + omitted);
@@ -103,10 +103,10 @@ fn collect_stream(
         };
         ordinal += source.take_feed_omissions();
         let step = match step {
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested: 1,
                 available: 0,
-            }) if retry_offset.is_some() => {
+            })) if retry_offset.is_some() => {
                 continue;
             }
             step => step.unwrap(),

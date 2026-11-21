@@ -51,7 +51,7 @@ fn expanded_header_is_the_existing_charged_owner_without_new_storage() {
         supply(&mut feeder, &mut input, 4096, true),
         Ok(FeedStep::Provided)
     ));
-    let window = input.retained_window().unwrap();
+    let window = input.buffered_owner().cloned().unwrap();
     assert!(
         window.shares_storage_with(&source),
         "must remove a real copied/frozen owner"
@@ -74,7 +74,7 @@ fn body_request_keeps_the_original_exact_capacity_path() {
         supply(&mut feeder, &mut input, 19, false),
         Ok(FeedStep::Provided)
     ));
-    let window = input.retained_window().unwrap();
+    let window = input.buffered_owner().cloned().unwrap();
     assert!(!window.shares_storage_with(&source));
     assert_eq!((window.len(), window.retained_capacity()), (19, 19));
     assert_eq!(window.as_ref(), &source[..19]);
@@ -87,7 +87,7 @@ fn fixed_inline_header_representation_stays_literal() {
         supply(&mut feeder, &mut input, 5, true),
         Ok(FeedStep::Provided)
     ));
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     let mut output = [0; 5];
     let mut work = WorkBudget::new(1);
     assert!(matches!(
@@ -124,12 +124,12 @@ fn zero_work_then_one_byte_consumption_preserves_view_and_position() {
 fn logical_reset_keeps_old_caller_alias_and_supplies_new_token_at_exact_offset() {
     let (_, source, mut feeder, mut input) = setup(90);
     supply(&mut feeder, &mut input, 40, true).unwrap();
-    let old = input.retained_window().unwrap();
+    let old = input.buffered_owner().cloned().unwrap();
     let token = input.token();
     input.reset(17).unwrap();
     assert_ne!(input.token(), token);
     supply(&mut feeder, &mut input, 25, true).unwrap();
-    let new = input.retained_window().unwrap();
+    let new = input.buffered_owner().cloned().unwrap();
     assert_eq!(old.as_ref(), &source[..40]);
     assert_eq!(new.as_ref(), &source[17..42]);
     assert!(old.shares_storage_with(&new));
@@ -146,7 +146,7 @@ fn cancellation_before_supply_does_not_move_source_or_publish_view() {
         Err(Error::Cancelled)
     ));
     assert_eq!(feeder.reader_mut().position(), 0);
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     cancelled.store(false, Ordering::Relaxed);
     assert!(matches!(
         input.read_into(&mut [0], &mut WorkBudget::new(1), &cancelled),
@@ -213,7 +213,7 @@ fn stale_request_cannot_reposition_or_publish_an_old_owner() {
         Err(Error::Invalid("blocking input request identity changed"))
     ));
     assert_eq!(feeder.reader_mut().position(), 0);
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
 }
 
 #[test]

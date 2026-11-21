@@ -231,7 +231,7 @@ impl ProgramReader {
 /// the EN 300 468 descriptors on PES private data whatever the namespace
 /// ([`ElementaryStream::dvb_descriptor_codec`]), and the user-private stream
 /// types 0x81 (AC-3), 0x87 (E-AC-3) and 0x90 (PGS).
-pub fn codec(stream: &ElementaryStream) -> Option<CodecId<'static>> {
+pub fn codec(stream: &ElementaryStream) -> Option<CodecId> {
     match stream.stream_type {
         0x81 => Some(CodecId::Ac3),
         0x87 => Some(CodecId::Eac3),
@@ -267,11 +267,11 @@ pub fn configuration(stream: &ElementaryStream) -> impl Iterator<Item = u8> + '_
 }
 
 /// The first descriptor tagged `tag` when `stream` carries `wanted`.
-fn first<'a>(
-    stream: &'a ElementaryStream,
-    wanted: CodecId<'static>,
+fn first(
+    stream: &ElementaryStream,
+    wanted: CodecId,
     tag: u8,
-) -> impl Iterator<Item = Descriptor<'a>> {
+) -> impl Iterator<Item = Descriptor<'_>> {
     (codec(stream) == Some(wanted))
         .then(|| {
             stream

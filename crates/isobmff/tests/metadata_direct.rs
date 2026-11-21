@@ -31,7 +31,7 @@ fn reserved_metadata_body_consumes_inline_bytes_under_complete_pool_pressure() {
         Step::Ready(BoxEvent::Header(_))
     ));
     assert_eq!(input.position(), 8);
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     let before_reserve = budget.used();
     reader.read_metadata(&input).unwrap();
     assert_eq!(budget.used(), before_reserve + 14);
@@ -71,7 +71,7 @@ fn reserved_metadata_body_consumes_inline_bytes_under_complete_pool_pressure() {
         assert_eq!(work.spent(), 1);
         assert_eq!(input.token(), token);
         assert_eq!(input.source(), SourceId(400));
-        assert!(input.retained_window().is_none());
+        assert!(input.buffered_owner().is_none());
         assert_eq!(budget.used(), held);
     }
     // All body bytes are retained; only the immutable storage header may wait.

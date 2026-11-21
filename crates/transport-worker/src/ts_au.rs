@@ -784,16 +784,8 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                 }
             }
             Step::Backpressure(pressure) => {
-                return Ok(deferred_continuity.unwrap_or_else(|| {
-                    refused(
-                        totals,
-                        &Error::Backpressure {
-                            requested: pressure.requested,
-                            available: pressure.available,
-                        },
-                        at,
-                    )
-                }));
+                return Ok(deferred_continuity
+                    .unwrap_or_else(|| refused(totals, &Error::Backpressure(pressure), at)));
             }
             Step::End(end) => {
                 if end.source != source

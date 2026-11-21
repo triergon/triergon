@@ -58,7 +58,7 @@ fn inline_header_supply_progresses_with_only_the_pool_control_charge() {
             .unwrap(),
         FeedStep::Provided
     ));
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     assert_eq!(pool.used(), baseline);
     assert_eq!(feeder.retained_buffer_bytes(), 0);
     let mut byte = [0];
@@ -76,7 +76,7 @@ fn inline_header_supply_progresses_with_only_the_pool_control_charge() {
         ));
         assert_eq!(byte[0], *expected);
         assert_eq!((input.position(), one.spent()), ((at + 1) as u64, 1));
-        assert!(input.retained_window().is_none());
+        assert!(input.buffered_owner().is_none());
         assert_eq!(pool.used(), baseline);
     }
     // Exhausting declared bytes still needs a real one-byte EOF probe.
@@ -152,7 +152,7 @@ fn tiny_typed_body_keeps_its_owned_freeze_retry_and_alias_lifetime() {
             FeedStep::Backpressure { .. }
         ));
         assert_eq!(input.position(), 0);
-        assert!(input.retained_window().is_none());
+        assert!(input.buffered_owner().is_none());
         assert_eq!(feeder.retained_buffer_bytes(), 3);
         assert_eq!(feeder.reader_mut().reads, 1);
     }
@@ -165,7 +165,7 @@ fn tiny_typed_body_keeps_its_owned_freeze_retry_and_alias_lifetime() {
     ));
     assert_eq!(feeder.reader_mut().reads, 1);
     assert_eq!(feeder.retained_buffer_bytes(), 0);
-    let owner = input.retained_window().unwrap();
+    let owner = input.buffered_owner().cloned().unwrap();
     let charge = 3 + Bytes::owner_overhead_bytes();
     assert_eq!(owner.retained_storage_bytes(), charge);
     assert_eq!(pool.used(), baseline + charge);
@@ -241,7 +241,7 @@ fn inline_header_cancellation_after_read_is_sticky_without_publication() {
         Err(Error::Cancelled)
     ));
     assert_eq!(input.position(), 0);
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     assert_eq!(feeder.retained_buffer_bytes(), 0);
     assert_eq!(feeder.reader_mut().reads, 1);
     cancel.store(false, Ordering::Relaxed);
@@ -288,6 +288,6 @@ fn inline_header_transport_failure_never_becomes_eof() {
         input.finish(request.source, request.token),
         Err(Error::Transport)
     ));
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     assert_eq!(pool.peak(), baseline);
 }

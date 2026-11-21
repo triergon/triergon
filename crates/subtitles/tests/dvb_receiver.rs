@@ -762,10 +762,10 @@ fn admitted_packets_never_stall() {
                     let status = decoder.decode(bytes, *pts, &mut work, &cancel);
                     drop(taken);
                     match status {
-                        Err(Error::Backpressure {
+                        Err(Error::Backpressure(triergon_core::Backpressure {
                             requested,
                             available,
-                        }) => room += requested - available,
+                        })) => room += requested - available,
                         status => break status.map(|_| ()),
                     }
                 };

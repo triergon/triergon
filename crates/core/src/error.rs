@@ -1,3 +1,4 @@
+use crate::{Backpressure, Step};
 use std::{fmt, io};
 
 /// The error of every format, codec, playback and core operation.
@@ -20,15 +21,9 @@ pub enum Error {
     /// A named format limit was exceeded (element count, nesting depth, scan
     /// distance). Like [`Error::Limit`], permanent for this input.
     Policy(&'static str),
-    /// The pool has only `available` of the `requested` bytes free because the
-    /// caller still holds earlier output. Nothing changed: release output and
-    /// repeat the call.
-    Backpressure {
-        /// Bytes asked for.
-        requested: usize,
-        /// Bytes the pool had free.
-        available: usize,
-    },
+    /// The pool lacks free bytes for a request because the caller still holds
+    /// earlier output. Nothing changed: release output and repeat the call.
+    Backpressure(Backpressure),
     /// The allocator refused memory the pool had granted.
     Allocation,
     /// A size, offset or time does not fit its integer type.
@@ -81,10 +76,10 @@ impl fmt::Display for Error {
             Self::Limit { requested, maximum } => {
                 write!(f, "capacity request {requested} exceeds policy {maximum}")
             }
-            Self::Backpressure {
+            Self::Backpressure(Backpressure {
                 requested,
                 available,
-            } => {
+            }) => {
                 write!(
                     f,
                     "capacity request {requested} needs released output; {available} available"
@@ -112,7 +107,8 @@ impl fmt::Display for Error {
 }
 
 // The derived format, written out: a derived `fmt` is compiled into every
-// crate that formats an error, this one once.
+// crate that formats an error, this one once. Backpressure prints its two
+// numbers as fields of the variant.
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -123,10 +119,10 @@ impl fmt::Debug for Error {
                 .field("maximum", maximum)
                 .finish(),
             Self::Policy(limit) => f.debug_tuple("Policy").field(limit).finish(),
-            Self::Backpressure {
+            Self::Backpressure(Backpressure {
                 requested,
                 available,
-            } => f
+            }) => f
                 .debug_struct("Backpressure")
                 .field("requested", requested)
                 .field("available", available)
@@ -157,6 +153,26 @@ impl fmt::Debug for Error {
 
 impl std::error::Error for Error {}
 
+impl Error {
+    /// The step a reader returns for this error: backpressure becomes
+    /// [`Step::Backpressure`], which the caller lifts by releasing output;
+    /// every other error stays an error.
+    #[inline]
+    pub fn into_step<T>(self) -> Result<Step<T, Backpressure>> {
+        match self {
+            Self::Backpressure(pressure) => Ok(Step::Backpressure(pressure)),
+            error => Err(error),
+        }
+    }
+}
+
+impl From<Backpressure> for Error {
+    #[inline]
+    fn from(pressure: Backpressure) -> Self {
+        Self::Backpressure(pressure)
+    }
+}
+
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
         match value.kind() {
@@ -169,9 +185,11 @@ impl From<io::Error> for Error {
 #[cfg(test)]
 mod tests {
     use super::Error;
+    use crate::{Backpressure, Step};
     use std::io::ErrorKind;
 
-    /// The variants as `#[derive(Debug)]` formats them.
+    /// The variants as `#[derive(Debug)]` formats them, backpressure with its
+    /// numbers as its own fields.
     #[derive(Debug)]
     #[expect(dead_code, reason = "read only through the derived Debug")]
     enum Derived {
@@ -200,10 +218,10 @@ mod tests {
             Error::Invalid(reason) => Derived::Invalid(reason),
             Error::Limit { requested, maximum } => Derived::Limit { requested, maximum },
             Error::Policy(limit) => Derived::Policy(limit),
-            Error::Backpressure {
+            Error::Backpressure(Backpressure {
                 requested,
                 available,
-            } => Derived::Backpressure {
+            }) => Derived::Backpressure {
                 requested,
                 available,
             },
@@ -235,10 +253,10 @@ mod tests {
                 maximum: 2,
             },
             Error::Policy("depth"),
-            Error::Backpressure {
+            Error::Backpressure(Backpressure {
                 requested: 3,
                 available: 4,
-            },
+            }),
             Error::Allocation,
             Error::Overflow,
             Error::Truncated,
@@ -262,5 +280,37 @@ mod tests {
             assert_eq!(format!("{error:?}"), format!("{:?}", twin(error)));
             assert_eq!(format!("{error:#?}"), format!("{:#?}", twin(error)));
         }
+    }
+
+    #[test]
+    fn backpressure_keeps_its_text_and_becomes_a_step() {
+        let pressure = Backpressure {
+            requested: 3,
+            available: 4,
+        };
+        let error = Error::from(pressure);
+        assert_eq!(
+            format!("{error:?}"),
+            "Backpressure { requested: 3, available: 4 }"
+        );
+        assert_eq!(
+            error.to_string(),
+            "capacity request 3 needs released output; 4 available"
+        );
+        assert!(matches!(
+            error.into_step::<()>(),
+            Ok(Step::Backpressure(step)) if step == pressure
+        ));
+        assert_eq!(
+            Error::Truncated.into_step::<()>().err(),
+            Some(Error::Truncated)
+        );
+    }
+
+    #[test]
+    fn an_error_is_24_bytes_at_most_and_adds_none_to_a_result() {
+        assert!(size_of::<Error>() <= 24);
+        assert_eq!(size_of::<crate::Result<()>>(), size_of::<Error>());
+        assert_eq!(size_of::<crate::Result<usize>>(), size_of::<Error>());
     }
 }

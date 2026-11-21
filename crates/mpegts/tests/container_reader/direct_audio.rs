@@ -35,7 +35,10 @@ fn direct_audio_is_scoped_to_the_declared_namespace() {
         while let Some(event) = unspecified.next().unwrap() {
             match event {
                 Event::Other(ReaderEvent::Unsupported { track, .. }) => {
-                    assert_eq!(track.codec(), CodecId::Other(&[kind]));
+                    assert_eq!(
+                        (track.codec(), track.codec_tag()),
+                        (CodecId::Other, &[kind][..])
+                    );
                     unsupported = true;
                 }
                 Event::Packet(_) => panic!("private code point without its namespace"),

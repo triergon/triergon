@@ -4,9 +4,7 @@ use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
 };
-use triergon_core::{
-    Budget, Bytes, Error, PushError, Result, SourceId, SourceLocation, WorkBudget,
-};
+use triergon_core::{Budget, Bytes, Error, Refused, Result, SourceId, SourceLocation, WorkBudget};
 
 const STUFFING: [u8; 182] = [0xff; 182];
 pub(crate) const TS188_BYTES: usize = 188;
@@ -381,9 +379,9 @@ impl TransportInspector {
         format: PacketFormat,
         location: SourceLocation,
         budget: &Budget,
-    ) -> std::result::Result<Self, PushError<Bytes>> {
+    ) -> std::result::Result<Self, Refused<Bytes>> {
         if !bytes.belongs_to(budget) {
-            return Err(PushError {
+            return Err(Refused {
                 error: Error::ForeignPool,
                 value: bytes,
             });
@@ -395,7 +393,7 @@ impl TransportInspector {
         format: PacketFormat,
         offset: u64,
         entity: Option<SourceId>,
-    ) -> std::result::Result<Self, PushError<Bytes>> {
+    ) -> std::result::Result<Self, Refused<Bytes>> {
         let error = if bytes.len() != format.bytes() {
             Some(Error::Invalid("transport packet size"))
         } else if offset.checked_add(bytes.len() as u64).is_none() {
@@ -404,7 +402,7 @@ impl TransportInspector {
             None
         };
         if let Some(error) = error {
-            return Err(PushError {
+            return Err(Refused {
                 error,
                 value: bytes,
             });

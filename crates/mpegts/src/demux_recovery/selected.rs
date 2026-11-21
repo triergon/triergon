@@ -251,7 +251,7 @@ impl RecoveryObserver {
         packet: TransportPacket,
         c: SourceContext,
         input: Option<&triergon_core::InputCursor>,
-    ) -> std::result::Result<(), PushError<TransportPacket>> {
+    ) -> std::result::Result<(), Refused<TransportPacket>> {
         let admission = (|| {
             self.selected_context(packet.source_id, packet.source_offset, c, &packet.source)?;
             DemuxObserver::transport_bounds(&packet)?;
@@ -291,7 +291,7 @@ impl RecoveryObserver {
         let (kind, start) = match admission {
             Ok(v) => v,
             Err(error) => {
-                return Err(PushError {
+                return Err(Refused {
                     error,
                     value: packet,
                 });
@@ -334,9 +334,9 @@ impl RecoveryObserver {
         &mut self,
         fault: TraceFault,
         c: SourceContext,
-    ) -> std::result::Result<(), PushError<TraceFault>> {
+    ) -> std::result::Result<(), Refused<TraceFault>> {
         if let Err(error) = self.inner.validate_input(None) {
-            return Err(PushError {
+            return Err(Refused {
                 error,
                 value: fault,
             });
@@ -378,7 +378,7 @@ impl RecoveryObserver {
         let (r, start) = match admission {
             Ok(v) => v,
             Err(error) => {
-                return Err(PushError {
+                return Err(Refused {
                     error,
                     value: fault,
                 });

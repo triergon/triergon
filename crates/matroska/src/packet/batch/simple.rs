@@ -182,10 +182,10 @@ impl SimplePacketJob {
         }
         let result = self.advance(borrowed, prefix, work, cancel);
         match result {
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => Ok(SimpleProgress::Backpressure {
+            })) => Ok(SimpleProgress::Backpressure {
                 requested,
                 available,
             }),

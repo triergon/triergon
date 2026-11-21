@@ -11,9 +11,7 @@ use crate::{
     TransportPacket,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, PushError, Result, SourceLocation, WorkBudget,
-};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, Refused, Result, SourceLocation, WorkBudget};
 
 mod lifecycle;
 mod selected;
@@ -270,7 +268,7 @@ impl RecoveryObserver {
         &mut self,
         packet: TransportPacket,
         context: SourceContext,
-    ) -> std::result::Result<(), PushError<TransportPacket>> {
+    ) -> std::result::Result<(), Refused<TransportPacket>> {
         self.push_accepted_bound(packet, context, None)
     }
     #[allow(
@@ -282,7 +280,7 @@ impl RecoveryObserver {
         packet: TransportPacket,
         context: SourceContext,
         input: &triergon_core::InputCursor,
-    ) -> std::result::Result<(), PushError<TransportPacket>> {
+    ) -> std::result::Result<(), Refused<TransportPacket>> {
         self.push_accepted_bound(packet, context, Some(input))
     }
     #[allow(
@@ -294,9 +292,9 @@ impl RecoveryObserver {
         packet: TransportPacket,
         context: SourceContext,
         input: Option<&triergon_core::InputCursor>,
-    ) -> std::result::Result<(), PushError<TransportPacket>> {
+    ) -> std::result::Result<(), Refused<TransportPacket>> {
         if let Err(error) = self.inner.validate_input(input) {
-            return Err(PushError {
+            return Err(Refused {
                 error,
                 value: packet,
             });
@@ -309,7 +307,7 @@ impl RecoveryObserver {
                     || (!self.entity_first && packet.source_offset <= offset)
             })
         {
-            return Err(PushError {
+            return Err(Refused {
                 error: Error::Invalid("native recovery input not drained/ordered"),
                 value: packet,
             });
@@ -324,7 +322,7 @@ impl RecoveryObserver {
         if boundary {
             if !self.inner.recovery_idle() || packet.prefix.is_some() || !packet.payload_unit_start
             {
-                return Err(PushError {
+                return Err(Refused {
                     error: Error::Unsupported(
                         "selected PCR boundary must be drained finite TS188 PUSI",
                     ),
@@ -356,11 +354,11 @@ impl RecoveryObserver {
         &mut self,
         rejection: RejectedTransport,
         context: SourceContext,
-    ) -> std::result::Result<(), PushError<RejectedTransport>> {
+    ) -> std::result::Result<(), Refused<RejectedTransport>> {
         // This finite-input position view does not admit new rejected-carrier
         // contexts. Unbound recovery is unaffected.
         if let Err(error) = self.inner.validate_input(None) {
-            return Err(PushError {
+            return Err(Refused {
                 error,
                 value: rejection,
             });
@@ -416,7 +414,7 @@ impl RecoveryObserver {
             None
         };
         if let Some(error) = error {
-            return Err(PushError {
+            return Err(Refused {
                 error,
                 value: rejection,
             });

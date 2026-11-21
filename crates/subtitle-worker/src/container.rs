@@ -94,7 +94,7 @@ pub fn head(file: &Path) -> Result<Vec<u8>> {
 /// packets in ticks of the segment's TimestampScale with the DTS equal to the
 /// PTS, ISO BMFF subtitle tracks through their edit list ([`edited_packets`]),
 /// transport streams as [`ts`] reads them.
-pub fn read_file_track(file: &Path, codec: CodecId<'_>, ordinal: usize) -> Result<Track> {
+pub fn read_file_track(file: &Path, codec: CodecId, ordinal: usize) -> Result<Track> {
     let selection = Selection::Codec(codec);
     if let Some(format) = PacketFormat::detect(&head(file)?) {
         return Ok(ts::read(file, format, selection, ordinal)?.0);
@@ -114,7 +114,7 @@ pub fn read_file_track(file: &Path, codec: CodecId<'_>, ordinal: usize) -> Resul
 pub fn read_file_video_track(
     file: &Path,
     ordinal: usize,
-) -> Result<(Track, Option<CodecId<'static>>)> {
+) -> Result<(Track, Option<CodecId>)> {
     let (track, scale, codec) = read(File::open(file)?, Selection::Video, ordinal)?;
     let track = match scale {
         Some(scale) => matroska_clock(track, scale)?,
@@ -125,8 +125,8 @@ pub fn read_file_video_track(
 
 /// Which tracks a reader counts.
 #[derive(Clone, Copy)]
-pub enum Selection<'a> {
-    Codec(CodecId<'a>),
+pub enum Selection {
+    Codec(CodecId),
     Video,
 }
 
@@ -134,9 +134,9 @@ pub enum Selection<'a> {
 /// when it is H.264 or HEVC.
 fn read(
     mut input: impl Input,
-    selection: Selection<'_>,
+    selection: Selection,
     ordinal: usize,
-) -> Result<(Track, Option<u64>, Option<CodecId<'static>>)> {
+) -> Result<(Track, Option<u64>, Option<CodecId>)> {
     let pool = Budget::new(1 << 30)?;
     let length = input.length();
     let capabilities = SourceCapabilities {
@@ -224,7 +224,7 @@ fn read(
 }
 
 /// The id of the `ordinal`th track the selection counts.
-fn select(reader: &AnyReader, selection: Selection<'_>, ordinal: usize) -> Result<TrackId> {
+fn select(reader: &AnyReader, selection: Selection, ordinal: usize) -> Result<TrackId> {
     Ok((0..reader.track_count())
         .filter_map(|i| reader.track(i))
         .filter(|t| match selection {

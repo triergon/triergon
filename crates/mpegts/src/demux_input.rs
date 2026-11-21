@@ -229,7 +229,8 @@ impl InputBootstrap {
             return Err(Error::ForeignPool);
         }
         let retained = input
-            .retained_window()
+            .buffered_owner()
+            .cloned()
             .ok_or(Error::Invalid("native startup window not provided"))?;
         if !retained.shares_storage_with(window.bytes())
             || (retained.len() != window.bytes().len()

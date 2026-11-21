@@ -193,7 +193,7 @@ impl Case<'_> {
     fn fonts(&self, budget: &Budget) -> Result<Fonts> {
         let default_font = match self.default_font.as_deref().map(read_font) {
             Some(Ok(file)) => {
-                Some(Bytes::try_from_vec(budget, file.data).map_err(|refused| refused.error())?)
+                Some(Bytes::try_from_vec(budget, file.data).map_err(|refused| refused.error)?)
             }
             Some(Err(_)) | None => None,
         };

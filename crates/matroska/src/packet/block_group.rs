@@ -591,10 +591,10 @@ impl GroupJob {
             return Err(Error::Invalid("group job requires replacement after error"));
         }
         match self.advance(work, cancel) {
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => Ok(ParseStep::Backpressure {
+            })) => Ok(ParseStep::Backpressure {
                 requested,
                 available,
             }),

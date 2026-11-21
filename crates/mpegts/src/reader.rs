@@ -22,9 +22,8 @@ pub use seek::SeekEntity;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{ContainerReader, Event, ReaderStep, SeekRequest, TrackId};
 use triergon_core::{
-    Backpressure, Budget, BudgetVec, Charged, Error, InputCursor, InputRequest, InputToken,
-    InputWindow, Result, SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step,
-    WorkBudget,
+    Budget, BudgetVec, Charged, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
+    SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, WorkBudget,
 };
 use triergon_framing::nal::RawAnnexBLimits;
 
@@ -596,22 +595,13 @@ impl Reader {
             }
             break result;
         };
-        match result {
-            Err(Error::Backpressure {
-                requested,
-                available,
-            }) => Ok(Step::Backpressure(Backpressure {
-                requested,
-                available,
-            })),
-            Err(error) => {
+        result.or_else(|error| {
+            error.into_step().inspect_err(|&error| {
                 if error != Error::Allocation {
                     self.stop(error);
                 }
-                Err(error)
-            }
-            result => result,
-        }
+            })
+        })
     }
     fn output(packet: Packet) -> Event<Packet, ReaderEvent> {
         if packet.0.recovered_adts {

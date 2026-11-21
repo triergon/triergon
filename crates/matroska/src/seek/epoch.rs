@@ -298,10 +298,10 @@ impl EpochRestoreJob {
             self.advance(reader, work, cancel)
         })();
         match result {
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => Ok(ParseStep::Backpressure {
+            })) => Ok(ParseStep::Backpressure {
                 requested,
                 available,
             }),

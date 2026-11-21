@@ -30,7 +30,7 @@ fn reserved_append_consumes_inline_with_no_free_pool_or_temporary_owner() {
             assert_eq!(work.spent(), 1);
             assert_eq!(input.position(), count);
             assert_eq!(input.token(), token);
-            assert!(input.retained_window().is_none());
+            assert!(input.buffered_owner().is_none());
             assert_eq!(output.as_slice().as_ptr(), pointer);
             assert_eq!(pool.used(), held);
         }
@@ -61,7 +61,7 @@ fn destination_pressure_preserves_source_work_bytes_capacity_and_allows_retry() 
     assert_eq!(work.spent(), 0);
     assert_eq!(input.position(), 0);
     assert_eq!(input.token(), token);
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     assert_eq!(output.as_slice(), b"pre");
     assert_eq!(output.capacity(), capacity);
     assert_eq!(output.as_slice().as_ptr(), pointer);
@@ -180,7 +180,7 @@ fn append_preserves_owned_hidden_capacity_and_independent_retained_handles() {
         Step::Ready(2)
     ));
     assert_eq!(output.as_slice(), b"ab");
-    assert!(input.retained_window().is_some());
+    assert!(input.buffered_owner().is_some());
     assert_eq!(pool.used(), charge);
     assert!(matches!(
         input
@@ -194,7 +194,7 @@ fn append_preserves_owned_hidden_capacity_and_independent_retained_handles() {
         Step::Ready(4)
     ));
     assert_eq!(output.as_slice(), b"abcdef");
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     assert_eq!(pool.used(), charge);
     assert_eq!(alias.as_ref(), b"abcdef");
     drop(input);
@@ -283,7 +283,7 @@ fn errors_precede_empty_reads_and_cancel_releases_only_cursor_ownership() {
         input.read_append(&mut output, 0, &mut work, &cancel),
         Err(Error::Cancelled)
     ));
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     assert_eq!(input.position(), 0);
     assert_eq!(work.spent(), 0);
     assert!(output.is_empty());

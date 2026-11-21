@@ -203,7 +203,7 @@ fn run(args: &[String]) -> Result<()> {
         return Err("input exceeds the size bound".into());
     }
     let budget = Budget::new(BUDGET_BYTES)?;
-    let file = Bytes::try_from_vec(&budget, std::fs::read(path)?).map_err(|e| e.error())?;
+    let file = Bytes::try_from_vec(&budget, std::fs::read(path)?).map_err(|e| e.error)?;
     let (selection, cases): (Option<Selection>, Vec<Option<Case>>) = match &input {
         Input::Glyphs {
             height,

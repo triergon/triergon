@@ -121,10 +121,10 @@ impl EncodingsJob {
         }
         let result = self.advance(work, cancel);
         match result {
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => Ok(ParseStep::Backpressure {
+            })) => Ok(ParseStep::Backpressure {
                 requested,
                 available,
             }),
@@ -442,7 +442,7 @@ impl EncodingsJob {
                             self.phase = Phase::Done;
                         }
                         Err(error) => {
-                            self.prefix = Some(error.buffer);
+                            self.prefix = Some(error.value);
                             return Err(error.error);
                         }
                     }

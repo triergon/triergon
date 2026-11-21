@@ -263,10 +263,10 @@ impl<S: Source, T: Sink> Pump<S, T> {
         }
         let outstanding = self.in_flight() + usize::from(self.pending.is_some());
         if outstanding != 0 {
-            return Err(Error::Backpressure {
+            return Err(Error::Backpressure(triergon_core::Backpressure {
                 requested: outstanding,
                 available: 0,
-            });
+            }));
         }
         // Construct the new callback fence before changing the player or sink.
         let identity = InputCursor::new(

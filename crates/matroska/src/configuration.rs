@@ -216,10 +216,10 @@ impl ConfigurationJob {
             .reserve(size_of::<Data>() + 2 * size_of::<usize>())
         {
             Ok(charge) => charge,
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => {
+            })) => {
                 return Ok(ParseStep::Backpressure {
                     requested,
                     available,
@@ -438,10 +438,10 @@ impl StateChangeJob {
             ));
         }
         match self.advance(work, cancel) {
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => Ok(ParseStep::Backpressure {
+            })) => Ok(ParseStep::Backpressure {
                 requested,
                 available,
             }),

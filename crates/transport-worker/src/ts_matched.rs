@@ -289,11 +289,7 @@ fn drain(
             }
             Step::Ready(Event::Other(_)) | Step::Yield => (),
             Step::Backpressure(pressure) => {
-                return Err(Error::Backpressure {
-                    requested: pressure.requested,
-                    available: pressure.available,
-                }
-                .into());
+                return Err(Error::Backpressure(pressure).into());
             }
             Step::End(_) if out.packets > start => return Ok(()),
             Step::End(_) => return Err("transport comparison delivered no packets".into()),

@@ -229,7 +229,7 @@ impl TransportFramer {
             let source = match carry.freeze() {
                 Ok(source) => source,
                 Err(error) => {
-                    self.carry = Some(error.buffer);
+                    self.carry = Some(error.value);
                     return Err(error.error);
                 }
             };

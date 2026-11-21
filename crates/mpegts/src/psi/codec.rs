@@ -16,7 +16,7 @@ impl ElementaryStream {
     /// [`DescriptorNamespace`] ([`Self::dvb_descriptor_codec`]).
     /// ATSC A/53 Part 3 §5.7 assigns 0x81 and 0x87 to AC-3 and E-AC-3
     /// in an explicitly selected ATSC namespace.
-    pub fn codec(&self) -> Option<CodecId<'static>> {
+    pub fn codec(&self) -> Option<CodecId> {
         match self.stream_type {
             0x01 | 0x02 => Some(CodecId::Mpeg2Video),
             0x03 | 0x04 => Some(CodecId::MpegAudio),
@@ -44,7 +44,7 @@ impl ElementaryStream {
     /// E-AC-3 (0x7a) or DTS core (0x7b), whatever the namespace and stream type. Outside DVB these
     /// tags are user private; the loop is read up to its first malformed
     /// descriptor.
-    pub fn dvb_descriptor_codec(&self) -> Option<CodecId<'static>> {
+    pub fn dvb_descriptor_codec(&self) -> Option<CodecId> {
         self.descriptors()
             .map_while(Result::ok)
             .find_map(|descriptor| match descriptor.tag {

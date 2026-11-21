@@ -873,19 +873,6 @@ impl Reader {
     }
 }
 
-fn pressure(error: Error) -> Result<Step<Output, Backpressure>> {
-    match error {
-        Error::Backpressure {
-            requested,
-            available,
-        } => Ok(Step::Backpressure(Backpressure {
-            requested,
-            available,
-        })),
-        other => Err(other),
-    }
-}
-
 impl ContainerReader for Reader {
     type Packet = Packet;
     type Track = Track;
@@ -916,8 +903,11 @@ impl ContainerReader for Reader {
         if let Some(error) = self.failed {
             return Err(error);
         }
-        self.advance(work, cancel)
-            .or_else(|error| pressure(error).inspect_err(|error| self.failed = Some(*error)))
+        self.advance(work, cancel).or_else(|error| {
+            error
+                .into_step()
+                .inspect_err(|error| self.failed = Some(*error))
+        })
     }
     /// Seek a configured, timed track. The target is on the physical stream's timeline;
     /// see [`crate::seek`] for the landing, and for the track of another chain link a

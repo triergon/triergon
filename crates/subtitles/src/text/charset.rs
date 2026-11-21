@@ -368,7 +368,7 @@ impl CharsetJob {
                             self.phase = Phase::Ready;
                         }
                         Err(e) => {
-                            self.output = e.buffer;
+                            self.output = e.value;
                             return Err(e.error);
                         }
                     }

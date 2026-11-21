@@ -37,13 +37,14 @@ pub enum MediaKind {
 ///
 /// Each reader owns one mapping from its native identifier (Matroska CodecID,
 /// ISO BMFF handler and sample entry, MPEG-TS stream_type). A name appears only
-/// where the source identifies that codec; anything else is [`CodecId::Other`]
-/// with the container's own tag, never a guess. Framing, profile and sample
-/// format stay on the format type: [`CodecId::Aac`] covers raw and ADTS access
-/// units, and [`CodecId::Pcm`] says nothing about width, order or sign.
+/// where the source identifies that codec; anything else is [`CodecId::Other`],
+/// never a guess, and [`TrackInfo::codec_tag`] has the container's own
+/// identifier. Framing, profile and sample format stay on the format type:
+/// [`CodecId::Aac`] covers raw and ADTS access units, and [`CodecId::Pcm`] says
+/// nothing about width, order or sign.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum CodecId<'a> {
+pub enum CodecId {
     /// ISO/IEC 13818-2 video, which includes ISO/IEC 11172-2 (MPEG-1) video.
     Mpeg2Video,
     /// ITU-T H.264 (AVC).
@@ -101,8 +102,9 @@ pub enum CodecId<'a> {
     Eia608,
     /// Blu-ray presentation graphics.
     Pgs,
-    /// Not named above; the same bytes as [`TrackInfo::codec_tag`].
-    Other(&'a [u8]),
+    /// Not named above; [`TrackInfo::codec_tag`] says what the container
+    /// calls it.
+    Other,
 }
 
 /// Whether decoding can start at a packet.
@@ -193,7 +195,7 @@ pub trait TrackInfo {
     /// four-character code, or stream_type), unnormalized.
     fn codec_tag(&self) -> &[u8];
     /// The codec this track's reader identifies from [`TrackInfo::codec_tag`].
-    fn codec(&self) -> CodecId<'_>;
+    fn codec(&self) -> CodecId;
     /// Codec configuration bytes (CodecPrivate, decoder configuration record).
     fn configuration(&self) -> &[u8];
     /// The language tag as the container writes it; `None` when it has none.
@@ -409,17 +411,11 @@ mod tests {
     }
 
     #[test]
-    fn an_unnamed_codec_keeps_the_tag_it_was_given() {
-        let tag = *b"xyz1";
-        assert_eq!(CodecId::Other(&tag), CodecId::Other(b"xyz1"));
-        assert_ne!(CodecId::Other(b""), CodecId::H264);
-    }
-
-    #[test]
     fn neutral_values_stay_small_on_32_bit_targets() {
         assert!(size_of::<Trim>() <= 32);
         assert!(size_of::<Sourced<u64>>() <= 16);
         assert_eq!(size_of::<TrackId>(), 8);
-        assert!(size_of::<CodecId<'_>>() <= 3 * size_of::<usize>());
+        assert_eq!(size_of::<CodecId>(), 1);
+        assert_eq!(size_of::<Option<CodecId>>(), 1);
     }
 }

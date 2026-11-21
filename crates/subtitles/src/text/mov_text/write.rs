@@ -135,7 +135,7 @@ impl<const N: usize> Writer<N> {
                 Ok(true)
             }
             Err(failure) => {
-                self.data = failure.buffer;
+                self.data = failure.value;
                 Err(failure.error)
             }
         }

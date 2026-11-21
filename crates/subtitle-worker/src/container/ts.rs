@@ -35,9 +35,9 @@ const WINDOW: usize = 64 * 1024;
 pub fn read(
     file: &Path,
     format: PacketFormat,
-    selection: Selection<'_>,
+    selection: Selection,
     ordinal: usize,
-) -> Result<(Track, Option<CodecId<'static>>)> {
+) -> Result<(Track, Option<CodecId>)> {
     let mut packets = Vec::new();
     let stream = for_each_packet(file, format, selection, ordinal, &mut |_, packet| {
         packets.push(packet);
@@ -54,7 +54,7 @@ pub fn read(
 /// A selected stream: the codec the demuxer opens for it and its
 /// configuration.
 pub struct Stream {
-    pub codec: Option<CodecId<'static>>,
+    pub codec: Option<CodecId>,
     pub configuration: Vec<u8>,
 }
 
@@ -65,7 +65,7 @@ pub struct Stream {
 pub fn for_each_packet(
     file: &Path,
     format: PacketFormat,
-    selection: Selection<'_>,
+    selection: Selection,
     ordinal: usize,
     packet_sink: &mut dyn FnMut(&Stream, Packet) -> Result<()>,
 ) -> Result<Stream> {
@@ -141,14 +141,14 @@ pub fn for_each_packet(
 }
 
 /// Counts the streams the PMTs introduce until the selected one.
-struct Finder<'a> {
-    selection: Selection<'a>,
+struct Finder {
+    selection: Selection,
     ordinal: usize,
     /// The PIDs of the streams seen so far.
     known: BudgetVec<u16>,
 }
 
-impl Finder<'_> {
+impl Finder {
     /// The selected stream, if `program` introduces it.
     fn find<'p>(&mut self, program: &'p Program) -> Result<Option<&'p ElementaryStream>> {
         for es in program.streams.as_slice() {

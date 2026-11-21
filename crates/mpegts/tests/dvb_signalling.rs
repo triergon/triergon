@@ -123,7 +123,7 @@ fn track_classification_keeps_native_tags_and_private_codec_identity() {
             0x03 | 0x04 => (MediaKind::Audio, CodecId::MpegAudio),
             0x0f => (MediaKind::Audio, CodecId::Aac),
             0x11 => (MediaKind::Audio, CodecId::AacLatm),
-            _ => (MediaKind::Unknown, CodecId::Other(stream.codec_tag())),
+            _ => (MediaKind::Unknown, CodecId::Other),
         };
         assert_eq!(stream.id(), TrackId(256));
         assert_eq!(stream.kind(), kind, "stream type {stream_type:#x}");
@@ -137,9 +137,6 @@ fn track_classification_keeps_native_tags_and_private_codec_identity() {
             },
         );
         assert_eq!(TrackInfo::codec(stream), codec);
-        if let CodecId::Other(tag) = TrackInfo::codec(stream) {
-            assert!(std::ptr::eq(tag.as_ptr(), stream.codec_tag().as_ptr()));
-        }
         assert_eq!(stream.codec_tag(), [stream_type]);
         assert!(std::ptr::eq(
             stream.codec_tag().as_ptr(),
@@ -250,8 +247,9 @@ fn private_audio_admission_does_not_backfill_source_classification() {
         );
         assert_eq!(
             TrackInfo::codec(stream),
-            source_codec.unwrap_or(CodecId::Other(&[6]))
+            source_codec.unwrap_or(CodecId::Other)
         );
+        assert_eq!(stream.codec_tag(), [6]);
         assert_eq!(stream.descriptor_namespace(), namespace);
         assert_eq!(stream.descriptor_bytes.as_ref(), raw);
 
@@ -325,8 +323,9 @@ fn private_audio_stays_unselected_after_carriage_refusal() {
         );
         assert_eq!(
             TrackInfo::codec(stream),
-            source_codec.unwrap_or(CodecId::Other(&[6]))
+            source_codec.unwrap_or(CodecId::Other)
         );
+        assert_eq!(stream.codec_tag(), [6]);
         assert_eq!(parsed.program_descriptors.as_ref(), program);
         assert_eq!(stream.descriptor_bytes.as_ref(), raw);
     }
@@ -384,9 +383,10 @@ fn subtitle_signalling_and_selected_pes_admission_remain_distinct() {
             if signalled {
                 CodecId::DvbSubtitle
             } else {
-                CodecId::Other(&[6])
+                CodecId::Other
             }
         );
+        assert_eq!(stream.codec_tag(), [6]);
         assert_eq!(stream.descriptor_namespace(), namespace);
         assert_eq!(stream.descriptor_bytes.as_ref(), raw);
     }
@@ -399,13 +399,14 @@ fn teletext_track_kind_respects_the_descriptor_namespace() {
         (DVB, CodecId::DvbTeletext, MediaKind::Subtitle),
         (
             DescriptorNamespace::Unspecified,
-            CodecId::Other(&[6][..]),
+            CodecId::Other,
             MediaKind::Unknown,
         ),
     ] {
         let parsed = map(&[], 6, &descriptor, namespace);
         let stream = &parsed.streams.as_slice()[0];
         assert_eq!(TrackInfo::codec(stream), codec);
+        assert_eq!(stream.codec_tag(), [6]);
         assert_eq!(stream.kind(), kind);
         assert_eq!(selected_track_kind(stream, None), kind);
     }
@@ -504,7 +505,8 @@ fn unknown_namespace_keeps_even_malformed_private_tag_bodies_opaque() {
     assert_eq!(stream.dvb_subtitling_signalling(), None);
     assert_eq!(stream.codec_identification(), CodecIdentification::Unknown);
     assert_eq!(stream.kind(), MediaKind::Unknown);
-    assert_eq!(TrackInfo::codec(stream), CodecId::Other(&[6]));
+    assert_eq!(TrackInfo::codec(stream), CodecId::Other);
+    assert_eq!(stream.codec_tag(), [6]);
     #[cfg(feature = "reference-trace")]
     assert!(
         stream
@@ -552,8 +554,9 @@ fn registration_or_private_specifier_does_not_infer_a_dvb_namespace() {
     assert_eq!(unspecified.streams.as_slice()[0].kind(), MediaKind::Unknown);
     assert_eq!(
         TrackInfo::codec(&unspecified.streams.as_slice()[0]),
-        CodecId::Other(&[6])
+        CodecId::Other
     );
+    assert_eq!(unspecified.streams.as_slice()[0].codec_tag(), [6]);
     let scoped = map(&[], 6, &raw, DVB);
     let stream = &scoped.streams.as_slice()[0];
     assert_eq!(stream.descriptor_bytes.as_ref(), raw);

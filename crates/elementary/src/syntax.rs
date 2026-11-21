@@ -93,7 +93,7 @@ pub enum SeekBasis {
 #[derive(Debug)]
 pub struct TrackFacts {
     pub(crate) codec_tag: &'static [u8],
-    pub(crate) codec: CodecId<'static>,
+    pub(crate) codec: CodecId,
     pub(crate) sample_rate: u32,
     pub(crate) channels: Option<u8>,
     pub(crate) configuration: BudgetVec<u8>,

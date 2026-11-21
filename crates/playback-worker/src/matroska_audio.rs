@@ -52,7 +52,7 @@ impl Select {
     fn family(
         self,
         kind: MediaKind,
-        codec: CodecId<'_>,
+        codec: CodecId,
         legacy_aac: Option<LegacyAacProfile>,
     ) -> Option<Family> {
         match (kind, codec) {
@@ -330,7 +330,7 @@ mod tests {
             assert_eq!(select.family(MediaKind::Video, CodecId::Aac, None), None);
             assert_eq!(select.family(audio, CodecId::Opus, None), None);
             assert_eq!(
-                select.family(audio, CodecId::Other(b"A_AAC/MPEG4/LC/UNKNOWN"), None),
+                select.family(audio, CodecId::Other, None),
                 None
             );
         }

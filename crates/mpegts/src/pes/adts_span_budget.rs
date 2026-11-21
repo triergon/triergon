@@ -208,10 +208,10 @@ fn rejected_unbounded_adts_span_growth_retries_after_caller_pressure() {
     );
     assert_eq!(cancelled.spent(), 0);
     let replacement = 3 * size_of::<PesSpan>();
-    let pressure = Error::Backpressure {
+    let pressure = Error::Backpressure(triergon_core::Backpressure {
         requested: replacement,
         available: replacement - 1,
-    };
+    });
     assert_eq!(poll(&mut pes).unwrap_err(), pressure);
     let mut retry = WorkBudget::new(1);
     assert_eq!(pes.poll(&mut retry, &RUNNING).unwrap_err(), pressure);

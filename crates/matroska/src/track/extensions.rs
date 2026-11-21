@@ -238,10 +238,10 @@ impl TrackExtensionsJob {
             }
         }
         match self.advance(work, cancel) {
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => {
+            })) => {
                 self.pressure = Some(crate::storage::usage::Pressure::new(requested));
                 Ok(ParseStep::Backpressure {
                     requested,

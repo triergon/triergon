@@ -223,7 +223,7 @@ pub(super) struct SeekProbe {
     pub has_vcl: bool,
 }
 
-fn seekable_audio(codec: CodecId<'_>) -> bool {
+fn seekable_audio(codec: CodecId) -> bool {
     matches!(
         codec,
         CodecId::Aac

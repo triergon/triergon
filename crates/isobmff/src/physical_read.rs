@@ -267,7 +267,7 @@ impl PhysicalReader {
                 let payload = match buffer.freeze() {
                     Ok(payload) => payload,
                     Err(failure) => {
-                        self.buffer = Some(failure.buffer);
+                        self.buffer = Some(failure.value);
                         return Err(failure.error);
                     }
                 };

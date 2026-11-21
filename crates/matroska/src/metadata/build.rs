@@ -359,10 +359,10 @@ impl DocumentJob {
         }
         let result = self.advance(work, cancel);
         match result {
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => Ok(ParseStep::Backpressure {
+            })) => Ok(ParseStep::Backpressure {
                 requested,
                 available,
             }),
@@ -1191,10 +1191,10 @@ impl CatalogueJob {
         }
         let result = self.advance(catalogue, work, cancel);
         match result {
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => Ok(ParseStep::Backpressure {
+            })) => Ok(ParseStep::Backpressure {
                 requested,
                 available,
             }),

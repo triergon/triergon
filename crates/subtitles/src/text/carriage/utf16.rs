@@ -155,7 +155,7 @@ impl Decoder {
         let bytes = match bytes.freeze() {
             Ok(bytes) => bytes,
             Err(error) => {
-                self.bytes = error.buffer;
+                self.bytes = error.value;
                 return Err(error.error);
             }
         };

@@ -377,7 +377,7 @@ impl PendingMedia {
                 bytes,
             })),
             Err(failure) => {
-                self.buffer = failure.buffer;
+                self.buffer = failure.value;
                 Err(failure.error)
             }
         }

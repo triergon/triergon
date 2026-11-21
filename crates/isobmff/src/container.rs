@@ -38,7 +38,7 @@ use triergon_core::{
 /// handler, and `mp4a` and `mp4s` need their stated object type (ISO/IEC 14496-1
 /// objectTypeIndication; 0xDD is the private value FFmpeg reads as Vorbis, 0xE0
 /// the one it reads as VobSub): without one they stay [`CodecId::Other`].
-fn codec_id<'a>(handler: &[u8; 4], format: &'a [u8; 4], object_type: Option<u8>) -> CodecId<'a> {
+fn codec_id(handler: &[u8; 4], format: &[u8; 4], object_type: Option<u8>) -> CodecId {
     match (handler, format) {
         (b"vide", b"avc1" | b"avc3") => CodecId::H264,
         (b"vide", b"hvc1" | b"hev1" | b"dvh1" | b"dvhe") => CodecId::Hevc,
@@ -51,7 +51,7 @@ fn codec_id<'a>(handler: &[u8; 4], format: &'a [u8; 4], object_type: Option<u8>)
             Some(0x69 | 0x6b) => CodecId::MpegAudio,
             Some(0xa9 | 0xaa) => CodecId::Dts,
             Some(0xdd) => CodecId::Vorbis,
-            _ => CodecId::Other(format),
+            _ => CodecId::Other,
         },
         (b"soun", b"ac-3") => CodecId::Ac3,
         (b"soun", b"ec-3") => CodecId::Eac3,
@@ -63,14 +63,14 @@ fn codec_id<'a>(handler: &[u8; 4], format: &'a [u8; 4], object_type: Option<u8>)
         (b"sbtl" | b"text" | b"subt", b"tx3g") => CodecId::Tx3g,
         (b"subp", b"mp4s") => match object_type {
             Some(0xe0) => CodecId::VobSub,
-            _ => CodecId::Other(format),
+            _ => CodecId::Other,
         },
-        _ => CodecId::Other(format),
+        _ => CodecId::Other,
     }
 }
 
 /// The sample entry child holding a codec's configuration record.
-fn configuration_box(codec: CodecId<'_>) -> Option<[u8; 4]> {
+fn configuration_box(codec: CodecId) -> Option<[u8; 4]> {
     Some(match codec {
         CodecId::H264 => *b"avcC",
         CodecId::Hevc => *b"hvcC",
@@ -283,12 +283,10 @@ impl TrackInfo for Track {
             .first()
             .map_or(&[], |entry| entry.format.as_slice())
     }
-    fn codec(&self) -> CodecId<'_> {
-        self.descriptions()
-            .first()
-            .map_or(CodecId::Other(&[]), |entry| {
-                codec_id(&self.header().handler, &entry.format, self.object_type)
-            })
+    fn codec(&self) -> CodecId {
+        self.descriptions().first().map_or(CodecId::Other, |entry| {
+            codec_id(&self.header().handler, &entry.format, self.object_type)
+        })
     }
     /// The configuration record's payload (AudioSpecificConfig for AAC), empty
     /// when it is absent, or the whole sample entry payload when the entry has
@@ -376,19 +374,6 @@ struct Seeking {
 }
 
 type Output = Step<Neutral<Packet, ReaderEvent>, Backpressure>;
-
-fn pressure(error: Error) -> Result<Output> {
-    match error {
-        Error::Backpressure {
-            requested,
-            available,
-        } => Ok(Step::Backpressure(Backpressure {
-            requested,
-            available,
-        })),
-        other => Err(other),
-    }
-}
 
 /// A resumable ISO BMFF reader over the source view; see the module
 /// documentation for what it reports. Errors are sticky until [`Reader::reset`].
@@ -637,7 +622,7 @@ impl Reader {
             return match buffer.freeze() {
                 Ok(payload) => self.finish_packet(payload).map(Some),
                 Err(rejected) => {
-                    reading.buffer = Some(rejected.buffer);
+                    reading.buffer = Some(rejected.value);
                     Err(rejected.error)
                 }
             };
@@ -826,7 +811,7 @@ fn step_entry_scan(
             };
             if let Some((object_type, specific)) = found {
                 track.object_type = Some(object_type);
-                if !matches!(track.codec(), CodecId::Other(_)) {
+                if track.codec() != CodecId::Other {
                     track.configuration =
                         Some(specific.map_or(Configuration::Absent, Configuration::Record));
                 }
@@ -882,8 +867,11 @@ impl ContainerReader for Reader {
         if let Some(error) = self.failed {
             return Err(error);
         }
-        self.advance(work, cancel)
-            .or_else(|error| pressure(error).inspect_err(|error| self.failed = Some(*error)))
+        self.advance(work, cancel).or_else(|error| {
+            error
+                .into_step()
+                .inspect_err(|error| self.failed = Some(*error))
+        })
     }
     /// The track must be open. The target is on the track's media clock, without
     /// edits, and delivery restarts at the latest stated sync sample presented at
@@ -997,10 +985,7 @@ mod tests {
             (b"subp", b"mp4s", None),
             (b"subp", b"mp4s", Some(0x40)),
         ] {
-            assert_eq!(
-                codec_id(handler, format, object_type),
-                CodecId::Other(format)
-            );
+            assert_eq!(codec_id(handler, format, object_type), CodecId::Other);
         }
     }
 

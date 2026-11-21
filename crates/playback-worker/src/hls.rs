@@ -254,7 +254,7 @@ pub fn run(args: &[String]) -> Result<()> {
         return Err("input must be bounded TS188".into());
     }
     let pool = Budget::new(256 * 1024 * 1024)?;
-    let raw = Bytes::try_from_vec(&pool, raw).map_err(|error| error.error())?;
+    let raw = Bytes::try_from_vec(&pool, raw).map_err(|error| error.error)?;
     measure(&invocation, OPERATION, Some(&pool), || {
         let segment = open_segment(&pool, std::hint::black_box(&raw), profile)?;
         Ok(fold_segment(&pool, segment)?.totals())

@@ -120,7 +120,7 @@ impl Bytes {
     pub fn try_from_vec(
         budget: &Budget,
         input: Vec<u8>,
-    ) -> std::result::Result<Self, TransferError> {
+    ) -> std::result::Result<Self, Refused<Vec<u8>>> {
         let charge = input
             .capacity()
             .checked_add(STORAGE_BYTES)
@@ -128,7 +128,10 @@ impl Bytes {
             .and_then(|size| budget.reserve(size));
         match charge {
             Ok(charge) => Ok(Self::from_storage(input, charge)),
-            Err(error) => Err(TransferError { error, input }),
+            Err(error) => Err(Refused {
+                error,
+                value: input,
+            }),
         }
     }
     fn from_storage(data: Vec<u8>, charge: Reservation) -> Self {
@@ -251,7 +254,7 @@ impl Bytes {
     /// hold earlier contents, or zero where nothing was written yet; capacity and charge
     /// are unchanged. `None`, without calling `fill`, when another handle shares the
     /// allocation or its capacity is below `len`. A failed fill leaves an empty view.
-    pub fn try_refill<E>(
+    pub(crate) fn try_refill<E>(
         &mut self,
         len: usize,
         fill: impl FnOnce(&mut [u8]) -> std::result::Result<usize, E>,
@@ -366,7 +369,7 @@ impl OwnedInputBytes {
     pub fn try_from_vec(
         budget: &Budget,
         input: Vec<u8>,
-    ) -> std::result::Result<Self, TransferError> {
+    ) -> std::result::Result<Self, Refused<Vec<u8>>> {
         Bytes::try_from_vec(budget, input).map(|bytes| Self { bytes })
     }
     /// The input as shared bytes, to clone or slice into windows.
@@ -406,20 +409,21 @@ impl std::ops::Deref for Bytes {
     }
 }
 
-/// A vector a pool refused to adopt, with the reason.
+/// A value an operation could not take, handed back unchanged with the
+/// reason: the element of [`BudgetVec::try_push`], the buffer of
+/// [`BudgetVec::freeze`], the vector of [`Bytes::try_from_vec`]. `?` keeps the
+/// reason and drops the value.
 #[derive(Debug)]
-pub struct TransferError {
-    error: Error,
-    input: Vec<u8>,
+pub struct Refused<T> {
+    /// Why the value was refused.
+    pub error: Error,
+    /// The value, unchanged.
+    pub value: T,
 }
-impl TransferError {
-    /// Why the charge was refused.
-    pub fn error(&self) -> Error {
-        self.error
-    }
-    /// The vector, unchanged.
-    pub fn into_vec(self) -> Vec<u8> {
-        self.input
+
+impl<T> From<Refused<T>> for Error {
+    fn from(refused: Refused<T>) -> Self {
+        refused.error
     }
 }
 
@@ -433,15 +437,6 @@ impl TransferError {
 pub struct BudgetVec<T> {
     data: Vec<T>,
     charge: Reservation,
-}
-
-/// The value [`BudgetVec::try_push`] could not store, with the reason.
-#[derive(Debug)]
-pub struct PushError<T> {
-    /// Why the vector could not grow.
-    pub error: Error,
-    /// The value that was to be pushed.
-    pub value: T,
 }
 
 impl<T> BudgetVec<T> {
@@ -568,11 +563,11 @@ impl<T> BudgetVec<T> {
     /// Appends `value`, growing as [`try_reserve`](Self::try_reserve) does; a
     /// refusal returns the value in the error.
     #[inline]
-    pub fn try_push(&mut self, value: T) -> std::result::Result<(), PushError<T>> {
+    pub fn try_push(&mut self, value: T) -> std::result::Result<(), Refused<T>> {
         if self.len() == self.capacity()
             && let Err(error) = self.grow_for_push()
         {
-            return Err(PushError { error, value });
+            return Err(Refused { error, value });
         }
         self.data.push(value);
         Ok(())
@@ -765,14 +760,6 @@ impl<T> IntoIterator for BudgetVec<T> {
     }
 }
 
-/// The buffer [`BudgetVec::freeze`] could not share, with the reason.
-#[derive(Debug)]
-pub struct FreezeError {
-    /// Why the header's charge was refused.
-    pub error: Error,
-    /// The buffer, unchanged.
-    pub buffer: BudgetVec<u8>,
-}
 impl BudgetVec<u8> {
     /// An empty buffer of `capacity` bytes for output whose size is known
     /// before it is written. Its capacity and the shared-owner header that
@@ -822,17 +809,14 @@ impl BudgetVec<u8> {
     /// The bytes as a shared immutable span, without a copy. The header a
     /// shared allocation adds is charged here; a refusal returns the buffer
     /// in the error.
-    pub fn freeze(mut self) -> std::result::Result<Bytes, FreezeError> {
+    pub fn freeze(mut self) -> std::result::Result<Bytes, Refused<Self>> {
         let result = self
             .capacity()
             .checked_add(STORAGE_BYTES)
             .ok_or(Error::Overflow)
             .and_then(|size| self.charge.grow_to(size));
         if let Err(error) = result {
-            return Err(FreezeError {
-                error,
-                buffer: self,
-            });
+            return Err(Refused { error, value: self });
         }
         let Self { data, charge } = self;
         Ok(Bytes::from_storage(data, charge))
@@ -1041,6 +1025,32 @@ mod tests {
             drop(bytes);
             assert_eq!(pool.used(), Budget::control_storage_bytes());
         }
+    }
+
+    #[test]
+    fn a_refill_rewrites_an_unshared_allocation_in_place() {
+        let budget = Budget::new(4096).unwrap();
+        let mut bytes = Bytes::copy_from_slice(&budget, b"abcdefgh").unwrap();
+        let address = bytes.as_ptr();
+        let charged = budget.used();
+        let alias = bytes.slice(0..2).unwrap();
+        let refused = bytes.try_refill(4, |_| Ok::<_, ()>(4));
+        assert!(refused.is_none());
+        drop(alias);
+        assert!(bytes.try_refill(9, |_| Ok::<_, ()>(9)).is_none());
+        let filled = bytes.try_refill(4, |buffer| {
+            assert_eq!(buffer, b"abcd");
+            buffer[..3].copy_from_slice(b"xyz");
+            Ok::<_, ()>(3)
+        });
+        assert_eq!(filled, Some(Ok(3)));
+        assert_eq!((bytes.as_ref(), bytes.as_ptr()), (&b"xyz"[..], address));
+        assert_eq!(bytes.try_refill(8, |_| Err(())), Some(Err(())));
+        assert!(bytes.is_empty());
+        // A count beyond the requested length is clamped to it.
+        assert_eq!(bytes.try_refill(2, |_| Ok::<_, ()>(5)), Some(Ok(2)));
+        assert_eq!(bytes.as_ref(), b"xy");
+        assert_eq!(budget.used(), charged);
     }
 
     #[test]

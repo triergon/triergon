@@ -310,10 +310,10 @@ impl Decoder {
     ) -> Result<bool> {
         let needed = Self::packet_work(packet.len());
         if work.remaining() < needed {
-            return Err(Error::Backpressure {
+            return Err(Error::Backpressure(triergon_core::Backpressure {
                 requested: usize::try_from(needed).unwrap_or(usize::MAX),
                 available: usize::try_from(work.remaining()).unwrap_or(usize::MAX),
-            });
+            }));
         }
         let reported = self.receive(packet, clock, out)?;
         let constructs = (packet.len() / 3) as u64;

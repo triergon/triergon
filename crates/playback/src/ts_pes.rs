@@ -215,7 +215,7 @@ impl PesData {
         match std::mem::replace(&mut self.data, BudgetVec::new(pool)).freeze() {
             Ok(bytes) => Ok(Some(bytes)),
             Err(error) => {
-                self.data = error.buffer;
+                self.data = error.value;
                 Err(error.error)
             }
         }

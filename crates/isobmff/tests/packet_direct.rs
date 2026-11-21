@@ -72,7 +72,7 @@ fn reserved_packet_consumes_inline_body_under_complete_pool_pressure() {
         assert_eq!(input.position(), end);
         assert_eq!(input.token(), token);
         assert_eq!(input.source(), SourceId(420));
-        assert!(input.retained_window().is_none());
+        assert!(input.buffered_owner().is_none());
         assert_eq!(budget.used(), held);
     }
     // Only the immutable storage may wait after the complete reserved body.

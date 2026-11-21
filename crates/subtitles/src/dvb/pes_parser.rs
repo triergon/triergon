@@ -239,7 +239,7 @@ impl PesParser {
             match copy.freeze() {
                 Ok(bytes) => Some(bytes),
                 Err(error) => {
-                    scan.copy = Some(error.buffer);
+                    scan.copy = Some(error.value);
                     return Err(error.error);
                 }
             }

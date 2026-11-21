@@ -301,10 +301,10 @@ impl<S: Source> TsProgressiveReader<S> {
     #[cold]
     fn step_failure(&mut self, error: Error) -> Result<TsProgressiveStep> {
         match error {
-            Error::Backpressure {
+            Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            } => Ok(TsProgressiveStep::Backpressure {
+            }) => Ok(TsProgressiveStep::Backpressure {
                 requested,
                 available,
             }),

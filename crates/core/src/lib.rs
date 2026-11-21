@@ -24,8 +24,8 @@ mod work;
 
 pub use budget::{Budget, Charged, Reservation};
 pub use bytes::{
-    BudgetVec, BudgetVecIntoIter, ByteStorageAddress, Bytes, BytesView, BytesWriter, FreezeError,
-    OwnedInputBytes, PushError, TransferError, nonzero_prefix_len,
+    BudgetVec, BudgetVecIntoIter, ByteStorageAddress, Bytes, BytesView, BytesWriter,
+    OwnedInputBytes, Refused, nonzero_prefix_len,
 };
 pub use error::{Error, Result};
 pub use input::{

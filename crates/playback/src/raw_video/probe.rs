@@ -390,7 +390,7 @@ impl<S: Source> ProbeDriver<S> {
         let prefix = match prefix.freeze() {
             Ok(prefix) => prefix,
             Err(rejected) => {
-                self.prefix = rejected.buffer;
+                self.prefix = rejected.value;
                 return Err(rejected.error);
             }
         };

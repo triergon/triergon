@@ -811,7 +811,7 @@ impl AvcTsReader {
         let source = match builder.freeze() {
             Ok(bytes) => bytes.into_slice(0..end)?,
             Err(error) => {
-                self.bytes = error.buffer;
+                self.bytes = error.value;
                 return Err(error.error);
             }
         };

@@ -1003,10 +1003,10 @@ fn memory_the_budget_refuses_changes_nothing() {
                 Error::Limit {
                     requested: 11600,
                     ..
-                } | Error::Backpressure {
+                } | Error::Backpressure(triergon_core::Backpressure {
                     requested: 11600,
                     ..
-                }
+                })
             ),
             "{refusal:?}"
         );

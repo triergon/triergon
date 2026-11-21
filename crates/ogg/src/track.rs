@@ -145,8 +145,8 @@ impl TrackInfo for Track {
     fn codec_tag(&self) -> &[u8] {
         &self.tag[..usize::from(self.tag_len)]
     }
-    fn codec(&self) -> CodecId<'_> {
-        self.mapping.codec(self.codec_tag())
+    fn codec(&self) -> CodecId {
+        self.mapping.codec()
     }
     /// The canonical configuration the header packets form (see [`crate::mapping`]);
     /// for an unknown mapping, its first packet.

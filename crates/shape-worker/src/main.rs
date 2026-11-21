@@ -533,7 +533,7 @@ fn run(args: &[String]) -> Result<()> {
         return Err("input exceeds the size bound".into());
     }
     let budget = Budget::new(1 << 30)?;
-    let file = Bytes::try_from_vec(&budget, std::fs::read(path)?).map_err(|e| e.error())?;
+    let file = Bytes::try_from_vec(&budget, std::fs::read(path)?).map_err(|e| e.error)?;
     let retained = budget.used();
     let mut out = io::stdout().lock();
     if let Action::Dump = action {

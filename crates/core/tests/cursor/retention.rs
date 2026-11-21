@@ -6,7 +6,7 @@ use triergon_core::{Budget, Bytes, InputWindow, Step, WorkBudget};
 fn retained_input_handle_deduplicates_spans_and_survives_full_consumption_and_reset() {
     let pool = Budget::new(4096).unwrap();
     let mut cursor = cursor(&pool, Some(4), true);
-    assert!(cursor.retained_window().is_none());
+    assert!(cursor.buffered_owner().is_none());
     let mut raw = Vec::with_capacity(511);
     raw.extend_from_slice(b"abcd");
     let bytes = Bytes::try_from_vec(&pool, raw).unwrap();
@@ -16,7 +16,7 @@ fn retained_input_handle_deduplicates_spans_and_survives_full_consumption_and_re
     cursor.provide(&supplied).unwrap();
     drop(supplied);
     let before = pool.used();
-    let retained = cursor.retained_window().unwrap();
+    let retained = cursor.buffered_owner().cloned().unwrap();
     assert_eq!(pool.used(), before);
     assert_eq!(retained.retained_storage_bytes(), footprint);
     let span = match cursor
@@ -28,7 +28,7 @@ fn retained_input_handle_deduplicates_spans_and_survives_full_consumption_and_re
     };
     assert_eq!(span.as_ref(), b"ab");
     assert!(retained.shares_storage_with(&span));
-    assert!(retained.shares_storage_with(&cursor.retained_window().unwrap()));
+    assert!(retained.shares_storage_with(&cursor.buffered_owner().cloned().unwrap()));
     let mut last = [0; 2];
     assert!(matches!(
         cursor
@@ -37,7 +37,7 @@ fn retained_input_handle_deduplicates_spans_and_survives_full_consumption_and_re
         Step::Ready(2)
     ));
     assert_eq!(&last, b"cd");
-    assert!(cursor.retained_window().is_none());
+    assert!(cursor.buffered_owner().is_none());
     cursor.reset(0).unwrap();
     drop((span, cursor));
     assert_eq!(retained.as_ref(), b"abcd");
@@ -55,13 +55,13 @@ fn cancellation_releases_cursor_ownership_but_preserves_an_explicit_retained_han
     let window = InputWindow::new(request.source, request.token, request.offset, bytes).unwrap();
     cursor.provide(&window).unwrap();
     drop(window);
-    let retained = cursor.retained_window().unwrap();
+    let retained = cursor.buffered_owner().cloned().unwrap();
     assert!(
         cursor
             .read_span(1, &mut WorkBudget::new(1), &AtomicBool::new(true))
             .is_err()
     );
-    assert!(cursor.retained_window().is_none());
+    assert!(cursor.buffered_owner().is_none());
     drop(cursor);
     assert_eq!(
         pool.used(),

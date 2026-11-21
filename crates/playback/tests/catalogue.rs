@@ -1227,10 +1227,10 @@ impl pump::CatalogueSink for Consumer {
     fn prepare_catalogue(&mut self, next: &Engine) -> Result<()> {
         assert!(matches!(next, Engine::Mp4(_)));
         if self.refuse {
-            return Err(C::Backpressure {
+            return Err(C::Backpressure(triergon_core::Backpressure {
                 requested: 1,
                 available: 0,
-            });
+            }));
         }
         self.prepared = true;
         if let Some(cancel) = self.cancel_during_prepare.as_ref() {

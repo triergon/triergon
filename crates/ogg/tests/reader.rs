@@ -353,7 +353,10 @@ fn long_empty_and_255_multiple_packets_survive_the_lacing() {
         let (reader, events, error) = read_with(&file, window, 1 << 20, false, Limits::default());
         assert_eq!(error, None);
         let track = &reader.tracks()[0];
-        assert_eq!(track.codec(), CodecId::Other(b"\x00unknown"));
+        assert_eq!(
+            (track.codec(), track.codec_tag()),
+            (CodecId::Other, &b"\x00unknown"[..])
+        );
         assert_eq!(track.configuration(), b"\x00unknown mapping head");
         let got: Vec<Vec<u8>> = packets(&events)
             .iter()

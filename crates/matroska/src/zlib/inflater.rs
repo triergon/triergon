@@ -736,10 +736,10 @@ impl State {
         let result = self.advance(source, &mut bits, work, cancel);
         self.position.save(&bits);
         match result {
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => Ok(ParseStep::Backpressure {
+            })) => Ok(ParseStep::Backpressure {
                 requested,
                 available,
             }),
@@ -1030,7 +1030,7 @@ impl State {
                             self.phase = Phase::Done;
                         }
                         Err(error) => {
-                            self.output = Some(error.buffer);
+                            self.output = Some(error.value);
                             return Err(error.error);
                         }
                     }

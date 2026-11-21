@@ -305,7 +305,7 @@ impl PageReader {
                             match buffer.freeze() {
                                 Ok(bytes) => bytes,
                                 Err(rejected) => {
-                                    self.buffer = rejected.buffer;
+                                    self.buffer = rejected.value;
                                     return Err(rejected.error);
                                 }
                             }

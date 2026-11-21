@@ -14,7 +14,7 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{CodecId, MediaKind, TrackInfo};
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, PushError, Result, SourceId, SourceLocation, WorkBudget,
+    Budget, BudgetVec, Bytes, Error, Refused, Result, SourceId, SourceLocation, WorkBudget,
 };
 
 // Public option data in the reference's doc/demuxers.texi, not a parser
@@ -556,7 +556,7 @@ impl DemuxObserver {
         packet: TransportPacket,
         context: SourceContext,
         input: &triergon_core::InputCursor,
-    ) -> std::result::Result<(), PushError<TransportPacket>> {
+    ) -> std::result::Result<(), Refused<TransportPacket>> {
         self.push_input_boundary(packet, context, false, input)
     }
     #[allow(
@@ -569,7 +569,7 @@ impl DemuxObserver {
         context: SourceContext,
         boundary: bool,
         input: &triergon_core::InputCursor,
-    ) -> std::result::Result<(), PushError<TransportPacket>> {
+    ) -> std::result::Result<(), Refused<TransportPacket>> {
         self.push_boundary(packet, context, boundary, Some(input))
     }
     #[cfg(feature = "reference-trace")]
@@ -697,7 +697,7 @@ impl DemuxObserver {
         &mut self,
         packet: TransportPacket,
         context: SourceContext,
-    ) -> std::result::Result<(), PushError<TransportPacket>> {
+    ) -> std::result::Result<(), Refused<TransportPacket>> {
         self.push_boundary(packet, context, false, None)
     }
 
@@ -728,7 +728,7 @@ impl DemuxObserver {
         &mut self,
         packet: TransportPacket,
         context: SourceContext,
-    ) -> std::result::Result<(), PushError<TransportPacket>> {
+    ) -> std::result::Result<(), Refused<TransportPacket>> {
         self.push_boundary(packet, context, true, None)
     }
     pub(crate) fn commit_clock_epoch(&mut self, context: SourceContext) {
@@ -830,9 +830,9 @@ impl DemuxObserver {
         context: SourceContext,
         selected_boundary: bool,
         input: Option<&triergon_core::InputCursor>,
-    ) -> std::result::Result<(), PushError<TransportPacket>> {
+    ) -> std::result::Result<(), Refused<TransportPacket>> {
         if let Some(error) = self.input_error(&packet, context, selected_boundary, input, false) {
-            return Err(PushError {
+            return Err(Refused {
                 error,
                 value: packet,
             });

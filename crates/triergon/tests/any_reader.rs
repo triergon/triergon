@@ -95,7 +95,10 @@ fn any_reader_reads_matroska_through_the_neutral_model() {
     assert_eq!(reader.track_count(), 1);
     let track = reader.track(0).unwrap();
     assert_eq!(track.kind(), MediaKind::Audio);
-    assert_eq!(track.codec(), CodecId::Other(b"A_AUTHORED"));
+    assert_eq!(
+        (track.codec(), track.codec_tag()),
+        (CodecId::Other, &b"A_AUTHORED"[..])
+    );
     assert_eq!(track.codec_tag(), b"A_AUTHORED");
     let mut ts = vec![0u8; 188 * 3];
     for packet in ts.chunks_mut(188) {

@@ -235,14 +235,10 @@ impl InputCursor {
     pub fn budget(&self) -> &Budget {
         &self.pool
     }
-    /// An owner of the current window's allocation, which keeps it charged
-    /// after the cursor has moved on. `None` between windows and for an inline
-    /// window, which has no allocation until [`read_span`](Self::read_span)
-    /// gives it one.
-    pub fn retained_window(&self) -> Option<Bytes> {
-        self.buffered_owner().cloned()
-    }
-    /// The current window as it was provided, read bytes included.
+    /// The current window as it was provided, read bytes included. A clone
+    /// keeps its allocation charged after the cursor has moved on. `None`
+    /// between windows and for an inline window, which has no allocation until
+    /// [`read_span`](Self::read_span) gives it one.
     pub fn buffered_owner(&self) -> Option<&Bytes> {
         self.window.as_ref()
     }

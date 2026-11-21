@@ -395,10 +395,10 @@ where
             return Err(Error::Cancelled);
         }
         match self.step(work, cancel) {
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => Ok(HlsSegmentProgress::Backpressure {
+            })) => Ok(HlsSegmentProgress::Backpressure {
                 requested,
                 available,
             }),

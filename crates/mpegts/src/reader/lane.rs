@@ -958,7 +958,7 @@ impl Incomplete {
         match self.buffer.take().expect("incomplete freeze").freeze() {
             Ok(bytes) => self.bytes = Some(bytes),
             Err(error) => {
-                self.buffer = Some(error.buffer);
+                self.buffer = Some(error.value);
                 return Err(error.error);
             }
         }
@@ -1096,7 +1096,7 @@ impl Build {
         match self.buffer.take().expect("coalescing storage").freeze() {
             Ok(bytes) => self.bytes = Some(bytes),
             Err(error) => {
-                self.buffer = Some(error.buffer);
+                self.buffer = Some(error.value);
                 return Err(error.error);
             }
         }

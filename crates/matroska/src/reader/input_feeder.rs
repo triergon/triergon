@@ -142,7 +142,9 @@ impl<R: Read> InputFeeder<R> {
         reposition: Option<fn(&mut R, u64) -> io::Result<u64>>,
     ) -> Result<FeedStep> {
         match self.advance_with(input, cancel, reposition, Some(request), false, None, true) {
-            Err(Error::Backpressure { requested, .. }) => Ok(FeedStep::Backpressure { requested }),
+            Err(Error::Backpressure(triergon_core::Backpressure { requested, .. })) => {
+                Ok(FeedStep::Backpressure { requested })
+            }
             other => other,
         }
     }
@@ -176,7 +178,9 @@ impl<R: Read> InputFeeder<R> {
             true,
             Some(plan.exact().maximum),
         ) {
-            Err(Error::Backpressure { requested, .. }) => Ok(FeedStep::Backpressure { requested }),
+            Err(Error::Backpressure(triergon_core::Backpressure { requested, .. })) => {
+                Ok(FeedStep::Backpressure { requested })
+            }
             other => other,
         }
     }
@@ -189,7 +193,9 @@ impl<R: Read> InputFeeder<R> {
         inline_header: bool,
     ) -> Result<FeedStep> {
         match self.advance(input, cancel, reposition, requested, inline_header, None) {
-            Err(Error::Backpressure { requested, .. }) => Ok(FeedStep::Backpressure { requested }),
+            Err(Error::Backpressure(triergon_core::Backpressure { requested, .. })) => {
+                Ok(FeedStep::Backpressure { requested })
+            }
             other => other,
         }
     }
@@ -372,7 +378,7 @@ impl<R: Read> InputFeeder<R> {
         let bytes = match buffer.freeze() {
             Ok(bytes) => bytes,
             Err(error) => {
-                pending.buffer = Some(error.buffer);
+                pending.buffer = Some(error.value);
                 return Err(error.error);
             }
         };
@@ -606,7 +612,7 @@ mod header_refill_feeder_tests {
         ));
         assert_eq!(feeder.position, 1024);
         assert_eq!(envelope.position(), 0);
-        let owner = envelope.range_input().retained_window().unwrap();
+        let owner = envelope.range_input().buffered_owner().cloned().unwrap();
         assert_eq!((owner.len(), owner.retained_capacity()), (1024, 1024));
         let alias = owner.slice(1023..1024).unwrap();
         let charge = owner.retained_storage_bytes();
@@ -654,7 +660,7 @@ mod header_refill_feeder_tests {
         ));
         assert_eq!(feeder.position, 1);
         assert_eq!(feeder.retained_buffer_bytes(), 0);
-        assert!(envelope.range_input().retained_window().is_none());
+        assert!(envelope.range_input().buffered_owner().is_none());
         assert_eq!(pool.used(), baseline);
         assert_eq!(pool.peak(), baseline);
     }
@@ -719,7 +725,8 @@ mod header_refill_feeder_tests {
         assert_eq!(
             envelope
                 .range_input()
-                .retained_window()
+                .buffered_owner()
+                .cloned()
                 .unwrap()
                 .retained_capacity(),
             1024
@@ -758,7 +765,7 @@ mod header_refill_feeder_tests {
             Err(Error::Cancelled)
         ));
         assert_eq!(envelope.position(), 0);
-        assert!(envelope.range_input().retained_window().is_none());
+        assert!(envelope.range_input().buffered_owner().is_none());
         cancel.store(false, Ordering::Relaxed);
         assert!(matches!(
             feeder.feed_typed_header_refill(envelope.range_input(), &plan, &cancel, None),

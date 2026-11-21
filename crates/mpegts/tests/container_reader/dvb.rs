@@ -275,7 +275,7 @@ fn scattered_segments_retry_freeze_and_keep_exact_opaque_bytes() {
         .unwrap();
     assert!(matches!(
         drive.next().unwrap_err(),
-        Error::Backpressure { requested, available } if requested == expected.len() && available < requested
+        Error::Backpressure(triergon_core::Backpressure { requested, available }) if requested == expected.len() && available < requested
     ));
     drop(pressure);
     // The lane's source table now exists. Give the copy room for just its bytes.
@@ -286,10 +286,10 @@ fn scattered_segments_retry_freeze_and_keep_exact_opaque_bytes() {
     for _ in 0..2 {
         assert_eq!(
             drive.next().unwrap_err(),
-            Error::Backpressure {
+            Error::Backpressure(triergon_core::Backpressure {
                 requested: Bytes::owner_overhead_bytes(),
                 available: 0,
-            }
+            })
         );
     }
     drop(pressure);

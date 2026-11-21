@@ -6,7 +6,7 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, PushError, Result, SourceId, SourceLocation, Time, WorkBudget,
+    Budget, BudgetVec, Bytes, Error, Refused, Result, SourceId, SourceLocation, Time, WorkBudget,
 };
 
 pub(crate) const HEADER_MAX: usize = 264; // 9 fixed bytes plus 8-bit optional-header length
@@ -321,7 +321,7 @@ impl PesAssembler {
         pusi: bool,
         entity: SourceId,
         offset: u64,
-    ) -> std::result::Result<(), PushError<Bytes>> {
+    ) -> std::result::Result<(), Refused<Bytes>> {
         let failure = if self.payload.is_some() {
             Some(Error::Invalid("PES payload not drained"))
         } else if self.ended {
@@ -336,7 +336,7 @@ impl PesAssembler {
             None
         };
         if let Some(error) = failure {
-            return Err(PushError {
+            return Err(Refused {
                 error,
                 value: bytes,
             });
@@ -843,7 +843,12 @@ impl PesAssembler {
                         let parsed =
                             parse_header(&self.budget, &self.raw_header[..self.header_used]);
                         let header = match parsed {
-                            Err(error @ Error::Backpressure { requested, .. }) => {
+                            Err(
+                                error @ Error::Backpressure(triergon_core::Backpressure {
+                                    requested,
+                                    ..
+                                }),
+                            ) => {
                                 self.record_blocked_header_storage(requested)?;
                                 return Err(error);
                             }

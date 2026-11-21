@@ -136,7 +136,7 @@ impl Assembler {
                         last_on_page: false,
                     }),
                     Err(rejected) => {
-                        self.partial = rejected.buffer;
+                        self.partial = rejected.value;
                         self.partial.truncate(before);
                         return Err(rejected.error);
                     }

@@ -24,7 +24,7 @@ fn inline_discard_needs_no_free_pool_or_temporary_owner() {
             assert_eq!(input.position(), position);
             assert_eq!(input.token(), token);
             assert_eq!(work.spent(), 1);
-            assert!(input.retained_window().is_none());
+            assert!(input.buffered_owner().is_none());
             assert_eq!(pool.used(), held);
         }
         assert!(
@@ -56,7 +56,10 @@ fn owned_hidden_capacity_lives_until_cursor_and_last_independent_alias_drop() {
         Step::Ready(2)
     ));
     assert_eq!(input.position(), 2);
-    assert_eq!(input.retained_window().unwrap().retained_capacity(), 64);
+    assert_eq!(
+        input.buffered_owner().cloned().unwrap().retained_capacity(),
+        64
+    );
     assert_eq!(pool.used(), baseline + charge);
     assert!(matches!(
         input
@@ -64,7 +67,7 @@ fn owned_hidden_capacity_lives_until_cursor_and_last_independent_alias_drop() {
             .unwrap(),
         Step::Ready(1)
     ));
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     assert_eq!(alias.as_ref(), b"abc");
     assert_eq!(pool.used(), baseline + charge);
     drop(input);
@@ -96,7 +99,7 @@ fn consumed_inline_prefix_and_unread_suffix_are_not_promoted() {
     ));
     assert_eq!(input.position(), 3);
     assert_eq!(work.spent(), 2);
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     assert!(matches!(
         input
             .read_into(&mut byte, &mut WorkBudget::new(1), &AtomicBool::new(false))
@@ -130,7 +133,7 @@ fn empty_wait_zero_work_and_explicit_end_follow_read_into_order() {
         Step::Yield
     ));
     assert_eq!(input.position(), 0);
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     assert!(matches!(
         input
             .read_discard(2, &mut WorkBudget::new(2), &AtomicBool::new(false))
@@ -202,7 +205,7 @@ fn sticky_transport_precedes_empty_read_and_cancellation_without_work() {
     );
     assert_eq!(input.position(), 0);
     assert_eq!(work.spent(), 0);
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
 }
 
 #[test]
@@ -224,7 +227,7 @@ fn cancellation_drops_only_cursor_owner_and_reset_rejects_old_request() {
     assert_eq!(input.position(), 0);
     assert_eq!(input.token(), token);
     assert_eq!(work.spent(), 0);
-    assert!(input.retained_window().is_none());
+    assert!(input.buffered_owner().is_none());
     assert_eq!(pool.used(), held);
     assert_eq!(alias.as_ref(), b"abc");
     assert_eq!(

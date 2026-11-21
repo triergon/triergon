@@ -92,7 +92,7 @@ fn movie(object_type: u8, specific: &[u8], samples: &[&[u8]]) -> Vec<u8> {
 }
 
 /// The track's codec, kind and configuration, and the payload of each packet.
-fn read(file: &[u8]) -> (CodecId<'static>, MediaKind, Vec<u8>, Vec<Vec<u8>>) {
+fn read(file: &[u8]) -> (CodecId, MediaKind, Vec<u8>, Vec<Vec<u8>>) {
     let pool = Budget::new(1 << 24).unwrap();
     let capabilities = SourceCapabilities {
         length: Some(file.len() as u64),
@@ -128,9 +128,9 @@ fn read(file: &[u8]) -> (CodecId<'static>, MediaKind, Vec<u8>, Vec<Vec<u8>>) {
         }
     }
     let track = reader.track(0).unwrap();
+    assert_eq!(track.codec_tag(), b"mp4s");
     let codec = match track.codec() {
-        CodecId::VobSub => CodecId::VobSub,
-        CodecId::Other(tag) => CodecId::Other(tag.to_vec().leak()),
+        codec @ (CodecId::VobSub | CodecId::Other) => codec,
         other => panic!("unexpected codec {other:?}"),
     };
     (codec, track.kind(), track.configuration().to_vec(), packets)
@@ -150,6 +150,6 @@ fn an_mp4s_track_of_object_type_0xe0_is_a_vobsub_track() {
 #[test]
 fn another_object_type_stays_unnamed() {
     let (codec, kind, _, _) = read(&movie(0x40, &[0; 64], &[&[1, 2, 3]]));
-    assert_eq!(codec, CodecId::Other(b"mp4s"));
+    assert_eq!(codec, CodecId::Other);
     assert_eq!(kind, MediaKind::Subtitle);
 }

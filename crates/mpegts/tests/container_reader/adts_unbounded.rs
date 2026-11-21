@@ -286,10 +286,7 @@ fn grow_last_span(reader: &mut Reader) -> Result<InputRequest, Error> {
         match step {
             Step::NeedInput(request) => return Ok(request),
             Step::Backpressure(pressure) => {
-                return Err(Error::Backpressure {
-                    requested: pressure.requested,
-                    available: pressure.available,
-                });
+                return Err(Error::Backpressure(pressure));
             }
             Step::Ready(Event::Other(ReaderEvent::Interrupted {
                 cause,
@@ -487,7 +484,7 @@ fn unbounded_span_growth_counts_other_active_lanes_and_deduplicates_the_window()
         let before = drive.reader.request().unwrap();
         assert!(matches!(
             grow_last_span(&mut drive.reader),
-            Err(Error::Backpressure { requested, available }) if requested == available + 1
+            Err(Error::Backpressure(triergon_core::Backpressure { requested, available })) if requested == available + 1
         ));
         drop(retained);
         let resumed = grow_last_span(&mut drive.reader).unwrap();
@@ -508,7 +505,7 @@ fn unbounded_span_growth_retries_after_dropping_a_source_event() {
     let before = drive.reader.request().unwrap();
     assert!(matches!(
         grow_last_span(&mut drive.reader),
-        Err(Error::Backpressure { requested, available }) if requested == available + 1
+        Err(Error::Backpressure(triergon_core::Backpressure { requested, available })) if requested == available + 1
     ));
     drop(carrier);
     let resumed = grow_last_span(&mut drive.reader).unwrap();

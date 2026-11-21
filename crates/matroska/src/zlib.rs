@@ -41,10 +41,10 @@ pub fn decompress_in(
                 requested,
                 available,
             } => {
-                return Err(Error::Backpressure {
+                return Err(Error::Backpressure(triergon_core::Backpressure {
                     requested,
                     available,
-                });
+                }));
             }
             _ => return Err(Error::Invalid("unexpected inflate input transition")),
         }

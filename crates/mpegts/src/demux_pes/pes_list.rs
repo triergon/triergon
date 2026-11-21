@@ -1,6 +1,6 @@
 //! A list the observer fills for one PES and hands out with it.
 
-use triergon_core::{Budget, BudgetVec, Error, PushError, Result};
+use triergon_core::{Budget, BudgetVec, Error, Refused, Result};
 
 /// A list whose capacity, for admission, payload runs and growth work, is the
 /// capacity its growth has planned: exactly that of a new list. A list handed
@@ -64,7 +64,7 @@ impl<T> PesList<T> {
     }
     /// Pushes within the planned capacity, or grows it as `BudgetVec::try_push`
     /// grows a new list.
-    pub(super) fn try_push(&mut self, value: T) -> std::result::Result<(), PushError<T>> {
+    pub(super) fn try_push(&mut self, value: T) -> std::result::Result<(), Refused<T>> {
         if self.len() == self.planned {
             let preferred = self.planned.saturating_mul(2).max(4);
             if self.items.capacity() < preferred {
@@ -75,7 +75,7 @@ impl<T> PesList<T> {
                     return Ok(());
                 }
                 if let Err(error) = self.items.try_reserve_exact(preferred - self.len()) {
-                    return Err(PushError { error, value });
+                    return Err(Refused { error, value });
                 }
             }
             self.planned = preferred;

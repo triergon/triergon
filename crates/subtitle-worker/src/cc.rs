@@ -162,7 +162,7 @@ fn video_track(file: &Path, ordinal: usize) -> Result<Track> {
 }
 
 /// How the extractor reads a video stream of `codec`.
-fn coding(codec: Option<CodecId<'_>>, configuration: &[u8]) -> Result<VideoCoding> {
+fn coding(codec: Option<CodecId>, configuration: &[u8]) -> Result<VideoCoding> {
     Ok(match codec {
         Some(CodecId::Mpeg2Video) => VideoCoding::Mpeg2Pes,
         Some(CodecId::H264) => VideoCoding::Nal(

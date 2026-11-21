@@ -105,10 +105,7 @@ fn grow(reader: &mut Reader) -> Result<InputRequest, Error> {
             Step::Yield => (),
             Step::NeedInput(request) => return Ok(request),
             Step::Backpressure(pressure) => {
-                return Err(Error::Backpressure {
-                    requested: pressure.requested,
-                    available: pressure.available,
-                });
+                return Err(Error::Backpressure(pressure));
             }
             Step::Ready(Event::Other(ReaderEvent::Source(source))) => {
                 let TraceEvent::Diagnostic(fault) = source.event() else {
@@ -184,10 +181,10 @@ fn retry_header_growth(policy: PesPolicy) {
     assert!(caller_charge > 0);
     let (mut drive, held) = before_growth(&raw, policy, minimum + caller_charge - 1, true, false);
     let before = drive.reader.request().unwrap();
-    let expected = Error::Backpressure {
+    let expected = Error::Backpressure(triergon_core::Backpressure {
         requested: REPLACEMENT,
         available: REPLACEMENT - 1,
-    };
+    });
     assert_eq!(grow(&mut drive.reader).unwrap_err(), expected);
     assert_eq!(grow(&mut drive.reader).unwrap_err(), expected);
     drop(held.unwrap());

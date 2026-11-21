@@ -5,7 +5,7 @@
 use crate::demux_pes::{DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, SourceContext};
 use crate::{AssemblyStep, FaultKind, SourceEpochs, SourceRange, TraceFault, TransportPacket};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{BudgetVec, Bytes, Error, PushError, Result, SourceLocation, WorkBudget};
+use triergon_core::{BudgetVec, Bytes, Error, Refused, Result, SourceLocation, WorkBudget};
 
 mod boundaries;
 pub use boundaries::TransportTailConfirmation;
@@ -255,7 +255,7 @@ impl TransportFaultRecovery {
         clippy::result_large_err,
         reason = "return the original observer inline"
     )]
-    pub fn new(inner: DemuxObserver) -> std::result::Result<Self, PushError<DemuxObserver>> {
+    pub fn new(inner: DemuxObserver) -> std::result::Result<Self, Refused<DemuxObserver>> {
         Self::with_policy(inner, PesFaultPolicy::default())
     }
     /// Explicit additional source-fault policies for drained finite AVC TS188.
@@ -266,14 +266,14 @@ impl TransportFaultRecovery {
     pub fn with_policy(
         inner: DemuxObserver,
         policy: PesFaultPolicy,
-    ) -> std::result::Result<Self, PushError<DemuxObserver>> {
+    ) -> std::result::Result<Self, Refused<DemuxObserver>> {
         let error = inner.validate_input(None).err().or_else(|| {
             (!inner.recovery_idle()).then_some(Error::Invalid(
                 "transport recovery requires drained observer",
             ))
         });
         if let Some(error) = error {
-            return Err(PushError {
+            return Err(Refused {
                 error,
                 value: inner,
             });
@@ -303,7 +303,7 @@ impl TransportFaultRecovery {
         &mut self,
         packet: TransportPacket,
         context: SourceContext,
-    ) -> std::result::Result<(), PushError<TransportPacket>> {
+    ) -> std::result::Result<(), Refused<TransportPacket>> {
         let error = self
             .fault
             .or_else(|| self.boundaries.input_error())
@@ -313,7 +313,7 @@ impl TransportFaultRecovery {
                     .map(|_| Error::Invalid("transport recovery input not drained"))
             });
         if let Some(error) = error {
-            return Err(PushError {
+            return Err(Refused {
                 error,
                 value: packet,
             });
@@ -361,7 +361,7 @@ impl TransportFaultRecovery {
         &mut self,
         fault: TraceFault,
         context: SourceContext,
-    ) -> std::result::Result<(), PushError<TraceFault>> {
+    ) -> std::result::Result<(), Refused<TraceFault>> {
         let error = self
             .fault
             .or_else(|| self.boundaries.input_error())
@@ -375,7 +375,7 @@ impl TransportFaultRecovery {
                     .then_some(Error::Unsupported("rejected clock recovery disabled"))
             });
         if let Some(error) = error {
-            return Err(PushError {
+            return Err(Refused {
                 error,
                 value: fault,
             });
@@ -476,7 +476,7 @@ impl TransportFaultJob {
         input: SourceContext,
         inner: &DemuxObserver,
         cursor: Option<&triergon_core::InputCursor>,
-    ) -> std::result::Result<Self, PushError<TransportPacket>> {
+    ) -> std::result::Result<Self, Refused<TransportPacket>> {
         Self::from_transport(packet, input, inner, cursor, false)
     }
     fn header_hint(packet: &TransportPacket) -> bool {
@@ -502,7 +502,7 @@ impl TransportFaultJob {
         packet: TransportPacket,
         input: SourceContext,
         inner: &DemuxObserver,
-    ) -> std::result::Result<Self, PushError<TransportPacket>> {
+    ) -> std::result::Result<Self, Refused<TransportPacket>> {
         Self::from_transport(packet, input, inner, None, true)
     }
     #[allow(
@@ -515,7 +515,7 @@ impl TransportFaultJob {
         inner: &DemuxObserver,
         cursor: Option<&triergon_core::InputCursor>,
         header_fault: bool,
-    ) -> std::result::Result<Self, PushError<TransportPacket>> {
+    ) -> std::result::Result<Self, Refused<TransportPacket>> {
         let admission = (|| {
             let budget = inner.transport_fault_input(&packet, input, cursor)?;
             if packet.source.len() != 188 || packet.prefix.is_some() || !packet.payload_unit_start {
@@ -564,7 +564,7 @@ impl TransportFaultJob {
         let (kind, start, position, header_ranges, spans) = match admission {
             Ok(value) => value,
             Err(error) => {
-                return Err(PushError {
+                return Err(Refused {
                     error,
                     value: packet,
                 });
@@ -593,7 +593,7 @@ impl TransportFaultJob {
         fault: TraceFault,
         input: SourceContext,
         inner: &DemuxObserver,
-    ) -> std::result::Result<Self, PushError<TraceFault>> {
+    ) -> std::result::Result<Self, Refused<TraceFault>> {
         let admission = (|| {
             let rejected = fault
                 .rejected
@@ -643,7 +643,7 @@ impl TransportFaultJob {
         let (rejected, kind, start, position, header_ranges, spans) = match admission {
             Ok(value) => value,
             Err(error) => {
-                return Err(PushError {
+                return Err(Refused {
                     error,
                     value: fault,
                 });

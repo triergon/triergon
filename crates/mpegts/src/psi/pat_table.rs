@@ -2,7 +2,7 @@
 use super::{PatSection, ProgramAssociation, SectionHeader, TableStep};
 use crate::{ParseLimits, SourceRange, limit};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Bytes, Error, PushError, Result, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, Refused, Result, WorkBudget};
 
 #[derive(Clone, Copy, Debug)]
 pub struct PatSourceRange {
@@ -82,18 +82,15 @@ impl PatCollector {
         clippy::result_large_err,
         reason = "return the original charged PAT and source spans without allocating on rejection"
     )]
-    pub fn submit(
-        &mut self,
-        section: PatSection,
-    ) -> std::result::Result<(), PushError<PatSection>> {
+    pub fn submit(&mut self, section: PatSection) -> std::result::Result<(), Refused<PatSection>> {
         if self.input.is_some() || self.building.is_some() {
-            return Err(PushError {
+            return Err(Refused {
                 error: Error::Invalid("PAT collector busy"),
                 value: section,
             });
         }
         if !section.source.belongs_to(&self.budget) {
-            return Err(PushError {
+            return Err(Refused {
                 error: Error::ForeignPool,
                 value: section,
             });

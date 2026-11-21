@@ -303,7 +303,7 @@ impl Envelope {
         match self.buffer.take().expect("DVB subtitle buffer").freeze() {
             Ok(bytes) => Ok(Some(bytes)),
             Err(error) => {
-                self.buffer = Some(error.buffer);
+                self.buffer = Some(error.value);
                 Err(error.error)
             }
         }

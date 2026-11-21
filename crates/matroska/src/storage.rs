@@ -28,7 +28,7 @@ impl SharedBytes {
         }
         Bytes::try_from_vec(pool, bytes)
             .map(Self::from_core)
-            .map_err(|e| e.error())
+            .map_err(|e| e.error)
     }
     pub fn slice(&self, range: Range<usize>) -> Result<Self> {
         match &self.0 {

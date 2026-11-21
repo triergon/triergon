@@ -92,7 +92,10 @@ fn opaque_private_audio_preserves_track_and_pes_at_logical_eof() {
         while let Some(event) = strict.next().unwrap() {
             match event {
                 Event::Other(ReaderEvent::Unsupported { track, .. }) => {
-                    assert_eq!(track.codec(), CodecId::Other(&[tag]));
+                    assert_eq!(
+                        (track.codec(), track.codec_tag()),
+                        (CodecId::Other, &[tag][..])
+                    );
                     unsupported += 1;
                 }
                 Event::Other(
@@ -130,7 +133,10 @@ fn opaque_private_audio_preserves_track_and_pes_at_logical_eof() {
             track.stream().descriptor_namespace(),
             DescriptorNamespace::Unspecified
         );
-        assert_eq!(track.codec(), CodecId::Other(&[tag]));
+        assert_eq!(
+            (track.codec(), track.codec_tag()),
+            (CodecId::Other, &[tag][..])
+        );
         let clock = audio.clock().unwrap();
         assert_eq!(clock.pts.ticks90, Some(90_000));
         assert_eq!(clock.dts.ticks90, None);

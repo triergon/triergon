@@ -360,7 +360,7 @@ impl SampleReader {
         match buffer.freeze() {
             Ok(bytes) => Ok(bytes),
             Err(failure) => {
-                self.buffer = SampleBuffer::Copying(failure.buffer);
+                self.buffer = SampleBuffer::Copying(failure.value);
                 Err(failure.error)
             }
         }

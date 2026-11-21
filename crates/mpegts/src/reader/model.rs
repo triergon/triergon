@@ -121,7 +121,7 @@ impl TrackInfo for Track {
     fn codec_tag(&self) -> &[u8] {
         self.stream().codec_tag()
     }
-    fn codec(&self) -> CodecId<'_> {
+    fn codec(&self) -> CodecId {
         if self.unlabelled_dts_core {
             CodecId::Dts
         } else {

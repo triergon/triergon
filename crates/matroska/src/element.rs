@@ -469,10 +469,10 @@ impl ElementReader {
         }
         let result = self.advance::<D>(work, cancel, admit);
         match result {
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => Ok(ParseStep::Backpressure {
+            })) => Ok(ParseStep::Backpressure {
                 requested,
                 available,
             }),
@@ -840,7 +840,7 @@ impl ElementReader {
                                 match buffer.freeze() {
                                     Ok(bytes) => bytes,
                                     Err(error) => {
-                                        body.buffer = Some(error.buffer);
+                                        body.buffer = Some(error.value);
                                         return Err(error.error);
                                     }
                                 }

@@ -86,7 +86,7 @@ impl TrackInfo for Track {
     fn codec_tag(&self) -> &[u8] {
         self.facts.codec_tag
     }
-    fn codec(&self) -> CodecId<'_> {
+    fn codec(&self) -> CodecId {
         self.facts.codec
     }
     /// FLAC: `fLaC`, STREAMINFO and the VORBIS_COMMENT block when the stream has one

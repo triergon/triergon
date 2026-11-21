@@ -189,7 +189,7 @@ impl CopyJob {
                             self.phase = CopyPhase::Done;
                         }
                         Err(error) => {
-                            self.buffer = Some(error.buffer);
+                            self.buffer = Some(error.value);
                             return Err(error.error);
                         }
                     }
@@ -451,10 +451,10 @@ impl RestoreJob {
         }
         let result = self.advance(work, cancel);
         match result {
-            Err(Error::Backpressure {
+            Err(Error::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => Ok(ParseStep::Backpressure {
+            })) => Ok(ParseStep::Backpressure {
                 requested,
                 available,
             }),

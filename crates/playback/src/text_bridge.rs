@@ -408,7 +408,7 @@ impl TextBridge {
             let frozen = match done.freeze() {
                 Ok(b) => b,
                 Err(f) => {
-                    *buffer = f.buffer;
+                    *buffer = f.value;
                     return Err(f.error);
                 }
             };

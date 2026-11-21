@@ -92,7 +92,10 @@ fn queued_eac3_pes_survives_lane_pressure_and_short_elementary_windows() {
     let pressure = drive.pool.reserve(drive.pool.available()).unwrap();
     assert!(matches!(
         drive.next(),
-        Err(Error::Backpressure { available: 0, .. })
+        Err(Error::Backpressure(triergon_core::Backpressure {
+            available: 0,
+            ..
+        }))
     ));
     drop(pressure);
     let packet = loop {

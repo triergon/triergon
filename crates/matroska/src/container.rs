@@ -81,7 +81,7 @@ impl TrackInfo for Track {
     fn codec_tag(&self) -> &[u8] {
         self.codec.as_str().as_bytes()
     }
-    fn codec(&self) -> CodecId<'_> {
+    fn codec(&self) -> CodecId {
         codec_id(self.codec.as_str())
     }
     fn configuration(&self) -> &[u8] {
@@ -105,7 +105,7 @@ impl TrackInfo for Track {
 /// The one mapping from a Matroska CodecID. The comparison is exact, so an
 /// unlisted CodecID, including a longer form of a listed one, stays
 /// [`CodecId::Other`].
-fn codec_id(codec: &str) -> CodecId<'_> {
+fn codec_id(codec: &str) -> CodecId {
     match codec {
         "V_MPEG4/ISO/AVC" => CodecId::H264,
         "V_MPEGH/ISO/HEVC" => CodecId::Hevc,
@@ -128,7 +128,7 @@ fn codec_id(codec: &str) -> CodecId<'_> {
         "S_DVBSUB" => CodecId::DvbSubtitle,
         "S_HDMV/PGS" => CodecId::Pgs,
         other if LegacyAacProfile::from_codec_id(other).is_some() => CodecId::Aac,
-        other => CodecId::Other(other.as_bytes()),
+        _ => CodecId::Other,
     }
 }
 
@@ -335,7 +335,7 @@ mod tests {
             "a_aac",
             "V_AUTHORED/OPAQUE",
         ] {
-            assert_eq!(codec_id(tag), CodecId::Other(tag.as_bytes()));
+            assert_eq!(codec_id(tag), CodecId::Other);
         }
     }
 }

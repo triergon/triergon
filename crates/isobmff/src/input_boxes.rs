@@ -315,7 +315,7 @@ impl BoxReader {
                         let bytes = match buffer.freeze() {
                             Ok(bytes) => bytes,
                             Err(rejected) => {
-                                self.metadata = Some(rejected.buffer);
+                                self.metadata = Some(rejected.value);
                                 return Err(rejected.error);
                             }
                         };

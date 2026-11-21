@@ -80,7 +80,7 @@ fn reserved_inline_carriers_need_no_temporary_backing_and_retry_freeze_pressure(
             assert_eq!(work.spent(), 1);
             assert_eq!(input.position(), offset as u64 + 1);
             assert_eq!(pool.used(), held);
-            assert!(input.retained_window().is_none());
+            assert!(input.buffered_owner().is_none());
             assert_eq!(framer.pending_or_last_packet_offset(), Some(0));
         }
         input.finish(input.source(), input.token()).unwrap();
