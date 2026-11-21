@@ -126,6 +126,27 @@ reuse the parser's original bytes.
 
 ## Access units
 
+VVC has a source-PES profile only: PMT `stream_type` `0x33` reports
+`CodecId::Vvc` and video kind, retaining the native tag. `TransportStream`
+assembles finite PES and zero-length video PES with stream IDs `0xe0`–`0xef`;
+the next PES start or logical EOF ends an unbounded PES. Payload bytes, source
+ranges and encoded PTS/DTS stay unchanged. PES boundaries are not picture
+boundaries. `Reader` has no VVC access-unit framer, seek profile or decoder.
+Temporal subsets (`0x34`) remain unrecognized. VVC video descriptors remain
+bounded opaque TLVs rather than typed profile validation.
+
+The specification anchors are [H.222.0 (08/2023)](https://www.itu.int/rec/T-REC-H.222.0-202308-S/en)
+Table 2-34 (`0x33`, `0x34`, LCEVC `0x36`), §2.4.3.6–2.4.3.7 (PES),
+§2.6.129–2.6.130 (VVC video descriptor) and §2.23.1 (VVC transport
+constraints). Codec byte-stream framing belongs to H.266 Annex B.
+LCEVC remains unrecognized: §2.6.90–2.6.91/Table 2-110 assigns extension
+tags `0x17` and `0x18` to its video and linkage descriptors;
+§2.6.137–2.6.140 defines their association through `lcevc_stream_tag`, and
+§2.25.1 defines transport constraints. These extension tags are inside a
+`0x3f` descriptor, not standalone DVB private tags. Descriptor bytes remain
+opaque; no base/enhancement association, enhancement framing or LCEVC decoding
+is implemented. Recognition of a base codec does not imply enhancement support.
+
 `Reader::new(&pool, source, capabilities, ReaderLimits::default(), input_window)`
 opens a sequential TS188 source. Set `ReaderLimits::format` for M2TS192, and
 `program` to select a program explicitly. Without a selection, the PAT must
@@ -769,7 +790,7 @@ assert_eq!(out.len() % 188, 0);
   adaptation field carries PCR = DTS·300 and, on key pictures, the
   random_access_indicator. Stuffing goes into the final packet's adaptation field.
   `TransportStream` does not read this output back: its source view accepts
-  unbounded PES only on video streams (0x01, 0x02, 0x1b, 0x24).
+  unbounded PES only on video streams (0x01, 0x02, 0x1b, 0x24, 0x33).
 - `MuxConfig::default()`: transport_stream_id 1, original_network_id 0xFF01,
   program 1, PMT PID 0x1000, video PID 0x0100, stream type 0x01, provider
   "Triergon", service "Service01".
@@ -795,7 +816,7 @@ pipeline ([triergon-capture](../capture/README.md#conformance)).
 | Continuity | per-PID counters, wrap, one duplicate packet (with the PCR exception), loss, signalled discontinuity |
 | PSI | pointer field, multi-section packets, CRC-32, PAT, PMT, program and ES descriptor loops |
 | Descriptors | registration, ISO 639 language, AVC, HEVC, DVB AC-3 (`0x6a`), E-AC-3 (`0x7a`), DVB subtitling (`0x59`), teletext (`0x56`) |
-| PES | split headers, finite lengths, unbounded lengths on MPEG-1/2 video (0x01, 0x02), AVC (0x1b) and HEVC (0x24) streams, PTS/DTS with marker checks, optional fields |
+| PES | split headers, finite lengths, unbounded lengths on MPEG-1/2 video (0x01, 0x02), AVC (0x1b), HEVC (0x24) and VVC (0x33) streams, PTS/DTS with marker checks, optional fields |
 | FFmpeg-compatible carriage | AVC, HEVC, AAC ADTS, AAC LATM (`RegisteredCarriage`); AC-3/E-AC-3 by DVB tag or stream type `0x81`/`0x87` (`PrivateAudioCarriage`); single-service DVB subtitles; PES packets of any stream (`PesCutter`), including PGS (`0x90`), teletext and caption-carrying video |
 
 ## Behaviour and limits
@@ -858,6 +879,20 @@ Specification basis:
 
 Verification:
 
+- `tests/video_pes.rs` checks finite and unbounded VVC PES with seven-byte
+  input windows, next-start and EOF completion, typed PMT identity and unchanged
+  refusals for unbounded private data, VVC temporal subsets and LCEVC. Its ignored
+  `vvc_pes_matches_public_ffmpeg_without_codec_parsing` control uses public FFmpeg
+  9.0.2 binaries through I/O only. Set `TRIERGON_FFMPEG` and `TRIERGON_FFPROBE`,
+  then run `CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test video_pes -- --include-ignored`.
+  FFprobe with `-fflags +noparse+nofillin` identifies VVC/video and returns
+  all three exact eight-byte payloads and PTS/DTS pairs (3003/0, 6006/3003,
+  9009/6006). Synthetic bodies establish transport boundaries, not valid pictures.
+  The macOS Homebrew 9.0.2_1 control binaries have SHA-256
+  `2be8e0caabc6ce733a628d1523f43235702d714826df3408e04e09b2a079b7a3`
+  (ffmpeg) and `072b4ddb060a6173b274510da92a96a8433d200cd40b277ed8117ffb718f2cbe`
+  (ffprobe). This is functional coverage, without runtime or memory qualification.
+
 - The [DTS seek comparison](../../harness/features/mpegts-dts-seek/contract.json)
   contains two DTS core history cases and 24 authored XLL cases. Twelve XLL cases
   use an extension alone and twelve carry an independently recoverable core.
@@ -916,6 +951,13 @@ Verification:
   original-cursor coverage and real EOF with `NoPacketsConfirmation`. That
   proof runs on the original source operation. The control-only replay runs
   inside the measured operation.
+  The required functional corpus contains 99 cases, retaining all 97 previous
+  cases and pins and adding `vvc-finite` and `vvc-unbounded`. Each new case
+  carries three opaque eight-byte payloads with PTS/DTS pairs (3003, 0),
+  (6006, 3003), (9009, 6006). Both match the pinned `d32b387f` public formats
+  worker: three packets, 24 bytes, digest `1768033906666164040` and EOF.
+  `RegisteredCarriage::Vvc` admits stream type `0x33` and PES stream ID `0xe0`
+  through the same observer and clock. This qualifies PES delivery only.
   For an ordered sequence, each intermediate physical End is sealed before
   the same cursor advances to its next request. Ordinary boundaries retain
   PES assembly and the demux clock, including an initialization entity's

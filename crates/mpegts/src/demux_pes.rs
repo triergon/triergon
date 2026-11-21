@@ -54,6 +54,7 @@ pub struct DemuxScope {
 pub enum RegisteredCarriage {
     Avc,
     Hevc,
+    Vvc,
     AacAdts,
     AacLatm,
 }
@@ -62,6 +63,7 @@ impl RegisteredCarriage {
         match self {
             Self::Avc => (0x1b, 0xe0),
             Self::Hevc => (0x24, 0xe0),
+            Self::Vvc => (0x33, 0xe0),
             Self::AacAdts => (0x0f, 0xc0),
             Self::AacLatm => (0x11, 0xc0),
         }

@@ -113,7 +113,9 @@
     "finite-continuation-body-408",
     "finite-continuation-body-409",
     "finite-continuation-body-414",
-    "finite-continuation-body-415"
+    "finite-continuation-body-415",
+    "vvc-finite",
+    "vvc-unbounded"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",

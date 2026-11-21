@@ -855,6 +855,8 @@ const FIXTURE_USAGE: &str = "usage: cargo xtask fixture <family> [options] --out
 
 families and options:
   m2ts INPUT.ts OUTPUT.m2ts   wrap TS188 packets for the program fixtures
+  transport-vvc --output ROOT [--record REFERENCE_ROOT --observations DIR]
+           regenerate VVC PES inputs and append pinned functional cases
   transport-access-units --output ROOT [--record --reference-worker FILE --observations DIR]
            regenerate MPEG-TS access-unit inputs and their reference-pinned corpus
   transport-dts --record REFERENCE   regenerate DVB DTS core transport inputs and pins
@@ -876,6 +878,9 @@ fn fixture(root: &Path, args: &[String]) -> Task {
             return Err(FIXTURE_USAGE.into());
         };
         return transport_fixtures::program_m2ts(Path::new(source), Path::new(target));
+    }
+    if family == "transport-vvc" {
+        return transport_fixtures::vvc::main(root, &args[1..]);
     }
     if family == "transport-access-units" {
         return transport_fixtures::main(root, &args[1..]);

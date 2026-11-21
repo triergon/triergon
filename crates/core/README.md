@@ -7,6 +7,9 @@ model. It is the bottom layer of the workspace and depends only on `std`. It
 performs no I/O, owns no threads and implements no format: packet boundaries,
 codec configuration and clock epochs belong to the format crates built on it.
 
+`CodecId::Vvc` identifies ITU-T H.266 video. Codec identity alone does not
+promise access-unit framing or a decoder.
+
 ## Usage
 
 ```rust

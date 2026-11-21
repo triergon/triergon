@@ -232,6 +232,7 @@ fn observer(
     let registered = match stream.stream_type {
         0x1b => Some(RegisteredCarriage::Avc),
         0x24 => Some(RegisteredCarriage::Hevc),
+        0x33 => Some(RegisteredCarriage::Vvc),
         0x0f => Some(RegisteredCarriage::AacAdts),
         0x11 => Some(RegisteredCarriage::AacLatm),
         _ => None,

@@ -3,6 +3,7 @@
 
 pub mod dts_hd;
 pub mod matched;
+pub mod vvc;
 
 use std::ffi::OsString;
 use std::fs;
@@ -155,6 +156,15 @@ fn original_inputs(mut manifest: Value) -> R<Value> {
     let Some((_, Value::Array(rows))) = fields.iter_mut().find(|(key, _)| key == "cases") else {
         return Err("missing original PES cases".into());
     };
+    // The AU corpus retains exactly the original PES inputs and request boundary.
+    if rows.len() != 97
+        && (rows.len() != 99
+            || rows[97].get("id") != Some(&Value::str("vvc-finite"))
+            || rows[98].get("id") != Some(&Value::str("vvc-unbounded")))
+    {
+        return Err("unexpected PES extension membership".into());
+    }
+    rows.truncate(97);
     for row in rows {
         let Value::Object(fields) = row else {
             return Err("invalid original PES case".into());
@@ -1310,7 +1320,14 @@ fn save_reference_result(
         && observation
             .get("data")
             .filter(|data| **data != Value::Null)
-            .is_some_and(|data| text(data, "operation").ok() != Some(OPERATION))
+            .is_some_and(|data| {
+                text(data, "operation").ok()
+                    != Some(if argv.get(1).is_some_and(|a| a == "ts-fold") {
+                        vvc::OPERATION
+                    } else {
+                        OPERATION
+                    })
+            })
     {
         return Err("reference worker ran a different operation".into());
     }
@@ -1338,13 +1355,17 @@ fn observation_hash(observation: &Value) -> String {
 }
 
 fn expected(observation: &Value) -> Value {
+    expected_for(observation, OPERATION)
+}
+
+fn expected_for(observation: &Value, operation: &str) -> Value {
     if observation.get("exit") != Some(&Value::int(0)) {
         return Value::Null;
     }
     let Some(data) = observation.get("data") else {
         return Value::Null;
     };
-    if data.get("operation").and_then(Value::as_str) != Some(OPERATION)
+    if data.get("operation").and_then(Value::as_str) != Some(operation)
         || data.get("iterations") != Some(&Value::int(1))
         || data.get("eof") != Some(&Value::Bool(true))
     {
@@ -1698,10 +1719,17 @@ mod tests {
 
     #[test]
     fn original_inputs_arguments_and_all272_request_associations_are_unchanged() {
+        let mut retained = read_json(&root().join(ORIGINAL)).unwrap();
+        let rows = cases(&retained).unwrap()[..97].to_vec();
+        put(&mut retained, "cases", Value::Array(rows)).unwrap();
+        assert_eq!(
+            sha256::hex((json::to_python(&retained, Some(2)) + "\n").as_bytes()),
+            ORIGINAL_SHA
+        );
         let original = read_json(&root().join(ORIGINAL)).unwrap();
         let generated = all_cases(root()).unwrap();
         assert_eq!(generated.len(), 179);
-        for (old, new) in cases(&original).unwrap().iter().zip(&generated) {
+        for (old, new) in cases(&original).unwrap()[..97].iter().zip(&generated) {
             assert!(new.bytes.is_none());
             for key in [
                 "id",
@@ -1716,8 +1744,7 @@ mod tests {
             }
         }
         assert_eq!(
-            cases(&original)
-                .unwrap()
+            cases(&original).unwrap()[..97]
                 .iter()
                 .map(|v| v.get("requests").unwrap().as_array().unwrap().len())
                 .sum::<usize>(),
@@ -1964,7 +1991,7 @@ mod tests {
         .unwrap();
         assert_eq!(old.prefix, "ts-");
         assert_eq!(old.candidate, "transport-worker");
-        assert_eq!(old.cases.len(), 97);
+        assert_eq!(old.cases.len(), 99);
     }
 
     #[test]
