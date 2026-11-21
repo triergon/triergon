@@ -503,7 +503,7 @@ impl DtsHeaderInspector {
                 State::Complete => return Ok(Step::End(self.record_end)),
                 &mut State::Failed(error) => return Err(error),
             };
-            match *phase {
+            match phase {
                 Phase::Read => {
                     if self.current == FIELD_COUNT {
                         *phase = Phase::Validate;
@@ -568,7 +568,7 @@ impl DtsHeaderInspector {
                     self.issues = issues;
                     *phase = Phase::Publish(views);
                 }
-                Phase::Publish(views) => {
+                Phase::Publish(_) => {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
@@ -576,16 +576,21 @@ impl DtsHeaderInspector {
                         value(&self.fields, DtsCoreField::Sync),
                         value(&self.fields, DtsCoreField::CrcPresent),
                     );
-                    let output = DtsInspection {
-                        raw: raw.clone(),
+                    let State::Inspecting {
+                        raw,
+                        phase: Phase::Publish(views),
+                    } = std::mem::replace(&mut self.state, State::Complete)
+                    else {
+                        unreachable!("the inspection is checked")
+                    };
+                    return Ok(Step::Ready(DtsInspection {
+                        raw,
                         identity: self.identity,
                         fields: self.fields,
                         issues: self.issues,
                         views,
                         required_bits,
-                    };
-                    self.state = State::Complete;
-                    return Ok(Step::Ready(output));
+                    }));
                 }
             }
         }
