@@ -43,17 +43,6 @@
    ]
   },
   {
-   "name": "crc_bad.opus",
-   "sha256": "58955283b54fc60407a235dc3579c6919619ca8d7f8f77ef7f0f41bd9430e614",
-   "view": "compat",
-   "dispositions": ["ogg-first-packet-after-bad-page"],
-   "difference_sha256": "b2c1520cb754f85c3892461bdb8203caa92aa74fb252853f263fb11f9c4833f0",
-   "differences": [
-    [0, 0, 0, "pts", -312, 4488, "ogg-first-packet-after-bad-page"],
-    [0, 0, 0, "dts", -312, 4488, "ogg-first-packet-after-bad-page"]
-   ]
-  },
-  {
    "name": "bear.ogv",
    "sha256": "c6281b645fc9ddcba7ecc8eb16c525758cec498de9645a5e6be44f6a8962ce57",
    "view": "native",

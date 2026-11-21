@@ -218,23 +218,6 @@
    ]
   },
   {
-   "id": "ogg-first-packet-after-bad-page",
-   "reason": "when the first audio page fails its CRC, FFmpeg times the first packet it keeps from that packet's page; the compat view times it from the stream start, as if the lost packets had been delivered",
-   "scope": [
-    {
-     "views": [
-      "compat"
-     ],
-     "fields": [
-      "pts",
-      "dts"
-     ],
-     "packets": "after-resync",
-     "reference": "any"
-    }
-   ]
-  },
-  {
    "id": "flac-rate-change-duration",
    "reason": "when the sample rate changes, FFmpeg delivers each FLAC frame's duration rescaled to the first frame's rate; the reader times every frame at its own rate. The reader reports no per-frame rate, so the scope is every duration",
    "scope": [

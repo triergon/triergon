@@ -399,6 +399,9 @@ fn a_lost_page_drops_its_packets_and_the_next_page_keeps_its_time() {
         Event::Other(ReaderEvent::Resync { offset, bytes }) if *offset == offsets[5] as u64 && *bytes == cut.len() as u64
     )));
     assert_eq!(summary(&events).len(), 25);
+    let kept = packets(&events);
+    assert_eq!(packet_timing(kept[15]).pts, Some(960 * 15 - 312));
+    assert_eq!(kept[15].pts(), Some(960 * 20 - 312));
     // Garbage between pages is skipped and reported.
     let mut garbage = file[..offsets[5]].to_vec();
     garbage.extend_from_slice(b"OggXOgg junk OggS");
@@ -406,6 +409,23 @@ fn a_lost_page_drops_its_packets_and_the_next_page_keeps_its_time() {
     let (_, events, error) = read_with(&garbage, 7, 1 << 20, false, Limits::default());
     assert_eq!(error, None);
     assert_eq!(packets(&events).len(), 30);
+}
+
+#[test]
+fn first_bad_opus_audio_page_uses_the_surviving_page_clock() {
+    let mut file = Vec::new();
+    opus_stream(5, 30, 5, 0, &mut file);
+    let offsets = page_offsets(&file);
+    file[offsets[2] + 40] ^= 0x55;
+    for window in [1 << 16, 7, 1] {
+        let (_, events, error) = read_with(&file, window, 1 << 20, false, Limits::default());
+        assert_eq!(error, None);
+        let kept = packets(&events);
+        assert_eq!(kept.len(), 25);
+        assert_eq!(kept[0].pts(), Some(5 * 960 - 312));
+        assert_eq!(packet_timing(kept[0]).pts, Some(5 * 960 - 312));
+        assert_eq!(packet_timing(kept[1]).pts, Some(6 * 960 - 312));
+    }
 }
 
 fn page_offsets(file: &[u8]) -> Vec<usize> {
