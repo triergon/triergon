@@ -362,7 +362,7 @@ impl DtsAudioFrame {
     }
 }
 
-/// One DTS-HD extension frame in a stream without a DTS core.
+/// One DTS-HD access unit containing extension substreams without a DTS core.
 #[derive(Debug)]
 pub struct DtsExtensionFrame {
     pub(super) bytes: Bytes,
@@ -371,12 +371,12 @@ pub struct DtsExtensionFrame {
 }
 
 impl DtsExtensionFrame {
-    /// Original extension header and asset payload.
+    /// Original extension headers, alignment bytes and asset payloads.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
 
-    /// Frame duration from the extension's current static metadata, if known.
+    /// Duration from the lowest-index extension's current static metadata, if known.
     pub const fn sample_span(&self) -> Option<Time> {
         self.duration
     }

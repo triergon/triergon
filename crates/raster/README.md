@@ -79,8 +79,8 @@ border it has and draws only the others, held through a handle of its own
 (`GlyphSource::Bitmap`; `Raster::render` uses `Arc<Bitmap>`), which the run
 and `Raster::compose` hold them by. The steps are public too: `Run::place`
 quantises and places the glyph without drawing it, giving the `BitmapTransform`
-its fill and border are drawn under; `Raster::stroke_border` strokes the border
-and `Raster::draw` draws each, the opaque box from `Shape::unit_box`; and
+its fill and border are drawn under; `Raster::stroke_border` strokes the border,
+returning it in storage of exactly its size, and `Raster::draw` draws each, the opaque box from `Shape::unit_box`; and
 `Run::add` adds what was drawn to the run. A bitmap is then keyed by its shape
 and its transform, a stroked border by its glyph and its `BorderStroke`, and a
 composite by `Effects::key` and its glyphs' bitmaps and places, as libass keys
@@ -141,8 +141,8 @@ properties are matched:
 ## Behaviour and limits
 
 Every input-dependent allocation is charged to the `Budget` a value was created
-with: outlines, bitmaps and the rasteriser's and blur's scratch, which a
-`Raster` keeps and reuses. Work is charged to the `WorkBudget` the caller passes
+with: outlines, bitmaps and the rasteriser's, stroker's and blur's scratch,
+which a `Raster` keeps and reuses. Work is charged to the `WorkBudget` the caller passes
 to each stage, one per frame: subdivision steps (each spline part the
 stroker offsets and each arc it subdivides), emitted points, polyline
 segments and 16×16 tiles filled, and every 16 pixels of a row a blur stage
