@@ -142,4 +142,4 @@ which delivers one link only: Vorbis and FLAC from the first link's start to its
 Opus and Speex from the last link's start, timed from that link's own zero.
 
 The `read_packets` helper reads every packet of a whole file in memory, headers
-included, for tests and tools.
+included, charged to the caller's pool, for tests and tools.

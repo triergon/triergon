@@ -8,7 +8,7 @@
 //! before it carries a start trim, which is how Opus pre-skip and a Vorbis or Opus start
 //! offset (a first page whose granule position is smaller than its samples) reach the
 //! decoder.
-use crate::compat::ReferenceTiming;
+use crate::compat::clock::ReferenceTiming;
 use crate::mapping::{Durations, Timeline};
 use triergon_core::container::Trim;
 

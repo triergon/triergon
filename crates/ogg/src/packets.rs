@@ -1,25 +1,25 @@
 //! Packet reassembly over the pages of one logical stream.
 use crate::page::PageHeader;
-use triergon_core::{BudgetVec, Bytes, Error, Result};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};
 
 /// A packet completed by a page.
 #[derive(Clone, Debug)]
-pub struct Completed {
+pub(crate) struct Completed {
     /// The packet bytes: a view of the page for a packet inside it, or the gathered
     /// pieces of a packet that spans pages.
-    pub payload: Bytes,
+    pub(crate) payload: Bytes,
     /// Whether this is the last packet completed on its page, the one the page's granule
     /// position describes.
-    pub last_on_page: bool,
+    pub(crate) last_on_page: bool,
 }
 
 /// What a page did to the packet in progress.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Continuity {
+pub(crate) enum Continuity {
     /// The page follows the previous one.
     Continuous,
-    /// The first page after [`Assembler::reset`], whose leading continuation (if any)
-    /// is skipped as RFC 3533 requires.
+    /// The first page the assembler sees, whose leading continuation (if any) is
+    /// skipped as RFC 3533 requires.
     Fresh,
     /// Bytes were lost: a sequence gap, a continuation with no packet in progress, or a
     /// packet that never finished. The broken packet is dropped.
@@ -33,7 +33,7 @@ pub enum Continuity {
 /// unfinished, so a page gathers at most one packet; every other packet is a view of
 /// the page. [`Assembler::push`] either applies a whole page or fails without change.
 #[derive(Debug)]
-pub struct Assembler {
+pub(crate) struct Assembler {
     /// The packet that continues onto the next page.
     partial: BudgetVec<u8>,
     next_sequence: Option<u32>,
@@ -44,7 +44,7 @@ pub struct Assembler {
 
 impl Assembler {
     /// An assembler holding packets of at most `max_packet` bytes.
-    pub fn new(budget: &triergon_core::Budget, max_packet: usize) -> Assembler {
+    pub(crate) fn new(budget: &Budget, max_packet: usize) -> Assembler {
         Assembler {
             partial: BudgetVec::new(budget),
             next_sequence: None,
@@ -53,15 +53,8 @@ impl Assembler {
         }
     }
 
-    /// Forget the packet in progress and the expected sequence number, as after a seek.
-    pub fn reset(&mut self) {
-        self.partial.clear();
-        self.next_sequence = None;
-        self.broken = false;
-    }
-
     /// Whether a packet continues past the last page pushed.
-    pub fn in_progress(&self) -> bool {
+    pub(crate) fn in_progress(&self) -> bool {
         !self.partial.is_empty()
     }
 
@@ -77,7 +70,7 @@ impl Assembler {
 
     /// Add one whole page (`page` starts with `header`) and append the packets it
     /// completes to `out`, which is cleared first.
-    pub fn push(
+    pub(crate) fn push(
         &mut self,
         header: &PageHeader,
         page: &Bytes,
@@ -180,9 +173,8 @@ impl Assembler {
 mod tests {
     use super::*;
     use crate::page::{CONTINUED, write_page};
-    use triergon_core::Budget;
 
-    fn push(assembler: &mut Assembler, page: &[u8], _: &Budget) -> (Continuity, Vec<Vec<u8>>) {
+    fn push(assembler: &mut Assembler, page: &[u8]) -> (Continuity, Vec<Vec<u8>>) {
         let header = PageHeader::parse(page).unwrap();
         let bytes = Bytes::copy_from_slice(&Budget::new(1 << 20).unwrap(), page).unwrap();
         let mut out = Vec::new();
@@ -196,12 +188,12 @@ mod tests {
         let mut assembler = Assembler::new(&budget, 1 << 16);
         let mut page = Vec::new();
         write_page(0, -1, 1, 0, &[255], &[1; 255], &mut page);
-        let (continuity, done) = push(&mut assembler, &page, &budget);
+        let (continuity, done) = push(&mut assembler, &page);
         assert_eq!((continuity, done.len()), (Continuity::Fresh, 0));
         assert!(assembler.in_progress());
         page.clear();
         write_page(CONTINUED, 9, 1, 2, &[10, 4], &[2; 14], &mut page);
-        let (continuity, done) = push(&mut assembler, &page, &budget);
+        let (continuity, done) = push(&mut assembler, &page);
         assert_eq!(continuity, Continuity::Lost);
         assert_eq!(done, [vec![2; 4]]);
         assert!(!assembler.in_progress());
@@ -214,20 +206,20 @@ mod tests {
         let mut page = Vec::new();
         // A fresh stream starting inside a packet: the continuation is skipped quietly.
         write_page(CONTINUED, -1, 1, 5, &[255], &[1; 255], &mut page);
-        let (continuity, done) = push(&mut assembler, &page, &budget);
+        let (continuity, done) = push(&mut assembler, &page);
         assert_eq!((continuity, done.len()), (Continuity::Fresh, 0));
         page.clear();
         write_page(CONTINUED, 3, 1, 6, &[2, 3], &[7; 5], &mut page);
-        let (continuity, done) = push(&mut assembler, &page, &budget);
+        let (continuity, done) = push(&mut assembler, &page);
         assert_eq!(continuity, Continuity::Continuous);
         assert_eq!(done, [vec![7; 3]]);
         // A page that starts fresh while a packet is in progress loses it.
         page.clear();
         write_page(0, -1, 1, 7, &[255], &[1; 255], &mut page);
-        push(&mut assembler, &page, &budget);
+        push(&mut assembler, &page);
         page.clear();
         write_page(0, 1, 1, 8, &[1], &[4], &mut page);
-        let (continuity, done) = push(&mut assembler, &page, &budget);
+        let (continuity, done) = push(&mut assembler, &page);
         assert_eq!((continuity, done), (Continuity::Lost, vec![vec![4]]));
     }
 
@@ -237,7 +229,7 @@ mod tests {
         let mut assembler = Assembler::new(&budget, 300);
         let mut page = Vec::new();
         write_page(0, -1, 1, 0, &[255], &[1; 255], &mut page);
-        push(&mut assembler, &page, &budget);
+        push(&mut assembler, &page);
         page.clear();
         write_page(CONTINUED, -1, 1, 1, &[255], &[1; 255], &mut page);
         let header = PageHeader::parse(&page).unwrap();

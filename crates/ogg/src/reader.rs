@@ -1,5 +1,5 @@
 //! The resumable Ogg reader.
-use crate::compat::ReferenceClock;
+use crate::compat::clock::ReferenceClock;
 use crate::mapping::{Configuration, HeaderStep, Headers, Mapping, Previous};
 use crate::packets::{Assembler, Completed, Continuity};
 use crate::page::{MAX_PAGE, Page, PageHeader, PageReader, PageStep};
@@ -65,14 +65,28 @@ pub enum ReaderEvent {
     /// The track at this index has read its headers (or its mapping has none) and is
     /// configured; its packets follow.
     Track(usize),
-    /// A chained link starts at this source offset; its tracks follow.
-    Link { index: u32, offset: u64 },
-    /// Bytes skipped before the page at `offset + bytes`: garbage, pages with a bad CRC,
-    /// or a partial page at the end of the input.
-    Resync { offset: u64, bytes: u64 },
-    /// Pages of the track were lost before the page at this offset; the packet they
-    /// carried is dropped.
-    Lost { track: usize, page: u64 },
+    /// A chained link starts; its tracks follow.
+    Link {
+        /// The link's position in the chain; the first link is 0 and is not announced.
+        index: u32,
+        /// Source offset of the link's first page.
+        offset: u64,
+    },
+    /// Bytes skipped before a page: garbage, pages with a bad CRC, or a partial page at
+    /// the end of the input.
+    Resync {
+        /// Source offset of the first skipped byte.
+        offset: u64,
+        /// Bytes skipped; the next page, if any, starts at `offset + bytes`.
+        bytes: u64,
+    },
+    /// Pages of a track were lost; the packet they carried is dropped.
+    Lost {
+        /// The index of the track.
+        track: usize,
+        /// Source offset of the first page after the loss.
+        page: u64,
+    },
 }
 
 /// The state of one logical stream of the current link.
@@ -909,10 +923,11 @@ impl ContainerReader for Reader {
                 .inspect_err(|error| self.failed = Some(*error))
         })
     }
-    /// Seek a configured, timed track. The target is on the physical stream's timeline;
-    /// see [`crate::seek`] for the landing, and for the track of another chain link a
-    /// target outside the track's link lands on. Packets of other tracks resume after
-    /// the landing in source order. The receipt arrives before the first packet.
+    /// Seek a configured, timed track. The target is on the physical stream's timeline:
+    /// the seek lands on the packet whose output is needed first, in the chain link that
+    /// holds the target, on the track at the requested track's position in that link
+    /// (see the crate documentation's Seeking section). Packets of other tracks resume
+    /// after the landing in source order. The receipt arrives before the first packet.
     fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
         if let Some(error) = self.failed {
             return Err(error);

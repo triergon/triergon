@@ -1,5 +1,5 @@
 //! Tracks and packets, and their neutral views.
-use crate::compat::ReferenceTiming;
+use crate::compat::clock::ReferenceTiming;
 use crate::mapping::{Configuration, Mapping, Timeline};
 use triergon_core::container::{
     CodecId, MediaKind, PacketInfo, RandomAccess, TrackId, TrackInfo, Trim,
@@ -78,6 +78,7 @@ impl Track {
         self.link
     }
 
+    /// The mapping the first packet identifies.
     pub fn mapping(&self) -> Mapping {
         self.mapping
     }
@@ -97,6 +98,7 @@ impl Track {
         self.config.sample_rate
     }
 
+    /// The channel count the identification header states.
     pub fn channels(&self) -> Option<u8> {
         self.config.channels
     }
@@ -128,6 +130,8 @@ impl Track {
         self.end
     }
 
+    /// The tick of the track's packet times: 1/sample rate, one Theora frame, or
+    /// nanoseconds for a mapping whose packets carry no time.
     pub fn time_base(&self) -> TimeBase {
         self.time_base
     }

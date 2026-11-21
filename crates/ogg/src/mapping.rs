@@ -26,10 +26,15 @@ use triergon_framing::{
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Mapping {
+    /// Vorbis I: the first packet is the identification header (`\x01vorbis`).
     Vorbis,
+    /// Opus (RFC 7845): the first packet is `OpusHead`.
     Opus,
+    /// FLAC (Ogg FLAC 1.0): the first packet is `\x7fFLAC` with the native stream header.
     Flac,
+    /// Theora I: the first packet is the identification header (`\x80theora`).
     Theora,
+    /// Speex: the first packet is the Speex header (`Speex   `).
     Speex,
     /// A mapping this reader does not interpret; [`Track::codec_tag`](crate::Track)
     /// holds the start of its first packet.
@@ -88,6 +93,7 @@ impl Mapping {
         )
     }
 
+    /// What the mapping codes.
     pub fn kind(self) -> MediaKind {
         match self {
             Mapping::Vorbis | Mapping::Opus | Mapping::Flac | Mapping::Speex => MediaKind::Audio,

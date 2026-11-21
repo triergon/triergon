@@ -11,8 +11,9 @@ fn stream(name: &str) -> Option<Vec<Vec<u8>>> {
         .join("../../.research/fate-samples/vorbis")
         .join(name);
     let data = std::fs::read(path).ok()?;
-    let packets = triergon::ogg::read_packets(&data).ok()?;
-    Some(packets.into_iter().map(|packet| packet.data).collect())
+    let pool = Budget::new(data.len().saturating_mul(4).max(1 << 20)).ok()?;
+    let packets = triergon::ogg::read_packets(&pool, &data).ok()?;
+    Some(packets.iter().map(|packet| packet.data.to_vec()).collect())
 }
 
 fn decoder(packets: &[Vec<u8>], limits: Limits) -> Result<Decoder, DecodeError> {
