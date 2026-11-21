@@ -31,7 +31,7 @@ mod canonical;
 mod inline_storage;
 mod record_input;
 
-use triergon_core::{BudgetVec, Bytes, Error, Result};
+use triergon_core::{BudgetVec, Bytes, Error, InputCursor, InputRequest, Result, SourceId};
 
 /// Whether a job may be stepped again after `error`: the pool refused storage it
 /// can grant once the caller frees some.
@@ -50,6 +50,63 @@ pub(crate) fn freeze_whole(output: &mut BudgetVec<u8>) -> Result<Bytes> {
             *output = refused.value;
             Err(refused.error)
         }
+    }
+}
+
+/// A reader's input: an [`InputCursor`] until the reader fails, then the request it
+/// had open and the error it returns from then on.
+pub(crate) enum ReaderInput {
+    Open(InputCursor),
+    Failed { request: InputRequest, error: Error },
+}
+
+impl ReaderInput {
+    /// The open request; once failed, the request that was open then.
+    pub(crate) fn request(&self) -> InputRequest {
+        match self {
+            Self::Open(cursor) => cursor.request(),
+            Self::Failed { request, .. } => request.clone(),
+        }
+    }
+    /// Source offset of the next byte the cursor yields.
+    pub(crate) fn position(&self) -> u64 {
+        match self {
+            Self::Open(cursor) => cursor.position(),
+            Self::Failed { request, .. } => request.offset,
+        }
+    }
+    /// Generation of the cursor's token.
+    pub(crate) fn generation(&self) -> u64 {
+        match self {
+            Self::Open(cursor) => cursor.generation(),
+            Self::Failed { request, .. } => request.token.generation(),
+        }
+    }
+    /// The source the reader reads.
+    pub(crate) fn source(&self) -> SourceId {
+        match self {
+            Self::Open(cursor) => cursor.source(),
+            Self::Failed { request, .. } => request.source,
+        }
+    }
+    /// The error that ended the reader, if any.
+    pub(crate) fn failure(&self) -> Option<Error> {
+        match self {
+            Self::Open(_) => None,
+            Self::Failed { error, .. } => Some(*error),
+        }
+    }
+    /// The cursor, or the error that ended the reader.
+    pub(crate) fn cursor(&mut self) -> Result<&mut InputCursor> {
+        match self {
+            Self::Open(cursor) => Ok(cursor),
+            Self::Failed { error, .. } => Err(*error),
+        }
+    }
+    /// Ends the input with `error`, keeping the request that is open.
+    pub(crate) fn fail_with(&mut self, error: Error) {
+        let request = self.request();
+        *self = Self::Failed { request, error };
     }
 }
 

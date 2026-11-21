@@ -2,12 +2,12 @@
 //! found from one sync to the next. Experimental, and not a reader for 14-bit DTS in
 //! general. ETSI TS 102 114 V1.2.1 §5.3 and V1.6.1 §5.3–5.4.2.
 use crate::dts::core_frame::CORE_SYNC;
-use crate::dts::reader::{ReaderInput, limit, source_error};
+use crate::dts::reader::{limit, source_error};
 use crate::dts::{
     Dts14BitPayload, Dts14BitUnpacker, DtsCoreHeader, DtsPackingLimits, DtsSourceIdentity,
     DtsWordOrder, probe_core_header,
 };
-use crate::{freeze_whole, retryable};
+use crate::{ReaderInput, freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
