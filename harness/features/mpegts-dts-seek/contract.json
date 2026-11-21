@@ -8,13 +8,27 @@
   "worker_operation": "ts-audio-seek-",
   "reference": "ffmpeg-ts-dts-seek",
   "contract": [
-    "Start with a preloaded DVB transport carrying canonical DTS core access units and a target in source 90 kHz ticks.",
+    "Start with a preloaded DVB transport carrying canonical DTS core access units or aligned, finite PES containing one self-contained lossless-only XLL access unit each, and a target in source 90 kHz ticks.",
     "Scan for the last core frame with maximal source PTS at or before the target whose history flag is clear. The reference uses the public FFmpeg demuxer with the DTS parser and NOFILLIN, reads HFLAG from the emitted core header, and replays from the selected frame.",
-    "Compare the requested, landing and discard times and every frame of the replay suffix through EOF, including frames that need earlier predictor history."
+    "For the authored XLL inputs every access unit has static setup, one extension-zero construction-17 asset, complete checksummed headers and immediate XLL sync at asset offset zero without smoothing. FFmpeg identifies this DVB extension descriptor as data and preserves each full PES payload; it does not validate XLL recovery. Reader tests check recovery navigation and refusals independently.",
+    "Compare the requested, landing and discard times and every source PTS, effective DTS and payload byte of the replay suffix through EOF, including core frames that need earlier predictor history. Both previous-entry and playback-preroll policies land early and late in each XLL stream. Repeated cases drain the late suffix to EOF, then seek backward with the candidate index and compare both complete suffixes.",
+    "Each measured iteration constructs the reader, scans, selects the landing and replays and folds the complete suffix, including the second seek where declared. Input loading and output serialisation stay outside timing; the standard report observers measure peak live heap and total resident peak RSS for the complete operation."
   ],
   "required_profiles": [
     "dts-core-history-preroll",
-    "dts-core-history-next-entry"
+    "dts-core-history-next-entry",
+    "dts-xll-ts188-early-previous",
+    "dts-xll-ts188-late-previous",
+    "dts-xll-ts188-backward-indexed-previous",
+    "dts-xll-ts188-early-preroll",
+    "dts-xll-ts188-late-preroll",
+    "dts-xll-ts188-backward-indexed-preroll",
+    "dts-xll-m2ts192-early-previous",
+    "dts-xll-m2ts192-late-previous",
+    "dts-xll-m2ts192-backward-indexed-previous",
+    "dts-xll-m2ts192-early-preroll",
+    "dts-xll-m2ts192-late-preroll",
+    "dts-xll-m2ts192-backward-indexed-preroll"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",

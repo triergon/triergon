@@ -83,6 +83,7 @@ pub fn shared_inputs(root: &Path) -> Result<Vec<String>, String> {
         "harness/fixtures/mpegts/dts-core-mono.dts",
         "harness/fixtures/mpegts/free-format-mono.mp3",
         "xtask/src/transport_fixtures/matched.rs",
+        "xtask/src/transport_fixtures/matched/xll.rs",
         "xtask/src/mpg123.rs",
         "harness/reference_ts_sequence.h",
         "harness/reference_pgs.h",
