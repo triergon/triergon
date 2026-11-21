@@ -37,7 +37,7 @@ mapping, `-compat` the conventional surround mapping.
 ## Outputs
 
 The output is 1920×1080 RGBA per picture, interleaved stereo s16le per mixed audio frame,
-all native PCM planes per configured AAC frame, or interleaved f32le ACN channels for `audio-opus-ambisonic`. The latter accepts 48 kHz first-order Ambisonics without non-diegetic channels and counts decoded nonempty frames. `packets` counts pictures or audio
+all native PCM planes per configured AAC frame, or interleaved f32le ACN channels for `audio-opus-ambisonic`. The latter accepts 48 kHz first-order Ambisonics with or without non-diegetic stereo and counts decoded nonempty frames. `packets` counts pictures or audio
 frames.
 
 | Mode | stdout |

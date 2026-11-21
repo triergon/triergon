@@ -268,6 +268,53 @@ fn ambisonic_planes_match_direct_streams_and_family_255() {
 }
 
 #[test]
+fn ambisonic_stereo_and_gain_apply_to_each_mapped_plane() {
+    let mapping = [3, 0, 255, 2, 1, 3];
+    let mut gained = Decoder::new(&head(6, 2, 2, 2, &mapping, 1536)).unwrap();
+    let mut plain = Decoder::new(&head(6, 2, 2, 2, &mapping, 0)).unwrap();
+    let mut streams = [
+        Decoder::new(&head(2, 0, 0, 0, &[], 0)).unwrap(),
+        Decoder::new(&head(2, 0, 0, 0, &[], 0)).unwrap(),
+    ];
+    let mut seed = 7;
+    let (mut a, mut b) = (AudioFrame::default(), AudioFrame::default());
+    let mut direct = [AudioFrame::default(), AudioFrame::default()];
+    let gain = 10f64.powf(6.0 / 20.0) as f32;
+    for _ in 0..3 {
+        let first = celt_packet(true, 60, &mut seed);
+        let second = celt_packet(true, 40, &mut seed);
+        let packet = [delimited(&first), second.clone()].concat();
+        gained.decode(&packet, &mut a).unwrap();
+        plain.decode(&packet, &mut b).unwrap();
+        streams[0].decode(&first, &mut direct[0]).unwrap();
+        streams[1].decode(&second, &mut direct[1]).unwrap();
+        assert_eq!(a.layout.ambisonic_order(), Some((1, true)));
+        for (plane, source) in [
+            Some((1, 1)),
+            Some((0, 0)),
+            None,
+            Some((1, 0)),
+            Some((0, 1)),
+            Some((1, 1)),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            if let Some((stream, channel)) = source {
+                assert_eq!(b.planes[plane], direct[stream].planes[channel]);
+                assert!(b.planes[plane].iter().any(|&x| x != 0.0));
+                for (&actual, &sample) in a.planes[plane].iter().zip(&b.planes[plane]) {
+                    assert_eq!(actual.to_bits(), (sample * gain).to_bits());
+                }
+            } else {
+                assert!(a.planes[plane].iter().all(|&x| x == 0.0));
+                assert!(b.planes[plane].iter().all(|&x| x == 0.0));
+            }
+        }
+    }
+}
+
+#[test]
 fn multistream_packets_fill_every_mapped_plane_and_silence_the_rest() {
     // Two streams: a coupled pair and a mono stream; plane 1 takes no stream.
     let config = head(4, 255, 2, 1, &[0, 255, 2, 1], 0);

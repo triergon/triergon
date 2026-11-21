@@ -349,9 +349,11 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
             if (native) {
                 if (frame->format != AV_SAMPLE_FMT_FLTP || frame->sample_rate != 48000 ||
                     frame->ch_layout.order != AV_CHANNEL_ORDER_AMBISONIC ||
-                    frame->ch_layout.nb_channels != 4 || frame->ch_layout.u.mask != 0)
+                    !((frame->ch_layout.nb_channels == 4 && frame->ch_layout.u.mask == 0) ||
+                      (frame->ch_layout.nb_channels == 6 && frame->ch_layout.u.mask == 3)))
                     die("ambisonic PCM format", AVERROR_INVALIDDATA);
-                size_t n = (size_t)frame->nb_samples * 4 * sizeof(float);
+                int channels = frame->ch_layout.nb_channels;
+                size_t n = (size_t)frame->nb_samples * channels * sizeof(float);
                 if (n > native_capacity) {
                     uint8_t *next = av_realloc(native_pcm, n);
                     if (!next) die("PCM allocation", AVERROR(ENOMEM));
@@ -359,8 +361,8 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
                     native_capacity = n;
                 }
                 for (int i = 0; i < frame->nb_samples; i++)
-                    for (int c = 0; c < 4; c++)
-                        memcpy(native_pcm + ((size_t)i * 4 + c) * sizeof(float),
+                    for (int c = 0; c < channels; c++)
+                        memcpy(native_pcm + ((size_t)i * channels + c) * sizeof(float),
                                frame->extended_data[c] + (size_t)i * sizeof(float), sizeof(float));
                 fold(&o->digest, native_pcm, n);
                 if (o->raw && fwrite(native_pcm, 1, n, o->raw) != n)

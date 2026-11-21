@@ -113,6 +113,15 @@
    "operation": "audio-opus-ambisonic",
    "iterations": 3,
    "origin": "authored first-order ambisonic Opus fixture (harness/codecs/opus/README.md)"
+  },
+  {
+   "id": "opus-ambisonic-stereo-gain",
+   "path": "harness/codecs/opus/family-2-stereo-gain.opus",
+   "sha256": "3766828b1ba9f51f47ebc38094d8728a4bad0468c2a519d55e489524df2c23d1",
+   "bytes": 5574,
+   "operation": "audio-opus-ambisonic",
+   "iterations": 3,
+   "origin": "authored ambisonic Opus fixture with reordered stereo channels and output gain (harness/codecs/opus/README.md)"
   }
  ]
 }

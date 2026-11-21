@@ -108,7 +108,8 @@ input).
   LFE dropped, normalised so no output exceeds full scale; mono goes to both sides
   at −3 dB. The `DownmixLevels` an AC-3/E-AC-3 stream carries (mix levels, Dolby or
   Pro Logic II surround encoding) are honoured. A layout without speaker positions
-  mixes as FFmpeg's default layout for its channel count, and 16-bit frames (FLAC) mix
+  mixes as FFmpeg's default layout for its channel count. `AudioSession` refuses
+  Ambisonic frames because it has no Ambisonic renderer. 16-bit frames (FLAC) mix
   in integers as FFmpeg's resampler mixes them
   ([harness/codecs/downmix-integer.md](../../harness/codecs/downmix-integer.md)). Float
   mixes become s16 rounded toward negative infinity and saturated (`mix::to_s16`).

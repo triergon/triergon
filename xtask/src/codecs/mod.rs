@@ -11,6 +11,7 @@ pub mod equivalence;
 pub mod fuzz;
 pub mod isobmff_reader;
 pub mod memory;
+mod opus_control;
 pub mod readers;
 pub mod summary;
 pub mod timing;
@@ -30,6 +31,8 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  decoder and write, or with --check compare, the generated PS tables
   aac-sources --out DIR
                  author the fixed-layout and indexed-rate AAC-LC sources
+  opus-control --ffmpeg FF --out FILE
+                 author the six-channel family 2 stereo and gain control
   derive --ffmpeg FF
                  make the derived streams of harness/codecs/derived-streams.json from their
                  FATE sources, fetched by their pins, with the decode profile's ffmpeg, and
@@ -395,6 +398,10 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
         "aac-sources" => {
             let a = Args::parse(rest, &["out"], &[])?;
             aac_sources::run(root, &a.path("out")?)?;
+        }
+        "opus-control" => {
+            let a = Args::parse(rest, &["ffmpeg", "out"], &[])?;
+            opus_control::run(&a.path("ffmpeg")?, &a.path("out")?)?;
         }
         "derive" => {
             let a = Args::parse(rest, &["ffmpeg"], &[])?;

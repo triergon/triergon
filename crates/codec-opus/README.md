@@ -60,7 +60,7 @@ the pre-skip or other container trims.
   order, optionally followed by non-diegetic left and right). Family 2 exposes its
   order and stereo flag through `ChannelLayout::ambisonic_order()`; it does not provide
   a speaker mask or a stereo downmix. The session downmixer treats layouts without a
-  speaker mask as default speaker layouts and is not an Ambisonic renderer. Coupled and uncoupled streams, stream
+  speaker mask as default speaker layouts; the stereo audio session refuses Ambisonic frames. Coupled and uncoupled streams, stream
   channels used by several outputs, and silent outputs (mapping index 255). Other
   families are `Unsupported`, and so are headers of more than 93 output channels (RFC
   7845 allows 255): 93 is the most a `ChannelLayout` holds.

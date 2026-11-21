@@ -230,7 +230,7 @@ fn file_audio<const AMBISONIC: bool>(data: &[u8], out: &mut Output) {
     }
 }
 
-/// Interleave the four ACN planes without changing their format or order.
+/// Interleave the ACN planes and optional stereo pair without changing their order.
 fn emit_native(
     decoded: Result<Option<triergon_codec::DownmixLevels>, triergon_codec::DecodeFailure>,
     frame: &AudioFrame,
@@ -241,10 +241,10 @@ fn emit_native(
         Ok(_) if frame.samples_per_channel == 0 => {}
         Ok(_) => {
             assert_eq!(frame.sample_rate, 48_000);
-            assert_eq!(frame.layout.ambisonic_order(), Some((1, false)));
-            assert_eq!(frame.planes.len(), 4);
+            assert!(matches!(frame.layout.ambisonic_order(), Some((1, _))));
+            assert_eq!(frame.planes.len(), frame.layout.channels());
             bytes.clear();
-            bytes.reserve(frame.samples_per_channel * 4 * size_of::<f32>());
+            bytes.reserve(frame.samples_per_channel * frame.planes.len() * size_of::<f32>());
             for i in 0..frame.samples_per_channel {
                 for plane in &frame.planes {
                     bytes.extend_from_slice(&plane[i].to_le_bytes());

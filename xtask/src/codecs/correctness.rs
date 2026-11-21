@@ -729,9 +729,10 @@ fn audio_decoder(
 }
 
 /// The authored family-2 fixture must produce all six trimmed frames and samples.
-fn complete_ambisonic_output(work: Option<&Value>, rc: i64, bytes: usize) -> bool {
+fn complete_ambisonic_output(work: Option<&Value>, rc: i64, bytes: usize, channels: usize) -> bool {
     rc == 0
-        && bytes == 4_800 * 4 * size_of::<f32>()
+        && channels != 0
+        && bytes == 4_800 * channels * size_of::<f32>()
         && work.and_then(|v| v.get("packets")).and_then(python::int) == Some(6)
         && work.and_then(|v| v.get("bytes")).and_then(python::int) == Some(bytes as i128)
 }
@@ -742,6 +743,7 @@ fn output_path(
     path: &str,
     tmp: &Path,
     initialized_aac: bool,
+    reference_channels: Option<usize>,
 ) -> Result<Value, Stop> {
     let decode = operation(lane).ok_or_else(|| unknown(lane))?;
     let op = format!("{decode}-raw");
@@ -767,10 +769,11 @@ fn output_path(
         let work = |stdout: &str| json_lines(stdout).pop();
         let ours = work(&po.stdout);
         let reference = work(&pr.stdout);
-        let stats = if complete_ambisonic_output(ours.as_ref(), po.code, co.len())
-            && complete_ambisonic_output(reference.as_ref(), pr.code, cr.len())
+        let stats = if let Some(channels) = reference_channels
+            && complete_ambisonic_output(ours.as_ref(), po.code, co.len(), channels)
+            && complete_ambisonic_output(reference.as_ref(), pr.code, cr.len(), channels)
         {
-            channel_stats(&co, &cr, 4)?
+            channel_stats(&co, &cr, channels as i128)?
         } else {
             None
         };
@@ -951,20 +954,30 @@ pub fn grade(a: &Grade) -> Result<(), String> {
             } else {
                 audio_decoder(a, &lane, &path, &tmp.0, initialized_aac)
             };
-            row.push((
-                "decoder".into(),
-                match decoded {
-                    Ok(value) => value,
-                    Err(Stop::Timeout(argv)) => timeout_row(argv),
-                    Err(Stop::Fatal(message)) => return Err(message),
-                },
-            ));
+            let decoded = match decoded {
+                Ok(value) => value,
+                Err(Stop::Timeout(argv)) => timeout_row(argv),
+                Err(Stop::Fatal(message)) => return Err(message),
+            };
+            let reference_channels = decoded
+                .get("ffmpeg_channels")
+                .and_then(python::int)
+                .and_then(|channels| u8::try_from(channels).ok())
+                .map(usize::from);
+            row.push(("decoder".into(), decoded));
             if lane != "aac-mov" {
                 let output_dir = tmp.0.join("o");
                 fs::create_dir(&output_dir).map_err(|e| e.to_string())?;
                 row.push((
                     "output".into(),
-                    match output_path(a, &lane, &path, &output_dir, initialized_aac) {
+                    match output_path(
+                        a,
+                        &lane,
+                        &path,
+                        &output_dir,
+                        initialized_aac,
+                        reference_channels,
+                    ) {
                         Ok(value) => value,
                         Err(Stop::Timeout(argv)) => timeout_row(argv),
                         Err(Stop::Fatal(message)) => return Err(message),
@@ -1002,12 +1015,16 @@ mod tests {
     #[test]
     fn ambisonic_worker_requires_complete_successful_output() {
         let work = Value::object([("packets", Value::int(6)), ("bytes", Value::int(76_800))]);
-        assert!(complete_ambisonic_output(Some(&work), 0, 76_800));
-        assert!(!complete_ambisonic_output(Some(&work), 1, 76_800));
-        assert!(!complete_ambisonic_output(Some(&work), 0, 76_784));
-        assert!(!complete_ambisonic_output(None, 0, 76_800));
+        assert!(complete_ambisonic_output(Some(&work), 0, 76_800, 4));
+        assert!(!complete_ambisonic_output(Some(&work), 0, 76_800, 6));
+        let stereo_pair =
+            Value::object([("packets", Value::int(6)), ("bytes", Value::int(115_200))]);
+        assert!(complete_ambisonic_output(Some(&stereo_pair), 0, 115_200, 6));
+        assert!(!complete_ambisonic_output(Some(&work), 1, 76_800, 4));
+        assert!(!complete_ambisonic_output(Some(&work), 0, 76_784, 4));
+        assert!(!complete_ambisonic_output(None, 0, 76_800, 4));
         let wrong = Value::object([("packets", Value::int(5)), ("bytes", Value::int(76_800))]);
-        assert!(!complete_ambisonic_output(Some(&wrong), 0, 76_800));
+        assert!(!complete_ambisonic_output(Some(&wrong), 0, 76_800, 4));
     }
 
     #[test]
