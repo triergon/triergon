@@ -8,7 +8,7 @@ use crate::normalize::{self, normalize};
 use crate::ot::apply::{Apply, Stage};
 use crate::ot::digest::Digest;
 use crate::ot::layout::{LayoutTable, Lookup};
-use crate::plan::{Plan, StageMap};
+use crate::plan::{Kerning, Plan, StageMap};
 use crate::shapers::{Shaper, ZeroMarks};
 use crate::tag::Direction;
 use crate::unicode::{GeneralCategory, code_point};
@@ -264,36 +264,40 @@ impl Run<'_, '_> {
         if plan.apply_gpos {
             self.apply_stages(Stage::Position, buffer)?;
         }
-        if plan.apply_kern {
-            let mut ctx = Apply::new(
-                Stage::Position,
-                self.face.gpos,
-                &self.face.gdef,
-                buffer,
-                self.font,
-                self.direction,
-            );
-            self.face.kern.apply(&mut ctx, plan.kern_mask)?;
-        } else if plan.apply_fallback_kern && self.font.has_h_kerning() {
-            // The font functions' kerning, in visual order and already scaled.
-            let backward = self.direction.is_backward();
-            if backward {
-                buffer.reverse();
+        match plan.kerning {
+            Kerning::Table => {
+                let mut ctx = Apply::new(
+                    Stage::Position,
+                    self.face.gpos,
+                    &self.face.gdef,
+                    buffer,
+                    self.font,
+                    self.direction,
+                );
+                self.face.kern.apply(&mut ctx, plan.kern_mask)?;
             }
-            let mut ctx = Apply::new(
-                Stage::Position,
-                self.face.gpos,
-                &self.face.gdef,
-                buffer,
-                self.font,
-                self.direction,
-            );
-            crate::ot::kern::kern_machine(&mut ctx, plan.kern_mask, false, |a, b| {
-                self.font.h_kerning(a, b)
-            })?;
-            if backward {
-                buffer.reverse();
+            Kerning::FontFunctions if self.font.has_h_kerning() => {
+                // The font functions' kerning, in visual order and already scaled.
+                let backward = self.direction.is_backward();
+                if backward {
+                    buffer.reverse();
+                }
+                let mut ctx = Apply::new(
+                    Stage::Position,
+                    self.face.gpos,
+                    &self.face.gdef,
+                    buffer,
+                    self.font,
+                    self.direction,
+                );
+                crate::ot::kern::kern_machine(&mut ctx, plan.kern_mask, false, |a, b| {
+                    self.font.h_kerning(a, b)
+                })?;
+                if backward {
+                    buffer.reverse();
+                }
             }
+            Kerning::FontFunctions | Kerning::None => {}
         }
         if zero == Some(ZeroMarks::Late) {
             zero_mark_widths(buffer, adjust_offsets);
