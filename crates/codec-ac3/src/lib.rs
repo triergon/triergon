@@ -403,21 +403,14 @@ impl Decoder {
         self.last_layout = Some((layout, dual_mono));
         self.last_downmix = downmix;
         Ok(FrameInfo {
-            syntax: first.syntax,
-            bsid: first.bsid,
-            acmod: first.acmod,
-            lfeon: first.lfeon,
             dialnorm: info_dialnorm,
-            sample_rate: rate,
-            samples,
-            layout,
-            dual_mono,
             substreams: decoded,
             crc_ok,
             concealed,
             features,
             downmix_codes,
             downmix,
+            ..FrameInfo::new(&first, layout, rate)
         })
     }
 
@@ -508,19 +501,7 @@ impl Decoder {
             }
         }
         Ok(FrameInfo {
-            syntax: first.syntax,
-            bsid: first.bsid,
-            acmod: first.acmod,
-            lfeon: first.lfeon,
-            dialnorm: 0,
-            sample_rate: rate,
-            samples,
-            layout,
-            dual_mono,
-            substreams: 0,
-            crc_ok: false,
             concealed: Some(truncated),
-            features: FrameFeatures::default(),
             downmix_codes: self.indep.downmix,
             // The header of the truncated frame is not decoded; repeat the last info.
             downmix: if same {
@@ -528,7 +509,31 @@ impl Decoder {
             } else {
                 downmix_info(false, first.acmod, &DownmixCodes::default())
             },
+            ..FrameInfo::new(first, layout, rate)
         })
+    }
+}
+
+impl FrameInfo {
+    /// The summary of an access unit led by `first`, before any syncframe is decoded.
+    fn new(first: &FrameHeader, layout: ChannelLayout, sample_rate: u32) -> Self {
+        FrameInfo {
+            syntax: first.syntax,
+            bsid: first.bsid,
+            acmod: first.acmod,
+            lfeon: first.lfeon,
+            dialnorm: 0,
+            sample_rate,
+            samples: first.samples(),
+            layout,
+            dual_mono: first.acmod == 0,
+            substreams: 0,
+            crc_ok: false,
+            concealed: None,
+            features: FrameFeatures::default(),
+            downmix_codes: DownmixCodes::default(),
+            downmix: None,
+        }
     }
 }
 
