@@ -130,9 +130,11 @@ performance gates where it touches hot code.
    is available through `AnyReader`. Its [supported carriages](../crates/mpegts/README.md#access-units)
    use format-owned track classification. Bounded picture and audio seeking scans
    one seekable entity or a declared contiguous sequence. An optional timestamp index
-   selects repeat landings within one entity. Replay reconstructs transport state
-   before delivering the original packet suffix. Additional carriages and direct
-   transport-offset access are open.
+   selects repeat landings within one entity. For independently framed Layer I/II
+   audio with in-band tables, bounded source checkpoints also permit direct
+   physical-offset reads. Other landings replay transport state before delivering
+   the original packet suffix. Additional carriages and broader direct access
+   are open.
 2. **Reference compatibility.** `triergon-framing`, `triergon-matroska`,
    `triergon-subtitles`, `triergon-mpegts` and `triergon-isobmff` follow the convention
    in [reference-compatible behaviour](#reference-compatible-behaviour). Playback moves

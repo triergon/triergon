@@ -642,6 +642,75 @@ fn latm_seek_cases(root: &Path, feature: &str, reference: &Path, cases: &mut Vec
     Ok(())
 }
 
+fn physical_audio_seek_cases(
+    root: &Path,
+    feature: &str,
+    reference: &Path,
+    cases: &mut Vec<Value>,
+) -> R<()> {
+    let pid = PID.to_string();
+    for (name, header, length, step, first, repeated) in [
+        (
+            "mpeg1-layer1-physical-repeated-preroll",
+            [0xff, 0xff, 0x14, 0xc0],
+            32,
+            720,
+            7,
+            1,
+        ),
+        (
+            "mpeg1-layer2-physical-repeated-preroll",
+            [0xff, 0xfd, 0x14, 0xc0],
+            96,
+            2160,
+            1,
+            7,
+        ),
+    ] {
+        let codec = Codec {
+            name,
+            stream_type: 0x03,
+            stream_id: 0xc0,
+            dvb: false,
+            bytes: silence(header, length),
+            first: length,
+            header: 4,
+        };
+        let mut ts = Transport::new();
+        // A physical prefix has no elementary coordinates. Each later landing
+        // starts at its local PAT/PMT, independently of this discarded prefix.
+        for _ in 0..17 {
+            ts.payload(0x1fff, &[0xff; 184]);
+        }
+        for index in 0..10 {
+            // Identical CRC-checked sections bootstrap the program at every
+            // checkpoint. The complete timestamped PES fits in one carrier.
+            ts.tables(&codec, &[])?;
+            let pts = 90_000 + index * step;
+            ts.pes(
+                codec.stream_id,
+                &part(&codec.bytes, Some(pts), (index % 2 != 0).then_some(pts)),
+            )?;
+        }
+        let input = Input {
+            name,
+            m2ts: false,
+            data: ts.finish(false),
+        };
+        let first = (90_001 + first * step).to_string();
+        let repeated = (90_001 + repeated * step).to_string();
+        cases.push(input.record(
+            root,
+            feature,
+            name,
+            &[&pid, &first, "preroll", &repeated],
+            reference,
+            "ts-audio-seek-fold",
+        )?);
+    }
+    Ok(())
+}
+
 /// Rewrap pinned audio frames with independently authored PES timing.
 pub fn author_audio_seek(root: &Path, args: &[String]) -> R<()> {
     let [record, reference] = args else {
@@ -807,6 +876,7 @@ pub fn author_audio_seek(root: &Path, args: &[String]) -> R<()> {
         )?);
     }
     latm_seek_cases(root, FEATURE, Path::new(reference), &mut cases)?;
+    physical_audio_seek_cases(root, FEATURE, Path::new(reference), &mut cases)?;
     manifest(root, FEATURE, cases)
 }
 

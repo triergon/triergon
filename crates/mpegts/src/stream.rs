@@ -604,6 +604,32 @@ impl TransportStream {
     pub(crate) fn has_active_map(&self) -> bool {
         self.pmt_source.is_some()
     }
+
+    /// A fresh in-band map re-establishes this profile's transport state. Only
+    /// its separately proved concatenated elementary coordinate needs restoring.
+    pub(crate) fn resume_audio_offset(&mut self, pid: u16, offset: u64) -> Result<()> {
+        let [route] = self.routes.as_mut_slice() else {
+            return Err(Error::SourceMismatch);
+        };
+        if route.pid != pid
+            || !matches!(route.stream_type, 0x03 | 0x04)
+            || route.epochs
+                != (SourceEpochs {
+                    configuration: 2,
+                    clock: 0,
+                })
+            || self.clock_pending
+            || self.clock_quarantined
+            || self.clock_samples.is_some()
+        {
+            return Err(Error::SourceMismatch);
+        }
+        route
+            .assembler
+            .as_mut()
+            .ok_or(Error::SourceMismatch)?
+            .resume_elementary_offset(offset)
+    }
     pub(crate) fn route_state(
         &self,
         index: usize,
