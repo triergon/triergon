@@ -156,7 +156,7 @@ impl Output {
     #[inline]
     fn event_budget(event: &RawEvent) -> Option<&Budget> {
         match event {
-            RawEvent::Matroska(triergon_matroska::typed::Event::Packet(packet)) => {
+            RawEvent::Matroska(triergon_matroska::Event::Packet(packet)) => {
                 Some(packet.configuration.budget())
             }
             RawEvent::NativeTs { packet, .. } => Some(packet.spans.budget()),
@@ -199,7 +199,7 @@ pub(crate) struct MatroskaReplayOutput {
     // Packet configurations already retain the pool. Other events carry the
     // same explicit budget handle as their original output.
     scope: OutputScope<Option<Budget>>,
-    pub event: triergon_matroska::typed::Event,
+    pub event: triergon_matroska::Event,
     pub(crate) delivery: Delivery,
     bytes: usize,
 }
@@ -1210,7 +1210,7 @@ impl<S: Source> Player<S> {
         // only an event out of it, where `?` or a temporary would move every step.
         let step = if let Engine::Matroska(matroska) = engine {
             match matroska.step(w, &self.cancel)? {
-                triergon_matroska::incremental::ParseStep::Event(event) => {
+                triergon_matroska::ParseStep::Event(event) => {
                     let source = engine.source();
                     return self.accept_event::<READY>(source, RawEvent::Matroska(event), w, slot);
                 }
@@ -1298,7 +1298,7 @@ impl<S: Source> Player<S> {
         }
         if matches!(
             e,
-            RawEvent::Matroska(triergon_matroska::typed::Event::Configuration(_))
+            RawEvent::Matroska(triergon_matroska::Event::Configuration(_))
                 | RawEvent::Ts(crate::TsEvent {
                     source: TraceEvent::ProgramMap { active: true, .. },
                     ..
@@ -1331,7 +1331,7 @@ impl<S: Source> Player<S> {
                     (
                         ClockChoice::SourceExact,
                         None,
-                        RawEvent::Matroska(triergon_matroska::typed::Event::Packet(packet)),
+                        RawEvent::Matroska(triergon_matroska::Event::Packet(packet)),
                     ) => {
                         if packet.packet.pts_ns.is_some() {
                             Delivery::Present
@@ -1357,7 +1357,7 @@ impl<S: Source> Player<S> {
                             matroska_ceiling_ns: Some(ceiling),
                             ..
                         }),
-                        RawEvent::Matroska(triergon_matroska::typed::Event::Packet(packet)),
+                        RawEvent::Matroska(triergon_matroska::Event::Packet(packet)),
                     ) if packet.packet.timing.frames == 1 => match packet.packet.pts_ns {
                         None => Delivery::UnknownTime,
                         Some(pts) if pts < ceiling => Delivery::DecodeOnly {

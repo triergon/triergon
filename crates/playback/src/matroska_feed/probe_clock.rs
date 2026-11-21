@@ -1,7 +1,7 @@
 //! Shared native initial-packet timing over a bounded probe prefix.
 use crate::Result;
 use triergon_core::{Budget, BudgetVec, Error};
-use triergon_matroska::typed::Packet;
+use triergon_matroska::TypedPacket as Packet;
 
 const MAX_PREFIX_PACKETS: usize = 4096;
 

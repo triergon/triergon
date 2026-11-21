@@ -7,7 +7,7 @@ use crate::{
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceLocation, TimeBase, WorkBudget};
-use triergon_matroska::typed::{Event, Packet};
+use triergon_matroska::{Event, TypedPacket as Packet};
 use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder, Status};
 use triergon_subtitles::{compat, dvb, pgs::PacketClock};
 
@@ -228,7 +228,7 @@ impl MatroskaBitmapTrack {
             .packet
             .group
             .as_ref()
-            .map(triergon_matroska::typed::BlockGroupSource::position)
+            .map(triergon_matroska::BlockGroupSource::position)
             .transpose()?
             .flatten();
         let clock = |ticks| dvb::ClockValue {

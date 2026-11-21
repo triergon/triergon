@@ -55,31 +55,6 @@ pub use track::extensions::{MappingExtension, MappingView, TrackExtensions, Trac
 pub use track::{LegacyAacProfile, Track};
 pub use triergon_core::{Error, Result};
 
-/// The earlier path of the reader's types, kept until every dependent names the root.
-#[doc(hidden)]
-pub mod typed {
-    pub use crate::compat::block_additions::BlockAdditionContainer;
-    pub use crate::{
-        AdditionView, BlockGroupSource, BlockingReader, CodecState, Configuration, Event,
-        ExtensionScope, ExtensionView, Hdr10Plus, Hdr10PlusGeometry, Hdr10PlusPeakGrid,
-        Hdr10PlusPercentile, Hdr10PlusToneCurve, Hdr10PlusWindow, Initialization,
-        InitializationOrigin, MappingExtension, MappingView, PayloadOwnership, Presence, Reader,
-        SeekRequest, SourcePosition, StateView, TrackExtensions, TrackExtensionsJob,
-        TypedPacket as Packet,
-    };
-}
-/// The earlier path of the track and packet types, kept until every dependent names the root.
-#[doc(hidden)]
-pub mod matroska {
-    pub use crate::{LegacyAacProfile, Packet, PacketData, SeekReceipt, Track};
-}
-/// The earlier path of [`element`], kept until every dependent names it.
-#[doc(hidden)]
-pub mod incremental {
-    pub use crate::ParseStep;
-    pub use crate::element::{ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader};
-}
-
 /// Explicit per-reader limits. Input and packets are streamed, never buffered as a file.
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {

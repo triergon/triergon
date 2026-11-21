@@ -10,7 +10,7 @@ use triergon_subtitles::text::{self, Extractor, Input, RawClock, Timing};
 )]
 enum Record {
     Mp4(Mp4Packet),
-    Matroska(triergon_matroska::typed::Packet),
+    Matroska(triergon_matroska::TypedPacket),
     Document(Input),
 }
 #[derive(Clone, Debug)]
@@ -51,7 +51,7 @@ impl TextSource {
         if !matches!(
             output.event(),
             RawEvent::Mp4(crate::Mp4Event::Packet(_))
-                | RawEvent::Matroska(triergon_matroska::typed::Event::Packet(_))
+                | RawEvent::Matroska(triergon_matroska::Event::Packet(_))
         ) {
             return Err(RejectedOutput {
                 output,
@@ -62,7 +62,7 @@ impl TextSource {
         let pool = output.pool().clone();
         let record = match output.into_event() {
             RawEvent::Mp4(crate::Mp4Event::Packet(p)) => Record::Mp4(p),
-            RawEvent::Matroska(triergon_matroska::typed::Event::Packet(p)) => Record::Matroska(p),
+            RawEvent::Matroska(triergon_matroska::Event::Packet(p)) => Record::Matroska(p),
             _ => unreachable!(),
         };
         Ok(Self {
@@ -112,7 +112,7 @@ impl TextSource {
             None
         }
     }
-    pub fn matroska(&self) -> Option<&triergon_matroska::typed::Packet> {
+    pub fn matroska(&self) -> Option<&triergon_matroska::TypedPacket> {
         if let Record::Matroska(p) = &self.record {
             Some(p)
         } else {

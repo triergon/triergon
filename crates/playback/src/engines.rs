@@ -20,10 +20,7 @@ use triergon_isobmff::{
         recovery::{RecoverySampleExtent, RecoverySampleRead, RunRecoveryProfile, ShortSample},
     },
 };
-use triergon_matroska::{
-    incremental::ParseStep,
-    typed::{Event as MkvEvent, Reader},
-};
+use triergon_matroska::{Event as MkvEvent, ParseStep, Reader};
 use triergon_mpegts::{
     self as ts, FeedContinuation, FeedItem, TraceEvent, TransportStream,
     clock::{ClockKey, SourceTimePolicy, SourceTimestamp, source_timestamp},
@@ -2566,7 +2563,7 @@ impl RawEvent {
             Self::NativeTs { packet, .. } => packet.payload_len,
             Self::Matroska(MkvEvent::Packet(p)) => p.packet.data.len(),
             Self::Matroska(MkvEvent::Envelope(
-                triergon_matroska::incremental::ElementEvent::Leaf { data, .. },
+                triergon_matroska::element::ElementEvent::Leaf { data, .. },
             )) => data.len(),
             Self::Mp4(Mp4Event::Packet(p)) => p.source.payload.len(),
             Self::Mp4(Mp4Event::NativeShortPacket(p)) => p.prefix.payload.len(),

@@ -1,7 +1,7 @@
 //! Native selected-video admission over the source's complete-cluster replay.
 use crate::{Delivery, Output, RawEvent, Result, TrackKey, player::OutputScope};
 use triergon_core::Error;
-use triergon_matroska::typed::Event;
+use triergon_matroska::Event;
 
 /// Admit the selected video's packets from the resolved keyframe onward.
 /// Use the same gate on each output in playback order after the seek receipt.

@@ -8,7 +8,7 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Error, InputRequest, WorkBudget};
-use triergon_matroska::typed::{Configuration, Event, Packet};
+use triergon_matroska::{Configuration, Event, TypedPacket as Packet};
 use triergon_subtitles::pgs::{Composition, Envelope, SegmentIter};
 
 #[derive(Clone, Copy, Debug)]

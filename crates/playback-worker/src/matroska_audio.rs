@@ -14,10 +14,7 @@ use crate::runner::Result;
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{CodecId, MediaKind, TrackInfo};
 use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId, WorkBudget};
-use triergon_matroska::{
-    matroska::LegacyAacProfile,
-    typed::{Configuration, Event, Packet as MatroskaPacket},
-};
+use triergon_matroska::{Configuration, Event, LegacyAacProfile, TypedPacket as MatroskaPacket};
 use triergon_playback::{
     ByteSource, Engine, Output, PlayerPolicy, Progress, RawEvent, Selection,
     io::SourceOwner,
@@ -301,7 +298,7 @@ pub fn operate(pool: &Budget, raw: &Bytes, argument: &str, work: Work) -> Result
 mod tests {
     use super::{Family, Select};
     use triergon_core::container::{CodecId, MediaKind};
-    use triergon_matroska::matroska::LegacyAacProfile;
+    use triergon_matroska::LegacyAacProfile;
 
     #[test]
     fn selection_follows_the_codec_family_the_reader_identifies() {

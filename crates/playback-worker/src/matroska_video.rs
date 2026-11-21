@@ -11,7 +11,7 @@ use crate::runner::{Invocation, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, Time, WorkBudget};
 use triergon_harness_protocol::digest::{fold, signed};
-use triergon_matroska::typed::{Event, Reader};
+use triergon_matroska::{Event, Reader};
 use triergon_playback::{
     ByteSource, Engine, Output, PlayerPolicy, Progress, RawEvent, Selection, TrackKey,
     io::SourceOwner,
