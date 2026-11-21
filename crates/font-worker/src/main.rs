@@ -104,15 +104,16 @@ fn read(file: &Bytes, budget: &Budget, operation: &Operation, sink: &mut impl Si
                 sink.record(Record::SizeError(height))?;
                 continue;
             };
-            match mode {
-                Mode::Scaled => scaled(&font, &sized, height, budget, sink)?,
-                Mode::Hinted => hinted(&font, &sized, sink)
-                    .map_err(|e| format!("face {index} at {height}: {e}"))?,
-                Mode::Vertical => vertical(&font, &sized, &mut Outline::new(budget), sink)
-                    .map_err(|e| format!("face {index} at {height}: {e}"))?,
-                Mode::Default => default(&font, &sized, &mut Outline::new(budget), sink)
-                    .map_err(|e| format!("face {index} at {height}: {e}"))?,
-            }
+            let measured = match mode {
+                Mode::Scaled => {
+                    scaled(&font, &sized, height, budget, sink)?;
+                    continue;
+                }
+                Mode::Hinted => hinted(&font, &sized, sink),
+                Mode::Vertical => vertical(&font, &sized, &mut Outline::new(budget), sink),
+                Mode::Default => default(&font, &sized, &mut Outline::new(budget), sink),
+            };
+            measured.map_err(|e| format!("face {index} at {height}: {e}"))?;
         }
     }
     Ok(())
@@ -238,19 +239,23 @@ fn scaled(
     Ok(())
 }
 
-/// The default-load advances. An advance the crate cannot give (`Unsupported`)
-/// ends the operation with an error: it is not a value to compare.
+/// What the default load gives for `glyph`, absent where it fails. What the
+/// crate cannot give (`Unsupported`) ends the operation with an error naming
+/// `what`: it is not a value to compare.
+fn supported<T>(loaded: triergon_core::Result<T>, glyph: GlyphId, what: &str) -> Result<Option<T>> {
+    match loaded {
+        Ok(value) => Ok(Some(value)),
+        Err(triergon_core::Error::Unsupported(why)) => {
+            Err(format!("glyph {}: {what} unsupported: {why}", glyph.0).into())
+        }
+        Err(_) => Ok(None),
+    }
+}
+
+/// The default-load advances.
 fn hinted(font: &Font, sized: &SizedFont<'_>, sink: &mut impl Sink) -> Result<()> {
     for glyph in font.glyphs() {
-        let advance = match sized.default_advance(glyph) {
-            Ok(advance) => Some(advance),
-            Err(triergon_core::Error::Unsupported(what)) => {
-                return Err(
-                    format!("glyph {}: hinted advance unsupported: {what}", glyph.0).into(),
-                );
-            }
-            Err(_) => None,
-        };
+        let advance = supported(sized.default_advance(glyph), glyph, "hinted advance")?;
         sink.record(Record::Hinted {
             index: glyph.0,
             advance,
@@ -260,8 +265,7 @@ fn hinted(font: &Font, sized: &SizedFont<'_>, sink: &mut impl Sink) -> Result<()
 }
 
 /// The vertical advances: of the unhinted load where the glyph's outline
-/// loads, and of the default load. A default-load advance the crate cannot
-/// give (`Unsupported`) ends the operation with an error.
+/// loads, and of the default load.
 fn vertical(
     font: &Font,
     sized: &SizedFont<'_>,
@@ -270,17 +274,11 @@ fn vertical(
 ) -> Result<()> {
     for glyph in font.glyphs() {
         let unhinted = sized.outline_into(glyph, outline).ok();
-        let hinted = match sized.default_vertical_advance(glyph) {
-            Ok(advance) => Some(advance),
-            Err(triergon_core::Error::Unsupported(what)) => {
-                return Err(format!(
-                    "glyph {}: hinted vertical advance unsupported: {what}",
-                    glyph.0
-                )
-                .into());
-            }
-            Err(_) => None,
-        };
+        let hinted = supported(
+            sized.default_vertical_advance(glyph),
+            glyph,
+            "hinted vertical advance",
+        )?;
         sink.record(Record::Vertical {
             index: glyph.0,
             unhinted,
@@ -290,8 +288,7 @@ fn vertical(
     Ok(())
 }
 
-/// The default-load metrics and outlines. A glyph the crate cannot load this
-/// way (`Unsupported`) ends the operation with an error.
+/// The default-load metrics and outlines.
 fn default(
     font: &Font,
     sized: &SizedFont<'_>,
@@ -300,13 +297,8 @@ fn default(
 ) -> Result<()> {
     for glyph in font.glyphs() {
         let mut work = WorkBudget::new(Limits::default().work);
-        let loaded = match sized.load(glyph, Load::Default, outline, &mut work) {
-            Ok(metrics) => Some(metrics),
-            Err(triergon_core::Error::Unsupported(what)) => {
-                return Err(format!("glyph {}: default load unsupported: {what}", glyph.0).into());
-            }
-            Err(_) => None,
-        };
+        let load = sized.load(glyph, Load::Default, outline, &mut work);
+        let loaded = supported(load, glyph, "default load")?;
         sink.record(Record::Default {
             index: glyph.0,
             loaded: loaded.map(|m| (m, &*outline)),
