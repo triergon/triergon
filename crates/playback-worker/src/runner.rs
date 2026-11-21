@@ -6,6 +6,7 @@
 //! (`triergon-harness-runner`).
 
 use std::process::ExitCode;
+use triergon_harness_runner::command;
 pub use triergon_harness_runner::{Invocation, Mode, Result, Totals, measure};
 
 /// The largest input file a runner reads.
@@ -54,15 +55,10 @@ pub fn dispatch(worker: &str, runners: &[(&str, Run)], args: &[String]) -> Resul
 
 /// A worker's `main`: dispatch the command line to `runners` and print an error
 /// with the worker's name.
+// A separate startup frame preserves the measured instruction counts.
+#[inline(never)]
 pub fn main(worker: &str, runners: &[(&str, Run)]) -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    match dispatch(worker, runners, &args) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("{worker}: {error}");
-            ExitCode::from(2)
-        }
-    }
+    command(Some(worker), 2, |args| dispatch(worker, runners, args))
 }
 
 #[cfg(test)]
