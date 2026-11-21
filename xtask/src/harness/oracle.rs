@@ -26,6 +26,9 @@ impl Kind {
     pub fn trace(name: &str) -> Result<Self, String> {
         [
             "views-smoke",
+            "mkv-metadata",
+            "mkv-track-extensions",
+            "mkv-codec-state",
             "hvcc-prefix",
             "hvcc-arrays",
             "vpcc",
