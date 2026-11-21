@@ -2,7 +2,7 @@
 
 use crate::{
     Error, Result, Source, SourceReply, TrackKey,
-    engines::{NativePacket, TsEngine, TsPayloadStep},
+    engines::{NativePacket, TsEngine, TsNativeConfiguration, TsPayloadStep},
     hls_aac::{HlsAac, HlsAacFrame},
     hls_avc::{AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
     io::SourceOwner,
@@ -288,28 +288,33 @@ impl<S: Source> TsProgressiveReader<S> {
                 {
                     continue;
                 }
-                Err(Error::Backpressure {
-                    requested,
-                    available,
-                }) => {
-                    return Ok(TsProgressiveStep::Backpressure {
-                        requested,
-                        available,
-                    });
-                }
-                // The frame assemblers retain state across allocation failure.
-                // A native track refusal while reading is terminal.
-                Err(Error::Allocation) if self.phase != Phase::Read => {
-                    return Err(Error::Allocation);
-                }
-                Err(error) => {
-                    self.fail();
-                    return Err(error);
-                }
+                Err(error) => return self.step_failure(error),
                 result => return result,
             }
         }
         Ok(TsProgressiveStep::Yield)
+    }
+
+    /// What a failed step gives the caller: backpressure is a step of its own,
+    /// and any other failure retires the reader, except that the frame assemblers
+    /// keep their state across a failed allocation after reading.
+    #[cold]
+    fn step_failure(&mut self, error: Error) -> Result<TsProgressiveStep> {
+        match error {
+            Error::Backpressure {
+                requested,
+                available,
+            } => Ok(TsProgressiveStep::Backpressure {
+                requested,
+                available,
+            }),
+            // A native track refusal while reading is terminal.
+            Error::Allocation if self.phase != Phase::Read => Err(Error::Allocation),
+            error => {
+                self.fail();
+                Err(error)
+            }
+        }
     }
 
     fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<TsProgressiveStep> {
@@ -325,12 +330,7 @@ impl<S: Source> TsProgressiveReader<S> {
                     TsPayloadStep::NeedInput(request) => {
                         return Ok(TsProgressiveStep::NeedInput(request));
                     }
-                    TsPayloadStep::End => {
-                        self.transport = None;
-                        self.video.as_mut().ok_or(Error::Truncated)?.finish();
-                        self.audio.as_mut().ok_or(Error::Truncated)?.finish();
-                        self.phase = Phase::DrainVideo;
-                    }
+                    TsPayloadStep::End => self.end_transport()?,
                     TsPayloadStep::Yield => {}
                     TsPayloadStep::AwaitEntity => {
                         return Err(Error::Invalid("unexpected TS entity boundary"));
@@ -353,10 +353,7 @@ impl<S: Source> TsProgressiveReader<S> {
                         self.reuse_pes_lists(|tracks| tracks.video, lists);
                         self.phase = Phase::Read;
                     }
-                    AvcTsStep::End if self.phase == Phase::DrainVideo => {
-                        self.video = None;
-                        self.phase = Phase::DrainAudio;
-                    }
+                    AvcTsStep::End if self.phase == Phase::DrainVideo => self.end_video(),
                     _ => return Err(Error::Invalid("unexpected progressive AVC state")),
                 }
             }
@@ -381,12 +378,7 @@ impl<S: Source> TsProgressiveReader<S> {
                         self.phase = Phase::Read;
                     }
                     AssemblyStep::Finished if self.phase == Phase::DrainAudio => {
-                        if !self.saw_video || self.audio_times.is_none() {
-                            return Err(Error::Invalid("progressive TS lacks a complete A/V feed"));
-                        }
-                        self.audio = None;
-                        self.phase = Phase::End;
-                        return Ok(TsProgressiveStep::End);
+                        return self.end_audio();
                     }
                     _ => return Err(Error::Invalid("unexpected progressive AAC state")),
                 }
@@ -400,27 +392,7 @@ impl<S: Source> TsProgressiveReader<S> {
     fn on_event(&mut self, event: TsPayloadStep) -> Result<()> {
         match event {
             TsPayloadStep::Event(event) => self.on_transport(event.source)?,
-            TsPayloadStep::Configuration(config) => {
-                let tracks = self
-                    .tracks
-                    .as_ref()
-                    .ok_or(Error::Invalid("missing TS PMT"))?;
-                if config.configuration_epoch != tracks.epoch {
-                    return Err(Error::Invalid("progressive TS configuration epoch"));
-                }
-                let pool = self
-                    .transport
-                    .as_ref()
-                    .ok_or(Error::Closed)?
-                    .engine
-                    .input
-                    .budget();
-                if config.track == tracks.video {
-                    self.video = Some(AvcTsReader::new_progressive(pool, config, self.limits.avc)?);
-                } else if config.track == tracks.audio {
-                    self.audio = Some(HlsAac::new(pool, config, 0x1fff)?);
-                }
-            }
+            TsPayloadStep::Configuration(config) => self.configure(config)?,
             TsPayloadStep::Packet { packet, clock } => match packet {
                 NativePacket::Owned(packet) => self.on_owned_packet(packet, &clock)?,
                 NativePacket::Compact(packet) => self.on_packet(packet, &clock)?,
@@ -434,6 +406,31 @@ impl<S: Source> TsProgressiveReader<S> {
                 return Err(error);
             }
             _ => {}
+        }
+        Ok(())
+    }
+
+    /// Makes the reader of a configured track, once per track.
+    #[cold]
+    fn configure(&mut self, config: TsNativeConfiguration) -> Result<()> {
+        let tracks = self
+            .tracks
+            .as_ref()
+            .ok_or(Error::Invalid("missing TS PMT"))?;
+        if config.configuration_epoch != tracks.epoch {
+            return Err(Error::Invalid("progressive TS configuration epoch"));
+        }
+        let pool = self
+            .transport
+            .as_ref()
+            .ok_or(Error::Closed)?
+            .engine
+            .input
+            .budget();
+        if config.track == tracks.video {
+            self.video = Some(AvcTsReader::new_progressive(pool, config, self.limits.avc)?);
+        } else if config.track == tracks.audio {
+            self.audio = Some(HlsAac::new(pool, config, 0x1fff)?);
         }
         Ok(())
     }
@@ -453,22 +450,38 @@ impl<S: Source> TsProgressiveReader<S> {
         packet: P,
         clock: &triergon_mpegts::compat::pes::DemuxTimeView,
     ) -> Result<()> {
+        let mut mailbox = Some(packet);
+        let result = self.hand_to_reader(&mut mailbox, clock);
+        // A reader takes the packets of its track; any other is dropped out of line.
+        if let Some(packet) = mailbox.take() {
+            discard(packet);
+        }
+        result
+    }
+
+    fn hand_to_reader<P: PesInput>(
+        &mut self,
+        mailbox: &mut Option<P>,
+        clock: &triergon_mpegts::compat::pes::DemuxTimeView,
+    ) -> Result<()> {
         let tracks = self
             .tracks
             .as_ref()
             .ok_or(Error::Invalid("missing TS PMT"))?;
-        let facts = packet.facts();
+        let facts = mailbox
+            .as_ref()
+            .ok_or(Error::Invalid("missing TS packet"))?
+            .facts();
         let track = TrackKey::Ts {
             program: facts.program,
             pid: facts.pid,
         };
-        let mut mailbox = Some(packet);
         if track == tracks.video {
             let video = self
                 .video
                 .as_mut()
                 .ok_or(Error::Invalid("missing AVC configuration"))?;
-            if !video.push_packet(&mut mailbox, clock)? {
+            if !video.push_packet(mailbox, clock)? {
                 return Err(Error::Invalid("progressive AVC mailbox is busy"));
             }
             self.phase = Phase::Video;
@@ -477,7 +490,7 @@ impl<S: Source> TsProgressiveReader<S> {
                 .audio
                 .as_mut()
                 .ok_or(Error::Invalid("missing AAC configuration"))?;
-            if !audio.push_packet(&mut mailbox, clock)? {
+            if !audio.push_packet(mailbox, clock)? {
                 return Err(Error::Invalid("progressive AAC mailbox is busy"));
             }
             self.phase = Phase::Audio;
@@ -573,12 +586,48 @@ impl<S: Source> TsProgressiveReader<S> {
             })
     }
 
+    /// Retires the transport at the source's end and starts draining both readers.
+    #[cold]
+    fn end_transport(&mut self) -> Result<()> {
+        self.transport = None;
+        self.video.as_mut().ok_or(Error::Truncated)?.finish();
+        self.audio.as_mut().ok_or(Error::Truncated)?.finish();
+        self.phase = Phase::DrainVideo;
+        Ok(())
+    }
+
+    /// Retires the drained video reader.
+    #[cold]
+    fn end_video(&mut self) {
+        self.video = None;
+        self.phase = Phase::DrainAudio;
+    }
+
+    /// Retires the drained audio reader, which ends a complete feed.
+    #[cold]
+    fn end_audio(&mut self) -> Result<TsProgressiveStep> {
+        if !self.saw_video || self.audio_times.is_none() {
+            return Err(Error::Invalid("progressive TS lacks a complete A/V feed"));
+        }
+        self.audio = None;
+        self.phase = Phase::End;
+        Ok(TsProgressiveStep::End)
+    }
+
+    /// Retires the reader after a failure.
+    #[cold]
     fn fail(&mut self) {
         self.phase = Phase::Failed;
         self.transport = None;
         self.video = None;
         self.audio = None;
     }
+}
+
+/// Drops a packet no reader took.
+#[cold]
+fn discard<P>(packet: P) {
+    drop(packet);
 }
 
 fn audio_presentation(

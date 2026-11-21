@@ -150,11 +150,12 @@ fn entity_input_failure(
     // This single-entity option declares a codec, so it has no companion input.
     let args = match (prefix, args) {
         (Some("ts-au-"), [option])
-            if option
-                .to_str()
-                .and_then(|option| option.strip_prefix("--dts-core="))
-                .and_then(|pid| pid.parse::<u16>().ok())
-                .is_some_and(|pid| (0x10..0x1fff).contains(&pid)) =>
+            if option == "--probe-dts-core"
+                || option
+                    .to_str()
+                    .and_then(|option| option.strip_prefix("--dts-core="))
+                    .and_then(|pid| pid.parse::<u16>().ok())
+                    .is_some_and(|pid| (0x10..0x1fff).contains(&pid)) =>
         {
             &[]
         }
@@ -1342,6 +1343,8 @@ pub(crate) fn collect(
             }
             if options.memory {
                 let index = rows.len();
+                let pinned_refusal =
+                    expected_for(case, &target).is_some_and(parity::pins_zero_output_refusal);
                 let registered = options.baseline_worker.is_none();
                 let workers = super::memory::WorkerPaths {
                     candidate: &candidate,
@@ -1367,6 +1370,7 @@ pub(crate) fn collect(
                                 memory_pairs,
                                 options.seed,
                                 &operation,
+                                pinned_refusal,
                             )
                         },
                     )?;
@@ -1731,6 +1735,16 @@ mod prefix_tests {
         let unpinned =
             parse(r#"{"arguments":["188","1","next.ts","--ignore-pcr-reserved-bits"]}"#).unwrap();
         assert!(entity_input_failure(root, &unpinned, Some("ts-au-")).is_err());
+        let probe =
+            parse(r#"{"arguments":["188","1","--probe-dts-core","--ignore-pcr-reserved-bits"]}"#)
+                .unwrap();
+        assert_eq!(
+            entity_input_failure(root, &probe, Some("ts-au-")).unwrap(),
+            None
+        );
+        assert!(entity_input_failure(root, &probe, Some("ts-")).is_err());
+        let unpinned_probe = parse(r#"{"arguments":["188","1","next.ts","--probe-dts-core","--ignore-pcr-reserved-bits"]}"#).unwrap();
+        assert!(entity_input_failure(root, &unpinned_probe, Some("ts-au-")).is_err());
     }
 
     #[test]

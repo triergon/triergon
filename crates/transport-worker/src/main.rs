@@ -11,7 +11,9 @@ mod ts_matched;
 use std::process::ExitCode;
 
 mod runner {
-    pub use triergon_harness_runner::{Invocation, Refusal, Result, Totals, measure};
+    pub use triergon_harness_runner::{
+        Invocation, Refusal, Result, Totals, measure, measure_repeated,
+    };
 
     pub const MAX_INPUT: u64 = 64 * 1024 * 1024;
 }

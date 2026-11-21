@@ -1,6 +1,7 @@
 //! MPEG-TS AU controls, authored independently of the container and codec crates.
 //! PES requests remain separate rows; their input bytes never change.
 
+pub mod dts_discovery;
 pub mod dts_hd;
 pub mod matched;
 

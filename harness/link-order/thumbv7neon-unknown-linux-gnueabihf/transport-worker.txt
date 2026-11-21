@@ -28,7 +28,9 @@ __aeabi_read_tp
 <alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutRaw>>::flush_buf
 transport_worker::ts_au::run::{closure#0}
 transport_worker::ts_au::operation
-<triergon_mpegts::reader::Reader>::advance::<false, <triergon_mpegts::reader::Reader>::step::{closure#0}>
+<triergon_mpegts::reader::Reader>::new
+<triergon_mpegts::reader::Reader>::step
+<triergon_mpegts::reader::Reader>::advance::<false, false, <triergon_mpegts::reader::Reader>::step::{closure#0}>
 <triergon_mpegts::framer::TransportFramer>::poll_bound_carrier::<false, false>
 <triergon_mpegts::compat::annex_b::ContinuityReader as triergon_core::container::ContainerReader>::provide
 <triergon_core::input::InputCursor>::provide
@@ -83,6 +85,7 @@ core::ptr::drop_glue::<triergon_mpegts::psi::tables::PmtReader>
 <triergon_core::bytes::BudgetVec<triergon_mpegts::reader::model::Track>>::reallocate
 core::ptr::drop_glue::<alloc::vec::Vec<triergon_mpegts::reader::model::Track>>
 <triergon_mpegts::reader::lane::Lane>::new
+<triergon_core::bytes::BudgetVec<triergon_mpegts::reader::model::Track>>::try_push
 <triergon_framing::aac_adts::stream::AacAdtsStreamReader>::create
 core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_mpegts::reader::model::Track>>
 <triergon_core::bytes::BudgetVec<transport_worker::ts_au::TrackProjection>>::try_push
@@ -90,7 +93,7 @@ core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_mpegts::reader::
 <triergon_core::bytes::BudgetVec<transport_worker::ts_au::TrackProjection>>::reallocate
 core::ptr::drop_glue::<alloc::vec::Vec<transport_worker::ts_au::TrackProjection>>
 core::ptr::drop_glue::<core::option::Option<triergon_mpegts::compat::annex_b::continuity::Route>>
-<triergon_mpegts::reader::Reader>::advance::<true, &mut &mut transport_worker::ts_au::operation::{closure#0}>
+<triergon_mpegts::reader::Reader>::advance::<true, false, &mut &mut transport_worker::ts_au::operation::{closure#0}>
 <triergon_mpegts::framer::TransportFramer>::share_buffered_owner
 triergon_mpegts::transport::pcr
 <triergon_mpegts::pes::PesAssembler>::push
@@ -117,6 +120,7 @@ core::ptr::drop_glue::<alloc::vec::Vec<triergon_mpegts::reader::lane::Piece>>
 <triergon_core::bytes::BudgetVec<triergon_mpegts::reader::lane::Piece>>::try_push
 <triergon_mpegts::reader::Reader>::lane_step
 <triergon_mpegts::reader::lane::Lane>::step
+<triergon_mpegts::reader::lane::Framer>::step
 <triergon_framing::raw_annex_b::RawAnnexBReader>::step
 <triergon_framing::raw_annex_b::RawAnnexBReader>::provide_owned
 <triergon_core::input::InputCursor>::provide_owned
@@ -134,7 +138,7 @@ triergon_framing::nal_syntax::skip_avc_scaling_matrix::<triergon_bitstream::rbsp
 <triergon_core::input::InputCursor>::consume_response::<<triergon_framing::reader::NalReader>::append_annex_payload::{closure#0}>
 triergon_framing::avc_picture::read_avc_slice_header
 <triergon_mpegts::reader::lane::Lane>::start_build
-core::ptr::drop_glue::<core::option::Option<triergon_mpegts::reader::lane::Build>>
+<triergon_mpegts::reader::model::AccessUnit>::range
 triergon_mpegts::clock::source_timestamp
 __aeabi_uldivmod
 __udivmoddi4
@@ -143,6 +147,7 @@ __aeabi_uidiv
 __udivsi3
 <triergon_core::budget::Budget>::reserve
 <triergon_mpegts::reader::model::AccessUnit>::duration
+<triergon_mpegts::reader::lane::Lane>::finish_build
 alloc::boxed::box_new_uninit
 <triergon_mpegts::reader::model::Track as triergon_core::container::TrackInfo>::id
 <triergon_mpegts::reader::model::Packet as triergon_core::container::PacketInfo>::payload
@@ -175,7 +180,7 @@ core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_mpegts::reader::
 core::ptr::drop_glue::<triergon_framing::aac_adts::stream::AacAdtsStreamReader>
 <triergon_mpegts::compat::annex_b::continuity::Proof>::finish
 core::ptr::drop_glue::<core::option::Option<alloc::boxed::Box<triergon_harness_runner::Refusal>>>
-core::ptr::drop_glue::<triergon_mpegts::compat::annex_b::ContinuityReader>
+core::ptr::drop_glue::<triergon_mpegts::reader::Reader>
 core::ptr::drop_glue::<triergon_mpegts::stream::TransportStream>
 core::ptr::drop_glue::<triergon_mpegts::psi::section::SectionAssembler>
 core::ptr::drop_glue::<triergon_mpegts::psi::pat_table::PatCollector>
@@ -186,7 +191,9 @@ core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_mpegts::stream::
 core::ptr::drop_glue::<core::option::Option<triergon_mpegts::pes::PesAssembler>>
 core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_mpegts::reader::lane::Lane>>
 core::ptr::drop_glue::<triergon_mpegts::reader::lane::Lane>
+core::ptr::drop_glue::<core::option::Option<triergon_mpegts::reader::lane::Build>>
 core::ptr::drop_glue::<triergon_mpegts::psi::tables::ProgramMap>
+core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_mpegts::reader::seek::Seeking>>
 core::ptr::drop_glue::<triergon_mpegts::compat::annex_b::continuity::Proof>
 alloc::fmt::format::format_inner
 core::fmt::write
@@ -204,6 +211,7 @@ core::fmt::write
 core::ptr::drop_glue::<transport_worker::ts_input::Request>
 <alloc::sync::Arc<triergon_core::budget::Inner>>::drop_slow
 <triergon_mpegts::psi::descriptors::Descriptor>::dvb_eac3
+<triergon_mpegts::psi::tables::ElementaryStream>::codec
 <triergon_mpegts::demux_pes::audio::PrivateAudioCarriage>::from_pmt
 <triergon_mpegts::reader::lane::eac3::Reader>::new
 <triergon_core::bytes::Bytes as core::ops::deref::Deref>::deref
@@ -214,6 +222,7 @@ triergon_framing::ac3::layout
 triergon_framing::ac3::probe_with_layout
 core::ptr::drop_glue::<core::option::Option<triergon_mpegts::reader::lane::eac3::Group>>
 transport_worker::ts_au::ac3_duration
+<triergon_core::time::Time>::to_ticks
 <triergon_framing::ac3::Ac3FrameReader>::finish
 core::ptr::drop_glue::<triergon_framing::ac3::Ac3FrameReader>
 transport_worker::ts::run::{closure#0}

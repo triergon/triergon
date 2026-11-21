@@ -3,6 +3,7 @@
 
 use crate::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measure};
 use std::cell::Cell;
+use std::error::Error;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
@@ -93,8 +94,8 @@ fn pair(time: Option<Time>) -> Result<[i64; 2]> {
         return Ok([0, 0]);
     };
     Ok([
-        i64::try_from(time.numerator())?,
-        i64::try_from(time.denominator())?,
+        i64::try_from(time.numerator()).map_err(boxed)?,
+        i64::try_from(time.denominator()).map_err(boxed)?,
     ])
 }
 
@@ -159,23 +160,29 @@ impl RetainedStream {
         self.retired_before_eof += u64::from(!input.eof);
         match &held.unit {
             TsProgressiveUnit::Video(video) => {
-                let clock = video.clock.ok_or("missing AVC clock")?;
+                let clock = video.clock.ok_or_else(|| failure("missing AVC clock"))?;
                 let size = video.feed_spans().map(<[u8]>::len).sum::<usize>();
                 self.fields(
                     'v',
                     &[
-                        clock.pts90.ok_or("missing AVC PTS")?,
-                        clock.dts90.ok_or("missing AVC DTS")?,
-                        i64::try_from(clock.source_pts_raw33.ok_or("missing AVC source PTS")?)?,
+                        clock.pts90.ok_or_else(|| failure("missing AVC PTS"))?,
+                        clock.dts90.ok_or_else(|| failure("missing AVC DTS"))?,
+                        i64::try_from(
+                            clock
+                                .source_pts_raw33
+                                .ok_or_else(|| failure("missing AVC source PTS"))?,
+                        )
+                        .map_err(boxed)?,
                         clock
                             .source_dts_raw33
                             .map(i64::try_from)
-                            .transpose()?
+                            .transpose()
+                            .map_err(boxed)?
                             .unwrap_or(-1),
                         i64::from(video.idr),
                         i64::from(video.raster.width),
                         i64::from(video.raster.height),
-                        i64::try_from(size)?,
+                        i64::try_from(size).map_err(boxed)?,
                     ],
                     out,
                 )?;
@@ -190,11 +197,11 @@ impl RetainedStream {
                 let rate = frame
                     .header
                     .coded_frequency_hz()
-                    .ok_or("missing AAC rate")?;
+                    .ok_or_else(|| failure("missing AAC rate"))?;
                 let channels = frame
                     .header
                     .coded_channel_count()
-                    .ok_or("missing AAC channels")?;
+                    .ok_or_else(|| failure("missing AAC channels"))?;
                 let [pn, pd] = pair(frame.pts)?;
                 let [dn, dd] = pair(frame.dts)?;
                 let [tn, td] = pair(Some(*presentation))?;
@@ -213,7 +220,7 @@ impl RetainedStream {
                         td,
                         sn,
                         sd,
-                        i64::try_from(frame.bytes.len())?,
+                        i64::try_from(frame.bytes.len()).map_err(boxed)?,
                     ],
                     out,
                 )?;
@@ -278,8 +285,21 @@ fn end_trace_line(out: &mut dyn Write) -> Result<()> {
 
 /// Describes a playback failure as the operation reports it.
 #[cold]
-fn playback_error(error: triergon_playback::Error) -> String {
-    format!("{error:?}")
+fn playback_error(error: triergon_playback::Error) -> Box<dyn Error> {
+    format!("{error:?}").into()
+}
+
+/// The error of a check the operation failed. Errors are built out of line, so
+/// that the session loop holds only the code it runs.
+#[cold]
+fn failure(message: &'static str) -> Box<dyn Error> {
+    message.into()
+}
+
+/// A failure of a library call, built out of line as [`failure`] is.
+#[cold]
+fn boxed(error: impl Error + 'static) -> Box<dyn Error> {
+    Box::new(error)
 }
 
 /// Prints the facts of both retained streams to stderr, after a traced session.
@@ -318,7 +338,7 @@ fn operation(
     let facts = file.metadata()?;
     let size = facts.len();
     if !facts.is_file() || size == 0 || size > MAX_INPUT || !size.is_multiple_of(188) {
-        return Err("expected bounded TS188 body".into());
+        return Err(failure("expected bounded TS188 body"));
     }
     let pool = Budget::new(LIVE_BYTES)?;
     let lifetime = Rc::new(Lifetime::default());
@@ -348,12 +368,14 @@ fn operation(
         {
             TsProgressiveStep::NeedInput(r) => {
                 if input.eof || r.offset != input.bytes || r.source != ID || r.maximum == 0 {
-                    return Err("unexpected forward source request".into());
+                    return Err(failure("unexpected forward source request"));
                 }
-                let count = file.read(&mut scratch[..r.maximum.min(WINDOW)])?;
+                let count = file
+                    .read(&mut scratch[..r.maximum.min(WINDOW)])
+                    .map_err(boxed)?;
                 let reply = if count == 0 {
                     if input.bytes != size {
-                        return Err("early physical EOF".into());
+                        return Err(failure("early physical EOF"));
                     }
                     input.eof = true;
                     SourceReply::End {
@@ -365,17 +387,20 @@ fn operation(
                     input.reads += 1;
                     input.max_read = input.max_read.max(count);
                     if input.bytes > size {
-                        return Err("body grew".into());
+                        return Err(failure("body grew"));
                     }
-                    SourceReply::Data(InputWindow::new(
-                        r.source,
-                        r.token,
-                        r.offset,
-                        Bytes::copy_from_slice(&pool, &scratch[..count])?,
-                    )?)
+                    SourceReply::Data(
+                        InputWindow::new(
+                            r.source,
+                            r.token,
+                            r.offset,
+                            Bytes::copy_from_slice(&pool, &scratch[..count]).map_err(boxed)?,
+                        )
+                        .map_err(boxed)?,
+                    )
                 };
                 if !reader.provide(&reply).map_err(playback_error)? {
-                    return Err("current reply was refused".into());
+                    return Err(failure("current reply was refused"));
                 }
             }
             TsProgressiveStep::Unit(unit) => {
@@ -386,12 +411,16 @@ fn operation(
                         .is_some()
                         != has_dts
                 {
-                    return Err("AVC source DTS shape differs from fixture contract".into());
+                    return Err(failure(
+                        "AVC source DTS shape differs from fixture contract",
+                    ));
                 }
                 if let TsProgressiveUnit::Audio { ref frame, .. } = unit
                     && frame.dts.is_some()
                 {
-                    return Err("AAC source DTS differs from PTS-only fixture contract".into());
+                    return Err(failure(
+                        "AAC source DTS differs from PTS-only fixture contract",
+                    ));
                 }
                 let stream = usize::from(matches!(unit, TsProgressiveUnit::Audio { .. }));
                 if let Some(out) = out.as_deref_mut() {
@@ -404,13 +433,13 @@ fn operation(
             TsProgressiveStep::Yield => {}
             TsProgressiveStep::End => break,
             TsProgressiveStep::Backpressure { .. } => {
-                return Err("progressive pool backpressure".into());
+                return Err(failure("progressive pool backpressure"));
             }
         }
     }
     drop(reader);
     if !input.eof || lifetime.aborts.get() != 1 || lifetime.closes.get() != 1 {
-        return Err("source completion or retirement did not match".into());
+        return Err(failure("source completion or retirement did not match"));
     }
     let mut work = Work::default();
     for stream in &mut streams {
@@ -421,7 +450,7 @@ fn operation(
                     || stream.across_read == 0
                     || stream.retired_before_eof == 0))
         {
-            return Err("progressive owned retention proof missing".into());
+            return Err(failure("progressive owned retention proof missing"));
         }
         work.packets += stream.count;
         work.bytes += stream.bytes;
@@ -429,7 +458,7 @@ fn operation(
         mix(&mut work.digest, stream.digest);
     }
     if pool.used() != Budget::control_storage_bytes() {
-        return Err("progressive pool retained charged storage".into());
+        return Err(failure("progressive pool retained charged storage"));
     }
     if out.is_some() {
         report_streams(&input, &streams);
@@ -445,20 +474,24 @@ fn operation(
 pub(super) fn run(args: &[String]) -> Result<()> {
     let invocation = Invocation::parse(args, PREFIX, " CLOCK PROGRESS", 2..=2, true)?;
     let [clock, progress] = invocation.arguments else {
-        return Err("expected CLOCK and PROGRESS".into());
+        return Err(failure("expected CLOCK and PROGRESS"));
     };
     let has_dts = match clock.as_str() {
         "pts-dts" => true,
         "pts-only" => false,
-        _ => return Err("expected pts-only or pts-dts video clock".into()),
+        _ => return Err(failure("expected pts-only or pts-dts video clock")),
     };
     let require_streaming = match progress.as_str() {
         "before-eof" => true,
         "at-eof" => false,
-        _ => return Err("expected before-eof or at-eof progress requirement".into()),
+        _ => {
+            return Err(failure(
+                "expected before-eof or at-eof progress requirement",
+            ));
+        }
     };
     if invocation.mode == Mode::Bench && invocation.iterations != 50 {
-        return Err("progressive-bench runs 50 sessions".into());
+        return Err(failure("progressive-bench runs 50 sessions"));
     }
     let path = Path::new(invocation.path);
     let trace = invocation.mode == Mode::Trace;

@@ -457,9 +457,16 @@ impl AvcTsReader {
             return Err(error);
         }
         let step = self.advance(work, cancel);
-        if let Err(error) = step
-            && !matches!(error, Error::Allocation | Error::Backpressure { .. })
-        {
+        if let Err(error) = step {
+            self.fail(error);
+        }
+        step
+    }
+
+    /// Retires the reader after a failure other than allocation or backpressure.
+    #[cold]
+    fn fail(&mut self, error: Error) {
+        if !matches!(error, Error::Allocation | Error::Backpressure { .. }) {
             self.failure = Some(error);
             self.pending_pes = None;
             self.input = None;
@@ -467,7 +474,6 @@ impl AvcTsReader {
             self.sps = BudgetVec::new(&self.pool);
             self.pps = BudgetVec::new(&self.pool);
         }
-        step
     }
 
     fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<AvcTsStep> {
