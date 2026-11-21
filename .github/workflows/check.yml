@@ -208,6 +208,36 @@ jobs:
           path: /home/runner/.cache/triergon-downloads
           key: ${{ steps.downloads.outputs.key }}
 
+  # The tests of the crates whose budget arithmetic tests pin storage sizes, on the
+  # 32-bit ARMv7 gate target under user-mode QEMU, where pointers and every owner
+  # and descriptor layout are smaller than on the 64-bit runner.
+  armv7:
+    name: armv7 tests
+    needs: scope
+    if: needs.scope.outputs.scope == 'full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARGO_INCREMENTAL: '0'
+      CARGO_TARGET_THUMBV7NEON_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
+      CARGO_TARGET_THUMBV7NEON_UNKNOWN_LINUX_GNUEABIHF_RUNNER: qemu-arm -L /usr/arm-linux-gnueabihf
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install the cross linker, QEMU and the target
+        run: |
+          packages='gcc-arm-linux-gnueabihf libc6-dev-armhf-cross qemu-user'
+          sudo apt-get install -y $packages ||
+            { sudo apt-get update && sudo apt-get install -y $packages; }
+          rustup show active-toolchain || rustup toolchain install
+          rustup target add thumbv7neon-unknown-linux-gnueabihf
+          rustc -vV
+      # The checked profile keeps every overflow check and debug assertion and runs
+      # the tests several times faster under emulation than a debug build.
+      - name: Test on the 32-bit ARMv7 gate target
+        run: >-
+          cargo test --profile checked --target thumbv7neon-unknown-linux-gnueabihf
+          -p triergon-framing -p triergon-isobmff -p triergon-mpegts
+
   # The steps that read the documents and evidence sets, for a pull request that
   # changes nothing else (`cargo xtask check docs`), on the test part's target
   # directory from main.
@@ -252,17 +282,19 @@ jobs:
       - name: Verify documents and evidence sets
         run: cargo xtask check docs
 
-  # The one required check: it passes when every part passed, or for a pull request
-  # that changes only documents and evidence sets, when `docs` passed.
+  # The one required check: it passes when every part and the ARMv7 tests passed,
+  # or for a pull request that changes only documents and evidence sets, when
+  # `docs` passed.
   check:
     if: always()
-    needs: [scope, part, docs]
+    needs: [scope, part, armv7, docs]
     runs-on: ubuntu-24.04
     steps:
       - name: Every required job passed
         run: |
           case "${{ needs.scope.outputs.scope }}" in
-            full) test "${{ needs.part.result }}" = success ;;
+            full) test "${{ needs.part.result }}" = success &&
+                test "${{ needs.armv7.result }}" = success ;;
             docs) test "${{ needs.docs.result }}" = success ;;
             *) exit 1 ;;
           esac
