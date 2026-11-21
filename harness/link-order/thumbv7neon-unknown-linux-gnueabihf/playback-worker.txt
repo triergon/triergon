@@ -180,7 +180,7 @@ core::ptr::drop_glue::<alloc::vec::Vec<triergon_isobmff::mov_cursor::range_seek:
 <triergon_isobmff::interleave::TrackSampleCursor>::poll_inner
 <triergon_isobmff::mov_clock::SchedulingClock>::from_clock
 <triergon_isobmff::mov_cursor::PacketCursor>::record_seek_checkpoint
-<triergon_isobmff::mov_cursor::Slot>::try_clone_with_edit_storage
+<triergon_isobmff::mov_cursor::Slot>::try_clone
 <triergon_core::bytes::BudgetVec<triergon_isobmff::mov_cursor::range_seek::Checkpoint>>::try_push
 <triergon_core::bytes::BudgetVec<triergon_isobmff::mov_cursor::range_seek::Checkpoint>>::grow_for_push
 <triergon_core::bytes::BudgetVec<triergon_isobmff::mov_cursor::range_seek::Checkpoint>>::reallocate
@@ -256,6 +256,7 @@ playback_worker::mp4_range::seek_to
 core::ptr::drop_glue::<core::option::Option<triergon_isobmff::mov_cursor::range_seek::TrackSeek>>
 <triergon_isobmff::mov_cursor::range_seek::TrackSeek>::finish_forward
 <triergon_isobmff::mov_cursor::range_seek::TrackSeek>::restart_at
+<triergon_isobmff::mov_cursor::Slot>::try_clone_into
 <triergon_core::time::TimeBase>::rescale
 <triergon_isobmff::encoded_edits::EncodedEditPlan>::align_seek_timestamp
 core::ptr::drop_glue::<core::option::Option<alloc::boxed::Box<triergon_isobmff::opus_seek::OpusRecoverySeek>>>
@@ -556,6 +557,7 @@ triergon_playback::raw_video::config::hevc::skip_profile_tier_level
 <triergon_playback::raw_video::config::hevc::Rbsp>::id
 <triergon_playback::raw_video::config::hevc::Rbsp>::ue
 <triergon_playback::raw_video::config::hevc::Rbsp>::fixed
+triergon_playback::raw_video::config::hevc::pps
 triergon_playback::raw_video::config::hevc::slice_picture
 core::ptr::drop_glue::<triergon_playback::raw_video::config::RawVideoConfiguration>
 core::ptr::drop_glue::<core::option::Option<triergon_playback::hls_segment::Unit<triergon_playback::hls_segment::lanes::HlsMediaVideoUnit, triergon_playback::hls_segment::lanes::HlsMediaAudioUnit>>>
@@ -646,11 +648,10 @@ core::ptr::drop_glue::<triergon_matroska::typed::reader::State>
 <triergon_core::bytes::BudgetVec<triergon_matroska::metadata::SharedDocument>>::reallocate
 core::ptr::drop_glue::<alloc::vec::Vec<triergon_matroska::metadata::SharedDocument>>
 <triergon_matroska::metadata::typed_document::CatalogueJob>::step
-<triergon_matroska::metadata::typed_document::CatalogueJob>::advance
 <triergon_matroska::metadata::typed_document::CatalogueJob>::start_document
 core::ptr::drop_glue::<core::option::Option<triergon_matroska::metadata::typed_document::DocumentJob>>
 <triergon_core::bytes::BudgetVec<triergon_matroska::metadata::Node>>::reallocate
-<triergon_matroska::storage::text_job::TextJob>::step
+<triergon_matroska::storage::text_job::TextCheck>::step
 triergon_matroska::metadata::typed_document::bit
 <triergon_matroska::storage::StorageVec<triergon_matroska::metadata::SharedDocument>>::push
 <triergon_matroska::matroska::typed::tracks::TracksJob>::step
@@ -787,15 +788,16 @@ core::ptr::drop_glue::<triergon_matroska::incremental::ParseStep<triergon_matros
 <triergon_matroska::matroska::typed::epoch::EpochRestoreJob>::after_group
 <triergon_matroska::matroska::typed::epoch::RestoredEpoch as core::clone::Clone>::clone
 core::ptr::drop_glue::<triergon_matroska::typed::reader::seeking::ScanBoundary>
+triergon_matroska::matroska::typed::packet::keep_recovery_packet
 <triergon_playback::matroska_feed::video_seek::MatroskaVideoSeekGate>::admits
 <triergon_matroska::incremental::ElementReader>::admit_typed_leaf
+<triergon_matroska::storage::text_job::TextJob>::step
 <triergon_framing::hevc_config::HvcConfigParser>::new
 <triergon_framing::hevc_config::HvcConfigParser>::step
 <triergon_framing::hevc_config::HvcConfigParser>::advance
 triergon_playback::raw_video::config::hevc::startup_sps
 <triergon_playback::raw_video::config::hevc::Rbsp>::bounded
 triergon_playback::raw_video::config::hevc::vps
-<triergon_framing::hevc_config::HvcConfigNal>::length_field_bytes
 core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfiguration>
 core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfigParser>
 <triergon_matroska::matroska::Track>::legacy_aac_profile
@@ -804,7 +806,7 @@ core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfigParser>
 <triergon_matroska::matroska::typed::configuration::Configuration>::initialization
 <triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>::step
 core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>
-triergon_playback::raw_video::config::hevc::vps_timing
+triergon_playback::raw_video::config::hevc::read_vps_timing
 core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbyFeed>
 core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::FeedCodec>
 playback_worker::matroska_audio::run
