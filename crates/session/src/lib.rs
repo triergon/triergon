@@ -38,6 +38,7 @@ mod video;
 
 pub use audio::{AudioSession, PcmBlock};
 pub use discard::Discard;
+pub use lane::OnRefusal;
 pub use queue::{FeedError, QueueLimits};
 #[cfg(feature = "codecs")]
 pub use track::{AacAccessUnitConfig, TrackDecoder};
@@ -194,6 +195,7 @@ pub enum SessionState {
     Starved,
     /// `end_of_stream` was called and all decoded output has been delivered.
     Ended,
-    /// The decoder refused an access unit, with this error.
+    /// The decoder refused an access unit with this error, and the lane fails on a refusal
+    /// ([`OnRefusal::Fail`]).
     Failed(Error),
 }

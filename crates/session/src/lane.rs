@@ -40,3 +40,40 @@ impl Phase {
         }
     }
 }
+
+/// What a lane does when its decoder refuses an access unit.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum OnRefusal {
+    /// The lane fails: it discards its queue, decodes nothing more and reports
+    /// [`SessionState::Failed`] until it restarts.
+    #[default]
+    Fail,
+    /// The lane drops the unit, counts it and decodes the next one. A refused end-of-stream
+    /// drain ends the lane as a drained one does.
+    Skip,
+}
+
+/// A lane's refusal policy and the refusals of its current stream.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Refusals {
+    pub(crate) policy: OnRefusal,
+    /// Refusals since the lane last restarted.
+    pub(crate) count: u64,
+    /// The latest of them.
+    pub(crate) last: Option<Error>,
+}
+
+impl Refusals {
+    /// Count `error`; what the lane does about it.
+    pub(crate) fn refuse(&mut self, error: Error) -> OnRefusal {
+        self.count += 1;
+        self.last = Some(error);
+        self.policy
+    }
+
+    /// A restart: no refusals yet, the same policy.
+    pub(crate) fn clear(&mut self) {
+        self.count = 0;
+        self.last = None;
+    }
+}

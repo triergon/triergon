@@ -6,10 +6,10 @@
 //! therefore yields nothing, and flush/stop discard everything queued.
 use crate::Discard;
 use crate::SessionState;
-use crate::lane::Phase;
+use crate::lane::{OnRefusal, Phase, Refusals};
 use crate::mix::Downmix;
 use crate::queue::{FeedError, QueueLimits, UnitQueue};
-use triergon_codec::{AudioFrame, DownmixLevels, DynAudioDecoder};
+use triergon_codec::{AudioFrame, DownmixLevels, DynAudioDecoder, Error};
 
 /// One block of output: interleaved stereo s16 at one sample rate.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -37,6 +37,7 @@ pub struct AudioSession {
     output: Output,
     generation: u64,
     phase: Phase,
+    refusals: Refusals,
 }
 
 impl core::fmt::Debug for AudioSession {
@@ -44,12 +45,14 @@ impl core::fmt::Debug for AudioSession {
         f.debug_struct("AudioSession")
             .field("state", &self.state())
             .field("generation", &self.generation)
+            .field("refusals", &self.refusals)
             .finish_non_exhaustive()
     }
 }
 
 impl AudioSession {
-    /// An idle lane whose queue holds at most `limits`.
+    /// An idle lane whose queue holds at most `limits`. A refused access unit fails it
+    /// ([`OnRefusal::Fail`]).
     pub fn new(limits: QueueLimits) -> Self {
         Self {
             decoder: None,
@@ -59,7 +62,14 @@ impl AudioSession {
             output: Output::default(),
             generation: 0,
             phase: Phase::Open,
+            refusals: Refusals::default(),
         }
+    }
+    /// This lane, doing what `policy` says when its decoder refuses an access unit.
+    #[must_use]
+    pub fn on_refusal(mut self, policy: OnRefusal) -> Self {
+        self.refusals.policy = policy;
+        self
     }
     /// A new stream: queued input goes and `decoder` takes over; `None` plays no audio
     /// ([`SessionState::Idle`]).
@@ -81,6 +91,7 @@ impl AudioSession {
         self.queue.clear();
         self.output.carry = None;
         self.phase = Phase::Open;
+        self.refusals.clear();
     }
     /// Increases with every [`load`](Self::load) and [`stop`](Self::stop).
     pub fn generation(&self) -> u64 {
@@ -155,8 +166,10 @@ impl AudioSession {
                     self.output.append(&self.frame, levels, unit.pts, out);
                 }
                 Err(error) => {
-                    self.phase = Phase::Failed(error);
-                    self.queue.clear();
+                    if self.refusals.refuse(error) == OnRefusal::Fail {
+                        self.phase = Phase::Failed(error);
+                        self.queue.clear();
+                    }
                 }
             }
         }
@@ -176,13 +189,25 @@ impl AudioSession {
                 self.output.append(&self.frame, None, None, out);
                 Phase::Drained
             }
-            Err(error) => Phase::Failed(error),
+            Err(error) => match self.refusals.refuse(error) {
+                OnRefusal::Fail => Phase::Failed(error),
+                OnRefusal::Skip => Phase::Drained,
+            },
         };
     }
     /// Why the lane is or is not producing output.
     pub fn state(&self) -> SessionState {
         let pending = !self.queue.is_empty() || self.output.carry.is_some();
         self.phase.state(self.decoder.is_some(), pending)
+    }
+    /// Access units the decoder refused since the last [`load`](Self::load) or
+    /// [`stop`](Self::stop), the end-of-stream drain included.
+    pub fn refusals(&self) -> u64 {
+        self.refusals.count
+    }
+    /// The decoder's latest refusal since then.
+    pub fn last_refusal(&self) -> Option<Error> {
+        self.refusals.last
     }
 }
 

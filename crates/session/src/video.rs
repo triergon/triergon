@@ -4,10 +4,10 @@
 //! decoder's reordering. The lane holds at most one converted picture ahead of
 //! the clock and publishes it once the clock reaches its PTS.
 use crate::SessionState;
-use crate::lane::Phase;
+use crate::lane::{OnRefusal, Phase, Refusals};
 use crate::queue::{FeedError, QueueLimits, UnitQueue};
 use std::sync::Arc;
-use triergon_codec::DynVideoDecoder;
+use triergon_codec::{DynVideoDecoder, Error};
 use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
 
 /// The current picture for the compositor. `sequence` increases for every
@@ -43,6 +43,7 @@ pub struct VideoSession {
     generation: u64,
     sequence: u64,
     phase: Phase,
+    refusals: Refusals,
 }
 
 impl core::fmt::Debug for VideoSession {
@@ -51,12 +52,14 @@ impl core::fmt::Debug for VideoSession {
             .field("state", &self.state())
             .field("generation", &self.generation)
             .field("sequence", &self.sequence)
+            .field("refusals", &self.refusals)
             .finish_non_exhaustive()
     }
 }
 
 impl VideoSession {
-    /// An idle lane whose queue holds at most `limits`.
+    /// An idle lane whose queue holds at most `limits`. A refused access unit fails it
+    /// ([`OnRefusal::Fail`]).
     pub fn new(limits: QueueLimits) -> Self {
         Self {
             decoder: None,
@@ -68,7 +71,14 @@ impl VideoSession {
             generation: 0,
             sequence: 0,
             phase: Phase::Open,
+            refusals: Refusals::default(),
         }
+    }
+    /// This lane, doing what `policy` says when its decoder refuses an access unit.
+    #[must_use]
+    pub fn on_refusal(mut self, policy: OnRefusal) -> Self {
+        self.refusals.policy = policy;
+        self
     }
     /// A new stream: old input, decoder state and picture go.
     pub fn load(&mut self, decoder: Box<DynVideoDecoder>) {
@@ -94,6 +104,7 @@ impl VideoSession {
             self.spare = Some(ahead.rgba);
         }
         self.phase = Phase::Open;
+        self.refusals.clear();
         if clear_picture {
             self.latest = None;
         }
@@ -160,7 +171,9 @@ impl VideoSession {
             }
             match self.queue.pop() {
                 Some(unit) => {
-                    if let Err(error) = decoder.send(&unit.data, unit.pts) {
+                    if let Err(error) = decoder.send(&unit.data, unit.pts)
+                        && self.refusals.refuse(error) == OnRefusal::Fail
+                    {
                         self.phase = Phase::Failed(error);
                         self.queue.clear();
                     }
@@ -181,5 +194,14 @@ impl VideoSession {
     pub fn state(&self) -> SessionState {
         let pending = self.ahead.is_some() || !self.queue.is_empty();
         self.phase.state(self.decoder.is_some(), pending)
+    }
+    /// Access units the decoder refused since the last [`load`](Self::load),
+    /// [`flush`](Self::flush) or [`stop`](Self::stop).
+    pub fn refusals(&self) -> u64 {
+        self.refusals.count
+    }
+    /// The decoder's latest refusal since then.
+    pub fn last_refusal(&self) -> Option<Error> {
+        self.refusals.last
     }
 }

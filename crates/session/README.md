@@ -111,8 +111,13 @@ The `mix` module holds the stereo downmix (`mix::Downmix`) and the s16 conversio
   the video decoder's remaining pictures, the audio decoder's held-back samples
   (`AudioDecoder::flush`, the Opus resampler delay), which follow the last unit's in its
   block, or start a block without a PTS. The state becomes `SessionState::Ended` once
-  that output is delivered. A decoder error is `SessionState::Failed` with that
-  error until the next load, flush or stop.
+  that output is delivered.
+- **Refusals.** By default a refused access unit fails its lane: `SessionState::Failed`
+  with the decoder's error until the next load, flush or stop, the queue discarded.
+  A lane built with `.on_refusal(OnRefusal::Skip)` drops the unit and decodes the next
+  one instead; a refused end-of-stream drain then ends the lane. Either way
+  `refusals()` counts the refusals since the lane last restarted and `last_refusal()`
+  holds the latest.
 - **Letterbox.** Each picture goes through one `triergon_pixel::letterbox::Scaler`
   into a 1920×1080 RGBA canvas; the fit, padding and conversion rules are in
   [triergon-pixel](../pixel/README.md).

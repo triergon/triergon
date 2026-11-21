@@ -6,7 +6,7 @@ use triergon_codec::{
 };
 use triergon_pixel::letterbox::CANVAS_BYTES;
 use triergon_session::{
-    AudioSession, FeedError, PcmBlock, QueueLimits, SessionState, VideoSession,
+    AudioSession, FeedError, OnRefusal, PcmBlock, QueueLimits, SessionState, VideoSession,
 };
 
 /// A reordering decoder: access unit `[luma, display_order]`, delay of two.
@@ -170,8 +170,29 @@ fn decoder_failure_is_explicit_and_backpressure_bounds_input() {
         SessionState::Failed(Error::Invalid("not an H.264 Annex-B access unit"))
     );
     assert_eq!(video.feed(&[1, 0], None), Err(FeedError::Idle));
+    assert_eq!(video.refusals(), 1);
     video.flush();
+    assert_eq!((video.refusals(), video.last_refusal()), (0, None));
     video.feed(&[1, 0], None).unwrap();
+}
+
+#[test]
+fn a_skipping_video_lane_drops_a_refused_unit_and_counts_it() {
+    let refusal = Error::Invalid("not an H.264 Annex-B access unit");
+    let mut video = VideoSession::new(QueueLimits::VIDEO).on_refusal(OnRefusal::Skip);
+    video.load(Box::<Script>::default());
+    video.feed(&[10, 0], Some(0)).unwrap();
+    video.feed(&[0xff, 0], Some(5)).unwrap();
+    video.feed(&[20, 1], Some(10)).unwrap();
+    video.end_of_stream();
+    assert!(video.step(None));
+    assert!(video.step(None));
+    assert_eq!(video.latest().unwrap().pts, Some(10));
+    assert!(!video.step(None));
+    assert_eq!(video.state(), SessionState::Ended);
+    assert_eq!((video.refusals(), video.last_refusal()), (1, Some(refusal)));
+    video.flush();
+    assert_eq!((video.refusals(), video.last_refusal()), (0, None));
 }
 
 /// Each unit decodes to `[rate_khz, value]` -> `value` samples at value/100.
@@ -324,6 +345,37 @@ fn a_refused_flush_fails_the_lane() {
     assert_eq!(audio.state(), SessionState::Failed(refusal));
 }
 
+#[test]
+fn a_skipping_audio_lane_drops_refused_units_and_ends_after_a_refused_flush() {
+    let refusal = Error::Invalid("bad sync");
+    let mut audio = AudioSession::new(QueueLimits::AUDIO).on_refusal(OnRefusal::Skip);
+    audio.load(Some(Tones::new([Speaker::FrontLeft, Speaker::FrontRight])));
+    for unit in [[48, 10], [0, 0], [48, 20]] {
+        audio.feed(&unit, None).unwrap();
+    }
+    let mut block = PcmBlock::default();
+    assert_eq!(audio.pull(None, 0, &mut block), 3);
+    assert_eq!(
+        block.samples.len(),
+        2 * 4 * 2,
+        "both decoded units, nothing of the refused"
+    );
+    assert_eq!(audio.state(), SessionState::Starved);
+    assert_eq!((audio.refusals(), audio.last_refusal()), (1, Some(refusal)));
+    audio.feed(&[48, 30], None).unwrap();
+    audio.stop();
+    assert_eq!((audio.refusals(), audio.last_refusal()), (0, None));
+
+    let held = Error::Invalid("held samples");
+    let mut audio = AudioSession::new(QueueLimits::AUDIO).on_refusal(OnRefusal::Skip);
+    audio.load(Some(Holding::new(Err(held))));
+    audio.feed(&[10], None).unwrap();
+    audio.end_of_stream();
+    assert_eq!(audio.pull(None, 0, &mut PcmBlock::default()), 1);
+    assert_eq!(audio.state(), SessionState::Ended);
+    assert_eq!((audio.refusals(), audio.last_refusal()), (1, Some(held)));
+}
+
 #[cfg(feature = "codecs")]
 #[test]
 fn a_selection_starts_the_lanes_it_names() {
@@ -376,6 +428,10 @@ fn a_sample_rate_change_starts_a_new_block_and_surround_is_downmixed() {
     assert_eq!(
         audio.state(),
         SessionState::Failed(Error::Invalid("bad sync"))
+    );
+    assert_eq!(
+        (audio.refusals(), audio.last_refusal()),
+        (1, Some(Error::Invalid("bad sync")))
     );
     audio.load(None);
     assert_eq!(
