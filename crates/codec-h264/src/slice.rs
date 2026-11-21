@@ -42,7 +42,6 @@ pub(crate) struct SliceHeader {
     pub(crate) idr: bool,
     pub(crate) first_mb: u32,
     pub(crate) slice_type: SliceType,
-    pub(crate) pps_id: u32,
     pub(crate) frame_num: u32,
     pub(crate) field_pic: bool,
     pub(crate) bottom_field: bool,
@@ -94,7 +93,7 @@ pub(crate) fn parse_slice_header(
     sps: &Sps,
     pps: &Pps,
 ) -> R<SliceHeader> {
-    let (first_mb, st, pps_id) = peek_pps_id(r)?;
+    let (first_mb, st, _) = peek_pps_id(r)?;
     let slice_type = match st % 5 {
         0 => SliceType::P,
         1 => SliceType::B,
@@ -320,7 +319,6 @@ pub(crate) fn parse_slice_header(
         idr,
         first_mb,
         slice_type,
-        pps_id,
         frame_num,
         field_pic,
         bottom_field,

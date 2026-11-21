@@ -6,19 +6,15 @@
     clippy::print_stderr,
     clippy::unwrap_used,
     clippy::expect_used,
-    unreachable_pub
+    unreachable_pub,
+    missing_docs
 )]
-// Pending: `missing_docs`.
-// Pending: these rewrites change the generated code of measured hot paths and are
-// adopted with an A/B timing run.
+// Kept in the forms whose generated code was measured on the hot paths.
 #![allow(
     clippy::bool_to_int_with_if,
-    clippy::manual_slice_fill,
     clippy::map_unwrap_or,
     clippy::nonminimal_bool,
-    clippy::overly_complex_bool_expr,
     clippy::single_match_else,
-    clippy::stable_sort_primitive,
     clippy::unnested_or_patterns
 )]
 mod cabac;
@@ -149,9 +145,13 @@ impl Default for Limits {
 /// Colour description from the VUI (Annex E); defaults are "unspecified" (2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ColourDescription {
+    /// colour_primaries (Table E-3).
     pub primaries: u8,
+    /// transfer_characteristics (Table E-4).
     pub transfer: u8,
+    /// matrix_coefficients (Table E-5).
     pub matrix: u8,
+    /// video_full_range_flag.
     pub full_range: bool,
 }
 
@@ -171,19 +171,30 @@ impl Default for ColourDescription {
 #[derive(Clone)]
 pub struct Plane {
     frame: std::sync::Arc<FrameBuf>,
-    comp: u8,
+    component: Component,
     offset: usize,
+    /// Visible samples per row.
     pub width: usize,
+    /// Visible rows.
     pub height: usize,
+    /// Distance in samples between the starts of two rows.
     pub stride: usize,
+}
+
+/// The plane of a frame buffer a [`Plane`] shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Component {
+    Y,
+    Cb,
+    Cr,
 }
 
 impl Plane {
     fn samples(&self) -> &[u8] {
-        match self.comp {
-            0 => &self.frame.y,
-            1 => &self.frame.cb,
-            _ => &self.frame.cr,
+        match self.component {
+            Component::Y => &self.frame.y,
+            Component::Cb => &self.frame.cb,
+            Component::Cr => &self.frame.cr,
         }
     }
     /// Visible samples of row `y` (`width` bytes).
@@ -216,13 +227,21 @@ impl std::fmt::Debug for Plane {
 /// chroma planes filled with 128 like FFmpeg's yuv420p output).
 #[derive(Clone, Debug)]
 pub struct Picture {
+    /// Cropped width in luma samples.
     pub width: usize,
+    /// Cropped height in luma samples.
     pub height: usize,
+    /// Bits per sample: always 8.
     pub bit_depth: u32,
+    /// Y, Cb and Cr; the chroma planes have half the width and height.
     pub planes: [Plane; 3],
+    /// The timestamp passed with the access unit that carried the picture.
     pub pts: Option<i64>,
+    /// PicOrderCnt of the frame (8.2.1): the smaller of its fields' counts.
     pub poc: i32,
+    /// Sample aspect ratio from the VUI as (width, height); (0, 0) when unspecified.
     pub sar: (u32, u32),
+    /// Colour description from the VUI.
     pub colour: ColourDescription,
     /// The picture was coded as fields (both fields of the output frame).
     pub interlaced: bool,
@@ -254,7 +273,6 @@ struct ActivePic {
     poc_lsb: u32,
     delta_poc_bottom: i32,
     delta_poc: [i32; 2],
-    pps_id: u32,
     idr_pic_id: u32,
     /// Marking information from the first slice.
     sh_first: SliceHeader,
@@ -327,11 +345,11 @@ fn output_picture(poc: i32, fs: &FrameStore) -> Option<Picture> {
     let (cx, cy, cw, ch) = fs.info.crop;
     let (cx, cy, cw, ch) = (cx as usize, cy as usize, cw as usize, ch as usize);
     let (ccw, cch) = (cw / 2, ch / 2);
-    let mk = |comp: u8| -> Plane {
-        if comp == 0 {
+    let mk = |component: Component| -> Plane {
+        if component == Component::Y {
             Plane {
                 frame: b.clone(),
-                comp,
+                component,
                 offset: cy * b.width + cx,
                 width: cw,
                 height: ch,
@@ -340,7 +358,7 @@ fn output_picture(poc: i32, fs: &FrameStore) -> Option<Picture> {
         } else {
             Plane {
                 frame: b.clone(),
-                comp,
+                component,
                 offset: (cy / 2) * b.cwidth + cx / 2,
                 width: ccw,
                 height: cch,
@@ -352,7 +370,7 @@ fn output_picture(poc: i32, fs: &FrameStore) -> Option<Picture> {
         width: cw,
         height: ch,
         bit_depth: 8,
-        planes: [mk(0), mk(1), mk(2)],
+        planes: [mk(Component::Y), mk(Component::Cb), mk(Component::Cr)],
         pts: fs.pts,
         poc,
         sar: fs.info.sar,
@@ -587,18 +605,13 @@ impl Decoder {
                 self.ppss[id] = Some(Box::new(pps));
                 Ok(())
             }
-            9..=11 => {
-                // Access unit delimiter / end of sequence / end of stream: picture boundary.
+            // SEI, access unit delimiter, end of sequence, end of stream: a picture boundary.
+            6 | 9..=11 => {
                 self.finish_picture();
                 Ok(())
             }
-            6 => {
-                self.finish_picture();
-                Ok(())
-            }
-            // SVC / MVC NAL units (prefix, subset SPS, slice extensions) are skipped so the
-            // base view / base layer decodes (Annex G/H NAL types).
-            14 | 15 | 20 | 21 => Ok(()),
+            // Everything else is skipped, among it the SVC / MVC units (prefix, subset SPS,
+            // slice extensions, Annex G/H), so the base view or layer decodes.
             _ => Ok(()),
         }
     }
@@ -646,12 +659,12 @@ impl Decoder {
             // Redundant coded pictures are not needed when the primary picture is intact.
             return Ok(());
         }
-        // New picture detection (7.4.1.2.4).
+        // New picture detection (7.4.1.2.4); a change of pic_parameter_set_id alone does
+        // not start one.
         let new_pic = match &self.active {
             None => true,
             Some(a) => {
                 a.frame_num != sh.frame_num
-                    || a.pps_id != sh.pps_id && false
                     || a.field_pic != sh.field_pic
                     || (sh.field_pic && a.bottom != sh.bottom_field)
                     || (a.nal_ref_idc == 0) != (sh.nal.nal_ref_idc == 0)
@@ -732,7 +745,6 @@ impl Decoder {
             poc_lsb: sh.poc_lsb,
             delta_poc_bottom: sh.delta_poc_bottom,
             delta_poc: sh.delta_poc,
-            pps_id: sh.pps_id,
             idr_pic_id: sh.idr_pic_id,
             sh_first: sh.clone(),
             max_slice_err: None,

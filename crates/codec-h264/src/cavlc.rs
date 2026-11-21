@@ -32,7 +32,7 @@ impl Vlc {
             .filter(|c| c.1 as u32 > bits)
             .map(|c| c.0 >> (c.1 as u32 - bits))
             .collect();
-        prefixes.sort();
+        prefixes.sort_unstable();
         prefixes.dedup();
         for p in prefixes {
             let sub_bits = codes

@@ -9,43 +9,79 @@ use triergon_bitstream::BitReader;
 use triergon_codec::{Budget, BudgetVec};
 use triergon_framing::nal::AnnexBUnits;
 
+/// The coding features a stream's parameter sets and slice headers use.
 #[derive(Debug, Default, Clone)]
 pub struct StreamFeatures {
+    /// profile_idc of every SPS.
     pub profiles: BTreeSet<u8>,
+    /// constraint_set flags of every SPS (the byte after profile_idc).
     pub constraint_flags: BTreeSet<u8>,
+    /// chroma_format_idc of every SPS.
     pub chroma_format_idc: BTreeSet<u32>,
+    /// The larger of the luma and chroma bit depths of every SPS.
     pub bit_depth: BTreeSet<u32>,
+    /// Coded frame width and height in luma samples of every SPS.
     pub sizes: BTreeSet<(u32, u32)>,
+    /// entropy_coding_mode_flag of every PPS.
     pub cabac: BTreeSet<bool>,
+    /// frame_mbs_only_flag of every SPS.
     pub frame_mbs_only: BTreeSet<bool>,
+    /// Some SPS sets mb_adaptive_frame_field_flag.
     pub mbaff_sps: bool,
+    /// Some slice is a field slice.
     pub field_pics: bool,
+    /// Some slice is an MBAFF frame slice.
     pub mbaff_pics: bool,
+    /// Slice types seen ("I", "P", "B", "SP", "SI").
     pub slice_types: BTreeSet<&'static str>,
+    /// Some PPS has more than one slice group.
     pub fmo: bool,
+    /// Some PPS sets redundant_pic_cnt_present_flag.
     pub redundant_pic_cnt_present: bool,
+    /// Some slice is a redundant slice.
     pub redundant_slices: bool,
+    /// Some slice carries a prediction weight table.
     pub weighted_explicit: bool,
+    /// Some B slice uses implicit weighted prediction.
     pub weighted_implicit: bool,
+    /// Some PPS sets transform_8x8_mode_flag.
     pub transform_8x8: bool,
+    /// Some SPS or PPS carries scaling matrices.
     pub scaling_matrices: bool,
+    /// pic_order_cnt_type of every SPS.
     pub poc_types: BTreeSet<u32>,
+    /// Some PPS sets constrained_intra_pred_flag.
     pub constrained_intra_pred: bool,
+    /// Some B slice uses spatial direct prediction.
     pub direct_spatial: bool,
+    /// Some B slice uses temporal direct prediction.
     pub direct_temporal: bool,
+    /// Some slice modifies a reference picture list.
     pub ref_list_mods: bool,
+    /// memory_management_control_operation values seen.
     pub mmco_ops: BTreeSet<u32>,
+    /// Some IDR slice sets long_term_reference_flag.
     pub long_term_idr: bool,
+    /// Some picture has more than one slice.
     pub multi_slice: bool,
+    /// nal_unit_type of every NAL unit.
     pub nal_types: BTreeSet<u8>,
+    /// Some SPS sets gaps_in_frame_num_value_allowed_flag.
     pub gaps_allowed: bool,
+    /// Some SPS sets qpprime_y_zero_transform_bypass_flag.
     pub lossless: bool,
+    /// Some SPS crops the frame.
     pub crop: bool,
+    /// The most slices counted in one picture.
     pub max_slices_per_pic: u32,
+    /// max_num_reorder_frames and max_dec_frame_buffering of the last SPS that gives them.
     pub bitstream_restriction: Option<(u32, u32)>,
+    /// The parameter sets and slice headers that failed to parse, with their errors.
     pub errors: Vec<String>,
 }
 
+/// The features of the Annex B stream `data`. Units that fail to parse are listed in
+/// [`StreamFeatures::errors`]; slice data is not decoded.
 pub fn inspect(data: &[u8]) -> StreamFeatures {
     let mut f = StreamFeatures::default();
     let mut spss: Vec<Option<Box<Sps>>> = vec![None; 32];
