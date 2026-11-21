@@ -1,0 +1,310 @@
+{
+ "name": "gate-run-armv7-fd9d1335-20261121-225946-shard-1",
+ "path": "gate-run-armv7-fd9d1335-20261121-225946-shard-1",
+ "retention": "retained",
+ "reason": "MPEG-TS packet, picture seek and LATM replay comparisons on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/fd9d133518c21b049a3a622b8c34826308622f9b-armv7-20261121-225946/shard-1/7cef32c91d862f320c37a72c99f00cade17e73c80053d6cbbf83774c590ad61c.tar.zst",
+ "sha256": "7cef32c91d862f320c37a72c99f00cade17e73c80053d6cbbf83774c590ad61c",
+ "bytes": 55072134,
+ "results": [
+  {
+   "path": "memory/mpegts-previous-audio/gate-result.json",
+   "command": "report --memory",
+   "key": "d3b59e4c0787936c50fa9700730916efc833bda520d56cba0c62bcb90645018e",
+   "status": 0,
+   "report_sha256": "93a17ca71e33ae639a482765fd98e353d8abc38ecf592b72c206267962837139",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-dts-seek/gate-result.json",
+   "command": "report --memory",
+   "key": "071d0211721dc17f159d67011aabe78f92a19cea46b12a24926e2425769f3f57",
+   "status": 0,
+   "report_sha256": "7a20b1477ba60d388f899c00f4d95b57f1c60426863da0a27238f4479680706c",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-access-units/gate-result.json",
+   "command": "report --memory",
+   "key": "b2a0449770878e9c549a9dd3e5baceccc4f2639303e51dd7775deb494bebf8e7",
+   "status": 0,
+   "report_sha256": "8c97d4463ea235d6385b0a97e2668600301433d1496a84cfb14732efadcfff66",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-previous-picture/gate-result.json",
+   "command": "report --memory",
+   "key": "7d7c6690cc20835a9673b2352f9e4bda4e5f2d6e614fa7880900f3dad8dc84df",
+   "status": 0,
+   "report_sha256": "927cab724f1e5baf5903c85932999ec402f818cb4238c8c8a1bc9af68658589e",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-dts-core/gate-result.json",
+   "command": "report --memory",
+   "key": "8429396bb239a9653740285764a4af3ce6b2c584d64777f9c73b289ef5f31557",
+   "status": 0,
+   "report_sha256": "768cd2540d1ea6a6c3f7223b7a143dccfed4c8ffc2ea788eb16e8395eb05995f",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-dts-hd-extensions/gate-result.json",
+   "command": "report --memory",
+   "key": "bf40420be2f486289e2e9b1eefba49ad8aca4f920a4a8002eaa0d4815ece7ab7",
+   "status": 0,
+   "report_sha256": "c8c8321db3b4ee30689bcf506defd3e112a8278a66317792d4fefb712810d953",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-dts-discovery/gate-result.json",
+   "command": "report --memory",
+   "key": "533854f952de6fa50ac05848f808c6beb5a686f0af52d502cf11aa05fad0ade9",
+   "status": 0,
+   "report_sha256": "350d37bcd21f0a3e129c77d869ad6da3e27d11581d9e555670d8cda976e28c78",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-pes/gate-result.json",
+   "command": "report --memory",
+   "key": "b757513e5257c89f7ebce5433188f570673b3308fb5ad542d0b04465049628d1",
+   "status": 0,
+   "report_sha256": "a658edcf824ef1eef3ca3c721450f6eeb84810591e50b4417bd3a166c7f05000",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-dts-hd-grouped/gate-result.json",
+   "command": "report --memory",
+   "key": "2d5a2ad4606d885af0b8d88c15fdb283183da923ff911de5fbe231a32d1ab034",
+   "status": 0,
+   "report_sha256": "101c36fbbd6ebe156c6537cecda39f9c2fa0769385e7865c7f16fba4718101c1",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-dts-legacy/gate-result.json",
+   "command": "report --memory",
+   "key": "b8eb62e412db5d06a337932230e5a84d82d96f4b50215f4180ff6759001745dd",
+   "status": 0,
+   "report_sha256": "8dc56bf86d44e9429e968e554fffde25a1a9834b09698cced74cfe6bfea19183",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-free-audio/gate-result.json",
+   "command": "report --memory",
+   "key": "d5badd40aaf75c9665f7e2501752345992bc14c53ccdfa4a2cd7061a62c42685",
+   "status": 0,
+   "report_sha256": "30945286e8aa92c2fb2f1ad5cd4c7db323e923f777460b09ab4cd23dd014ad8e",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-dts-hd/gate-result.json",
+   "command": "report --memory",
+   "key": "d41533176d42da30647148aef73865129c5bfdf8f67817ba6878dfeb94a33069",
+   "status": 0,
+   "report_sha256": "ec19f8d454bb4fc322df4d4a53a4955c530b3ed641d1f132af87aad687e030ab",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-atsc-eac3-six-block/gate-result.json",
+   "command": "report --memory",
+   "key": "0399a8fb1d8756f7539c6591e13c807ac91035717d49d9cb8cf4a338ff849705",
+   "status": 0,
+   "report_sha256": "46afc0ffcede4a8cbec86370c8dbb8f0d71d759b4a8c9d57f5fd135b84104641",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-previous-audio/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4f38cf888aa57970887d1bf183efeb8ecc8d53852caed63d93c354d786212712",
+   "status": 0,
+   "report_sha256": "d6788a6e37755d3cdeb68ecc3ac63976ce9e02ca8f994670570f58a27866f66a",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-dts-seek/gate-result.json",
+   "command": "report --benchmark",
+   "key": "001c5a7fe35cbbe54812f509ca2efdcc3dcb2487dd7cfe3244f925c3cdbea2e4",
+   "status": 0,
+   "report_sha256": "dada3b3ed6c9be0911f3146f597a0ad3291a49887c9b59f370edc587bb126e19",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-access-units/gate-result.json",
+   "command": "report --benchmark",
+   "key": "f6475a184727977801d07aa6b688310bb726a9b47097969aad6ea8be1dbcdda3",
+   "status": 0,
+   "report_sha256": "303ab4c12a6dee374f872a6daf1283d23228171acad55c909e1c54944c4e54a7",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-previous-picture/gate-result.json",
+   "command": "report --benchmark",
+   "key": "547340826d9ede11bd7428d5f4c4f6de3ed9bb73458bd79df492836cf83c2b16",
+   "status": 0,
+   "report_sha256": "18ad6624cbc99ac7f9608d353e6184ca0fa7645fbf3e24eb030803ab55fffbb6",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-dts-core/gate-result.json",
+   "command": "report --benchmark",
+   "key": "68c05ed1aa75e144536c37119ed614675adce0ab5aac7b5f2c2c46dd59a9ca2e",
+   "status": 0,
+   "report_sha256": "47d754b70414f1025d5b387e94c657b1fde1a8a15a412fbba861081c9ea8fdc0",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-dts-hd-extensions/gate-result.json",
+   "command": "report --benchmark",
+   "key": "1e11b38f8345425b1b34ab6588b35149817084f5e1c41d111885096f311b1198",
+   "status": 0,
+   "report_sha256": "6fdf1c37dd928f137e71a9e40755493f4c588ab22cdc7f39f29e9feb76eb5a18",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-dts-discovery/gate-result.json",
+   "command": "report --benchmark",
+   "key": "98ba36cc60a4208d5fac1b8ab50ffe04b8b635d94637015c602cdfec0a0c5937",
+   "status": 0,
+   "report_sha256": "c4ec15d9171093062f57e4c6196d756bc49e79e1eb0bb5cd2eef763c6f2585b7",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-pes/gate-result.json",
+   "command": "report --benchmark",
+   "key": "77e67ec5b006b0ab593dd0bb9b31faea3830948f104086a6402416ba41b901e8",
+   "status": 0,
+   "report_sha256": "ab92542f266dc4dcc933491748234f66d7bec334ac7c4dc424e8bed356f34a52",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-dts-hd-grouped/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b6ccae25257be6071ddc5f3fb41604d9d48f17c2a22fef2b346cbca46f5f0531",
+   "status": 0,
+   "report_sha256": "69875ac337141b7856e56776db9cca2f4a1ebe7cee20177c55d81a628802530d",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-dts-legacy/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4fa06a1b93ada0fd235e6739a21b442894eecc236b0537251f29866fd3e17a2d",
+   "status": 0,
+   "report_sha256": "97964f2b796ecfe794ebece56277d1d4c832c8150da9232105ba8806a7a886db",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-free-audio/gate-result.json",
+   "command": "report --benchmark",
+   "key": "7585ce415798bdccd5338261e4fd67d96ed3e1b67af52758f2b3d4a7a8191119",
+   "status": 0,
+   "report_sha256": "2413e27613f0fa3ec5ecea332cd7ff8e8ff8e78b9fac1d0d18a5e388755e5205",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-dts-hd/gate-result.json",
+   "command": "report --benchmark",
+   "key": "cb791cd1d6a9ee833300cf05237fdc2f1031c895118b9946ae099a7f39c1def8",
+   "status": 0,
+   "report_sha256": "6212d5803df5bfcc75bbe6792b2a8ba67bfe9431792489d7040ab6303a09207d",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-atsc-eac3-six-block/gate-result.json",
+   "command": "report --benchmark",
+   "key": "bda24d73089733187337693bb056c97d4e1226b32f6483ad21830fb04ad5c82b",
+   "status": 0,
+   "report_sha256": "466482428ae58f74e6a65151f10851d85f67562581038938b3f13a651e1fdd91",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mpegts-previous-audio/gate-result.json",
+   "command": "grade",
+   "key": "81802e3c6b3d675bdfdbd00b82cf2f7c68dc7f542097d9b99ce2ecddd376e582",
+   "status": 0,
+   "report_sha256": "0c3dc1df1c0c578ff4980f0c2d29ce5c0241b46e1ed8754458b5c98bd8b3859b"
+  },
+  {
+   "path": "graded/mpegts-dts-seek/gate-result.json",
+   "command": "grade",
+   "key": "0933609acc0e0e7bea1b6dbd923e317fb3b65039f862473e3229fffab8b5a816",
+   "status": 0,
+   "report_sha256": "913e4b55f4c561faaf3e64696cca7879d5642e8ade2bc221a4817a08a121aecd"
+  },
+  {
+   "path": "graded/mpegts-access-units/gate-result.json",
+   "command": "grade",
+   "key": "58946d4c401dffc49a1f1f33933c41d33ca11dc6d2a4adad42ed2ddd1d2fb430",
+   "status": 0,
+   "report_sha256": "a234d373cf2ff8cdcf74f35bdf26cfe8d3d2436f99cc731ddec6ea3970ec290d"
+  },
+  {
+   "path": "graded/mpegts-previous-picture/gate-result.json",
+   "command": "grade",
+   "key": "47cfee187aa35b2c73a2f5e507e01323c19043a0b97050ab237f412c644851e4",
+   "status": 0,
+   "report_sha256": "50116f875806297f883daa470c1fee22dc7867b34d8569e3a94c8c3edef00165"
+  },
+  {
+   "path": "graded/mpegts-dts-core/gate-result.json",
+   "command": "grade",
+   "key": "9631fc107f9ad171bf888d58a8a9d3db28f8002436d586a2ea9d178358b76cc9",
+   "status": 0,
+   "report_sha256": "37d959131637b8e0fcaef4c6f712665ced5e0455f46f2648a705f3b4d1e70756"
+  },
+  {
+   "path": "graded/mpegts-dts-hd-extensions/gate-result.json",
+   "command": "grade",
+   "key": "1f39973827e68d9af82aa3682235b951939509ac79c57e5ac0659654e69e50b6",
+   "status": 0,
+   "report_sha256": "4cf6551dd786daeb378e065840bd4f676085917852cff9a0ec3a8278b5a52835"
+  },
+  {
+   "path": "graded/mpegts-dts-discovery/gate-result.json",
+   "command": "grade",
+   "key": "ae367a7dac03fd2280f5c1eb0d1795667fb09915bc46be099822c160c62a75ac",
+   "status": 0,
+   "report_sha256": "fa3ea3d4857ad5f9cf50c0928d563c9db56d3c000b5c00dabc209bc66a064a40"
+  },
+  {
+   "path": "graded/mpegts-pes/gate-result.json",
+   "command": "grade",
+   "key": "48ef22cfa36edd7787a20d413df315cf937dd8da9388c5510388b7eaf5a72c9e",
+   "status": 0,
+   "report_sha256": "f112ba7147ad03d65c506ecd592be58b6fff1e166bf1b4e26282d3b63cd6d190"
+  },
+  {
+   "path": "graded/mpegts-dts-hd-grouped/gate-result.json",
+   "command": "grade",
+   "key": "debd4c96b4c247aef02b337706719bd4dcb1c05bf8fa700c3616073e0aa1d71b",
+   "status": 0,
+   "report_sha256": "5830b2c3ddc3b337128b9b30a98ad3d6e2d3c1f9c8940d1f310718bb47245789"
+  },
+  {
+   "path": "graded/mpegts-dts-legacy/gate-result.json",
+   "command": "grade",
+   "key": "bbe013eeb6e9be5de90495bbf05c5459ada3878f8585e0f289bd8df70d9761df",
+   "status": 0,
+   "report_sha256": "c437fd34fe2672f2a7f7e25fc9567a78d281f391b2b5d868a1e2de836e86126c"
+  },
+  {
+   "path": "graded/mpegts-free-audio/gate-result.json",
+   "command": "grade",
+   "key": "71701f7b116056a052722d6992fa9b92014d338d592f05d0dc0708e0d60455e5",
+   "status": 0,
+   "report_sha256": "a386bb56d1613ab177f576b27821a2c8be8ac449285e4ffbc504f89d443540f7"
+  },
+  {
+   "path": "graded/mpegts-dts-hd/gate-result.json",
+   "command": "grade",
+   "key": "9c1ba81289a078fca34b2c0f980d1eace696c022da514a2429596ed4da62071e",
+   "status": 0,
+   "report_sha256": "00921e3ba274aae6da6f3d48668584f2e866a9c90f2b3d698a13af94d4da3d9f"
+  },
+  {
+   "path": "graded/mpegts-atsc-eac3-six-block/gate-result.json",
+   "command": "grade",
+   "key": "4cd34457961e8105f95d17212a97f1bbd332868d1cab9753fcabe03eeddd05eb",
+   "status": 0,
+   "report_sha256": "2ac647facc8ef6f228e6f476c181bb45c172d623f5877cc09b9ba3539229a7c8"
+  }
+ ]
+}
