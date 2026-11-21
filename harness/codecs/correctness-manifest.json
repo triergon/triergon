@@ -5446,6 +5446,20 @@
    "path": ".research/opus-generated/ts71.mka",
    "bytes": 415287,
    "sha256": "53c92c27dfa01fa713e96626040c9ef66f5218a88d54c0fe369e4361ad98f6a3"
+  },
+  {
+   "lane": "opus-ambisonic",
+   "name": "family-2-acn.opus",
+   "path": "harness/codecs/opus/family-2-acn.opus",
+   "bytes": 5733,
+   "sha256": "0271602f7eef4c181f2f50a68dd8cd73f96cefa1e7d6e85ef2f204ce51d604df"
+  },
+  {
+   "lane": "opus-ambisonic",
+   "name": "family-2-stereo-gain.opus",
+   "path": "harness/codecs/opus/family-2-stereo-gain.opus",
+   "bytes": 5574,
+   "sha256": "3766828b1ba9f51f47ebc38094d8728a4bad0468c2a519d55e489524df2c23d1"
   }
  ]
 }

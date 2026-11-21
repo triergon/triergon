@@ -1,4 +1,4 @@
-//! Channel mapping (RFC 7845 section 5.1.1): which decoded stream channel each output
+//! Channel mapping (RFC 7845 section 5.1.1 and RFC 8486): which decoded stream channel each output
 //! channel takes, the output layout, and the header's output gain.
 
 use crate::DecodeError;
@@ -43,6 +43,17 @@ impl Mapping {
                 .ok_or(DecodeError::Invalid(
                     "Vorbis channel mapping beyond 8 channels",
                 ))?,
+            2 => {
+                let layout = (0..=8)
+                    .find_map(|order| {
+                        [false, true].into_iter().find_map(|stereo| {
+                            let layout = ChannelLayout::ambisonic(order, stereo)?;
+                            (layout.channels() == channels).then_some(layout)
+                        })
+                    })
+                    .ok_or(DecodeError::Invalid("Opus Ambisonic channel count"))?;
+                (layout, core::array::from_fn(|i| i as u8))
+            }
             255 => unordered(channels),
             _ => return Err(DecodeError::Unsupported("Opus channel mapping family")),
         };

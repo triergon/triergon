@@ -297,7 +297,7 @@ static int file_lane(const char *name, const char **demuxer) {
 
 /* A file-format lane: the demuxer reads the piped (non-seekable) file, the decoder for
  * its first audio stream decodes every packet, and the same filter chain converts. */
-static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, struct out *o) {
+static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, struct out *o, int native) {
     struct memory_input m = {data, size, 0};
     unsigned char *buffer = av_malloc(65536);
     AVIOContext *io = avio_alloc_context(buffer, 65536, 0, &m, memory_read, NULL, NULL);
@@ -312,6 +312,7 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
         if (fmt->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) index = (int)i;
     if (index < 0) die("stream", AVERROR_STREAM_NOT_FOUND);
     AVStream *st = fmt->streams[index];
+    if (native && st->codecpar->codec_id != AV_CODEC_ID_OPUS) die("Opus stream", AVERROR_INVALIDDATA);
     const AVCodec *codec = avcodec_find_decoder(st->codecpar->codec_id);
     /* Layer I and II: FFmpeg's float decoders, like Layer III's default, where the CLI
      * would pick the fixed-point decoders, whose 16-bit rounding alone reaches the float
@@ -329,6 +330,8 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
     AVFrame *frame = av_frame_alloc();
     AVFilterGraph *graph = NULL;
     AVFilterContext *src = NULL, *sink = NULL;
+    uint8_t *native_pcm = NULL;
+    size_t native_capacity = 0;
     for (int done = 0; !done;) {
         r = av_read_frame(fmt, pkt);
         if (r < 0) {
@@ -343,10 +346,36 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
             r = avcodec_receive_frame(dec, frame);
             if (r == AVERROR(EAGAIN) || r == AVERROR_EOF) break;
             if (r < 0) die("receive", r);
-            if (!graph) graph = graph_for(dec, frame, 0, &src, &sink);
-            if ((r = av_buffersrc_add_frame_flags(src, frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0) die("buffersrc", r);
-            av_frame_unref(frame);
-            sink_frames(sink, o, 0);
+            if (native) {
+                if (frame->format != AV_SAMPLE_FMT_FLTP || frame->sample_rate != 48000 ||
+                    frame->ch_layout.order != AV_CHANNEL_ORDER_AMBISONIC ||
+                    !((frame->ch_layout.nb_channels == 4 && frame->ch_layout.u.mask == 0) ||
+                      (frame->ch_layout.nb_channels == 6 && frame->ch_layout.u.mask == 3)))
+                    die("ambisonic PCM format", AVERROR_INVALIDDATA);
+                int channels = frame->ch_layout.nb_channels;
+                size_t n = (size_t)frame->nb_samples * channels * sizeof(float);
+                if (n > native_capacity) {
+                    uint8_t *next = av_realloc(native_pcm, n);
+                    if (!next) die("PCM allocation", AVERROR(ENOMEM));
+                    native_pcm = next;
+                    native_capacity = n;
+                }
+                for (int i = 0; i < frame->nb_samples; i++)
+                    for (int c = 0; c < channels; c++)
+                        memcpy(native_pcm + ((size_t)i * channels + c) * sizeof(float),
+                               frame->extended_data[c] + (size_t)i * sizeof(float), sizeof(float));
+                fold(&o->digest, native_pcm, n);
+                if (o->raw && fwrite(native_pcm, 1, n, o->raw) != n)
+                    die("raw output", AVERROR(EIO));
+                o->bytes += n;
+                o->frames++;
+                av_frame_unref(frame);
+            } else {
+                if (!graph) graph = graph_for(dec, frame, 0, &src, &sink);
+                if ((r = av_buffersrc_add_frame_flags(src, frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0) die("buffersrc", r);
+                av_frame_unref(frame);
+                sink_frames(sink, o, 0);
+            }
         }
     }
     if (graph) {
@@ -354,6 +383,7 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
         sink_frames(sink, o, 0);
         avfilter_graph_free(&graph);
     }
+    av_free(native_pcm);
     av_frame_free(&frame);
     av_packet_free(&pkt);
     avcodec_free_context(&dec);
@@ -371,8 +401,10 @@ static void pass(const char *name, const AVCodecParameters *par, const uint8_t *
     const char *demuxer;
     if (configured_aac_operation(name, video))
         aac_access_units(data, size, o);
+    else if (!video && !strcmp(name, "opus-ambisonic"))
+        demux_pass(NULL, data, size, o, 1);
     else if (!video && file_lane(name, &demuxer))
-        demux_pass(demuxer, data, size, o);
+        demux_pass(demuxer, data, size, o, 0);
     else
         one_pass(name, par, data, size, video, o);
 }

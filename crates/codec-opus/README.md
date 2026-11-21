@@ -1,7 +1,8 @@
 # triergon-codec-opus
 
 Opus decoder written from RFC 6716 with the RFC 8251 updates (its reference code is
-normative where the text defers to it), with the channel mapping of RFC 7845. It decodes
+normative where the text defers to it), with the channel mappings of RFC 7845 and
+RFC 8486. It decodes
 one Opus packet per access unit to planar `f32` at 48 kHz in FFmpeg's channel order (the
 [triergon-codec](../codec/README.md) `AudioDecoder` contract): SILK-only, hybrid and
 CELT-only frames of 2.5 to 60 ms, packets up to 120 ms, and multistream packets of up to
@@ -55,7 +56,11 @@ the pre-skip or other container trims.
   between packets.
 - Channel mapping families 0 and 1 (Vorbis order, reported in FFmpeg's native layouts:
   mono, stereo, 3.0, quad, 5.0, 5.1, 6.1, 7.1) and 255 (coded order without speaker
-  positions, `ChannelLayout::mask() == 0`), coupled and uncoupled streams, stream
+  positions, `ChannelLayout::mask() == 0`), and 2 (SN3D Ambisonic components in ACN
+  order, optionally followed by non-diegetic left and right). Family 2 exposes its
+  order and stereo flag through `ChannelLayout::ambisonic_order()`; it does not provide
+  a speaker mask or a stereo downmix. The session downmixer treats layouts without a
+  speaker mask as default speaker layouts; the stereo audio session refuses Ambisonic frames. Coupled and uncoupled streams, stream
   channels used by several outputs, and silent outputs (mapping index 255). Other
   families are `Unsupported`, and so are headers of more than 93 output channels (RFC
   7845 allows 255): 93 is the most a `ChannelLayout` holds.
@@ -99,6 +104,10 @@ Constant tables are taken from RFC 6716; see [THIRD-PARTY.md](THIRD-PARTY.md).
 
 ## Standards
 
-RFC 6716 with the RFC 8251 updates, and RFC 7845 for the identification header and the
-channel mappings. Verification: [harness/codecs](../../harness/codecs/STATUS.md); results
+RFC 6716 with the RFC 8251 updates, RFC 7845 for the identification header, and RFC 8486
+for Ambisonic channel mapping. Verification: [harness/codecs](../../harness/codecs/STATUS.md); results
 in [docs/status.md](../../docs/status.md).
+
+A four-channel family 2 comparison against FFmpeg's native Opus decoder checks
+layout, frame lengths and float PCM. A diagnostic comparison with FFmpeg's libopus
+decoder reports `quad` where this decoder reports `ambisonic 1`.

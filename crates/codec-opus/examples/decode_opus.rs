@@ -157,7 +157,7 @@ fn main() -> ExitCode {
         "{{\"sample_rate\":48000,\"channels\":{},\"layout\":\"{}\",\"frames\":{},\"samples_per_channel\":{},\"errors\":{},\"last_error\":{:?}{ranges}}}",
         layout.channels(),
         // ffprobe's name for a layout of unspecified order.
-        if layout.mask() == 0 {
+        if layout.ambisonic_order().is_none() && layout.mask() == 0 {
             "unknown".into()
         } else {
             layout.name()

@@ -299,3 +299,29 @@ fn a_sample_rate_change_starts_a_new_block_and_surround_is_downmixed() {
         "no audio lane for unknown codecs"
     );
 }
+
+#[test]
+fn audio_session_refuses_ambisonic_before_touching_output() {
+    for order in [0, 1] {
+        let mut audio = AudioSession::new(QueueLimits::AUDIO);
+        audio.load(Some(Box::new(Tones {
+            layout: ChannelLayout::ambisonic(order, false).unwrap(),
+        })));
+        audio.feed(&[48, 10], Some(42)).unwrap();
+        audio.feed(&[48, 20], Some(43)).unwrap();
+        let mut out = PcmBlock {
+            sample_rate: 44_100,
+            pts: Some(7),
+            samples: vec![123, -456],
+        };
+        let original = out.clone();
+        assert_eq!(audio.pull(None, 0, &mut out), 1);
+        assert_eq!(out, original);
+        assert_eq!(
+            audio.state(),
+            SessionState::Failed("unsupported Ambisonic stereo downmix".into())
+        );
+        assert_eq!(audio.pull(None, 0, &mut out), 0);
+        assert_eq!(out, original);
+    }
+}

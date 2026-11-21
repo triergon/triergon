@@ -19,25 +19,38 @@ struct Summary {
     samples: u64,
     errors: u64,
     last_error: String,
+    frame_lengths: Option<Vec<usize>>,
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let [_, input, output] = args.as_slice() else {
-        eprintln!("usage: decode_audio INPUT OUTPUT.f32");
+    let [_, input, output, rest @ ..] = args.as_slice() else {
+        eprintln!("usage: decode_audio INPUT OUTPUT.f32 [--frame-lengths]");
         std::process::exit(2);
     };
+    if !rest.is_empty() && rest != ["--frame-lengths"] {
+        std::process::exit(2);
+    }
     let file = std::fs::File::open(input).expect("input");
     let mut out = std::io::BufWriter::new(std::fs::File::create(output).expect("output"));
     let mut summary = Summary::default();
+    if !rest.is_empty() {
+        summary.frame_lengths = Some(Vec::new());
+    }
     if let Err(error) = decode(file, &mut out, &mut summary) {
         summary.errors += 1;
         summary.last_error = error;
     }
     out.flush().expect("flush");
     let (rate, layout) = summary.format.unwrap_or_default();
+    let lengths = summary
+        .frame_lengths
+        .as_ref()
+        .map_or_else(String::new, |lengths| {
+            format!(",\"frame_lengths\":{lengths:?}")
+        });
     eprintln!(
-        "{{\"sample_rate\":{rate},\"channels\":{},\"layout\":\"{}\",\"frames\":{},\"samples_per_channel\":{},\"errors\":{},\"last_error\":{:?}}}",
+        "{{\"sample_rate\":{rate},\"channels\":{},\"layout\":\"{}\",\"frames\":{},\"samples_per_channel\":{},\"errors\":{},\"last_error\":{:?}{lengths}}}",
         layout.channels(),
         if summary.format.is_some() {
             layout.name()
@@ -108,6 +121,9 @@ impl Summary {
         match decoded {
             Ok(_) if frame.samples_per_channel == 0 => {}
             Ok(_) => {
+                if let Some(lengths) = &mut self.frame_lengths {
+                    lengths.push(frame.samples_per_channel);
+                }
                 self.frames += 1;
                 self.samples += frame.samples_per_channel as u64;
                 self.format.get_or_insert((frame.sample_rate, frame.layout));
@@ -125,5 +141,35 @@ impl Summary {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ambisonic_fixture_keeps_trimmed_frame_boundaries() {
+        let file = std::fs::File::open(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../harness/codecs/opus/family-2-acn.opus"
+        ))
+        .unwrap();
+        let mut summary = Summary {
+            frame_lengths: Some(Vec::new()),
+            ..Summary::default()
+        };
+        let mut pcm = Vec::new();
+        decode(file, &mut pcm, &mut summary).unwrap();
+        let (rate, layout) = summary.format.unwrap();
+        assert_eq!((rate, layout.ambisonic_order()), (48_000, Some((1, false))));
+        assert_eq!(summary.errors, 0);
+        assert_eq!(summary.frames, 6);
+        assert_eq!(
+            summary.frame_lengths.unwrap(),
+            [648, 960, 960, 960, 960, 312]
+        );
+        assert_eq!(summary.samples, 4_800);
+        assert_eq!(pcm.len(), 4_800 * 4 * size_of::<f32>());
     }
 }

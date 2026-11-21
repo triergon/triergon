@@ -130,6 +130,15 @@ impl AudioSession {
             }
             let unit = self.queue.pop().expect("front unit");
             let result = decoder.decode(&unit.data, &mut self.frame);
+            let result = result.and_then(|levels| {
+                if self.frame.layout.ambisonic_order().is_some() {
+                    Err(triergon_codec::DecodeFailure(
+                        "unsupported Ambisonic stereo downmix".into(),
+                    ))
+                } else {
+                    Ok(levels)
+                }
+            });
             if result.is_ok() {
                 unit.discard.apply(&mut self.frame, &mut self.delay);
             }

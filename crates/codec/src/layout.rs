@@ -5,9 +5,9 @@
 //! A [`Speaker`]'s discriminant is FFmpeg's channel id (`AV_CHAN_*`), which is also
 //! the bit index of its `AV_CH_*` mask. Every decoder emits one plane per speaker in
 //! ascending discriminant order, which is the "native" order FFmpeg's own decoders
-//! use, so plane `i` corresponds to channel `i` of the reference output. The one
-//! exception is an AAC program configuration FFmpeg cannot map to a known layout:
-//! FFmpeg then keeps the PCE's element order and so does the AAC decoder.
+//! use, so plane `i` corresponds to channel `i` of the reference output. The
+//! exceptions are an AAC program configuration FFmpeg cannot map to a known layout,
+//! Opus family 255's unspecified order, and Opus family 2's Ambisonic order.
 
 /// A loudspeaker position. Discriminant = FFmpeg `AV_CHAN_*` id / `AV_CH_*` bit index.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -127,14 +127,15 @@ impl Speaker {
     }
 }
 
-/// Speaker position of each output plane, in plane order.
+/// Output plane order, as speaker positions or Ambisonic components.
 ///
 /// Inline storage, so a layout is `Copy` and comparing or caching one never allocates.
-/// Equality compares the speakers in plane order.
+/// Equality compares the channel meaning and plane order.
 #[derive(Clone, Copy)]
 pub struct ChannelLayout {
     speakers: [Speaker; ChannelLayout::CAPACITY],
     len: u8,
+    ambisonic: Option<(u8, bool)>,
 }
 
 impl ChannelLayout {
@@ -147,6 +148,7 @@ impl ChannelLayout {
     pub const EMPTY: ChannelLayout = ChannelLayout {
         speakers: [Speaker::FrontCenter; ChannelLayout::CAPACITY],
         len: 0,
+        ambisonic: None,
     };
 
     /// A layout with `speakers` as its planes, in the order given. `None` beyond
@@ -167,6 +169,28 @@ impl ChannelLayout {
         ChannelLayout::new(core::iter::repeat_n(Speaker::FrontCenter, channels))
     }
 
+    /// SN3D Ambisonic components in ACN order, followed by optional non-diegetic
+    /// left and right channels. Returns `None` if the layout exceeds the capacity.
+    pub fn ambisonic(order: u8, stereo: bool) -> Option<ChannelLayout> {
+        let side = usize::from(order) + 1;
+        let channels = side
+            .checked_mul(side)?
+            .checked_add(2 * usize::from(stereo))?;
+        if channels > Self::CAPACITY {
+            return None;
+        }
+        Some(ChannelLayout {
+            len: channels as u8,
+            ambisonic: Some((order, stereo)),
+            ..Self::EMPTY
+        })
+    }
+
+    /// Ambisonic order and presence of a trailing non-diegetic stereo pair.
+    pub fn ambisonic_order(&self) -> Option<(u8, bool)> {
+        self.ambisonic
+    }
+
     /// FFmpeg's default layout for `channels` channels: the first standard layout with
     /// that many speakers (`stereo` for 2, `7.1` for 8). Mixing treats an unspecified
     /// layout as this one, as FFmpeg's resampler does.
@@ -181,9 +205,13 @@ impl ChannelLayout {
         )
     }
 
-    /// Speakers in plane order.
+    /// Speakers in plane order; empty for an Ambisonic layout.
     pub fn speakers(&self) -> &[Speaker] {
-        &self.speakers[..usize::from(self.len)]
+        &self.speakers[..if self.ambisonic.is_some() {
+            0
+        } else {
+            usize::from(self.len)
+        }]
     }
 
     /// Number of planes.
@@ -207,6 +235,9 @@ impl ChannelLayout {
     /// layout's name (`stereo`, `5.1(side)`, ...), else the speaker names joined by `+`,
     /// or `N channels` when a speaker repeats.
     pub fn name(&self) -> String {
+        if let Some((order, stereo)) = self.ambisonic {
+            return format!("ambisonic {order}{}", if stereo { "+stereo" } else { "" });
+        }
         let mask = self.mask();
         if mask == 0 {
             return format!("{} channels", self.channels());
@@ -275,7 +306,7 @@ impl Default for ChannelLayout {
 
 impl PartialEq for ChannelLayout {
     fn eq(&self, other: &Self) -> bool {
-        self.speakers() == other.speakers()
+        self.ambisonic == other.ambisonic && self.speakers() == other.speakers()
     }
 }
 
@@ -283,12 +314,20 @@ impl Eq for ChannelLayout {}
 
 impl core::hash::Hash for ChannelLayout {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.ambisonic.hash(state);
         self.speakers().hash(state);
     }
 }
 
 impl core::fmt::Debug for ChannelLayout {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if let Some((order, stereo)) = self.ambisonic {
+            return f
+                .debug_struct("Ambisonic")
+                .field("order", &order)
+                .field("stereo", &stereo)
+                .finish_non_exhaustive();
+        }
         f.debug_list()
             .entries(self.speakers().iter().map(|s| s.name()))
             .finish()
@@ -424,6 +463,21 @@ mod tests {
         assert_eq!(format!("{stereo:?}"), r#"["FL", "FR"]"#);
         assert!(ChannelLayout::new([FrontCenter; ChannelLayout::CAPACITY]).is_some());
         assert!(ChannelLayout::new([FrontCenter; ChannelLayout::CAPACITY + 1]).is_none());
+    }
+
+    #[test]
+    fn ambisonic_layouts_keep_channel_meaning() {
+        let layout = ChannelLayout::ambisonic(1, true).unwrap();
+        assert_eq!(layout.channels(), 6);
+        assert_eq!(layout.ambisonic_order(), Some((1, true)));
+        assert_eq!(layout.mask(), 0);
+        assert_eq!(layout.position(Speaker::FrontCenter), None);
+        assert_ne!(layout, ChannelLayout::unspecified(6).unwrap());
+        assert_ne!(
+            ChannelLayout::ambisonic(0, false).unwrap(),
+            ChannelLayout::new([Speaker::FrontCenter]).unwrap()
+        );
+        assert!(ChannelLayout::ambisonic(9, false).is_none());
     }
 
     #[test]

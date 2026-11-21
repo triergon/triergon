@@ -319,7 +319,7 @@ const READER_MANIFEST: &str = "harness/codecs/reader-manifest.json";
 const READER_SEEKS: &str = "harness/codecs/reader-seeks.json";
 const OGG_READER_LANES: &str = "reader-ogg,reader-ogg-seek";
 /// The correctness lanes of the audio decoders the `codecs-audio` item grades.
-const AUDIO_LANES: &str = "aac,ac3,eac3,dts";
+const AUDIO_LANES: &str = "aac,ac3,eac3,dts,opus-ambisonic";
 
 fn xtask(args: &[&str]) -> Vec<String> {
     std::iter::once("xtask")
@@ -719,9 +719,11 @@ fn items(
            -p triergon-codec-aac --features simd --example decode_aac && \
          cargo build --release --locked {cargo_target} -p triergon-codec-ac3 --example decode_ac3 && \
          cargo build --release --locked {cargo_target} -p triergon-codec-dca --example decode_dts && \
+         cargo build --release --locked {cargo_target} -p triergon-session --features codecs --example decode_audio && \
          cp {nightly_release}/examples/decode_aac {audio_bin}/codec-aac-decode && \
          cp {release}/examples/decode_ac3 {audio_bin}/codec-ac3-decode && \
-         cp {release}/examples/decode_dts {audio_bin}/codec-dca-decode"
+         cp {release}/examples/decode_dts {audio_bin}/codec-dca-decode && \
+         cp {release}/examples/decode_audio {audio_bin}/audio-decode"
     ));
     let audio_run = format!("{out}/codecs-audio-grade.jsonl");
     items.push(Item {

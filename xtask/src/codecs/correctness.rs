@@ -63,7 +63,7 @@ fn audio_suffixes(lane: &str) -> Option<&'static [&'static str]> {
         "mp2" => Some(&[".mp2"]),
         "mp1" => Some(&[".mp1"]),
         "vorbis" => Some(&[".ogg"]),
-        "opus" => Some(&[".opus", ".mka"]),
+        "opus" | "opus-ambisonic" => Some(&[".opus", ".mka"]),
         _ => None,
     }
 }
@@ -80,7 +80,7 @@ fn audio_format(lane: &str) -> Result<Option<&'static str>, String> {
         "flac" => Some("flac"),
         "mp3" | "mp2" | "mp1" => Some("mp3"),
         "vorbis" => Some("ogg"),
-        "opus" => None,
+        "opus" | "opus-ambisonic" => None,
         _ => return Err(unknown(lane)),
     })
 }
@@ -96,7 +96,7 @@ fn reference_decoder(lane: &str) -> Option<&'static str> {
         "mp2" => "mp2float",
         "mp1" => "mp1float",
         "vorbis" => "vorbis",
-        "opus" => "opus",
+        "opus" | "opus-ambisonic" => "opus",
         _ => return None,
     })
 }
@@ -109,7 +109,9 @@ fn example(lane: &str) -> Option<&'static str> {
         "aac" => "codec-aac-decode",
         "dts" => "codec-dca-decode",
         // File-format lanes decode through a container reader, as a player does.
-        "aac-mov" | "flac" | "mp3" | "mp2" | "mp1" | "vorbis" | "opus" => "audio-decode",
+        "aac-mov" | "flac" | "mp3" | "mp2" | "mp1" | "vorbis" | "opus" | "opus-ambisonic" => {
+            "audio-decode"
+        }
         _ => return None,
     })
 }
@@ -126,6 +128,7 @@ fn operation(lane: &str) -> Option<&'static str> {
         "mp3" | "mp2" | "mp1" => "audio-mp3",
         "vorbis" => "audio-vorbis",
         "opus" => "audio-opus",
+        "opus-ambisonic" => "audio-opus-ambisonic",
         _ => return None,
     })
 }
@@ -307,6 +310,7 @@ fn probe(
     path: &str,
     format: Option<&str>,
     audio: bool,
+    decoder: Option<&str>,
 ) -> Result<(i64, Option<Value>), Stop> {
     let entries = if audio {
         "stream=sample_rate,channels,channel_layout"
@@ -316,6 +320,9 @@ fn probe(
     let mut argv = vec![ffprobe.to_owned(), "-v".into(), "error".into()];
     if let Some(format) = format {
         argv.extend(["-f".into(), format.to_owned()]);
+    }
+    if let Some(decoder) = decoder {
+        argv.extend(["-c:a".into(), decoder.to_owned()]);
     }
     argv.extend(
         [
@@ -440,7 +447,13 @@ fn audio_decoder(
     initialized_aac: bool,
 ) -> Result<Value, Stop> {
     let format = audio_format(lane)?;
-    let (_, stream) = probe(&a.ffprobe, path, format, true)?;
+    let (_, stream) = probe(
+        &a.ffprobe,
+        path,
+        format,
+        true,
+        (lane == "opus-ambisonic").then_some("opus"),
+    )?;
     let (reference_path, ours_path) = (tmp.join("ref.f32"), tmp.join("ours.f32"));
     let mut reference_argv: Vec<String> = [
         a.ffmpeg.as_str(),
@@ -499,10 +512,11 @@ fn audio_decoder(
     } else {
         run_text(&reference_argv, RUN_TIMEOUT)?
     };
-    let ours_run = run_text(
-        &[a.example(lane)?, path.to_owned(), python::path(&ours_path)],
-        RUN_TIMEOUT,
-    )?;
+    let mut ours_argv = vec![a.example(lane)?, path.to_owned(), python::path(&ours_path)];
+    if lane == "opus-ambisonic" {
+        ours_argv.push("--frame-lengths".into());
+    }
+    let ours_run = run_text(&ours_argv, RUN_TIMEOUT)?;
     let info = json_lines(&ours_run.stderr)
         .pop()
         .unwrap_or_else(|| Value::object::<&str>([]));
@@ -614,6 +628,46 @@ fn audio_decoder(
         .as_ref()
         .and_then(|s| s.get("channel_layout"))
         .and_then(Value::as_str);
+    let frame_lengths_match = if lane == "opus-ambisonic" {
+        let probe_run = run_text(
+            &[
+                a.ffprobe.clone(),
+                "-v".into(),
+                "error".into(),
+                "-c:a".into(),
+                "opus".into(),
+                "-select_streams".into(),
+                "a:0".into(),
+                "-show_entries".into(),
+                "frame=nb_samples".into(),
+                "-of".into(),
+                "json".into(),
+                path.into(),
+            ],
+            PROBE_TIMEOUT,
+        )?;
+        let lengths = python::loads(&probe_run.stdout).and_then(|v| {
+            v.get("frames").and_then(Value::as_array).map(|frames| {
+                Value::Array(
+                    frames
+                        .iter()
+                        .map(|f| f.get("nb_samples").cloned().unwrap_or(Value::Null))
+                        .collect(),
+                )
+            })
+        });
+        let matches = probe_run.code == 0
+            && lengths.as_ref().is_some_and(|v| {
+                v.as_array().is_some_and(|a| !a.is_empty()) && Some(v) == info.get("frame_lengths")
+            });
+        row.push((
+            "ffmpeg_frame_lengths".into(),
+            lengths.unwrap_or(Value::Null),
+        ));
+        matches
+    } else {
+        true
+    };
     // Fixed AAC configurations 5 and 6 each have one surround pair in
     // Table 1.19. FFmpeg labels those planes as back in MOV.
     let surround_pair_labels = lane == "aac-mov"
@@ -628,15 +682,20 @@ fn audio_decoder(
         ));
     }
     let exact = same(ours_channels, reference_channels)
+        && frame_lengths_match
         && same(ours_rate, reference_rate)
         && candidate.len() == reference.len()
-        && (lane != "aac-mov" && !initialized_aac
+        && (lane != "aac-mov" && lane != "opus-ambisonic" && !initialized_aac
             || (ours_run.code == 0
                 && reference_run.code == 0
                 && info.get("errors").and_then(python::int) == Some(0)
                 && (surround_pair_labels
                     || ours_layout.is_some() && ours_layout == reference_layout)));
-    let stats = if exact {
+    let comparable_pcm = same(ours_channels, reference_channels)
+        && same(ours_rate, reference_rate)
+        && candidate.len() == reference.len()
+        && !candidate.is_empty();
+    let stats = if exact || lane == "opus-ambisonic" && comparable_pcm {
         let channels = reference_channels.ok_or_else(|| {
             Stop::Fatal("'<=' not supported between instances of 'NoneType' and 'int'".into())
         })?;
@@ -653,11 +712,12 @@ fn audio_decoder(
         ));
         row.push(("worst_rms".into(), Value::float(worst_rms)));
         row.push(("worst_abs".into(), Value::float(worst_abs)));
-        let pass = if a.rules.exact.iter().any(|exact| exact == lane) {
-            worst_abs == 0.0
-        } else {
-            worst_rms <= a.rules.rms && worst_abs <= a.rules.abs
-        };
+        let pass = exact
+            && if a.rules.exact.iter().any(|exact| exact == lane) {
+                worst_abs == 0.0
+            } else {
+                worst_rms <= a.rules.rms && worst_abs <= a.rules.abs
+            };
         status(&mut row, if pass { "pass" } else { "fail" });
     } else {
         row.push(("stats".into(), Value::Null));
@@ -668,12 +728,22 @@ fn audio_decoder(
     Ok(Value::Object(row))
 }
 
+/// The authored family-2 fixture must produce all six trimmed frames and samples.
+fn complete_ambisonic_output(work: Option<&Value>, rc: i64, bytes: usize, channels: usize) -> bool {
+    rc == 0
+        && channels != 0
+        && bytes == 4_800 * channels * size_of::<f32>()
+        && work.and_then(|v| v.get("packets")).and_then(python::int) == Some(6)
+        && work.and_then(|v| v.get("bytes")).and_then(python::int) == Some(bytes as i128)
+}
+
 fn output_path(
     a: &Grade,
     lane: &str,
     path: &str,
     tmp: &Path,
     initialized_aac: bool,
+    reference_channels: Option<usize>,
 ) -> Result<Value, Stop> {
     let decode = operation(lane).ok_or_else(|| unknown(lane))?;
     let op = format!("{decode}-raw");
@@ -695,6 +765,39 @@ fn output_path(
     )?;
     let co = fs::read(&o).unwrap_or_default();
     let cr = fs::read(&r).unwrap_or_default();
+    if lane == "opus-ambisonic" {
+        let work = |stdout: &str| json_lines(stdout).pop();
+        let ours = work(&po.stdout);
+        let reference = work(&pr.stdout);
+        let stats = if let Some(channels) = reference_channels
+            && complete_ambisonic_output(ours.as_ref(), po.code, co.len(), channels)
+            && complete_ambisonic_output(reference.as_ref(), pr.code, cr.len(), channels)
+        {
+            channel_stats(&co, &cr, channels as i128)?
+        } else {
+            None
+        };
+        let pass = stats.as_ref().is_some_and(|(rms, abs)| {
+            python::max(rms) <= a.rules.rms && python::max(abs) <= a.rules.abs
+        });
+        let floats =
+            |values: &[f64]| Value::Array(values.iter().map(|&v| Value::float(v)).collect());
+        return Ok(Value::object([
+            ("status", Value::str(if pass { "pass" } else { "fail" })),
+            ("ours_rc", Value::int(po.code)),
+            ("reference_rc", Value::int(pr.code)),
+            ("ours_work", ours.unwrap_or(Value::Null)),
+            ("reference_work", reference.unwrap_or(Value::Null)),
+            ("ours_bytes", Value::int(co.len() as i64)),
+            ("reference_bytes", Value::int(cr.len() as i64)),
+            (
+                "stats",
+                stats.map_or(Value::Null, |(rms, abs)| {
+                    Value::object([("rms", floats(&rms)), ("abs", floats(&abs))])
+                }),
+            ),
+        ]));
+    }
     let mut row = vec![
         ("samples_ours".to_owned(), Value::int((co.len() / 4) as i64)),
         ("samples_ref".to_owned(), Value::int((cr.len() / 4) as i64)),
@@ -851,20 +954,30 @@ pub fn grade(a: &Grade) -> Result<(), String> {
             } else {
                 audio_decoder(a, &lane, &path, &tmp.0, initialized_aac)
             };
-            row.push((
-                "decoder".into(),
-                match decoded {
-                    Ok(value) => value,
-                    Err(Stop::Timeout(argv)) => timeout_row(argv),
-                    Err(Stop::Fatal(message)) => return Err(message),
-                },
-            ));
+            let decoded = match decoded {
+                Ok(value) => value,
+                Err(Stop::Timeout(argv)) => timeout_row(argv),
+                Err(Stop::Fatal(message)) => return Err(message),
+            };
+            let reference_channels = decoded
+                .get("ffmpeg_channels")
+                .and_then(python::int)
+                .and_then(|channels| u8::try_from(channels).ok())
+                .map(usize::from);
+            row.push(("decoder".into(), decoded));
             if lane != "aac-mov" {
                 let output_dir = tmp.0.join("o");
                 fs::create_dir(&output_dir).map_err(|e| e.to_string())?;
                 row.push((
                     "output".into(),
-                    match output_path(a, &lane, &path, &output_dir, initialized_aac) {
+                    match output_path(
+                        a,
+                        &lane,
+                        &path,
+                        &output_dir,
+                        initialized_aac,
+                        reference_channels,
+                    ) {
                         Ok(value) => value,
                         Err(Stop::Timeout(argv)) => timeout_row(argv),
                         Err(Stop::Fatal(message)) => return Err(message),
@@ -898,6 +1011,21 @@ pub fn grade(a: &Grade) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ambisonic_worker_requires_complete_successful_output() {
+        let work = Value::object([("packets", Value::int(6)), ("bytes", Value::int(76_800))]);
+        assert!(complete_ambisonic_output(Some(&work), 0, 76_800, 4));
+        assert!(!complete_ambisonic_output(Some(&work), 0, 76_800, 6));
+        let stereo_pair =
+            Value::object([("packets", Value::int(6)), ("bytes", Value::int(115_200))]);
+        assert!(complete_ambisonic_output(Some(&stereo_pair), 0, 115_200, 6));
+        assert!(!complete_ambisonic_output(Some(&work), 1, 76_800, 4));
+        assert!(!complete_ambisonic_output(Some(&work), 0, 76_784, 4));
+        assert!(!complete_ambisonic_output(None, 0, 76_800, 4));
+        let wrong = Value::object([("packets", Value::int(5)), ("bytes", Value::int(76_800))]);
+        assert!(!complete_ambisonic_output(Some(&wrong), 0, 76_800, 4));
+    }
 
     #[test]
     fn initialized_aac_reference_requires_the_pinned_input() {

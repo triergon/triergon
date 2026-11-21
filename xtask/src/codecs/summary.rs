@@ -403,6 +403,28 @@ mod tests {
     }
 
     #[test]
+    fn ambisonic_requires_decoder_and_worker_output() {
+        assert_eq!(
+            classify(&row(r#"{"decoder":{"status":"pass"}}"#), "opus-ambisonic"),
+            "FAIL"
+        );
+        assert_eq!(
+            classify(
+                &row(r#"{"decoder":{"status":"pass"},"output":{"status":"pass"}}"#),
+                "opus-ambisonic"
+            ),
+            "pass"
+        );
+        assert_eq!(
+            classify(
+                &row(r#"{"decoder":{"status":"pass"},"output":{"status":"fail"}}"#),
+                "opus-ambisonic"
+            ),
+            "FAIL"
+        );
+    }
+
+    #[test]
     fn classifies_refusals_and_failures() {
         assert_eq!(
             classify(&row(r#"{"decoder":{"status":"pass"}}"#), "aac-mov"),
