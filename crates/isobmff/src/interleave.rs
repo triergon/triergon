@@ -503,6 +503,8 @@ impl<'a> PhysicalSampleCursor<'a> {
         }
         result
     }
+    // One loop over the phases: `Fill`, `ReadHead` and `Select` run per sample, and moving
+    // the validation phases out of the loop changes their code.
     fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         loop {
             if cancel.load(Ordering::Relaxed) {

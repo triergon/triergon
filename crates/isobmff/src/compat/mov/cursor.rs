@@ -1651,6 +1651,8 @@ impl<'a> PacketCursor<'a> {
         }
         result
     }
+    // One loop over the phases: `Fill` and `Select` run per packet, and moving the setup
+    // phases out of the loop changes their code.
     fn poll_inner<const PREPARE: bool>(
         &mut self,
         work: &mut WorkBudget,
