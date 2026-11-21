@@ -144,17 +144,6 @@ pub fn resolve_hls_aac_clocks(
     Ok(clocks)
 }
 
-/// Presentation nanoseconds for the AVC/AAC caller using a parser-only AAC
-/// reference. Its missing frame durations use the ADTS-derived integer
-/// nanoseconds. This view is separate from exact sample time and the full
-/// FFmpeg demux clock.
-pub(crate) fn ns_aac_pts(
-    frames: &BudgetVec<HlsAacFrame>,
-    cancel: &AtomicBool,
-) -> Result<BudgetVec<i64>> {
-    ns_aac_clocks(frames, cancel, |clock| clock.pts_ns)
-}
-
 pub(crate) fn ns_aac_clocks<T>(
     frames: &BudgetVec<HlsAacFrame>,
     cancel: &AtomicBool,
@@ -311,7 +300,7 @@ mod tests {
         for pts in [None, Some(3), None, Some(8), None] {
             frames.try_push(frame(&pool, pts)).unwrap();
         }
-        let stamps = ns_aac_pts(&frames, &AtomicBool::new(false)).unwrap();
+        let stamps = ns_aac_clocks(&frames, &AtomicBool::new(false), |clock| clock.pts_ns).unwrap();
         let step = 1_024_000_000_000 / 44_100;
         let first = frames.as_slice()[1]
             .pts

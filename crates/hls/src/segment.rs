@@ -3,10 +3,7 @@
 use crate::{
     aac::{HlsAac, HlsAacFrame},
     avc::{AvcRaster, AvcTsAccessUnit, AvcTsLimits, AvcTsReader},
-    clock::{
-        HlsAacClock, HlsAudioClockNs, ns_aac_clocks, ns_aac_pts, ns_audio_clocks,
-        resolve_hls_aac_clocks,
-    },
+    clock::{HlsAacClock, HlsAudioClockNs, ns_aac_clocks, ns_audio_clocks, resolve_hls_aac_clocks},
     packet::UnitPacket,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -113,13 +110,6 @@ impl HlsSegment {
             .as_slice()
             .last()
             .map(|clock| clock.demux90.pts_and_dts)
-    }
-
-    /// Presentation times for the AAC units in access_units order. This view
-    /// matches the application path that fills durations missing from a
-    /// parser-only AAC reference using the ADTS header.
-    pub fn audio_pts_ns(&self, cancel: &AtomicBool) -> Result<BudgetVec<i64>> {
-        ns_aac_pts(&self.audio, cancel)
     }
 
     /// `unit`, a unit of this segment, through [`PacketInfo`](triergon_core::container::PacketInfo)
