@@ -7,9 +7,10 @@ use crate::aac::adts::carrier::{AacAdtsCarrier, AacAdtsCarrierBoundary};
 use crate::aac::adts::{
     AacAdtsFrame, AacAdtsHeader, inspect_adts_header, validate_selected_header,
 };
+use crate::{freeze_started, started};
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
+use triergon_core::{BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
 
 /// Outcome of one phase step.
 type Flow = ControlFlow<Step<StreamOutput>>;
@@ -194,7 +195,7 @@ impl AacAdtsStreamReader {
             });
         }
         self.check_minimum(self.used)?;
-        frame(&mut self.buffer, &self.pool).try_reserve_exact(self.used)?;
+        started(&mut self.buffer, &self.pool).try_reserve_exact(self.used)?;
         self.phase = Phase::CopyHeader;
         Ok(NEXT)
     }
@@ -212,7 +213,7 @@ impl AacAdtsStreamReader {
         if n == 0 {
             return Ok(YIELD);
         }
-        frame(&mut self.buffer, &self.pool)
+        started(&mut self.buffer, &self.pool)
             .try_extend_from_slice(&self.prefix[self.copied..self.copied + n])?;
         self.copied += n;
         Ok(NEXT)
@@ -220,7 +221,7 @@ impl AacAdtsStreamReader {
 
     #[inline]
     fn read_body(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Flow> {
-        let b = frame(&mut self.buffer, &self.pool);
+        let b = started(&mut self.buffer, &self.pool);
         let remaining = self
             .frame_bytes
             .checked_sub(b.len())
@@ -257,7 +258,7 @@ impl AacAdtsStreamReader {
             return Ok(NEXT);
         }
         let cursor = self.input.cursor()?;
-        let buffer = frame(&mut self.buffer, &self.pool);
+        let buffer = started(&mut self.buffer, &self.pool);
         let maximum = if scanning {
             1
         } else {
@@ -293,7 +294,7 @@ impl AacAdtsStreamReader {
             return Ok(YIELD);
         }
         // The scan window: the last seven bytes read.
-        let window = frame(&mut self.buffer, &self.pool).as_slice();
+        let window = started(&mut self.buffer, &self.pool).as_slice();
         let start = window.len().checked_sub(7).ok_or(Error::Overflow)?;
         let h = inspect_adts_header(&window[start..])?;
         if self.plausible_envelope(h) {
@@ -326,17 +327,7 @@ impl AacAdtsStreamReader {
             return Ok(YIELD);
         }
         self.check_minimum(Bytes::owner_overhead_bytes())?;
-        let b = self
-            .buffer
-            .take()
-            .unwrap_or_else(|| BudgetVec::new(&self.pool));
-        let raw = match b.freeze() {
-            Ok(b) => b,
-            Err(e) => {
-                self.buffer = Some(e.value);
-                return Err(e.error);
-            }
-        };
+        let raw = freeze_started(&mut self.buffer, &self.pool)?;
         let prefix = raw.slice(0..self.header_offset)?;
         let cursor = self.input.cursor()?;
         let source = AacSource {
@@ -391,7 +382,7 @@ impl AacAdtsStreamReader {
             return Ok(YIELD);
         }
         self.check_minimum(self.growth_target)?;
-        let b = frame(&mut self.buffer, &self.pool);
+        let b = started(&mut self.buffer, &self.pool);
         b.try_reserve_exact(
             self.growth_target
                 .checked_sub(b.len())
@@ -474,10 +465,4 @@ impl AacAdtsStreamReader {
             offset: self.position(),
         })))
     }
-}
-
-/// The frame being built; the first use after a freeze starts an empty one.
-#[inline(always)]
-fn frame<'a>(buffer: &'a mut Option<BudgetVec<u8>>, pool: &Budget) -> &'a mut BudgetVec<u8> {
-    buffer.get_or_insert_with(|| BudgetVec::new(pool))
 }

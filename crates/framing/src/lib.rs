@@ -31,7 +31,7 @@ mod canonical;
 mod inline_storage;
 mod record_input;
 
-use triergon_core::{BudgetVec, Bytes, Error, InputCursor, InputRequest, Result, SourceId};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, Result, SourceId};
 
 /// Whether a job may be stepped again after `error`: the pool refused storage it
 /// can grant once the caller frees some.
@@ -48,6 +48,28 @@ pub(crate) fn freeze_whole(output: &mut BudgetVec<u8>) -> Result<Bytes> {
         Ok(bytes) => Ok(bytes),
         Err(refused) => {
             *output = refused.value;
+            Err(refused.error)
+        }
+    }
+}
+
+/// The output a reader is building in `slot`; the first use after a freeze starts an
+/// empty one on `pool`.
+#[inline(always)]
+pub(crate) fn started<'a>(
+    slot: &'a mut Option<BudgetVec<u8>>,
+    pool: &Budget,
+) -> &'a mut BudgetVec<u8> {
+    slot.get_or_insert_with(|| BudgetVec::new(pool))
+}
+
+/// Freezes the output in `slot`, leaving none; a refused freeze puts it back for retry.
+#[inline(always)]
+pub(crate) fn freeze_started(slot: &mut Option<BudgetVec<u8>>, pool: &Budget) -> Result<Bytes> {
+    match slot.take().unwrap_or_else(|| BudgetVec::new(pool)).freeze() {
+        Ok(bytes) => Ok(bytes),
+        Err(refused) => {
+            *slot = Some(refused.value);
             Err(refused.error)
         }
     }
