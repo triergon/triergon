@@ -1,6 +1,15 @@
 use super::*;
 use crate::json::parse;
 
+/// The record of report rows in the shape the bounds are graded on.
+fn of_rows(rows: &[Value], policy: Policy) -> Option<Measured> {
+    let cases: Vec<CaseBounds> = rows
+        .iter()
+        .filter_map(super::super::bounds::case_bounds)
+        .collect();
+    Measured::of_cases(&cases, policy)
+}
+
 fn policy() -> Policy {
     Policy::load(&crate::root()).unwrap()
 }
@@ -14,10 +23,11 @@ fn row(id: &str, upper: &str, heap: &str, rss: &str) -> Value {
     .unwrap()
 }
 
-fn files(entries: &[(&str, &str)]) -> Vec<(String, Vec<u8>)> {
-    entries
+/// The graded rows `source` reads from `files`, each a path and its text.
+fn rows(source: Source, files: &[(&str, &str)]) -> Vec<Value> {
+    files
         .iter()
-        .map(|(path, text)| ((*path).to_owned(), text.as_bytes().to_vec()))
+        .flat_map(|(path, text)| source.rows(path, text.as_bytes()).unwrap())
         .collect()
 }
 
@@ -31,7 +41,7 @@ fn a_record_holds_the_largest_bounds_and_the_cases_that_hold() {
         parse(r#"{"id": "d", "outcome": "refusal"}"#).unwrap(),
         parse(r#"{"id": "e", "timing": {"status": "contaminated"}}"#).unwrap(),
     ];
-    let record = Measured::of_rows(&rows, policy()).unwrap();
+    let record = of_rows(&rows, policy()).unwrap();
     assert_eq!(
         record.runtime,
         Some(Runtime {
@@ -56,13 +66,8 @@ fn a_record_holds_the_largest_bounds_and_the_cases_that_hold() {
             parse(r#"{"id": "a", "timing": {"status": "measured", "ratio": {"upper_95": 0.5}}}"#)
                 .unwrap(),
         ];
-    assert!(
-        Measured::of_rows(&timed, policy())
-            .unwrap()
-            .memory
-            .is_none()
-    );
-    assert_eq!(Measured::of_rows(&rows[3..4], policy()), None);
+    assert!(of_rows(&timed, policy()).unwrap().memory.is_none());
+    assert_eq!(of_rows(&rows[3..4], policy()), None);
 }
 
 #[test]
@@ -141,21 +146,24 @@ fn each_command_is_read_from_the_files_it_writes() {
 
 #[test]
 fn codec_and_capture_outputs_become_graded_rows() {
-    let times = files(&[
-        (
-            "aac-lc.json",
-            r#"{"id": "aac-lc", "operation": "audio-aac", "status": "measured", "ratio": {"upper_95": 0.8}}"#,
-        ),
-        (
-            "h264.json",
-            r#"{"id": "h264", "operation": "video-h264", "status": "invalid-timing"}"#,
-        ),
-        (
-            "claims.json",
-            r#"{"0123": {"id": "aac-lc", "status": "measured"}}"#,
-        ),
-    ]);
-    let record = Measured::of_rows(&Source::CodecTimes.rows(&times).unwrap(), policy()).unwrap();
+    let times = rows(
+        Source::CodecTimes,
+        &[
+            (
+                "aac-lc.json",
+                r#"{"id": "aac-lc", "operation": "audio-aac", "status": "measured", "ratio": {"upper_95": 0.8}}"#,
+            ),
+            (
+                "h264.json",
+                r#"{"id": "h264", "operation": "video-h264", "status": "invalid-timing"}"#,
+            ),
+            (
+                "claims.json",
+                r#"{"0123": {"id": "aac-lc", "status": "measured"}}"#,
+            ),
+        ],
+    );
+    let record = of_rows(&times, policy()).unwrap();
     assert_eq!(
         record.runtime,
         Some(Runtime {
@@ -164,12 +172,15 @@ fn codec_and_capture_outputs_become_graded_rows() {
             cases: 2,
         })
     );
-    let memory = files(&[(
-        "summary.json",
-        r#"[{"id": "aac-lc", "memory_status": "qualified", "heap_ratio_upper_95": 0.7, "total_rss_ratio_upper_95": 0.6},
+    let memory = rows(
+        Source::CodecMemory,
+        &[(
+            "summary.json",
+            r#"[{"id": "aac-lc", "memory_status": "qualified", "heap_ratio_upper_95": 0.7, "total_rss_ratio_upper_95": 0.6},
             {"id": "h264", "memory_status": "contaminated", "heap_ratio_upper_95": 0.2, "total_rss_ratio_upper_95": 0.3}]"#,
-    )]);
-    let record = Measured::of_rows(&Source::CodecMemory.rows(&memory).unwrap(), policy()).unwrap();
+        )],
+    );
+    let record = of_rows(&memory, policy()).unwrap();
     assert_eq!(
         (record.runtime, record.memory),
         (
@@ -182,15 +193,18 @@ fn codec_and_capture_outputs_become_graded_rows() {
             })
         )
     );
-    let capture = files(&[
-        (
-            "c01/result.json",
-            r#"{"runtime": {"ratio": {"median": 0.9, "upper_95": 0.95}},
+    let capture = rows(
+        Source::Capture,
+        &[
+            (
+                "c01/result.json",
+                r#"{"runtime": {"ratio": {"median": 0.9, "upper_95": 0.95}},
                 "memory": {"status": "qualified", "heap_ratio_upper_95": 0.5, "total_rss_ratio_upper_95": 0.9}}"#,
-        ),
-        ("c02/result.json", r#"{"runtime": {"status": "refused"}}"#),
-    ]);
-    let record = Measured::of_rows(&Source::Capture.rows(&capture).unwrap(), policy()).unwrap();
+            ),
+            ("c02/result.json", r#"{"runtime": {"status": "refused"}}"#),
+        ],
+    );
+    let record = of_rows(&capture, policy()).unwrap();
     assert_eq!(
         record.runtime,
         Some(Runtime {
@@ -200,12 +214,15 @@ fn codec_and_capture_outputs_become_graded_rows() {
         })
     );
     assert_eq!(record.memory.map(|m| (m.lower, m.cases)), Some((1, 1)));
-    let report = files(&[(
-        "report.json",
-        r#"{"case": {"id": "v", "timing": {"status": "measured", "ratio": {"upper_95": 0.4}}}}"#,
-    )]);
+    let report = rows(
+        Source::Report,
+        &[(
+            "report.json",
+            r#"{"case": {"id": "v", "timing": {"status": "measured", "ratio": {"upper_95": 0.4}}}}"#,
+        )],
+    );
     assert_eq!(
-        Measured::of_rows(&Source::Report.rows(&report).unwrap(), policy())
+        of_rows(&report, policy())
             .and_then(|record| record.runtime)
             .map(|runtime| runtime.cases),
         Some(1)

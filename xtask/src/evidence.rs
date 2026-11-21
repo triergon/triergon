@@ -20,6 +20,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::archive::{TarFiles, TarReader};
+use crate::harness::bounds::{CaseBounds, case_bounds};
 use crate::harness::measured::{Measured, Source};
 use crate::harness::policy::Policy;
 use crate::harness::reuse;
@@ -503,15 +504,22 @@ pub fn entry(
 /// The fresh gate results a packed set holds ([`reuse::listed`]), which a later gate
 /// run reuses once the set is kept, each with what it measured ([`Measured`]) where
 /// its command measures, graded against `policy`. The pack is read twice: for the
-/// results, then for the reports beside them.
+/// results, then for the reports beside them, each summarised as it is read.
 fn gate_results(
     archive: &Path,
     compression: Compression,
     policy: Policy,
 ) -> Result<Vec<Value>, String> {
-    let results = read_pack(archive, compression, |path| {
-        path.rsplit('/').next() == Some(reuse::RESULT)
-    })?;
+    let mut results = Vec::new();
+    read_pack(
+        archive,
+        compression,
+        |path| path.rsplit('/').next() == Some(reuse::RESULT),
+        |path, data| {
+            results.push((path, data));
+            Ok(())
+        },
+    )?;
     let mut listed = reuse::listed(&results)?;
     // Each result's directory and where its command writes what it measured.
     let sources: Vec<Option<(String, Source)>> = listed
@@ -526,28 +534,45 @@ fn gate_results(
     if sources.iter().all(Option::is_none) {
         return Ok(listed);
     }
-    let reports = read_pack(archive, compression, |path| {
-        sources.iter().flatten().any(|(directory, source)| {
-            below(path, directory).is_some_and(|file| source.reads(file))
-        })
-    })?;
-    for (result, source) in listed.iter_mut().zip(&sources) {
-        let (Some((directory, source)), Value::Object(fields)) = (source, result) else {
-            continue;
-        };
-        let read: Vec<(String, Vec<u8>)> = reports
-            .iter()
-            .filter_map(|(path, data)| {
-                let file = below(path, directory).filter(|file| source.reads(file))?;
-                Some((file.to_owned(), data.clone()))
-            })
-            .collect();
-        let rows = source.rows(&read).map_err(|e| format!("{directory}/{e}"))?;
-        if let Some(measured) = Measured::of_rows(&rows, policy) {
+    let mut cases: Vec<Vec<CaseBounds>> = listed.iter().map(|_| Vec::new()).collect();
+    read_pack(
+        archive,
+        compression,
+        |path| reads(&sources, path).next().is_some(),
+        |path, data| {
+            for (index, source, file) in reads(&sources, &path) {
+                let rows = source
+                    .rows(file, &data)
+                    .map_err(|e| format!("{path}: {e}"))?;
+                cases[index].extend(rows.iter().filter_map(case_bounds));
+            }
+            Ok(())
+        },
+    )?;
+    for ((result, source), cases) in listed.iter_mut().zip(&sources).zip(&cases) {
+        if let (Some(_), Value::Object(fields)) = (source, result)
+            && let Some(measured) = Measured::of_cases(cases, policy)
+        {
             fields.push(("measured".into(), measured.to_value()));
         }
     }
     Ok(listed)
+}
+
+/// Each result, by its index, whose measurements `path` holds: its source and the
+/// file's path below the result's directory.
+fn reads<'a>(
+    sources: &'a [Option<(String, Source)>],
+    path: &'a str,
+) -> impl Iterator<Item = (usize, Source, &'a str)> + 'a {
+    sources
+        .iter()
+        .enumerate()
+        .filter_map(move |(index, source)| {
+            let (directory, source) = source.as_ref()?;
+            let file = below(path, directory).filter(|file| source.reads(file))?;
+            Some((index, *source, file))
+        })
 }
 
 /// `path` below `directory` of a pack (the pack's root for an empty one).
@@ -559,47 +584,45 @@ fn below<'a>(path: &'a str, directory: &str) -> Option<&'a str> {
     }
 }
 
-/// Every file of a pack whose path, without a leading `./`, `keep` accepts, with its
-/// bytes, in the pack's order.
+/// Hands `each` every file of a pack whose path, without a leading `./`, `keep`
+/// accepts, with its bytes, in the pack's order, one file at a time.
 fn read_pack(
     archive: &Path,
     compression: Compression,
     keep: impl Fn(&str) -> bool,
-) -> Result<Vec<(String, Vec<u8>)>, String> {
-    struct Kept<F> {
-        keep: F,
-        files: Vec<(String, Vec<u8>)>,
-        current: bool,
+    each: impl FnMut(String, Vec<u8>) -> Result<(), String>,
+) -> Result<(), String> {
+    struct Kept<K, E> {
+        keep: K,
+        each: E,
+        current: Option<(String, Vec<u8>)>,
     }
-    impl<F: Fn(&str) -> bool> TarFiles for Kept<F> {
+    impl<K: Fn(&str) -> bool, E: FnMut(String, Vec<u8>) -> Result<(), String>> TarFiles for Kept<K, E> {
         fn begin(&mut self, path: &str, _: u64) -> Result<(), String> {
             let path = path.trim_start_matches("./");
-            self.current = (self.keep)(path);
-            if self.current {
-                self.files.push((path.to_owned(), Vec::new()));
-            }
+            self.current = (self.keep)(path).then(|| (path.to_owned(), Vec::new()));
             Ok(())
         }
         fn data(&mut self, chunk: &[u8]) -> Result<(), String> {
-            if self.current
-                && let Some((_, data)) = self.files.last_mut()
-            {
+            if let Some((_, data)) = &mut self.current {
                 data.extend_from_slice(chunk);
             }
             Ok(())
         }
         fn end(&mut self) -> Result<(), String> {
-            self.current = false;
-            Ok(())
+            match self.current.take() {
+                Some((path, data)) => (self.each)(path, data),
+                None => Ok(()),
+            }
         }
     }
     let mut tar = TarReader::new(Kept {
         keep,
-        files: Vec::new(),
-        current: false,
+        each,
+        current: None,
     });
     compression.unpack(archive, &mut tar)?;
-    Ok(tar.finish()?.files)
+    tar.finish().map(drop)
 }
 
 /// `cargo xtask evidence promote SET`: copy an indexed set from `qualification/`

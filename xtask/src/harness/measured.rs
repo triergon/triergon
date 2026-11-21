@@ -9,7 +9,7 @@
 
 use std::path::Path;
 
-use super::bounds::{Bound, CaseBounds, case_bounds};
+use super::bounds::{Bound, CaseBounds};
 use super::policy::Policy;
 use crate::json::{self, Value};
 
@@ -45,10 +45,8 @@ pub struct Measured {
 }
 
 impl Measured {
-    /// The record of `rows`, report rows in the shape the bounds are graded on; `None`
-    /// when no row measured anything.
-    pub fn of_rows(rows: &[Value], policy: Policy) -> Option<Self> {
-        let cases: Vec<CaseBounds> = rows.iter().filter_map(case_bounds).collect();
+    /// The record of the graded `cases`; `None` when none measured anything.
+    pub fn of_cases(cases: &[CaseBounds], policy: Policy) -> Option<Self> {
         let valid = |value: Option<f64>| value.filter(|v| v.is_finite());
         let largest = |bound: Bound| {
             cases
@@ -277,13 +275,13 @@ impl Source {
         }
     }
 
-    /// The graded rows of the files the source reads, each by its path below the
-    /// result's directory.
-    pub fn rows(self, files: &[(String, Vec<u8>)]) -> Result<Vec<Value>, String> {
+    /// The graded rows of a file the source reads, at `path` below the result's
+    /// directory.
+    pub fn rows(self, path: &str, data: &[u8]) -> Result<Vec<Value>, String> {
+        let text = std::str::from_utf8(data).map_err(|_| "not UTF-8".to_owned())?;
+        let document = json::parse(text).map_err(|e| e.to_string())?;
         let mut rows = Vec::new();
-        for (path, data) in files {
-            let text = std::str::from_utf8(data).map_err(|_| format!("{path}: not UTF-8"))?;
-            let document = json::parse(text).map_err(|e| format!("{path}: {e}"))?;
+        {
             match self {
                 Self::Report => match (document.get("cases"), document.get("case")) {
                     (Some(Value::Array(cases)), _) => rows.extend(cases.iter().cloned()),
