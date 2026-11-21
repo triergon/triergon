@@ -227,6 +227,9 @@ specification. Verification:
   locally executable target. Each run under `.research/core-time-check/runs/`
   retains the source snapshot, probes, outputs and a report with compiler and
   Cargo artifact identities. Use `--output DIR` to choose the report directory.
+- The [budget comparison](../../harness/features/core-budgets/contract.json)
+  checks charges and refusals across reservation, release, aliasing, vector
+  replacement and work exhaustion against an independent accounting model.
 - Two `compile_fail` doctests on `OwnedInputBytes` prove produced storage
   cannot be turned back into caller input.
 - Container-model unit tests check exact packet time without fabricated values and

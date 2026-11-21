@@ -127,3 +127,11 @@ Speaker ids and names follow FFmpeg's channel layout API (`AV_CHAN_*`, `AV_CH_*`
 The channel order is verified through the codec crates, whose output planes are
 compared with FFmpeg channel by channel; unit tests pin layout equality, masks and
 capacity. Gates: [docs/quality.md](../../docs/quality.md).
+
+The [inverse transform comparison](../../harness/features/dsp-imdct/contract.json)
+checks IMDCT and DCT-IV samples at every supported length through 8192 against
+the cosine definitions and the public FFmpeg transform under a numeric rule.
+The [window comparison](../../harness/features/dsp-windows/contract.json) checks
+KBD and Vorbis windows against their formulae within one binary32 ULP.
+The [division comparison](../../harness/features/dsp-divide/contract.json)
+checks truncation, quotients and remainders against exact integer arithmetic.

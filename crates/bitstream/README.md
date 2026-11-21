@@ -120,3 +120,11 @@ assert_eq!(section.remainder(), 0x0376_e6e7);
 // EBML CRC-32 elements.
 assert_eq!(Crc32Ieee::of(b"123456789"), 0xcbf4_3926);
 ```
+
+## Conformance
+
+The [bit reader comparison](../../harness/features/bit-readers/contract.json) checks
+field values, refusals, positions and overruns against independent MSB, LSB and Rice
+models. The [RBSP comparison](../../harness/features/rbsp-unescape/contract.json)
+checks strict and lenient output, prevention errors and run boundaries against
+the H.264 payload rules.

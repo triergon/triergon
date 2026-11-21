@@ -115,6 +115,9 @@ output, including the three timed Opus inputs.
 
 - Specifications: RFC 6716 with the RFC 8251 updates, and RFC 7845 for the identification
   header and the channel mappings.
+- The [final-range comparison](../../harness/features/opus-final-range/contract.json)
+  checks `Decoder::final_range` after every packet against the encoder range
+  recorded in the twelve RFC 8251 bitstreams.
 - `cargo xtask codecs grade` runs the `opus` lane
   ([harness/codecs/STATUS.md](../../harness/codecs/STATUS.md)), which decodes each file
   through the container readers with its trims applied and compares the result with FFmpeg
