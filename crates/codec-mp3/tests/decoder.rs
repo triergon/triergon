@@ -1,12 +1,13 @@
 //! Behaviour through the public API: output shape, budgets, and malformed input.
 
 use triergon_codec::{AudioDecoder, AudioFrame, Budget, Speaker, StorageError};
-use triergon_codec_mp3::{DecodeError, Decoder, Limits, frame_header};
+use triergon_codec_mp3::{DecodeError, Decoder, Limits};
+use triergon_framing::mpeg_audio::MpegAudioHeader;
 
 /// A frame of `length` bytes with header word `header` and an all-zero body: silence
 /// in every layer (no allocation, no Huffman data).
 fn silent_frame(header: u32) -> Vec<u8> {
-    let length = frame_header(&header.to_be_bytes())
+    let length = MpegAudioHeader::parse(header)
         .unwrap()
         .frame_bytes()
         .unwrap();

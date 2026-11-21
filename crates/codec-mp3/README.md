@@ -26,8 +26,8 @@ fn decode(frames: &[&[u8]]) -> Result<(), DecodeError> {
 }
 ```
 
-An access unit is one whole frame, header included. `Decoder::new_in` charges a
-caller's `Budget`; `frame_header` reads a frame header as the decoder does.
+An access unit is one whole frame, header included, as `triergon-framing`'s
+`MpegAudioHeader::from_bytes` reads it. `Decoder::new_in` charges a caller's `Budget`.
 `examples/decode_mp3` decodes the first MPEG audio track of a file (a raw stream or a
 container), read through the `triergon` facade, to interleaved f32le: the decoder's whole
 output, without container trims. `--reset-at N` resets the decoder before access unit N.

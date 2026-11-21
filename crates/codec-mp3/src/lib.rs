@@ -111,7 +111,10 @@ impl Default for Decoder {
 impl Decoder {
     /// A decoder with the default limits.
     pub fn new() -> Self {
-        #[allow(clippy::expect_used)] // The default limit is far above a pool's own charge.
+        #[expect(
+            clippy::expect_used,
+            reason = "the default limit is far above a pool's own charge"
+        )]
         Self::with_limits(Limits::default()).expect("default storage budget")
     }
 
@@ -133,7 +136,7 @@ impl Decoder {
     /// were zero; bytes after the frame are ignored. A frame refused after its header
     /// leaves `out` empty.
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
-        let header = frame_header(au).ok_or(DecodeError::Invalid("frame header"))?;
+        let header = MpegAudioHeader::from_bytes(au).ok_or(DecodeError::Invalid("frame header"))?;
         let length = header
             .frame_bytes()
             .ok_or(DecodeError::Unsupported("free-format frame"))?;
@@ -176,11 +179,6 @@ impl Decoder {
         }
         Ok(())
     }
-}
-
-/// The header of the frame at the start of `bytes`.
-pub fn frame_header(bytes: &[u8]) -> Option<MpegAudioHeader> {
-    MpegAudioHeader::from_bytes(bytes)
 }
 
 impl AudioDecoder for Decoder {
