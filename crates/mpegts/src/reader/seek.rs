@@ -365,7 +365,7 @@ impl Reader {
     }
 
     /// Seek a selected AVC, HEVC, ADTS AAC-LC, AC-3, E-AC-3, MPEG audio or DTS core
-    /// core track in one length-known, seekable entity. The reader lands on the last coded
+    /// track in one length-known, seekable entity. The reader lands on the last coded
     /// random-access picture or complete audio frame carrying the greatest
     /// resolved PTS at or before the target. It delivers original transport,
     /// clocks and PES provenance, including untimed frames after the landing.
@@ -484,7 +484,12 @@ impl Reader {
         } else {
             let single_track =
                 matches!(&self.packet_tracks, PacketTracks::Selected(pids) if pids.len() == 1);
-            let retain = (entities.is_none() && length <= 256 * 1024 && single_track)
+            // An indexed scan retains landing points. Replay can then stream
+            // the suffix without keeping both the index and the output packets.
+            let retain = (index_entries.is_none()
+                && entities.is_none()
+                && length <= 256 * 1024
+                && single_track)
                 .then(|| Retain::new(&self.pool));
             (
                 Phase::Scan(Scan {

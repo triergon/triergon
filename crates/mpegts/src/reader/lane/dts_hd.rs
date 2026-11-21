@@ -135,15 +135,10 @@ impl Validation {
             if let Some(crc) = &mut self.crc {
                 let end = crc.at + work.take((crc.end - crc.at).min(256) as u64) as usize;
                 for &byte in &bytes[crc.at..end] {
-                    crc.remainder ^= u16::from(byte) << 8;
-                    for _ in 0..8 {
-                        crc.remainder = (crc.remainder << 1)
-                            ^ if crc.remainder & 0x8000 != 0 {
-                                0x1021
-                            } else {
-                                0
-                            };
-                    }
+                    // Fold the high byte through x^16 + x^12 + x^5 + 1.
+                    let high = (crc.remainder >> 8) ^ u16::from(byte);
+                    let folded = high ^ (high >> 4);
+                    crc.remainder = (crc.remainder << 8) ^ (folded << 12) ^ (folded << 5) ^ folded;
                 }
                 crc.at = end;
                 if end < crc.end {

@@ -157,8 +157,9 @@ PES and access units. The ordinary single-entity method requires a single source
 
 Call `Reader::request_seek_and_index` to collect a bounded timestamp index
 during the first scan. Later seeks to the same track can use the index to select
-a landing with no separate scan. Replay still reads the entity prefix to
-reconstruct transport state and packet provenance. The index preserves the last
+a landing with no separate scan. The index stores only landing points. Replay
+reads the entity prefix to reconstruct transport state and packet provenance,
+then streams the selected suffix. The index preserves the last
 packet on tied timestamps. It falls back to scanning when anchors are out of
 order or the entry or storage limit is reached. The source must remain stable.
 Reset, close and entity continuation discard the index.
