@@ -854,6 +854,19 @@ pipeline ([triergon-capture](../capture/README.md#conformance)).
 - **Not handled.** SI tables beyond PAT/PMT (their packets are still reported),
   ATSC/Blu-ray signalling, descrambling, multi-program PES output.
 
+The [automatic DTS comparison](../../harness/features/mpegts-dts-discovery/contract.json)
+checks seven complete TS188 inputs with the opt-in initial-PES probe: three full
+packet folds and four zero-output refusals. Its
+inputs are prepared by `cargo xtask fetch-vectors` from the hash-checked FATE
+seed and committed synthetic controls. FATE inputs retain the restricted
+external-input category and are not redistributed. The independent public-API reference
+adapter admits a unique descriptor-free route using two independently verified
+core envelopes, then parses the unchanged transport through EOF. Ordinary
+reference discovery still reports the pinned FATE `dts/dts.ts` as 127 data PES;
+the automatic adapter emits 253 DTS frames. This is tested packet parity, not a
+native runtime or memory result. Split initial frames, M2TS, packed core,
+alternate descriptor namespaces and changing PMTs are outside this comparison.
+
 ## Conformance
 
 Specification basis:

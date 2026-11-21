@@ -41,11 +41,20 @@ worker's operations read only the raw-video and timed-text movies of its compari
 
 The opt-in unlabelled DTS core probe requires two complete matching canonical
 frames in the initial PES of a unique descriptor-free private route. On the
-pinned FATE `dts/dts.ts` input, all 253 payloads and clocks match explicit
-DTS selection. The pinned reference's ordinary stream discovery classifies
-PID 256 as `bin_data` and emits 127 PES packets. Automatic-discovery
-qualification, alternate descriptor namespaces, packed core and split initial
-frames remain open.
+pinned FATE `dts/dts.ts` input, all 253 payloads and clocks match the independent
+public-API automatic reference adapter. The
+[`mpegts-dts-discovery`](../harness/features/mpegts-dts-discovery/contract.json)
+comparison checks seven complete inputs: three full packet folds and four
+zero-output refusals with EOF=false.
+The standard `fetch-vectors` preparation generates these seven pinned inputs
+from the verified external FATE seed and committed synthetic controls; local
+gate input checks recognize that preparation without downloading media.
+Both operations include admission, allocation and full parsing; no PID is supplied. The pinned reference's ordinary
+stream discovery still classifies PID 256 as `bin_data` and emits 127 PES packets.
+These are development-host parity checks. Native AArch64 and ARMv7 runtime,
+peak heap and kernel-bound total RSS qualification with at least 30 pairs remain
+unmeasured. Alternate descriptor namespaces, packed core, M2TS, split initial
+frames and changing PMTs remain outside this comparison.
 
 The blocking facade stops reading as soon as a container signature selects a reader.
 It reserves replay capacity before consuming sequential input and rewinds seekable input.

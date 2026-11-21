@@ -1183,6 +1183,7 @@ struct Tree {
     /// The generated fixtures, under their repository-relative paths.
     generated: Option<PathBuf>,
     fetched: BTreeMap<String, String>,
+    prepared: BTreeMap<String, String>,
     /// Path to SHA-256.
     kept: BTreeMap<String, String>,
     hashes: BTreeMap<PathBuf, String>,
@@ -1209,6 +1210,18 @@ impl Tree {
             tree.fetched
                 .insert(format!("{}/{}", pin.directory, pin.file), pin.sha256);
         }
+        use crate::transport_fixtures::dts_discovery;
+        let dts_inputs = dts_discovery::prepared_inputs(root)?;
+        if !dts_inputs.is_empty() {
+            let seed = tree
+                .fetched
+                .get(dts_discovery::FATE_FILE)
+                .map(String::as_str);
+            if seed != Some(dts_discovery::FATE_SHA) {
+                return Err("DTS discovery preparation seed is not fetched with its pin".into());
+            }
+            tree.prepared.extend(dts_inputs);
+        }
         tree.kept = kept_files(root)?;
         Ok(tree)
     }
@@ -1233,6 +1246,7 @@ impl Tree {
                 .collect(),
             generated: None,
             fetched: BTreeMap::new(),
+            prepared: BTreeMap::new(),
             kept: BTreeMap::new(),
             hashes: BTreeMap::new(),
         })
@@ -1293,6 +1307,8 @@ impl Tree {
             (Source::Generated, self.hash(path)?)
         } else if let Some(pin) = self.fetched.get(&relative) {
             (Source::Fetched, pin.clone())
+        } else if let Some(pin) = self.prepared.get(&relative) {
+            (Source::Generated, pin.clone())
         } else if let Some(hash) = self.kept.get(&relative) {
             (Source::Kept, hash.clone())
         } else if generated_manifest(&self.root, &input.path).is_some() {

@@ -439,6 +439,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
         program: Some(request.program),
         descriptor_namespace: request.namespace,
         unlabelled_dts_core: request.unlabelled_dts_core,
+        probe_unlabelled_dts_core: request.probe_dts_core,
         pcr_policy: request.pcr_policy,
         audio_eof_policy: AudioEofPolicy::ReportIncomplete,
         unframed_audio_policy: UnframedAudioPolicy::ReportAtEof,
@@ -707,6 +708,23 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                 cause,
                 ..
             }))) if matches!(cause.event(), TraceEvent::Discontinuity { .. }) => (),
+            // The opt-in reader announces unsupported source signalling before
+            // its first-PES probe. Keep reading; EOF with no packets still refuses.
+            Step::Ready(Event::Other(ContinuityEvent::Source(ReaderEvent::Unsupported {
+                track,
+                ..
+            }))) if request.probe_dts_core
+                && track.program_map().program_descriptors.is_empty()
+                && track.stream().stream_type == 6
+                && track.stream().descriptor_bytes.is_empty()
+                && track
+                    .program_map()
+                    .streams
+                    .as_slice()
+                    .iter()
+                    .filter(|stream| stream.stream_type == 6 && stream.descriptor_bytes.is_empty())
+                    .count()
+                    == 1 => {}
             Step::Ready(Event::Other(ContinuityEvent::Source(event))) => {
                 if let Some(original) = deferred_continuity {
                     return Ok(original);
@@ -866,7 +884,7 @@ pub fn run(args: &[String]) -> Result<()> {
     let invocation = Invocation::parse(
         args,
         PREFIX,
-        " SIZE PROGRAM [--dvb|--atsc] [[--discontinuity] ENTITY]... [--dts-core=PID] [--ignore-pcr-reserved-bits]",
+        " SIZE PROGRAM [--dvb|--atsc] [[--discontinuity] ENTITY]... [--dts-core=PID|--probe-dts-core] [--ignore-pcr-reserved-bits]",
         2..=usize::MAX,
         false,
     )?;
@@ -906,6 +924,7 @@ mod tests {
             program: 1,
             namespace: DescriptorNamespace::Unspecified,
             unlabelled_dts_core: None,
+            probe_dts_core: false,
             pcr_policy: triergon_mpegts::compat::pes::PcrPolicy::Strict,
             following: BudgetVec::new(&pool),
         };
