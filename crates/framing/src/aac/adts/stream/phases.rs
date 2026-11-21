@@ -5,9 +5,10 @@ use super::{AacAdtsStreamReader, Phase, StreamOutput};
 use crate::aac::AacSource;
 use crate::aac::adts::carrier::{AacAdtsCarrier, AacAdtsCarrierBoundary};
 use crate::aac::adts::{AacAdtsFrame, inspect_adts_header, validate_selected_header};
+use crate::freeze_whole;
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
+use triergon_core::{Bytes, Error, Result, SourceLocation, Step, WorkBudget};
 
 /// Outcome of one phase step.
 type Flow = ControlFlow<Step<StreamOutput>>;
@@ -192,14 +193,8 @@ impl AacAdtsStreamReader {
                 maximum: self.limits.maximum_frames,
             });
         }
-        if self.buffer.is_none() {
-            self.buffer = Some(BudgetVec::new(&self.pool));
-        }
         self.check_minimum(self.used)?;
-        self.buffer
-            .as_mut()
-            .ok_or(Error::Invalid("missing ADTS builder"))?
-            .try_reserve_exact(self.used)?;
+        self.buffer.try_reserve_exact(self.used)?;
         self.phase = Phase::CopyHeader;
         Ok(NEXT)
     }
@@ -218,8 +213,6 @@ impl AacAdtsStreamReader {
             return Ok(YIELD);
         }
         self.buffer
-            .as_mut()
-            .ok_or(Error::Invalid("missing ADTS builder"))?
             .try_extend_from_slice(&self.prefix[self.copied..self.copied + n])?;
         self.copied += n;
         Ok(NEXT)
@@ -227,10 +220,7 @@ impl AacAdtsStreamReader {
 
     #[inline]
     fn read_body(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Flow> {
-        let b = self
-            .buffer
-            .as_ref()
-            .ok_or(Error::Invalid("missing ADTS builder"))?;
+        let b = &self.buffer;
         let remaining = self
             .frame_bytes
             .checked_sub(b.len())
@@ -267,10 +257,7 @@ impl AacAdtsStreamReader {
             return Ok(NEXT);
         }
         let cursor = self.input.cursor()?;
-        let buffer = self
-            .buffer
-            .as_mut()
-            .ok_or(Error::Invalid("missing ADTS builder"))?;
+        let buffer = &mut self.buffer;
         let maximum = if scanning {
             1
         } else {
@@ -312,11 +299,7 @@ impl AacAdtsStreamReader {
         }
         let h = inspect_adts_header(&self.prefix)?;
         if self.plausible_envelope(h) {
-            let b = self
-                .buffer
-                .as_ref()
-                .ok_or(Error::Invalid("missing ADTS scan builder"))?;
-            let start = b.len().checked_sub(7).ok_or(Error::Overflow)?;
+            let start = self.buffer.len().checked_sub(7).ok_or(Error::Overflow)?;
             let end = start
                 .checked_add(usize::from(h.frame_length()))
                 .ok_or(Error::Overflow)?;
@@ -344,17 +327,7 @@ impl AacAdtsStreamReader {
             return Ok(YIELD);
         }
         self.check_minimum(Bytes::owner_overhead_bytes())?;
-        let b = self
-            .buffer
-            .take()
-            .ok_or(Error::Invalid("missing recovery prefix"))?;
-        let raw = match b.freeze() {
-            Ok(b) => b,
-            Err(e) => {
-                self.buffer = Some(e.value);
-                return Err(e.error);
-            }
-        };
+        let raw = freeze_whole(&mut self.buffer)?;
         let prefix = raw.slice(0..self.header_offset)?;
         let cursor = self.input.cursor()?;
         let source = AacSource {
@@ -409,10 +382,7 @@ impl AacAdtsStreamReader {
             return Ok(YIELD);
         }
         self.check_minimum(self.growth_target)?;
-        let b = self
-            .buffer
-            .as_mut()
-            .ok_or(Error::Invalid("missing ADTS builder"))?;
+        let b = &mut self.buffer;
         b.try_reserve_exact(
             self.growth_target
                 .checked_sub(b.len())
@@ -441,20 +411,10 @@ impl AacAdtsStreamReader {
             generation: cursor.generation(),
             offset: self.frame_start,
         };
-        let b = self
-            .buffer
-            .take()
-            .ok_or(Error::Invalid("missing ADTS builder"))?;
-        if b.len() != self.frame_bytes {
+        if self.buffer.len() != self.frame_bytes {
             return Err(Error::Invalid("ADTS complete output extent"));
         }
-        let raw = match b.freeze() {
-            Ok(b) => b,
-            Err(e) => {
-                self.buffer = Some(e.value);
-                return Err(e.error);
-            }
-        };
+        let raw = freeze_whole(&mut self.buffer)?;
         if self.carrier {
             let boundary = if self.eof_fragment {
                 AacAdtsCarrierBoundary::ExplicitEofFragment
