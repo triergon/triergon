@@ -92,6 +92,19 @@ impl Outline {
         self.segments.clear();
     }
 
+    /// A copy whose storage holds exactly its points and segments, charged to
+    /// the same budget.
+    ///
+    /// # Errors
+    ///
+    /// The budget's errors.
+    pub fn try_clone(&self) -> Result<Self> {
+        Ok(Self {
+            points: self.points.try_clone()?,
+            segments: self.segments.try_clone()?,
+        })
+    }
+
     /// Gives back the storage beyond the points and segments it holds.
     ///
     /// # Errors

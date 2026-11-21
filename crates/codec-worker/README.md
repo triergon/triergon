@@ -41,9 +41,11 @@ each with a little-endian 32-bit length and 64 zero padding bytes. Both workers
 cap the preloaded input at 64 MiB and require 1024 samples per plane per packet.
 The `raw` mode writes little-endian floats in frame and plane order and reports
 the ordered speaker IDs. The command compares every sample with the AAC
-accuracy bounds and checks the speaker order. Pass its `workloads.json` to
+accuracy bounds and checks the speaker order. The comparison's candidate is
+`codec-aac-worker`, as its contract names. Pass its `workloads.json` to
 `cargo xtask codecs time` and `cargo xtask codecs memory` with the same input
-directory and workers. Both commands require the matching `parity.json`.
+directory, and that worker as `--candidate`. Both commands require the matching
+`parity.json`.
 `audio-aac-access-units` uses the specification mapping.
 `audio-aac-access-units-compat` uses the conventional surround mapping.
 

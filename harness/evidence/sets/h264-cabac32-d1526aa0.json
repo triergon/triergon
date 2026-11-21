@@ -1,0 +1,9 @@
+{
+ "name": "h264-cabac32-d1526aa0",
+ "path": "h264-cabac32-d1526aa0",
+ "retention": "retained",
+ "reason": "Counts and tests of the 32-bit CABAC register and the decode-time H.264 motion summaries, one c6g.4xlarge host (Graviton2) per target from the gate images: the inline-resolved source-line cycle profile of h264-high-1080p at main 41031255 on ARMv7, a code-generation probe of 64-bit shifts, the stepwise counts of gate-way builds, perf stat counts of all 20 codec workloads at main 41031255 and d1526aa0 on both targets with digests, playback-worker SHA-256 at both revisions, and the codec, pixel and H.264 crate tests including 195 conformance vectors; cited by docs/status.md for the ARMv7 timing of h264-high-1080p.",
+ "key": "evidence/h264-cabac32-d1526aa0/30cc9f8561a5792db2353744b30ff0147b539b7c68242e3db11b0d191b168ec4.tar.gz",
+ "sha256": "30cc9f8561a5792db2353744b30ff0147b539b7c68242e3db11b0d191b168ec4",
+ "bytes": 46615
+}

@@ -1,0 +1,28 @@
+{
+ "name": "aac-access-units-41846888-aarch64",
+ "path": "aac-access-units-41846888-aarch64",
+ "retention": "retained",
+ "reason": "Configured AAC access-unit parity, paired runtime and kernel-bound memory at 41846888, measured from codec-aac-worker (the pinned nightly with codec-aac's simd feature), with the build identity.",
+ "key": "evidence/aac-access-units/41846888-aarch64/b70cb064645dea80a2cec595bd44f2b53f3a258fc600de5927f8d5de4e0e37a5.tar.zst",
+ "sha256": "b70cb064645dea80a2cec595bd44f2b53f3a258fc600de5927f8d5de4e0e37a5",
+ "bytes": 69420850,
+ "results": [
+  {
+   "path": "benchmark/gate-result.json",
+   "command": "codecs time",
+   "key": "d737956eca2a3f6e251d250f4d693ad529e549459a815efe31cbc743b3e0a2cd",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/gate-result.json",
+   "command": "codecs memory",
+   "key": "90dba5af984e951ecc4c0f4f9baf42457bded0239d69739d0596bf29553b2566",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "41846888291776f0a9664ad4b5e1dba30bd79518"
+ ]
+}
