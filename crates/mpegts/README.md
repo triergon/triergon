@@ -222,9 +222,14 @@ A LOAS envelope with an in-band version-zero AAC-LC configuration can
 be a seek entry. The reader accepts one program and layer with 1–64 nonempty
 subframes and preserves the complete envelope and its source ranges.
 
-The picture seek corpus also covers an AVC to HEVC change on one TS188 PID.
-Playback preroll retains the in-band parameter sets and emits all twelve
-pictures through EOF.
+Construction-14 DTS-HD seeking also accepts a complete core and aligned XLL
+asset with static mode-zero navigation and component mask `0x201`. The core
+must have clear predictor history and the XLL recovery header must validate.
+
+The picture seek corpus includes an AVC to HEVC change on one TS188 PID.
+Playback preroll retains the in-band HEVC parameter sets and emits all
+twelve pictures through EOF. The [case](../../harness/features/mpegts-previous-picture/corpus.json)
+records its clocks, source positions and packet digest.
 
 ### Opt-in policies
 
