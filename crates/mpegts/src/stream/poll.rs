@@ -1,0 +1,574 @@
+//! The entry points and the carrier loop.
+use super::event::{CarrierObservation, CompactTraceEvent, FaultKind, TraceEvent, TraceFault};
+use super::feed::{FeedCarrier, FeedContinuation, FeedItem};
+use super::{Route, TransportStream};
+use crate::transport::carrier::{PlainContinuation, TransportObservation};
+use crate::transport::framer::FramedCarrier;
+use crate::{ContinuityOutcome, Pes, SourceEpochs, TransportFramer, TransportPacket};
+use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::{Error, InputCursor, Result, SourceLocation, Step, WorkBudget};
+
+// Preparing, beginning and publishing one source event.
+const OBSERVED_EVENT_WORK: u64 = 3;
+
+enum ObservedContinuation {
+    Fallback,
+    Retained,
+    Completed(Pes),
+}
+
+const FEED_FALLBACK_PHASE: u8 = 8;
+
+// Select the returned event type before entering the shared parser loop. Ordinary
+// feeds never construct a compact event just to unpack its source event again.
+trait PollOutput: Sized {
+    const COMPACT: bool = false;
+
+    fn event(event: TraceEvent) -> Self;
+
+    fn null_run(
+        _framer: &mut TransportFramer,
+        _input: &mut InputCursor,
+        _work: &mut WorkBudget,
+        _cancel: &AtomicBool,
+    ) -> Result<Option<Self>> {
+        Ok(None)
+    }
+}
+
+impl PollOutput for TraceEvent {
+    fn event(event: Self) -> Self {
+        event
+    }
+}
+
+impl PollOutput for CompactTraceEvent {
+    const COMPACT: bool = true;
+
+    fn event(event: TraceEvent) -> Self {
+        Self::Event(event)
+    }
+
+    fn null_run(
+        framer: &mut TransportFramer,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<Self>> {
+        Ok(framer.try_null_run(input, work, cancel)?.map(Self::NullRun))
+    }
+}
+
+impl TransportStream {
+    fn retain_observed_continuation(
+        &mut self,
+        carrier: &mut PlainContinuation,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        observe: &mut impl FnMut(CarrierObservation<'_>),
+    ) -> Result<ObservedContinuation> {
+        let Route::Pes(index) = self.route else {
+            return Ok(ObservedContinuation::Fallback);
+        };
+        let pid = carrier.pid();
+        let clock = self.pcr_pid == Some(pid);
+        if (clock && self.clock_pending) || self.collector.has_pending() {
+            return Ok(ObservedContinuation::Fallback);
+        }
+        let route = &mut self.routes.as_mut_slice()[index];
+        let continuity = route
+            .continuity
+            .as_mut()
+            .ok_or(Error::Invalid("PES continuity missing"))?;
+        if !continuity.expects_payload_counter(carrier.counter()) {
+            return Ok(ObservedContinuation::Fallback);
+        }
+        let assembler = route
+            .assembler
+            .as_mut()
+            .ok_or(Error::Invalid("PES route missing"))?;
+        let Some(bytes) = carrier.source.as_ref() else {
+            return Ok(ObservedContinuation::Fallback);
+        };
+        let start = carrier.payload_start();
+        let location = SourceLocation {
+            source: carrier.entity.ok_or(Error::SourceMismatch)?,
+            offset: carrier.offset + start as u64,
+        };
+        let grant = work.remaining().saturating_sub(2 * OBSERVED_EVENT_WORK + 1);
+        if !assembler.can_retain_body_carrier(bytes, start, location.offset, grant)
+            || cancel.load(Ordering::Relaxed)
+        {
+            return Ok(ObservedContinuation::Fallback);
+        }
+
+        work.take(OBSERVED_EVENT_WORK);
+        observe(CarrierObservation::Transport(
+            TransportObservation::continuation(carrier, bytes),
+        ));
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        work.take(1);
+        continuity.record_plain_continuation(bytes.as_ref(), carrier.counter());
+        work.take(OBSERVED_EVENT_WORK);
+        observe(CarrierObservation::Continuity {
+            pid,
+            outcome: ContinuityOutcome::Continuous,
+        });
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if clock {
+            self.clock_signal = false;
+        }
+        let bytes = carrier.source.take().expect("observed carrier source");
+        let len = bytes.len();
+        assembler.append_body_carrier(bytes.into_slice(start..len)?, location, work);
+        Ok(assembler.take_complete_body()?.map_or(
+            ObservedContinuation::Retained,
+            ObservedContinuation::Completed,
+        ))
+    }
+
+    /// Reports a carrier the framer rejected and discards every partial table
+    /// and PES, which the lost bytes may belong to.
+    #[cold]
+    fn framing_fault(&mut self, input: &InputCursor, error: Error) -> TraceEvent {
+        let location = SourceLocation {
+            source: input.source(),
+            offset: self
+                .framer
+                .pending_or_last_packet_offset()
+                .unwrap_or_else(|| input.position().saturating_sub(self.format.bytes() as u64)),
+        };
+        let rejected = self.framer.take_rejection();
+        self.framer.discard();
+        self.pat.assembler.discard();
+        if let Some(pmt) = self.pmt.as_mut() {
+            pmt.assembler.discard();
+        }
+        for route in self.routes.as_mut_slice() {
+            if let Some(assembler) = route.assembler.as_mut() {
+                assembler.discard(route.epochs);
+            }
+        }
+        TraceEvent::Diagnostic(TraceFault {
+            kind: FaultKind::Transport,
+            pid: None,
+            location,
+            error,
+            rejected,
+        })
+    }
+
+    pub fn poll(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<TraceEvent>> {
+        // Select the full trace before entering the per-carrier loop.
+        if self.feed_omissions.is_none() {
+            return self.poll_inner::<TraceEvent, false, false, false, false>(
+                input,
+                work,
+                cancel,
+                |_, _, _, _| Ok(FeedContinuation::Emit),
+                |_| (),
+            );
+        }
+        self.poll_feed(input, work, cancel, &mut |_, _, _, _| {
+            Ok(FeedContinuation::Emit)
+        })
+    }
+
+    /// Offer stable PES continuations to a feed before publishing a trace event.
+    /// The callback receives the number of preceding events omitted in this poll
+    /// window and the current source epochs. Buffered consumes the carrier,
+    /// and Yield consumes it and returns control to the feed. Both advance
+    /// the omitted count. Emit and errors must leave the carrier unchanged.
+    /// After an error, the carrier is retained for ordinary transport delivery.
+    pub fn poll_feed(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        consume: &mut impl FnMut(
+            &mut TransportPacket,
+            u64,
+            SourceEpochs,
+            &mut WorkBudget,
+        ) -> Result<FeedContinuation>,
+    ) -> Result<Step<TraceEvent>> {
+        self.poll_feed_inner::<false, false>(input, work, cancel, |item, omitted, epochs, work| {
+            let FeedItem::Carrier(carrier) = item else {
+                unreachable!("literal carrier delivery");
+            };
+            match carrier.0 {
+                FramedCarrier::Packet(packet) => consume(packet, omitted, epochs, work),
+                FramedCarrier::Plain(_) => unreachable!("literal carrier delivery"),
+            }
+        })
+    }
+
+    /// Like poll_feed, with compact carriers for ordinary progressive TS188
+    /// continuations. Emit and errors retain the full transport event.
+    pub fn poll_feed_carriers(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        consume: &mut impl FnMut(
+            FeedCarrier<'_>,
+            u64,
+            SourceEpochs,
+            &mut WorkBudget,
+        ) -> Result<FeedContinuation>,
+    ) -> Result<Step<TraceEvent>> {
+        let mut single = |item: FeedItem<'_>, omitted, epochs, work: &mut WorkBudget| {
+            let FeedItem::Carrier(carrier) = item else {
+                unreachable!("single carrier delivery");
+            };
+            consume(carrier, omitted, epochs, work)
+        };
+        if self.feed_validated_carriers {
+            self.poll_feed_inner::<true, false>(input, work, cancel, &mut single)
+        } else {
+            self.poll_feed_inner::<false, false>(input, work, cancel, &mut single)
+        }
+    }
+
+    /// Like poll_feed_carriers, with optional shared-window runs for progressive
+    /// feeds. A run is accepted by FeedPayloadRun::append_ready. The returned
+    /// FeedContinuation applies to ordinary carriers.
+    pub fn poll_feed_with_payload_runs(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        consume: &mut impl FnMut(
+            FeedItem<'_>,
+            u64,
+            SourceEpochs,
+            &mut WorkBudget,
+        ) -> Result<FeedContinuation>,
+    ) -> Result<Step<TraceEvent>> {
+        if self.feed_validated_carriers {
+            self.poll_feed_inner::<true, true>(input, work, cancel, consume)
+        } else {
+            self.poll_feed_inner::<false, false>(input, work, cancel, consume)
+        }
+    }
+
+    // A stream runs one of the two variants, so neither is inlined into the
+    // other's caller: the one that runs stays contiguous.
+    #[inline(never)]
+    fn poll_feed_inner<const DIRECT: bool, const RUNS: bool>(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        consume: impl FnMut(
+            FeedItem<'_>,
+            u64,
+            SourceEpochs,
+            &mut WorkBudget,
+        ) -> Result<FeedContinuation>,
+    ) -> Result<Step<TraceEvent>> {
+        self.poll_inner::<TraceEvent, true, DIRECT, RUNS, false>(
+            input,
+            work,
+            cancel,
+            consume,
+            |_| (),
+        )
+    }
+
+    pub(crate) fn poll_observing<const OBSERVING: bool>(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        observe: impl FnMut(CarrierObservation<'_>),
+    ) -> Result<Step<TraceEvent>> {
+        self.poll_inner::<TraceEvent, false, false, false, OBSERVING>(
+            input,
+            work,
+            cancel,
+            |_, _, _, _| Ok(FeedContinuation::Emit),
+            observe,
+        )
+    }
+
+    pub fn poll_compact(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<CompactTraceEvent>> {
+        self.poll_inner::<CompactTraceEvent, true, false, false, false>(
+            input,
+            work,
+            cancel,
+            |_, _, _, _| Ok(FeedContinuation::Emit),
+            |_| (),
+        )
+    }
+
+    fn poll_inner<
+        T: PollOutput,
+        const FEED: bool,
+        const DIRECT: bool,
+        const RUNS: bool,
+        const OBSERVING: bool,
+    >(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        mut consume: impl FnMut(
+            FeedItem<'_>,
+            u64,
+            SourceEpochs,
+            &mut WorkBudget,
+        ) -> Result<FeedContinuation>,
+        mut observe: impl FnMut(CarrierObservation<'_>),
+    ) -> Result<Step<T>> {
+        let ready = |event| Step::Ready(T::event(event));
+        if self.finished {
+            return Err(Error::Invalid("TS stream already finished"));
+        }
+        'events: loop {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if FEED && self.deferred_feed_events != 0 {
+                if self.phase == FEED_FALLBACK_PHASE {
+                    if work.remaining() == 0 {
+                        return Ok(Step::Yield);
+                    }
+                    let packet = self
+                        .packet
+                        .take()
+                        .ok_or(Error::Invalid("TS packet missing"))?;
+                    self.phase = 0;
+                    return Ok(ready(TraceEvent::Transport(packet)));
+                }
+                self.omit_feed_events(self.deferred_feed_events)?;
+                self.deferred_feed_events = 0;
+            }
+            if self.boundary_event {
+                self.boundary_event = false;
+                return Ok(ready(TraceEvent::Discontinuity {
+                    epochs: self.source_epochs(),
+                }));
+            }
+            if self.fault.is_some()
+                || self.map_build.is_some()
+                || self.section.is_some()
+                || self.job.is_some()
+                || self.collector.has_pending()
+            {
+                if let Some(event) = self.poll_jobs(work, cancel)? {
+                    return Ok(ready(event));
+                }
+                if self.job.is_some() || self.section.is_some() || self.map_build.is_some() {
+                    return Ok(Step::Yield);
+                }
+            } else if FEED && cancel.load(Ordering::Relaxed) {
+                // Feed omissions may have advanced since the loop's first check.
+                return Err(Error::Cancelled);
+            }
+            if work.remaining() == 0 {
+                return Ok(Step::Yield);
+            }
+            if self.packet.is_some() {
+                match self.phase {
+                    1 => {
+                        if !self.observe(work)? {
+                            return Ok(Step::Yield);
+                        }
+                        let outcome = self.outcome.take();
+                        if FEED && self.feed_validated_carriers {
+                            let packet = self
+                                .packet
+                                .as_ref()
+                                .ok_or(Error::Invalid("TS packet missing"))?;
+                            match outcome {
+                                Some(ContinuityOutcome::First | ContinuityOutcome::Continuous)
+                                    if matches!(self.route, Route::Pes(_)) && self.phase == 2 =>
+                                {
+                                    // Count the hidden continuity event after the
+                                    // carrier so its full-trace ordinal is retained.
+                                    self.deferred_feed_events = 1;
+                                    return Ok(ready(TraceEvent::Transport(packet.clone())));
+                                }
+                                Some(ContinuityOutcome::SignalledDiscontinuity) => {
+                                    let pid = packet.pid;
+                                    self.omit_feed_events(1)?;
+                                    return Ok(ready(TraceEvent::Continuity {
+                                        pid,
+                                        outcome: ContinuityOutcome::SignalledDiscontinuity,
+                                    }));
+                                }
+                                Some(_) => self.omit_feed_events(2)?,
+                                None => self.omit_feed_events(1)?,
+                            }
+                            continue;
+                        }
+                        if let Some(outcome) = outcome {
+                            if FEED && self.feed_omissions.is_some() {
+                                self.omit_feed_events(1)?;
+                                continue;
+                            }
+                            let pid = self
+                                .packet
+                                .as_ref()
+                                .ok_or(Error::Invalid("TS packet missing"))?
+                                .pid;
+                            if !matches!(
+                                outcome,
+                                ContinuityOutcome::First | ContinuityOutcome::Continuous
+                            ) || !OBSERVING
+                                || cancel.load(Ordering::Relaxed)
+                                || !work.try_charge(OBSERVED_EVENT_WORK)
+                            {
+                                return Ok(ready(TraceEvent::Continuity { pid, outcome }));
+                            }
+                            observe(CarrierObservation::Continuity { pid, outcome });
+                        }
+                    }
+                    2 => {
+                        self.phase = 5;
+                        if let Some(event) = self.clock_transition()? {
+                            return Ok(ready(event));
+                        }
+                    }
+                    5 => self.feed::<FEED>(work)?,
+                    6 => {
+                        if let Some(event) = self.drain::<FEED>(work, cancel)? {
+                            return Ok(ready(event));
+                        }
+                    }
+                    7 => {
+                        self.packet = None;
+                        self.phase = 0;
+                    }
+                    _ => return Err(Error::Invalid("TS packet stage")),
+                }
+                continue;
+            }
+            if self.logical_end {
+                return match self.eof(work, cancel)? {
+                    Step::Ready(event) => Ok(ready(event)),
+                    Step::NeedInput(request) => Ok(Step::NeedInput(request)),
+                    Step::Yield => Ok(Step::Yield),
+                    Step::End(location) => Ok(Step::End(location)),
+                };
+            }
+            if T::COMPACT
+                && matches!(self.find_route(0x1fff), Route::Ignore)
+                && let Some(event) = T::null_run(&mut self.framer, input, work, cancel)?
+            {
+                self.entity_end = None;
+                return Ok(Step::Ready(event));
+            }
+            // Reading carriers advances the cursor within the same source
+            // request. The feed callback never receives the cursor.
+            self.framer.bind_input(input)?;
+            loop {
+                if RUNS && self.try_feed_payload_run(input, work, cancel, &mut consume)? {
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
+                    }
+                    continue;
+                }
+                match self
+                    .framer
+                    .poll_bound_carrier::<DIRECT, OBSERVING>(input, work, cancel)
+                {
+                    Ok(Step::Ready(mut carrier)) => {
+                        self.entity_end = None;
+                        self.route = self.route_for_carrier(carrier.pid());
+                        if OBSERVING && let FramedCarrier::Plain(plain) = &mut carrier {
+                            match self.retain_observed_continuation(
+                                plain,
+                                work,
+                                cancel,
+                                &mut observe,
+                            )? {
+                                ObservedContinuation::Fallback => {}
+                                ObservedContinuation::Retained => continue,
+                                ObservedContinuation::Completed(pes) => {
+                                    return Ok(ready(TraceEvent::from_assembled_pes(pes)));
+                                }
+                            }
+                        }
+                        if FEED && self.validate_feed_continuation(&carrier, work)? {
+                            match consume(
+                                FeedItem::Carrier(FeedCarrier(&mut carrier)),
+                                self.feed_omissions.unwrap_or(0),
+                                self.source_epochs(),
+                                work,
+                            ) {
+                                Ok(FeedContinuation::Emit) => {}
+                                Ok(FeedContinuation::Buffered) => {
+                                    self.omit_feed_events(1)?;
+                                    if cancel.load(Ordering::Relaxed) {
+                                        return Err(Error::Cancelled);
+                                    }
+                                    // A validated continuation never starts a table or
+                                    // clock update. Resume framing at the next carrier.
+                                    let deferred = std::mem::take(&mut self.deferred_feed_events);
+                                    self.omit_feed_events(deferred)?;
+                                    if work.remaining() == 0 {
+                                        return Ok(Step::Yield);
+                                    }
+                                    continue;
+                                }
+                                Ok(FeedContinuation::Yield) => {
+                                    self.omit_feed_events(1)?;
+                                    return Ok(Step::Yield);
+                                }
+                                Err(error) => {
+                                    self.packet = Some(carrier.into_packet()?);
+                                    self.phase = FEED_FALLBACK_PHASE;
+                                    return Err(error);
+                                }
+                            }
+                            return Ok(ready(TraceEvent::Transport(carrier.into_packet()?)));
+                        }
+                        let packet = carrier.into_packet()?;
+                        self.phase = 1;
+                        if FEED && self.feed_validated_carriers {
+                            self.packet = Some(packet);
+                            continue 'events;
+                        }
+                        if OBSERVING
+                            && !cancel.load(Ordering::Relaxed)
+                            && work.try_charge(OBSERVED_EVENT_WORK)
+                        {
+                            observe(CarrierObservation::Transport((&packet).into()));
+                            self.packet = Some(packet);
+                            continue 'events;
+                        }
+                        let event = TraceEvent::Transport(packet.clone());
+                        self.packet = Some(packet);
+                        return Ok(ready(event));
+                    }
+                    Ok(Step::NeedInput(request)) => return Ok(Step::NeedInput(request)),
+                    Ok(Step::Yield) => return Ok(Step::Yield),
+                    Ok(Step::End(location)) => {
+                        self.entity_end = Some(location);
+                        return Ok(Step::End(location));
+                    }
+                    Err(error) if matches!(error, Error::Invalid(_) | Error::Truncated) => {
+                        return Ok(ready(self.framing_fault(input, error)));
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+        }
+    }
+}

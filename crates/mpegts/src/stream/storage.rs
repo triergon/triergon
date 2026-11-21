@@ -1,5 +1,6 @@
 //! The transport storage pinned while a PES range or span replacement is refused.
 
+use super::event::TraceEvent;
 use super::{Route, TransportStream};
 use crate::{PesAssembler, table_storage};
 use triergon_core::{Bytes, Error, Result};
@@ -162,5 +163,39 @@ impl TransportStorageCursor {
             Self::End => None,
         };
         Ok(item)
+    }
+}
+
+impl TransportStream {
+    pub(crate) fn blocked_pes_growth_floor(&self) -> Result<Option<usize>> {
+        let Route::Pes(index) = self.route else {
+            return Ok(None);
+        };
+        if self.phase != 6 {
+            return Ok(None);
+        }
+        let Some(span_floor) = self.routes.as_slice()[index]
+            .assembler
+            .as_ref()
+            .and_then(PesAssembler::blocked_growth_floor)
+        else {
+            return Ok(None);
+        };
+        let pmt = self
+            .pmt
+            .as_ref()
+            .map_or(Ok(0), |route| route.assembler.table_storage())?;
+        let floor = span_floor
+            .checked_add(table_storage(&self.routes)?)
+            .and_then(|n| n.checked_add(self.pat.assembler.table_storage().ok()?))
+            .and_then(|n| n.checked_add(pmt))
+            .and_then(|n| n.checked_add(self.framer.carry_storage().ok()?))
+            .ok_or(Error::Overflow)?;
+        Ok(Some(floor))
+    }
+
+    pub(crate) fn refuse_blocked_pes_growth(&mut self, error: Error) -> TraceEvent {
+        debug_assert!(matches!(self.blocked_pes_growth_floor(), Ok(Some(_))));
+        self.discard_faulted_route(error)
     }
 }
