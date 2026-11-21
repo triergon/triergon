@@ -316,7 +316,7 @@ impl FragmentIndex {
         self.count
     }
     /// 1-based track ordinal of the first sample.
-    pub fn first_ordinal(&self) -> u64 {
+    pub(crate) fn first_ordinal(&self) -> u64 {
         self.first_ordinal
     }
     /// `track_ID` from `tfhd`.

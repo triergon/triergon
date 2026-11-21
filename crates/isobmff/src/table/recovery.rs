@@ -37,7 +37,8 @@ pub enum RunKind {
 pub struct RunCoverage {
     /// The table that overruns.
     pub kind: RunKind,
-    pub(crate) first_excess_row: u32,
+    /// 0-based row of the first run that passes the sample count.
+    pub first_excess_row: u32,
     /// Absolute file offset of the `sample_count` field of the first row whose run passes
     /// the sample count.
     pub count_field_start: u64,
@@ -49,7 +50,8 @@ pub struct RunCoverage {
     pub bounded_samples: u64,
     /// `declared_samples` minus `bounded_samples`; never zero.
     pub surplus_samples: u64,
-    pub(crate) strict_error: Error,
+    /// The error strict parsing reports for the table.
+    pub strict_error: Error,
 }
 /// Builds a [`RunRecoveryTable`] from an `stbl` box whose runs overrun its sample count, as
 /// FFmpeg's MOV demuxer reads it. Only the last `stts` run may pass the sample count, and it
@@ -269,9 +271,12 @@ pub struct SyncDiagnostic {
     pub first_bad_row: u32,
     /// The entry's stated 1-based sample number.
     pub source_value: u32,
-    pub(crate) field_start: u64,
-    pub(crate) field_end: u64,
-    pub(crate) strict_error: Error,
+    /// Absolute file offset of the entry in `stss`.
+    pub field_start: u64,
+    /// Absolute file offset just past that 4-byte entry.
+    pub field_end: u64,
+    /// The error strict parsing reports for the entry.
+    pub strict_error: Error,
 }
 /// A recovered declaration whose sync rows were rejected has unknown access.
 fn recovery_access(mut source: Sample, unknown_access: bool) -> Sample {
@@ -342,12 +347,17 @@ impl RecoveryPacketCursor<'_> {
 /// [`RunRecoveryTable::index_cursor`].
 #[derive(Debug)]
 pub struct RecoveryIndexEntry {
-    pub(crate) ordinal: u64,
-    pub(crate) position: i64,
-    pub(crate) timestamp: i64,
+    /// 0-based position of the entry in the index.
+    pub ordinal: u64,
+    /// Absolute file offset of the packet's bytes.
+    pub position: i64,
+    /// The packet's decode time as FFmpeg's signed field holds it, in ticks of the demux
+    /// time base.
+    pub timestamp: i64,
     /// The entry's flags as FFmpeg's index reports them; 1 marks a key entry.
     pub flags: i32,
-    pub(crate) size: u32,
+    /// Size of the packet in bytes.
+    pub size: u32,
     /// Entries since the last key entry; 0 at a key entry and at the first entry.
     pub min_distance: i32,
     /// The sample as the table declares it; its access is unknown when the sync table was

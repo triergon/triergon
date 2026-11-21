@@ -147,7 +147,7 @@ impl EncodedEditPlan {
     }
     /// Whether packets take their disposable flag from the table's `sdtp` bytes: for a
     /// table with an `sdtp` box under the dependency, recovery and context views.
-    pub fn has_dependency_view(&self) -> bool {
+    pub(crate) fn has_dependency_view(&self) -> bool {
         self.dependency_table
     }
     /// The `stbl` box of the planned track.
@@ -167,7 +167,7 @@ impl EncodedEditPlan {
         self.entry
     }
     /// 0-based index of that edit in the `elst` box: 1 after a leading empty edit, else 0.
-    pub fn edit_ordinal(&self) -> u32 {
+    pub(crate) fn edit_ordinal(&self) -> u32 {
         self.edit_ordinal
     }
     pub(crate) fn seek_offset(&self) -> i64 {

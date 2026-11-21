@@ -28,12 +28,18 @@ pub struct EncodedContextProfile;
 pub struct WaveObservation {
     /// The `wave` box.
     pub raw: BoxView,
-    pub(crate) format: Option<BoxView>,
-    pub(crate) marker: Option<BoxView>,
-    pub(crate) terminator: Option<BoxView>,
-    pub(crate) format_count: u32,
-    pub(crate) configuration_count: u32,
-    pub(crate) child_count: u32,
+    /// The first `frma` child, which names the wrapped format.
+    pub format: Option<BoxView>,
+    /// The first `mp4a` marker child.
+    pub marker: Option<BoxView>,
+    /// The first zero-type terminator child.
+    pub terminator: Option<BoxView>,
+    /// Number of `frma` children.
+    pub format_count: u32,
+    /// Number of configuration (`esds`) children.
+    pub configuration_count: u32,
+    /// Number of children walked.
+    pub child_count: u32,
     /// Number of faults read past.
     pub fault_count: u32,
     /// The first of them, as the metadata view reports it; `None` when there are none.

@@ -437,11 +437,16 @@ impl<'a> SourceCompositionLookup<'a> {
 /// recovery scopes, with the default [`SourceSeekLimits`] and [`RecoveryLimits`].
 #[derive(Clone, Copy, Debug)]
 pub struct MovieSeekLimits {
-    pub(crate) max_edits: u32,
-    pub(crate) max_scanned_samples: u64,
-    pub(crate) max_recovery_scopes: usize,
-    pub(crate) source: SourceSeekLimits,
-    pub(crate) recovery: RecoveryLimits,
+    /// Most edit list entries walked.
+    pub max_edits: u32,
+    /// Most samples scanned to find the target and its sync sample.
+    pub max_scanned_samples: u64,
+    /// Most sample group scopes searched for recovery groups.
+    pub max_recovery_scopes: usize,
+    /// Bounds of the source seek plan the planner builds.
+    pub source: SourceSeekLimits,
+    /// Bounds of reading the recovery groups.
+    pub recovery: RecoveryLimits,
 }
 impl Default for MovieSeekLimits {
     fn default() -> Self {

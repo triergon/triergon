@@ -20,7 +20,8 @@ pub struct MovieHeader {
     /// Duration in ticks of the movie timescale as stored; all ones means unknown (see
     /// [`declared_duration_ticks`](Self::declared_duration_ticks)).
     pub duration: u64,
-    pub(crate) raw: BoxView,
+    /// The `mvhd` box.
+    pub raw: BoxView,
 }
 impl MovieHeader {
     /// The movie time base, `1/timescale` seconds.
@@ -81,7 +82,8 @@ pub struct TrackHeader {
     /// `track_ID` of the `tkhd` box; never zero.
     pub track_id: u32,
     /// Ticks per second of the media clock (`mdhd`), in which sample times count; zero
-    /// only when read with [`parse_inner`](Self::parse_inner) accepting it.
+    /// only in a header read by
+    /// [`RecoveryTrackHeader`](crate::compat::mov::recovery::RecoveryTrackHeader).
     pub timescale: u32,
     /// Media duration in ticks of the media timescale, as `mdhd` stores it.
     pub duration: u64,
@@ -110,7 +112,7 @@ impl TrackHeader {
     }
     /// [`parse`](Self::parse), also accepting a zero media timescale when `observed_zero`
     /// is `true`.
-    pub fn parse_inner(
+    pub(crate) fn parse_inner(
         tkhd: &BoxView,
         mdhd: &BoxView,
         hdlr: &BoxView,

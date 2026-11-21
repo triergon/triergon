@@ -92,16 +92,20 @@ pub enum DescriptionEmission {
 /// An `stsc` row whose `sample_description_index` strict parsing rejects.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DescriptionRowDiagnostic {
-    pub(crate) row: u32,
+    /// 0-based row in `stsc`.
+    pub row: u32,
     /// The stated index; never 1.
     pub raw_description: u32,
-    pub(crate) declared_first_chunk: u32,
-    pub(crate) declared_samples_per_chunk: u32,
+    /// The row's `first_chunk`.
+    pub declared_first_chunk: u32,
+    /// The row's `samples_per_chunk`.
+    pub declared_samples_per_chunk: u32,
     /// Absolute file offset of the row's `sample_description_index` field.
     pub field_start: u64,
     /// Absolute file offset just past that 4-byte field.
     pub field_end: u64,
-    pub(crate) strict_error: Error,
+    /// The error strict parsing reports for the row.
+    pub strict_error: Error,
 }
 
 /// One declared sample of a [`DescriptionPacketCursor`], with the packet FFmpeg reports for

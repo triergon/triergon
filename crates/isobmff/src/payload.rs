@@ -62,7 +62,7 @@ impl TerminalMdat {
     }
     /// [`require_sample`](Self::require_sample) for a byte range; `Error::Invalid` also
     /// for a reversed range.
-    pub fn require_range(self, range: &Range<u64>) -> Result<()> {
+    pub(crate) fn require_range(self, range: &Range<u64>) -> Result<()> {
         if range.start > range.end || range.start < self.payload_start {
             return Err(Error::Invalid("sample outside terminal MDAT declaration"));
         }

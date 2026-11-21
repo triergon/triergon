@@ -192,7 +192,8 @@ pub enum LanguageCause {
 pub struct LanguageSource {
     /// The word as stored: a pad bit and three 5-bit letters, or a QuickTime code.
     pub raw_word: u16,
-    pub(crate) demux: [u8; 3],
+    /// The ISO 639-2/T code the demuxer reports for the word.
+    pub demux: [u8; 3],
     /// How the word was read.
     pub cause: LanguageCause,
 }

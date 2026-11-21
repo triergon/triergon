@@ -63,12 +63,14 @@ pub enum DurationBasis {
 pub struct EditOccurrence {
     /// 1-based position of the packet in the cursor's output.
     pub sequence: u64,
-    pub(crate) edit_ordinal: u32,
+    /// 1-based position in `elst` of the edit the packet falls in.
+    pub edit_ordinal: u32,
     /// The source sample the packet carries, unchanged; edits can repeat it.
     pub source: Sample,
     /// The packet the demuxer reports.
     pub demux: PacketView,
-    pub(crate) duration_basis: DurationBasis,
+    /// Where the packet's duration comes from.
+    pub duration_basis: DurationBasis,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -179,7 +179,7 @@ impl RecoveryDescriptions {
     }
     /// `default_length`: bytes per entry, or 0 when each entry states its own length;
     /// 2 for version 0, which has no such field.
-    pub fn fixed_entry_length(&self) -> u32 {
+    pub(crate) fn fixed_entry_length(&self) -> u32 {
         self.length
     }
     /// Number of entries.
@@ -192,7 +192,7 @@ impl RecoveryDescriptions {
         self.default
     }
     /// Offset in the box payload, in bytes, of the first entry.
-    pub fn validation_start(&self) -> usize {
+    pub(crate) fn validation_start(&self) -> usize {
         self.records
     }
     // Continues a walk at entry `index`, `offset` bytes into the payload. The
@@ -398,7 +398,7 @@ impl RecoveryMappings {
     /// `group_description_index`, where 0 means no group, 1 to 0xFFFF name an entry of
     /// the track's `sgpd`, and 0x10000 + n names entry n of the fragment's own `sgpd`.
     /// `Error::Invalid` when `row` is not below [`run_count`](Self::run_count).
-    pub fn run(&self, row: u32) -> Result<(u32, u32)> {
+    pub(crate) fn run(&self, row: u32) -> Result<(u32, u32)> {
         if row >= self.count {
             return Err(Error::Invalid("recovery run index"));
         }

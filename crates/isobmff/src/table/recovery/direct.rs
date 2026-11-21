@@ -45,7 +45,8 @@ pub struct InitialDescriptionDiagnostic {
     pub observed_first_chunk_samples: u32,
     /// 1-based sample description FFmpeg uses for the samples; always 1.
     pub demux_catalogue_entry: u32,
-    pub(crate) strict_error: Error,
+    /// The error strict parsing reports for the row.
+    pub strict_error: Error,
 }
 /// What the caller knows about the source for direct recovery.
 #[derive(Clone, Copy, Debug)]
@@ -85,10 +86,12 @@ pub struct DirectOccurrence {
     pub declaration: Sample,
     /// The packet FFmpeg reports.
     pub demux: PacketView,
-    pub(crate) source_timescale: u32,
+    /// The `mdhd` timescale as stored; zero when the header declares none.
+    pub source_timescale: u32,
     /// How `demux` relates to `declaration`.
     pub association: DirectAssociation,
-    pub(crate) raw_chunk_description: u32,
+    /// The `stsc` sample description index of the sample's chunk, as stated.
+    pub raw_chunk_description: u32,
     /// Why the packet's byte range leaves the media extent, if it does.
     pub range_error: Option<Error>,
     /// Whether the packet's bytes can be read.

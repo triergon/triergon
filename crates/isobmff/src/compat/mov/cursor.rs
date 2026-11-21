@@ -1628,7 +1628,11 @@ impl<'a> PacketCursor<'a> {
     /// Runs the checks that precede the first packet: the sample ranges, the
     /// clocks and the edit setup. `Ready` once they have passed; the next
     /// [`poll`](Self::poll) produces packets.
-    pub fn prepare(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
+    pub(crate) fn prepare(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<CursorStatus> {
         self.poll_until::<true>(work, cancel)
     }
     /// Polls; with `PREPARE`, only up to the first fill.

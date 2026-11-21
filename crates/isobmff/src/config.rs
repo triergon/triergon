@@ -296,7 +296,7 @@ impl EsdsWalk {
 #[derive(Debug)]
 pub struct AacConfiguration {
     /// Absolute source offset of the first configuration byte.
-    pub(crate) offset: u64,
+    pub offset: u64,
     /// Shared view into the sample description, without copying the payload.
     pub bytes: Bytes,
 }

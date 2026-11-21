@@ -65,7 +65,8 @@ pub struct ModeledOpenState {
 /// at the physical end, returns end of file. No packet bytes are produced.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ModeledInitialRead {
-    pub(crate) possible_windows: u32,
+    /// Number of possible buffer states, from 1 to 64.
+    pub possible_windows: u32,
     /// Fewest callback calls returning bytes before the call that returns end of file, over
     /// the possible buffer states.
     pub positive_callback_calls_min: u64,
@@ -75,7 +76,8 @@ pub struct ModeledInitialRead {
     /// Absolute file offset of the call that returns end of file: the physical length of
     /// the source.
     pub terminal_callback_position: u64,
-    pub(crate) terminal_callback_requested: u32,
+    /// Bytes the reader asks for in the call that returns end of file: its buffer size.
+    pub terminal_callback_requested: u32,
 }
 
 /// The buffer states FFmpeg's reader can be in after opening a small QuickTime raw-video

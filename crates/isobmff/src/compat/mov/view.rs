@@ -167,7 +167,7 @@ impl StreamView {
     /// vendor, a QuickTime language code, or a handler name that is not
     /// NUL-terminated ASCII in the ISO `hdlr` layout; `Error::Limit` for a name
     /// field over 256 bytes.
-    pub fn with_projection_base(
+    pub(crate) fn with_projection_base(
         header: &TrackHeader,
         entry: &SampleDescription,
         demux_base: TimeBase,
@@ -302,7 +302,7 @@ impl PacketProjector {
     /// sample's times move by the edit's movie start less `decode_start`, the decode
     /// time from which the edit's packets start. `Error::Unsupported` for an edit
     /// whose rate is not one.
-    pub fn project_demux_edit(
+    pub(crate) fn project_demux_edit(
         &self,
         source: &Sample,
         edit: ProjectedEdit,

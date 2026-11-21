@@ -116,10 +116,12 @@ fn packed_language(mdhd: &[u8]) -> Result<Option<[u8; 3]>> {
 /// Bounds of one [`Reader`], on top of the caller's memory [`Budget`](triergon_core::Budget).
 #[derive(Clone, Copy, Debug)]
 pub struct ReaderLimits {
-    pub(crate) open: OpenLimits,
+    /// Bounds of the movie open: root boxes, retained metadata and tables.
+    pub open: OpenLimits,
     /// Largest sample.
-    pub(crate) packet_bytes: usize,
-    pub(crate) configuration: ConfigurationLimits,
+    pub packet_bytes: usize,
+    /// Bounds of reading each codec configuration from its sample entry.
+    pub configuration: ConfigurationLimits,
 }
 impl Default for ReaderLimits {
     fn default() -> Self {
