@@ -4,7 +4,7 @@ use std::ops::Range;
 use triergon_core::{Budget, Error, SourceCapabilities, SourceId};
 use triergon_playback::{
     Result,
-    mp4_open::{MetadataReadScope, Movie, Mp4Open, OpenLimits},
+    mp4::{MetadataReadScope, Movie, Mp4Open, OpenLimits},
 };
 
 const ISO: &[u8] = include_bytes!("../../isobmff/tests/fixtures/encoded-edit/original.mp4");

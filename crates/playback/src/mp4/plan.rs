@@ -2,8 +2,8 @@
 //! The temporary IndexJob's lifetime is explicit; no self-reference or copied core.
 use crate::{
     Result,
-    mp4_open::{CachedMedia, Movie, RETAINED_MEDIA_BYTES},
-    sample_sort::SampleSort,
+    mp4::open::{CachedMedia, Movie, RETAINED_MEDIA_BYTES},
+    mp4::sample_sort::SampleSort,
 };
 use std::{
     alloc::Layout,
@@ -222,7 +222,7 @@ impl SourceRow {
 /// ```
 #[derive(Debug)]
 pub struct PreparedMp4 {
-    pub(crate) read_scope: crate::mp4_open::MetadataReadScope,
+    pub(crate) read_scope: crate::mp4::open::MetadataReadScope,
     pub(crate) demux_recovery: bool,
     /// A single track's first sample declared at or beyond the end of the media
     /// read while indexing. Only the physical end of the source shows whether it
@@ -304,7 +304,7 @@ impl PreparedMp4 {
         Ok(true)
     }
     /// What the opener read before the media.
-    pub fn read_scope(&self) -> crate::mp4_open::MetadataReadScope {
+    pub fn read_scope(&self) -> crate::mp4::open::MetadataReadScope {
         self.read_scope
     }
     /// The size-zero `mdat` that runs to the end of the source, if any.
@@ -480,7 +480,7 @@ impl<'a> Mp4IndexJob<'a> {
     pub(crate) fn front(movie: &'a Movie, limits: PlanLimits) -> Result<Self> {
         if !matches!(
             movie.read_scope(),
-            crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(_)
+            crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(_)
         ) {
             return Err(Error::Invalid(
                 "native front operation needs actual front metadata",
@@ -508,7 +508,7 @@ impl<'a> Mp4IndexJob<'a> {
         if movie.native_recovery()
             || !matches!(
                 movie.read_scope(),
-                crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(_)
+                crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(_)
             )
             || movie.media().len() != 1
             || movie.terminal_mdat().is_some()
@@ -530,7 +530,7 @@ impl<'a> Mp4IndexJob<'a> {
         limits: PlanLimits,
     ) -> Result<Self> {
         if movie.native_recovery()
-            || movie.read_scope() != crate::mp4_open::MetadataReadScope::CompleteEntity
+            || movie.read_scope() != crate::mp4::open::MetadataReadScope::CompleteEntity
         {
             return Err(Error::Unsupported(
                 "encoded edits require a complete native range source",
@@ -546,7 +546,7 @@ impl<'a> Mp4IndexJob<'a> {
         media_tracks_only: bool,
     ) -> Result<Self> {
         if movie.native_recovery()
-            || movie.read_scope() != crate::mp4_open::MetadataReadScope::CompleteEntity
+            || movie.read_scope() != crate::mp4::open::MetadataReadScope::CompleteEntity
         {
             return Err(Error::Unsupported(
                 "native range playback requires a complete source",
@@ -661,7 +661,7 @@ impl<'a> Mp4IndexJob<'a> {
             iso::table::TimingRunPolicy::BoundedPrefix
         };
         let forward_regular = match movie.read_scope() {
-            crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(h)
+            crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(h)
                 if movie.terminal_mdat().is_none()
                     && movie.media().len() == 1
                     && (!movie.native_recovery()
@@ -772,7 +772,7 @@ impl<'a> Mp4IndexJob<'a> {
                     native_limits,
                     DemuxProfile::NoParseNoFillin,
                 )?
-            } else if movie.read_scope() == crate::mp4_open::MetadataReadScope::CompleteEntity {
+            } else if movie.read_scope() == crate::mp4::open::MetadataReadScope::CompleteEntity {
                 PacketCursor::new_complete_source(
                     b,
                     native.as_slice(),
@@ -1074,7 +1074,7 @@ impl<'a> Mp4IndexJob<'a> {
         }
         let step = match source.poll(w, c) {
             Err(_)
-                if p.read_scope == crate::mp4_open::MetadataReadScope::CompleteEntity
+                if p.read_scope == crate::mp4::open::MetadataReadScope::CompleteEntity
                     && source.resume_in_track_order() =>
             {
                 self.source_track_order = true;

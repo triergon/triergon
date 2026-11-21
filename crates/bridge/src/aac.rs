@@ -7,7 +7,7 @@ use triergon_framing::{
     BuildStep,
     aac::{AacAdtsOutput, AacAdtsParameters, AacAdtsWriter, AacAudioSpecificConfig, AacSource},
 };
-use triergon_playback::Mp4Packet;
+use triergon_playback::mp4::Mp4Packet;
 /// Wraps the raw AAC access units of one MP4 track and configuration revision in
 /// ADTS headers.
 #[derive(Debug)]

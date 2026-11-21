@@ -8,8 +8,8 @@ use triergon_core::{
 };
 use triergon_framing::nal::{Codec, NalHeader, RawAnnexBLimits, RawAnnexBReader};
 use triergon_playback::{
-    Format, Source, SourceReply,
-    io::{CONTAINER_SIGNATURE_BYTES, SelectedInput, SourceOwner, detect_container, provide},
+    Format, Source, SourceOwner, SourceReply,
+    probe::{CONTAINER_SIGNATURE_BYTES, SelectedInput, detect_container},
 };
 
 const MAXIMUM_PROBE_WINDOW: usize = 4096;
@@ -361,7 +361,7 @@ impl<S: Source> ProbeDriver<S> {
                 return Err(Error::Invalid("raw video probe reply exceeds request"));
             }
             let ended = matches!(reply, SourceReply::End { .. });
-            if !provide(&mut self.input, &reply)? {
+            if !reply.provide_to(&mut self.input)? {
                 return Ok(PlaybackProbeStep::NeedInput(request));
             }
             if ended {

@@ -23,7 +23,7 @@ use triergon_matroska::{
     Configuration, Event as MkvEvent, LegacyAacProfile, TypedPacket as MatroskaPacket,
 };
 use triergon_playback::{
-    ByteSource, Engine, Event, Output, PlayerPolicy, Progress, Selection, io::SourceOwner,
+    ByteSource, Engine, Event, Output, PlayerPolicy, Progress, Selection, SourceOwner,
 };
 
 pub const PREFIX: &str = "mkv-audio-";

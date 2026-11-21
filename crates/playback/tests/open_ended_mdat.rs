@@ -9,10 +9,12 @@ use triergon_core::{
     SourceFailure, SourceId, Time, WorkBudget,
 };
 use triergon_playback::{
-    io::{SelectedInput, SourceOwner},
-    mp4_open::{MetadataReadScope, Mp4Open, OpenLimits, OpenProgress},
-    mp4_plan::{Mp4IndexJob, PlanLimits},
-    progressive::ProgressiveLimits,
+    SourceOwner,
+    mp4::{
+        MetadataReadScope, Mp4Event, Mp4IndexJob, Mp4Open, OpenLimits, OpenProgress, PlanLimits,
+        ProgressiveLimits,
+    },
+    probe::SelectedInput,
     *,
 };
 #[allow(dead_code)]
@@ -126,7 +128,7 @@ fn opened(
     raw: &[u8],
     known: Option<u64>,
     allow_end: bool,
-) -> (mp4_open::OpenedMp4<FiniteSource>, Budget, Arc<Signals>) {
+) -> (mp4::OpenedMp4<FiniteSource>, Budget, Arc<Signals>) {
     let (mut open, b, signals) = opener(raw, known, allow_end);
     run_open(&mut open, 1).unwrap();
     (open.finish().unwrap(), b, signals)

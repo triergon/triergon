@@ -17,9 +17,10 @@ use terminal_golds::{CASES, Case, Packet, Probe};
 use triergon_core::{Budget, Error, SourceCapabilities, SourceId, TimeBase};
 use triergon_isobmff::compat::mov::packets::PacketOccurrence;
 use triergon_playback::{
-    mp4_open::{MetadataReadScope, Mp4Open, OpenLimits, OpenedMp4},
-    mp4_plan::{PlanLimits, PreparedMp4},
-    progressive::ProgressiveLimits,
+    mp4::{
+        MetadataReadScope, Mp4Event, Mp4Open, OpenLimits, OpenedMp4, PlanLimits, PreparedMp4,
+        ProgressiveLimits,
+    },
     *,
 };
 

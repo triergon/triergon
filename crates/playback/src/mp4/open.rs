@@ -1,9 +1,5 @@
 //! The transport pump around the ISO BMFF movie opener.
-use crate::{
-    Format, Result,
-    input::Source,
-    io::{SelectedInput, SourceOwner, provide},
-};
+use crate::{Format, Result, Source, SourceOwner, probe::SelectedInput};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, InputCursor, WorkBudget};
 pub(crate) use triergon_isobmff::open::{
@@ -136,10 +132,7 @@ impl<S: Source> Mp4Open<S> {
                 .as_mut()
                 .ok_or(Error::Invalid("source missing"))?
                 .poll(&r, w, c)?;
-            if provide(
-                self.input.as_mut().ok_or(Error::Invalid("input missing"))?,
-                &reply,
-            )? {
+            if reply.provide_to(self.input.as_mut().ok_or(Error::Invalid("input missing"))?)? {
                 self.request = None;
             }
             return Ok(OpenProgress::Yield);

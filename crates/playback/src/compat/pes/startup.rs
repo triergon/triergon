@@ -2,11 +2,10 @@
 //! The finite profile needs a complete window and an actual positive-size EOF
 //! reply. The M2TS prefix profile keeps subsequent Source reads open.
 use super::PidSelection;
-use crate::input::{Source, SourceReply};
 use crate::pes_feed::TsEngine;
+use crate::source::{Source, SourceReply};
 use crate::{
-    Engine, Format, Player, PlayerPolicy, Result, Selection,
-    io::{SelectedInput, SourceOwner},
+    Engine, Format, Player, PlayerPolicy, Result, Selection, SourceOwner, probe::SelectedInput,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{

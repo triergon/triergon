@@ -9,8 +9,8 @@ use crate::engine::ts::feed::{FeedPacket, FeedStep, TsStepProjection, map_payloa
 use crate::engine::ts::tracks::{PesTrack, PesTracks, TrackUpdate};
 use crate::engine::{TrackFact, track_kind};
 use crate::event::TsEvent;
-use crate::input::SourceReply;
-use crate::{Result, TrackKey, io::provide};
+use crate::source::SourceReply;
+use crate::{Result, TrackKey};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{BudgetVec, Error, InputCursor, Step, WorkBudget};
 use triergon_mpegts::stream::{FeedContinuation, FeedItem, TraceEvent, TransportStream};
@@ -322,7 +322,7 @@ impl TsEngine {
 
     /// Hands a source reply to the input; true when it was accepted.
     pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
-        provide(&mut self.input, reply)
+        reply.provide_to(&mut self.input)
     }
 
     /// The next step of a feed made by [`Self::progressive`].

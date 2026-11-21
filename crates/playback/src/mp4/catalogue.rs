@@ -2,12 +2,11 @@
 //! A second in-band moov is not a source discontinuity. The caller supplies a
 //! freshly opened entity and keeps transport/entity validation outside this crate.
 use crate::{
-    Engine, Event, Output, Player, Result, SeekIntent, Selection, Source,
+    Engine, Event, Output, Player, Result, SeekIntent, Selection, Source, SourceOwner,
     engine::Mp4RangeLanding,
     engine::mp4::progressive::ProgressiveLimits,
-    io::SourceOwner,
-    mp4_open::{Movie, OpenedMp4},
-    mp4_plan::PreparedMp4,
+    mp4::open::{Movie, OpenedMp4},
+    mp4::plan::PreparedMp4,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, InputRequest, SourceId};

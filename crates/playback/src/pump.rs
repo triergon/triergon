@@ -1,10 +1,10 @@
 //! Consumer-neutral producer/pump ownership. Accepted envelopes MOVE to the sink;
 //! a blocked or failed submission returns the same source owner. No borrowed
 //! native Feed/Load lifetime or device behavior is inferred by this contract.
-use crate::input::Source;
+use crate::source::Source;
 use crate::{
-    Mp4DemuxSeekCommand, Mp4SyncSeekCommand, Output, Player, Progress, Result, SeekIntent,
-    Selection, TrackKey,
+    Output, Player, Progress, Result, SeekIntent, Selection, TrackKey,
+    mp4::{Mp4DemuxSeekCommand, Mp4SyncSeekCommand},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -85,7 +85,7 @@ pub trait CatalogueSink: Sink {
     /// Undoes `prepare_catalogue` after the change was refused.
     fn abandon_catalogue(&mut self);
     /// Switches to the new catalogue, whose outputs begin at `boundary`.
-    fn commit_catalogue(&mut self, boundary: crate::catalogue::CatalogueBoundary);
+    fn commit_catalogue(&mut self, boundary: crate::mp4::catalogue::CatalogueBoundary);
 }
 /// One step of a [`Pump`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -111,7 +111,7 @@ pub enum PumpStep {
 }
 enum CatalogueChange<'a> {
     Replace(Selection),
-    ProgressiveSeek(crate::catalogue::RangeSeek<'a>),
+    ProgressiveSeek(crate::mp4::catalogue::RangeSeek<'a>),
 }
 
 /// Moves a player's outputs into a sink, with a bounded number of feeds in flight.
@@ -249,11 +249,11 @@ impl<S: Source, T: Sink> Pump<S, T> {
     /// Refusal never drops such an owner or advances the active player/source.
     pub fn replace_mp4_catalogue(
         &mut self,
-        next: &mut Option<crate::catalogue::Mp4Catalogue<S>>,
+        next: &mut Option<crate::mp4::catalogue::Mp4Catalogue<S>>,
         selection: Selection,
         w: &mut WorkBudget,
         c: &AtomicBool,
-    ) -> Result<Option<crate::catalogue::RetiredCatalogue>>
+    ) -> Result<Option<crate::mp4::catalogue::RetiredCatalogue>>
     where
         T: CatalogueSink,
     {
@@ -264,11 +264,11 @@ impl<S: Source, T: Sink> Pump<S, T> {
     /// Both queued sink ownership and stale callbacks use the catalogue fence.
     pub fn apply_mp4_progressive_sync_seek(
         &mut self,
-        next: &mut Option<crate::catalogue::Mp4Catalogue<S>>,
+        next: &mut Option<crate::mp4::catalogue::Mp4Catalogue<S>>,
         command: &Mp4SyncSeekCommand,
         w: &mut WorkBudget,
         c: &AtomicBool,
-    ) -> Result<Option<crate::catalogue::RetiredCatalogue>>
+    ) -> Result<Option<crate::mp4::catalogue::RetiredCatalogue>>
     where
         T: CatalogueSink,
     {
@@ -279,11 +279,11 @@ impl<S: Source, T: Sink> Pump<S, T> {
     /// complete native range seek while fencing any prior sink callbacks.
     pub fn apply_mp4_progressive_demux_seek(
         &mut self,
-        next: &mut Option<crate::catalogue::Mp4Catalogue<S>>,
+        next: &mut Option<crate::mp4::catalogue::Mp4Catalogue<S>>,
         command: &Mp4DemuxSeekCommand,
         w: &mut WorkBudget,
         c: &AtomicBool,
-    ) -> Result<Option<crate::catalogue::RetiredCatalogue>>
+    ) -> Result<Option<crate::mp4::catalogue::RetiredCatalogue>>
     where
         T: CatalogueSink,
     {
@@ -292,11 +292,11 @@ impl<S: Source, T: Sink> Pump<S, T> {
 
     fn commit_catalogue_change(
         &mut self,
-        next: &mut Option<crate::catalogue::Mp4Catalogue<S>>,
+        next: &mut Option<crate::mp4::catalogue::Mp4Catalogue<S>>,
         change: CatalogueChange<'_>,
         w: &mut WorkBudget,
         c: &AtomicBool,
-    ) -> Result<Option<crate::catalogue::RetiredCatalogue>>
+    ) -> Result<Option<crate::mp4::catalogue::RetiredCatalogue>>
     where
         T: CatalogueSink,
     {

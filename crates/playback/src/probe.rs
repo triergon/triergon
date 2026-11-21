@@ -1,8 +1,8 @@
-//! Source ownership and container probing: [`Probe`] selects Matroska, MP4, TS188 or
-//! M2TS192 from a bounded prefix, and the selected input replays that prefix.
+//! Container probing: [`Probe`] selects Matroska, MP4, TS188 or M2TS192 from a bounded
+//! prefix, and the selected input replays that prefix.
 use crate::{
     Format, Result,
-    input::{Source, SourceReply},
+    source::{Source, SourceOwner, SourceReply},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::signature::{
@@ -11,107 +11,8 @@ use triergon_core::signature::{
 };
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceCapabilities,
-    SourceFailure, SourceId, Step, WorkBudget,
+    SourceId, Step, WorkBudget,
 };
-/// The injected source remains the sole transport owner. Dropping a partially
-/// opened format aborts/quiesces and closes exactly once.
-#[derive(Debug)]
-pub struct SourceOwner<S: Source> {
-    source: Option<S>,
-    aborted: bool,
-}
-impl<S: Source> SourceOwner<S> {
-    /// Takes ownership of `source`.
-    pub fn new(source: S) -> Self {
-        Self {
-            source: Some(source),
-            aborted: false,
-        }
-    }
-    /// The same ownership over `map(source)`; `Closed` after an abort.
-    pub fn map<T: Source>(mut self, map: impl FnOnce(S) -> T) -> Result<SourceOwner<T>> {
-        if self.aborted {
-            return Err(Error::Closed);
-        }
-        let source = self.source.take().ok_or(Error::Closed)?;
-        Ok(SourceOwner::new(map(source)))
-    }
-    pub(crate) fn source_mut(&mut self) -> Option<&mut S> {
-        self.source.as_mut()
-    }
-    /// Invalidates an outstanding range operation of the source.
-    pub fn invalidate(&mut self) {
-        if let Some(s) = self.source.as_mut() {
-            s.invalidate();
-        }
-    }
-    /// Polls the source: `Pending` without work left, `Cancelled` when `c` is set, and
-    /// `Invalid` after `close`.
-    pub fn poll(
-        &mut self,
-        r: &InputRequest,
-        w: &mut WorkBudget,
-        c: &AtomicBool,
-    ) -> Result<SourceReply> {
-        if c.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled);
-        }
-        if w.remaining() == 0 {
-            return Ok(SourceReply::Pending);
-        }
-        self.source
-            .as_mut()
-            .ok_or(Error::Invalid("source closed"))?
-            .poll(r, w, c)
-    }
-    /// Aborts the source, once.
-    pub fn abort(&mut self) {
-        if !self.aborted {
-            if let Some(s) = self.source.as_mut() {
-                s.abort();
-            }
-            self.aborted = true;
-        }
-    }
-    /// Aborts, then closes the source, once.
-    pub fn close(&mut self) {
-        self.abort();
-        if let Some(mut s) = self.source.take() {
-            s.close();
-        }
-    }
-}
-impl<S: Source> Drop for SourceOwner<S> {
-    fn drop(&mut self) {
-        self.close();
-    }
-}
-/// Hands `reply` to `input`, and returns whether it made progress: `false` for
-/// `Pending` or empty data. A failure reply fails with `Transport` or `Cancelled`.
-pub fn provide(input: &mut InputCursor, reply: &SourceReply) -> Result<bool> {
-    match reply {
-        SourceReply::Pending => Ok(false),
-        SourceReply::Data(w) => {
-            input.provide(w)?;
-            Ok(!w.bytes().is_empty())
-        }
-        SourceReply::End { source, token } => {
-            input.finish(*source, token.clone())?;
-            Ok(true)
-        }
-        SourceReply::Failed {
-            source,
-            token,
-            failure,
-        } => {
-            input.fail(*source, token.clone(), *failure)?;
-            Err(match failure {
-                SourceFailure::Transport => Error::Transport,
-                SourceFailure::Cancelled => Error::Cancelled,
-            })
-        }
-    }
-}
 /// An input whose container format is known, with its source.
 #[derive(Debug)]
 pub struct SelectedInput<S: Source> {
@@ -236,7 +137,7 @@ impl<S: Source> Probe<S> {
                     })
                     .map_err(|e| e.error)?;
             }
-            if provide(input, reply)? {
+            if reply.provide_to(input)? {
                 self.request = None;
             }
             self.pending_reply = None;

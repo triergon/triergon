@@ -19,8 +19,8 @@ use triergon_mpegts::{
 };
 use triergon_playback::compat::pes::{self, Carriage};
 use triergon_playback::{
-    ByteSource, ClockChoice, Event, Player, PlayerPolicy, Progress, Selection, State, TrackKey,
-    io::SourceOwner,
+    ByteSource, ClockChoice, Event, Player, PlayerPolicy, Progress, Selection, SourceOwner, State,
+    TrackKey,
 };
 
 fn payload(out: &mut String, bytes: &[u8]) {

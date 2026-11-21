@@ -7,9 +7,8 @@ use triergon_core::{Budget, SourceCapabilities, SourceId, WorkBudget};
 use triergon_framing::BuildStep;
 use triergon_isobmff::config::ConfigurationLimits;
 use triergon_playback::{
-    Engine, Event, Mp4Event, Player, PlayerPolicy, Selection,
-    mp4_open::{Mp4Open, OpenLimits},
-    mp4_plan::PlanLimits,
+    Engine, Event, Player, PlayerPolicy, Selection,
+    mp4::{Mp4Event, Mp4Open, OpenLimits, PlanLimits},
 };
 
 const ID: SourceId = SourceId(173);

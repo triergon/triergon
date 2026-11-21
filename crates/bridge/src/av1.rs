@@ -10,7 +10,7 @@ use triergon_framing::{
 };
 use triergon_isobmff::{Access, Limits, Next, boxes::BoxChildren, movie::EntryLayout};
 use triergon_matroska::{Configuration, TypedPacket as MatroskaPacket};
-use triergon_playback::{Mp4Packet, mp4_plan::Mp4Configuration};
+use triergon_playback::mp4::{Mp4Configuration, Mp4Packet};
 
 /// The player or sink keeps the original packet (and its clock) for the lifetime
 /// of the receiver view. Bind a new bridge after a source configuration changes.

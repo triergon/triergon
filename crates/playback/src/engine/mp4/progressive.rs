@@ -1,10 +1,11 @@
 //! Sequential MP4 continuation through real source box/fragment/sample jobs.
 //! A drained current MDAT is a batch boundary, never an invented media EOF.
 use crate::{
-    EngineStep, Event, Mp4EmptyPacket, Result,
-    mp4_open::{PendingMedia, RETAINED_MEDIA_BYTES, box_reader, word},
-    mp4_plan::{PlanView, PreparedMp4, SourceRow},
-    sample_sort::SampleSort,
+    EngineStep, Event, Result,
+    mp4::Mp4EmptyPacket,
+    mp4::open::{PendingMedia, RETAINED_MEDIA_BYTES, box_reader, word},
+    mp4::plan::{PlanView, PreparedMp4, SourceRow},
+    mp4::sample_sort::SampleSort,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Error, InputCursor, Step, WorkBudget};
@@ -157,7 +158,8 @@ impl ProgressiveState {
         {
             return Err(Error::Invalid("progressive MP4 policy"));
         }
-        let crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(h) = plan.read_scope else {
+        let crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(h) = plan.read_scope
+        else {
             return Err(Error::Invalid(
                 "progressive attachment needs actual front-MDAT boundary",
             ));
@@ -349,7 +351,7 @@ impl ProgressiveState {
                     self.next_root = next_root;
                     self.regular_media_seen = seen;
                     engine.plan.read_scope =
-                        crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(h);
+                        crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(h);
                     self.reader = None;
                     self.header = None;
                     return Ok(EngineStep::Yield);
@@ -376,7 +378,7 @@ impl ProgressiveState {
                 }
                 engine.plan.terminal_mdat = self.terminal;
                 engine.plan.read_scope =
-                    crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(h);
+                    crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(h);
                 *engine.row = 0;
                 self.rows.clear();
                 self.row = 0;

@@ -1,5 +1,5 @@
-use crate::input::{Source, SourceReply};
-use crate::{Engine, EngineStep, Event, Result, io::SourceOwner};
+use crate::source::{Source, SourceReply};
+use crate::{Engine, EngineStep, Event, Result, SourceOwner};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, InputRequest, Time, TimeBase, WorkBudget};
 use triergon_isobmff::compat::mov::packets::PacketCursor;
@@ -829,12 +829,12 @@ impl<S: Source> Player<S> {
     /// `SourceMismatch` for a command of another plan.
     pub fn apply_movie_seek(
         &mut self,
-        command: &crate::mp4_plan::MovieSeekCommand,
+        command: &crate::mp4::plan::MovieSeekCommand,
         selection: Selection,
         w: &mut WorkBudget,
         c: &AtomicBool,
-    ) -> Result<crate::mp4_plan::MovieSeekOutcome> {
-        use crate::mp4_plan::MovieSeekOutcome;
+    ) -> Result<crate::mp4::plan::MovieSeekOutcome> {
+        use crate::mp4::plan::MovieSeekOutcome;
         if c.load(Ordering::Relaxed) {
             self.cancel();
             return Err(Error::Cancelled);
@@ -921,11 +921,11 @@ impl<S: Source> Player<S> {
     /// by the caller's stable-entity contract, never inferred from metadata.
     pub fn prepare_mp4_catalogue<'a>(
         &'a mut self,
-        next: &'a mut Option<crate::catalogue::Mp4Catalogue<S>>,
+        next: &'a mut Option<crate::mp4::catalogue::Mp4Catalogue<S>>,
         selection: Selection,
         w: &mut WorkBudget,
         c: &'a AtomicBool,
-    ) -> Result<Option<crate::catalogue::CatalogueCommit<'a, S>>> {
+    ) -> Result<Option<crate::mp4::catalogue::CatalogueCommit<'a, S>>> {
         if c.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
@@ -953,7 +953,7 @@ impl<S: Source> Player<S> {
         }
         selection.validate(&candidate.engine)?;
         let queue = self.prepare_retired_queue()?;
-        Ok(Some(crate::catalogue::CatalogueCommit {
+        Ok(Some(crate::mp4::catalogue::CatalogueCommit {
             player: self,
             next,
             selection,
@@ -975,7 +975,7 @@ impl<S: Source> Player<S> {
     }
     fn progressive_seek_candidate<'a>(
         &self,
-        next: &'a crate::catalogue::Mp4Catalogue<S>,
+        next: &'a crate::mp4::catalogue::Mp4Catalogue<S>,
     ) -> Result<&'a Engine> {
         let (Some(Engine::Mp4(old)), engine @ Engine::Mp4(candidate)) =
             (self.engine.as_ref(), &next.engine)
@@ -985,7 +985,7 @@ impl<S: Source> Player<S> {
             ));
         };
         if !old.is_progressive()
-            || candidate.plan.read_scope != crate::mp4_open::MetadataReadScope::CompleteEntity
+            || candidate.plan.read_scope != crate::mp4::open::MetadataReadScope::CompleteEntity
             || !candidate.supports_range_replay()
         {
             return Err(Error::Unsupported(
@@ -1008,7 +1008,7 @@ impl<S: Source> Player<S> {
     /// Apply a range seek planned for this player's current generation.
     fn apply_range_seek(
         &mut self,
-        seek: crate::catalogue::RangeSeek<'_>,
+        seek: crate::mp4::catalogue::RangeSeek<'_>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<bool> {
@@ -1043,11 +1043,11 @@ impl<S: Source> Player<S> {
 
     pub(crate) fn prepare_progressive_commit<'a>(
         &'a mut self,
-        next: &'a mut Option<crate::catalogue::Mp4Catalogue<S>>,
-        seek: crate::catalogue::RangeSeek<'a>,
+        next: &'a mut Option<crate::mp4::catalogue::Mp4Catalogue<S>>,
+        seek: crate::mp4::catalogue::RangeSeek<'a>,
         work: &mut WorkBudget,
         cancel: &'a AtomicBool,
-    ) -> Result<Option<crate::catalogue::CatalogueCommit<'a, S>>> {
+    ) -> Result<Option<crate::mp4::catalogue::CatalogueCommit<'a, S>>> {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
@@ -1085,7 +1085,7 @@ impl<S: Source> Player<S> {
             return Ok(None);
         }
         let queue = self.prepare_retired_queue()?;
-        Ok(Some(crate::catalogue::CatalogueCommit {
+        Ok(Some(crate::mp4::catalogue::CatalogueCommit {
             player: self,
             next,
             selection: seek.selection,
@@ -1100,26 +1100,26 @@ impl<S: Source> Player<S> {
     /// `None` when `w` had no work left.
     pub fn replace_mp4_catalogue(
         &mut self,
-        next: &mut Option<crate::catalogue::Mp4Catalogue<S>>,
+        next: &mut Option<crate::mp4::catalogue::Mp4Catalogue<S>>,
         selection: Selection,
         w: &mut WorkBudget,
         c: &AtomicBool,
-    ) -> Result<Option<crate::catalogue::RetiredCatalogue>> {
+    ) -> Result<Option<crate::mp4::catalogue::RetiredCatalogue>> {
         self.prepare_mp4_catalogue(next, selection, w, c)?
-            .map(crate::catalogue::CatalogueCommit::commit)
+            .map(crate::mp4::catalogue::CatalogueCommit::commit)
             .transpose()
     }
     pub(crate) fn commit_mp4_catalogue(
         &mut self,
-        next: crate::catalogue::Mp4Catalogue<S>,
+        next: crate::mp4::catalogue::Mp4Catalogue<S>,
         selection: Selection,
         epoch: u64,
         mut queue: BudgetVec<Option<Output>>,
-    ) -> crate::catalogue::RetiredCatalogue {
+    ) -> crate::mp4::catalogue::RetiredCatalogue {
         for (i, slot) in queue.as_mut_slice().iter_mut().enumerate() {
             *slot = self.queue.as_mut_slice()[(self.head + i) % self.policy.slots].take();
         }
-        let retired = crate::catalogue::RetiredCatalogue {
+        let retired = crate::mp4::catalogue::RetiredCatalogue {
             engine: self.engine.replace(next.engine),
             queue,
             head: 0,
@@ -1508,7 +1508,11 @@ impl<S: Source> Player<S> {
                         },
                         Some(_) => Delivery::Present,
                     },
-                    (ClockChoice::Demux, seek, Event::Mp4(crate::Mp4Event::Packet(packet))) => {
+                    (
+                        ClockChoice::Demux,
+                        seek,
+                        Event::Mp4(crate::mp4::Mp4Event::Packet(packet)),
+                    ) => {
                         match packet
                             .occurrence
                             .as_ref()
@@ -1570,7 +1574,7 @@ impl<S: Source> Player<S> {
             && bytes != 0
             && matches!(delivery, Delivery::Present | Delivery::Unselected)
             && event.track() == Some(seek.intent.track)
-            && !matches!(&event, Event::Mp4(crate::Mp4Event::ShortPacket(_)))
+            && !matches!(&event, Event::Mp4(crate::mp4::Mp4Event::ShortPacket(_)))
             && !matches!(&event, Event::DemuxPes { packet, .. } if packet.flags & 2 != 0)
         {
             // Reordered packets still need the original presentation target.

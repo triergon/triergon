@@ -570,7 +570,7 @@ fn raw_probe_backpressure_retains_the_delivered_source_window() {
 #[test]
 fn playback_probe_selects_containers_and_replays_the_exact_forward_prefix() {
     use triergon_mpegts::PacketFormat;
-    use triergon_playback::{Format, io::provide};
+    use triergon_playback::Format;
     use triergon_raw_video::{
         PlaybackInput, PlaybackInputKind, PlaybackProbe, PlaybackProbeStep, RawVideoProbeLimits,
     };
@@ -652,7 +652,7 @@ fn playback_probe_selects_containers_and_replays_the_exact_forward_prefix() {
                     }
                     Step::NeedInput(request) => {
                         let reply = selected.source.poll(&request, &mut work, &OFF).unwrap();
-                        provide(&mut selected.input, &reply).unwrap();
+                        reply.provide_to(&mut selected.input).unwrap();
                     }
                     Step::Yield => {}
                     Step::End(at) => {

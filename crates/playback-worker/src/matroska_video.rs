@@ -17,7 +17,7 @@ use triergon_core::{Budget, Bytes, SourceId, Time, WorkBudget};
 use triergon_harness_protocol::digest::{fold, signed};
 use triergon_matroska::{Event as MkvEvent, Reader};
 use triergon_playback::{
-    ByteSource, Engine, Event, Output, PlayerPolicy, Progress, Selection, TrackKey, io::SourceOwner,
+    ByteSource, Engine, Event, Output, PlayerPolicy, Progress, Selection, SourceOwner, TrackKey,
 };
 
 pub const PREFIX: &str = "feed-";

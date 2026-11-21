@@ -23,8 +23,8 @@ use triergon_playback::compat::pes::{
     startup::{Startup, StartupStep},
 };
 use triergon_playback::{
-    ByteSource, ClockChoice, Event, Format, Player, PlayerPolicy, Progress, Selection,
-    io::{SelectedInput, SourceOwner},
+    ByteSource, ClockChoice, Event, Format, Player, PlayerPolicy, Progress, Selection, SourceOwner,
+    probe::SelectedInput,
 };
 
 pub const PREFIX: &str = "ts-program-";

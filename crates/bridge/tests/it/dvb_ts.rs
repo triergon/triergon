@@ -5,8 +5,8 @@ use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence, PsiCrc32};
 use triergon_mpegts::stream::TraceEvent;
 use triergon_mpegts::{PacketFormat, ParseLimits, clock::SourceTimePolicy};
 use triergon_playback::{
-    ByteSource, Engine, Event, Output, Player, PlayerPolicy, Progress, Selection, TsEvent,
-    io::SourceOwner,
+    ByteSource, Engine, Event, Output, Player, PlayerPolicy, Progress, Selection, SourceOwner,
+    TsEvent,
 };
 use triergon_subtitles::dvb::Size;
 

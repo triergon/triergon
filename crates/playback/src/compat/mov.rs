@@ -4,8 +4,8 @@
 use crate::{
     Engine, Result,
     engine::mp4::progressive::ProgressiveLimits,
-    mp4_open::Movie,
-    mp4_plan::{Mp4IndexJob, PlanLimits, PreparedMp4},
+    mp4::open::Movie,
+    mp4::plan::{Mp4IndexJob, PlanLimits, PreparedMp4},
 };
 use triergon_core::InputCursor;
 use triergon_isobmff::compat::mov::edits::EncodedEditPlan;

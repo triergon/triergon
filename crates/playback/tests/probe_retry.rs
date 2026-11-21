@@ -7,7 +7,7 @@ use triergon_core::{
 };
 use triergon_playback::{
     Format, Source, SourceReply,
-    io::{Probe, ProbeProgress},
+    probe::{Probe, ProbeProgress},
 };
 const ID: SourceId = SourceId(9121);
 const RAW: &[u8] = include_bytes!("fixtures/mp4/r-front-stco.mov");

@@ -2,7 +2,7 @@
 //! forward continuation of a progressive source.
 
 pub(crate) mod demux_replay;
-pub mod progressive;
+pub(crate) mod progressive;
 
 use crate::engine::mp4::demux_replay::{DemuxReplay, DemuxReplayStep};
 use crate::event::{
@@ -10,8 +10,8 @@ use crate::event::{
 };
 use crate::{
     Result,
-    mp4_open::PendingMedia,
-    mp4_plan::{Mp4Configuration, PreparedMp4, SourceRow},
+    mp4::open::PendingMedia,
+    mp4::plan::{Mp4Configuration, PreparedMp4, SourceRow},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, InputCursor, Step, WorkBudget};
@@ -165,7 +165,7 @@ impl Mp4Engine {
         let within_source = if self.plan.demux_recovery {
             Error::Invalid("native first sample starts before physical end")
         } else {
-            crate::mp4_plan::BACKWARD_LAYOUT_REFUSAL
+            crate::mp4::plan::BACKWARD_LAYOUT_REFUSAL
         };
         if self.input.position() > start {
             return Err(within_source);

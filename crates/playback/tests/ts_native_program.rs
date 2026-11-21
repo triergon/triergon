@@ -14,7 +14,7 @@ use triergon_mpegts::{
 use triergon_playback::compat;
 use triergon_playback::{
     ByteSource, ClockChoice, Delivery, Engine, Event, Player, PlayerPolicy, Progress, Selection,
-    TrackKey, TsEvent, io::SourceOwner,
+    SourceOwner, TrackKey, TsEvent,
 };
 use triergon_playback::{compat::pes::Carriage, compat::pes::PidSelection};
 

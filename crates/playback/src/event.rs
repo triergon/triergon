@@ -1,7 +1,7 @@
 //! Events a player delivers and the engine steps that carry them.
 
 use crate::compat::pes::AdmittedCarriage;
-use crate::{Result, SeekIntent, TrackKey, mp4_plan::Mp4Configuration};
+use crate::{Result, SeekIntent, TrackKey, mp4::plan::Mp4Configuration};
 use triergon_core::container::{PacketInfo, RandomAccess, TrackId, Trim};
 use triergon_core::{Error, InputRequest, SourceLocation, Time, TimeBase};
 use triergon_isobmff::{

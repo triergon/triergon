@@ -6,8 +6,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Error, InputRequest, Result, WorkBudget};
 use triergon_matroska::{Configuration, Event as MkvEvent, TypedPacket as Packet};
 use triergon_playback::{
-    Engine, Event, MatroskaReplayOutput, Output, Player, PlayerPolicy, Progress, Selection, Source,
-    SourceReply, State, io::SourceOwner,
+    Engine, Event, Output, Player, PlayerPolicy, Progress, Selection, Source, SourceOwner,
+    SourceReply, State, matroska::ReplayOutput,
 };
 use triergon_subtitles::pgs::{Composition, Envelope, SegmentIter};
 
@@ -231,7 +231,7 @@ pub struct MatroskaDiscovery<S: Source> {
 #[derive(Debug)]
 enum ReplayBuffer {
     Full(BudgetVec<Output>),
-    Matroska(BudgetVec<MatroskaReplayOutput>),
+    Matroska(BudgetVec<ReplayOutput>),
 }
 
 impl ReplayBuffer {
@@ -252,7 +252,7 @@ impl ReplayBuffer {
 
 /// Startup replay stored using the typed Matroska event representation.
 #[derive(Debug)]
-pub struct MatroskaReplayPrefix(BudgetVec<MatroskaReplayOutput>);
+pub struct MatroskaReplayPrefix(BudgetVec<ReplayOutput>);
 
 impl MatroskaReplayPrefix {
     /// The buffered events, in source order.
@@ -282,7 +282,7 @@ impl MatroskaReplayPrefix {
 
     /// Move each output in original order, preserving scope and delivery.
     pub fn into_outputs(self) -> impl ExactSizeIterator<Item = Output> {
-        self.0.into_iter().map(MatroskaReplayOutput::into_output)
+        self.0.into_iter().map(ReplayOutput::into_output)
     }
 }
 

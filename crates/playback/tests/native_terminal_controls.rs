@@ -10,10 +10,11 @@ use triergon_core::{
 };
 use triergon_isobmff::compat::mov::clock::ClockOrigin;
 use triergon_playback::{
-    io::{SelectedInput, SourceOwner},
-    mp4_open::{Mp4Open, OpenLimits, OpenProgress},
-    mp4_plan::{Mp4IndexJob, PlanLimits},
-    progressive::ProgressiveLimits,
+    SourceOwner,
+    mp4::{
+        Mp4Event, Mp4IndexJob, Mp4Open, OpenLimits, OpenProgress, PlanLimits, ProgressiveLimits,
+    },
+    probe::SelectedInput,
     *,
 };
 mod terminal_golds;
@@ -160,7 +161,7 @@ fn try_make_source_mode(
     let opened = open.finish().unwrap();
     let front = matches!(
         opened.movie.read_scope(),
-        mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(_)
+        mp4::MetadataReadScope::FrontMetadataBeforeMdat(_)
     );
     let mut job = if native && front {
         compat::mov::index_front(&opened.movie, PlanLimits::default())

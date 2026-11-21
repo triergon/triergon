@@ -10,11 +10,10 @@ use crate::engine::matroska::MkvEngine;
 use crate::engine::mp4::Mp4Engine;
 use crate::engine::ts::{Delivery as TsDelivery, TsEngine};
 use crate::event::EngineStep;
-use crate::input::SourceReply;
+use crate::source::SourceReply;
 use crate::{
     Format, Result, SeekIntent, TrackKey, TrackKind,
-    io::provide,
-    mp4_plan::{PlanTrack, PreparedMp4},
+    mp4::plan::{PlanTrack, PreparedMp4},
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{CodecId, ColourDescription, MediaKind, TrackId, TrackInfo};
@@ -438,7 +437,7 @@ impl Engine {
     /// `Cancelled`.
     pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
         match self {
-            Self::Mp4(r) => provide(&mut r.input, reply),
+            Self::Mp4(r) => reply.provide_to(&mut r.input),
             Self::Ts(r) => r.provide(reply),
             Self::Matroska(r) => match reply {
                 SourceReply::Pending => Ok(false),

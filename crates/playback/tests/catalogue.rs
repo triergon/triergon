@@ -9,10 +9,12 @@ use triergon_core::{
     WorkBudget,
 };
 use triergon_playback::{
-    catalogue::{Mp4Catalogue, Mp4CatalogueMode},
-    io::{SelectedInput, SourceOwner},
-    mp4_open::{Mp4Open, OpenLimits, OpenProgress, OpenedMp4},
-    mp4_plan::{Mp4IndexJob, PlanLimits, PreparedMp4},
+    SourceOwner,
+    mp4::{
+        Mp4Catalogue, Mp4CatalogueMode, Mp4DemuxSeekRequest, Mp4Event, Mp4IndexJob, Mp4Open,
+        Mp4SyncSeekRequest, OpenLimits, OpenProgress, OpenedMp4, PlanLimits, PreparedMp4,
+    },
+    probe::SelectedInput,
     *,
 };
 mod gold {
@@ -928,7 +930,7 @@ fn progressive_candidate(
         opened,
         plan,
         1 << 20,
-        Mp4CatalogueMode::Progressive(progressive::ProgressiveLimits::default()),
+        Mp4CatalogueMode::Progressive(mp4::ProgressiveLimits::default()),
     )
     .unwrap();
     (Some(catalogue), signals)
@@ -957,7 +959,7 @@ fn catalogue_replacement_selects_native_terminal_and_waits_for_source_end() {
             opened,
             plan,
             1 << 20,
-            Mp4CatalogueMode::NativeTerminalV1(progressive::ProgressiveLimits::default()),
+            Mp4CatalogueMode::NativeTerminalV1(mp4::ProgressiveLimits::default()),
         )
         .unwrap(),
     );
@@ -1185,7 +1187,7 @@ struct Consumer {
     refuse: bool,
     prepared: bool,
     abandoned: usize,
-    boundaries: Vec<catalogue::CatalogueBoundary>,
+    boundaries: Vec<mp4::CatalogueBoundary>,
     seeks: Vec<SeekIntent>,
     paused: bool,
     stopped: usize,
@@ -1234,7 +1236,7 @@ impl pump::CatalogueSink for Consumer {
         self.prepared = false;
         self.abandoned += 1;
     }
-    fn commit_catalogue(&mut self, boundary: catalogue::CatalogueBoundary) {
+    fn commit_catalogue(&mut self, boundary: mp4::CatalogueBoundary) {
         assert!(self.prepared);
         self.prepared = false;
         self.boundaries.push(boundary);
@@ -1486,14 +1488,14 @@ fn progressive_range_seek_promotes_the_same_fragmented_entity_through_the_pump()
     let front = finish_range_open(front);
     assert!(matches!(
         front.movie.read_scope(),
-        mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(_)
+        mp4::MetadataReadScope::FrontMetadataBeforeMdat(_)
     ));
     let plan = index(&front, View::Source);
     let engine = Engine::mp4_progressive(
         front.input,
         plan,
         1 << 20,
-        progressive::ProgressiveLimits::default(),
+        mp4::ProgressiveLimits::default(),
     )
     .unwrap();
     let mut p = Player::new(
@@ -1509,7 +1511,7 @@ fn progressive_range_seek_promotes_the_same_fragmented_entity_through_the_pump()
     let complete = finish_range_open(complete);
     assert_eq!(
         complete.movie.read_scope(),
-        mp4_open::MetadataReadScope::CompleteEntity
+        mp4::MetadataReadScope::CompleteEntity
     );
     assert!(
         front.movie.tracks()[0].fragments().len() < complete.movie.tracks()[0].fragments().len()
@@ -1675,7 +1677,7 @@ fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges
         front.input,
         job.finish().unwrap(),
         1 << 20,
-        progressive::ProgressiveLimits::default(),
+        mp4::ProgressiveLimits::default(),
     )
     .unwrap();
     let mut p = Player::new(

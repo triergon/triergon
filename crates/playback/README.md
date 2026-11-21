@@ -17,7 +17,7 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
 use triergon_mpegts::{PacketFormat, ParseLimits, clock::SourceTimePolicy, psi::DescriptorNamespace};
 use triergon_playback::{
-    ByteSource, Engine, Player, PlayerPolicy, Progress, Selection, io::SourceOwner,
+    ByteSource, Engine, Player, PlayerPolicy, Progress, Selection, SourceOwner,
 };
 
 # let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/hls/media-00.ts");
@@ -51,15 +51,15 @@ assert!(packets > 0);
 ```
 
 Implement `Source` for real transports. `ByteSource` serves immutable local
-bytes. Use `io::Probe` when the container is unknown; its `SelectedInput`
+bytes. Use `probe::Probe` when the container is unknown; its `SelectedInput`
 replays the probed prefix and then continues reading. The probe accepts the MP4
 opening boxes `ftyp`, `styp`, `moov`, `free`, `wide` and `mdat`. For transport
 streams it examines a 389-byte prefix and requires exactly one of the TS188 and
 M2TS192 three-sync patterns to match. Raw AVC and HEVC Annex B input is
 [`triergon-raw-video`](../raw-video/README.md), whose `PlaybackProbe` tells it
 apart from these containers.
-MP4 needs an open and index step first: `mp4_open::Mp4Open` →
-`mp4_plan::Mp4IndexJob` → `Engine::mp4`.
+MP4 needs an open and index step first: `mp4::Mp4Open` →
+`mp4::Mp4IndexJob` → `Engine::mp4`.
 Indexed MP4 packets share immutable track metadata. A complete sample in a
 shared input window can retain that window as its payload.
 When the movie declares its duration, the range player checks source ranges and
@@ -110,12 +110,12 @@ video and audio tracks.
 
 | Area | Entry points |
 |---|---|
-| Source protocol | `Source`, `SourceReply`, `ByteSource`, `io::SourceOwner` |
-| Probe | `io::Probe`: Matroska, MP4, TS188 and M2TS192 |
+| Source protocol | `Source`, `SourceReply`, `ByteSource`, `SourceOwner` |
+| Probe | `probe::Probe`: Matroska, MP4, TS188 and M2TS192 |
 | Matroska | `Engine::matroska` (an unstarted reader built with `Reader::new`, `Reader::new_with_payload_ownership`, `new_with_immutable_seek_index` or `compat::block_additions::new_reader`) |
-| MP4 / MOV | `mp4_open::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `Engine::mp4`, `Engine::mp4_progressive`, `compat::mov::{index, index_front, index_encoded_range, open_front, forward_encoded_edits}`, `Mp4RangeOpen` / `Mp4RangePlayer` |
+| MP4 / MOV | `mp4::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `Engine::mp4`, `Engine::mp4_progressive`, `compat::mov::{index, index_front, index_encoded_range, open_front, forward_encoded_edits}`, `Mp4RangeOpen` / `Mp4RangePlayer` |
 | MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_demux_seek` / `apply_mp4_demux_seek`, progressive variants, `PreparedMp4::movie_seek` |
-| MP4 catalogue replacement | `catalogue::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
+| MP4 catalogue replacement | `mp4::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
 | TS / M2TS | `Engine::ts`, `Engine::ts_entities`; demux PES of selected PIDs or of a segment's own tracks: `compat::pes::{open, open_segment, open_private_audio}`, `compat::pes::startup::Startup` for bound M2TS startup |
 | PES feed | `pes_feed`: the feed [`triergon-hls`](../hls/README.md) reads HLS segments and progressive TS188 input from |
 | Sink handoff | `pump::{Pump, Sink, CatalogueSink, Feed}` |

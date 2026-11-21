@@ -12,23 +12,27 @@
 pub mod compat;
 mod engine;
 mod event;
-pub mod io;
-pub mod mp4_open;
-pub mod mp4_plan;
+pub mod mp4;
 pub mod pes_feed;
 mod player;
-mod sample_sort;
+pub mod probe;
+pub mod pump;
+mod source;
+
 pub use engine::{Engine, Track};
-pub use event::{
-    DemuxTimes, EngineStep, Event, Mp4EmptyPacket, Mp4Event, Mp4MissingSample, Mp4Packet,
-    Mp4ShortPacket, Packet, TsEvent,
-};
+pub use event::{DemuxTimes, EngineStep, Event, Packet, TsEvent};
 pub use player::{
-    ClockChoice, Delivery, MatroskaReplayOutput, Mp4DemuxSeekCommand, Mp4DemuxSeekJob,
-    Mp4DemuxSeekRequest, Mp4RangeOpen, Mp4RangePlayer, Mp4RangeSeek, Mp4RangeSeekJob,
-    Mp4SyncSeekCommand, Mp4SyncSeekJob, Mp4SyncSeekRequest, Output, OutputScope, Player,
-    PlayerPolicy, Progress, SeekIntent, Selection, State, TrackKey, TrackKind,
+    ClockChoice, Delivery, Output, OutputScope, Player, PlayerPolicy, Progress, SeekIntent,
+    Selection, State, TrackKey, TrackKind,
 };
+pub use source::{ByteSource, Source, SourceOwner, SourceReply};
+pub use triergon_core::{Error, Result};
+
+/// Matroska playback beside the reader's own events.
+pub mod matroska {
+    pub use crate::player::MatroskaReplayOutput as ReplayOutput;
+}
+
 /// The container format of an input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Format {
@@ -39,12 +43,3 @@ pub enum Format {
     /// An MPEG transport stream in this packet format.
     Ts(triergon_mpegts::PacketFormat),
 }
-pub use triergon_core::{Error, Result};
-
-pub use engine::mp4::progressive;
-pub mod pump;
-
-pub mod input;
-pub use input::{ByteSource, Source, SourceReply};
-
-pub mod catalogue;

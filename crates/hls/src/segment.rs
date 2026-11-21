@@ -18,8 +18,8 @@ use triergon_mpegts::{
     compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors},
 };
 use triergon_playback::{
-    ClockChoice, Event, Player, PlayerPolicy, Progress, Selection, Source, SourceReply, State,
-    TrackKey, io::SourceOwner, pes_feed::SpentLists,
+    ClockChoice, Event, Player, PlayerPolicy, Progress, Selection, Source, SourceOwner,
+    SourceReply, State, TrackKey, pes_feed::SpentLists,
 };
 
 mod lanes;

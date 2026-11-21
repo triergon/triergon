@@ -14,11 +14,16 @@ use triergon_mpegts::{
     clock::{SourceTimePolicy, SourceTimeStatus},
 };
 use triergon_playback::compat::pes::PrivateAudioSelection;
-use triergon_playback::{ByteSource, Source, SourceReply};
 use triergon_playback::{
-    io::{Probe, ProbeProgress, SelectedInput, SourceOwner},
-    mp4_open::{Mp4Open, OpenLimits, OpenProgress},
-    mp4_plan::{Mp4IndexJob, PlanLimits},
+    ByteSource, Source, SourceReply,
+    mp4::{
+        Mp4DemuxSeekRequest, Mp4Event, Mp4Packet, Mp4RangeOpen, Mp4RangePlayer, Mp4SyncSeekRequest,
+    },
+};
+use triergon_playback::{
+    SourceOwner,
+    mp4::{Mp4IndexJob, Mp4Open, OpenLimits, OpenProgress, PlanLimits},
+    probe::{Probe, ProbeProgress, SelectedInput},
     *,
 };
 mod gold {
@@ -28,11 +33,7 @@ const ID: SourceId = SourceId(771);
 fn pool() -> Budget {
     Budget::new(64 * 1024 * 1024).unwrap()
 }
-fn open(
-    raw: &[u8],
-    quantum: usize,
-    units: u64,
-) -> Result<(mp4_open::OpenedMp4<ByteSource>, Budget)> {
+fn open(raw: &[u8], quantum: usize, units: u64) -> Result<(mp4::OpenedMp4<ByteSource>, Budget)> {
     let b = pool();
     let capabilities = SourceCapabilities {
         length: Some(raw.len() as u64),
@@ -601,7 +602,7 @@ fn probe(
     raw: &[u8],
     q: usize,
     sequential: bool,
-) -> (SelectedInput<io::ReplaySource<Observed>>, Budget, Calls) {
+) -> (SelectedInput<probe::ReplaySource<Observed>>, Budget, Calls) {
     let b = pool();
     let (source, calls, _) = observed(&b, raw, q, sequential);
     let mut probe = Probe::new(
@@ -1656,13 +1657,13 @@ fn real_movie_edit_seek_maps_exact_source_point_before_playback_fence() {
     assert!(matches!(
         p.apply_movie_seek(&command, Selection::All, &mut WorkBudget::new(0), &off())
             .unwrap(),
-        mp4_plan::MovieSeekOutcome::Yield
+        mp4::MovieSeekOutcome::Yield
     ));
     assert!(p.current(&old));
     assert!(matches!(
         p.apply_movie_seek(&command, Selection::All, &mut WorkBudget::new(1), &off())
             .unwrap(),
-        mp4_plan::MovieSeekOutcome::Applied(_)
+        mp4::MovieSeekOutcome::Applied(_)
     ));
     assert!(!p.current(&old));
     let out = collect(&mut p, 1).unwrap();
@@ -1703,7 +1704,7 @@ fn front_moov_mp4_streams_real_samples_without_source_seek_or_preloading_mdat() 
         let opened = open.finish().unwrap();
         assert!(matches!(
             opened.movie.read_scope(),
-            mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(_)
+            mp4::MetadataReadScope::FrontMetadataBeforeMdat(_)
         ));
         let at = opened.input.position();
         assert!(at < raw.len() as u64);
@@ -2851,7 +2852,7 @@ fn combined_playback_probe_opens_real_sequential_mp4() {
     assert_eq!(b.used(), Budget::control_storage_bytes());
 }
 
-fn observed_mp4_open(bytes: &[u8]) -> (mp4_open::OpenedMp4<Observed>, Calls, Budget) {
+fn observed_mp4_open(bytes: &[u8]) -> (mp4::OpenedMp4<Observed>, Calls, Budget) {
     open_with_timing_policy(
         bytes,
         triergon_isobmff::table::TimingRunPolicy::Strict,
@@ -2864,7 +2865,7 @@ fn open_with_timing_policy(
     bytes: &[u8],
     policy: triergon_isobmff::table::TimingRunPolicy,
     random_access: bool,
-) -> Result<(mp4_open::OpenedMp4<Observed>, Calls, Budget)> {
+) -> Result<(mp4::OpenedMp4<Observed>, Calls, Budget)> {
     let pool = pool();
     let (source, calls, _) = observed(&pool, bytes, 23, !random_access);
     let input = InputCursor::new(
@@ -2889,7 +2890,7 @@ fn open_with_timing_policy(
     Ok((opener.finish()?, calls, pool))
 }
 
-fn native_range_player(bytes: &[u8]) -> (Player<Observed>, mp4_open::Movie, Calls, Budget) {
+fn native_range_player(bytes: &[u8]) -> (Player<Observed>, mp4::Movie, Calls, Budget) {
     let (opened, calls, pool) = observed_mp4_open(bytes);
     let mut job = compat::mov::index(&opened.movie, PlanLimits::default()).unwrap();
     assert!((0..100_000).any(|_| job.poll(&mut WorkBudget::new(17), &off()).unwrap()));
@@ -3087,7 +3088,7 @@ fn bounded_timing_accepts_forward_index_with_finite_media() {
 
 #[test]
 fn forward_encoded_edits_keep_aac_preroll_and_trim_in_source_order() {
-    use triergon_playback::progressive::ProgressiveLimits;
+    use triergon_playback::mp4::ProgressiveLimits;
 
     let raw = include_bytes!("fixtures/mp4/forward-aac-priming.mp4");
     let (selected, budget, calls) = probe(raw, 37, true);
@@ -3172,7 +3173,7 @@ fn forward_encoded_edits_keep_aac_preroll_and_trim_in_source_order() {
 
 #[test]
 fn forward_fragment_edits_keep_source_clocks_and_trim_once() {
-    use triergon_playback::progressive::ProgressiveLimits;
+    use triergon_playback::mp4::ProgressiveLimits;
 
     for raw in [
         include_bytes!("fixtures/mp4/forward-fragment-aac-edit.mp4").as_slice(),
@@ -3325,7 +3326,7 @@ fn forward_encoded_edit_drains_samples_outside_the_presentation() {
             opened.input,
             prepared,
             1 << 20,
-            progressive::ProgressiveLimits::default(),
+            mp4::ProgressiveLimits::default(),
         )
         .unwrap();
         let mut player = Player::new_direct(
@@ -3826,7 +3827,7 @@ fn native_range_open_refuses_late_unprojectable_metadata_before_playback() {
 }
 
 fn range_configs(
-    track: &mp4_open::MovieTrack,
+    track: &mp4::MovieTrack,
     major_brand: Option<[u8; 4]>,
     input: &mut InputCursor,
 ) -> Vec<triergon_isobmff::compat::mov::encoded::EncodedStream> {
@@ -3865,7 +3866,7 @@ fn range_configs(
 fn encoded_range_open(
     raw: &[u8],
 ) -> (
-    mp4_open::OpenedMp4<ByteSource>,
+    mp4::OpenedMp4<ByteSource>,
     Vec<Option<triergon_isobmff::compat::mov::edits::EncodedEditPlan>>,
 ) {
     let (mut opened, _) = open(raw, 97, 4096).unwrap();
@@ -3874,7 +3875,7 @@ fn encoded_range_open(
 }
 
 fn encoded_plans<S: triergon_playback::Source>(
-    opened: &mut mp4_open::OpenedMp4<S>,
+    opened: &mut mp4::OpenedMp4<S>,
 ) -> Vec<Option<triergon_isobmff::compat::mov::edits::EncodedEditPlan>> {
     use triergon_isobmff::{
         CursorStatus,
@@ -4113,7 +4114,7 @@ fn range_media_projection_checks_excluded_sample_extents() {
     assert_eq!(refusal, Some(C::Invalid("sample outside media extent")));
 }
 
-fn encoded_range_player(raw: &[u8]) -> (Player<ByteSource>, mp4_open::Movie) {
+fn encoded_range_player(raw: &[u8]) -> (Player<ByteSource>, mp4::Movie) {
     let (opened, plans) = encoded_range_open(raw);
     let cancel = off();
     let mut index =
@@ -4779,7 +4780,7 @@ fn track_views_report_each_format_s_own_tracks() {
             .find(|track| track.id() == id)
             .unwrap()
     };
-    let codecs = |plan: &mp4_plan::PreparedMp4| {
+    let codecs = |plan: &mp4::PreparedMp4| {
         plan.tracks()
             .iter()
             .map(|track| (track.codec(), track.configuration().is_empty()))

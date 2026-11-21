@@ -17,7 +17,7 @@ use triergon_framing::{
 use triergon_matroska::{Configuration, ElementEvent, Event as MkvEvent};
 use triergon_playback::{
     ByteSource, Delivery, Engine, Event, Output, Player, PlayerPolicy, Progress, Selection,
-    TrackKey, io::SourceOwner,
+    SourceOwner, TrackKey,
 };
 
 const ID: SourceId = SourceId(172);

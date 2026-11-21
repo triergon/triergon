@@ -5,8 +5,7 @@ use triergon_core::{Budget, SourceCapabilities, SourceId, WorkBudget};
 use triergon_playback::compat;
 use triergon_playback::{
     ByteSource,
-    mp4_open::{Mp4Open, OpenLimits, OpenedMp4},
-    mp4_plan::PlanLimits,
+    mp4::{Mp4Open, OpenLimits, OpenedMp4, PlanLimits},
 };
 
 const REGULAR: &[u8] = include_bytes!("fixtures/open-ended/regular-terminal.mp4");
@@ -41,7 +40,7 @@ fn selected_native_plan(known: bool) {
             if known {
                 assert!(plan.terminal_mdat().is_none());
                 assert!(
-                    matches!(plan.read_scope(), triergon_playback::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(h) if h.end().unwrap() == Some(REGULAR.len() as u64))
+                    matches!(plan.read_scope(), triergon_playback::mp4::MetadataReadScope::FrontMetadataBeforeMdat(h) if h.end().unwrap() == Some(REGULAR.len() as u64))
                 );
             } else {
                 assert!(plan.terminal_mdat().is_some());
