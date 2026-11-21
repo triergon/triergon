@@ -19,7 +19,16 @@ CARGO_INCREMENTAL=0 TRIERGON_PMT_FFPROBE=/path/to/ffprobe \
   cargo test -p triergon-mpegts --test demux_streams identity_black_box -- --ignored
 ```
 
-The test verifies the executable hash before invoking it. The argument list is
+To compare another local ffprobe against every recorded input and output, run:
+
+```sh
+CARGO_INCREMENTAL=0 cargo xtask transport-fate pmt-identity /path/to/ffprobe
+```
+
+This prints the executable SHA-256 and checks all 48 complete stdout and stderr
+hashes and packet assignments against the recorded observations. A passing output
+comparison does not identify the executable as the original pinned build. The
+original test verifies the executable hash before invoking it. The argument list is
 `-v error -bitexact -f mpegts -fflags +noparse+nofillin -merge_pmt_versions 0|1
 -show_entries stream=index,id,codec_tag:packet=stream_index,pos,size
 -show_packets -of compact -i INPUT`. Marker packet positions identify the wire

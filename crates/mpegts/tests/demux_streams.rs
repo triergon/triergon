@@ -537,6 +537,21 @@ fn identity_black_box_cascades() {
         sha256::file_hex(std::path::Path::new(&probe)).unwrap(),
         "d9d0840413169e2ec50eb1a2e3c9bebf3aa5a15ab97217ac987ca9a901b33896"
     );
+    compare_identity_cascades(&probe);
+}
+
+#[test]
+#[ignore = "black-box comparison: requires TRIERGON_PMT_FFPROBE"]
+fn identity_black_box_output_comparison() {
+    let probe = std::env::var_os("TRIERGON_PMT_FFPROBE").expect("ffprobe path");
+    eprintln!(
+        "ffprobe sha256 {}",
+        sha256::file_hex(std::path::Path::new(&probe)).unwrap()
+    );
+    compare_identity_cascades(&probe);
+}
+
+fn compare_identity_cascades(probe: &std::ffi::OsStr) {
     let root =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.research/pmt-identity");
     std::fs::create_dir_all(&root).unwrap();
