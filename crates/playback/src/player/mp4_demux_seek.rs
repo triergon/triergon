@@ -8,7 +8,7 @@ use crate::{
     input::Source,
     mp4_native_replay::DemuxReplay,
     mp4_open::{MetadataReadScope, Movie},
-    mp4_plan::{Mp4View, PreparedMp4, include_media_track},
+    mp4_plan::{PlanView, PreparedMp4, include_media_track},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, Time, WorkBudget};
@@ -167,7 +167,7 @@ impl<'a> Mp4DemuxSeekJob<'a> {
             return Err(Error::Invalid("native seek requires MP4"));
         };
         let plan = &mp4.plan;
-        if plan.view != Mp4View::PinnedMov9NoParseNoFillin
+        if plan.view != PlanView::Demux
             || plan.read_scope != MetadataReadScope::CompleteEntity
             || plan.demux_recovery
             || !mp4.supports_range_replay()

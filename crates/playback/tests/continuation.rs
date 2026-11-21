@@ -16,7 +16,7 @@ use triergon_playback::{ByteSource, Source, SourceReply};
 use triergon_playback::{
     io::{SelectedInput, SourceOwner},
     mp4_open::{Mp4Open, OpenLimits, OpenProgress},
-    mp4_plan::{Mp4IndexJob, Mp4View, PlanLimits},
+    mp4_plan::{Mp4IndexJob, PlanLimits},
     progressive::ProgressiveLimits,
     pump::*,
     *,
@@ -94,12 +94,7 @@ fn player(
     .unwrap();
     run_open(&mut open, 1).unwrap();
     let opened = open.finish().unwrap();
-    let mut index = Mp4IndexJob::new(
-        &opened.movie,
-        Mp4View::SourcePhysical,
-        PlanLimits::default(),
-    )
-    .unwrap();
+    let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default()).unwrap();
     while !index.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
     let plan = index.finish().unwrap();
     let engine = if live {
@@ -634,10 +629,8 @@ fn native_m2ts_context_uses_real_complete_window_and_positive_eof_reply() {
             1,
             triergon_mpegts::ParseLimits::default(),
             triergon_mpegts::clock::SourceTimePolicy::Unanchored,
-            TsNativeSelection {
-                pid: 256,
-                carriage: triergon_mpegts::compat::pes::RegisteredCarriage::Avc,
-            },
+            256,
+            triergon_mpegts::compat::pes::RegisteredCarriage::Avc,
             Selection::All,
             PlayerPolicy::default(),
         )
@@ -743,10 +736,8 @@ fn native_m2ts_seek_requires_new_context_and_keeps_old_output_scope() {
             1,
             triergon_mpegts::ParseLimits::default(),
             triergon_mpegts::clock::SourceTimePolicy::RelativeEpochZero,
-            TsNativeSelection {
-                pid: 256,
-                carriage: triergon_mpegts::compat::pes::RegisteredCarriage::Avc,
-            },
+            256,
+            triergon_mpegts::compat::pes::RegisteredCarriage::Avc,
             Selection::All,
             PlayerPolicy::default(),
         )
@@ -860,12 +851,7 @@ fn aac_fixture_player() -> (Player<ByteSource>, Budget, Bytes, u64) {
         .unwrap();
     assert!(relative + asc.len() <= config.bytes().len());
     let offset = config.header().start + relative as u64;
-    let mut index = Mp4IndexJob::new(
-        &opened.movie,
-        Mp4View::SourcePhysical,
-        PlanLimits::default(),
-    )
-    .unwrap();
+    let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default()).unwrap();
     while !index.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
     let plan = index.finish().unwrap();
     let player = Player::new(
@@ -1196,16 +1182,18 @@ fn matroska_utf8_text_bridge_runs_real_reader_without_core_or_native_field_repai
     let raw = include_bytes!("fixtures/mkv/observed-11.mkv");
     let b = pool();
     let engine = Engine::matroska(
-        &b,
-        ID,
-        SourceCapabilities {
-            length: Some(raw.len() as u64),
-            random_access: true,
-        },
-        triergon_matroska::Limits::default(),
-        4096,
-    )
-    .unwrap();
+        triergon_matroska::Reader::new(
+            &b,
+            ID,
+            SourceCapabilities {
+                length: Some(raw.len() as u64),
+                random_access: true,
+            },
+            triergon_matroska::Limits::default(),
+            4096,
+        )
+        .unwrap(),
+    );
     let mut p = Player::new(
         engine,
         SourceOwner::new(ByteSource::new(ID, Bytes::copy_from_slice(&b, raw).unwrap(), 7).unwrap()),
@@ -1905,10 +1893,8 @@ fn open_prefix(mut startup: startup::Startup<SequentialStartup>) -> Player<Seque
                     1,
                     triergon_mpegts::ParseLimits::default(),
                     triergon_mpegts::clock::SourceTimePolicy::Unanchored,
-                    TsNativeSelection {
-                        pid: 256,
-                        carriage: triergon_mpegts::compat::pes::RegisteredCarriage::Avc,
-                    },
+                    256,
+                    triergon_mpegts::compat::pes::RegisteredCarriage::Avc,
                     Selection::All,
                     PlayerPolicy::default(),
                 )
@@ -2168,16 +2154,18 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     .concat();
     let pool = pool();
     let engine = Engine::matroska(
-        &pool,
-        ID,
-        SourceCapabilities {
-            length: Some(data.len() as u64),
-            random_access: true,
-        },
-        triergon_matroska::Limits::default(),
-        4096,
-    )
-    .unwrap();
+        triergon_matroska::Reader::new(
+            &pool,
+            ID,
+            SourceCapabilities {
+                length: Some(data.len() as u64),
+                random_access: true,
+            },
+            triergon_matroska::Limits::default(),
+            4096,
+        )
+        .unwrap(),
+    );
     let source = ByteSource::new(ID, Bytes::copy_from_slice(&pool, &data).unwrap(), 7).unwrap();
     let mut player = Player::new(
         engine,
@@ -2513,16 +2501,18 @@ fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
     for (case, (fixture, expected)) in cases.into_iter().enumerate() {
         let pool = pool();
         let engine = Engine::matroska(
-            &pool,
-            ID,
-            SourceCapabilities {
-                length: Some(fixture.len() as u64),
-                random_access: true,
-            },
-            triergon_matroska::Limits::default(),
-            4096,
-        )
-        .unwrap();
+            triergon_matroska::Reader::new(
+                &pool,
+                ID,
+                SourceCapabilities {
+                    length: Some(fixture.len() as u64),
+                    random_access: true,
+                },
+                triergon_matroska::Limits::default(),
+                4096,
+            )
+            .unwrap(),
+        );
         let source =
             ByteSource::new(ID, Bytes::copy_from_slice(&pool, fixture).unwrap(), 7).unwrap();
         let mut player = Player::new(
@@ -2753,16 +2743,18 @@ fn matroska_discovery_stops_on_canvas_or_limits_and_replays_the_same_source() {
             && cutoff == MatroskaDiscoveryCutoff::StreamsReady;
         let pool = pool();
         let engine = Engine::matroska(
-            &pool,
-            ID,
-            SourceCapabilities {
-                length: Some(fixture.len() as u64),
-                random_access: true,
-            },
-            triergon_matroska::Limits::default(),
-            4096,
-        )
-        .unwrap();
+            triergon_matroska::Reader::new(
+                &pool,
+                ID,
+                SourceCapabilities {
+                    length: Some(fixture.len() as u64),
+                    random_access: true,
+                },
+                triergon_matroska::Limits::default(),
+                4096,
+            )
+            .unwrap(),
+        );
         let transferred = Arc::new(AtomicUsize::new(0));
         let ready = Arc::new(AtomicBool::new(false));
         let source = Counted {
@@ -2921,16 +2913,18 @@ fn matroska_discovery_observes_timed_audio_without_caller_confirmation() {
     for (fixture, expected_prefix, expected_count) in cases {
         let pool = pool();
         let engine = Engine::matroska(
-            &pool,
-            ID,
-            SourceCapabilities {
-                length: Some(fixture.len() as u64),
-                random_access: true,
-            },
-            triergon_matroska::Limits::default(),
-            4096,
-        )
-        .unwrap();
+            triergon_matroska::Reader::new(
+                &pool,
+                ID,
+                SourceCapabilities {
+                    length: Some(fixture.len() as u64),
+                    random_access: true,
+                },
+                triergon_matroska::Limits::default(),
+                4096,
+            )
+            .unwrap(),
+        );
         let source =
             ByteSource::new(ID, Bytes::copy_from_slice(&pool, fixture).unwrap(), 7).unwrap();
         let mut discovery = MatroskaDiscovery::new(
@@ -3014,16 +3008,18 @@ fn matroska_discovery_observes_video_and_keeps_decode_order() {
     ] {
         let pool = pool();
         let engine = Engine::matroska(
-            &pool,
-            ID,
-            SourceCapabilities {
-                length: Some(fixture.len() as u64),
-                random_access: true,
-            },
-            triergon_matroska::Limits::default(),
-            4096,
-        )
-        .unwrap();
+            triergon_matroska::Reader::new(
+                &pool,
+                ID,
+                SourceCapabilities {
+                    length: Some(fixture.len() as u64),
+                    random_access: true,
+                },
+                triergon_matroska::Limits::default(),
+                4096,
+            )
+            .unwrap(),
+        );
         let source =
             ByteSource::new(ID, Bytes::copy_from_slice(&pool, fixture).unwrap(), 7).unwrap();
         let mut discovery = MatroskaDiscovery::new(

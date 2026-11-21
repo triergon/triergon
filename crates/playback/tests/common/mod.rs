@@ -15,8 +15,8 @@ use triergon_framing::{
 use triergon_isobmff::{Limits, Next, movie::EntryLayout};
 use triergon_playback::{
     io::{SelectedInput, SourceOwner},
-    mp4_open::{Mp4Open, OpenProgress},
-    mp4_plan::Mp4IndexJob,
+    mp4_open::{Movie, Mp4Open, OpenProgress},
+    mp4_plan::{Mp4IndexJob, PlanLimits},
     *,
 };
 
@@ -47,6 +47,21 @@ pub fn run_open<S: Source>(open: &mut Mp4Open<S>, units: u64) -> Result<()> {
             OpenProgress::Ready
         ))
     })
+}
+
+/// Which index a test plays: source samples or the MOV demux view.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum View {
+    Source,
+    Demux,
+}
+
+/// The index job of `movie` in `view`.
+pub fn index_job(movie: &Movie, view: View, limits: PlanLimits) -> Result<Mp4IndexJob<'_>> {
+    match view {
+        View::Source => Mp4IndexJob::new(movie, limits),
+        View::Demux => compat::mov::index(movie, limits),
+    }
 }
 
 /// Advance an index job until its plan is ready.

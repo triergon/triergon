@@ -193,19 +193,6 @@ pub struct Mp4Engine {
     revision: u64,
     pub(crate) maximum_packet: usize,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct TsNativeSelection {
-    pub pid: u16,
-    pub carriage: RegisteredCarriage,
-}
-impl From<TsNativeSelection> for PidSelection {
-    fn from(selection: TsNativeSelection) -> Self {
-        Self {
-            pid: selection.pid,
-            carriage: Carriage::Registered(selection.carriage),
-        }
-    }
-}
 
 enum TrackUpdate {
     Configuration(AdmittedCarriage),
@@ -470,24 +457,12 @@ impl Engine {
             engine.reuse_pes_lists(pid, lists);
         }
     }
-    pub fn matroska(
-        pool: &Budget,
-        id: SourceId,
-        caps: SourceCapabilities,
-        limits: triergon_matroska::Limits,
-        window: usize,
-    ) -> Result<Self> {
-        Ok(Self::matroska_reader(Reader::new(
-            pool, id, caps, limits, window,
-        )?))
-    }
-
     /// Play an unstarted Matroska reader configured by the caller, for example
-    /// with `Reader::new_with_payload_ownership`,
+    /// with `Reader::new`, `Reader::new_with_payload_ownership`,
     /// `Reader::new_with_immutable_seek_index` or
     /// `compat::block_additions::new_reader`. A player refuses the engine if
     /// the reader has already read or repositioned its input.
-    pub fn matroska_reader(reader: Reader) -> Self {
+    pub fn matroska(reader: Reader) -> Self {
         let source = reader.source();
         Self::Matroska(MkvEngine { reader, source })
     }
@@ -571,8 +546,8 @@ impl Engine {
         Self::mp4_with_progressive(input, plan, maximum_packet, limits)
     }
     /// Complete one actual front-metadata source using the explicit nonseekable
-    /// native view. A terminal MDAT finishes only on a matching Source End.
-    pub fn mp4_native_terminal_v1(
+    /// demux view. A terminal MDAT finishes only on a matching Source End.
+    pub(crate) fn mp4_front(
         input: InputCursor,
         plan: PreparedMp4,
         maximum_packet: usize,
@@ -596,25 +571,23 @@ impl Engine {
         }
         Ok(engine)
     }
+    /// Source events of one program of a transport stream: carriers, tables,
+    /// PES with their source clocks, and faults. The source's end ends the stream.
     pub fn ts(
         input: InputCursor,
         format: ts::PacketFormat,
         program: u16,
         limits: ts::ParseLimits,
         policy: SourceTimePolicy,
+        namespace: DescriptorNamespace,
     ) -> Result<Self> {
-        Self::ts_with_namespace(
-            input,
-            format,
-            program,
-            limits,
-            policy,
-            DescriptorNamespace::Unspecified,
-        )
+        TsEngine::program(input, format, program, limits, policy, namespace).map(Self::Ts)
     }
 
-    /// Strict TS playback with an explicit descriptor namespace.
-    pub fn ts_with_namespace(
+    /// [`Self::ts`] over a sequence of entities: each entity's end is reported
+    /// as [`Event::EntityEnd`], and the caller continues with the next one or
+    /// finishes the logical source.
+    pub fn ts_entities(
         input: InputCursor,
         format: ts::PacketFormat,
         program: u16,
@@ -622,134 +595,11 @@ impl Engine {
         policy: SourceTimePolicy,
         namespace: DescriptorNamespace,
     ) -> Result<Self> {
-        let stream = TransportStream::new_with_namespace(
-            input.budget().clone(),
-            format,
-            limits,
-            program,
-            namespace,
-        )?;
-        TsEngine::from_stream(input, format, limits, policy, namespace, stream).map(Self::Ts)
-    }
-    pub fn ts_native(
-        input: InputCursor,
-        format: ts::PacketFormat,
-        program: u16,
-        limits: ts::ParseLimits,
-        policy: SourceTimePolicy,
-        selection: TsNativeSelection,
-    ) -> Result<Self> {
-        if format != ts::PacketFormat::Ts188 {
-            return Err(Error::Unsupported(
-                "full native M2TS requires an admitted startup-position context; use source and clock views",
-            ));
-        }
-        Self::ts_with_native(input, format, program, limits, policy, selection.into())
-    }
-    /// Expose the admitted native private-audio PES alongside unchanged Source
-    /// facts. The chosen carriage is checked against the active program map.
-    pub fn ts_native_private_audio_v1(
-        input: InputCursor,
-        format: ts::PacketFormat,
-        program: u16,
-        limits: ts::ParseLimits,
-        policy: SourceTimePolicy,
-        selection: crate::compat::pes::PrivateAudioSelection,
-    ) -> Result<Self> {
-        if format != ts::PacketFormat::Ts188 {
-            return Err(Error::Unsupported("native private audio requires TS188"));
-        }
-        crate::compat::pes::open_private_audio(input, program, limits, policy, selection)
-    }
-    pub(crate) fn ts_with_native(
-        input: InputCursor,
-        format: ts::PacketFormat,
-        program: u16,
-        limits: ts::ParseLimits,
-        policy: SourceTimePolicy,
-        selection: PidSelection,
-    ) -> Result<Self> {
-        let mut engine = Self::ts(input, format, program, limits, policy)?;
-        if let Self::Ts(t) = &mut engine {
-            t.pes_tracks = PesTracks::Inline(Some(PesTrack::new(selection)));
-        }
-        Ok(engine)
-    }
-    pub(crate) fn ts_native_context(
-        input: InputCursor,
-        format: ts::PacketFormat,
-        program: u16,
-        limits: ts::ParseLimits,
-        policy: SourceTimePolicy,
-        selection: TsNativeSelection,
-        context: ts::compat::input::InputContext,
-    ) -> Result<Self> {
-        context.validate_cursor(&input)?;
-        let mut engine =
-            Self::ts_with_native(input, format, program, limits, policy, selection.into())?;
-        if let Self::Ts(t) = &mut engine {
-            t.native_context = Some(context);
-        }
-        Ok(engine)
-    }
-    /// Assemble explicitly selected PIDs from one TS188 program. The input
-    /// carrier order determines completed packet order. Remaining packets drain
-    /// by ascending PID at logical EOF. All selected packets share the same
-    /// native program clock, independently of the source-clock view.
-    pub fn ts_native_program_v1(
-        input: InputCursor,
-        format: ts::PacketFormat,
-        program: u16,
-        limits: ts::ParseLimits,
-        policy: SourceTimePolicy,
-        namespace: DescriptorNamespace,
-        selections: &[PidSelection],
-    ) -> Result<Self> {
-        if format != ts::PacketFormat::Ts188 {
-            return Err(Error::Unsupported(
-                "multiplexed native playback requires TS188",
-            ));
-        }
-        if selections.is_empty() {
-            return Err(Error::Invalid("native program selection is empty"));
-        }
-        if selections.len() > 64 {
-            return Err(Error::Limit {
-                requested: selections.len(),
-                maximum: 64,
-            });
-        }
-        if selections
-            .iter()
-            .any(|selection| !(1..=0x1ffe).contains(&selection.pid))
-        {
-            return Err(Error::Invalid("native program selection PID"));
-        }
-        let mut engine =
-            Self::ts_with_namespace(input, format, program, limits, policy, namespace)?;
-        if let Self::Ts(ts) = &mut engine {
-            ts.pes_tracks = if let [selection] = selections {
-                PesTracks::Inline(Some(PesTrack::new(*selection)))
-            } else {
-                let mut tracks = BudgetVec::new(ts.input.budget());
-                tracks.try_reserve_exact(selections.len())?;
-                for selection in selections {
-                    tracks
-                        .try_push(PesTrack::new(*selection))
-                        .map_err(|e| e.error)?;
-                }
-                tracks.as_mut_slice().sort_unstable_by_key(PesTrack::pid);
-                if tracks
-                    .as_slice()
-                    .windows(2)
-                    .any(|pair| pair[0].pid() == pair[1].pid())
-                {
-                    return Err(Error::Invalid("duplicate native program selection PID"));
-                }
-                PesTracks::Multiple(tracks)
-            };
-        }
-        Ok(engine)
+        let engine = TsEngine::program(input, format, program, limits, policy, namespace)?;
+        Ok(Self::Ts(TsEngine {
+            segmented: true,
+            ..engine
+        }))
     }
 
     pub fn delivers_demux_pes(&self) -> bool {
@@ -758,25 +608,12 @@ impl Engine {
     pub(crate) fn assembles_pid(&self, pid: u16) -> bool {
         matches!(self, Self::Ts(t) if t.pes_tracks.index(pid).is_some())
     }
-    /// Read an independent TS188 media segment with an in-band PAT and PMT.
-    /// Discover its single program, announce supported track carriage before
-    /// packet delivery, and preserve other tracks as Source events. Create a new
-    /// engine for each segment.
-    pub fn ts_native_segment_v1(
-        input: InputCursor,
-        limits: ts::ParseLimits,
-        policy: SourceTimePolicy,
-        namespace: DescriptorNamespace,
-    ) -> Result<Self> {
-        Self::ts_native_segment(input, limits, policy, namespace, SegmentDiscovery::Native)
-    }
-
     pub(crate) fn ts_hls_segment(
         input: InputCursor,
         limits: ts::ParseLimits,
         media: bool,
     ) -> Result<Self> {
-        Self::ts_native_segment(
+        TsEngine::segment(
             input,
             limits,
             SourceTimePolicy::Unanchored,
@@ -787,31 +624,9 @@ impl Engine {
                 SegmentDiscovery::AvcAacFeed
             },
         )
+        .map(Self::Ts)
     }
 
-    fn ts_native_segment(
-        input: InputCursor,
-        limits: ts::ParseLimits,
-        policy: SourceTimePolicy,
-        namespace: DescriptorNamespace,
-        discovery: SegmentDiscovery,
-    ) -> Result<Self> {
-        TsEngine::native_segment(input, limits, policy, namespace, discovery).map(Self::Ts)
-    }
-
-    pub fn ts_segmented(
-        input: InputCursor,
-        format: ts::PacketFormat,
-        program: u16,
-        limits: ts::ParseLimits,
-        policy: SourceTimePolicy,
-    ) -> Result<Self> {
-        let mut engine = Self::ts(input, format, program, limits, policy)?;
-        if let Self::Ts(t) = &mut engine {
-            t.segmented = true;
-        }
-        Ok(engine)
-    }
     pub(crate) fn continue_entity(
         &mut self,
         source: SourceId,
@@ -1615,7 +1430,123 @@ impl TsEngine {
         })
     }
 
-    fn native_segment(
+    /// The source events of `program`; see [`Engine::ts`].
+    fn program(
+        input: InputCursor,
+        format: ts::PacketFormat,
+        program: u16,
+        limits: ts::ParseLimits,
+        policy: SourceTimePolicy,
+        namespace: DescriptorNamespace,
+    ) -> Result<Self> {
+        let stream = TransportStream::new_with_namespace(
+            input.budget().clone(),
+            format,
+            limits,
+            program,
+            namespace,
+        )?;
+        Self::from_stream(input, format, limits, policy, namespace, stream)
+    }
+
+    /// The source events of a TS188 `program` and the demux PES of the selected
+    /// PIDs: 1 to 64 distinct PIDs from 1 to 0x1ffe.
+    pub(crate) fn with_selections(
+        input: InputCursor,
+        program: u16,
+        limits: ts::ParseLimits,
+        policy: SourceTimePolicy,
+        namespace: DescriptorNamespace,
+        selections: &[PidSelection],
+    ) -> Result<Self> {
+        if selections.is_empty() {
+            return Err(Error::Invalid("native program selection is empty"));
+        }
+        if selections.len() > 64 {
+            return Err(Error::Limit {
+                requested: selections.len(),
+                maximum: 64,
+            });
+        }
+        if selections
+            .iter()
+            .any(|selection| !(1..=0x1ffe).contains(&selection.pid))
+        {
+            return Err(Error::Invalid("native program selection PID"));
+        }
+        let engine = Self::program(
+            input,
+            ts::PacketFormat::Ts188,
+            program,
+            limits,
+            policy,
+            namespace,
+        )?;
+        let pes_tracks = if let [selection] = selections {
+            PesTracks::Inline(Some(PesTrack::new(*selection)))
+        } else {
+            let mut tracks = BudgetVec::new(engine.input.budget());
+            tracks.try_reserve_exact(selections.len())?;
+            for selection in selections {
+                tracks
+                    .try_push(PesTrack::new(*selection))
+                    .map_err(|e| e.error)?;
+            }
+            tracks.as_mut_slice().sort_unstable_by_key(PesTrack::pid);
+            if tracks
+                .as_slice()
+                .windows(2)
+                .any(|pair| pair[0].pid() == pair[1].pid())
+            {
+                return Err(Error::Invalid("duplicate native program selection PID"));
+            }
+            PesTracks::Multiple(tracks)
+        };
+        Ok(Self {
+            pes_tracks,
+            ..engine
+        })
+    }
+
+    /// The source events of `program` and the demux PES of one PID, with the
+    /// observer bound to the startup context of this input.
+    pub(crate) fn with_bound_input(
+        input: InputCursor,
+        format: ts::PacketFormat,
+        program: u16,
+        limits: ts::ParseLimits,
+        policy: SourceTimePolicy,
+        selection: PidSelection,
+        context: ts::compat::input::InputContext,
+    ) -> Result<Self> {
+        context.validate_cursor(&input)?;
+        let engine = Self::program(
+            input,
+            format,
+            program,
+            limits,
+            policy,
+            DescriptorNamespace::Unspecified,
+        )?;
+        Ok(Self {
+            pes_tracks: PesTracks::Inline(Some(PesTrack::new(selection))),
+            native_context: Some(context),
+            ..engine
+        })
+    }
+
+    /// The source events of one independent TS188 segment and the demux PES of
+    /// the tracks its own PMT names.
+    pub(crate) fn discovered_segment(
+        input: InputCursor,
+        limits: ts::ParseLimits,
+        policy: SourceTimePolicy,
+        namespace: DescriptorNamespace,
+    ) -> Result<Self> {
+        Self::segment(input, limits, policy, namespace, SegmentDiscovery::Native)
+    }
+
+    fn segment(
         input: InputCursor,
         limits: ts::ParseLimits,
         policy: SourceTimePolicy,
@@ -1634,7 +1565,7 @@ impl TsEngine {
                 TransportStream::new_single_program_feed(budget, limits, namespace)?
             }
         };
-        let mut engine = Self::from_stream(
+        let engine = Self::from_stream(
             input,
             ts::PacketFormat::Ts188,
             limits,
@@ -1642,15 +1573,17 @@ impl TsEngine {
             namespace,
             stream,
         )?;
-        engine.segment_discovery = Some(discovery);
-        Ok(engine)
+        Ok(Self {
+            segment_discovery: Some(discovery),
+            ..engine
+        })
     }
 
     /// A progressive PES feed of a single-program TS188 source: AVC and AAC
     /// tracks found in its PMT, delivered as owned or, with `compact`, compact
     /// payloads. Poll it with [`Self::poll_progressive_payload`].
     pub fn progressive(input: InputCursor, limits: ts::ParseLimits, compact: bool) -> Result<Self> {
-        Self::native_segment(
+        Self::segment(
             input,
             limits,
             SourceTimePolicy::Unanchored,

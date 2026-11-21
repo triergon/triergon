@@ -1,9 +1,11 @@
 //! Transport-backed finite and bounded-prefix native TS startup.
 //! The finite profile needs a complete window and an actual positive-size EOF
 //! reply. The M2TS prefix profile keeps subsequent Source reads open.
+use super::PidSelection;
 use crate::input::{Source, SourceReply};
+use crate::pes_feed::TsEngine;
 use crate::{
-    Engine, Format, Player, PlayerPolicy, Result, Selection, TsNativeSelection,
+    Engine, Format, Player, PlayerPolicy, Result, Selection,
     io::{SelectedInput, SourceOwner},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -14,6 +16,7 @@ use triergon_mpegts::{
     PacketFormat, ParseLimits,
     clock::SourceTimePolicy,
     compat::input::{InputBootstrap, InputContext, InputStep},
+    compat::pes::RegisteredCarriage,
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StartupStep {
@@ -331,24 +334,31 @@ impl<S: Source> BoundInput<S> {
     pub fn context(&self) -> &InputContext {
         &self.context
     }
+    /// A player of `program` with the demux PES of `pid`, whose observer is
+    /// bound to this input's startup context.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the program, clock and player choices of one TS engine"
+    )]
     pub fn into_player(
         self,
         program: u16,
         limits: ParseLimits,
         policy: SourceTimePolicy,
-        native: TsNativeSelection,
+        pid: u16,
+        carriage: RegisteredCarriage,
         selection: Selection,
         player_policy: PlayerPolicy,
     ) -> Result<Player<S>> {
-        let engine = Engine::ts_native_context(
+        let engine = TsEngine::with_bound_input(
             self.input,
             self.format,
             program,
             limits,
             policy,
-            native,
+            PidSelection::registered(pid, carriage),
             self.context,
         )?;
-        Player::new(engine, self.source, selection, player_policy)
+        Player::new(Engine::Ts(engine), self.source, selection, player_policy)
     }
 }

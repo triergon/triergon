@@ -7,10 +7,11 @@ use triergon_core::{
 use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence};
 use triergon_mpegts::stream::TraceEvent;
 use triergon_mpegts::{
-    PacketFormat, ParseLimits,
+    ParseLimits,
     clock::SourceTimePolicy,
     compat::pes::{DemuxBoundary, DemuxPacket, PrivateAudioCarriage, RegisteredCarriage},
 };
+use triergon_playback::compat;
 use triergon_playback::{
     ByteSource, ClockChoice, Delivery, Engine, Event, Player, PlayerPolicy, Progress, Selection,
     TrackKey, TsEvent, io::SourceOwner,
@@ -51,7 +52,6 @@ fn budget() -> Budget {
 fn engine(
     budget: &Budget,
     selections: &[PidSelection],
-    format: PacketFormat,
     namespace: DescriptorNamespace,
 ) -> triergon_playback::Result<Engine> {
     let input = InputCursor::new(
@@ -64,9 +64,8 @@ fn engine(
         188,
     )
     .unwrap();
-    Engine::ts_native_program_v1(
+    compat::pes::open(
         input,
-        format,
         1,
         ParseLimits::default(),
         SourceTimePolicy::Unanchored,
@@ -99,7 +98,7 @@ fn player_with_namespace(
     )
     .unwrap();
     let mut player = Player::new(
-        engine(&budget, selections, PacketFormat::Ts188, namespace).unwrap(),
+        engine(&budget, selections, namespace).unwrap(),
         SourceOwner::new(source),
         selection,
         PlayerPolicy::default(),
@@ -139,7 +138,7 @@ fn segment_player(raw: &[u8], quantum: usize) -> (Player<ByteSource>, Budget) {
         188,
     )
     .unwrap();
-    let engine = Engine::ts_native_segment_v1(
+    let engine = compat::pes::open_segment(
         cursor,
         ParseLimits::default(),
         SourceTimePolicy::Unanchored,
@@ -622,25 +621,18 @@ fn seeking_replays_the_current_audio_configurations_in_a_new_generation() {
 fn selections_reject_duplicate_and_out_of_scope_pids_and_strides() {
     let b = budget();
     assert!(matches!(
-        engine(&b, &[AVC, AVC], PacketFormat::Ts188, NAMESPACE),
+        engine(&b, &[AVC, AVC], NAMESPACE),
         Err(Error::Invalid("duplicate native program selection PID"))
     ));
     let invalid = PidSelection { pid: 0x1fff, ..AVC };
     assert!(matches!(
-        engine(&b, &[invalid], PacketFormat::Ts188, NAMESPACE),
+        engine(&b, &[invalid], NAMESPACE),
         Err(Error::Invalid(_))
     ));
+    assert!(matches!(engine(&b, &[], NAMESPACE), Err(Error::Invalid(_))));
     assert!(matches!(
-        engine(&b, &[], PacketFormat::Ts188, NAMESPACE),
-        Err(Error::Invalid(_))
-    ));
-    assert!(matches!(
-        engine(&b, &[AVC; 65], PacketFormat::Ts188, NAMESPACE),
+        engine(&b, &[AVC; 65], NAMESPACE),
         Err(Error::Limit { .. })
-    ));
-    assert!(matches!(
-        engine(&b, &[AVC, AAC], PacketFormat::M2ts192, NAMESPACE),
-        Err(Error::Unsupported(_))
     ));
     assert_eq!(b.used(), Budget::control_storage_bytes());
 }

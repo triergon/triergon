@@ -103,7 +103,7 @@ fn session(pool: &Budget, raw: &Bytes, operation: Operation) -> Work {
         QUANTUM,
     )
     .unwrap();
-    let engine = Engine::matroska_reader(reader);
+    let engine = Engine::matroska(reader);
     let source = ByteSource::new(id, raw.clone(), QUANTUM).unwrap();
     let mut discovery = MatroskaCompactDiscovery::new(
         engine,

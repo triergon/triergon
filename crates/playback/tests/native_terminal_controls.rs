@@ -1,5 +1,5 @@
 mod common;
-use common::{collect, off, packets, run_open};
+use common::{View, collect, index_job, off, packets, run_open};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
@@ -12,7 +12,7 @@ use triergon_isobmff::compat::mov::clock::ClockOrigin;
 use triergon_playback::{
     io::{SelectedInput, SourceOwner},
     mp4_open::{Mp4Open, OpenLimits, OpenProgress},
-    mp4_plan::{Mp4IndexJob, Mp4View, PlanLimits},
+    mp4_plan::{Mp4IndexJob, PlanLimits},
     progressive::ProgressiveLimits,
     *,
 };
@@ -163,15 +163,11 @@ fn try_make_source_mode(
         mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(_)
     );
     let mut job = if native && front {
-        Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default())
+        compat::mov::index_front(&opened.movie, PlanLimits::default())
     } else {
-        Mp4IndexJob::new(
+        index_job(
             &opened.movie,
-            if native {
-                Mp4View::PinnedMov9NoParseNoFillin
-            } else {
-                Mp4View::SourcePhysical
-            },
+            if native { View::Demux } else { View::Source },
             PlanLimits::default(),
         )
     }
@@ -190,7 +186,7 @@ fn try_make_source_mode(
         assert_eq!(plan.rows(), plan.demux_rows().len());
     }
     let engine = if native && front {
-        Engine::mp4_native_terminal_v1(opened.input, plan, 1 << 20, ProgressiveLimits::default())
+        compat::mov::open_front(opened.input, plan, 1 << 20, ProgressiveLimits::default())
     } else if front {
         Engine::mp4_progressive(opened.input, plan, 1 << 20, ProgressiveLimits::default())
     } else {
@@ -424,17 +420,11 @@ fn ordinary_progressive_native_context_stays_refused() {
     .unwrap();
     run_open(&mut open, 4096).unwrap();
     let opened = open.finish().unwrap();
-    let mut job = Mp4IndexJob::new(
-        &opened.movie,
-        Mp4View::SourcePhysical,
-        PlanLimits::default(),
-    )
-    .unwrap();
+    let mut job = Mp4IndexJob::new(&opened.movie, PlanLimits::default()).unwrap();
     while !job.poll(&mut WorkBudget::new(4096), &off()).unwrap() {}
     let plan = job.finish().unwrap();
     assert!(
-        Engine::mp4_native_terminal_v1(opened.input, plan, 1 << 20, ProgressiveLimits::default())
-            .is_err()
+        compat::mov::open_front(opened.input, plan, 1 << 20, ProgressiveLimits::default()).is_err()
     );
 }
 

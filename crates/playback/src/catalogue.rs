@@ -57,7 +57,7 @@ impl<S: Source> Mp4Catalogue<S> {
                 Engine::mp4_progressive(opened.input, plan, maximum_packet, limits)?
             }
             Mp4CatalogueMode::NativeTerminalV1(limits) => {
-                Engine::mp4_native_terminal_v1(opened.input, plan, maximum_packet, limits)?
+                Engine::mp4_front(opened.input, plan, maximum_packet, limits)?
             }
         };
         Ok((

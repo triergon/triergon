@@ -62,7 +62,7 @@ impl<'a> Mp4RangeOpen<'a> {
             movie,
             edits,
             media_tracks_only,
-            index: Mp4IndexJob::new_native_range(movie, edits, limits, media_tracks_only)?,
+            index: Mp4IndexJob::for_range(movie, edits, limits, media_tracks_only)?,
         })
     }
 

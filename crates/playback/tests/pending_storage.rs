@@ -10,7 +10,7 @@ use triergon_core::{
 use triergon_playback::{
     io::{SelectedInput, SourceOwner},
     mp4_open::{Mp4Open, OpenLimits, OpenProgress, OpenedMp4},
-    mp4_plan::{Mp4IndexJob, Mp4View, PlanLimits, PreparedMp4},
+    mp4_plan::{Mp4IndexJob, PlanLimits, PreparedMp4},
     progressive::ProgressiveLimits,
     *,
 };
@@ -112,12 +112,7 @@ fn prepare(raw: &[u8]) -> Prepared {
     }
     assert!(ready);
     let opened = open.finish().unwrap();
-    let mut index = Mp4IndexJob::new(
-        &opened.movie,
-        Mp4View::SourcePhysical,
-        PlanLimits::default(),
-    )
-    .unwrap();
+    let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default()).unwrap();
     let mut indexed = false;
     for _ in 0..200_000 {
         if index.poll(&mut WorkBudget::new(1), &off()).unwrap() {

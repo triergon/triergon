@@ -2,12 +2,13 @@
 
 pub mod startup;
 
-use crate::{Engine, Result, TrackKey};
+use crate::{Engine, Result, TrackKey, pes_feed::TsEngine};
 use triergon_core::InputCursor;
 use triergon_mpegts::{
-    PacketFormat, ParseLimits,
+    ParseLimits,
     clock::SourceTimePolicy,
     compat::pes::{PrivateAudioCarriage, RegisteredCarriage},
+    psi::DescriptorNamespace,
 };
 
 /// Private audio PID and carriage to check against the active program map.
@@ -19,7 +20,42 @@ pub struct PrivateAudioSelection {
     pub carriage: PrivateAudioCarriage,
 }
 
-/// Deliver the selected private-audio PES packets from a TS188 source.
+/// The source events of one TS188 `program` and the demux PES of the selected
+/// PIDs, cut and timed as FFmpeg's demuxer does. The input carrier order sets
+/// the order of completed packets; at the logical end the rest drain by
+/// ascending PID. Every selected packet shares the program's demux clock,
+/// independently of the source clock view.
+///
+/// # Errors
+///
+/// `Invalid` for no selection, a PID outside 1 to 0x1ffe or a PID selected twice;
+/// `Limit` for more than 64 selections; allocation failures.
+pub fn open(
+    input: InputCursor,
+    program: u16,
+    limits: ParseLimits,
+    policy: SourceTimePolicy,
+    namespace: DescriptorNamespace,
+    selections: &[PidSelection],
+) -> Result<Engine> {
+    TsEngine::with_selections(input, program, limits, policy, namespace, selections).map(Engine::Ts)
+}
+
+/// The source events of one independent TS188 media segment with an in-band PAT
+/// and PMT, and the demux PES of its tracks. The segment's single program is
+/// discovered, each supported track's carriage is announced before its packets,
+/// and other tracks stay source events. Make a new engine for each segment.
+pub fn open_segment(
+    input: InputCursor,
+    limits: ParseLimits,
+    policy: SourceTimePolicy,
+    namespace: DescriptorNamespace,
+) -> Result<Engine> {
+    TsEngine::discovered_segment(input, limits, policy, namespace).map(Engine::Ts)
+}
+
+/// [`open`] for one private-audio PID, its carriage checked against each active
+/// program map.
 pub fn open_private_audio(
     input: InputCursor,
     program: u16,
@@ -27,16 +63,16 @@ pub fn open_private_audio(
     policy: SourceTimePolicy,
     selection: PrivateAudioSelection,
 ) -> Result<Engine> {
-    Engine::ts_with_native(
+    open(
         input,
-        PacketFormat::Ts188,
         program,
         limits,
         policy,
-        PidSelection {
+        DescriptorNamespace::Unspecified,
+        &[PidSelection {
             pid: selection.pid,
             carriage: Carriage::PrivateAudio(selection.carriage),
-        },
+        }],
     )
 }
 
@@ -59,8 +95,21 @@ pub struct AdmittedCarriage {
     pub carriage: Carriage,
 }
 
+/// One selected PID of a TS program and how its packets are read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PidSelection {
+    /// Elementary stream PID.
     pub pid: u16,
+    /// How its PES packets are interpreted.
     pub carriage: Carriage,
+}
+
+impl PidSelection {
+    /// A PID with a registered carriage.
+    pub const fn registered(pid: u16, carriage: RegisteredCarriage) -> Self {
+        Self {
+            pid,
+            carriage: Carriage::Registered(carriage),
+        }
+    }
 }

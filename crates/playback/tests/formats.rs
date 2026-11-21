@@ -1,5 +1,5 @@
 mod common;
-use common::{annex_b, annex_b_session, byte_input, collect, off, run_open};
+use common::{View, annex_b, annex_b_session, byte_input, collect, index_job, off, run_open};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
@@ -18,7 +18,7 @@ use triergon_playback::{ByteSource, Source, SourceReply};
 use triergon_playback::{
     io::{Probe, ProbeProgress, SelectedInput, SourceOwner},
     mp4_open::{Mp4Open, OpenLimits, OpenProgress},
-    mp4_plan::{Mp4IndexJob, Mp4View, PlanLimits},
+    mp4_plan::{Mp4IndexJob, PlanLimits},
     *,
 };
 mod gold {
@@ -48,14 +48,9 @@ fn open(
     run_open(&mut job, units)?;
     Ok((job.finish()?, b))
 }
-fn mp4(
-    raw: &[u8],
-    view: Mp4View,
-    quantum: usize,
-    units: u64,
-) -> Result<(Player<ByteSource>, Budget)> {
+fn mp4(raw: &[u8], view: View, quantum: usize, units: u64) -> Result<(Player<ByteSource>, Budget)> {
     let (opened, b) = open(raw, quantum, units)?;
-    let mut job = Mp4IndexJob::new(&opened.movie, view, PlanLimits::default())?;
+    let mut job = index_job(&opened.movie, view, PlanLimits::default())?;
     for _ in 0..2_000_000 {
         if job.poll(&mut WorkBudget::new(units), &off())? {
             let plan = job.finish()?;
@@ -99,6 +94,7 @@ fn ts(
                 1,
                 triergon_mpegts::ParseLimits::default(),
                 policy,
+                triergon_mpegts::psi::DescriptorNamespace::Unspecified,
             )?,
             source,
             Selection::All,
@@ -150,7 +146,7 @@ fn all17_frozen_mp4_controls_keep_independent_original_source_gold() {
             "SOURCE_CASE {} fragmented={} gap={} malformed={}",
             case.name, case.fragmented, case.gap, case.malformed
         );
-        let result = mp4(case.bytes, Mp4View::SourcePhysical, 7, 1);
+        let result = mp4(case.bytes, View::Source, 7, 1);
         if case.malformed {
             assert!(
                 result.is_err(),
@@ -201,7 +197,7 @@ fn all17_frozen_mp4_controls_keep_independent_original_source_gold() {
 #[test]
 fn actual_mp4_native_order_stays_distinct_from_all_source_facts() {
     let raw = include_bytes!("fixtures/mp4/r-multitrack.mov");
-    let (mut p, _) = mp4(raw, Mp4View::PinnedMov9NoParseNoFillin, 7, 1).unwrap();
+    let (mut p, _) = mp4(raw, View::Demux, 7, 1).unwrap();
     if let Some(Engine::Mp4(engine)) = p.engine() {
         assert_eq!(engine.plan.source_rows().len(), 12);
         assert_eq!(engine.plan.demux_rows().len(), 12);
@@ -243,7 +239,7 @@ fn description_changes_publish_raw_config_before_each_matching_packet() {
         include_bytes!("fixtures/mp4/r-description-change.mov").as_slice(),
         include_bytes!("fixtures/mp4/f-description-change.mp4").as_slice(),
     ] {
-        let (mut p, _) = mp4(raw, Mp4View::SourcePhysical, 1, 1).unwrap();
+        let (mut p, _) = mp4(raw, View::Source, 1, 1).unwrap();
         let out = collect(&mut p, 1).unwrap();
         let mut last = None;
         let mut seen = Vec::new();
@@ -277,7 +273,7 @@ fn description_changes_publish_raw_config_before_each_matching_packet() {
 fn multitrack_packet_configuration_uses_its_track_revision_not_latest_other_track() {
     let (mut p, _) = mp4(
         include_bytes!("fixtures/mp4/r-multitrack.mov"),
-        Mp4View::SourcePhysical,
+        View::Source,
         7,
         1,
     )
@@ -300,7 +296,7 @@ fn multitrack_packet_configuration_uses_its_track_revision_not_latest_other_trac
 #[test]
 fn source_unknown_fragment_clock_is_not_filled_from_native_projection() {
     let raw = include_bytes!("fixtures/mp4/f-no-second-tfdt.mp4");
-    let (mut p, _) = mp4(raw, Mp4View::PinnedMov9NoParseNoFillin, 1, 1).unwrap();
+    let (mut p, _) = mp4(raw, View::Demux, 1, 1).unwrap();
     let out = collect(&mut p, 1).unwrap();
     let unknown: Vec<_> = mp4_packets(&out)
         .into_iter()
@@ -648,6 +644,7 @@ fn observed_ts() -> (Player<Observed>, Budget, Calls, Arc<AtomicBool>) {
             1,
             triergon_mpegts::ParseLimits::default(),
             SourceTimePolicy::RelativeEpochZero,
+            triergon_mpegts::psi::DescriptorNamespace::Unspecified,
         )
         .unwrap(),
         SourceOwner::new(source),
@@ -692,6 +689,7 @@ fn sequential_ts_probe_replays_owned_prefix_without_transport_rewind() {
             1,
             triergon_mpegts::ParseLimits::default(),
             SourceTimePolicy::RelativeEpochZero,
+            triergon_mpegts::psi::DescriptorNamespace::Unspecified,
         )
         .unwrap();
         let mut player = Player::new(
@@ -792,12 +790,7 @@ fn mp4_work_zero_after_open_and_index_construction_neither_polls_nor_allocates()
     drop(o);
     assert_eq!(b.used(), Budget::control_storage_bytes());
     let (opened, b) = open(raw, 7, 1).unwrap();
-    let mut job = Mp4IndexJob::new(
-        &opened.movie,
-        Mp4View::SourcePhysical,
-        PlanLimits::default(),
-    )
-    .unwrap();
+    let mut job = Mp4IndexJob::new(&opened.movie, PlanLimits::default()).unwrap();
     let before = b.used();
     assert!(!job.poll(&mut WorkBudget::new(0), &off()).unwrap());
     assert_eq!(b.used(), before);
@@ -913,7 +906,7 @@ fn stale_foreign_source_and_foreign_pool_windows_preserve_live_request() {
 #[test]
 fn eof_mp4_seek_replays_all_source_preroll_without_editing_packet_time() {
     let raw = include_bytes!("fixtures/mp4/r-front-stco.mov");
-    let (mut p, _) = mp4(raw, Mp4View::SourcePhysical, 1, 1).unwrap();
+    let (mut p, _) = mp4(raw, View::Source, 1, 1).unwrap();
     let old = collect(&mut p, 1).unwrap();
     let first = &old[0];
     assert!(p.current(first));
@@ -1012,7 +1005,7 @@ fn paused_seek_changes_scope_now_and_waits_for_resume_before_any_io() {
 #[test]
 fn track_switch_keeps_all_mp4_source_packets_and_marks_unselected() {
     let raw = include_bytes!("fixtures/mp4/r-multitrack.mov");
-    let (mut p, _) = mp4(raw, Mp4View::SourcePhysical, 1, 1).unwrap();
+    let (mut p, _) = mp4(raw, View::Source, 1, 1).unwrap();
     let old = first_packet(&mut p);
     let selection = Selection::Tracks {
         video: Some(TrackKey::Mp4(1)),
@@ -1136,7 +1129,7 @@ fn late_preseek_range_reply_is_rejected_before_current_source_advance() {
 fn retained_real_mp4_packet_config_and_native_view_outlive_player() {
     let (mut p, b) = mp4(
         include_bytes!("fixtures/mp4/r-front-stco.mov"),
-        Mp4View::PinnedMov9NoParseNoFillin,
+        View::Demux,
         7,
         1,
     )
@@ -1215,6 +1208,7 @@ fn actual_queue_pressure_stops_read_and_release_resumes_whole_operation() {
             1,
             triergon_mpegts::ParseLimits::default(),
             SourceTimePolicy::RelativeEpochZero,
+            triergon_mpegts::psi::DescriptorNamespace::Unspecified,
         )
         .unwrap(),
         SourceOwner::new(source),
@@ -1252,7 +1246,7 @@ fn actual_queue_pressure_stops_read_and_release_resumes_whole_operation() {
 #[test]
 fn real_mp4_avc_packets_frame_as_annex_b_from_their_source_bytes() {
     let raw = include_bytes!("fixtures/mp4/encoded-avc-aac-front.mp4");
-    let (mut p, b) = mp4(raw, Mp4View::SourcePhysical, 7, 17).unwrap();
+    let (mut p, b) = mp4(raw, View::Source, 7, 17).unwrap();
     let out = collect(&mut p, 17).unwrap();
     let packets: Vec<_> = mp4_packets(&out)
         .into_iter()
@@ -1334,12 +1328,7 @@ fn cancelled_opener_and_probe_cannot_later_publish_ready() {
 fn mp4_plan_cannot_attach_to_another_entity_or_generation() {
     let raw = include_bytes!("fixtures/mp4/r-front-stco.mov");
     let (opened, b) = open(raw, 7, 1).unwrap();
-    let mut job = Mp4IndexJob::new(
-        &opened.movie,
-        Mp4View::SourcePhysical,
-        PlanLimits::default(),
-    )
-    .unwrap();
+    let mut job = Mp4IndexJob::new(&opened.movie, PlanLimits::default()).unwrap();
     while !job.poll(&mut WorkBudget::new(11), &off()).unwrap() {}
     let plan = job.finish().unwrap();
     let other = InputCursor::new(
@@ -1356,12 +1345,7 @@ fn mp4_plan_cannot_attach_to_another_entity_or_generation() {
         Engine::mp4(other, plan, 1 << 20),
         Err(C::SourceMismatch)
     ));
-    let mut job = Mp4IndexJob::new(
-        &opened.movie,
-        Mp4View::SourcePhysical,
-        PlanLimits::default(),
-    )
-    .unwrap();
+    let mut job = Mp4IndexJob::new(&opened.movie, PlanLimits::default()).unwrap();
     while !job.poll(&mut WorkBudget::new(11), &off()).unwrap() {}
     let plan = job.finish().unwrap();
     let other = InputCursor::new(
@@ -1386,7 +1370,6 @@ fn actual_bounded_source_index_refuses_resource_exhaustion_and_releases_owners()
     let before = b.used();
     let mut job = Mp4IndexJob::new(
         &opened.movie,
-        Mp4View::SourcePhysical,
         PlanLimits {
             samples: 2,
             ..PlanLimits::default()
@@ -1476,13 +1459,13 @@ fn full_native_ts_packets_are_distinct_from_source_pes_and_keep_literal_fields()
             64,
         )
         .unwrap();
-        let engine = Engine::ts_native(
+        let engine = compat::pes::open(
             input,
-            PacketFormat::Ts188,
             1,
             triergon_mpegts::ParseLimits::default(),
             SourceTimePolicy::Unanchored,
-            TsNativeSelection { pid, carriage },
+            triergon_mpegts::psi::DescriptorNamespace::Unspecified,
+            &[compat::pes::PidSelection::registered(pid, carriage)],
         )
         .unwrap();
         let mut p = Player::new(
@@ -1558,16 +1541,16 @@ fn native_carriage_refusal_keeps_source_and_is_not_a_native_codec_error() {
         64,
     )
     .unwrap();
-    let engine = Engine::ts_native(
+    let engine = compat::pes::open(
         input,
-        PacketFormat::Ts188,
         1,
         triergon_mpegts::ParseLimits::default(),
         SourceTimePolicy::RelativeEpochZero,
-        TsNativeSelection {
-            pid: 256,
-            carriage: RegisteredCarriage::Hevc,
-        },
+        triergon_mpegts::psi::DescriptorNamespace::Unspecified,
+        &[compat::pes::PidSelection::registered(
+            256,
+            RegisteredCarriage::Hevc,
+        )],
     )
     .unwrap();
     let mut p = Player::new(
@@ -1592,32 +1575,7 @@ fn native_carriage_refusal_keeps_source_and_is_not_a_native_codec_error() {
     );
 }
 #[test]
-fn full_native_m2ts_position_is_refused_without_inventing_startup_evidence() {
-    let b = pool();
-    let input = InputCursor::new(
-        &b,
-        ID,
-        SourceCapabilities {
-            length: Some(576),
-            random_access: true,
-        },
-        64,
-    )
-    .unwrap();
-    assert!(matches!(
-        Engine::ts_native(
-            input,
-            PacketFormat::M2ts192,
-            1,
-            triergon_mpegts::ParseLimits::default(),
-            SourceTimePolicy::Unanchored,
-            TsNativeSelection {
-                pid: 256,
-                carriage: triergon_mpegts::compat::pes::RegisteredCarriage::Avc
-            }
-        ),
-        Err(C::Unsupported(_))
-    ));
+fn m2ts_source_pes_needs_no_startup_evidence() {
     let (mut p, _) = ts(
         include_bytes!("fixtures/ts/m2ts192-opaque-prefix.m2ts"),
         PacketFormat::M2ts192,
@@ -1633,13 +1591,15 @@ fn real_encoded_matroska_uses_old183_reader_after_sequential_probe() {
     let (selected, b, _) = probe(raw, 7, true);
     assert_eq!(selected.format, Format::Matroska);
     let engine = Engine::matroska(
-        &b,
-        ID,
-        selected.input.capabilities(),
-        triergon_matroska::Limits::default(),
-        4096,
-    )
-    .unwrap();
+        triergon_matroska::Reader::new(
+            &b,
+            ID,
+            selected.input.capabilities(),
+            triergon_matroska::Limits::default(),
+            4096,
+        )
+        .unwrap(),
+    );
     let mut p = Player::new(
         engine,
         selected.source,
@@ -1673,7 +1633,7 @@ fn real_encoded_matroska_uses_old183_reader_after_sequential_probe() {
 #[test]
 fn real_movie_edit_seek_maps_exact_source_point_before_playback_fence() {
     let raw = include_bytes!("fixtures/mp4/r-edits-repeat.mov");
-    let (mut p, _) = mp4(raw, Mp4View::SourcePhysical, 7, 1).unwrap();
+    let (mut p, _) = mp4(raw, View::Source, 7, 1).unwrap();
     let old = first_packet(&mut p);
     let Some(Engine::Mp4(engine)) = p.engine() else {
         panic!()
@@ -1714,8 +1674,8 @@ fn real_movie_edit_seek_maps_exact_source_point_before_playback_fence() {
 #[test]
 fn movie_seek_command_cannot_cross_source_owner_pools() {
     let raw = include_bytes!("fixtures/mp4/r-front-stco.mov");
-    let (a, _) = mp4(raw, Mp4View::SourcePhysical, 7, 1).unwrap();
-    let (mut b, _) = mp4(raw, Mp4View::SourcePhysical, 7, 1).unwrap();
+    let (a, _) = mp4(raw, View::Source, 7, 1).unwrap();
+    let (mut b, _) = mp4(raw, View::Source, 7, 1).unwrap();
     let Some(Engine::Mp4(engine)) = a.engine() else {
         panic!()
     };
@@ -1745,12 +1705,7 @@ fn front_moov_mp4_streams_real_samples_without_source_seek_or_preloading_mdat() 
         ));
         let at = opened.input.position();
         assert!(at < raw.len() as u64);
-        let mut index = Mp4IndexJob::new(
-            &opened.movie,
-            Mp4View::SourcePhysical,
-            PlanLimits::default(),
-        )
-        .unwrap();
+        let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default()).unwrap();
         while !index.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
         let plan = index.finish().unwrap();
         let mut player = Player::new(
@@ -1802,12 +1757,13 @@ fn real_ts_entity_transition_preserves_partial_pes_and_requires_explicit_logical
         64,
     )
     .unwrap();
-    let engine = Engine::ts_segmented(
+    let engine = Engine::ts_entities(
         input,
         PacketFormat::Ts188,
         1,
         triergon_mpegts::ParseLimits::default(),
         SourceTimePolicy::RelativeEpochZero,
+        triergon_mpegts::psi::DescriptorNamespace::Unspecified,
     )
     .unwrap();
     let mut player = Player::new(
@@ -1938,16 +1894,16 @@ fn native_ts_projection_only_replaces_source_pes_for_its_selected_pid() {
         64,
     )
     .unwrap();
-    let engine = Engine::ts_native(
+    let engine = compat::pes::open(
         input,
-        PacketFormat::Ts188,
         1,
         triergon_mpegts::ParseLimits::default(),
         SourceTimePolicy::RelativeEpochZero,
-        TsNativeSelection {
-            pid: 256,
-            carriage: RegisteredCarriage::Avc,
-        },
+        triergon_mpegts::psi::DescriptorNamespace::Unspecified,
+        &[compat::pes::PidSelection::registered(
+            256,
+            RegisteredCarriage::Avc,
+        )],
     )
     .unwrap();
     let mut p = Player::new(
@@ -2172,9 +2128,9 @@ fn private_audio_mismatch_reports_refusal_and_retains_source_packet() {
 }
 
 #[test]
-fn private_audio_policy_and_legacy_constructor_replay_the_same_packets_after_seek() {
+fn private_audio_policy_and_pid_selection_replay_the_same_packets_after_seek() {
     let raw = include_bytes!("fixtures/ts/program-private-avc-dvb.ts");
-    let open = |legacy| {
+    let open = |general| {
         let capabilities = SourceCapabilities {
             length: Some(raw.len() as u64),
             random_access: true,
@@ -2186,14 +2142,17 @@ fn private_audio_policy_and_legacy_constructor_replay_the_same_packets_after_see
         };
         let limits = triergon_mpegts::ParseLimits::default();
         let clock = SourceTimePolicy::RelativeEpochZero;
-        let engine = if legacy {
-            Engine::ts_native_private_audio_v1(
+        let engine = if general {
+            compat::pes::open(
                 io.input,
-                PacketFormat::Ts188,
                 1,
                 limits,
                 clock,
-                audio,
+                triergon_mpegts::psi::DescriptorNamespace::Unspecified,
+                &[compat::pes::PidSelection {
+                    pid: audio.pid,
+                    carriage: compat::pes::Carriage::PrivateAudio(audio.carriage),
+                }],
             )
         } else {
             compat::pes::open_private_audio(io.input, 1, limits, clock, audio)
@@ -2204,10 +2163,10 @@ fn private_audio_policy_and_legacy_constructor_replay_the_same_packets_after_see
         player.set_clock_view(ClockChoice::Demux).unwrap();
         player
     };
-    let (mut legacy, mut policy) = (open(true), open(false));
+    let (mut general, mut policy) = (open(true), open(false));
     for replay in [false, true] {
         if replay {
-            for player in [&mut legacy, &mut policy] {
+            for player in [&mut general, &mut policy] {
                 let video = TrackKey::Ts {
                     program: 1,
                     pid: 256,
@@ -2225,10 +2184,10 @@ fn private_audio_policy_and_legacy_constructor_replay_the_same_packets_after_see
                 );
             }
         }
-        let old = collect(&mut legacy, 128).unwrap();
+        let old = collect(&mut general, 128).unwrap();
         let new = collect(&mut policy, 128).unwrap();
         assert_eq!(
-            (legacy.state(), policy.state()),
+            (general.state(), policy.state()),
             (State::Ended, State::Ended)
         );
         assert_source_pes_match(&old, &new);
@@ -2250,36 +2209,6 @@ fn private_audio_policy_and_legacy_constructor_replay_the_same_packets_after_see
         assert!(!expected.is_empty());
         assert_eq!(expected, audio_packets(&new));
     }
-}
-
-#[test]
-fn private_audio_does_not_admit_m2ts_by_construction() {
-    use triergon_mpegts::compat::pes::PrivateAudioCarriage as Carriage;
-    let budget = pool();
-    let input = InputCursor::new(
-        &budget,
-        ID,
-        SourceCapabilities {
-            length: None,
-            random_access: false,
-        },
-        64,
-    )
-    .unwrap();
-    assert!(matches!(
-        Engine::ts_native_private_audio_v1(
-            input,
-            PacketFormat::M2ts192,
-            1,
-            triergon_mpegts::ParseLimits::default(),
-            SourceTimePolicy::RelativeEpochZero,
-            PrivateAudioSelection {
-                pid: 257,
-                carriage: Carriage::DvbAc3Tag
-            },
-        ),
-        Err(C::Unsupported(_))
-    ));
 }
 
 #[test]
@@ -2379,16 +2308,18 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
         (mp4_raw.as_slice(), 4096),
         (&dolby_entry, 7),
     ] {
-        let (mut mp4, mp4_pool) = mp4(mp4_raw, Mp4View::SourcePhysical, quantum, 3).unwrap();
+        let (mut mp4, mp4_pool) = mp4(mp4_raw, View::Source, quantum, 3).unwrap();
         let (selected, mkv_pool, _) = probe(webm_raw, quantum, false);
         let engine = Engine::matroska(
-            &mkv_pool,
-            ID,
-            selected.input.capabilities(),
-            triergon_matroska::Limits::default(),
-            4096,
-        )
-        .unwrap();
+            triergon_matroska::Reader::new(
+                &mkv_pool,
+                ID,
+                selected.input.capabilities(),
+                triergon_matroska::Limits::default(),
+                4096,
+            )
+            .unwrap(),
+        );
         let mut mkv = Player::new(
             engine,
             selected.source,
@@ -2519,7 +2450,7 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
 #[test]
 fn indexed_mp4_seek_starts_at_late_sync_and_republishes_its_configuration() {
     let raw = include_bytes!("fixtures/mp4/r-description-change.mov");
-    let (mut p, _) = mp4(raw, Mp4View::SourcePhysical, 7, 1).unwrap();
+    let (mut p, _) = mp4(raw, View::Source, 7, 1).unwrap();
     let old = first_packet(&mut p);
     let target = Time::new(7, 2).unwrap();
     let mut unsafe_transition = p
@@ -2609,12 +2540,7 @@ fn indexed_mp4_seek_budget_covers_preroll_and_stops_at_the_target() {
     // 5s packet needs a sixth window.
     for seek_input_bytes in [34, 35] {
         let (opened, _) = open(raw, 7, 64).unwrap();
-        let mut index = Mp4IndexJob::new(
-            &opened.movie,
-            Mp4View::SourcePhysical,
-            PlanLimits::default(),
-        )
-        .unwrap();
+        let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default()).unwrap();
         while !index.poll(&mut WorkBudget::new(64), &off()).unwrap() {}
         let engine = Engine::mp4(opened.input, index.finish().unwrap(), 1 << 20).unwrap();
         let mut player = Player::new(
@@ -2662,7 +2588,7 @@ fn indexed_mp4_seek_budget_covers_preroll_and_stops_at_the_target() {
 #[test]
 fn indexed_mp4_seek_keeps_selected_subtitle_prefix_and_only_late_video() {
     let raw = include_bytes!("fixtures/mp4/r-multitrack.mov");
-    let (mut p, _) = mp4(raw, Mp4View::SourcePhysical, 7, 1).unwrap();
+    let (mut p, _) = mp4(raw, View::Source, 7, 1).unwrap();
     let before = collect(&mut p, 7).unwrap();
     let all = mp4_packets(&before);
     let expected: Vec<_> = all
@@ -2730,12 +2656,7 @@ fn indexed_mp4_seek_reads_aac_preroll_and_matches_the_encoded_suffix() {
         OpenProgress::Ready
     ) {}
     let opened = open.finish().unwrap();
-    let mut index = Mp4IndexJob::new(
-        &opened.movie,
-        Mp4View::SourcePhysical,
-        PlanLimits::default(),
-    )
-    .unwrap();
+    let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default()).unwrap();
     while !index.poll(&mut WorkBudget::new(64), &off()).unwrap() {}
     let engine = Engine::mp4(opened.input, index.finish().unwrap(), 1 << 20).unwrap();
     let mut p = Player::new(
@@ -2889,12 +2810,7 @@ fn combined_playback_probe_opens_real_sequential_mp4() {
     });
     assert!(ready);
     let opened = open.finish().unwrap();
-    let mut index = Mp4IndexJob::new(
-        &opened.movie,
-        Mp4View::SourcePhysical,
-        PlanLimits::default(),
-    )
-    .unwrap();
+    let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default()).unwrap();
     assert!((0..100_000).any(|_| index.poll(&mut WorkBudget::new(1), &off()).unwrap()));
     let mut player = Player::new(
         Engine::mp4(opened.input, index.finish().unwrap(), 1 << 20).unwrap(),
@@ -2970,12 +2886,7 @@ fn open_with_timing_policy(
 
 fn native_range_player(bytes: &[u8]) -> (Player<Observed>, mp4_open::Movie, Calls, Budget) {
     let (opened, calls, pool) = observed_mp4_open(bytes);
-    let mut job = Mp4IndexJob::new(
-        &opened.movie,
-        Mp4View::PinnedMov9NoParseNoFillin,
-        PlanLimits::default(),
-    )
-    .unwrap();
+    let mut job = compat::mov::index(&opened.movie, PlanLimits::default()).unwrap();
     assert!((0..100_000).any(|_| job.poll(&mut WorkBudget::new(17), &off()).unwrap()));
     let engine = Engine::mp4(opened.input, job.finish().unwrap(), 1 << 20).unwrap();
     let mut player = Player::new(
@@ -3159,8 +3070,7 @@ fn bounded_timing_accepts_forward_index_with_finite_media() {
     let bytes = include_bytes!("../../isobmff/tests/fixtures/bad-stts-count-mismatch.mov");
     let (opened, _, _) =
         open_with_timing_policy(bytes, TimingRunPolicy::BoundedPrefix, false).unwrap();
-    let mut job =
-        Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default()).unwrap();
+    let mut job = compat::mov::index_front(&opened.movie, PlanLimits::default()).unwrap();
     assert!((0..100_000).any(|_| job.poll(&mut WorkBudget::new(1), &off()).unwrap()));
     let plan = job.finish().unwrap();
     assert_eq!(plan.demux_rows().len(), 6);
@@ -3183,7 +3093,7 @@ fn forward_encoded_edits_keep_aac_preroll_and_trim_in_source_order() {
     let limits = PlanLimits::default();
     let mut index = compat::mov::forward_encoded_edits(&opened.movie, &plans, limits).unwrap();
     while !index.poll(&mut WorkBudget::new(17), &off()).unwrap() {}
-    let engine = Engine::mp4_native_terminal_v1(
+    let engine = compat::mov::open_front(
         opened.input,
         index.finish().unwrap(),
         1 << 20,
@@ -3267,10 +3177,9 @@ fn forward_fragment_edits_keep_source_clocks_and_trim_once() {
         let mut open = Mp4Open::new_progressive(selected, OpenLimits::default()).unwrap();
         run_open(&mut open, 17).unwrap();
         let opened = open.finish().unwrap();
-        let mut index =
-            Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default()).unwrap();
+        let mut index = compat::mov::index_front(&opened.movie, PlanLimits::default()).unwrap();
         assert!((0..100_000).any(|_| index.poll(&mut WorkBudget::new(17), &off()).unwrap()));
-        let engine = Engine::mp4_native_terminal_v1(
+        let engine = compat::mov::open_front(
             opened.input,
             index.finish().unwrap(),
             1 << 20,
@@ -3344,8 +3253,7 @@ fn forward_fragment_ranges_are_checked_before_initialization_edit_support() {
         let mut open = Mp4Open::new_progressive(selected, OpenLimits::default()).unwrap();
         run_open(&mut open, 17).unwrap();
         let opened = open.finish().unwrap();
-        let mut index =
-            Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default()).unwrap();
+        let mut index = compat::mov::index_front(&opened.movie, PlanLimits::default()).unwrap();
         for _ in 0..100_000 {
             match index.poll(&mut WorkBudget::new(17), &off()) {
                 Err(error) => return error,
@@ -3408,7 +3316,7 @@ fn forward_encoded_edit_drains_samples_outside_the_presentation() {
         let prepared = index.finish().unwrap();
         assert_eq!(prepared.source_rows().len(), 21);
         assert_eq!(prepared.rows(), 10);
-        let engine = Engine::mp4_native_terminal_v1(
+        let engine = compat::mov::open_front(
             opened.input,
             prepared,
             1 << 20,
@@ -3524,21 +3432,10 @@ fn bounded_timing_range_playback_preserves_packets_and_seeks() {
         assert_eq!(track.table().sample_count(), 6);
         assert_eq!(track.table().timing_run_surplus(), surplus);
         assert!(matches!(
-            Mp4IndexJob::new(
-                &opened.movie,
-                Mp4View::SourcePhysical,
-                PlanLimits::default()
-            ),
+            Mp4IndexJob::new(&opened.movie, PlanLimits::default()),
             Err(C::Invalid("source view requires exact timing coverage"))
         ));
-        assert!(
-            Mp4IndexJob::new(
-                &opened.movie,
-                Mp4View::PinnedMov9NoParseNoFillin,
-                PlanLimits::default(),
-            )
-            .is_ok()
-        );
+        assert!(compat::mov::index(&opened.movie, PlanLimits::default()).is_ok());
 
         let mut job = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
         assert!((0..100_000).any(|_| job.poll(&mut WorkBudget::new(3), &off()).unwrap()));
@@ -4217,8 +4114,7 @@ fn encoded_range_player(raw: &[u8]) -> (Player<ByteSource>, mp4_open::Movie) {
     let (opened, plans) = encoded_range_open(raw);
     let cancel = off();
     let mut index =
-        Mp4IndexJob::new_native_encoded_range(&opened.movie, &plans, PlanLimits::default())
-            .unwrap();
+        compat::mov::index_encoded_range(&opened.movie, &plans, PlanLimits::default()).unwrap();
     while !index.poll(&mut WorkBudget::new(4096), &cancel).unwrap() {}
     let plan = index.finish().unwrap();
     drop(plans);
@@ -4791,16 +4687,18 @@ fn direct_read_exposes_pending_input_after_one_transport_poll() {
     let (mut source, calls, _) = observed(&b, raw, 4096, false);
     source.pending = 3;
     let engine = Engine::matroska(
-        &b,
-        ID,
-        SourceCapabilities {
-            length: Some(raw.len() as u64),
-            random_access: true,
-        },
-        triergon_matroska::Limits::default(),
-        4096,
-    )
-    .unwrap();
+        triergon_matroska::Reader::new(
+            &b,
+            ID,
+            SourceCapabilities {
+                length: Some(raw.len() as u64),
+                random_access: true,
+            },
+            triergon_matroska::Limits::default(),
+            4096,
+        )
+        .unwrap(),
+    );
     let mut player = Player::new(
         engine,
         SourceOwner::new(source),

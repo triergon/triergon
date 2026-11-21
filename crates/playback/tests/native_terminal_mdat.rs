@@ -2,10 +2,11 @@ mod common;
 use common::{byte_input, run_open};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, SourceCapabilities, SourceId, WorkBudget};
+use triergon_playback::compat;
 use triergon_playback::{
     ByteSource,
     mp4_open::{Mp4Open, OpenLimits, OpenedMp4},
-    mp4_plan::{Mp4IndexJob, Mp4View, PlanLimits},
+    mp4_plan::PlanLimits,
 };
 
 const REGULAR: &[u8] = include_bytes!("fixtures/open-ended/regular-terminal.mp4");
@@ -29,7 +30,7 @@ fn open(raw: &[u8], known: bool) -> (OpenedMp4<ByteSource>, Budget) {
 
 fn selected_native_plan(known: bool) {
     let (opened, _pool) = open(REGULAR, known);
-    let mut job = Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default())
+    let mut job = compat::mov::index_front(&opened.movie, PlanLimits::default())
         .expect("explicit native terminal profile must admit actual front terminal metadata");
     for _ in 0..200_000 {
         if job
@@ -75,22 +76,14 @@ fn native_terminal_known_length_regular_index_is_complete() {
 #[test]
 fn default_native_terminal_refusal_stays_explicit() {
     let (opened, _pool) = open(REGULAR, false);
-    assert!(
-        Mp4IndexJob::new(
-            &opened.movie,
-            Mp4View::PinnedMov9NoParseNoFillin,
-            PlanLimits::default()
-        )
-        .is_err()
-    );
+    assert!(compat::mov::index(&opened.movie, PlanLimits::default()).is_err());
 }
 
 #[test]
 fn finite_initial_native_front_plan_cannot_use_unattached_indexed_end() {
     let raw = include_bytes!("fixtures/open-ended/pending-terminal.mp4");
     let (opened, _pool) = open(raw, false);
-    let mut job =
-        Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default()).unwrap();
+    let mut job = compat::mov::index_front(&opened.movie, PlanLimits::default()).unwrap();
     while !job
         .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
         .unwrap()

@@ -11,7 +11,7 @@ use triergon_core::{
 use triergon_playback::{
     io::{SelectedInput, SourceOwner},
     mp4_open::{MetadataReadScope, Mp4Open, OpenLimits, OpenProgress},
-    mp4_plan::{Mp4IndexJob, Mp4View, PlanLimits},
+    mp4_plan::{Mp4IndexJob, PlanLimits},
     progressive::ProgressiveLimits,
     *,
 };
@@ -137,12 +137,7 @@ fn make(
     allow_end: bool,
 ) -> (Player<FiniteSource>, Budget, Arc<Signals>) {
     let (opened, b, signals) = opened(raw, known, allow_end);
-    let mut index = Mp4IndexJob::new(
-        &opened.movie,
-        Mp4View::SourcePhysical,
-        PlanLimits::default(),
-    )
-    .unwrap();
+    let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default()).unwrap();
     for _ in 0..200_000 {
         if index.poll(&mut WorkBudget::new(1), &off()).unwrap() {
             break;
@@ -508,19 +503,10 @@ fn open_ended_unproven_native_and_unattached_completion_are_refused() {
         matches!(opened.movie.read_scope(), MetadataReadScope::FrontMetadataBeforeMdat(h) if h.size.is_none())
     );
     assert!(matches!(
-        Mp4IndexJob::new(
-            &opened.movie,
-            Mp4View::PinnedMov9NoParseNoFillin,
-            PlanLimits::default()
-        ),
+        compat::mov::index(&opened.movie, PlanLimits::default()),
         Err(Error::Unsupported(_))
     ));
-    let mut index = Mp4IndexJob::new(
-        &opened.movie,
-        Mp4View::SourcePhysical,
-        PlanLimits::default(),
-    )
-    .unwrap();
+    let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default()).unwrap();
     while !index.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
     let plan = index.finish().unwrap();
     assert!(matches!(

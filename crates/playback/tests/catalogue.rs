@@ -1,5 +1,5 @@
 mod common;
-use common::{collect, off, run_open};
+use common::{View, collect, index_job, off, run_open};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -12,7 +12,7 @@ use triergon_playback::{
     catalogue::{Mp4Catalogue, Mp4CatalogueMode},
     io::{SelectedInput, SourceOwner},
     mp4_open::{Mp4Open, OpenLimits, OpenProgress, OpenedMp4},
-    mp4_plan::{Mp4IndexJob, Mp4View, PlanLimits, PreparedMp4},
+    mp4_plan::{Mp4IndexJob, PlanLimits, PreparedMp4},
     *,
 };
 mod gold {
@@ -102,8 +102,8 @@ fn range_opener(
     };
     (open.unwrap(), signals)
 }
-fn index(opened: &OpenedMp4<Transport>, view: Mp4View) -> PreparedMp4 {
-    let mut job = Mp4IndexJob::new(&opened.movie, view, PlanLimits::default()).unwrap();
+fn index(opened: &OpenedMp4<Transport>, view: View) -> PreparedMp4 {
+    let mut job = index_job(&opened.movie, view, PlanLimits::default()).unwrap();
     for _ in 0..200_000 {
         if job.poll(&mut WorkBudget::new(1), &off()).unwrap() {
             return job.finish().unwrap();
@@ -187,7 +187,7 @@ fn catalogue_required_opener_pressure_keeps_source_alive_and_complete_facts() {
             assert!(ready, "{}", case.name);
             assert!(refused > 0);
             let opened = open.finish().unwrap();
-            let plan = index(&opened, Mp4View::SourcePhysical);
+            let plan = index(&opened, View::Source);
             check_plan(&plan, case);
             for raw in opened.movie.raw_roots() {
                 let start = usize::try_from(raw.header().start).unwrap();
@@ -210,7 +210,7 @@ fn prepared(
     b: &Budget,
     id: SourceId,
     case: &gold::Case,
-    view: Mp4View,
+    view: View,
 ) -> (OpenedMp4<Transport>, PreparedMp4, Arc<Signals>) {
     let (mut job, signals) = opener(b, id, case.bytes, 7);
     run_open(&mut job, 1).unwrap();
@@ -224,7 +224,7 @@ fn player(
     case: &gold::Case,
     policy: PlayerPolicy,
 ) -> (Player<Transport>, Arc<Signals>) {
-    let (opened, plan, signals) = prepared(b, id, case, Mp4View::SourcePhysical);
+    let (opened, plan, signals) = prepared(b, id, case, View::Source);
     (
         Player::new(
             Engine::mp4(opened.input, plan, 1 << 20).unwrap(),
@@ -240,7 +240,7 @@ fn candidate(
     b: &Budget,
     id: SourceId,
     case: &gold::Case,
-    view: Mp4View,
+    view: View,
 ) -> (Option<Mp4Catalogue<Transport>>, Arc<Signals>) {
     let (opened, plan, signals) = prepared(b, id, case, view);
     (
@@ -385,7 +385,7 @@ fn catalogue_all_valid_original_movies_replace_without_rewriting_source_facts() 
         );
         let retained = first_packet(&mut p);
         fill(&mut p, 2);
-        let (mut next, new) = candidate(&b, SourceId(8202), case, Mp4View::SourcePhysical);
+        let (mut next, new) = candidate(&b, SourceId(8202), case, View::Source);
         let before = (
             old.polls.load(Ordering::Relaxed),
             new.polls.load(Ordering::Relaxed),
@@ -447,7 +447,7 @@ fn catalogue_retirement_pressure_returns_candidate_and_keeps_old_output_current(
     let (mut p, old) = player(&b, SourceId(8301), &gold::CASES[0], PlayerPolicy::default());
     let output = first_packet(&mut p);
     fill(&mut p, 2);
-    let (mut next, new) = candidate(&b, SourceId(8302), &gold::CASES[4], Mp4View::SourcePhysical);
+    let (mut next, new) = candidate(&b, SourceId(8302), &gold::CASES[4], View::Source);
     let polls = (
         old.polls.load(Ordering::Relaxed),
         new.polls.load(Ordering::Relaxed),
@@ -489,7 +489,7 @@ fn catalogue_workzero_and_attempt_cancel_preserve_both_entities() {
     let b = Budget::new(64 << 20).unwrap();
     let (mut p, old) = player(&b, SourceId(8401), &gold::CASES[0], PlayerPolicy::default());
     let output = first_packet(&mut p);
-    let (mut next, new) = candidate(&b, SourceId(8402), &gold::CASES[4], Mp4View::SourcePhysical);
+    let (mut next, new) = candidate(&b, SourceId(8402), &gold::CASES[4], View::Source);
     let before = (
         b.used(),
         old.polls.load(Ordering::Relaxed),
@@ -534,7 +534,7 @@ fn catalogue_dropped_preparation_and_late_cancellation_are_rollback_only() {
     let (mut p, old) = player(&b, SourceId(8501), &gold::CASES[0], PlayerPolicy::default());
     let output = first_packet(&mut p);
     fill(&mut p, 2);
-    let (mut next, new) = candidate(&b, SourceId(8502), &gold::CASES[4], Mp4View::SourcePhysical);
+    let (mut next, new) = candidate(&b, SourceId(8502), &gold::CASES[4], View::Source);
     let before = b.used();
     let cancel = off();
     {
@@ -580,7 +580,7 @@ fn catalogue_identity_selection_and_foreign_pool_refusals_are_non_destructive() 
             C::Invalid("selected source track missing/disabled/kind"),
         ),
     ] {
-        let (mut next, signals) = candidate(pool, id, &gold::CASES[0], Mp4View::SourcePhysical);
+        let (mut next, signals) = candidate(pool, id, &gold::CASES[0], View::Source);
         assert!(
             matches!(p.replace_mp4_catalogue(&mut next, selection, &mut WorkBudget::new(1), &off()),
             Err(e) if e == expected)
@@ -598,7 +598,7 @@ fn catalogue_identity_selection_and_foreign_pool_refusals_are_non_destructive() 
 fn catalogue_selection_storage_pressure_retries_before_retiring_any_owner() {
     let b = Budget::new(64 << 20).unwrap();
     let (mut p, old) = player(&b, SourceId(8701), &gold::CASES[0], PlayerPolicy::default());
-    let (mut next, new) = candidate(&b, SourceId(8702), &gold::CASES[0], Mp4View::SourcePhysical);
+    let (mut next, new) = candidate(&b, SourceId(8702), &gold::CASES[0], View::Source);
     let selected = Selection::Tracks {
         video: Some(TrackKey::Mp4(1)),
         audio: None,
@@ -633,7 +633,7 @@ fn catalogue_empty_retirement_under_pressure_retains_unqueued_configuration() {
         Progress::Yield
     ));
     assert_eq!(p.queued(), 0);
-    let (mut next, _) = candidate(&b, SourceId(8802), &gold::CASES[4], Mp4View::SourcePhysical);
+    let (mut next, _) = candidate(&b, SourceId(8802), &gold::CASES[4], View::Source);
     let hold = b.reserve(b.available()).unwrap();
     let retired = p
         .replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off())
@@ -662,7 +662,7 @@ fn catalogue_pause_survives_replacement_and_resume_emits_fresh_configuration() {
     let (mut p, old) = player(&b, SourceId(8901), &gold::CASES[0], PlayerPolicy::default());
     fill(&mut p, 2);
     p.pause(true).unwrap();
-    let (mut next, new) = candidate(&b, SourceId(8902), &gold::CASES[4], Mp4View::SourcePhysical);
+    let (mut next, new) = candidate(&b, SourceId(8902), &gold::CASES[4], View::Source);
     let mut retired = p
         .replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off())
         .unwrap()
@@ -691,7 +691,7 @@ fn catalogue_eof_handoff_keeps_old_outputs_and_restarts_only_new_entity() {
     let (mut p, old) = player(&b, SourceId(9001), &gold::CASES[0], PlayerPolicy::default());
     let out = collect(&mut p, 1).unwrap();
     assert_eq!(p.state(), State::Ended);
-    let (mut next, _) = candidate(&b, SourceId(9002), &gold::CASES[4], Mp4View::SourcePhysical);
+    let (mut next, _) = candidate(&b, SourceId(9002), &gold::CASES[4], View::Source);
     let retired = p
         .replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off())
         .unwrap()
@@ -720,7 +720,7 @@ fn catalogue_old_range_receipt_remains_readable_and_late_completion_is_rejected(
         }
     }
     let old_request = p.pending_request().unwrap().clone();
-    let (mut next, _) = candidate(&b, SourceId(9102), &gold::CASES[4], Mp4View::SourcePhysical);
+    let (mut next, _) = candidate(&b, SourceId(9102), &gold::CASES[4], View::Source);
     let retired = p
         .replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off())
         .unwrap()
@@ -766,7 +766,7 @@ fn catalogue_replacement_does_not_reset_cumulative_event_limit() {
         },
     );
     fill(&mut p, 2);
-    let (mut next, _) = candidate(&b, SourceId(9202), &gold::CASES[4], Mp4View::SourcePhysical);
+    let (mut next, _) = candidate(&b, SourceId(9202), &gold::CASES[4], View::Source);
     let retired = p
         .replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off())
         .unwrap()
@@ -794,12 +794,7 @@ fn catalogue_explicit_native_projection_keeps_literal_source_and_clock_view() {
     let b = Budget::new(64 << 20).unwrap();
     let (mut p, _) = player(&b, SourceId(9301), &gold::CASES[0], PlayerPolicy::default());
     p.set_clock_view(ClockChoice::Demux).unwrap();
-    let (mut next, _) = candidate(
-        &b,
-        SourceId(9302),
-        &gold::CASES[7],
-        Mp4View::PinnedMov9NoParseNoFillin,
-    );
+    let (mut next, _) = candidate(&b, SourceId(9302), &gold::CASES[7], View::Demux);
     p.replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off())
         .unwrap()
         .unwrap();
@@ -859,11 +854,7 @@ fn catalogue_bad_preparation_and_stopped_player_do_not_consume_new_owner() {
                 Ok(OpenProgress::Ready) => {
                     // Range validation belongs to the real index, not open metadata.
                     let opened = bad.finish().unwrap();
-                    match Mp4IndexJob::new(
-                        &opened.movie,
-                        Mp4View::SourcePhysical,
-                        PlanLimits::default(),
-                    ) {
+                    match Mp4IndexJob::new(&opened.movie, PlanLimits::default()) {
                         Err(_) => failed = true,
                         Ok(mut index) => {
                             for _ in 0..200_000 {
@@ -886,7 +877,7 @@ fn catalogue_bad_preparation_and_stopped_player_do_not_consume_new_owner() {
     }
     p.stop();
     once(&old);
-    let (mut next, new) = candidate(&b, SourceId(9403), &gold::CASES[0], Mp4View::SourcePhysical);
+    let (mut next, new) = candidate(&b, SourceId(9403), &gold::CASES[0], View::Source);
     assert!(matches!(
         p.replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off()),
         Err(Error::Closed)
@@ -930,7 +921,7 @@ fn progressive_candidate(
     raw: &[u8],
 ) -> (Option<Mp4Catalogue<Transport>>, Arc<Signals>) {
     let (opened, signals) = open_progressive(b, id, raw);
-    let plan = index(&opened, Mp4View::SourcePhysical);
+    let plan = index(&opened, View::Source);
     let catalogue = Mp4Catalogue::new(
         opened,
         plan,
@@ -954,8 +945,7 @@ fn catalogue_replacement_selects_native_terminal_and_waits_for_source_end() {
 
     let raw = include_bytes!("fixtures/open-ended/regular-terminal.mp4");
     let (opened, next_signals) = open_progressive(&b, SourceId(9512), raw);
-    let mut index =
-        Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default()).unwrap();
+    let mut index = compat::mov::index_front(&opened.movie, PlanLimits::default()).unwrap();
     let cancel = off();
     assert!((0..200_000).any(|_| index.poll(&mut WorkBudget::new(1), &cancel).unwrap()));
     let plan = index.finish().unwrap();
@@ -1103,7 +1093,7 @@ fn catalogue_replacement_terminal_mdat_needs_actual_source_end_and_keeps_unknown
 fn catalogue_second_inband_movie_stays_refused_without_implicit_replacement() {
     let b = Budget::new(64 << 20).unwrap();
     let case = &gold::CASES[8];
-    let (opened, plan, _) = prepared(&b, SourceId(9700), case, Mp4View::SourcePhysical);
+    let (opened, plan, _) = prepared(&b, SourceId(9700), case, View::Source);
     let moov = opened
         .movie
         .raw_roots()
@@ -1166,7 +1156,7 @@ fn catalogue_existing_seek_intent_is_retained_but_not_applied_to_new_source_cloc
         .unwrap()
     );
     let intent = p.seek_intent().unwrap();
-    let (mut next, _) = candidate(&b, SourceId(9802), &gold::CASES[0], Mp4View::SourcePhysical);
+    let (mut next, _) = candidate(&b, SourceId(9802), &gold::CASES[0], View::Source);
     let retired = p
         .replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off())
         .unwrap()
@@ -1261,7 +1251,7 @@ fn catalogue_pump_blocked_and_accepted_owners_must_retire_before_commit() {
         1,
     )
     .unwrap();
-    let (mut next, new) = candidate(&b, SourceId(9902), &gold::CASES[4], Mp4View::SourcePhysical);
+    let (mut next, new) = candidate(&b, SourceId(9902), &gold::CASES[4], View::Source);
     for _ in 0..200_000 {
         pump.step(&mut WorkBudget::new(1), &off()).unwrap();
         if pump.pending().is_some() {
@@ -1343,12 +1333,7 @@ fn catalogue_pump_sink_preparation_refusal_and_pause_are_transactional() {
         1,
     )
     .unwrap();
-    let (mut next, new) = candidate(
-        &b,
-        SourceId(10002),
-        &gold::CASES[4],
-        Mp4View::SourcePhysical,
-    );
+    let (mut next, new) = candidate(&b, SourceId(10002), &gold::CASES[4], View::Source);
     let before = b.used();
     assert!(
         pump.replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(0), &off())
@@ -1411,12 +1396,7 @@ fn catalogue_pump_cancel_during_sink_preparation_abandons_without_source_swap() 
         1,
     )
     .unwrap();
-    let (mut next, new) = candidate(
-        &b,
-        SourceId(10102),
-        &gold::CASES[4],
-        Mp4View::SourcePhysical,
-    );
+    let (mut next, new) = candidate(&b, SourceId(10102), &gold::CASES[4], View::Source);
     assert!(matches!(
         pump.replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &cancel),
         Err(C::Cancelled)
@@ -1450,12 +1430,7 @@ fn catalogue_stale_candidate_constructor_and_cancelled_opener_keep_active_source
         PlayerPolicy::default(),
     );
     let retained = first_packet(&mut p);
-    let (mut opened, plan, signals) = prepared(
-        &b,
-        SourceId(10202),
-        &gold::CASES[0],
-        Mp4View::SourcePhysical,
-    );
+    let (mut opened, plan, signals) = prepared(&b, SourceId(10202), &gold::CASES[0], View::Source);
     opened.input.reset(0).unwrap();
     assert!(matches!(
         Mp4Catalogue::new(opened, plan, 1 << 20, Mp4CatalogueMode::Indexed),
@@ -1510,7 +1485,7 @@ fn progressive_range_seek_promotes_the_same_fragmented_entity_through_the_pump()
         front.movie.read_scope(),
         mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(_)
     ));
-    let plan = index(&front, Mp4View::SourcePhysical);
+    let plan = index(&front, View::Source);
     let engine = Engine::mp4_progressive(
         front.input,
         plan,
@@ -1537,7 +1512,7 @@ fn progressive_range_seek_promotes_the_same_fragmented_entity_through_the_pump()
         front.movie.tracks()[0].fragments().len() < complete.movie.tracks()[0].fragments().len()
     );
     let original_candidate_generation = complete.input.generation();
-    let plan = index(&complete, Mp4View::SourcePhysical);
+    let plan = index(&complete, View::Source);
     let mut next =
         Some(Mp4Catalogue::new(complete, plan, 1 << 20, Mp4CatalogueMode::Indexed).unwrap());
     let old_polls = old.polls.load(Ordering::Relaxed);
@@ -1689,10 +1664,10 @@ fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges
     let id = SourceId(10402);
     let raw = include_bytes!("fixtures/mp4/f-multitrack.mp4");
     let (front, old) = open_progressive(&b, id, raw);
-    let mut job = Mp4IndexJob::new_native_terminal_v1(&front.movie, PlanLimits::default()).unwrap();
+    let mut job = compat::mov::index_front(&front.movie, PlanLimits::default()).unwrap();
     let cancel = off();
     assert!((0..200_000).any(|_| job.poll(&mut WorkBudget::new(1), &cancel).unwrap()));
-    let engine = Engine::mp4_native_terminal_v1(
+    let engine = compat::mov::open_front(
         front.input,
         job.finish().unwrap(),
         1 << 20,
@@ -1715,7 +1690,7 @@ fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges
 
     let (complete, new) = opener(&b, id, raw, 23);
     let complete = finish_range_open(complete);
-    let plan = index(&complete, Mp4View::PinnedMov9NoParseNoFillin);
+    let plan = index(&complete, View::Demux);
     let (candidate, movie) =
         Mp4Catalogue::new_with_movie(complete, plan, 1 << 20, Mp4CatalogueMode::Indexed).unwrap();
     let mut next = Some(candidate);

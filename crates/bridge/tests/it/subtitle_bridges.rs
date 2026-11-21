@@ -20,7 +20,7 @@ use triergon_mpegts::{PacketFormat, ParseLimits, clock::SourceTimePolicy};
 use triergon_playback::{
     io::{SelectedInput, SourceOwner},
     mp4_open::{Mp4Open, OpenLimits},
-    mp4_plan::{Mp4IndexJob, Mp4View, PlanLimits},
+    mp4_plan::{Mp4IndexJob, PlanLimits},
     *,
 };
 use triergon_subtitles::cc::video::nal::{Codec, Framing};
@@ -52,7 +52,7 @@ fn ts_player(
         random_access: true,
     };
     let input = InputCursor::new(pool, ID, capabilities, 4096).unwrap();
-    let engine = Engine::ts_with_namespace(
+    let engine = Engine::ts(
         input,
         format,
         1,
@@ -88,11 +88,7 @@ fn mp4_player(pool: &Budget, raw: &[u8], selection: Selection) -> Result<Player<
     let mut open = Mp4Open::new(selected, OpenLimits::default())?;
     run_open(&mut open, 64)?;
     let opened = open.finish()?;
-    let mut index = Mp4IndexJob::new(
-        &opened.movie,
-        Mp4View::SourcePhysical,
-        PlanLimits::default(),
-    )?;
+    let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default())?;
     while !index.poll(&mut WorkBudget::new(64), &off())? {}
     let engine = Engine::mp4(opened.input, index.finish()?, 1 << 20)?;
     Player::new(engine, opened.source, selection, PlayerPolicy::default())

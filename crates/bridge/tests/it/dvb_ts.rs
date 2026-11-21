@@ -30,7 +30,7 @@ fn play(
         4096,
     )
     .unwrap();
-    let engine = Engine::ts_with_namespace(
+    let engine = Engine::ts(
         input,
         PacketFormat::Ts188,
         1,

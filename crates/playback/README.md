@@ -15,7 +15,7 @@ It checks startup and backward seek through EOF for both.
 ```rust
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
-use triergon_mpegts::{PacketFormat, ParseLimits, clock::SourceTimePolicy};
+use triergon_mpegts::{PacketFormat, ParseLimits, clock::SourceTimePolicy, psi::DescriptorNamespace};
 use triergon_playback::{
     ByteSource, Engine, Player, PlayerPolicy, Progress, Selection, io::SourceOwner,
 };
@@ -28,7 +28,8 @@ let caps = SourceCapabilities { length: Some(bytes.len() as u64), random_access:
 let source = SourceOwner::new(ByteSource::new(id, bytes, 64 * 1024)?); // or your own `Source`
 let input = InputCursor::new(&pool, id, caps, 4096)?;
 let (program, policy) = (1, SourceTimePolicy::RelativeEpochZero);
-let engine = Engine::ts(input, PacketFormat::Ts188, program, ParseLimits::default(), policy)?;
+let namespace = DescriptorNamespace::Unspecified;
+let engine = Engine::ts(input, PacketFormat::Ts188, program, ParseLimits::default(), policy, namespace)?;
 let mut player = Player::new(engine, source, Selection::All, PlayerPolicy::default())?;
 let cancel = AtomicBool::new(false);
 let mut packets = 0;
@@ -111,11 +112,11 @@ video and audio tracks.
 |---|---|
 | Source protocol | `Source`, `SourceReply`, `ByteSource`, `io::SourceOwner` |
 | Probe | `io::Probe`: Matroska, MP4, TS188 and M2TS192 |
-| Matroska | `Engine::matroska`, `Engine::matroska_reader` (an unstarted reader built with `Reader::new_with_payload_ownership`, `new_with_immutable_seek_index` or `compat::block_additions::new_reader`) |
-| MP4 / MOV | `mp4_open::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `Engine::mp4`, `Engine::mp4_progressive`, `Engine::mp4_native_terminal_v1`, `Mp4RangeOpen` / `Mp4RangePlayer` |
+| Matroska | `Engine::matroska` (an unstarted reader built with `Reader::new`, `Reader::new_with_payload_ownership`, `new_with_immutable_seek_index` or `compat::block_additions::new_reader`) |
+| MP4 / MOV | `mp4_open::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `Engine::mp4`, `Engine::mp4_progressive`, `compat::mov::{index, index_front, index_encoded_range, open_front, forward_encoded_edits}`, `Mp4RangeOpen` / `Mp4RangePlayer` |
 | MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_demux_seek` / `apply_mp4_demux_seek`, progressive variants, `PreparedMp4::movie_seek` |
 | MP4 catalogue replacement | `catalogue::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
-| TS / M2TS | `Engine::ts`, `ts_with_namespace`, `ts_segmented`, `ts_native`, `compat::pes::open_private_audio`, `ts_native_program_v1`, `ts_native_segment_v1`; `compat::pes::startup::Startup` |
+| TS / M2TS | `Engine::ts`, `Engine::ts_entities`; demux PES of selected PIDs or of a segment's own tracks: `compat::pes::{open, open_segment, open_private_audio}`, `compat::pes::startup::Startup` for bound M2TS startup |
 | PES feed | `pes_feed`: the feed [`triergon-hls`](../hls/README.md) reads HLS segments and progressive TS188 input from |
 | Sink handoff | `pump::{Pump, Sink, CatalogueSink, Feed}` |
 
@@ -141,11 +142,11 @@ Transport carrier, section and PES outputs use the budget of their retained
 storage for pool identity.
 
 **Clocks.** Every packet keeps its exact source timestamps. FFmpeg-compatible
-packet clocks are explicit opt-in views (`ClockChoice::Demux`,
-`Mp4View::PinnedMov9NoParseNoFillin`, the `native_*` Matroska clocks and the
-`*_native_*` TS engines); they never overwrite source facts. Native views can
+packet clocks are explicit opt-in views (`ClockChoice::Demux`, the MOV demux
+plans of `compat::mov`, the demux clocks of the Matroska feeds and the
+`compat::pes` TS engines); they never overwrite source facts. Demux views can
 emit events the source view does not, such as `Mp4Event::ShortPacket`,
-`EmptyPacket`, `MissingSample` and native refusals.
+`EmptyPacket`, `MissingSample` and `Event::PesRefusal`.
 
 **Generations.** A seek, track switch or configuration change starts a new
 generation. Check outputs with `Player::may_deliver`. `Delivery::DecodeOnly`
@@ -194,16 +195,16 @@ use the timing prefix covered by the sample sizes for forward playback and
 `Mp4RangeOpen`. Each track's table reports the unused timing occurrences. The source playback view
 requires exact coverage. `subp` tracks are subtitle tracks.
 
-The FFmpeg-compatible packet view opens with `Mp4Open::new_recovery`. When
+The MOV demux packet view opens with `Mp4Open::new_recovery`. When
 the opener read the metadata before any media
 (`MetadataReadScope::FrontMetadataBeforeMdat`, which a nonseekable source with
-a front `moov` gives), it indexes with `Mp4IndexJob::new_native_terminal_v1`
-and reads with `Engine::mp4_native_terminal_v1`; otherwise it indexes with
-`Mp4View::PinnedMov9NoParseNoFillin` and reads with `Engine::mp4`. It recovers
+a front `moov` gives), it indexes with `compat::mov::index_front`
+and reads with `compat::mov::open_front`; otherwise it indexes with
+`compat::mov::index` and reads with `Engine::mp4`. It recovers
 what FFmpeg recovers: a first sample outside the source ends the view with
 `MissingSample`, a truncated sample becomes a corrupt
 `ShortPacket` carrying the available prefix, a zero media timescale
-reads in a 1/1 base, and a zero-size read ends native delivery, with a
+reads in a 1/1 base, and a zero-size read ends demux delivery, with an
 `EmptyPacket` where FFmpeg emits one. On a seekable source the recovery
 opener refuses a zero-size fragment sample in the header, as FFmpeg does.
 `Mp4Open::new` refuses out-of-source, truncated and zero-timescale media and
@@ -213,7 +214,7 @@ source of unknown length may still hold that chunk in a later `mdat`: the
 view reads on and refuses it as outside the media extent (`Invalid`) at the
 physical end, or as an unsupported layout once the source passes its start.
 
-**MPEG-TS.** `ts_native_program_v1` selects up to 64 PIDs of one program.
+**MPEG-TS.** `compat::pes::open` selects up to 64 PIDs of one TS188 program.
 Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB
 admission, and a subtitle track when a DVB namespace names DVB subtitling or
 teletext; stream type `0x90` (PGS) is a subtitle track. M2TS prefix startup (`compat::pes::startup::Startup::new_m2ts_prefix`) needs an

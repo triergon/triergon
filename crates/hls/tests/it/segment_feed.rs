@@ -17,10 +17,10 @@ use triergon_mpegts::{
     AssemblyStep, ParseLimits, clock::SourceTimePolicy, compat::pes::RegisteredCarriage,
     psi::DescriptorNamespace,
 };
-use triergon_playback::compat::pes::Carriage;
+use triergon_playback::compat::pes::{self, Carriage};
 use triergon_playback::{
-    ByteSource, ClockChoice, Engine, Event, Player, PlayerPolicy, Progress, Selection, State,
-    TrackKey, io::SourceOwner,
+    ByteSource, ClockChoice, Event, Player, PlayerPolicy, Progress, Selection, State, TrackKey,
+    io::SourceOwner,
 };
 
 fn payload(out: &mut String, bytes: &[u8]) {
@@ -155,7 +155,7 @@ fn check_segment(raw: &[u8], expected: &str, service: u16, raster: AvcRaster) {
             read_quantum,
         )
         .unwrap();
-        let engine = Engine::ts_native_segment_v1(
+        let engine = pes::open_segment(
             input,
             ParseLimits::default(),
             SourceTimePolicy::Unanchored,

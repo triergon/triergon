@@ -152,7 +152,7 @@ fn feeds(
 fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Result<Work> {
     let cancel = AtomicBool::new(false);
     let id = SourceId(41);
-    let engine = Engine::matroska(
+    let engine = Engine::matroska(triergon_matroska::Reader::new(
         pool,
         id,
         SourceCapabilities {
@@ -161,7 +161,7 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
         },
         triergon_matroska::Limits::default(),
         QUANTUM,
-    )?;
+    )?);
     let mut discovery = MatroskaCompactDiscovery::new(
         engine,
         SourceOwner::new(ByteSource::new(id, raw.clone(), QUANTUM)?),

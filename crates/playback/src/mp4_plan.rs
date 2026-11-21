@@ -34,10 +34,13 @@ use triergon_isobmff::{
 fn push<T>(v: &mut BudgetVec<T>, x: T) -> Result<()> {
     v.try_push(x).map_err(|e| e.error)
 }
+/// Which packets a plan delivers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Mp4View {
-    SourcePhysical,
-    PinnedMov9NoParseNoFillin,
+pub(crate) enum PlanView {
+    /// Source samples in physical order.
+    Source,
+    /// The MOV demux packet view.
+    Demux,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct PlanLimits {
@@ -163,7 +166,7 @@ pub struct PreparedMp4 {
     pub(crate) source: triergon_core::SourceId,
     pub(crate) opening_generation: u64,
     pub(crate) source_length: Option<u64>,
-    pub(crate) view: Mp4View,
+    pub(crate) view: PlanView,
     pub(crate) demux_front: bool,
     pub(crate) demux_order_replay: bool,
     pub(crate) front_boundary: Option<iso::compat::mov::front::FrontReadBoundary>,
@@ -254,8 +257,8 @@ impl PreparedMp4 {
             return self.source_rows.len();
         }
         match self.view {
-            Mp4View::SourcePhysical => self.source_rows.len(),
-            Mp4View::PinnedMov9NoParseNoFillin => self.demux_rows.len(),
+            PlanView::Source => self.source_rows.len(),
+            PlanView::Demux => self.demux_rows.len(),
         }
     }
     pub fn row(&self, at: usize) -> Option<SourceRow> {
@@ -263,13 +266,11 @@ impl PreparedMp4 {
             return self.source_rows.as_slice().get(at).cloned();
         }
         match self.view {
-            Mp4View::SourcePhysical => self.source_rows.as_slice().get(at).cloned(),
-            Mp4View::PinnedMov9NoParseNoFillin => {
-                self.demux_rows.as_slice().get(at).map(|n| SourceRow {
-                    track_id: n.track_id,
-                    sample: n.source.clone(),
-                })
-            }
+            PlanView::Source => self.source_rows.as_slice().get(at).cloned(),
+            PlanView::Demux => self.demux_rows.as_slice().get(at).map(|n| SourceRow {
+                track_id: n.track_id,
+                sample: n.source.clone(),
+            }),
         }
     }
     pub fn track(&self, id: u32) -> Result<&PlanTrack> {
@@ -280,7 +281,7 @@ impl PreparedMp4 {
             .ok_or(Error::Invalid("unknown plan track"))
     }
     pub fn demux_row(&self, at: usize) -> Option<&PacketOccurrence> {
-        if self.view == Mp4View::PinnedMov9NoParseNoFillin {
+        if self.view == PlanView::Demux {
             self.demux_rows.as_slice().get(at)
         } else {
             None
@@ -332,7 +333,7 @@ impl<'a> Mp4IndexJob<'a> {
     /// Explicit native view of one from-start front-metadata source. Source
     /// clocks/extents are unchanged; the engine must retain actual EOF authority.
     /// This does not establish a complete-source fact for an isolated fragment.
-    pub fn new_native_terminal_v1(movie: &'a Movie, limits: PlanLimits) -> Result<Self> {
+    pub(crate) fn front(movie: &'a Movie, limits: PlanLimits) -> Result<Self> {
         if !matches!(
             movie.read_scope(),
             crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(_)
@@ -341,17 +342,16 @@ impl<'a> Mp4IndexJob<'a> {
                 "native front operation needs actual front metadata",
             ));
         }
-        Self::new_inner(
-            movie,
-            Mp4View::PinnedMov9NoParseNoFillin,
-            limits,
-            true,
-            None,
-            None,
-        )
+        Self::new_inner(movie, PlanView::Demux, limits, true, None, None)
     }
-    pub fn new(movie: &'a Movie, view: Mp4View, limits: PlanLimits) -> Result<Self> {
-        Self::new_inner(movie, view, limits, false, None, None)
+    /// Index `movie` for playback of its source samples in physical order.
+    pub fn new(movie: &'a Movie, limits: PlanLimits) -> Result<Self> {
+        Self::new_inner(movie, PlanView::Source, limits, false, None, None)
+    }
+
+    /// Index `movie` in the MOV demux packet view.
+    pub(crate) fn demux(movie: &'a Movie, limits: PlanLimits) -> Result<Self> {
+        Self::new_inner(movie, PlanView::Demux, limits, false, None, None)
     }
     pub(crate) fn for_forward_encoded_edits(
         movie: &'a Movie,
@@ -375,19 +375,12 @@ impl<'a> Mp4IndexJob<'a> {
                 "forward encoded edits require regular front media",
             ));
         }
-        Self::new_inner(
-            movie,
-            Mp4View::PinnedMov9NoParseNoFillin,
-            limits,
-            true,
-            Some(plans),
-            None,
-        )
+        Self::new_inner(movie, PlanView::Demux, limits, true, Some(plans), None)
     }
 
     /// Build the native range view with explicitly validated encoded edits.
     /// The retained plans also govern seeks on this exact range index.
-    pub fn new_native_encoded_range(
+    pub(crate) fn encoded_range(
         movie: &'a Movie,
         plans: &'a [Option<iso::compat::mov::edits::EncodedEditPlan>],
         limits: PlanLimits,
@@ -399,17 +392,10 @@ impl<'a> Mp4IndexJob<'a> {
                 "encoded edits require a complete native range source",
             ));
         }
-        Self::new_inner(
-            movie,
-            Mp4View::PinnedMov9NoParseNoFillin,
-            limits,
-            false,
-            Some(plans),
-            None,
-        )
+        Self::new_inner(movie, PlanView::Demux, limits, false, Some(plans), None)
     }
 
-    pub(crate) fn new_native_range(
+    pub(crate) fn for_range(
         movie: &'a Movie,
         plans: Option<&'a [Option<iso::compat::mov::edits::EncodedEditPlan>]>,
         limits: PlanLimits,
@@ -432,7 +418,7 @@ impl<'a> Mp4IndexJob<'a> {
         };
         Self::new_inner(
             movie,
-            Mp4View::PinnedMov9NoParseNoFillin,
+            PlanView::Demux,
             limits,
             false,
             plans,
@@ -446,13 +432,13 @@ impl<'a> Mp4IndexJob<'a> {
 
     fn new_inner(
         movie: &'a Movie,
-        view: Mp4View,
+        view: PlanView,
         limits: PlanLimits,
         demux_front: bool,
         encoded_edits: Option<&'a [Option<iso::compat::mov::edits::EncodedEditPlan>]>,
         range_duration: Option<RangeDuration>,
     ) -> Result<Self> {
-        if movie.native_recovery() && view == Mp4View::SourcePhysical {
+        if movie.native_recovery() && view == PlanView::Source {
             return Err(Error::Invalid(
                 "native recovery open requires native packet view",
             ));
@@ -463,7 +449,7 @@ impl<'a> Mp4IndexJob<'a> {
                 maximum: limits.tracks.min(64),
             });
         }
-        if movie.terminal_mdat().is_some() && view != Mp4View::SourcePhysical && !demux_front {
+        if movie.terminal_mdat().is_some() && view != PlanView::Source && !demux_front {
             return Err(Error::Unsupported(
                 "native terminal MDAT context is not established",
             ));
@@ -525,7 +511,7 @@ impl<'a> Mp4IndexJob<'a> {
             max_tracks: limits.tracks,
             max_samples: limits.samples,
         };
-        let timing_policy = if view == Mp4View::SourcePhysical {
+        let timing_policy = if view == PlanView::Source {
             iso::table::TimingRunPolicy::Strict
         } else {
             iso::table::TimingRunPolicy::BoundedPrefix
@@ -538,7 +524,7 @@ impl<'a> Mp4IndexJob<'a> {
                         || movie
                             .source_length()
                             .is_none_or(|length| movie.media()[0].end <= length))
-                    && (view == Mp4View::SourcePhysical || demux_front)
+                    && (view == PlanView::Source || demux_front)
                     && movie.trex().is_empty()
                     && movie
                         .tracks()
@@ -584,7 +570,7 @@ impl<'a> Mp4IndexJob<'a> {
                 timing_policy,
             )?)
         };
-        let native = if view == Mp4View::PinnedMov9NoParseNoFillin {
+        let native = if view == PlanView::Demux {
             let native_limits = limits.native_packet_limits();
             let media_tracks_only = range_duration
                 .as_ref()
@@ -1073,7 +1059,7 @@ impl<'a> Mp4IndexJob<'a> {
                 }
             }
             5 => {
-                if p.view == Mp4View::PinnedMov9NoParseNoFillin && self.track < p.tracks.len() {
+                if p.view == PlanView::Demux && self.track < p.tracks.len() {
                     if self.fragment_aac_trim.is_none() {
                         if !w.try_charge(1) {
                             return Ok(false);

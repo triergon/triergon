@@ -7,7 +7,7 @@
   "worker_operation": "ts-program-",
   "reference": "ffmpeg-formats-native",
   "contract": [
-    "one TS188 program through Engine::ts_native_program_v1 from a preloaded seekable source, or one M2TS192 PID through NativeStartup::new_m2ts_prefix_v2 from a forward-only source; 32 KiB windows; the reference uses the mpegts demuxer without parsers or timestamp fill-in",
+    "one TS188 program through compat::pes::open from a preloaded seekable source, or one M2TS192 PID through compat::pes::startup::Startup::new_m2ts_prefix from a forward-only source; 32 KiB windows; the reference uses the mpegts demuxer without parsers or timestamp fill-in",
     "explicit PIDs of program 1 with their carriage; the native clock projection on every selected PES packet through a clean end of file",
     "each selected packet folded in demux order with PID, PTS, DTS and duration in 90 kHz ticks, packet flags, size and every payload byte",
     "the progressive AVC and AAC access-unit feed is not part of this operation",

@@ -94,7 +94,7 @@ fn matroska_source(
         ownership,
     )
     .unwrap();
-    let engine = Engine::matroska_reader(reader);
+    let engine = Engine::matroska(reader);
     let source =
         ByteSource::new(ID, Bytes::copy_from_slice(&pool, input).unwrap(), quantum).unwrap();
     (engine, SourceOwner::new(source), pool)
@@ -1695,7 +1695,7 @@ fn player_refuses_a_matroska_reader_that_has_read_input() {
             PlayerPolicy::default(),
         )
     };
-    assert!(player(Engine::matroska_reader(reader(&pool)), &pool).is_ok());
+    assert!(player(Engine::matroska(reader(&pool)), &pool).is_ok());
     let mut started = reader(&pool);
     let cancel = AtomicBool::new(false);
     let Step::NeedInput(request) = started.step(&mut WorkBudget::new(64), &cancel).unwrap() else {
@@ -1710,7 +1710,7 @@ fn player_refuses_a_matroska_reader_that_has_read_input() {
         Step::Yield
     ) {}
     assert!(matches!(
-        player(Engine::matroska_reader(started), &pool),
+        player(Engine::matroska(started), &pool),
         Err(Error::Invalid("Matroska engine needs an unstarted reader"))
     ));
 }

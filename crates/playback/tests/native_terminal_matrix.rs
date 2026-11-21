@@ -12,13 +12,13 @@
 mod common;
 mod terminal_golds;
 
-use common::{byte_input, read_units, run_index, run_open};
+use common::{View, byte_input, index_job, read_units, run_index, run_open};
 use terminal_golds::{CASES, Case, Packet, Probe};
 use triergon_core::{Budget, Error, SourceCapabilities, SourceId, TimeBase};
 use triergon_isobmff::compat::mov::packets::PacketOccurrence;
 use triergon_playback::{
     mp4_open::{MetadataReadScope, Mp4Open, OpenLimits, OpenedMp4},
-    mp4_plan::{Mp4IndexJob, Mp4View, PlanLimits, PreparedMp4},
+    mp4_plan::{PlanLimits, PreparedMp4},
     progressive::ProgressiveLimits,
     *,
 };
@@ -275,10 +275,10 @@ fn front(opened: &OpenedMp4<ByteSource>) -> bool {
 
 fn index(opened: &OpenedMp4<ByteSource>, g: Geometry) -> Result<PreparedMp4> {
     let mut job = if front(opened) {
-        Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default())?
+        compat::mov::index_front(&opened.movie, PlanLimits::default())?
     } else {
-        let view = Mp4View::PinnedMov9NoParseNoFillin;
-        Mp4IndexJob::new(&opened.movie, view, PlanLimits::default())?
+        let view = View::Demux;
+        index_job(&opened.movie, view, PlanLimits::default())?
     };
     run_index(&mut job, g.work)?;
     job.finish()
@@ -287,7 +287,7 @@ fn index(opened: &OpenedMp4<ByteSource>, g: Geometry) -> Result<PreparedMp4> {
 fn attach(opened: OpenedMp4<ByteSource>, plan: PreparedMp4) -> Result<Player<ByteSource>> {
     let engine = if front(&opened) {
         let limits = ProgressiveLimits::default();
-        Engine::mp4_native_terminal_v1(opened.input, plan, 1 << 20, limits)?
+        compat::mov::open_front(opened.input, plan, 1 << 20, limits)?
     } else {
         Engine::mp4(opened.input, plan, 1 << 20)?
     };

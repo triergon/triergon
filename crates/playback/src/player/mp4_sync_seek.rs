@@ -6,7 +6,7 @@ use crate::{
     catalogue::{CatalogueCommit, Mp4Catalogue, RangeSeek, RetiredCatalogue},
     engines::{Mp4RangeLanding, Mp4SyncLanding},
     input::Source,
-    mp4_plan::{Mp4View, PreparedMp4, SourceRow},
+    mp4_plan::{PlanView, PreparedMp4, SourceRow},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, Rounding, Time, TimeBase, WorkBudget};
@@ -160,7 +160,7 @@ impl<'a> Mp4SyncSeekJob<'a> {
         let Engine::Mp4(mp4) = engine else {
             return Err(Error::Invalid("indexed seek requires MP4"));
         };
-        if mp4.plan.view != Mp4View::SourcePhysical || !mp4.supports_range_replay() {
+        if mp4.plan.view != PlanView::Source || !mp4.supports_range_replay() {
             return Err(Error::Unsupported(
                 "indexed seek needs exact range-backed MP4",
             ));

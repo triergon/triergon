@@ -1,9 +1,9 @@
-//! One TS188 or M2TS192 program through the playback engine's native packet view:
+//! One TS188 or M2TS192 program through the playback engine's demux PES view:
 //! open a preloaded seekable source, select explicit PIDs of program 1 with their
 //! carriage, project native clocks and fold every selected PES packet through the
 //! end of the source.
 //!
-//! TS188 uses `Engine::ts_native_program_v1` with every selection. M2TS192 starts
+//! TS188 uses `compat::pes::open` with every selection. M2TS192 starts
 //! through `Startup::new_m2ts_prefix`, which admits one registered
 //! carriage. Times are 90 kHz ticks of the native projection; the duration is the
 //! demuxer's raw 90 kHz duration and the flags its packet flags.
@@ -18,15 +18,13 @@ use triergon_mpegts::{
     compat::pes::{DemuxPacket, DemuxTimeView, PrivateAudioCarriage, RegisteredCarriage},
     psi::{DescriptorNamespace, DvbNamespaceEvidence},
 };
-use triergon_playback::{
-    ByteSource, ClockChoice, Engine, Event, Format, Player, PlayerPolicy, Progress, Selection,
-    TsNativeSelection,
-    io::{SelectedInput, SourceOwner},
+use triergon_playback::compat::pes::{
+    self, Carriage, PidSelection,
+    startup::{Startup, StartupStep},
 };
 use triergon_playback::{
-    compat::pes::Carriage,
-    compat::pes::PidSelection,
-    compat::pes::startup::{Startup, StartupStep},
+    ByteSource, ClockChoice, Event, Format, Player, PlayerPolicy, Progress, Selection,
+    io::{SelectedInput, SourceOwner},
 };
 
 pub const PREFIX: &str = "ts-program-";
@@ -103,9 +101,7 @@ fn player(
     let limits = ParseLimits::default();
     let policy = SourceTimePolicy::Unanchored;
     let mut player = if format == PacketFormat::Ts188 {
-        let engine = Engine::ts_native_program_v1(
-            input, format, PROGRAM, limits, policy, NAMESPACE, selections,
-        )?;
+        let engine = pes::open(input, PROGRAM, limits, policy, NAMESPACE, selections)?;
         Player::new(engine, source, Selection::All, PlayerPolicy::default())?
     } else {
         let [
@@ -123,15 +119,12 @@ fn player(
             format: Format::Ts(format),
         })?;
         while startup.advance(&mut WorkBudget::new(WORK), &cancel)? != StartupStep::Ready {}
-        let native = TsNativeSelection {
-            pid: *pid,
-            carriage: *carriage,
-        };
         startup.finish()?.into_player(
             PROGRAM,
             limits,
             policy,
-            native,
+            *pid,
+            *carriage,
             Selection::All,
             PlayerPolicy::default(),
         )?

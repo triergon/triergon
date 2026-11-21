@@ -3,7 +3,7 @@
 use crate::{
     EngineStep, Event, Mp4EmptyPacket, Result,
     mp4_open::{PendingMedia, RETAINED_MEDIA_BYTES, box_reader, word},
-    mp4_plan::{Mp4View, PreparedMp4, SourceRow},
+    mp4_plan::{PlanView, PreparedMp4, SourceRow},
     sample_sort::SampleSort,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -133,7 +133,7 @@ pub(crate) struct ProgressiveState {
 }
 impl ProgressiveState {
     pub(crate) fn new(plan: &PreparedMp4, limits: ProgressiveLimits) -> Result<Self> {
-        if plan.view != Mp4View::SourcePhysical && !plan.demux_front {
+        if plan.view != PlanView::Source && !plan.demux_front {
             return Err(Error::Unsupported(
                 "progressive native MOV context is not established",
             ));

@@ -18,12 +18,12 @@ use triergon_core::{
 };
 use triergon_isobmff::compat::mov::edits::EncodedEditPlan;
 use triergon_playback::{
-    ByteSource, Engine, Event, Format, Mp4Event, Mp4RangeOpen, Output, Player, PlayerPolicy,
-    Progress, Selection,
+    ByteSource, Event, Format, Mp4Event, Mp4RangeOpen, Output, Player, PlayerPolicy, Progress,
+    Selection,
     compat::mov,
     io::{SelectedInput, SourceOwner},
     mp4_open::{Movie, Mp4Open, OpenLimits, OpenProgress, OpenedMp4},
-    mp4_plan::{Mp4IndexJob, PlanLimits},
+    mp4_plan::PlanLimits,
     progressive::ProgressiveLimits,
 };
 
@@ -214,10 +214,10 @@ fn progressive(
     };
     let mut index = match &plans {
         Some(plans) => mov::forward_encoded_edits(&movie, plans.as_slice(), limits)?,
-        None => Mp4IndexJob::new_native_terminal_v1(&movie, limits)?,
+        None => mov::index_front(&movie, limits)?,
     };
     while !index.poll(&mut WorkBudget::new(WORK), cancel)? {}
-    let engine = Engine::mp4_native_terminal_v1(
+    let engine = mov::open_front(
         input,
         index.finish()?,
         MAX_PACKET,
