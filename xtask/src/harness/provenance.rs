@@ -88,6 +88,7 @@ pub fn shared_inputs(root: &Path) -> Result<Vec<String>, String> {
         "xtask/src/transport_fixtures/dts_hd.rs",
         "xtask/src/transport_fixtures/dts_discovery.rs",
         "xtask/src/transport_fixtures/matched/xll.rs",
+        "xtask/src/transport_fixtures/matched/xll_mode_zero.rs",
         "xtask/src/mpg123.rs",
         "harness/reference_ts_sequence.h",
         "harness/reference_pgs.h",
