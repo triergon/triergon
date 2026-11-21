@@ -46,12 +46,7 @@ impl Default for Limits {
 impl Limits {
     /// The work budget of an item of `chars` characters.
     pub(crate) fn budget(self, chars: usize) -> WorkBudget {
-        let chars = u64::try_from(chars).unwrap_or(u64::MAX);
-        WorkBudget::new(
-            chars
-                .saturating_mul(self.work_per_char)
-                .max(self.minimum_work),
-        )
+        per_char(self.work_per_char, self.minimum_work, chars)
     }
 
     /// The most glyphs the buffer may hold for an item of `chars` characters.
@@ -60,6 +55,13 @@ impl Limits {
             .saturating_mul(self.glyphs_per_char)
             .max(self.minimum_glyphs)
     }
+}
+
+/// A budget of `per_char` units for each of `chars` characters, and at least
+/// `minimum` in all.
+pub(crate) fn per_char(per_char: u64, minimum: u64, chars: usize) -> WorkBudget {
+    let chars = u64::try_from(chars).unwrap_or(u64::MAX);
+    WorkBudget::new(chars.saturating_mul(per_char).max(minimum))
 }
 
 /// Planning work per byte of a face's GSUB and GPOS tables.
