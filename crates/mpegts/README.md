@@ -222,6 +222,10 @@ A LOAS envelope with an in-band version-zero AAC-LC configuration can
 be a seek entry. The reader accepts one program and layer with 1–64 nonempty
 subframes and preserves the complete envelope and its source ranges.
 
+The picture seek corpus also covers an AVC to HEVC change on one TS188 PID.
+Playback preroll retains the in-band parameter sets and emits all twelve
+pictures through EOF.
+
 ### Opt-in policies
 
 | `ReaderLimits` field | Non-default choice |
