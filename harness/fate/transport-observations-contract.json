@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "mpegts-original-observations",
+  "runner": "cargo xtask transport-fate observe SPEC OUTPUT_DIR",
+  "reference_revision": "d32b387f2b0a484599d4587d651891f0c63c4238",
+  "qualification": false,
+  "contract": [
+    "Observe only the indexed original mpegts/pmtchange.ts or mpegts/loewe.ts, at most 64 MiB. The specification pins its SHA-256, reference build manifest and each executable before and after all operations. Missing inputs are fetched through the existing pinned-download cache; no media is redistributed.",
+    "The ordinary reference discovery observations use ffprobe JSON: PMT merging enables merge_pmt_versions and reports programs and streams, program discovery reports programs, and LATM discovery reports streams. These are explicit public probe operations, not executions of the upstream FATE commands whose hashes the indexes retain.",
+    "Run both original-input packet operations through the existing transport runner: ts-fold and ts-au-fold with TS188 and an explicit nonzero program. Compare complete operation identities, packet counts, byte counts and ordered digests only after one iteration and real EOF. Preserve nonzero exits, refusals, timeouts, malformed outputs and mismatches as failures. No re-packetization, timestamp normalization, filtering or synthesized DTS is allowed.",
+    "Reference metadata is recorded without claiming candidate probe parity. Strict original PCR/OPCR, complete PES headers, raw33 PTS/DTS, source ranges and clock epochs require an independent source oracle; compatibility timestamps cannot substitute for them. Existing strict source-clock tests remain separate from these packet observations.",
+    "Cap each child output pipe at 1 MiB and each operation at 120 seconds. An over-limit output fails rather than becoming a successful truncated observation. Record the exact arguments, specification, tracked identity inventory, tool hash and raw-output hashes. Raw observations stay outside git.",
+    "Qualification requires complete selected parity and the shared native gates in harness/policy.json. An observation leaves all existing packet and framing cases in place."
+  ],
+  "ordinary_profiles": [
+    "fate-mpegts-probe-pmt-merge",
+    "fate-mpegts-probe-program",
+    "fate-mpegts-probe-latm"
+  ],
+  "uncovered_profiles": [
+    "candidate-probe-metadata",
+    "strict-original-clock-and-pes-facts",
+    "multi-program-and-program-removal-playback",
+    "complete-m2ts192-multi-pid-program-playback",
+    "remux-output",
+    "lcevc-in-band-enhancement",
+    "lcevc-separate-track-association",
+    "vvc-track-mapping-and-framing"
+  ]
+}

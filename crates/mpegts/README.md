@@ -901,3 +901,10 @@ Verification:
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).
+
+The [original-input coverage inventory](../../harness/fate/README.md) separates
+ordinary PMT merge, program and LATM probes from packet framing, remux and
+LCEVC/VVC features. Its observation tool reuses the transport packet runner and
+records reference discovery metadata without claiming probe parity. Unsupported
+stream types 0x33 and 0x36 retain their native tags and descriptors as unknown
+tracks; this does not provide VVC framing or LCEVC enhancement support.
