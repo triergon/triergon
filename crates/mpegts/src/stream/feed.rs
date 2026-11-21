@@ -208,17 +208,11 @@ impl TransportStream {
             FramedCarrier::Plain(packet) => (packet.counter(), 188 - packet.payload_start()),
         };
         let route = &mut self.routes.as_mut_slice()[index];
-        let continuity = route
-            .continuity
-            .as_mut()
-            .ok_or(Error::Invalid("PES continuity missing"))?;
+        let continuity = &mut route.continuity;
         if payload_len == 0 || !continuity.expects_payload_counter(counter) {
             return Ok(false);
         }
-        let assembler = route
-            .assembler
-            .as_mut()
-            .ok_or(Error::Invalid("PES route missing"))?;
+        let assembler = &mut route.assembler;
         let Some(completed) = assembler.validate_body_carrier(payload_len, work)? else {
             return Ok(false);
         };
@@ -276,13 +270,11 @@ impl TransportStream {
         };
         let epochs = self.source_epochs();
         let route = &mut self.routes.as_mut_slice()[index];
-        let (Some(continuity), Some(assembler), Some(omissions)) = (
-            route.continuity.as_mut(),
-            route.assembler.as_mut(),
-            self.feed_omissions.as_mut(),
-        ) else {
+        let Some(omissions) = self.feed_omissions.as_mut() else {
             return Ok(false);
         };
+        let continuity = &mut route.continuity;
+        let assembler = &mut route.assembler;
         let maximum = assembler.body_run_capacity(PLAIN_PAYLOAD_BYTES);
         if maximum < 2 || !continuity.expects_payload_counter(counter) {
             return Ok(false);

@@ -78,17 +78,11 @@ impl TransportStream {
             return Ok(ObservedContinuation::Fallback);
         }
         let route = &mut self.routes.as_mut_slice()[index];
-        let continuity = route
-            .continuity
-            .as_mut()
-            .ok_or(Error::Invalid("PES continuity missing"))?;
+        let continuity = &mut route.continuity;
         if !continuity.expects_payload_counter(carrier.counter()) {
             return Ok(ObservedContinuation::Fallback);
         }
-        let assembler = route
-            .assembler
-            .as_mut()
-            .ok_or(Error::Invalid("PES route missing"))?;
+        let assembler = &mut route.assembler;
         let Some(bytes) = carrier.source.as_ref() else {
             return Ok(ObservedContinuation::Fallback);
         };
@@ -151,9 +145,7 @@ impl TransportStream {
             pmt.assembler.discard();
         }
         for route in self.routes.as_mut_slice() {
-            if let Some(assembler) = route.assembler.as_mut() {
-                assembler.discard(route.epochs);
-            }
+            route.assembler.discard(route.epochs);
         }
         TraceEvent::Diagnostic(TraceFault {
             kind: FaultKind::Transport,

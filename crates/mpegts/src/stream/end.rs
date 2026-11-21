@@ -244,10 +244,7 @@ impl TransportStream {
             }
             let route = &mut self.routes.as_mut_slice()[index];
             let pid = route.pid;
-            let assembler = route
-                .assembler
-                .as_mut()
-                .ok_or(Error::Invalid("PES route missing at EOF"))?;
+            let assembler = &mut route.assembler;
             assembler.end_of_source();
             let step = Self::poll_pes(assembler, self.feed_omissions.is_none(), work, cancel);
             match step {
