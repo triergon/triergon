@@ -7,8 +7,7 @@ use triergon::{
     SourceId, Step, Time, TrackId, WorkBudget, isobmff::ReaderEvent,
 };
 
-const FILE: &[u8] =
-    include_bytes!("../../isobmff/tests/fixtures/encoded-config/creation-all.mp4");
+const FILE: &[u8] = include_bytes!("../../isobmff/tests/fixtures/encoded-config/creation-all.mp4");
 
 fn capabilities() -> SourceCapabilities {
     SourceCapabilities {

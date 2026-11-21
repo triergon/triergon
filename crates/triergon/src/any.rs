@@ -31,7 +31,8 @@ use triergon_core::{
     feature = "matroska",
     feature = "isobmff",
     feature = "mpegts",
-    feature = "ogg"
+    feature = "ogg",
+    feature = "elementary"
 ))]
 const WINDOW: usize = 64 * 1024;
 
@@ -40,20 +41,28 @@ const WINDOW: usize = 64 * 1024;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum AnyReader {
+    /// Matroska or WebM with track configuration and block side data.
     #[cfg(feature = "matroska")]
     Matroska(triergon_matroska::Reader),
+    /// ISO BMFF samples from a seekable source.
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::Reader),
+    /// Access units and transport events from TS188 or M2TS192.
     #[cfg(feature = "mpegts")]
     MpegTs(triergon_mpegts::Reader),
+    /// Packets from the logical streams of an Ogg source.
     #[cfg(feature = "ogg")]
     Ogg(triergon_ogg::Reader),
+    /// FLAC frames with or without a native stream header.
     #[cfg(feature = "elementary")]
     Flac(triergon_elementary::FlacReader),
+    /// Frames from an MPEG audio elementary stream.
     #[cfg(feature = "elementary")]
     MpegAudio(triergon_elementary::MpegAudioReader),
+    /// AAC audio from an ADTS elementary stream.
     #[cfg(feature = "elementary")]
     Adts(triergon_elementary::AdtsReader),
+    /// Syncframes from an AC-3 or E-AC-3 elementary stream.
     #[cfg(feature = "elementary")]
     Ac3(triergon_elementary::Ac3Reader),
 }
@@ -63,32 +72,41 @@ pub enum AnyReader {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum AnyPacket {
+    /// One Matroska block frame with its track configuration and side data.
     #[cfg(feature = "matroska")]
     Matroska(triergon_matroska::TypedPacket),
+    /// One ISO BMFF sample with its track timing.
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::Packet),
+    /// One framed access unit from an MPEG transport stream.
     #[cfg(feature = "mpegts")]
     MpegTs(triergon_mpegts::Packet),
+    /// One packet assembled from the pages of an Ogg logical stream.
     #[cfg(feature = "ogg")]
     Ogg(triergon_ogg::Packet),
-    /// Every elementary stream reader's packet.
+    /// One coded audio packet from an elementary stream.
     #[cfg(feature = "elementary")]
     Elementary(triergon_elementary::Packet),
 }
 
-/// Non-packet events of whichever reader produced them.
+/// Format-specific payloads of [`Event::Other`].
 // Stored inline for the same reason as `AnyPacket`.
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum AnyOther {
+    /// Matroska structure, track configuration or a validated document.
     #[cfg(feature = "matroska")]
     Matroska(triergon_matroska::Event),
+    /// An ISO BMFF root box or notification that the movie index is ready.
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::ReaderEvent),
+    /// Original transport or PES data, or an outcome of continuity or framing.
     #[cfg(feature = "mpegts")]
     MpegTs(triergon_mpegts::ReaderEvent),
+    /// Track readiness, a new chained link, skipped bytes or lost pages.
     #[cfg(feature = "ogg")]
     Ogg(triergon_ogg::ReaderEvent),
+    /// Notification that an elementary stream's track is ready.
     #[cfg(feature = "elementary")]
     Elementary(triergon_elementary::ReaderEvent),
 }
@@ -172,7 +190,11 @@ macro_rules! neutral_step {
 }
 
 impl AnyReader {
-    /// Open the reader `probe` selects for `prefix`, the first bytes of the source.
+    /// Open the reader selected by [`probe`] with the format's default limits.
+    /// The prefix selects the format. Feed it to the reader with the rest of the source.
+    ///
+    /// Returns an error if the prefix cannot select an enabled reader, the source
+    /// lacks capabilities that reader requires, or the budget cannot hold its state.
     pub fn open(
         prefix: &[u8],
         pool: &Budget,
@@ -271,6 +293,8 @@ impl AnyReader {
 }
 
 /// Probe up to 64 KiB of a seekable source, then feed its reader from the start.
+///
+/// Returns an error if reading, seeking, format selection or reader construction fails.
 pub fn open_blocking<S: std::io::Read + std::io::Seek>(
     mut source: S,
     pool: &Budget,
@@ -286,6 +310,9 @@ pub fn open_blocking<S: std::io::Read + std::io::Seek>(
 
 /// Probe up to 64 KiB of a sequential source and replay the consumed prefix.
 /// The reader sees a pipe with unknown length and no random access.
+///
+/// Returns an error if the budget cannot hold the probe or reader, reading fails,
+/// or the prefix cannot select an enabled reader that supports sequential input.
 pub fn open_sequential<S: std::io::Read>(
     mut source: S,
     pool: &Budget,

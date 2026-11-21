@@ -1,56 +1,70 @@
 # triergon
 
-The consumer boundary of the workspace. It re-exports the shared vocabulary and the
-neutral container model of [triergon-core](../core/README.md), classifies a source
-from its first bytes (`probe`), opens it as one closed reader enum (`AnyReader`), and
-exposes each format crate behind its own Cargo feature. It is a composition-layer
-crate that depends on triergon-core and the enabled format crates. Those crates parse
-container packets. The blocking adapters handle I/O for callers that supply a reader.
+Triergon exposes container readers, packet playback, software decode, text and
+bitmap subtitles, and ASS rendering through one crate. Enable the groups you use.
+The default feature enables the Matroska and WebM reader, and the neutral container
+model is always available.
 
 ## Usage
 
-```rust
-use std::sync::atomic::AtomicBool;
-use triergon::{
-    AnyReader, Budget, Bytes, ContainerReader, Event, InputWindow, PacketInfo,
-    SourceCapabilities, SourceId, Step, TrackInfo, WorkBudget,
-};
+With `playback,codecs,render`, open the source with `playback::probe::Probe` and
+read outputs from a `playback::Player`. Look up the packet's track with
+`Engine::track`, load the audio and video sessions with the matching decoders,
+and step `AccessUnits::for_track` once per selected track to obtain its framer.
+Here `ready` supplies a fresh work budget when the framing job yields.
 
-# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../matroska/tests/fixtures/seek/cues-front.mkv");
-let file = std::fs::read(path)?;                      // any transport; the reader does no I/O
-let pool = Budget::new(64 << 20)?;
-let caps = SourceCapabilities { length: Some(file.len() as u64), random_access: true };
-let mut reader = AnyReader::open(&file[..file.len().min(64)], &pool, SourceId(1), caps)?;
-let cancel = AtomicBool::new(false);
-loop {
-    match reader.step(&mut WorkBudget::new(1 << 16), &cancel)? {
-        Step::Ready(Event::Packet(p)) => {
-            // p.track(), p.payload(), p.pts(), p.dts(), p.time_base(), p.random_access()
-        }
-        Step::Ready(Event::Seek(receipt)) => { /* receipt.landing, receipt.discard_until */ }
-        Step::Ready(Event::Other(_)) => {}            // configuration, documents, structure
-        // Supply 1..=req.maximum bytes at req.offset, or finish at end of source.
-        Step::NeedInput(req) => match file.get(usize::try_from(req.offset)?..) {
-            Some(rest) if !rest.is_empty() => {
-                let bytes = Bytes::copy_from_slice(&pool, &rest[..rest.len().min(req.maximum)])?;
-                reader.provide(&InputWindow::new(req.source, req.token, req.offset, bytes)?)?;
-            }
-            _ => reader.finish(req.source, req.token)?,
-        },
-        Step::Yield => {}                             // step budget spent
-        Step::Backpressure(_) => { /* drop retained packets, then step again */ }
-        Step::End(_) => break,
-    }
+```rust,no_run
+# #[cfg(all(feature = "playback", feature = "codecs", feature = "render"))]
+# fn play_one(
+#     track: &dyn triergon::TrackInfo, packet: &impl triergon::PacketInfo,
+#     units: &mut triergon::bridge::access::AccessUnits,
+#     cancel: &std::sync::atomic::AtomicBool, video: &mut triergon::session::VideoSession,
+#     audio: &mut triergon::session::AudioSession, pcm: &mut triergon::session::PcmBlock,
+#     renderer: &mut triergon::render::ass::Renderer, script: &mut triergon::render::ass::Script,
+#     time_ms: i64,
+# ) -> Result<(), Box<dyn std::error::Error>> {
+# use triergon::framing::BuildStep;
+# fn ready<T>(mut step: impl FnMut(&mut triergon::WorkBudget) -> triergon::Result<BuildStep<T>>) -> triergon::Result<T> {
+#     loop {
+#         match step(&mut triergon::WorkBudget::new(1 << 20))? {
+#             BuildStep::Ready(value) => return Ok(value),
+#             BuildStep::Yield => {}
+#             BuildStep::Complete => return Err(triergon::Error::Invalid("no access unit")),
+#         }
+#     }
+# }
+use triergon::{MediaKind, PacketInfo, Rounding, TimeBase, session::Discard};
+
+let mut job = units.packet(packet)?;
+let unit = ready(|work| job.step(work, cancel))?;
+let pts = unit.pts().map(|t| unit.time_base()
+    .rescale(t, TimeBase::NANOSECONDS, Rounding::Floor)).transpose()?;
+match track.kind() {
+    MediaKind::Video => { video.feed(unit.payload(), pts)?; while video.step(None) {} }
+    MediaKind::Audio => { audio.feed_discarding(unit.payload(), pts, Discard::of(&unit))?;
+                          audio.pull(None, 0, pcm); }
+    _ => {}
 }
-for i in 0..reader.track_count() {
-    let track = reader.track(i).ok_or("no such track")?; // &dyn TrackInfo
-    // track.id(), track.kind(), track.codec(), track.codec_tag(), track.configuration()
-}
-# Ok::<(), Box<dyn std::error::Error>>(())
+let images = renderer.render(script, time_ms)?.images;
+# let _ = images;
+# Ok(())
+# }
 ```
 
-A seek is `reader.request_seek(SeekRequest { track, target, policy })?`; the reader
-then asks for input and delivers `Event::Seek(SeekReceipt)` before the next packet.
+The [play example](examples/play.rs) shows source opening, track selection,
+decoder configuration, draining both sessions at EOF, and rendering an ASS
+script at a requested time. From the workspace root:
+
+```sh
+cargo run -p triergon --features playback,codecs,render --example play -- \
+  crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv \
+  harness/fixtures/ass-render/decorations-orientation.ass 500
+```
+
+For demuxing alone, use `AnyReader::open` with the source prefix and capabilities,
+then supply the ranges requested by `ContainerReader::step`. After
+`reader.request_seek(SeekRequest { track, target, policy })`, the reader delivers
+`Event::Seek(SeekReceipt)` before the next packet.
 
 `open_blocking(source, &pool)` does the probing and input handling for a
 `std::io::Read + Seek` source and returns a `Blocking` driver with `next_event`,
@@ -69,7 +83,7 @@ can release it and retry the same pipe. Fixed signatures allocate only the bytes
 consumed. Longer elementary probes use one buffer. The sequential adapter
 releases its retained capacity after replaying the last byte.
 
-## Supported
+## Features and lower-level crates
 
 | Feature | Default | Module | Through `AnyReader` |
 |---|---|---|---|
@@ -80,14 +94,28 @@ releases its retained capacity after replaying the last byte.
 | `elementary` | no | `triergon::elementary` ([triergon-elementary](../elementary/README.md)): native FLAC, MPEG audio, ADTS, AC-3 | yes |
 | `framing` | no | `triergon::framing` ([triergon-framing](../framing/README.md)) | not a reader |
 | `subtitles` | no | `triergon::subtitles` ([triergon-subtitles](../subtitles/README.md)) | not a reader |
+| `playback` | no | `playback` ([engine and player](../playback/README.md)), `hls` ([segments and progressive feeds](../hls/README.md)), `raw_video` ([Annex B feeds and probing](../raw-video/README.md)), `bridge` ([decoder access units](../bridge/README.md]). Also enables `framing`. | independent |
+| `session` | no | `session` ([decode queues](../session/README.md)), `codec` ([decoder traits](../codec/README.md)) and `codec::pixel` ([picture and colour types](../pixel/README.md)) | independent |
+| `codecs` | no | Enables `session` and adds the built-in decoders under `codec` | independent |
+| `render` | no | `render::ass` ([scripts and images](../ass/README.md)), `render::font` ([font faces](../font/README.md)), `render::shape` ([shaping](../shape/README.md)), `render::raster` ([rasterising](../raster/README.md)) | independent |
+
+The decoder crates can also be selected individually.
+[AAC](../codec-aac/README.md), [AC-3 and E-AC-3](../codec-ac3/README.md),
+[DTS](../codec-dca/README.md), [FLAC](../codec-flac/README.md),
+[H.264](../codec-h264/README.md), [HEVC](../codec-hevc/README.md),
+[MPEG audio](../codec-mp3/README.md), [Opus](../codec-opus/README.md) and
+[Vorbis](../codec-vorbis/README.md).
+
+Using `default-features = false` without selecting another feature exposes the
+shared types and leaves `AnyReader` with no enabled formats.
 
 Re-exported from triergon-core, independent of features:
 
 | Area | Items |
 |---|---|
 | Container model | `ContainerReader`, `ReaderStep`, `Event`, `PacketInfo`, `TrackInfo`, `TrackId`, `MediaKind`, `CodecId`, `RandomAccess`, `Trim`, `SeekRequest`, `SeekPolicy`, `SeekReceipt`, `SeekMethod`, `ColourDescription`, `ColourRange`, `MasteringDisplay`, `ContentLight`, `Sourced`, `Origin` |
-| Input and work | `Step`, `Backpressure`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure`, `WorkBudget` |
-| Storage, time, errors | `Budget`, `Bytes`, `Time`, `TimeBase`, `Error`, `Result` |
+| Input and work | `Step`, `Backpressure`, `InputCursor`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure`, `WorkBudget` |
+| Storage, time, errors | `Budget`, `BudgetVec`, `Bytes`, `Time`, `TimeBase`, `Rounding`, `Error`, `Result` |
 
 The meaning of each type is documented in
 [triergon-core](../core/README.md#container-model).
@@ -131,7 +159,8 @@ The meaning of each type is documented in
   `TrackId` is the TrackNumber, the target is floored to nanoseconds, and only
   video tracks can be seek targets. For ISO BMFF the `TrackId` is the `track_ID`, the
   target is on that track's media clock without edits, and any track can be a target.
-  MPEG-TS currently refuses seeking and can reset to the source start.
+  MPEG-TS can seek within a length-known, seekable entity for
+  [supported access units](../mpegts/README.md#access-units).
 
 ## Conformance
 
@@ -146,4 +175,6 @@ checks TS188/M2TS192 dispatch, full source AUs and unchanged PES payload bytes.
 authored MP4 through `AnyReader`; `tests/any_reader_ogg.rs` and
 `tests/any_reader_elementary.rs` read authored Ogg Opus, MPEG audio and headerless FLAC
 streams with their trims. `tests/blocking_probe.rs` checks short reads, interruptions,
-reader features, container precedence and budgeted prefix replay. Gates: [docs/quality.md](../../docs/quality.md).
+reader features, container precedence and budgeted prefix replay.
+`tests/play.rs` runs the example pipeline with the tracked AVC/AAC and ASS
+fixtures under plain `cargo test`. See [quality gates](../../docs/quality.md).

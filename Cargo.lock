@@ -9,6 +9,7 @@ dependencies = [
  "triergon-ass",
  "triergon-core",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
  "triergon-raster",
  "triergon-worker-entry",
 ]
@@ -18,6 +19,7 @@ name = "capture-worker"
 version = "0.0.0"
 dependencies = [
  "triergon-capture",
+ "triergon-harness-runner",
  "triergon-worker-entry",
 ]
 
@@ -33,6 +35,7 @@ dependencies = [
  "triergon-codec-h264",
  "triergon-codec-hevc",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
  "triergon-isobmff",
  "triergon-pixel",
  "triergon-session",
@@ -46,6 +49,7 @@ dependencies = [
  "triergon-core",
  "triergon-font",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
  "triergon-worker-entry",
 ]
 
@@ -55,6 +59,7 @@ version = "0.0.0"
 dependencies = [
  "triergon-core",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
  "triergon-matroska",
  "triergon-worker-entry",
 ]
@@ -84,6 +89,7 @@ dependencies = [
  "triergon-core",
  "triergon-font",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
  "triergon-raster",
  "triergon-worker-entry",
 ]
@@ -95,6 +101,7 @@ dependencies = [
  "triergon-core",
  "triergon-font",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
  "triergon-shape",
  "triergon-worker-entry",
 ]
@@ -129,13 +136,33 @@ name = "triergon"
 version = "0.0.0"
 dependencies = [
  "triergon",
+ "triergon-ass",
+ "triergon-bridge",
+ "triergon-codec",
+ "triergon-codec-aac",
+ "triergon-codec-ac3",
+ "triergon-codec-dca",
+ "triergon-codec-flac",
+ "triergon-codec-h264",
+ "triergon-codec-hevc",
+ "triergon-codec-mp3",
+ "triergon-codec-opus",
+ "triergon-codec-vorbis",
  "triergon-core",
  "triergon-elementary",
+ "triergon-font",
  "triergon-framing",
+ "triergon-hls",
  "triergon-isobmff",
  "triergon-matroska",
  "triergon-mpegts",
  "triergon-ogg",
+ "triergon-pixel",
+ "triergon-playback",
+ "triergon-raster",
+ "triergon-raw-video",
+ "triergon-session",
+ "triergon-shape",
  "triergon-subtitles",
 ]
 
@@ -193,6 +220,7 @@ version = "0.0.0"
 dependencies = [
  "triergon-bitstream",
  "triergon-codec",
+ "triergon-harness-protocol",
 ]
 
 [[package]]
@@ -201,6 +229,7 @@ version = "0.0.0"
 dependencies = [
  "triergon-bitstream",
  "triergon-codec",
+ "triergon-harness-protocol",
 ]
 
 [[package]]
@@ -208,6 +237,7 @@ name = "triergon-codec-dca"
 version = "0.0.0"
 dependencies = [
  "triergon-codec",
+ "triergon-harness-protocol",
 ]
 
 [[package]]

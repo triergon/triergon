@@ -1,7 +1,7 @@
 [package]
 name = "triergon"
 version = "0.0.0"
-description = "Triergon facade: the neutral container model, AnyReader and each format crate behind its own feature."
+description = "Media readers, playback, software decode and subtitle rendering."
 repository.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -17,10 +17,30 @@ triergon-ogg = { path = "../ogg", optional = true }
 triergon-elementary = { path = "../elementary", optional = true }
 triergon-framing = { path = "../framing", optional = true }
 triergon-subtitles = { path = "../subtitles", optional = true }
+triergon-playback = { path = "../playback", optional = true }
+triergon-hls = { path = "../hls", optional = true }
+triergon-raw-video = { path = "../raw-video", optional = true }
+triergon-bridge = { path = "../bridge", optional = true }
+triergon-session = { path = "../session", optional = true }
+triergon-pixel = { path = "../pixel", optional = true }
+triergon-codec = { path = "../codec", optional = true }
+triergon-codec-aac = { path = "../codec-aac", optional = true }
+triergon-codec-ac3 = { path = "../codec-ac3", optional = true }
+triergon-codec-dca = { path = "../codec-dca", optional = true }
+triergon-codec-flac = { path = "../codec-flac", optional = true }
+triergon-codec-h264 = { path = "../codec-h264", optional = true }
+triergon-codec-hevc = { path = "../codec-hevc", optional = true }
+triergon-codec-mp3 = { path = "../codec-mp3", optional = true }
+triergon-codec-opus = { path = "../codec-opus", optional = true }
+triergon-codec-vorbis = { path = "../codec-vorbis", optional = true }
+triergon-ass = { path = "../ass", optional = true }
+triergon-font = { path = "../font", optional = true }
+triergon-raster = { path = "../raster", optional = true }
+triergon-shape = { path = "../shape", optional = true }
 
 [dev-dependencies]
-# The workspace test run builds no other crate with this feature.
-triergon = { path = ".", features = ["isobmff", "ogg", "elementary"] }
+# Exercise the full playback example in plain cargo test.
+triergon = { path = ".", default-features = false, features = ["isobmff", "ogg", "elementary", "playback", "codecs", "render"] }
 
 [features]
 default = ["matroska"]
@@ -31,6 +51,22 @@ ogg = ["dep:triergon-ogg"]
 elementary = ["dep:triergon-elementary"]
 framing = ["dep:triergon-framing"]
 subtitles = ["dep:triergon-subtitles"]
+playback = [
+    "dep:triergon-playback", "dep:triergon-hls", "dep:triergon-raw-video",
+    "dep:triergon-bridge", "framing",
+]
+session = ["dep:triergon-session", "dep:triergon-codec", "dep:triergon-pixel"]
+codecs = [
+    "session", "triergon-session/codecs", "dep:triergon-codec-aac", "dep:triergon-codec-ac3",
+    "dep:triergon-codec-dca", "dep:triergon-codec-flac", "dep:triergon-codec-h264",
+    "dep:triergon-codec-hevc", "dep:triergon-codec-mp3", "dep:triergon-codec-opus",
+    "dep:triergon-codec-vorbis",
+]
+render = ["dep:triergon-ass", "dep:triergon-font", "dep:triergon-raster", "dep:triergon-shape"]
 
 [lints]
 workspace = true
+
+[[example]]
+name = "play"
+required-features = ["playback", "matroska", "codecs", "render"]
