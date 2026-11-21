@@ -241,9 +241,11 @@ fn bs_motion(mp: &PuMotion, mq: &PuMotion, sp: &SliceInfo, sq: &SliceInfo) -> u8
         }
         return diff(mp.mv[lp], mq.mv[lq]) as u8;
     }
-    // Two motion vectors each.
-    let (p0, p1) = (ref_p(0).unwrap(), ref_p(1).unwrap());
-    let (q0, q1) = (ref_q(0).unwrap(), ref_q(1).unwrap());
+    // Two motion vectors each (inter blocks have at least one).
+    let ([Some(p0), Some(p1)], [Some(q0), Some(q1)]) = ([ref_p(0), ref_p(1)], [ref_q(0), ref_q(1)])
+    else {
+        return 1;
+    };
     if !((p0 == q0 && p1 == q1) || (p0 == q1 && p1 == q0)) {
         return 1;
     }
