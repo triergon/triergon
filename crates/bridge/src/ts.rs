@@ -10,7 +10,7 @@ use triergon_mpegts::clock::SourceTimestamp;
 use triergon_mpegts::pes::Pes;
 use triergon_mpegts::psi::ElementaryStream;
 use triergon_mpegts::stream::TraceEvent;
-use triergon_playback::{Delivery, Output, RawEvent, TrackKey, TsEvent};
+use triergon_playback::{Delivery, Event, Output, TrackKey, TsEvent};
 
 /// `stream_id` of PES private data: DVB subtitles, teletext and HDMV PGS.
 const PRIVATE_STREAM_1: u8 = 0xbd;
@@ -45,7 +45,7 @@ impl PesBinding {
         pid: u16,
         packet_limit: usize,
     ) -> Result<(Self, &ElementaryStream)> {
-        let RawEvent::Ts(TsEvent {
+        let Event::Ts(TsEvent {
             source:
                 TraceEvent::ProgramMap {
                     map,
@@ -109,7 +109,7 @@ impl PesBinding {
                 received: output.generation(),
             });
         }
-        let RawEvent::Ts(TsEvent {
+        let Event::Ts(TsEvent {
             source: TraceEvent::Pes(pes),
             source_pts,
             source_dts,
@@ -141,7 +141,7 @@ impl PesBinding {
             });
         }
         let (pts, dts) = (*source_pts, *source_dts);
-        let Some(RawEvent::Ts(TsEvent {
+        let Some(Event::Ts(TsEvent {
             source: TraceEvent::Pes(pes),
             ..
         })) = mailbox.take().map(Output::into_event)

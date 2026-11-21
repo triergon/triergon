@@ -18,7 +18,7 @@ use triergon_mpegts::{
     psi::DescriptorNamespace,
 };
 use triergon_playback::{
-    ByteSource, ClockChoice, Engine, Player, PlayerPolicy, Progress, RawEvent, Selection, State,
+    ByteSource, ClockChoice, Engine, Event, Player, PlayerPolicy, Progress, Selection, State,
     TrackKey, TsNativeCarriage, io::SourceOwner,
 };
 
@@ -168,9 +168,7 @@ fn check_segment(raw: &[u8], expected: &str, service: u16, raster: AvcRaster) {
             PlayerPolicy::default(),
         )
         .unwrap();
-        player
-            .set_clock_view(ClockChoice::ExplicitNativeProjection)
-            .unwrap();
+        player.set_clock_view(ClockChoice::Demux).unwrap();
         let mut video = None;
         let mut audio = None;
         let mut video_rows = String::new();
@@ -180,7 +178,7 @@ fn check_segment(raw: &[u8], expected: &str, service: u16, raster: AvcRaster) {
             let progress = player.advance(&mut WorkBudget::new(work), &cancel).unwrap();
             while let Some(output) = player.pop() {
                 match output.into_event() {
-                    RawEvent::NativeTsConfiguration(config) => {
+                    Event::PesCarriage(config) => {
                         assert!(
                             matches!(config.track, TrackKey::Ts { program, .. } if program == service)
                         );
@@ -199,7 +197,7 @@ fn check_segment(raw: &[u8], expected: &str, service: u16, raster: AvcRaster) {
                             other => panic!("unexpected carriage {other:?}"),
                         }
                     }
-                    RawEvent::NativeTs { packet, clock } => {
+                    Event::DemuxPes { packet, clock } => {
                         let is_video = packet.stream_id == 0xe0;
                         let mut mailbox = Some(packet);
                         if is_video {
@@ -213,7 +211,7 @@ fn check_segment(raw: &[u8], expected: &str, service: u16, raster: AvcRaster) {
                         }
                         assert!(mailbox.is_none());
                     }
-                    RawEvent::NativeRefusal { error, .. } => {
+                    Event::PesRefusal { error, .. } => {
                         panic!("unexpected PES refusal {error:?}")
                     }
                     _ => {}

@@ -4,10 +4,10 @@ mod video;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Error, InputRequest, Result, WorkBudget};
-use triergon_matroska::{Configuration, Event, TypedPacket as Packet};
+use triergon_matroska::{Configuration, Event as MkvEvent, TypedPacket as Packet};
 use triergon_playback::{
-    Engine, MatroskaReplayOutput, Output, Player, PlayerPolicy, Progress, RawEvent, Selection,
-    Source, SourceReply, State, io::SourceOwner,
+    Engine, Event, MatroskaReplayOutput, Output, Player, PlayerPolicy, Progress, Selection, Source,
+    SourceReply, State, io::SourceOwner,
 };
 use triergon_subtitles::pgs::{Composition, Envelope, SegmentIter};
 
@@ -240,7 +240,7 @@ impl ReplayBuffer {
 pub struct MatroskaReplayPrefix(BudgetVec<MatroskaReplayOutput>);
 
 impl MatroskaReplayPrefix {
-    pub fn events(&self) -> impl ExactSizeIterator<Item = &Event> {
+    pub fn events(&self) -> impl ExactSizeIterator<Item = &MkvEvent> {
         self.0.as_slice().iter().map(|output| &output.event)
     }
 
@@ -255,7 +255,7 @@ impl MatroskaReplayPrefix {
             .as_slice()
             .get(ordinal)
             .ok_or(Error::Invalid("Matroska replay ordinal"))?;
-        let Event::Packet(packet) = &output.event else {
+        let MkvEvent::Packet(packet) = &output.event else {
             return Ok(None);
         };
         feed.association
@@ -312,7 +312,7 @@ impl<S: Source> MatroskaCompactDiscovery<S> {
         Ok(discovery)
     }
 
-    pub fn buffered_events(&self) -> impl ExactSizeIterator<Item = &Event> {
+    pub fn buffered_events(&self) -> impl ExactSizeIterator<Item = &MkvEvent> {
         let ReplayBuffer::Matroska(outputs) = &self.0.outputs else {
             unreachable!("compact discovery always has a Matroska replay buffer");
         };
@@ -503,7 +503,7 @@ impl<S: Source> MatroskaDiscovery<S> {
             return Ok(MatroskaDiscoveryStep::Progress(Progress::Yield));
         }
         let packet_bytes = match output.event() {
-            RawEvent::Matroska(Event::Packet(packet)) => {
+            Event::Matroska(MkvEvent::Packet(packet)) => {
                 if !self.pending_observed {
                     let ready = self.readiness.as_mut().ok_or(Error::Invalid(
                         "Matroska discovery packet before configuration",
@@ -514,7 +514,7 @@ impl<S: Source> MatroskaDiscovery<S> {
                 }
                 packet.packet.data.len()
             }
-            RawEvent::Matroska(Event::Configuration(configuration)) => {
+            Event::Matroska(MkvEvent::Configuration(configuration)) => {
                 if !self.pending_observed {
                     self.readiness = Some(Readiness::new(configuration, self.probe_subtitles)?);
                 }

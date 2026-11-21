@@ -37,8 +37,10 @@ use triergon_framing::{
         AvcConfigParser, AvcConfigSource,
     },
 };
-use triergon_matroska::{Configuration, Event, LegacyAacProfile, TypedPacket as Packet};
-use triergon_playback::{Delivery, Output, RawEvent};
+use triergon_matroska::{
+    Configuration, Event as MkvEvent, LegacyAacProfile, TypedPacket as Packet,
+};
+use triergon_playback::{Delivery, Event, Output};
 pub use video_clock::MatroskaAvcClock;
 pub use video_seek::MatroskaVideoSeekGate;
 
@@ -73,7 +75,7 @@ impl Association {
     }
 
     fn selected_packet<'a>(&self, output: &'a Output) -> Result<Option<&'a Packet>> {
-        let RawEvent::Matroska(Event::Packet(packet)) = output.event() else {
+        let Event::Matroska(MkvEvent::Packet(packet)) = output.event() else {
             return Ok(None);
         };
         self.selected_source(packet, output.delivery())

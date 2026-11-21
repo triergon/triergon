@@ -1,5 +1,5 @@
 use crate::input::{Source, SourceReply};
-use crate::{BackendStep, Engine, RawEvent, Result, io::SourceOwner};
+use crate::{Engine, EngineStep, Event, Result, io::SourceOwner};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, InputRequest, Time, TimeBase, WorkBudget};
 use triergon_isobmff::compat::mov::packets::PacketCursor;
@@ -82,8 +82,8 @@ pub struct SeekIntent {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClockChoice {
-    SourceExact,
-    ExplicitNativeProjection,
+    Source,
+    Demux,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Delivery {
@@ -122,14 +122,14 @@ pub struct Output {
     session: u64,
     epoch: u64,
     generation: u64,
-    event: RawEvent,
+    event: Event,
     delivery: Delivery,
     bytes: usize,
 }
 impl Output {
     /// The output without its event-sized storage, when it holds a Matroska event.
     pub fn into_matroska_replay(self) -> Option<MatroskaReplayOutput> {
-        let RawEvent::Matroska(event) = self.event else {
+        let Event::Matroska(event) = self.event else {
             return None;
         };
         Some(MatroskaReplayOutput {
@@ -160,13 +160,13 @@ impl Output {
     }
 
     #[inline]
-    fn event_budget(event: &RawEvent) -> Option<&Budget> {
+    fn event_budget(event: &Event) -> Option<&Budget> {
         match event {
-            RawEvent::Matroska(triergon_matroska::Event::Packet(packet)) => {
+            Event::Matroska(triergon_matroska::Event::Packet(packet)) => {
                 Some(packet.configuration.budget())
             }
-            RawEvent::NativeTs { packet, .. } => Some(packet.spans.budget()),
-            RawEvent::Ts(event) => match &event.source {
+            Event::DemuxPes { packet, .. } => Some(packet.spans.budget()),
+            Event::Ts(event) => match &event.source {
                 TraceEvent::Transport(packet) => Some(packet.source.budget()),
                 TraceEvent::Section(section) => Some(section.bytes().budget()),
                 TraceEvent::Pes(packet) => Some(packet.header_source_ranges.budget()),
@@ -186,7 +186,7 @@ impl Output {
             generation: self.generation,
         }
     }
-    pub fn event(&self) -> &RawEvent {
+    pub fn event(&self) -> &Event {
         &self.event
     }
     pub fn delivery(&self) -> Delivery {
@@ -198,7 +198,7 @@ impl Output {
     pub fn generation(&self) -> u64 {
         self.generation
     }
-    pub fn into_event(self) -> RawEvent {
+    pub fn into_event(self) -> Event {
         self.event
     }
 }
@@ -224,7 +224,7 @@ impl MatroskaReplayOutput {
             session: self.scope.session,
             epoch: self.scope.epoch,
             generation: self.scope.generation,
-            event: RawEvent::Matroska(self.event),
+            event: Event::Matroska(self.event),
             delivery: self.delivery,
             bytes: self.bytes,
         }
@@ -406,7 +406,7 @@ pub struct Player<S: Source> {
     head: usize,
     count: usize,
     bytes: usize,
-    pending: Option<RawEvent>,
+    pending: Option<Event>,
     pending_source: Option<triergon_core::SourceId>,
     request: Option<InputRequest>,
     seek: Option<ActiveSeek>,
@@ -472,7 +472,7 @@ impl<S: Source> Player<S> {
             state: State::Running,
             policy,
             selection,
-            clock: ClockChoice::SourceExact,
+            clock: ClockChoice::Source,
             queue,
             head: 0,
             count: 0,
@@ -688,7 +688,7 @@ impl<S: Source> Player<S> {
         // is below its ceiling in nanoseconds. Keep the original time for
         // delivery and the rational comparison for laced or extreme clocks.
         let matroska_ceiling_ns = if matches!(intent.track, TrackKey::Matroska(_))
-            && intent.clock == ClockChoice::SourceExact
+            && intent.clock == ClockChoice::Source
         {
             intent
                 .target
@@ -703,7 +703,7 @@ impl<S: Source> Player<S> {
             reached_target: false,
         });
         self.seek_read = 0;
-        self.pending = Some(RawEvent::Seek(intent));
+        self.pending = Some(Event::Seek(intent));
         self.pending_source = self.engine.as_ref().map(Engine::source);
     }
 
@@ -732,7 +732,7 @@ impl<S: Source> Player<S> {
         }
         match &command.point {
             triergon_isobmff::seek::MoviePoint::Media(point) => {
-                let target = if self.clock == ClockChoice::SourceExact {
+                let target = if self.clock == ClockChoice::Source {
                     point.source_time
                 } else {
                     point.requested_movie_time
@@ -904,7 +904,7 @@ impl<S: Source> Player<S> {
             });
         }
         if matches!(seek.landing, crate::engines::Mp4RangeLanding::Native(_))
-            && self.clock != ClockChoice::ExplicitNativeProjection
+            && self.clock != ClockChoice::Demux
         {
             return Err(Error::Invalid("native seek clock changed"));
         }
@@ -1229,9 +1229,9 @@ impl<S: Source> Player<S> {
             match matroska.step(w, &self.cancel)? {
                 triergon_matroska::ParseStep::Event(event) => {
                     let source = engine.source();
-                    return self.accept_event::<READY>(source, RawEvent::Matroska(event), w, slot);
+                    return self.accept_event::<READY>(source, Event::Matroska(event), w, slot);
                 }
-                step => Ok(BackendStep::from_matroska(step)),
+                step => Ok(EngineStep::from_matroska(step)),
             }
         } else if let Some(cursor) = cursor {
             engine.poll_mp4_range(cursor, w, &self.cancel)
@@ -1245,21 +1245,21 @@ impl<S: Source> Player<S> {
             self.events = events;
         }
         match step {
-            Ok(BackendStep::Event(event)) => {
+            Ok(EngineStep::Event(event)) => {
                 let source = engine.source();
                 self.accept_event::<READY>(source, event, w, slot)
             }
-            Ok(BackendStep::NeedInput(r)) => {
+            Ok(EngineStep::NeedInput(r)) => {
                 self.request = Some(r.clone());
                 Ok(Progress::NeedInput(r))
             }
-            Ok(BackendStep::Yield) => Ok(Progress::Yield),
-            Ok(BackendStep::AwaitEntity) => Ok(Progress::AwaitEntity),
-            Ok(BackendStep::End) => {
+            Ok(EngineStep::Yield) => Ok(Progress::Yield),
+            Ok(EngineStep::AwaitEntity) => Ok(Progress::AwaitEntity),
+            Ok(EngineStep::End) => {
                 self.state = State::Ended;
                 Ok(Progress::Ended)
             }
-            Ok(BackendStep::Backpressure {
+            Ok(EngineStep::Backpressure {
                 requested,
                 available,
             }) => Ok(Progress::Backpressure {
@@ -1274,7 +1274,7 @@ impl<S: Source> Player<S> {
     fn accept_event<const READY: bool>(
         &mut self,
         source: triergon_core::SourceId,
-        event: RawEvent,
+        event: Event,
         work: &mut WorkBudget,
         slot: Option<&mut Option<Output>>,
     ) -> Result<Progress> {
@@ -1295,7 +1295,7 @@ impl<S: Source> Player<S> {
         progress
     }
 
-    fn admit(&self, e: &RawEvent, w: &mut WorkBudget) -> Result<Option<(usize, Delivery)>> {
+    fn admit(&self, e: &Event, w: &mut WorkBudget) -> Result<Option<(usize, Delivery)>> {
         let bytes = e.payload_bytes();
         if bytes > self.policy.queued_payload_bytes {
             return Err(Error::Limit {
@@ -1315,8 +1315,8 @@ impl<S: Source> Player<S> {
         }
         if matches!(
             e,
-            RawEvent::Matroska(triergon_matroska::Event::Configuration(_))
-                | RawEvent::Ts(crate::TsEvent {
+            Event::Matroska(triergon_matroska::Event::Configuration(_))
+                | Event::Ts(crate::TsEvent {
                     source: TraceEvent::ProgramMap { active: true, .. },
                     ..
                 })
@@ -1324,16 +1324,15 @@ impl<S: Source> Player<S> {
             self.selection
                 .validate(self.engine.as_ref().ok_or(Error::Closed)?)?;
         }
-        let facts_only = (self.clock == ClockChoice::SourceExact
-            && matches!(e, RawEvent::NativeTs { .. }))
-            || (self.clock == ClockChoice::ExplicitNativeProjection
+        let facts_only = (self.clock == ClockChoice::Source && matches!(e, Event::DemuxPes { .. }))
+            || (self.clock == ClockChoice::Demux
                 && matches!(
                     e,
-                    RawEvent::Ts(crate::TsEvent {
+                    Event::Ts(crate::TsEvent {
                         source: TraceEvent::Pes(pes),
                         ..
                     }) if self.engine.as_ref().is_some_and(|engine| {
-                        engine.replaces_source_ts_pes(pes.pid)
+                        engine.assembles_pid(pes.pid)
                     })
                 ));
         let delivery = if facts_only {
@@ -1346,9 +1345,9 @@ impl<S: Source> Player<S> {
                     // Matroska already checked and rounded the source PTS.
                     // Before a seek, delivery needs only its knownness.
                     (
-                        ClockChoice::SourceExact,
+                        ClockChoice::Source,
                         None,
-                        RawEvent::Matroska(triergon_matroska::Event::Packet(packet)),
+                        Event::Matroska(triergon_matroska::Event::Packet(packet)),
                     ) => {
                         if packet.packet.pts_ns.is_some() {
                             Delivery::Present
@@ -1356,11 +1355,7 @@ impl<S: Source> Player<S> {
                             Delivery::UnknownTime
                         }
                     }
-                    (
-                        ClockChoice::ExplicitNativeProjection,
-                        None,
-                        RawEvent::NativeTs { clock, .. },
-                    ) => {
+                    (ClockChoice::Demux, None, Event::DemuxPes { clock, .. }) => {
                         if clock.pts90.is_some() {
                             Delivery::Present
                         } else {
@@ -1368,13 +1363,13 @@ impl<S: Source> Player<S> {
                         }
                     }
                     (
-                        ClockChoice::SourceExact,
+                        ClockChoice::Source,
                         Some(ActiveSeek {
                             intent,
                             matroska_ceiling_ns: Some(ceiling),
                             ..
                         }),
-                        RawEvent::Matroska(triergon_matroska::Event::Packet(packet)),
+                        Event::Matroska(triergon_matroska::Event::Packet(packet)),
                     ) if packet.packet.timing.frames == 1 => match packet.packet.pts_ns {
                         None => Delivery::UnknownTime,
                         Some(pts) if pts < ceiling => Delivery::DecodeOnly {
@@ -1382,29 +1377,27 @@ impl<S: Source> Player<S> {
                         },
                         Some(_) => Delivery::Present,
                     },
-                    (
-                        ClockChoice::ExplicitNativeProjection,
-                        seek,
-                        RawEvent::Mp4(crate::Mp4Event::Packet(packet)),
-                    ) => match packet
-                        .native
-                        .as_ref()
-                        .and_then(|n| n.demux.pts.map(|pts| (pts, n.media_clock.demux_base)))
-                    {
-                        None => Delivery::UnknownTime,
-                        Some((pts, base)) => match seek {
-                            Some(s) if mp4_tick_before(pts, base, s.intent.target)? => {
-                                Delivery::DecodeOnly {
-                                    until: s.intent.target,
+                    (ClockChoice::Demux, seek, Event::Mp4(crate::Mp4Event::Packet(packet))) => {
+                        match packet
+                            .native
+                            .as_ref()
+                            .and_then(|n| n.demux.pts.map(|pts| (pts, n.media_clock.demux_base)))
+                        {
+                            None => Delivery::UnknownTime,
+                            Some((pts, base)) => match seek {
+                                Some(s) if mp4_tick_before(pts, base, s.intent.target)? => {
+                                    Delivery::DecodeOnly {
+                                        until: s.intent.target,
+                                    }
                                 }
-                            }
-                            _ => Delivery::Present,
-                        },
-                    },
+                                _ => Delivery::Present,
+                            },
+                        }
+                    }
                     (clock, seek, _) => {
                         let pts = match clock {
-                            ClockChoice::SourceExact => e.source_pts()?,
-                            ClockChoice::ExplicitNativeProjection => e.native_pts()?,
+                            ClockChoice::Source => e.source_pts()?,
+                            ClockChoice::Demux => e.demux_pts()?,
                         };
                         match (pts, seek) {
                             (None, _) => Delivery::UnknownTime,
@@ -1437,7 +1430,7 @@ impl<S: Source> Player<S> {
     fn publish(
         &mut self,
         source: triergon_core::SourceId,
-        event: RawEvent,
+        event: Event,
         bytes: usize,
         delivery: Delivery,
         slot: Option<&mut Option<Output>>,
@@ -1446,15 +1439,15 @@ impl<S: Source> Player<S> {
             && bytes != 0
             && matches!(delivery, Delivery::Present | Delivery::Unselected)
             && event.track() == Some(seek.intent.track)
-            && !matches!(&event, RawEvent::Mp4(crate::Mp4Event::NativeShortPacket(_)))
-            && !matches!(&event, RawEvent::NativeTs { packet, .. } if packet.flags & 2 != 0)
+            && !matches!(&event, Event::Mp4(crate::Mp4Event::NativeShortPacket(_)))
+            && !matches!(&event, Event::DemuxPes { packet, .. } if packet.flags & 2 != 0)
         {
             // Reordered packets still need the original presentation target.
             // Only the preroll input accounting ends here.
             seek.reached_target = delivery == Delivery::Present
                 || match seek.intent.clock {
-                    ClockChoice::SourceExact => event.source_pts(),
-                    ClockChoice::ExplicitNativeProjection => event.native_pts(),
+                    ClockChoice::Source => event.source_pts(),
+                    ClockChoice::Demux => event.demux_pts(),
                 }
                 .is_ok_and(|pts| pts.is_some_and(|pts| pts >= seek.intent.target));
         }

@@ -17,7 +17,7 @@ use triergon_mpegts::{
     compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors},
 };
 use triergon_playback::{
-    ClockChoice, Player, PlayerPolicy, Progress, RawEvent, Selection, Source, SourceReply, State,
+    ClockChoice, Event, Player, PlayerPolicy, Progress, Selection, Source, SourceReply, State,
     TrackKey, io::SourceOwner, pes_feed::SpentLists,
 };
 
@@ -353,7 +353,7 @@ where
                 ..PlayerPolicy::default()
             },
         )?;
-        player.set_clock_view(ClockChoice::ExplicitNativeProjection)?;
+        player.set_clock_view(ClockChoice::Demux)?;
         Ok(Self {
             player: Some(player),
             pool: pool.clone(),
@@ -566,9 +566,9 @@ where
         }
     }
 
-    fn on_event(&mut self, event: RawEvent) -> Result<()> {
+    fn on_event(&mut self, event: Event) -> Result<()> {
         match event {
-            RawEvent::Ts(event) => match event.source {
+            Event::Ts(event) => match event.source {
                 TraceEvent::ProgramMap {
                     map,
                     active: true,
@@ -592,7 +592,7 @@ where
                 }
                 _ => {}
             },
-            RawEvent::NativeTsConfiguration(config) => {
+            Event::PesCarriage(config) => {
                 let (video, audio, epoch) = self
                     .map
                     .ok_or(Error::Invalid("HLS configuration precedes PMT"))?;
@@ -605,7 +605,7 @@ where
                     self.audio_assembler = Some(A::bind(&self.pool, config, self.limits)?);
                 }
             }
-            RawEvent::NativeTs { packet, clock } => {
+            Event::DemuxPes { packet, clock } => {
                 let (video, audio, _) =
                     self.map.ok_or(Error::Invalid("HLS packet precedes PMT"))?;
                 let track = TrackKey::Ts {
@@ -633,7 +633,7 @@ where
                     self.phase = Phase::Audio;
                 }
             }
-            RawEvent::NativeRefusal { track, error, .. }
+            Event::PesRefusal { track, error, .. }
                 if self
                     .map
                     .is_some_and(|(video, audio, _)| track == video || Some(track) == audio) =>

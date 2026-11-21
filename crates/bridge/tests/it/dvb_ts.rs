@@ -5,7 +5,7 @@ use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence, PsiCrc32};
 use triergon_mpegts::stream::TraceEvent;
 use triergon_mpegts::{PacketFormat, ParseLimits, clock::SourceTimePolicy};
 use triergon_playback::{
-    ByteSource, Engine, Output, Player, PlayerPolicy, Progress, RawEvent, Selection, TsEvent,
+    ByteSource, Engine, Event, Output, Player, PlayerPolicy, Progress, Selection, TsEvent,
     io::SourceOwner,
 };
 use triergon_subtitles::dvb::Size;
@@ -54,11 +54,11 @@ fn play(
         let state = player.advance(&mut WorkBudget::new(17), &cancel).unwrap();
         while let Some(output) = player.pop() {
             match output.event() {
-                RawEvent::Ts(TsEvent {
+                Event::Ts(TsEvent {
                     source: TraceEvent::ProgramMap { active: true, .. },
                     ..
                 }) => map = Some(output),
-                RawEvent::Ts(TsEvent {
+                Event::Ts(TsEvent {
                     source: TraceEvent::Pes(_),
                     ..
                 }) => pes.push(output),

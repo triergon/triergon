@@ -6,8 +6,8 @@ use crate::{
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, SourceLocation, TimeBase, WorkBudget};
-use triergon_matroska::{Event, TypedPacket as Packet};
-use triergon_playback::{Delivery, Output, RawEvent, TrackKey};
+use triergon_matroska::{Event as MkvEvent, TypedPacket as Packet};
+use triergon_playback::{Delivery, Event, Output, TrackKey};
 use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder, Status};
 use triergon_subtitles::{compat, dvb, pgs::PacketClock};
 
@@ -111,8 +111,8 @@ impl MatroskaBitmapTrack {
     /// configuration after seeking. `track` is the Matroska TrackNumber.
     pub fn new(output: &Output, track: u64) -> Result<Self> {
         let configuration = match output.event() {
-            RawEvent::Matroska(Event::Configuration(configuration)) => configuration,
-            RawEvent::Matroska(Event::Packet(packet)) => &packet.configuration,
+            Event::Matroska(MkvEvent::Configuration(configuration)) => configuration,
+            Event::Matroska(MkvEvent::Packet(packet)) => &packet.configuration,
             _ => return Err(Error::Invalid("Matroska bitmap configuration required")),
         };
         let (index, descriptor) = configuration
@@ -286,7 +286,7 @@ impl MatroskaBitmapTrack {
         {
             return Ok(None);
         }
-        let RawEvent::Matroska(Event::Packet(packet)) = output.event() else {
+        let Event::Matroska(MkvEvent::Packet(packet)) = output.event() else {
             return Ok(None);
         };
         if output.source_id() != self.scope.source {

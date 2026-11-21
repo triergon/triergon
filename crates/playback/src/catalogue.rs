@@ -2,7 +2,7 @@
 //! A second in-band moov is not a source discontinuity. The caller supplies a
 //! freshly opened entity and keeps transport/entity validation outside this crate.
 use crate::{
-    Engine, Output, Player, RawEvent, Result, SeekIntent, Selection, Source,
+    Engine, Event, Output, Player, Result, SeekIntent, Selection, Source,
     engines::Mp4RangeLanding,
     io::SourceOwner,
     mp4_open::{Movie, OpenedMp4},
@@ -84,7 +84,7 @@ pub struct RetiredCatalogue {
     pub(crate) engine: Option<Engine>,
     pub(crate) queue: BudgetVec<Option<Output>>,
     pub(crate) head: usize,
-    pub(crate) pending: Option<RawEvent>,
+    pub(crate) pending: Option<Event>,
     pub(crate) pending_source: Option<SourceId>,
     pub(crate) request: Option<InputRequest>,
     pub(crate) seek: Option<SeekIntent>,
@@ -110,7 +110,7 @@ impl RetiredCatalogue {
         self.head += 1;
         out
     }
-    pub fn pending_event(&self) -> Option<&RawEvent> {
+    pub fn pending_event(&self) -> Option<&Event> {
         self.pending.as_ref()
     }
     pub fn pending_source(&self) -> Option<SourceId> {

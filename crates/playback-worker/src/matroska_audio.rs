@@ -19,9 +19,11 @@ use triergon_bridge::matroska::{
 };
 use triergon_core::container::{CodecId, MediaKind, TrackInfo};
 use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId, WorkBudget};
-use triergon_matroska::{Configuration, Event, LegacyAacProfile, TypedPacket as MatroskaPacket};
+use triergon_matroska::{
+    Configuration, Event as MkvEvent, LegacyAacProfile, TypedPacket as MatroskaPacket,
+};
 use triergon_playback::{
-    ByteSource, Engine, Output, PlayerPolicy, Progress, RawEvent, Selection, io::SourceOwner,
+    ByteSource, Engine, Event, Output, PlayerPolicy, Progress, Selection, io::SourceOwner,
 };
 
 pub const PREFIX: &str = "mkv-audio-";
@@ -82,15 +84,15 @@ enum Clock<'a> {
 }
 
 fn output_packet(output: &Output) -> Option<&MatroskaPacket> {
-    let RawEvent::Matroska(event) = output.event() else {
+    let Event::Matroska(event) = output.event() else {
         return None;
     };
     source_packet(event)
 }
 
-fn source_packet(event: &Event) -> Option<&MatroskaPacket> {
+fn source_packet(event: &MkvEvent) -> Option<&MatroskaPacket> {
     match event {
-        Event::Packet(packet) => Some(packet),
+        MkvEvent::Packet(packet) => Some(packet),
         _ => None,
     }
 }
@@ -177,7 +179,7 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
     let configuration = prefix
         .events()
         .find_map(|event| match event {
-            Event::Configuration(configuration) => Some(configuration),
+            MkvEvent::Configuration(configuration) => Some(configuration),
             _ => None,
         })
         .ok_or("no Matroska configuration before the first packet")?;

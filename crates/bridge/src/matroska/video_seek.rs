@@ -1,7 +1,7 @@
 //! Native selected-video admission over the source's complete-cluster replay.
 use triergon_core::{Error, Result};
-use triergon_matroska::Event;
-use triergon_playback::{Delivery, Output, OutputScope, RawEvent, TrackKey};
+use triergon_matroska::Event as MkvEvent;
+use triergon_playback::{Delivery, Event, Output, OutputScope, TrackKey};
 
 /// Admit the selected video's packets from the resolved keyframe onward.
 /// Use the same gate on each output in playback order after the seek receipt.
@@ -16,13 +16,13 @@ pub struct MatroskaVideoSeekGate {
 impl MatroskaVideoSeekGate {
     /// Bind the seek intent and matching Matroska receipt from the player.
     pub fn new(intent: &Output, receipt: &Output) -> Result<Self> {
-        let RawEvent::Seek(seek) = intent.event() else {
+        let Event::Seek(seek) = intent.event() else {
             return Err(Error::Invalid("Matroska video seek intent"));
         };
         let TrackKey::Matroska(track) = seek.track else {
             return Err(Error::Invalid("Matroska video seek track"));
         };
-        let RawEvent::Matroska(Event::Seek(landing)) = receipt.event() else {
+        let Event::Matroska(MkvEvent::Seek(landing)) = receipt.event() else {
             return Err(Error::Invalid("Matroska video seek receipt"));
         };
         let scope = receipt.scope();
@@ -46,7 +46,7 @@ impl MatroskaVideoSeekGate {
         if output.delivery() == Delivery::Unselected {
             return Ok(false);
         }
-        let RawEvent::Matroska(Event::Packet(packet)) = output.event() else {
+        let Event::Matroska(MkvEvent::Packet(packet)) = output.event() else {
             return Ok(false);
         };
         if packet

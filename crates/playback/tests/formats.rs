@@ -120,7 +120,7 @@ fn first_packet<S: Source>(p: &mut Player<S>) -> Output {
 fn mp4_packets(v: &[Output]) -> Vec<&Mp4Packet> {
     v.iter()
         .filter_map(|o| {
-            if let RawEvent::Mp4(Mp4Event::Packet(p)) = o.event() {
+            if let Event::Mp4(Mp4Event::Packet(p)) = o.event() {
                 Some(p)
             } else {
                 None
@@ -131,7 +131,7 @@ fn mp4_packets(v: &[Output]) -> Vec<&Mp4Packet> {
 fn pes(v: &[Output]) -> Vec<&TsEvent> {
     v.iter()
         .filter_map(|o| {
-            if let RawEvent::Ts(e) = o.event()
+            if let Event::Ts(e) = o.event()
                 && matches!(e.source, TraceEvent::Pes(_))
             {
                 return Some(e);
@@ -248,11 +248,11 @@ fn description_changes_publish_raw_config_before_each_matching_packet() {
         let mut seen = Vec::new();
         for o in &out {
             match o.event() {
-                RawEvent::Mp4(Mp4Event::Configuration(c)) => {
+                Event::Mp4(Mp4Event::Configuration(c)) => {
                     last = Some((c.track.track_id, c.description.index, c.revision));
                     seen.push(c.description.index);
                 }
-                RawEvent::Mp4(Mp4Event::Packet(p)) => {
+                Event::Mp4(Mp4Event::Packet(p)) => {
                     assert_eq!(
                         last,
                         Some((
@@ -285,10 +285,10 @@ fn multitrack_packet_configuration_uses_its_track_revision_not_latest_other_trac
     let mut revisions = std::collections::BTreeMap::new();
     for o in out {
         match o.event() {
-            RawEvent::Mp4(Mp4Event::Configuration(c)) => {
+            Event::Mp4(Mp4Event::Configuration(c)) => {
                 revisions.insert(c.track.track_id, c.revision);
             }
-            RawEvent::Mp4(Mp4Event::Packet(p)) => assert_eq!(
+            Event::Mp4(Mp4Event::Packet(p)) => assert_eq!(
                 Some(&p.configuration.revision),
                 revisions.get(&p.configuration.track.track_id)
             ),
@@ -325,8 +325,8 @@ fn source_and_native_clock_delivery_are_explicit_independent_views() {
         SourceTimeStatus::AnchorBoundMissing
     );
     assert!(e.source_pts.unwrap().exact.is_none());
-    assert_eq!(e.native_clock.unwrap().pts90, Some((1_i128 << 33) - 2));
-    assert_eq!(e.native_clock.unwrap().dts90, Some(3));
+    assert_eq!(e.demux_clock.unwrap().pts90, Some((1_i128 << 33) - 2));
+    assert_eq!(e.demux_clock.unwrap().dts90, Some(3));
     assert!(
         source
             .iter()
@@ -334,16 +334,14 @@ fn source_and_native_clock_delivery_are_explicit_independent_views() {
             .all(|o| o.delivery() == Delivery::UnknownTime)
     );
     let (mut native, _) = ts(raw, PacketFormat::Ts188, 7, SourceTimePolicy::Unanchored).unwrap();
-    native
-        .set_clock_view(ClockChoice::ExplicitNativeProjection)
-        .unwrap();
+    native.set_clock_view(ClockChoice::Demux).unwrap();
     let out = collect(&mut native, 1).unwrap();
     assert!(
         out.iter()
             .filter(|o| o.event().track().is_some())
             .all(|o| o.delivery() == Delivery::Present)
     );
-    assert!(native.set_clock_view(ClockChoice::SourceExact).is_err());
+    assert!(native.set_clock_view(ClockChoice::Source).is_err());
 }
 #[test]
 fn ts188_and_m2ts_real_readers_preserve_complete_carriage_and_pes() {
@@ -371,7 +369,7 @@ fn ts188_and_m2ts_real_readers_preserve_complete_carriage_and_pes() {
                 pes.payload().flatten().copied().collect::<Vec<_>>(),
                 b"lane-ts-original-payload\x00\x47\xff"
             );
-            assert_eq!(events[0].native_clock.unwrap().pts90, Some(90_000));
+            assert_eq!(events[0].demux_clock.unwrap().pts90, Some(90_000));
             assert_eq!(
                 events[0].source_pts.unwrap().exact,
                 Some(Time::new(1, 1).unwrap())
@@ -379,7 +377,7 @@ fn ts188_and_m2ts_real_readers_preserve_complete_carriage_and_pes() {
             let carriers: Vec<_> = out
                 .iter()
                 .filter_map(|o| {
-                    if let RawEvent::Ts(TsEvent {
+                    if let Event::Ts(TsEvent {
                         source: TraceEvent::Transport(t),
                         ..
                     }) = o.event()
@@ -422,7 +420,7 @@ fn actual_pmt_version_change_preserves_both_maps_and_epoch_order() {
     let maps: Vec<_> = out
         .iter()
         .filter_map(|o| {
-            if let RawEvent::Ts(TsEvent {
+            if let Event::Ts(TsEvent {
                 source:
                     TraceEvent::ProgramMap {
                         map,
@@ -469,7 +467,7 @@ fn source_ts_errors_are_retained_diagnostics_not_fabricated_pes() {
         let out = collect(&mut p, 1).unwrap();
         assert!(out.iter().any(|o| matches!(
             o.event(),
-            RawEvent::Ts(TsEvent {
+            Event::Ts(TsEvent {
                 source: TraceEvent::Diagnostic(_),
                 ..
             })
@@ -497,14 +495,14 @@ fn all_remaining_frozen_ts_cases_have_actual_terminal_owned_outcomes() {
         let out = collect(&mut p, 1).unwrap();
         assert!(out.iter().any(|o| matches!(
             o.event(),
-            RawEvent::Ts(TsEvent {
+            Event::Ts(TsEvent {
                 source: TraceEvent::Finished,
                 ..
             })
         )));
         for e in pes(&out) {
             assert!(e.source_pts.unwrap().exact.is_none());
-            assert!(e.native_clock.is_some());
+            assert!(e.demux_clock.is_some());
         }
         drop(out);
         drop(p);
@@ -969,7 +967,7 @@ fn source_ts_seek_replay_has_new_generation_and_keeps_complete_psi_before_pes() 
         .position(|o| {
             matches!(
                 o.event(),
-                RawEvent::Ts(TsEvent {
+                Event::Ts(TsEvent {
                     source: TraceEvent::ProgramMap { active: true, .. },
                     ..
                 })
@@ -1146,7 +1144,7 @@ fn retained_real_mp4_packet_config_and_native_view_outlive_player() {
     p.stop();
     assert!(!p.current(&output));
     drop(p);
-    let RawEvent::Mp4(Mp4Event::Packet(packet)) = output.event() else {
+    let Event::Mp4(Mp4Event::Packet(packet)) = output.event() else {
         panic!()
     };
     assert!(!packet.source.payload.is_empty());
@@ -1162,7 +1160,7 @@ fn retained_ts_packet_spans_and_header_outlive_stop_without_leaks() {
     let output = first_packet(&mut p);
     p.stop();
     drop(p);
-    let RawEvent::Ts(TsEvent {
+    let Event::Ts(TsEvent {
         source: TraceEvent::Pes(pes),
         ..
     }) = output.event()
@@ -1495,15 +1493,14 @@ fn full_native_ts_packets_are_distinct_from_source_pes_and_keep_literal_fields()
             PlayerPolicy::default(),
         )
         .unwrap();
-        p.set_clock_view(ClockChoice::ExplicitNativeProjection)
-            .unwrap();
+        p.set_clock_view(ClockChoice::Demux).unwrap();
         let out = collect(&mut p, 1).unwrap();
         assert_eq!(pes(&out).len(), 1);
         assert!(
             out.iter()
                 .filter(|o| matches!(
                     o.event(),
-                    RawEvent::Ts(TsEvent {
+                    Event::Ts(TsEvent {
                         source: TraceEvent::Pes(_),
                         ..
                     })
@@ -1513,7 +1510,7 @@ fn full_native_ts_packets_are_distinct_from_source_pes_and_keep_literal_fields()
         let native: Vec<_> = out
             .iter()
             .filter_map(|o| {
-                if let RawEvent::NativeTs { packet, clock } = o.event() {
+                if let Event::DemuxPes { packet, clock } = o.event() {
                     assert_eq!(o.delivery(), Delivery::Present);
                     Some((packet, clock))
                 } else {
@@ -1583,14 +1580,14 @@ fn native_carriage_refusal_keeps_source_and_is_not_a_native_codec_error() {
     assert_eq!(pes(&out).len(), 1);
     assert!(out.iter().any(|o| matches!(
         o.event(),
-        RawEvent::NativeRefusal {
+        Event::PesRefusal {
             error: C::Unsupported(_),
             ..
         }
     )));
     assert!(
         out.iter()
-            .all(|o| !matches!(o.event(), RawEvent::NativeTs { .. }))
+            .all(|o| !matches!(o.event(), Event::DemuxPes { .. }))
     );
 }
 #[test]
@@ -1653,7 +1650,7 @@ fn real_encoded_matroska_uses_old183_reader_after_sequential_probe() {
     let packets: Vec<_> = out
         .iter()
         .filter_map(|o| {
-            if let RawEvent::Matroska(triergon_matroska::Event::Packet(p)) = o.event() {
+            if let Event::Matroska(triergon_matroska::Event::Packet(p)) = o.event() {
                 Some(p)
             } else {
                 None
@@ -1892,7 +1889,7 @@ fn real_ts_entity_transition_preserves_partial_pes_and_requires_explicit_logical
     assert!(p.source_ranges().any(|r| r.entity == SourceId(ID.0 + 1)));
     assert_eq!(
         out.iter()
-            .filter(|o| matches!(o.event(), RawEvent::EntityEnd(_)))
+            .filter(|o| matches!(o.event(), Event::EntityEnd(_)))
             .count(),
         2
     );
@@ -1961,13 +1958,12 @@ fn native_ts_projection_only_replaces_source_pes_for_its_selected_pid() {
         PlayerPolicy::default(),
     )
     .unwrap();
-    p.set_clock_view(ClockChoice::ExplicitNativeProjection)
-        .unwrap();
+    p.set_clock_view(ClockChoice::Demux).unwrap();
     let out = collect(&mut p, 1).unwrap();
     let source_packets: Vec<_> = out
         .iter()
         .filter_map(|o| {
-            if let RawEvent::Ts(TsEvent {
+            if let Event::Ts(TsEvent {
                 source: TraceEvent::Pes(pes),
                 ..
             }) = o.event()
@@ -1984,7 +1980,7 @@ fn native_ts_projection_only_replaces_source_pes_for_its_selected_pid() {
     );
     assert_eq!(
         out.iter()
-            .filter(|o| matches!(o.event(), RawEvent::NativeTs { .. }))
+            .filter(|o| matches!(o.event(), Event::DemuxPes { .. }))
             .count(),
         1
     );
@@ -2085,8 +2081,7 @@ fn private_audio_playback_matches_all_four_archived_packet_controls() {
                 },
                 quantum,
             );
-            p.set_clock_view(ClockChoice::ExplicitNativeProjection)
-                .unwrap();
+            p.set_clock_view(ClockChoice::Demux).unwrap();
             let out = collect(&mut p, 1).unwrap();
             let (mut strict, _) = ts(
                 raw,
@@ -2099,10 +2094,10 @@ fn private_audio_playback_matches_all_four_archived_packet_controls() {
             assert_source_pes_match(&out, &strict_out);
             assert!(
                 out.iter()
-                    .all(|o| !matches!(o.event(), RawEvent::NativeRefusal { .. }))
+                    .all(|o| !matches!(o.event(), Event::PesRefusal { .. }))
             );
             let mut native = out.iter().filter_map(|o| {
-                if let RawEvent::NativeTs { packet, clock } = o.event() {
+                if let Event::DemuxPes { packet, clock } = o.event() {
                     assert_eq!(o.delivery(), Delivery::Present);
                     Some((packet, clock))
                 } else {
@@ -2155,13 +2150,13 @@ fn private_audio_mismatch_reports_refusal_and_retains_source_packet() {
     assert_source_pes_match(&out, &collect(&mut strict, 1).unwrap());
     assert!(
         out.iter()
-            .all(|o| !matches!(o.event(), RawEvent::NativeTs { .. }))
+            .all(|o| !matches!(o.event(), Event::DemuxPes { .. }))
     );
     assert_eq!(
         out.iter()
             .filter(|o| matches!(
                 o.event(),
-                RawEvent::NativeRefusal {
+                Event::PesRefusal {
                     track: TrackKey::Ts {
                         program: 1,
                         pid: 257
@@ -2205,9 +2200,7 @@ fn private_audio_policy_and_legacy_constructor_replay_the_same_packets_after_see
         .unwrap();
         let mut player =
             Player::new(engine, io.source, Selection::All, PlayerPolicy::default()).unwrap();
-        player
-            .set_clock_view(ClockChoice::ExplicitNativeProjection)
-            .unwrap();
+        player.set_clock_view(ClockChoice::Demux).unwrap();
         player
     };
     let (mut legacy, mut policy) = (open(true), open(false));
@@ -2241,7 +2234,7 @@ fn private_audio_policy_and_legacy_constructor_replay_the_same_packets_after_see
         let audio_packets = |out: &[Output]| {
             out.iter()
                 .filter_map(|row| match row.event() {
-                    RawEvent::NativeTs { packet, clock } => Some((
+                    Event::DemuxPes { packet, clock } => Some((
                         row.delivery(),
                         packet.pid,
                         clock.pts90,
@@ -2298,7 +2291,7 @@ fn native_pressure_retries_instead_of_disabling_the_observer() {
         if let Some(event) = player.pop()
             && matches!(
                 event.event(),
-                RawEvent::Ts(TsEvent { source: TraceEvent::Transport(packet), .. })
+                Event::Ts(TsEvent { source: TraceEvent::Transport(packet), .. })
                     if packet.pid == 257
             )
         {
@@ -2319,12 +2312,12 @@ fn native_pressure_retries_instead_of_disabling_the_observer() {
             let out = collect(&mut player, 1).unwrap();
             assert!(
                 out.iter()
-                    .any(|o| matches!(o.event(), RawEvent::NativeTs { packet, .. }
+                    .any(|o| matches!(o.event(), Event::DemuxPes { packet, .. }
                     if packet.payload().flatten().copied().eq(raw[537..].iter().copied())))
             );
             assert!(
                 out.iter()
-                    .all(|o| !matches!(o.event(), RawEvent::NativeRefusal { .. }))
+                    .all(|o| !matches!(o.event(), Event::PesRefusal { .. }))
             );
             return;
         }
@@ -2411,7 +2404,7 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
             let mut packets = 0;
             for output in outputs {
                 let (packet, payload) = match output.event() {
-                    RawEvent::Mp4(Mp4Event::Configuration(config)) => {
+                    Event::Mp4(Mp4Event::Configuration(config)) => {
                         assert_eq!(packets, 0);
                         bridge = Some(bind(
                             Av1BridgeSetup::for_mp4(pool, ID, config, config_limits, packet_limits)
@@ -2419,7 +2412,7 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
                         ));
                         continue;
                     }
-                    RawEvent::Matroska(triergon_matroska::Event::Configuration(config)) => {
+                    Event::Matroska(triergon_matroska::Event::Configuration(config)) => {
                         assert_eq!(packets, 0);
                         let track = config
                             .tracks()
@@ -2439,10 +2432,10 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
                         ));
                         continue;
                     }
-                    RawEvent::Mp4(Mp4Event::Packet(packet)) => {
+                    Event::Mp4(Mp4Event::Packet(packet)) => {
                         (Av1Input::Mp4(packet), packet.source.payload.as_ref())
                     }
-                    RawEvent::Matroska(triergon_matroska::Event::Packet(packet)) => {
+                    Event::Matroska(triergon_matroska::Event::Packet(packet)) => {
                         (Av1Input::Matroska(packet), packet.packet.data.as_ref())
                     }
                     _ => continue,
@@ -2496,7 +2489,7 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
                     .unwrap()
                 );
                 let replay = first_packet(&mut mkv);
-                let RawEvent::Matroska(triergon_matroska::Event::Packet(packet)) = replay.event()
+                let Event::Matroska(triergon_matroska::Event::Packet(packet)) = replay.event()
                 else {
                     panic!("seek did not return an AV1 packet");
                 };
@@ -2574,18 +2567,18 @@ fn indexed_mp4_seek_starts_at_late_sync_and_republishes_its_configuration() {
     assert_eq!(packets[0].configuration.description.index, 2);
     assert!(matches!(
         events[0].event(),
-        RawEvent::Seek(SeekIntent {
+        Event::Seek(SeekIntent {
             replay_from_start: false,
             ..
         })
     ));
     assert!(matches!(
         events[1].event(),
-        RawEvent::Mp4(Mp4Event::Configuration(_))
+        Event::Mp4(Mp4Event::Configuration(_))
     ));
     let delivered = events
         .iter()
-        .filter(|e| matches!(e.event(), RawEvent::Mp4(Mp4Event::Packet(_))))
+        .filter(|e| matches!(e.event(), Event::Mp4(Mp4Event::Packet(_))))
         .map(Output::delivery)
         .collect::<Vec<_>>();
     assert_eq!(
@@ -2649,7 +2642,7 @@ fn indexed_mp4_seek_budget_covers_preroll_and_stops_at_the_target() {
             let output = output.unwrap();
             let deliveries: Vec<_> = output
                 .iter()
-                .filter(|output| matches!(output.event(), RawEvent::Mp4(Mp4Event::Packet(_))))
+                .filter(|output| matches!(output.event(), Event::Mp4(Mp4Event::Packet(_))))
                 .map(Output::delivery)
                 .collect();
             assert_eq!(
@@ -2991,9 +2984,7 @@ fn native_range_player(bytes: &[u8]) -> (Player<Observed>, mp4_open::Movie, Call
         PlayerPolicy::default(),
     )
     .unwrap();
-    player
-        .set_clock_view(ClockChoice::ExplicitNativeProjection)
-        .unwrap();
+    player.set_clock_view(ClockChoice::Demux).unwrap();
     (player, opened.movie, calls, pool)
 }
 
@@ -3097,8 +3088,8 @@ fn assert_native_seek_packets(
 ) {
     assert!(matches!(
         events[0].event(),
-        RawEvent::Seek(SeekIntent {
-            clock: ClockChoice::ExplicitNativeProjection,
+        Event::Seek(SeekIntent {
+            clock: ClockChoice::Demux,
             replay_from_start: false,
             ..
         })
@@ -3107,11 +3098,11 @@ fn assert_native_seek_packets(
     let mut wanted = expected.lines();
     for event in &events[1..] {
         match event.event() {
-            RawEvent::Mp4(Mp4Event::Configuration(config)) => {
+            Event::Mp4(Mp4Event::Configuration(config)) => {
                 configurations[(config.track.track_id - 1) as usize] =
                     Some((config.revision, config.description.index));
             }
-            RawEvent::Mp4(Mp4Event::Packet(packet)) => {
+            Event::Mp4(Mp4Event::Packet(packet)) => {
                 let fields: Vec<_> = wanted
                     .next()
                     .expect("extra packet after native seek")
@@ -3432,7 +3423,7 @@ fn forward_encoded_edit_drains_samples_outside_the_presentation() {
                     .unwrap();
                 if let Some(event) = output.take() {
                     packets +=
-                        usize::from(matches!(event.event(), RawEvent::Mp4(Mp4Event::Packet(_))));
+                        usize::from(matches!(event.event(), Event::Mp4(Mp4Event::Packet(_))));
                 }
                 assert!(!matches!(progress, Progress::Ended));
                 match progress {
@@ -3657,7 +3648,7 @@ fn native_range_packet_reclaims_optional_seek_state_under_pool_pressure() {
         .unwrap();
     let _held = pool.reserve(pool.available()).unwrap();
     let packet = std::iter::from_fn(|| next_range_output(&mut player))
-        .find(|output| matches!(output.event(), RawEvent::Mp4(Mp4Event::Packet(_))))
+        .find(|output| matches!(output.event(), Event::Mp4(Mp4Event::Packet(_))))
         .unwrap();
     assert!(player.current(&packet));
     assert!(!player.discard_seek_checkpoints());
@@ -3782,7 +3773,7 @@ fn repeated_range_seek_preserves_catalogue_order_with_video_second() {
         let output = std::iter::from_fn(|| next_range_output(&mut player))
             .find(|item| item.event().track() == Some(TrackKey::Mp4(1)))
             .unwrap();
-        let RawEvent::Mp4(Mp4Event::Packet(packet)) = output.event() else {
+        let Event::Mp4(Mp4Event::Packet(packet)) = output.event() else {
             panic!("expected a video packet");
         };
         assert_eq!(packet.native.as_ref().unwrap().demux.dts, Some(3000));
@@ -4228,9 +4219,7 @@ fn encoded_range_player(raw: &[u8]) -> (Player<ByteSource>, mp4_open::Movie) {
         PlayerPolicy::default(),
     )
     .unwrap();
-    player
-        .set_clock_view(ClockChoice::ExplicitNativeProjection)
-        .unwrap();
+    player.set_clock_view(ClockChoice::Demux).unwrap();
     (player, opened.movie)
 }
 
@@ -4392,7 +4381,7 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
         let events: Vec<_> = events
             .iter()
             .filter_map(|event| match event.event() {
-                RawEvent::Mp4(event) => Some(event),
+                Event::Mp4(event) => Some(event),
                 _ => None,
             })
             .collect();
@@ -4671,7 +4660,7 @@ fn native_range_player_carries_dolby_leading_trim() {
         let packets: Vec<_> = events
             .iter()
             .filter_map(|event| match event.event() {
-                RawEvent::Mp4(Mp4Event::Packet(packet)) => Some(packet),
+                Event::Mp4(Mp4Event::Packet(packet)) => Some(packet),
                 _ => None,
             })
             .collect();
@@ -4700,7 +4689,7 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
     let audio_trim: Vec<_> = linear
         .iter()
         .filter_map(|output| match output.event() {
-            RawEvent::Mp4(Mp4Event::Packet(packet)) if packet.configuration.track.track_id == 2 => {
+            Event::Mp4(Mp4Event::Packet(packet)) if packet.configuration.track.track_id == 2 => {
                 packet.encoded_skip_samples
             }
             _ => None,
@@ -4734,7 +4723,7 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
     let packets: Vec<_> = output
         .iter()
         .filter_map(|event| match event.event() {
-            RawEvent::Mp4(Mp4Event::Packet(packet)) => Some(packet),
+            Event::Mp4(Mp4Event::Packet(packet)) => Some(packet),
             _ => None,
         })
         .collect();

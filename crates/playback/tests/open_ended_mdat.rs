@@ -422,10 +422,7 @@ fn open_ended_opaque_tail_is_payload_until_actual_end() {
     read(&mut p, &mut out).unwrap();
     check_regular(&out);
     assert_eq!(signals.ends.load(Ordering::Relaxed), 1);
-    assert!(
-        !out.iter()
-            .any(|o| matches!(o.event(), RawEvent::Mp4Root(_)))
-    );
+    assert!(!out.iter().any(|o| matches!(o.event(), Event::Mp4Root(_))));
 }
 #[test]
 fn open_ended_packet_pressure_retries_all_declared_samples() {
@@ -536,7 +533,7 @@ fn open_ended_nonseekable_refusal_keeps_current_source_outputs() {
     let (mut p, _, signals, mut out) = parked();
     let held = out
         .iter()
-        .find(|o| matches!(o.event(), RawEvent::Mp4(Mp4Event::Packet(_))))
+        .find(|o| matches!(o.event(), Event::Mp4(Mp4Event::Packet(_))))
         .unwrap();
     assert!(p.current(held));
     assert!(

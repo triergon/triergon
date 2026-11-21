@@ -109,7 +109,7 @@ fn subtitle_only(track: TrackKey) -> Selection {
 fn is_active_map(output: &Output) -> bool {
     matches!(
         output.event(),
-        RawEvent::Ts(TsEvent {
+        Event::Ts(TsEvent {
             source: TraceEvent::ProgramMap { active: true, .. },
             ..
         })
@@ -118,7 +118,7 @@ fn is_active_map(output: &Output) -> bool {
 
 fn mp4_packet(output: &Output) -> Option<&Mp4Packet> {
     match output.event() {
-        RawEvent::Mp4(Mp4Event::Packet(packet)) => Some(packet),
+        Event::Mp4(Mp4Event::Packet(packet)) => Some(packet),
         _ => None,
     }
 }

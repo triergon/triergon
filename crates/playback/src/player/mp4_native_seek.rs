@@ -86,7 +86,7 @@ impl Mp4NativeSeekCommand {
             intent: SeekIntent {
                 track: TrackKey::Mp4(self.video),
                 target: self.target,
-                clock: ClockChoice::ExplicitNativeProjection,
+                clock: ClockChoice::Demux,
                 replay_from_start: false,
             },
             landing: Mp4RangeLanding::Native(&self.replay),
@@ -137,7 +137,7 @@ impl<S: Source> Player<S> {
     }
 
     fn check_native_seek_clock(&self) -> Result<()> {
-        if self.clock != ClockChoice::ExplicitNativeProjection {
+        if self.clock != ClockChoice::Demux {
             return Err(Error::Unsupported(
                 "native seek needs complete native range MP4",
             ));

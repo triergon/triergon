@@ -141,7 +141,7 @@ Transport carrier, section and PES outputs use the budget of their retained
 storage for pool identity.
 
 **Clocks.** Every packet keeps its exact source timestamps. FFmpeg-compatible
-packet clocks are explicit opt-in views (`ClockChoice::ExplicitNativeProjection`,
+packet clocks are explicit opt-in views (`ClockChoice::Demux`,
 `Mp4View::PinnedMov9NoParseNoFillin`, the `native_*` Matroska clocks and the
 `*_native_*` TS engines); they never overwrite source facts. Native views can
 emit events the source view does not, such as `Mp4Event::NativeShortPacket`,

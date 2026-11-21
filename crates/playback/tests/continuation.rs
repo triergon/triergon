@@ -165,7 +165,7 @@ fn progressive_all_five_fragment_sequences_keep_original_source_golds() {
         }
         assert!(
             out.iter()
-                .any(|o| matches!(o.event(),RawEvent::Mp4Root(r)if r.header().kind==*b"moof"))
+                .any(|o| matches!(o.event(),Event::Mp4Root(r)if r.header().kind==*b"moof"))
         );
         drop(out);
         drop(p);
@@ -231,11 +231,11 @@ fn progressive_second_fragment_description_precedes_its_packets() {
     let mut descriptions = Vec::new();
     for o in &out {
         match o.event() {
-            RawEvent::Mp4(Mp4Event::Configuration(c)) => {
+            Event::Mp4(Mp4Event::Configuration(c)) => {
                 cfg = Some((c.track.track_id, c.description.index, c.revision));
                 descriptions.push(c.description.index);
             }
-            RawEvent::Mp4(Mp4Event::Packet(p)) => assert_eq!(
+            Event::Mp4(Mp4Event::Packet(p)) => assert_eq!(
                 cfg,
                 Some((
                     p.configuration.track.track_id,
@@ -462,7 +462,7 @@ fn pump_sink_owns_accepted_raw_packets_after_source_and_pump_teardown() {
     }
     let sink = p.into_sink().unwrap();
     assert_eq!(sink.stops, 1);
-    assert!(sink.accepted.iter().any(|f|matches!(f.output().event(),RawEvent::Mp4(Mp4Event::Packet(p))if !p.source.payload.is_empty())));
+    assert!(sink.accepted.iter().any(|f|matches!(f.output().event(),Event::Mp4(Mp4Event::Packet(p))if !p.source.payload.is_empty())));
     assert!(b.used() > Budget::control_storage_bytes());
     drop(sink);
     assert_eq!(b.used(), Budget::control_storage_bytes());
@@ -643,13 +643,12 @@ fn native_m2ts_context_uses_real_complete_window_and_positive_eof_reply() {
             PlayerPolicy::default(),
         )
         .unwrap();
-    p.set_clock_view(ClockChoice::ExplicitNativeProjection)
-        .unwrap();
+    p.set_clock_view(ClockChoice::Demux).unwrap();
     let out = collect(&mut p, 1).unwrap();
     let native: Vec<_> = out
         .iter()
         .filter_map(|o| {
-            if let RawEvent::NativeTs { packet, clock } = o.event() {
+            if let Event::DemuxPes { packet, clock } = o.event() {
                 Some((packet, clock))
             } else {
                 None
@@ -664,7 +663,7 @@ fn native_m2ts_context_uses_real_complete_window_and_positive_eof_reply() {
     assert_eq!(native[0].1.pts90, Some(90_000));
     assert!(out.iter().any(|o| matches!(
         o.event(),
-        RawEvent::Ts(TsEvent {
+        Event::Ts(TsEvent {
             source: triergon_mpegts::stream::TraceEvent::Pes(_),
             ..
         })
@@ -1148,7 +1147,7 @@ fn tx3g_real_reader_handoff_retains_source_sample_and_exact_clock_after_teardown
         ProgressiveLimits::default(),
     );
     let out = collect(&mut p, 1).unwrap();
-    let output=out.into_iter().find(|o|matches!(o.event(),RawEvent::Mp4(Mp4Event::Packet(p))if p.configuration.description.format==*b"tx3g")).unwrap();
+    let output=out.into_iter().find(|o|matches!(o.event(),Event::Mp4(Mp4Event::Packet(p))if p.configuration.description.format==*b"tx3g")).unwrap();
     let source = TextSource::from_output(output).unwrap_or_else(|e| panic!("{:?}", e.error));
     let packet = source.mp4().unwrap();
     let raw = packet.source.payload.clone();
@@ -1217,7 +1216,7 @@ fn matroska_utf8_text_bridge_runs_real_reader_without_core_or_native_field_repai
     )
     .unwrap();
     let out = collect(&mut p, 1).unwrap();
-    let output=out.into_iter().find(|o|matches!(o.event(),RawEvent::Matroska(triergon_matroska::Event::Packet(p))if p.configuration.tracks()[p.packet.track].codec.as_ref()=="S_TEXT/UTF8")).unwrap();
+    let output=out.into_iter().find(|o|matches!(o.event(),Event::Matroska(triergon_matroska::Event::Packet(p))if p.configuration.tracks()[p.packet.track].codec.as_ref()=="S_TEXT/UTF8")).unwrap();
     assert_eq!(output.source_id(), ID);
     let source = TextSource::from_output(output).unwrap_or_else(|e| panic!("{:?}", e.error));
     let packet = source.matroska().unwrap();
@@ -1919,9 +1918,7 @@ fn open_prefix(
                     PlayerPolicy::default(),
                 )
                 .unwrap();
-            player
-                .set_clock_view(ClockChoice::ExplicitNativeProjection)
-                .unwrap();
+            player.set_clock_view(ClockChoice::Demux).unwrap();
             return player;
         }
     }
@@ -1939,10 +1936,10 @@ fn native_m2ts_prefix_preserves_the_same_sequential_source_through_late_pes() {
         let positions: Vec<_> = output
             .iter()
             .filter_map(|item| match item.event() {
-                RawEvent::NativeTs { packet, .. } => {
+                Event::DemuxPes { packet, .. } => {
                     Some((packet.position, packet.source_origin.offset))
                 }
-                RawEvent::NativeRefusal { error, .. } => {
+                Event::PesRefusal { error, .. } => {
                     panic!("unexpected native refusal {error:?}")
                 }
                 _ => None,
@@ -2013,7 +2010,7 @@ fn native_m2ts_prefix_grid_loss_preserves_source_and_refuses_native_tail() {
     assert_eq!(
         output
             .iter()
-            .filter(|o| matches!(o.event(), RawEvent::NativeTs { .. }))
+            .filter(|o| matches!(o.event(), Event::DemuxPes { .. }))
             .count(),
         1
     );
@@ -2022,7 +2019,7 @@ fn native_m2ts_prefix_grid_loss_preserves_source_and_refuses_native_tail() {
             .iter()
             .filter(|o| matches!(
                 o.event(),
-                RawEvent::NativeRefusal {
+                Event::PesRefusal {
                     error: C::Unsupported("native M2TS carrier grid lost"),
                     ..
                 }
@@ -2035,7 +2032,7 @@ fn native_m2ts_prefix_grid_loss_preserves_source_and_refuses_native_tail() {
             .iter()
             .filter(|o| matches!(
                 o.event(),
-                RawEvent::Ts(TsEvent {
+                Event::Ts(TsEvent {
                     source: triergon_mpegts::stream::TraceEvent::Pes(_),
                     ..
                 })
@@ -2051,7 +2048,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     use matroska_feed::{
         MatroskaBitmapClockProbe, MatroskaBitmapCodec, MatroskaBitmapTrack, MatroskaDvbStep,
     };
-    use triergon_matroska::Event;
+    use triergon_matroska::Event as MkvEvent;
     use triergon_subtitles::{dvb, pgs};
 
     fn element(id: &[u8], data: &[u8]) -> Vec<u8> {
@@ -2197,7 +2194,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     let outputs = collect(&mut player, 1).unwrap();
     let configuration = outputs
         .iter()
-        .find(|o| matches!(o.event(), RawEvent::Matroska(Event::Configuration(_))))
+        .find(|o| matches!(o.event(), Event::Matroska(MkvEvent::Configuration(_))))
         .unwrap();
     let pgs_track = MatroskaBitmapTrack::new(configuration, 3).unwrap();
     let dvd_track = MatroskaBitmapTrack::new(configuration, 7).unwrap();
@@ -2438,7 +2435,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
 fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
     use bitmap_bridge::{PgsBridge, PgsQueueAction, PgsStep};
     use matroska_feed::{MatroskaBitmapClockProbe, MatroskaBitmapTrack};
-    use triergon_matroska::Event;
+    use triergon_matroska::Event as MkvEvent;
     use triergon_subtitles::pgs;
 
     type Timing = (Option<i64>, Option<i64>);
@@ -2543,7 +2540,7 @@ fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
         let outputs = collect(&mut player, 1).unwrap();
         let config = outputs
             .iter()
-            .find(|output| matches!(output.event(), RawEvent::Matroska(Event::Configuration(_))))
+            .find(|output| matches!(output.event(), Event::Matroska(MkvEvent::Configuration(_))))
             .unwrap();
         let track = MatroskaBitmapTrack::new(config, 3).unwrap();
         let target = Some(TrackKey::Matroska(3));
@@ -2662,7 +2659,7 @@ fn matroska_discovery_stops_on_canvas_or_limits_and_replays_the_same_source() {
         MatroskaBitmapClockProbe, MatroskaBitmapTrack, MatroskaDiscovered, MatroskaDiscovery,
         MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
     };
-    use triergon_matroska::Event;
+    use triergon_matroska::Event as MkvEvent;
 
     struct Counted {
         inner: ByteSource,
@@ -2806,7 +2803,7 @@ fn matroska_discovery_stops_on_canvas_or_limits_and_replays_the_same_source() {
             }
             if report_video
                 && !confirmed
-                && let Some(RawEvent::Matroska(Event::Configuration(config))) =
+                && let Some(Event::Matroska(MkvEvent::Configuration(config))) =
                     discovery.buffered().last().map(Output::event)
             {
                 let revision = config.revision();
@@ -2852,7 +2849,7 @@ fn matroska_discovery_stops_on_canvas_or_limits_and_replays_the_same_source() {
             let config = prefix
                 .iter()
                 .find(|output| {
-                    matches!(output.event(), RawEvent::Matroska(Event::Configuration(_)))
+                    matches!(output.event(), Event::Matroska(MkvEvent::Configuration(_)))
                 })
                 .unwrap();
             let track = MatroskaBitmapTrack::new(config, 3).unwrap();
@@ -2912,7 +2909,7 @@ fn matroska_discovery_observes_timed_audio_without_caller_confirmation() {
     use matroska_feed::{
         MatroskaDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
     };
-    use triergon_matroska::Event;
+    use triergon_matroska::Event as MkvEvent;
 
     let cases: [(&[u8], &[usize], usize); 2] = [
         (
@@ -2960,7 +2957,7 @@ fn matroska_discovery_observes_timed_audio_without_caller_confirmation() {
         assert_eq!(cutoff, MatroskaDiscoveryCutoff::StreamsReady);
         let mut done = discovery.finish().unwrap();
         let track = |output: &Output| match output.event() {
-            RawEvent::Matroska(Event::Packet(packet)) => {
+            Event::Matroska(MkvEvent::Packet(packet)) => {
                 assert!(
                     triergon_matroska::compat::clock::packet_timing(packet.packet.timing)
                         .unwrap()
@@ -2986,7 +2983,7 @@ fn matroska_discovery_observes_video_and_keeps_decode_order() {
     use matroska_feed::{
         MatroskaDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
     };
-    use triergon_matroska::Event;
+    use triergon_matroska::Event as MkvEvent;
 
     use MatroskaDiscoveryCutoff::{SourceEnd, StreamsReady};
 
@@ -3053,7 +3050,7 @@ fn matroska_discovery_observes_video_and_keeps_decode_order() {
         assert_eq!(cutoff, expected_cutoff, "{packets}");
         let mut done = discovery.finish().unwrap();
         let packet = |output: &Output| match output.event() {
-            RawEvent::Matroska(Event::Packet(packet)) => {
+            Event::Matroska(MkvEvent::Packet(packet)) => {
                 Some((packet.packet.track, packet.packet.pts_ns))
             }
             _ => None,

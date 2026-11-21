@@ -94,7 +94,7 @@ impl<'a> Mp4RangeOpen<'a> {
         }
         let engine = Engine::mp4(input, plan, maximum_packet)?;
         let mut player = Player::new_direct(engine, source, selection, policy)?;
-        player.set_clock_view(ClockChoice::ExplicitNativeProjection)?;
+        player.set_clock_view(ClockChoice::Demux)?;
         Ok(Mp4RangePlayer {
             movie: self.movie,
             edits: self.edits,

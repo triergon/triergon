@@ -21,8 +21,8 @@ use triergon_isobmff::{
     config::{AacConfigurationJob, ConfigurationLimits, ObjectTypeScan},
 };
 use triergon_playback::{
-    ByteSource, Format, Mp4Event, Mp4NativeSeekRequest, Mp4Packet, Mp4RangeOpen, Mp4RangePlayer,
-    PlayerPolicy, Progress, RawEvent, Selection,
+    ByteSource, Event, Format, Mp4Event, Mp4NativeSeekRequest, Mp4Packet, Mp4RangeOpen,
+    Mp4RangePlayer, PlayerPolicy, Progress, Selection,
     io::{SelectedInput, SourceOwner},
     mp4_open::{Movie, MovieTrack, Mp4Open, OpenLimits, OpenProgress, OpenedMp4},
     mp4_plan::PlanLimits,
@@ -343,7 +343,7 @@ fn seek_to(
         let progress = player.read_output(&mut output, &mut work(), cancel)?;
         if output
             .take()
-            .is_some_and(|item| matches!(item.event(), RawEvent::Mp4(Mp4Event::Packet(_))))
+            .is_some_and(|item| matches!(item.event(), Event::Mp4(Mp4Event::Packet(_))))
         {
             break;
         }
@@ -416,8 +416,8 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
         let progress = player.read_output(&mut output, &mut work(), &cancel)?;
         if let Some(item) = output.take() {
             match item.event() {
-                RawEvent::Mp4(Mp4Event::Packet(packet)) => result.packet(packet)?,
-                RawEvent::Mp4(Mp4Event::Configuration(_)) | RawEvent::Seek(_) => {}
+                Event::Mp4(Mp4Event::Packet(packet)) => result.packet(packet)?,
+                Event::Mp4(Mp4Event::Configuration(_)) | Event::Seek(_) => {}
                 _ => return Err("unexpected range playback output".into()),
             }
         }

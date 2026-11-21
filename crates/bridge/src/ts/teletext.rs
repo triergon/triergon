@@ -22,7 +22,7 @@ use triergon_mpegts::compat::pes::pcr_bounded_pts;
 use triergon_mpegts::pes::Pes;
 use triergon_mpegts::stream::TraceEvent;
 use triergon_mpegts::transport::TransportPacket;
-use triergon_playback::{Output, RawEvent, TsEvent};
+use triergon_playback::{Event, Output, TsEvent};
 use triergon_subtitles::compat::teletext::{Decoded, Decoder, Options, Refusal};
 
 /// Drain calls after the last packet, as the reference makes at most.
@@ -112,7 +112,7 @@ impl TeletextTsBridge {
                 received: output.generation(),
             });
         }
-        if let RawEvent::Ts(TsEvent {
+        if let Event::Ts(TsEvent {
             source: TraceEvent::Transport(packet),
             ..
         }) = output.event()

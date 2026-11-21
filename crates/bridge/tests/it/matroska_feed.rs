@@ -14,9 +14,9 @@ use triergon_framing::{
     avc::{AvcAnnexBLimits, AvcConfigLimits},
     hevc::HvcConfigLimits,
 };
-use triergon_matroska::{Configuration, ElementEvent, Event};
+use triergon_matroska::{Configuration, ElementEvent, Event as MkvEvent};
 use triergon_playback::{
-    ByteSource, Delivery, Engine, Output, Player, PlayerPolicy, Progress, RawEvent, Selection,
+    ByteSource, Delivery, Engine, Event, Output, Player, PlayerPolicy, Progress, Selection,
     TrackKey, io::SourceOwner,
 };
 
@@ -222,7 +222,7 @@ fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
         let mut count = 0;
         for output in discovered.prefix.as_slice().iter().chain(&tail) {
             match output.event() {
-                RawEvent::Matroska(Event::Configuration(configuration)) => {
+                Event::Matroska(MkvEvent::Configuration(configuration)) => {
                     let track = &configuration.tracks()[0];
                     assert_eq!(track.codec(), CodecId::Aac);
                     assert_eq!(track.codec_tag(), codec);
@@ -238,7 +238,7 @@ fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
                     );
                     feed = Some(setup(&pool, configuration, 0));
                 }
-                RawEvent::Matroska(Event::Packet(packet)) => {
+                Event::Matroska(MkvEvent::Packet(packet)) => {
                     let output = frame(feed.as_ref().unwrap(), output);
                     let MatroskaFeedPayload::Aac { header, raw } = output.payload else {
                         panic!("legacy AAC did not produce ADTS");
@@ -283,7 +283,7 @@ fn legacy_aac_lc_refuses_empty_initialization_and_ambiguous_channels() {
         let configuration = events
             .iter()
             .find_map(|output| match output.event() {
-                RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+                Event::Matroska(MkvEvent::Configuration(configuration)) => Some(configuration),
                 _ => None,
             })
             .unwrap();
@@ -341,7 +341,7 @@ fn legacy_aac_lc_uses_defaults_only_with_audio_settings() {
         let configuration = events
             .iter()
             .find_map(|output| match output.event() {
-                RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+                Event::Matroska(MkvEvent::Configuration(configuration)) => Some(configuration),
                 _ => None,
             })
             .unwrap();
@@ -370,10 +370,10 @@ fn matroska_avc_and_two_aac_tracks_match_complete_feed_packets_and_source_pts() 
         let mut retained_subtick_clock = false;
         for event in &events {
             match event.event() {
-                RawEvent::Matroska(Event::Configuration(configuration)) => {
+                Event::Matroska(MkvEvent::Configuration(configuration)) => {
                     feeds = (0..3).map(|i| setup(&pool, configuration, i)).collect();
                 }
-                RawEvent::Matroska(Event::Packet(packet)) => {
+                Event::Matroska(MkvEvent::Packet(packet)) => {
                     let track = packet.packet.track;
                     let output = frame(&feeds[track], event);
                     assert!(std::ptr::eq(output.source, packet));
@@ -427,7 +427,7 @@ fn matroska_seek_and_audio_switch_fence_old_feed_bindings() {
     let config = initial
         .iter()
         .find_map(|event| match event.event() {
-            RawEvent::Matroska(Event::Configuration(config)) => Some(config),
+            Event::Matroska(MkvEvent::Configuration(config)) => Some(config),
             _ => None,
         })
         .unwrap();
@@ -458,7 +458,7 @@ fn matroska_seek_and_audio_switch_fence_old_feed_bindings() {
     let replay = collect(&mut player);
     let mut selected = [0; 3];
     for event in &replay {
-        if let RawEvent::Matroska(Event::Packet(packet)) = event.event() {
+        if let Event::Matroska(MkvEvent::Packet(packet)) = event.event() {
             if event.delivery() == Delivery::Unselected {
                 assert_eq!(packet.packet.track, 1);
                 assert!(old.packet(event).unwrap().is_none());
@@ -562,12 +562,12 @@ fn matroska_hevc_ac3_and_eac3_match_complete_feed_packets_and_source_pts() {
         let mut counts = [0; 3];
         for event in &events {
             match event.event() {
-                RawEvent::Matroska(Event::Configuration(configuration)) => {
+                Event::Matroska(MkvEvent::Configuration(configuration)) => {
                     feeds = (0..3)
                         .map(|track| hevc_dolby_setup(&pool, configuration, track))
                         .collect();
                 }
-                RawEvent::Matroska(Event::Packet(packet)) => {
+                Event::Matroska(MkvEvent::Packet(packet)) => {
                     let track = packet.packet.track;
                     let output = hevc_dolby_frame(&feeds[track], event);
                     assert!(std::ptr::eq(output.source, packet));
@@ -631,7 +631,7 @@ fn matroska_native_video_clocks_preserve_unknown_and_source_timing() {
     let configuration = events
         .iter()
         .find_map(|event| match event.event() {
-            RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+            Event::Matroska(MkvEvent::Configuration(configuration)) => Some(configuration),
             _ => None,
         })
         .unwrap();
@@ -655,7 +655,7 @@ fn matroska_native_video_clocks_preserve_unknown_and_source_timing() {
     let configuration = events
         .iter()
         .find_map(|event| match event.event() {
-            RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+            Event::Matroska(MkvEvent::Configuration(configuration)) => Some(configuration),
             _ => None,
         })
         .unwrap();
@@ -699,11 +699,11 @@ fn matroska_video_seek_gate_admits_the_cue_keyframe_and_preserves_preroll() {
     let resumed = collect_with_work(&mut player, 1);
     let intent = resumed
         .iter()
-        .find(|output| matches!(output.event(), RawEvent::Seek(_)))
+        .find(|output| matches!(output.event(), Event::Seek(_)))
         .unwrap();
     let receipt = resumed
         .iter()
-        .find(|output| matches!(output.event(), RawEvent::Matroska(Event::Seek(_))))
+        .find(|output| matches!(output.event(), Event::Matroska(MkvEvent::Seek(_))))
         .unwrap();
     let mut gate = MatroskaVideoSeekGate::new(intent, receipt).unwrap();
     assert!(gate.admits(&initial[0]).is_err());
@@ -725,7 +725,7 @@ fn matroska_video_seek_gate_admits_the_cue_keyframe_and_preserves_preroll() {
     let foreign_outputs = collect_with_work(&mut foreign, 1);
     let foreign_receipt = foreign_outputs
         .iter()
-        .find(|output| matches!(output.event(), RawEvent::Matroska(Event::Seek(_))))
+        .find(|output| matches!(output.event(), Event::Matroska(MkvEvent::Seek(_))))
         .unwrap();
     assert_eq!(foreign_receipt.source_id(), receipt.source_id());
     assert_eq!(foreign_receipt.epoch(), receipt.epoch());
@@ -748,7 +748,7 @@ fn matroska_video_seek_gate_admits_the_cue_keyframe_and_preserves_preroll() {
     assert!(gate.landed());
     assert_eq!((skipped, admitted.len()), (4, 48));
 
-    let RawEvent::Matroska(Event::Packet(landing)) = admitted[0].event() else {
+    let Event::Matroska(MkvEvent::Packet(landing)) = admitted[0].event() else {
         panic!("missing landing packet");
     };
     assert!(landing.packet.keyframe);
@@ -778,7 +778,7 @@ fn matroska_hevc_seek_and_eac3_selection_reject_stale_configuration() {
     let configuration = initial
         .iter()
         .find_map(|event| match event.event() {
-            RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+            Event::Matroska(MkvEvent::Configuration(configuration)) => Some(configuration),
             _ => None,
         })
         .unwrap();
@@ -812,7 +812,7 @@ fn matroska_hevc_seek_and_eac3_selection_reject_stale_configuration() {
     let mut unselected = 0;
     let mut feeds = None;
     for event in &collect(&mut player) {
-        let RawEvent::Matroska(Event::Packet(packet)) = event.event() else {
+        let Event::Matroska(MkvEvent::Packet(packet)) = event.event() else {
             continue;
         };
         let track = packet.packet.track;
@@ -843,11 +843,11 @@ fn matroska_hevc_seek_and_eac3_selection_reject_stale_configuration() {
 fn event_key(output: &Output) -> (String, Vec<u8>) {
     let delivery = output.delivery();
     match output.event() {
-        RawEvent::Matroska(Event::Envelope(ElementEvent::Leaf { header, data })) => {
+        Event::Matroska(MkvEvent::Envelope(ElementEvent::Leaf { header, data })) => {
             (format!("{delivery:?} leaf {header:?}"), data.to_vec())
         }
-        RawEvent::Matroska(Event::Envelope(event)) => (format!("{delivery:?} {event:?}"), vec![]),
-        RawEvent::Matroska(Event::Configuration(config)) => {
+        Event::Matroska(MkvEvent::Envelope(event)) => (format!("{delivery:?} {event:?}"), vec![]),
+        Event::Matroska(MkvEvent::Configuration(config)) => {
             let mut raw = Vec::new();
             for (i, track) in config.tracks().iter().enumerate() {
                 raw.extend_from_slice(&track.number.to_le_bytes());
@@ -855,8 +855,8 @@ fn event_key(output: &Output) -> (String, Vec<u8>) {
             }
             (format!("{delivery:?} config {}", config.revision()), raw)
         }
-        RawEvent::Matroska(Event::Document(_)) => (format!("{delivery:?} document"), vec![]),
-        RawEvent::Matroska(Event::Packet(packet)) => {
+        Event::Matroska(MkvEvent::Document(_)) => (format!("{delivery:?} document"), vec![]),
+        Event::Matroska(MkvEvent::Packet(packet)) => {
             let p = &packet.packet;
             (
                 format!(
@@ -866,7 +866,7 @@ fn event_key(output: &Output) -> (String, Vec<u8>) {
                 p.data.to_vec(),
             )
         }
-        RawEvent::Matroska(Event::Seek(seek)) => (format!("{delivery:?} seek {seek:?}"), vec![]),
+        Event::Matroska(MkvEvent::Seek(seek)) => (format!("{delivery:?} seek {seek:?}"), vec![]),
         other => panic!("unexpected Matroska fixture event {other:?}"),
     }
 }
@@ -1004,7 +1004,7 @@ fn shared_source_blocks_preserve_the_feed_and_keep_the_full_owner_charged() {
         for output in &outputs {
             assert!(output.belongs_to(&pool));
             assert!(!output.belongs_to(&foreign_pool));
-            if let RawEvent::Matroska(Event::Packet(packet)) = output.event() {
+            if let Event::Matroska(MkvEvent::Packet(packet)) = output.event() {
                 assert!(packet.configuration.budget().same_pool(&pool));
                 let data = &packet.packet.data;
                 if data.retained_capacity() == INPUT.len() {
@@ -1097,7 +1097,7 @@ fn matroska_feed_setup_reuses_charged_initialization_under_pool_pressure() {
         let configuration = outputs
             .iter()
             .find_map(|output| match output.event() {
-                RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+                Event::Matroska(MkvEvent::Configuration(configuration)) => Some(configuration),
                 _ => None,
             })
             .unwrap();
@@ -1318,7 +1318,7 @@ fn hevc_repeated_configuration_preserves_packet_clocks() {
         let configuration = events
             .iter()
             .find_map(|output| match output.event() {
-                RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+                Event::Matroska(MkvEvent::Configuration(configuration)) => Some(configuration),
                 _ => None,
             })
             .unwrap();
@@ -1381,7 +1381,7 @@ fn av_discovery_hands_off_before_pgs_and_delivers_every_late_packet() {
                 return Some(cutoff);
             }
             if !confirmed
-                && let Some(Event::Packet(packet)) = discovery.buffered_events().last()
+                && let Some(MkvEvent::Packet(packet)) = discovery.buffered_events().last()
                 && packet.packet.track == 0
             {
                 discovery
@@ -1395,9 +1395,9 @@ fn av_discovery_hands_off_before_pgs_and_delivers_every_late_packet() {
     assert!(confirmed);
     assert_eq!(cutoff, MatroskaDiscoveryCutoff::StreamsReady);
     assert!(
-        discovery
-            .buffered_events()
-            .all(|event| { !matches!(event, Event::Packet(packet) if packet.packet.track == 1) })
+        discovery.buffered_events().all(|event| {
+            !matches!(event, MkvEvent::Packet(packet) if packet.packet.track == 1)
+        })
     );
     let mut discovered = discovery.finish().unwrap();
     let mut keys: Vec<_> = discovered
@@ -1424,7 +1424,7 @@ fn av_discovery_hands_off_before_pgs_and_delivers_every_late_packet() {
     let (mut reference, _) = player_with_input(fixture, 7);
     let reference = collect(&mut reference);
     assert_eq!(reference.iter().filter(|output| {
-        matches!(output.event(), RawEvent::Matroska(Event::Packet(packet)) if packet.packet.track == 1)
+        matches!(output.event(), Event::Matroska(MkvEvent::Packet(packet)) if packet.packet.track == 1)
     }).count(), 5);
     assert_eq!(keys, reference.iter().map(event_key).collect::<Vec<_>>());
 }
@@ -1454,7 +1454,7 @@ fn matroska_integral_packet_delivery_preserves_fractional_seek_targets() {
         );
         let mut packets = 0;
         for output in collect_with_work(&mut player, 1) {
-            if let RawEvent::Matroska(Event::Packet(packet)) = output.event() {
+            if let Event::Matroska(MkvEvent::Packet(packet)) = output.event() {
                 let exact = match packet.source_pts().unwrap() {
                     None => Delivery::UnknownTime,
                     Some(pts) if pts < target => Delivery::DecodeOnly { until: target },
@@ -1525,11 +1525,11 @@ fn matroska_dolby_clock_matches_pinned_startup_and_forward_lace_timestamps() {
         let outputs = collect_with_work(&mut player, 1);
         let mut packets = outputs
             .iter()
-            .filter(|output| matches!(output.event(), RawEvent::Matroska(Event::Packet(_))));
+            .filter(|output| matches!(output.event(), Event::Matroska(MkvEvent::Packet(_))));
         let configuration = outputs
             .iter()
             .find_map(|output| match output.event() {
-                RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+                Event::Matroska(MkvEvent::Configuration(configuration)) => Some(configuration),
                 _ => None,
             })
             .unwrap();
@@ -1577,7 +1577,7 @@ fn matroska_aac_clock_matches_pinned_mixed_rates_from_probe_through_eof() {
     let configuration = outputs
         .iter()
         .find_map(|output| match output.event() {
-            RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+            Event::Matroska(MkvEvent::Configuration(configuration)) => Some(configuration),
             _ => None,
         })
         .unwrap();
@@ -1591,7 +1591,7 @@ fn matroska_aac_clock_matches_pinned_mixed_rates_from_probe_through_eof() {
         let foreign = Budget::new(1 << 20).unwrap();
         assert!(feed.native_aac_clock_probe(&foreign, 2).is_err());
         let mut packets = outputs.iter().filter(|output| {
-            matches!(output.event(), RawEvent::Matroska(Event::Packet(packet))
+            matches!(output.event(), Event::Matroska(MkvEvent::Packet(packet))
                 if packet.packet.track == track)
         });
         let mut probe = feed.native_aac_clock_probe(&pool, 2).unwrap().unwrap();
@@ -1632,14 +1632,14 @@ fn matroska_dolby_source_clock_preserves_damaged_ac3_before_decoder_admission() 
     let configuration = outputs
         .iter()
         .find_map(|output| match output.event() {
-            RawEvent::Matroska(Event::Configuration(c)) => Some(c),
+            Event::Matroska(MkvEvent::Configuration(c)) => Some(c),
             _ => None,
         })
         .unwrap();
     assert_eq!(configuration.tracks()[0].codec, "A_AC3");
     let feed = hevc_dolby_setup(&pool, configuration, 0);
     let mut packets = outputs.iter().filter_map(|output| match output.event() {
-        RawEvent::Matroska(Event::Packet(packet)) if packet.packet.track == 0 => {
+        Event::Matroska(MkvEvent::Packet(packet)) if packet.packet.track == 0 => {
             Some((output, packet))
         }
         _ => None,
@@ -1743,7 +1743,7 @@ fn compact_replay_prepares_the_same_aac_spans_as_the_output_feed() {
     let configuration = prefix
         .events()
         .find_map(|event| match event {
-            Event::Configuration(configuration) => Some(configuration),
+            MkvEvent::Configuration(configuration) => Some(configuration),
             _ => None,
         })
         .unwrap();
@@ -1755,7 +1755,7 @@ fn compact_replay_prepares_the_same_aac_spans_as_the_output_feed() {
     let feed = setup(&pool, configuration, track);
     let ordinal = prefix
         .events()
-        .position(|event| matches!(event, Event::Packet(packet) if packet.packet.track == track))
+        .position(|event| matches!(event, MkvEvent::Packet(packet) if packet.packet.track == track))
         .unwrap();
 
     let mut replay = prefix.feed_packet(ordinal, &feed).unwrap().unwrap();

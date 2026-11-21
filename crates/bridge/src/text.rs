@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation, Time, WorkBudget,
 };
-use triergon_playback::{Mp4Packet, Output, RawEvent};
+use triergon_playback::{Event, Mp4Packet, Output};
 use triergon_subtitles::text::{self, Extractor, Input, RawClock, Timing};
 #[derive(Clone, Debug)]
 #[expect(
@@ -52,8 +52,8 @@ impl TextSource {
     pub fn from_output(output: Output) -> std::result::Result<Self, RejectedOutput> {
         if !matches!(
             output.event(),
-            RawEvent::Mp4(triergon_playback::Mp4Event::Packet(_))
-                | RawEvent::Matroska(triergon_matroska::Event::Packet(_))
+            Event::Mp4(triergon_playback::Mp4Event::Packet(_))
+                | Event::Matroska(triergon_matroska::Event::Packet(_))
         ) {
             return Err(RejectedOutput {
                 output,
@@ -63,8 +63,8 @@ impl TextSource {
         let source = output.source_id();
         let pool = output.pool().clone();
         let record = match output.into_event() {
-            RawEvent::Mp4(triergon_playback::Mp4Event::Packet(p)) => Record::Mp4(p),
-            RawEvent::Matroska(triergon_matroska::Event::Packet(p)) => Record::Matroska(p),
+            Event::Mp4(triergon_playback::Mp4Event::Packet(p)) => Record::Mp4(p),
+            Event::Matroska(triergon_matroska::Event::Packet(p)) => Record::Matroska(p),
             _ => unreachable!(),
         };
         Ok(Self {

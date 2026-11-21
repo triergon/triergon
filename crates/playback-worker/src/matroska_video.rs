@@ -15,10 +15,9 @@ use triergon_bridge::matroska::{
 };
 use triergon_core::{Budget, Bytes, SourceId, Time, WorkBudget};
 use triergon_harness_protocol::digest::{fold, signed};
-use triergon_matroska::{Event, Reader};
+use triergon_matroska::{Event as MkvEvent, Reader};
 use triergon_playback::{
-    ByteSource, Engine, Output, PlayerPolicy, Progress, RawEvent, Selection, TrackKey,
-    io::SourceOwner,
+    ByteSource, Engine, Event, Output, PlayerPolicy, Progress, Selection, TrackKey, io::SourceOwner,
 };
 
 pub const PREFIX: &str = "feed-";
@@ -127,7 +126,7 @@ fn session(pool: &Budget, raw: &Bytes, operation: Operation) -> Work {
     let mut configuration = prefix
         .events()
         .find_map(|event| match event {
-            Event::Configuration(configuration) => Some(configuration),
+            MkvEvent::Configuration(configuration) => Some(configuration),
             _ => None,
         })
         .unwrap()
@@ -178,14 +177,14 @@ fn session(pool: &Budget, raw: &Bytes, operation: Operation) -> Work {
                     .unwrap();
                 if let Some(output) = pending.take() {
                     match output.event() {
-                        RawEvent::Seek(_) => intent = Some(output),
-                        RawEvent::Matroska(Event::Seek(_)) => {
+                        Event::Seek(_) => intent = Some(output),
+                        Event::Matroska(MkvEvent::Seek(_)) => {
                             gate = Some(
                                 MatroskaVideoSeekGate::new(intent.as_ref().unwrap(), &output)
                                     .unwrap(),
                             );
                         }
-                        RawEvent::Matroska(Event::Packet(packet))
+                        Event::Matroska(MkvEvent::Packet(packet))
                             if packet.packet.track == track
                                 && gate.as_mut().unwrap().admits(&output).unwrap() =>
                         {
@@ -222,7 +221,7 @@ fn session(pool: &Budget, raw: &Bytes, operation: Operation) -> Work {
         .map(|feed| feed.native_hevc_clock().unwrap().unwrap());
     let mut work = Work::default();
     let mut output = |event: &Output| {
-        let RawEvent::Matroska(Event::Packet(packet)) = event.event() else {
+        let Event::Matroska(MkvEvent::Packet(packet)) = event.event() else {
             return;
         };
         if packet.packet.track != track

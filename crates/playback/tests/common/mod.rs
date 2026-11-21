@@ -104,7 +104,7 @@ pub fn collect<S: Source>(player: &mut Player<S>, units: u64) -> Result<Vec<Outp
 pub fn packets(out: &[Output]) -> Vec<&Mp4Packet> {
     out.iter()
         .filter_map(|output| match output.event() {
-            RawEvent::Mp4(Mp4Event::Packet(packet)) => Some(packet),
+            Event::Mp4(Mp4Event::Packet(packet)) => Some(packet),
             _ => None,
         })
         .collect()

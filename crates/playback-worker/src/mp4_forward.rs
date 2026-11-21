@@ -18,8 +18,8 @@ use triergon_core::{
 };
 use triergon_isobmff::compat::mov::edits::EncodedEditPlan;
 use triergon_playback::{
-    ByteSource, Engine, Format, Mp4Event, Mp4RangeOpen, Output, Player, PlayerPolicy, Progress,
-    RawEvent, Selection,
+    ByteSource, Engine, Event, Format, Mp4Event, Mp4RangeOpen, Output, Player, PlayerPolicy,
+    Progress, Selection,
     compat::mov,
     io::{SelectedInput, SourceOwner},
     mp4_open::{Movie, Mp4Open, OpenLimits, OpenProgress, OpenedMp4},
@@ -123,7 +123,7 @@ fn collect<const INCLUDE_TRIM: bool>(
     loop {
         let progress = read(&mut pending)?;
         if let Some(output) = pending.take()
-            && let RawEvent::Mp4(event) = output.event()
+            && let Event::Mp4(event) = output.event()
         {
             fold::<INCLUDE_TRIM>(&mut work, event)?;
         }

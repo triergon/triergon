@@ -12,7 +12,7 @@ use triergon_mpegts::{
     compat::pes::{DemuxBoundary, DemuxPacket, PrivateAudioCarriage, RegisteredCarriage},
 };
 use triergon_playback::{
-    ByteSource, ClockChoice, Delivery, Engine, Player, PlayerPolicy, Progress, RawEvent, Selection,
+    ByteSource, ClockChoice, Delivery, Engine, Event, Player, PlayerPolicy, Progress, Selection,
     TrackKey, TsEvent, TsNativeCarriage, TsNativeTrackSelection, io::SourceOwner,
 };
 
@@ -104,9 +104,7 @@ fn player_with_namespace(
         PlayerPolicy::default(),
     )
     .unwrap();
-    player
-        .set_clock_view(ClockChoice::ExplicitNativeProjection)
-        .unwrap();
+    player.set_clock_view(ClockChoice::Demux).unwrap();
     (player, budget)
 }
 
@@ -147,7 +145,7 @@ fn segment_player(raw: &[u8], quantum: usize) -> (Player<ByteSource>, Budget) {
         NAMESPACE,
     )
     .unwrap();
-    assert!(engine.has_native_packet_view());
+    assert!(engine.delivers_demux_pes());
     let source = ByteSource::new(
         ENTITY,
         Bytes::copy_from_slice(&budget, raw).unwrap(),
@@ -161,9 +159,7 @@ fn segment_player(raw: &[u8], quantum: usize) -> (Player<ByteSource>, Budget) {
         PlayerPolicy::default(),
     )
     .unwrap();
-    player
-        .set_clock_view(ClockChoice::ExplicitNativeProjection)
-        .unwrap();
+    player.set_clock_view(ClockChoice::Demux).unwrap();
     (player, budget)
 }
 
@@ -185,7 +181,7 @@ fn independent_ts_segment_refuses_multiple_programs_or_missing_pmt() {
         for _ in 0..2000 {
             let progress = player.advance(&mut WorkBudget::new(1), &AtomicBool::new(false));
             while let Some(item) = player.pop() {
-                assert!(!matches!(item.event(), RawEvent::NativeTs { .. }));
+                assert!(!matches!(item.event(), Event::DemuxPes { .. }));
             }
             match progress {
                 Ok(Progress::Ended) => panic!("invalid segment was treated as clean EOF"),
@@ -221,7 +217,7 @@ fn independent_ts_segments_discover_tracks_and_emit_configuration_before_packets
             let mut map_epoch = None;
             for item in &output {
                 match item.event() {
-                    RawEvent::Ts(TsEvent {
+                    Event::Ts(TsEvent {
                         source:
                             TraceEvent::ProgramMap {
                                 active: true,
@@ -233,7 +229,7 @@ fn independent_ts_segments_discover_tracks_and_emit_configuration_before_packets
                         announced = [None; 2];
                         map_epoch = Some(*configuration_epoch);
                     }
-                    RawEvent::NativeTsConfiguration(config) => {
+                    Event::PesCarriage(config) => {
                         assert_eq!(Some(config.configuration_epoch), map_epoch);
                         let slot = if config.track == key(256) {
                             assert_eq!(config.carriage, AVC.carriage);
@@ -249,13 +245,13 @@ fn independent_ts_segments_discover_tracks_and_emit_configuration_before_packets
                                 .is_none()
                         );
                     }
-                    RawEvent::NativeTs { packet, clock } => {
+                    Event::DemuxPes { packet, clock } => {
                         let slot = usize::from(packet.pid != 256);
                         assert_eq!(packet.pid, 256 + slot as u16);
                         assert_eq!(announced[slot], Some(packet.source_epochs.configuration));
                         actual.push((packet.pid, clock.pts90, clock.dts90, digest(packet)));
                     }
-                    RawEvent::NativeRefusal { error, .. } => panic!("unexpected refusal {error:?}"),
+                    Event::PesRefusal { error, .. } => panic!("unexpected refusal {error:?}"),
                     _ => {}
                 }
             }
@@ -268,7 +264,7 @@ fn independent_ts_segments_discover_tracks_and_emit_configuration_before_packets
                 .unwrap()
                 .iter()
                 .filter_map(|item| match item.event() {
-                    RawEvent::NativeTs { packet, clock } => {
+                    Event::DemuxPes { packet, clock } => {
                         Some((packet.pid, clock.pts90, clock.dts90, digest(packet)))
                     }
                     _ => None,
@@ -304,7 +300,7 @@ fn mixed_avc_ac3_dvb_keep_carrier_order_and_a_common_clock() {
             assert!(item.belongs_to(&budget));
             assert!(!item.belongs_to(&foreign_pool));
             match item.event() {
-                RawEvent::NativeTs { packet, clock } => {
+                Event::DemuxPes { packet, clock } => {
                     assert_eq!(item.delivery(), Delivery::Present);
                     assert_eq!(
                         clock.origin.unwrap().first_reference_raw90,
@@ -322,14 +318,14 @@ fn mixed_avc_ac3_dvb_keep_carrier_order_and_a_common_clock() {
                     assert_eq!(packet.source_header.dts_raw33, None);
                     assert_eq!(packet.boundary, DemuxBoundary::FiniteLength);
                 }
-                RawEvent::Ts(TsEvent {
+                Event::Ts(TsEvent {
                     source: TraceEvent::Pes(p),
                     ..
                 }) => {
                     assert_eq!(item.delivery(), Delivery::Source);
                     sources.push((p.pid, p.header.pts_raw33, p.header.dts_raw33));
                 }
-                RawEvent::NativeRefusal { error, .. } => panic!("unexpected refusal {error:?}"),
+                Event::PesRefusal { error, .. } => panic!("unexpected refusal {error:?}"),
                 _ => {}
             }
         }
@@ -383,10 +379,10 @@ fn packet_delivery_uses_projected_timestamp_availability_without_a_seek() {
         };
         let mut packets = 0;
         for item in collect(&mut player, 1).unwrap() {
-            if let RawEvent::NativeTs { clock, .. } = item.event() {
+            if let Event::DemuxPes { clock, .. } = item.event() {
                 packets += 1;
                 assert_eq!(clock.pts90.is_some(), has_timestamps);
-                assert_eq!(item.event().native_pts().unwrap().is_some(), has_timestamps);
+                assert_eq!(item.event().demux_pts().unwrap().is_some(), has_timestamps);
                 assert_eq!(item.delivery(), expected);
             }
         }
@@ -401,12 +397,12 @@ fn unbounded_packets_drain_by_pid_only_after_logical_eof() {
     let packets: Vec<_> = output
         .iter()
         .filter_map(|item| match item.event() {
-            RawEvent::NativeTs { packet, .. } => {
+            Event::DemuxPes { packet, .. } => {
                 assert_eq!(packet.boundary, DemuxBoundary::LogicalEof);
                 assert_eq!((packet.payload_len, digest(packet)), (27, AV_PAYLOAD));
                 Some((packet.pid, packet.position))
             }
-            RawEvent::NativeRefusal { error, .. } => panic!("unexpected refusal {error:?}"),
+            Event::PesRefusal { error, .. } => panic!("unexpected refusal {error:?}"),
             _ => None,
         })
         .collect();
@@ -422,9 +418,9 @@ fn pmt_retype_only_refuses_the_changed_pid() {
     let mut maps = Vec::new();
     for (index, item) in output.iter().enumerate() {
         match item.event() {
-            RawEvent::NativeTs { packet, .. } => packets.push(packet.pid),
-            RawEvent::NativeRefusal { track, .. } => refusals.push((index, *track)),
-            RawEvent::Ts(TsEvent {
+            Event::DemuxPes { packet, .. } => packets.push(packet.pid),
+            Event::PesRefusal { track, .. } => refusals.push((index, *track)),
+            Event::Ts(TsEvent {
                 source: TraceEvent::ProgramMap { active: true, .. },
                 ..
             }) => maps.push(index),
@@ -453,7 +449,7 @@ fn selected_audio_follows_pmt_and_matches_native_carrier_order() {
         let mut sources = Vec::new();
         for (index, item) in output.iter().enumerate() {
             match item.event() {
-                RawEvent::Ts(TsEvent {
+                Event::Ts(TsEvent {
                     source:
                         TraceEvent::ProgramMap {
                             active: true,
@@ -465,14 +461,14 @@ fn selected_audio_follows_pmt_and_matches_native_carrier_order() {
                     map = Some((index, *configuration_epoch));
                     audio = None;
                 }
-                RawEvent::NativeTsConfiguration(config) => {
+                Event::PesCarriage(config) => {
                     assert_eq!(item.delivery(), Delivery::Source);
                     assert_eq!(config.track, key(257));
                     assert_eq!(map, Some((index - 1, config.configuration_epoch)));
                     audio = Some(config.configuration_epoch);
                     configurations.push(config.carriage);
                 }
-                RawEvent::NativeTs { packet, clock } => {
+                Event::DemuxPes { packet, clock } => {
                     assert_eq!(item.delivery(), Delivery::Present);
                     if packet.pid == 257 {
                         assert_eq!(audio, Some(packet.source_epochs.configuration));
@@ -487,14 +483,14 @@ fn selected_audio_follows_pmt_and_matches_native_carrier_order() {
                         digest(packet),
                     ));
                 }
-                RawEvent::Ts(TsEvent {
+                Event::Ts(TsEvent {
                     source: TraceEvent::Pes(p),
                     ..
                 }) if p.pid == 257 => {
                     assert_eq!(item.delivery(), Delivery::Source);
                     sources.push((p.header.stream_id, p.header.pts_raw33, p.header.dts_raw33));
                 }
-                RawEvent::NativeRefusal { error, .. } => panic!("unexpected refusal {error:?}"),
+                Event::PesRefusal { error, .. } => panic!("unexpected refusal {error:?}"),
                 _ => {}
             }
         }
@@ -538,7 +534,7 @@ fn missing_dvb_context_preserves_private_source_and_later_latm_recovers() {
     let mut audio = Vec::new();
     for item in &output {
         match item.event() {
-            RawEvent::NativeRefusal { track, error, .. } => {
+            Event::PesRefusal { track, error, .. } => {
                 assert_eq!(*track, key(257));
                 assert!(matches!(
                     error,
@@ -546,21 +542,21 @@ fn missing_dvb_context_preserves_private_source_and_later_latm_recovers() {
                 ));
                 audio.push("refusal");
             }
-            RawEvent::Ts(TsEvent {
+            Event::Ts(TsEvent {
                 source: TraceEvent::Pes(p),
                 ..
             }) if p.pid == 257 && p.header.stream_id == 0xbd => {
                 assert_eq!(item.delivery(), Delivery::Source);
                 audio.push("private source");
             }
-            RawEvent::NativeTsConfiguration(config) => {
+            Event::PesCarriage(config) => {
                 assert_eq!(
                     config.carriage,
                     TsNativeCarriage::Registered(RegisteredCarriage::AacLatm)
                 );
                 audio.push("latm configuration");
             }
-            RawEvent::NativeTs { packet, .. } if packet.pid == 257 => {
+            Event::DemuxPes { packet, .. } if packet.pid == 257 => {
                 assert_eq!(packet.stream_id, 0xc0);
                 audio.push("latm native");
             }
@@ -587,7 +583,7 @@ fn seeking_replays_the_current_audio_configurations_in_a_new_generation() {
         .rev()
         .find(|item| {
             matches!(
-                item.event(), RawEvent::NativeTs { packet, .. } if packet.pid == 257
+                item.event(), Event::DemuxPes { packet, .. } if packet.pid == 257
             )
         })
         .unwrap();
@@ -608,7 +604,7 @@ fn seeking_replays_the_current_audio_configurations_in_a_new_generation() {
     let carriages: Vec<_> = replay
         .iter()
         .filter_map(|item| match item.event() {
-            RawEvent::NativeTsConfiguration(config) => Some(config.carriage),
+            Event::PesCarriage(config) => Some(config.carriage),
             _ => None,
         })
         .collect();

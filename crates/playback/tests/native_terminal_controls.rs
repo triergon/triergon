@@ -729,7 +729,7 @@ fn native_out_of_source_first_sample_requires_a_physical_end() {
                 let [refusal] = out.as_slice() else {
                     panic!("expected one native refusal")
                 };
-                let RawEvent::Mp4(Mp4Event::NativeMissingSample(refusal)) = refusal.event() else {
+                let Event::Mp4(Mp4Event::NativeMissingSample(refusal)) = refusal.event() else {
                     panic!("expected a missing first sample");
                 };
                 assert_eq!(refusal.track_id, 1);
@@ -862,7 +862,7 @@ fn native_zero_timescale_keeps_the_declared_source_clock_unavailable() {
                 let out = collect(&mut native, work).unwrap();
                 let mut count = 0;
                 for output in &out {
-                    let RawEvent::Mp4(Mp4Event::Packet(packet)) = output.event() else {
+                    let Event::Mp4(Mp4Event::Packet(packet)) = output.event() else {
                         continue;
                     };
                     let track = &packet.configuration.track;
@@ -881,7 +881,7 @@ fn native_zero_timescale_keeps_the_declared_source_clock_unavailable() {
                     assert_eq!(track.native_catalogue.as_ref().unwrap().clock, *clock);
                     assert_eq!(output.event().source_pts().unwrap(), None);
                     assert_eq!(
-                        output.event().native_pts().unwrap(),
+                        output.event().demux_pts().unwrap(),
                         Some(triergon_core::Time::new(count * 1000, 1).unwrap())
                     );
                     let start = 675 + 12 * count as usize;
@@ -931,7 +931,7 @@ fn native_short_media_packet_requires_a_positive_prefix_at_eof() {
                     let out = collect(&mut native, work).unwrap();
                     assert_eq!(packets(&out).len(), 5);
                     let last = out.last().unwrap().event();
-                    let RawEvent::Mp4(Mp4Event::NativeShortPacket(p)) = last else {
+                    let Event::Mp4(Mp4Event::NativeShortPacket(p)) = last else {
                         panic!("expected a native short packet");
                     };
                     assert_eq!(p.prefix.declared, p.native.source);
@@ -977,7 +977,7 @@ fn native_short_packet_distinguishes_pending_failure_and_empty_eof() {
         while let Some(output) = native.pop() {
             assert!(!matches!(
                 output.event(),
-                RawEvent::Mp4(Mp4Event::NativeShortPacket(_))
+                Event::Mp4(Mp4Event::NativeShortPacket(_))
             ));
         }
         if native
@@ -1032,7 +1032,7 @@ fn interior_zero_read_preserves_the_native_packet_prefix_and_source() {
                     .iter()
                     .enumerate()
                     .filter_map(|(i, e)| match e.event() {
-                        RawEvent::Mp4(Mp4Event::NativeEmptyPacket(empty)) => Some((i, empty)),
+                        Event::Mp4(Mp4Event::NativeEmptyPacket(empty)) => Some((i, empty)),
                         _ => None,
                     })
                     .collect();
@@ -1040,10 +1040,10 @@ fn interior_zero_read_preserves_the_native_packet_prefix_and_source() {
                     panic!("expected a single unassociated native packet");
                 };
                 assert!(
-                    matches!(output[*at - 1].event(), RawEvent::Mp4(Mp4Event::Packet(p)) if p.source.sample.ordinal == 8)
+                    matches!(output[*at - 1].event(), Event::Mp4(Mp4Event::Packet(p)) if p.source.sample.ordinal == 8)
                 );
                 assert!(
-                    matches!(output[*at + 1].event(), RawEvent::Mp4(Mp4Event::Packet(p)) if p.source.sample.ordinal == 9)
+                    matches!(output[*at + 1].event(), Event::Mp4(Mp4Event::Packet(p)) if p.source.sample.ordinal == 9)
                 );
                 assert_eq!(Some(empty.boundary), got[7].native_front_read_boundary_v1);
                 assert_eq!(empty.boundary.source_ordinal, 8);
@@ -1097,7 +1097,7 @@ fn native_empty_run_tail_uses_the_greatest_completed_run_end_once() {
         let durations: Vec<_> = output
             .iter()
             .filter_map(|e| match e.event() {
-                RawEvent::Mp4(Mp4Event::NativeEmptyPacket(empty)) => Some(empty.duration),
+                Event::Mp4(Mp4Event::NativeEmptyPacket(empty)) => Some(empty.duration),
                 _ => None,
             })
             .collect();

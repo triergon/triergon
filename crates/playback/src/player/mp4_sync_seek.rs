@@ -82,7 +82,7 @@ impl Mp4SyncSeekCommand {
             intent: SeekIntent {
                 track: TrackKey::Mp4(self.request.video),
                 target: self.request.source_time,
-                clock: ClockChoice::SourceExact,
+                clock: ClockChoice::Source,
                 replay_from_start: false,
             },
             landing: Mp4RangeLanding::Source(self.landing),
@@ -132,7 +132,7 @@ impl<S: Source> Player<S> {
     }
 
     fn check_sync_seek_clock(&self) -> Result<()> {
-        if self.clock != ClockChoice::SourceExact {
+        if self.clock != ClockChoice::Source {
             return Err(Error::Unsupported(
                 "indexed seek needs exact range-backed MP4",
             ));

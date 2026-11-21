@@ -252,7 +252,7 @@ fn first_packet(p: &mut Player<Transport>) -> Output {
     for _ in 0..200_000 {
         p.advance(&mut WorkBudget::new(1), &off()).unwrap();
         while let Some(value) = p.pop() {
-            if matches!(value.event(), RawEvent::Mp4(Mp4Event::Packet(_))) {
+            if matches!(value.event(), Event::Mp4(Mp4Event::Packet(_))) {
                 return value;
             }
         }
@@ -299,13 +299,13 @@ fn check_outputs_with_roots(
     for output in out {
         assert_eq!(output.source_id(), id);
         match output.event() {
-            RawEvent::Mp4(Mp4Event::Configuration(c)) => {
+            Event::Mp4(Mp4Event::Configuration(c)) => {
                 configs.insert(c.track.track_id, (c.description.index, c.revision));
                 let raw = c.description.raw().bytes();
                 let at = c.description.raw().header().start as usize;
                 assert_eq!(raw.as_ref(), &case.bytes[at..at + raw.len()]);
             }
-            RawEvent::Mp4(Mp4Event::Packet(p)) => {
+            Event::Mp4(Mp4Event::Packet(p)) => {
                 packets += 1;
                 let wanted = case
                     .samples
@@ -337,7 +337,7 @@ fn check_outputs_with_roots(
                     "configuration must precede its packet"
                 );
             }
-            RawEvent::Mp4Root(raw) => {
+            Event::Mp4Root(raw) => {
                 let wanted = roots.get(root_at).expect("unexpected extra source root");
                 let header = raw.header();
                 assert_eq!(header.kind, wanted.kind);
@@ -412,7 +412,7 @@ fn catalogue_all_valid_original_movies_replace_without_rewriting_source_facts() 
         while let Some(output) = retired.pop() {
             assert!(!p.current(&output));
             assert_eq!(output.source_id(), SourceId(8201));
-            let RawEvent::Mp4(Mp4Event::Packet(packet)) = output.event() else {
+            let Event::Mp4(Mp4Event::Packet(packet)) = output.event() else {
                 panic!()
             };
             assert_eq!(packet.source.sample.ordinal, ordinal);
@@ -641,7 +641,7 @@ fn catalogue_empty_retirement_under_pressure_retains_unqueued_configuration() {
         .unwrap();
     assert_eq!(retired.queued(), 0);
     assert_eq!(retired.pending_source(), Some(SourceId(8801)));
-    let Some(RawEvent::Mp4(Mp4Event::Configuration(config))) = retired.pending_event() else {
+    let Some(Event::Mp4(Mp4Event::Configuration(config))) = retired.pending_event() else {
         panic!()
     };
     assert_eq!(config.description.index, 1);
@@ -793,8 +793,7 @@ fn catalogue_replacement_does_not_reset_cumulative_event_limit() {
 fn catalogue_explicit_native_projection_keeps_literal_source_and_clock_view() {
     let b = Budget::new(64 << 20).unwrap();
     let (mut p, _) = player(&b, SourceId(9301), &gold::CASES[0], PlayerPolicy::default());
-    p.set_clock_view(ClockChoice::ExplicitNativeProjection)
-        .unwrap();
+    p.set_clock_view(ClockChoice::Demux).unwrap();
     let (mut next, _) = candidate(
         &b,
         SourceId(9302),
@@ -809,7 +808,7 @@ fn catalogue_explicit_native_projection_keeps_literal_source_and_clock_view() {
     let order: Vec<_> = out
         .iter()
         .filter_map(|o| match o.event() {
-            RawEvent::Mp4(Mp4Event::Packet(p)) => {
+            Event::Mp4(Mp4Event::Packet(p)) => {
                 Some((p.configuration.track.track_id, p.source.sample.ordinal))
             }
             _ => None,
@@ -836,7 +835,7 @@ fn catalogue_explicit_native_projection_keeps_literal_source_and_clock_view() {
     assert!(
         out.iter()
             .filter_map(|o| match o.event() {
-                RawEvent::Mp4(Mp4Event::Packet(p)) => Some(p),
+                Event::Mp4(Mp4Event::Packet(p)) => Some(p),
                 _ => None,
             })
             .all(|p| p.native.is_some())
@@ -993,7 +992,7 @@ fn catalogue_replacement_selects_native_terminal_and_waits_for_source_end() {
         while let Some(output) = p.pop() {
             assert_eq!(output.source_id(), SourceId(9512));
             assert!(p.current(&output));
-            if let RawEvent::Mp4(Mp4Event::Packet(packet)) = output.into_event() {
+            if let Event::Mp4(Mp4Event::Packet(packet)) = output.into_event() {
                 packets.push(packet);
             }
         }
@@ -1044,7 +1043,7 @@ fn catalogue_progressive_replacement_keeps_future_batches_and_unknown_clocks() {
     assert!(
         out.iter()
             .filter_map(|o| match o.event() {
-                RawEvent::Mp4(Mp4Event::Packet(packet)) if packet.source.sample.ordinal > 3 =>
+                Event::Mp4(Mp4Event::Packet(packet)) if packet.source.sample.ordinal > 3 =>
                     Some(packet),
                 _ => None,
             })
@@ -1082,7 +1081,7 @@ fn catalogue_replacement_terminal_mdat_needs_actual_source_end_and_keeps_unknown
     let mut packets = 0;
     for output in &out {
         assert_eq!(output.source_id(), SourceId(9602));
-        if let RawEvent::Mp4(Mp4Event::Packet(packet)) = output.event() {
+        if let Event::Mp4(Mp4Event::Packet(packet)) = output.event() {
             packets += 1;
             let sample = &packet.source.sample;
             assert_eq!(
@@ -1173,13 +1172,13 @@ fn catalogue_existing_seek_intent_is_retained_but_not_applied_to_new_source_cloc
         .unwrap()
         .unwrap();
     assert_eq!(retired.seek_intent(), Some(intent));
-    assert!(matches!(retired.pending_event(), Some(RawEvent::Seek(x)) if *x == intent));
+    assert!(matches!(retired.pending_event(), Some(Event::Seek(x)) if *x == intent));
     assert_eq!(p.seek_intent(), None);
     let out = collect(&mut p, 1).unwrap();
     check_outputs(&out, &gold::CASES[0], SourceId(9802));
     assert!(
         out.iter()
-            .filter(|o| matches!(o.event(), RawEvent::Mp4(Mp4Event::Packet(_))))
+            .filter(|o| matches!(o.event(), Event::Mp4(Mp4Event::Packet(_))))
             .all(|o| o.delivery() == Delivery::Present)
     );
     once(&old);
@@ -1315,7 +1314,7 @@ fn catalogue_pump_blocked_and_accepted_owners_must_retire_before_commit() {
     assert_eq!(sink.held[1].output().source_id(), SourceId(9902));
     assert!(matches!(
         sink.held[1].output().event(),
-        RawEvent::Mp4(Mp4Event::Configuration(_))
+        Event::Mp4(Mp4Event::Configuration(_))
     ));
     assert_ne!(sink.held[1].token(), &old_token);
     sink.completions.push_back(old_token);
@@ -1653,14 +1652,12 @@ fn progressive_range_seek_promotes_the_same_fragmented_entity_through_the_pump()
         }
     }
     assert_eq!(first_read, Some(1647));
-    assert!(
-        matches!(out[0].event(), RawEvent::Seek(intent) if intent.target == request.source_time)
-    );
+    assert!(matches!(out[0].event(), Event::Seek(intent) if intent.target == request.source_time));
     assert!(out.iter().all(|event| event.generation() == boundary.input_generation && event.source_id() == id));
     let video: Vec<_> = out
         .iter()
         .filter_map(|out| match out.event() {
-            RawEvent::Mp4(Mp4Event::Packet(packet)) if packet.configuration.track.track_id == 1 => {
+            Event::Mp4(Mp4Event::Packet(packet)) if packet.configuration.track.track_id == 1 => {
                 Some(packet)
             }
             _ => None,
@@ -1709,10 +1706,9 @@ fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges
         PlayerPolicy::default(),
     )
     .unwrap();
-    p.set_clock_view(ClockChoice::ExplicitNativeProjection)
-        .unwrap();
+    p.set_clock_view(ClockChoice::Demux).unwrap();
     let before = first_packet(&mut p);
-    let RawEvent::Mp4(Mp4Event::Packet(packet)) = before.event() else {
+    let Event::Mp4(Mp4Event::Packet(packet)) = before.event() else {
         panic!("expected progressive native packet");
     };
     assert!(packet.native.is_some());
@@ -1754,7 +1750,7 @@ fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges
     untouched(&new);
     let boundary = pump.sink().unwrap().boundaries[0];
     let seek = pump.sink().unwrap().seeks[0];
-    assert_eq!(seek.clock, ClockChoice::ExplicitNativeProjection);
+    assert_eq!(seek.clock, ClockChoice::Demux);
     assert_eq!(seek.target, Time::new(7, 2).unwrap());
     assert!(!seek.replay_from_start);
     assert_eq!(pump.player().unwrap().state(), State::Paused);
@@ -1774,7 +1770,7 @@ fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges
             let output = feed.into_output();
             assert_eq!(output.generation(), boundary.input_generation);
             assert_eq!(output.source_id(), id);
-            if let RawEvent::Mp4(Mp4Event::Packet(packet)) = output.into_event() {
+            if let Event::Mp4(Mp4Event::Packet(packet)) = output.into_event() {
                 packets.push(packet);
             }
             pump.sink_mut().unwrap().completions.push_back(token);

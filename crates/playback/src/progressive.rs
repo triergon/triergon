@@ -1,7 +1,7 @@
 //! Sequential MP4 continuation through real source box/fragment/sample jobs.
 //! A drained current MDAT is a batch boundary, never an invented media EOF.
 use crate::{
-    BackendStep, Mp4NativeEmptyPacket, RawEvent, Result,
+    EngineStep, Event, Mp4NativeEmptyPacket, Result,
     mp4_open::{PendingMedia, RETAINED_MEDIA_BYTES, box_reader, word},
     mp4_plan::{Mp4View, PreparedMp4, SourceRow},
     sample_sort::SampleSort,
@@ -202,15 +202,15 @@ impl ProgressiveState {
         engine: &mut Continuation<'_>,
         w: &mut WorkBudget,
         c: &AtomicBool,
-    ) -> Result<BackendStep> {
+    ) -> Result<EngineStep> {
         if c.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
         if w.remaining() == 0 {
-            return Ok(BackendStep::Yield);
+            return Ok(EngineStep::Yield);
         }
         if self.finished {
-            return Ok(BackendStep::End);
+            return Ok(EngineStep::End);
         }
         match self.phase {
             Phase::Drain => {
@@ -226,13 +226,13 @@ impl ProgressiveState {
                     )
                     .map_err(|_| Error::Overflow)?;
                     return Ok(match engine.input.read_discard(n, w, c)? {
-                        Step::NeedInput(r) => BackendStep::NeedInput(r),
-                        Step::Ready(_) | Step::Yield => BackendStep::Yield,
+                        Step::NeedInput(r) => EngineStep::NeedInput(r),
+                        Step::Ready(_) | Step::Yield => EngineStep::Yield,
                         Step::End(_) => return Err(Error::Truncated),
                     });
                 }
                 if !w.try_charge(1) {
-                    return Ok(BackendStep::Yield);
+                    return Ok(EngineStep::Yield);
                 }
                 self.reader = Some(box_reader(
                     engine.input,
@@ -251,10 +251,10 @@ impl ProgressiveState {
                 // a search for box signatures inside opaque media payload.
                 match engine.input.read_discard(64 * 1024, w, c)? {
                     Step::Ready(_) | Step::Yield => {}
-                    Step::NeedInput(request) => return Ok(BackendStep::NeedInput(request)),
+                    Step::NeedInput(request) => return Ok(EngineStep::NeedInput(request)),
                     Step::End(_) => {
                         self.finished = true;
-                        return Ok(BackendStep::End);
+                        return Ok(EngineStep::End);
                     }
                 }
             }
@@ -265,7 +265,7 @@ impl ProgressiveState {
                     .ok_or(Error::Invalid("progressive root reader"))?;
                 if let Some(mut h) = self.header {
                     if !w.try_charge(1) {
-                        return Ok(BackendStep::Yield);
+                        return Ok(EngineStep::Yield);
                     }
                     if h.kind == *b"mdat" {
                         if engine.plan.native_recovery && reader.announced_open_mdat() {
@@ -314,7 +314,7 @@ impl ProgressiveState {
                                 crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(h);
                             self.reader = None;
                             self.header = None;
-                            return Ok(BackendStep::Yield);
+                            return Ok(EngineStep::Yield);
                         }
                         engine.plan.forward_regular_extents = None;
                         self.next_root = h.end()?;
@@ -373,11 +373,11 @@ impl ProgressiveState {
                         reader.read_metadata(engine.input)?;
                     }
                     self.header = None;
-                    return Ok(BackendStep::Yield);
+                    return Ok(EngineStep::Yield);
                 }
                 match reader.poll(engine.input, w, c)? {
                     Step::Yield => {}
-                    Step::NeedInput(r) => return Ok(BackendStep::NeedInput(r)),
+                    Step::NeedInput(r) => return Ok(EngineStep::NeedInput(r)),
                     Step::End(_) => {
                         if *engine.row != engine.plan.rows()
                             || self.row != self.rows.len()
@@ -386,7 +386,7 @@ impl ProgressiveState {
                             return Err(Error::Truncated);
                         }
                         self.finished = true;
-                        return Ok(BackendStep::End);
+                        return Ok(EngineStep::End);
                     }
                     Step::Ready(BoxEvent::Header(h)) => {
                         self.roots = self.roots.checked_add(1).ok_or(Error::Overflow)?;
@@ -412,7 +412,7 @@ impl ProgressiveState {
                                 "new movie catalogue requires explicit source discontinuity",
                             ));
                         }
-                        return Ok(BackendStep::Event(RawEvent::Mp4Root(raw)));
+                        return Ok(EngineStep::Event(Event::Mp4Root(raw)));
                     }
                     Step::Ready(BoxEvent::Skipped(_)) => {}
                 }
@@ -421,7 +421,7 @@ impl ProgressiveState {
                 if let Some(cursor) = self.pending_cursor.take() {
                     if !w.try_charge(1) {
                         self.pending_cursor = Some(cursor);
-                        return Ok(BackendStep::Yield);
+                        return Ok(EngineStep::Yield);
                     }
                     let end = cursor.cursor.index().implicit_data_end()?;
                     let next = engine.plan.tracks.as_slice()[self.track]
@@ -461,7 +461,7 @@ impl ProgressiveState {
                     engine.plan.tracks.as_mut_slice()[self.track].next_ordinal = next;
                     self.scan = None;
                     self.traf = None;
-                    return Ok(BackendStep::Yield);
+                    return Ok(EngineStep::Yield);
                 }
                 if let Some(job) = self.builder.as_mut() {
                     if job.poll(w)? == BuildStatus::Ready {
@@ -482,7 +482,7 @@ impl ProgressiveState {
                             native: None,
                         });
                     }
-                    return Ok(BackendStep::Yield);
+                    return Ok(EngineStep::Yield);
                 }
                 if let Some(scan) = self.scan.as_mut() {
                     match scan.poll(w)? {
@@ -538,7 +538,7 @@ impl ProgressiveState {
                             }
                         }
                     }
-                    return Ok(BackendStep::Yield);
+                    return Ok(EngineStep::Yield);
                 }
                 match self
                     .children
@@ -570,11 +570,11 @@ impl ProgressiveState {
                 if self.fill < self.cursors.len() {
                     let Some(current) = self.cursors.as_mut_slice()[self.fill].as_mut() else {
                         self.fill += 1;
-                        return Ok(BackendStep::Yield);
+                        return Ok(EngineStep::Yield);
                     };
                     if current.head.is_some() {
                         self.fill += 1;
-                        return Ok(BackendStep::Yield);
+                        return Ok(EngineStep::Yield);
                     }
                     let step = match &mut current.cursor {
                         SourceCursor::Physical(cursor) => cursor.poll(w)?,
@@ -604,11 +604,11 @@ impl ProgressiveState {
                             self.fill += 1;
                         }
                     }
-                    return Ok(BackendStep::Yield);
+                    return Ok(EngineStep::Yield);
                 }
                 if self.select < self.cursors.len() {
                     if !w.try_charge(1) {
-                        return Ok(BackendStep::Yield);
+                        return Ok(EngineStep::Yield);
                     }
                     let at = self.select;
                     self.select += 1;
@@ -631,10 +631,10 @@ impl ProgressiveState {
                             self.best = Some(at);
                         }
                     }
-                    return Ok(BackendStep::Yield);
+                    return Ok(EngineStep::Yield);
                 }
                 if !w.try_charge(1) {
-                    return Ok(BackendStep::Yield);
+                    return Ok(EngineStep::Yield);
                 }
                 if let Some(at) = self.best.take() {
                     let sample = &self.cursors.as_slice()[at]
@@ -647,7 +647,7 @@ impl ProgressiveState {
                             || (sample.range.start == extent.end && !sample.range.is_empty())
                         {
                             self.finish_merge(engine.plan)?;
-                            return Ok(BackendStep::Yield);
+                            return Ok(EngineStep::Yield);
                         }
                         sample.require_within(extent.clone())?;
                     } else if let Some(terminal) = self.terminal {
@@ -748,7 +748,7 @@ impl ProgressiveState {
             }
             Phase::Admit => {
                 if !w.try_charge(1) {
-                    return Ok(BackendStep::Yield);
+                    return Ok(EngineStep::Yield);
                 }
                 if let Some(row) = self.rows.as_slice().get(self.row) {
                     if let Some(extent) = self.extent.as_ref() {
@@ -826,7 +826,7 @@ impl ProgressiveState {
                             .map_err(|e| e.error)?;
                     }
                     self.row += 1;
-                    return Ok(BackendStep::Yield);
+                    return Ok(EngineStep::Yield);
                 }
                 self.reader = None;
                 self.extent = None;
@@ -837,7 +837,7 @@ impl ProgressiveState {
                 };
             }
         }
-        Ok(BackendStep::Yield)
+        Ok(EngineStep::Yield)
     }
 
     fn finish_merge(&mut self, plan: &PreparedMp4) -> Result<()> {

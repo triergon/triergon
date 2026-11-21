@@ -189,8 +189,8 @@ fn project(outputs: &[Output], tracks: &[u32]) -> Vec<Object> {
     let mut objects = Vec::new();
     for output in outputs {
         let event = match output.event() {
-            RawEvent::Mp4(event) => event,
-            RawEvent::Mp4Root(_) => continue,
+            Event::Mp4(event) => event,
+            Event::Mp4Root(_) => continue,
             other => panic!("unexpected event {other:?}"),
         };
         match event {

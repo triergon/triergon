@@ -19,7 +19,7 @@ use triergon_mpegts::{
     psi::{DescriptorNamespace, DvbNamespaceEvidence},
 };
 use triergon_playback::{
-    ByteSource, ClockChoice, Engine, Format, Player, PlayerPolicy, Progress, RawEvent, Selection,
+    ByteSource, ClockChoice, Engine, Event, Format, Player, PlayerPolicy, Progress, Selection,
     TsNativeCarriage, TsNativeSelection, TsNativeTrackSelection,
     io::{SelectedInput, SourceOwner},
     native_startup::{NativeStartup, StartupStep},
@@ -132,7 +132,7 @@ fn player(
             PlayerPolicy::default(),
         )?
     };
-    player.set_clock_view(ClockChoice::ExplicitNativeProjection)?;
+    player.set_clock_view(ClockChoice::Demux)?;
     Ok(player)
 }
 
@@ -146,8 +146,8 @@ pub fn operate(pool: &Budget, raw: &Bytes, argument: &str, mut work: Work) -> Re
         let progress = player.read_output(&mut pending, &mut WorkBudget::new(WORK), &cancel)?;
         if let Some(output) = pending.take() {
             match output.event() {
-                RawEvent::NativeTs { packet, clock } => fold(&mut work, packet, clock)?,
-                RawEvent::NativeRefusal { track, error, .. } => {
+                Event::DemuxPes { packet, clock } => fold(&mut work, packet, clock)?,
+                Event::PesRefusal { track, error, .. } => {
                     return Err(format!("native refusal on {track:?}: {error:?}").into());
                 }
                 _ => {}

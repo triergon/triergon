@@ -88,19 +88,19 @@ pub struct TsEvent {
     pub source: TraceEvent,
     pub source_pts: Option<SourceTimestamp>,
     pub source_dts: Option<SourceTimestamp>,
-    pub native_clock: Option<DemuxTimeView>,
+    pub demux_clock: Option<DemuxTimeView>,
     pub clock_key: Option<ClockKey>,
 }
 #[derive(Debug)]
-pub enum RawEvent {
+pub enum Event {
     Mp4Root(triergon_isobmff::boxes::BoxView),
     EntityEnd(ts::stream::MediaEntityEnd),
-    NativeTs {
+    DemuxPes {
         packet: DemuxPacket,
         clock: DemuxTimeView,
     },
-    NativeTsConfiguration(TsNativeConfiguration),
-    NativeRefusal {
+    PesCarriage(TsNativeConfiguration),
+    PesRefusal {
         track: TrackKey,
         error: Error,
         source_event_ordinal: u64,
@@ -115,18 +115,18 @@ pub enum RawEvent {
     clippy::large_enum_variant,
     reason = "one bounded inline event; queue slots and all retained buffers use Budget; a per-event Box would add an untracked allocation"
 )]
-pub enum BackendStep {
-    Event(RawEvent),
+pub enum EngineStep {
+    Event(Event),
     NeedInput(InputRequest),
     Yield,
     End,
     Backpressure { requested: usize, available: usize },
     AwaitEntity,
 }
-impl BackendStep {
+impl EngineStep {
     pub(crate) fn from_matroska(step: ParseStep<MkvEvent>) -> Self {
         match step {
-            ParseStep::Event(event) => Self::Event(RawEvent::Matroska(event)),
+            ParseStep::Event(event) => Self::Event(Event::Matroska(event)),
             ParseStep::NeedInput(request) => Self::NeedInput(request),
             ParseStep::Yield => Self::Yield,
             ParseStep::Backpressure {
@@ -407,21 +407,19 @@ trait TsStepProjection: Sized {
     fn project(step: TsPayloadStep) -> Result<Self>;
 }
 
-impl TsStepProjection for BackendStep {
+impl TsStepProjection for EngineStep {
     const PROGRESSIVE: bool = false;
 
     #[inline(always)]
     fn project(step: TsPayloadStep) -> Result<Self> {
         Ok(match step {
-            TsPayloadStep::Event(event) => Self::Event(RawEvent::Ts(event)),
-            TsPayloadStep::Configuration(config) => {
-                Self::Event(RawEvent::NativeTsConfiguration(config))
-            }
+            TsPayloadStep::Event(event) => Self::Event(Event::Ts(event)),
+            TsPayloadStep::Configuration(config) => Self::Event(Event::PesCarriage(config)),
             TsPayloadStep::Refusal {
                 track,
                 error,
                 source_event_ordinal,
-            } => Self::Event(RawEvent::NativeRefusal {
+            } => Self::Event(Event::PesRefusal {
                 track,
                 error,
                 source_event_ordinal,
@@ -429,12 +427,12 @@ impl TsStepProjection for BackendStep {
             TsPayloadStep::Packet {
                 packet: NativePacket::Owned(packet),
                 clock,
-            } => Self::Event(RawEvent::NativeTs { packet, clock }),
+            } => Self::Event(Event::DemuxPes { packet, clock }),
             TsPayloadStep::Packet {
                 packet: NativePacket::Compact(_),
                 ..
             } => return Err(Error::Invalid("compact TS payload polling required")),
-            TsPayloadStep::EntityEnd(end) => Self::Event(RawEvent::EntityEnd(end)),
+            TsPayloadStep::EntityEnd(end) => Self::Event(Event::EntityEnd(end)),
             TsPayloadStep::NeedInput(request) => Self::NeedInput(request),
             TsPayloadStep::Yield => Self::Yield,
             TsPayloadStep::End => Self::End,
@@ -781,10 +779,10 @@ impl Engine {
         Ok(engine)
     }
 
-    pub fn has_native_packet_view(&self) -> bool {
+    pub fn delivers_demux_pes(&self) -> bool {
         matches!(self, Self::Ts(t) if t.segment_discovery.is_some() || !t.native_tracks.as_slice().is_empty())
     }
-    pub(crate) fn replaces_source_ts_pes(&self, pid: u16) -> bool {
+    pub(crate) fn assembles_pid(&self, pid: u16) -> bool {
         matches!(self, Self::Ts(t) if t.native_tracks.index(pid).is_some())
     }
     /// Read an independent TS188 media segment with an in-band PAT and PMT.
@@ -958,15 +956,15 @@ impl Engine {
             },
         }
     }
-    pub fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<BackendStep> {
+    pub fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<EngineStep> {
         match self {
-            Self::Matroska(r) => Ok(BackendStep::from_matroska(r.step(w, c)?)),
+            Self::Matroska(r) => Ok(EngineStep::from_matroska(r.step(w, c)?)),
             Self::Mp4(r) => r.poll(w, c, None),
             Self::Ts(r) => {
                 if r.segment_discovery == Some(SegmentDiscovery::CompactProgressive) {
                     return Err(Error::Invalid("compact TS payload polling required"));
                 }
-                r.poll::<BackendStep>(w, c)
+                r.poll::<EngineStep>(w, c)
             }
         }
     }
@@ -983,7 +981,7 @@ impl Engine {
         cursor: &mut PacketCursor<'_>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<BackendStep> {
+    ) -> Result<EngineStep> {
         match self {
             Self::Mp4(mp4) => mp4.poll(work, cancel, Some(cursor)),
             _ => Err(Error::Invalid("native range cursor requires MP4")),
@@ -1135,7 +1133,7 @@ impl Engine {
                     return Err(Error::Invalid("seek source program"));
                 }
                 if matches!(r.policy, SourceTimePolicy::Unanchored)
-                    && intent.clock == crate::ClockChoice::SourceExact
+                    && intent.clock == crate::ClockChoice::Source
                 {
                     return Err(Error::Unsupported("unanchored TS source time"));
                 }
@@ -1213,7 +1211,7 @@ impl Mp4Engine {
         at_track: usize,
         source: SourcePacket,
         cursor: Option<&mut PacketCursor<'_>>,
-    ) -> Result<BackendStep> {
+    ) -> Result<EngineStep> {
         let cfg = self.packet_config(at_track, source.sample.description_index)?;
         let native = match cursor {
             Some(cursor) => Some(cursor.take_occurrence()?),
@@ -1237,20 +1235,18 @@ impl Mp4Engine {
         } else {
             self.row += 1;
         }
-        Ok(BackendStep::Event(RawEvent::Mp4(Mp4Event::Packet(
-            Mp4Packet {
-                native_front_read_boundary_v1: self.native_boundary_observed,
-                source,
-                configuration: cfg,
-                native,
-                encoded_skip_samples,
-            },
-        ))))
+        Ok(EngineStep::Event(Event::Mp4(Mp4Event::Packet(Mp4Packet {
+            native_front_read_boundary_v1: self.native_boundary_observed,
+            source,
+            configuration: cfg,
+            native,
+            encoded_skip_samples,
+        }))))
     }
 
-    fn poll_progressive(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<BackendStep> {
+    fn poll_progressive(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<EngineStep> {
         let Some(state) = self.progressive.as_mut() else {
-            return Ok(BackendStep::End);
+            return Ok(EngineStep::End);
         };
         let mut continuation = crate::progressive::Continuation {
             input: &mut self.input,
@@ -1262,11 +1258,7 @@ impl Mp4Engine {
         state.poll(&mut continuation, w, c)
     }
 
-    fn poll_unavailable_first(
-        &mut self,
-        w: &mut WorkBudget,
-        c: &AtomicBool,
-    ) -> Result<BackendStep> {
+    fn poll_unavailable_first(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<EngineStep> {
         let start = self
             .plan
             .unavailable_first
@@ -1284,7 +1276,7 @@ impl Mp4Engine {
             return Err(within_source);
         }
         let step = self.poll_progressive(w, c)?;
-        if !matches!(step, BackendStep::End) {
+        if !matches!(step, EngineStep::End) {
             return Ok(step);
         }
         match self.input.read_discard(1, w, c)? {
@@ -1296,7 +1288,7 @@ impl Mp4Engine {
                     return Err(Error::Invalid("sample outside media extent"));
                 }
                 if !w.try_charge(1) {
-                    return Ok(BackendStep::Yield);
+                    return Ok(EngineStep::Yield);
                 }
                 let row = self
                     .plan
@@ -1304,7 +1296,7 @@ impl Mp4Engine {
                     .as_ref()
                     .ok_or(Error::Invalid("missing first sample declaration"))?;
                 self.native_recovery_end = true;
-                Ok(BackendStep::Event(RawEvent::Mp4(
+                Ok(EngineStep::Event(Event::Mp4(
                     Mp4Event::NativeMissingSample(Mp4NativeMissingSample {
                         declared: row.sample.clone(),
                         track_id: row.track_id,
@@ -1312,8 +1304,8 @@ impl Mp4Engine {
                     }),
                 )))
             }
-            Step::NeedInput(r) => Ok(BackendStep::NeedInput(r)),
-            Step::Yield => Ok(BackendStep::Yield),
+            Step::NeedInput(r) => Ok(EngineStep::NeedInput(r)),
+            Step::Yield => Ok(EngineStep::Yield),
             Step::Ready(_) => Err(Error::Invalid("first sample requires source end")),
         }
     }
@@ -1323,7 +1315,7 @@ impl Mp4Engine {
         w: &mut WorkBudget,
         c: &AtomicBool,
         cursor: Option<&mut PacketCursor<'_>>,
-    ) -> Result<BackendStep> {
+    ) -> Result<EngineStep> {
         let (at_track, reader) = self
             .packet
             .as_mut()
@@ -1357,17 +1349,17 @@ impl Mp4Engine {
                 let encoded_skip_samples = self.skip_samples(at_track, &native)?;
                 self.packet = None;
                 self.native_recovery_end = true;
-                Ok(BackendStep::Event(RawEvent::Mp4(
-                    Mp4Event::NativeShortPacket(Mp4NativeShortPacket {
+                Ok(EngineStep::Event(Event::Mp4(Mp4Event::NativeShortPacket(
+                    Mp4NativeShortPacket {
                         prefix,
                         configuration,
                         native,
                         encoded_skip_samples,
-                    }),
-                )))
+                    },
+                ))))
             }
-            Step::NeedInput(r) => Ok(BackendStep::NeedInput(r)),
-            Step::Yield => Ok(BackendStep::Yield),
+            Step::NeedInput(r) => Ok(EngineStep::NeedInput(r)),
+            Step::Yield => Ok(EngineStep::Yield),
             Step::End(_) => Err(Error::Truncated),
         }
     }
@@ -1379,10 +1371,10 @@ impl Mp4Engine {
         w: &mut WorkBudget,
         c: &AtomicBool,
         mut cursor: Option<&mut PacketCursor<'_>>,
-    ) -> Result<BackendStep> {
+    ) -> Result<EngineStep> {
         if self.native_recovery_end {
             self.input.read_into(&mut [], w, c)?;
-            return Ok(BackendStep::End);
+            return Ok(EngineStep::End);
         }
         if self.plan.unavailable_first.is_some() {
             return self.poll_unavailable_first(w, c);
@@ -1391,7 +1383,7 @@ impl Mp4Engine {
             && self.native_boundary_observed == Some(packet.boundary)
         {
             if !w.try_charge(1) {
-                return Ok(BackendStep::Yield);
+                return Ok(EngineStep::Yield);
             }
             if remaining > 1 {
                 self.native_empty_run = Some((packet, remaining - 1));
@@ -1399,9 +1391,9 @@ impl Mp4Engine {
             } else {
                 self.native_empty_run = None;
             }
-            return Ok(BackendStep::Event(RawEvent::Mp4(
-                Mp4Event::NativeEmptyPacket(packet),
-            )));
+            return Ok(EngineStep::Event(Event::Mp4(Mp4Event::NativeEmptyPacket(
+                packet,
+            ))));
         }
         if let Some(replay) = self.replay_media.as_mut() {
             return match replay.poll(&mut self.input, w, c)? {
@@ -1411,10 +1403,10 @@ impl Mp4Engine {
                         .try_push(cached)
                         .map_err(|failure| failure.error)?;
                     self.replay_media = None;
-                    Ok(BackendStep::Yield)
+                    Ok(EngineStep::Yield)
                 }
-                Step::NeedInput(r) => Ok(BackendStep::NeedInput(r)),
-                Step::Yield => Ok(BackendStep::Yield),
+                Step::NeedInput(r) => Ok(EngineStep::NeedInput(r)),
+                Step::Yield => Ok(EngineStep::Yield),
                 Step::End(_) => Err(Error::Truncated),
             };
         }
@@ -1424,8 +1416,8 @@ impl Mp4Engine {
         if let Some(replay) = &mut self.native_seek {
             match replay.poll(self.plan.native_rows(), w, c)? {
                 NativeMp4ReplayStep::Ready(row) => self.row = row,
-                NativeMp4ReplayStep::Yield => return Ok(BackendStep::Yield),
-                NativeMp4ReplayStep::End => return Ok(BackendStep::End),
+                NativeMp4ReplayStep::Yield => return Ok(EngineStep::Yield),
+                NativeMp4ReplayStep::End => return Ok(EngineStep::End),
             }
         }
         if let Some((video, sync)) = self.indexed_sync {
@@ -1434,7 +1426,7 @@ impl Mp4Engine {
                     return Err(Error::Cancelled);
                 }
                 if !w.try_charge(1) {
-                    return Ok(BackendStep::Yield);
+                    return Ok(EngineStep::Yield);
                 }
                 self.row += 1;
             }
@@ -1453,8 +1445,8 @@ impl Mp4Engine {
                         sample: occurrence.source.clone(),
                     })
                 }
-                CursorStatus::Yield => return Ok(BackendStep::Yield),
-                CursorStatus::End => return Ok(BackendStep::End),
+                CursorStatus::Yield => return Ok(EngineStep::Yield),
+                CursorStatus::End => return Ok(EngineStep::End),
             }
         } else {
             self.plan.row(self.row)
@@ -1471,13 +1463,13 @@ impl Mp4Engine {
                     return self.poll_progressive(w, c);
                 }
                 if !w.try_charge(1) {
-                    return Ok(BackendStep::Yield);
+                    return Ok(EngineStep::Yield);
                 }
                 return Err(Error::Invalid("sample outside media extent"));
             }
         }
         if w.remaining() == 0 {
-            return Ok(BackendStep::Yield);
+            return Ok(EngineStep::Yield);
         }
         let at = self
             .plan
@@ -1500,9 +1492,7 @@ impl Mp4Engine {
                 revision,
             });
             self.revision = revision;
-            return Ok(BackendStep::Event(RawEvent::Mp4(Mp4Event::Configuration(
-                cfg,
-            ))));
+            return Ok(EngineStep::Event(Event::Mp4(Mp4Event::Configuration(cfg))));
         }
         let sequential = !self.input.capabilities().random_access;
         let position = self.input.position();
@@ -1512,8 +1502,8 @@ impl Mp4Engine {
             // Discard charges the byte work itself. With a one-unit quantum
             // that unit must reach the input cursor for the gap to advance.
             return match self.input.read_discard(count, w, c)? {
-                Step::Ready(_) | Step::Yield => Ok(BackendStep::Yield),
-                Step::NeedInput(r) => Ok(BackendStep::NeedInput(r)),
+                Step::Ready(_) | Step::Yield => Ok(EngineStep::Yield),
+                Step::NeedInput(r) => Ok(EngineStep::NeedInput(r)),
                 Step::End(_) => Err(Error::Truncated),
             };
         }
@@ -1606,7 +1596,7 @@ impl Mp4Engine {
         };
         self.packet = Some((at, packet));
         if w.remaining() == 0 {
-            return Ok(BackendStep::Yield);
+            return Ok(EngineStep::Yield);
         }
         self.poll_packet(w, c, cursor)
     }
@@ -2435,7 +2425,7 @@ impl TsEngine {
         };
         let mut source_pts = None;
         let mut source_dts = None;
-        let mut native_clock = None;
+        let mut demux_clock = None;
         if let TraceEvent::Pes(pes) = event {
             if let Some(key) = key {
                 source_pts = Some(source_timestamp(pes.header.pts_raw33, key, self.policy)?);
@@ -2447,8 +2437,8 @@ impl TsEngine {
                 .native
                 .as_mut()
                 .ok_or(Error::Invalid("TS PES before program discovery"))?;
-            native_clock = projector.project(pes, w, c)?;
-            if native_clock.is_none() {
+            demux_clock = projector.project(pes, w, c)?;
+            if demux_clock.is_none() {
                 return T::project(TsPayloadStep::Yield);
             }
         }
@@ -2499,7 +2489,7 @@ impl TsEngine {
             source: event,
             source_pts,
             source_dts,
-            native_clock,
+            demux_clock,
             clock_key: key,
         }))
     }
@@ -2515,10 +2505,10 @@ impl TsEngine {
         self.deliver_event(w, c)
     }
 }
-impl RawEvent {
+impl Event {
     pub fn track(&self) -> Option<TrackKey> {
         match self {
-            Self::NativeTs { packet, .. } => Some(TrackKey::Ts {
+            Self::DemuxPes { packet, .. } => Some(TrackKey::Ts {
                 program: packet.program,
                 pid: packet.pid,
             }),
@@ -2553,9 +2543,9 @@ impl RawEvent {
             _ => Ok(None),
         }
     }
-    pub fn native_pts(&self) -> Result<Option<Time>> {
+    pub fn demux_pts(&self) -> Result<Option<Time>> {
         match self {
-            Self::NativeTs { clock, .. } => clock.pts90.map(|t| Time::new(t, 90_000)).transpose(),
+            Self::DemuxPes { clock, .. } => clock.pts90.map(|t| Time::new(t, 90_000)).transpose(),
             Self::Mp4(Mp4Event::Packet(p)) => p
                 .native
                 .as_ref()
@@ -2574,7 +2564,7 @@ impl RawEvent {
                 .map(|ticks| Time::from_ticks(i128::from(ticks), p.native.media_clock.demux_base))
                 .transpose(),
             Self::Ts(e) => e
-                .native_clock
+                .demux_clock
                 .and_then(|n| n.pts90)
                 .map(|t| Time::new(t, 90_000))
                 .transpose(),
@@ -2589,7 +2579,7 @@ impl RawEvent {
     #[inline]
     pub fn payload_bytes(&self) -> usize {
         match self {
-            Self::NativeTs { packet, .. } => packet.payload_len,
+            Self::DemuxPes { packet, .. } => packet.payload_len,
             Self::Matroska(MkvEvent::Packet(p)) => p.packet.data.len(),
             Self::Matroska(MkvEvent::Envelope(triergon_matroska::ElementEvent::Leaf {
                 data,
@@ -2633,7 +2623,7 @@ mod projection_tests {
                 source_timestamp(Some(9), key, SourceTimePolicy::RelativeEpochZero).unwrap(),
             ),
             source_dts: Some(source_timestamp(None, key, SourceTimePolicy::Unanchored).unwrap()),
-            native_clock: Some(DemuxTimeView {
+            demux_clock: Some(DemuxTimeView {
                 profile: DemuxProfile::PesPackets,
                 program: key.program,
                 pid: 257,
@@ -2657,7 +2647,7 @@ mod projection_tests {
         let expected = format!("{event:?}");
         let step = TsPayloadStep::project(TsPayloadStep::Event(event)).unwrap();
         assert_eq!(step.payload_bytes(), Some(0));
-        let BackendStep::Event(RawEvent::Ts(event)) = BackendStep::project(step).unwrap() else {
+        let EngineStep::Event(Event::Ts(event)) = EngineStep::project(step).unwrap() else {
             panic!("source event was not delivered");
         };
         assert_eq!(format!("{event:?}"), expected);
@@ -2675,7 +2665,7 @@ mod projection_tests {
         .unwrap();
         assert_eq!(step.payload_bytes(), Some(0));
         assert!(
-            matches!(BackendStep::project(step), Ok(BackendStep::Event(RawEvent::NativeRefusal {
+            matches!(EngineStep::project(step), Ok(EngineStep::Event(Event::PesRefusal {
             track: actual_track, error: actual_error, source_event_ordinal: 109,
         })) if actual_track == track && actual_error == error)
         );

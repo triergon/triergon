@@ -9,7 +9,7 @@
 use crate::bitmap::{BitmapInput, BitmapScope, DvdBridgeConfig};
 use triergon_core::{Error, Result, WorkBudget};
 use triergon_isobmff::config::{ConfigurationLimits, ObjectTypeScan};
-use triergon_playback::{Delivery, Mp4Event, Mp4Packet, Output, RawEvent, TrackKey};
+use triergon_playback::{Delivery, Event, Mp4Event, Mp4Packet, Output, TrackKey};
 use triergon_subtitles::{compat, pgs::PacketClock};
 
 /// The object type of DVD subpicture streams.
@@ -25,7 +25,7 @@ pub struct Mp4DvdSetup {
 impl Mp4DvdSetup {
     /// Bind from a current MP4 packet output of the track.
     pub fn new(output: &Output, limits: ConfigurationLimits) -> Result<Self> {
-        let RawEvent::Mp4(Mp4Event::Packet(packet)) = output.event() else {
+        let Event::Mp4(Mp4Event::Packet(packet)) = output.event() else {
             return Err(Error::Invalid("MP4 DVD track needs an MP4 packet"));
         };
         let configuration = &packet.configuration;
@@ -98,7 +98,7 @@ impl Mp4DvdTrack {
         {
             return Ok(None);
         }
-        let RawEvent::Mp4(Mp4Event::Packet(packet)) = output.event() else {
+        let Event::Mp4(Mp4Event::Packet(packet)) = output.event() else {
             return Ok(None);
         };
         if output.source_id() != self.scope.source {

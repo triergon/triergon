@@ -137,7 +137,7 @@ fn pending_moofs_required_whole_source_matches_independent_box_recipe() {
         check(&out, case);
         assert_eq!(
             out.iter()
-                .filter(|o| matches!(o.event(),RawEvent::Mp4Root(v)if v.header().kind==*b"moof"))
+                .filter(|o| matches!(o.event(),Event::Mp4Root(v)if v.header().kind==*b"moof"))
                 .count(),
             2
         );
@@ -325,7 +325,7 @@ fn pending_moofs_nonseekable_refusal_preserves_live_source_fence() {
     let (mut p, _, gate, _, mut out) = parked();
     let held = out
         .iter()
-        .find(|o| matches!(o.event(), RawEvent::Mp4(Mp4Event::Packet(_))))
+        .find(|o| matches!(o.event(), Event::Mp4(Mp4Event::Packet(_))))
         .unwrap();
     assert!(p.current(held));
     let result = p.seek_and_select(
