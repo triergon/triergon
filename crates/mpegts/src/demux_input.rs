@@ -3,24 +3,133 @@
 use crate::PacketFormat;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Bytes, Error, InputCursor, InputToken, InputWindow, Result, SourceId, WorkBudget,
+    Bytes, Error, InputCursor, InputToken, InputWindow, Result, SourceId, Step, WorkBudget,
 };
+
+const STARTUP_WIDTH: usize = crate::carrier::TS188_BYTES;
+const STARTUP_PACKETS: usize = 7;
+const STARTUP_PREFIX: usize = (STARTUP_PACKETS + 1) * STARTUP_WIDTH;
+
+fn ts188_startup_header(carrier: &[u8]) -> bool {
+    carrier[0] == 0x47 && carrier[3] & 0x30 != 0
+}
+
+/// Opt-in TS188 startup for program/PES traversal on a seekable original entity.
+///
+/// Reads eight carrier widths through the caller's charged cursor windows, then
+/// requests the unique carrier phase in the same entity. Leading bytes are not
+/// removed and all later transport positions and diagnostics stay physical.
+/// This establishes a grid only; it does not validate or repair transport data.
+#[derive(Debug)]
+pub struct Ts188Startup {
+    source: SourceId,
+    token: InputToken,
+    prefix: [u8; STARTUP_PREFIX],
+    used: usize,
+    phase: usize,
+    carrier: usize,
+    found: Option<usize>,
+    competing: bool,
+    offset: Option<u64>,
+}
+
+impl Ts188Startup {
+    /// Begin at physical offset zero, before any transport parser has run.
+    pub fn new(input: &InputCursor) -> Result<Self> {
+        if input.position() != 0 || !input.capabilities().random_access {
+            return Err(Error::Unsupported(
+                "TS188 startup requires seekable input at zero",
+            ));
+        }
+        Ok(Self {
+            source: input.source(),
+            token: input.token(),
+            prefix: [0; STARTUP_PREFIX],
+            used: 0,
+            phase: 0,
+            carrier: 0,
+            found: None,
+            competing: false,
+            offset: None,
+        })
+    }
+
+    /// Return the physical phase after repositioning the cursor for traversal.
+    /// Short input, absent grids and competing grids are errors. Each copied
+    /// byte is charged. Each inspected header costs one work unit, with at
+    /// most seven headers checked at each phase. Inspection can yield with a
+    /// one-unit work grant.
+    /// Repeated successful polls are idempotent until the cursor moves.
+    pub fn poll(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<u64>> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if input.source() != self.source {
+            return Err(Error::SourceMismatch);
+        }
+        if input.token() != self.token
+            || input.position() != self.offset.unwrap_or(self.used as u64)
+        {
+            return Err(Error::Invalid("TS188 startup cursor changed"));
+        }
+        if let Some(offset) = self.offset {
+            return Ok(Step::Ready(offset));
+        }
+        while self.used < self.prefix.len() {
+            match input.read_into(&mut self.prefix[self.used..], work, cancel)? {
+                Step::Ready(count) => self.used += count,
+                Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
+                Step::Yield => return Ok(Step::Yield),
+                Step::End(_) => return Err(Error::Truncated),
+                Step::Backpressure(never) => match never {},
+            }
+        }
+        while self.phase < STARTUP_WIDTH && !self.competing {
+            if !work.try_charge(1) {
+                return Ok(Step::Yield);
+            }
+            let at = self.phase + self.carrier * STARTUP_WIDTH;
+            if ts188_startup_header(&self.prefix[at..]) {
+                self.carrier += 1;
+                if self.carrier < STARTUP_PACKETS {
+                    continue;
+                }
+                self.competing = self.found.replace(self.phase).is_some();
+            }
+            self.phase += 1;
+            self.carrier = 0;
+        }
+        if self.competing {
+            return Err(Error::Unsupported(
+                "TS188 startup with competing sync grids",
+            ));
+        }
+        let offset =
+            self.found
+                .ok_or(Error::Unsupported("TS188 startup without a sync grid"))? as u64;
+        input.request_range_reusing_window(offset)?;
+        self.token = input.token();
+        self.offset = Some(offset);
+        Ok(Step::Ready(offset))
+    }
+}
 
 /// Find the first carrier when the caller expects TS188 and the initial prefix
 /// can contain fewer than 188 leading bytes. The prefix must include at least
 /// eight carrier widths. Seven complete headers must agree on a unique phase.
 /// The offset is relative to the supplied prefix and leaves it untouched.
 pub fn ts188_carrier_offset(prefix: &[u8]) -> Result<usize> {
-    const PACKETS: usize = 7;
-    const WIDTH: usize = crate::carrier::TS188_BYTES;
-    let prefix = prefix
-        .get(..(PACKETS + 1) * WIDTH)
-        .ok_or(Error::Truncated)?;
-    let mut starts = (0..WIDTH).filter(|&start| {
+    let prefix = prefix.get(..STARTUP_PREFIX).ok_or(Error::Truncated)?;
+    let mut starts = (0..STARTUP_WIDTH).filter(|&start| {
         prefix[start..]
-            .chunks_exact(WIDTH)
-            .take(PACKETS)
-            .all(|carrier| carrier[0] == 0x47 && carrier[3] & 0x30 != 0)
+            .chunks_exact(STARTUP_WIDTH)
+            .take(STARTUP_PACKETS)
+            .all(ts188_startup_header)
     });
     let start = starts
         .next()

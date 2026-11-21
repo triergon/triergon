@@ -26,6 +26,17 @@ source events and discovers all its tracks without framing access units. The
 [original-input controls](../../harness/fate/README.md) cover PMT replacement,
 encoded clocks, PES payload ranges, and diagnostics for unaligned input.
 
+`compat::input::Ts188Startup` is an opt-in operation before program or PES
+traversal with `TransportStream`. Construct it on a seekable `InputCursor` at
+physical zero, poll it with work and cancellation budgets, and satisfy its
+`NeedInput` requests through the same cursor. It copies 1,504 prefix bytes from
+charged windows and charges another 2,632 work units for the bounded unique-grid
+inspection. Success repositions that cursor to the physical TS188 phase;
+pass it directly to `TransportStream::poll`. The original entity, length and
+leading bytes remain unchanged. Short, absent or competing grids are errors.
+Later malformed carriers retain the ordinary diagnostics. This operation does
+not alter `Reader`, automatic probing or seek replay policy.
+
 The non-default `reference-trace` feature adds `reference_trace`, the projections
 that exist only to compare traces with FFmpeg: `recovery` (packets from rejected
 carriers), `catalogue` (programs and streams), `dvb` and `input`.

@@ -112,6 +112,16 @@ the original entity at that offset gives the pinned reference's program 769, PMT
 PID 1363, PCR PID 1361 and HEVC/AAC track PIDs 1361/1362. Source positions keep
 the leading byte in their coordinate system. This control checks program
 membership, with full probe metadata and packet-fold comparisons still open.
+`compat::input::Ts188Startup` provides that explicit operation on a seekable
+original cursor before `TransportStream` program/PES traversal, with charged
+input windows, bounded work and cancellation. Authored phase-zero and phase-one
+controls compare complete source-byte/event records with explicit-offset
+traversal, including continuity and partial-tail diagnostics. Phases 0, 1 and
+187 also cover one-byte input and one-unit work grants. The hash-pinned
+`loewe.ts` integration control checks the same program facts and original
+carrier offsets as explicit-offset traversal; it requires the external sample
+cache. Native runtime, heap and kernel-bound RSS qualification of this opt-in
+operation remains open on AArch64 and ARMv7.
 
 ## Subtitle text comparisons
 

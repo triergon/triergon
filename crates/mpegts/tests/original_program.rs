@@ -285,6 +285,16 @@ fn startup_requires_a_unique_complete_sync_grid() {
 #[test]
 #[ignore = "requires hash-pinned original mpegts/loewe.ts in the FATE cache"]
 fn original_program_discovery_uses_the_probed_source_offset() {
+    discover_original_program(false);
+}
+
+#[test]
+#[ignore = "requires hash-pinned original mpegts/loewe.ts in the FATE cache"]
+fn original_program_discovery_uses_seekable_startup() {
+    discover_original_program(true);
+}
+
+fn discover_original_program(startup: bool) {
     let bytes = original(
         "loewe.ts",
         "f93d2b5d78e4f04027c635e8e1dd866dcf35c233a0fa508f3bcc6a656fba286e",
@@ -302,7 +312,40 @@ fn original_program_discovery_uses_the_probed_source_offset() {
         32 * 1024,
     )
     .unwrap();
-    input.request_range(offset).unwrap();
+    if startup {
+        let mut startup = triergon_mpegts::compat::input::Ts188Startup::new(&input).unwrap();
+        let cancel = AtomicBool::new(false);
+        loop {
+            match startup
+                .poll(&mut input, &mut WorkBudget::new(64), &cancel)
+                .unwrap()
+            {
+                Step::NeedInput(request) => {
+                    let at = request.offset as usize;
+                    let end = bytes.len().min(at + request.maximum.min(187));
+                    input
+                        .provide(
+                            &InputWindow::new(
+                                request.source,
+                                request.token,
+                                request.offset,
+                                Bytes::copy_from_slice(&pool, &bytes[at..end]).unwrap(),
+                            )
+                            .unwrap(),
+                        )
+                        .unwrap();
+                }
+                Step::Yield => {}
+                Step::Ready(actual) => {
+                    assert_eq!(actual, offset);
+                    break;
+                }
+                other => panic!("unexpected startup: {other:?}"),
+            }
+        }
+    } else {
+        input.request_range(offset).unwrap();
+    }
     let limits = ParseLimits::default();
     let mut stream = TransportStream::new(pool.clone(), PacketFormat::Ts188, limits, 769).unwrap();
     let cancel = AtomicBool::new(false);

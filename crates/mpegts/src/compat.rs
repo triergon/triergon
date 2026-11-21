@@ -253,9 +253,14 @@ pub mod input {
     //! [`ts188_carrier_offset`] locates a unique TS188 grid in a bounded prefix.
     //! Use its offset for the initial [`InputCursor::request_range`] so that
     //! subsequent packet positions stay relative to the original entity.
+    //! [`Ts188Startup`] performs the bounded inspection and initial range
+    //! transaction incrementally on a seekable original cursor before program
+    //! or PES traversal with [`TransportStream`](crate::TransportStream).
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     //!
     //! [`InputCursor::request_range`]: triergon_core::InputCursor::request_range
-    pub use crate::demux_input::{InputBootstrap, InputContext, InputStep, ts188_carrier_offset};
+    pub use crate::demux_input::{
+        InputBootstrap, InputContext, InputStep, Ts188Startup, ts188_carrier_offset,
+    };
 }
