@@ -363,6 +363,19 @@ fn every_root_box_is_reported() {
 }
 
 #[test]
+fn a_later_file_type_box_does_not_replace_the_major_brand() {
+    let mut file = include_bytes!("fixtures/encoded-config-v3/creation-all.mp4").to_vec();
+    // Two 16-byte boxes in place of the 32-byte `ftyp` keep every offset.
+    assert_eq!(&file[..8], b"\0\0\0\x20ftyp");
+    file[..32].copy_from_slice(b"\0\0\0\x10ftypisom\0\0\x02\0\0\0\0\x10ftypqt  \0\0\0\0");
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut reader = open(&pool, &file);
+    let reading = read(&mut reader, &pool, &file, 1 << 20, 1 << 16).unwrap();
+    assert_eq!(reading.roots[..2], [*b"ftyp", *b"ftyp"]);
+    assert_eq!(reader.major_brand(), Some(*b"isom"));
+}
+
+#[test]
 fn a_source_without_random_access_is_refused() {
     let pool = Budget::new(1 << 20).unwrap();
     let forward = SourceCapabilities {

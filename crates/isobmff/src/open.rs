@@ -427,8 +427,9 @@ pub struct Movie {
     pub(crate) pool: Budget,
 }
 impl Movie {
-    /// The `ftyp` major brand, if the source has an `ftyp`; that of the last one where it
-    /// has several.
+    /// The `ftyp` major brand, if the source has an `ftyp`. ISO/IEC 14496-12 §4.3 places
+    /// exactly one before any variable-length box; where a source has several, the first
+    /// counts.
     pub fn major_brand(&self) -> Option<[u8; 4]> {
         self.major_brand
     }
@@ -946,7 +947,7 @@ impl MovieOpen {
         match &raw.header().kind {
             b"moov" => self.moov = Some(raw.clone()),
             b"moof" => push(&mut self.moofs, raw.clone())?,
-            b"ftyp" => self.brand = brand,
+            b"ftyp" => self.brand = self.brand.or(brand),
             _ => {}
         }
         push(&mut self.roots, raw.clone())?;

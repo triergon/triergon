@@ -430,7 +430,7 @@ impl Reader {
     fn movie_open(&self) -> bool {
         matches!(self.phase, Phase::Packets | Phase::Seek | Phase::Ended)
     }
-    /// The `ftyp` major brand; that of the last `ftyp` where the source has several.
+    /// The `ftyp` major brand; that of the first `ftyp` where the source has several.
     pub fn major_brand(&self) -> Option<[u8; 4]> {
         self.movie.as_ref().and_then(Movie::major_brand)
     }
