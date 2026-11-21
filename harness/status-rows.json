@@ -110,9 +110,7 @@
         "aarch64-unknown-linux-gnu",
         "thumbv7neon-unknown-linux-gnueabihf"
       ],
-      "results": [
-        "matroska-startup-seek"
-      ]
+      "unmeasured": "matroska-startup-seek"
     },
     {
       "area": "Matroska audio clocks",
@@ -146,6 +144,8 @@
         "isobmff-seek"
       ]
     },
+    {"area": "MOV one-track seek", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mov-track-seek"},
+    {"area": "ISO BMFF source seek", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "isobmff-source-seek"},
     {
       "area": "QuickTime PCM samples",
       "targets": [
