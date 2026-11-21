@@ -1,6 +1,6 @@
-//! Explicit, transactional replacement of a checked MP4 source catalogue.
-//! A second in-band moov is not a source discontinuity. The caller supplies a
-//! freshly opened entity and keeps transport/entity validation outside this crate.
+//! Replacement of a player's MP4 catalogue, as one transaction. An in-band second
+//! `moov` does not start a new catalogue: the caller opens the new entity and hands
+//! it over, and decides outside this crate which entity follows which.
 use crate::{
     Engine, Event, Output, Player, Result, SeekIntent, Selection, Source, SourceOwner,
     engine::Mp4RangeLanding,
@@ -34,9 +34,8 @@ pub struct CatalogueBoundary {
     pub delivery_epoch: u64,
 }
 
-/// Only this constructor can create a candidate. Its engine has never emitted
-/// a packet or advanced a delivery/configuration cursor. All source facts and
-/// native-view refusals come from the existing checked open/index operations.
+/// A replacement catalogue: a freshly opened and indexed MP4 source with an engine
+/// that has read and delivered nothing yet.
 #[derive(Debug)]
 pub struct Mp4Catalogue<S: Source> {
     pub(crate) engine: Engine,
@@ -54,7 +53,8 @@ impl<S: Source> Mp4Catalogue<S> {
         Self::new_with_movie(opened, plan, maximum_packet, mode).map(|(catalogue, _)| catalogue)
     }
 
-    /// Retain the complete source tables for a native range seek.
+    /// As [`Self::new`], also returning the movie, whose sample tables a later
+    /// range seek plans from.
     pub fn new_with_movie(
         opened: OpenedMp4<S>,
         plan: PreparedMp4,
@@ -88,10 +88,10 @@ impl<S: Source> Mp4Catalogue<S> {
     }
 }
 
-/// Retirement preserves the complete old parser/plan/cursor owners, the FIFO
-/// envelopes and any not-yet-queued event and range request. Its transport has
-/// already been aborted/quiesced/closed. These are readable retired facts, never
-/// current feed permission. Dropping the receipt releases only its own aliases.
+/// What a replaced catalogue leaves behind: its engine and plan, its queued
+/// outputs, and any event and input request it had not yet queued. Its source is
+/// already aborted and closed. The outputs are for reading, not for delivery;
+/// dropping the value releases them.
 #[derive(Debug)]
 pub struct RetiredCatalogue {
     pub(crate) engine: Option<Engine>,
@@ -111,8 +111,7 @@ pub struct RetiredCatalogue {
     pub(crate) seek: Option<SeekIntent>,
 }
 impl RetiredCatalogue {
-    /// Cursor into the retired engine's current owned plan, not a physical I/O
-    /// position or an inferred native demuxer cursor.
+    /// The row of its plan the retired engine would have read next.
     #[cfg(feature = "reference-trace")]
     pub fn indexed_row_cursor(&self) -> Option<usize> {
         match self.engine.as_ref() {

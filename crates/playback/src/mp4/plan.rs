@@ -1,5 +1,5 @@
-//! Owned, charged playback plan produced by borrowing actual compact indexes.
-//! The temporary IndexJob's lifetime is explicit; no self-reference or copied core.
+//! The playback plan of an MP4 movie: [`Mp4IndexJob`] borrows the opened movie's
+//! sample tables and builds a [`PreparedMp4`] that owns its rows, charged to the pool.
 use crate::{
     Result,
     mp4::open::{CachedMedia, Movie, RETAINED_MEDIA_BYTES},
@@ -67,7 +67,7 @@ impl Default for PlanLimits {
 }
 
 impl PlanLimits {
-    fn native_packet_limits(self) -> PacketLimits {
+    fn packet_limits(self) -> PacketLimits {
         PacketLimits {
             max_tracks: self.tracks,
             max_media_extents: self.media_extents,
@@ -214,9 +214,10 @@ impl SourceRow {
         (self.sample.range.start, self.track_id, self.sample.ordinal)
     }
 }
-/// Constructed only from a checked, source-bound index job.
+/// An indexed movie, bound to the source and pool it was opened over. Only an
+/// [`Mp4IndexJob`] makes one, and its rows cannot be changed afterwards:
 /// ```compile_fail
-/// fn corrupt(plan: &mut triergon_playback::mp4_plan::PreparedMp4) {
+/// fn corrupt(plan: &mut triergon_playback::mp4::PreparedMp4) {
 ///     plan.source_rows.clear();
 /// }
 /// ```
@@ -315,8 +316,8 @@ impl PreparedMp4 {
     pub fn movie_base(&self) -> TimeBase {
         self.movie_base
     }
-    /// Declared Source rows. A forward regular plan checks pending rows against
-    /// the actual later MDAT before it can read or publish their payload.
+    /// The samples the tables declare, in physical order. A forward plan checks a
+    /// row against the `mdat` that follows before it reads or delivers its payload.
     pub fn source_rows(&self) -> &[SourceRow] {
         self.source_rows.as_slice()
     }
@@ -334,8 +335,8 @@ impl PreparedMp4 {
         self.raw_roots.as_slice()
     }
 
-    /// A front-native operation continues all Source declarations even after a
-    /// separately reported native read boundary. Only native occurrences stop.
+    /// Where a front demux plan stops reading, if it does. Source rows continue
+    /// past it; only the demux occurrences end there.
     pub fn front_read_boundary(&self) -> Option<iso::compat::mov::front::FrontReadBoundary> {
         self.front_boundary
     }
@@ -474,9 +475,9 @@ pub(crate) fn include_media_track(movie: &Movie, ordinal: usize) -> bool {
 }
 
 impl<'a> Mp4IndexJob<'a> {
-    /// Explicit native view of one from-start front-metadata source. Source
-    /// clocks/extents are unchanged; the engine must retain actual EOF authority.
-    /// This does not establish a complete-source fact for an isolated fragment.
+    /// The demux view of metadata read before its media; see
+    /// [`compat::mov::index_front`](crate::compat::mov::index_front). The source ends
+    /// only where its `SourceReply::End` says.
     pub(crate) fn front(movie: &'a Movie, limits: PlanLimits) -> Result<Self> {
         if !matches!(
             movie.read_scope(),
@@ -522,8 +523,9 @@ impl<'a> Mp4IndexJob<'a> {
         Self::new_inner(movie, PlanView::Demux, limits, true, Some(plans), None)
     }
 
-    /// Build the native range view with explicitly validated encoded edits.
-    /// The retained plans also govern seeks on this exact range index.
+    /// The demux view of a complete source with encoded edit plans, which also
+    /// govern seeks on this index; see
+    /// [`compat::mov::index_encoded_range`](crate::compat::mov::index_encoded_range).
     pub(crate) fn encoded_range(
         movie: &'a Movie,
         plans: &'a [Option<iso::compat::mov::edits::EncodedEditPlan>],
@@ -715,7 +717,7 @@ impl<'a> Mp4IndexJob<'a> {
             )?)
         };
         let native = if view == PlanView::Demux {
-            let native_limits = limits.native_packet_limits();
+            let native_limits = limits.packet_limits();
             let media_tracks_only = range_duration
                 .as_ref()
                 .is_some_and(|range| range.media_tracks_only);

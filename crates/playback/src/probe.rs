@@ -33,8 +33,8 @@ pub enum ProbeProgress {
     /// The format is known: call `finish`.
     Selected(Format),
 }
-/// Original bounded signature selection. Filenames and caller expected output
-/// have no role. Three physical sync bytes distinguish TS188 and M2TS192.
+/// Selects the container format of a source from its first bytes alone, within
+/// work budgets. Three sync bytes one packet apart tell TS188 from M2TS192.
 #[derive(Debug)]
 pub struct Probe<S: Source> {
     input: Option<InputCursor>,
@@ -235,8 +235,9 @@ struct CachedWindow {
     offset: u64,
     bytes: Bytes,
 }
-/// A probe replays only actual provided prefix owners. Sequential transports do
-/// not need to reopen or seek; the next upstream range follows the cached bytes.
+/// The source of a selected input: replays the windows the probe read, then
+/// continues with the caller's source at the next offset, so a sequential
+/// transport is neither reopened nor rewound.
 #[derive(Debug)]
 pub struct ReplaySource<S: Source> {
     source: SourceId,

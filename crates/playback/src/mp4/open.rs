@@ -1,4 +1,5 @@
-//! The transport pump around the ISO BMFF movie opener.
+//! Opens an MP4 movie over the source protocol: drives the ISO BMFF movie opener
+//! from a selected input, within work budgets.
 use crate::{Format, Result, Source, SourceOwner, probe::SelectedInput};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, InputCursor, WorkBudget};
@@ -63,8 +64,8 @@ impl<S: Source> Mp4Open<S> {
         Ok(Self::with_opener(selected, opener))
     }
 
-    /// Choose how the opener validates surplus sample timing.
-    /// Inspect each track's sample table for the declared surplus counts.
+    /// [`Self::new`] with `policy` for sample tables that declare more timing entries
+    /// than samples. Each track's table reports the entries it left unused.
     pub fn with_timing_policy(
         selected: SelectedInput<S>,
         limits: OpenLimits,
@@ -75,16 +76,18 @@ impl<S: Source> Mp4Open<S> {
         Ok(opener)
     }
 
-    /// Stop at the first media header after a front movie, even when the
-    /// transport offers ranges. The progressive engine parses later fragments.
+    /// An opener that stops at the first `mdat` after a front `moov`, even over a
+    /// seekable source. [`Engine::mp4_progressive`](crate::Engine::mp4_progressive)
+    /// reads the later fragments.
     pub fn new_progressive(selected: SelectedInput<S>, limits: OpenLimits) -> Result<Self> {
         check_format(&selected)?;
         let opener = MovieOpen::new_progressive(&selected.input, limits)?;
         Ok(Self::with_opener(selected, opener))
     }
 
-    /// Admit terminal media declarations for the explicit pinned native
-    /// recovery view. SourcePhysical uses the strict opener.
+    /// An opener for the MOV demux view of [`compat::mov`](crate::compat::mov): it
+    /// admits media declared outside the source, truncated or in a zero timescale,
+    /// which that view recovers as FFmpeg does. [`Self::new`] refuses such media.
     pub fn new_recovery(selected: SelectedInput<S>, limits: OpenLimits) -> Result<Self> {
         check_format(&selected)?;
         let opener = MovieOpen::new_recovery(&selected.input, limits)?;

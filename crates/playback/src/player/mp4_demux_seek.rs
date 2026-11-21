@@ -1,4 +1,5 @@
-//! Player handoff for the pinned MOV global seek over complete range sources.
+//! Demux-clock seeks of a complete MP4 source: the MOV demux view's seek across
+//! all tracks, planned from the tables and applied to a player.
 
 use super::{ClockChoice, Player, SeekIntent, Selection, TrackKey};
 use crate::{
@@ -26,7 +27,7 @@ use triergon_isobmff::{
 pub struct Mp4DemuxSeekRequest {
     /// The track ID of the reference video track.
     pub video: u32,
-    /// Signed ticks in the reference track's native timebase.
+    /// The target, in ticks of the reference track's demux time base.
     pub timestamp: i64,
     /// Bounds of the index search.
     pub limits: SeekLimits,
@@ -59,7 +60,7 @@ pub struct Mp4DemuxSeekJob<'a> {
     failure: Option<Error>,
 }
 
-/// A generation-bound native seek with the original reference index entry.
+/// A planned demux-clock seek, valid for the generation it was planned in.
 #[derive(Debug)]
 pub struct Mp4DemuxSeekCommand {
     pool: Budget,
@@ -117,8 +118,8 @@ impl<S: Source> Player<S> {
         Mp4DemuxSeekJob::new(engine, movie, request, selection, None)
     }
 
-    /// Plan native replay after switching a progressive source to an
-    /// independently opened range view of the same stable byte entity.
+    /// Plans a demux-clock seek for a progressive player from `next`, a complete
+    /// range index of the same entity opened separately, which the seek switches to.
     pub fn prepare_mp4_progressive_demux_seek<'a>(
         &self,
         next: &'a Mp4Catalogue<S>,

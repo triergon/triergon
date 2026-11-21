@@ -3,122 +3,135 @@
 Composes the Matroska, MP4 and MPEG-TS readers into a player-facing packet
 feed: caller-owned sources, format probing, bounded container events, track
 selection, seeking, and a producer/sink pump. It sits above
-`triergon-matroska`, `triergon-isobmff`, `triergon-mpegts` and `triergon-framing`. It does not fetch over HTTP,
-parse playlists, retry transports, decode media or render.
-
-The MP4 range comparison includes two upstream samples, one with an initial
-non-sync AVC prefix and one with tracks shorter than the declared movie.
-It checks startup and backward seek through EOF for both.
+`triergon-matroska`, `triergon-isobmff` and `triergon-mpegts`. It does not fetch
+over HTTP, parse playlists, retry transports, decode media or render.
 
 ## Usage
 
+Probe the source, open the engine of its format, and drive one loop: every
+packet whose payload is one slice arrives as a `Packet`, which implements
+`triergon_core::container::PacketInfo`.
+
 ```rust
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
-use triergon_mpegts::{PacketFormat, ParseLimits, clock::SourceTimePolicy, psi::DescriptorNamespace};
+use triergon_core::container::PacketInfo;
+use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId, WorkBudget};
+use triergon_mpegts::{ParseLimits, clock::SourceTimePolicy, psi::DescriptorNamespace};
+use triergon_playback::mp4::{Mp4IndexJob, Mp4Open, OpenLimits, OpenProgress, PlanLimits};
+use triergon_playback::probe::{Probe, ProbeProgress};
 use triergon_playback::{
-    ByteSource, Engine, Player, PlayerPolicy, Progress, Selection, SourceOwner,
+    ByteSource, Delivery, Engine, Format, Player, PlayerPolicy, Progress, Selection,
 };
 
-# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/hls/media-00.ts");
+# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/mkv/observed-11.mkv");
 let pool = Budget::new(64 << 20)?;
 let id = SourceId(1);
 let bytes = Bytes::copy_from_slice(&pool, &std::fs::read(path)?)?;
 let caps = SourceCapabilities { length: Some(bytes.len() as u64), random_access: true };
-let source = SourceOwner::new(ByteSource::new(id, bytes, 64 * 1024)?); // or your own `Source`
-let input = InputCursor::new(&pool, id, caps, 4096)?;
-let (program, policy) = (1, SourceTimePolicy::RelativeEpochZero);
-let namespace = DescriptorNamespace::Unspecified;
-let engine = Engine::ts(input, PacketFormat::Ts188, program, ParseLimits::default(), policy, namespace)?;
-let mut player = Player::new(engine, source, Selection::All, PlayerPolicy::default())?;
+let source = ByteSource::new(id, bytes, 64 * 1024)?; // or your own `Source`
 let cancel = AtomicBool::new(false);
-let mut packets = 0;
+let work = || WorkBudget::new(4096);
+
+let mut probe = Probe::new(&pool, id, caps, 4096, source)?;
+while !matches!(probe.advance(&mut work(), &cancel)?, ProbeProgress::Selected(_)) {}
+let selected = probe.finish()?;
+let (engine, source) = match selected.format {
+    Format::Matroska => {
+        let reader = triergon_matroska::Reader::new(&pool, id, caps, Default::default(), 4096)?;
+        (Engine::matroska(reader), selected.source)
+    }
+    Format::Mp4 => {
+        let mut open = Mp4Open::new(selected, OpenLimits::default())?;
+        while !matches!(open.advance(&mut work(), &cancel)?, OpenProgress::Ready) {}
+        let opened = open.finish()?;
+        let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default())?;
+        while !index.poll(&mut work(), &cancel)? {}
+        (Engine::mp4(opened.input, index.finish()?, 1 << 20)?, opened.source)
+    }
+    Format::Ts(format) => {
+        let (program, policy) = (1, SourceTimePolicy::RelativeEpochZero);
+        let namespace = DescriptorNamespace::Unspecified;
+        let limits = ParseLimits::default();
+        let engine = Engine::ts(selected.input, format, program, limits, policy, namespace)?;
+        (engine, selected.source)
+    }
+};
+
+let mut player = Player::new_direct(engine, source, Selection::All, PlayerPolicy::default())?;
+let (mut slot, mut payload) = (None, 0);
 loop {
-    let progress = player.advance(&mut WorkBudget::new(4096), &cancel)?;
-    while let Some(out) = player.pop() {
-        if player.may_deliver(&out) && out.event().track().is_some() {
-            packets += 1; // deliver(out.event())
-        }
+    let progress = player.read_output(&mut slot, &mut work(), &cancel)?;
+    if let Some(output) = slot.take()
+        && player.may_deliver(&output)
+        && output.delivery() != Delivery::Unselected
+        && let Some(packet) = output.packet()
+    {
+        payload += packet.payload().len(); // track, times and flags: `PacketInfo`
     }
     match progress {
         Progress::Ended => break,
-        Progress::NeedInput(_) | Progress::Yield | Progress::Queued => {}
-        other => return Err(format!("{other:?}").into()), // Backpressure, Paused, AwaitEntity, ...
+        Progress::Queued | Progress::Yield | Progress::NeedInput(_) => {}
+        other => return Err(format!("{other:?}").into()), // Backpressure, Paused, ...
     }
 }
-assert!(packets > 0);
+assert!(payload > 0);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-Every format reaches a consumer through the neutral views of
-`triergon_core::container`. `Output::packet` (or `Event::packet`) shows a Matroska
-frame or an MP4 sample as a `Packet<'_>`, a borrow that implements `PacketInfo` on
-the source clock; `Packet::demux_times` gives the demux clock beside it. Transport
-stream PES are several payload spans, not one slice, and have no packet view: their
-access units come from [`triergon-hls`](../hls/README.md) or `triergon_mpegts::Reader`.
-`Engine::track_count` and `Engine::track` show the tracks known so far as `Track<'_>`,
-which implements `TrackInfo`: the Matroska reader's tracks, the MP4 plan's tracks, or
-the streams of the transport stream's active program map. An MP4 track's codec and
-configuration record come from its first sample entry, which
-`mp4::PreparedMp4::identify_tracks` reads on request; until then an `mp4a` entry
-names no codec and no record. [`triergon-bridge`](../bridge/README.md)'s
-`access::AccessUnits` frames such packets as a decoder's access units.
+**The loop.** `Player::read_output` fills one caller-owned slot (`Player::new_direct`
+allocates no queue); `Player::advance` with `Player::pop` is the same delivery
+through a bounded FIFO, and `pump::Pump` hands outputs to a `Sink` that owns them
+until its callbacks retire. Check each output with `Player::may_deliver` and read
+`Output::delivery` before using it.
+
+**Packets and tracks.** `Output::packet` (or `Event::packet`) shows a Matroska
+frame or an MP4 sample as a `Packet<'_>`: a borrow, never a copy.
+`Engine::track_count` and `Engine::track` show the tracks known so far as
+`Track<'_>`, which implements `TrackInfo`: the Matroska reader's tracks, the MP4
+plan's tracks, or the streams of the transport stream's active program map. An
+MP4 track's codec and configuration record come from its first sample entry,
+which `mp4::PreparedMp4::identify_tracks` reads on request; until then an `mp4a`
+entry names no codec and no record.
+[`triergon-bridge`](../bridge/README.md)'s `access::AccessUnits` frames a track's
+packets as the access units its decoder takes.
+
+**Where the packet view ends.** A transport stream delivers source events
+(`Event::Ts`: carriers, tables, PES, faults) and, through `compat::pes`, demux
+PES (`Event::DemuxPes`). A PES payload is a list of spans and is not a decoder's
+access unit, so `Output::packet` is `None` for both; `Event::{track, source_pts,
+demux_pts, payload_bytes}` still describe them. Access units of TS media come
+from [`triergon-hls`](../hls/README.md) (HLS segments and progressive TS188) or
+from `triergon_mpegts::Reader`, and raw Annex B input is
+[`triergon-raw-video`](../raw-video/README.md).
+
+**Two clocks.** A packet keeps its source timestamps: `PacketInfo` on a `Packet`
+reports them. The demux clock is what FFmpeg's demuxers report for the same
+packet: `Packet::demux_times`, `Event::demux_pts`. `Player::set_clock_view` chooses
+which of the two times delivery and seeking (`ClockChoice::Source`, the default,
+or `ClockChoice::Demux`). MP4 packets carry demux times only on a plan indexed by
+`compat::mov`; TS tracks only when selected through `compat::pes`.
+
+**Seeking.** `Player::seek_and_select` seeks to a time on a video track: Matroska
+through its Cues, MP4 and TS by replaying from the start. MP4 plans a seek from
+its tables first: `Player::prepare_mp4_sync_seek` (source clock) or
+`prepare_mp4_demux_seek` (demux clock) give a job to `poll` and a command to
+`apply_*`; `mp4::Mp4RangePlayer` plays and seeks a complete file by byte ranges.
+A seek starts a new generation: outputs from before it fail `may_deliver`, and
+packets before the target arrive as `Delivery::DecodeOnly`.
+
+**Names.** *Source* is what the container carries, unchanged. *Demux* is the
+packet view FFmpeg's demuxer gives of the same bytes, reproduced by the
+`compat` modules: `compat::mov` (MP4 packet order and edit clocks) and
+`compat::pes` (PES of selected PIDs, cut and timed). `pes_feed` is the engine
+seam [`triergon-hls`](../hls/README.md) reads from, not a consumer entry point.
 
 Implement `Source` for real transports. `ByteSource` serves immutable local
-bytes. Use `probe::Probe` when the container is unknown; its `SelectedInput`
-replays the probed prefix and then continues reading. The probe accepts the MP4
-opening boxes `ftyp`, `styp`, `moov`, `free`, `wide` and `mdat`. For transport
-streams it examines a 389-byte prefix and requires exactly one of the TS188 and
-M2TS192 three-sync patterns to match. Raw AVC and HEVC Annex B input is
-[`triergon-raw-video`](../raw-video/README.md), whose `PlaybackProbe` tells it
-apart from these containers.
-MP4 needs an open and index step first: `mp4::Mp4Open` →
-`mp4::Mp4IndexJob` → `Engine::mp4`.
-Indexed MP4 packets share immutable track metadata. A complete sample in a
-shared input window can retain that window as its payload.
-When the movie declares its duration, the range player checks source ranges and
-packet projections before merging the tracks for delivery.
-Regular AVC with a leading empty edit keeps its video start delay in range and
-forward playback. A media edit can start at a later sync sample, and a backward
-seek accounts for the composition lead. A short edit retains enough of the next
-decode interval to complete its displayed pictures. An empty edit does not
-produce a packet.
-QuickTime range playback reads AAC configuration from version 1 and version 2
-sound descriptions with `wave` extensions. The `avc-aac-quicktime-surround.mov`
-fixture contains synthetic AVC and six-channel, 48 kHz AAC. The range comparison
-also runs with the optional format and marker atoms replaced by free boxes.
-`avc-aac-quicktime-reordered.mov` adds 44.1 kHz AAC and AVC with B pictures.
-`avc-aac-quicktime-fragmented.mov` exercises open and seek with empty
-initialization sample tables and a version 1 sound description. It remuxes the
-synthetic `fragmented-avc-aac.mp4` fixture under the same MIT or Apache-2.0 license.
-`avc-aac-quicktime-7-1.mov` uses the same synthetic video pattern and distinct
-tones at 251, 379, 503, 71, 641, 769, 911 and 1031 Hz for the eight speakers.
-FFmpeg 9.0.2 encoded the fixture as 44.1 kHz AAC-LC with channel configuration
-12. The fixture is distributed under the repository's dual licence. The
-[range corpus](../../harness/features/mp4-range/corpus.json) records its SHA-256.
-
-`avc-aac-program.mov` uses an authored AVC pattern and seven independent tones
-in a 48 kHz AAC-LC program with a leading edit. The range corpus compares its
-original configuration and every selected packet on open and backward seek.
-The fixture uses the repository's dual licence. To regenerate it with FFmpeg
-9.0.2 and libx264:
-
-```sh
-signal='0.13*sin(2*PI*107*t)|0.13*sin(2*PI*211*t)|0.13*sin(2*PI*307*t)|0.13*sin(2*PI*53*t)|0.13*sin(2*PI*409*t)|0.13*sin(2*PI*509*t)|0.13*sin(2*PI*601*t)'
-ffmpeg -nostdin -f lavfi -i 'testsrc2=s=96x64:r=25' \
-  -f lavfi -i "aevalsrc=${signal}:s=48000:c=6.1(back)" -t 2.4 \
-  -c:v libx264 -threads:v 1 -g 25 -keyint_min 25 -sc_threshold 0 -bf 0 -pix_fmt yuv420p \
-  -c:a aac -aac_pce 1 -threads:a 1 -b:a 224k -flags:a +bitexact -fflags +bitexact \
-  -video_track_timescale 16000 -movie_timescale 48000 -use_editlist 1 -movflags +faststart \
-  avc-aac-program.mov
-```
-
-`Mp4RangeOpen::for_media` projects media tracks for playback and seek alignment.
-Data tracks such as RTP hints and timecode still have their sample extents checked.
-Supply any edit plans in source track order, with `None` for each data track.
-The `avc-aac-rtp-hints.mp4` test fixture contains a synthetic AVC test pattern,
-AAC sine audio and two RTP hint tracks, with the first hint track between the
-video and audio tracks.
+bytes. `probe::Probe` accepts the MP4 opening boxes `ftyp`, `styp`, `moov`,
+`free`, `wide` and `mdat`. For transport streams it examines a 389-byte prefix
+and requires exactly one of the TS188 and M2TS192 three-sync patterns to match.
+Its `SelectedInput` replays the probed prefix and then continues reading.
+Raw AVC and HEVC Annex B input is told apart from these containers by
+`triergon-raw-video`'s `PlaybackProbe`.
 
 ## Supported
 
@@ -174,7 +187,21 @@ packet's configuration supplies its allocation budget to the output.
 The immutable seek index reuses keyframe positions after one sequential read and
 needs no Cues.
 
-**MP4.** Progressive playback of a front-`moov` file continues through later
+**MP4.** Indexed packets share immutable track metadata. A complete sample in a
+shared input window can retain that window as its payload.
+When the movie declares its duration, the range player checks source ranges and
+packet projections before merging the tracks for delivery.
+Regular AVC with a leading empty edit keeps its video start delay in range and
+forward playback. A media edit can start at a later sync sample, and a backward
+seek accounts for the composition lead. A short edit retains enough of the next
+decode interval to complete its displayed pictures. An empty edit does not
+produce a packet.
+QuickTime range playback reads AAC configuration from version 1 and version 2
+sound descriptions with `wave` extensions.
+`Mp4RangeOpen::for_media` projects media tracks for playback and seek alignment.
+Data tracks such as RTP hints and timecode still have their sample extents checked.
+Supply any edit plans in source track order, with `None` for each data track.
+Progressive playback of a front-`moov` file continues through later
 `moof`/`mdat` pairs with at most 64 pending fragment slots. A size-zero
 terminal `mdat` ends only on a matching `SourceReply::End`. Forward-only
 reordering retains at most 32 KiB of media. An in-band second `moov` is not
@@ -233,7 +260,7 @@ physical end, or as an unsupported layout once the source passes its start.
 Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB
 admission, and a subtitle track when a DVB namespace names DVB subtitling or
 teletext; stream type `0x90` (PGS) is a subtitle track. M2TS prefix startup (`compat::pes::startup::Startup::new_m2ts_prefix`) needs an
-8 KiB input window. The DVB native PES parser caps a continued segment at
+8 KiB input window. The DVB demux PES parser caps a continued segment at
 65,536 bytes. PES outputs reuse their payload storage's budget handle, which
 remains valid while a caller retains an output after closing the player.
 Delivery without a seek uses the presence of the projected presentation
@@ -253,7 +280,7 @@ is imposed.
 Integration tests in `tests/it/`, one module per behaviour, replay authored and
 FFmpeg-generated fixtures and compare packet order, bytes, flags, PTS, DTS and
 duration with pinned FFprobe records. `tests/it/native_terminal_matrix.rs` reads 39 terminal-media
-inputs through the native packet view in 13 source geometries: 12
+inputs through the MOV demux view in 13 source geometries: 12
 nonseekable (known and unknown length, read sizes 1, 7 and 4096, work quanta
 1 and 4096) for every input, and one seekable read of known length for each
 of the 31 original inputs, 499 rows in all, run in debug and release. It compares every packet object
@@ -262,36 +289,12 @@ to refuse while opening, before any packet. With `Mp4Open::new_recovery`
 499/499 rows pass: 497 identical packet lists and 2 matching header refusals.
 With `Mp4Open::new` 446/499 pass; the test pins the other 53 outcomes.
 
-The synthetic `forward-aac-priming.mp4` fixture uses a 64 × 48 AVC test
-pattern at 12 fps and a 440 Hz mono AAC tone at 44.1 kHz. To reproduce it with
-FFmpeg 9.0.2 and libx264, run:
+The MP4 range comparison includes two upstream samples, one with an initial
+non-sync AVC prefix and one with tracks shorter than the declared movie.
+It checks startup and backward seek through EOF for both.
 
-```sh
-ffmpeg -nostdin -v error \
-  -f lavfi -i 'testsrc2=s=64x48:r=12' -f lavfi -i 'sine=f=440:r=44100' \
-  -t 0.35 -map 0:v:0 -map 1:a:0 -c:v libx264 -threads:v 1 -profile:v baseline \
-  -pix_fmt yuv420p -g 2 -bf 0 -c:a aac -b:a 40k -movflags +faststart forward-aac-priming.mp4
-```
-
-`forward-aac-tail-trim.mp4` keeps the 44,100 Hz movie timescale and sets
-the audio edit to media time zero and duration 16,459.
-`forward-aac-fractional-edit.mp4` sets the movie timescale to 1,000, its
-duration and the video edit's duration to 334, and the audio edit's media
-time and duration to 64 and 45. The audio edit rounds to an end one sample
-into the third packet. All three fixtures use the repository's dual license.
-The four fragmented fixtures also use the repository's dual license.
-`forward-fragment-aac-edit.mp4` and `forward-fragment-aac-late-track.mp4`
-use an FFmpeg-generated AVC test pattern and mono AAC tone. Both carry an
-open-ended audio initialization edit. The latter starts with a video-only
-fragment. `forward-fragment-aac-short.mp4` truncates an authored AVC/AAC
-fragment inside its first AAC packet. `forward-fragment-mp3-edit.mp4` uses a
-generated mono MP3 tone with an initialization edit to exercise the same clock
-projection for a different MPEG-4 audio object type. The
-[`mp4-forward` corpus](../../harness/features/mp4-forward/corpus.json) records
-their hashes and compares source byte offsets, reduced time bases and AAC trim
-along with the packet data.
-
-Fixture provenance: [AV1](tests/fixtures/av1/README.md),
+Fixture provenance: [MP4](tests/fixtures/mp4/README.md),
+[AV1](tests/fixtures/av1/README.md),
 [Matroska feeds](tests/fixtures/mkv-feed/README.md),
 [Dolby clocks](tests/fixtures/dolby-clock/README.md),
 [subtitle probes](tests/fixtures/matroska-subtitle-probe/README.md),

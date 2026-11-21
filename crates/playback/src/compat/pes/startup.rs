@@ -1,6 +1,6 @@
-//! Transport-backed finite and bounded-prefix native TS startup.
-//! The finite profile needs a complete window and an actual positive-size EOF
-//! reply. The M2TS prefix profile keeps subsequent Source reads open.
+//! The startup context a bound demux PES engine needs, read from the source before
+//! playback: a finite entity read whole through its confirmed end within one input
+//! window, or an M2TS prefix, after which the source reads on.
 use super::PidSelection;
 use crate::pes_feed::TsEngine;
 use crate::source::{Source, SourceReply};

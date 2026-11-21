@@ -1,4 +1,4 @@
-//! Replay scheduling over the complete-source native MP4 occurrence catalogue.
+//! The order in which a demux-clock seek replays the occurrences of a complete source.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};

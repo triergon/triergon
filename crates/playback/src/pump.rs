@@ -275,8 +275,8 @@ impl<S: Source, T: Sink> Pump<S, T> {
         self.commit_catalogue_change(next, CatalogueChange::ProgressiveSeek(command.seek()), w, c)
     }
 
-    /// Promote a progressive native-clock player to the same entity's
-    /// complete native range seek while fencing any prior sink callbacks.
+    /// Applies a demux-clock seek that switches a progressive player to `next`, a
+    /// complete range index of the same entity, fencing earlier sink callbacks.
     pub fn apply_mp4_progressive_demux_seek(
         &mut self,
         next: &mut Option<crate::mp4::catalogue::Mp4Catalogue<S>>,

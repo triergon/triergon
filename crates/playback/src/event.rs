@@ -19,8 +19,8 @@ use ts::compat::pes::{DemuxPacket, DemuxTimeView};
 /// One MP4 sample with its configuration and, on the demux view, its occurrence.
 #[derive(Clone, Debug)]
 pub struct Mp4Packet {
-    /// Explicit native read boundary, independent of the full Source stream.
-    /// Later Source packets remain present with `native == None`.
+    /// Where a front demux plan stops reading, once reached. Source packets after
+    /// it are still delivered, without an `occurrence`.
     pub front_read_boundary: Option<FrontReadBoundary>,
     /// The sample and its payload.
     pub source: SourcePacket,
@@ -29,12 +29,14 @@ pub struct Mp4Packet {
     /// The demux view's occurrence of the sample, with its clocks; `None` on the source
     /// view.
     pub occurrence: Option<PacketOccurrence>,
-    /// Sample trim from the associated encoded edit plan, in native skip-samples layout.
+    /// Decoded samples to discard, as FFmpeg's skip-samples side data: leading
+    /// and trailing counts as little-endian `u32` in bytes 0..4 and 4..8.
+    /// [`Packet::demux_times`] reads it as a `Trim`.
     pub encoded_skip_samples: Option<[u8; 10]>,
 }
 
-/// An unassociated empty packet in the pinned native receiver view. Its public
-/// position is a receiver field, with no corresponding physical sample.
+/// An empty packet the demux view reports at its front read boundary. No sample
+/// of the source corresponds to it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Mp4EmptyPacket {
     /// The read boundary the packet reports.
@@ -55,8 +57,8 @@ pub struct Mp4EmptyPacket {
     pub flags: u32,
 }
 
-/// A native corrupt packet with an actual physical prefix and a separately
-/// retained sample declaration. It is never a complete Source packet.
+/// The demux view's packet for a sample the source ends inside: the bytes that
+/// are present, flagged corrupt, with the sample as its table declares it.
 #[derive(Clone, Debug)]
 pub struct Mp4ShortPacket {
     /// The bytes present of the truncated sample.
@@ -65,19 +67,19 @@ pub struct Mp4ShortPacket {
     pub configuration: Mp4Configuration,
     /// The demux view's occurrence of the declared sample.
     pub occurrence: PacketOccurrence,
-    /// Decoder trim attached to the recovered occurrence.
+    /// As [`Mp4Packet::encoded_skip_samples`].
     pub encoded_skip_samples: Option<[u8; 10]>,
 }
 
-/// The first native read has a positive declaration starting at or beyond the
-/// confirmed physical end. The view ends without emitting a packet.
+/// The demux view's end at a first sample that is declared with a size but
+/// starts at or beyond the confirmed end of the source. No packet precedes it.
 #[derive(Clone, Debug)]
 pub struct Mp4MissingSample {
     /// The sample the table declares.
     pub declared: triergon_isobmff::Sample,
-    /// Its track ID.
+    /// The ID of the sample's track.
     pub track_id: u32,
-    /// The source's end.
+    /// The confirmed end of the source.
     pub end: SourceLocation,
 }
 
@@ -129,7 +131,7 @@ pub enum Event {
     PesCarriage(AdmittedCarriage),
     /// A selected TS track the demux view refuses.
     PesRefusal {
-        /// The track.
+        /// The selected track, which delivers no more demux PES.
         track: TrackKey,
         /// Why it is refused.
         error: Error,
@@ -153,7 +155,7 @@ pub enum Event {
     reason = "one bounded inline event; queue slots and all retained buffers use Budget; a per-event Box would add an untracked allocation"
 )]
 pub enum EngineStep {
-    /// An event.
+    /// The next event, in delivery order.
     Event(Event),
     /// The engine waits on this input request.
     NeedInput(InputRequest),

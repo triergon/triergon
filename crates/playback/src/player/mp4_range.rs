@@ -1,4 +1,5 @@
-//! Native range playback over borrowed MP4 sample tables and charged track heads.
+//! Range playback of a complete MP4 source in the MOV demux view, planned from the
+//! borrowed sample tables with one head per track.
 
 use super::{
     ClockChoice, Mp4DemuxSeekRequest, Output, Player, PlayerPolicy, Progress, Selection, TrackKey,
@@ -24,9 +25,8 @@ use triergon_isobmff::{
 
 type Edits<'a> = &'a [Option<EncodedEditPlan>];
 
-/// Prepare range playback from a complete, checked MP4 open transaction.
-/// The native cursor checks every source extent and projected occurrence
-/// before publishing data.
+/// Prepares range playback of a completely opened movie: checks every sample
+/// extent and every packet the demux view projects before any data is delivered.
 #[derive(Debug)]
 pub struct Mp4RangeOpen<'a> {
     movie: &'a Movie,
@@ -108,9 +108,9 @@ impl<'a> Mp4RangeOpen<'a> {
     }
 }
 
-/// Direct-output range player. Sample geometry and clocks are produced in
-/// native occurrence order from the checked tables, with one head per track.
-/// Payload reads and output generations use the ordinary player and MP4 engine.
+/// Plays a complete MP4 source by byte ranges into one caller-owned output slot.
+/// Packets come in the demux view's order with its clocks, computed from the
+/// checked tables; payload reads, generations and delivery are the [`Player`]'s.
 #[derive(Debug)]
 pub struct Mp4RangePlayer<'a, S: Source> {
     movie: &'a Movie,
