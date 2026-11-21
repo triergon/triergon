@@ -166,7 +166,7 @@ commands:
                  fails above the quick-check limit
   screen         REPORTS   grade one paired timing round, with each contract's report
                  under REPORTS/<contract>, against the quick-check tolerances
-  transport-fate check | inventory OUTPUT | observe SPEC OUTPUT_DIR
+  transport-fate check | inventory OUTPUT | observe SPEC OUTPUT_DIR | pmt-identity FFPROBE
                  check TS identity coverage or record pinned original-input observations
   fate-inventory --source DIR --output FILE [--configured-list FILE]
                  index FATE definitions as data; nothing is executed

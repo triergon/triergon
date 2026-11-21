@@ -251,7 +251,9 @@ pub mod stream {
     //! The demuxer's streams.
     //!
     //! [`ProgramReader`] reads the PAT and PMT sections the demuxer accepts and
-    //! reports each [`Program`] with its elementary streams. [`codec`] is the
+    //! reports each [`Program`] with its elementary streams. [`PositionalStreamIds`]
+    //! separately retains identities across complete positional PID replacements.
+    //! [`codec`] is the
     //! codec the demuxer opens for a PMT entry, [`is_video`] whether it opens a
     //! video stream, and [`configuration`] the decoder configuration it derives
     //! from the entry's DVB subtitling or teletext descriptor. The standard
@@ -261,7 +263,9 @@ pub mod stream {
     //!
     //! [`TransportStream`]: crate::TransportStream
     //! [`ElementaryStream::codec`]: crate::psi::ElementaryStream::codec
-    pub use crate::demux_stream::{Program, ProgramReader, codec, configuration, is_video};
+    pub use crate::demux_stream::{
+        PositionalStreamIds, Program, ProgramReader, StreamIdentity, codec, configuration, is_video,
+    };
 }
 
 pub mod input {

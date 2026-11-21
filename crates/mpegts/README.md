@@ -356,6 +356,11 @@ The [original-input controls](../../harness/fate/README.md) check source
 program discovery events, PMT replacement, encoded clocks, PES payload ranges
 and diagnostics for unaligned input.
 
+The opt-in PMT merge policy can preserve stream identities when a complete
+program map replaces every PID with streams of the same positional types.
+It retains the original PMT and descriptor bytes. The [PMT identity comparison](tests/data/pmt-identity-cascades.md) checks the recorded probe outcomes with a
+local ffprobe.
+
 ## Verification
 
 Integration tests use independently authored streams in `tests/data/` (listed in
