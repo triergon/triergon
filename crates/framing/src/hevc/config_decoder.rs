@@ -65,13 +65,22 @@ impl HvcDecoderConfigOutput {
 #[derive(Debug)]
 pub struct HvcDecoderConfigWriter {
     pool: Budget,
-    input: Option<HvcConfiguration>,
-    writer: Option<HvcAnnexBWriter>,
     maximum: usize,
     array: usize,
-    complete: bool,
-    failure: Option<Error>,
+    state: State,
 }
+
+/// Where a conversion stands.
+#[derive(Debug)]
+enum State {
+    /// The record's arrays are checked.
+    Checking(HvcConfiguration),
+    /// The record is converted.
+    Writing(HvcAnnexBWriter),
+    Complete,
+    Failed(Error),
+}
+
 impl HvcDecoderConfigWriter {
     /// Starts the conversion of `input` into a buffer of at most `maximum` bytes
     /// charged to `pool`. Fails when the record belongs to another pool.
@@ -81,12 +90,9 @@ impl HvcDecoderConfigWriter {
         }
         Ok(Self {
             pool: pool.clone(),
-            input: Some(input),
-            writer: None,
             maximum,
             array: 0,
-            complete: false,
-            failure: None,
+            state: State::Checking(input),
         })
     }
     /// Advances by at most the units in `work` and returns the output once, as
@@ -98,75 +104,74 @@ impl HvcDecoderConfigWriter {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<HvcDecoderConfigOutput>> {
-        if let Some(e) = self.failure {
-            return Err(e);
-        }
         let result = self.advance(work, cancel);
         if let Err(e) = result
             && !retryable(e)
         {
-            self.failure = Some(e);
-            self.input = None;
-            self.writer = None;
+            self.state = State::Failed(e);
         }
         result
     }
+    /// Takes the state for one step; every arm that does not finish leaves the next.
     fn advance(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<HvcDecoderConfigOutput>> {
         loop {
-            if self.complete {
-                return Ok(BuildStep::Complete);
-            }
-            if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
-            }
-            if let Some(writer) = &mut self.writer {
-                return match writer.step(work, cancel)? {
-                    BuildStep::Yield => Ok(BuildStep::Yield),
-                    BuildStep::Ready(o) => {
-                        self.complete = true;
-                        self.writer = None;
-                        Ok(BuildStep::Ready(HvcDecoderConfigOutput::Converted(o)))
+            match std::mem::replace(&mut self.state, State::Complete) {
+                State::Failed(error) => return Err(error),
+                State::Complete => return Ok(BuildStep::Complete),
+                State::Writing(mut writer) => {
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
                     }
-                    BuildStep::Complete => Err(Error::Invalid("missing decoder-config output")),
-                };
-            }
-            if !work.try_charge(1) {
-                return Ok(BuildStep::Yield);
-            }
-            let input = self
-                .input
-                .as_ref()
-                .ok_or(Error::Invalid("missing decoder configuration"))?;
-            if let Some(array) = input.array(self.array) {
-                let kind = array.declared_nal_type();
-                if !matches!(kind, 32 | 33 | 34 | 39 | 40) {
-                    let reason = HvcDecoderConfigRefusal {
-                        array_index: self.array,
-                        declared_nal_type: kind,
+                    return match writer.step(work, cancel) {
+                        Ok(BuildStep::Ready(o)) => {
+                            Ok(BuildStep::Ready(HvcDecoderConfigOutput::Converted(o)))
+                        }
+                        Ok(BuildStep::Complete) => Ok(BuildStep::Complete),
+                        Ok(BuildStep::Yield) => {
+                            self.state = State::Writing(writer);
+                            Ok(BuildStep::Yield)
+                        }
+                        Err(error) => {
+                            self.state = State::Writing(writer);
+                            Err(error)
+                        }
                     };
-                    let configuration = self
-                        .input
-                        .take()
-                        .ok_or(Error::Invalid("missing decoder configuration"))?;
-                    self.complete = true;
-                    return Ok(BuildStep::Ready(HvcDecoderConfigOutput::Refused {
-                        configuration,
-                        reason,
-                    }));
                 }
-                self.array += 1;
-            } else {
-                self.writer = Some(HvcAnnexBWriter::new(
-                    &self.pool,
-                    self.input
-                        .take()
-                        .ok_or(Error::Invalid("missing decoder configuration"))?,
-                    self.maximum,
-                )?);
+                State::Checking(input) => {
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
+                    }
+                    if !work.try_charge(1) {
+                        self.state = State::Checking(input);
+                        return Ok(BuildStep::Yield);
+                    }
+                    match input.array(self.array).map(|a| a.declared_nal_type()) {
+                        Some(32 | 33 | 34 | 39 | 40) => {
+                            self.array += 1;
+                            self.state = State::Checking(input);
+                        }
+                        Some(declared_nal_type) => {
+                            return Ok(BuildStep::Ready(HvcDecoderConfigOutput::Refused {
+                                configuration: input,
+                                reason: HvcDecoderConfigRefusal {
+                                    array_index: self.array,
+                                    declared_nal_type,
+                                },
+                            }));
+                        }
+                        None => {
+                            self.state = State::Writing(HvcAnnexBWriter::new(
+                                &self.pool,
+                                input,
+                                self.maximum,
+                            )?);
+                        }
+                    }
+                }
             }
         }
     }

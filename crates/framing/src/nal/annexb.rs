@@ -1,7 +1,6 @@
 use crate::BuildStep;
-use crate::nal::packet::freeze_whole;
 use crate::nal::{NalFacts, NalUnit};
-use crate::retryable;
+use crate::{freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 

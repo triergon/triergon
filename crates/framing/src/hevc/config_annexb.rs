@@ -2,8 +2,8 @@
 //! available; unknown arrays, duplicates and mismatched declarations are written as
 //! they are.
 use crate::nal::annexb::START_CODE;
-use crate::retryable;
 use crate::{BuildStep, hevc::HvcConfiguration};
+use crate::{freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
@@ -31,30 +31,49 @@ enum Phase {
     Reserve,
     Copy,
     Freeze,
-    Complete,
 }
+
+/// Where a conversion stands. The record and the output are held only while it is
+/// written.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one write per writer; boxing it would allocate outside the pool"
+)]
+enum State {
+    Writing(Writing),
+    Complete,
+    Failed(Error),
+}
+
+struct Writing {
+    input: HvcConfiguration,
+    output: BudgetVec<u8>,
+}
+
 /// Writes every NAL unit of an `hvcC` record as Annex B, in record order and
 /// whatever type its array declares: each after a four-byte start code, into one
 /// buffer charged to the pool.
 pub struct HvcAnnexBWriter {
     pool: Budget,
-    input: Option<HvcConfiguration>,
-    output: Option<BudgetVec<u8>>,
     maximum: usize,
     total: usize,
     index: usize,
     nal_offset: usize,
     phase: Phase,
-    failure: Option<Error>,
+    state: State,
 }
 impl std::fmt::Debug for HvcAnnexBWriter {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let failure = match self.state {
+            State::Failed(error) => Some(error),
+            State::Writing(_) | State::Complete => None,
+        };
         formatter
             .debug_struct("HvcAnnexBWriter")
             .field("maximum", &self.maximum)
             .field("total", &self.total)
             .field("index", &self.index)
-            .field("failure", &self.failure)
+            .field("failure", &failure)
             .finish_non_exhaustive()
     }
 }
@@ -72,14 +91,15 @@ impl HvcAnnexBWriter {
         }
         Ok(Self {
             pool: pool.clone(),
-            input: Some(input),
-            output: None,
             maximum: maximum_output_bytes,
             total: 0,
             index: 0,
             nal_offset: 0,
             phase: Phase::Count,
-            failure: None,
+            state: State::Writing(Writing {
+                input,
+                output: BudgetVec::new(pool),
+            }),
         })
     }
     /// Advances by at most the units in `work` and returns the output once, as
@@ -96,39 +116,49 @@ impl HvcAnnexBWriter {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<HvcAnnexBOutput>> {
-        if let Some(e) = self.failure {
-            return Err(e);
+        let mut writing = match std::mem::replace(&mut self.state, State::Complete) {
+            State::Writing(writing) => writing,
+            State::Complete => return Ok(BuildStep::Complete),
+            State::Failed(error) => {
+                self.state = State::Failed(error);
+                return Err(error);
+            }
+        };
+        match self.write(&mut writing, work, cancel) {
+            Ok(Some(bytes)) => Ok(BuildStep::Ready(HvcAnnexBOutput {
+                bytes,
+                configuration: writing.input,
+            })),
+            Ok(None) => {
+                self.state = State::Writing(writing);
+                Ok(BuildStep::Yield)
+            }
+            Err(error) => {
+                self.state = if retryable(error) {
+                    State::Writing(writing)
+                } else {
+                    State::Failed(error)
+                };
+                Err(error)
+            }
         }
-        let result = self.advance(work, cancel);
-        if let Err(e) = result
-            && !retryable(e)
-        {
-            self.failure = Some(e);
-            self.input = None;
-            self.output = None;
-        }
-        result
     }
-    fn advance(
+    /// Writes for as long as `work` lasts; the output once it is frozen.
+    fn write(
         &mut self,
+        writing: &mut Writing,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<BuildStep<HvcAnnexBOutput>> {
+    ) -> Result<Option<Bytes>> {
+        let Writing { input, output } = writing;
         loop {
-            if matches!(self.phase, Phase::Complete) {
-                return Ok(BuildStep::Complete);
-            }
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            let input = self
-                .input
-                .as_ref()
-                .ok_or(Error::Invalid("missing hvcC framing input"))?;
             match self.phase {
                 Phase::Count => {
                     if !work.try_charge(1) {
-                        return Ok(BuildStep::Yield);
+                        return Ok(None);
                     }
                     if let Some(nal) = input.nal(self.index) {
                         let total = self
@@ -162,15 +192,9 @@ impl HvcAnnexBWriter {
                 }
                 Phase::Reserve => {
                     if !work.try_charge(1) {
-                        return Ok(BuildStep::Yield);
+                        return Ok(None);
                     }
-                    if self.output.is_none() {
-                        self.output = Some(BudgetVec::new(&self.pool));
-                    }
-                    self.output
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing hvcC framing builder"))?
-                        .try_reserve_exact(self.total)?;
+                    output.try_reserve_exact(self.total)?;
                     self.phase = Phase::Copy;
                 }
                 Phase::Copy => {
@@ -185,7 +209,7 @@ impl HvcAnnexBWriter {
                         .ok_or(Error::Overflow)?;
                     if self.nal_offset == end {
                         if !work.try_charge(1) {
-                            return Ok(BuildStep::Yield);
+                            return Ok(None);
                         }
                         self.index += 1;
                         self.nal_offset = 0;
@@ -201,51 +225,27 @@ impl HvcAnnexBWriter {
                     )
                     .map_err(|_| Error::Overflow)?;
                     if count == 0 {
-                        return Ok(BuildStep::Yield);
+                        return Ok(None);
                     }
-                    let out = self
-                        .output
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing hvcC framing builder"))?;
                     if self.nal_offset < 4 {
-                        out.try_extend_from_slice(
+                        output.try_extend_from_slice(
                             &START_CODE[self.nal_offset..self.nal_offset + count],
                         )?;
                     } else {
                         let start = self.nal_offset - 4;
-                        out.try_extend_from_slice(&nal.source_bytes()[start..start + count])?;
+                        output.try_extend_from_slice(&nal.source_bytes()[start..start + count])?;
                     }
                     self.nal_offset += count;
                 }
                 Phase::Freeze => {
                     if !work.try_charge(1) {
-                        return Ok(BuildStep::Yield);
+                        return Ok(None);
                     }
-                    let out = self
-                        .output
-                        .take()
-                        .ok_or(Error::Invalid("missing hvcC framing builder"))?;
-                    if out.len() != self.total {
+                    if output.len() != self.total {
                         return Err(Error::Invalid("hvcC framing byte count"));
                     }
-                    let bytes = match out.freeze() {
-                        Ok(b) => b,
-                        Err(e) => {
-                            self.output = Some(e.value);
-                            return Err(e.error);
-                        }
-                    };
-                    let configuration = self
-                        .input
-                        .take()
-                        .ok_or(Error::Invalid("missing hvcC framing input"))?;
-                    self.phase = Phase::Complete;
-                    return Ok(BuildStep::Ready(HvcAnnexBOutput {
-                        bytes,
-                        configuration,
-                    }));
+                    return freeze_whole(output).map(Some);
                 }
-                Phase::Complete => return Ok(BuildStep::Complete),
             }
         }
     }

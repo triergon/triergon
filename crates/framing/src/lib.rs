@@ -31,13 +31,26 @@ mod canonical;
 mod inline_storage;
 mod record_input;
 
-use triergon_core::{Error, Result};
+use triergon_core::{BudgetVec, Bytes, Error, Result};
 
 /// Whether a job may be stepped again after `error`: the pool refused storage it
 /// can grant once the caller frees some.
 #[inline]
 pub(crate) const fn retryable(error: Error) -> bool {
     matches!(error, Error::Backpressure { .. } | Error::Allocation)
+}
+
+/// Freezes `output`, leaving an empty vector on its pool; a refused freeze leaves the
+/// charged bytes in `output` for retry.
+pub(crate) fn freeze_whole(output: &mut BudgetVec<u8>) -> Result<Bytes> {
+    let empty = BudgetVec::new(output.budget());
+    match std::mem::replace(output, empty).freeze() {
+        Ok(bytes) => Ok(bytes),
+        Err(refused) => {
+            *output = refused.value;
+            Err(refused.error)
+        }
+    }
 }
 
 /// One step of a work-bounded job that requests no input.

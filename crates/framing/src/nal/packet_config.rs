@@ -2,11 +2,10 @@
 //! bitstream filters named on [`crate::compat::nal`] publish it when they are
 //! initialised, in a bounded output.
 use crate::nal::packet::{
-    NalConfigurationRefusal, copy_annex_b_segment, copy_annex_b_whole, freeze_whole,
-    start_annex_b_output,
+    NalConfigurationRefusal, copy_annex_b_segment, copy_annex_b_whole, start_annex_b_output,
 };
-use crate::retryable;
 use crate::{BuildStep, avc::AvcConfigArrayKind, nal::NalPacketConfiguration};
+use crate::{freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
