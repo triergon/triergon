@@ -188,22 +188,12 @@ impl RangeLeafJob {
                         }
                     }
                     if self.id_width == 0 {
-                        if self.bytes[0] == 0 {
-                            return Err(Error::Invalid("zero VINT marker"));
-                        }
-                        self.id_width = self.bytes[0].leading_zeros() as usize + 1;
-                        if self.id_width > 4 {
-                            return Err(Error::Invalid("element ID width"));
-                        }
+                        self.id_width = ebml::id_width(self.bytes[0])?;
                         self.target = self.id_width + 1;
                         continue;
                     }
                     if self.target == self.id_width + 1 {
-                        let first = self.bytes[self.id_width];
-                        if first == 0 {
-                            return Err(Error::Invalid("zero VINT marker"));
-                        }
-                        let target = self.id_width + first.leading_zeros() as usize + 1;
+                        let target = self.id_width + ebml::size_width(self.bytes[self.id_width])?;
                         if target != self.target {
                             self.target = target;
                             continue;

@@ -661,10 +661,9 @@ impl ElementReader {
     ) -> Option<PrefixBoundary> {
         let header = |at: u64| -> Option<(u64, Option<u64>, u64)> {
             let bytes = root.get(usize::try_from(at).ok()?..)?;
-            let (id, id_width, _) = crate::ebml::vint(bytes, true).ok()?;
-            let (size, size_width, unknown) = crate::ebml::vint(&bytes[id_width..], false).ok()?;
-            let data = at.checked_add((id_width + size_width) as u64)?;
-            Some((id, (!unknown).then_some(size), data))
+            let head = crate::ebml::header(bytes).ok()?;
+            let data = at.checked_add(head.len as u64)?;
+            Some((head.id, head.size, data))
         };
         let mut left = scan_left;
         let mut elements = 0_u64;

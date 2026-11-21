@@ -139,14 +139,13 @@ fn colour_presence(entry: &[u8]) -> u16 {
     fn child(data: &[u8], id: u64) -> Option<&[u8]> {
         let mut rest = data;
         while !rest.is_empty() {
-            let (element, id_width, _) = crate::ebml::vint(rest, true).ok()?;
-            let (size, size_width, unknown) = crate::ebml::vint(&rest[id_width..], false).ok()?;
-            let start = id_width + size_width;
-            let end = start.checked_add(usize::try_from(size).ok()?)?;
-            if unknown || end > rest.len() {
+            let head = crate::ebml::header(rest).ok()?;
+            let start = head.len;
+            let end = start.checked_add(usize::try_from(head.size?).ok()?)?;
+            if end > rest.len() {
                 return None;
             }
-            if element == id {
+            if head.id == id {
                 return Some(&rest[start..end]);
             }
             rest = &rest[end..];

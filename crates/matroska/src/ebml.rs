@@ -1,15 +1,28 @@
-//! EBML primitives written from RFC 8794. No upstream implementation code.
+//! EBML primitives from RFC 8794: variable-size integers, element headers,
+//! fixed-width integers and the children of a master element held in memory.
+//! Every reader of this crate decodes an element header through this module.
 use crate::step::{ParseStep, check};
 use crate::{Error, Result};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::WorkBudget;
 
+/// Width in bytes, 1 to 8, of the variable-size integer that starts with
+/// `first`. A zero byte carries no marker and reads as 9.
+#[inline(always)]
+pub(crate) const fn vint_width(first: u8) -> usize {
+    first.leading_zeros() as usize + 1
+}
+
+/// One variable-size integer (RFC 8794 §4) at the start of `data`: its value,
+/// its width in bytes, and whether it is the reserved all-ones value that marks
+/// an unknown data size. With `keep_marker` the marker bit stays in the value
+/// and the width is at most four, as an Element ID is read (§5).
 pub(crate) fn vint(data: &[u8], keep_marker: bool) -> Result<(u64, usize, bool)> {
     let first = *data.first().ok_or(Error::Truncated)?;
     if first == 0 {
         return Err(Error::Invalid("zero VINT marker"));
     }
-    let width = first.leading_zeros() as usize + 1;
+    let width = vint_width(first);
     if keep_marker && width > 4 {
         return Err(Error::Invalid("element ID width"));
     }
@@ -26,6 +39,77 @@ pub(crate) fn vint(data: &[u8], keep_marker: bool) -> Result<(u64, usize, bool)>
     ))
 }
 
+/// Width of the Element ID that starts with `first`, at most four bytes.
+#[inline(always)]
+pub(crate) fn id_width(first: u8) -> Result<usize> {
+    if first == 0 {
+        return Err(Error::Invalid("zero VINT marker"));
+    }
+    let width = vint_width(first);
+    if width > 4 {
+        return Err(Error::Invalid("element ID width"));
+    }
+    Ok(width)
+}
+
+/// Width of the element data size that starts with `first`.
+#[inline(always)]
+pub(crate) fn size_width(first: u8) -> Result<usize> {
+    if first == 0 {
+        return Err(Error::Invalid("zero VINT marker"));
+    }
+    Ok(vint_width(first))
+}
+
+/// Bytes the Element ID `id` occupies, from its value with the marker kept.
+#[inline(always)]
+pub(crate) const fn id_len(id: u32) -> usize {
+    (32 - id.leading_zeros()).div_ceil(8) as usize
+}
+
+/// Widths of the ID and of the data size of an element header that lies
+/// wholly at the start of `bytes`; `None` when it is malformed or incomplete.
+#[inline]
+pub(crate) fn header_widths(bytes: &[u8]) -> Option<(usize, usize)> {
+    let first = *bytes.first()?;
+    if first == 0 {
+        return None;
+    }
+    let id_width = vint_width(first);
+    if id_width > 4 {
+        return None;
+    }
+    let size = *bytes.get(id_width)?;
+    if size == 0 {
+        return None;
+    }
+    let size_width = vint_width(size);
+    (bytes.len() >= id_width + size_width).then_some((id_width, size_width))
+}
+
+/// An element header decoded from bytes in memory.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Header {
+    pub id: u64,
+    /// Data size in bytes; `None` for the reserved unknown size.
+    pub size: Option<u64>,
+    /// Bytes the ID and the data size occupy together.
+    pub len: usize,
+}
+
+/// The element header at the start of `data`.
+#[inline(always)]
+pub(crate) fn header(data: &[u8]) -> Result<Header> {
+    let (id, id_width, _) = vint(data, true)?;
+    let (size, size_width, unknown) = vint(&data[id_width..], false)?;
+    Ok(Header {
+        id,
+        size: (!unknown).then_some(size),
+        len: id_width + size_width,
+    })
+}
+
+/// A big-endian unsigned integer of zero to eight bytes (RFC 8794 §7.2).
 pub(crate) fn uint(data: &[u8]) -> Result<u64> {
     if data.len() > 8 {
         return Err(Error::Invalid("integer width"));
@@ -33,6 +117,7 @@ pub(crate) fn uint(data: &[u8]) -> Result<u64> {
     Ok(data.iter().fold(0, |v, b| (v << 8) | u64::from(*b)))
 }
 
+/// A big-endian two's-complement integer of zero to eight bytes (RFC 8794 §7.1).
 pub(crate) fn sint(data: &[u8]) -> Result<i64> {
     if data.is_empty() {
         return Ok(0);
@@ -42,12 +127,17 @@ pub(crate) fn sint(data: &[u8]) -> Result<i64> {
     Ok(((u << shift) as i64) >> shift)
 }
 
+/// One child element of a master element held in memory.
 #[derive(Debug)]
 pub(crate) struct Child {
     pub id: u64,
+    /// Offset of the child's header in the source.
     pub header: usize,
+    /// Range of the child's data in the source.
     pub payload: Range<usize>,
 }
+/// Walks the children of one master element whose bytes are in memory, one
+/// child and one work unit per step. A child of unknown size is refused.
 #[derive(Debug)]
 pub(crate) struct ChildCursor {
     at: usize,

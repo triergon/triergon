@@ -115,8 +115,8 @@ impl<'a> Element<'a> {
         // nodes at twelve bytes. During construction, LEN remains authoritative:
         // a completed prefix tail need not be the final raw-source child yet.
         let n = self.doc.nodes[self.index as usize];
-        let at = n.header as usize + (32 - n.id.leading_zeros()).div_ceil(8) as usize;
-        let width = raw[at].leading_zeros() as usize + 1;
+        let at = n.header as usize + ebml::id_len(n.id);
+        let width = ebml::vint_width(raw[at]);
         let start = at + width;
         if n.next > self.index && self.doc.nodes[0].next as usize == self.doc.nodes.len() {
             let end = self

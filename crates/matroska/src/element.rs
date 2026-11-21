@@ -525,7 +525,7 @@ impl ElementReader {
         cancel: &AtomicBool,
     ) -> Result<Option<ElementHeader>> {
         let bytes = self.input.buffered();
-        let Some((id_width, size_width)) = buffered_header_widths(bytes) else {
+        let Some((id_width, size_width)) = ebml::header_widths(bytes) else {
             return Ok(None);
         };
         let width = id_width + size_width;
@@ -610,7 +610,7 @@ impl ElementReader {
                         // and scan bounds are consumed by the one read below;
                         // malformed or partial headers keep the byte-wise path.
                         if let Some((id_width, size_width)) =
-                            buffered_header_widths(self.input.buffered())
+                            ebml::header_widths(self.input.buffered())
                                 .filter(|(i, s)| self.scan_left >= (i + s) as u64)
                         {
                             state.id_width = id_width;
@@ -674,7 +674,7 @@ impl ElementReader {
                             if state.bytes[0] == 0 {
                                 return Err(Error::Invalid("zero VINT marker"));
                             }
-                            state.id_width = state.bytes[0].leading_zeros() as usize + 1;
+                            state.id_width = ebml::vint_width(state.bytes[0]);
                             if state.id_width > 4 {
                                 return Err(Error::Invalid("element ID width"));
                             }
@@ -687,7 +687,7 @@ impl ElementReader {
                             if first == 0 {
                                 return Err(Error::Invalid("zero VINT marker"));
                             }
-                            state.size_width = first.leading_zeros() as usize + 1;
+                            state.size_width = ebml::vint_width(first);
                             state.target = state.id_width + state.size_width;
                             Self::check_input_cancel(&mut self.input, cancel)?;
                             continue;
@@ -953,25 +953,6 @@ impl ElementReader {
         }
     }
 }
-/// ID and size VINT widths of a header wholly present in `bytes`, if valid.
-#[inline]
-fn buffered_header_widths(bytes: &[u8]) -> Option<(usize, usize)> {
-    let first = *bytes.first()?;
-    if first == 0 {
-        return None;
-    }
-    let id_width = first.leading_zeros() as usize + 1;
-    if id_width > 4 {
-        return None;
-    }
-    let size = *bytes.get(id_width)?;
-    if size == 0 {
-        return None;
-    }
-    let size_width = size.leading_zeros() as usize + 1;
-    (bytes.len() >= id_width + size_width).then_some((id_width, size_width))
-}
-
 pub(crate) mod control;
 
 #[cfg(test)]
