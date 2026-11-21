@@ -20,14 +20,14 @@ const BITS: u32 = 13;
 /// Extra fraction bits carried between the two passes.
 const PASS: u32 = 3;
 
-/// Integer upper bound for every coefficient produced from this residual SAD.
-/// Each one-dimensional weight has magnitude at most4096. With the actual
-/// row shift10 and rounding512, the sum of eight absolute row results is at
-/// most4*SAD+4. The column shift16 and rounding32768 therefore give
-/// floor((4096*(4*SAD+4)+32768)/65536) = ceil(SAD/4).
-/// The encoder's eight-bit residual domain also keeps both passes within i32.
+/// Upper bound of every forward coefficient of a residual whose absolute samples
+/// sum to `sum_abs` (its SAD). Each one-dimensional weight is at most 4096 in
+/// magnitude. With the row pass's shift of 10 and rounding of 512, the eight absolute
+/// row results sum to at most 4·SAD + 4; the column pass's shift of 16 and rounding
+/// of 32768 then give ⌊(4096·(4·SAD + 4) + 32768) / 65536⌋ = ⌈SAD / 4⌉. Eight-bit
+/// residuals keep both passes within `i32`.
 #[inline]
-pub(super) fn magnitude_bound(sum_abs: u32) -> u32 {
+pub(crate) fn magnitude_bound(sum_abs: u32) -> u32 {
     sum_abs.div_ceil(4)
 }
 

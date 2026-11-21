@@ -1,12 +1,13 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr
 )]
-// Pending: `missing_docs`, `clippy::unwrap_used`, `clippy::expect_used`.
+// Pending: `clippy::unwrap_used`, `clippy::expect_used`.
 
 mod analysis;
 mod bits;
@@ -32,17 +33,21 @@ pub use triergon_core::{Budget, Error as StorageError};
 use triergon_core::{BudgetVec, Reservation};
 use triergon_pixel::{Geometry, Picture, PictureView};
 
-/// Encoder parameters.
+/// The parameters of one coded sequence. [`Encoder::new`] refuses values outside the
+/// ranges given here.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EncoderConfig {
+    /// Size of every input picture, and of the coded pictures.
     pub geometry: Geometry,
-    /// Average target in bits per second.
+    /// Average rate the GOP allocation aims for, in bit/s; nonzero.
     pub bit_rate: u32,
-    /// VBV fill rate and sequence-header bit_rate, bits per second.
+    /// Rate at which the VBV buffer fills, in bit/s, and the sequence header's
+    /// bit_rate, rounded up to 400 bit/s units; 1 to 104,857,200.
     pub max_rate: u32,
-    /// VBV buffer size in bits.
+    /// VBV buffer size in bits, signalled rounded up to 16,384-bit units; 1 to
+    /// 16,760,832 (1023 units).
     pub vbv_bits: u32,
-    /// Intra period in pictures.
+    /// Intra period: an I picture at least every `gop` pictures; nonzero.
     pub gop: u32,
 }
 
@@ -58,6 +63,7 @@ pub struct Limits {
 }
 
 impl Default for Limits {
+    /// 96 MiB of live storage.
     fn default() -> Self {
         Limits {
             live_storage_bytes: 96 * 1024 * 1024,
@@ -79,16 +85,27 @@ const GUARDED_MB_BITS: usize = 128;
 /// Sequence, GOP, picture and slice headers with their alignment.
 const HEADER_BITS: usize = 512;
 
-/// Facts about one encoded picture.
+/// What one [`Encoder::encode`] call coded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EncodedPicture {
+    /// An I picture, preceded by a sequence header and a GOP header: a point a
+    /// decoder can start at.
     pub key: bool,
-    /// Picture index within the session (0-based).
+    /// Position of the picture in the sequence, from 0.
     pub index: u64,
+    /// Size of the coded picture in bits: eight times the bytes written to `out`.
     pub bits: usize,
+    /// Mean quantizer_scale of the picture's macroblocks, rounded; 2 to 31.
     pub qscale_mean: u32,
 }
 
+/// An MPEG-1 video encoder for one sequence of pictures of one geometry.
+///
+/// Each successful [`encode`](Self::encode) codes the next picture as an I or P
+/// picture and returns its complete bytes, with no reordering delay. The storage the
+/// configuration needs is charged to the encoder's [`Budget`] when it is built; only
+/// the motion search's decimated planes and the caller's output are charged later,
+/// before a picture is coded.
 #[derive(Debug)]
 pub struct Encoder {
     cfg: EncoderConfig,
@@ -120,6 +137,7 @@ pub struct Encoder {
     /// Per-block quantised levels of the macroblock being coded; entries are
     /// only meaningful where the block's non-zero mask says so.
     levels: [[i32; 64]; 6],
+    /// Index of the next picture and of the first picture of the current GOP.
     index: u64,
     gop_start: u64,
     /// Charge of the caller's output buffer: its capacity, at least `picture_bound`.
@@ -129,18 +147,23 @@ pub struct Encoder {
 }
 
 impl Encoder {
-    /// An encoder with a pool of the default limit.
+    /// An encoder with its own pool of the default [`Limits`]. Fails as
+    /// [`new_in`](Self::new_in) does.
     pub fn new(cfg: EncoderConfig) -> Result<Encoder> {
         Encoder::with_limits(cfg, Limits::default())
     }
 
-    /// An encoder with its own pool of `limits.live_storage_bytes`.
+    /// An encoder with its own pool of `limits.live_storage_bytes`. Fails as
+    /// [`new_in`](Self::new_in) does, and refuses the configuration before creating
+    /// the pool.
     pub fn with_limits(cfg: EncoderConfig, limits: Limits) -> Result<Encoder> {
         validate(&cfg)?;
         Encoder::new_in(cfg, &Budget::new(limits.live_storage_bytes)?)
     }
 
-    /// An encoder charging the caller's pool.
+    /// An encoder charging the caller's pool. Fails with [`Error::BitRate`],
+    /// [`Error::VbvBuffer`] or [`Error::Gop`] for a configuration outside the ranges of
+    /// [`EncoderConfig`], and with [`Error::Budget`] when its storage does not fit.
     pub fn new_in(cfg: EncoderConfig, budget: &Budget) -> Result<Encoder> {
         validate(&cfg)?;
         let g = cfg.geometry;
@@ -184,21 +207,30 @@ impl Encoder {
         })
     }
 
+    /// The configuration the encoder was built with.
     pub fn config(&self) -> &EncoderConfig {
         &self.cfg
     }
 
-    /// Total VBV underflow observed by the rate controller (bits).
+    /// Bits by which pictures so far exceeded the modelled VBV occupancy, summed;
+    /// 0 while every picture fitted.
     pub fn vbv_underflow_bits(&self) -> f64 {
         self.rc.underflow_bits
     }
 
-    /// The reconstruction of the most recently encoded picture, over the coded planes.
+    /// What a decoder reconstructs from the most recent picture, over the coded
+    /// planes; zero luma and neutral chroma before the first picture.
     pub fn reconstruction(&self) -> PictureView<'_> {
         self.reference.view()
     }
 
-    /// Encode `input` (same geometry, padded), replacing `out` on success.
+    /// Code `input` as the next picture and replace the contents of `out` with its
+    /// bytes. The input must have the configured geometry and its coded padding
+    /// filled ([`Picture::pad_edges`]).
+    ///
+    /// A geometry mismatch is [`Error::PictureGeometry`]; storage refused before
+    /// coding is [`Error::Budget`]. Either error codes nothing and leaves `out` as it
+    /// was: release space and retry the same input at the same picture index.
     pub fn encode(&mut self, input: &Picture, out: &mut Vec<u8>) -> Result<EncodedPicture> {
         if input.geometry() != self.cfg.geometry {
             return Err(Error::PictureGeometry {
@@ -216,14 +248,16 @@ impl Encoder {
 
 fn validate(cfg: &EncoderConfig) -> Result<()> {
     if cfg.gop == 0 {
-        return Err(Error::Gop(0));
+        return Err(Error::Gop(cfg.gop));
     }
-    if cfg.max_rate == 0
-        || cfg.max_rate.div_ceil(400) > 0x3FFFF
-        || cfg.bit_rate == 0
-        || cfg.vbv_bits == 0
-    {
-        return Err(Error::BitRate(cfg.bit_rate as u64));
+    if cfg.bit_rate == 0 {
+        return Err(Error::BitRate(cfg.bit_rate));
+    }
+    if cfg.max_rate == 0 || cfg.max_rate.div_ceil(400) > 0x3FFFF {
+        return Err(Error::BitRate(cfg.max_rate));
+    }
+    if cfg.vbv_bits == 0 || cfg.vbv_bits.div_ceil(16384) > 1023 {
+        return Err(Error::VbvBuffer(cfg.vbv_bits));
     }
     Ok(())
 }
@@ -243,7 +277,7 @@ fn picture_bound(cfg: &EncoderConfig) -> Result<usize> {
 }
 
 #[cfg(test)]
-mod limits {
+mod tests {
     use super::*;
 
     /// The largest configuration fits the default with room for what encoding adds:

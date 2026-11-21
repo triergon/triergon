@@ -42,7 +42,7 @@ charges a caller's `Budget`.
 | Area | Behaviour |
 |---|---|
 | Pictures | I and P; no B or D pictures |
-| Sequence header | Before every I picture. Size from the `Geometry`, square pixels (pel_aspect_ratio 1), 30 Hz (frame_rate_code 5), bit_rate = `max_rate` in 400 bit/s units, vbv_buffer_size from `vbv_bits` in 16 kbit units (1–1023), default intra and non-intra matrices, constrained_parameters_flag 0 |
+| Sequence header | Before every I picture. Size from the `Geometry`, square pixels (pel_aspect_ratio 1), 30 Hz (frame_rate_code 5), bit_rate = `max_rate` in 400 bit/s units rounded up, vbv_buffer_size = `vbv_bits` in 16 kbit units rounded up, default intra and non-intra matrices, constrained_parameters_flag 0 |
 | GOP | GOP header before every I picture; time code from the picture index at 30 Hz. An I picture every `gop` pictures; a P picture whose prediction is worse than intra coding across the picture becomes an I picture and restarts the GOP (scene change). Without B pictures every GOP decodes independently; `closed_gop` is set on the first GOP only, as FFmpeg does |
 | Slices | One slice per picture; DC and vector predictors run across row ends, and per-row quantiser changes travel in macroblock_quant fields |
 | Motion | Forward half-sample vectors, search window ±64 luma samples, f_code up to 4; skipped macroblocks; a P macroblock is intra coded when that is cheaper. A picture whose luma repeats the previous source picture's is predicted at the zero vector without a search |
@@ -51,10 +51,11 @@ charges a caller's `Budget`.
 
 ## Behaviour and limits
 
-- `Encoder::new` refuses `gop == 0` (`Error::Gop`) and a zero `bit_rate`, `max_rate`
-  or `vbv_bits`, or a `max_rate` beyond the 18-bit sequence-header field in
-  400 bit/s units (`Error::BitRate`). Geometry limits (even, 2–4094) are enforced by
-  `Geometry::new`.
+- `Encoder::new` refuses `gop == 0` (`Error::Gop`), a zero `bit_rate` or a `max_rate`
+  that is zero or beyond the 18-bit sequence-header field in 400 bit/s units
+  (`Error::BitRate`, with the refused rate), and a `vbv_bits` that is zero or beyond
+  1023 units of 16 kbit (`Error::VbvBuffer`). Geometry limits (even, 2–4094) are
+  enforced by `Geometry::new`.
 - `encode` refuses a picture whose geometry differs from the configuration
   (`Error::PictureGeometry`) before changing any state. A successful encode replaces the contents of `out`.
 - Storage sized from the configuration is charged to the encoder's budget before it
@@ -81,8 +82,6 @@ charges a caller's `Budget`.
 - The picture rate is fixed at 30 Hz. Timestamps belong to the caller or muxer.
 - A nonzero `vbv_underflow_bits` means some picture exceeded the modelled buffer
   occupancy.
-- The `motion` module is public but hidden from the documentation; it is not a
-  supported API.
 
 ## Conformance
 

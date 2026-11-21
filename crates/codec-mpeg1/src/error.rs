@@ -2,20 +2,29 @@ use std::fmt;
 use triergon_core::Error as StorageError;
 use triergon_pixel::Geometry;
 
+/// The result of building an encoder or coding a picture.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Why an encoder refused a configuration or a picture.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
-    /// Bit rate outside the encodable 18-bit/400 bps sequence-header range.
-    BitRate(u64),
-    /// An intra period must contain at least one picture.
+    /// `bit_rate` is zero, or `max_rate` is zero or above the 104,857,200 bit/s the
+    /// sequence header's bit_rate field holds; carries the refused rate in bit/s.
+    BitRate(u32),
+    /// `vbv_bits` is zero or above the 16,760,832 bits the sequence header's
+    /// vbv_buffer_size field holds; carries the refused size.
+    VbvBuffer(u32),
+    /// `gop` is zero: an intra period holds at least one picture.
     Gop(u32),
-    /// Input picture geometry differs from the encoder's fixed geometry.
+    /// The input picture's geometry differs from the configured one.
     PictureGeometry {
+        /// The configured geometry.
         expected: Geometry,
+        /// The input picture's geometry.
         actual: Geometry,
     },
-    /// Storage the encoder needs does not fit its budget.
+    /// Storage the encoder needs does not fit its budget: a limit when it is built,
+    /// backpressure before a picture is coded.
     Budget(StorageError),
 }
 
@@ -29,6 +38,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::BitRate(bps) => write!(f, "unsupported bit rate {bps} bps"),
+            Error::VbvBuffer(bits) => write!(f, "unsupported VBV buffer size {bits} bits"),
             Error::Gop(g) => write!(f, "unsupported intra period {g}"),
             Error::PictureGeometry { expected, actual } => write!(
                 f,
