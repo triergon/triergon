@@ -2,14 +2,21 @@
   "schema": 1,
   "about": "What the gates require and every exception to them, counted from the feature contracts, the gate plan, every list under harness/ whose name starts with open_ (an entry counts once for each case it names, under each gate target it is open on) and the public features of each crate in harness/not-compared.json that no contract compares. `cargo xtask check-design` counts them again: a change that drops a requirement or adds an exception must change this file too.",
   "counts": {
-    "features": 81,
-    "required_by_check": 50,
+    "features": 90,
+    "required_by_check": 59,
     "on_demand": 3,
     "diagnostic": 1,
-    "gated_by_report": 50,
-    "gated_by_another_command": 28,
+    "gated_by_report": 56,
+    "gated_by_another_command": 31,
     "not_gated": 3,
     "open": {
+      "harness/features/mkv-attachments/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 2, "thumbv7neon-unknown-linux-gnueabihf": 2}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 156, "thumbv7neon-unknown-linux-gnueabihf": 156}},
+      "harness/features/mkv-codec-state/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 15, "thumbv7neon-unknown-linux-gnueabihf": 15}},
+      "harness/features/mkv-metadata-fields/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 3, "thumbv7neon-unknown-linux-gnueabihf": 3}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 156, "thumbv7neon-unknown-linux-gnueabihf": 156}},
+      "harness/features/mkv-metadata-oracle/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 156, "thumbv7neon-unknown-linux-gnueabihf": 156}},
+      "harness/features/mkv-side-data/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 4, "thumbv7neon-unknown-linux-gnueabihf": 4}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 81, "thumbv7neon-unknown-linux-gnueabihf": 81}},
+      "harness/features/mkv-track-extensions/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 2, "thumbv7neon-unknown-linux-gnueabihf": 2}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 36, "thumbv7neon-unknown-linux-gnueabihf": 36}},
+      "harness/features/mkv-track-extensions-oracle/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 36, "thumbv7neon-unknown-linux-gnueabihf": 36}},
       "harness/features/hevc-record-annexb/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 18, "thumbv7neon-unknown-linux-gnueabihf": 18}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 210, "thumbv7neon-unknown-linux-gnueabihf": 210}},
       "harness/features/nal-config-inputs/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 100, "thumbv7neon-unknown-linux-gnueabihf": 100}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 720, "thumbv7neon-unknown-linux-gnueabihf": 720}},
       "harness/features/nal-length-prefixed/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 135, "thumbv7neon-unknown-linux-gnueabihf": 135}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 3609, "thumbv7neon-unknown-linux-gnueabihf": 3609}},
@@ -167,6 +174,8 @@
           "thumbv7neon-unknown-linux-gnueabihf": 63
         }
       },
+      "harness/features/mov-track-seek/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 548, "thumbv7neon-unknown-linux-gnueabihf": 548}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 8832, "thumbv7neon-unknown-linux-gnueabihf": 8832}},
+      "harness/features/isobmff-source-seek/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 161, "thumbv7neon-unknown-linux-gnueabihf": 161}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 13329, "thumbv7neon-unknown-linux-gnueabihf": 13329}},
       "harness/status-rows.json": {
         "open_cells": {
           "aarch64-unknown-linux-gnu": 30,
@@ -193,8 +202,8 @@
       "triergon-elementary": 4,
       "triergon-font": 0,
       "triergon-framing": 6,
-      "triergon-isobmff": 4,
-      "triergon-matroska": 5,
+      "triergon-isobmff": 2,
+      "triergon-matroska": 0,
       "triergon-ogg": 4,
       "triergon-pixel": 1,
       "triergon-raster": 0,
