@@ -1,10 +1,6 @@
-//! The byte positions the reference parser reports with a packet. They are the
-//! parser's counters and never positions in the source. They follow the output of
-//! the parser named on [`crate::reference_trace::dts`], run with default flags
-//! through its public interface. The position reported with a packet flushed at
-//! the end of input is a signed value the parser gives; it is not the end of the
-//! source, a syntax check or a timestamp, and nothing is claimed for other DTS
-//! streams or other FFmpeg revisions.
+//! The byte positions the reference parser named on [`crate::reference_trace::dts`]
+//! reports with a packet, run with default flags through its public interface.
+//! Nothing is claimed for other DTS streams or other FFmpeg revisions.
 use crate::dts::{Dts14CarrierBoundary, Dts14CarrierPacket};
 use triergon_core::{Error, Result};
 /// Which way of returning a packet the positions of a [`ParserHints`] belong to.
@@ -37,11 +33,10 @@ pub struct ParserHints {
 }
 impl ParserHints {
     /// The positions the parser reports with `packet`, derived from the packet's
-    /// source range, its boundary and its [`Dts14CarrierPacket::provision`]. The
-    /// packet itself is not changed. The result holds for a parser opened at offset
-    /// zero of the source and fed the same contiguous input windows with default
-    /// flags. The caller answers for that: the packet does not record it, and
-    /// nothing is claimed for a parser that was reset or reopened.
+    /// source range, its boundary and its [`Dts14CarrierPacket::provision`]. They hold
+    /// for a parser opened at offset zero of the source and fed the same contiguous
+    /// input windows with default flags, which the packet does not record; nothing is
+    /// claimed for a parser that was reset or reopened.
     ///
     /// Fails with [`Error::Invalid`] when the packet's `provision` contradicts itself
     /// or the packet's boundary: a window that ends before it starts, a read position
@@ -76,8 +71,8 @@ impl ParserHints {
                 if p.consumed_through != end {
                     return Err(Error::Invalid("DTS parser hint explicit-flush evidence"));
                 }
-                // Observed opaque reference EOF hint; varying-geometry probes are mandatory. Signed:
-                // small sources produce negative values. Never a SourceLocation.
+                // The flush hint as observed, to be checked at several window sizes. It is
+                // signed, negative for small sources, and never a SourceLocation.
                 (
                     end,
                     i64::try_from(end)

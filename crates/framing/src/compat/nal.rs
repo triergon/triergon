@@ -316,11 +316,10 @@ impl ReceiverAvcConfigParser {
             .into_build_step(ready)
     }
 
-    /// Publishes into an empty caller-provided slot. Occupied slots are rejected before
-    /// any state, work or retained storage changes, including update rejections. Yield,
-    /// completion and errors leave an initially empty slot empty. Fails with
-    /// [`Error::Invalid`] for an occupied slot, after which the parser can be stepped
-    /// again; otherwise as [`step`](Self::step).
+    /// Publishes into an empty caller-provided slot; yield, completion and errors leave
+    /// it empty. Fails with [`Error::Invalid`] for an occupied slot before any state,
+    /// work or retained storage changes, update rejections included, so the parser can
+    /// be stepped again; otherwise as [`step`](Self::step).
     pub fn step_into(
         &mut self,
         work: &mut WorkBudget,
@@ -402,11 +401,10 @@ impl ReceiverHevcConfigParser {
             .into_build_step(ready)
     }
 
-    /// Publishes into an empty caller-provided slot. Occupied slots are rejected before
-    /// any state, work or retained storage changes. Yield, completion and errors leave
-    /// an initially empty slot empty. Fails with [`Error::Invalid`] for an occupied
-    /// slot, after which the parser can be stepped again; otherwise as
-    /// [`step`](Self::step).
+    /// Publishes into an empty caller-provided slot; yield, completion and errors leave
+    /// it empty. Fails with [`Error::Invalid`] for an occupied slot before any state,
+    /// work or retained storage changes, so the parser can be stepped again; otherwise
+    /// as [`step`](Self::step).
     pub fn step_into(
         &mut self,
         work: &mut WorkBudget,

@@ -26,10 +26,9 @@ impl AnnexBOutput {
     }
 }
 
-/// Emits exactly 00 00 00 01 followed by the original NAL bytes. No parameter
-/// sets, access-unit delimiters, emulation-prevention bytes or padding are added
-/// inside the NAL. A four-byte prefix includes the Annex-B `zero_byte` so callers
-/// need not guess whether this NAL starts an access unit.
+/// Writes one NAL unit behind `00 00 00 01`, its bytes unchanged: nothing is added,
+/// emulation prevention included. The four-byte code carries the Annex B `zero_byte`,
+/// which is valid whether or not the NAL unit starts an access unit.
 #[derive(Debug)]
 pub struct AnnexBWriter {
     facts: NalFacts,
@@ -79,11 +78,11 @@ impl AnnexBWriter {
         })
     }
 
-    /// Charges one unit per output byte copied and one per reserve/freeze attempt. A
-    /// failed freeze retains the completed builder for retry. Fails with
-    /// [`Error::Cancelled`] when `cancel` is set. [`Error::Backpressure`] and
-    /// [`Error::Allocation`] are retryable: the writer keeps its progress. Every other
-    /// error is final and returned again by each later call.
+    /// Writes for as long as `work` lasts: one unit per byte copied and one per
+    /// reservation or freeze attempt. Fails with [`Error::Cancelled`] when `cancel` is
+    /// set. [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the writer
+    /// keeps its progress. Every other error is final and returned again by each later
+    /// call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

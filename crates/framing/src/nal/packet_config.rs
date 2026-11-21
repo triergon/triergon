@@ -1,6 +1,4 @@
-//! The configuration of a packet session as Annex B extradata, as the FFmpeg
-//! bitstream filters named on [`crate::compat::nal`] publish it when they are
-//! initialised, in a bounded output.
+//! The configuration of a packet session as Annex B extradata, in a bounded output.
 use crate::nal::packet::{
     NalConfigurationRefusal, copy_annex_b_segment, copy_annex_b_whole, start_annex_b_output,
 };

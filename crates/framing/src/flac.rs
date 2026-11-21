@@ -21,15 +21,15 @@ pub struct FlacStreamInfo {
     pub min_block_size: u16,
     /// Largest block of the stream, in inter-channel samples.
     pub max_block_size: u16,
-    /// Bytes; 0 when unknown.
+    /// Smallest frame of the stream in bytes; 0 when unknown.
     pub min_frame_size: u32,
     /// Largest frame of the stream in bytes; 0 when unknown.
     pub max_frame_size: u32,
     /// Sample rate in Hz, a 20-bit field.
     pub sample_rate: u32,
-    /// 1 to 8.
+    /// Channels, 1 to 8.
     pub channels: u8,
-    /// 4 to 32.
+    /// Bits per sample, 4 to 32.
     pub bits_per_sample: u8,
     /// Inter-channel samples in the stream; 0 when unknown.
     pub total_samples: u64,
@@ -41,7 +41,7 @@ impl FlacStreamInfo {
     /// Size of the block body.
     pub const BYTES: usize = 34;
 
-    /// Parse a STREAMINFO block body. Fails when `body` is shorter than
+    /// Parses a STREAMINFO block body. Fails when `body` is shorter than
     /// [`Self::BYTES`], codes fewer than 4 bits per sample, or has a minimum block size
     /// above its maximum.
     pub fn parse(body: &[u8]) -> Result<FlacStreamInfo> {
@@ -223,11 +223,11 @@ pub struct FlacFrameHeader {
     pub blocking: FlacBlocking,
     /// Inter-channel samples in the frame, 1 to 65536.
     pub block_size: u32,
-    /// `None` when the header defers to STREAMINFO.
+    /// Sample rate in Hz; `None` when the header defers to STREAMINFO.
     pub sample_rate: Option<u32>,
     /// How the frame codes its channels, and how many.
     pub channels: FlacChannelAssignment,
-    /// `None` when the header defers to STREAMINFO.
+    /// Bits per sample; `None` when the header defers to STREAMINFO.
     pub bits_per_sample: Option<u8>,
     /// Frame number (fixed blocking) or first sample number (variable blocking).
     pub number: u64,
@@ -245,7 +245,7 @@ impl FlacFrameHeader {
         }
     }
 
-    /// Parse the header at the start of `bytes`. `Err(Truncated)` asks for more bytes;
+    /// Parses the header at the start of `bytes`. `Err(Truncated)` asks for more bytes;
     /// any other error means no valid header starts here.
     pub fn parse(bytes: &[u8]) -> Result<FlacFrameHeader> {
         let fixed = bytes.get(..4).ok_or(Error::Truncated)?;

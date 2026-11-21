@@ -289,10 +289,6 @@ impl AacAdtsParser {
     }
     /// Parses for as long as `work` lasts; the frame costs three units.
     ///
-    /// [`BuildStep::Yield`] asks for another call with more work.
-    /// [`BuildStep::Ready`] carries the frame, once; later calls return
-    /// [`BuildStep::Complete`].
-    ///
     /// Fails when the buffer ends before the header, the CRC or the declared frame
     /// length; when the syncword is not `0xfff`, the layer is not 0, the sampling
     /// frequency index names no frequency, the frame length is shorter than the header
@@ -444,7 +440,7 @@ impl AacAdtsParameters {
             copyright_id_start: false,
         })
     }
-    /// Build a header for an access unit the consumer already owns. The payload stays
+    /// Builds a header for an access unit the consumer already owns. The payload stays
     /// in its original storage. Fails when `frequency_index`, `channel_configuration`
     /// or `buffer_fullness` is out of range, or the frame of `payload_bytes` and the
     /// seven header bytes exceeds the 8191 bytes `aac_frame_length` can declare.
@@ -526,7 +522,6 @@ pub struct AacAdtsWriter {
     state: WriteState,
 }
 
-/// Where a write stands.
 #[derive(Debug)]
 enum WriteState {
     /// The header and the payload are copied into the frame, empty until it is
@@ -598,10 +593,6 @@ impl AacAdtsWriter {
     /// byte copied and one for the output. `cancel` is checked at least every 4096
     /// bytes.
     ///
-    /// [`BuildStep::Yield`] asks for another call with more work.
-    /// [`BuildStep::Ready`] carries the frame, once; later calls return
-    /// [`BuildStep::Complete`].
-    ///
     /// Fails when `cancel` is set: the writer then returns the same error from every
     /// later call. [`Error::Backpressure`] and [`Error::Allocation`] keep what is
     /// written, to be stepped again.
@@ -664,7 +655,7 @@ impl AacAdtsWriter {
                 }
                 self.copied += count;
             }
-            // Every source byte has been copied. Release our source owner before
+            // Every source byte has been copied. Release the payload's owner before
             // adding the frozen output's owner header; retries retain real output.
             let WriteState::Copying { output, .. } =
                 std::mem::replace(&mut self.state, WriteState::Complete)

@@ -145,8 +145,7 @@ pub struct AacPceFacts {
     /// `sampling_frequency_index`, 0 to 15, as coded; [`indexed_frequency`] gives
     /// its frequency.
     pub frequency_index: u8,
-    /// Entries declared for each list.
-    /// Front, side, back, LFE, associated data, coupling, in wire order.
+    /// Entries declared for each list: front, side, back, LFE, associated data, coupling.
     pub counts: [u8; 6],
     /// `mono_mixdown_element_number`, 0 to 15; `None` when `mono_mixdown_present` is
     /// clear.
@@ -252,10 +251,8 @@ impl AacAscFacts {
     }
 }
 
-/// A parsed AudioSpecificConfig with the record it was read from.
-///
-/// The record's bytes are shared, not copied, and stay readable whole, including
-/// those the parser did not read.
+/// A parsed AudioSpecificConfig with the record it was read from, whose bytes are
+/// shared and stay readable whole, including those the parser did not read.
 #[derive(Debug)]
 pub struct AacAudioSpecificConfig {
     raw: Bytes,
@@ -634,10 +631,6 @@ impl AacAscParser {
     }
 
     /// Parses for as long as `work` lasts, one unit per group of fields.
-    ///
-    /// [`BuildStep::Yield`] asks for another call with more work.
-    /// [`BuildStep::Ready`] carries the configuration, once; later calls return
-    /// [`BuildStep::Complete`].
     ///
     /// Fails when the extent ends inside a field; when an object type is not AAC LC,
     /// alone or under SBR or PS, the channel configuration is not 0, 1 to 7, 11, 12 or

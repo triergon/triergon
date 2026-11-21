@@ -29,7 +29,7 @@ pub struct VorbisIdentification {
 }
 
 impl VorbisIdentification {
-    /// Parse an identification header packet.
+    /// Parses an identification header packet.
     ///
     /// Fails when the packet is shorter than 30 bytes or is not an identification
     /// header, its `vorbis_version` is not 0, a channel count, sample rate or block

@@ -153,7 +153,6 @@ enum Frame {
         header: DtsPackedHeader,
         job: DtsPackedPayloadJob,
     },
-    /// The frame, to be returned.
     Ready(DtsNormalSourceFrame),
     /// The source ended after the last frame.
     Ended(SourceLocation),
@@ -194,9 +193,6 @@ enum BodyStep {
 /// is searched for after input that is not a frame, and the coded audio is not
 /// checked: a returned frame is a measured span of the source, not a judgement on
 /// its content.
-///
-/// Call [`step`](Self::step) and answer each [`Step::NeedInput`] with
-/// [`provide`](Self::provide), [`finish`](Self::finish) or [`fail`](Self::fail).
 pub struct DtsNormalSourceReader {
     pool: Budget,
     input: ReaderInput,
@@ -349,10 +345,8 @@ impl DtsNormalSourceReader {
         self.input.fail_with(error);
         self.frame = Frame::Header;
     }
-    /// Reads on, as far as `work` allows. [`Step::Ready`] carries the next frame,
-    /// [`Step::NeedInput`] the request to answer before the next call, and
-    /// [`Step::End`] the end of the source once the last frame is returned;
-    /// [`Step::Yield`] means the work is spent.
+    /// Reads on, as far as `work` allows. [`Step::Ready`] carries the next frame, and
+    /// [`Step::End`] the end of the source once the last frame is returned.
     ///
     /// [`Error::Backpressure`] and [`Error::Allocation`] leave the reader as it was:
     /// free pool storage and call again. Every other error is kept and returned by all

@@ -148,8 +148,7 @@ pub struct AvcSliceHeader {
     pub delta_pic_order_cnt: [i32; 2],
     /// `redundant_pic_cnt`, 0 to 127; 0 when it is absent.
     pub redundant_pic_cnt: u32,
-    /// Read with [`AvcSliceDepth::Marking`]: `memory_management_control_operation`
-    /// 5 is present, and `no_output_of_prior_pics_flag` of an IDR picture.
+    /// `memory_management_control_operation` 5 is present, read with [`AvcSliceDepth::Marking`].
     pub mmco5: bool,
     /// `no_output_of_prior_pics_flag` of an IDR picture, read with
     /// [`AvcSliceDepth::Marking`]; `false` otherwise.

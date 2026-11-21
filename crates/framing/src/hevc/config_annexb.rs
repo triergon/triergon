@@ -102,9 +102,8 @@ impl HvcAnnexBWriter {
             }),
         })
     }
-    /// Advances by at most the units in `work` and returns the output once, as
-    /// [`BuildStep`] describes. Sizing the output costs one unit for each NAL unit
-    /// and writing it one for each byte.
+    /// Advances by at most the units in `work` and returns the output once. Sizing
+    /// the output costs one unit for each NAL unit and writing it one for each byte.
     ///
     /// Fails when `cancel` is set, the output would exceed `maximum_output_bytes`, or
     /// the pool's limit is below the record and the output together. Every later call

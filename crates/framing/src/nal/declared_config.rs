@@ -13,8 +13,7 @@ use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget};
 
-/// An externally supplied integer range followed immediately by a NAL range.
-/// Widths 1..=4 describe generic big-endian fields, not ISO width eligibility.
+/// One NAL unit the caller declares: its length field and the NAL unit right after it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeclaredConfigNal {
     /// Byte range in the record of the NAL unit's big-endian length field: 1 to
@@ -25,8 +24,8 @@ pub struct DeclaredConfigNal {
     pub payload: Range<usize>,
 }
 
-/// Array membership and metadata are declarations. Only byte ranges, lengths
-/// and the fixed NAL headers are verified against the source bytes.
+/// One array the caller declares. Only byte ranges, lengths and fixed NAL headers are
+/// checked against the record; membership and the other fields are taken as declared.
 #[derive(Clone, Debug)]
 pub struct DeclaredConfigArray<'a> {
     /// Byte range in the record of the whole array. Arrays are declared in
@@ -55,7 +54,7 @@ pub struct DeclaredConfigLimits {
     pub maximum_nal_bytes: usize,
 }
 
-/// Zero-copy source span plus the independently checked fixed NAL header.
+/// One declared NAL unit as a span of the record, with its checked fixed header.
 #[derive(Clone, Debug)]
 pub struct DeclaredConfigNalView {
     bytes: Bytes,
@@ -83,8 +82,7 @@ impl DeclaredConfigNalView {
         self.header
     }
     /// Whether the header's `nal_unit_type` differs from the type its array
-    /// declares. The disagreement is reported without changing or filtering
-    /// bytes.
+    /// declares; the bytes are kept either way.
     pub const fn array_type_mismatch(&self) -> bool {
         self.mismatch
     }
@@ -123,8 +121,8 @@ impl DeclaredConfigArrayView {
     }
 }
 
-/// Owns all output descriptors and source storage; no declaration borrow escapes.
-/// `SourceId` and sample width are caller declarations, not inferred wire facts.
+/// A record with the layout the caller declared, owning its views and bytes. The
+/// source and the sample width are kept as declared, not read from the record.
 #[derive(Debug)]
 pub struct DeclaredConfiguration {
     source: SourceId,
@@ -193,12 +191,10 @@ enum State {
     Failed(Error),
 }
 
-/// A complete owned record plus immutable external layout. Each count, range
-/// validation, length byte and descriptor publication consumes bounded work.
-/// Descriptor capacity is reserved while empty, never by copying a growing
-/// prefix inside one work unit. Backpressure/allocation errors are retryable.
-/// This parser does not expose incremental external input/generation or certify
-/// record versions, reserved-bit values, ISO grammar or SPS/RBSP semantics.
+/// Checks a complete record against the layout the caller declares. Each count, range
+/// check, length byte and view costs one unit of work, and the views' storage is
+/// reserved before the first is written. Record versions, reserved bits, the ISO/IEC
+/// 14496-15 grammar and parameter-set contents are not read.
 pub struct DeclaredConfigParser<'a> {
     source: SourceId,
     codec: Codec,

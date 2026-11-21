@@ -222,8 +222,8 @@ impl Dec3Substream {
             None
         }
     }
-    /// Under this ETSI record profile, fscod == 3 is reserved. The record has no
-    /// fscod2 field; a reduced E-AC-3 frame's rate is not inferred here.
+    /// The sample rate that `fscod` names, in Hz; `None` for the reserved code 3. The
+    /// record has no `fscod2`, so the rate of a reduced-rate frame is not inferred.
     pub fn sample_rate_hz(self) -> Option<u32> {
         if !(11..=16).contains(&self.bsid()) {
             return None;
@@ -349,9 +349,9 @@ enum Phase {
     Finish,
 }
 
-/// Pool-owned, already-complete box payload inspection. At most eight fixed
-/// descriptors are stored inline; returned spans alias the original record.
-/// Trailing dec3 reserved bytes are retained without scanning or interpretation.
+/// Parses a complete `dac3` or `dec3` box payload charged to the parser's pool. The
+/// result shares the record's bytes, stores at most eight substream entries inline,
+/// and keeps the trailing reserved bytes of a `dec3` record uninterpreted.
 pub struct Ac3ConfigParser {
     state: State,
     identity: SourceId,

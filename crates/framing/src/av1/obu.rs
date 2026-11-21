@@ -11,8 +11,8 @@ use triergon_core::{
 /// How the OBUs of a source are delimited.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Av1ObuFraming {
-    /// Section 5.2: every OBU has its own size field. Never infer a missing
-    /// size from the end of a packet or transport chunk.
+    /// Section 5.2: every OBU has its own size field; a missing size is not
+    /// inferred from the end of a packet or transport chunk.
     LowOverhead,
     /// Exactly one externally delimited OBU in a known-length source entity.
     /// Its internal size, when present, must agree with that boundary. This is
@@ -23,7 +23,7 @@ pub enum Av1ObuFraming {
 /// Bounds on what an [`Av1ObuReader`] accepts. Each must be non-zero.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Av1ObuLimits {
-    /// Entire encoded OBU, including header, extension and encoded size field.
+    /// The longest OBU accepted, in bytes: header, extension, size field and payload.
     pub maximum_obu_bytes: usize,
     /// The most OBUs one reader frames; the start of one more is refused.
     pub maximum_obus: usize,
@@ -127,7 +127,7 @@ impl Av1ObuHeaderIssues {
 pub struct Av1ObuHeader {
     /// The first header byte as coded.
     pub raw_byte: u8,
-    /// None and an explicitly present all-zero extension remain distinct.
+    /// The extension byte; `None` when absent, which differs from a present zero byte.
     pub extension: Option<Av1ObuExtension>,
 }
 
@@ -189,7 +189,7 @@ pub struct Av1ObuFacts {
     pub header: Av1ObuHeader,
     /// The `obu_size` field as coded; `None` when `obu_has_size_field` is 0.
     pub size_field: Option<Av1Leb128>,
-    /// Total source OBU length supplied by the explicit OneObu envelope.
+    /// The whole OBU's length as the source gives it in [`Av1ObuFraming::OneObu`].
     pub external_length: Option<u64>,
 }
 
@@ -250,9 +250,9 @@ enum Phase {
     End,
 }
 
-/// Resumable complete-OBU framing. `Ready` certifies a complete bounded wire
-/// envelope, not AV1 conformance. Header issues, reserved types, payload trailing
-/// bits and metadata bytes remain observable without modification or filtering.
+/// Reads the complete OBUs of a source from input of any chunking. A returned OBU is
+/// complete and within the limits, which says nothing of AV1 conformance. Header
+/// issues, reserved types, trailing bits and metadata bytes are kept as coded.
 #[derive(Debug)]
 pub struct Av1ObuReader {
     cursor: InputCursor,
@@ -411,15 +411,11 @@ impl Av1ObuReader {
         self.output = None;
     }
 
-    /// One unit per input byte with constant classification/copy work, per
-    /// prefix byte copied, and per resolve/reserve/freeze. No growth occurs
-    /// after reserve; large payload copies are at most 4096 bytes each.
-    ///
-    /// `Ready` is the next complete OBU. `NeedInput` waits for an answer through
-    /// [`provide`](Self::provide), [`finish`](Self::finish) or
-    /// [`fail`](Self::fail), `Yield` for more work. `End` is the end of the
-    /// source at an OBU boundary, after the single OBU of
-    /// [`Av1ObuFraming::OneObu`].
+    /// Reads on, as far as `work` allows: one unit per input byte, per prefix byte
+    /// copied, and per resolve, reserve and freeze. Storage does not grow once it is
+    /// reserved, and payload copies are at most 4096 bytes each. `Ready` carries the
+    /// next complete OBU, and `End` the end of the source at an OBU boundary, after
+    /// the single OBU of [`Av1ObuFraming::OneObu`].
     ///
     /// Fails on cancellation; a source that ends inside an OBU; a size field that
     /// continues past eight bytes or exceeds `u32::MAX`; an OBU longer than

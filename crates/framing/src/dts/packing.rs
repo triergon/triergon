@@ -1,7 +1,6 @@
 //! The payload of 14-bit DTS words, the low 14 bits of each 16-bit word (ETSI
-//! TS 102 114 V1.2.1 §5.3), in a byte order the caller names. The source words with
-//! their unused high bits and the payload bits after the last whole byte are kept;
-//! no sync word is searched for and no length is derived from `FSIZE`.
+//! TS 102 114 V1.2.1 §5.3), in a byte order the caller names. No length is derived
+//! from `FSIZE`.
 use crate::dts::DtsSourceIdentity;
 use crate::dts::reader::limit;
 use crate::retryable;
@@ -166,10 +165,8 @@ enum State {
 }
 
 /// Unpacks one complete record of 14-bit DTS words that the caller owns
-/// (ETSI TS 102 114 V1.2.1 §5.3) into canonical bytes, step by step. Every
-/// 16-bit word gives its low 14 bits, most significant first, in either byte
-/// order. The unpacker does not look for a sync word or a frame boundary. A
-/// record with an odd number of bytes is refused as truncated.
+/// (ETSI TS 102 114 V1.2.1 §5.3) into canonical bytes, step by step, in either
+/// byte order. The unpacker does not look for a sync word or a frame boundary.
 ///
 /// The output is allocated once, at its final size, before the first bit is
 /// written. Every payload bit and every output byte costs one unit of work;
@@ -266,8 +263,8 @@ impl Dts14BitUnpacker {
 
     /// Advances the unpacking by at most the work left in `work`. `Ready`
     /// carries the payload, once; every later step returns `End` with the
-    /// location of the record's end in its source. `Yield` means the work is
-    /// spent. An owned record never requests input.
+    /// location of the record's end in its source. An owned record never
+    /// requests input.
     ///
     /// Fails with `Cancelled` when `cancel` is set; `Backpressure` or `Allocation` when
     /// the output cannot be allocated: after these two, and only these, `step` may be

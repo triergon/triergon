@@ -25,12 +25,10 @@ pub enum ConfigEncoding {
 /// How much of a configuration's source bytes was checked.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConfigInspection {
-    /// Record bytes and externally declared sample framing only. No record
-    /// syntax, `lengthSizeMinusOne`, arrays, profile, completeness or validity is
-    /// inferred: the ISO/IEC 14496-15 record is not parsed.
+    /// Only the record's bytes and the caller's sample framing: the ISO/IEC 14496-15
+    /// record is not parsed.
     DeclaredOpaque,
-    /// Annex-B boundaries and fixed NAL headers checked. Parameter-set contents
-    /// and completeness/consistency are not parsed or certified.
+    /// Annex B boundaries and fixed NAL headers are checked; parameter-set contents are not.
     AnnexBFramed,
 }
 
@@ -93,9 +91,8 @@ impl ParameterSet {
     }
 }
 
-/// Preserves the complete source configuration, its declared encoding and the
-/// independently declared framing of media samples. Parameter-set order and
-/// duplicates are preserved. This is not a decoder-ready/complete-set claim.
+/// A configuration's source bytes, their encoding and the declared framing of its
+/// samples. Parameter sets keep their order and duplicates; the set may be incomplete.
 #[derive(Debug)]
 pub struct Configuration {
     codec: Codec,
@@ -107,9 +104,8 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    /// Holds an unparsed ISO record without guessing sample framing. The caller
-    /// must supply the framing fact from a separately validated source. A wrong
-    /// or conflicting declaration cannot be detected by this opaque constructor.
+    /// An unparsed ISO record with the sample framing the caller declares, which is
+    /// not checked against the record.
     ///
     /// Fails with [`Error::Invalid`] when `source` is empty, a limit that must not be
     /// zero is, or `encoding` is not the record of `codec`; [`Error::ForeignPool`] when
@@ -170,10 +166,9 @@ impl Configuration {
     }
 }
 
-/// Parses an already pool-owned, bounded Annex-B parameter-set configuration.
-/// The entire original source remains available even when normalization drops
-/// start codes/padding from the extracted NAL views. Feeding the private reader
-/// uses source slices, without private I/O or a second input copy.
+/// Parses a complete Annex B parameter-set configuration charged to the parser's pool.
+/// The parameter sets are views without start codes or padding; the whole source
+/// stays readable and is not copied.
 #[derive(Debug)]
 pub struct AnnexBConfigParser {
     pool: Budget,

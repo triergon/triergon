@@ -1,9 +1,6 @@
-//! Declared DTS substream extents at an already established frame boundary.
-//!
-//! Extension sizes follow ETSI TS 102 114 V1.6.1 §7.5.2, Table 7-2.
-//! The probes read the size fields from established boundaries. A caller
-//! validates extension header CRC, assets and alignment before assembling an
-//! access unit and assigning container clocks.
+//! Declared DTS frame extents at an established frame boundary; extension sizes
+//! follow ETSI TS 102 114 V1.6.1 §7.5.2, Table 7-2. The probes read size fields
+//! only: the extension header CRC, assets and alignment are the caller's to check.
 use triergon_bitstream::{BitCursor, BitSource};
 use triergon_core::{Error, Result};
 
@@ -78,11 +75,10 @@ impl DtsFrameExtent {
     }
 }
 
-/// Probe an already aligned canonical big-endian DTS frame prefix without
-/// allocation, scanning, copying payload or altering source bytes. Inspects at
-/// most fifteen bytes. `Truncated` means an incomplete prefix, not an incomplete
-/// frame body; the caller must separately acquire the returned declared extent.
-/// Word-swapped and 14-bit carriers are outside this API.
+/// The declared extent of the canonical big-endian DTS frame at the start of `input`.
+/// The probe allocates nothing, inspects at most fifteen bytes and does not search
+/// for a sync word; `Truncated` means an incomplete prefix, not an incomplete frame.
+/// Word-swapped and 14-bit packings are not read.
 ///
 /// Fails with `Truncated` when `input` ends inside the prefix; `Invalid` when it begins
 /// with neither the core nor the extension substream sync word, and when a limit is
@@ -106,12 +102,10 @@ pub fn probe_frame_extent(input: &[u8], limits: DtsFrameExtentLimits) -> Result<
     }
 }
 
-/// Probe only the extension size prefix (nine bytes for short sizes, ten for
-/// long sizes). The sizes are encoded minus one; the index is retained even
-/// when nonzero. No ordering or dependency between substreams is inferred.
-///
-/// Rejects a header that overlaps its size prefix/CRC or leaves no asset data
-/// in the frame. This is an extent sanity check, not full header validation.
+/// Reads the size prefix of an extension substream header: nine bytes with short
+/// sizes, ten with long ones. The sizes are coded minus one; the index is kept even
+/// when nonzero. Neither the rest of the header nor any order or dependency between
+/// substreams is checked.
 ///
 /// Fails with `Truncated` when `input` ends inside the size prefix; `Invalid` when it
 /// does not begin with the extension substream sync word `0x64582025`, when the

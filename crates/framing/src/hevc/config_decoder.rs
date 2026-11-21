@@ -59,9 +59,8 @@ impl HvcDecoderConfigOutput {
 
 /// Writes the NAL units of an `hvcC` record as Annex B when every array declares
 /// a type a decoder configuration carries: VPS, SPS, PPS, prefix SEI or suffix
-/// SEI (32 to 34, 39, 40). It refuses any other record, and the refusal retains
-/// the exact complete configuration. [`HvcAnnexBWriter`] converts the NAL units
-/// of every record, whatever its arrays declare.
+/// SEI (32 to 34, 39, 40), and refuses any other record. [`HvcAnnexBWriter`]
+/// converts every record, whatever its arrays declare.
 #[derive(Debug)]
 pub struct HvcDecoderConfigWriter {
     pool: Budget,
@@ -70,7 +69,6 @@ pub struct HvcDecoderConfigWriter {
     state: State,
 }
 
-/// Where a conversion stands.
 #[derive(Debug)]
 enum State {
     /// The record's arrays are checked.
@@ -95,10 +93,9 @@ impl HvcDecoderConfigWriter {
             state: State::Checking(input),
         })
     }
-    /// Advances by at most the units in `work` and returns the output once, as
-    /// [`BuildStep`] describes. A refusal is an output, not an error. Checking an array
-    /// costs one unit; the rest is the work of [`HvcAnnexBWriter::step`]. Fails as
-    /// [`HvcAnnexBWriter::step`] does.
+    /// Advances by at most the units in `work` and returns the output once; a refusal
+    /// is an output, not an error. Checking an array costs one unit; the rest is the
+    /// work of [`HvcAnnexBWriter::step`]. Fails as [`HvcAnnexBWriter::step`] does.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

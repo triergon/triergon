@@ -9,11 +9,11 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
-/// The NAL count bounds the sample. The output byte bound includes prepended
-/// parameter sets from the separately bounded configuration record.
+/// The bounds of one sample's conversion; `maximum_output_bytes` counts the
+/// parameter sets put before a random access point.
 pub type HevcAnnexBLimits = AvcAnnexBLimits;
 
-/// Holds the hvcC record and its declaration-order VPS/SPS/PPS extent.
+/// An `hvcC` record prepared for [`HevcAnnexBJob`], with its VPS, SPS and PPS NAL units.
 #[derive(Debug)]
 pub struct HevcAnnexBConfig {
     record: HvcConfiguration,
@@ -80,8 +80,8 @@ fn is_parameter_set(nal: &HvcConfigNal<'_>) -> bool {
     matches!(nal.declared_nal_type(), VPS..=PPS)
 }
 
-/// Borrows a fully checked access unit and its configuration. The HEVC IRAP
-/// indication is a NAL type fact, independent of the container key flag.
+/// A checked access unit as Annex B segments, borrowing the sample and its
+/// configuration. Its IRAP indication comes from the NAL types, not the container.
 #[derive(Debug)]
 pub struct HevcAnnexBAccessUnit<'a> {
     config: &'a HevcAnnexBConfig,
@@ -104,10 +104,8 @@ impl HevcAnnexBAccessUnit<'_> {
     /// The access unit as Annex B, in pieces to write one after another: a
     /// four-byte start code and then a NAL unit, for the NAL units of the record's
     /// VPS, SPS and PPS arrays when [`Self::is_random_access`] and then for each NAL
-    /// unit of the sample.
-    ///
-    /// Length fields are re-read from the checked sample. Each segment is a
-    /// static prefix or a borrowed NAL, in original declaration/sample order.
+    /// unit of the sample. Iterating rereads only the length fields; it allocates
+    /// and copies nothing.
     pub fn segments(&self) -> impl Iterator<Item = &[u8]> {
         let parameters = self
             .random_access
@@ -130,7 +128,7 @@ impl HevcAnnexBAccessUnit<'_> {
         self.config
     }
 
-    /// Borrow the checked sample's NAL bodies in original order.
+    /// The sample's NAL units without their length fields, in sample order.
     pub fn source_nals(&self) -> impl Iterator<Item = &[u8]> {
         let width = usize::from(self.config.record.length_size().bytes());
         let mut rest = self.sample;
@@ -158,11 +156,8 @@ pub struct HevcAnnexBJob<'a> {
 }
 
 impl<'a> HevcAnnexBJob<'a> {
-    /// Advances by at most the units in `work` and returns the access unit once, as
-    /// [`BuildStep`] describes.
-    ///
-    /// One work unit covers the length field and fixed HEVC header. Even after
-    /// finding IRAP, the complete sample must validate before publication.
+    /// Advances by at most the units in `work`, one per length field and NAL header,
+    /// and returns the access unit once the whole sample is checked.
     ///
     /// Fails when `cancel` is set, a length field or NAL unit runs past the end of the
     /// sample, a NAL unit is shorter than its two-byte header or has

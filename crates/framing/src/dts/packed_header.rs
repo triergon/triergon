@@ -95,13 +95,12 @@ impl DtsPackedHeader {
 }
 
 /// Inspects the core header in the first `valid_bits` bits of `storage`, most
-/// significant bit first, as [`DtsPackedPayload::storage_bytes`] holds a frame
-/// unpacked from any packing. Bits of `storage` after `valid_bits` are ignored.
+/// significant bit first, as
+/// [`DtsPackedPayload::storage_bytes`](crate::dts::DtsPackedPayload::storage_bytes)
+/// holds a frame unpacked from any packing. Bits after `valid_bits` are ignored.
 /// At most 120 bits are read, and only the header prefix and the values derived
 /// from it are kept. A header that breaks the specification, or that the bits
 /// end inside, is reported in the result.
-///
-/// [`DtsPackedPayload::storage_bytes`]: crate::dts::DtsPackedPayload::storage_bytes
 ///
 /// Fails with `Invalid` when `valid_bits` exceeds the bits `storage` holds.
 pub fn inspect_header_bits(storage: &[u8], valid_bits: usize) -> Result<DtsPackedHeader> {

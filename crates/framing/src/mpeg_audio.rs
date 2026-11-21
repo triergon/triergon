@@ -110,7 +110,7 @@ const BITRATES: [[[u16; 15]; 3]; 2] = [
 ];
 
 impl MpegAudioHeader {
-    /// Parse a big-endian header word. `None` for a word that is not a valid header:
+    /// Parses a big-endian header word. `None` for a word that is not a valid header:
     /// no 11-bit sync, a reserved version, layer, bit rate or sample rate.
     pub fn parse(word: u32) -> Option<MpegAudioHeader> {
         if word >> 21 != 0x7ff {
@@ -165,7 +165,7 @@ impl MpegAudioHeader {
         })
     }
 
-    /// Parse the header at the start of `bytes`.
+    /// Parses the header at the start of `bytes`.
     pub fn from_bytes(bytes: &[u8]) -> Option<MpegAudioHeader> {
         let word = bytes.get(..4)?;
         Self::parse(u32::from_be_bytes([word[0], word[1], word[2], word[3]]))

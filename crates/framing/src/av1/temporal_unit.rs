@@ -1,9 +1,6 @@
-//! Temporal units (AV1 §5.2) from complete container samples.
-//!
-//! The AV1 ISOBMFF binding v1.3.0 §2.4 lets the last OBU of a sample omit its size.
-//! A decoder fed temporal units also needs a temporal delimiter, and the
-//! configuration OBUs at random access. The source sample is kept, and the output
-//! is described as spans of it.
+//! Temporal units (AV1 §5.2) from complete container samples. The AV1 ISOBMFF
+//! binding v1.3.0 §2.4 lets the last OBU of a sample omit its size; a decoder also
+//! needs a temporal delimiter, and the configuration OBUs at random access.
 use crate::av1::obu::push_leb_byte;
 use crate::{
     BuildStep,
@@ -62,8 +59,7 @@ fn receiver_configuration(obu: &Av1Obu) -> bool {
     matches!(obu.facts().header.obu_type(), SEQUENCE_HEADER | METADATA)
 }
 
-/// Bounds on one sample and the temporal unit made of it. Each must be
-/// non-zero.
+/// Bounds on one sample and the temporal unit made of it. Each must be non-zero.
 #[derive(Clone, Copy, Debug)]
 pub struct Av1TemporalUnitLimits {
     /// The most bytes of the container sample.
@@ -171,9 +167,9 @@ impl Av1TemporalUnit<'_> {
     }
 }
 
-/// A resumable envelope scan for a complete one-temporal-unit MP4 or Matroska
-/// sample. Each charge covers one OBU header and size field (at most 10 bytes).
-/// Payloads are skipped by length, including a size-less final OBU.
+/// Makes a decoder temporal unit of one complete MP4 or Matroska sample. A unit of
+/// work reads one OBU header and size field, at most 10 bytes; payloads are skipped
+/// by length, a size-less final OBU included.
 pub struct Av1TemporalUnitJob<'a> {
     source: Option<&'a [u8]>,
     configuration: Option<Av1TemporalUnitConfig<'a>>,

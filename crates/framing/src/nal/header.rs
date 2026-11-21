@@ -20,8 +20,8 @@ impl Codec {
     }
 }
 
-/// Only the fixed NAL header is inspected. Reserved types and HEVC layers are
-/// retained, without claiming that the corresponding coding tool is supported.
+/// A fixed NAL unit header. Reserved types and HEVC layers are kept as coded;
+/// nothing says their coding tools are supported.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NalHeader {
     /// The one-byte header of H.264 7.3.1.
@@ -116,7 +116,6 @@ impl NalHeader {
 
     /// The parameter set `nal_unit_type` names: H.264 types 7 and 8, H.265 types
     /// 32 to 34; `None` for every other type.
-    /// This is a type classification, not a parse of parameter-set contents.
     pub const fn parameter_set_kind(self) -> Option<ParameterSetKind> {
         match self {
             Self::Avc {

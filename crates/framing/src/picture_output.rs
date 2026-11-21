@@ -38,9 +38,8 @@
 //! [`DecodedPictures::store`] stores a picture without any process, for a
 //! caller that drives output itself with [`DecodedPictures::bump`] and the
 //! counts [`DecodedPictures::len`] and [`DecodedPictures::bumpable`]. Storing
-//! is the only step that takes
-//! memory; [`DecodedPictures::try_reserve`] takes it ahead, for a caller whose
-//! step must not fail once it has changed the buffer.
+//! is the only step that takes memory; [`DecodedPictures::try_reserve`] takes
+//! it ahead, for a caller whose step must not fail once it has changed the buffer.
 //!
 //! The processes follow the specifications. FFmpeg's decoders were observed
 //! to output in other ways (see the caption extraction of `triergon-subtitles`
@@ -57,8 +56,7 @@
 //!   more than C.5.2.2 allows after it applies (pass
 //!   [`HevcLimits::max_dec_pic_buffering`] as `None` to leave the specified
 //!   check out).
-//! * [`LateOutput`]: a picture that leaves after a picture with a higher
-//!   order count has been output is dropped; observed for H.264.
+//! * [`LateOutput`]: drops a picture that leaves out of order; observed for H.264.
 //!
 //! [`order`] derives the picture order counts, with the observed H.264 rules
 //! as options: [`order::AfterMmco5::CodedLsb`] and
@@ -268,8 +266,7 @@ impl<'a, P> View<'a, P> {
         self.0.poc
     }
 
-    /// The marking of `field`. A frame is stored with both fields marked
-    /// alike, a field picture with the field it lacks unused.
+    /// The marking of `field`, as [`Entry::marking`] reads it.
     #[must_use]
     pub fn marking(&self, field: Parity) -> Marking {
         self.0.marking[field.index()]

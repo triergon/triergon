@@ -1,7 +1,6 @@
-//! The VP9 `VPCodecConfigurationRecord` of WebM's authoritative v1.0 binding
-//! (the `vpcC` box). The caller supplies the `FullBox` version and flags
-//! explicitly, as [`Vp9ConfigContext`]; this module does not guess whether
-//! record bytes include box headers or v0 syntax.
+//! The VP9 `VPCodecConfigurationRecord` of the v1.0 ISO media binding (the `vpcC`
+//! box). The caller supplies the `FullBox` version and flags as [`Vp9ConfigContext`];
+//! the record starts after the box headers.
 use crate::{BuildStep, record_input};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, InputCursor, Result, SourceId, Step, WorkBudget};
@@ -145,10 +144,9 @@ impl Vp9Configuration {
     }
 }
 
-/// Reads exactly the eight-byte fixed record prefix with bounded work, checks
-/// its declared initialization length, and retains the opaque initialization.
-/// Nonempty VP9 initialization violates the binding; it is reported as a syntax
-/// issue rather than silently removed. No source-sized copy/allocation occurs.
+/// Parses a `vpcC` record: its eight fixed bytes and the initialization data whose
+/// length they declare, kept uninterpreted. Initialization data, which the binding
+/// rules out for VP9, is reported as a syntax issue. The record is not copied.
 #[derive(Debug)]
 pub struct Vp9ConfigParser {
     state: State,

@@ -42,10 +42,9 @@ pub(super) const fn core_rate(code: u32) -> Option<u32> {
 
 /// The header of a normal DTS core frame (ETSI TS 102 114 V1.6.1 clause 5.3,
 /// Table 5-1): every field as coded, in bitstream order, then the values derived
-/// from them. The ranges given are those [`probe_core_header`] returns.
-/// `hcrc` distinguishes physical absence from a coded zero. `None` for channel
-/// count, nominal bitrate or dialog gain means the code defines no value; no
-/// default is substituted.
+/// from them. The ranges given are those [`probe_core_header`] returns. `None`
+/// for channel count, nominal bitrate or dialog gain means the code defines no
+/// value; no default is substituted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsCoreHeader {
     /// `FTYPE`, the frame type: 1, a normal frame.
@@ -166,9 +165,8 @@ impl HeaderBits<'_> {
 
 /// Reads the header of a normal core frame from the start of `input`, which
 /// begins at the sync word `0x7FFE8001` in canonical big-endian byte order.
-/// The probe allocates nothing and inspects at most fifteen bytes (120 bits),
-/// regardless of the size of the caller's slice. Success does not certify a
-/// complete body, coded audio or decoder readiness.
+/// The probe allocates nothing and inspects at most fifteen bytes (120 bits).
+/// Success does not certify a complete body, coded audio or decoder readiness.
 ///
 /// Fails with `Truncated` when `input` ends before the header does: 13 bytes, or 15
 /// with `HCRC`; `Invalid` when `input` begins with neither the core nor the extension
@@ -372,7 +370,6 @@ enum Frame {
         buffer: BudgetVec<u8>,
         step: BodyStep,
     },
-    /// The frame's bytes, to be returned.
     Ready { header: DtsCoreHeader, bytes: Bytes },
     /// The source ended after the last frame.
     Ended(SourceLocation),
@@ -380,11 +377,9 @@ enum Frame {
 
 /// The steps of reading a frame's bytes.
 enum BodyStep {
-    /// Reserving storage for the frame.
     Reserve,
     /// Copying the header bytes into the frame, `copied` of them so far.
     CopyPrefix { copied: usize },
-    /// Reading the next span of the frame.
     ReadBody,
     /// Copying `pending` into the frame, `copied` bytes of it so far.
     CopyBody { pending: Bytes, copied: usize },
@@ -393,18 +388,14 @@ enum BodyStep {
 }
 
 /// Reads the core frames of an aligned stream: canonical big-endian normal
-/// frames back to back, the first at offset zero. Each frame is returned
-/// complete: the `FSIZE + 1` bytes its header declares, copied byte for byte.
-/// The reader never searches for a sync word: bytes that are not a frame header
-/// where one is due are an error. It does not convert word packings, and refuses
-/// termination frames and extension substreams.
+/// frames back to back, the first at offset zero. The reader never searches for
+/// a sync word: bytes that are not a frame header where one is due are an error.
+/// It does not convert word packings, and refuses termination frames and
+/// extension substreams.
 ///
 /// Reading input and copying into the frame are each charged one unit of work per
 /// byte; the sync check, reading `CPF`, the header probe, the allocation,
-/// completing the frame and returning it cost one unit each. An error from
-/// [`step`](Self::step) ends the reader, and every later call returns it again,
-/// except `Backpressure` and `Allocation`, after which `step` may be called
-/// again.
+/// completing the frame and returning it cost one unit each.
 pub struct DtsCoreFrameReader {
     input: ReaderInput,
     limits: DtsCoreFrameLimits,
@@ -509,16 +500,16 @@ impl DtsCoreFrameReader {
     }
 
     /// Advances the reader by at most the work left in `work`. `Ready` carries
-    /// the next complete frame. `NeedInput` carries the request to answer before
-    /// the next call, `Yield` means the work is spent, and `End` that the source
-    /// ended on a frame boundary, at the location given.
+    /// the next complete frame, and `End` the location where the source ended on
+    /// a frame boundary.
     ///
     /// Fails with `Cancelled` when `cancel` is set; `Truncated` when the source ends
     /// inside a frame; the error of [`probe_core_header`] for a header it refuses;
     /// `Limit` when a frame exceeds `maximum_frame_bytes` or what the pool can hold, and
     /// when input continues after `maximum_frames` frames; `Backpressure` or
     /// `Allocation` when the frame's storage cannot be allocated: after these two, and
-    /// only these, `step` may be called again.
+    /// only these, `step` may be called again; every other error is returned by every
+    /// later call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

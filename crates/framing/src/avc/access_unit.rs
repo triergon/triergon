@@ -50,8 +50,7 @@ fn add_nal_bytes(bytes: usize, nal_bytes: usize) -> Result<usize> {
         .ok_or(Error::Overflow)
 }
 
-/// The bounds of one sample's conversion to an Annex B access unit. Each must be
-/// above 0.
+/// The bounds of one sample's conversion to an Annex B access unit. Each must be above 0.
 #[derive(Clone, Copy, Debug)]
 pub struct AvcAnnexBLimits {
     /// Largest sample accepted, in bytes.
@@ -87,9 +86,7 @@ impl AvcAnnexBAccessUnit<'_> {
     /// The access unit as Annex B, in pieces to write one after another: a
     /// four-byte start code and then a NAL unit, for the record's SPS and PPS NAL
     /// units when [`Self::is_idr`] and then for each NAL unit of the sample.
-    ///
-    /// All bounds were checked before publication. Iterating reparses only the
-    /// short length fields, with no descriptor allocation or payload copy.
+    /// Iterating rereads only the length fields; it allocates and copies nothing.
     #[inline]
     pub fn segments(&self) -> impl Iterator<Item = &[u8]> {
         AnnexBSegments {
@@ -106,7 +103,7 @@ impl AvcAnnexBAccessUnit<'_> {
         self.config
     }
 
-    /// Borrow the checked sample's NAL bodies in original order.
+    /// The sample's NAL units without their length fields, in sample order.
     pub fn source_nals(&self) -> impl Iterator<Item = &[u8]> {
         let width = usize::from(self.config.record.sample_length_size().bytes());
         let mut rest = self.sample;
@@ -205,11 +202,8 @@ impl<'a> AvcAnnexBJob<'a> {
         })
     }
 
-    /// Advances by at most the units in `work` and returns the access unit once, as
-    /// [`BuildStep`] describes.
-    ///
-    /// One work unit covers one checked length field and fixed NAL header.
-    /// A malformed tail never publishes a partially converted access unit.
+    /// Advances by at most the units in `work`, one per length field and NAL header,
+    /// and returns the access unit once the whole sample is checked.
     ///
     /// Fails when `cancel` is set, a length field or NAL unit runs past the end of the
     /// sample, a NAL unit is empty or has `forbidden_zero_bit` set, or a limit is

@@ -116,9 +116,8 @@ impl DtsCoreField {
 }
 
 /// What the source holds of one header field. When the source ends inside a
-/// field, the partial prefix integer has exactly `observed_bits` bits. It has
-/// not been shifted/zero-filled to the declared width. `value()` is `None` until
-/// the field is complete.
+/// field, `prefix` holds exactly `observed_bits` bits, not shifted or zero-filled
+/// to the declared width.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FieldObservation {
     /// No bit of the field was read: the source ends before it, or a
@@ -470,10 +469,10 @@ impl DtsHeaderInspector {
     }
 
     /// Advances the inspection. `Ready` occurs once, then `End` at the record's end:
-    /// the end of the owned record, not an observed end of the transport. `Yield` means
-    /// the work is spent. An owned record never requests input. Fails with `Cancelled`
-    /// when `cancel` is set. A header that breaks the specification is not an error: it
-    /// is reported in the result.
+    /// the end of the owned record, not an observed end of the transport. An owned
+    /// record never requests input. Fails with `Cancelled` when `cancel` is set. A
+    /// header that breaks the specification is not an error: it is reported in the
+    /// result.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

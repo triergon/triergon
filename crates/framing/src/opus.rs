@@ -50,7 +50,7 @@ impl core::fmt::Debug for OpusHead {
 }
 
 impl OpusHead {
-    /// Parse an `OpusHead` packet (RFC 7845 section 5.1). Bytes after the mapping table
+    /// Parses an `OpusHead` packet (RFC 7845 section 5.1). Bytes after the mapping table
     /// are ignored, as the specification requires of a version 0 header. Fails when the
     /// magic is missing, the packet ends before a field or the mapping table, the
     /// version is above 15, the channel count is 0 or, in family 0, above 2, or the
@@ -79,7 +79,7 @@ impl OpusHead {
         )
     }
 
-    /// Parse the payload of an ISO BMFF `dOps` box (Opus in ISO BMFF, section 4.3.2):
+    /// Parses the payload of an ISO BMFF `dOps` box (Opus in ISO BMFF, section 4.3.2):
     /// the same fields, big-endian, without the magic. Fails when the box version is
     /// not 0, and as [`parse`](Self::parse) for the fields.
     pub fn from_dops(bytes: &[u8]) -> Result<OpusHead> {
@@ -171,7 +171,7 @@ impl OpusHead {
     /// Bytes of the longest `OpusHead` packet: 21 header bytes and 255 mapping entries.
     pub const MAX_BYTES: usize = 21 + 255;
 
-    /// Write the header as an `OpusHead` packet, the canonical configuration the decoder
+    /// Writes the header as an `OpusHead` packet, the canonical configuration the decoder
     /// takes, to the start of `out`; returns its length.
     pub fn write(&self, out: &mut [u8; Self::MAX_BYTES]) -> usize {
         out[..8].copy_from_slice(b"OpusHead");

@@ -99,9 +99,7 @@ pub struct Eac3BsiFacts {
     /// counted from the first bit of the syncword.
     pub end_bit: usize,
     /// Bit position where the fields of the frame's header end and the fields
-    /// below begin: the header's [`probe_bits`].
-    ///
-    /// [`probe_bits`]: crate::ac3::Ac3FrameHeader::probe_bits
+    /// below begin: the header's [`probe_bits`](crate::ac3::Ac3FrameHeader::probe_bits).
     pub prefix_end_bit: usize,
     /// Range of the mixing metadata, from `mixmdate` through its last field.
     /// `None` when `mixmdate` is 0.
@@ -343,10 +341,10 @@ struct Walk {
     facts: Eac3BsiFacts,
 }
 
-/// Inspects a complete same-pool E-AC-3 frame from Ac3FrameReader. The reader
-/// owns chunk/EOF/transport and reserve/freeze handling; this second stage owns
-/// BSI bit work and cancellation. It allocates no output storage or descriptors.
-/// Mixing definitions 0/1/2 are selected; flexible definition 3 is unsupported.
+/// Reads the bit stream information of a complete E-AC-3 frame from `Ac3FrameReader`,
+/// charged to the same pool; the reader handles input and the frame's storage. It
+/// allocates nothing. Mixing definitions 0, 1 and 2 are read; definition 3 is
+/// [`Error::Unsupported`].
 pub struct Eac3BsiParser {
     limits: Eac3BsiLimits,
     state: State,

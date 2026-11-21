@@ -8,8 +8,7 @@ use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
 
-/// How the bits of a DTS stream are stored in its bytes (ETSI TS 102 114
-/// §3.4/5.3).
+/// How the bits of a DTS stream are stored in its bytes (ETSI TS 102 114 §3.4/5.3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DtsPacking {
     /// The bitstream as specified: bytes in order, most significant bit first.
@@ -362,8 +361,7 @@ impl DtsPackedPayloadJob {
     }
     /// Advances the job by at most the work left in `work`. `Ready` carries the
     /// payload, once; every later step returns `End` with the location of the
-    /// record's end in its source. `Yield` means the work is spent. An owned
-    /// record never requests input.
+    /// record's end in its source. An owned record never requests input.
     ///
     /// Fails with `Cancelled` when `cancel` is set; `Backpressure` or `Allocation` when
     /// the storage cannot be allocated: after these two, and only these, `step` may be

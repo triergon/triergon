@@ -1,10 +1,7 @@
-//! Packets of a 14-bit DTS stream, cut at the byte pattern of its sync words. This
-//! is a reader of its own beside the frame reader for 14-bit streams. The 14-bit
-//! unpacking follows ETSI TS 102 114 5.3. A packet starts only at the 16-bit words
-//! `1FFF E800 07Fx`, the two unused high bits of each word included; that is
-//! narrower than the frame reader's sync, which accepts any value in those bits. A
-//! packet that does not start with the pattern stays opaque: it gets no header, no
-//! unpacked payload, no claim about its audio, and no end but the end of the source.
+//! Packets of a 14-bit DTS stream, cut at the byte pattern of its sync words; the
+//! 14-bit unpacking follows ETSI TS 102 114 5.3. A packet starts only at the 16-bit
+//! words `1FFF E800 07Fx`, the two unused high bits of each word included; that is
+//! narrower than the frame reader's sync, which accepts any value in those bits.
 use crate::dts::reader::{limit, source_error};
 use crate::dts::sync14::{header_payload, word};
 use crate::dts::{
@@ -119,7 +116,6 @@ enum Packet {
         raw: Bytes,
         unpacker: Dts14BitUnpacker,
     },
-    /// The packet, to be returned.
     Ready {
         raw: Bytes,
         payload: Option<Dts14BitPayload>,
@@ -169,7 +165,6 @@ enum BodyStep {
 /// The steps of moving a packet into larger storage.
 #[derive(Clone, Copy)]
 enum GrowStep {
-    /// Reserving the larger storage.
     Reserve,
     /// Copying the packet, `copied` bytes of it so far.
     Copy { copied: usize },
@@ -195,9 +190,6 @@ enum GrowStep {
 /// readers are independent. With the `reference-trace` feature,
 /// `reference_trace::dts` pairs these packets with the clock and byte positions of
 /// FFmpeg's `dca` parser.
-///
-/// Call [`step`](Self::step) and answer each [`Step::NeedInput`] with
-/// [`provide`](Self::provide), [`finish`](Self::finish) or [`fail`](Self::fail).
 pub struct Dts14CarrierReader {
     pool: Budget,
     input: ReaderInput,
@@ -348,10 +340,8 @@ impl Dts14CarrierReader {
         self.input.fail_with(error);
         self.packet = Packet::Reserve;
     }
-    /// Reads on, as far as `work` allows. [`Step::Ready`] carries the next packet,
-    /// [`Step::NeedInput`] the request to answer before the next call, and
-    /// [`Step::End`] the end of the source once the last packet is returned;
-    /// [`Step::Yield`] means the work is spent.
+    /// Reads on, as far as `work` allows. [`Step::Ready`] carries the next packet, and
+    /// [`Step::End`] the end of the source once the last packet is returned.
     ///
     /// [`Error::Backpressure`] and [`Error::Allocation`] leave the reader as it was:
     /// free pool storage and call again. Every other error is kept and returned by all

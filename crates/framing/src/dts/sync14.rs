@@ -112,7 +112,6 @@ enum Frame {
         facts: Dts14SyncFacts,
         unpacker: Dts14BitUnpacker,
     },
-    /// The frame, to be returned.
     Ready(Dts14SyncFrame),
     /// The source ended after the last frame.
     Ended(SourceLocation),
@@ -153,11 +152,6 @@ enum BodyStep {
 /// makes this narrower than 14-bit DTS in general. A reader from [`new`](Self::new)
 /// also requires every frame to span as many source bytes as the first; one from
 /// [`per_frame`](Self::per_frame) lets each frame have its own length.
-///
-/// Call [`step`](Self::step) and answer each [`Step::NeedInput`] with
-/// [`provide`](Self::provide), [`finish`](Self::finish) or [`fail`](Self::fail).
-/// [`reset`](Self::reset) on a reader that has not failed forgets the stream read so
-/// far and starts a new cursor generation.
 pub struct Dts14SyncReader {
     pool: Budget,
     input: ReaderInput,
@@ -256,11 +250,9 @@ impl Dts14SyncReader {
         self.input.position()
     }
     /// A reader like one from [`new`](Self::new), except that each frame has its own
-    /// length (ETSI TS 102 114 V1.6.1 5.3). Each frame ends at a following normal
-    /// sync or at the declared end of the source, and its 14-bit payload holds
-    /// exactly `FSIZE` + 1 bytes. The length and every source bit of a frame are
-    /// checked for that frame alone; a payload that does not end on a byte boundary
-    /// or does not hold `FSIZE` + 1 bytes is [`Error::Unsupported`].
+    /// length (ETSI TS 102 114 V1.6.1 5.3), checked with every source bit of the frame
+    /// for that frame alone: a payload that does not end on a byte boundary or does
+    /// not hold `FSIZE` + 1 bytes is [`Error::Unsupported`].
     ///
     /// Fails as [`new`](Self::new) does.
     pub fn per_frame(
@@ -344,10 +336,8 @@ impl Dts14SyncReader {
         self.frame = Frame::Header;
     }
 
-    /// Reads on, as far as `work` allows. [`Step::Ready`] carries the next frame,
-    /// [`Step::NeedInput`] the request to answer before the next call, and
-    /// [`Step::End`] the end of the source once the last frame is returned;
-    /// [`Step::Yield`] means the work is spent.
+    /// Reads on, as far as `work` allows. [`Step::Ready`] carries the next frame, and
+    /// [`Step::End`] the end of the source once the last frame is returned.
     ///
     /// [`Error::Backpressure`] and [`Error::Allocation`] leave the reader as it was:
     /// free pool storage and call again. Every other error is kept and returned by all
@@ -733,7 +723,7 @@ fn normal_sync(source: &[u8; 6], order: DtsWordOrder) -> bool {
 }
 
 pub(crate) fn header_payload(source: &[u8; 18], order: DtsWordOrder) -> Result<[u8; 15]> {
-    // Fixed120-bit stack probe. Complete source words stay in the raw owner.
+    // Fixed 120-bit stack probe. Complete source words stay in the raw owner.
     let mut output = [0_u8; 15];
     for bit in 0..120_usize {
         let value = (word(source, (bit / 14) * 2, order) >> (13 - bit % 14)) & 1;

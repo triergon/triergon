@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, Step, WorkBudget};
 
 /// Bits: 1 marker missing, 2 nonzero upper reserved bits, 4 nonzero absent-delay
-/// reserved bits. Empty issues do not certify Sequence Header/sample semantics.
+/// reserved bits. An empty set says nothing of the Sequence Header or the samples.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Av1ConfigSyntaxIssues(u8);
 
@@ -139,9 +139,8 @@ impl Av1ConfigFields {
 pub struct Av1ConfigLimits {
     /// The most bytes of the whole record.
     pub maximum_record_bytes: usize,
-    /// Count and wire-size limits apply to configOBUs as well as scratch work.
-    /// The parser reserves room for `maximum_obus` OBU descriptions before it
-    /// reads the first, and reads the record in windows of at most
+    /// Bounds on the configuration OBUs. The parser reserves room for `maximum_obus`
+    /// of them before it reads the first, and reads the record in windows of at most
     /// `maximum_input_window` bytes.
     pub obu: Av1ObuLimits,
 }
@@ -182,10 +181,9 @@ impl Av1Configuration {
     }
 }
 
-/// Accepts the codec record only, without the surrounding av1C box size/type.
-/// Empty configOBUs are allowed. The at-most-one/first Sequence Header OBU rule
-/// is checked; its payload/record-field agreement and sample requirements are
-/// deliberately unverified. Syntax issues and unknown OBU types are preserved.
+/// Parses an `av1C` record: the box payload, without its size and type. `configOBUs`
+/// may be empty; a Sequence Header OBU in it must be the first OBU. Syntax issues and
+/// unknown OBU types are kept.
 #[derive(Debug)]
 pub struct Av1ConfigParser {
     pool: Budget,
@@ -259,9 +257,8 @@ impl Av1ConfigParser {
         })
     }
 
-    /// Charges fixed-header bytes, OBU work, one reserve, one descriptor insert
-    /// per OBU, and one final record handoff. Backpressure retains the exact
-    /// pending builder/descriptor. No source or payload reparse on retry.
+    /// Parses for as long as `work` lasts: one unit per fixed byte, the OBU reader's
+    /// work, one unit for the reservation, one per OBU stored and one for the result.
     ///
     /// Fails on cancellation; a `version` other than 1; an OBU that
     /// [`Av1ObuReader::step`] refuses in low-overhead framing, such as one without a

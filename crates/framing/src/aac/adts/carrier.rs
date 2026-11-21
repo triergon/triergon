@@ -49,9 +49,7 @@ impl AacAdtsCarrier {
     /// AAC LC frame of one raw data block that starts with its header: the boundary
     /// is `DeclaredEnvelope { header_offset: 0 }`, there is no
     /// [`selected_error`](Self::selected_error) and the unit is as long as the
-    /// header declares.
-    ///
-    /// Any other unit is returned as it was.
+    /// header declares. Any other unit is returned as it was.
     pub fn into_selected_frame(self) -> std::result::Result<AacAdtsFrame, Self> {
         let Some(header) = self.header else {
             return Err(self);
@@ -129,9 +127,6 @@ pub struct AacAdtsCarrierLimits {
 /// From anything else the reader scans byte by byte for such a header. Bytes that
 /// the end of the source leaves over form a last unit. Nothing is decoded and no
 /// CRC is verified; each unit says why it is not a frame.
-///
-/// Input is requested and answered as for an
-/// [`InputCursor`](triergon_core::InputCursor).
 #[derive(Debug)]
 pub struct AacAdtsCarrierReader {
     pub(crate) inner: AacAdtsStreamReader,
@@ -267,13 +262,9 @@ impl AacAdtsCarrierReader {
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
         self.inner.reset(offset)
     }
-    /// Reads for as long as `work` lasts.
-    ///
-    /// [`Step::Ready`] carries the next unit. [`Step::NeedInput`] carries the request
-    /// to answer with [`provide`](Self::provide), [`finish`](Self::finish) or
-    /// [`fail`](Self::fail). [`Step::Yield`] asks for another call with more work.
-    /// [`Step::End`] reports the end of the source once every byte has been
-    /// produced in a unit.
+    /// Reads for as long as `work` lasts. [`Step::Ready`] carries the next unit, and
+    /// [`Step::End`] reports the end of the source once every byte has been produced
+    /// in a unit.
     ///
     /// Fails when a unit exceeds `maximum_packet_bytes` or the units exceed
     /// `maximum_packets`, when `cancel` is set, or when the source failed or ended
