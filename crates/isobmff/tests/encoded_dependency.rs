@@ -1,122 +1,21 @@
 mod common;
-use common::{child, children, roots, table};
-use std::{ops::Range, sync::atomic::AtomicBool};
-use triergon_core::{
-    Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, TimeBase, WorkBudget,
-};
+use std::sync::atomic::AtomicBool;
+use triergon_core::{Error, InputCursor, SourceFailure, WorkBudget};
 use triergon_isobmff::{
-    CursorStatus, Limits, Next,
+    CursorStatus, Next,
     compat::mov::{
-        edits::{
-            EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
-            EncodedEditProfile,
-        },
-        encoded::{
-            EncodedConfigProfile, EncodedMetadataProfile, EncodedSelection, EncodedStream,
-            EncodedStreamJob,
-        },
-        packets::{DemuxTrack, PacketCursor, PacketLimits},
+        edits::{EncodedEditJob, EncodedEditLimits, EncodedEditPlan, EncodedEditProfile},
+        encoded::{EncodedConfigProfile, EncodedMetadataProfile, EncodedStream},
+        packets::{PacketCursor, PacketLimits},
         seek::{IndexCursor, IndexLimits},
     },
-    config::ConfigurationLimits,
-    movie::{EditList, TrackHeader},
-    table::SampleTable,
 };
 const BASE: &[u8] = include_bytes!("fixtures/encoded-dependency-v4/dep-unreferenced.mp4");
-struct Source {
-    pool: Budget,
-    header: TrackHeader,
-    table: SampleTable,
-    edits: EditList,
-    media: Vec<Range<u64>>,
-    length: u64,
-}
+#[path = "support/encoded_track.rs"]
+mod encoded_track;
+use encoded_track::{Source, finish, rows};
+
 impl Source {
-    fn new(b: &[u8]) -> Self {
-        let pool = Budget::new(1 << 22).unwrap();
-        let top = roots(&pool, b).unwrap();
-        let movie = top.iter().find(|b| b.header().kind == *b"moov").unwrap();
-        let track = children(movie, 0)
-            .unwrap()
-            .into_iter()
-            .find(|b| b.header().kind == *b"trak")
-            .unwrap();
-        let mdia = child(&track, b"mdia").unwrap();
-        let header = TrackHeader::parse(
-            &child(&track, b"tkhd").unwrap(),
-            &child(&mdia, b"mdhd").unwrap(),
-            &child(&mdia, b"hdlr").unwrap(),
-        )
-        .unwrap();
-        let table = table(
-            child(&child(&mdia, b"minf").unwrap(), b"stbl").unwrap(),
-            &pool,
-            1,
-        )
-        .unwrap();
-        let edits = EditList::parse(
-            child(&child(&track, b"edts").unwrap(), b"elst").unwrap(),
-            Limits::default(),
-        )
-        .unwrap();
-        let media = top
-            .iter()
-            .filter(|b| b.header().kind == *b"mdat")
-            .map(|b| b.header().payload_range().unwrap())
-            .collect();
-        Self {
-            pool,
-            header,
-            table,
-            edits,
-            media,
-            length: b.len() as u64,
-        }
-    }
-    fn input(&self) -> InputCursor {
-        InputCursor::new(
-            &self.pool,
-            SourceId(1997),
-            SourceCapabilities {
-                length: Some(self.length),
-                random_access: true,
-            },
-            64,
-        )
-        .unwrap()
-    }
-    fn configs(&self, i: &mut InputCursor) -> Vec<EncodedStream> {
-        let mut j = EncodedStreamJob::new_description_with_metadata(
-            &self.header,
-            &self.table,
-            i,
-            EncodedSelection {
-                major_brand: Some(*b"isom"),
-                description: 1,
-                limits: ConfigurationLimits::default(),
-            },
-            EncodedMetadataProfile,
-        )
-        .unwrap();
-        for _ in 0..20000 {
-            if j.poll(i, &mut WorkBudget::new(1), &AtomicBool::new(false))
-                .unwrap()
-                == CursorStatus::Ready
-            {
-                return vec![j.take(i, &AtomicBool::new(false)).unwrap()];
-            }
-        }
-        panic!("config progress");
-    }
-    fn context<'a>(&'a self, s: &'a EncodedStream) -> EncodedEditContext<'a> {
-        EncodedEditContext {
-            table: &self.table,
-            edits: &self.edits,
-            stream: s,
-            media_base: self.header.time_base().unwrap(),
-            movie_base: TimeBase::new(1, 1000).unwrap(),
-        }
-    }
     fn job<'a>(&'a self, configs: &'a [EncodedStream], i: &InputCursor) -> EncodedEditJob<'a> {
         EncodedEditJob::new_with_dependency_table(
             self.context(&configs[0]),
@@ -132,56 +31,6 @@ impl Source {
         let configs = self.configs(&mut i);
         finish(&mut self.job(&configs, &i), &mut i, q)
     }
-    fn track(&self) -> DemuxTrack<'_> {
-        DemuxTrack {
-            track_id: self.header.track_id,
-            table: &self.table,
-            fragments: &[],
-            media_base: self.header.time_base().unwrap(),
-            edits: Some((&self.edits, TimeBase::new(1, 1000).unwrap())),
-        }
-    }
-}
-fn finish(
-    j: &mut EncodedEditJob<'_>,
-    i: &mut InputCursor,
-    q: u64,
-) -> Result<EncodedEditPlan, Error> {
-    for _ in 0..20000 {
-        let mut w = WorkBudget::new(q);
-        let state = j.poll(i, &mut w, &AtomicBool::new(false))?;
-        assert!(w.spent() <= q);
-        if state == CursorStatus::Ready {
-            return j.take(i, &AtomicBool::new(false));
-        }
-    }
-    panic!("group/sample actual-work progress");
-}
-fn rows(
-    s: &Source,
-    plan: EncodedEditPlan,
-) -> Vec<triergon_isobmff::compat::mov::packets::PacketOccurrence> {
-    let plans = [Some(plan)];
-    let mut c = PacketCursor::new_encoded_regular(
-        &s.pool,
-        &[s.track()],
-        &s.media,
-        PacketLimits::default(),
-        &plans,
-        EncodedEditProfile,
-    )
-    .unwrap();
-    let mut rows = Vec::new();
-    for _ in 0..20000 {
-        let mut w = WorkBudget::new(1);
-        match c.poll(&mut w, &AtomicBool::new(false)).unwrap() {
-            CursorStatus::Yield => {}
-            CursorStatus::End => return rows,
-            CursorStatus::Ready => rows.push(c.take_occurrence().unwrap()),
-        }
-        assert!(w.spent() <= 1);
-    }
-    panic!("packet work1 progress");
 }
 #[test]
 fn disposable_flag_is_separate_from_raw_dependency_stss_and_source_clock() {
