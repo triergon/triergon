@@ -199,26 +199,26 @@ pub struct AacAscScopeParser {
 
 /// Where a parse stands: the declared extent is parsed first, then every byte.
 #[derive(Debug)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one parse per parser; boxing it would allocate outside the pool"
+)]
 enum State {
-    Declared {
-        raw: Bytes,
-        declared: AacAscParser,
-        physical: AacAscParser,
-    },
     /// `declared` is `None` when the declared length covers every byte.
-    Physical {
+    Reading {
         raw: Bytes,
-        declared: Option<AacAscScopeOutcome>,
-        physical: AacAscParser,
-    },
-    /// Both outcomes, returned by the next unit of work.
-    Parsed {
-        raw: Bytes,
-        declared: Option<AacAscScopeOutcome>,
-        physical: AacAscScopeOutcome,
+        declared: Option<Extent>,
+        physical: Extent,
     },
     Complete,
     Failed(Error),
+}
+
+/// The parse of one extent, then its outcome.
+#[derive(Debug)]
+enum Extent {
+    Parsing(AacAscParser),
+    Parsed(AacAscScopeOutcome),
 }
 
 impl AacAscScopeParser {
@@ -239,32 +239,24 @@ impl AacAscScopeParser {
         let declared = if bits == physical_bits {
             None
         } else {
-            Some(AacAscParser::with_bit_length(
+            Some(Extent::Parsing(AacAscParser::with_bit_length(
                 pool,
                 source,
                 raw.clone(),
                 bits,
                 limits,
-            )?)
+            )?))
         };
-        let physical = AacAscParser::new(pool, source, raw.clone(), limits)?;
-        let state = match declared {
-            Some(declared) => State::Declared {
-                raw,
-                declared,
-                physical,
-            },
-            None => State::Physical {
-                raw,
-                declared: None,
-                physical,
-            },
-        };
+        let physical = Extent::Parsing(AacAscParser::new(pool, source, raw.clone(), limits)?);
         Ok(Self {
             pool: pool.clone(),
             source,
             bits,
-            state,
+            state: State::Reading {
+                raw,
+                declared,
+                physical,
+            },
         })
     }
     /// The outcome of one step of an extent's parser, `None` until it has one. A
@@ -287,13 +279,13 @@ impl AacAscScopeParser {
             Err(e) => Err(e),
         }
     }
-    /// An error of an extent's parser in `state`: backpressure becomes a limit when
-    /// the pool could never hold the record, both parses and the request together.
-    fn refusal(&self, state: &State, error: Error) -> Error {
+    /// An error of an extent's parser: backpressure becomes a limit when the pool
+    /// could never hold the record, both parses and the request together.
+    fn refusal(&self, error: Error) -> Error {
         let Error::Backpressure(triergon_core::Backpressure { requested, .. }) = error else {
             return error;
         };
-        match Self::minimum_owned_storage(state, requested) {
+        match self.minimum_owned_storage(requested) {
             Ok(minimum) if minimum > self.pool.limit() => Error::Limit {
                 requested: minimum,
                 maximum: self.pool.limit(),
@@ -302,40 +294,26 @@ impl AacAscScopeParser {
             Err(e) => e,
         }
     }
-    fn minimum_owned_storage(state: &State, requested: usize) -> Result<usize> {
-        let (raw, parsers, outcomes) = match state {
-            State::Declared {
+    fn minimum_owned_storage(&self, requested: usize) -> Result<usize> {
+        let (raw, extents) = match &self.state {
+            State::Reading {
                 raw,
                 declared,
                 physical,
-            } => (Some(raw), [Some(declared), Some(physical)], [None, None]),
-            State::Physical {
-                raw,
-                declared,
-                physical,
-            } => (Some(raw), [Some(physical), None], [declared.as_ref(), None]),
-            State::Parsed {
-                raw,
-                declared,
-                physical,
-            } => (Some(raw), [None, None], [declared.as_ref(), Some(physical)]),
-            State::Complete | State::Failed(_) => (None, [None, None], [None, None]),
+            } => (Some(raw), [declared.as_ref(), Some(physical)]),
+            State::Complete | State::Failed(_) => (None, [None, None]),
         };
         let mut total = Budget::control_storage_bytes()
             .checked_add(raw.map_or(0, Bytes::retained_storage_bytes))
             .and_then(|v| v.checked_add(requested))
             .ok_or(Error::Overflow)?;
-        for output in outcomes.into_iter().flatten() {
-            if let AacAscScopeOutcome::Parsed(c) = output {
-                total = total
-                    .checked_add(c.descriptor_storage_bytes()?)
-                    .ok_or(Error::Overflow)?;
-            }
-        }
-        for parser in parsers.into_iter().flatten() {
-            total = total
-                .checked_add(parser.descriptor_storage_bytes()?)
-                .ok_or(Error::Overflow)?;
+        for extent in extents.into_iter().flatten() {
+            let bytes = match extent {
+                Extent::Parsing(parser) => parser.descriptor_storage_bytes()?,
+                Extent::Parsed(AacAscScopeOutcome::Parsed(c)) => c.descriptor_storage_bytes()?,
+                Extent::Parsed(AacAscScopeOutcome::Refused(_)) => 0,
+            };
+            total = total.checked_add(bytes).ok_or(Error::Overflow)?;
         }
         Ok(total)
     }
@@ -354,105 +332,66 @@ impl AacAscScopeParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<AacAscScopeViews>> {
-        let state = std::mem::replace(&mut self.state, State::Complete);
-        let (state, result) = self.advance(state, work, cancel);
-        self.state = match result {
-            Err(e) if !retryable(e) => State::Failed(e),
-            _ => state,
-        };
+        let result = self.advance(work, cancel);
+        if let Err(e) = result
+            && !retryable(e)
+        {
+            self.state = State::Failed(e);
+        }
         result
     }
-    /// Steps `state` for as long as `work` lasts; the state to keep, and the result.
     fn advance(
-        &self,
-        mut state: State,
+        &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> (State, Result<BuildStep<AacAscScopeViews>>) {
+    ) -> Result<BuildStep<AacAscScopeViews>> {
         loop {
-            state = match state {
-                State::Failed(e) => return (State::Failed(e), Err(e)),
-                State::Complete => return (State::Complete, Ok(BuildStep::Complete)),
-                state if cancel.load(Ordering::Relaxed) => return (state, Err(Error::Cancelled)),
-                State::Declared {
-                    raw,
-                    mut declared,
-                    physical,
-                } => match Self::outcome(declared.step(work, cancel)) {
-                    Ok(Some(outcome)) => State::Physical {
-                        raw,
-                        declared: Some(outcome),
-                        physical,
-                    },
-                    Ok(None) => {
-                        let state = State::Declared {
-                            raw,
-                            declared,
-                            physical,
-                        };
-                        return (state, Ok(BuildStep::Yield));
-                    }
-                    Err(e) => {
-                        let state = State::Declared {
-                            raw,
-                            declared,
-                            physical,
-                        };
-                        let e = self.refusal(&state, e);
-                        return (state, Err(e));
-                    }
-                },
-                State::Physical {
-                    raw,
-                    declared,
-                    mut physical,
-                } => match Self::outcome(physical.step(work, cancel)) {
-                    Ok(Some(outcome)) => State::Parsed {
-                        raw,
-                        declared,
-                        physical: outcome,
-                    },
-                    Ok(None) => {
-                        let state = State::Physical {
-                            raw,
-                            declared,
-                            physical,
-                        };
-                        return (state, Ok(BuildStep::Yield));
-                    }
-                    Err(e) => {
-                        let state = State::Physical {
-                            raw,
-                            declared,
-                            physical,
-                        };
-                        let e = self.refusal(&state, e);
-                        return (state, Err(e));
-                    }
-                },
-                State::Parsed {
-                    raw,
-                    declared,
-                    physical,
-                } => {
-                    if !work.try_charge(1) {
-                        let state = State::Parsed {
-                            raw,
-                            declared,
-                            physical,
-                        };
-                        return (state, Ok(BuildStep::Yield));
-                    }
-                    let views = AacAscScopeViews {
-                        raw,
-                        source: self.source,
-                        declared_bits: self.bits,
-                        declared,
-                        physical,
-                    };
-                    return (State::Complete, Ok(BuildStep::Ready(views)));
-                }
+            let State::Reading {
+                declared, physical, ..
+            } = &mut self.state
+            else {
+                return match self.state {
+                    State::Failed(e) => Err(e),
+                    State::Reading { .. } | State::Complete => Ok(BuildStep::Complete),
+                };
             };
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            let extent = match declared {
+                Some(extent @ Extent::Parsing(_)) => extent,
+                Some(Extent::Parsed(_)) | None => physical,
+            };
+            if let Extent::Parsing(parser) = extent {
+                match Self::outcome(parser.step(work, cancel)) {
+                    Ok(Some(outcome)) => *extent = Extent::Parsed(outcome),
+                    Ok(None) => return Ok(BuildStep::Yield),
+                    Err(e) => return Err(self.refusal(e)),
+                }
+                continue;
+            }
+            if !work.try_charge(1) {
+                return Ok(BuildStep::Yield);
+            }
+            let State::Reading {
+                raw,
+                declared,
+                physical: Extent::Parsed(physical),
+            } = std::mem::replace(&mut self.state, State::Complete)
+            else {
+                unreachable!("both extents are parsed")
+            };
+            let declared = declared.map(|extent| match extent {
+                Extent::Parsed(outcome) => outcome,
+                Extent::Parsing(_) => unreachable!("the declared extent is parsed first"),
+            });
+            return Ok(BuildStep::Ready(AacAscScopeViews {
+                raw,
+                source: self.source,
+                declared_bits: self.bits,
+                declared,
+                physical,
+            }));
         }
     }
 }
