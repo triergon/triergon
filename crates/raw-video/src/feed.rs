@@ -30,8 +30,11 @@ struct SubmissionClock {
     picture_duration: Time,
 }
 
-/// Packet bytes still alias the bounded raw NAL owners. The configuration
-/// owner belongs to this packet and remains valid across later updates.
+/// One access unit of a raw Annex B input with the configuration it decodes under.
+/// The unit's bytes stay in the reader's NAL allocations, several slices that
+/// `RawAccessUnit::segments` reads in order, so the packet has no `PacketInfo`
+/// view: a decoder that takes one slice needs the segments copied together. The
+/// configuration belongs to this packet and stays valid across later updates.
 #[derive(Debug)]
 pub struct RawVideoFeedPacket {
     /// The access unit, aliasing the reader's NAL owners.

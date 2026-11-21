@@ -1,10 +1,16 @@
-//! The access units a decoder takes, framed from any reader's packets through the
+//! The access units a decoder takes, framed from a container's packets through the
 //! neutral views: Annex B for AVC and HEVC, ADTS for AAC with a configuration
 //! record, and the packet itself for every other codec.
 //!
 //! [`AccessUnits::for_track`] reads the track's [`TrackInfo`] configuration record;
 //! [`AccessUnits::packet`] frames one packet of the track. Every step is bounded by
 //! the caller's [`WorkBudget`], and every buffer is charged to the pool.
+//!
+//! This is for packets a container stores in its own framing: Matroska frames and
+//! MP4 samples. The units of `triergon-hls` and `triergon-raw-video` are Annex B and
+//! ADTS already and go to a decoder as they are; where such a unit is several
+//! slices (an HEVC picture of a media segment, a raw Annex B unit), its reader's
+//! `contiguous_feed` or `segments` gives the bytes.
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{CodecId, PacketInfo, RandomAccess, TrackId, TrackInfo, Trim};
 use triergon_core::{Budget, Bytes, Error, Result, SourceId, SourceLocation, TimeBase, WorkBudget};
@@ -97,64 +103,85 @@ impl AccessUnits {
     /// configuration record: the AVC or HEVC decoder configuration record, or the AAC
     /// AudioSpecificConfig. A track without a record is taken to carry Annex B or ADTS
     /// already, as an MPEG-TS track does. Fails with `Limit` for a record above
-    /// `limits`, or as the record's parser does.
+    /// `limits`, as the record's parser does, and as [`Self::with_record`] does for a
+    /// Matroska AAC track without one.
     pub fn for_track(
         pool: &Budget,
         track: &dyn TrackInfo,
         limits: AccessUnitLimits,
     ) -> Result<AccessUnitsSetup> {
-        let record = || -> Result<Bytes> {
-            let raw = track.configuration();
-            if raw.len() > limits.configuration_bytes {
+        Self::with_record(pool, track, track.configuration(), limits)
+    }
+
+    /// [`Self::for_track`] with `record` in place of the track's own configuration
+    /// record, for a track whose container describes its stream elsewhere. A Matroska
+    /// AAC track named by a codec identifier with a profile suffix (`A_AAC/MPEG4/LC`)
+    /// carries raw frames and no record:
+    /// [`legacy_aac_lc_initialization`](crate::compat::matroska::legacy_aac_lc_initialization)
+    /// derives its AudioSpecificConfig. Fails with `Unsupported` for a Matroska AAC
+    /// track and an empty `record`, whose frames are not ADTS.
+    pub fn with_record(
+        pool: &Budget,
+        track: &dyn TrackInfo,
+        record: &[u8],
+        limits: AccessUnitLimits,
+    ) -> Result<AccessUnitsSetup> {
+        let owned = || -> Result<Bytes> {
+            if record.len() > limits.configuration_bytes {
                 return Err(Error::Limit {
-                    requested: raw.len(),
+                    requested: record.len(),
                     maximum: limits.configuration_bytes,
                 });
             }
-            Bytes::copy_from_slice(pool, raw)
+            Bytes::copy_from_slice(pool, record)
         };
         let setup = match track.codec() {
-            CodecId::H264 if !track.configuration().is_empty() => Setup::Avc(AvcConfigParser::new(
+            CodecId::H264 if !record.is_empty() => Setup::Avc(AvcConfigParser::new(
                 pool,
                 AvcConfigSource {
                     source: UNNAMED,
                     generation: 0,
                     offset: 0,
                 },
-                record()?,
+                owned()?,
                 AvcConfigLimits {
                     maximum_record_bytes: limits.configuration_bytes,
                     maximum_nals: limits.configuration_nals,
                     maximum_nal_bytes: limits.configuration_bytes,
                 },
             )?),
-            CodecId::Hevc if !track.configuration().is_empty() => {
-                Setup::Hevc(HvcConfigParser::new(
-                    pool,
-                    HvcConfigSource {
-                        source: UNNAMED,
-                        generation: 0,
-                        offset: 0,
-                    },
-                    record()?,
-                    HvcConfigLimits {
-                        maximum_record_bytes: limits.configuration_bytes,
-                        maximum_arrays: limits.configuration_nals,
-                        maximum_nals: limits.configuration_nals,
-                        maximum_nal_bytes: limits.configuration_bytes,
-                    },
-                )?)
-            }
-            CodecId::Aac if !track.configuration().is_empty() => Setup::Aac(AacAscParser::new(
+            CodecId::Hevc if !record.is_empty() => Setup::Hevc(HvcConfigParser::new(
+                pool,
+                HvcConfigSource {
+                    source: UNNAMED,
+                    generation: 0,
+                    offset: 0,
+                },
+                owned()?,
+                HvcConfigLimits {
+                    maximum_record_bytes: limits.configuration_bytes,
+                    maximum_arrays: limits.configuration_nals,
+                    maximum_nals: limits.configuration_nals,
+                    maximum_nal_bytes: limits.configuration_bytes,
+                },
+            )?),
+            CodecId::Aac if !record.is_empty() => Setup::Aac(AacAscParser::new(
                 pool,
                 AAC_SOURCE,
-                record()?,
+                owned()?,
                 AacConfigLimits {
                     maximum_record_bytes: limits.configuration_bytes,
                     maximum_pce_elements: 64,
                     maximum_comment_bytes: 255,
                 },
             )?),
+            // Matroska stores AAC frames raw under every one of its AAC codec
+            // identifiers, so without a record they cannot pass as ADTS.
+            CodecId::Aac if track.codec_tag().starts_with(b"A_AAC") => {
+                return Err(Error::Unsupported(
+                    "Matroska AAC track without an initialization record",
+                ));
+            }
             _ => Setup::Ready(Some(Framing::Packet)),
         };
         Ok(AccessUnitsSetup {

@@ -259,6 +259,53 @@ fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
 }
 
 #[test]
+fn access_units_frame_legacy_aac_lc_from_the_derived_record_and_refuse_it_without() {
+    use triergon_bridge::access::{AccessUnitLimits, AccessUnits};
+    use triergon_bridge::compat::matroska::legacy_aac_lc_initialization;
+    use triergon_core::container::PacketInfo;
+
+    let input = include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc.mkv");
+    let (mut player, pool) = player_with_input(input, 7);
+    let events = collect(&mut player);
+    let cancel = AtomicBool::new(false);
+    let mut gold =
+        include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-lc.feed").as_slice();
+    let mut units = None;
+    let mut count = 0;
+    for output in &events {
+        if let Event::Matroska(MkvEvent::Configuration(configuration)) = output.event() {
+            let track = &configuration.tracks()[0];
+            assert!(matches!(
+                AccessUnits::for_track(&pool, track, AccessUnitLimits::default()),
+                Err(Error::Unsupported(
+                    "Matroska AAC track without an initialization record"
+                ))
+            ));
+            let record = legacy_aac_lc_initialization(configuration, 0)
+                .unwrap()
+                .unwrap();
+            let mut setup =
+                AccessUnits::with_record(&pool, track, &record, AccessUnitLimits::default())
+                    .unwrap();
+            units = Some(crate::framing::ready(|work| {
+                setup.step(work, &cancel).unwrap()
+            }));
+        }
+        let Some(packet) = output.packet() else {
+            continue;
+        };
+        let mut job = units.as_mut().unwrap().packet(&packet).unwrap();
+        let unit = crate::framing::ready(|work| job.step(work, &cancel).unwrap());
+        let (want, rest) = gold.split_at(7 + packet.payload().len());
+        assert_eq!(unit.payload(), want);
+        gold = rest;
+        count += 1;
+    }
+    assert_eq!(count, 8);
+    assert!(gold.is_empty());
+}
+
+#[test]
 fn legacy_aac_lc_refuses_empty_initialization_and_ambiguous_channels() {
     use triergon_bridge::compat::matroska::legacy_aac_lc_initialization;
 

@@ -9,7 +9,7 @@ subtitle receivers of `triergon-subtitles`. It does not decode media or render.
 |---|---|
 | Matroska feeds | `matroska::MatroskaFeedSetup` (AVC Annex B, AAC ADTS), `MatroskaHevcDolbySetup` (HEVC Annex B, AC-3/E-AC-3), `MatroskaDiscovery`, `MatroskaCompactDiscovery`, `MatroskaVideoSeekGate` |
 | Matroska clocks | feed methods `demux_avc_clock`, `demux_aac_clock_probe` (`MatroskaTrackFeed`), `demux_hevc_clock`, `demux_dolby_clock_probe` (`MatroskaHevcDolbyFeed`); the audio probes are `MatroskaClockProbe`s; `MatroskaBitmapClockProbe` |
-| Access units | `access::AccessUnits` from any reader's `TrackInfo` and `PacketInfo`: AVC and HEVC as Annex B, AAC with an AudioSpecificConfig as ADTS, other codecs and tracks without a record as they are |
+| Access units | `access::AccessUnits` from a container track's `TrackInfo` and its packets' `PacketInfo`: AVC and HEVC as Annex B, AAC with an AudioSpecificConfig as ADTS, other codecs and tracks without a record as they are; `AccessUnits::with_record` where the record comes from elsewhere |
 | Packet bridges | `aac::AacBridge` (MP4 AAC as ADTS, bound to one plan's track and configuration revision), `av1::Av1Bridge` (including MP4 `av01` and `dav1`) |
 | Subtitles | `text::TextBridge`, `bitmap::{PgsBridge, DvdReceiver}`, `matroska::MatroskaBitmapTrack`, `mp4_dvd::{Mp4DvdSetup, Mp4DvdTrack}`, `ts::dvb::DvbTsBridge`, `ts::pgs::PgsTsTrack`, `ts::teletext::TeletextTsBridge`, `caption::CaptionBridge` |
 | Compatibility | `compat::matroska::legacy_aac_lc_initialization` |
@@ -29,6 +29,19 @@ scale when those fields are present. The single-layer VPS is checked through
 its trailing bits, the SPS through its timing fields, and the base PPS through
 its extension flags. The native packet clock also accepts matching in-band
 sets before a picture's first slice.
+
+**Access units.** `AccessUnits` frames what a container stores in its own
+framing: Matroska frames and MP4 samples, through `Output::packet`. The units of
+`triergon-hls` and `triergon-raw-video` are Annex B and ADTS already and go to a
+decoder as they are, as do transport stream access units of
+`triergon_mpegts::Reader`; a unit of several slices (an HEVC picture of a media
+segment, a raw Annex B unit) is first joined by its reader's `contiguous_feed` or
+from its `segments`. A playback `Event::Ts` or `Event::DemuxPes` is a PES, not an
+access unit, and has no packet view.
+A Matroska AAC track without CodecPrivate carries raw frames, so
+`AccessUnits::for_track` refuses it; for the AAC-LC codec identifiers
+`compat::matroska::legacy_aac_lc_initialization` derives the record
+`AccessUnits::with_record` takes.
 
 **Legacy Matroska AAC.** Discovery and `MatroskaFeedSetup` accept
 `A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC`. When a track has no initialization

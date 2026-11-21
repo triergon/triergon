@@ -124,7 +124,10 @@ enum Picture {
     Hevc(HlsHevcPicture),
 }
 
-/// One AVC or HEVC picture of a media segment.
+/// One AVC or HEVC picture of a media segment: an Annex B access unit, with any
+/// parameter sets its decoder needs inserted. It has no `PacketInfo` view, because
+/// an HEVC picture is several slices of the reader's input: [`Self::contiguous_feed`]
+/// gives a decoder the unit as one buffer, and [`Self::clock`] its PES times.
 #[derive(Debug)]
 pub struct HlsMediaVideoUnit(Picture);
 
