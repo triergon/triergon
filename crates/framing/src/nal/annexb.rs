@@ -1,5 +1,6 @@
 use crate::BuildStep;
 use crate::nal::{NalFacts, NalUnit};
+use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
@@ -97,7 +98,7 @@ impl AnnexBWriter {
         }
         let result = self.step_inner(work, cancel);
         if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(error)
         {
             self.stop(error);
         }

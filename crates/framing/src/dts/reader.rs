@@ -67,12 +67,6 @@ pub(super) const fn source_error(failure: SourceFailure) -> Error {
     }
 }
 
-/// Whether a reader may be stepped again after `error`: the pool refused storage
-/// it can grant once the caller frees some.
-pub(super) const fn retryable(error: Error) -> bool {
-    matches!(error, Error::Backpressure { .. } | Error::Allocation)
-}
-
 /// [`Error::Limit`] when `requested` exceeds `maximum`.
 pub(super) fn limit(requested: usize, maximum: usize) -> Result<()> {
     if requested > maximum {

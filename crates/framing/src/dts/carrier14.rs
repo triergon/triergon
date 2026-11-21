@@ -5,12 +5,13 @@
 //! narrower than the frame reader's sync, which accepts any value in those bits. A
 //! packet that does not start with the pattern stays opaque: it gets no header, no
 //! unpacked payload, no claim about its audio, and no end but the end of the source.
-use crate::dts::reader::{ReaderInput, limit, retryable, source_error};
+use crate::dts::reader::{ReaderInput, limit, source_error};
 use crate::dts::sync14::{header_payload, word};
 use crate::dts::{
     Dts14BitPayload, Dts14BitUnpacker, DtsCoreHeader, DtsPackingLimits, DtsSourceIdentity,
     DtsWordOrder, probe_core_header,
 };
+use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,

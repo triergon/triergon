@@ -33,6 +33,13 @@ mod record_input;
 
 use triergon_core::{Error, Result};
 
+/// Whether a job may be stepped again after `error`: the pool refused storage it
+/// can grant once the caller frees some.
+#[inline]
+pub(crate) const fn retryable(error: Error) -> bool {
+    matches!(error, Error::Backpressure { .. } | Error::Allocation)
+}
+
 /// One step of a work-bounded job that requests no input.
 ///
 /// `Ready` occurs exactly once; later calls return `Complete` unless the job was

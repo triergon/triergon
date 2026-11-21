@@ -2,6 +2,7 @@
 //! available; unknown arrays, duplicates and mismatched declarations are written as
 //! they are.
 use crate::nal::annexb::START_CODE;
+use crate::retryable;
 use crate::{BuildStep, hevc::HvcConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
@@ -105,7 +106,7 @@ impl HvcAnnexBWriter {
         }
         let result = self.advance(work, cancel);
         if let Err(e) = result
-            && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(e)
         {
             self.failure = Some(e);
             self.input = None;

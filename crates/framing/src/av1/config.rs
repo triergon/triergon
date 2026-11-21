@@ -1,6 +1,7 @@
 //! The AV1CodecConfigurationRecord of the AV1 ISOBMFF binding v1.3.0: its fixed
 //! fields and the framing of its configuration OBUs. The payload of a Sequence
 //! Header OBU is not read, nor checked against the record's fields or samples.
+use crate::retryable;
 use crate::{
     BuildStep,
     av1::{Av1Obu, Av1ObuFraming, Av1ObuLimits, Av1ObuReader},
@@ -279,7 +280,7 @@ impl Av1ConfigParser {
         }
         let result = self.step_inner(work, cancel);
         if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(error)
         {
             self.stop(error);
         }

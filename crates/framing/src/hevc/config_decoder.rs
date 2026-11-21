@@ -1,6 +1,7 @@
 //! The NAL units of an `hvcC` record that a decoder is configured with, as Annex B.
 //! A record with an array of another type is refused rather than written without
 //! it, and no NAL unit's bytes are changed.
+use crate::retryable;
 use crate::{
     BuildStep,
     hevc::{HvcAnnexBOutput, HvcAnnexBWriter, HvcConfiguration},
@@ -109,7 +110,7 @@ impl HvcDecoderConfigWriter {
         }
         let result = self.advance(work, cancel);
         if let Err(e) = result
-            && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(e)
         {
             self.failure = Some(e);
             self.input = None;

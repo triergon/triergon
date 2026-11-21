@@ -4,6 +4,7 @@
 //! no sync word is searched for and no length is derived from `FSIZE`.
 use crate::dts::DtsSourceIdentity;
 use crate::dts::reader::limit;
+use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
 
@@ -280,7 +281,7 @@ impl Dts14BitUnpacker {
         }
         let result = self.advance(work, cancel);
         if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(error)
         {
             self.failure = Some(error);
             self.source = None;

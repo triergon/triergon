@@ -1,3 +1,4 @@
+use crate::retryable;
 use crate::{
     BuildStep,
     nal::{Codec, Framing, NalReader, NalUnit, ParameterSetKind, ReaderLimits},
@@ -270,7 +271,7 @@ impl AnnexBConfigParser {
         }
         let result = self.step_inner(work, cancel);
         if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(error)
         {
             self.stop(error);
         }

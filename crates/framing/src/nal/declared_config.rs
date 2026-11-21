@@ -4,6 +4,7 @@
 //! Length fields are big-endian integers of the declared widths. Neither field
 //! offsets nor which NAL units belong to an array are read from the bytes. The
 //! whole record, unknown and reserved bytes included, is kept.
+use crate::retryable;
 use crate::{
     BuildStep,
     nal::{Codec, ConfigInspection, LengthSize, NalHeader},
@@ -304,7 +305,7 @@ impl<'a> DeclaredConfigParser<'a> {
         }
         let result = self.advance(work, cancel);
         if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(error)
         {
             self.stop(error);
         }

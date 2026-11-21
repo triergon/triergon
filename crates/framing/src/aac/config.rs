@@ -1,6 +1,7 @@
 //! The AudioSpecificConfig of ISO/IEC 14496-3 for AAC LC, alone or under SBR or PS,
 //! with its GASpecificConfig and program config element. Nothing here decodes audio.
 use crate::BuildStep;
+use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::bits_at;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget};
@@ -548,7 +549,7 @@ impl AacAscParser {
         }
         let result = self.advance(work, cancel);
         if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(error)
         {
             self.failure = Some(error);
             self.raw = None;

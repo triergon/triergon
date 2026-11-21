@@ -4,6 +4,7 @@
 use crate::dts::core_frame::CORE_SYNC;
 use crate::dts::reader::limit;
 use crate::dts::{DtsPackedBitLocation, DtsSourceIdentity};
+use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
 
@@ -382,7 +383,7 @@ impl DtsPackedPayloadJob {
         }
         let result = self.advance(work, cancel);
         if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(error)
         {
             self.failure = Some(error);
             self.raw = None;

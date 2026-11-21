@@ -2,11 +2,12 @@
 //! §5.4.2. A frame is the span from one normal sync to the next; how its length
 //! relates to `FSIZE` is reported, and neither shows that the coded audio is valid.
 use crate::dts::core_frame::CORE_SYNC;
-use crate::dts::reader::{ReaderInput, limit, retryable, source_error};
+use crate::dts::reader::{ReaderInput, limit, source_error};
 use crate::dts::{
     DtsCoreField, DtsPackedHeader, DtsPackedLimits, DtsPackedPayload, DtsPackedPayloadJob,
     DtsPacking, DtsSourceIdentity, inspect_header_bits,
 };
+use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,

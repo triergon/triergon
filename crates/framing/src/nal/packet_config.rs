@@ -5,6 +5,7 @@ use crate::nal::packet::{
     NalConfigurationRefusal, copy_annex_b_segment, copy_annex_b_whole, freeze_annex_b_output,
     start_annex_b_output,
 };
+use crate::retryable;
 use crate::{BuildStep, avc::AvcConfigArrayKind, nal::NalPacketConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
@@ -227,7 +228,7 @@ impl<'a> NalPacketConfigWriter<'a> {
         }
         let r = self.advance(work, cancel);
         if let Err(e) = r
-            && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(e)
         {
             self.failure = Some(e);
             self.output = None;

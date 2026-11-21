@@ -2,6 +2,7 @@
 //! byte of the buffer, and a decoder's view of a parsed configuration. Neither
 //! extent is derived from a parse that succeeds, a file name, padding or how the
 //! record was carried.
+use crate::retryable;
 use crate::{
     BuildStep,
     aac::{
@@ -295,7 +296,7 @@ impl AacAscScopeParser {
         }
         let r = self.advance(work, cancel);
         if let Err(e) = r
-            && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(e)
         {
             self.failure = Some(e);
             self.raw = None;

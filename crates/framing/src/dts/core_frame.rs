@@ -1,7 +1,8 @@
 //! Normal core frame headers of a canonical DTS stream and the frames they declare
 //! (ETSI TS 102 114 V1.6.1 §3.4, §5.3, §5.4.2). Coded audio and the extensions
 //! inside a frame stay unread source bytes.
-use crate::dts::reader::{ReaderInput, retryable, source_error};
+use crate::dts::reader::{ReaderInput, source_error};
+use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::{BitCursor, BitSource};
 use triergon_core::{
