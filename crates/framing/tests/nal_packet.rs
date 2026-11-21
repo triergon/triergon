@@ -666,8 +666,8 @@ fn inline_and_spilled_segments_retain_all_bytes_after_session_drop() {
                 assert_eq!(out.segment_bytes(index), Some(NON));
             }
             let descriptor_capacity = match count {
-                0..=6 => 0,
-                7..=8 => 8,
+                0..=7 => 0,
+                8 => 8,
                 _ => 16,
             };
             let retained = Budget::control_storage_bytes()
@@ -733,21 +733,29 @@ fn inline_capacity_does_not_relax_logical_segment_or_output_limits() {
 
 #[test]
 fn spill_pressure_keeps_a_verified_update_until_resume_or_cancellation() {
+    // One descriptor more than a packet keeps inline.
+    const SPILLED: usize = 8;
     for cancel_retry in [false, true] {
         let p = pool();
         let mut s = session(&p);
         let update = avc(&p, 129);
-        let mut source = packet(&p, &[NON; 7]);
+        let mut source = packet(&p, &[NON; SPILLED]);
         source.new_extradata = Some(update.source_bytes().clone());
-        let blocker = p
-            .reserve(p.available() - 6 * size_of::<NalPacketSegment>())
-            .unwrap();
+        // Leave room for the output storage but not for the spilled table, so
+        // the spill is the one refused reservation on every pointer width.
+        let expected: Vec<_> = (0..SPILLED)
+            .flat_map(|i| framed(if i == 0 { 4 } else { 3 }, NON))
+            .collect();
+        let output_storage = Bytes::owner_overhead_bytes() + expected.len();
+        let table = SPILLED * size_of::<NalPacketSegment>();
+        assert!(output_storage < table);
+        let blocker = p.reserve(p.available() - output_storage).unwrap();
         let charge = p.used();
         let mut j = s.packet(source, Some(update)).unwrap();
         loop {
             match j.step(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
                 Ok(BuildStep::Yield) => (),
-                Err(Error::Backpressure { .. }) => break,
+                Err(Error::Backpressure { requested, .. }) if requested == table => break,
                 _ => panic!("spill must pause without publishing"),
             }
         }
@@ -789,11 +797,8 @@ fn spill_pressure_keeps_a_verified_update_until_resume_or_cancellation() {
             };
             drop(j);
             assert_eq!(out.receiver_epoch(), 1);
-            assert_eq!(out.segments().len(), 7);
+            assert_eq!(out.segments().len(), SPILLED);
             assert_eq!(out.configuration_bytes().as_ref(), avcc(129));
-            let expected: Vec<_> = (0..7)
-                .flat_map(|i| framed(if i == 0 { 4 } else { 3 }, NON))
-                .collect();
             assert_eq!(out.bytes().as_ref(), expected);
             assert_eq!(s.receiver_epoch(), 1);
             assert_eq!(s.configuration().bytes().as_ref(), avcc(129));
