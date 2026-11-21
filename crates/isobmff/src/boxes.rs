@@ -69,7 +69,7 @@ impl BoxHeader {
             0 => {
                 if !top_level || kind != *b"mdat" {
                     return Err(Error::Unsupported(
-                        "zero-size box outside terminal top-level mdat profile",
+                        "zero-size box other than a top-level mdat",
                     ));
                 }
                 remaining

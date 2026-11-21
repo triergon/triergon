@@ -301,9 +301,7 @@ impl BoxReader {
                     match BoxHeader::parse(&self.prefix[..self.filled], self.start, bound, true)? {
                         HeaderRead::Need(count) => {
                             if count > self.prefix.len() {
-                                return Err(Error::Unsupported(
-                                    "box header beyond acquired subset",
-                                ));
+                                return Err(Error::Unsupported("box header longer than 16 bytes"));
                             }
                             self.needed = count;
                         }

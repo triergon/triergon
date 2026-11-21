@@ -480,9 +480,7 @@ impl SampleTableBuilder {
                         if let Some(ctts) = &self.parts.ctts {
                             let (version, flags) = fields::full(ctts.payload())?;
                             if version > 1 || flags != 0 {
-                                return Err(Error::Unsupported(
-                                    "ctts version/flags outside acquired syntax",
-                                ));
+                                return Err(Error::Unsupported("ctts version/flags"));
                             }
                         }
                         let stsd = required(self.parts.stsd.as_ref())?;

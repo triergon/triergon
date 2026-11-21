@@ -99,9 +99,7 @@ impl Tfhd {
         let b = raw.payload();
         let (version, flags) = fields::full(b)?;
         if version != 0 || flags & !0x03003b != 0 {
-            return Err(Error::Unsupported(
-                "tfhd version/flags outside acquired syntax",
-            ));
+            return Err(Error::Unsupported("tfhd version/flags"));
         }
         let mut at = 8usize;
         let base = if flags & 1 != 0 {
@@ -178,9 +176,7 @@ impl Run {
         // Experimental signed v1 field types from ISO FDAM3 replacement8.8.8.2
         // and MPEG m76694 table9 Original. No arbitrary nonzero-version rule.
         if version > 1 || flags & !0x000f05 != 0 {
-            return Err(Error::Unsupported(
-                "trun version/flags outside acquired syntax",
-            ));
+            return Err(Error::Unsupported("trun version/flags"));
         }
         if flags & 4 != 0 && flags & 0x400 != 0 {
             return Err(Error::Invalid("both first and per-sample flags"));

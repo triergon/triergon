@@ -23,17 +23,15 @@ impl Words {
         fields::full_zero(raw.payload())?;
         Self::rows(raw, 0, stride, limits)
     }
-    /// Only ctts has the acquired version-1 row interpretation. Other tables
-    /// keep their version/flags-zero constructor above.
+    /// The `ctts` rows, whose version 1 reads the offsets as signed. Other tables go
+    /// through the constructor above, which accepts version and flags zero only.
     pub(crate) fn parse_ctts(raw: BoxView, limits: Limits) -> Result<Self> {
         if raw.header().kind != *b"ctts" {
             return Err(Error::Invalid("not ctts"));
         }
         let (version, flags) = fields::full(raw.payload())?;
         if version > 1 || flags != 0 {
-            return Err(Error::Unsupported(
-                "ctts version/flags outside acquired syntax",
-            ));
+            return Err(Error::Unsupported("ctts version/flags"));
         }
         Self::rows(raw, version, 8, limits)
     }
@@ -117,13 +115,11 @@ impl Sizes {
         fields::slice(b, 0, 12)?;
         fields::full_zero(b)?;
         if b[4..7] != [0; 3] {
-            return Err(Error::Unsupported("stz2 reserved-field semantics"));
+            return Err(Error::Unsupported("stz2 reserved bytes not zero"));
         }
         let width = b[7];
         if !matches!(width, 4 | 8 | 16) {
-            return Err(Error::Unsupported(
-                "stz2 field width outside selected profile",
-            ));
+            return Err(Error::Unsupported("stz2 field width other than 4, 8 or 16"));
         }
         let count = fields::u32_at(b, 8)?;
         let bits = u64::from(count)
@@ -136,10 +132,10 @@ impl Sizes {
             return Err(Error::Truncated);
         }
         if end != available {
-            return Err(Error::Unsupported("stz2 opaque trailing full bytes"));
+            return Err(Error::Unsupported("stz2 trailing bytes"));
         }
-        // The acquired primary array layout establishes MSB-first entries.
-        // No acquired padding rule establishes a value for an unused low nibble.
+        // Entries are packed from the most significant bit. The unused low nibble of an
+        // odd count of 4-bit entries has no stated value and is not checked.
         Ok(Self {
             raw,
             count,

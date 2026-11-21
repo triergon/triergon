@@ -47,9 +47,7 @@ pub(crate) fn full(b: &[u8]) -> Result<(u8, u32)> {
 }
 pub(crate) fn full_zero(b: &[u8]) -> Result<()> {
     if full(b)? != (0, 0) {
-        return Err(Error::Unsupported(
-            "full box version/flags outside sourced subset",
-        ));
+        return Err(Error::Unsupported("full box version/flags not zero"));
     }
     Ok(())
 }
