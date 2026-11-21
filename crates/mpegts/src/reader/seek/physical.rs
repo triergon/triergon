@@ -18,28 +18,45 @@ use triergon_framing::MpegLayer;
 const WIDTH: usize = 188;
 // Video publication can look ahead into the next PES. Keep two bounded PES
 // extents and their tables; anything older or larger simply loses direct proof.
-const VIDEO_CARRIERS: usize = 32;
-const HISTORY: usize = 2 * (VIDEO_CARRIERS + 2);
+const PES_CARRIERS: usize = 32;
+const HISTORY: usize = 2 * (PES_CARRIERS + 2);
+
+// Keep fixed-divisor indexing for the common TS188 path.
+fn carrier_slot(offset: u64, width: usize) -> usize {
+    let ordinal = if width == WIDTH {
+        offset / WIDTH as u64
+    } else {
+        offset / 192
+    };
+    (ordinal % HISTORY as u64) as usize
+}
 
 #[derive(Clone, Copy)]
 struct Carrier {
     offset: u64,
     pid: u16,
-    payload: usize,
+    payload: u8,
     pusi: bool,
-    bytes: [u8; WIDTH],
+    bytes: [u8; 192],
+    width: u8,
 }
 
 impl Carrier {
     fn from_packet(packet: &TransportPacket) -> Option<Self> {
-        let bytes: [u8; WIDTH] = packet.source.as_ref().try_into().ok()?;
+        let width = packet.source.len();
+        let prefix = packet.prefix.as_ref().map_or(0, triergon_core::Bytes::len);
+        if width != WIDTH + prefix || !matches!(prefix, 0 | 4) {
+            return None;
+        }
+        let mut bytes = [0; 192];
+        bytes[..width].copy_from_slice(packet.source.as_ref());
         if packet.transport_error || packet.scrambling != 0 || packet.discontinuity_indicator() {
             return None;
         }
         Some(Self {
             offset: packet.source_offset,
             pid: packet.pid,
-            payload: usize::try_from(
+            payload: u8::try_from(
                 packet
                     .payload_source_offset
                     .checked_sub(packet.source_offset)?,
@@ -47,11 +64,15 @@ impl Carrier {
             .ok()?,
             pusi: packet.payload_unit_start,
             bytes,
+            width: u8::try_from(width).ok()?,
         })
     }
 
     fn table(&self, pid: u16, section: &[u8]) -> bool {
-        let Some(payload) = self.bytes.get(self.payload..) else {
+        let Some(payload) = self
+            .bytes
+            .get(usize::from(self.payload)..usize::from(self.width))
+        else {
             return false;
         };
         self.pid == pid
@@ -83,6 +104,7 @@ pub(super) struct Capture {
     source: SourceId,
     length: u64,
     next: u64,
+    width: usize,
     elementary: u64,
     frames: usize,
     nals: usize,
@@ -115,6 +137,7 @@ impl Capture {
                 length,
                 maximum: capacity,
                 next: 0,
+                width: 0,
                 elementary: 0,
                 frames: 0,
                 nals: 0,
@@ -134,10 +157,7 @@ impl Capture {
         }
         match event {
             ReaderEvent::Transport(packet) => {
-                if packet.prefix.is_some()
-                    || packet.source_id != Some(self.source)
-                    || packet.source_offset != self.next
-                {
+                if packet.source_id != Some(self.source) || packet.source_offset != self.next {
                     self.valid = false;
                     return;
                 }
@@ -145,9 +165,14 @@ impl Capture {
                     self.valid = false;
                     return;
                 };
-                let slot = (self.next / WIDTH as u64 % HISTORY as u64) as usize;
+                if self.width != 0 && self.width != usize::from(carrier.width) {
+                    self.valid = false;
+                    return;
+                }
+                self.width = usize::from(carrier.width);
+                let slot = carrier_slot(self.next, self.width);
                 self.carriers[slot] = Some(carrier);
-                self.next += WIDTH as u64;
+                self.next += self.width as u64;
                 if packet.pid != 0 && packet.pid != 0x1fff
                     && !self.map.as_ref().is_some_and(|map| {
                         map.map().streams.as_slice()[0].pid == packet.pid
@@ -204,19 +229,22 @@ impl Capture {
     }
 
     fn record_packet(&mut self, packet: &Packet) -> bool {
+        if self.width == 0 {
+            return false;
+        }
         let (maximum_carriers, nals) = match packet.access_unit() {
             AccessUnit::MpegAudio(frame)
                 if matches!(frame.header().layer, MpegLayer::I | MpegLayer::II)
                     && frame.header().bitrate_kbps != 0
                     && frame.header().frame_bytes() == Some(packet.payload().len()) =>
             {
-                (1, 0)
+                (PES_CARRIERS, 0)
             }
             AccessUnit::Video(unit) => {
                 let Some(nals) = video::nals(unit) else {
                     return false;
                 };
-                (VIDEO_CARRIERS, nals)
+                (PES_CARRIERS, nals)
             }
             _ => return false,
         };
@@ -227,7 +255,7 @@ impl Capture {
         let [header] = pes.header_source_ranges.as_slice() else {
             return false;
         };
-        let first = header.offset / WIDTH as u64 * WIDTH as u64;
+        let first = header.offset / self.width as u64 * self.width as u64;
         let Some(carrier) = self.carrier(first) else {
             return false;
         };
@@ -257,19 +285,19 @@ impl Capture {
             || header.bytes != pes.header.as_bytes().len()
             || carrier
                 .bytes
-                .get(carrier.payload..carrier.payload + header.bytes)
+                .get(usize::from(carrier.payload)..usize::from(carrier.payload) + header.bytes)
                 != Some(pes.header.as_bytes())
         {
             return false;
         }
         let mut consumed = 0;
         for (index, span) in pes.spans().iter().enumerate() {
-            let Some(carrier) = self.carrier(first + (index * WIDTH) as u64) else {
+            let Some(carrier) = self.carrier(first + (index * self.width) as u64) else {
                 return false;
             };
             let physical = span.source_range();
-            let start = carrier.payload + if index == 0 { header.bytes } else { 0 };
-            let Some(bytes) = carrier.bytes.get(start..) else {
+            let start = usize::from(carrier.payload) + if index == 0 { header.bytes } else { 0 };
+            let Some(bytes) = carrier.bytes.get(start..usize::from(carrier.width)) else {
                 return false;
             };
             if carrier.pid != pes.pid
@@ -289,15 +317,15 @@ impl Capture {
         }
         if packet.clock().and_then(|clock| clock.pts.exact).is_some()
             && let Some(pat) = first
-                .checked_sub((2 * WIDTH) as u64)
+                .checked_sub((2 * self.width) as u64)
                 .and_then(|at| self.carrier(at))
             && let Some(pmt) = first
-                .checked_sub(WIDTH as u64)
+                .checked_sub(self.width as u64)
                 .and_then(|at| self.carrier(at))
             && let (Some(pat_source), Some(map)) = (&self.pat, &self.map)
             && let TraceEvent::Pat(table) = pat_source.event()
-            && pat.offset + WIDTH as u64 == pmt.offset
-            && pmt.offset + WIDTH as u64 == first
+            && pat.offset + self.width as u64 == pmt.offset
+            && pmt.offset + self.width as u64 == first
             && pat.table(0, table.source_sections.as_slice()[0].as_ref())
             && pmt.table(table.programs.as_slice()[0].pid, map.map().source.as_ref())
         {
@@ -315,7 +343,7 @@ impl Capture {
                 return false;
             }
             for index in 0..pes.spans().len() {
-                let Some(carrier) = self.carrier(first + (index * WIDTH) as u64) else {
+                let Some(carrier) = self.carrier(first + (index * self.width) as u64) else {
                     return false;
                 };
                 if carriers.try_push(carrier).is_err() {
@@ -345,7 +373,7 @@ impl Capture {
     }
 
     fn carrier(&self, offset: u64) -> Option<Carrier> {
-        let carrier = self.carriers[(offset / WIDTH as u64 % HISTORY as u64) as usize]?;
+        let carrier = self.carriers[carrier_slot(offset, self.width)]?;
         (carrier.offset == offset).then_some(carrier)
     }
 
@@ -438,7 +466,7 @@ impl Direct {
                 };
                 if packet.source_id != Some(self.index.source)
                     || packet.source_offset != expected.offset
-                    || packet.source.as_ref() != expected.bytes
+                    || packet.source.as_ref() != &expected.bytes[..usize::from(expected.width)]
                 {
                     return Err(Error::SourceMismatch);
                 }
