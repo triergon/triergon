@@ -8,6 +8,12 @@
 //! never edits a table: a table any of whose subtables or variation-sequence
 //! tables lies outside it, whose version is not 0, or whose checks exceed the
 //! sanitizer's operation budget is no table, and maps nothing.
+//!
+//! So this is not `triergon-font`'s `cmap` reader, which gives FreeType's
+//! results: that one checks no version, validates each subtable on its own
+//! and keeps every charmap that passes, searches unordered format 4 segments
+//! linearly and remaps no symbol or Macintosh code, where this one sanitizes
+//! the table as a whole and reads the one subtable HarfBuzz prefers.
 
 #[rustfmt::skip] // Laid out by the generator.
 mod tables;

@@ -1,6 +1,13 @@
 //! The legacy `kern` table, applied the way HarfBuzz applies it when GPOS has no
 //! kerning: format 0 pair subtables over adjacent non-mark glyphs in visual
 //! order, each kerning value split between the two glyphs.
+//!
+//! `triergon-font`'s `kern` reader gives FreeType's pair values instead: it
+//! reads at most 32 subtables, skips minimum ones and those of other formats,
+//! ignores the cross-stream bit, honours the override bit, searches unordered
+//! pairs linearly and reads Apple's version 1 table as empty. This one applies
+//! every horizontal subtable, refuses other formats, cross-stream subtables
+//! and Apple's table, and bisects the pairs whatever their order.
 
 use super::apply::{Apply, Next, Values};
 use super::data::Data;

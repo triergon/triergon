@@ -7,6 +7,12 @@
 //! Charstring Format*) defines them. Where HarfBuzz settles what the
 //! specifications leave open, or departs from them, the rule names the probe
 //! under `harness/shape/probes` that shows it (`cargo xtask shape probe`).
+//!
+//! `triergon-font`'s charstring reader gives FreeType's outlines and box,
+//! which differ: it computes in 16.16, allows 48 operands in CFF, 16 nested
+//! calls and any number of operations within the work budget; this one
+//! computes in `f64` and allows 513 operands, 10 nested calls and 200,000
+//! operations.
 
 use triergon_core::{Error, Result, WorkBudget};
 use triergon_font::read::{u16_at, u32_at};
