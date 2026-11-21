@@ -2,6 +2,8 @@
 //! regenerated from the specification's formulas. Large tables live in `spec_tables.rs`,
 //! which is generated from the specification text.
 
+use crate::substream::ExpStrategy;
+
 /// Table 7.6 slowdec[].
 pub(crate) const SLOWDEC: [i32; 4] = [0x0f, 0x11, 0x13, 0x15];
 /// Table 7.7 fastdec[].
@@ -39,12 +41,12 @@ pub(crate) fn spx_band_start(sbnd: usize) -> usize {
     25 + 12 * sbnd
 }
 
-/// Annex E Table E2.10: frame exponent strategy combinations (0 = reuse, 1 = D15, 2 = D25, 3 = D45).
-pub(crate) const FRM_EXPSTR: [[u8; 6]; 32] = {
-    const R: u8 = 0;
-    const A: u8 = 1; // D15
-    const B: u8 = 2; // D25
-    const C: u8 = 3; // D45
+/// Annex E Table E2.10: frame exponent strategy combinations.
+pub(crate) const FRM_EXPSTR: [[ExpStrategy; 6]; 32] = {
+    const R: ExpStrategy = ExpStrategy::Reuse;
+    const A: ExpStrategy = ExpStrategy::D15;
+    const B: ExpStrategy = ExpStrategy::D25;
+    const C: ExpStrategy = ExpStrategy::D45;
     [
         [A, R, R, R, R, R],
         [A, R, R, R, R, C],

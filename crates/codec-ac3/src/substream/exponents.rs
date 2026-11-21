@@ -1,6 +1,6 @@
 //! Exponent strategies, channel bandwidths and grouped exponents (5.4.3, 7.1).
 
-use super::{CPL, E, LFE, REUSE, Substream, bad};
+use super::{CPL, E, LFE, Substream, bad};
 use crate::bitalloc::BaRerun;
 use crate::tables::spx_band_start;
 use triergon_bitstream::BitReader;
@@ -17,20 +17,29 @@ impl Substream {
         let nfch = self.nfchans;
         let eac3 = self.eac3;
         if !eac3 {
-            self.expstr[CPL][blk] = if cplinu { br.read(2) as u8 } else { REUSE };
+            self.expstr[CPL][blk] = if cplinu {
+                ExpStrategy::from_code(br.read(2))
+            } else {
+                ExpStrategy::Reuse
+            };
             for ch in 0..nfch {
-                self.expstr[ch][blk] = br.read(2) as u8;
+                self.expstr[ch][blk] = ExpStrategy::from_code(br.read(2));
             }
             if self.lfeon {
-                self.expstr[LFE][blk] = br.read(1) as u8;
+                self.expstr[LFE][blk] = ExpStrategy::from_code(br.read(1));
             }
         }
-        if blk == 0 && !eac3 && self.coded_channels().any(|ch| self.expstr[ch][0] == REUSE) {
+        if blk == 0
+            && !eac3
+            && self
+                .coded_channels()
+                .any(|ch| self.expstr[ch][0] == ExpStrategy::Reuse)
+        {
             return Err(bad("exponent reuse in block 0"));
         }
         // Channel bandwidth codes.
         for ch in 0..nfch {
-            if self.expstr[ch][blk] != REUSE {
+            if self.expstr[ch][blk] != ExpStrategy::Reuse {
                 if self.chincpl[ch] && cplinu {
                     self.endmant[ch] = self.cplstrtmant;
                 } else if eac3 && self.spxinu && self.chinspx[ch] {
@@ -59,25 +68,28 @@ impl Substream {
     ) -> Result<(), E> {
         let nfch = self.nfchans;
         let eac3 = self.eac3;
-        if cplinu && self.expstr[CPL][blk] != REUSE {
-            let strategy = self.expstr[CPL][blk];
+        if cplinu && self.expstr[CPL][blk] != ExpStrategy::Reuse {
             let cplabsexp = (br.read(4) as u8) << 1;
-            let gs = grp_size(strategy);
+            let gs = self.expstr[CPL][blk].group_size();
             let ngrps = (self.cplendmant - self.cplstrtmant) / (3 * gs);
             let start = self.cplstrtmant;
             decode_exponents(br, &mut self.exps[CPL], cplabsexp, start, ngrps, gs)?;
             self.strtmant[CPL] = self.cplstrtmant;
             self.endmant[CPL] = self.cplendmant;
             self.ba_rerun[CPL] = BaRerun::Psd;
-        } else if cplinu && new_cpl_strategy && !eac3 && self.expstr[CPL][blk] == REUSE && blk == 0
+        } else if cplinu
+            && new_cpl_strategy
+            && !eac3
+            && self.expstr[CPL][blk] == ExpStrategy::Reuse
+            && blk == 0
         {
             return Err(bad("coupling exponents missing"));
         }
         for ch in 0..nfch {
             let strategy = self.expstr[ch][blk];
-            if strategy != REUSE {
+            if strategy != ExpStrategy::Reuse {
                 let absexp = br.read(4) as u8;
-                let gs = grp_size(strategy);
+                let gs = strategy.group_size();
                 let end = self.endmant[ch];
                 let ngrps = (end - 1 + 3 * gs - 3) / (3 * gs);
                 self.exps[ch][0] = absexp;
@@ -86,7 +98,7 @@ impl Substream {
                 self.ba_rerun[ch] = BaRerun::Psd;
             }
         }
-        if self.lfeon && self.expstr[LFE][blk] != REUSE {
+        if self.lfeon && self.expstr[LFE][blk] != ExpStrategy::Reuse {
             let absexp = br.read(4) as u8;
             self.exps[LFE][0] = absexp;
             decode_exponents(br, &mut self.exps[LFE], absexp, 1, 2, 1)?;
@@ -98,13 +110,39 @@ impl Substream {
     }
 }
 
-/// Exponents per group (7.1.3) of the D15, D25 and D45 strategies.
-#[inline]
-fn grp_size(strategy: u8) -> usize {
-    match strategy {
-        1 => 1,
-        2 => 2,
-        _ => 4,
+/// Exponent strategy of one channel in one block (5.4.3.21-23, Table 5.16).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ExpStrategy {
+    /// Reuse the previous block's exponents.
+    Reuse = 0,
+    /// One exponent per transform coefficient.
+    D15 = 1,
+    /// One exponent per two coefficients.
+    D25 = 2,
+    /// One exponent per four coefficients.
+    D45 = 3,
+}
+
+impl ExpStrategy {
+    /// The strategy of a chexpstr/cplexpstr code (2 bits) or lfeexpstr (1 bit).
+    #[inline(always)]
+    pub(crate) fn from_code(code: u32) -> Self {
+        match code & 3 {
+            0 => ExpStrategy::Reuse,
+            1 => ExpStrategy::D15,
+            2 => ExpStrategy::D25,
+            _ => ExpStrategy::D45,
+        }
+    }
+
+    /// Coefficients sharing one exponent (7.1.3).
+    #[inline]
+    fn group_size(self) -> usize {
+        match self {
+            ExpStrategy::D15 => 1,
+            ExpStrategy::D25 => 2,
+            _ => 4,
+        }
     }
 }
 

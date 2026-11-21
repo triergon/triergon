@@ -10,6 +10,8 @@ mod exponents;
 mod mantissas;
 mod reconstruct;
 
+pub(crate) use exponents::ExpStrategy;
+
 use crate::bitalloc::{BaCache, BaParams, BaRerun, Dba};
 use crate::error::DecodeError;
 use crate::imdct::Imdct;
@@ -21,8 +23,6 @@ use triergon_bitstream::BitReader;
 pub(crate) const CPL: usize = 5;
 pub(crate) const LFE: usize = 6;
 pub(crate) const NCH: usize = 7;
-
-const REUSE: u8 = 0;
 
 type E = DecodeError;
 
@@ -134,7 +134,7 @@ pub(crate) struct Substream {
     cplstre_blk: [bool; 6],
     cplinu_blk: [bool; 6],
     /// Exponent strategy per channel (fbw, CPL, LFE) per block.
-    expstr: [[u8; 6]; NCH],
+    expstr: [[ExpStrategy; 6]; NCH],
     aht: [bool; NCH],
     aht_read: [bool; NCH],
     frmcsnroffst: u8,
@@ -270,7 +270,7 @@ impl Substream {
             skipflde: false,
             cplstre_blk: [false; 6],
             cplinu_blk: [false; 6],
-            expstr: [[0; 6]; NCH],
+            expstr: [[ExpStrategy::Reuse; 6]; NCH],
             aht: [false; NCH],
             aht_read: [false; NCH],
             frmcsnroffst: 0,

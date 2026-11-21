@@ -1,7 +1,7 @@
 //! Bit stream information (5.3.2, Annex E 2.3.1) and the E-AC-3 audio frame element
 //! (Annex E 2.3.2).
 
-use super::{CPL, DownmixCodes, E, LFE, NCH, NFCHANS, REUSE, Substream, bad};
+use super::{CPL, DownmixCodes, E, ExpStrategy, LFE, NCH, NFCHANS, Substream, bad};
 use crate::error::{DecodeError, Feature};
 use crate::tables::{DEF_SPX_BNDSTRC, FRM_EXPSTR};
 use crate::trace::Trace;
@@ -295,12 +295,12 @@ impl Substream {
         if expstre {
             for blk in 0..nblk {
                 self.expstr[CPL][blk] = if self.cplinu_blk[blk] {
-                    br.read(2) as u8
+                    ExpStrategy::from_code(br.read(2))
                 } else {
-                    REUSE
+                    ExpStrategy::Reuse
                 };
                 for ch in 0..nfch {
-                    self.expstr[ch][blk] = br.read(2) as u8;
+                    self.expstr[ch][blk] = ExpStrategy::from_code(br.read(2));
                 }
             }
         } else {
@@ -311,7 +311,7 @@ impl Substream {
                     self.expstr[CPL][blk] = FRM_EXPSTR[s][blk];
                 }
             } else {
-                self.expstr[CPL] = [REUSE; 6];
+                self.expstr[CPL] = [ExpStrategy::Reuse; 6];
             }
             for ch in 0..nfch {
                 let s = br.read(5) as usize;
@@ -320,7 +320,7 @@ impl Substream {
         }
         if self.lfeon {
             for blk in 0..nblk {
-                self.expstr[LFE][blk] = br.read(1) as u8;
+                self.expstr[LFE][blk] = ExpStrategy::from_code(br.read(1));
             }
         }
         // Converter exponent strategy.
@@ -335,19 +335,23 @@ impl Substream {
         self.aht_read = [false; NCH];
         if ahte {
             let ncplregs = (0..6)
-                .filter(|&b| self.cplstre_blk[b] || self.expstr[CPL][b] != REUSE)
+                .filter(|&b| self.cplstre_blk[b] || self.expstr[CPL][b] != ExpStrategy::Reuse)
                 .count();
             if ncplblks == 6 && ncplregs == 1 {
                 self.aht[CPL] = br.bit();
             }
             for ch in 0..nfch {
-                let nregs = (0..6).filter(|&b| self.expstr[ch][b] != REUSE).count();
+                let nregs = (0..6)
+                    .filter(|&b| self.expstr[ch][b] != ExpStrategy::Reuse)
+                    .count();
                 if nregs == 1 {
                     self.aht[ch] = br.bit();
                 }
             }
             if self.lfeon {
-                let nregs = (0..6).filter(|&b| self.expstr[LFE][b] != REUSE).count();
+                let nregs = (0..6)
+                    .filter(|&b| self.expstr[LFE][b] != ExpStrategy::Reuse)
+                    .count();
                 if nregs == 1 {
                     self.aht[LFE] = br.bit();
                 }
