@@ -151,15 +151,20 @@ impl Vp9Configuration {
 /// issue rather than silently removed. No source-sized copy/allocation occurs.
 #[derive(Debug)]
 pub struct Vp9ConfigParser {
-    source: Option<Bytes>,
-    cursor: Option<InputCursor>,
+    state: State,
     context: Vp9ConfigContext,
     identity: SourceId,
     generation: u64,
     header: [u8; 8],
     used: usize,
-    complete: bool,
-    failure: Option<Error>,
+}
+
+/// Where a parse stands. The record and its cursor are held only while it is read.
+#[derive(Debug)]
+enum State {
+    Reading { source: Bytes, cursor: InputCursor },
+    Complete,
+    Failed(Error),
 }
 
 impl Vp9ConfigParser {
@@ -185,22 +190,16 @@ impl Vp9ConfigParser {
         let cursor = record_input::cursor(pool, source, &record, limits.maximum_input_window)?;
         let generation = cursor.generation();
         Ok(Self {
-            source: Some(record),
-            cursor: Some(cursor),
+            state: State::Reading {
+                source: record,
+                cursor,
+            },
             context,
             identity: source,
             generation,
             header: [0; 8],
             used: 0,
-            complete: false,
-            failure: None,
         })
-    }
-
-    fn stop(&mut self, error: Error) {
-        self.failure = Some(error);
-        self.source = None;
-        self.cursor = None;
     }
 
     /// Reads the fixed fields, one work unit per byte and one for the length check, and
@@ -212,28 +211,28 @@ impl Vp9ConfigParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<Vp9Configuration>> {
-        if let Some(error) = self.failure {
+        if let State::Failed(error) = self.state {
             return Err(error);
         }
         if cancel.load(Ordering::Relaxed) {
-            self.stop(Error::Cancelled);
+            self.state = State::Failed(Error::Cancelled);
             return Err(Error::Cancelled);
         }
-        let result = self.step_inner(work, cancel);
+        let result = self.read(work, cancel);
         if let Err(error) = result {
-            self.stop(error);
+            self.state = State::Failed(error);
         }
         result
     }
 
-    fn step_inner(
+    fn read(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<Vp9Configuration>> {
-        if self.complete {
+        let State::Reading { source, cursor } = &mut self.state else {
             return Ok(BuildStep::Complete);
-        }
+        };
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -246,10 +245,6 @@ impl Vp9ConfigParser {
                 let expected = 8_usize
                     .checked_add(usize::from(fields.initialization_size()))
                     .ok_or(Error::Overflow)?;
-                let source = self
-                    .source
-                    .as_ref()
-                    .ok_or(Error::Invalid("missing VP9 record source"))?;
                 if source.len() < expected {
                     return Err(Error::Truncated);
                 }
@@ -258,12 +253,8 @@ impl Vp9ConfigParser {
                         "trailing bytes after VP9 configuration record",
                     ));
                 }
-                let raw = self
-                    .source
-                    .take()
-                    .ok_or(Error::Invalid("missing VP9 record source"))?;
-                self.cursor = None;
-                self.complete = true;
+                let raw = source.clone();
+                self.state = State::Complete;
                 return Ok(BuildStep::Ready(Vp9Configuration {
                     raw,
                     context: self.context,
@@ -272,26 +263,16 @@ impl Vp9ConfigParser {
                     generation: self.generation,
                 }));
             }
-            let cursor = self
-                .cursor
-                .as_mut()
-                .ok_or(Error::Invalid("missing VP9 record cursor"))?;
             match cursor.read_into(&mut self.header[self.used..], work, cancel)? {
                 Step::Ready(count) => {
                     self.used = self.used.checked_add(count).ok_or(Error::Overflow)?;
                 }
                 Step::Yield => return Ok(BuildStep::Yield),
                 Step::End(_) => return Err(Error::Truncated),
-                Step::NeedInput(request) => {
-                    let source = self
-                        .source
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing VP9 record source"))?;
-                    match record_input::window(source, &request)? {
-                        Some(window) => cursor.provide(&window)?,
-                        None => cursor.finish(request.source, request.token)?,
-                    }
-                }
+                Step::NeedInput(request) => match record_input::window(source, &request)? {
+                    Some(window) => cursor.provide(&window)?,
+                    None => cursor.finish(request.source, request.token)?,
+                },
             }
         }
     }
