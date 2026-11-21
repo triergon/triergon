@@ -1,6 +1,7 @@
 use triergon_pixel::{Error, Geometry, Orientation, Picture, rgba_to_yuv420};
+
 #[test]
-fn private_geometry_has_checked_dimensions_and_coded_extents() {
+fn geometry_reports_visible_and_coded_extents() {
     let g = Geometry::new(18, 34).unwrap();
     assert_eq!(
         (
@@ -16,12 +17,14 @@ fn private_geometry_has_checked_dimensions_and_coded_extents() {
         (32, 16, 18 * 34 * 4)
     );
 }
+
 #[test]
 fn largest_valid_geometry_is_32bit_representable_without_allocation() {
     let g = Geometry::new(4094, 4094).unwrap();
     assert_eq!((g.luma_stride(), g.chroma_stride()), (4096, 2048));
     assert!(g.rgba_len() < u32::MAX as usize);
 }
+
 #[test]
 fn invalid_geometry_stays_explicit() {
     for (w, h) in [
@@ -36,6 +39,7 @@ fn invalid_geometry_stays_explicit() {
         assert!(matches!(Geometry::new(w, h), Err(Error::Geometry { .. })));
     }
 }
+
 #[test]
 fn mutable_planes_keep_exact_layout_and_convert_safely() {
     let mut p = Picture::new(Geometry::new(2, 2).unwrap());
@@ -48,6 +52,7 @@ fn mutable_planes_keep_exact_layout_and_convert_safely() {
     assert_eq!(p.geometry(), Geometry::new(2, 2).unwrap());
     assert_eq!(p.visible_yuv420(), [16, 16, 16, 16, 128, 128]);
 }
+
 #[test]
 fn row_accessors_reject_end_and_overflow_indices() {
     let p = Picture::new(Geometry::new(18, 34).unwrap());
