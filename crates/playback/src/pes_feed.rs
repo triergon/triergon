@@ -9,8 +9,8 @@ use crate::{Engine, Result};
 use triergon_core::InputCursor;
 use triergon_mpegts::ParseLimits;
 
-pub use crate::engines::{FeedPacket, FeedStep, TsEngine};
-pub use crate::ts_payload::{PesFacts, PesInput, SpentLists};
+pub use crate::engine::ts::TsEngine;
+pub use crate::engine::ts::feed::{FeedPacket, FeedStep, PesFacts, PesInput, SpentLists};
 
 /// A player engine over one independent TS188 segment with an in-band PAT and
 /// PMT, delivering demux PES of the tracks its PMT names: AVC and AAC, or with

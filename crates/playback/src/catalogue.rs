@@ -3,11 +3,11 @@
 //! freshly opened entity and keeps transport/entity validation outside this crate.
 use crate::{
     Engine, Event, Output, Player, Result, SeekIntent, Selection, Source,
-    engines::Mp4RangeLanding,
+    engine::Mp4RangeLanding,
+    engine::mp4::progressive::ProgressiveLimits,
     io::SourceOwner,
     mp4_open::{Movie, OpenedMp4},
     mp4_plan::PreparedMp4,
-    progressive::ProgressiveLimits,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, InputRequest, SourceId};

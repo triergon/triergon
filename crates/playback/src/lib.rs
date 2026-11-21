@@ -3,17 +3,18 @@
 #![warn(clippy::print_stdout, clippy::print_stderr, clippy::unwrap_used)]
 // Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::expect_used`.
 pub mod compat;
-mod engines;
+mod engine;
+mod event;
 pub mod io;
-mod mp4_native_replay;
 pub mod mp4_open;
 pub mod mp4_plan;
 pub mod pes_feed;
 mod player;
 mod sample_sort;
-pub use engines::{
-    Engine, EngineStep, Event, Mp4EmptyPacket, Mp4Event, Mp4MissingSample, Mp4Packet,
-    Mp4ShortPacket, TsEvent,
+pub use engine::Engine;
+pub use event::{
+    EngineStep, Event, Mp4EmptyPacket, Mp4Event, Mp4MissingSample, Mp4Packet, Mp4ShortPacket,
+    TsEvent,
 };
 pub use player::{
     ClockChoice, Delivery, MatroskaReplayOutput, Mp4DemuxSeekCommand, Mp4DemuxSeekJob,
@@ -29,12 +30,10 @@ pub enum Format {
 }
 pub use triergon_core::{Error, Result};
 
-pub mod progressive;
+pub use engine::mp4::progressive;
 pub mod pump;
 
 pub mod input;
 pub use input::{ByteSource, Source, SourceReply};
 
 pub mod catalogue;
-
-mod ts_payload;

@@ -522,7 +522,7 @@ impl<S: Source> Player<S> {
     }
     /// Hands a consumed PES's lists back to the observer of `pid`, so that it
     /// allocates nothing for its next PES. Does nothing for other engines.
-    pub fn reuse_pes_lists(&mut self, pid: u16, lists: crate::ts_payload::SpentLists) {
+    pub fn reuse_pes_lists(&mut self, pid: u16, lists: crate::engine::ts::feed::SpentLists) {
         if let Some(engine) = self.engine.as_mut() {
             engine.reuse_pes_lists(pid, lists);
         }
@@ -622,7 +622,7 @@ impl<S: Source> Player<S> {
         track: TrackKey,
         target: Time,
         selection: Selection,
-        mp4_landing: Option<crate::engines::Mp4RangeLanding<'_>>,
+        mp4_landing: Option<crate::engine::Mp4RangeLanding<'_>>,
         w: &mut WorkBudget,
         c: &AtomicBool,
     ) -> Result<bool> {
@@ -903,7 +903,7 @@ impl<S: Source> Player<S> {
                 received: seek.candidate_generation,
             });
         }
-        if matches!(seek.landing, crate::engines::Mp4RangeLanding::Demux(_))
+        if matches!(seek.landing, crate::engine::Mp4RangeLanding::Demux(_))
             && self.clock != ClockChoice::Demux
         {
             return Err(Error::Invalid("native seek clock changed"));

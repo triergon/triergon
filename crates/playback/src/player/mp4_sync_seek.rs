@@ -4,7 +4,7 @@ use super::{ClockChoice, Player, SeekIntent, Selection, TrackKey};
 use crate::{
     Engine, Result,
     catalogue::{CatalogueCommit, Mp4Catalogue, RangeSeek, RetiredCatalogue},
-    engines::{Mp4RangeLanding, Mp4SyncLanding},
+    engine::{Mp4RangeLanding, Mp4SyncLanding},
     input::Source,
     mp4_plan::{PlanView, PreparedMp4, SourceRow},
 };

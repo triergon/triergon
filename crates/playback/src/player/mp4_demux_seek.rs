@@ -4,9 +4,9 @@ use super::{ClockChoice, Player, SeekIntent, Selection, TrackKey};
 use crate::{
     Engine, Result,
     catalogue::{CatalogueCommit, Mp4Catalogue, RangeSeek, RetiredCatalogue},
-    engines::Mp4RangeLanding,
+    engine::Mp4RangeLanding,
+    engine::mp4::demux_replay::DemuxReplay,
     input::Source,
-    mp4_native_replay::DemuxReplay,
     mp4_open::{MetadataReadScope, Movie},
     mp4_plan::{PlanView, PreparedMp4, include_media_track},
 };
