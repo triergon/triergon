@@ -1159,9 +1159,83 @@ impl Reader {
                         return Ok(step);
                     }
                 }
-                State::ScanSimple(_) => {
-                    if let Some(step) = self.step_scan_simple(work, cancel, scan_prefix)? {
-                        return crate::step::pending(step);
+                // Kept in the loop: a seek scan passes here for every block, and as
+                // a function of its own it ran up to 1% more instructions per seek.
+                State::ScanSimple(job) => {
+                    if !scan_prefix {
+                        return Err(Error::Invalid("scan probe outside seek scan"));
+                    }
+                    let context = ScanContext {
+                        configuration: self.configuration.as_ref(),
+                        pool: &self.pool,
+                        source: self.envelope.request().source,
+                        generation: self.envelope.generation(),
+                        cluster_ticks: self.cluster_time,
+                        scale: self.scale,
+                    };
+                    if job.completed_fields().is_some() {
+                        // advance_scan consumes this scalar completion in this
+                        // same call; it is never a public packet/event boundary.
+                        return Ok(ParseStep::Yield);
+                    }
+                    if job.draining() {
+                        if !job.context_matches(&context) {
+                            return Err(Error::Invalid("scan drain source context changed"));
+                        }
+                        if let Some(remaining) = self.scan_remaining {
+                            self.envelope.set_scan_remaining(remaining);
+                        }
+                        let before = self.envelope.position();
+                        let progress = self.envelope.step_typed_compact_after_input_health(
+                            Admit::Pause,
+                            work,
+                            cancel,
+                        );
+                        if let Err(error) = Self::record_demux_bytes(
+                            &mut self.scan_remaining,
+                            &mut self.demux_read_bytes,
+                            before,
+                            self.envelope.position(),
+                        ) {
+                            self.envelope.discard_compact_leaf();
+                            return Err(error);
+                        }
+                        let progress = progress?;
+                        if self.envelope.finish_scanned_leaf(job.header())? {
+                            job.finish();
+                            return Ok(ParseStep::Yield);
+                        }
+                        match progress {
+                            EnvelopeProgress::Step(step) => {
+                                return crate::step::pending(step);
+                            }
+                            EnvelopeProgress::Header(_) => {
+                                return Err(Error::Invalid(
+                                    "new header before scan drain completed",
+                                ));
+                            }
+                        }
+                    }
+                    let header = job.header();
+                    match job.step_prefix(
+                        self.envelope.scan_prefix_bytes(header)?,
+                        &context,
+                        work,
+                        cancel,
+                    )? {
+                        ParseStep::Event(drain) => {
+                            if self
+                                .envelope
+                                .resolve_scan_prefix(header, drain, work, cancel)?
+                            {
+                                job.finish();
+                                return Ok(ParseStep::Yield);
+                            }
+                            if !drain {
+                                self.state = State::Envelope;
+                            }
+                        }
+                        step => return crate::step::pending(step),
                     }
                 }
                 State::Cue(_) | State::Epoch(_) => {
@@ -1221,11 +1295,14 @@ impl Reader {
         }
     }
 
+    // The three metadata seams below are compiled into the demux step. Opening a
+    // file passes through them once per element and phase; called out of line
+    // they cost the metadata workloads up to 1.7% more instructions.
+
     /// One step of admitting a level-one leaf: the cached-metadata lookup, the
     /// position reservation, the catalogue preparation of a document and the
     /// envelope's admission. `Ok(None)` continues the demux loop.
-    #[cold]
-    #[inline(never)]
+    #[inline(always)]
     fn step_admission(
         &mut self,
         left: usize,
@@ -1347,8 +1424,7 @@ impl Reader {
 
     /// Completes the EBML header, Tracks, an Info, Chapters, Tags or Attachments
     /// document, or Cues, and returns its event.
-    #[cold]
-    #[inline(never)]
+    #[inline(always)]
     fn step_metadata<D: PacketProjection>(
         &mut self,
         work: &mut WorkBudget,
@@ -1419,8 +1495,7 @@ impl Reader {
     /// Completes a SeekHead and merges its entries into the seek targets; returns the
     /// SeekHead's envelope event once every entry is in. `Ok(None)` continues the
     /// demux loop.
-    #[cold]
-    #[inline(never)]
+    #[inline(always)]
     fn step_seek_head<D: PacketProjection>(
         &mut self,
         work: &mut WorkBudget,
@@ -1473,93 +1548,6 @@ impl Reader {
                 *at += 1;
             }
             _ => return Err(Error::Invalid("SeekHead step outside a SeekHead job")),
-        }
-        Ok(None)
-    }
-
-    /// One step of probing a SimpleBlock prefix during a bounded seek scan, or of
-    /// draining the rest of a probed block. `Ok(None)` continues the demux loop.
-    #[cold]
-    #[inline(never)]
-    fn step_scan_simple(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-        scan_prefix: bool,
-    ) -> Result<Option<ParseStep<Infallible>>> {
-        let State::ScanSimple(job) = &mut self.state else {
-            return Err(Error::Invalid("scan probe outside its state"));
-        };
-        if !scan_prefix {
-            return Err(Error::Invalid("scan probe outside seek scan"));
-        }
-        let context = ScanContext {
-            configuration: self.configuration.as_ref(),
-            pool: &self.pool,
-            source: self.envelope.request().source,
-            generation: self.envelope.generation(),
-            cluster_ticks: self.cluster_time,
-            scale: self.scale,
-        };
-        if job.completed_fields().is_some() {
-            // advance_scan consumes this scalar completion in this
-            // same call; it is never a public packet/event boundary.
-            return Ok(Some(ParseStep::Yield));
-        }
-        if job.draining() {
-            if !job.context_matches(&context) {
-                return Err(Error::Invalid("scan drain source context changed"));
-            }
-            if let Some(remaining) = self.scan_remaining {
-                self.envelope.set_scan_remaining(remaining);
-            }
-            let before = self.envelope.position();
-            let progress =
-                self.envelope
-                    .step_typed_compact_after_input_health(Admit::Pause, work, cancel);
-            if let Err(error) = Self::record_demux_bytes(
-                &mut self.scan_remaining,
-                &mut self.demux_read_bytes,
-                before,
-                self.envelope.position(),
-            ) {
-                self.envelope.discard_compact_leaf();
-                return Err(error);
-            }
-            let progress = progress?;
-            if self.envelope.finish_scanned_leaf(job.header())? {
-                job.finish();
-                return Ok(Some(ParseStep::Yield));
-            }
-            match progress {
-                EnvelopeProgress::Step(step) => {
-                    return crate::step::pending(step).map(Some);
-                }
-                EnvelopeProgress::Header(_) => {
-                    return Err(Error::Invalid("new header before scan drain completed"));
-                }
-            }
-        }
-        let header = job.header();
-        match job.step_prefix(
-            self.envelope.scan_prefix_bytes(header)?,
-            &context,
-            work,
-            cancel,
-        )? {
-            ParseStep::Event(drain) => {
-                if self
-                    .envelope
-                    .resolve_scan_prefix(header, drain, work, cancel)?
-                {
-                    job.finish();
-                    return Ok(Some(ParseStep::Yield));
-                }
-                if !drain {
-                    self.state = State::Envelope;
-                }
-            }
-            step => return crate::step::pending(step).map(Some),
         }
         Ok(None)
     }
