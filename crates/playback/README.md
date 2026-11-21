@@ -102,6 +102,8 @@ packet clocks are explicit opt-in views (`ClockChoice::ExplicitNativeProjection`
 `*_native_*` TS engines); they never overwrite source facts. Native views can
 emit events the source view does not, such as `Mp4Event::NativeShortPacket`,
 `NativeEmptyPacket`, `NativeMissingSample` and native refusals.
+The Matroska AAC playback clock can infer a duration from the configuration;
+its projected clock may therefore differ from a demuxer that leaves duration unknown.
 
 **Generations.** A seek, track switch or configuration change starts a new
 generation. Check outputs with `Player::may_deliver`. Feeds, bridges, clocks

@@ -20,6 +20,9 @@ use triergon_playback::{
     },
 };
 
+#[path = "../../media/tests/support/ebml.rs"]
+mod cued_audio_fixture;
+
 const ID: SourceId = SourceId(172);
 const INPUT: &[u8] = include_bytes!("fixtures/mkv-feed/three-tracks.mkv");
 const GOLD: &[u8] = include_bytes!("fixtures/mkv-feed/three-tracks.feed");
@@ -1602,6 +1605,53 @@ fn matroska_aac_clock_matches_pinned_mixed_rates_from_probe_through_eof() {
             })
             .collect();
         assert_eq!(timings, expected);
+    }
+}
+
+#[test]
+fn cued_aac_suffix_keeps_source_and_projected_clocks_distinct() {
+    let (fixture, _, _) = cued_audio_fixture::cued_aac();
+    let (mut player, pool) = player_with_input(&fixture, 7);
+    let outputs = collect_with_work(&mut player, 1);
+    let configuration = outputs
+        .iter()
+        .find_map(|output| match output.event() {
+            RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+            _ => None,
+        })
+        .unwrap();
+    let feed = setup(&pool, configuration, 0);
+    let packets = outputs
+        .iter()
+        .filter(|output| matches!(output.event(), RawEvent::Matroska(Event::Packet(_))))
+        .collect::<Vec<_>>();
+    assert_eq!(packets.len(), 3);
+
+    // A fresh clock sees the same packet suffix as the indexed seek. The
+    // FFmpeg backward-seek comparison reports these PTS/DTS values and no duration.
+    let expected = [
+        (1_000_000_000, &b"second"[..]),
+        (1_020_000_000, &b"third"[..]),
+    ];
+    let mut probe = feed.native_aac_clock_probe(&pool, 2).unwrap().unwrap();
+    for (ordinal, (output, (pts_ns, bytes))) in packets[1..].iter().zip(expected).enumerate() {
+        let packet = frame(&feed, output);
+        assert_eq!(packet.source.packet.data.as_ref(), bytes);
+        assert_eq!(packet.source.packet.pts_ns, Some(pts_ns));
+        assert_eq!(packet.source.packet.dts_ns, None);
+        assert_eq!(packet.source.packet.duration_ns, None);
+        let demux =
+            triergon_matroska::compat::clock::packet_timing(packet.source.packet.timing).unwrap();
+        assert_eq!(demux.pts.unwrap().rounded_ns().unwrap(), pts_ns);
+        assert_eq!(demux.duration, None);
+        assert_eq!(probe.push(&packet).unwrap(), ordinal);
+    }
+    let projected = probe.finish();
+    for (ordinal, (pts_ns, _)) in expected.into_iter().enumerate() {
+        let timing = projected.timing(ordinal).unwrap();
+        assert_eq!(timing.pts_ns, Some(pts_ns));
+        assert_eq!(timing.dts_ns, Some(pts_ns));
+        assert_eq!(timing.duration_ns, Some(23_000_000));
     }
 }
 

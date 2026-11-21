@@ -1,6 +1,7 @@
 /* Black-box comparison using the public libavformat API. */
 #include <inttypes.h>
 #include <stdio.h>
+#include <string.h>
 #include <libavformat/avformat.h>
 #include <libavutil/mathematics.h>
 
@@ -12,12 +13,19 @@ int main(int argc, char **argv) {
     AVFormatContext *ctx = NULL;
     AVPacket *pkt = NULL;
     int result;
-    if (argc != 2) return 2;
+    if (argc != 3) return 2;
+    const int source = strcmp(argv[2], "source") == 0;
+    if (!source && strcmp(argv[2], "projected") != 0) return 2;
     av_log_set_level(AV_LOG_QUIET);
+    if (source) {
+        ctx = avformat_alloc_context();
+        if (!ctx) return 1;
+        ctx->flags |= AVFMT_FLAG_NOPARSE | AVFMT_FLAG_NOFILLIN;
+    }
     if ((result = avformat_open_input(&ctx, argv[1], NULL, NULL)) < 0) {
         fprintf(stderr, "avformat_open_input=%d\n", result); return 1;
     }
-    if ((result = avformat_find_stream_info(ctx, NULL)) < 0) {
+    if (!source && (result = avformat_find_stream_info(ctx, NULL)) < 0) {
         fprintf(stderr, "avformat_find_stream_info=%d\n", result); avformat_close_input(&ctx); return 1;
     }
     if (ctx->nb_streams != 1) { fprintf(stderr, "stream_count=%u\n", ctx->nb_streams); avformat_close_input(&ctx); return 1; }

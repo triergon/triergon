@@ -75,7 +75,7 @@ commands:
   check-revisions
                  every commit docs/status.md cites is reachable from HEAD (needs the
                  full history)
-  cued-aac-compare FFMPEG_INSTALL   compare a cued AAC seek and all packets
+  cued-aac-compare FFMPEG_INSTALL [--projected]   compare a cued AAC seek and all packets
   core-time      compare exact arithmetic against the independent fraction oracle
   fixtures       generate the authored Matroska corpus into .research/ and its manifests
   session-queues compare baseline and candidate session queues; --help for usage
