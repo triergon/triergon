@@ -73,9 +73,7 @@ pub fn decode<const SBR: bool>(
         {
             return Err("unsupported AAC SBR configuration".into());
         }
-        // The pinned source signals LC while its packets carry 2× SBR. Present the
-        // equivalent explicit HE-AAC configuration to the normal track factory.
-        let mut decoder = TrackDecoder::aac_access_units_in(&[0x2b, 0x11, 0x88, 0x00], &pool)
+        let mut decoder = TrackDecoder::aac_access_units_in(config, &pool)
             .map_err(|error| error.0)?
             .into_decoder();
         decode_packets::<2048>(data, rate, channels, packets, decoder.as_mut(), out)

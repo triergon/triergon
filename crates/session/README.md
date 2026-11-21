@@ -53,8 +53,9 @@ the decoded PCM. The default AAC decoder uses the encoder signature.
 
 Use `TrackDecoder::aac_access_units_in` to decode raw AAC-LC from a checked
 AudioSpecificConfig with a fixed layout or a Program Configuration Element, or explicit
-stereo HE-AAC with 2× SBR and 1024-sample AAC-LC core frames. The SBR path requires an
-indexed core rate and an extension rate exactly twice that rate; PS is not supported.
+stereo HE-AAC with 2× SBR and 1024-sample AAC-LC core frames. SBR can be stated by the
+leading object type or the AAC-LC sync extension. This path requires an indexed core
+rate and an extension rate exactly twice that rate and refuses Parametric Stereo.
 `TrackDecoder::aac_access_units_with_layout_in` accepts
 `compat::aac::Policy::ConventionalSurround` for fixed layouts. Call
 `TrackDecoder::into_decoder` to use the configured decoder in an audio session; with

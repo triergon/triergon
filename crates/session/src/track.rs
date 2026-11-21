@@ -75,7 +75,7 @@ impl TrackDecoder {
         budget: &Budget,
     ) -> Result<Self, DecodeFailure> {
         let parsed = parse_aac_access_unit_config(configuration, budget)?;
-        let decoder: Box<dyn AudioDecoder> = if parsed.facts().outer_object_type.code == 5 {
+        let decoder: Box<dyn AudioDecoder> = if parsed.facts().sbr.is_present() {
             let facts = parsed.facts();
             validate_raw_sbr(facts)?;
             drop(parsed);
@@ -213,9 +213,10 @@ fn validate_raw_sbr(facts: AacAscFacts) -> Result<(), DecodeFailure> {
         };
         rate_matches && encoding_matches
     });
-    if facts.outer_object_type.code != 5
-        || facts.core_object_type.code != 2
-        || facts.sbr != AacExtensionSignal::Explicit(true)
+    if !matches!(
+        (facts.outer_object_type.code, facts.sbr),
+        (5, AacExtensionSignal::Explicit(true)) | (2, AacExtensionSignal::Sync(true))
+    ) || facts.core_object_type.code != 2
         || facts.ps.is_present()
         || facts.channel_configuration != 2
         || facts.core_channels != 2
@@ -318,5 +319,8 @@ mod tests {
         facts = parsed.facts();
         facts.ps = AacExtensionSignal::Sync(true);
         assert!(validate_raw_sbr(facts).is_err());
+        let sync = parse_aac_access_unit_config(&[0x13, 0x10, 0x56, 0xe5, 0x98], &budget).unwrap();
+        assert_eq!(sync.facts().sbr, AacExtensionSignal::Sync(true));
+        assert!(validate_raw_sbr(sync.facts()).is_ok());
     }
 }
