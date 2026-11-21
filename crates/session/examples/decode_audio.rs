@@ -68,10 +68,16 @@ fn decode(file: std::fs::File, out: &mut impl Write, summary: &mut Summary) -> R
             let raw_aac = matches!(reader, AnyReader::Isobmff(_)) && track.codec() == CodecId::Aac;
             let selected = if raw_aac {
                 TrackDecoder::aac_access_units_in(track.configuration(), &pool)
+            } else if triergon_session::audio_codec(track.codec()).is_none() {
+                return Err(match track.codec() {
+                    CodecId::Other => format!("unsupported codec Other({:?})", track.codec_tag()),
+                    codec => format!("unsupported codec {codec:?}"),
+                });
             } else {
                 TrackDecoder::new(track)
             };
-            decoder = Some((track.id(), selected.map_err(|e| e.0)?, raw_aac));
+            let selected = selected.map_err(|error| format!("{error:?}"))?;
+            decoder = Some((track.id(), selected, raw_aac));
         }
         let Some((track, decoder, raw_aac)) = decoder.as_mut() else {
             continue;
@@ -100,7 +106,7 @@ impl Summary {
     /// Account for one decode result and write its samples.
     fn write<T>(
         &mut self,
-        decoded: Result<T, triergon_codec::DecodeFailure>,
+        decoded: Result<T, triergon_session::Error>,
         frame: &AudioFrame,
         bytes: &mut Vec<u8>,
         out: &mut impl Write,
@@ -121,7 +127,7 @@ impl Summary {
             }
             Err(error) => {
                 self.errors += 1;
-                self.last_error = error.0;
+                self.last_error = format!("{error:?}");
             }
         }
         Ok(())

@@ -38,8 +38,7 @@ use lfe::{Lfe2x, LfeFir, LfeState};
 use qmf::{Qmf, QmfState};
 use subframe::{SideInfo, SubBuf};
 use triergon_codec::{
-    AudioDecoder, Budget, BudgetVec, Charged, DecodeFailure, DownmixLevels, Reservation,
-    StorageError,
+    AudioDecoder, Budget, BudgetVec, Charged, DownmixLevels, Reservation, StorageError,
 };
 
 /// Typed decode failure. The decoder never panics on malformed input.
@@ -58,6 +57,19 @@ pub enum DecodeError {
 impl From<StorageError> for DecodeError {
     fn from(error: StorageError) -> Self {
         DecodeError::Budget(error)
+    }
+}
+
+impl From<DecodeError> for triergon_codec::Error {
+    /// The workspace error of the same class; a refused storage charge is the budget's
+    /// own error.
+    fn from(error: DecodeError) -> Self {
+        match error {
+            DecodeError::Unsupported(feature) => Self::Unsupported(feature),
+            DecodeError::InvalidData(detail) => Self::Invalid(detail),
+            DecodeError::ResourceLimit(limit) => Self::Policy(limit),
+            DecodeError::Budget(error) => error,
+        }
     }
 }
 
@@ -268,13 +280,15 @@ impl FrameDecoder {
 }
 
 impl AudioDecoder for Decoder {
+    type Error = DecodeError;
+
     fn decode(
         &mut self,
         au: &[u8],
         out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
+    ) -> Result<Option<DownmixLevels>, DecodeError> {
         out.clear();
-        Decoder::decode(self, au, out).map_err(DecodeFailure::from_error)?;
+        Decoder::decode(self, au, out)?;
         Ok(None)
     }
     fn reset(&mut self) {

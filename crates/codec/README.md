@@ -14,9 +14,12 @@ decoders only through these traits.
 ## Usage
 
 ```rust
-use triergon_codec::{AudioDecoder, AudioFrame, DecodeFailure, Speaker, VideoDecoder};
+use triergon_codec::{
+    AudioDecoder, AudioFrame, DynAudioDecoder, DynVideoDecoder, Error, Speaker, VideoDecoder,
+};
 
-fn video(decoder: &mut dyn VideoDecoder, au: &[u8], pts: i64) -> Result<(), DecodeFailure> {
+// A decoder of a codec chosen at run time refuses with the workspace `Error`.
+fn video(decoder: &mut DynVideoDecoder, au: &[u8], pts: i64) -> Result<(), Error> {
     decoder.send(au, Some(pts))?;              // one Annex B access unit
     while let Some(picture) = decoder.receive() {
         // picture.width, .height, .bit_depth, .planes, .pts, .sar, .colour
@@ -24,13 +27,19 @@ fn video(decoder: &mut dyn VideoDecoder, au: &[u8], pts: i64) -> Result<(), Deco
     Ok(())
 }
 
-fn audio(decoder: &mut dyn AudioDecoder, au: &[u8]) -> Result<(), DecodeFailure> {
+// A concrete decoder refuses with its crate's own error.
+fn audio<D: AudioDecoder>(decoder: &mut D, au: &[u8]) -> Result<(), D::Error> {
     let mut frame = AudioFrame::default();
     let levels = decoder.decode(au, &mut frame)?.unwrap_or_default(); // DownmixLevels
     if let Some(i) = frame.layout.position(Speaker::LowFrequency) {
         let _lfe = &frame.planes[i][..frame.samples_per_channel];
     }
     Ok(())
+}
+
+// `boxed` turns the second into the first.
+fn erase(decoder: impl AudioDecoder<Error: Into<Error>> + 'static) -> Box<DynAudioDecoder> {
+    decoder.boxed()
 }
 ```
 
@@ -45,15 +54,18 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 
 | Item | Meaning |
 |---|---|
-| `VideoDecoder` | `send(au, pts)`, `receive() -> Option<PictureView>`, `flush`, `reset`; `Send` |
-| `AudioDecoder` | `decode(au, &mut AudioFrame) -> Result<Option<DownmixLevels>, DecodeFailure>`, `reset`; `delay()` (samples a stream starts with that carry no signal, 0 by default) and `flush(&mut AudioFrame)` (samples held back at the end, none by default); `Send` |
+| `VideoDecoder` | `send(au, pts) -> Result<(), Self::Error>`, `receive() -> Option<PictureView>`, `flush`, `reset`; `Send` |
+| `AudioDecoder` | `decode(au, &mut AudioFrame) -> Result<Option<DownmixLevels>, Self::Error>`, `reset`; `delay()` (samples a stream starts with that carry no signal, 0 by default) and `flush(&mut AudioFrame)` (samples held back at the end, none by default); `Send` |
+| `Error` (associated) | the decoder's own error type; each decoder crate's `DecodeError` is `Copy` and converts to `triergon_core::Error` without formatting or allocating |
+| `boxed::<E>()` | the decoder behind a box with its errors converted to `E` |
+| `DynVideoDecoder`, `DynAudioDecoder` | `dyn VideoDecoder<Error = Error>` and `dyn AudioDecoder<Error = Error>`: a decoder of a codec chosen at run time |
+| `Error`, `StorageError` | `triergon_core::Error`; the second name is the one decoders use for a refused storage charge |
 | `AudioFrame` | `sample_rate`, `layout`, `samples_per_channel`, `planes`: planar `f32`, full scale 1.0; `sample_format` (`SampleFormat::Float`, `S16`, `S32`): the decoder's native format, for mixing as FFmpeg mixes it |
 | `ChannelLayout` | speaker of each plane in plane order; `new`, `unspecified(n)` (no positions), `default_for(n)` (FFmpeg's default), `speakers`, `channels`, `position`, `mask`, `name` (FFmpeg's layout name), `EMPTY`, `CAPACITY` |
 | `layout::{vorbis_order, flac_order, native_order}` | the Vorbis/Opus and FLAC coded channel orders, and the plane each coded channel goes to |
 | `mdct::Imdct` | inverse MDCT and DCT-IV for any `N` with `N / 4` a product of 2, 3 and 5: an iterative mixed-radix FFT over split real and imaginary planes; `table_bytes` charges a budget first |
 | `Speaker` | loudspeaker position; `name()` gives FFmpeg's short name, `mask()` its `AV_CH_*` bit |
 | `DownmixLevels` | `center`, `surround`, `lfe` gains and `SurroundEncoding` (`None`, `Dolby`, `ProLogicII`) |
-| `DecodeFailure` | the refusing codec error's `Debug` text; `from_error` builds one |
 | `AudioFrame::try_resize` | sizes the planes, charging the frame's capacity to a decoder's `Reservation` first |
 | `kbd_window` | rising half of a Kaiser-Bessel-derived window of any length and alpha |
 | `divide`, `divide_u32` | `a / b` rounded towards zero for `b > 0`; on 32-bit ARM, whose baseline has no divide instruction, an exact double division instead of the library routine |
@@ -98,8 +110,13 @@ then keeps the element order of the PCE, and so does the AAC decoder.
   it carries them (AC-3 and E-AC-3). `DownmixLevels::default()` is the conventional
   −3 dB centre and surrounds (1/√2) with LFE omitted and no surround encoding, for
   streams that carry none.
-- **Errors.** A refused access unit is a `DecodeFailure`; the decoder stays usable.
-  Typed errors are available from each codec crate's own `decode`/`send`.
+- **Errors.** A refused access unit leaves the decoder usable. Each decoder reports
+  its crate's own `DecodeError` through the trait. Converted to `triergon_core::Error`
+  it keeps its class and detail text: invalid data is `Invalid`, a feature outside the
+  decoder's set `Unsupported`, a resource cap of the codec `Policy`, a short access unit
+  `Truncated`, and a refused storage charge the budget's own error (`Limit`,
+  `Allocation`, `Overflow`). What only the decoder's type can say (byte counts, a
+  feature's number) stays with that type.
 
 ## Conformance
 

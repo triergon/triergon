@@ -6,7 +6,8 @@
 use crate::SessionState;
 use crate::queue::{FeedError, QueueLimits, UnitQueue};
 use std::sync::Arc;
-use triergon_codec::VideoDecoder;
+use triergon_codec::DynVideoDecoder;
+use triergon_core::Error;
 use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
 
 /// The current picture for the compositor. `sequence` increases for every
@@ -27,7 +28,7 @@ struct Ahead {
 }
 
 pub struct VideoSession {
-    decoder: Option<Box<dyn VideoDecoder>>,
+    decoder: Option<Box<DynVideoDecoder>>,
     queue: UnitQueue,
     scaler: Scaler,
     ahead: Option<Ahead>,
@@ -37,7 +38,7 @@ pub struct VideoSession {
     sequence: u64,
     ended: bool,
     drained: bool,
-    failure: Option<String>,
+    failure: Option<Error>,
 }
 
 impl VideoSession {
@@ -57,7 +58,7 @@ impl VideoSession {
         }
     }
     /// A new stream: old input, decoder state and picture go.
-    pub fn load(&mut self, decoder: Box<dyn VideoDecoder>) {
+    pub fn load(&mut self, decoder: Box<DynVideoDecoder>) {
         self.reset(true);
         self.decoder = Some(decoder);
     }
@@ -151,7 +152,7 @@ impl VideoSession {
             match self.queue.pop() {
                 Some(unit) => {
                     if let Err(error) = decoder.send(&unit.data, unit.pts) {
-                        self.failure = Some(error.0);
+                        self.failure = Some(error);
                         self.queue.clear();
                     }
                 }
@@ -167,9 +168,9 @@ impl VideoSession {
         self.latest.as_ref()
     }
     pub fn state(&self) -> SessionState {
-        match (&self.decoder, &self.failure) {
+        match (&self.decoder, self.failure) {
             (None, _) => SessionState::Idle,
-            (_, Some(message)) => SessionState::Failed(message.clone()),
+            (_, Some(error)) => SessionState::Failed(error),
             _ if self.ahead.is_some() || !self.queue.is_empty() => SessionState::Running,
             _ if self.drained => SessionState::Ended,
             _ => SessionState::Starved,

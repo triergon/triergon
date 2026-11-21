@@ -10,7 +10,7 @@ ISO/IEC 13818-3 (low sampling frequencies), with the MPEG-2.5 extension to 8, 11
 ## Usage
 
 ```rust
-use triergon_codec::{AudioDecoder, AudioFrame};
+use triergon_codec::AudioFrame;
 use triergon_codec_mp3::{DecodeError, Decoder};
 
 fn decode(frames: &[&[u8]]) -> Result<(), DecodeError> {

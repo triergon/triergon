@@ -15,7 +15,7 @@
 
 use core::f64::consts::PI;
 
-use triergon_core::{Budget, BudgetVec, Error as StorageError};
+use triergon_core::{Budget, BudgetVec, Error};
 
 /// `(a + ib)(c + id)`, in the order every stage uses.
 #[inline(always)]
@@ -94,7 +94,7 @@ fn radices(len: usize) -> Option<([usize; 32], usize)> {
 
 impl Fft {
     /// `Ok(None)` unless `len` is a product of 2, 3 and 5.
-    fn new(len: usize, budget: &Budget) -> Result<Option<Fft>, StorageError> {
+    fn new(len: usize, budget: &Budget) -> Result<Option<Fft>, Error> {
         let Some((radices, count)) = radices(len) else {
             return Ok(None);
         };
@@ -466,17 +466,17 @@ impl Imdct {
     ///
     /// # Errors
     /// `Invalid` unless [`Imdct::supports`] `n`; a refused charge.
-    pub fn new(n: usize, scale: f64, budget: &Budget) -> Result<Imdct, StorageError> {
+    pub fn new(n: usize, scale: f64, budget: &Budget) -> Result<Imdct, Error> {
         if !Imdct::supports(n) {
-            return Err(StorageError::Invalid("IMDCT length"));
+            return Err(Error::Invalid("IMDCT length"));
         }
         let q = n / 4;
         let k = n / 2;
-        let fft = Fft::new(q, budget)?.ok_or(StorageError::Invalid("IMDCT length"))?;
+        let fft = Fft::new(q, budget)?.ok_or(Error::Invalid("IMDCT length"))?;
         // The twiddles of each `j` that `index` yields, scaled by `s`.
         let twiddles = |s: f64,
                         index: &mut dyn Iterator<Item = usize>|
-         -> Result<(BudgetVec<f32>, BudgetVec<f32>), StorageError> {
+         -> Result<(BudgetVec<f32>, BudgetVec<f32>), Error> {
             let angle = |j: usize| -PI * (j as f64 + 0.125) / k as f64;
             let mut re = BudgetVec::try_filled(budget, 0.0, q)?;
             let mut im = BudgetVec::try_filled(budget, 0.0, q)?;
@@ -736,7 +736,7 @@ mod tests {
         let small = Budget::new(1024).unwrap();
         assert!(matches!(
             Imdct::new(2048, 1.0, &small),
-            Err(StorageError::Limit { .. })
+            Err(Error::Limit { .. })
         ));
     }
 }

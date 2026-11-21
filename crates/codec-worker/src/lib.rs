@@ -1,5 +1,5 @@
 //! Decoder measurement workers for the harness: the same operations as
-//! the decode build of `harness/reference.c`, through the session decoders.
+//! the decode build of `harness/reference.c`, through the decoders the session uses.
 //! `codec-worker` serves every operation; `codec-aac-worker` serves the AAC decode
 //! operations alone, so that a build of the AAC decoder with other features or another
 //! compiler measures nothing else.
@@ -31,11 +31,24 @@ mod packets;
 use std::io::Write;
 use std::time::Instant;
 use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_sequential};
-use triergon_codec::{AudioCodec, AudioFrame, VideoCodec};
+use triergon_codec::{
+    AudioCodec, AudioDecoder, AudioFrame, DownmixLevels, VideoCodec, VideoDecoder,
+};
 use triergon_harness_protocol::interleaved::InterleavedDigest;
 use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
+use triergon_session::TrackDecoder;
 use triergon_session::mix::Downmix;
-use triergon_session::{TrackDecoder, audio_decoder, video_decoder};
+
+/// A refused access unit as a `decode error` line prints it: the `Debug` form of the
+/// decoder's own error. It has no `Debug` of its own, which lets every such error
+/// convert to it.
+struct Refusal(String);
+
+impl<E: std::fmt::Debug> From<E> for Refusal {
+    fn from(error: E) -> Self {
+        Refusal(format!("{error:?}"))
+    }
+}
 
 #[derive(Default)]
 struct Output {
@@ -110,7 +123,10 @@ fn access_units<'a>(data: &'a [u8], hevc: bool, mut each: impl FnMut(&'a [u8])) 
 }
 
 fn video(codec: VideoCodec, data: &[u8], out: &mut Output) {
-    let mut decoder = video_decoder(codec);
+    let mut decoder: Box<dyn VideoDecoder<Error = Refusal>> = match codec {
+        VideoCodec::H264 => triergon_codec_h264::Decoder::new().boxed(),
+        VideoCodec::Hevc => triergon_codec_hevc::Decoder::new().boxed(),
+    };
     let mut scaler = Scaler::default();
     let mut rgba = vec![0_u8; CANVAS_BYTES];
     let mut n = 0;
@@ -173,7 +189,14 @@ fn audio_units<'a>(codec: AudioCodec, data: &'a [u8], mut each: impl FnMut(&'a [
 }
 
 fn audio(codec: AudioCodec, data: &[u8], out: &mut Output) {
-    let mut decoder = audio_decoder(codec, &[]).expect("decoder");
+    let mut decoder: Box<dyn AudioDecoder<Error = Refusal>> = match codec {
+        AudioCodec::Ac3 | AudioCodec::Eac3 => triergon_codec_ac3::Decoder::new().boxed(),
+        AudioCodec::Aac => triergon_codec_aac::Decoder::new().boxed(),
+        AudioCodec::Dts => triergon_codec_dca::Decoder::new().boxed(),
+        AudioCodec::Flac | AudioCodec::Opus | AudioCodec::Vorbis | AudioCodec::MpegAudio => {
+            unreachable!("file-format lanes read through their container")
+        }
+    };
     let mut frame = AudioFrame::default();
     let mut downmix = Downmix::default();
     let mut pcm = Vec::new();
@@ -213,18 +236,25 @@ fn file_audio(data: &[u8], out: &mut Output) {
         if packet.track() != *track {
             continue;
         }
-        let decoded = decoder.decode(&packet, &mut frame);
+        let decoded = decoder.decode(&packet, &mut frame).map_err(Refusal::from);
         emit_mixed(decoded, &frame, &mut downmix, &mut pcm, &mut bytes, out);
     }
     if let Some((_, decoder)) = decoder.as_mut() {
         let flushed = decoder.flush(&mut frame).map(|()| None);
-        emit_mixed(flushed, &frame, &mut downmix, &mut pcm, &mut bytes, out);
+        emit_mixed(
+            flushed.map_err(Refusal::from),
+            &frame,
+            &mut downmix,
+            &mut pcm,
+            &mut bytes,
+            out,
+        );
     }
 }
 
 /// Mix one decode result to stereo s16 and emit it.
 fn emit_mixed(
-    decoded: Result<Option<triergon_codec::DownmixLevels>, triergon_codec::DecodeFailure>,
+    decoded: Result<Option<DownmixLevels>, Refusal>,
     frame: &AudioFrame,
     downmix: &mut Downmix,
     pcm: &mut Vec<i16>,

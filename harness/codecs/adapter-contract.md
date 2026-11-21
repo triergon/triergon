@@ -20,7 +20,7 @@ decoder cannot decode reports `Failed`, never a black picture.
 
 ## States and timing
 
-- `SessionState::{Idle, Running, Starved, Ended, Failed(reason)}`. Starved (waiting for
+- `SessionState::{Idle, Running, Starved, Ended, Failed(error)}`. Starved (waiting for
   input), Ended (decoded end of stream) and Failed (sticky until the next
   `load`/`flush`/`stop`) are distinct. Feeding after `end_of_stream` is `Invalid`.
 - Each picture carries the PTS of the access unit that coded it through reordering.

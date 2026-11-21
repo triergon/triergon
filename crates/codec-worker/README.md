@@ -1,7 +1,7 @@
 # codec-worker
 
-Decoder measurement workers for the harness. It decodes an elementary stream through
-the [triergon-session](../session/README.md) decoders, letterboxes video with
+Decoder measurement workers for the harness. It decodes an elementary stream with the
+decoders [triergon-session](../session/README.md) uses, letterboxes video with
 [`triergon_pixel::letterbox`](../pixel/README.md) and downmixes audio with
 `triergon_session::mix::Downmix`, performing the same operations as the FFmpeg
 reference decode worker in `harness/`. It is tooling (`publish = false`), not part of
@@ -31,7 +31,7 @@ Video is split into Annex B access units and audio into frames (AC-3/E-AC-3 by
 `access_unit_len`, AAC by the ADTS header, DTS by the core FSIZE) the same way the
 reference worker's parser does, so both decode the same units. This is measurement
 framing; playback frames access units through `triergon-framing`. Decode errors are
-printed to stderr and decoding continues.
+printed to stderr as the decoder crate's own error and decoding continues.
 
 For configured AAC, `cargo xtask codecs aac-access-units --out DIR` extracts the
 original packets and AudioSpecificConfig with the pinned `ffprobe`. Each input

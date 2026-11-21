@@ -6,7 +6,7 @@ use triergon_codec::StorageError;
 
 /// Decoder error. Unsupported features are named so callers can tell a gap in the
 /// selected feature set from corrupt input.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
     /// A valid H.265 feature outside the selected Main / Main 10 / Main Still Picture set.
     Unsupported(&'static str),
@@ -29,6 +29,21 @@ impl From<InvalidOffset> for DecodeError {
 impl From<StorageError> for DecodeError {
     fn from(error: StorageError) -> Self {
         DecodeError::Budget(error)
+    }
+}
+
+impl From<DecodeError> for triergon_codec::Error {
+    /// The workspace error of the same class. A missing parameter set is invalid data
+    /// named by the set; a refused storage charge is the budget's own error.
+    fn from(error: DecodeError) -> Self {
+        match error {
+            DecodeError::Unsupported(feature) => Self::Unsupported(feature),
+            DecodeError::InvalidData(detail) | DecodeError::MissingParameterSet(detail) => {
+                Self::Invalid(detail)
+            }
+            DecodeError::ResourceLimit(limit) => Self::Policy(limit),
+            DecodeError::Budget(error) => error,
+        }
     }
 }
 

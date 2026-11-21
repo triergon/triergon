@@ -29,7 +29,7 @@ pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, StorageError};
 use frame::FrameDecoder;
 use output::{FloatOutput, IntegerOutput};
 use stream::Stream;
-use triergon_codec::{AudioDecoder, DecodeFailure, DownmixLevels, Reservation};
+use triergon_codec::{AudioDecoder, DownmixLevels, Reservation};
 
 /// Bounds of one decoder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -111,11 +111,7 @@ impl Decoder {
 
     /// Replaces `out` with the frame `au` holds as planar `f32`, scaled as FFmpeg's FLAC
     /// decoder output converts to `f32`. On failure `out` is left empty.
-    pub fn decode_float(
-        &mut self,
-        au: &[u8],
-        out: &mut AudioFrame,
-    ) -> Result<FrameInfo, DecodeError> {
+    pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<FrameInfo, DecodeError> {
         let mut output = FloatOutput::new(out, &mut self.output_charge);
         self.frames.decode(au, &mut output)
     }
@@ -138,14 +134,14 @@ impl Decoder {
 }
 
 impl AudioDecoder for Decoder {
+    type Error = DecodeError;
+
     fn decode(
         &mut self,
         au: &[u8],
         out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
-        self.decode_float(au, out)
-            .map(|_| None)
-            .map_err(DecodeFailure::from_error)
+    ) -> Result<Option<DownmixLevels>, DecodeError> {
+        Decoder::decode(self, au, out).map(|_| None)
     }
 
     /// FLAC frames are independent: there is no signal history to drop.

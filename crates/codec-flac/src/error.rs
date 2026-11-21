@@ -2,7 +2,7 @@
 use triergon_codec::StorageError;
 
 /// Why a decoder refused a configuration or an access unit.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
     /// A feature this decoder does not implement.
     Unsupported(&'static str),
@@ -17,6 +17,19 @@ pub enum DecodeError {
 impl From<StorageError> for DecodeError {
     fn from(error: StorageError) -> Self {
         DecodeError::Budget(error)
+    }
+}
+
+impl From<DecodeError> for triergon_codec::Error {
+    /// The workspace error of the same class. A frame CRC mismatch is invalid data; a
+    /// refused storage charge is the budget's own error.
+    fn from(error: DecodeError) -> Self {
+        match error {
+            DecodeError::Unsupported(feature) => Self::Unsupported(feature),
+            DecodeError::Invalid(detail) => Self::Invalid(detail),
+            DecodeError::CrcMismatch => Self::Invalid("frame CRC-16"),
+            DecodeError::Budget(error) => error,
+        }
     }
 }
 

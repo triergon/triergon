@@ -66,7 +66,7 @@ layout holds) at any sample rate.
   3.0, quad, 5.0, 5.1, 6.1, 7.1). Beyond eight channels the planes stay in coded order
   under a layout without positions (`ChannelLayout::mask() == 0`), where FFmpeg reports an
   unspecified order.
-- Malformed packets return `DecodeFailure` (an `Invalid` error inside) and leave the
+- Malformed packets return `DecodeError::Invalid` and leave the
   decoder usable; malformed headers are `Invalid`, a version other than 0 `Unsupported`.
 - Memory: everything the stream sizes is charged to the decoder's budget before it is
   allocated (`Limits::live_storage_bytes`, 32 MiB by default): the setup header's

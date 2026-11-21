@@ -114,7 +114,7 @@ fn main() -> ExitCode {
             continue;
         };
         if let Err(error) = current.decoder.decode(packet.payload(), &mut frame) {
-            summary.fail(error.0);
+            summary.fail(format_args!("{error:?}"));
             continue;
         }
         summary.decoded += 1;

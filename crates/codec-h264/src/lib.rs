@@ -51,9 +51,7 @@ use slicedec::{ColInfo, CurPic, Refs, SliceCtx, SliceDecoder, Wp};
 use std::collections::VecDeque;
 use tables::*;
 use triergon_bitstream::BitReader;
-use triergon_codec::{
-    Budget, BudgetVec, Colour, DecodeFailure, PictureView, StorageError, VideoDecoder,
-};
+use triergon_codec::{Budget, BudgetVec, Colour, PictureView, StorageError, VideoDecoder};
 use triergon_framing::nal::AnnexBUnits;
 use triergon_framing::picture_output::levels::max_dpb_mbs;
 use triergon_framing::picture_output::{
@@ -61,7 +59,7 @@ use triergon_framing::picture_output::{
 };
 
 /// Decoder error. The decoder never panics on bad input.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
     /// A syntactically valid stream uses a feature outside the selected matrix.
     Unsupported(&'static str),
@@ -98,6 +96,19 @@ impl From<SliceError> for DecodeError {
         match error {
             SliceError::Unsupported(s) => DecodeError::Unsupported(s),
             SliceError::InvalidData(s) => DecodeError::InvalidData(s),
+        }
+    }
+}
+
+impl From<DecodeError> for triergon_codec::Error {
+    /// The workspace error of the same class; a refused storage charge is the budget's
+    /// own error.
+    fn from(error: DecodeError) -> Self {
+        match error {
+            DecodeError::Unsupported(feature) => Self::Unsupported(feature),
+            DecodeError::InvalidData(detail) => Self::Invalid(detail),
+            DecodeError::ResourceLimit(limit) => Self::Policy(limit),
+            DecodeError::Budget(error) => error,
         }
     }
 }
@@ -1122,7 +1133,7 @@ impl Decoder {
         let mut dec = SliceDecoder::new(&ctx, pic, refs, &self.rbsp, len, &mut self.mb_samples);
         dec.run().map_err(|e| {
             let e = DecodeError::from(e);
-            active.max_slice_err = Some(e.clone());
+            active.max_slice_err = Some(e);
             e
         })
     }
@@ -1306,9 +1317,11 @@ impl Decoder {
 /// The session view of the decoder. A received picture is held until the next call, so
 /// its frame buffer returns to the spare pool exactly when the inherent API's would.
 impl VideoDecoder for Decoder {
-    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), DecodeFailure> {
+    type Error = DecodeError;
+
+    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), DecodeError> {
         self.held = None;
-        Decoder::send(self, au, pts).map_err(DecodeFailure::from_error)
+        Decoder::send(self, au, pts)
     }
     fn receive(&mut self) -> Option<PictureView<'_>> {
         self.held = self.out.pop_front();

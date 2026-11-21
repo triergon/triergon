@@ -60,7 +60,7 @@ pub fn decode(mut data: &[u8], layout: Policy, out: &mut Output) -> Result<(), S
     let pool =
         Budget::new(TrackDecoder::DEFAULT_STORAGE_BYTES).map_err(|error| format!("{error:?}"))?;
     let mut decoder = TrackDecoder::aac_access_units_with_layout_in(config, layout, &pool)
-        .map_err(|error| error.0)?
+        .map_err(|error| format!("{error:?}"))?
         .into_decoder();
     let mut frame = AudioFrame::default();
     for _ in 0..packets {
@@ -78,7 +78,7 @@ pub fn decode(mut data: &[u8], layout: Policy, out: &mut Output) -> Result<(), S
         data = rest;
         decoder
             .decode(packet, &mut frame)
-            .map_err(|error| error.0)?;
+            .map_err(|error| format!("{error:?}"))?;
         if frame.sample_rate != rate
             || frame.planes.len() != channels
             || frame.samples_per_channel != SAMPLES
@@ -119,7 +119,9 @@ pub fn decode(mut data: &[u8], layout: Policy, out: &mut Output) -> Result<(), S
     if !data.is_empty() {
         return Err("AAC trailing input".into());
     }
-    decoder.flush(&mut frame).map_err(|error| error.0)?;
+    decoder
+        .flush(&mut frame)
+        .map_err(|error| format!("{error:?}"))?;
     if frame.samples_per_channel != 0 {
         return Err("AAC unexpected delayed output".into());
     }

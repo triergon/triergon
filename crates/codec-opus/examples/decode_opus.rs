@@ -61,7 +61,7 @@ impl Output {
         if let Some(range) = range {
             self.checked += 1;
             if let Err(error) = decoder.decode(packet, frame) {
-                self.fail(error.0);
+                self.fail(format!("{error:?}"));
                 return Ok(());
             }
             if range != decoder.final_range() {
@@ -69,7 +69,7 @@ impl Output {
                 self.first_mismatch.get_or_insert(self.checked - 1);
             }
         } else if let Err(error) = decoder.decode(packet, frame) {
-            self.fail(error.0);
+            self.fail(format!("{error:?}"));
             return Ok(());
         }
         self.write(frame)

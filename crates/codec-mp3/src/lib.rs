@@ -17,8 +17,8 @@ mod subband;
 mod synthesis;
 
 use triergon_codec::{
-    AudioDecoder, AudioFrame, Budget, ChannelLayout, Charged, DecodeFailure, DownmixLevels,
-    Reservation, Speaker, StorageError,
+    AudioDecoder, AudioFrame, Budget, ChannelLayout, Charged, DownmixLevels, Reservation, Speaker,
+    StorageError,
 };
 use triergon_framing::mpeg_audio::{MpegAudioHeader, MpegLayer};
 
@@ -43,7 +43,7 @@ impl Default for Limits {
 }
 
 /// Why a decoder refused a configuration or an access unit.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
     /// A feature this decoder does not implement.
     Unsupported(&'static str),
@@ -56,6 +56,18 @@ pub enum DecodeError {
 impl From<StorageError> for DecodeError {
     fn from(error: StorageError) -> Self {
         DecodeError::Budget(error)
+    }
+}
+
+impl From<DecodeError> for triergon_codec::Error {
+    /// The workspace error of the same class; a refused storage charge is the budget's
+    /// own error.
+    fn from(error: DecodeError) -> Self {
+        match error {
+            DecodeError::Unsupported(feature) => Self::Unsupported(feature),
+            DecodeError::Invalid(detail) => Self::Invalid(detail),
+            DecodeError::Budget(error) => error,
+        }
     }
 }
 
@@ -120,7 +132,7 @@ impl Decoder {
     /// Decode one frame into `out`. A frame cut short decodes as if the missing bytes
     /// were zero; bytes after the frame are ignored. A frame refused after its header
     /// leaves `out` empty.
-    pub fn decode_frame(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
+    pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
         let header = frame_header(au).ok_or(DecodeError::Invalid("frame header"))?;
         let length = header
             .frame_bytes()
@@ -172,13 +184,14 @@ pub fn frame_header(bytes: &[u8]) -> Option<MpegAudioHeader> {
 }
 
 impl AudioDecoder for Decoder {
+    type Error = DecodeError;
+
     fn decode(
         &mut self,
         au: &[u8],
         out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
-        self.decode_frame(au, out)
-            .map_err(DecodeFailure::from_error)?;
+    ) -> Result<Option<DownmixLevels>, DecodeError> {
+        Decoder::decode(self, au, out)?;
         Ok(None)
     }
 

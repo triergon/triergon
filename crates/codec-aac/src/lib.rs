@@ -39,7 +39,7 @@ pub use error::{DecodeError, Feature};
 pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 
 use triergon_bitstream::CachedBitReader;
-use triergon_codec::{AudioDecoder, Budget, DecodeFailure, DownmixLevels};
+use triergon_codec::{AudioDecoder, Budget, DownmixLevels};
 
 /// Optional AAC decoding policies.
 pub mod compat {
@@ -259,12 +259,14 @@ impl RawLcDecoder {
 }
 
 impl AudioDecoder for RawLcDecoder {
+    type Error = DecodeError;
+
     fn decode(
         &mut self,
         au: &[u8],
         out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
-        RawLcDecoder::decode(self, au, out).map_err(DecodeFailure::from_error)?;
+    ) -> Result<Option<DownmixLevels>, DecodeError> {
+        RawLcDecoder::decode(self, au, out)?;
         Ok(None)
     }
 
@@ -368,12 +370,14 @@ fn decode_blocks<const RAW: bool>(
 }
 
 impl AudioDecoder for Decoder {
+    type Error = DecodeError;
+
     fn decode(
         &mut self,
         au: &[u8],
         out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
-        Decoder::decode(self, au, out).map_err(DecodeFailure::from_error)?;
+    ) -> Result<Option<DownmixLevels>, DecodeError> {
+        Decoder::decode(self, au, out)?;
         Ok(None)
     }
     fn reset(&mut self) {

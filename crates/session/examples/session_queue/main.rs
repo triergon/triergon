@@ -18,7 +18,7 @@ enum Codec {
 }
 
 impl Codec {
-    fn id(self) -> CodecId<'static> {
+    fn id(self) -> CodecId {
         match self {
             Self::Ac3 => CodecId::Ac3,
             Self::Aac => CodecId::Aac,
@@ -133,7 +133,7 @@ impl Session {
                     AudioCodec::Ac3
                 };
                 let mut audio = AudioSession::new(limits);
-                audio.load(Some(audio_decoder(kind, &[]).map_err(|e| e.0)?));
+                audio.load(Some(audio_decoder(kind, &[])?));
                 Ok(Self::Audio(audio, PcmBlock::default()))
             }
         }
@@ -191,8 +191,8 @@ impl Session {
                 }
             }
         }
-        if let SessionState::Failed(reason) = self.state() {
-            return Err(reason.into());
+        if let SessionState::Failed(error) = self.state() {
+            return Err(format!("{error:?}").into());
         }
         Ok(())
     }

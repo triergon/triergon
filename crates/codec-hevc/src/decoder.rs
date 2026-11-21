@@ -14,9 +14,7 @@ use crate::ps::{self, Layout, Pps, Shared, Sps};
 use crate::slice::{self, SLICE_B, SLICE_I, SliceHeader};
 use crate::state::{PicState, SliceInfo};
 use crate::{deblock, sao};
-use triergon_codec::{
-    Budget, BudgetVec, Charged, Colour, DecodeFailure, PictureView, VideoDecoder,
-};
+use triergon_codec::{Budget, BudgetVec, Charged, Colour, PictureView, VideoDecoder};
 use triergon_framing::picture_output::{
     DecodedPictures, HevcLimits, HevcPicture, Leave, Marking, NewPicture, Parity, View,
 };
@@ -138,9 +136,11 @@ pub struct Picture {
 /// The session view of the decoder. A received picture is held until the next call, so
 /// its frame returns to the pool exactly when the inherent API's would.
 impl VideoDecoder for Decoder {
-    fn send(&mut self, au: &[u8], pts: Option<i64>) -> core::result::Result<(), DecodeFailure> {
+    type Error = DecodeError;
+
+    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<()> {
         self.ctx.held = None;
-        Decoder::send(self, au, pts).map_err(DecodeFailure::from_error)
+        Decoder::send(self, au, pts)
     }
     fn receive(&mut self) -> Option<PictureView<'_>> {
         self.ctx.held = self.ctx.out.pop_front();

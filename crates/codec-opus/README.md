@@ -89,7 +89,7 @@ the pre-skip or other container trims.
     (the reference alternates the channels per band; both are within the conformance
     tolerance).
 - No packet loss concealment or forward error correction: every access unit is a packet.
-- Malformed packets return `DecodeFailure` (an `Invalid` error inside); streams of one
+- Malformed packets return `DecodeError::Invalid`; streams of one
   multistream packet with different durations are `Invalid`. A packet is checked whole
   before any stream decodes: the framing of every stream's packet, the redundant frame
   size of each hybrid frame, the durations, then the output frame's charge. The redundant

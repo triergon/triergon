@@ -49,6 +49,33 @@ impl From<StorageError> for DecodeError {
     }
 }
 
+impl From<DecodeError> for triergon_codec::Error {
+    /// The workspace error of the same class. A short or empty access unit is
+    /// [`Truncated`](triergon_codec::Error::Truncated) without its byte counts, an unsupported feature keeps its
+    /// name and loses the number it carries, and a refused storage charge is the
+    /// budget's own error.
+    fn from(error: DecodeError) -> Self {
+        match error {
+            DecodeError::NoSync => Self::Invalid("AC-3 syncword"),
+            DecodeError::Truncated { .. } | DecodeError::Empty => Self::Truncated,
+            DecodeError::InvalidData(detail) => Self::Invalid(detail),
+            DecodeError::CrcMismatch { .. } => Self::Invalid("syncframe CRC"),
+            DecodeError::Unsupported(feature) => Self::Unsupported(match feature {
+                Feature::EnhancedCoupling => "enhanced coupling",
+                Feature::BitstreamId(_) => "bitstream identification",
+                Feature::Eac3ReducedSampleRate => "E-AC-3 reduced sample rate",
+                Feature::ReservedSampleRate => "reserved sample rate",
+                Feature::ReservedStreamType => "reserved stream type",
+            }),
+            DecodeError::OutputLayoutMismatch => Self::Invalid("output frame layout"),
+            DecodeError::MissingIndependentSubstream => {
+                Self::Invalid("access unit without independent substream 0")
+            }
+            DecodeError::Budget(error) => error,
+        }
+    }
+}
+
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

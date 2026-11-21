@@ -98,7 +98,7 @@ fn main() -> ExitCode {
         if packet.track() != *track {
             continue;
         }
-        match decoder.decode_float(packet.payload(), &mut frame) {
+        match decoder.decode(packet.payload(), &mut frame) {
             Ok(info) => {
                 if per_frame {
                     eprintln!(

@@ -85,7 +85,7 @@ fn check_md5(max_bytes: u64) {
                 };
                 uniform &= frame.layout.channels() == usize::from(info.channels)
                     && frame.sample_rate == info.sample_rate;
-                decoder.decode_float(au, &mut float).unwrap();
+                decoder.decode(au, &mut float).unwrap();
                 let width = usize::from(info.bits_per_sample).div_ceil(8);
                 let scale = |x: i32| {
                     let bits = u32::from(info.bits_per_sample);
@@ -123,7 +123,7 @@ fn damaged_files_never_panic() {
             let bytes = std::fs::read(&path).unwrap();
             let mut decoder = Decoder::new(&[]).unwrap();
             for piece in bytes.chunks(4096) {
-                let _ = decoder.decode_float(piece, &mut out);
+                let _ = decoder.decode(piece, &mut out);
             }
             continue;
         };
@@ -131,7 +131,7 @@ fn damaged_files_never_panic() {
             continue;
         };
         for au in &frames {
-            let _ = decoder.decode_float(au, &mut out);
+            let _ = decoder.decode(au, &mut out);
         }
     }
 }

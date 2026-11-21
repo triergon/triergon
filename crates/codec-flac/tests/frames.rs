@@ -3,7 +3,6 @@
 mod common;
 
 use common::{configuration, frame, rice_residual, subframe_header, verbatim};
-use triergon_codec::AudioDecoder;
 use triergon_codec_flac::{AudioFrame, Budget, CrcPolicy, DecodeError, Decoder, Limits};
 
 fn decoder(channels: u8, bits: u8) -> Decoder {
@@ -126,7 +125,7 @@ fn thirty_two_bit_side_channels_have_33_bits() {
         verbatim(b, 32, &[0, 0]);
     });
     let mut float = AudioFrame::default();
-    flac.decode_float(&au, &mut float).unwrap();
+    flac.decode(&au, &mut float).unwrap();
     assert_eq!(float.planes[0], [1.0, -1.0], "i32::MAX rounds to 2^31");
 }
 
@@ -135,10 +134,10 @@ fn float_output_scales_as_ffmpeg_converts() {
     // 8 bits: s16 output, x << 8 / 2^15. 24 bits: s32 output, x << 8 / 2^31.
     let au = frame(2, 0, 1, &|b| verbatim(b, 8, &[-128, 127]));
     let mut out = AudioFrame::default();
-    decoder(1, 8).decode_float(&au, &mut out).unwrap();
+    decoder(1, 8).decode(&au, &mut out).unwrap();
     assert_eq!(out.planes[0], [-1.0, 127.0 / 128.0]);
     let au = frame(2, 0, 6, &|b| verbatim(b, 24, &[-8_388_608, 1]));
-    decoder(1, 24).decode_float(&au, &mut out).unwrap();
+    decoder(1, 24).decode(&au, &mut out).unwrap();
     assert_eq!(out.planes[0], [-1.0, 1.0 / 8_388_608.0]);
     assert_eq!(out.sample_rate, 44100);
     assert_eq!(out.samples_per_channel, 2);
@@ -274,7 +273,7 @@ fn the_default_limit_holds_the_largest_frames_in_both_outputs() {
     let mut flac = Decoder::new(&[]).unwrap();
     let (mut float, mut integer) = (AudioFrame::default(), flac.integer_frame());
     for au in &frames {
-        flac.decode_float(au, &mut float).unwrap();
+        flac.decode(au, &mut float).unwrap();
         flac.decode_integer(au, &mut integer).unwrap();
     }
     assert_eq!(integer.planes().count(), 8);
@@ -292,7 +291,7 @@ fn too_small_a_budget_is_a_budget_error() {
     let mut flac = Decoder::with_limits(&config, limits).unwrap();
     let mut out = AudioFrame::default();
     let failure = flac.decode(&au, &mut out).unwrap_err();
-    assert!(failure.0.starts_with("Budget("), "{failure:?}");
+    assert!(matches!(failure, DecodeError::Budget(_)), "{failure:?}");
     let mut integer = flac.integer_frame();
     assert!(matches!(
         flac.decode_integer(&au, &mut integer),

@@ -83,7 +83,7 @@ fn a_too_small_budget_is_refused_and_decoding_resumes() {
     let mut seed = 1;
     let packets: Vec<Vec<u8>> = (0..3).map(|_| celt_packet(true, 100, &mut seed)).collect();
     let failure = decoder.decode(&packets[0], &mut frame).unwrap_err();
-    assert!(failure.0.starts_with("Budget("), "{failure:?}");
+    assert!(matches!(failure, DecodeError::Budget(_)), "{failure:?}");
 
     // Once the pool has room, decoding goes on as in a decoder that was never refused.
     drop(other);
@@ -155,7 +155,7 @@ fn a_hybrid_frame_whose_redundant_frame_does_not_fit_changes_nothing() {
         .unwrap()
         .decode(&[&[toc][..], &refused_frame].concat(), &mut frame)
         .unwrap_err();
-    assert!(failure.0.contains("redundant frame size"), "{failure:?}");
+    assert_eq!(failure, DecodeError::Invalid("redundant frame size"));
     let mut seed = 9;
     let packets: Vec<Vec<u8>> = (0..5).map(|_| hybrid(&mut seed)).collect();
     // A decodable first frame, then the refused one (code 2).

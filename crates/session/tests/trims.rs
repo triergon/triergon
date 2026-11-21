@@ -3,7 +3,7 @@
 use triergon::ogg::page::{BEGIN_OF_STREAM, END_OF_STREAM, write_page};
 use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_blocking};
 use triergon_codec::{AudioFrame, Speaker};
-use triergon_session::{AudioSession, Discard, PcmBlock, QueueLimits, TrackDecoder};
+use triergon_session::{AudioSession, Discard, Error, PcmBlock, QueueLimits, TrackDecoder};
 
 /// Ogg Opus: five 20 ms CELT packets, a 312-sample pre-skip, and a final granule (which
 /// counts the pre-skip) 100 samples before the end of the last packet.
@@ -66,7 +66,7 @@ fn a_track_decoder_charges_its_configuration_to_the_callers_pool() {
     let track = source.reader().track(0).unwrap();
     let tiny = Budget::new(Budget::control_storage_bytes() + 8).unwrap();
     let refused = TrackDecoder::new_in(track, &tiny).unwrap_err();
-    assert!(refused.0.starts_with("Limit"), "{}", refused.0);
+    assert!(matches!(refused, Error::Limit { .. }), "{refused:?}");
     let decoder = TrackDecoder::new_in(track, &Budget::new(1 << 20).unwrap()).unwrap();
     assert_eq!(decoder.codec(), triergon_session::AudioCodec::Opus);
 }

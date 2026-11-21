@@ -13,14 +13,15 @@ library.
 
 ```rust
 use triergon_session::{
-    AudioDecoder, AudioSession, FeedError, PcmBlock, QueueLimits, VideoDecoder, VideoSession, audio,
+    AudioSession, DynAudioDecoder, DynVideoDecoder, FeedError, PcmBlock, QueueLimits,
+    VideoSession, audio,
 };
 
 // With the `codecs` feature the decoders come from `video_decoder(VideoCodec::H264)` and
 // `audio_decoder(AudioCodec::Aac)`; `StreamSelection::load` starts both sessions with them.
 fn play(
-    video_decoder: Box<dyn VideoDecoder>,
-    audio_decoder: Option<Box<dyn AudioDecoder>>,
+    video_decoder: Box<DynVideoDecoder>,
+    audio_decoder: Option<Box<DynAudioDecoder>>,
     access_unit: &[u8],
     pts_ns: i64,
     clock_ns: i64,
@@ -44,7 +45,8 @@ fn play(
 feature, which adds the nine decoder crates. `audio_decoder(codec, configuration)` takes
 the canonical configuration of FLAC, Opus and Vorbis (see `audio_configuration`) and
 ignores it for the others. Without it, implement `VideoDecoder`
-and `AudioDecoder` (re-exported from triergon-codec) yourself; the tests use
+and `AudioDecoder` (re-exported from triergon-codec) with `Error = triergon_session::Error`
+yourself, or box a decoder with another error type through `boxed()`; the tests use
 scripted decoders. The `simd` feature forwards to the HEVC decoder's nightly-only
 SIMD kernels.
 
@@ -103,8 +105,8 @@ input).
 - **Lifecycle.** `load` starts a new stream; video `flush` restarts the timeline
   but keeps the last picture; `stop` clears everything. Each of these advances
   `generation()`. `end_of_stream` drains the decoder; the state then becomes
-  `SessionState::Ended`. A decoder error is `SessionState::Failed` until the
-  next load, flush or stop.
+  `SessionState::Ended`. A decoder error is `SessionState::Failed` with that
+  error until the next load, flush or stop.
 - **Letterbox.** Each picture goes through one `triergon_pixel::letterbox::Scaler`
   into a 1920×1080 RGBA canvas; the fit, padding and conversion rules are in
   [triergon-pixel](../pixel/README.md).

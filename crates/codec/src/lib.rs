@@ -10,6 +10,8 @@
 )]
 // Pending: `missing_docs`.
 
+use core::marker::PhantomData;
+
 mod division;
 pub mod layout;
 pub mod mdct;
@@ -17,7 +19,10 @@ mod window;
 
 pub use division::{Divisor, divide, divide_u32};
 pub use layout::{ChannelLayout, Speaker};
-pub use triergon_core::{Budget, BudgetVec, Charged, Error as StorageError, Reservation};
+/// [`Error`] where a decoder names a refused storage charge, as in a codec crate's
+/// `DecodeError::Budget`.
+pub use triergon_core::Error as StorageError;
+pub use triergon_core::{Budget, BudgetVec, Charged, Error, Reservation};
 pub use triergon_pixel::{Colour, PictureView, Plane};
 pub use window::{kbd_window, vorbis_window};
 
@@ -38,17 +43,6 @@ pub enum AudioCodec {
     Vorbis,
     /// MPEG-1/2 audio Layer I, II or III.
     MpegAudio,
-}
-
-/// Why a decoder refused an access unit: the codec error's `Debug` text.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DecodeFailure(pub String);
-
-impl DecodeFailure {
-    /// The failure for a codec crate's error.
-    pub fn from_error(error: impl core::fmt::Debug) -> Self {
-        DecodeFailure(format!("{error:?}"))
-    }
 }
 
 /// The sample format a decoder produces natively, before its samples become the
@@ -97,31 +91,27 @@ impl AudioFrame {
         channels: usize,
         len: usize,
         charge: &mut Reservation,
-    ) -> Result<(), StorageError> {
+    ) -> Result<(), Error> {
         self.planes.truncate(channels);
         let planes = |count: usize| {
             count
                 .checked_mul(size_of::<Vec<f32>>())
-                .ok_or(StorageError::Overflow)
+                .ok_or(Error::Overflow)
         };
-        let samples = |count: usize| {
-            count
-                .checked_mul(size_of::<f32>())
-                .ok_or(StorageError::Overflow)
-        };
+        let samples = |count: usize| count.checked_mul(size_of::<f32>()).ok_or(Error::Overflow);
         let mut bytes = planes(self.planes.capacity().max(channels))?;
         for i in 0..channels {
             let capacity = self.planes.get(i).map_or(0, Vec::capacity).max(len);
             bytes = bytes
                 .checked_add(samples(capacity)?)
-                .ok_or(StorageError::Overflow)?;
+                .ok_or(Error::Overflow)?;
         }
         charge.resize_to(bytes)?;
         let mut grew = false;
         if channels > self.planes.len() {
             self.planes
                 .try_reserve_exact(channels - self.planes.len())
-                .map_err(|_| StorageError::Allocation)?;
+                .map_err(|_| Error::Allocation)?;
             self.planes.resize_with(channels, Vec::new);
             grew = true;
         }
@@ -129,7 +119,7 @@ impl AudioFrame {
             if len > plane.capacity() {
                 plane
                     .try_reserve_exact(len - plane.len())
-                    .map_err(|_| StorageError::Allocation)?;
+                    .map_err(|_| Error::Allocation)?;
                 grew = true;
             }
             plane.resize(len, 0.0);
@@ -139,7 +129,7 @@ impl AudioFrame {
             for plane in &self.planes {
                 bytes = bytes
                     .checked_add(samples(plane.capacity())?)
-                    .ok_or(StorageError::Overflow)?;
+                    .ok_or(Error::Overflow)?;
             }
             charge.resize_to(bytes)?;
         }
@@ -178,8 +168,15 @@ pub enum SurroundEncoding {
 
 /// An Annex-B video decoder with caller timestamps carried through reordering.
 pub trait VideoDecoder: Send {
-    /// One Annex-B access unit with its caller timestamp.
-    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), DecodeFailure>;
+    /// Why the decoder refuses an access unit: its crate's own error. Every decoder of
+    /// this workspace has one that converts to [`Error`], keeping its class (invalid
+    /// data, an unsupported feature, a limit, a refused storage charge) and its detail
+    /// text.
+    type Error;
+
+    /// One Annex-B access unit with its caller timestamp. A refused access unit leaves
+    /// the decoder usable.
+    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), Self::Error>;
     /// The next picture in output order, if ready. The view borrows the decoder until
     /// the next call; it returns `None` once no picture is ready.
     fn receive(&mut self) -> Option<PictureView<'_>>;
@@ -187,17 +184,35 @@ pub trait VideoDecoder: Send {
     fn flush(&mut self);
     /// Discontinuity: drop all decoder state except parameter sets.
     fn reset(&mut self);
+
+    /// This decoder boxed, its errors converted to `E`: the form for a caller that
+    /// chooses the codec at run time. With [`Error`] for `E` it is a
+    /// [`DynVideoDecoder`].
+    fn boxed<E: 'static>(self) -> Box<dyn VideoDecoder<Error = E>>
+    where
+        Self: Sized + 'static,
+        Self::Error: Into<E>,
+    {
+        Box::new(Converting::new(self))
+    }
 }
 
 /// An audio decoder taking one access unit at a time.
 pub trait AudioDecoder: Send {
+    /// Why the decoder refuses an access unit: its crate's own error. Every decoder of
+    /// this workspace has one that converts to [`Error`], keeping its class (invalid
+    /// data, an unsupported feature, a limit, a refused storage charge) and its detail
+    /// text.
+    type Error;
+
     /// Replace `out` with the output of `au` (`samples_per_channel == 0` when it
-    /// produced none). Returns the stream's downmix metadata, if it carries any.
+    /// produced none). Returns the stream's downmix metadata, if it carries any. A
+    /// refused access unit leaves the decoder usable.
     fn decode(
         &mut self,
         au: &[u8],
         out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure>;
+    ) -> Result<Option<DownmixLevels>, Self::Error>;
     /// Samples at the start of the stream that carry no signal and are discarded unless
     /// the container says otherwise (the Opus pre-skip); 0 for most decoders.
     fn delay(&self) -> usize {
@@ -205,10 +220,85 @@ pub trait AudioDecoder: Send {
     }
     /// End of stream: replace `out` with any samples the decoder still holds back
     /// (`samples_per_channel == 0` when there are none, as for most decoders).
-    fn flush(&mut self, out: &mut AudioFrame) -> Result<(), DecodeFailure> {
+    fn flush(&mut self, out: &mut AudioFrame) -> Result<(), Self::Error> {
         out.clear();
         Ok(())
     }
     /// Discontinuity: drop all signal history.
     fn reset(&mut self);
+
+    /// This decoder boxed, its errors converted to `E`: the form for a caller that
+    /// chooses the codec at run time. With [`Error`] for `E` it is a
+    /// [`DynAudioDecoder`].
+    fn boxed<E: 'static>(self) -> Box<dyn AudioDecoder<Error = E>>
+    where
+        Self: Sized + 'static,
+        Self::Error: Into<E>,
+    {
+        Box::new(Converting::new(self))
+    }
+}
+
+/// A video decoder of a codec chosen at run time. It refuses with the workspace
+/// [`Error`]; [`VideoDecoder::boxed`] makes one from a codec crate's decoder.
+pub type DynVideoDecoder = dyn VideoDecoder<Error = Error>;
+
+/// An audio decoder of a codec chosen at run time. It refuses with the workspace
+/// [`Error`]; [`AudioDecoder::boxed`] makes one from a codec crate's decoder.
+pub type DynAudioDecoder = dyn AudioDecoder<Error = Error>;
+
+/// A decoder whose errors convert to `E` on the way out.
+struct Converting<D, E> {
+    decoder: D,
+    // `fn() -> E`: the wrapper holds no `E`, so it is `Send` whenever the decoder is.
+    error: PhantomData<fn() -> E>,
+}
+
+impl<D, E> Converting<D, E> {
+    fn new(decoder: D) -> Self {
+        Converting {
+            decoder,
+            error: PhantomData,
+        }
+    }
+}
+
+impl<D: VideoDecoder, E> VideoDecoder for Converting<D, E>
+where
+    D::Error: Into<E>,
+{
+    type Error = E;
+
+    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), E> {
+        self.decoder.send(au, pts).map_err(Into::into)
+    }
+    fn receive(&mut self) -> Option<PictureView<'_>> {
+        self.decoder.receive()
+    }
+    fn flush(&mut self) {
+        self.decoder.flush();
+    }
+    fn reset(&mut self) {
+        self.decoder.reset();
+    }
+}
+
+impl<D: AudioDecoder, E> AudioDecoder for Converting<D, E>
+where
+    D::Error: Into<E>,
+{
+    type Error = E;
+
+    fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<Option<DownmixLevels>, E> {
+        self.decoder.decode(au, out).map_err(Into::into)
+    }
+    fn delay(&self) -> usize {
+        self.decoder.delay()
+    }
+    fn flush(&mut self, out: &mut AudioFrame) -> Result<(), E> {
+        self.decoder.flush(out).map_err(Into::into)
+    }
+    fn reset(&mut self) {
+        self.decoder.reset();
+    }
 }

@@ -44,6 +44,29 @@ impl From<StorageError> for DecodeError {
     }
 }
 
+impl From<DecodeError> for triergon_codec::Error {
+    /// The workspace error of the same class. An unsupported feature keeps its name and
+    /// loses the number it carries; a refused storage charge is the budget's own error.
+    fn from(error: DecodeError) -> Self {
+        match error {
+            DecodeError::Unsupported(feature) => Self::Unsupported(match feature {
+                Feature::SsrGainControl => "SSR gain control",
+                Feature::ObjectType(_) => "audio object type",
+                Feature::FrameLength960 => "960-sample frames",
+                Feature::RawSbr => "SBR in a raw AAC-LC access unit",
+                Feature::CouplingTarget => "coupling channel target",
+                Feature::TooManyChannels => "channel count",
+                Feature::RawProgramLayout => "raw program speaker layout",
+                Feature::SampleRateIndex(_) => "sampling frequency index",
+            }),
+            DecodeError::InvalidData(detail) => Self::Invalid(detail),
+            DecodeError::ResourceLimit(limit) => Self::Policy(limit),
+            DecodeError::Truncated => Self::Truncated,
+            DecodeError::Budget(error) => error,
+        }
+    }
+}
+
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

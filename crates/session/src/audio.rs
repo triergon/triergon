@@ -8,7 +8,8 @@ use crate::Discard;
 use crate::SessionState;
 use crate::mix::Downmix;
 use crate::queue::{FeedError, QueueLimits, UnitQueue};
-use triergon_codec::{AudioDecoder, AudioFrame};
+use triergon_codec::{AudioFrame, DynAudioDecoder};
+use triergon_core::Error;
 
 /// Interleaved stereo s16 at `sample_rate`; `pts` is the first unit's caller PTS.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -22,7 +23,7 @@ pub struct PcmBlock {
 pub const DEFAULT_LEAD_NS: i64 = 120_000_000;
 
 pub struct AudioSession {
-    decoder: Option<Box<dyn AudioDecoder>>,
+    decoder: Option<Box<DynAudioDecoder>>,
     /// Samples of the decoder's start delay not discarded yet.
     delay: usize,
     queue: UnitQueue,
@@ -32,7 +33,7 @@ pub struct AudioSession {
     carry: Option<PcmBlock>,
     generation: u64,
     ended: bool,
-    failure: Option<String>,
+    failure: Option<Error>,
 }
 
 impl AudioSession {
@@ -50,7 +51,7 @@ impl AudioSession {
         }
     }
     /// A new stream; `None` plays no audio.
-    pub fn load(&mut self, decoder: Option<Box<dyn AudioDecoder>>) {
+    pub fn load(&mut self, decoder: Option<Box<DynAudioDecoder>>) {
         self.reset();
         self.delay = decoder.as_ref().map_or(0, |decoder| decoder.delay());
         self.decoder = decoder;
@@ -136,7 +137,7 @@ impl AudioSession {
             consumed += 1;
             match result {
                 Err(error) => {
-                    self.failure = Some(error.0);
+                    self.failure = Some(error);
                     self.queue.clear();
                 }
                 Ok(_) if self.frame.samples_per_channel == 0 => {}
@@ -159,9 +160,9 @@ impl AudioSession {
         consumed
     }
     pub fn state(&self) -> SessionState {
-        match (&self.decoder, &self.failure) {
+        match (&self.decoder, self.failure) {
             (None, _) => SessionState::Idle,
-            (_, Some(message)) => SessionState::Failed(message.clone()),
+            (_, Some(error)) => SessionState::Failed(error),
             _ if !self.queue.is_empty() || self.carry.is_some() => SessionState::Running,
             _ if self.ended => SessionState::Ended,
             _ => SessionState::Starved,

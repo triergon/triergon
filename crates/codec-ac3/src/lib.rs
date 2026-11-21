@@ -35,9 +35,7 @@ pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 use quant::GroupTables;
 use substream::{BlockSink, LFE, NCH, PlaneMap, Substream, acmod_channels};
 use triergon_bitstream::BitReader;
-use triergon_codec::{
-    AudioDecoder, Budget, Charged, DecodeFailure, DownmixLevels, Reservation, SurroundEncoding,
-};
+use triergon_codec::{AudioDecoder, Budget, Charged, DownmixLevels, Reservation, SurroundEncoding};
 
 /// Bytes of zero padding kept after a frame in the decode buffer.
 pub(crate) const PAD: usize = 16;
@@ -753,13 +751,15 @@ fn dependent<'a>(
 }
 
 impl AudioDecoder for Decoder {
+    type Error = DecodeError;
+
     fn decode(
         &mut self,
         au: &[u8],
         out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
+    ) -> Result<Option<DownmixLevels>, DecodeError> {
         out.clear();
-        let info = Decoder::decode(self, au, out).map_err(DecodeFailure::from_error)?;
+        let info = Decoder::decode(self, au, out)?;
         Ok(info.downmix.map(|info| info.levels()))
     }
     fn reset(&mut self) {

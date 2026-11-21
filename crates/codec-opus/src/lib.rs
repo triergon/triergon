@@ -22,8 +22,8 @@ use multistream::Mapping;
 use packet::Packet;
 use stream::{Staging, StreamDecoder, Workspace};
 use triergon_codec::{
-    AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, Charged, DecodeFailure,
-    DownmixLevels, Reservation, StorageError,
+    AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, Charged, DownmixLevels,
+    Reservation, StorageError,
 };
 use triergon_framing::opus::{self, OpusHead};
 
@@ -45,7 +45,7 @@ impl Default for Limits {
 }
 
 /// Why a decoder refused a configuration or an access unit.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
     /// A feature this decoder does not implement.
     Unsupported(&'static str),
@@ -58,6 +58,18 @@ pub enum DecodeError {
 impl From<StorageError> for DecodeError {
     fn from(error: StorageError) -> Self {
         DecodeError::Budget(error)
+    }
+}
+
+impl From<DecodeError> for triergon_codec::Error {
+    /// The workspace error of the same class; a refused storage charge is the budget's
+    /// own error.
+    fn from(error: DecodeError) -> Self {
+        match error {
+            DecodeError::Unsupported(feature) => Self::Unsupported(feature),
+            DecodeError::Invalid(detail) => Self::Invalid(detail),
+            DecodeError::Budget(error) => error,
+        }
     }
 }
 
@@ -251,22 +263,22 @@ fn sub_packets(au: &[u8], streams: usize) -> impl Iterator<Item = Result<Packet<
 }
 
 impl AudioDecoder for Decoder {
+    type Error = DecodeError;
+
     fn decode(
         &mut self,
         au: &[u8],
         out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
-        self.decode_packet(au, out)
-            .map(|()| None)
-            .map_err(DecodeFailure::from_error)
+    ) -> Result<Option<DownmixLevels>, DecodeError> {
+        self.decode_packet(au, out).map(|()| None)
     }
 
     fn delay(&self) -> usize {
         usize::from(self.pre_skip)
     }
 
-    fn flush(&mut self, out: &mut AudioFrame) -> Result<(), DecodeFailure> {
-        Decoder::flush(self, out).map_err(DecodeFailure::from_error)
+    fn flush(&mut self, out: &mut AudioFrame) -> Result<(), DecodeError> {
+        Decoder::flush(self, out)
     }
 
     fn reset(&mut self) {

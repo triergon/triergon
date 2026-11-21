@@ -17,7 +17,7 @@ fn decode(configuration: &[u8], frames: &[&[u8]]) -> Result<(), DecodeError> {
     let mut float = AudioFrame::default();
     let mut integer = decoder.integer_frame();
     for au in frames {
-        let info = decoder.decode_float(au, &mut float)?; // or AudioDecoder::decode
+        let info = decoder.decode(au, &mut float)?; // or AudioDecoder::decode
         decoder.decode_integer(au, &mut integer)?; // integer.plane(0), ...
         let _ = (info.sample_rate, info.bits_per_sample, info.layout);
     }
@@ -41,7 +41,7 @@ channel counts that change between frames.
 
 ## Behaviour and limits
 
-- `decode_float` scales as FFmpeg converts its FLAC decoder output to `f32`: up to 16
+- `decode` scales as FFmpeg converts its FLAC decoder output to `f32`: up to 16
   bits per sample the samples go through 16-bit (`(x << (16 - bits)) as i16 / 2^15`),
   above that through 32-bit (`(x << (32 - bits)) as f32 / 2^31`, which rounds 25- to
   32-bit samples to `f32`). `decode_integer` returns the samples themselves.

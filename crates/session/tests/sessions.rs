@@ -1,8 +1,8 @@
 //! Lifecycle tests for both session lanes with scripted decoders.
 use std::collections::VecDeque;
 use triergon_codec::{
-    AudioDecoder, AudioFrame, ChannelLayout, Colour, DecodeFailure, DownmixLevels, PictureView,
-    Plane, Speaker, VideoDecoder,
+    AudioDecoder, AudioFrame, ChannelLayout, Colour, DownmixLevels, Error, PictureView, Plane,
+    Speaker, VideoDecoder,
 };
 use triergon_pixel::letterbox::CANVAS_BYTES;
 use triergon_session::{
@@ -18,9 +18,11 @@ struct Script {
     picture: (Vec<u8>, Vec<u8>),
 }
 impl VideoDecoder for Script {
-    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), DecodeFailure> {
+    type Error = Error;
+
+    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), Error> {
         if au[0] == 0xff {
-            return Err(DecodeFailure("not an H.264 Annex-B access unit".into()));
+            return Err(Error::Invalid("not an H.264 Annex-B access unit"));
         }
         self.held.push((au[0], au[1], pts));
         if self.held.len() > 2 {
@@ -163,7 +165,10 @@ fn decoder_failure_is_explicit_and_backpressure_bounds_input() {
     video.flush();
     video.feed(&[0xff, 0], None).unwrap();
     assert!(!video.step(None));
-    assert!(matches!(video.state(), SessionState::Failed(m) if m.contains("H.264")));
+    assert_eq!(
+        video.state(),
+        SessionState::Failed(Error::Invalid("not an H.264 Annex-B access unit"))
+    );
     assert_eq!(video.feed(&[1, 0], None), Err(FeedError::Idle));
     video.flush();
     video.feed(&[1, 0], None).unwrap();
@@ -182,14 +187,12 @@ impl Tones {
     }
 }
 impl AudioDecoder for Tones {
-    fn decode(
-        &mut self,
-        au: &[u8],
-        out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
+    type Error = Error;
+
+    fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<Option<DownmixLevels>, Error> {
         out.clear();
         if au[0] == 0 {
-            return Err(DecodeFailure("bad sync".into()));
+            return Err(Error::Invalid("bad sync"));
         }
         out.sample_rate = u32::from(au[0]) * 1000;
         out.layout = self.layout;
@@ -291,7 +294,10 @@ fn a_sample_rate_change_starts_a_new_block_and_surround_is_downmixed() {
     assert_eq!((second.sample_rate, second.samples.len()), (44_000, 8));
     audio.feed(&[0, 0], None).unwrap();
     audio.pull(None, 0, &mut PcmBlock::default());
-    assert!(matches!(audio.state(), SessionState::Failed(_)));
+    assert_eq!(
+        audio.state(),
+        SessionState::Failed(Error::Invalid("bad sync"))
+    );
     audio.load(None);
     assert_eq!(
         audio.feed(&[48, 1], None),

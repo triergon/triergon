@@ -24,8 +24,8 @@ use triergon_bitstream::LsbReader;
 use triergon_codec::layout::{native_order, vorbis_order};
 use triergon_codec::mdct::Imdct;
 use triergon_codec::{
-    AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, DecodeFailure, DownmixLevels,
-    Reservation, StorageError,
+    AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, DownmixLevels, Reservation,
+    StorageError,
 };
 use triergon_framing::vorbis::{VorbisHeaders, VorbisIdentification};
 
@@ -56,7 +56,7 @@ impl Default for Limits {
 }
 
 /// Why a decoder refused a configuration or an access unit.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
     /// A feature this decoder does not implement.
     Unsupported(&'static str),
@@ -69,6 +69,18 @@ pub enum DecodeError {
 impl From<StorageError> for DecodeError {
     fn from(error: StorageError) -> Self {
         DecodeError::Budget(error)
+    }
+}
+
+impl From<DecodeError> for triergon_codec::Error {
+    /// The workspace error of the same class; a refused storage charge is the budget's
+    /// own error.
+    fn from(error: DecodeError) -> Self {
+        match error {
+            DecodeError::Unsupported(feature) => Self::Unsupported(feature),
+            DecodeError::Invalid(detail) => Self::Invalid(detail),
+            DecodeError::Budget(error) => error,
+        }
     }
 }
 
@@ -451,14 +463,14 @@ fn output_layout(channels: usize) -> (ChannelLayout, [u8; ChannelLayout::CAPACIT
 }
 
 impl AudioDecoder for Decoder {
+    type Error = DecodeError;
+
     fn decode(
         &mut self,
         au: &[u8],
         out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
-        self.decode_packet(au, out)
-            .map(|()| None)
-            .map_err(DecodeFailure::from_error)
+    ) -> Result<Option<DownmixLevels>, DecodeError> {
+        self.decode_packet(au, out).map(|()| None)
     }
 
     fn reset(&mut self) {
