@@ -161,6 +161,7 @@ enum Phase {
 
 pub(super) struct Seeking {
     request: SeekRequest,
+    selected_epochs: Option<SourceEpochs>,
     phase: Phase,
     retain: Option<Retain>,
     full_scan: bool,
@@ -306,14 +307,28 @@ impl Seeking {
         matches!(self.phase, Phase::Scan(_)).then_some(self.request.track)
     }
 
-    pub(super) fn publishes_tables(&self) -> bool {
+    pub(super) fn publishes_source(&self, event: &TraceEvent) -> bool {
         matches!(self.phase, Phase::Replay { .. })
+            && (matches!(event, TraceEvent::Pat(_) | TraceEvent::ProgramMap { .. })
+                || (self.selected_epochs.is_some()
+                    && matches!(
+                        event,
+                        TraceEvent::Timeline { .. } | TraceEvent::Discontinuity { .. }
+                    )))
     }
 
     pub(super) fn picture_delivery(&self, track: TrackId) -> PictureDelivery {
         match self.phase {
             Phase::Scan(_) if self.full_scan => PictureDelivery::Full,
             Phase::Scan(_) => PictureDelivery::Scan,
+            // Keep header-only groups from the selected epoch available for
+            // decoder setup. Coded packets before the landing are discarded
+            // by advance_seek, in their original decode order.
+            Phase::Replay { .. }
+                if self.selected_epochs.is_some() && track == self.request.track =>
+            {
+                PictureDelivery::Full
+            }
             Phase::Replay { landing, .. } if track == self.request.track => {
                 PictureDelivery::Landing {
                     offset: landing.offset,
@@ -344,6 +359,7 @@ impl Scan {
         probe: SeekProbe,
         target: Time,
         policy: SourceTimePolicy,
+        selected_epochs: Option<SourceEpochs>,
     ) -> Result<bool> {
         let SeekProbe {
             offset,
@@ -354,6 +370,9 @@ impl Scan {
             random_access,
             ..
         } = probe;
+        if selected_epochs.is_some_and(|selected| selected != epochs) {
+            return Ok(false);
+        }
         if *self.epochs.get_or_insert(epochs) != epochs {
             return Err(Error::Unsupported("MPEG-TS seek across source epochs"));
         }
@@ -421,7 +440,12 @@ impl Reader {
         let seek = &mut self.seek.as_mut_slice()[0];
         match &mut seek.phase {
             Phase::Scan(scan) => scan
-                .observe(picture, seek.request.target, self.limits.time_policy)
+                .observe(
+                    picture,
+                    seek.request.target,
+                    self.limits.time_policy,
+                    seek.selected_epochs,
+                )
                 .map(|_| ()),
             Phase::Replay { skipped, .. } => {
                 *skipped = true;
@@ -443,7 +467,35 @@ impl Reader {
     /// landing scan while replay still reconstructs transport state.
     #[cold]
     pub fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
-        self.begin_seek(request, None, None)
+        self.begin_seek(request, None, None, None)
+    }
+
+    /// Seek within the exact source clock and configuration pair reported by
+    /// [Packet::epochs] in this entity. Only access units with this pair compete
+    /// for the landing, even when other epochs have overlapping timestamps.
+    /// The existing timestamp-only seek still refuses epoch changes.
+    ///
+    /// Scans and replays one length-known, seekable entity from its start,
+    /// reconstructing transport state and original provenance. Replay publishes
+    /// program tables, clock transitions and selected-epoch video header groups
+    /// before the landing. The landing and complete following suffix retain
+    /// decode order, source clocks and track configurations. The caller supplies
+    /// any additional decoder configuration needed at the landing.
+    /// This operation does not use a timestamp-only index or retain the suffix.
+    /// The source must remain stable between scan and replay.
+    ///
+    /// # Errors
+    ///
+    /// Returns the source, track, clock and scan-limit errors of [Self::request_seek].
+    /// A missing pair, no eligible access unit at or before the target in that
+    /// pair, or an ambiguous clock wrap within it is refused during the scan.
+    #[cold]
+    pub fn request_seek_in_epoch(
+        &mut self,
+        request: SeekRequest,
+        epochs: SourceEpochs,
+    ) -> Result<InputRequest> {
+        self.begin_seek(request, None, None, Some(epochs))
     }
 
     /// Seek and retain an index of up to `maximum_entries` distinct landing
@@ -465,7 +517,7 @@ impl Reader {
         if maximum_entries == 0 {
             return Err(Error::Invalid("MPEG-TS seek index entry limit"));
         }
-        self.begin_seek(request, Some(maximum_entries), None)
+        self.begin_seek(request, Some(maximum_entries), None, None)
     }
 
     /// Seek over consecutive parts of one logical transport stream. Supply
@@ -511,7 +563,7 @@ impl Reader {
     ) -> Result<InputRequest> {
         self.healthy()?;
         let plan = EntityPlan::new(&self.pool, entities, self.limits.maximum_seek_scan_bytes)?;
-        self.begin_seek(request, maximum_entries, Some(plan))
+        self.begin_seek(request, maximum_entries, Some(plan), None)
     }
 
     fn begin_seek(
@@ -519,6 +571,7 @@ impl Reader {
         request: SeekRequest,
         index_entries: Option<usize>,
         entities: Option<Charged<Box<EntityPlan>>>,
+        selected_epochs: Option<SourceEpochs>,
     ) -> Result<InputRequest> {
         self.healthy()?;
         let length = if let Some(plan) = &entities {
@@ -546,7 +599,8 @@ impl Reader {
             .ok()
             .filter(|pid| crate::ELEMENTARY_PID_RANGE.contains(pid) && self.selected_track(*pid))
             .ok_or(Error::Invalid("MPEG-TS seek track is not selected"))?;
-        if entities.is_none()
+        if selected_epochs.is_none()
+            && entities.is_none()
             && let Some(track) = self.tracks().iter().find(|track| track.stream().pid == pid)
             && !matches!(track.codec(), CodecId::H264 | CodecId::Hevc)
             && !seekable_audio(track.codec())
@@ -561,7 +615,8 @@ impl Reader {
             .seek_index
             .as_ref()
             .filter(|index| {
-                index_entries.is_none()
+                selected_epochs.is_none()
+                    && index_entries.is_none()
                     && index.track == request.track
                     && match (entities.as_deref(), self.seek_entities.as_deref()) {
                         (None, None) => true,
@@ -584,7 +639,8 @@ impl Reader {
                 matches!(&self.packet_tracks, PacketTracks::Selected(pids) if pids.len() == 1);
             // An indexed scan retains landing points. Replay can then stream
             // the suffix without keeping both the index and the output packets.
-            let retain = (index_entries.is_none()
+            let retain = (selected_epochs.is_none()
+                && index_entries.is_none()
                 && entities.is_none()
                 && length <= 256 * 1024
                 && single_track)
@@ -602,6 +658,7 @@ impl Reader {
         };
         seek.try_push(Seeking {
             request,
+            selected_epochs,
             phase,
             full_scan: retain.is_some(),
             retain,
@@ -680,11 +737,16 @@ impl Reader {
             let step = step?;
             match (&mut seek.phase, step) {
                 (Phase::Scan(scan), Step::Ready(Event::Packet(packet))) => {
-                    if packet.track() == request.track {
+                    if packet.track() == request.track
+                        && seek
+                            .selected_epochs
+                            .is_none_or(|epochs| epochs == packet.epochs())
+                    {
                         let better = scan.observe(
                             packet_probe(&packet)?,
                             request.target,
                             self.limits.time_policy,
+                            seek.selected_epochs,
                         )?;
                         if let Some(retain) = &mut seek.retain
                             && !retain.packet(packet, better)
@@ -702,6 +764,11 @@ impl Reader {
                 }
                 (Phase::Scan(scan), Step::End(end)) => {
                     let landing = scan.landing.ok_or_else(|| {
+                        if seek.selected_epochs.is_some() {
+                            return Error::Unsupported(
+                                "MPEG-TS selected epoch has no eligible access unit at or before the target",
+                            );
+                        }
                         let audio = self.tracks.as_slice().iter().any(|track| {
                             track.id() == request.track && seekable_audio(track.codec())
                         });
@@ -777,7 +844,10 @@ impl Reader {
                 }
                 (Phase::Replay { .. }, Step::Ready(Event::Other(event))) => {
                     if matches!(&event, ReaderEvent::Source(source)
-                        if matches!(source.event(), TraceEvent::Pat(_) | TraceEvent::ProgramMap { .. }))
+                        if seek.publishes_source(source.event()))
+                        || matches!(&event, ReaderEvent::VideoHeaders(packet)
+                            if packet.track() == request.track
+                                && seek.selected_epochs == Some(packet.epochs()))
                     {
                         return Ok(Step::Ready(Event::Other(event)));
                     }
