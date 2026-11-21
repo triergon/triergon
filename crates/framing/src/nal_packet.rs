@@ -760,7 +760,7 @@ impl NalPacketSegment {
     }
 }
 
-const INLINE_PACKET_SEGMENTS: usize = 6;
+const INLINE_PACKET_SEGMENTS: usize = 7;
 
 type PacketSegmentStorage = InlineStorage<NalPacketSegment, INLINE_PACKET_SEGMENTS>;
 
