@@ -89,7 +89,7 @@ reference links as under `static-toolchain-runtime-v1`.
 
 The TS program packet comparison also covers a complete forward-only M2TS192
 AVC/AAC program from the same authored fixture: 33 packets (24 video, 9 audio),
-26,592 payload bytes, ordered fold `12066748960095057291`, matching the pinned
+26,592 payload bytes, ordered fold 12066748960095057291, matching the pinned
 reference through physical EOF. All 35 previous controls and pins remain intact.
 The combined case extends untimed correctness coverage to 36 cases. Its
 AArch64 and ARMv7 runtime, peak heap and kernel-bound RSS remain unmeasured.
