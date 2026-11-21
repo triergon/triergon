@@ -5,7 +5,8 @@
 //! [`PER_TARGET`] are `ass-parse-host`'s instead. Rendering renders every
 //! script and stream of `harness/fixtures/ass-render` in each of
 //! [`RENDER_SIZES`], those of [`RENDER_PER_TARGET`] as `ass-render-host`'s
-//! cases. The work each case must fold is pinned in
+//! cases. `ass-render-settings` renders a fixed subset at 1080p with
+//! configurable margins, positioning and scaling. The work each case must fold is pinned in
 //! `harness/features/<id>/pins.json`, libass's folds (see [`crate::generators`]),
 //! per target in `ass-parse-host`.
 
@@ -30,6 +31,45 @@ pub const FONTS: &str = ".research/fonts/files";
 pub const RENDER_SIZES: [(&str, [&str; 4]); 2] = [
     ("1080p", ["1920", "1080", "1280", "720"]),
     ("720p", ["1280", "720", "720", "576"]),
+];
+
+const SETTINGS_FIXTURES: [&str; 12] = [
+    "animation.ass",
+    "basic.ass",
+    "bidi.ass",
+    "blur.ass",
+    "box-borders.ass",
+    "cjk.ass",
+    "clip.ass",
+    "collision-far-margins.ass",
+    "collision.ass",
+    "decorations-sizes.ass",
+    "positioning.ass",
+    "stream-change.chunks",
+];
+
+const RENDER_SETTINGS: [(&str, &[&str]); 11] = [
+    ("margins", &["margins=40,60,20,30"]),
+    ("letterbox", &["margins=0,140,0,0", "use-margins=1"]),
+    ("use-margins", &["use-margins=1"]),
+    ("pixel-aspect-wide", &["pixel-aspect=1.25"]),
+    ("pixel-aspect-narrow", &["pixel-aspect=0.8"]),
+    ("font-scale-small", &["font-scale=0.5"]),
+    ("font-scale-large", &["font-scale=1.75"]),
+    ("line-spacing", &["line-spacing=12.5"]),
+    ("line-position-middle", &["line-position=35"]),
+    ("line-position-top", &["line-position=100"]),
+    (
+        "combined",
+        &[
+            "margins=40,60,20,30",
+            "use-margins=1",
+            "pixel-aspect=1.25",
+            "font-scale=1.75",
+            "line-spacing=12.5",
+            "line-position=35",
+        ],
+    ),
 ];
 
 /// How a case runs its fixture.
@@ -83,7 +123,7 @@ pub const ROW_SOURCES: [&str; 1] = ["xtask/src/ass/manifest.rs"];
 /// style and header quirks, a stream with every command, and the walks over
 /// drawings, karaoke, animation and out-of-range coordinates and values, and
 /// a rendered script and stream.
-pub const SMOKE_CASES: [(&str, &[&str]); 5] = [
+pub const SMOKE_CASES: [(&str, &[&str]); 6] = [
     (
         "ass-parse-scripts",
         &[
@@ -109,6 +149,13 @@ pub const SMOKE_CASES: [(&str, &[&str]); 5] = [
         "ass-render",
         &["basic-ass-720p", "stream-fallback-chunks-1080p"],
     ),
+    (
+        "ass-render-settings",
+        &[
+            "basic-ass-1080p-pixel-aspect-square",
+            "stream-change-chunks-1080p-combined",
+        ],
+    ),
 ];
 
 pub const GENERATOR: Generator = Generator {
@@ -131,7 +178,7 @@ pub const GENERATOR: Generator = Generator {
 };
 
 fn directory(id: &str) -> &'static str {
-    if id == "ass-render" || id == "ass-render-host" {
+    if matches!(id, "ass-render" | "ass-render-host" | "ass-render-settings") {
         RENDER_FIXTURES
     } else {
         FIXTURES
@@ -145,6 +192,9 @@ fn note(id: &str) -> &'static str {
         }
         "ass-render-host" => {
             "The rendered scripts whose result C leaves to the host, rendered as ass-render renders them: libass's int arithmetic overflowing or converting out of range; pinned from each target's reference."
+        }
+        "ass-render-settings" => {
+            "Authored scripts and a packet stream rendered at 1080p with the same explicit libass renderer settings on both sides; every image of every frame."
         }
         "ass-parse-scripts" => {
             "Every authored script read whole as libass 0.17.5's ass_read_memory reads it, with the style overrides and font extraction its directives set: every track, style and event field and every embedded font."
@@ -204,6 +254,9 @@ fn timed(data: &[u8]) -> bool {
 }
 
 fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
+    if id == "ass-render-settings" {
+        return settings_rows(root);
+    }
     if id == "ass-render" || id == "ass-render-host" {
         return render_rows(root, id == "ass-render-host");
     }
@@ -254,25 +307,64 @@ fn render_rows(root: &Path, per_target: bool) -> R<Vec<Value>> {
         if RENDER_PER_TARGET.contains(&name.as_str()) != per_target {
             continue;
         }
-        let (profile, mode) = match kind(&name) {
-            Some(Kind::Script(_)) => ("script", "script"),
-            Some(Kind::Stream) => ("stream", "chunks"),
-            None => return Err(format!("{RENDER_FIXTURES}/{name}: not a fixture")),
-        };
         for (suffix, size) in RENDER_SIZES {
-            let mut arguments = vec![mode, FONTS];
-            arguments.extend(size);
-            rows.push(Value::object([
-                (
-                    "id",
-                    Value::str(format!("{}-{suffix}", name.replace('.', "-"))),
-                ),
-                ("profile", Value::str(profile)),
-                ("file", Value::str(&name)),
-                ("sha256", Value::str(crate::sha256::hex(&data))),
-                ("rights", Value::str("authored-synthetic")),
-                ("arguments", Value::strings(arguments)),
-            ]));
+            rows.push(render_row(&name, &data, suffix, size, &[])?);
+        }
+    }
+    Ok(rows)
+}
+
+fn render_row(
+    name: &str,
+    data: &[u8],
+    suffix: &str,
+    size: [&str; 4],
+    overrides: &[&str],
+) -> R<Value> {
+    let (profile, mode) = match kind(name) {
+        Some(Kind::Script(_)) => ("script", "script"),
+        Some(Kind::Stream) => ("stream", "chunks"),
+        None => return Err(format!("{RENDER_FIXTURES}/{name}: not a fixture")),
+    };
+    let mut arguments = vec![mode, FONTS];
+    arguments.extend(size);
+    arguments.extend_from_slice(overrides);
+    Ok(Value::object([
+        (
+            "id",
+            Value::str(format!("{}-{suffix}", name.replace('.', "-"))),
+        ),
+        ("profile", Value::str(profile)),
+        ("file", Value::str(name)),
+        ("sha256", Value::str(crate::sha256::hex(data))),
+        ("rights", Value::str("authored-synthetic")),
+        ("arguments", Value::strings(arguments)),
+    ]))
+}
+
+fn settings_rows(root: &Path) -> R<Vec<Value>> {
+    let (resolution, size) = RENDER_SIZES[0];
+    let mut rows = Vec::new();
+    for name in SETTINGS_FIXTURES {
+        let path = root.join(RENDER_FIXTURES).join(name);
+        let data = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        for (variant, overrides) in RENDER_SETTINGS {
+            rows.push(render_row(
+                name,
+                &data,
+                &format!("{resolution}-{variant}"),
+                size,
+                overrides,
+            )?);
+        }
+        if name == "basic.ass" {
+            rows.push(render_row(
+                name,
+                &data,
+                "1080p-pixel-aspect-square",
+                size,
+                &["pixel-aspect=1"],
+            )?);
         }
     }
     Ok(rows)

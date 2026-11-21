@@ -1,0 +1,672 @@
+{
+  "schema": 1,
+  "reference": "libass-ass-native",
+  "note": "libass 0.17.5's folds, recorded by `cargo xtask ass manifest --record`; never edited by hand.",
+  "pins": {
+    "animation-ass-1080p-margins": {
+      "packets": 378,
+      "bytes": 9908001,
+      "digest": 10722193271223680181
+    },
+    "animation-ass-1080p-letterbox": {
+      "packets": 378,
+      "bytes": 9925936,
+      "digest": 11015222666596656716
+    },
+    "animation-ass-1080p-use-margins": {
+      "packets": 378,
+      "bytes": 11390580,
+      "digest": 7015355191729152973
+    },
+    "animation-ass-1080p-pixel-aspect-wide": {
+      "packets": 378,
+      "bytes": 13817463,
+      "digest": 7889391336028442004
+    },
+    "animation-ass-1080p-pixel-aspect-narrow": {
+      "packets": 378,
+      "bytes": 9220880,
+      "digest": 2777738105822654362
+    },
+    "animation-ass-1080p-font-scale-small": {
+      "packets": 378,
+      "bytes": 11390580,
+      "digest": 7015355191729152973
+    },
+    "animation-ass-1080p-font-scale-large": {
+      "packets": 378,
+      "bytes": 11390580,
+      "digest": 7015355191729152973
+    },
+    "animation-ass-1080p-line-spacing": {
+      "packets": 378,
+      "bytes": 11390580,
+      "digest": 7015355191729152973
+    },
+    "animation-ass-1080p-line-position-middle": {
+      "packets": 378,
+      "bytes": 11390580,
+      "digest": 7015355191729152973
+    },
+    "animation-ass-1080p-line-position-top": {
+      "packets": 378,
+      "bytes": 11390580,
+      "digest": 7015355191729152973
+    },
+    "animation-ass-1080p-combined": {
+      "packets": 378,
+      "bytes": 11317150,
+      "digest": 12152723555045001672
+    },
+    "basic-ass-1080p-margins": {
+      "packets": 72,
+      "bytes": 997472,
+      "digest": 11771563632683885268
+    },
+    "basic-ass-1080p-letterbox": {
+      "packets": 72,
+      "bytes": 1019696,
+      "digest": 2225693039597027668
+    },
+    "basic-ass-1080p-use-margins": {
+      "packets": 72,
+      "bytes": 1147064,
+      "digest": 8260616302430643668
+    },
+    "basic-ass-1080p-pixel-aspect-wide": {
+      "packets": 72,
+      "bytes": 1409984,
+      "digest": 1277387788731647572
+    },
+    "basic-ass-1080p-pixel-aspect-narrow": {
+      "packets": 72,
+      "bytes": 920720,
+      "digest": 17484885425990520404
+    },
+    "basic-ass-1080p-font-scale-small": {
+      "packets": 72,
+      "bytes": 359160,
+      "digest": 3441311775829321676
+    },
+    "basic-ass-1080p-font-scale-large": {
+      "packets": 72,
+      "bytes": 3055352,
+      "digest": 17023733030163527592
+    },
+    "basic-ass-1080p-line-spacing": {
+      "packets": 72,
+      "bytes": 1147064,
+      "digest": 8260616302430643668
+    },
+    "basic-ass-1080p-line-position-middle": {
+      "packets": 72,
+      "bytes": 1147064,
+      "digest": 4884516589002052100
+    },
+    "basic-ass-1080p-line-position-top": {
+      "packets": 72,
+      "bytes": 496640,
+      "digest": 14602480974134364244
+    },
+    "basic-ass-1080p-combined": {
+      "packets": 72,
+      "bytes": 3347760,
+      "digest": 13364742359216506964
+    },
+    "basic-ass-1080p-pixel-aspect-square": {
+      "packets": 72,
+      "bytes": 1147064,
+      "digest": 8260616302430643668
+    },
+    "bidi-ass-1080p-margins": {
+      "packets": 216,
+      "bytes": 3547416,
+      "digest": 7673202581197551556
+    },
+    "bidi-ass-1080p-letterbox": {
+      "packets": 216,
+      "bytes": 3488752,
+      "digest": 7290904465899945060
+    },
+    "bidi-ass-1080p-use-margins": {
+      "packets": 216,
+      "bytes": 3962640,
+      "digest": 4359936657432470372
+    },
+    "bidi-ass-1080p-pixel-aspect-wide": {
+      "packets": 216,
+      "bytes": 4949320,
+      "digest": 563135307308203748
+    },
+    "bidi-ass-1080p-pixel-aspect-narrow": {
+      "packets": 216,
+      "bytes": 3233312,
+      "digest": 1043724476335274340
+    },
+    "bidi-ass-1080p-font-scale-small": {
+      "packets": 216,
+      "bytes": 1253888,
+      "digest": 15187527114464372452
+    },
+    "bidi-ass-1080p-font-scale-large": {
+      "packets": 216,
+      "bytes": 11012216,
+      "digest": 6295173442692461772
+    },
+    "bidi-ass-1080p-line-spacing": {
+      "packets": 216,
+      "bytes": 3965088,
+      "digest": 13269967102559446756
+    },
+    "bidi-ass-1080p-line-position-middle": {
+      "packets": 216,
+      "bytes": 3967472,
+      "digest": 790438683611645284
+    },
+    "bidi-ass-1080p-line-position-top": {
+      "packets": 216,
+      "bytes": 3690240,
+      "digest": 16020307358740150244
+    },
+    "bidi-ass-1080p-combined": {
+      "packets": 240,
+      "bytes": 10297664,
+      "digest": 4637608820745161956
+    },
+    "blur-ass-1080p-margins": {
+      "packets": 224,
+      "bytes": 5087288,
+      "digest": 12196707064523299732
+    },
+    "blur-ass-1080p-letterbox": {
+      "packets": 224,
+      "bytes": 5088768,
+      "digest": 14364192548664071908
+    },
+    "blur-ass-1080p-use-margins": {
+      "packets": 224,
+      "bytes": 5675144,
+      "digest": 12603582313550525260
+    },
+    "blur-ass-1080p-pixel-aspect-wide": {
+      "packets": 224,
+      "bytes": 6851600,
+      "digest": 10498551948951467620
+    },
+    "blur-ass-1080p-pixel-aspect-narrow": {
+      "packets": 224,
+      "bytes": 4669320,
+      "digest": 3102986705312824172
+    },
+    "blur-ass-1080p-font-scale-small": {
+      "packets": 224,
+      "bytes": 5675144,
+      "digest": 12603582313550525260
+    },
+    "blur-ass-1080p-font-scale-large": {
+      "packets": 224,
+      "bytes": 5675144,
+      "digest": 12603582313550525260
+    },
+    "blur-ass-1080p-line-spacing": {
+      "packets": 224,
+      "bytes": 5675144,
+      "digest": 12603582313550525260
+    },
+    "blur-ass-1080p-line-position-middle": {
+      "packets": 224,
+      "bytes": 5675144,
+      "digest": 12603582313550525260
+    },
+    "blur-ass-1080p-line-position-top": {
+      "packets": 224,
+      "bytes": 5675144,
+      "digest": 12603582313550525260
+    },
+    "blur-ass-1080p-combined": {
+      "packets": 224,
+      "bytes": 5798664,
+      "digest": 8497407929604748412
+    },
+    "box-borders-ass-1080p-margins": {
+      "packets": 84,
+      "bytes": 866484,
+      "digest": 6667337238735920235
+    },
+    "box-borders-ass-1080p-letterbox": {
+      "packets": 84,
+      "bytes": 861560,
+      "digest": 677131753512517549
+    },
+    "box-borders-ass-1080p-use-margins": {
+      "packets": 84,
+      "bytes": 982447,
+      "digest": 16749811024146645021
+    },
+    "box-borders-ass-1080p-pixel-aspect-wide": {
+      "packets": 84,
+      "bytes": 1223706,
+      "digest": 8791889177953260402
+    },
+    "box-borders-ass-1080p-pixel-aspect-narrow": {
+      "packets": 84,
+      "bytes": 817678,
+      "digest": 8361574562096218258
+    },
+    "box-borders-ass-1080p-font-scale-small": {
+      "packets": 84,
+      "bytes": 982447,
+      "digest": 16749811024146645021
+    },
+    "box-borders-ass-1080p-font-scale-large": {
+      "packets": 84,
+      "bytes": 982447,
+      "digest": 16749811024146645021
+    },
+    "box-borders-ass-1080p-line-spacing": {
+      "packets": 84,
+      "bytes": 982447,
+      "digest": 16749811024146645021
+    },
+    "box-borders-ass-1080p-line-position-middle": {
+      "packets": 84,
+      "bytes": 982447,
+      "digest": 16749811024146645021
+    },
+    "box-borders-ass-1080p-line-position-top": {
+      "packets": 84,
+      "bytes": 982447,
+      "digest": 16749811024146645021
+    },
+    "box-borders-ass-1080p-combined": {
+      "packets": 84,
+      "bytes": 997009,
+      "digest": 12683161199991773102
+    },
+    "cjk-ass-1080p-margins": {
+      "packets": 192,
+      "bytes": 6874056,
+      "digest": 18047226213417487412
+    },
+    "cjk-ass-1080p-letterbox": {
+      "packets": 192,
+      "bytes": 6925280,
+      "digest": 16480311316485325028
+    },
+    "cjk-ass-1080p-use-margins": {
+      "packets": 192,
+      "bytes": 7688776,
+      "digest": 10076839086766232372
+    },
+    "cjk-ass-1080p-pixel-aspect-wide": {
+      "packets": 192,
+      "bytes": 8859664,
+      "digest": 14731998647555914468
+    },
+    "cjk-ass-1080p-pixel-aspect-narrow": {
+      "packets": 192,
+      "bytes": 6724296,
+      "digest": 2862224828709417748
+    },
+    "cjk-ass-1080p-font-scale-small": {
+      "packets": 192,
+      "bytes": 2562016,
+      "digest": 807965815276259684
+    },
+    "cjk-ass-1080p-font-scale-large": {
+      "packets": 192,
+      "bytes": 17418328,
+      "digest": 9301522714298435452
+    },
+    "cjk-ass-1080p-line-spacing": {
+      "packets": 192,
+      "bytes": 7688776,
+      "digest": 10076839086766232372
+    },
+    "cjk-ass-1080p-line-position-middle": {
+      "packets": 192,
+      "bytes": 7709176,
+      "digest": 2081619651703041068
+    },
+    "cjk-ass-1080p-line-position-top": {
+      "packets": 192,
+      "bytes": 3735736,
+      "digest": 5290923403702904548
+    },
+    "cjk-ass-1080p-combined": {
+      "packets": 192,
+      "bytes": 17749464,
+      "digest": 2322585207521166948
+    },
+    "clip-ass-1080p-margins": {
+      "packets": 168,
+      "bytes": 7445096,
+      "digest": 13447440600743564518
+    },
+    "clip-ass-1080p-letterbox": {
+      "packets": 168,
+      "bytes": 7479680,
+      "digest": 10406814168979938726
+    },
+    "clip-ass-1080p-use-margins": {
+      "packets": 168,
+      "bytes": 8708704,
+      "digest": 18364225394580766502
+    },
+    "clip-ass-1080p-pixel-aspect-wide": {
+      "packets": 168,
+      "bytes": 10762784,
+      "digest": 8827028345947348262
+    },
+    "clip-ass-1080p-pixel-aspect-narrow": {
+      "packets": 168,
+      "bytes": 7037360,
+      "digest": 2555370044748484006
+    },
+    "clip-ass-1080p-font-scale-small": {
+      "packets": 168,
+      "bytes": 8708704,
+      "digest": 18364225394580766502
+    },
+    "clip-ass-1080p-font-scale-large": {
+      "packets": 168,
+      "bytes": 8708704,
+      "digest": 18364225394580766502
+    },
+    "clip-ass-1080p-line-spacing": {
+      "packets": 168,
+      "bytes": 8708704,
+      "digest": 18364225394580766502
+    },
+    "clip-ass-1080p-line-position-middle": {
+      "packets": 168,
+      "bytes": 8708704,
+      "digest": 18364225394580766502
+    },
+    "clip-ass-1080p-line-position-top": {
+      "packets": 168,
+      "bytes": 8708704,
+      "digest": 18364225394580766502
+    },
+    "clip-ass-1080p-combined": {
+      "packets": 168,
+      "bytes": 8566608,
+      "digest": 16818863031724024230
+    },
+    "collision-far-margins-ass-1080p-margins": {
+      "packets": 18,
+      "bytes": 201414,
+      "digest": 18104200389200199428
+    },
+    "collision-far-margins-ass-1080p-letterbox": {
+      "packets": 18,
+      "bytes": 206182,
+      "digest": 4536112231429172676
+    },
+    "collision-far-margins-ass-1080p-use-margins": {
+      "packets": 18,
+      "bytes": 228192,
+      "digest": 2433410785177038486
+    },
+    "collision-far-margins-ass-1080p-pixel-aspect-wide": {
+      "packets": 18,
+      "bytes": 277632,
+      "digest": 10558998786186898614
+    },
+    "collision-far-margins-ass-1080p-pixel-aspect-narrow": {
+      "packets": 18,
+      "bytes": 188512,
+      "digest": 7440224044512858774
+    },
+    "collision-far-margins-ass-1080p-font-scale-small": {
+      "packets": 18,
+      "bytes": 74160,
+      "digest": 11706803487442181206
+    },
+    "collision-far-margins-ass-1080p-font-scale-large": {
+      "packets": 18,
+      "bytes": 613396,
+      "digest": 18036373227996320854
+    },
+    "collision-far-margins-ass-1080p-line-spacing": {
+      "packets": 18,
+      "bytes": 228192,
+      "digest": 2433410785177038486
+    },
+    "collision-far-margins-ass-1080p-line-position-middle": {
+      "packets": 18,
+      "bytes": 228192,
+      "digest": 13941083303362231158
+    },
+    "collision-far-margins-ass-1080p-line-position-top": {
+      "packets": 18,
+      "bytes": 155034,
+      "digest": 5024493162357905090
+    },
+    "collision-far-margins-ass-1080p-combined": {
+      "packets": 18,
+      "bytes": 620664,
+      "digest": 16246482342830672342
+    },
+    "collision-ass-1080p-margins": {
+      "packets": 318,
+      "bytes": 6952152,
+      "digest": 3034153109760733472
+    },
+    "collision-ass-1080p-letterbox": {
+      "packets": 318,
+      "bytes": 7110464,
+      "digest": 3242437066904977856
+    },
+    "collision-ass-1080p-use-margins": {
+      "packets": 318,
+      "bytes": 8009084,
+      "digest": 18288526070104400866
+    },
+    "collision-ass-1080p-pixel-aspect-wide": {
+      "packets": 318,
+      "bytes": 9929644,
+      "digest": 17044452589047949626
+    },
+    "collision-ass-1080p-pixel-aspect-narrow": {
+      "packets": 318,
+      "bytes": 6401908,
+      "digest": 7307098242867767094
+    },
+    "collision-ass-1080p-font-scale-small": {
+      "packets": 318,
+      "bytes": 2848680,
+      "digest": 1075165648979313596
+    },
+    "collision-ass-1080p-font-scale-large": {
+      "packets": 318,
+      "bytes": 20682858,
+      "digest": 6439756341050670288
+    },
+    "collision-ass-1080p-line-spacing": {
+      "packets": 318,
+      "bytes": 8011700,
+      "digest": 8627247655233498302
+    },
+    "collision-ass-1080p-line-position-middle": {
+      "packets": 318,
+      "bytes": 8009084,
+      "digest": 500550086358643658
+    },
+    "collision-ass-1080p-line-position-top": {
+      "packets": 318,
+      "bytes": 4723338,
+      "digest": 15157172277967278570
+    },
+    "collision-ass-1080p-combined": {
+      "packets": 318,
+      "bytes": 21605968,
+      "digest": 3897106708185485248
+    },
+    "decorations-sizes-ass-1080p-margins": {
+      "packets": 16,
+      "bytes": 1663148,
+      "digest": 10164793867045045974
+    },
+    "decorations-sizes-ass-1080p-letterbox": {
+      "packets": 16,
+      "bytes": 1643022,
+      "digest": 14357506568073737290
+    },
+    "decorations-sizes-ass-1080p-use-margins": {
+      "packets": 16,
+      "bytes": 1886480,
+      "digest": 16816898659974019126
+    },
+    "decorations-sizes-ass-1080p-pixel-aspect-wide": {
+      "packets": 16,
+      "bytes": 2333900,
+      "digest": 9700284844252865910
+    },
+    "decorations-sizes-ass-1080p-pixel-aspect-narrow": {
+      "packets": 16,
+      "bytes": 1495650,
+      "digest": 4016425570578953282
+    },
+    "decorations-sizes-ass-1080p-font-scale-small": {
+      "packets": 16,
+      "bytes": 1886480,
+      "digest": 16816898659974019126
+    },
+    "decorations-sizes-ass-1080p-font-scale-large": {
+      "packets": 16,
+      "bytes": 1886480,
+      "digest": 16816898659974019126
+    },
+    "decorations-sizes-ass-1080p-line-spacing": {
+      "packets": 16,
+      "bytes": 1886480,
+      "digest": 16816898659974019126
+    },
+    "decorations-sizes-ass-1080p-line-position-middle": {
+      "packets": 16,
+      "bytes": 1886480,
+      "digest": 16816898659974019126
+    },
+    "decorations-sizes-ass-1080p-line-position-top": {
+      "packets": 16,
+      "bytes": 1886480,
+      "digest": 16816898659974019126
+    },
+    "decorations-sizes-ass-1080p-combined": {
+      "packets": 16,
+      "bytes": 1913212,
+      "digest": 13854909917674315158
+    },
+    "positioning-ass-1080p-margins": {
+      "packets": 528,
+      "bytes": 12739745,
+      "digest": 12180717488278329287
+    },
+    "positioning-ass-1080p-letterbox": {
+      "packets": 528,
+      "bytes": 12949961,
+      "digest": 8018491900637795343
+    },
+    "positioning-ass-1080p-use-margins": {
+      "packets": 528,
+      "bytes": 15327119,
+      "digest": 524358066967669852
+    },
+    "positioning-ass-1080p-pixel-aspect-wide": {
+      "packets": 528,
+      "bytes": 18818623,
+      "digest": 365757244628251943
+    },
+    "positioning-ass-1080p-pixel-aspect-narrow": {
+      "packets": 528,
+      "bytes": 12315727,
+      "digest": 17654969818909852944
+    },
+    "positioning-ass-1080p-font-scale-small": {
+      "packets": 528,
+      "bytes": 9773263,
+      "digest": 16095210609886675164
+    },
+    "positioning-ass-1080p-font-scale-large": {
+      "packets": 528,
+      "bytes": 28531391,
+      "digest": 14922559847982075468
+    },
+    "positioning-ass-1080p-line-spacing": {
+      "packets": 528,
+      "bytes": 15327119,
+      "digest": 524358066967669852
+    },
+    "positioning-ass-1080p-line-position-middle": {
+      "packets": 528,
+      "bytes": 15327119,
+      "digest": 524358066967669852
+    },
+    "positioning-ass-1080p-line-position-top": {
+      "packets": 528,
+      "bytes": 15327119,
+      "digest": 524358066967669852
+    },
+    "positioning-ass-1080p-combined": {
+      "packets": 528,
+      "bytes": 31365323,
+      "digest": 967090925348688615
+    },
+    "stream-change-chunks-1080p-margins": {
+      "packets": 66,
+      "bytes": 1222890,
+      "digest": 14021525437006532203
+    },
+    "stream-change-chunks-1080p-letterbox": {
+      "packets": 66,
+      "bytes": 1250431,
+      "digest": 16626829695515608351
+    },
+    "stream-change-chunks-1080p-use-margins": {
+      "packets": 66,
+      "bytes": 1259505,
+      "digest": 13080225429228172361
+    },
+    "stream-change-chunks-1080p-pixel-aspect-wide": {
+      "packets": 66,
+      "bytes": 1584543,
+      "digest": 11105669343651083136
+    },
+    "stream-change-chunks-1080p-pixel-aspect-narrow": {
+      "packets": 66,
+      "bytes": 1030710,
+      "digest": 5529651352571128392
+    },
+    "stream-change-chunks-1080p-font-scale-small": {
+      "packets": 66,
+      "bytes": 781515,
+      "digest": 10976301493694552928
+    },
+    "stream-change-chunks-1080p-font-scale-large": {
+      "packets": 66,
+      "bytes": 2728290,
+      "digest": 9862133044916933003
+    },
+    "stream-change-chunks-1080p-line-spacing": {
+      "packets": 66,
+      "bytes": 1259505,
+      "digest": 13080225429228172361
+    },
+    "stream-change-chunks-1080p-line-position-middle": {
+      "packets": 66,
+      "bytes": 1272360,
+      "digest": 5734593974775091721
+    },
+    "stream-change-chunks-1080p-line-position-top": {
+      "packets": 66,
+      "bytes": 1259505,
+      "digest": 3727315986815776679
+    },
+    "stream-change-chunks-1080p-combined": {
+      "packets": 66,
+      "bytes": 2963247,
+      "digest": 3383196838555534634
+    }
+  }
+}

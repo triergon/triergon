@@ -17,18 +17,19 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use triergon_ass::{
-    Change, Fonts, Image, ImageKind, Options, Renderer, Script, Settings,
+    Change, Fonts, FrameMargins, Image, ImageKind, Options, Renderer, Script, Settings,
     compat::libass::cache_limits,
 };
 use triergon_core::{Budget, Bytes};
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
+use triergon_harness_runner::{Boundary, Invocation, Mode, Totals, write_summary};
 
 use crate::fixture::{Command, Fixture, Frames as Frames_, frames_error};
 use crate::perform::{Result, parse};
-use crate::record::{self, Work};
+use crate::record::Work;
 
 const USAGE: &str =
-    "usage: ass-worker ass-render-fold FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H
+    "usage: ass-worker ass-render-fold FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H [KEY=VALUE ...]
        | ass-render-bench FILE ITERATIONS MODE ... | ass-render-memory FILE MODE ...
        | ass-render-dump FILE MODE ...
   MODE: script | chunks";
@@ -84,8 +85,48 @@ pub struct Case<'a> {
     pub default_family: Option<&'a [u8]>,
     /// The default font file, which the operation opens.
     pub default_font: Option<PathBuf>,
-    pub frame: Size,
-    pub storage: Size,
+    pub settings: Settings,
+}
+
+fn settings(frame: Size, storage: Size, overrides: &[String]) -> Result<Settings> {
+    let mut settings = Settings::new(triergon_ass::Size::new(frame.width, frame.height));
+    settings.storage = Some(triergon_ass::Size::new(storage.width, storage.height));
+    // A player's cache limits, as the libass worker sets them.
+    settings.cache = cache_limits(1000, 24);
+    for option in overrides {
+        let (key, value) = option.split_once('=').ok_or(USAGE)?;
+        let number = || match value.parse::<f64>() {
+            Ok(value) if value.is_finite() => Ok(value),
+            _ => Err(USAGE),
+        };
+        match (key, value) {
+            ("margins", value) => {
+                let mut values = value.split(',');
+                let mut side = || {
+                    values
+                        .next()
+                        .and_then(|n| n.parse::<i32>().ok())
+                        .ok_or(USAGE)
+                };
+                settings.margins = FrameMargins {
+                    top: side()?,
+                    bottom: side()?,
+                    left: side()?,
+                    right: side()?,
+                };
+                if values.next().is_some() {
+                    return Err(USAGE.into());
+                }
+            }
+            ("use-margins", "0" | "1") => settings.use_margins = value == "1",
+            ("pixel-aspect", _) => settings.pixel_aspect = Some(number()?),
+            ("font-scale", _) => settings.font_scale = number()?,
+            ("line-spacing", _) => settings.line_spacing = number()?,
+            ("line-position", _) => settings.line_position = number()?,
+            _ => return Err(USAGE.into()),
+        }
+    }
+    Ok(settings)
 }
 
 /// libass's number for an image's kind (`IMAGE_TYPE_CHARACTER`, `_OUTLINE`,
@@ -209,25 +250,13 @@ impl Case<'_> {
         })
     }
 
-    fn settings(&self) -> Settings {
-        let mut settings =
-            Settings::new(triergon_ass::Size::new(self.frame.width, self.frame.height));
-        settings.storage = Some(triergon_ass::Size::new(
-            self.storage.width,
-            self.storage.height,
-        ));
-        // A player's cache limits, as the libass worker sets them.
-        settings.cache = cache_limits(1000, 24);
-        settings
-    }
-
     /// One operation: the fonts, a renderer, the script read or the stream
     /// run, and every frame rendered, timed from the configured renderer to
     /// the last frame; what it rendered with is returned, to be freed outside
     /// the timed span.
     fn render(&self, budget: &Budget, data: &[u8], out: &mut impl Frames) -> Result<Rendered> {
         let fonts = self.fonts(budget)?;
-        let mut renderer = Renderer::new(budget, &self.settings(), &fonts)?;
+        let mut renderer = Renderer::new(budget, &self.settings, &fonts)?;
         let options = Options {
             extract_fonts: true,
             ..Options::default()
@@ -292,20 +321,25 @@ impl Case<'_> {
 /// `ass-render-*` with its arguments after the program name.
 pub fn run(args: &[String]) -> Result<()> {
     let (action, rest) = args.split_first().ok_or(USAGE)?;
-    let (iterations, path, rest) = match (action.as_str(), rest) {
-        ("ass-render-bench", [path, count, rest @ ..]) => {
-            let count: u64 = count.parse()?;
-            if !(1..=1_000_000).contains(&count) {
-                return Err(USAGE.into());
-            }
-            (count, path, rest)
-        }
-        ("ass-render-fold" | "ass-render-memory" | "ass-render-dump", [path, rest @ ..]) => {
-            (1, path, rest)
-        }
-        _ => return Err(USAGE.into()),
-    };
-    let [mode, fonts, frame_w, frame_h, storage_w, storage_h] = rest else {
+    let action = action.strip_prefix("ass-render-").ok_or(USAGE)?;
+    let invocation = Invocation::parse_mode(action, rest, Some("dump"), || USAGE)?;
+    invocation.check_iterations(|| USAGE)?;
+    let Invocation {
+        mode: action,
+        path,
+        iterations,
+        arguments: rest,
+    } = invocation;
+    let [
+        mode,
+        fonts,
+        frame_w,
+        frame_h,
+        storage_w,
+        storage_h,
+        overrides @ ..,
+    ] = rest
+    else {
         return Err(USAGE.into());
     };
     let stream = match mode.as_str() {
@@ -333,8 +367,11 @@ pub fn run(args: &[String]) -> Result<()> {
             .default_font
             .map(|path| font_path(fonts, path))
             .transpose()?,
-        frame: Size::read(frame_w, frame_h)?,
-        storage: Size::read(storage_w, storage_h)?,
+        settings: settings(
+            Size::read(frame_w, frame_h)?,
+            Size::read(storage_w, storage_h)?,
+            overrides,
+        )?,
         stream,
         fixture,
     };
@@ -342,16 +379,16 @@ pub fn run(args: &[String]) -> Result<()> {
     // decides: 16 GiB, or all of a 32-bit address space.
     let budget = Budget::new(usize::try_from(1_u64 << 34).unwrap_or(usize::MAX))?;
     let mut out = io::stdout().lock();
-    if action == "ass-render-dump" {
+    if action == Mode::Trace {
         let mut printed = Printed(BufWriter::new(out));
         case.render(&budget, &data, &mut printed)?;
         return Ok(printed.0.flush()?);
     }
-    let memory = action == "ass-render-memory";
+    let memory = action == Mode::Memory;
     if memory {
-        record::mark(&mut out, record::WINDOW_BEGIN)?;
+        Boundary::Begin.mark(&mut out)?;
     }
-    let bench = action == "ass-render-bench";
+    let bench = action == Mode::Bench;
     let (mut total, mut elapsed) = (Work::default(), Duration::ZERO);
     for _ in 0..iterations {
         let mut folded = Folded::default();
@@ -362,7 +399,18 @@ pub fn run(args: &[String]) -> Result<()> {
     }
     let elapsed = if bench { elapsed.as_nanos() } else { 0 };
     if memory {
-        record::mark(&mut out, record::WINDOW_END)?;
+        Boundary::End.mark(&mut out)?;
     }
-    Ok(total.print(&mut out, "ass-render", iterations, elapsed)?)
+    Ok(write_summary(
+        &mut out,
+        "ass-render",
+        iterations,
+        elapsed,
+        &Totals {
+            packets: total.packets,
+            bytes: total.bytes,
+            digest: total.digest,
+            refusal: None,
+        },
+    )?)
 }
