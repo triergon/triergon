@@ -4,7 +4,7 @@
 //! no sync word is searched for and no length is derived from `FSIZE`.
 use crate::dts::DtsSourceIdentity;
 use crate::dts::reader::limit;
-use crate::retryable;
+use crate::{freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
 
@@ -146,8 +146,23 @@ enum Phase {
     Bits,
     Byte,
     Freeze,
-    Publish,
+}
+
+/// Where an unpacking stands. The record and its output are held only until the
+/// payload is returned.
+enum State {
+    Unpacking {
+        source: Bytes,
+        output: BudgetVec<u8>,
+        phase: Phase,
+    },
+    /// The payload is complete and returned by the next unit of work.
+    Frozen {
+        source: Bytes,
+        canonical: Bytes,
+    },
     Complete,
+    Failed(Error),
 }
 
 /// Unpacks one complete record of 14-bit DTS words that the caller owns
@@ -163,10 +178,6 @@ enum Phase {
 /// and may be stepped again; any other error is returned again by every later
 /// step.
 pub struct Dts14BitUnpacker {
-    pool: Budget,
-    source: Option<Bytes>,
-    output: Option<BudgetVec<u8>>,
-    frozen: Option<Bytes>,
     identity: DtsSourceIdentity,
     order: DtsWordOrder,
     record_end: SourceLocation,
@@ -175,18 +186,21 @@ pub struct Dts14BitUnpacker {
     position: usize,
     partial_bits: u8,
     partial: u8,
-    phase: Phase,
-    failure: Option<Error>,
+    state: State,
 }
 
 impl std::fmt::Debug for Dts14BitUnpacker {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let failure = match self.state {
+            State::Failed(error) => Some(error),
+            _ => None,
+        };
         f.debug_struct("Dts14BitUnpacker")
             .field("identity", &self.identity)
             .field("order", &self.order)
             .field("payload_bits", &self.payload_bits)
             .field("position", &self.position)
-            .field("failure", &self.failure)
+            .field("failure", &failure)
             .finish_non_exhaustive()
     }
 }
@@ -231,10 +245,6 @@ impl Dts14BitUnpacker {
             .ok_or(Error::Overflow)?;
         limit(minimum, pool.limit())?;
         Ok(Self {
-            pool: pool.clone(),
-            source: Some(source),
-            output: None,
-            frozen: None,
             identity,
             order,
             record_end: SourceLocation {
@@ -246,8 +256,11 @@ impl Dts14BitUnpacker {
             position: 0,
             partial_bits: 0,
             partial: 0,
-            phase: Phase::Reserve,
-            failure: None,
+            state: State::Unpacking {
+                source,
+                output: BudgetVec::new(pool),
+                phase: Phase::Reserve,
+            },
         })
     }
 
@@ -264,17 +277,14 @@ impl Dts14BitUnpacker {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<Dts14BitPayload>> {
-        if let Some(error) = self.failure {
+        if let State::Failed(error) = self.state {
             return Err(error);
         }
         let result = self.advance(work, cancel);
         if let Err(error) = result
             && !retryable(error)
         {
-            self.failure = Some(error);
-            self.source = None;
-            self.output = None;
-            self.frozen = None;
+            self.state = State::Failed(error);
         }
         result
     }
@@ -288,29 +298,44 @@ impl Dts14BitUnpacker {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if matches!(self.phase, Phase::Complete) {
-                return Ok(Step::End(self.record_end));
-            }
+            let (source, output, phase) = match &mut self.state {
+                State::Unpacking {
+                    source,
+                    output,
+                    phase,
+                } => (source, output, phase),
+                State::Frozen { source, canonical } => {
+                    if !work.try_charge(1) {
+                        return Ok(Step::Yield);
+                    }
+                    let output = Dts14BitPayload {
+                        source: source.clone(),
+                        canonical: canonical.clone(),
+                        identity: self.identity,
+                        order: self.order,
+                        payload_bits: self.payload_bits,
+                        residual_bits: self.partial_bits,
+                        residual_value: self.partial,
+                    };
+                    self.state = State::Complete;
+                    return Ok(Step::Ready(output));
+                }
+                State::Complete => return Ok(Step::End(self.record_end)),
+                &mut State::Failed(error) => return Err(error),
+            };
             if !work.try_charge(1) {
                 return Ok(Step::Yield);
             }
-            match self.phase {
+            match phase {
                 Phase::Reserve => {
-                    let buffer = self
-                        .output
-                        .get_or_insert_with(|| BudgetVec::new(&self.pool));
-                    buffer.try_reserve_exact(self.output_bytes)?;
-                    self.phase = Phase::Bits;
+                    output.try_reserve_exact(self.output_bytes)?;
+                    *phase = Phase::Bits;
                 }
                 Phase::Bits => {
                     if self.position == self.payload_bits {
-                        self.phase = Phase::Freeze;
+                        *phase = Phase::Freeze;
                         continue;
                     }
-                    let source = self
-                        .source
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing DTS packed source"))?;
                     let at = (self.position / 14).checked_mul(2).ok_or(Error::Overflow)?;
                     let word = self
                         .order
@@ -321,63 +346,30 @@ impl Dts14BitUnpacker {
                     self.partial_bits += 1;
                     self.position += 1;
                     if self.partial_bits == 8 {
-                        self.phase = Phase::Byte;
+                        *phase = Phase::Byte;
                     }
                 }
                 Phase::Byte => {
-                    let buffer = self
-                        .output
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing DTS packed output"))?;
                     // Enforce the pre-reserved construction invariant before the
                     // generic push can try growing/moving a materialized prefix.
-                    if buffer.len() == buffer.capacity() {
+                    if output.len() == output.capacity() {
                         return Err(Error::Invalid("DTS packed output capacity"));
                     }
-                    buffer.try_push(self.partial).map_err(|error| error.error)?;
+                    output.try_push(self.partial).map_err(|error| error.error)?;
                     self.partial = 0;
                     self.partial_bits = 0;
-                    self.phase = Phase::Bits;
+                    *phase = Phase::Bits;
                 }
                 Phase::Freeze => {
-                    let buffer = self
-                        .output
-                        .take()
-                        .ok_or(Error::Invalid("missing DTS packed freeze"))?;
-                    if buffer.len() != self.output_bytes {
+                    if output.len() != self.output_bytes {
                         return Err(Error::Invalid("DTS packed output length"));
                     }
-                    match buffer.freeze() {
-                        Ok(bytes) => {
-                            self.frozen = Some(bytes);
-                            self.phase = Phase::Publish;
-                        }
-                        Err(error) => {
-                            self.output = Some(error.value);
-                            return Err(error.error);
-                        }
-                    }
-                }
-                Phase::Publish => {
-                    let output = Dts14BitPayload {
-                        source: self
-                            .source
-                            .take()
-                            .ok_or(Error::Invalid("missing DTS packed publication source"))?,
-                        canonical: self
-                            .frozen
-                            .take()
-                            .ok_or(Error::Invalid("missing DTS packed publication bytes"))?,
-                        identity: self.identity,
-                        order: self.order,
-                        payload_bits: self.payload_bits,
-                        residual_bits: self.partial_bits,
-                        residual_value: self.partial,
+                    let canonical = freeze_whole(output)?;
+                    self.state = State::Frozen {
+                        source: source.clone(),
+                        canonical,
                     };
-                    self.phase = Phase::Complete;
-                    return Ok(Step::Ready(output));
                 }
-                Phase::Complete => return Ok(Step::End(self.record_end)),
             }
         }
     }

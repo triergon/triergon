@@ -4,7 +4,7 @@
 use crate::dts::core_frame::CORE_SYNC;
 use crate::dts::reader::limit;
 use crate::dts::{DtsPackedBitLocation, DtsSourceIdentity};
-use crate::retryable;
+use crate::{freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
 
@@ -243,8 +243,24 @@ enum Phase {
     Bits,
     Byte,
     Freeze,
-    Publish,
+}
+
+/// Where a job stands. The record and its storage are held only until the payload
+/// is returned.
+enum State {
+    Unpacking {
+        raw: Bytes,
+        builder: BudgetVec<u8>,
+        phase: Phase,
+    },
+    /// The payload is complete and returned by the next unit of work; a canonical
+    /// record is its own storage.
+    Frozen {
+        raw: Bytes,
+        storage: Bytes,
+    },
     Complete,
+    Failed(Error),
 }
 /// Unpacks one complete record the caller owns, stored in a known
 /// [`DtsPacking`], into a [`DtsPackedPayload`], step by step. A canonical record
@@ -257,10 +273,6 @@ enum Phase {
 /// or `Allocation` the job keeps its record and progress and may be stepped
 /// again; any other error is returned again by every later step.
 pub struct DtsPackedPayloadJob {
-    pool: Budget,
-    raw: Option<Bytes>,
-    builder: Option<BudgetVec<u8>>,
-    frozen: Option<Bytes>,
     identity: DtsSourceIdentity,
     packing: DtsPacking,
     valid_bits: usize,
@@ -268,18 +280,21 @@ pub struct DtsPackedPayloadJob {
     position: usize,
     partial: u8,
     partial_bits: u8,
-    phase: Phase,
-    failure: Option<Error>,
+    state: State,
     end: SourceLocation,
 }
 impl std::fmt::Debug for DtsPackedPayloadJob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let failure = match self.state {
+            State::Failed(error) => Some(error),
+            _ => None,
+        };
         f.debug_struct("DtsPackedPayloadJob")
             .field("identity", &self.identity)
             .field("packing", &self.packing)
             .field("valid_bits", &self.valid_bits)
             .field("position", &self.position)
-            .field("failure", &self.failure)
+            .field("failure", &failure)
             .finish_non_exhaustive()
     }
 }
@@ -314,12 +329,12 @@ impl DtsPackedPayloadJob {
                 .checked_add(u64::try_from(raw.len()).map_err(|_| Error::Overflow)?)
                 .ok_or(Error::Overflow)?,
         };
-        let phase = if matches!(packing, DtsPacking::CanonicalBe) {
-            Phase::Publish
+        let state = if matches!(packing, DtsPacking::CanonicalBe) {
+            State::Frozen {
+                storage: raw.clone(),
+                raw,
+            }
         } else {
-            Phase::Reserve
-        };
-        if !matches!(packing, DtsPacking::CanonicalBe) {
             let minimum = raw
                 .retained_storage_bytes()
                 .checked_add(storage_bytes)
@@ -327,12 +342,13 @@ impl DtsPackedPayloadJob {
                 .and_then(|v| v.checked_add(Budget::control_storage_bytes()))
                 .ok_or(Error::Overflow)?;
             limit(minimum, pool.limit())?;
-        }
+            State::Unpacking {
+                raw,
+                builder: BudgetVec::new(pool),
+                phase: Phase::Reserve,
+            }
+        };
         Ok(Self {
-            pool: pool.clone(),
-            raw: Some(raw),
-            builder: None,
-            frozen: None,
             identity,
             packing,
             valid_bits,
@@ -340,8 +356,7 @@ impl DtsPackedPayloadJob {
             position: 0,
             partial: 0,
             partial_bits: 0,
-            phase,
-            failure: None,
+            state,
             end,
         })
     }
@@ -358,17 +373,14 @@ impl DtsPackedPayloadJob {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<DtsPackedPayload>> {
-        if let Some(error) = self.failure {
+        if let State::Failed(error) = self.state {
             return Err(error);
         }
         let result = self.advance(work, cancel);
         if let Err(error) = result
             && !retryable(error)
         {
-            self.failure = Some(error);
-            self.raw = None;
-            self.builder = None;
-            self.frozen = None;
+            self.state = State::Failed(error);
         }
         result
     }
@@ -381,47 +393,57 @@ impl DtsPackedPayloadJob {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if matches!(self.phase, Phase::Complete) {
-                return Ok(Step::End(self.end));
-            }
+            let (raw, builder, phase) = match &mut self.state {
+                State::Unpacking {
+                    raw,
+                    builder,
+                    phase,
+                } => (raw, builder, phase),
+                State::Frozen { raw, storage } => {
+                    if !work.try_charge(1) {
+                        return Ok(Step::Yield);
+                    }
+                    let payload = DtsPackedPayload {
+                        raw: raw.clone(),
+                        storage: storage.clone(),
+                        identity: self.identity,
+                        packing: self.packing,
+                        valid_bits: self.valid_bits,
+                    };
+                    self.state = State::Complete;
+                    return Ok(Step::Ready(payload));
+                }
+                State::Complete => return Ok(Step::End(self.end)),
+                &mut State::Failed(error) => return Err(error),
+            };
             if !work.try_charge(1) {
                 return Ok(Step::Yield);
             }
-            match self.phase {
+            match phase {
                 Phase::Reserve => {
-                    self.builder
-                        .get_or_insert_with(|| BudgetVec::new(&self.pool))
-                        .try_reserve_exact(self.storage_bytes)?;
-                    self.phase = Phase::Bits;
+                    builder.try_reserve_exact(self.storage_bytes)?;
+                    *phase = Phase::Bits;
                 }
                 Phase::Bits => {
                     if self.position == self.valid_bits {
                         if self.partial_bits == 0 {
-                            self.phase = Phase::Freeze;
+                            *phase = Phase::Freeze;
                         } else {
                             // Representation alignment only. valid_bits does not include these zeros.
                             self.partial <<= 8 - self.partial_bits;
-                            self.phase = Phase::Byte;
+                            *phase = Phase::Byte;
                         }
                         continue;
                     }
-                    let raw = self
-                        .raw
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing packed source"))?;
                     self.partial =
                         (self.partial << 1) | self.packing.bit(raw.as_ref(), self.position)?;
                     self.partial_bits += 1;
                     self.position += 1;
                     if self.partial_bits == 8 {
-                        self.phase = Phase::Byte;
+                        *phase = Phase::Byte;
                     }
                 }
                 Phase::Byte => {
-                    let builder = self
-                        .builder
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing packed builder"))?;
                     if builder.len() == builder.capacity() {
                         return Err(Error::Invalid("packed capacity invariant"));
                     }
@@ -430,46 +452,15 @@ impl DtsPackedPayloadJob {
                         .map_err(|failure| failure.error)?;
                     self.partial = 0;
                     self.partial_bits = 0;
-                    self.phase = Phase::Bits;
+                    *phase = Phase::Bits;
                 }
                 Phase::Freeze => {
-                    let builder = self
-                        .builder
-                        .take()
-                        .ok_or(Error::Invalid("missing packed freeze"))?;
-                    match builder.freeze() {
-                        Ok(bytes) => {
-                            self.frozen = Some(bytes);
-                            self.phase = Phase::Publish;
-                        }
-                        Err(failure) => {
-                            self.builder = Some(failure.value);
-                            return Err(failure.error);
-                        }
-                    }
-                }
-                Phase::Publish => {
-                    let raw = self
-                        .raw
-                        .take()
-                        .ok_or(Error::Invalid("missing packed publication"))?;
-                    let storage = if matches!(self.packing, DtsPacking::CanonicalBe) {
-                        raw.clone()
-                    } else {
-                        self.frozen
-                            .take()
-                            .ok_or(Error::Invalid("missing packed storage"))?
-                    };
-                    self.phase = Phase::Complete;
-                    return Ok(Step::Ready(DtsPackedPayload {
-                        raw,
+                    let storage = freeze_whole(builder)?;
+                    self.state = State::Frozen {
+                        raw: raw.clone(),
                         storage,
-                        identity: self.identity,
-                        packing: self.packing,
-                        valid_bits: self.valid_bits,
-                    }));
+                    };
                 }
-                Phase::Complete => return Ok(Step::End(self.end)),
             }
         }
     }

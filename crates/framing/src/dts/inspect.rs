@@ -369,8 +369,16 @@ impl DtsInspection {
 enum Phase {
     Read,
     Validate,
-    Publish,
+    /// The checked header, returned by the next unit of work.
+    Publish(DtsInspectionViews),
+}
+
+/// Where an inspection stands. The record is held only until the result is
+/// returned.
+enum State {
+    Inspecting { raw: Bytes, phase: Phase },
     Complete,
+    Failed(Error),
 }
 
 /// Reads the core header fields of one record the caller owns, bit by bit, and
@@ -385,7 +393,6 @@ enum Phase {
 /// delays the result. An error, cancellation included, is returned again by
 /// every later step.
 pub struct DtsHeaderInspector {
-    raw: Option<Bytes>,
     identity: DtsSourceIdentity,
     fields: [FieldObservation; FIELD_COUNT],
     current: usize,
@@ -393,20 +400,22 @@ pub struct DtsHeaderInspector {
     field_start: u16,
     source_bits: u16,
     record_end: SourceLocation,
-    phase: Phase,
     issues: DtsInspectionIssues,
-    views: Option<DtsInspectionViews>,
-    failure: Option<Error>,
+    state: State,
 }
 
 impl std::fmt::Debug for DtsHeaderInspector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let failure = match self.state {
+            State::Failed(error) => Some(error),
+            State::Inspecting { .. } | State::Complete => None,
+        };
         f.debug_struct("DtsHeaderInspector")
             .field("identity", &self.identity)
             .field("position", &self.position)
             .field("source_bits", &self.source_bits)
             .field("issues", &self.issues)
-            .field("failure", &self.failure)
+            .field("failure", &failure)
             .finish_non_exhaustive()
     }
 }
@@ -442,7 +451,6 @@ impl DtsHeaderInspector {
             .ok_or(Error::Overflow)?;
         let source_bits = u16::try_from(source.len().min(15) * 8).map_err(|_| Error::Overflow)?;
         Ok(Self {
-            raw: Some(source),
             identity,
             fields: [FieldObservation::NotReached; FIELD_COUNT],
             current: 0,
@@ -453,10 +461,11 @@ impl DtsHeaderInspector {
                 source: identity.source,
                 offset: end,
             },
-            phase: Phase::Read,
             issues: DtsInspectionIssues(0),
-            views: None,
-            failure: None,
+            state: State::Inspecting {
+                raw: source,
+                phase: Phase::Read,
+            },
         })
     }
 
@@ -470,14 +479,12 @@ impl DtsHeaderInspector {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<DtsInspection>> {
-        if let Some(error) = self.failure {
+        if let State::Failed(error) = self.state {
             return Err(error);
         }
         let result = self.advance(work, cancel);
         if let Err(error) = result {
-            self.failure = Some(error);
-            self.raw = None;
-            self.views = None;
+            self.state = State::Failed(error);
         }
         result
     }
@@ -491,16 +498,20 @@ impl DtsHeaderInspector {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            match self.phase {
-                Phase::Complete => return Ok(Step::End(self.record_end)),
+            let (raw, phase) = match &mut self.state {
+                State::Inspecting { raw, phase } => (raw, phase),
+                State::Complete => return Ok(Step::End(self.record_end)),
+                &mut State::Failed(error) => return Err(error),
+            };
+            match *phase {
                 Phase::Read => {
                     if self.current == FIELD_COUNT {
-                        self.phase = Phase::Validate;
+                        *phase = Phase::Validate;
                         continue;
                     }
                     let field = DtsCoreField::ALL[self.current];
                     if field == DtsCoreField::Hcrc
-                        && self.value(DtsCoreField::CrcPresent) == Some(0)
+                        && value(&self.fields, DtsCoreField::CrcPresent) == Some(0)
                     {
                         if !work.try_charge(1) {
                             return Ok(Step::Yield);
@@ -510,7 +521,7 @@ impl DtsHeaderInspector {
                         continue;
                     }
                     if self.position == self.source_bits {
-                        self.phase = Phase::Validate;
+                        *phase = Phase::Validate;
                         continue;
                     }
                     if !work.try_charge(1) {
@@ -524,10 +535,6 @@ impl DtsHeaderInspector {
                     }
                     // A budget yield preserves the cursor. Extract the prefix once,
                     // when the field is complete or the source ends inside it.
-                    let raw = self
-                        .raw
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing DTS inspection source"))?;
                     let prefix = bits_at(
                         raw.as_ref(),
                         usize::from(self.field_start),
@@ -544,7 +551,7 @@ impl DtsHeaderInspector {
                     if observed == u16::from(width) {
                         self.current += 1;
                         if field == DtsCoreField::Sync && prefix != CORE_SYNC {
-                            self.phase = Phase::Validate;
+                            *phase = Phase::Validate;
                         }
                     }
                 }
@@ -554,46 +561,40 @@ impl DtsHeaderInspector {
                     }
                     // Conditional absence is known from CPF source bits even if
                     // an earlier partial field stopped the incremental walk.
-                    if self.value(DtsCoreField::CrcPresent) == Some(0) {
+                    if value(&self.fields, DtsCoreField::CrcPresent) == Some(0) {
                         self.fields[DtsCoreField::Hcrc as usize] = FieldObservation::NotInSyntax;
                     }
-                    let (issues, views) = validate_header(|field| self.value(field))?;
+                    let (issues, views) = validate_header(|field| value(&self.fields, field))?;
                     self.issues = issues;
-                    self.views = Some(views);
-                    self.phase = Phase::Publish;
+                    *phase = Phase::Publish(views);
                 }
-                Phase::Publish => {
+                Phase::Publish(views) => {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
                     let required_bits = required_header_bits(
-                        self.value(DtsCoreField::Sync),
-                        self.value(DtsCoreField::CrcPresent),
+                        value(&self.fields, DtsCoreField::Sync),
+                        value(&self.fields, DtsCoreField::CrcPresent),
                     );
                     let output = DtsInspection {
-                        raw: self
-                            .raw
-                            .take()
-                            .ok_or(Error::Invalid("missing DTS publication source"))?,
+                        raw: raw.clone(),
                         identity: self.identity,
                         fields: self.fields,
                         issues: self.issues,
-                        views: self
-                            .views
-                            .take()
-                            .ok_or(Error::Invalid("missing DTS publication views"))?,
+                        views,
                         required_bits,
                     };
-                    self.phase = Phase::Complete;
+                    self.state = State::Complete;
                     return Ok(Step::Ready(output));
                 }
             }
         }
     }
+}
 
-    fn value(&self, field: DtsCoreField) -> Option<u32> {
-        self.fields[field as usize].value()
-    }
+/// The value observed for `field`, when all its bits were read.
+fn value(fields: &[FieldObservation; FIELD_COUNT], field: DtsCoreField) -> Option<u32> {
+    fields[field as usize].value()
 }
 
 pub(super) fn required_header_bits(sync: Option<u32>, cpf: Option<u32>) -> Option<u16> {
