@@ -64,7 +64,8 @@ pub const SUITES: [Suite; 7] = [
 
 /// The evidence sets of media inputs a gate image is built with (docs/quality.md,
 /// "Gate hosts").
-const IMAGE_INPUTS: [&str; 6] = [
+const IMAGE_INPUTS: [&str; 7] = [
+    "opus-testvectors",
     "gate-media-inputs",
     "codec-file-workload-inputs",
     "ogg-reader-inputs",
