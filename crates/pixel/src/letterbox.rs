@@ -69,7 +69,7 @@ pub fn fit(width: usize, height: usize) -> Fit {
 
 /// One resampling pass: `len` taps per output sample, all inside the source
 /// (`start[i] + len <= source length`), summing to the pass's unit.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 struct Filter {
     len: usize,
     start: Vec<u32>,
@@ -317,7 +317,7 @@ fn vfixed_into<const ADD: bool>(coef: &[i16], rows: [&[i16]; 4], acc: &mut [i32]
 }
 
 /// A plane resampled row by row through a ring of horizontally scaled rows.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Pass {
     horizontal: Filter,
     vertical: Filter,
@@ -382,7 +382,7 @@ impl Pass {
 }
 
 /// Per-geometry state of the separable path.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Plan {
     luma: Pass,
     chroma: [Pass; 2],
@@ -646,8 +646,9 @@ impl Wide {
 /// bit depth of the pictures changes.
 #[derive(Debug, Default)]
 pub struct Scaler {
-    key: Option<(usize, usize, u8)>,
-    plan: Option<Plan>,
+    /// The separable path's state, with the width, height and bit depth of
+    /// the pictures it was built for.
+    plan: Option<((usize, usize, u8), Plan)>,
     rows: [Vec<u8>; 3],
     terms: Terms,
 }
@@ -666,12 +667,17 @@ impl Scaler {
             return;
         }
         let key = (picture.width, picture.height, picture.bit_depth);
-        if self.key != Some(key) || self.plan.is_none() {
-            self.key = Some(key);
-            self.plan = Some(Plan::new(picture.width, picture.height, f));
+        if self
+            .plan
+            .as_ref()
+            .is_some_and(|(built_for, _)| *built_for != key)
+        {
+            self.plan = None;
         }
-        #[expect(clippy::expect_used, reason = "the plan was built just above")]
-        self.plan.as_mut().expect("plan").run(picture, f, rgba);
+        let (_, plan) = self
+            .plan
+            .get_or_insert_with(|| (key, Plan::new(picture.width, picture.height, f)));
+        plan.run(picture, f, rgba);
     }
 
     fn direct(&mut self, picture: &PictureView<'_>, f: Fit, rgba: &mut [u8]) {
