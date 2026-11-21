@@ -1,0 +1,154 @@
+{
+ "name": "gate-run-aarch64-5b8dd88f-20261121-085805-shard-4",
+ "path": "gate-run-aarch64-5b8dd88f-20261121-085805-shard-4",
+ "retention": "retained",
+ "reason": "Full gate run at 5b8dd88f (main 133ad93d with the runtime ceiling at 1.0) on eight c6g.4xlarge hosts, Linux AArch64, shard 4 of 8: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results).",
+ "key": "evidence/gate-runs/5b8dd88fde60314257060bf7f594d1886812219d-aarch64-20261121-085805/shard-4/e201ef8a26ffb25a062deedb0f62b4ce0b8c946b7e0ab248e2f781550eb6327f.tar.zst",
+ "sha256": "e201ef8a26ffb25a062deedb0f62b4ce0b8c946b7e0ab248e2f781550eb6327f",
+ "bytes": 99721985,
+ "results": [
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "9f22349ad56c0551e13a218b4351f42a85c61066cd256b3eb7dbb0f02ff07974",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-file-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "44adcdcf08bffc222098dcb9d3905b5f95fa793833f52be3e04f57c7b42cec85",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/mpegts-previous-picture/gate-result.json",
+   "command": "report --memory",
+   "key": "a81aed34bde455576c265a9c8d25f536863fb96a36cdfd11200da63ff7a4ae83",
+   "status": 0,
+   "report_sha256": "fa9cee4efb035522d27b014000c025045d7ec0604521e09b178eb9a4520de04c",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/codec-file-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "c34f4b6287ad96b97a65ab59af7564ff5caf3c93bab7904c17825bbd884d336a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/subtitle-teletext/gate-result.json",
+   "command": "report --memory",
+   "key": "991607d075784b176048030ae4a9bbc9ad649a238a2236319c1504daa62f76de",
+   "status": 0,
+   "report_sha256": "89c1ae47aff02a6e422bab5f3c10aaa05d4bf43601566800f390100b526bfa7f",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "c766e50a22f3c8d4837d68163266bf0a145c5ce6201a977be6ef57f310753236",
+   "status": 0,
+   "report_sha256": "18f545acaa39b52eb67d67f8dc71a6f3472cae25c8afea28fda0fabb6469e665",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-pes/gate-result.json",
+   "command": "report --memory",
+   "key": "4c138108e75d5311d4264e6c0375f7af98f4350e6e9b892c5a4dd1ea42bd82c2",
+   "status": 0,
+   "report_sha256": "5231f2f6a809257b1252fef1f96790dd83e1323b16112e9d569f032afde02a04",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvb/gate-result.json",
+   "command": "report --memory",
+   "key": "1615570684266f80745dd753c18f2aaf02f80a21c9d15ee7d4100c189a6bb069",
+   "status": 0,
+   "report_sha256": "34793169a28fb4bcc587d26a2c66d23007b1b5e897ac638aae8d69524d560adb",
+   "cases_checked": true
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "2b8a1e157d04c62112ad2a8f394090954258c3dbdb30aea6742b3dd676ae6bf7",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/mpegts-previous-picture/gate-result.json",
+   "command": "report --benchmark",
+   "key": "e9d1dae7243c3c1437fdf35e84fabf239b06e77531b94aa3d3556c5d099c1a12",
+   "status": 0,
+   "report_sha256": "0bc3d97ab4421012e35cf98b3fdbafb1699878e729e22f85c9fefadd7e51919a",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-teletext/gate-result.json",
+   "command": "report --benchmark",
+   "key": "052c4ff7c6b7b320a83fe4a172c5222d24c8da68b7d43bfec8394015528ffd16",
+   "status": 0,
+   "report_sha256": "e1ff96dcfe402cc9da934253f87a70d6f01f1ee63b19e754da747d96b3455c3b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "0c6f7dcca9e6ba1c2da8bed51a5ab0895dd64d250bae6f86f75f01bdddec6593",
+   "status": 0,
+   "report_sha256": "831f3da4e7765012547b89cd6e8f9b8c2508b54f97e43adeac9bce1561acc8d7",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-pes/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4a59ca191aad6c8bac5293fbeaa38af6a95bf4f7b9413e76977bf7cb31dc8e27",
+   "status": 0,
+   "report_sha256": "516b26440b272121ed3c732d621f4edf076f822c8f0f708e589d49dff7cc6f69",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvb/gate-result.json",
+   "command": "report --benchmark",
+   "key": "f3c86eb4b0efa346d29595d10aced8ef5b6deef0df6be12e6d5fd59efba772ed",
+   "status": 0,
+   "report_sha256": "b643a940c1b0fcfd5d8c69493660c298088f653a894c2f864f53e9e3274cb1dc",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mpegts-previous-picture/gate-result.json",
+   "command": "grade",
+   "key": "7be307fd8a1e632b07285dfdf8eddbe37a2f45a0d091dbd6a7e32d201ada3ead",
+   "status": 0,
+   "report_sha256": "b9a922b5ec09e69aa488c543bb651c55b3f0d022154ee19e27ce347d9d06351f"
+  },
+  {
+   "path": "graded/subtitle-teletext/gate-result.json",
+   "command": "grade",
+   "key": "08ada8a5bfd25be42ad57e34e37b5131a3dfe43e3188df789e714e3b76ba5e20",
+   "status": 0,
+   "report_sha256": "9dc77b514c77da11aac694be3b8c86482579caa7678bf3fdf461a623c8081bca"
+  },
+  {
+   "path": "graded/isobmff-3/gate-result.json",
+   "command": "grade",
+   "key": "4a10d92cd0b441fd137a4c24c0ea392bfcf80d32844fe51c9e6e1e9dc16e118c",
+   "status": 0,
+   "report_sha256": "bf706f97e484b6ce8fbd118879607931441dd85b7dab4879ae68da67c0f905b2"
+  },
+  {
+   "path": "graded/mpegts-pes/gate-result.json",
+   "command": "grade",
+   "key": "deb076631372f3cf5e9179e0f10d29386be6bc3a26bd38eba93ed37ff8ac64a6",
+   "status": 0,
+   "report_sha256": "520f9f25b54bd9d3281d546fe7f67da0e6279157ff8225c043494983a07b8cbe"
+  },
+  {
+   "path": "graded/subtitle-dvb/gate-result.json",
+   "command": "grade",
+   "key": "f51ad86620786e3206b96d5d989adc16eee141d8cfabb1b230a9b0b86d9d53ab",
+   "status": 0,
+   "report_sha256": "fc348a637803a7be33da8c8ce6aab4874b078700db5d769e64afd0b30a05682c"
+  }
+ ]
+}
