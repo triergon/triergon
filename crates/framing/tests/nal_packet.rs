@@ -347,26 +347,36 @@ fn aud_and_sei_keep_order_and_native_three_byte_prefix() {
 }
 #[test]
 fn multiple_idr_slices_are_not_dropped_or_sorted() {
-    let expected = [
-        conf(),
-        framed(3, IDR),
-        framed(3, CONT),
-        conf(),
-        framed(3, IDR),
-    ]
-    .concat();
-    for quantum in [1, 4096] {
-        let p = pool();
-        let mut s = session(&p);
-        let source = packet(&p, &[IDR, CONT, IDR]);
-        let baseline = p.used();
-        let out = run(&mut s, source, None, quantum).unwrap();
-        assert_eq!(out.bytes().as_ref(), expected);
-        assert_eq!(out.segments().len(), 7);
-        assert_eq!(
-            p.used() - baseline - out.bytes().retained_storage_bytes(),
-            size_of_val(out.segments())
-        );
+    // Seven descriptors stay inline; with one more slice the table spills and
+    // its heap storage is charged.
+    for (slices, table_charge) in [
+        (&[IDR, CONT, IDR][..], false),
+        (&[IDR, CONT, CONT, IDR], true),
+    ] {
+        let mut expected = conf();
+        for (index, &slice) in slices.iter().enumerate() {
+            if index != 0 && slice == IDR {
+                expected.extend(conf());
+            }
+            expected.extend(framed(3, slice));
+        }
+        for quantum in [1, 4096] {
+            let p = pool();
+            let mut s = session(&p);
+            let source = packet(&p, slices);
+            let baseline = p.used();
+            let out = run(&mut s, source, None, quantum).unwrap();
+            assert_eq!(out.bytes().as_ref(), expected);
+            assert_eq!(out.segments().len(), slices.len() + 4);
+            assert_eq!(
+                p.used() - baseline - out.bytes().retained_storage_bytes(),
+                if table_charge {
+                    size_of_val(out.segments())
+                } else {
+                    0
+                }
+            );
+        }
     }
 }
 #[test]
@@ -899,7 +909,7 @@ fn avc_parameter_set_counts_preserve_tight_budget_admission() {
             packet(p, &[&[0x68, 0xee, 0x3c]]),
         )
     }
-    for (count, output_bytes) in [(2, 21), (5, 43), (6, 49)] {
+    for (count, output_bytes) in [(2, 21), (5, 43), (6, 49), (7, 57)] {
         let raw = record(count);
         // Include the actual parsed configuration-table charge when it spills.
         let base = {
@@ -909,8 +919,8 @@ fn avc_parameter_set_counts_preserve_tight_budget_admission() {
         };
         let output_storage = Bytes::owner_overhead_bytes() + output_bytes;
         let spare = match count {
-            2 => 120,            // The three-entry output stays inline.
-            5 => output_storage, // Six actual entries stay inline.
+            2 => 120,                // The three-entry output stays inline.
+            5 | 6 => output_storage, // Six or seven actual entries stay inline.
             _ => (usize::from(count) + 1) * size_of::<NalPacketSegment>() + output_storage,
         };
         for quantum in [1, 4096] {
@@ -952,8 +962,8 @@ fn avc_parameter_set_counts_preserve_tight_budget_admission() {
 }
 #[test]
 fn avc_first_spill_leaves_room_for_the_exact_output() {
-    let segment_count = 7;
-    let mut nals = [NON; 8];
+    let segment_count = 8;
+    let mut nals = [NON; 9];
     nals[segment_count] = &[];
     let mut expected = framed(4, NON);
     for _ in 1..segment_count {
