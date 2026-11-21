@@ -859,8 +859,9 @@ Specification basis:
 Verification:
 
 - The [DTS seek comparison](../../harness/features/mpegts-dts-seek/contract.json)
-  contains the two DTS core history cases and twelve authored XLL cases. XLL covers
-  short extension headers in TS188 and long extension headers in M2TS192, both
+  contains two DTS core history cases and 24 authored XLL cases. Twelve XLL cases
+  use an extension alone and twelve carry an independently recoverable core.
+  The cases cover short extension headers in TS188 and long extension headers in M2TS192, both
   seek policies at 90,000 and 91,920 source ticks, explicit and missing source DTS,
   and an indexed backward seek after draining to EOF. Each suffix includes every
   payload byte and its source clocks. The fixture author is
@@ -874,7 +875,7 @@ Verification:
   `CARGO_INCREMENTAL=0 cargo xtask report --contract harness/features/mpegts-dts-seek/contract.json --manifest harness/features/mpegts-dts-seek/corpus.json --corpus . --output DIR`.
   Adding `--benchmark --memory --require-slice-acceptance` applies the complete
   per-case runtime, live-heap and total-RSS contract on each required native target.
-  XLL runtime and memory remain unmeasured.
+  [Native results](../../docs/status.md) include both XLL profiles on AArch64 and ARMv7.
 - `CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test container_reader seek::dts_hd`
   checks DTS-HD seek metadata, full original packet and PES provenance, exact clocks,
   small input/work grants, TS188/M2TS192, previous/preroll landings, index reuse,
