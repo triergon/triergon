@@ -26,7 +26,7 @@ fn open(raw: &[u8], known: bool) -> (OpenedMp4<ByteSource>, Budget) {
 fn selected_native_plan(known: bool) {
     let (opened, _pool) = open(REGULAR, known);
     let mut job = compat::mov::index_front(&opened.movie, PlanLimits::default())
-        .expect("explicit native terminal profile must admit actual front terminal metadata");
+        .expect("front demux index must admit metadata read before the terminal mdat");
     for _ in 0..200_000 {
         if job
             .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
@@ -55,7 +55,7 @@ fn selected_native_plan(known: bool) {
             return;
         }
     }
-    panic!("bounded explicit native terminal index");
+    panic!("bounded front demux index");
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn finite_initial_native_front_plan_cannot_use_unattached_indexed_end() {
     assert!(matches!(
         triergon_playback::Engine::mp4(opened.input, plan, 1 << 20),
         Err(triergon_core::Error::Unsupported(
-            "native front plan requires actual source completion"
+            "front demux plan requires progressive source completion"
         ))
     ));
 }

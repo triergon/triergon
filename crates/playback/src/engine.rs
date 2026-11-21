@@ -150,7 +150,7 @@ impl Engine {
         let engine = Self::mp4_unattached(input, plan, maximum_packet)?;
         if matches!(&engine, Self::Mp4(mp4) if mp4.plan.demux_front) {
             return Err(Error::Unsupported(
-                "native front plan requires actual source completion",
+                "front demux plan requires progressive source completion",
             ));
         }
         if matches!(&engine, Self::Mp4(mp4) if mp4.plan.terminal_mdat.is_some()) {
@@ -222,7 +222,7 @@ impl Engine {
     ) -> Result<Self> {
         if plan.demux_front {
             return Err(Error::Unsupported(
-                "native front plan needs explicit native attachment",
+                "front demux plan must be opened with compat::mov::open_front",
             ));
         }
         Self::mp4_with_progressive(input, plan, maximum_packet, limits)
@@ -236,7 +236,9 @@ impl Engine {
         limits: mp4::progressive::ProgressiveLimits,
     ) -> Result<Self> {
         if !plan.demux_front || input.capabilities().random_access {
-            return Err(Error::Invalid("native front attachment context"));
+            return Err(Error::Invalid(
+                "expected a front demux plan and a nonseekable source",
+            ));
         }
         Self::mp4_with_progressive(input, plan, maximum_packet, limits)
     }
@@ -489,7 +491,7 @@ impl Engine {
     ) -> Result<EngineStep> {
         match self {
             Self::Mp4(mp4) => mp4.poll(work, cancel, Some(cursor)),
-            _ => Err(Error::Invalid("native range cursor requires MP4")),
+            _ => Err(Error::Invalid("demux range cursor requires MP4")),
         }
     }
     pub(crate) fn facts(&self) -> Result<BudgetVec<TrackFact>> {

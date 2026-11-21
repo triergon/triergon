@@ -58,6 +58,8 @@ or configuration change.
 
 **Matroska clocks.** The Dolby clock probe retains at most 4,096 timing rows and
 inspects up to 32 syncframes to infer a missing duration.
+Demux clock errors identify a wrong packet codec, a mismatched feed, or a
+video sample that cannot extend the decode clock.
 
 **Subtitles.** The TS bridges bind to one PID of one active PMT and take its
 strict private-stream PES; a new generation, PMT epoch or clock epoch needs a

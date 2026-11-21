@@ -28,7 +28,7 @@ use triergon_playback::{
 };
 
 pub const PREFIX: &str = "ts-program-";
-const OPERATION: &str = "ts-native-program";
+const OPERATION: &str = "ts-program-pes";
 const PROGRAM: u16 = 1;
 const WINDOW: usize = 32 * 1024;
 const WORK: u64 = 1 << 16;
@@ -145,7 +145,7 @@ pub fn operate(pool: &Budget, raw: &Bytes, argument: &str, mut work: Work) -> Re
             match output.event() {
                 Event::DemuxPes { packet, clock } => fold(&mut work, packet, clock)?,
                 Event::PesRefusal { track, error, .. } => {
-                    return Err(format!("native refusal on {track:?}: {error:?}").into());
+                    return Err(format!("PES refusal on {track:?}: {error:?}").into());
                 }
                 _ => {}
             }

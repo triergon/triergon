@@ -118,7 +118,7 @@ impl TsEngine {
         }
         if self.bound_context.is_some() {
             return Err(Error::Unsupported(
-                "bound native startup needs a fresh observed context after seek",
+                "PES playback needs a fresh startup context after seek",
             ));
         }
         if !self.input.capabilities().random_access {
@@ -237,7 +237,7 @@ impl TsEngine {
         selections: &[PidSelection],
     ) -> Result<Self> {
         if selections.is_empty() {
-            return Err(Error::Invalid("native program selection is empty"));
+            return Err(Error::Invalid("PES program selection has no PIDs"));
         }
         if selections.len() > 64 {
             return Err(Error::Limit {
@@ -249,7 +249,9 @@ impl TsEngine {
             .iter()
             .any(|selection| !(1..=0x1ffe).contains(&selection.pid))
         {
-            return Err(Error::Invalid("native program selection PID"));
+            return Err(Error::Invalid(
+                "selected PES PID must be between 1 and 8190",
+            ));
         }
         let engine = Self::program(
             input,
@@ -275,7 +277,7 @@ impl TsEngine {
                 .windows(2)
                 .any(|pair| pair[0].pid() == pair[1].pid())
             {
-                return Err(Error::Invalid("duplicate native program selection PID"));
+                return Err(Error::Invalid("duplicate PID in PES program selection"));
             }
             PesTracks::Multiple(tracks)
         };
@@ -532,11 +534,11 @@ impl TsEngine {
         let packet = self
             .pes_pending
             .as_ref()
-            .ok_or(Error::Invalid("native packet missing"))?;
+            .ok_or(Error::Invalid("pending PES packet missing"))?;
         let projector = self
             .pes_clock
             .as_mut()
-            .ok_or(Error::Invalid("native TS packet before program discovery"))?;
+            .ok_or(Error::Invalid("PES packet before program discovery"))?;
         let (pid, epochs, header) = match packet {
             FeedPacket::Owned(packet) => (packet.pid, packet.source_epochs, packet.time_header()),
             FeedPacket::Compact(packet) => (packet.pid, packet.source_epochs, packet.time_header()),
@@ -547,7 +549,7 @@ impl TsEngine {
         let packet = self
             .pes_pending
             .take()
-            .ok_or(Error::Invalid("native packet missing"))?;
+            .ok_or(Error::Invalid("pending PES packet missing"))?;
         T::project(FeedStep::Packet { packet, clock })
     }
 
@@ -610,7 +612,9 @@ impl TsEngine {
     fn refuse_after_lost_grid(&mut self) {
         self.grid_lost = true;
         for track in self.pes_tracks.as_mut_slice() {
-            track.refuse(Error::Unsupported("native M2TS carrier grid lost"));
+            track.refuse(Error::Unsupported(
+                "M2TS carrier grid lost during PES playback",
+            ));
         }
         self.pes_updates_from = Some(0);
     }

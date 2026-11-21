@@ -55,10 +55,10 @@ impl<S: Source> Startup<S> {
     /// offset zero.
     pub fn new(selected: SelectedInput<S>) -> Result<Self> {
         let Format::Ts(format) = selected.format else {
-            return Err(Error::Invalid("native startup requires TS selection"));
+            return Err(Error::Invalid("PES startup requires a selected TS input"));
         };
         if selected.input.position() != 0 {
-            return Err(Error::Invalid("native startup not at initial cursor"));
+            return Err(Error::Invalid("PES startup requires input at offset zero"));
         }
         Ok(Self {
             input: Some(selected.input),
@@ -79,7 +79,7 @@ impl<S: Source> Startup<S> {
             || selected.input.request().maximum < InputBootstrap::M2TS_PREFIX_BYTES
         {
             return Err(Error::Unsupported(
-                "native M2TS prefix needs a fresh 8192-byte window",
+                "M2TS prefix needs an unbuffered M2TS input with an 8192-byte window",
             ));
         }
         let bytes = BudgetVec::new(selected.input.budget());
@@ -144,7 +144,7 @@ impl<S: Source> Startup<S> {
                 }
                 SourceReply::End { source, token } => {
                     input.finish(source, token)?;
-                    return Err(Error::Unsupported("empty native startup entity"));
+                    return Err(Error::Unsupported("empty entity at PES startup"));
                 }
                 SourceReply::Data(window) => {
                     if window.bytes().is_empty() {
@@ -156,7 +156,7 @@ impl<S: Source> Startup<S> {
                         .is_some_and(|n| n != window.bytes().len() as u64)
                     {
                         return Err(Error::Unsupported(
-                            "native finite startup requires one actual complete initial window; short reads stay source-only",
+                            "finite PES startup needs an initial window containing the whole entity",
                         ));
                     }
                     input.provide(&window)?;
@@ -238,7 +238,7 @@ impl<S: Source> Startup<S> {
             context: self
                 .context
                 .take()
-                .ok_or(Error::Invalid("native startup not ready"))?,
+                .ok_or(Error::Invalid("PES startup context not ready"))?,
             input: self.input.take().ok_or(Error::Closed)?,
             source: self.source.take().ok_or(Error::Closed)?,
             format: self.format,
@@ -287,7 +287,7 @@ impl PrefixRead {
                     return Err(if input.capabilities().length.is_some() {
                         Error::Truncated
                     } else {
-                        Error::Unsupported("short source for native M2TS prefix")
+                        Error::Unsupported("source ended before the 8192-byte M2TS prefix")
                     });
                 }
                 SourceReply::Data(window) => {
@@ -298,7 +298,9 @@ impl PrefixRead {
                         || window.offset != request.offset
                         || window.bytes().len() > request.maximum
                     {
-                        return Err(Error::Invalid("native M2TS prefix reply range"));
+                        return Err(Error::Invalid(
+                            "M2TS prefix reply is outside the requested range",
+                        ));
                     }
                     if !window.bytes().belongs_to(input.budget()) {
                         return Err(Error::ForeignPool);

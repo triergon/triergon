@@ -51,7 +51,9 @@ impl DemuxReplay {
             });
         }
         if track_ids.is_empty() || track_ids.len() != starts.len() {
-            return Err(Error::Invalid("native MP4 replay track starts"));
+            return Err(Error::Invalid(
+                "MP4 demux replay start positions do not cover the tracks",
+            ));
         }
         let mut slots = [Slot {
             track_id: 0,
@@ -62,9 +64,9 @@ impl DemuxReplay {
             let occurrence = rows
                 .get(start)
                 .filter(|occurrence| occurrence.track_id == track_id)
-                .ok_or(Error::Invalid("native MP4 replay start row"))?;
+                .ok_or(Error::Invalid("MP4 demux replay start row missing"))?;
             if track_ids[..slot].contains(&track_id) {
-                return Err(Error::Invalid("duplicate native MP4 replay track"));
+                return Err(Error::Invalid("duplicate MP4 demux replay track"));
             }
             slots[slot] = Slot {
                 track_id,
@@ -94,7 +96,7 @@ impl DemuxReplay {
         cancel: &AtomicBool,
     ) -> Result<DemuxReplayStep> {
         if rows.len() != self.row_count {
-            return Err(Error::Invalid("native MP4 replay row count changed"));
+            return Err(Error::Invalid("MP4 demux replay row count changed"));
         }
         loop {
             if cancel.load(Ordering::Relaxed) {
@@ -164,13 +166,15 @@ impl DemuxReplay {
             };
             return Ok(());
         }
-        Err(Error::Invalid("native MP4 replay delivery row"))
+        Err(Error::Invalid(
+            "delivered row is not at the head of MP4 demux replay",
+        ))
     }
 
     fn head(&self, slot: usize) -> Result<usize> {
         self.slots[slot]
             .head
-            .ok_or(Error::Invalid("native MP4 replay head absent"))
+            .ok_or(Error::Invalid("MP4 demux replay head absent"))
     }
 }
 

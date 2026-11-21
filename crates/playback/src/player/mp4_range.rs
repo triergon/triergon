@@ -82,9 +82,7 @@ impl<'a> Mp4RangeOpen<'a> {
         policy: PlayerPolicy,
     ) -> Result<Mp4RangePlayer<'a, S>> {
         if !input.capabilities().random_access {
-            return Err(Error::Unsupported(
-                "native range playback needs random access",
-            ));
+            return Err(Error::Unsupported("MP4 range playback needs random access"));
         }
         let (plan, mut cursor, duration_us) = self.index.finish_native_range()?;
         // Leave space for packet/input staging and selection validation.
@@ -199,7 +197,9 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
             || !selected.snapshot.enabled
             || !self.player.selection.includes(TrackKey::Mp4(request.video))
         {
-            return Err(Error::Invalid("native seek requires selected MP4 video"));
+            return Err(Error::Invalid(
+                "demux seek requires a selected MP4 video track",
+            ));
         }
         let base = MediaClock::from_source(selected.snapshot.base.require()?)?.demux_base;
         let checked = self.cursor.prepare_checked_range_seek(
@@ -262,7 +262,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
         let replacement = command
             .cursor
             .as_mut()
-            .ok_or(Error::Invalid("native range seek command already applied"))?;
+            .ok_or(Error::Invalid("MP4 range seek command already applied"))?;
         let mut apply = |work: &mut WorkBudget| {
             self.player.apply_seek(
                 TrackKey::Mp4(scope.video),
@@ -365,18 +365,18 @@ impl<'a> Mp4RangeSeekJob<'a> {
             let cursor = self
                 .replay_seed
                 .take()
-                .ok_or(Error::Invalid("native range replay seed missing"))?
+                .ok_or(Error::Invalid("MP4 range replay seed missing"))?
                 .resume_checked_replay(plan.anchors())?;
             self.replay = Some((cursor, plan.landing().clone()));
         }
         let (cursor, _) = self
             .replay
             .as_mut()
-            .ok_or(Error::Invalid("native range replay missing"))?;
+            .ok_or(Error::Invalid("MP4 range replay missing"))?;
         match cursor.poll(work, cancel)? {
             CursorStatus::Ready => Ok(true),
             CursorStatus::Yield => Ok(false),
-            CursorStatus::End => Err(Error::Invalid("native range seek landed at end")),
+            CursorStatus::End => Err(Error::Invalid("MP4 range seek landed at end")),
         }
     }
 
@@ -388,10 +388,10 @@ impl<'a> Mp4RangeSeekJob<'a> {
         }
         let (cursor, landing) = self
             .replay
-            .ok_or(Error::Invalid("native range seek still pending"))?;
+            .ok_or(Error::Invalid("MP4 range seek still pending"))?;
         let offset = cursor
             .occurrence()
-            .ok_or(Error::Invalid("native range seek still pending"))?
+            .ok_or(Error::Invalid("MP4 range seek still pending"))?
             .source
             .range
             .start;

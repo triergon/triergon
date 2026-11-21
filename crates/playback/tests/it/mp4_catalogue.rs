@@ -146,7 +146,7 @@ fn catalogue_required_opener_pressure_keeps_source_alive_and_complete_facts() {
     for case in gold::CASES.iter().filter(|x| !x.malformed) {
         // gap is the historical native-view disposition, never a Source exclusion.
         println!(
-            "PRESSURE_SOURCE {} native_gap={} fragmented={}",
+            "PRESSURE_SOURCE {} demux_gap={} fragmented={}",
             case.name, case.gap, case.fragmented
         );
         for quantum in [1, 4096] {
@@ -1677,7 +1677,7 @@ fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges
     p.set_clock_view(ClockChoice::Demux).unwrap();
     let before = first_packet(&mut p);
     let Event::Mp4(Mp4Event::Packet(packet)) = before.event() else {
-        panic!("expected progressive native packet");
+        panic!("expected progressive demux packet");
     };
     assert!(packet.occurrence.is_some());
 

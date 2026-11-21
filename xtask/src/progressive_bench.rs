@@ -20,7 +20,7 @@ Timing uses 50 complete sessions per sample and at least 30 paired samples.";
 
 /// The feature's directory; its inputs are under `inputs`.
 pub const FEATURE: &str = "harness/features/progressive-ts188";
-const OPERATION: &str = "ProgressiveAvcAacTsOwnedFeedV1";
+const OPERATION: &str = "progressive-avc-aac-ts188";
 const TIMED: [&str; 3] = ["continuous-44100", "reordered-48000", "later-entry-48000"];
 const CONTROLS: [&str; 5] = [
     TIMED[0],

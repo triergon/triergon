@@ -112,7 +112,7 @@ impl<S: Source> Player<S> {
         selection: Selection,
     ) -> Result<Mp4DemuxSeekJob<'a>> {
         let Some(engine @ Engine::Mp4(_)) = self.engine.as_ref() else {
-            return Err(Error::Invalid("native seek requires MP4"));
+            return Err(Error::Invalid("demux seek requires MP4"));
         };
         self.check_native_seek_clock()?;
         Mp4DemuxSeekJob::new(engine, movie, request, selection, None)
@@ -149,7 +149,7 @@ impl<S: Source> Player<S> {
     fn check_native_seek_clock(&self) -> Result<()> {
         if self.clock != ClockChoice::Demux {
             return Err(Error::Unsupported(
-                "native seek needs complete native range MP4",
+                "demux seek requires a complete MP4 range plan",
             ));
         }
         Ok(())
@@ -175,7 +175,7 @@ impl<'a> Mp4DemuxSeekJob<'a> {
         progressive_generation: Option<u64>,
     ) -> Result<Self> {
         let Engine::Mp4(mp4) = engine else {
-            return Err(Error::Invalid("native seek requires MP4"));
+            return Err(Error::Invalid("demux seek requires MP4"));
         };
         let plan = &mp4.plan;
         if plan.view != PlanView::Demux
@@ -184,7 +184,7 @@ impl<'a> Mp4DemuxSeekJob<'a> {
             || !mp4.supports_range_replay()
         {
             return Err(Error::Unsupported(
-                "native seek needs complete native range MP4",
+                "demux seek requires a complete MP4 range plan",
             ));
         }
         if !movie.pool().same_pool(&plan.pool) {
@@ -202,7 +202,9 @@ impl<'a> Mp4DemuxSeekJob<'a> {
             || !selected.snapshot.enabled
             || !selection.includes(TrackKey::Mp4(request.video))
         {
-            return Err(Error::Invalid("native seek requires selected MP4 video"));
+            return Err(Error::Invalid(
+                "demux seek requires a selected MP4 video track",
+            ));
         }
         let base = MediaClock::from_source(selected.snapshot.base.require()?)?.demux_base;
         let target = Time::from_ticks(i128::from(request.timestamp), base)?;
@@ -322,7 +324,7 @@ impl Mp4DemuxSeekJob<'_> {
             let global = self
                 .global
                 .take()
-                .ok_or(Error::Invalid("missing native seek planner"))?
+                .ok_or(Error::Invalid("demux seek planner missing"))?
                 .finish()?;
             self.receipt = Some(global.landing().clone());
             self.tracks = global.anchors().len();
@@ -352,14 +354,12 @@ impl Mp4DemuxSeekJob<'_> {
                 });
             }
             let row = rows.get(self.row).ok_or(Error::Invalid(
-                "native seek occurrence absent from playback plan",
+                "demux seek occurrence absent from playback plan",
             ))?;
             let anchor = self.anchors[..self.tracks]
                 .iter_mut()
                 .find(|anchor| anchor.track == row.track_id)
-                .ok_or(Error::Invalid(
-                    "native seek track absent from playback plan",
-                ))?;
+                .ok_or(Error::Invalid("demux seek track absent from playback plan"))?;
             if anchor.row == usize::MAX {
                 if anchor.seen == anchor.occurrence {
                     anchor.row = self.row;
@@ -375,7 +375,7 @@ impl Mp4DemuxSeekJob<'_> {
         let receipt = self
             .receipt
             .as_ref()
-            .ok_or(Error::Invalid("native seek receipt missing"))?;
+            .ok_or(Error::Invalid("demux seek receipt missing"))?;
         for (i, anchor) in self.anchors[..self.tracks].iter().enumerate() {
             let row = &rows[anchor.row];
             if anchor.track == self.request.video
@@ -384,7 +384,7 @@ impl Mp4DemuxSeekJob<'_> {
                     || row.edit != receipt.selected.occurrence.edit)
             {
                 return Err(Error::Invalid(
-                    "native reference occurrence differs from playback plan",
+                    "demux seek landing differs from playback plan",
                 ));
             }
             tracks[i] = anchor.track;
@@ -406,7 +406,7 @@ impl Mp4DemuxSeekJob<'_> {
         }
         let replay = self
             .replay
-            .ok_or(Error::Invalid("native playback seek still pending"))?;
+            .ok_or(Error::Invalid("playback demux seek still pending"))?;
         let offset = self.plan.demux_rows()[replay.first_row()]
             .source
             .range
@@ -421,7 +421,7 @@ impl Mp4DemuxSeekJob<'_> {
             replay,
             receipt: self
                 .receipt
-                .ok_or(Error::Invalid("native seek receipt missing"))?,
+                .ok_or(Error::Invalid("demux seek receipt missing"))?,
             offset,
         })
     }

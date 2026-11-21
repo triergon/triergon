@@ -20,7 +20,7 @@ use triergon_hls::progressive::{
 use triergon_playback::{Source, SourceReply};
 
 pub const PREFIX: &str = "progressive-";
-const OP: &str = "ProgressiveAvcAacTsOwnedFeedV1";
+const OP: &str = "progressive-avc-aac-ts188";
 const WINDOW: usize = 4096;
 const DEPTH: usize = 2;
 const LIVE_BYTES: usize = 256 * 1024;

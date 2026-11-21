@@ -229,7 +229,7 @@ fn check(out: &[Output], case: &gold::Case) {
             w.offset()..w.offset() + w.data.len() as u64
         );
         assert_eq!(p.configuration.track.track_id as usize, w.stream_index + 1);
-        let n = p.occurrence.as_ref().expect("native occurrence required");
+        let n = p.occurrence.as_ref().expect("demux occurrence required");
         assert_eq!(n.source, p.source.sample);
         assert_eq!(n.track_id, p.configuration.track.track_id);
         assert_eq!(n.demux.source_ordinal, p.source.sample.ordinal);
@@ -288,7 +288,7 @@ fn native_terminal_unknown_source_clocks_and_literal_origin_chain_are_retained()
             assert_eq!(p.source.sample.cts_ticks, None);
             let ClockOrigin::PredecessorEnd(origin) = p.occurrence.as_ref().unwrap().clock_origin
             else {
-                panic!("derived native origin required")
+                panic!("derived demux clock origin required")
             };
             assert_eq!(origin.predecessor_sample, at as u64);
             assert_eq!(origin.derived_dts_ticks, at as i128 * 1000);
@@ -715,7 +715,7 @@ fn native_out_of_source_first_sample_requires_a_physical_end() {
                 let out = collect(&mut native, work).unwrap();
                 assert!(packets(&out).is_empty());
                 let [refusal] = out.as_slice() else {
-                    panic!("expected one native refusal")
+                    panic!("expected one demux refusal")
                 };
                 let Event::Mp4(Mp4Event::MissingSample(refusal)) = refusal.event() else {
                     panic!("expected a missing first sample");
@@ -785,7 +785,7 @@ fn native_missing_first_sample_does_not_infer_end_from_starvation_or_layout() {
     assert!(matches!(
         collect(&mut native, 1),
         Err(Error::Invalid(
-            "native first sample starts before physical end"
+            "first demux sample starts before the physical end of the source"
         ))
     ));
 }
@@ -920,7 +920,7 @@ fn native_short_media_packet_requires_a_positive_prefix_at_eof() {
                     assert_eq!(packets(&out).len(), 5);
                     let last = out.last().unwrap().event();
                     let Event::Mp4(Mp4Event::ShortPacket(p)) = last else {
-                        panic!("expected a native short packet");
+                        panic!("expected a short demux packet");
                     };
                     assert_eq!(p.prefix.declared, p.occurrence.source);
                     assert_eq!(p.prefix.declared.range, start..start + 12);
@@ -1025,7 +1025,7 @@ fn interior_zero_read_preserves_the_native_packet_prefix_and_source() {
                     })
                     .collect();
                 let [(at, empty)] = empty.as_slice() else {
-                    panic!("expected a single unassociated native packet");
+                    panic!("expected a single demux packet without a source sample");
                 };
                 assert!(
                     matches!(output[*at - 1].event(), Event::Mp4(Mp4Event::Packet(p)) if p.source.sample.ordinal == 8)
@@ -1274,7 +1274,7 @@ fn reversed_forward_fragments_require_a_complete_bounded_extent() {
     assert!(matches!(
         collect(&mut native, 13),
         Err(Error::Unsupported(
-            "native replay exceeds media cache bound"
+            "demux replay media extent is empty or exceeds the cache limit"
         ))
     ));
 
@@ -1427,7 +1427,7 @@ fn forward_native_edit_replay_requires_a_complete_extent_within_the_cache_limit(
     assert!(matches!(
         try_make_mode(&oversized, true, 64, 4096, true, true),
         Err(Error::Unsupported(
-            "native front source occurrence order is not physical"
+            "demux occurrences are outside source order and media cannot be retained"
         ))
     ));
 

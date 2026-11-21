@@ -35,12 +35,14 @@ impl MatroskaTrackFeed {
             MatroskaFeedPayload::Aac { raw, .. },
         ) = (&self.codec, &packet.payload)
         else {
-            return Err(Error::Invalid("native AAC clock packet codec"));
+            return Err(Error::Invalid("AAC demux clock requires an AAC packet"));
         };
         if !self.association.matches(packet.source)
             || !std::ptr::eq(*raw, packet.source.packet.data.as_ref())
         {
-            return Err(Error::Invalid("native AAC clock feed association"));
+            return Err(Error::Invalid(
+                "AAC packet belongs to a different feed or configuration",
+            ));
         }
         check_limit(
             raw.len().checked_add(7).ok_or(Error::Overflow)?,

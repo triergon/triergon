@@ -92,7 +92,7 @@ fn prepared_native() -> (startup::BoundInput<StartupSource>, Budget) {
             return (setup.finish().unwrap(), b);
         }
     }
-    panic!("finite native setup stalled")
+    panic!("finite PES startup stalled")
 }
 
 #[test]
@@ -270,7 +270,7 @@ impl Source for SequentialStartup {
         Ok(reply)
     }
     fn invalidate(&mut self) {
-        panic!("native prefix must preserve the same source generation");
+        panic!("M2TS prefix must preserve the source generation");
     }
     fn abort(&mut self) {
         self.source.abort();
@@ -369,7 +369,7 @@ fn native_m2ts_prefix_preserves_the_same_sequential_source_through_late_pes() {
                     Some((packet.position, packet.source_origin.offset))
                 }
                 Event::PesRefusal { error, .. } => {
-                    panic!("unexpected native refusal {error:?}")
+                    panic!("unexpected PES refusal {error:?}")
                 }
                 _ => None,
             })
@@ -413,7 +413,10 @@ fn native_m2ts_prefix_requires_the_actual_complete_unambiguous_window() {
     }
     for (raw, message) in [
         (&ambiguous[..], "native M2TS prefix grid is ambiguous"),
-        (&ambiguous[..8000], "short source for native M2TS prefix"),
+        (
+            &ambiguous[..8000],
+            "source ended before the 8192-byte M2TS prefix",
+        ),
     ] {
         let (mut startup, budget, _) = prefix_setup(raw, false, 1024);
         let failure = loop {
@@ -449,7 +452,7 @@ fn native_m2ts_prefix_grid_loss_preserves_source_and_refuses_native_tail() {
             .filter(|o| matches!(
                 o.event(),
                 Event::PesRefusal {
-                    error: C::Unsupported("native M2TS carrier grid lost"),
+                    error: C::Unsupported("M2TS carrier grid lost during PES playback"),
                     ..
                 }
             ))

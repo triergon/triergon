@@ -36,9 +36,12 @@ leaves any of that input's pool charged. An operation that ends early stops the 
 the line then counts the operations that ran, says `"eof":false` and names the refusal
 and the input event it is attributed to.
 
+The JSON `operation` is `ts-program-pes` for the `ts-program-` family and
+`progressive-avc-aac-ts188` for the `progressive-` family.
+
 | Prefix | ARGS | Operation | Contract |
 |---|---|---|---|
-| `feed-` | none; FILE is a capsule | Matroska discovery with a 4 KiB read window; the first video track's AVC or HEVC packets with native PTS, DTS and duration, from startup or after a backward seek | `matroska-startup-seek` |
+| `feed-` | none; FILE is a capsule | Matroska discovery with a 4 KiB read window; the first video track's AVC or HEVC packets with demux PTS, DTS and duration, from startup or after a backward seek | `matroska-startup-seek` |
 | `hls-` | VIDEO (`avc`, `hevc`) and AUDIO (`aac`, `ac3`, `eac3`) | one TS188 segment: every access unit retained through segment EOF, then `contiguous_feed` for every video unit, folding its payload, the audio bytes, timing and both stream tails | `hls-segments` |
 | `mp4-range-` | an optional backward seek target in video ticks and optional `opus-roll` policy | regular or complete fragmented AVC/AAC, regular AVC/Opus, and regular HEVC/AAC or AV1 with dedicated Dolby Vision sample entries. Seek cases read one packet before seeking backward. The digest covers order, source extents, clocks, flags, trim, bytes and the tag and decoder configuration of Opus and dedicated video entries. The source-roll policy also folds the video landing, audio ordinals and preroll | `mp4-range` |
 | `progressive-` | CLOCK (`pts-only`, `pts-dts`) and PROGRESS (`before-eof`, `at-eof`) | a forward-only AVC/AAC TS188 session read from the file in 4 KiB windows, two retained units per stream; `bench` runs 50 sessions, and `trace` prints every unit with the stream facts on stderr | `progressive-ts188` |

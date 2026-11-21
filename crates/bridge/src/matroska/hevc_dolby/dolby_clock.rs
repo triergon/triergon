@@ -31,20 +31,28 @@ impl MatroskaHevcDolbyFeed {
         let (FeedCodec::Dolby(codec), MatroskaHevcDolbyPayload::Dolby { family, raw }) =
             (&self.codec, &packet.payload)
         else {
-            return Err(Error::Invalid("native Dolby clock packet codec"));
+            return Err(Error::Invalid(
+                "Dolby demux clock requires an AC-3 or E-AC-3 packet",
+            ));
         };
         if *family != codec.family() || !std::ptr::eq(*raw, packet.source.packet.data.as_ref()) {
-            return Err(Error::Invalid("native Dolby clock feed association"));
+            return Err(Error::Invalid(
+                "Dolby packet belongs to a different feed or configuration",
+            ));
         }
         self.dolby_source_timing(packet.source)
     }
 
     fn dolby_source_timing(&self, packet: &Packet) -> Result<DemuxPacketTiming> {
         let FeedCodec::Dolby(codec) = &self.codec else {
-            return Err(Error::Invalid("native Dolby clock packet codec"));
+            return Err(Error::Invalid(
+                "Dolby demux clock requires an AC-3 or E-AC-3 packet",
+            ));
         };
         if !self.association.matches(packet) {
-            return Err(Error::Invalid("native Dolby clock feed association"));
+            return Err(Error::Invalid(
+                "Dolby packet belongs to a different feed or configuration",
+            ));
         }
         let raw = packet.packet.data.as_ref();
         check_limit(raw.len(), self.limits.dolby_packet.maximum_packet_bytes)?;

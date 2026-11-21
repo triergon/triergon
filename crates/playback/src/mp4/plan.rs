@@ -491,7 +491,7 @@ impl<'a> Mp4IndexJob<'a> {
             crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(_)
         ) {
             return Err(Error::Invalid(
-                "native front operation needs actual front metadata",
+                "front demux indexing requires metadata read before mdat",
             ));
         }
         Self::new_inner(movie, PlanView::Demux, limits, true, None, None)
@@ -542,7 +542,7 @@ impl<'a> Mp4IndexJob<'a> {
             || movie.read_scope() != crate::mp4::open::MetadataReadScope::CompleteEntity
         {
             return Err(Error::Unsupported(
-                "encoded edits require a complete native range source",
+                "encoded edits require metadata from a complete MP4 source opened without recovery",
             ));
         }
         Self::new_inner(movie, PlanView::Demux, limits, false, Some(plans), None)
@@ -558,7 +558,7 @@ impl<'a> Mp4IndexJob<'a> {
             || movie.read_scope() != crate::mp4::open::MetadataReadScope::CompleteEntity
         {
             return Err(Error::Unsupported(
-                "native range playback requires a complete source",
+                "MP4 range playback requires metadata from a complete source opened without recovery",
             ));
         }
         let header = movie.header();
@@ -593,7 +593,7 @@ impl<'a> Mp4IndexJob<'a> {
     ) -> Result<Self> {
         if movie.native_recovery() && view == PlanView::Source {
             return Err(Error::Invalid(
-                "native recovery open requires native packet view",
+                "MP4 opened with recovery requires a demux packet plan",
             ));
         }
         if limits.tracks == 0 || limits.tracks > 64 || movie.tracks().len() > limits.tracks {
@@ -604,7 +604,7 @@ impl<'a> Mp4IndexJob<'a> {
         }
         if movie.terminal_mdat().is_some() && view != PlanView::Source && !demux_front {
             return Err(Error::Unsupported(
-                "native terminal MDAT context is not established",
+                "demux playback of an open-ended mdat requires a front plan",
             ));
         }
         let media_count = movie
@@ -631,7 +631,9 @@ impl<'a> Mp4IndexJob<'a> {
                     || t.header().handler != *b"vide"
                     || !matches!(t.table().descriptions(), [entry] if entry.format == *b"raw ")
                 {
-                    return Err(Error::Unsupported("zero-scale native track context"));
+                    return Err(Error::Unsupported(
+                        "zero-timescale recovery requires regular raw video with samples, one description and no edits",
+                    ));
                 }
                 let clock =
                     MediaClock::for_zero_scale(iso::compat::mov::recovery::RunRecoveryProfile)?;
@@ -1147,7 +1149,7 @@ impl<'a> Mp4IndexJob<'a> {
             let cursor = self
                 .native
                 .as_mut()
-                .ok_or(Error::Invalid("missing native range cursor"))?;
+                .ok_or(Error::Invalid("demux range cursor missing"))?;
             match cursor.poll(w, c)? {
                 CursorStatus::Yield => return Ok(false),
                 CursorStatus::Ready => {
@@ -1192,9 +1194,9 @@ impl<'a> Mp4IndexJob<'a> {
                             .any(|track| track.edits.is_some());
                     if !demux_order_replay {
                         let reason = if source.is_none() {
-                            "native front repeated occurrence needs seekable context"
+                            "repeated demux occurrence needs a seekable source or retained media"
                         } else {
-                            "native front source occurrence order is not physical"
+                            "demux occurrences are outside source order and media cannot be retained"
                         };
                         return Err(Error::Unsupported(reason));
                     }
@@ -1292,7 +1294,7 @@ impl<'a> Mp4IndexJob<'a> {
         let state = self
             .native
             .as_ref()
-            .ok_or(Error::Invalid("front native cursor"))?
+            .ok_or(Error::Invalid("front demux cursor missing"))?
             .front_track(self.track)?;
         push(&mut p.front_tracks, state)?;
         self.track += 1;
@@ -1314,7 +1316,7 @@ impl<'a> Mp4IndexJob<'a> {
         let cursor = self
             .native
             .take()
-            .ok_or(Error::Invalid("missing native range cursor"))?;
+            .ok_or(Error::Invalid("demux range cursor missing"))?;
         Ok((self.finish()?, cursor, duration.micros))
     }
 }

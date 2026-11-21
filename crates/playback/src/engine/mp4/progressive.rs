@@ -93,16 +93,18 @@ pub(crate) fn prepare_media_replay(
 ) -> Result<PendingMedia> {
     let [extent] = plan.media.as_slice() else {
         return Err(Error::Unsupported(
-            "native replay needs a finite media extent",
+            "demux replay needs one finite media extent",
         ));
     };
     if input.position() != extent.start || input.capabilities().random_access {
-        return Err(Error::Invalid("native replay source position"));
+        return Err(Error::Invalid(
+            "demux replay requires a nonseekable source at the start of the media extent",
+        ));
     }
     let length = extent.end - extent.start;
     if !(1..=RETAINED_MEDIA_BYTES as u64).contains(&length) {
         return Err(Error::Unsupported(
-            "native replay exceeds media cache bound",
+            "demux replay media extent is empty or exceeds the cache limit",
         ));
     }
     let pending = PendingMedia::new(extent.start, length as usize, input.budget())?;
@@ -147,7 +149,7 @@ impl ProgressiveState {
     pub(crate) fn new(plan: &PreparedMp4, limits: ProgressiveLimits) -> Result<Self> {
         if plan.view != PlanView::Source && !plan.demux_front {
             return Err(Error::Unsupported(
-                "progressive native MOV context is not established",
+                "progressive MOV demux playback requires a front plan",
             ));
         }
         if limits.metadata_bytes < 8
@@ -841,10 +843,9 @@ impl ProgressiveState {
                     .iter()
                     .position(|t| t.snapshot.track_id == row.source.track_id)
                     .ok_or(Error::Invalid("front continuation track"))?;
-                let head = row
-                    .native
-                    .as_ref()
-                    .ok_or(Error::Invalid("front native head"))?;
+                let head = row.native.as_ref().ok_or(Error::Invalid(
+                    "front demux continuation is missing its next occurrence",
+                ))?;
                 let duration = engine
                     .plan
                     .empty_duration

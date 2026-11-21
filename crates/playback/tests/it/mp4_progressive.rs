@@ -20,7 +20,7 @@ fn progressive_all_five_fragment_sequences_keep_original_source_golds() {
         );
         assert!(
             case.gap,
-            "original native-comparison gap membership must remain visible; source closure does not waive it"
+            "case must remain in the demux comparison gap set after source closure"
         );
         let (mut p, b, _, _) = player(case.bytes, true, ProgressiveLimits::default());
         let out = collect(&mut p, 1).unwrap();

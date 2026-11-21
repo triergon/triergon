@@ -41,12 +41,14 @@ impl MatroskaAvcClock<'_> {
     /// timing remains available on the supplied packet.
     pub fn observe(&mut self, packet: &MatroskaFeedPacket<'_>) -> Result<MatroskaPacketTiming> {
         let MatroskaFeedPayload::Avc(unit) = &packet.payload else {
-            return Err(Error::Invalid("native AVC clock packet codec"));
+            return Err(Error::Invalid("AVC demux clock requires an AVC packet"));
         };
         if !self.association.matches(packet.source)
             || !std::ptr::eq(self.config, unit.configuration())
         {
-            return Err(Error::Invalid("native AVC clock feed association"));
+            return Err(Error::Invalid(
+                "AVC packet belongs to a different feed or configuration",
+            ));
         }
         self.clock
             .observe(packet.source, unit.source_nals(), |_| Ok(false), |_| None)
@@ -83,12 +85,16 @@ impl DecodeClock {
         fallback_duration: impl FnOnce(u64) -> Option<u64>,
     ) -> Result<MatroskaPacketTiming> {
         if !self.valid {
-            return Err(Error::Invalid("native video clock continuity"));
+            return Err(Error::Invalid(
+                "video demux clock cannot continue after an invalid sample",
+            ));
         }
         let timing = source.packet.timing;
         if timing.frames != 1 {
             self.valid = false;
-            return Err(Error::Unsupported("native video clock laced sample"));
+            return Err(Error::Unsupported(
+                "video demux clock requires one frame per packet",
+            ));
         }
         if let Err(error) = self.validate_picture(nals, repeated_parameter_set) {
             self.valid = false;
@@ -134,13 +140,15 @@ impl DecodeClock {
                 continue;
             };
             if pps != self.pps || first == picture || (!self.started && !random_access) {
-                return Err(Error::Unsupported("native video clock picture continuity"));
+                return Err(Error::Unsupported(
+                    "video demux clock needs one picture with the configured PPS and an initial random-access picture",
+                ));
             }
             picture = true;
         }
         if !picture {
             return Err(Error::Unsupported(
-                "native video clock sample has no picture",
+                "video sample has no picture for the demux clock",
             ));
         }
         Ok(())

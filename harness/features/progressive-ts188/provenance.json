@@ -12,6 +12,6 @@
   "historical_reference_sha256": "c4116cc26659315be7dd1f0b6b2164eb31d762583b48b4e5628048870aaa8d9d",
   "original_timed_cases": 3,
   "functional_controls": 5,
-  "controls_sha256": "540ee2d4b786f54c42f683c65836eba925748f644da7333115060a6ce34df127",
-  "timing_corpus_sha256": "3ac94befb9929fc9012f1e9c0ca30f718ce5165fb687a74d67d317e0ea568335"
+  "controls_sha256": "d72a781830dbea1c50abf1b0e6edcd35b5cec69fdedad4dd1ec30902637b6828",
+  "timing_corpus_sha256": "35b100cf7ef6210ed2d011a1941404b3dcd941d4001f93b05415f72a4c3d2b02"
 }

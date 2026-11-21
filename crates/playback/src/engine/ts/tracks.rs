@@ -118,8 +118,7 @@ impl TsEngine {
         map: &ProgramMap,
         configuration_epoch: u64,
     ) -> Result<(DemuxObserver, Carriage)> {
-        let mismatch =
-            Error::Unsupported("selected native carriage disagrees with accepted source PMT");
+        let mismatch = Error::Unsupported("selected PES carriage disagrees with the active PMT");
         let stream = map
             .streams
             .as_slice()
@@ -150,7 +149,7 @@ impl TsEngine {
                     && !matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_)) =>
                 {
                     return Err(Error::Unsupported(
-                        "native PMT audio needs explicit DVB context",
+                        "private PMT audio needs an explicit DVB namespace",
                     ));
                 }
                 0x06 | 0x81 | 0x87 => Carriage::PrivateAudio(if hls_audio {

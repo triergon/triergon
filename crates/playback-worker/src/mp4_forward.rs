@@ -81,7 +81,7 @@ fn fold<const INCLUDE_TRIM: bool>(work: &mut Work, event: &Mp4Event) -> Result<(
             let native = packet
                 .occurrence
                 .as_ref()
-                .ok_or("source packet without a native occurrence")?;
+                .ok_or("source packet without a demux occurrence")?;
             (
                 native,
                 packet.source.payload.as_ref(),
@@ -94,7 +94,7 @@ fn fold<const INCLUDE_TRIM: bool>(work: &mut Work, event: &Mp4Event) -> Result<(
             short.encoded_skip_samples,
         ),
         Mp4Event::EmptyPacket(_) | Mp4Event::MissingSample(_) => {
-            return Err("native packet without a track".into());
+            return Err("demux packet without a track".into());
         }
         Mp4Event::Configuration(_) => return Ok(()),
     };

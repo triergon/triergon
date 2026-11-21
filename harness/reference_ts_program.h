@@ -96,5 +96,5 @@ done:
 
 static int ts_program_main(int argc, char **argv, const uint8_t *data, long size)
 {
-    return packet_main(argc, argv, data, size, "ts-program-", "ts-native-program", ts_program_operation);
+    return packet_main(argc, argv, data, size, "ts-program-", "ts-program-pes", ts_program_operation);
 }

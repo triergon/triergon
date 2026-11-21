@@ -195,13 +195,10 @@ fn project(outputs: &[Output], tracks: &[u32]) -> Vec<Object> {
         match event {
             Mp4Event::Packet(p) => {
                 let Some(n) = &p.occurrence else {
-                    assert!(
-                        ended,
-                        "source packet without a native occurrence in the native view"
-                    );
+                    assert!(ended, "source packet without a demux occurrence");
                     continue;
                 };
-                assert!(!ended, "native packet after the end of the native view");
+                assert!(!ended, "packet after the end of the demux view");
                 let range = &n.demux.source_range;
                 let size = range.end - range.start;
                 let (handler, data) = (p.configuration.track.handler, p.source.payload.as_ref());
@@ -210,7 +207,7 @@ fn project(outputs: &[Output], tracks: &[u32]) -> Vec<Object> {
                 ended = p.front_read_boundary.is_some();
             }
             Mp4Event::ShortPacket(p) => {
-                assert!(!ended, "short packet after the end of the native view");
+                assert!(!ended, "short packet after the end of the demux view");
                 let n = &p.occurrence;
                 let (handler, data) = (p.configuration.track.handler, p.prefix.payload.as_ref());
                 let native =

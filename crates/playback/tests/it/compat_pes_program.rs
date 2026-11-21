@@ -538,7 +538,7 @@ fn missing_dvb_context_preserves_private_source_and_later_latm_recovers() {
                 assert_eq!(*track, key(257));
                 assert!(matches!(
                     error,
-                    Error::Unsupported("native PMT audio needs explicit DVB context")
+                    Error::Unsupported("private PMT audio needs an explicit DVB namespace")
                 ));
                 audio.push("refusal");
             }
@@ -558,7 +558,7 @@ fn missing_dvb_context_preserves_private_source_and_later_latm_recovers() {
             }
             Event::DemuxPes { packet, .. } if packet.pid == 257 => {
                 assert_eq!(packet.stream_id, 0xc0);
-                audio.push("latm native");
+                audio.push("LATM PES");
             }
             _ => {}
         }
@@ -569,7 +569,7 @@ fn missing_dvb_context_preserves_private_source_and_later_latm_recovers() {
             "refusal",
             "private source",
             "latm configuration",
-            "latm native"
+            "LATM PES"
         ]
     );
 }
@@ -623,7 +623,9 @@ fn a_single_selection_refuses_the_pat_and_null_pids_and_admits_the_range_between
     for pid in [0, 0x1fff] {
         assert!(matches!(
             engine(&b, &[PidSelection { pid, ..AVC }], NAMESPACE),
-            Err(Error::Invalid("native program selection PID"))
+            Err(Error::Invalid(
+                "selected PES PID must be between 1 and 8190"
+            ))
         ));
     }
     for pid in [1, 0x1ffe] {
@@ -637,7 +639,7 @@ fn selections_reject_duplicate_and_out_of_scope_pids_and_strides() {
     let b = budget();
     assert!(matches!(
         engine(&b, &[AVC, AVC], NAMESPACE),
-        Err(Error::Invalid("duplicate native program selection PID"))
+        Err(Error::Invalid("duplicate PID in PES program selection"))
     ));
     let invalid = PidSelection { pid: 0x1fff, ..AVC };
     assert!(matches!(

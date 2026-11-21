@@ -145,7 +145,7 @@ fn native_range_seek_matches_ffprobe_packet_order_bytes_and_clocks() {
         assert_eq!(command.receipt().selected.timestamp, selected);
         assert!(
             calls.lock().unwrap().is_empty(),
-            "native planning read media"
+            "demux seek planning read media"
         );
         assert!(
             !player
@@ -206,7 +206,7 @@ fn assert_native_seek_packets(
             Event::Mp4(Mp4Event::Packet(packet)) => {
                 let fields: Vec<_> = wanted
                     .next()
-                    .expect("extra packet after native seek")
+                    .expect("extra packet after demux seek")
                     .split_ascii_whitespace()
                     .collect();
                 let track: u32 = fields[0].parse().unwrap();
@@ -230,10 +230,10 @@ fn assert_native_seek_packets(
                 assert_eq!(packet.source.payload.as_ref(), &bytes[pos..pos + size]);
                 assert!(current(event));
             }
-            _ => panic!("unexpected native seek output"),
+            _ => panic!("unexpected demux seek output"),
         }
     }
-    assert!(wanted.next().is_none(), "short native seek packet sequence");
+    assert!(wanted.next().is_none(), "short demux seek packet sequence");
 }
 
 fn next_range_output<S: Source>(player: &mut Mp4RangePlayer<'_, S>) -> Option<Output> {
@@ -249,7 +249,7 @@ fn next_range_output<S: Source>(player: &mut Mp4RangePlayer<'_, S>) -> Option<Ou
             progress => panic!("unexpected range progress {progress:?}"),
         }
     }
-    panic!("native range output stalled");
+    panic!("MP4 range output stalled");
 }
 
 #[test]
@@ -1018,12 +1018,12 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
             EncodedInitial::new(table, &configs, &first, &opened.input, EncodedConfigProfile,)
                 .err(),
             refusal,
-            "pinned V3 initial catalogue"
+            "initial catalogue"
         );
         assert_eq!(
             EncodedConfigSequence::new(table, &configs, &opened.input, EncodedConfigProfile,).err(),
             refusal,
-            "pinned V3 configuration sequence"
+            "configuration sequence"
         );
         assert_eq!(
             EncodedEditJob::new_with_recovery_contexts(
@@ -1041,7 +1041,7 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
             )
             .err(),
             refusal,
-            "pinned V7 edit job"
+            "encoded edit job"
         );
 
         let mut job =

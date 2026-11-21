@@ -1033,7 +1033,7 @@ impl<S: Source> Player<S> {
         if matches!(seek.landing, crate::engine::Mp4RangeLanding::Demux(_))
             && self.clock != ClockChoice::Demux
         {
-            return Err(Error::Invalid("native seek clock changed"));
+            return Err(Error::Invalid("demux seek clock changed"));
         }
         self.apply_seek(
             seek.intent.track,

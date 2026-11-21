@@ -213,10 +213,10 @@ fn pgs_compatibility_bridge_keeps_the_first_event_and_fences_packet_owners() {
             |_| match bridge.step(&mut WorkBudget::new(1), &cancel).unwrap() {
                 PgsStep::Yield => None,
                 PgsStep::Output(output) => Some(output),
-                _ => panic!("expected native-only packet output"),
+                _ => panic!("expected demux PES output"),
             },
         )
-        .expect("bounded native-only output");
+        .expect("bounded demux PES output");
     let source = retained.packet.input();
     assert_eq!(source.sequence, 11);
     assert_eq!(source.clock.pts, Some(9_000));
@@ -308,7 +308,7 @@ fn pgs_packet_clock_queue_distinguishes_a_clear_from_no_output() {
             match bridge.step(&mut WorkBudget::new(32), &cancel).unwrap() {
                 PgsStep::Yield => (),
                 PgsStep::Output(output) => break output,
-                _ => panic!("expected native-only packet output"),
+                _ => panic!("expected demux PES output"),
             }
         };
         let action = output.packet_clock_action().unwrap();

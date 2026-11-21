@@ -92,7 +92,7 @@ impl Mp4Engine {
             return Err(Error::Unsupported("MP4 replay needs source ranges"));
         }
         if self.plan.unavailable_first.is_some() {
-            return Err(Error::Unsupported("native first sample is unavailable"));
+            return Err(Error::Unsupported("first demux sample is unavailable"));
         }
         let TrackKey::Mp4(id) = intent.track else {
             return Err(Error::Invalid("seek track format"));
@@ -130,7 +130,7 @@ impl Mp4Engine {
                 let occurrence = self
                     .plan
                     .demux_row(first)
-                    .ok_or(Error::Invalid("MP4 native seek first row"))?;
+                    .ok_or(Error::Invalid("MP4 demux seek is missing its first row"))?;
                 (
                     first,
                     occurrence.source.range.start,
@@ -247,7 +247,7 @@ impl Mp4Engine {
             .range
             .start;
         let within_source = if self.plan.demux_recovery {
-            Error::Invalid("native first sample starts before physical end")
+            Error::Invalid("first demux sample starts before the physical end of the source")
         } else {
             crate::mp4::plan::BACKWARD_LAYOUT_REFUSAL
         };
@@ -322,7 +322,7 @@ impl Mp4Engine {
                 let mut occurrence = self
                     .plan
                     .demux_row(self.row)
-                    .ok_or(Error::Invalid("short packet needs native occurrence"))?
+                    .ok_or(Error::Invalid("short packet needs a demux occurrence"))?
                     .clone();
                 occurrence.demux.flags |= 2;
                 let encoded_skip_samples = self.skip_samples(at_track, &occurrence)?;
@@ -459,7 +459,7 @@ impl Mp4Engine {
                 CursorStatus::Ready => {
                     let occurrence = cursor
                         .occurrence()
-                        .ok_or(Error::Invalid("missing native range occurrence"))?;
+                        .ok_or(Error::Invalid("demux range occurrence missing"))?;
                     Some(SourceRow {
                         track_id: occurrence.track_id,
                         sample: occurrence.source.clone(),

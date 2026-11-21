@@ -550,11 +550,11 @@ fn native_pressure_retries_instead_of_disabling_the_observer() {
                         blocked = true;
                         break;
                     }
-                    Progress::Queued => panic!("native observer escaped allocation pressure"),
+                    Progress::Queued => panic!("PES observer escaped allocation pressure"),
                     _ => {}
                 }
             }
-            assert!(blocked, "native observer pressure must be retryable");
+            assert!(blocked, "PES observer pressure must be retryable");
             drop(pressure);
             let out = collect(&mut player, 1).unwrap();
             assert!(

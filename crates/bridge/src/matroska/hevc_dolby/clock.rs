@@ -54,12 +54,14 @@ impl MatroskaHevcClock<'_> {
         packet: &MatroskaHevcDolbyPacket<'_>,
     ) -> Result<MatroskaPacketTiming> {
         let MatroskaHevcDolbyPayload::Hevc(unit) = &packet.payload else {
-            return Err(Error::Invalid("native HEVC clock packet codec"));
+            return Err(Error::Invalid("HEVC demux clock requires an HEVC packet"));
         };
         if !self.association.matches(packet.source)
             || !std::ptr::eq(self.config, unit.configuration())
         {
-            return Err(Error::Invalid("native HEVC clock feed association"));
+            return Err(Error::Invalid(
+                "HEVC packet belongs to a different feed or configuration",
+            ));
         }
         self.clock.observe(
             packet.source,

@@ -180,6 +180,9 @@ plans of `compat::mov`, the demux clocks of the Matroska feeds and the
 `compat::pes` TS engines); they never overwrite source facts. Demux views can
 emit events the source view does not, such as `Mp4Event::ShortPacket`,
 `EmptyPacket`, `MissingSample` and `Event::PesRefusal`.
+MP4 refusal details refer to the demux plan or packet occurrence when a check
+concerns that view. TS playback reports PID selection and startup failures in
+terms of the PES feed.
 
 **Generations.** A seek, track switch or configuration change starts a new
 generation. Check outputs with `Player::may_deliver`. `Delivery::DecodeOnly`
