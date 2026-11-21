@@ -133,8 +133,7 @@ impl<F: Format> Reader<F> {
             .take()
             .ok_or(Error::Invalid("no seek in progress"))?;
         let time_base = self
-            .track
-            .as_ref()
+            .stream()
             .map(Track::time_base)
             .ok_or(Error::Invalid("seek before the stream is open"))?;
         let landing_time = Time::from_ticks(i128::from(landing), time_base)?;
@@ -164,8 +163,7 @@ impl<F: Format> Reader<F> {
             return Err(Error::Invalid("seek track is not the stream's"));
         }
         let time_base = self
-            .track
-            .as_ref()
+            .stream()
             .map(Track::time_base)
             .ok_or(Error::Invalid("seek before the stream is open"))?;
         let context = self.seek_context()?;
@@ -175,9 +173,9 @@ impl<F: Format> Reader<F> {
             .max(0) as u64;
         // An estimated landing for playback aims early enough for the preroll and one
         // frame of error; exact plans read forward to the target either way.
-        let aim = match (request.policy, self.reference) {
-            (SeekPolicy::PlaybackPreroll, Some(reference)) => target.saturating_sub(
-                u64::from(F::PREROLL + 1) * u64::from(self.format.samples(&reference)),
+        let aim = match (request.policy, self.opened.as_ref()) {
+            (SeekPolicy::PlaybackPreroll, Some((_, reference))) => target.saturating_sub(
+                u64::from(F::PREROLL + 1) * u64::from(self.format.samples(reference)),
             ),
             _ => target,
         };

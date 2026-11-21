@@ -217,10 +217,9 @@ pub struct Reader<F: Format> {
     format: F,
     limits: Limits,
     phase: Phase<F::Header>,
-    /// The first header of the stream; later headers must continue it.
-    reference: Option<F::Header>,
+    /// The track and the stream's first header, which later headers must continue.
+    opened: Option<(Track, F::Header)>,
     last: Option<F::Header>,
-    track: Option<Track>,
     tags: BudgetVec<Tag>,
     retained: usize,
     announce: bool,
@@ -254,9 +253,8 @@ impl<F: Format> Reader<F> {
             format: F::new(pool, &limits),
             limits,
             phase: Phase::Leading,
-            reference: None,
+            opened: None,
             last: None,
-            track: None,
             tags: BudgetVec::new(pool),
             retained: 0,
             announce: false,
@@ -274,7 +272,7 @@ impl<F: Format> Reader<F> {
     }
     /// The stream's track, once its first frame is confirmed.
     pub fn stream(&self) -> Option<&Track> {
-        self.track.as_ref()
+        self.opened.as_ref().map(|(track, _)| track)
     }
     /// Tags found so far: ID3v2 at the start, ID3v1 and APEv2 once reached.
     pub fn tags(&self) -> &[Tag] {
@@ -320,8 +318,9 @@ impl<F: Format> Reader<F> {
     }
 
     fn continues(&self, header: &F::Header) -> bool {
-        self.reference
-            .is_none_or(|reference| self.format.continues(&reference, header))
+        self.opened
+            .as_ref()
+            .is_none_or(|(_, reference)| self.format.continues(reference, header))
     }
 
     /// The next event, or why there is none yet. A full pool is an error here, which
@@ -703,7 +702,7 @@ impl<F: Format> Reader<F> {
             self.seeking = None;
             return Ok(Flow::Wait(Wait::End));
         }
-        if self.track.is_none() {
+        if self.opened.is_none() {
             return Err(Error::Invalid("no frame in the source"));
         }
         Ok(Flow::Wait(Wait::End))
@@ -719,11 +718,10 @@ impl<F: Format> Reader<F> {
         if self.seeking.is_some() {
             return self.seek_found(header);
         }
-        if self.track.is_none() {
+        if self.opened.is_none() {
             let facts = self.format.adopt(&header, self.input.cursor().budget())?;
             let time_base = TimeBase::new(1, u64::from(facts.sample_rate))?;
-            self.track = Some(Track { facts, time_base });
-            self.reference = Some(header);
+            self.opened = Some((Track { facts, time_base }, header));
             self.announce = true;
         }
         if !self.announce {
@@ -753,7 +751,7 @@ impl<F: Format> Reader<F> {
         }
         self.audio_start = Some(start);
         self.announce = false;
-        if let (Some(track), Some(duration)) = (self.track.as_mut(), self.format.duration()) {
+        if let (Some((track, _)), Some(duration)) = (self.opened.as_mut(), self.format.duration()) {
             track.facts.duration = Some(duration);
         }
         Ok(Flow::Ready(Some(Event::Other(ReaderEvent::Opened))))
@@ -1108,8 +1106,7 @@ impl<F: Format> Reader<F> {
             return Ok(Flow::Wait(Wait::Step(Step::Yield)));
         };
         let time_base = self
-            .track
-            .as_ref()
+            .stream()
             .map(Track::time_base)
             .ok_or(Error::Invalid("packet before the stream is open"))?;
         let packet = Packet {
@@ -1177,9 +1174,8 @@ impl<F: Format> ContainerReader for Reader<F> {
     /// Keeps nothing: the stream is found again from the source start.
     fn reset(&mut self) -> Result<InputRequest> {
         self.phase = Phase::Leading;
-        self.reference = None;
+        self.opened = None;
         self.last = None;
-        self.track = None;
         self.tags.clear();
         self.retained = 0;
         self.announce = false;
@@ -1200,10 +1196,10 @@ impl<F: Format> ContainerReader for Reader<F> {
         self.start_seek(request)
     }
     fn track_count(&self) -> usize {
-        usize::from(self.track.is_some())
+        usize::from(self.opened.is_some())
     }
     fn track(&self, index: usize) -> Option<&Track> {
-        self.track.as_ref().filter(|_| index == 0)
+        self.stream().filter(|_| index == 0)
     }
     fn capabilities(&self) -> SourceCapabilities {
         self.input.capabilities()
