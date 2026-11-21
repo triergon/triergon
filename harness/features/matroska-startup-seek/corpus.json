@@ -82,6 +82,22 @@
       }
     },
     {
+      "id": "startup-avc-pgs-early-canvas",
+      "profile": "startup-avc-pgs-early-canvas",
+      "file": "startup-avc-pgs-early-canvas.case",
+      "sha256": "381c15727d6b9deb18a97ec97c41d320d28dec06d03cfd4778ddf3a90123a3e2",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-pgs-early-canvas.mkv",
+      "source_sha256": "158a661369533103eba91a13192558c472f15da5e2e7b74d3acb4ed222f54a58",
+      "operation": "startup",
+      "target_ms": 0,
+      "expected": {
+        "packets": 12,
+        "bytes": 1837,
+        "digest": 6848508061490563097
+      }
+    },
+    {
       "id": "startup-avc-six-pictures",
       "profile": "startup-avc-six-pictures",
       "file": "startup-avc-six-pictures.case",
