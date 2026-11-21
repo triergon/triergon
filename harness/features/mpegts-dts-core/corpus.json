@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "dts-core-single-frame",
+      "profile": "dts-core-single-frame",
+      "file": "harness/features/mpegts-dts-core/inputs/dts-core-single-frame.ts",
+      "sha256": "68c16d3a9c1a4f8030426ab872ee279d05bc4b60328cef159d83f407a5821dfc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 512,
+        "digest": 6742967310259488781
+      }
+    },
+    {
+      "id": "dts-core-multiple-per-pes",
+      "profile": "dts-core-multiple-per-pes",
+      "file": "harness/features/mpegts-dts-core/inputs/dts-core-multiple-per-pes.ts",
+      "sha256": "ff2778489281b91e387768f8ec02f73f3613155a555ca2efabb04a7ac053bae8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 6144,
+        "digest": 9298255530268396507
+      }
+    },
+    {
+      "id": "dts-core-header-across-pes",
+      "profile": "dts-core-header-across-pes",
+      "file": "harness/features/mpegts-dts-core/inputs/dts-core-header-across-pes.m2ts",
+      "sha256": "84cfcd316dd0bf0d909c219d3be19ec39af75f06c390fa543a8e3ca967391201",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 6144,
+        "digest": 12668716322324449620
+      }
+    },
+    {
+      "id": "dts-core-body-across-pes",
+      "profile": "dts-core-body-across-pes",
+      "file": "harness/features/mpegts-dts-core/inputs/dts-core-body-across-pes.ts",
+      "sha256": "1418988c978120bb4721b094b0e5b63c54dafe0c83587710e95dd1c8480bd8b4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 6144,
+        "digest": 4157049037433056952
+      }
+    }
+  ]
+}

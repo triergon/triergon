@@ -82,6 +82,9 @@ resource limit becomes an explicit, reviewed rule for that case.
   capture output independently, and `capture` (gating) and `capture-small` for the
   capture comparison. The two capture profiles link FFmpeg's component libraries
   into the worker so the allocation observer can audit the code doing the work.
+- **DTS transport reference.** The `transport-dts` profile enables the MPEG-TS
+  demuxer and DTS parser for the [DVB DTS comparison](../harness/features/mpegts-dts-core/contract.json).
+  The worker uses the same transport fold as the formats reference.
 - **Container scope.** A candidate worker carries only the runner families its
   reference build can demux. `media-worker` reads Matroska for the `matroska` build's
   container harness; `playback-matroska-worker` runs Matroska startup and seek (`feed-`)

@@ -13,8 +13,9 @@ use crate::{
 };
 use lane::{Lane, LaneStep, PesRun, StorageScan};
 pub use model::{
-    Ac3AccessUnit, AccessUnit, DvbSubtitleUnit, IncompleteVideo, LoasFrame, MpegAudioFrame, Packet,
-    PacketClock, PayloadSource, ReaderEvent, SourceEvent, Track, UnframedAudio,
+    Ac3AccessUnit, AccessUnit, DtsAudioFrame, DvbSubtitleUnit, IncompleteVideo, LoasFrame,
+    MpegAudioFrame, Packet, PacketClock, PayloadSource, ReaderEvent, SourceEvent, Track,
+    UnframedAudio,
 };
 use model::{ClockContext, Shared};
 use std::sync::atomic::{AtomicBool, Ordering};
