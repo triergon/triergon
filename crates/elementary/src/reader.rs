@@ -324,7 +324,8 @@ impl<F: Format> Reader<F> {
             .is_none_or(|reference| self.format.continues(&reference, header))
     }
 
-    /// The next event, or why there is none yet.
+    /// The next event, or why there is none yet. A full pool is an error here, which
+    /// [`ContainerReader::step`] turns into [`Step::Backpressure`].
     fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
         loop {
             let next = match self.phase {
@@ -1191,7 +1192,7 @@ impl<F: Format> ContainerReader for Reader<F> {
     }
     #[inline]
     fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
-        self.advance(work, cancel)
+        self.advance(work, cancel).or_else(Error::into_step)
     }
     /// Seek the stream's track; a [`Event::Seek`] receipt arrives before the first packet
     /// at the landing point.
