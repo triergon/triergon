@@ -62,7 +62,7 @@ assert_eq!(base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?, 203
 | Storage | `Budget`, `Reservation`, `Charged<T>`, `Bytes`, `BytesView`, `BytesWriter`, `BudgetVec<T>`, `BudgetVecIntoIter`, `OwnedInputBytes`, `ByteStorageAddress`, `nonzero_prefix_len` |
 | Input | `InputCursor`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure` |
 | Blocking sources | Module `blocking`: `Blocking` drives any `ContainerReader` from a `std::io::Read` source, seeking when it is also `Seek`; `Feed` answers the requests of an `InputCursor`; `seekable_capabilities` measures a seekable source. |
-| Source signatures | Module `signature` exposes the EBML and Ogg markers, the opening box type and the three sync bytes for each transport packet spacing. Each caller chooses its accepted boxes and how to resolve ambiguous transport. |
+| Source signatures | Module `signature` exposes the EBML and Ogg markers, the opening box type and the three sync bytes for each transport packet spacing, and `select`, the one walk over them. Each caller states in a `Policy` its accepted boxes and how a prefix that fits both transport spacings is resolved. |
 | Steps | `Step<T, B>`, `Backpressure` |
 | Work | `WorkBudget` |
 | Container model | module `container`: `ContainerReader`, `ReaderStep`, `Event`, `PacketInfo`, `TrackInfo`, `TrackId`, `MediaKind`, `CodecId`, `RandomAccess`, `Trim`, seek and colour types |

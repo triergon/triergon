@@ -1,8 +1,9 @@
 //! Facade format selection for a supplied prefix or a blocking source.
 use std::io::{ErrorKind, Read};
 use triergon_core::signature::{
-    self,
+    self, Container, Selection,
     TransportSync::{M2ts192, Ts188},
+    TransportTie,
 };
 use triergon_core::{Budget, Error, Reservation, Result};
 
@@ -37,51 +38,41 @@ pub enum Probe {
 /// the start of its second frame, and an ID3v2 tag must fit in it whole.
 pub fn probe(bytes: &[u8]) -> Probe {
     match container(bytes) {
-        Selection::Format(kind) => kind,
-        Selection::Need(_) | Selection::Elementary => elementary(bytes),
+        Selection::Container(kind) => format(kind),
+        _ => elementary(bytes),
     }
 }
 
-enum Selection {
-    Format(Probe),
-    Need(usize),
-    Elementary,
-}
+/// What the readers select where the signatures leave a choice: every box a source
+/// they read may open with, a fragment or an index included; Ogg; and TS188 for a
+/// prefix that fits both transport spacings. `triergon-playback` selects for a
+/// player instead (`triergon_playback::probe::SELECTION`): `wide` but no `moof`,
+/// `sidx` or `skip`, no Ogg, and no packet size for such a prefix.
+const POLICY: signature::Policy = signature::Policy {
+    opening_boxes: &[
+        b"ftyp", b"styp", b"moov", b"moof", b"mdat", b"free", b"skip", b"sidx",
+    ],
+    ogg: true,
+    transport_tie: TransportTie::Ts188,
+};
 
-// Opening-box policy belongs to the facade. In particular, an arbitrary first
-// word (even a FLAC marker) can be the size of a recognised opening box.
-const BOXES: [&[u8; 4]; 8] = [
-    b"ftyp", b"styp", b"moov", b"moof", b"mdat", b"free", b"skip", b"sidx",
-];
+fn format(container: Container) -> Probe {
+    match container {
+        Container::Matroska => Probe::Matroska,
+        Container::Isobmff => Probe::Isobmff,
+        Container::Ogg => Probe::Ogg,
+        Container::Transport(Ts188) => Probe::Ts,
+        Container::Transport(M2ts192) => Probe::M2ts,
+    }
+}
 
 fn container(bytes: &[u8]) -> Selection {
-    if signature::ebml(bytes) {
-        return Selection::Format(Probe::Matroska);
-    }
-    if signature::opening_box(bytes).is_some_and(|kind| BOXES.contains(&kind)) {
-        return Selection::Format(Probe::Isobmff);
-    }
-    if signature::ogg(bytes) {
-        return Selection::Format(Probe::Ogg);
-    }
-    if bytes.len() < 4 {
-        return Selection::Need(4);
-    }
+    // One more byte settles an Ogg page, and tells a FLAC marker from the size of
+    // an opening box, where a box type would ask for four.
     if bytes.len() == 4 && (bytes == b"OggS" || bytes == b"fLaC") {
         return Selection::Need(5);
     }
-    if bytes.len() < 8 && BOXES.iter().any(|kind| kind.starts_with(&bytes[4..])) {
-        return Selection::Need(8);
-    }
-    // TS188 wins even when both three-sync patterns are present.
-    for (sync, kind) in [(Ts188, Probe::Ts), (M2ts192, Probe::M2ts)] {
-        match sync.observed(bytes) {
-            Some(true) => return Selection::Format(kind),
-            Some(false) => {}
-            None => return Selection::Need(sync.prefix_len()),
-        }
-    }
-    Selection::Elementary
+    signature::select(bytes, &POLICY)
 }
 
 /// The elementary stream `bytes` starts, when that reader is built in.
@@ -171,7 +162,7 @@ impl ProbeBuffer {
         loop {
             let bytes = &self.header[..self.used];
             match container(bytes) {
-                Selection::Format(kind) => return Ok(kind),
+                Selection::Container(kind) => return Ok(format(kind)),
                 Selection::Need(end) => {
                     let count = read(source, &mut self.header[self.used..end])?;
                     if count == 0 {
@@ -179,7 +170,7 @@ impl ProbeBuffer {
                     }
                     self.used += count;
                 }
-                Selection::Elementary => {
+                Selection::Unrecognised | Selection::Ambiguous => {
                     if !cfg!(feature = "elementary") || bytes.starts_with(b"fLaC") {
                         return Ok(elementary(bytes));
                     }

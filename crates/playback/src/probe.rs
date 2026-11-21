@@ -6,8 +6,9 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::signature::{
-    self,
+    self, Container, Selection,
     TransportSync::{M2ts192, Ts188},
+    TransportTie,
 };
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceCapabilities,
@@ -206,28 +207,34 @@ impl<S: Source> Probe<S> {
 /// Prefix bytes [`detect_container`] needs for a conclusive answer.
 pub const CONTAINER_SIGNATURE_BYTES: usize = M2ts192.prefix_len();
 
-/// The container format a prefix starts with; `None` when it matches none.
+/// What playback selects where the signatures leave a choice. An MP4 or QuickTime
+/// file opens with `ftyp`, `styp`, `moov`, `free`, `wide` or `mdat`; a `moof`,
+/// `sidx` or `skip` first, which `triergon`'s reader probe also accepts, is not a
+/// file a player opens. A transport packet size is chosen on the whole
+/// [`CONTAINER_SIGNATURE_BYTES`] and never for a prefix that fits both, where that
+/// probe takes TS188 at its third sync byte.
+pub const SELECTION: signature::Policy = signature::Policy {
+    opening_boxes: &[b"ftyp", b"styp", b"moov", b"free", b"wide", b"mdat"],
+    ogg: false,
+    transport_tie: TransportTie::Refuse,
+};
+
+/// The container format a prefix starts with under [`SELECTION`]; `None` when it
+/// matches none or is too short to say. Fails with `Invalid` for a prefix that fits
+/// both transport packet sizes.
 pub fn detect_container(prefix: &[u8]) -> Result<Option<Format>> {
-    if signature::ebml(prefix) {
-        return Ok(Some(Format::Matroska));
-    }
-    if matches!(
-        signature::opening_box(prefix),
-        Some(b"ftyp" | b"styp" | b"moov" | b"free" | b"wide" | b"mdat")
-    ) {
-        return Ok(Some(Format::Mp4));
-    }
-    // Playback requires the full ambiguity window, even for a shorter prefix
-    // that already has all three TS188 sync bytes.
-    if prefix.len() < CONTAINER_SIGNATURE_BYTES {
-        return Ok(None);
-    }
-    match (Ts188.observed(prefix), M2ts192.observed(prefix)) {
-        (Some(true), Some(false)) => Ok(Some(Format::Ts(triergon_mpegts::PacketFormat::Ts188))),
-        (Some(false), Some(true)) => Ok(Some(Format::Ts(triergon_mpegts::PacketFormat::M2ts192))),
-        (Some(true), Some(true)) => Err(Error::Invalid("ambiguous transport signature")),
-        _ => Ok(None),
-    }
+    Ok(match signature::select(prefix, &SELECTION) {
+        Selection::Container(Container::Matroska) => Some(Format::Matroska),
+        Selection::Container(Container::Isobmff) => Some(Format::Mp4),
+        Selection::Container(Container::Transport(Ts188)) => {
+            Some(Format::Ts(triergon_mpegts::PacketFormat::Ts188))
+        }
+        Selection::Container(Container::Transport(M2ts192)) => {
+            Some(Format::Ts(triergon_mpegts::PacketFormat::M2ts192))
+        }
+        Selection::Ambiguous => return Err(Error::Invalid("ambiguous transport signature")),
+        Selection::Container(Container::Ogg) | Selection::Need(_) | Selection::Unrecognised => None,
+    })
 }
 
 #[derive(Debug)]
