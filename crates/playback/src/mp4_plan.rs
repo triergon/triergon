@@ -292,6 +292,28 @@ impl PreparedMp4 {
             .configuration(row.sample.description_index, revision)
     }
 }
+/// The phase of an index job, in the order the job runs them.
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum IndexPhase {
+    /// Track headers and sample descriptions.
+    Tracks = 0,
+    /// The roots of the source.
+    Roots = 1,
+    /// The media extents.
+    Media = 2,
+    /// The source rows, merged in physical order.
+    SourceRows = 3,
+    /// The range check of every packet projection.
+    RangeCheck = 4,
+    /// The leading trim of the first fragment AAC packets.
+    FragmentTrim = 5,
+    /// The front tracks of a front-metadata demux plan.
+    FrontTracks = 6,
+    /// The plan is ready.
+    Ready = 7,
+}
+
 pub struct Mp4IndexJob<'a> {
     movie: &'a Movie,
     plan: Option<PreparedMp4>,
@@ -299,13 +321,12 @@ pub struct Mp4IndexJob<'a> {
     native: Option<PacketCursor<'a>>,
     range_duration: Option<RangeDuration>,
     limits: PlanLimits,
-    phase: u8,
+    phase: IndexPhase,
     track: usize,
     description: usize,
     fragment_aac_trim: Option<FragmentAacTrimJob>,
     root: usize,
     extent: usize,
-    ready: bool,
     pending_source: Option<SourceRow>,
     pending_native: Option<PacketOccurrence>,
     source_track_order: bool,
@@ -700,13 +721,12 @@ impl<'a> Mp4IndexJob<'a> {
             native,
             range_duration,
             limits,
-            phase: 0,
+            phase: IndexPhase::Tracks,
             track: 0,
             description: 0,
             fragment_aac_trim: None,
             root: 0,
             extent: 0,
-            ready: false,
             pending_source: None,
             pending_native: None,
             source_track_order: false,
@@ -719,7 +739,7 @@ impl<'a> Mp4IndexJob<'a> {
         if c.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        if self.ready {
+        if self.phase == IndexPhase::Ready {
             return Ok(true);
         }
         if w.remaining() == 0 {
@@ -727,7 +747,7 @@ impl<'a> Mp4IndexJob<'a> {
         }
         let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
         match self.phase {
-            0 => {
+            IndexPhase::Tracks => {
                 if let Some(t) = self.movie.tracks().get(self.track) {
                     if self.description == 0 {
                         if !w.try_charge(1) {
@@ -806,10 +826,10 @@ impl<'a> Mp4IndexJob<'a> {
                     self.track += 1;
                     self.description = 0;
                 } else {
-                    self.phase = 1;
+                    self.phase = IndexPhase::Roots;
                 }
             }
-            1 => {
+            IndexPhase::Roots => {
                 if let Some(raw) = self.movie.raw_roots().get(self.root) {
                     if !w.try_charge(1) {
                         return Ok(false);
@@ -817,10 +837,10 @@ impl<'a> Mp4IndexJob<'a> {
                     push(&mut p.raw_roots, raw.clone())?;
                     self.root += 1;
                 } else {
-                    self.phase = 2;
+                    self.phase = IndexPhase::Media;
                 }
             }
-            2 => {
+            IndexPhase::Media => {
                 if let Some(range) = self.movie.media().get(self.extent) {
                     if !w.try_charge(1) {
                         return Ok(false);
@@ -842,13 +862,13 @@ impl<'a> Mp4IndexJob<'a> {
                             }
                             cursor.enable_range_seek_checkpoints();
                         }
-                        4
+                        IndexPhase::RangeCheck
                     } else {
-                        3
+                        IndexPhase::SourceRows
                     };
                 }
             }
-            3 => {
+            IndexPhase::SourceRows => {
                 let source = self
                     .source
                     .as_mut()
@@ -870,7 +890,7 @@ impl<'a> Mp4IndexJob<'a> {
                                 track_id: p.tracks.as_slice()[0].snapshot.track_id,
                                 sample,
                             });
-                            self.ready = true;
+                            self.phase = IndexPhase::Ready;
                             return Ok(true);
                         }
                         _ => return Err(*refusal),
@@ -878,7 +898,7 @@ impl<'a> Mp4IndexJob<'a> {
                 }
                 if let Some(sort) = self.source_sort.as_mut() {
                     if sort.poll(p.source_rows.as_mut_slice(), SourceRow::physical_key, w) {
-                        self.phase = 4;
+                        self.phase = IndexPhase::RangeCheck;
                     }
                     return Ok(false);
                 }
@@ -955,12 +975,12 @@ impl<'a> Mp4IndexJob<'a> {
                         if self.source_track_order {
                             self.source_sort = Some(SampleSort::new(p.source_rows.len()));
                         } else {
-                            self.phase = 4;
+                            self.phase = IndexPhase::RangeCheck;
                         }
                     }
                 }
             }
-            4 => {
+            IndexPhase::RangeCheck => {
                 if let Some(duration) = &mut self.range_duration {
                     let cursor = self
                         .native
@@ -979,7 +999,7 @@ impl<'a> Mp4IndexJob<'a> {
                             }
                             cursor.rewind_at_end()?;
                             self.track = 0;
-                            self.phase = 5;
+                            self.phase = IndexPhase::FragmentTrim;
                             return Ok(false);
                         }
                     }
@@ -1051,14 +1071,14 @@ impl<'a> Mp4IndexJob<'a> {
                         }
                         CursorStatus::End => {
                             self.track = 0;
-                            self.phase = 5;
+                            self.phase = IndexPhase::FragmentTrim;
                         }
                     }
                 } else {
-                    self.phase = 5;
+                    self.phase = IndexPhase::FragmentTrim;
                 }
             }
-            5 => {
+            IndexPhase::FragmentTrim => {
                 if p.view == PlanView::Demux && self.track < p.tracks.len() {
                     if self.fragment_aac_trim.is_none() {
                         if !w.try_charge(1) {
@@ -1089,10 +1109,10 @@ impl<'a> Mp4IndexJob<'a> {
                     self.track += 1;
                 } else {
                     self.track = 0;
-                    self.phase = 6;
+                    self.phase = IndexPhase::FrontTracks;
                 }
             }
-            6 if p.demux_front && self.track < p.tracks.len() => {
+            IndexPhase::FrontTracks if p.demux_front && self.track < p.tracks.len() => {
                 if !w.try_charge(1) {
                     return Ok(false);
                 }
@@ -1104,15 +1124,15 @@ impl<'a> Mp4IndexJob<'a> {
                 push(&mut p.front_tracks, state)?;
                 self.track += 1;
             }
-            _ => {
-                self.ready = true;
+            IndexPhase::FrontTracks | IndexPhase::Ready => {
+                self.phase = IndexPhase::Ready;
                 return Ok(true);
             }
         }
         Ok(false)
     }
     pub fn finish(mut self) -> Result<PreparedMp4> {
-        if !self.ready {
+        if self.phase != IndexPhase::Ready {
             return Err(Error::Invalid("playback plan not ready"));
         }
         self.plan.take().ok_or(Error::Invalid("plan consumed"))
