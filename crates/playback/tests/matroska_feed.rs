@@ -9,7 +9,7 @@ use triergon_framing::{
     avc::{AvcAnnexBLimits, AvcConfigLimits},
     hevc::HvcConfigLimits,
 };
-use triergon_matroska::{Configuration, Event, element::ElementEvent};
+use triergon_matroska::{Configuration, ElementEvent, Event};
 use triergon_playback::{
     ByteSource, Delivery, Engine, Output, Player, PlayerPolicy, Progress, RawEvent, Selection,
     TrackKey,

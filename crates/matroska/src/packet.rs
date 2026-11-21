@@ -28,7 +28,7 @@ impl std::ops::Deref for PacketData {
 }
 impl PacketData {
     /// Share the restored frame in its original charged allocation.
-    pub fn shared_bytes(&self) -> Result<Option<crate::storage::Bytes>> {
+    pub fn shared_bytes(&self) -> Result<Option<triergon_core::Bytes>> {
         self.storage
             .as_core()
             .map(|storage| storage.slice(self.range.clone()))

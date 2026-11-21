@@ -31,6 +31,46 @@ pub(crate) fn mkv(segment: &[u8]) -> Vec<u8> {
     .concat()
 }
 
+/// A file with one AVC track (CodecPrivate, name, BCP 47 language), one attachment
+/// and a Cluster of two keyframe SimpleBlocks.
+pub(crate) fn avc_file_with_attachment() -> Vec<u8> {
+    let track = [
+        element(0xd7, &[1]),
+        element(0x73c5, &[1]),
+        element(0x83, &[1]),
+        element(0x86, b"V_MPEG4/ISO/AVC"),
+        element(0x63a2, b"private"),
+        element(0x536e, b"authored track"),
+        element(0x22b59d, b"en-GB"),
+    ]
+    .concat();
+    let attachment = element(
+        0x61a7,
+        &[
+            element(0x46ae, &[1]),
+            element(0x466e, b"a.bin"),
+            element(0x4660, b"application/octet-stream"),
+            element(0x465c, b"opaque"),
+        ]
+        .concat(),
+    );
+    let cluster = element(
+        0x1f43b675,
+        &[
+            element(0xe7, &[0]),
+            element(0xa3, &[0x81, 0, 0, 0x80, 1, 2, 3]),
+            element(0xa3, &[0x81, 0, 1, 0x80, 4, 5, 6]),
+        ]
+        .concat(),
+    );
+    mkv(&[
+        element(0x1654ae6b, &element(0xae, &track)),
+        element(0x1941a469, &attachment),
+        cluster,
+    ]
+    .concat())
+}
+
 /// The fields of a TrackEntry: number, UID and type, then an authored codec and `extra`.
 pub(crate) fn track_entry(number: u64, kind: u64, extra: &[u8]) -> Vec<u8> {
     [

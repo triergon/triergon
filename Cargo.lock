@@ -53,6 +53,7 @@ dependencies = [
 name = "media-worker"
 version = "0.0.0"
 dependencies = [
+ "triergon-core",
  "triergon-harness-protocol",
  "triergon-matroska",
  "triergon-worker-entry",

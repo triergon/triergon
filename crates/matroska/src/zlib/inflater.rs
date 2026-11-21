@@ -444,6 +444,7 @@ impl Inflater {
             },
         })
     }
+    #[cfg(any(test, feature = "reference-trace"))]
     pub fn output_len(&self) -> usize {
         self.state.output_len()
     }

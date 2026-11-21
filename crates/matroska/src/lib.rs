@@ -23,7 +23,7 @@ mod configuration;
 mod container;
 mod content_encoding;
 mod ebml;
-pub mod element;
+mod element;
 mod hdr10_plus;
 pub mod metadata;
 mod packet;
@@ -32,12 +32,13 @@ mod reader;
 pub mod reference_trace;
 mod seek;
 mod step;
-pub mod storage;
+mod storage;
 pub mod timing;
 mod track;
 mod zlib;
 
 pub use configuration::{CodecState, Configuration, Initialization, InitializationOrigin};
+pub use element::{ElementEvent, ElementHeader};
 pub use hdr10_plus::{
     Hdr10Plus, Hdr10PlusGeometry, Hdr10PlusPeakGrid, Hdr10PlusPercentile, Hdr10PlusToneCurve,
     Hdr10PlusWindow,
@@ -50,7 +51,7 @@ pub use packet::{Packet, PacketData, TypedPacket};
 pub use reader::{BlockingReader, Event, Reader};
 pub use seek::{SeekReceipt, SeekRequest};
 pub use step::ParseStep;
-pub use storage::PayloadOwnership;
+pub use storage::{PayloadOwnership, SharedBytes, SharedText};
 pub use track::extensions::{MappingExtension, MappingView, TrackExtensions, TrackExtensionsJob};
 pub use track::{LegacyAacProfile, Track};
 pub use triergon_core::{Error, Result};

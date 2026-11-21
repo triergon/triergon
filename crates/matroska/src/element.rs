@@ -157,7 +157,7 @@ struct Master {
 /// It supplies envelope context only; a packet consumer still owns track/Cues
 /// validation, previous-random-access selection and all-track preroll policy.
 #[derive(Clone, Debug)]
-pub struct ClusterCheckpoint {
+pub(crate) struct ClusterCheckpoint {
     pool: Budget,
     parser: u64,
     source: SourceId,
@@ -168,7 +168,7 @@ impl ClusterCheckpoint {
     pub(crate) fn segment_end(&self) -> Option<u64> {
         self.segment.end
     }
-    pub fn offset(&self) -> u64 {
+    pub(crate) fn offset(&self) -> u64 {
         self.offset
     }
 }
@@ -184,7 +184,7 @@ enum Phase {
 /// Each call resumes exactly where the previous call stopped. Storage rejection
 /// retains the header/body builder, including a complete leaf awaiting freeze.
 #[derive(Debug)]
-pub struct ElementReader {
+pub(crate) struct ElementReader {
     input: InputCursor,
     parser: u64,
     limits: Limits,
@@ -205,7 +205,7 @@ pub struct ElementReader {
 /// referenced Block.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct EpochAdmission {
-    pub keep: [Option<u64>; 2],
+    pub(crate) keep: [Option<u64>; 2],
 }
 /// Select whether the typed caller admits leaves after a pause or the
 /// envelope applies a preselected admission rule in place.
@@ -221,7 +221,7 @@ impl ElementReader {
     pub(crate) fn input(&self) -> &InputCursor {
         &self.input
     }
-    pub fn new(
+    pub(crate) fn new(
         pool: &Budget,
         source: SourceId,
         capabilities: SourceCapabilities,
@@ -253,31 +253,31 @@ impl ElementReader {
     pub(crate) fn payload_ownership(&self) -> PayloadOwnership {
         self.payload_ownership
     }
-    pub fn budget(&self) -> &Budget {
+    pub(crate) fn budget(&self) -> &Budget {
         self.input.budget()
     }
-    pub fn position(&self) -> u64 {
+    pub(crate) fn position(&self) -> u64 {
         self.input.position()
     }
-    pub fn generation(&self) -> u64 {
+    pub(crate) fn generation(&self) -> u64 {
         self.input.generation()
     }
-    pub fn request(&self) -> InputRequest {
+    pub(crate) fn request(&self) -> InputRequest {
         self.input.request()
     }
-    pub fn location(&self) -> SourceLocation {
+    pub(crate) fn location(&self) -> SourceLocation {
         SourceLocation {
             source: self.input.source(),
             offset: self.input.position(),
         }
     }
-    pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
+    pub(crate) fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.input.provide(window)
     }
-    pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
+    pub(crate) fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.input.finish(source, token)
     }
-    pub fn fail(
+    pub(crate) fn fail(
         &mut self,
         source: SourceId,
         token: InputToken,
@@ -285,7 +285,7 @@ impl ElementReader {
     ) -> Result<()> {
         self.input.fail(source, token, failure)
     }
-    pub fn cluster_checkpoint(&self) -> Option<ClusterCheckpoint> {
+    pub(crate) fn cluster_checkpoint(&self) -> Option<ClusterCheckpoint> {
         Some(ClusterCheckpoint {
             pool: self.input.budget().clone(),
             parser: self.parser,
@@ -296,7 +296,10 @@ impl ElementReader {
     }
     /// Explicit logical range seek. Generation changes invalidate every earlier
     /// supplied range; retained earlier-generation leaf payloads stay charged.
-    pub fn reset_to_cluster(&mut self, checkpoint: &ClusterCheckpoint) -> Result<InputRequest> {
+    pub(crate) fn reset_to_cluster(
+        &mut self,
+        checkpoint: &ClusterCheckpoint,
+    ) -> Result<InputRequest> {
         if !checkpoint.pool.same_pool(self.input.budget()) {
             return Err(Error::ForeignPool);
         }
@@ -321,7 +324,7 @@ impl ElementReader {
     }
     /// Reset the logical document. Caller-retained earlier events remain valid
     /// and charged; their old range tokens are rejected by the core cursor.
-    pub fn reset(&mut self) -> Result<InputRequest> {
+    pub(crate) fn reset(&mut self) -> Result<InputRequest> {
         let request = self.input.reset(0)?;
         self.phase = Phase::Between;
         self.segment = None;
@@ -440,7 +443,7 @@ impl ElementReader {
         });
         Ok(None)
     }
-    pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ParseStep> {
+    pub(crate) fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ParseStep> {
         self.step_mode::<PublicDelivery>(work, cancel, Admit::Never)
     }
     fn step_mode<D: EnvelopeDelivery>(
@@ -959,3 +962,5 @@ mod header_loop_regressions;
 
 #[cfg(test)]
 mod header_guards;
+#[cfg(test)]
+mod input_tests;

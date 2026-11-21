@@ -1,8 +1,7 @@
 //! Immutable charged compatibility views. Cloning these handles shares storage.
 use crate::{Error, Result};
 use std::ops::{Deref, DerefMut, Range};
-use triergon_core::BudgetVec;
-pub use triergon_core::{Budget, Bytes, OwnedInputBytes};
+use triergon_core::{Budget, BudgetVec, Bytes};
 
 /// Empty values need no allocation. Nonempty spans retain their complete backing
 /// allocation's charge, including bytes hidden by a slice.

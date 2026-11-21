@@ -33,10 +33,10 @@ fn open_shared<R: Read>(source: R, limits: Limits) -> triergon_matroska::Result<
 fn open_owned(
     data: Vec<u8>,
     limits: Limits,
-) -> triergon_matroska::Result<Demuxer<Cursor<triergon_matroska::storage::OwnedInputBytes>>> {
-    let pool = triergon_matroska::storage::Budget::new(limits.live_storage_bytes)?;
-    let source = triergon_matroska::storage::OwnedInputBytes::try_from_vec(&pool, data)
-        .map_err(|error| error.error)?;
+) -> triergon_matroska::Result<Demuxer<Cursor<triergon_core::OwnedInputBytes>>> {
+    let pool = triergon_core::Budget::new(limits.live_storage_bytes)?;
+    let source =
+        triergon_core::OwnedInputBytes::try_from_vec(&pool, data).map_err(|error| error.error)?;
     Demuxer::open_owned_seekable_in(
         source,
         limits,
