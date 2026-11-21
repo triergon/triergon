@@ -370,7 +370,10 @@ enum Frame {
         buffer: BudgetVec<u8>,
         step: BodyStep,
     },
-    Ready { header: DtsCoreHeader, bytes: Bytes },
+    Ready {
+        header: DtsCoreHeader,
+        bytes: Bytes,
+    },
     /// The source ended after the last frame.
     Ended(SourceLocation),
 }
@@ -379,10 +382,15 @@ enum Frame {
 enum BodyStep {
     Reserve,
     /// Copying the header bytes into the frame, `copied` of them so far.
-    CopyPrefix { copied: usize },
+    CopyPrefix {
+        copied: usize,
+    },
     ReadBody,
     /// Copying `pending` into the frame, `copied` bytes of it so far.
-    CopyBody { pending: Bytes, copied: usize },
+    CopyBody {
+        pending: Bytes,
+        copied: usize,
+    },
     /// The frame's bytes are complete.
     Freeze,
 }

@@ -106,7 +106,10 @@ enum Frame {
         step: BodyStep,
     },
     /// The frame's source bytes are complete.
-    Frozen { facts: Dts14SyncFacts, raw: Bytes },
+    Frozen {
+        facts: Dts14SyncFacts,
+        raw: Bytes,
+    },
     /// Unpacking the frame's 14-bit words.
     Unpack {
         facts: Dts14SyncFacts,

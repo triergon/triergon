@@ -312,7 +312,9 @@ impl ReceiverAvcConfigParser {
         cancel: &AtomicBool,
     ) -> Result<BuildStep<ReceiverAvcConfiguration>> {
         let mut ready = None;
-        Ok(self.step_into(work, cancel, &mut ready)?.into_build_step(ready))
+        Ok(self
+            .step_into(work, cancel, &mut ready)?
+            .into_build_step(ready))
     }
 
     /// Publishes into an empty caller-provided slot; yield, completion and errors leave
@@ -396,7 +398,9 @@ impl ReceiverHevcConfigParser {
         cancel: &AtomicBool,
     ) -> Result<BuildStep<ReceiverHevcConfiguration>> {
         let mut ready = None;
-        Ok(self.step_into(work, cancel, &mut ready)?.into_build_step(ready))
+        Ok(self
+            .step_into(work, cancel, &mut ready)?
+            .into_build_step(ready))
     }
 
     /// Publishes into an empty caller-provided slot; yield, completion and errors leave

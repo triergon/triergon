@@ -167,7 +167,9 @@ enum BodyStep {
 enum GrowStep {
     Reserve,
     /// Copying the packet, `copied` bytes of it so far.
-    Copy { copied: usize },
+    Copy {
+        copied: usize,
+    },
     /// Replacing the packet's storage with the larger one.
     Swap,
 }

@@ -147,7 +147,10 @@ enum Frame {
         step: BodyStep,
     },
     /// The frame's source bytes are complete.
-    Frozen { header: DtsPackedHeader, raw: Bytes },
+    Frozen {
+        header: DtsPackedHeader,
+        raw: Bytes,
+    },
     /// Unpacking the frame's payload.
     Unpack {
         header: DtsPackedHeader,

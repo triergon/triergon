@@ -418,7 +418,9 @@ impl HvcConfigParser {
         cancel: &AtomicBool,
     ) -> Result<BuildStep<HvcConfiguration>> {
         let mut ready = None;
-        Ok(self.step_into(work, cancel, &mut ready)?.into_build_step(ready))
+        Ok(self
+            .step_into(work, cancel, &mut ready)?
+            .into_build_step(ready))
     }
 
     /// Publishes into an empty caller-provided slot without returning the record. An
