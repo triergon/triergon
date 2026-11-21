@@ -273,7 +273,71 @@ impl Mp4Engine {
         }
     }
 
-    // Keep backend-specific polling workspaces out of the shared dispatcher.
+    /// One packet of a run of empty demux packets at the front read boundary.
+    #[cold]
+    fn emit_empty_run(
+        &mut self,
+        mut packet: Mp4EmptyPacket,
+        remaining: u32,
+        w: &mut WorkBudget,
+    ) -> Result<EngineStep> {
+        if !w.try_charge(1) {
+            return Ok(EngineStep::Yield);
+        }
+        if remaining > 1 {
+            self.empty_run = Some((packet, remaining - 1));
+            packet.duration = 0;
+        } else {
+            self.empty_run = None;
+        }
+        Ok(EngineStep::Event(Event::Mp4(Mp4Event::EmptyPacket(packet))))
+    }
+
+    /// Reads the media a demux-order replay serves from memory, once per engine.
+    #[cold]
+    fn fill_media_cache(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<EngineStep> {
+        let Some(replay) = self.media_cache_fill.as_mut() else {
+            return Ok(EngineStep::Yield);
+        };
+        match replay.poll(&mut self.input, w, c)? {
+            Step::Ready(cached) => {
+                self.plan
+                    .media_cache
+                    .try_push(cached)
+                    .map_err(|failure| failure.error)?;
+                self.media_cache_fill = None;
+                Ok(EngineStep::Yield)
+            }
+            Step::NeedInput(r) => Ok(EngineStep::NeedInput(r)),
+            Step::Yield => Ok(EngineStep::Yield),
+            Step::End(_) => Err(Error::Truncated),
+        }
+    }
+
+    /// Publishes the configuration of track `at` for `row`'s sample description
+    /// under the next revision.
+    #[cold]
+    fn publish_configuration(
+        &mut self,
+        at: usize,
+        row: &SourceRow,
+        w: &mut WorkBudget,
+    ) -> Result<EngineStep> {
+        w.take(1);
+        let revision = self.revision.checked_add(1).ok_or(Error::Overflow)?;
+        let cfg = self.plan.tracks.as_slice()[at]
+            .configuration(row.sample.description_index, revision)?;
+        self.configs[at] = Some(CachedDescription {
+            track: row.track_id,
+            description: row.sample.description_index,
+            revision,
+        });
+        self.revision = revision;
+        Ok(EngineStep::Event(Event::Mp4(Mp4Event::Configuration(cfg))))
+    }
+
+    // The measured per-packet spine: row, configuration check, gap, buffered
+    // sample, `emit_packet`. Its rare arms are cold methods called in tail position.
     #[inline(never)]
     pub(crate) fn poll(
         &mut self,
@@ -288,34 +352,13 @@ impl Mp4Engine {
         if self.plan.unavailable_first.is_some() {
             return self.poll_unavailable_first(w, c);
         }
-        if let Some((mut packet, remaining)) = self.empty_run
+        if let Some((packet, remaining)) = self.empty_run
             && self.front_boundary == Some(packet.boundary)
         {
-            if !w.try_charge(1) {
-                return Ok(EngineStep::Yield);
-            }
-            if remaining > 1 {
-                self.empty_run = Some((packet, remaining - 1));
-                packet.duration = 0;
-            } else {
-                self.empty_run = None;
-            }
-            return Ok(EngineStep::Event(Event::Mp4(Mp4Event::EmptyPacket(packet))));
+            return self.emit_empty_run(packet, remaining, w);
         }
-        if let Some(replay) = self.media_cache_fill.as_mut() {
-            return match replay.poll(&mut self.input, w, c)? {
-                Step::Ready(cached) => {
-                    self.plan
-                        .media_cache
-                        .try_push(cached)
-                        .map_err(|failure| failure.error)?;
-                    self.media_cache_fill = None;
-                    Ok(EngineStep::Yield)
-                }
-                Step::NeedInput(r) => Ok(EngineStep::NeedInput(r)),
-                Step::Yield => Ok(EngineStep::Yield),
-                Step::End(_) => Err(Error::Truncated),
-            };
+        if self.media_cache_fill.is_some() {
+            return self.fill_media_cache(w, c);
         }
         if self.packet.is_some() {
             return self.poll_packet(w, c, cursor);
@@ -389,17 +432,7 @@ impl Mp4Engine {
             d.track != row.track_id || d.description != row.sample.description_index
         });
         if changed {
-            w.take(1);
-            let revision = self.revision.checked_add(1).ok_or(Error::Overflow)?;
-            let cfg = self.plan.tracks.as_slice()[at]
-                .configuration(row.sample.description_index, revision)?;
-            self.configs[at] = Some(CachedDescription {
-                track: row.track_id,
-                description: row.sample.description_index,
-                revision,
-            });
-            self.revision = revision;
-            return Ok(EngineStep::Event(Event::Mp4(Mp4Event::Configuration(cfg))));
+            return self.publish_configuration(at, &row, w);
         }
         let sequential = !self.input.capabilities().random_access;
         let position = self.input.position();
