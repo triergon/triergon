@@ -508,18 +508,18 @@ impl StorageCursor {
             }
             Self::Framer(lane) => {
                 *self = Self::FramerBacking(lane, 0);
-                let framer = reader.lanes.as_slice()[lane]
-                    .framer
-                    .as_ref()
-                    .expect("live framer");
-                Some(StorageItem::Fixed(framer.input_wait_storage()?))
+                match &reader.lanes.as_slice()[lane].framer {
+                    Some(framer) => Some(StorageItem::Fixed(framer.input_wait_storage()?)),
+                    None => None,
+                }
             }
             Self::FramerBacking(lane, index) => {
-                let framer = reader.lanes.as_slice()[lane]
-                    .framer
-                    .as_ref()
-                    .expect("live framer");
-                if let Some(bytes) = framer.input_wait_backing(index)? {
+                let framer = reader.lanes.as_slice()[lane].framer.as_ref();
+                if let Some(bytes) = framer
+                    .map(|framer| framer.input_wait_backing(index))
+                    .transpose()?
+                    .flatten()
+                {
                     *self = Self::FramerBacking(lane, index + 1);
                     Some(StorageItem::Bytes(bytes))
                 } else {
@@ -779,16 +779,25 @@ impl FragmentKind {
 struct Incomplete {
     kind: FragmentKind,
     range: Range<u64>,
-    buffer: Option<BudgetVec<u8>>,
-    bytes: Option<Bytes>,
-    prepared: bool,
+    buffer: BudgetVec<u8>,
+    stage: FragmentStage,
     piece: usize,
-    span: Option<usize>,
     span_start: usize,
     copied: usize,
     covered: usize,
     origins: usize,
+    /// The reader's other storage, once the reader has audited it.
     reader_storage: Option<usize>,
+}
+
+/// How far the copy of an unfinished tail has come.
+#[derive(Clone, Copy)]
+enum FragmentStage {
+    /// Measuring the tail's coverage and origins; `span` is the span of the current piece, or
+    /// `None` before its first.
+    Scan { span: Option<usize> },
+    /// The buffer is reserved; copying from span `span` of the current piece.
+    Copy { span: usize },
 }
 
 impl Incomplete {
@@ -796,11 +805,9 @@ impl Incomplete {
         Self {
             kind,
             range,
-            buffer: Some(BudgetVec::new(pool)),
-            bytes: None,
-            prepared: false,
+            buffer: BudgetVec::new(pool),
+            stage: FragmentStage::Scan { span: None },
             piece: 0,
-            span: None,
             span_start: 0,
             copied: 0,
             covered: 0,
@@ -811,6 +818,7 @@ impl Incomplete {
 
     fn scan(
         &mut self,
+        mut span: Option<usize>,
         pieces: &[Piece],
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -820,12 +828,13 @@ impl Incomplete {
                 return Err(Error::Cancelled);
             }
             if !work.try_charge(1) {
+                self.stage = FragmentStage::Scan { span };
                 return Ok(false);
             }
             let pes = piece.source.pes();
-            if let Some(index) = self.span {
-                if let Some(span) = pes.spans().get(index) {
-                    let length = span.as_ref().len();
+            if let Some(index) = span {
+                if let Some(payload) = pes.spans().get(index) {
+                    let length = payload.as_ref().len();
                     let begin = piece
                         .range
                         .start
@@ -842,32 +851,33 @@ impl Incomplete {
                         .checked_add(usize::try_from(count).map_err(|_| Error::Overflow)?)
                         .ok_or(Error::Overflow)?;
                     self.span_start = self.span_start.checked_add(length).ok_or(Error::Overflow)?;
-                    self.span = Some(index + 1);
+                    span = Some(index + 1);
                 } else {
                     self.piece += 1;
-                    self.span = None;
+                    span = None;
                     self.span_start = 0;
                 }
             } else {
                 if piece.range.start < self.range.end && self.range.start < piece.range.end {
                     self.origins += 1;
                 }
-                self.span = Some(0);
+                span = Some(0);
             }
+            self.stage = FragmentStage::Scan { span };
         }
         Ok(true)
     }
 
+    /// Reserves the buffer once the scan is complete; `false` when the work grant is spent.
     fn prepare(
         &mut self,
+        span: Option<usize>,
+        reader_storage: usize,
         pieces: &[Piece],
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<bool> {
-        if self.prepared {
-            return Ok(true);
-        }
-        if !self.scan(pieces, work, cancel)? || !work.try_charge(1) {
+        if !self.scan(span, pieces, work, cancel)? || !work.try_charge(1) {
             return Ok(false);
         }
         let size =
@@ -881,49 +891,54 @@ impl Incomplete {
         let minimum = self
             .origins
             .checked_mul(size_of::<PayloadSource>())
-            .and_then(|n| n.checked_add(self.reader_storage.expect("audited reader storage")))
+            .and_then(|n| n.checked_add(reader_storage))
             .and_then(|n| n.checked_add(size))
             .and_then(|n| n.checked_add(Bytes::owner_overhead_bytes()))
             .and_then(|n| n.checked_add(publication))
             .ok_or(Error::Overflow)?;
-        let buffer = self.buffer.as_mut().expect("incomplete fragment buffer");
-        if minimum > buffer.budget().limit() {
+        let limit = self.buffer.budget().limit();
+        if minimum > limit {
             return Err(Error::Limit {
                 requested: minimum,
-                maximum: buffer.budget().limit(),
+                maximum: limit,
             });
         }
-        buffer.try_reserve_exact(size)?;
-        self.prepared = true;
+        self.buffer.try_reserve_exact(size)?;
+        self.stage = FragmentStage::Copy { span: 0 };
         self.piece = 0;
-        self.span = Some(0);
         self.span_start = 0;
         Ok(true)
     }
 
+    /// Copies the validated tail after the reader's audit of `reader_storage` bytes, and returns
+    /// its bytes once complete.
     fn copy(
         &mut self,
+        reader_storage: usize,
         pieces: &[Piece],
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<bool> {
-        if self.bytes.is_some() {
-            return Ok(true);
-        }
-        if !self.prepare(pieces, work, cancel)? {
-            return Ok(false);
-        }
+    ) -> Result<Option<Bytes>> {
+        let mut index = match self.stage {
+            FragmentStage::Scan { span } => {
+                if !self.prepare(span, reader_storage, pieces, work, cancel)? {
+                    return Ok(None);
+                }
+                0
+            }
+            FragmentStage::Copy { span } => span,
+        };
         while let Some(piece) = pieces.get(self.piece) {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            let index = self.span.expect("prepared span cursor");
             let Some(span) = piece.source.pes().spans().get(index) else {
                 if !work.try_charge(1) {
-                    return Ok(false);
+                    return Ok(None);
                 }
                 self.piece += 1;
-                self.span = Some(0);
+                index = 0;
+                self.stage = FragmentStage::Copy { span: 0 };
                 self.span_start = 0;
                 continue;
             };
@@ -941,9 +956,10 @@ impl Incomplete {
                 .map_err(|_| Error::Overflow)?;
             if self.copied == length {
                 if !work.try_charge(1) {
-                    return Ok(false);
+                    return Ok(None);
                 }
-                self.span = Some(index + 1);
+                index += 1;
+                self.stage = FragmentStage::Copy { span: index };
                 self.span_start = self
                     .span_start
                     .checked_add(bytes.len())
@@ -954,41 +970,69 @@ impl Incomplete {
             let count = usize::try_from(work.take((length - self.copied).min(4096) as u64))
                 .map_err(|_| Error::Overflow)?;
             if count == 0 {
-                return Ok(false);
+                return Ok(None);
             }
             let at = usize::try_from(start - begin).map_err(|_| Error::Overflow)? + self.copied;
-            self.buffer
-                .as_mut()
-                .expect("incomplete buffer")
-                .try_extend_from_slice(&bytes[at..at + count])?;
+            self.buffer.try_extend_from_slice(&bytes[at..at + count])?;
             self.copied += count;
         }
         if !work.try_charge(1) {
-            return Ok(false);
+            return Ok(None);
         }
-        match self.buffer.take().expect("incomplete freeze").freeze() {
-            Ok(bytes) => self.bytes = Some(bytes),
+        let empty = BudgetVec::new(self.buffer.budget());
+        match std::mem::replace(&mut self.buffer, empty).freeze() {
+            Ok(bytes) => Ok(Some(bytes)),
             Err(error) => {
-                self.buffer = Some(error.value);
-                return Err(error.error);
+                self.buffer = error.value;
+                Err(error.error)
             }
         }
-        Ok(true)
     }
 }
 
 enum BuildUnit {
     Packet(AccessUnit),
-    Unframed(UnframedKind, Range<u64>),
+    Unframed(UnframedKind, Range<u64>, Bytes),
 }
 
 impl BuildUnit {
     fn range_and_anchor(&self) -> (Range<u64>, u64) {
         match self {
             Self::Packet(unit) => (unit.range(), unit.anchor_offset()),
-            Self::Unframed(_, range) => (range.clone(), range.start),
+            Self::Unframed(_, range, _) => (range.clone(), range.start),
         }
     }
+}
+
+/// The contiguous copy of a video access unit's NAL units.
+enum Coalesced {
+    /// The unit keeps its own bytes.
+    Unneeded,
+    /// Copying into this buffer.
+    Copying(BudgetVec<u8>),
+    /// Copied.
+    Ready(Bytes),
+}
+
+/// The facts of an access unit whose publication work is paid, short of building its packet.
+struct Publication {
+    consumed_end: u64,
+    charge: triergon_core::Reservation,
+    epochs: SourceEpochs,
+    duration: Option<Time>,
+    pts: Option<i64>,
+    dts: Option<i64>,
+    duration90: Option<i64>,
+}
+
+/// How far an access unit's publication came in one step.
+enum Published {
+    /// It waits; the lane returns this step and keeps the build.
+    Pending(LaneStep),
+    /// A discarded picture was measured for the seek and its PES retired.
+    Probed(SeekProbe, u64),
+    /// Everything is paid for: build the packet.
+    Ready(Publication),
 }
 
 enum BuildOrigins {
@@ -998,8 +1042,7 @@ enum BuildOrigins {
 
 struct Build {
     unit: BuildUnit,
-    buffer: Option<BudgetVec<u8>>,
-    bytes: Option<Bytes>,
+    coalesced: Coalesced,
     nal: usize,
     part: u8,
     copied: usize,
@@ -1015,9 +1058,9 @@ struct Build {
 
 impl Build {
     fn new(unit: AccessUnit, pool: &Budget, last_anchor: u64) -> Self {
-        Self::with_unit(BuildUnit::Packet(unit), None, pool, last_anchor)
+        Self::with_unit(BuildUnit::Packet(unit), pool, last_anchor)
     }
-    fn with_unit(unit: BuildUnit, bytes: Option<Bytes>, pool: &Budget, last_anchor: u64) -> Self {
+    fn with_unit(unit: BuildUnit, pool: &Budget, last_anchor: u64) -> Self {
         let origins = match &unit {
             // The DVB storage check already accounts for a separate table.
             BuildUnit::Packet(AccessUnit::DvbSubtitle(_)) => {
@@ -1025,12 +1068,14 @@ impl Build {
             }
             _ => PayloadSources::Inline(None),
         };
-        let buffer =
-            matches!(unit, BuildUnit::Packet(AccessUnit::Video(_))).then(|| BudgetVec::new(pool));
+        let coalesced = if matches!(unit, BuildUnit::Packet(AccessUnit::Video(_))) {
+            Coalesced::Copying(BudgetVec::new(pool))
+        } else {
+            Coalesced::Unneeded
+        };
         Self {
             unit,
-            buffer,
-            bytes,
+            coalesced,
             nal: 0,
             part: 0,
             copied: 0,
@@ -1045,15 +1090,14 @@ impl Build {
         }
     }
     fn copy(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
-        if self.bytes.is_some() {
+        let Coalesced::Copying(buffer) = &mut self.coalesced else {
             return Ok(true);
-        }
+        };
         let BuildUnit::Packet(AccessUnit::Video(unit)) = &self.unit else {
             return Ok(true);
         };
         let size =
             usize::try_from(unit.range.end - unit.range.start).map_err(|_| Error::Overflow)?;
-        let buffer = self.buffer.as_mut().expect("pending coalescing storage");
         buffer.try_reserve_exact(size.saturating_sub(buffer.len()))?;
         const ZEROS: [u8; 256] = [0; 256];
         while let Some(nal) = unit.nals().get(self.nal) {
@@ -1104,10 +1148,11 @@ impl Build {
         if !work.try_charge(1) {
             return Ok(false);
         }
-        match self.buffer.take().expect("coalescing storage").freeze() {
-            Ok(bytes) => self.bytes = Some(bytes),
+        let empty = BudgetVec::new(buffer.budget());
+        match std::mem::replace(buffer, empty).freeze() {
+            Ok(bytes) => self.coalesced = Coalesced::Ready(bytes),
             Err(error) => {
-                self.buffer = Some(error.value);
+                *buffer = error.value;
                 return Err(error.error);
             }
         }
@@ -1232,11 +1277,11 @@ impl Lane {
     pub(super) fn has_incomplete(&self) -> bool {
         self.incomplete.is_some()
     }
+    /// Records the reader's audited storage for the unfinished tail, if the lane holds one.
     pub(super) fn set_reader_storage(&mut self, bytes: usize) {
-        self.incomplete
-            .as_mut()
-            .expect("pending fragment")
-            .reader_storage = Some(bytes);
+        if let Some(incomplete) = &mut self.incomplete {
+            incomplete.reader_storage = Some(bytes);
+        }
     }
     /// Admits the PES of `source`: `Ok(None)` once admitted or ignored, `Ok(Some(source))` when
     /// the work grant is spent; a refusal returns the source with the error.
@@ -1385,22 +1430,28 @@ impl Lane {
                 self.retire_credit = 0;
                 continue;
             }
-            if self.build.is_some() {
-                return self.publish(picture_delivery, work, cancel);
+            if let Some(build) = self.build.take() {
+                return self.publish(build, picture_delivery, work, cancel);
             }
             if let Some(incomplete) = self.incomplete.as_mut() {
-                if incomplete.reader_storage.is_none() {
+                let Some(reader_storage) = incomplete.reader_storage else {
                     return Ok(LaneStep::DeferredFragment);
-                }
-                if !incomplete.copy(self.pieces.as_slice(), work, cancel)? {
+                };
+                let Some(bytes) =
+                    incomplete.copy(reader_storage, self.pieces.as_slice(), work, cancel)?
+                else {
                     return Ok(LaneStep::Yield);
-                }
-                let incomplete = self.incomplete.take().expect("finished fragment copy");
-                let bytes = incomplete.bytes.expect("copied fragment bytes");
-                let mut build = match incomplete.kind {
+                };
+                let (kind, range, origins) = (
+                    incomplete.kind,
+                    incomplete.range.clone(),
+                    incomplete.origins,
+                );
+                self.incomplete = None;
+                let mut build = match kind {
                     FragmentKind::Audio => Build::new(
                         AccessUnit::IncompleteAudio {
-                            range: incomplete.range,
+                            range,
                             bytes,
                             reason: Error::Truncated,
                         },
@@ -1408,13 +1459,12 @@ impl Lane {
                         self.last_anchor,
                     ),
                     FragmentKind::Unframed(kind) => Build::with_unit(
-                        BuildUnit::Unframed(kind, incomplete.range),
-                        Some(bytes),
+                        BuildUnit::Unframed(kind, range, bytes),
                         &self.pool,
                         self.last_anchor,
                     ),
                 };
-                build.origins = BuildOrigins::ReserveTable(incomplete.origins);
+                build.origins = BuildOrigins::ReserveTable(origins);
                 self.build = Some(build);
                 continue;
             }
@@ -1437,7 +1487,9 @@ impl Lane {
                 if !ready {
                     return Ok(LaneStep::Yield);
                 }
-                self.supplied = pieces.last().expect("unframed PES").range.end;
+                if let Some(last) = pieces.last() {
+                    self.supplied = last.range.end;
+                }
                 if !draining {
                     return Ok(LaneStep::NeedPayload);
                 }
@@ -1495,9 +1547,7 @@ impl Lane {
                         .pieces
                         .as_slice()
                         .last()
-                        .expect("video input PES")
-                        .range
-                        .end;
+                        .map_or(self.supplied, |piece| piece.range.end);
                     self.check_video_residue_extent(end)?;
                     // Recheck all retained bytes, including the portion the
                     // framer already read and any unsupplied part of this PES.
@@ -1691,25 +1741,24 @@ impl Lane {
         Ok(())
     }
 
-    fn finish_build(&mut self, consumed_end: u64) -> Build {
-        let build = self.build.take().expect("prepared publication");
+    fn finish_build(&mut self, build: &Build, consumed_end: u64) {
         self.retire = build.retire;
         self.last_anchor = build.last_anchor;
         self.completed += 1;
         self.published = consumed_end;
-        build
     }
 
+    /// Measures a picture the seek discards, with the extent and anchor a delivered packet
+    /// would have.
     fn probe_picture(
-        &mut self,
-        range: Range<u64>,
-        anchor_offset: u64,
+        &self,
+        build: &mut Build,
         (has_vcl, random_access): (bool, bool),
         scan: bool,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<LaneStep> {
-        let build = self.build.as_mut().expect("pending picture");
+    ) -> Result<Published> {
+        let (range, anchor_offset) = build.unit.range_and_anchor();
         let pieces = self.pieces.as_slice();
         // Track the same source extent and anchor as a delivered packet without
         // retaining PES owners or computing decode times for discarded pictures.
@@ -1718,7 +1767,7 @@ impl Lane {
                 return Err(Error::Cancelled);
             }
             if !work.try_charge(1) {
-                return Ok(LaneStep::Yield);
+                return Ok(Published::Pending(LaneStep::Yield));
             }
             if piece.range.start < range.end
                 && range.start < piece.range.end
@@ -1742,12 +1791,12 @@ impl Lane {
                 return Err(Error::Cancelled);
             }
             if !work.try_charge(1) {
-                return Ok(LaneStep::Yield);
+                return Ok(Published::Pending(LaneStep::Yield));
             }
             build.retire += 1;
         }
         if !work.try_charge(1) {
-            return Ok(LaneStep::Yield);
+            return Ok(Published::Pending(LaneStep::Yield));
         }
         let (epochs, byte_run, pes_offset) = build
             .picture_origin
@@ -1771,26 +1820,56 @@ impl Lane {
         } else {
             (None, None)
         };
-        self.finish_build(range.end);
-        Ok(LaneStep::PictureProbe(SeekProbe {
-            offset: range.start,
-            epochs,
-            byte_run,
-            pes_offset,
-            ticks,
-            time,
-            random_access,
-            has_vcl,
-        }))
+        Ok(Published::Probed(
+            SeekProbe {
+                offset: range.start,
+                epochs,
+                byte_run,
+                pes_offset,
+                ticks,
+                time,
+                random_access,
+                has_vcl,
+            },
+            range.end,
+        ))
     }
 
+    /// Publishes `build`, which the lane keeps while the publication waits, also after an
+    /// error.
     fn publish(
         &mut self,
+        mut build: Build,
         picture_delivery: PictureDelivery,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<LaneStep> {
-        let build = self.build.as_mut().expect("pending publication");
+        match self.prepare_publication(&mut build, picture_delivery, work, cancel) {
+            Ok(Published::Ready(publication)) => Ok(self.emit(build, publication)),
+            Ok(Published::Probed(probe, consumed_end)) => {
+                self.finish_build(&build, consumed_end);
+                Ok(LaneStep::PictureProbe(probe))
+            }
+            Ok(Published::Pending(step)) => {
+                self.build = Some(build);
+                Ok(step)
+            }
+            Err(error) => {
+                self.build = Some(build);
+                Err(error)
+            }
+        }
+    }
+
+    /// Pays for the publication of `build`: probes a discarded picture, or copies its bytes,
+    /// collects its PES origins and clock, retires consumed PES and reserves its packet.
+    fn prepare_publication(
+        &self,
+        build: &mut Build,
+        picture_delivery: PictureDelivery,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Published> {
         let (range, anchor_offset) = build.unit.range_and_anchor();
         let probing = match picture_delivery {
             PictureDelivery::Full => false,
@@ -1810,8 +1889,7 @@ impl Lane {
         if probing && let BuildUnit::Packet(AccessUnit::Video(unit)) = &build.unit {
             let flags = (unit.has_vcl, unit.random_access);
             return self.probe_picture(
-                range,
-                anchor_offset,
+                build,
                 flags,
                 matches!(picture_delivery, PictureDelivery::Scan),
                 work,
@@ -1820,14 +1898,14 @@ impl Lane {
         }
         if let BuildOrigins::ReserveTable(count) = build.origins {
             if !work.try_charge(1) {
-                return Ok(LaneStep::Yield);
+                return Ok(Published::Pending(LaneStep::Yield));
             }
             let mut origins = BudgetVec::new(&self.pool);
             origins.try_reserve_exact(count)?;
             build.origins = BuildOrigins::Ready(PayloadSources::Table(origins));
         }
         if !build.copy(work, cancel)? {
-            return Ok(LaneStep::Yield);
+            return Ok(Published::Pending(LaneStep::Yield));
         }
         let BuildOrigins::Ready(origins) = &mut build.origins else {
             unreachable!("prepared PES sources");
@@ -1841,7 +1919,7 @@ impl Lane {
                 return Err(Error::Cancelled);
             }
             if !work.try_charge(1) {
-                return Ok(LaneStep::Yield);
+                return Ok(Published::Pending(LaneStep::Yield));
             }
             let start = range.start.max(piece.range.start);
             let end = range.end.min(piece.range.end);
@@ -1894,12 +1972,12 @@ impl Lane {
                 return Err(Error::Cancelled);
             }
             if !work.try_charge(1) {
-                return Ok(LaneStep::Yield);
+                return Ok(Published::Pending(LaneStep::Yield));
             }
             build.retire += 1;
         }
         if !work.try_charge(1) {
-            return Ok(LaneStep::Yield);
+            return Ok(Published::Pending(LaneStep::Yield));
         }
         let epochs = origins
             .as_slice()
@@ -1944,7 +2022,29 @@ impl Lane {
             .map(i64::try_from)
             .transpose()
             .map_err(|_| Error::Overflow)?;
-        let build = self.finish_build(consumed_end);
+        Ok(Published::Ready(Publication {
+            consumed_end,
+            charge,
+            epochs,
+            duration,
+            pts,
+            dts,
+            duration90,
+        }))
+    }
+
+    /// Builds the packet of `build`, whose publication is paid for.
+    fn emit(&mut self, build: Build, publication: Publication) -> LaneStep {
+        let Publication {
+            consumed_end,
+            charge,
+            epochs,
+            duration,
+            pts,
+            dts,
+            duration90,
+        } = publication;
+        self.finish_build(&build, consumed_end);
         let recovered_adts = build.recovered_adts_bytes
             || build.clock.as_ref().is_some_and(|clock| {
                 matches!(
@@ -1957,11 +2057,14 @@ impl Lane {
             unreachable!("prepared PES sources");
         };
         match build.unit {
-            BuildUnit::Packet(unit) => Ok(LaneStep::Packet(Packet(Shared::new(
+            BuildUnit::Packet(unit) => LaneStep::Packet(Packet(Shared::new(
                 PacketData {
                     track,
                     unit,
-                    video_bytes: build.bytes,
+                    video_bytes: match build.coalesced {
+                        Coalesced::Ready(bytes) => Some(bytes),
+                        Coalesced::Unneeded | Coalesced::Copying(_) => None,
+                    },
                     sources: origins,
                     clock: build.clock,
                     epochs,
@@ -1972,8 +2075,8 @@ impl Lane {
                     recovered_adts,
                 },
                 charge,
-            )))),
-            BuildUnit::Unframed(kind, range) => {
+            ))),
+            BuildUnit::Unframed(kind, range, bytes) => {
                 let PayloadSources::Table(sources) = origins else {
                     unreachable!("unframed PES sources use a table");
                 };
@@ -1981,19 +2084,19 @@ impl Lane {
                     UnframedData {
                         track,
                         range,
-                        bytes: build.bytes.expect("prepared unframed bytes"),
+                        bytes,
                         sources,
                         clock: build.clock,
                         epochs,
                     },
                     charge,
                 );
-                Ok(match kind {
+                match kind {
                     UnframedKind::Video => LaneStep::IncompleteVideo(IncompleteVideo(data)),
                     UnframedKind::Audio(carriage) => {
                         LaneStep::UnframedAudio(UnframedAudio { data, carriage })
                     }
-                })
+                }
             }
         }
     }
@@ -2068,11 +2171,11 @@ mod incomplete_audio_tests {
         }
         reader.lanes.as_slice().iter().find_map(|lane| {
             if let Some(copy) = &lane.incomplete {
-                if !copy.prepared && copy.piece == lane.pieces.len() {
-                    return Some(0);
-                }
-                if copy.prepared && copy.piece == lane.pieces.len() && copy.bytes.is_none() {
-                    return Some(1);
+                let copied = copy.piece == lane.pieces.len();
+                match copy.stage {
+                    FragmentStage::Scan { .. } if copied => return Some(0),
+                    FragmentStage::Copy { .. } if copied => return Some(1),
+                    _ => (),
                 }
             }
             let build = lane.build.as_ref()?;
