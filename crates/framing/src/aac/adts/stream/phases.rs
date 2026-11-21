@@ -4,7 +4,9 @@
 use super::{AacAdtsStreamReader, Phase, StreamOutput};
 use crate::aac::AacSource;
 use crate::aac::adts::carrier::{AacAdtsCarrier, AacAdtsCarrierBoundary};
-use crate::aac::adts::{AacAdtsFrame, inspect_adts_header, validate_selected_header};
+use crate::aac::adts::{
+    AacAdtsFrame, AacAdtsHeader, inspect_adts_header, validate_selected_header,
+};
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
@@ -268,11 +270,6 @@ impl AacAdtsStreamReader {
                     return Err(Error::Invalid("zero ADTS body read"));
                 }
                 if scanning {
-                    self.prefix.copy_within(1..7, 0);
-                    self.prefix[6] = *buffer
-                        .as_slice()
-                        .last()
-                        .ok_or(Error::Invalid("missing ADTS scan byte"))?;
                     self.phase = Phase::ScanCheck;
                 }
             }
@@ -296,12 +293,11 @@ impl AacAdtsStreamReader {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        let h = inspect_adts_header(&self.prefix)?;
+        // The scan window: the last seven bytes read.
+        let window = frame(&mut self.buffer, &self.pool).as_slice();
+        let start = window.len().checked_sub(7).ok_or(Error::Overflow)?;
+        let h = inspect_adts_header(&window[start..])?;
         if self.plausible_envelope(h) {
-            let start = frame(&mut self.buffer, &self.pool)
-                .len()
-                .checked_sub(7)
-                .ok_or(Error::Overflow)?;
             let end = start
                 .checked_add(usize::from(h.frame_length()))
                 .ok_or(Error::Overflow)?;
@@ -315,6 +311,8 @@ impl AacAdtsStreamReader {
             self.header = Some(h);
             self.frame_bytes = end;
             if self.split_prefix {
+                // The header found starts the next unit.
+                self.prefix = h.raw_prefix();
                 self.phase = Phase::EmitPrefix;
                 return Ok(NEXT);
             }
@@ -353,9 +351,9 @@ impl AacAdtsStreamReader {
             .frame_start
             .checked_add(u64::try_from(self.header_offset).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
-        let h = self
-            .header
-            .ok_or(Error::Invalid("missing recovered header"))?;
+        let h = AacAdtsHeader {
+            prefix: self.prefix,
+        };
         self.frame_bytes = usize::from(h.frame_length());
         self.header_offset = 0;
         self.used = 7;
