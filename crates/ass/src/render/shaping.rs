@@ -29,11 +29,9 @@ use crate::{Info, charge};
 /// How an event's text is shaped and reordered.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Shaping<'a> {
-    /// The paragraph direction: left to right, or found from the text for
-    /// `\fe-1` (`ass_resolve_base_direction`).
-    pub(super) base: BaseDirection,
-    /// The text is shaped and reordered as a whole rather than run by run:
-    /// implicitly for `\fe-1`.
+    /// The text is shaped and reordered as a whole, each paragraph in the
+    /// direction found from its text, rather than run by run from left to
+    /// right: for `\fe-1`.
     pub(super) whole_text: bool,
     /// The `Kerning` header.
     pub(super) kerning: bool,
@@ -44,16 +42,19 @@ pub(super) struct Shaping<'a> {
 impl<'a> Shaping<'a> {
     /// The settings for an event of `info` whose last `\fe` is `encoding`.
     pub(super) fn new(encoding: i32, info: &'a Info) -> Self {
-        let (base, whole_text) = if encoding == -1 {
-            (BaseDirection::Auto, true)
-        } else {
-            (BaseDirection::LeftToRight, false)
-        };
         Self {
-            base,
-            whole_text,
+            whole_text: encoding == -1,
             kerning: info.kerning,
             language: info.language(),
+        }
+    }
+
+    /// The direction paragraphs are resolved in.
+    fn base(&self) -> BaseDirection {
+        if self.whole_text {
+            BaseDirection::Auto
+        } else {
+            BaseDirection::LeftToRight
         }
     }
 }
@@ -124,14 +125,42 @@ pub(super) struct Bidi {
 }
 
 /// What one shaping plan is built for: a face, a direction, a script, a
-/// language code and libass's three feature switches.
+/// language code and the features switched on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct PlanKey {
     face: u32,
     direction: Direction,
     script: WritingScript,
     language: [u8; 4],
-    features: [bool; 3],
+    features: Features,
+}
+
+/// The features libass switches for a run.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct Features {
+    /// `vert` and `vkna`, for `@` fonts.
+    vertical: bool,
+    /// `kern`, by the `Kerning` header.
+    kerning: bool,
+    /// `liga` and `clig`, without letter spacing.
+    ligatures: bool,
+}
+
+impl Features {
+    /// The features a plan is built with.
+    fn plan(self) -> [Feature; 5] {
+        let feature = |tag: &[u8; 4], on: bool| Feature {
+            tag: Tag::new(tag),
+            value: u32::from(on),
+        };
+        [
+            feature(b"vert", self.vertical),
+            feature(b"vkna", self.vertical),
+            feature(b"kern", self.kerning),
+            feature(b"liga", self.ligatures),
+            feature(b"clig", self.ligatures),
+        ]
+    }
 }
 
 /// The characters of context a shaping call reads on either side of its item
@@ -490,7 +519,7 @@ impl Shaper {
                 let direction = self.resolver.resolve(
                     &bidi.classes[start..=i],
                     None,
-                    shaping.base,
+                    shaping.base(),
                     &mut bidi.levels.as_mut_slice()[start..=i],
                 )?;
                 if shaping.whole_text {
@@ -533,13 +562,11 @@ impl Shaper {
         let face_font = &font.faces()[usize::from(itemised.face)];
         let script = itemised.script;
         let language = language_code(shaping.language, script);
-        // Ligatures only without letter spacing, vertical forms for `@`
-        // fonts.
-        let features = [
-            font.vertical(),
-            shaping.kerning,
-            text.style(first).spacing == 0.0,
-        ];
+        let features = Features {
+            vertical: font.vertical(),
+            kerning: shaping.kerning,
+            ligatures: text.style(first).spacing == 0.0,
+        };
         let context = if shaping.whole_text {
             0..len
         } else {
@@ -593,7 +620,7 @@ impl Shaper {
                 direction,
                 script,
                 &Language::new(language),
-                &plan_features(features),
+                &features.plan(),
                 &self.budget,
             )?;
             self.plans.insert(key, plan);
@@ -687,22 +714,6 @@ impl Shaper {
     }
 }
 
-/// libass's features: `vert` and `vkna` for `@` fonts, `kern` by the
-/// header, `liga` and `clig` without letter spacing.
-fn plan_features([vertical, kerning, ligatures]: [bool; 3]) -> [Feature; 5] {
-    let feature = |tag: &[u8; 4], on: bool| Feature {
-        tag: Tag::new(tag),
-        value: u32::from(on),
-    };
-    [
-        feature(b"vert", vertical),
-        feature(b"vkna", vertical),
-        feature(b"kern", kerning),
-        feature(b"liga", ligatures),
-        feature(b"clig", ligatures),
-    ]
-}
-
 /// `ass_shaper_determine_script`: Common and Inherited scripts take the
 /// script before them, or after them at the start.
 fn inherit_scripts(items: &mut [Itemised]) {
@@ -775,10 +786,7 @@ impl Bidi {
                         .copied()
                         .unwrap_or(Direction::LeftToRight)
                 } else {
-                    match shaping.base {
-                        BaseDirection::RightToLeft => Direction::RightToLeft,
-                        _ => Direction::LeftToRight,
-                    }
+                    Direction::LeftToRight
                 };
                 reorder_line(
                     &self.classes[start..=i],
