@@ -199,11 +199,25 @@ impl ElementaryStream {
     }
     /// An entry read outside [`PmtReader`], without a descriptor namespace.
     pub(crate) fn unchecked(stream_type: u8, pid: u16, descriptor_bytes: Bytes) -> Self {
+        Self::in_namespace(
+            stream_type,
+            pid,
+            descriptor_bytes,
+            super::DescriptorNamespace::Unspecified,
+        )
+    }
+    /// An entry read outside [`PmtReader`] under `namespace`, for its codec and kind.
+    pub(crate) fn in_namespace(
+        stream_type: u8,
+        pid: u16,
+        descriptor_bytes: Bytes,
+        namespace: super::DescriptorNamespace,
+    ) -> Self {
         Self {
             stream_type,
             pid,
             descriptor_bytes,
-            namespace: super::DescriptorNamespace::Unspecified,
+            namespace,
             dvb: super::dvb::DvbSummary::default(),
         }
     }

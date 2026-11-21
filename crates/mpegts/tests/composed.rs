@@ -1,5 +1,6 @@
 //! Composed-operation regressions.
 use std::sync::atomic::AtomicBool;
+use triergon_core::container::TrackInfo;
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
@@ -403,6 +404,11 @@ fn active_program_borrows_the_accepted_map_until_the_stream_ends() {
                         entry.descriptor_bytes.as_ref()
                     );
                     assert_eq!(stream.descriptors().count(), entry.descriptors().count());
+                    assert_eq!(stream.id(), entry.id());
+                    assert_eq!(stream.kind(), entry.kind());
+                    assert_eq!(stream.codec_tag(), entry.codec_tag());
+                    assert_eq!(TrackInfo::codec(&stream), TrackInfo::codec(entry));
+                    assert_eq!(stream.configuration(), entry.configuration());
                 }
                 return;
             }
