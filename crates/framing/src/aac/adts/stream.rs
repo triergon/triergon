@@ -39,6 +39,25 @@ enum Phase {
     End,
 }
 
+/// What the reader returns.
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum Mode {
+    /// Validated frames ([`AacAdtsStreamReader::new`]).
+    Selected,
+    /// Carrier units ([`AacAdtsCarrierReader::new`](super::AacAdtsCarrierReader::new)).
+    Carrier,
+    /// Carrier units split at headers found by scanning
+    /// ([`AacAdtsCarrierReader::for_parser_packets`](super::AacAdtsCarrierReader::for_parser_packets)).
+    ParserPackets,
+}
+impl Mode {
+    #[inline(always)]
+    fn carrier(self) -> bool {
+        self != Self::Selected
+    }
+}
+
 /// Reads a stream of consecutive ADTS frames, each one AAC LC raw data block, from
 /// input of any chunking.
 ///
@@ -73,9 +92,8 @@ pub struct AacAdtsStreamReader {
     growth_copy_credit: usize,
     completed: usize,
     header_offset: usize,
-    carrier: bool,
+    mode: Mode,
     eof_fragment: bool,
-    split_prefix: bool,
     phase: Phase,
     prefix: [u8; 7],
 }
@@ -105,7 +123,7 @@ impl AacAdtsStreamReader {
         capabilities: SourceCapabilities,
         limits: AacAdtsStreamLimits,
     ) -> Result<Self> {
-        Self::create(pool, source, capabilities, limits, false, false)
+        Self::create(pool, source, capabilities, limits, Mode::Selected)
     }
     pub(super) fn new_carrier(
         pool: &Budget,
@@ -113,7 +131,7 @@ impl AacAdtsStreamReader {
         capabilities: SourceCapabilities,
         limits: AacAdtsStreamLimits,
     ) -> Result<Self> {
-        Self::create(pool, source, capabilities, limits, true, false)
+        Self::create(pool, source, capabilities, limits, Mode::Carrier)
     }
     pub(super) fn new_parser_packets(
         pool: &Budget,
@@ -121,15 +139,14 @@ impl AacAdtsStreamReader {
         capabilities: SourceCapabilities,
         limits: AacAdtsStreamLimits,
     ) -> Result<Self> {
-        Self::create(pool, source, capabilities, limits, true, true)
+        Self::create(pool, source, capabilities, limits, Mode::ParserPackets)
     }
     fn create(
         pool: &Budget,
         source: SourceId,
         capabilities: SourceCapabilities,
         limits: AacAdtsStreamLimits,
-        carrier: bool,
-        split_prefix: bool,
+        mode: Mode,
     ) -> Result<Self> {
         if limits.maximum_frame_bytes == 0
             || limits.maximum_frames == 0
@@ -154,11 +171,10 @@ impl AacAdtsStreamReader {
             growth_target: 0,
             growth_copy_credit: 0,
             completed: 0,
-            carrier,
+            mode,
             header_offset: 0,
             eof_fragment: false,
             selected_error: None,
-            split_prefix,
         })
     }
     /// Capacity of the mutable frame buffer, excluding buffered source bytes.
@@ -359,7 +375,7 @@ impl AacAdtsStreamReader {
     }
     fn plausible_envelope(&self, h: AacAdtsHeader) -> bool {
         h.syncword() == 0xfff
-            && (self.split_prefix || h.layer() == 0)
+            && (self.mode == Mode::ParserPackets || h.layer() == 0)
             && h.coded_frequency_hz().is_some()
             && h.frame_length() >= 7
     }

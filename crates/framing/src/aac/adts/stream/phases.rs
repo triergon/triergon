@@ -1,7 +1,7 @@
 //! The ADTS stream state machine: one method per [`Phase`], driven by
 //! [`AacAdtsStreamReader::advance`]. Each method is one pass of that loop;
 //! `Flow::Continue` re-enters the loop and `Flow::Break` returns.
-use super::{AacAdtsStreamReader, Phase, StreamOutput};
+use super::{AacAdtsStreamReader, Mode, Phase, StreamOutput};
 use crate::aac::AacSource;
 use crate::aac::adts::carrier::{AacAdtsCarrier, AacAdtsCarrierBoundary};
 use crate::aac::adts::{
@@ -67,7 +67,7 @@ impl AacAdtsStreamReader {
             self.phase = Phase::Validate;
             return Ok(NEXT);
         }
-        if self.carrier && self.used == self.limits.maximum_frame_bytes {
+        if self.mode.carrier() && self.used == self.limits.maximum_frame_bytes {
             if !work.try_charge(1) {
                 return Ok(YIELD);
             }
@@ -84,7 +84,7 @@ impl AacAdtsStreamReader {
             }
         }
         let cursor = self.input.cursor()?;
-        let end = if self.carrier {
+        let end = if self.mode.carrier() {
             self.limits.maximum_frame_bytes.min(7)
         } else {
             7
@@ -103,7 +103,7 @@ impl AacAdtsStreamReader {
                     self.phase = Phase::End;
                     return Ok(Flow::Break(Step::End(e)));
                 }
-                if self.carrier {
+                if self.mode.carrier() {
                     self.fragment_prefix()?;
                     return Ok(NEXT);
                 }
@@ -125,7 +125,7 @@ impl AacAdtsStreamReader {
             });
         }
         let h = inspect_adts_header(&self.prefix)?;
-        if self.carrier {
+        if self.mode.carrier() {
             self.selected_error = validate_selected_header(h).err();
             if self.plausible_envelope(h) {
                 let n = usize::from(h.frame_length());
@@ -187,7 +187,7 @@ impl AacAdtsStreamReader {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        if self.carrier && self.completed >= self.limits.maximum_frames {
+        if self.mode.carrier() && self.completed >= self.limits.maximum_frames {
             return Err(Error::Limit {
                 requested: self.completed.checked_add(1).ok_or(Error::Overflow)?,
                 maximum: self.limits.maximum_frames,
@@ -225,7 +225,7 @@ impl AacAdtsStreamReader {
             .frame_bytes
             .checked_sub(b.len())
             .ok_or(Error::Overflow)?;
-        let scanning = self.carrier && self.header.is_none() && !self.eof_fragment;
+        let scanning = self.mode.carrier() && self.header.is_none() && !self.eof_fragment;
         if remaining == 0 {
             if scanning {
                 if !work.try_charge(1) {
@@ -275,7 +275,7 @@ impl AacAdtsStreamReader {
             Step::NeedInput(r) => return Ok(Flow::Break(Step::NeedInput(r))),
             Step::Yield => return Ok(YIELD),
             Step::End(_) => {
-                if !self.carrier {
+                if !self.mode.carrier() {
                     return Err(Error::Truncated);
                 }
                 self.frame_bytes = buffer.len();
@@ -309,7 +309,7 @@ impl AacAdtsStreamReader {
             self.header_offset = start;
             self.header = Some(h);
             self.frame_bytes = end;
-            if self.split_prefix {
+            if self.mode == Mode::ParserPackets {
                 // The header found starts the next unit.
                 self.prefix = h.raw_prefix();
                 self.phase = Phase::EmitPrefix;
@@ -434,7 +434,7 @@ impl AacAdtsStreamReader {
                 return Err(e.error);
             }
         };
-        if self.carrier {
+        if self.mode.carrier() {
             let boundary = if self.eof_fragment {
                 AacAdtsCarrierBoundary::ExplicitEofFragment
             } else if self.header.is_some_and(|h| h.layer() != 0) {
