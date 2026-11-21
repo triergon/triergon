@@ -93,6 +93,12 @@ fn decoder_entry(job: &Job) -> Value {
 /// under the gate build's link policy; ARGS select one binary or example; `quiet`
 /// captures its output.
 pub fn cargo_build(root: &Path, args: &[&str], quiet: bool) -> Result<(), String> {
+    if !selects_one_target(args) {
+        return Err(format!(
+            "cargo rustc {}: select one binary or example (--bin NAME or --example NAME)",
+            args.join(" ")
+        ));
+    }
     let mut command = Command::new("cargo");
     command
         .args(["rustc", "--release", "--locked"])
@@ -113,6 +119,16 @@ pub fn cargo_build(root: &Path, args: &[&str], quiet: bool) -> Result<(), String
     } else {
         Err(format!("cargo rustc {}: {status}", args.join(" ")))
     }
+}
+
+/// Whether `args` name exactly one `--bin` or `--example`: `cargo rustc` takes extra
+/// compiler arguments for one target only, and a package such as `codec-worker` has
+/// several binaries.
+fn selects_one_target(args: &[&str]) -> bool {
+    args.iter()
+        .filter(|&&arg| arg == "--bin" || arg == "--example")
+        .count()
+        == 1
 }
 
 /// Write the record and, with `compare`, check it against an earlier one.
@@ -192,7 +208,11 @@ pub fn run(
     compare: Option<&Path>,
     threads: usize,
 ) -> Result<i32, String> {
-    cargo_build(root, &["-p", "codec-worker"], false)?;
+    cargo_build(
+        root,
+        &["-p", "codec-worker", "--bin", "codec-worker"],
+        false,
+    )?;
     let suite = root.join(".research/fate-samples");
     let examples = root
         .join(crate::harness::gate_build::release_dir()?)
@@ -274,4 +294,27 @@ pub fn run(
         &summary,
         compare,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builds_name_one_binary_or_example() {
+        assert!(selects_one_target(&[
+            "-p",
+            "codec-worker",
+            "--bin",
+            "codec-worker"
+        ]));
+        assert!(selects_one_target(&[
+            "--example",
+            "decode_aac",
+            "-p",
+            "triergon-codec-aac"
+        ]));
+        assert!(!selects_one_target(&["-p", "codec-worker"]));
+        assert!(!selects_one_target(&["--bin", "a", "--example", "b"]));
+    }
 }
