@@ -59,9 +59,9 @@ fn canonical_audio_cue_lands_and_replays_source_packets() {
     let mut reader = BlockingReader::open_seekable(source, Limits::default()).unwrap();
     assert_eq!(reader.tracks()[0].number, 7);
     let cancel = AtomicBool::new(false);
-    let receipt = reader.seek_cued_aac(0, 1_010_000_000, &cancel).unwrap();
-    assert!(receipt.used_index);
-    assert_eq!(receipt.actual_ns, 1_000_000_000);
+    let landing = reader.seek_cued_aac(0, 1_010_000_000, &cancel).unwrap();
+    assert!(landing.used_index);
+    assert_eq!(landing.actual_ns, 1_000_000_000);
     assert!(seeks.borrow().contains(&cluster));
     let first = reader.next_packet(&cancel).unwrap().unwrap();
     let second = reader.next_packet(&cancel).unwrap().unwrap();
@@ -82,6 +82,45 @@ fn canonical_audio_cue_lands_and_replays_source_packets() {
         ),
         (None, None, None, None)
     );
+    assert!(reader.next_packet(&cancel).unwrap().is_none());
+}
+
+#[test]
+fn fractional_target_before_cue_lands_at_previous_source_cluster() {
+    let (bytes, second_cluster, _) = ebml::cued_aac();
+    let first_cluster = bytes
+        .windows(4)
+        .position(|w| w == [0x1f, 0x43, 0xb6, 0x75])
+        .unwrap() as u64;
+    let seeks = Rc::new(RefCell::new(Vec::new()));
+    let source = Logged {
+        input: Cursor::new(bytes),
+        seeks: seeks.clone(),
+    };
+    let mut reader = BlockingReader::open_seekable(source, Limits::default()).unwrap();
+    let cancel = AtomicBool::new(false);
+    let landing = reader.seek_cued_aac(0, 999_600_000, &cancel).unwrap();
+    assert!(landing.used_index);
+    assert_eq!(landing.actual_ns, 0);
+    assert!(first_cluster < second_cluster);
+    assert!(seeks.borrow().contains(&first_cluster));
+    for (pts, payload) in [
+        (0, &b"first"[..]),
+        (1_000_000_000, &b"second"[..]),
+        (1_020_000_000, &b"third"[..]),
+    ] {
+        let packet = reader.next_packet(&cancel).unwrap().unwrap();
+        assert_eq!(
+            (
+                packet.track,
+                packet.pts_ns,
+                packet.dts_ns,
+                packet.duration_ns,
+                packet.data.as_ref()
+            ),
+            (0, Some(pts), None, None, payload)
+        );
+    }
     assert!(reader.next_packet(&cancel).unwrap().is_none());
 }
 

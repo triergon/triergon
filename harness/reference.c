@@ -229,7 +229,8 @@ static int cued_aac(const uint8_t *data, size_t len, int64_t target_ns, int trac
         goto done;
     }
     AVRational tb = f->streams[0]->time_base;
-    int64_t target = av_rescale_q(target_ns, (AVRational){1, 1000000000}, tb);
+    int64_t target = av_rescale_q_rnd(target_ns, (AVRational){1, 1000000000}, tb,
+                                      AV_ROUND_DOWN);
     result = av_seek_frame(f, 0, target, AVSEEK_FLAG_BACKWARD);
     if (result < 0) goto done;
     p = av_packet_alloc();

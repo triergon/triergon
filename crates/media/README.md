@@ -174,28 +174,25 @@ does not scan for uncued packets. It validates the referenced block and returns
 its source clock and bytes; it does not validate or decode AAC payloads. The
 general playback and video seek operations continue to require video.
 
-`cargo xtask cued-aac-compare FFMPEG_INSTALL` compares the source view with a
-backward `av_seek_frame` using the public flags that preserve demuxed fields.
-It compares the landing time and every packet's track, PTS, DTS, duration and
-bytes through EOF. On the authored two-Cue fixture both land at 1 s with
-matching PTS, unknown durations and absent DTS.
-
-The `media-worker` and public libavformat reference also expose a separate
-`cued-aac-` worker protocol. `trace`, `fold` and `memory` take a file and a
+The `media-worker` and public libavformat reference expose the `cued-aac-`
+worker protocol. The reference uses a backward `av_seek_frame` and public flags
+that preserve demuxed fields. `trace`, `fold` and `memory` take a file and a
 seek target in nanoseconds; `bench` additionally takes an iteration count before
 the target. Both preload the file and perform open, seek, complete packet
 traversal and teardown inside each operation. The fold includes the landing,
 track, presence and value of each timestamp and duration, payload length and
 bytes, and successful EOF. The [cued AAC contract](../../harness/features/matroska-cued-aac/contract.json)
-registers this operation on both targets. To regenerate the authored input:
+registers the original seek and a fractional target immediately before the second
+Cue. The latter lands at the first Cue and folds all three packets through EOF;
+the reference floors the target to its stream time base. To regenerate the authored input:
 
 ```sh
-CARGO_INCREMENTAL=0 cargo run -p triergon-matroska --example cued_aac_comparison -- \
+CARGO_INCREMENTAL=0 cargo run -p triergon-matroska --example cued_aac_fixture -- \
   harness/features/matroska-cued-aac/inputs/two-cues.mkv
 ```
 
-The `--projected` comparison enables stream-information probing and FFmpeg's
-clock projection. In that view FFmpeg reports DTS equal to PTS for both packets.
+With stream-information probing and clock projection enabled, FFmpeg reports
+DTS equal to PTS for both packets in the second Cue's suffix.
 A fresh playback AAC clock fed the same suffix projects those DTS values and
 infers 23 ms durations, which remain unknown in the reference. The fixture
 exercises seek and demux with opaque payloads. Native performance and memory

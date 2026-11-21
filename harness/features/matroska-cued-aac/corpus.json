@@ -15,6 +15,20 @@
         "digest": 14086002072218715579,
         "eof": true
       }
+    },
+    {
+      "id": "fraction-before-second-cue",
+      "profile": "fraction-before-second-cue",
+      "file": "harness/features/matroska-cued-aac/inputs/two-cues.mkv",
+      "sha256": "52ab8f29366d3910f38d2a1eac9380f05e197ace1547605086ccad7a6cdd2871",
+      "rights": "authored-synthetic",
+      "arguments": ["999600000"],
+      "expected": {
+        "packets": 3,
+        "bytes": 16,
+        "digest": 10656081498208427173,
+        "eof": true
+      }
     }
   ]
 }

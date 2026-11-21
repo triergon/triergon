@@ -11,7 +11,6 @@ mod checks;
 mod codecs;
 mod core_time;
 mod corpus;
-mod cued_aac;
 mod ebml;
 mod evidence;
 mod fate;
@@ -75,7 +74,6 @@ commands:
   check-revisions
                  every commit docs/status.md cites is reachable from HEAD (needs the
                  full history)
-  cued-aac-compare FFMPEG_INSTALL [--projected]   compare a cued AAC seek and all packets
   core-time      compare exact arithmetic against the independent fraction oracle
   fixtures       generate the authored Matroska corpus into .research/ and its manifests
   session-queues compare baseline and candidate session queues; --help for usage
@@ -223,7 +221,6 @@ fn main() -> ExitCode {
         Some("check-design") => check_design(&root),
         Some("check-safety") => check_safety(&root),
         Some("check-revisions") => check_revisions(&root),
-        Some("cued-aac-compare") => cued_aac::main(&root, &args[1..]),
         Some("core-time") => core_time::main(&root, &args[1..]),
         Some("fixtures") => fixtures(&root),
         Some("fixture") => fixture(&root, &args[1..]),
