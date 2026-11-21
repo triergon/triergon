@@ -65,13 +65,13 @@ pub const SUITES: [Suite; 7] = [
 /// The evidence sets of media inputs a gate image is built with (docs/quality.md,
 /// "Gate hosts").
 const IMAGE_INPUTS: [&str; 7] = [
-    "opus-testvectors",
     "gate-media-inputs",
     "codec-file-workload-inputs",
     "ogg-reader-inputs",
     "subtitle-cc-inputs",
     "codec-derived-streams",
     "codec-vector-inputs",
+    "opus-testvectors",
 ];
 
 /// One check a test binary reported it did not run.
@@ -377,7 +377,7 @@ exit 3";
             ]
         );
         let mut sets = image_sets(&held());
-        sets.remove(4);
+        sets.retain(|(path, _)| !path.ends_with("/codec-derived-streams.json"));
         assert_eq!(
             design_errors(&sets),
             [format!(
