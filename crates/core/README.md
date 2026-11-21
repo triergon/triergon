@@ -79,7 +79,11 @@ calculation without heap allocation. Rounded views (`to_ticks`, `to_i64_ticks`,
 `TowardZero`, `AwayFromZero`, `Floor`, `Ceil` or `NearestAway`. Results that do
 not fit return `Error::Overflow`; a zero timebase or denominator is `Invalid`.
 Clock projections use checked 64-bit multiplication and division when
-the scaled magnitude fits, with the selected rounding policy.
+the scaled magnitude fits, with the selected rounding policy. On targets with
+32-bit registers, where 64-bit division is a library loop, reduction to lowest
+terms uses a binary greatest common divisor and divides by it exactly through
+the divisor's inverse modulo 2⁶⁴, and a tick base that is a multiple of the time's
+denominator is recognised the same way; 64-bit targets divide.
 Use `TimeBase::MICROSECONDS` and `TimeBase::NANOSECONDS` for those fixed clocks.
 
 **Budget and storage.** `Budget::new(limit)` creates one accounting pool; clones
