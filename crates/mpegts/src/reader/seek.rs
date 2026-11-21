@@ -6,10 +6,11 @@ use crate::{SourceEpochs, TraceEvent, clock::SourceTimePolicy};
 use retained::{Retain, RetainedOutput};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{
-    CodecId, Event, PacketInfo, RandomAccess, ReaderStep, SeekMethod, SeekPolicy, SeekReceipt,
-    SeekRequest, TrackId, TrackInfo,
+    CodecId, Event, PacketInfo, ReaderStep, SeekMethod, SeekPolicy, SeekReceipt, SeekRequest,
+    TrackId, TrackInfo,
 };
 use triergon_core::{BudgetVec, Error, InputRequest, Result, Step, Time, WorkBudget};
+use triergon_framing::Ac3Family;
 
 #[derive(Clone, Copy)]
 struct Landing {
@@ -51,13 +52,43 @@ pub(super) enum PictureDelivery {
     Landing(u64),
 }
 
-pub(super) struct PictureProbe {
+pub(super) struct SeekProbe {
     pub offset: u64,
     pub epochs: SourceEpochs,
     pub ticks: Option<i128>,
     pub time: Option<Time>,
     pub random_access: bool,
     pub has_vcl: bool,
+}
+
+fn seekable_audio(codec: CodecId<'_>) -> bool {
+    matches!(codec, CodecId::Aac | CodecId::Ac3)
+}
+
+fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
+    let clock = packet.clock();
+    let time = clock.and_then(|clock| clock.pts.exact);
+    let (offset, random_access) = match packet.access_unit() {
+        AccessUnit::Video(unit) => (unit.range.start, unit.random_access),
+        AccessUnit::Adts(frame) => (frame.source().offset, time.is_some()),
+        AccessUnit::Ac3(frame) if frame.facts().header.family == Ac3Family::Ac3 => {
+            (frame.facts().offset, time.is_some())
+        }
+        AccessUnit::AdtsFragment(fragment) => (fragment.source().offset, false),
+        _ => {
+            return Err(Error::Unsupported(
+                "MPEG-TS seek requires AVC, HEVC, ADTS AAC-LC or AC-3",
+            ));
+        }
+    };
+    Ok(SeekProbe {
+        offset,
+        epochs: packet.epochs(),
+        ticks: clock.and_then(|clock| clock.pts.ticks90),
+        time,
+        random_access,
+        has_vcl: true,
+    })
 }
 
 impl Seeking {
@@ -85,18 +116,18 @@ impl Seeking {
 impl Scan {
     fn observe(
         &mut self,
-        picture: PictureProbe,
+        probe: SeekProbe,
         target: Time,
         policy: SourceTimePolicy,
     ) -> Result<bool> {
-        let PictureProbe {
+        let SeekProbe {
             offset,
             epochs,
             ticks,
             time,
             random_access,
             ..
-        } = picture;
+        } = probe;
         if *self.epochs.get_or_insert(epochs) != epochs {
             return Err(Error::Unsupported("MPEG-TS seek across source epochs"));
         }
@@ -146,7 +177,7 @@ fn seek_result(
 }
 
 impl Reader {
-    pub(super) fn observe_seek_picture(&mut self, picture: PictureProbe) -> Result<()> {
+    pub(super) fn observe_seek_picture(&mut self, picture: SeekProbe) -> Result<()> {
         if !picture.has_vcl {
             return Ok(());
         }
@@ -163,9 +194,11 @@ impl Reader {
         }
     }
 
-    /// Seek a selected AVC or HEVC track in one length-known, seekable entity.
-    /// The reader scans for the previous coded random-access picture, then
-    /// delivers original transport, clock and PES provenance from the landing.
+    /// Seek a selected AVC, HEVC, ADTS AAC-LC or AC-3 track in one
+    /// length-known, seekable entity. The reader lands on the last coded
+    /// random-access picture or complete audio frame carrying the greatest
+    /// resolved PTS at or before the target. It delivers original transport,
+    /// clocks and PES provenance, including untimed frames after the landing.
     /// Short single-track suffixes can be retained as the reader scans.
     /// The caller supplies any decoder configuration needed at the landing.
     /// Requests from a previously continued entity or with unresolved clock
@@ -193,8 +226,11 @@ impl Reader {
             .ok_or(Error::Invalid("MPEG-TS seek track is not selected"))?;
         if let Some(track) = self.tracks().iter().find(|track| track.stream().pid == pid)
             && !matches!(track.codec(), CodecId::H264 | CodecId::Hevc)
+            && !seekable_audio(track.codec())
         {
-            return Err(Error::Unsupported("MPEG-TS seek requires AVC or HEVC"));
+            return Err(Error::Unsupported(
+                "MPEG-TS seek requires AVC, HEVC, ADTS AAC-LC or AC-3",
+            ));
         }
         let mut seek = BudgetVec::new(&self.pool);
         seek.try_reserve_exact(1)?;
@@ -262,19 +298,8 @@ impl Reader {
             match (&mut seek.phase, step) {
                 (Phase::Scan(scan), Step::Ready(Event::Packet(packet))) => {
                     if packet.track() == request.track {
-                        let AccessUnit::Video(unit) = packet.access_unit() else {
-                            return Err(Error::Unsupported("MPEG-TS seek requires AVC or HEVC"));
-                        };
-                        let clock = packet.clock();
                         let better = scan.observe(
-                            PictureProbe {
-                                offset: unit.range.start,
-                                epochs: packet.epochs(),
-                                ticks: clock.and_then(|clock| clock.pts.ticks90),
-                                time: clock.and_then(|clock| clock.pts.exact),
-                                random_access: unit.random_access,
-                                has_vcl: true,
-                            },
+                            packet_probe(&packet)?,
                             request.target,
                             self.limits.time_policy,
                         )?;
@@ -293,9 +318,16 @@ impl Reader {
                     }
                 }
                 (Phase::Scan(scan), Step::End(end)) => {
-                    let landing = scan.landing.ok_or(Error::Unsupported(
-                        "MPEG-TS has no random-access picture at or before the target",
-                    ))?;
+                    let landing = scan.landing.ok_or_else(|| {
+                        let audio = self.tracks.as_slice().iter().any(|track| {
+                            track.id() == request.track && seekable_audio(track.codec())
+                        });
+                        Error::Unsupported(if audio {
+                            "MPEG-TS has no timestamped audio frame at or before the target"
+                        } else {
+                            "MPEG-TS has no random-access picture at or before the target"
+                        })
+                    })?;
                     if let Some(retain) = seek.retain.take() {
                         let result = seek_result(request, landing, end.offset, retain.skipped);
                         let tracks =
@@ -331,9 +363,8 @@ impl Reader {
                         *skipped = true;
                         continue;
                     }
-                    if packet.random_access() != RandomAccess::Sync
-                        || packet.clock().and_then(|clock| clock.pts.exact) != Some(landing.time)
-                    {
+                    let probe = packet_probe(&packet).map_err(|_| Error::SourceMismatch)?;
+                    if !probe.random_access || probe.time != Some(landing.time) {
                         return Err(Error::SourceMismatch);
                     }
                     let receipt = seek_result(request, *landing, *scanned_bytes, *skipped);

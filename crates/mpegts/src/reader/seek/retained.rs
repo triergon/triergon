@@ -12,7 +12,7 @@ pub(super) struct Retain {
     table_end: usize,
     map_epoch: Option<u64>,
     started: bool,
-    previous_picture: bool,
+    previous_packet: bool,
     pub(super) skipped: bool,
 }
 
@@ -31,7 +31,7 @@ impl Retain {
             table_end: 0,
             map_epoch: None,
             started: false,
-            previous_picture: false,
+            previous_packet: false,
             skipped: false,
         }
     }
@@ -41,9 +41,9 @@ impl Retain {
             self.tail.clear();
             self.table_end = self.tables.len();
             self.started = true;
-            self.skipped = self.previous_picture;
+            self.skipped = self.previous_packet;
         }
-        self.previous_picture = true;
+        self.previous_packet = true;
         self.append(Event::Packet(packet))
     }
 

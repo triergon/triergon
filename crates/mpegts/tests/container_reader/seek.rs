@@ -350,3 +350,108 @@ fn retained_seek_matches_replay_packets_tables_and_carrier_order() {
     }
     assert_eq!(traces[0], traces[1]);
 }
+
+#[test]
+fn audio_seek_preserves_timed_and_untimed_frames() {
+    for ac3 in [false, true] {
+        let (mut ts, mut limits) = audio_eof_transport(ac3);
+        let format = if ac3 {
+            PacketFormat::M2ts192
+        } else {
+            PacketFormat::Ts188
+        };
+        limits.format = format;
+        let frame = audio_eof_frame(ac3);
+        let stream = if ac3 { 0xbd } else { 0xc0 };
+        ts.pes(PID, stream, &frame, Some(90_000), None);
+        ts.pes(PID, stream, &frame.repeat(2), Some(99_000), Some(98_910));
+        ts.pes(PID, stream, &frame, None, None);
+        ts.pes(PID, stream, &frame, Some(117_000), None);
+        let bytes = if ac3 { ts.m2ts() } else { ts.bytes };
+        for selected in [false, true] {
+            let pool = Budget::new(1 << 20).unwrap();
+            let caps = SourceCapabilities {
+                length: Some(bytes.len() as u64),
+                random_access: true,
+            };
+            let track = TrackId(PID.into());
+            let mut reader = if selected {
+                Reader::new_with_packet_tracks(&pool, ID, caps, limits, 4096, &[track])
+            } else {
+                Reader::new(&pool, ID, caps, limits, 4096)
+            }
+            .unwrap();
+            let request = SeekRequest {
+                track,
+                target: clock(100_000),
+                policy: SeekPolicy::PlaybackPreroll,
+            };
+            let generation = reader.request_seek(request).unwrap().token.generation();
+            let mut landed = false;
+            let mut clocks = Vec::new();
+            while let Some(event) = next(&mut reader, &pool, &bytes, 127, 17).unwrap() {
+                match event {
+                    Event::Seek(result) => {
+                        assert!(!landed);
+                        assert_eq!(result.landing, clock(99_000));
+                        assert_eq!(result.discard_until, request.target);
+                        assert_eq!(result.scanned_bytes, bytes.len() as u64);
+                        assert!(!result.replays_from_start);
+                        assert_eq!(
+                            reader.request().unwrap().token.generation() == generation,
+                            selected
+                        );
+                        landed = true;
+                    }
+                    Event::Packet(packet) => {
+                        assert!(landed);
+                        assert_eq!(packet.payload(), frame);
+                        let offset = ((clocks.len() + 1) * frame.len()) as u64;
+                        assert_eq!(
+                            packet.elementary_range(),
+                            offset..offset + frame.len() as u64
+                        );
+                        clocks.push((packet.pts(), packet.dts()));
+                    }
+                    Event::Other(_) => (),
+                }
+            }
+            assert_eq!(
+                clocks,
+                [
+                    (Some(99_000), Some(98_910)),
+                    (None, None),
+                    (None, None),
+                    (Some(117_000), None)
+                ]
+            );
+        }
+    }
+}
+
+#[test]
+fn audio_seek_needs_a_source_timestamp_at_or_before_the_target() {
+    let frame = adts(b"audio");
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    ts.pes(PID, 0xc0, &frame, None, None);
+    ts.pes(PID, 0xc0, &frame, Some(117_000), None);
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+    reader
+        .request_seek(SeekRequest {
+            track: TrackId(PID.into()),
+            target: clock(100_000),
+            policy: SeekPolicy::PreviousRandomAccess,
+        })
+        .unwrap();
+    loop {
+        match next(&mut reader, &pool, &ts.bytes, 4096, 8192) {
+            Ok(Some(Event::Other(_))) => (),
+            Err(Error::Unsupported(
+                "MPEG-TS has no timestamped audio frame at or before the target",
+            )) => break,
+            event => panic!("unexpected seek result {event:?}"),
+        }
+    }
+}

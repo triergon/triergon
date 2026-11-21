@@ -6,7 +6,7 @@ mod mpeg_audio;
 mod unframed_audio;
 
 use super::model::{ClockContext, PacketData, PayloadSources, Shared, UnframedData};
-use super::seek::{PictureDelivery, PictureProbe};
+use super::seek::{PictureDelivery, SeekProbe};
 use super::{
     Ac3AccessUnit, AccessUnit, AudioEofPolicy, DtsAudioFrame, IncompleteVideo, LoasFrame, Packet,
     PacketClock, PayloadSource, ReaderLimits, SourceEvent, Track, UnframedAudio,
@@ -1058,7 +1058,7 @@ impl Build {
 
 pub(super) enum LaneStep {
     Packet(Packet),
-    PictureProbe(PictureProbe),
+    PictureProbe(SeekProbe),
     IncompleteVideo(IncompleteVideo),
     LatmPes(latm::PesPacket),
     UnframedAudio(UnframedAudio),
@@ -1646,7 +1646,7 @@ impl Lane {
             (None, None)
         };
         self.finish_build(range.end);
-        Ok(LaneStep::PictureProbe(PictureProbe {
+        Ok(LaneStep::PictureProbe(SeekProbe {
             offset: range.start,
             epochs,
             ticks,

@@ -879,6 +879,9 @@ fn fixture(root: &Path, args: &[String]) -> Task {
     if family == "transport-dts" {
         return transport_fixtures::matched::author_dts(root, &args[1..]);
     }
+    if family == "transport-audio-seek" {
+        return transport_fixtures::matched::author_audio_seek(root, &args[1..]);
+    }
     if family == "transport-matched" {
         return transport_fixtures::matched::author(root, &args[1..]);
     }
