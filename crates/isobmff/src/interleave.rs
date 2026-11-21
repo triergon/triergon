@@ -119,7 +119,8 @@ impl<'a> TrackSampleCursor<'a> {
                 .map(|fragment| (fragment, cursor.run_index()))
         })
     }
-    /// The next sample, for one work unit per sample and per fragment index passed.
+    /// The next sample, for one work unit per sample and per fragment run and fragment
+    /// index passed.
     #[inline]
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         if let Some(error) = self.failed {

@@ -74,7 +74,7 @@ pub enum MoviePoint {
     Media(MovieSourcePoint),
     /// In an empty edit.
     Empty(MovieEmptyEdit),
-    /// Before zero, after the last edit, or at or after
+    /// Before zero, at or after the end of the last edit, or at or after
     /// [`media_duration`](MovieSeekClocks::media_duration) without an edit list.
     Outside {
         /// The movie time asked for.
@@ -323,8 +323,8 @@ impl<'a> SourceCompositionLookup<'a> {
             failed: None,
         })
     }
-    /// Advances the scan. Fails with `Error::Invalid` when sample ordinals do not
-    /// increase from 1; an error is kept and returned by every later poll.
+    /// Advances the scan. Fails with `Error::Invalid` for a sample ordinal of zero or one
+    /// not above the one before; an error is kept and returned by every later poll.
     // Out of line, the per-sample scan keeps its registers whatever the planner does.
     #[inline(never)]
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
@@ -447,7 +447,8 @@ impl<'a> SourceCompositionLookup<'a> {
 pub struct MovieSeekLimits {
     /// Most edit list entries walked.
     pub max_edits: u32,
-    /// Most samples scanned to find the target and its sync sample.
+    /// Most samples the composition scan reads to find the target; the sync sample
+    /// search is bounded by [`source`](Self::source).
     pub max_scanned_samples: u64,
     /// Most sample group scopes searched for recovery groups.
     pub max_recovery_scopes: usize,

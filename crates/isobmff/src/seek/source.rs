@@ -594,8 +594,8 @@ pub struct SourceSeekSamples<'a> {
 }
 impl SourceSeekSamples<'_> {
     /// Returns the next planned sample. Fails with `Error::Invalid` if the indexes
-    /// return a different sample than planned; an error is kept and returned by every
-    /// later poll.
+    /// return a sample of another ordinal than planned; an error is kept and returned by
+    /// every later poll.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Next<Sample>> {
         if let Some(error) = self.failed {
             return Err(error);
