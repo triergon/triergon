@@ -61,14 +61,6 @@
    "cases_checked": true
   },
   {
-   "path": "memory/subtitle-dvb/gate-result.json",
-   "command": "report --memory",
-   "key": "74035c2ea204292849ef72e847fc59698a41477afd6ced31df46202be9d865f0",
-   "status": 1,
-   "report_sha256": "1ebc1e6e1b43e4926287192dff7a472a46c1e48895590f6e6d7b345744082c11",
-   "cases_checked": true
-  },
-  {
    "path": "capture-c07-ui-static-480-bottomup-timing/gate-result.json",
    "command": "capture qualify",
    "key": "3b82588ff8a437feb7865f6fde66f47c12c9f22b1a66f35c78c51da45b7c29dd",
@@ -105,14 +97,6 @@
    "key": "2c54a52159337f188bd8ca2c845d5db2c73ce6636f05f9d99cc26bb8b2d62170",
    "status": 0,
    "report_sha256": "ff7804a038703e6d580442dd3ef4a51a8bc633203155519e825b0b1c3aa1309c",
-   "cases_checked": true
-  },
-  {
-   "path": "benchmark/subtitle-dvb/gate-result.json",
-   "command": "report --benchmark",
-   "key": "dfe2a6307875a39cf85a8abe7ab5a6bf66185dd86da23300f888fc575ad55f64",
-   "status": 0,
-   "report_sha256": "3bcef0b5127aad0112a1e3db35ec47e4fb85c396f5c22700878b8909ac830892",
    "cases_checked": true
   },
   {

@@ -67,7 +67,7 @@ The [session queue workloads](../harness/session-queues/README.md) cover five re
 | MPEG-TS program playback | Selected TS188 program and M2TS192 PID with packet payloads and clock projection | 35/35 packet folds | 0.7796 (35/35 pass, worst `m2ts-entry-hevc-aac-44100-01-video`) | heap ≤0.0880, total RSS ≤0.6980 (35/35 lower) | additional program and carriage profiles |
 | MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.0006 (2/3 pass, worst `reordered-48000`, median 0.9996) | heap ≤0.0155, total RSS ≤0.5562 (3/3 lower) | `reordered-48000`'s runtime bound, above the [ceiling](quality.md#gates); broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 0.7859 (71/71 pass, worst `dvb-hevc-eac3-32000`) | heap ≤0.0207, total RSS ≤0.6592 (71/71 lower) | other profiles |
-| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core with consistent coded-window diagnostics from owned and packed inspectors | 135/135 AVC/HEVC reference comparisons. At `7c730ff8` on AArch64, both DTS inspectors agreed on all 27 fields and every core matched its reference length and bytes across seven inputs. [DTS corpus and instruction counts](#dts-core-header-inspection). | 0.9579 (135/135 pass for AVC/HEVC, worst `hevc-irap_repeat`) | heap ≤0.3367, total RSS ≤0.8143 (135/135 lower) | full AVC/HEVC/ADTS grammar; on [32-bit ARMv7](#32-bit-armv7), the test `spill_pressure_keeps_a_verified_update_until_resume_or_cancellation` in `crates/framing/tests/nal_packet.rs` fails |
+| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core with consistent coded-window diagnostics from owned and packed inspectors | 135/135 AVC/HEVC reference comparisons. At `7c730ff8` on AArch64, both DTS inspectors agreed on all 27 fields and every core matched its reference length and bytes across seven inputs. [DTS corpus and instruction counts](#dts-core-header-inspection). | 0.9579 (135/135 pass for AVC/HEVC, worst `hevc-irap_repeat`) | heap ≤0.3367, total RSS ≤0.8143 (135/135 lower) | full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SubRip and WebVTT documents as FFmpeg's `srt` and `webvtt` demuxers read them, ASS packets as its `ass` decoder decodes them, with `sub_charenc` charsets including EUC-KR receiver policies, and mov_text and tx3g to ASS | 367/367 cases (`subtitle-text`: 82 captured mov_text cases, 13 authored mov_text sessions for the override tags written where a style record or the highlight starts or ends, the samples of the 79 tx3g tests, 80 charset cases, 17 ASS packets, 96 SubRip and WebVTT documents) on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7). `subtitle-text-host` matches 23/23 SubRip and WebVTT documents with oversized timestamp fields on both targets. | `subtitle-text` 0.8008 (367/367 pass, worst `mov-text-tags-highlight-style-colour`)<br>`subtitle-text-host` 0.0840 (23/23 pass, worst `vtt-seconds-9223372036854775808`) | `subtitle-text` heap ≤0.3360, total RSS ≤0.8121 (367/367 lower)<br>`subtitle-text-host` heap ≤0.0120, total RSS ≤0.7342 (23/23 lower) | FATE coverage |
 | Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 319/319 cases (`subtitle-pgs`: TS, SUP and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.8050 (319/319 pass, worst `rle-long-rows-sup`) | heap ≤0.9654, total RSS ≤0.9225 (319/319 lower) | FATE coverage |
 | Subtitles, PGS capsules | Recorded PGS packet sessions through `compat::pgs::ReceiverDecoder`, with raw PTS, DTS and time base, the forced-only option and hard resets that reopen the decoder | 229/229 cases (`subtitle-pgs-capsules`: capsules of up to 64 complete PGS packets against FFmpeg's `pgssub` decoder), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.7134 (229/229 pass, worst `pgs-original140--compat-cache-rejected-first-then-valid-replacement`) | heap ≤0.5788, total RSS ≤0.6089 (229/229 lower) | — |
@@ -332,6 +332,21 @@ measures a codec workload list: 34/34 cases pass runtime on each target, the hig
 `gate-run-armv7-5b8dd88f-20261121-085846-shard-1` to `-8` hold the shards' step records,
 logs, build identities and gate results, and `aac-access-units-5b8dd88f-TARGET` the AAC in
 MOV measurements with the build identity.
+
+At `fa7e4621`, a partial gate run on one ARMv7 c6g.4xlarge host, as the full run measures,
+ran the `subtitle-dvb` item and the workspace and worker tests again; all seven steps pass.
+The framing test now frames one segment descriptor more than a packet keeps inline, so it
+spills on every pointer width. Its seven descriptors had fit inline, and it passed on Linux
+AArch64 only because the output's 64-bit storage owner left the output no room. The
+workspace tests pass, 4,845 checked and 4,844 in release, and all 241 DVB cases are
+measured: runtime ≤0.8312, heap ≤0.7118 and total RSS ≤0.8224, all lower, with no missed
+kernel RSS events. At `5b8dd88f` each of the four invalid samples had reported four missed
+events, and their cases ended within ten seconds of one another. The module counts missed
+probe hits for the whole host, not per process, so one burst voided every session open at
+that moment. Set `gate-run-armv7-fa7e4621-20261121-125820-shard-1` holds the run's outputs.
+The `subtitle-dvb` timing and memory results it lists have the same keys as those of
+`gate-run-armv7-5b8dd88f-20261121-085846-shard-4`, so the index lists them in the newer set
+only.
 
 The earlier full gate run at `a73350ca` was one sharded gate run per target
 ([running the gates](quality.md#running-the-gates)), each on eight c6g.4xlarge hosts
@@ -1303,6 +1318,7 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Full gate run, ARMv7, shard 7 of 8 | `5b8dd88fde60314257060bf7f594d1886812219d` | [`de9f60b2ee7f6a4d26c29fd3bb47b145f1e1b9750e1de41dd97598a2837a92be`](../harness/evidence/sets/gate-run-armv7-5b8dd88f-20261121-085846-shard-7.json) |
 | Full gate run, ARMv7, shard 8 of 8 | `5b8dd88fde60314257060bf7f594d1886812219d` | [`8b98600c1057fe6f025b4835b560cf30936987bb59be2b6defa289fe058cee85`](../harness/evidence/sets/gate-run-armv7-5b8dd88f-20261121-085846-shard-8.json) |
 | AAC in MOV, ARMv7 | `5b8dd88fde60314257060bf7f594d1886812219d` | [`d41dcd07c77d98b3e036ca752d5a9de348e87f77f55fe62457abebaaae5b82c4`](../harness/evidence/sets/aac-access-units-5b8dd88f-armv7.json) |
+| Subtitles, DVB and workspace tests, partial gate run, ARMv7 | `fa7e4621bc8717bab7b75a4a9c2b0a078d34557c` | [`eb1d42b3994493e10615a3214061bbf96828c4a562e4a49b3695cc8e685c62ed`](../harness/evidence/sets/gate-run-armv7-fa7e4621-20261121-125820-shard-1.json) |
 | DVB DTS and MPEG-TS regression cases, Linux AArch64 | `861201e38d527cf5b3a429bd78cb60573ee0085e` | [`00ccc8cf08aaff7af999c31bd482ac6a4154898f2d37c6fa4faf143bdc73d526`](../harness/evidence/sets/gate-run-aarch64-861201e3-20261121-002137-shard-1.json) |
 | DVB DTS and MPEG-TS regression cases, 32-bit ARMv7 | `861201e38d527cf5b3a429bd78cb60573ee0085e` | [`5aeaac2e745583b6a7aa59bd45e8c5939f04e2e3a33f77ff7017ff4dd6d51050`](../harness/evidence/sets/gate-run-armv7-861201e3-20261121-002203-shard-1.json) |
 | MPEG-TS seek, free-format audio and access units, Linux AArch64 | `92e9186eaff58916ba7193c45d16f946ff8bbc46` | [`970946cd34eb61fe613cf7158ec238d54949616b4ddc9f963a479492fe45e860`](../harness/evidence/sets/gate-run-aarch64-92e9186e-20261120-203101-shard-1.json) |
@@ -2059,7 +2075,7 @@ full gate run at `5b8dd88f`, and AAC in MOV from its measurements at that revisi
 host of its own ([measured revisions](#measured-revisions)): each feature timed on CPU 1,
 then its memory collected in parallel on CPUs 1–15
 ([memory in parallel](quality.md#memory-in-parallel)).
-The workspace and worker tests were run in that gate run, the rasterising, shaping and ASS
+The workspace and worker tests were run at `fa7e4621`, the rasterising, shaping and ASS
 parsing comparisons at `3df7ae6d`, and the font and shaping comparisons at `69d4d0f8`, on c6g.4xlarge hosts with the same user
 space and kernel.
 Memory is kernel-bound in every row: measured under the kernel RSS bound, through its
@@ -2070,7 +2086,7 @@ gated as on AArch64, and no codec workload is open on this target.
 
 | Area | Verified against the reference | Runtime | Memory |
 |---|---|---|---|
-| Core | 51,235 exact-arithmetic cases; at `5b8dd88f` the worker tests pass and the workspace tests fail one test in checked and in release builds, `spill_pressure_keeps_a_verified_update_until_resume_or_cancellation` in `crates/framing/tests/nal_packet.rs` ("spill must pause without publishing"); at `f8e1c4d9` the workspace tests (4,719 checked, 4,718 in release) and the worker tests passed | via dependents | via dependents |
+| Core | 51,235 exact-arithmetic cases; at `fa7e4621` the workspace tests (4,845 checked, 4,844 in release) and the worker tests pass | via dependents | via dependents |
 | Matroska / WebM | 129/129 across six feature groups and the external HDR vector, including 21/21 Cues cases | 0.9683 (129/129 pass, worst `cues-sparse`) | heap ≤0.7747, total RSS ≤0.8895 (129/129 lower) |
 | Matroska legacy AAC-LC | 4/4 (`matroska-legacy-aac`) | 0.8336 (4/4 pass, worst `mpeg2-lc-laced`) | heap ≤0.4763, total RSS ≤0.8787 (4/4 lower) |
 | Matroska startup and seek | 45/45 | 0.8490 (45/45 pass, worst `seek-hevc-seek-no-cues-0-fresh`) | heap ≤0.3956, total RSS ≤0.7626 (45/45 lower), on `playback-matroska-worker` |
@@ -2101,7 +2117,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | Subtitles, text | `subtitle-text` 367/367 and `subtitle-text-host` 23/23 pass | `subtitle-text` 0.8672 (367/367 pass, worst `mov-text-tags-ranges`)<br>`subtitle-text-host` 0.0810 (23/23 pass, worst `vtt-seconds-9223372036854775808`) | `subtitle-text` heap ≤0.3358, total RSS ≤0.9264 (367/367 lower)<br>`subtitle-text-host` heap ≤0.0075, total RSS ≤0.8736 (23/23 lower) |
 | Subtitles, PGS | 319/319 (`subtitle-pgs`) | 0.7747 (319/319 pass, worst `gold-original140--old34-run-16383-255-ts`) | heap ≤0.9678, total RSS ≤0.9965 (319/319 lower) |
 | Subtitles, PGS capsules | 229/229 (`subtitle-pgs-capsules`) | 0.7313 (229/229 pass, worst `pgs-original140--old34-run-16383-0`) | heap ≤0.5966, total RSS ≤0.7327 (229/229 lower) |
-| Subtitles, DVB | 241/241 (`subtitle-dvb`) | 0.8337 (241/241 pass, worst `automatic-large-exposure-ts`) | heap ≤0.7118, total RSS ≤0.8242 (237/237 lower); 4 cases unmeasured (`invalid-memory-observation`: the kernel RSS observer reported missed events in one of their 30 samples), `pes-no-identifier-ts`, `recorded-dvb-ancillary-pages--matroska-segments-ts`, `recorded-dvb-map2to4--matroska-segments-ts` and `pages-ancillary-after--dvb_substream-0` |
+| Subtitles, DVB | 241/241 (`subtitle-dvb`), at `fa7e4621` | 0.8312 (241/241 pass, worst `automatic-large-exposure-ts`) | heap ≤0.7118, total RSS ≤0.8224 (241/241 lower) |
 | Subtitles, DVD | 228/228 (`subtitle-dvd`) and 5/5 (`subtitle-dvd-host`, gated on this target) | `subtitle-dvd` 0.9769 (228/228 pass, worst `fate-dvd-still-frame-1`); `subtitle-dvd-host` 0.6799 (5/5 pass, worst `vobsub-idx-delay-beyond-32-bits`) | `subtitle-dvd` heap ≤0.9657, total RSS ≤0.8462 (228/228 lower); `subtitle-dvd-host` heap ≤0.2037, total RSS ≤0.7141 (5/5 lower) |
 | Closed captions | 461/461 (`subtitle-cc`, the fold and the prepared packets' times) | 0.7847 (461/461 pass, worst `mpeg2-dish-m2v-second`); whole worker runs over the 112 inputs at `adaa4bc7` take 0.909 of main's instructions in sum (main at `03cc8d3f`), no input above main beyond the run spread but `h264-rate-two-ts` (+0.60%) | heap ≤0.1269, total RSS ≤0.7903 (461/461 lower) |
 | Teletext | 72/72 (`subtitle-teletext`) | 0.5218 (72/72 pass, worst `teletext-national-ass-cyrillic`) | heap ≤0.6256, total RSS ≤0.7779 (72/72 lower) |
