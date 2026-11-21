@@ -1,7 +1,7 @@
 //! AC-3 and E-AC-3 syncframe headers (ATSC A/52:2018) and the frames they declare.
 //! A frame is returned whole without further checks: its CRCs, the rest of its bit
 //! stream information and its audio blocks are not read.
-use crate::retryable;
+use crate::{freeze_started, retryable, started};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::bits_at;
 use triergon_core::{
@@ -850,12 +850,6 @@ impl Ac3FrameReader {
         }
         result
     }
-    fn buffer(&mut self) -> Result<&mut BudgetVec<u8>> {
-        self.buffer
-            .as_mut()
-            .ok_or(Error::Invalid("missing audio frame builder"))
-    }
-
     fn check_layout(&self, info: Layout) -> Result<()> {
         if matches!(
             (self.selection, info.family),
@@ -969,11 +963,8 @@ impl Ac3FrameReader {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    if self.buffer.is_none() {
-                        self.buffer = Some(BudgetVec::new(self.cursor.budget()));
-                    }
-                    let length = self.frame_bytes;
-                    self.buffer()?.try_reserve_exact(length)?;
+                    started(&mut self.buffer, self.cursor.budget())
+                        .try_reserve_exact(self.frame_bytes)?;
                     self.phase = Phase::Prefix;
                 }
                 Phase::Prefix => {
@@ -991,18 +982,12 @@ impl Ac3FrameReader {
                     }
                     let start = self.copied;
                     let end = start.checked_add(count).ok_or(Error::Overflow)?;
-                    let buffer = self
-                        .buffer
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing audio frame builder"))?;
-                    buffer.try_extend_from_slice(&self.prefix[start..end])?;
+                    started(&mut self.buffer, self.cursor.budget())
+                        .try_extend_from_slice(&self.prefix[start..end])?;
                     self.copied = end;
                 }
                 Phase::Body => {
-                    let buffer = self
-                        .buffer
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing audio frame builder"))?;
+                    let buffer = started(&mut self.buffer, self.cursor.budget());
                     let remaining = self
                         .frame_bytes
                         .checked_sub(buffer.len())
@@ -1028,17 +1013,7 @@ impl Ac3FrameReader {
                     let header = self
                         .header
                         .ok_or(Error::Invalid("missing audio frame header"))?;
-                    let buffer = self
-                        .buffer
-                        .take()
-                        .ok_or(Error::Invalid("missing audio frame builder"))?;
-                    let bytes = match buffer.freeze() {
-                        Ok(bytes) => bytes,
-                        Err(rejected) => {
-                            self.buffer = Some(rejected.value);
-                            return Err(rejected.error);
-                        }
-                    };
+                    let bytes = freeze_started(&mut self.buffer, self.cursor.budget())?;
                     self.completed = self.completed.checked_add(1).ok_or(Error::Overflow)?;
                     self.phase = Phase::Start;
                     return Ok(Step::Ready(Ac3Frame {
