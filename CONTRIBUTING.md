@@ -19,11 +19,15 @@ cargo xtask check                 # everything CI runs
 ```
 
 CI runs the check in four parts as parallel jobs, each after `cargo xtask prepare-check
-PART`: `cargo xtask check lint`, `test`, `variants` and `parity`; the required `check`
-status passes only when all four pass. Each part runs locally the same way. The jobs
-restore the packed reference builds (`cargo xtask references`) and the target
-directory of an earlier run; `tools/target-cache.py` marks every tracked file whose
-content differs from that run's as new, so cargo rebuilds whatever reads it.
+PART`: `cargo xtask check lint`, `test`, `variants` and `parity`. Each part runs
+locally the same way. The jobs restore the packed reference builds (`cargo xtask
+references`) and the target directory of an earlier run; `tools/target-cache.py` marks
+every tracked file whose content differs from that run's as new, so cargo rebuilds
+whatever reads it. Beside them, a job runs the tests of `triergon-framing`,
+`triergon-isobmff` and `triergon-mpegts` in the `checked` profile for the 32-bit gate
+target `thumbv7neon-unknown-linux-gnueabihf` under user-mode QEMU, where smaller
+pointers change the storage sizes their budget tests pin. The required `check` status passes
+only when the four parts and this job pass.
 
 A pull request that changes only `docs/`, `harness/evidence/sets/` or Markdown files
 no code reads runs `cargo xtask check docs` instead: formatting, check-design,
