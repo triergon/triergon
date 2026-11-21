@@ -34,6 +34,8 @@ pub enum Profile {
     /// The subtitle decoders (PGS, DVB, DVD, teletext through libzvbi, closed
     /// captions) with the demuxers and video decoders their inputs need.
     Subtitles,
+    /// MPEG-TS and the DTS core packet parser.
+    TransportDts,
     /// FFmpeg's default configuration (static libraries, `ffmpeg`, `ffprobe`):
     /// the decoder comparison reference, and the independent decoder and demuxer
     /// of the capture comparison.
@@ -58,6 +60,7 @@ impl Profile {
         match self {
             Profile::Matroska => ".research/reference",
             Profile::Formats => ".research/reference-formats",
+            Profile::TransportDts => ".research/reference-transport-dts",
             Profile::Video => ".research/reference-video",
             Profile::Subtitles => ".research/reference-subtitles",
             Profile::Decode => ".research/reference-decode",
@@ -68,9 +71,11 @@ impl Profile {
 
     fn source(self) -> Source {
         match self {
-            Profile::Matroska | Profile::Formats | Profile::Video | Profile::Subtitles => {
-                Source::Revision
-            }
+            Profile::Matroska
+            | Profile::Formats
+            | Profile::Video
+            | Profile::Subtitles
+            | Profile::TransportDts => Source::Revision,
             Profile::Decode | Profile::Capture | Profile::CaptureSmall => Source::Release,
         }
     }
@@ -79,6 +84,7 @@ impl Profile {
         [
             Profile::Matroska,
             Profile::Formats,
+            Profile::TransportDts,
             Profile::Video,
             Profile::Subtitles,
             Profile::Decode,
@@ -93,6 +99,7 @@ impl Profile {
         match self {
             Profile::Matroska => "matroska",
             Profile::Formats => "formats",
+            Profile::TransportDts => "transport-dts",
             Profile::Video => "video",
             Profile::Subtitles => "subtitles",
             Profile::Decode => "decode",
@@ -156,7 +163,11 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
             return release(&args);
         }
         Profile::Decode => return release(&DECODE_ARGS),
-        Profile::Matroska | Profile::Formats | Profile::Video | Profile::Subtitles => {}
+        Profile::Matroska
+        | Profile::Formats
+        | Profile::Video
+        | Profile::Subtitles
+        | Profile::TransportDts => {}
     }
     let mut argv: Vec<String> = [
         "./configure",
@@ -192,6 +203,16 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
             .to_owned();
         }
         argv.push("--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,extract_extradata".into());
+    }
+    if profile == Profile::TransportDts {
+        for flag in &mut argv {
+            *flag = match flag.as_str() {
+                "--enable-demuxer=matroska" => "--enable-demuxer=mpegts",
+                "--enable-parser=h264,hevc,aac,ac3,vorbis" => "--enable-parser=dca",
+                other => other,
+            }
+            .to_owned();
+        }
     }
     if profile == Profile::Subtitles {
         for flag in &mut argv {

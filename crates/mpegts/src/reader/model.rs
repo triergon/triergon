@@ -322,6 +322,31 @@ impl MpegAudioFrame {
     }
 }
 
+/// One complete canonical DTS core frame from a DVB-signalled stream.
+#[derive(Debug)]
+pub struct DtsAudioFrame {
+    pub(super) bytes: Bytes,
+    pub(super) offset: u64,
+    pub(super) duration: Time,
+}
+
+impl DtsAudioFrame {
+    /// Complete frame, including the DTS core header.
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+
+    /// Exact duration of the core coding window.
+    pub const fn sample_span(&self) -> Time {
+        self.duration
+    }
+
+    /// Frame extent in the track's concatenated PES payload.
+    pub fn elementary_range(&self) -> Range<u64> {
+        self.offset..self.offset + self.bytes.len() as u64
+    }
+}
+
 /// Original framed bytes and syntax facts, before decoder-feed conversion.
 /// Framer offsets use a private concatenated elementary view (`SourceId(0)`);
 /// physical transport provenance is retained by [`Packet::sources`].
@@ -331,6 +356,7 @@ pub enum AccessUnit {
     Adts(AacAdtsFrame),
     Loas(LoasFrame),
     MpegAudio(MpegAudioFrame),
+    Dts(DtsAudioFrame),
     /// An opaque ADTS parser observation with its original source diagnostic.
     AdtsFragment(AacAdtsCarrier),
     Ac3(Ac3AccessUnit),
@@ -350,6 +376,7 @@ impl AccessUnit {
             Self::AdtsFragment(fragment) => fragment.source_bytes(),
             Self::Loas(frame) => frame.bytes(),
             Self::MpegAudio(frame) => frame.bytes(),
+            Self::Dts(frame) => frame.bytes(),
             Self::Ac3(frame) => frame.bytes(),
             Self::DvbSubtitle(unit) => unit.bytes(),
             Self::IncompleteAudio { bytes, .. } => bytes,
@@ -369,6 +396,7 @@ impl AccessUnit {
             }
             Self::Loas(frame) => frame.elementary_range(),
             Self::MpegAudio(frame) => frame.elementary_range(),
+            Self::Dts(frame) => frame.elementary_range(),
             Self::Ac3(frame) => {
                 frame.facts().offset..frame.facts().offset + frame.bytes().len() as u64
             }
@@ -406,6 +434,7 @@ impl AccessUnit {
                 Ok(Some(Time::new(1024, u128::from(rate))?))
             }
             Self::Ac3(frame) => Ok(Some(frame.facts().header.sample_span()?)),
+            Self::Dts(frame) => Ok(Some(frame.sample_span())),
             Self::MpegAudio(frame) => Ok(Some(Time::new(
                 i128::from(frame.header.samples_per_frame()),
                 u128::from(frame.header.sample_rate),

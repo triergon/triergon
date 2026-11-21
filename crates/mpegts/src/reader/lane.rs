@@ -8,8 +8,8 @@ mod unframed_audio;
 use super::model::{ClockContext, PacketData, PayloadSources, Shared, UnframedData};
 use super::seek::{PictureDelivery, PictureProbe};
 use super::{
-    Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, LoasFrame, Packet, PacketClock,
-    PayloadSource, ReaderLimits, SourceEvent, Track, UnframedAudio,
+    Ac3AccessUnit, AccessUnit, AudioEofPolicy, DtsAudioFrame, IncompleteVideo, LoasFrame, Packet,
+    PacketClock, PayloadSource, ReaderLimits, SourceEvent, Track, UnframedAudio,
 };
 use crate::clock::{SourceTimePolicy, source_timestamp};
 use crate::compat::adts::PacketPolicy;
@@ -23,13 +23,15 @@ use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
 };
+use triergon_core::container::CodecId;
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputRequest, InputWindow, Result, SourceCapabilities,
-    SourceId, SourceLocation, Step, WorkBudget,
+    SourceId, SourceLocation, Step, Time, WorkBudget,
 };
 use triergon_framing::{
     AacAdtsCarrierLimits, AacAdtsCarrierReader, AacAdtsStreamLimits, AacAdtsStreamReader,
     Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, Codec, RawAnnexBReader,
+    probe_dts_core_header,
 };
 
 // Keep concrete readers inline; their containing BudgetVec charges the whole state.
@@ -40,6 +42,7 @@ enum Framer {
     AdtsFragments(AacAdtsCarrierReader),
     Loas(aligned_audio::Reader<3, ()>),
     MpegAudio(mpeg_audio::Reader),
+    Dts(aligned_audio::Reader<15, Time>),
     LatmPes,
     Ac3(Ac3FrameReader),
     Eac3(eac3::Reader),
@@ -54,6 +57,7 @@ impl Framer {
             Self::AdtsFragments(reader) => reader.input_wait_buffer_capacity(),
             Self::Loas(reader) => reader.input_wait_buffer_capacity(),
             Self::MpegAudio(reader) => reader.input_wait_buffer_capacity()?,
+            Self::Dts(reader) => reader.input_wait_buffer_capacity(),
             Self::Ac3(reader) => reader.input_wait_buffer_capacity(),
             Self::Eac3(reader) => reader.input_wait_storage()?,
             // Direct PES carriages do not keep a pending unit between inputs.
@@ -76,7 +80,12 @@ impl Framer {
     fn is_audio(&self) -> bool {
         matches!(
             self,
-            Self::Adts(_) | Self::Loas(_) | Self::MpegAudio(_) | Self::Ac3(_) | Self::Eac3(_)
+            Self::Adts(_)
+                | Self::Loas(_)
+                | Self::MpegAudio(_)
+                | Self::Dts(_)
+                | Self::Ac3(_)
+                | Self::Eac3(_)
         )
     }
     fn new(pool: &Budget, track: &Track, limits: ReaderLimits) -> Result<Self> {
@@ -143,6 +152,15 @@ impl Framer {
             )?)),
             0x06 if stream.codec_identification() == CodecIdentification::DvbSubtitles => {
                 Ok(Self::Dvb(dvb::Reader::new(limits.dvb_subtitle_tail_policy)))
+            }
+            0x06 if stream.codec() == Some(CodecId::Dts) => {
+                Ok(Self::Dts(aligned_audio::Reader::new(
+                    pool,
+                    source,
+                    caps,
+                    limits.maximum_audio_frame_bytes,
+                    limits.elementary_input_window,
+                )?))
             }
             0x06 if matches!(namespace, DescriptorNamespace::Dvb(_)) => {
                 let descriptors = PrivateAudioDescriptors {
@@ -215,6 +233,19 @@ impl Framer {
                 })
             }),
             Self::MpegAudio(reader) => map(reader.step(work, cancel)?, AccessUnit::MpegAudio),
+            Self::Dts(reader) => map(
+                reader.step(work, cancel, |prefix| {
+                    let header = probe_dts_core_header(prefix)?;
+                    Ok((header.window, header.frame_bytes))
+                })?,
+                |frame| {
+                    AccessUnit::Dts(DtsAudioFrame {
+                        bytes: frame.bytes,
+                        offset: frame.offset,
+                        duration: frame.header,
+                    })
+                },
+            ),
             Self::AdtsFragments(reader) => map(reader.step(work, cancel)?, |carrier| match carrier
                 .into_selected_frame()
             {
@@ -234,6 +265,7 @@ impl Framer {
             Self::Adts(reader) => reader.provide_owned(window),
             Self::Loas(reader) => reader.provide(window),
             Self::MpegAudio(reader) => reader.provide(window),
+            Self::Dts(reader) => reader.provide(window),
             Self::AdtsFragments(reader) => reader.provide_owned(window),
             Self::Ac3(reader) => reader.provide_owned(window),
             Self::Eac3(reader) => reader.provide(window),
@@ -246,6 +278,7 @@ impl Framer {
             Self::Adts(reader) => reader.finish(request.source, request.token),
             Self::Loas(reader) => reader.finish(request),
             Self::MpegAudio(reader) => reader.finish(request),
+            Self::Dts(reader) => reader.finish(request),
             Self::AdtsFragments(reader) => reader.finish(request.source, request.token),
             Self::Ac3(reader) => reader.finish(request.source, request.token),
             Self::Eac3(reader) => reader.finish(request),

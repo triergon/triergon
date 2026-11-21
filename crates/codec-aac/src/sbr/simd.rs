@@ -126,11 +126,11 @@ pub(super) fn synthesis_window(v: &[f32], w: &[f32; 640], scale: f32, out: &mut 
 
 /// The covariances of [`super::covariance`] for four bands, lane j from band `x[j]`. Each
 /// lane adds the scalar code's terms in its order. The bands are transposed two slots at a
-/// time, so that every vector holds one slot's real or imaginary parts of the four bands.
+/// time, so that every vector holds one slot's real or imaginary parts of the four bands,
+/// and the sums run over a window of the last three slots.
 pub(super) fn covariance4(x: [&[Cpx; XL_LEN]; 4]) -> [Covariance; 4] {
-    let mut re = [V::splat(0.0); XL_LEN];
-    let mut im = [V::splat(0.0); XL_LEN];
-    for n in (0..XL_LEN).step_by(2) {
+    // slots n and n + 1 of the four bands, as (re, im) vectors
+    let slots = |n: usize| {
         let [a, b, c, d] = x.map(|x| ld2(x, n));
         let (ab_lo, cd_lo) = (
             simd_swizzle!(a, b, [0, 4, 1, 5]),
@@ -140,18 +140,22 @@ pub(super) fn covariance4(x: [&[Cpx; XL_LEN]; 4]) -> [Covariance; 4] {
             simd_swizzle!(a, b, [2, 6, 3, 7]),
             simd_swizzle!(c, d, [2, 6, 3, 7]),
         );
-        re[n] = simd_swizzle!(ab_lo, cd_lo, [0, 1, 4, 5]);
-        im[n] = simd_swizzle!(ab_lo, cd_lo, [2, 3, 6, 7]);
-        re[n + 1] = simd_swizzle!(ab_hi, cd_hi, [0, 1, 4, 5]);
-        im[n + 1] = simd_swizzle!(ab_hi, cd_hi, [2, 3, 6, 7]);
-    }
+        (
+            (
+                simd_swizzle!(ab_lo, cd_lo, [0, 1, 4, 5]),
+                simd_swizzle!(ab_lo, cd_lo, [2, 3, 6, 7]),
+            ),
+            (
+                simd_swizzle!(ab_hi, cd_hi, [0, 1, 4, 5]),
+                simd_swizzle!(ab_hi, cd_hi, [2, 3, 6, 7]),
+            ),
+        )
+    };
     let zero = V::splat(0.0);
     let (mut r01re, mut r01im, mut r02re, mut r02im) = (zero, zero, zero, zero);
     let (mut r11, mut r12re, mut r12im, mut r22) = (zero, zero, zero, zero);
-    for n in 0..XL_LEN - 2 {
-        let (ar, ai) = (re[n + 2], im[n + 2]);
-        let (br, bi) = (re[n + 1], im[n + 1]);
-        let (cr, ci) = (re[n], im[n]);
+    // the term of slot n + 2 (a), with b and c the two slots before it
+    let mut add = |(ar, ai): (V, V), (br, bi): (V, V), (cr, ci): (V, V)| {
         r01re += ar * br + ai * bi;
         r01im += ai * br - ar * bi;
         r02re += ar * cr + ai * ci;
@@ -160,6 +164,13 @@ pub(super) fn covariance4(x: [&[Cpx; XL_LEN]; 4]) -> [Covariance; 4] {
         r12re += br * cr + bi * ci;
         r12im += bi * cr - br * ci;
         r22 += cr * cr + ci * ci;
+    };
+    let (mut c, mut b) = slots(0);
+    for n in (2..XL_LEN).step_by(2) {
+        let (a0, a1) = slots(n);
+        add(a0, b, c);
+        add(a1, a0, b);
+        (c, b) = (a0, a1);
     }
     std::array::from_fn(|j| Covariance {
         r01: Cpx::new(r01re[j], r01im[j]),

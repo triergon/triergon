@@ -59,15 +59,15 @@ caller's reserved PCM planes and reuses them on the next access unit.
 
 | Feature | Default | Effect |
 |---|---|---|
-| `simd` | off | `std::simd` forms of the SBR QMF analysis and synthesis windowing and shuffles, of the covariance sums of HF generation (four source bands at a time) and of the Parametric Stereo hybrid filters (four slots at a time). Requires a nightly toolchain (`portable_simd`); `cargo xtask check-simd` uses the pinned one. |
+| `simd` | off | `std::simd` forms of the DCT-IV passes after the input gather (pre-twiddle, radix-4 stages, post-twiddle and the last radix-2 stage fused with it, four points at a time), which serve the SBR QMF banks and the IMDCT; of the SBR QMF analysis and synthesis windowing and shuffles; of the covariance sums of HF generation (four source bands at a time); and of the Parametric Stereo hybrid filters (four slots at a time). Requires a nightly toolchain (`portable_simd`); `cargo xtask check-simd` uses the pinned one. |
 
 Without `simd` the crate builds on stable and uses the scalar code. Each vector lane
 performs the scalar code's operations in the same order, so output is identical where the
 vector unit follows IEEE 754 (AArch64); ARMv7 NEON flushes subnormal values to zero. On
-32-bit ARM (`thumbv7neon`) LLVM emits no NEON float code from the scalar loops, and the
-feature cuts HE-AAC decoding by about a fifth of its instructions there. The gate build
-builds the AAC decode path (`codec-aac-worker` and the AAC decode example) with the
-pinned nightly and this feature, on both targets; every other worker stays on stable.
+32-bit ARM (`thumbv7neon`) LLVM emits no NEON float code from the scalar loops, so there
+only these forms run on NEON. The gate build builds the AAC decode path
+(`codec-aac-worker` and the AAC decode example) with the pinned nightly and this feature,
+on both targets; every other worker stays on stable.
 
 ## Supported
 
