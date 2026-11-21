@@ -7,12 +7,33 @@ use crate::tables::*;
 use std::sync::OnceLock;
 use triergon_bitstream::CachedBitReader;
 
-pub(crate) const LONG_START: u8 = 1;
-pub(crate) const EIGHT_SHORT: u8 = 2;
-pub(crate) const LONG_STOP: u8 = 3;
+/// The window_sequence of ics_info(): the windows and transform lengths of a frame. The
+/// discriminants are the field's values.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum WindowSequence {
+    #[default]
+    OnlyLong = 0,
+    LongStart = 1,
+    EightShort = 2,
+    LongStop = 3,
+}
+
+impl WindowSequence {
+    /// The sequence the 2-bit field value `bits` codes.
+    fn from_bits(bits: u32) -> WindowSequence {
+        match bits & 3 {
+            0 => WindowSequence::OnlyLong,
+            1 => WindowSequence::LongStart,
+            2 => WindowSequence::EightShort,
+            _ => WindowSequence::LongStop,
+        }
+    }
+}
 
 pub(crate) const ZERO_HCB: u8 = 0;
 pub(crate) const ESC_HCB: u8 = 11;
+pub(crate) const RESERVED_HCB: u8 = 12;
 pub(crate) const NOISE_HCB: u8 = 13;
 pub(crate) const INTENSITY_HCB2: u8 = 14;
 pub(crate) const INTENSITY_HCB: u8 = 15;
@@ -45,7 +66,7 @@ impl Default for Ltp {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct IcsInfo {
-    pub window_sequence: u8,
+    pub window_sequence: WindowSequence,
     pub window_shape: u8,
     pub max_sfb: usize,
     pub num_windows: usize,
@@ -63,7 +84,7 @@ pub(crate) struct IcsInfo {
 impl Default for IcsInfo {
     fn default() -> Self {
         IcsInfo {
-            window_sequence: 0,
+            window_sequence: WindowSequence::OnlyLong,
             window_shape: 0,
             max_sfb: 0,
             num_windows: 1,
@@ -168,13 +189,13 @@ pub(crate) fn parse_ics_info(
         // ics_reserved_bit: FFmpeg reports and continues; we treat as invalid like the spec.
         return Err(DecodeError::Invalid("ics_reserved_bit"));
     }
-    info.window_sequence = br.read(2) as u8;
+    info.window_sequence = WindowSequence::from_bits(br.read(2));
     info.window_shape = br.read(1) as u8;
     info.predictor_data_present = false;
     info.predictor_reset_group = 0;
     info.ltp[0].present = false;
     info.ltp[1].present = false;
-    if info.window_sequence == EIGHT_SHORT {
+    if info.window_sequence == WindowSequence::EightShort {
         info.max_sfb = br.read(4) as usize;
         let grouping = br.read(7);
         info.num_windows = 8;
@@ -264,7 +285,7 @@ pub(crate) fn parse_ics(
     ch.tns.present = false;
     if !scale_flag {
         if br.bit() {
-            if ch.info.window_sequence == EIGHT_SHORT {
+            if ch.info.window_sequence == WindowSequence::EightShort {
                 return Err(DecodeError::Invalid("pulse data in short window"));
             }
             npulse = br.read(2) as usize + 1;
@@ -300,7 +321,7 @@ pub(crate) fn parse_ics(
 
 fn parse_section_data(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Result<()> {
     let info = &ch.info;
-    let (bits, esc) = if info.window_sequence == EIGHT_SHORT {
+    let (bits, esc) = if info.window_sequence == WindowSequence::EightShort {
         (3, 7)
     } else {
         (5, 31)
@@ -309,7 +330,7 @@ fn parse_section_data(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Res
         let mut k = 0usize;
         while k < info.max_sfb {
             let cb = br.read(4) as u8;
-            if cb == 12 {
+            if cb == RESERVED_HCB {
                 return Err(DecodeError::Invalid("reserved codebook 12"));
             }
             let mut len = 0usize;
@@ -396,7 +417,7 @@ fn parse_scalefactors(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Res
 
 fn parse_tns(br: &mut CachedBitReader<'_>, cfg: &CoreCfg, ch: &mut ChannelData) -> Result<()> {
     let info = &ch.info;
-    let short = info.window_sequence == EIGHT_SHORT;
+    let short = info.window_sequence == WindowSequence::EightShort;
     let (nf_bits, len_bits, ord_bits, max_order) = if short {
         (1, 4, 3, 7u8)
     } else {
@@ -822,7 +843,7 @@ pub(crate) fn tns_filter(
     coef: &mut [f32],
     synthesis: bool,
 ) {
-    let short = info.window_sequence == EIGHT_SHORT;
+    let short = info.window_sequence == WindowSequence::EightShort;
     let max_bands = if short {
         TNS_MAX_BANDS_SHORT[cfg.sf_index]
     } else {

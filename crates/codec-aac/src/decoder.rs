@@ -60,7 +60,6 @@ pub(crate) enum FixedLayout {
 pub(crate) struct ChannelState {
     pub overlap: [f32; 1024],
     pub prev_shape: u8,
-    pub prev_seq: u8,
     pub pred: Option<pred::PredState>,
     pub ltp: Option<ltp::LtpState>,
 }
@@ -70,7 +69,6 @@ impl ChannelState {
         Ok(ChannelState {
             overlap: [0.0; 1024],
             prev_shape: 0,
-            prev_seq: 0,
             pred: if aot == AOT_MAIN {
                 Some(pred::PredState::new(budget)?)
             } else {
@@ -87,7 +85,6 @@ impl ChannelState {
     fn reset(&mut self) {
         self.overlap.fill(0.0);
         self.prev_shape = 0;
-        self.prev_seq = 0;
         if let Some(p) = &mut self.pred {
             p.reset();
         }
@@ -1024,7 +1021,6 @@ pub(crate) fn process_channel(
     }
     crate::cce::apply_time(cce, kind, tag, ch_in_elem, &mut out[..1024]);
     st.prev_shape = info.window_shape;
-    st.prev_seq = info.window_sequence;
 }
 
 /// Assign speakers to the fixed elements of ISO/IEC 14496-3:2009/Amd.4, Table 1.19.
