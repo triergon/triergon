@@ -9,6 +9,7 @@
 //! under `harness/shape/probes` that shows it (`cargo xtask shape probe`).
 
 use triergon_core::{Error, Result, WorkBudget};
+use triergon_font::read::{u16_at, u32_at};
 use triergon_font::{Font, GlyphId, OutlineFormat};
 
 /// The argument stack's capacity, CFF2's limit, which HarfBuzz applies to CFF
@@ -245,18 +246,6 @@ enum Fault {
 type Step<T> = std::result::Result<T, Fault>;
 
 // ------------------------------------------------------------------ tables
-
-fn u16_at(data: &[u8], at: usize) -> Option<u16> {
-    Some(u16::from_be_bytes(
-        data.get(at..at.checked_add(2)?)?.try_into().ok()?,
-    ))
-}
-
-fn u32_at(data: &[u8], at: usize) -> Option<u32> {
-    Some(u32::from_be_bytes(
-        data.get(at..at.checked_add(4)?)?.try_into().ok()?,
-    ))
-}
 
 /// An offset of `size` bytes (1 to 4), big-endian.
 fn offset_at(data: &[u8], at: usize, size: usize) -> Option<usize> {
