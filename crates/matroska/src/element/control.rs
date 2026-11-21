@@ -1,7 +1,7 @@
 //! The reader-facing control of the envelope: compact typed delivery of leaf
 //! events, typed leaf admission, scan prefixes, and the storage walk of the
 //! envelope's state. There is one core `InputCursor` and no second buffered layer.
-use super::{Admit, ElementHeader, ElementReader, ParseStep, Phase, ScanBody};
+use super::{Admit, ElementHeader, ElementReader, ParseStep, Phase, SIMPLE_BLOCK, ScanBody};
 use crate::step::Required;
 use crate::{Error, Result};
 use std::sync::atomic::AtomicBool;
@@ -178,7 +178,7 @@ impl ElementReader {
             || !body.typed_admitted
             || body.allocated
             || !body.collect
-            || header.id != 0xa3
+            || header.id != SIMPLE_BLOCK
             || body.scan != ScanBody::Off
         {
             return Err(Error::Invalid("scan leaf admission identity changed"));

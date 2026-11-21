@@ -9,8 +9,8 @@ use crate::track::extensions::TrackExtensionsJob;
 use crate::{
     Error, Limits, Result, ebml,
     element::{
-        ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader, EpochAdmission,
-        control::EnvelopeProgress, replay::ReplayLocation,
+        BLOCK_GROUP, ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader, EpochAdmission,
+        SIMPLE_BLOCK, control::EnvelopeProgress, replay::ReplayLocation,
     },
     storage::SharedBytes,
 };
@@ -357,7 +357,7 @@ impl EpochRestoreJob {
                             // CodecState is a BlockGroup child. An unrelated
                             // SimpleBlock was never decoded by this job; consume
                             // its real bytes without collecting a useless owner.
-                            let skip = header.id == 0xa3 && !replay_boundary && !reference;
+                            let skip = header.id == SIMPLE_BLOCK && !replay_boundary && !reference;
                             reader.admit_typed_leaf(header, None, skip)?;
                             continue;
                         }
@@ -403,7 +403,7 @@ impl EpochRestoreJob {
                                 }
                             }
                             match header.id {
-                                0xa0 => {
+                                BLOCK_GROUP => {
                                     self.header = Some(header);
                                     self.group_job = Some(GroupJob::new(
                                         data,
@@ -421,10 +421,10 @@ impl EpochRestoreJob {
                                 }
                                 // A SimpleBlock cannot carry CodecState. Its Track
                                 // membership still matters at the referenced RAP.
-                                0xa3 if self
-                                    .target
-                                    .reference
-                                    .is_some_and(|reference| reference.block == header.start) =>
+                                SIMPLE_BLOCK
+                                    if self.target.reference.is_some_and(|reference| {
+                                        reference.block == header.start
+                                    }) =>
                                 {
                                     self.header = Some(header);
                                     self.simple = Some(data);

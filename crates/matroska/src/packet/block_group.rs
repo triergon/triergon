@@ -502,7 +502,7 @@ impl GroupJob {
             .as_mut()
             .required("missing group frame")?;
         let scope = frame.scope;
-        if child.id == 0xbf {
+        if child.id == crate::element::CRC32 {
             if frame.crc.is_some() || child.header != frame.span.data || child.payload.len() != 4 {
                 return Err(Error::Invalid("packet source CRC element"));
             }

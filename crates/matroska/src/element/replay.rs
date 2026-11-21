@@ -4,8 +4,8 @@
 //! generation; only the explicit seek transition starts a new one.
 use super::control::EnvelopeProgress;
 use super::{
-    CLUSTER, ClusterCheckpoint, EBML, ElementHeader, ElementReader, Master, ParseStep, Phase,
-    SEGMENT, is_segment_metadata,
+    BLOCK_GROUP, CLUSTER, CRC32, ClusterCheckpoint, EBML, ElementHeader, ElementReader, Master,
+    ParseStep, Phase, SEGMENT, SIMPLE_BLOCK, TIMESTAMP, VOID, is_segment_metadata,
 };
 use crate::step::Required;
 use crate::{Error, Result};
@@ -87,7 +87,9 @@ impl ElementReader {
         Ok(request)
     }
     fn replay_block_context(&self, header: ElementHeader) -> Result<(Master, Master)> {
-        if !matches!(header.id, 0xa0 | 0xa3) || header.generation != self.generation() {
+        if !matches!(header.id, BLOCK_GROUP | SIMPLE_BLOCK)
+            || header.generation != self.generation()
+        {
             return Err(Error::Invalid("invalid replay block identity"));
         }
         let cluster = self.cluster.required("replay block outside Cluster")?;
@@ -288,9 +290,11 @@ impl ElementReader {
                             return None;
                         }
                         match id {
-                            0xa3 if size <= self.limits.block_bytes as u64 => (),
-                            0xe7 if size <= 8 => (),
-                            CLUSTER | SEGMENT | EBML | 0xa0 | 0xa3 | 0xe7 => return None,
+                            SIMPLE_BLOCK if size <= self.limits.block_bytes as u64 => (),
+                            TIMESTAMP if size <= 8 => (),
+                            CLUSTER | SEGMENT | EBML | BLOCK_GROUP | SIMPLE_BLOCK | TIMESTAMP => {
+                                return None;
+                            }
                             id if is_segment_metadata(id) => return None,
                             _ => (),
                         }
@@ -299,7 +303,7 @@ impl ElementReader {
                     }
                     position = end;
                 }
-                0xec | 0xbf if size <= left => {
+                VOID | CRC32 if size <= left => {
                     consume(size, &mut left)?;
                     position = end;
                 }

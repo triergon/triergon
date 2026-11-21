@@ -16,7 +16,8 @@ use crate::track::parse::TracksJob;
 use crate::{
     Error, Limits, Result, ebml,
     element::{
-        Admit, ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader,
+        Admit, BLOCK_GROUP, ClusterCheckpoint, EBML, ElementEvent, ElementHeader, ElementReader,
+        SIMPLE_BLOCK, TIMESTAMP,
         control::{CompactElementEvent, CompactEnvelopeProgress as EnvelopeProgress},
         replay::ReplayLocation,
     },
@@ -825,7 +826,7 @@ impl Reader {
         // Keep each large constructor tied to its selected destination arm,
         // avoiding a merged maximum-sized enum result in this path.
         match header.id {
-            0x1a45dfa3 => {
+            EBML => {
                 self.state = State::Ebml {
                     header,
                     job: EbmlJob::new(data),
@@ -888,11 +889,11 @@ impl Reader {
                     ),
                 };
             }
-            0xe7 => {
+            TIMESTAMP => {
                 self.cluster_time = Some(ebml::uint(&data)?);
                 self.state = State::Envelope;
             }
-            0xa0 | 0xa3 => {
+            BLOCK_GROUP | SIMPLE_BLOCK => {
                 let configuration = self.configuration.as_ref().required("missing Tracks")?;
                 let time = self
                     .cluster_time
@@ -902,7 +903,7 @@ impl Reader {
                     header,
                     self.cluster_time,
                 )?;
-                if header.id == 0xa3 {
+                if header.id == SIMPLE_BLOCK {
                     self.state = State::Simple(D::simple(
                         data,
                         time,
@@ -1071,7 +1072,7 @@ impl Reader {
                             }
                             self.envelope.admit_typed_leaf(header, None, false)?;
                             if scan_prefix
-                                && header.id == 0xa3
+                                && header.id == SIMPLE_BLOCK
                                 && stop.is_none_or(|stop| {
                                     header
                                         .size
@@ -1327,7 +1328,7 @@ impl Reader {
                 // A block touching a finite scan stop keeps the old
                 // body/stop scheduling, including work-boundary cases.
                 if scan_prefix
-                    && admission.header.id == 0xa3
+                    && admission.header.id == SIMPLE_BLOCK
                     && stop.is_none_or(|stop| {
                         admission
                             .header

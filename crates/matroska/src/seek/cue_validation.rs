@@ -9,7 +9,8 @@ use crate::step::{ParseStep, Required, check};
 use crate::{
     Error, Limits, Result, ebml,
     element::{
-        ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader, replay::ReplayLocation,
+        BLOCK_GROUP, ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader, SIMPLE_BLOCK,
+        TIMESTAMP, replay::ReplayLocation,
     },
 };
 use std::sync::atomic::AtomicBool;
@@ -244,8 +245,8 @@ impl CueValidationJob {
                                 return Err(Error::Invalid("cue target is not Cluster"));
                             }
                             match header.id {
-                                0xe7 => self.cluster_time = Some(ebml::uint(&data)?),
-                                0xa0 | 0xa3 => {
+                                TIMESTAMP => self.cluster_time = Some(ebml::uint(&data)?),
+                                BLOCK_GROUP | SIMPLE_BLOCK => {
                                     let ticks = self
                                         .cluster_time
                                         .required("Block before Cluster Timestamp")?;
@@ -257,14 +258,14 @@ impl CueValidationJob {
                                     self.first = true;
                                     self.batch = Some(PacketBatchJob::new(
                                         data,
-                                        header.id == 0xa3,
+                                        header.id == SIMPLE_BLOCK,
                                         ticks,
                                         self.scale,
                                         self.configuration.clone(),
                                         self.limits,
                                         &self.pool,
                                     )?);
-                                    if let (0xa0, Some(segment_data)) =
+                                    if let (BLOCK_GROUP, Some(segment_data)) =
                                         (header.id, self.segment_data)
                                     {
                                         self.batch

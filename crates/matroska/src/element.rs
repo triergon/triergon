@@ -19,7 +19,14 @@ use crate::metadata::{
     ATTACHMENTS, CHAPTERS, CLUSTER, CUES, INFO, SEEK_HEAD, SEGMENT, TAGS, TRACKS,
     is_segment_metadata,
 };
-const EBML: u64 = 0x1a45dfa3;
+/// The EBML header, the two elements valid anywhere (RFC 8794 §11), and the Cluster
+/// children the reader collects (RFC 9559 §5.1.3).
+pub(crate) const EBML: u64 = 0x1a45dfa3;
+pub(crate) const VOID: u64 = 0xec;
+pub(crate) const CRC32: u64 = 0xbf;
+pub(crate) const TIMESTAMP: u64 = 0xe7;
+pub(crate) const BLOCK_GROUP: u64 = 0xa0;
+pub(crate) const SIMPLE_BLOCK: u64 = 0xa3;
 
 /// One decoded EBML element header (RFC 8794 §§4–6) and where it was read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -407,7 +414,7 @@ impl ElementReader {
                 end: header.end()?,
             });
             return Ok(Some(D::start(header)));
-        } else if !self.seen_segment && !matches!(header.id, 0xec | 0xbf) {
+        } else if !self.seen_segment && !matches!(header.id, VOID | CRC32) {
             return Err(Error::Invalid("element before Segment"));
         } else if header.id == SEGMENT || header.id == EBML {
             return Err(Error::Unsupported("multiple EBML documents/Segments"));
@@ -437,8 +444,8 @@ impl ElementReader {
                     .checked_add(self.limits.attachment_bytes)
                     .ok_or(Error::Overflow)?,
             ),
-            0xa3 | 0xa0 if self.cluster.is_some() => (true, self.limits.block_bytes),
-            0xe7 if self.cluster.is_some() => (true, 8),
+            SIMPLE_BLOCK | BLOCK_GROUP if self.cluster.is_some() => (true, self.limits.block_bytes),
+            TIMESTAMP if self.cluster.is_some() => (true, 8),
             _ => (false, usize::MAX),
         };
         if collect && size > maximum as u64 {
@@ -734,10 +741,10 @@ impl ElementReader {
                     if pause_for_admission && !body.typed_admitted && !body.allocated {
                         let ordinary_block = matches!(admit, Admit::OrdinaryBlocks)
                             && body.collect
-                            && matches!(body.header.id, 0xa0 | 0xa3);
+                            && matches!(body.header.id, BLOCK_GROUP | SIMPLE_BLOCK);
                         let scan_block = matches!(admit, Admit::ScanSimpleBlocks)
                             && body.collect
-                            && body.header.id == 0xa3;
+                            && body.header.id == SIMPLE_BLOCK;
                         if !ordinary_block && !scan_block && !matches!(admit, Admit::Epoch(_)) {
                             return Ok(ParseStep::Yield);
                         }
@@ -745,7 +752,7 @@ impl ElementReader {
                             return Ok(ParseStep::Yield);
                         }
                         if let Admit::Epoch(admission) = admit
-                            && body.header.id == 0xa3
+                            && body.header.id == SIMPLE_BLOCK
                             && !admission.keep.contains(&Some(body.header.start))
                         {
                             body.collect = false;
@@ -864,7 +871,7 @@ impl ElementReader {
                         };
                         // Only a collected Cluster block ends this envelope
                         // scan phase. A skipped Block ID cannot refill it.
-                        if body.collect && matches!(header.id, 0xa0 | 0xa3) {
+                        if body.collect && matches!(header.id, BLOCK_GROUP | SIMPLE_BLOCK) {
                             self.scan_left = self.limits.scan_bytes;
                         }
                         if body.collect && D::RETAIN_LEAF {
@@ -897,7 +904,7 @@ impl ElementReader {
                         continue;
                     }
                     let share_block = self.payload_ownership == PayloadOwnership::SharedBounded
-                        && matches!(body.header.id, 0xa0 | 0xa3);
+                        && matches!(body.header.id, BLOCK_GROUP | SIMPLE_BLOCK);
                     let byte_work = maximum as u64;
                     if !share_block
                         && body.scan == ScanBody::Off
