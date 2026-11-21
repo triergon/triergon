@@ -345,11 +345,18 @@ impl GlyphDrawing<'_> {
     /// is timed from.
     pub(super) fn leftmost_x(&self, request: &GlyphRequest<'_>, leftmost_x: i32) -> i32 {
         if self.karaoke {
-            request.shape().outlines()[0].min_transformed_x(request.matrix(), leftmost_x)
+            karaoke_leftmost_x(request, leftmost_x)
         } else {
             leftmost_x
         }
     }
+}
+
+/// [`GlyphDrawing::leftmost_x`] of a `\kf` glyph. Cold, so the scan of its
+/// points stays out of the per-glyph drawing loop (measured).
+#[cold]
+fn karaoke_leftmost_x(request: &GlyphRequest<'_>, leftmost_x: i32) -> i32 {
+    request.shape().outlines()[0].min_transformed_x(request.matrix(), leftmost_x)
 }
 
 /// What places an event's glyphs in the frame as they are drawn.
