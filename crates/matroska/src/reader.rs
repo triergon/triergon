@@ -195,7 +195,7 @@ pub struct Reader {
     state_coverage_end: u64,
     // An immutable source's root, lent by the blocking adapter for one seek
     // poll and never retained across polls.
-    pub(crate) owned_root: Option<triergon_core::Bytes>,
+    owned_root: Option<triergon_core::Bytes>,
     seek_index: Option<Box<seek_index::ImmutableSeekIndex>>,
     state_coverage_contiguous: bool,
     state_seen: bool,
