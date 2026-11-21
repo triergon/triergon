@@ -317,6 +317,26 @@ impl TransportStream {
         )
     }
 
+    /// The carrier a feed consumer refused, for publication as a transport event.
+    #[cold]
+    fn take_refused(&mut self) -> Result<TransportPacket> {
+        let packet = self
+            .packet
+            .take()
+            .ok_or(Error::Invalid("TS packet missing"))?;
+        self.stage = Stage::Read;
+        Ok(packet)
+    }
+
+    /// The discontinuity event owed after [`TransportStream::discontinuity`].
+    #[cold]
+    fn take_boundary(&mut self) -> TraceEvent {
+        self.boundary_event = false;
+        TraceEvent::Discontinuity {
+            epochs: self.source_epochs(),
+        }
+    }
+
     fn poll_inner<
         T: PollOutput,
         const FEED: bool,
@@ -349,21 +369,13 @@ impl TransportStream {
                     if work.remaining() == 0 {
                         return Ok(Step::Yield);
                     }
-                    let packet = self
-                        .packet
-                        .take()
-                        .ok_or(Error::Invalid("TS packet missing"))?;
-                    self.stage = Stage::Read;
-                    return Ok(ready(TraceEvent::Transport(packet)));
+                    return Ok(ready(TraceEvent::Transport(self.take_refused()?)));
                 }
                 self.omit_feed_events(self.deferred_feed_events)?;
                 self.deferred_feed_events = 0;
             }
             if self.boundary_event {
-                self.boundary_event = false;
-                return Ok(ready(TraceEvent::Discontinuity {
-                    epochs: self.source_epochs(),
-                }));
+                return Ok(ready(self.take_boundary()));
             }
             if self.fault.is_some()
                 || self.map_build.is_some()

@@ -240,6 +240,8 @@ impl TransportStream {
             configuration_epoch: build.epoch,
         }))
     }
+    // Runs per PSI section or table step, never per carrier.
+    #[cold]
     pub(super) fn poll_jobs(
         &mut self,
         work: &mut WorkBudget,
