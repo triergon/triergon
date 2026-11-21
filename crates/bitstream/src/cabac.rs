@@ -1,9 +1,12 @@
 //! Context-adaptive binary arithmetic decoding, common to H.264 clause 9.3 and H.265
 //! clause 9.3. A context state byte is `(pStateIdx << 1) | valMPS`.
 //!
-//! [`Engine`] keeps the 9-bit offset in the top bits of a 64-bit register with look-ahead
-//! stream bits below it, so a comparison uses a constant shift and renormalisation is a
-//! shift plus an occasional 32-bit refill off the critical path.
+//! [`Engine`] keeps the 9-bit offset in the top bits of a register with look-ahead stream
+//! bits below it, so a comparison uses a constant shift and renormalisation is a shift plus
+//! an occasional refill off the critical path. The register is a machine word: 64 bits,
+//! refilled 32 bits at a time, on 64-bit targets, and 32 bits, refilled to capacity from the
+//! stream's bit position, on 32-bit targets, where a 64-bit shift or comparison takes
+//! several instructions.
 //!
 //! Every decoding process keeps the offset below the range once it starts there, so the
 //! engine refuses the two initial offsets that do not (510 and 511) and a bin string of
@@ -126,6 +129,13 @@ static NEXT_LPS: [u8; 128] = {
     table
 };
 
+/// The engine's register.
+#[cfg(target_pointer_width = "64")]
+type Word = u64;
+/// The engine's register.
+#[cfg(not(target_pointer_width = "64"))]
+type Word = u32;
+
 /// An initial offset of 510 or 511, which H.264 clause 9.3.1.2 and H.265 clause 9.3.2.5
 /// forbid: no range covers it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -134,23 +144,24 @@ pub struct InvalidOffset;
 /// The arithmetic decoding engine. Reads past the end of the slice yield zero bits; a
 /// decoder bounds a corrupt stream through [`Engine::bits_read`] or [`Engine::next_byte`].
 ///
-/// `HEADROOM` keeps one bit free above the offset and starts with seven bytes of look-ahead
-/// instead of four. Every stream decodes the same either way.
+/// `HEADROOM` keeps one bit free above the offset (and on 64-bit targets starts with seven
+/// bytes of look-ahead instead of four). Every stream decodes the same either way.
 ///
 /// Hot loops can work on a local copy, which keeps the registers in machine registers.
 #[derive(Clone, Copy, Debug)]
 pub struct Engine<'a, const HEADROOM: bool> {
     data: &'a [u8],
+    /// The next byte to load (64-bit targets) or the next bit (32-bit targets).
     next: usize,
     range: u32,
-    value: u64,
+    value: Word,
     /// Look-ahead bits below the offset.
     available: i32,
 }
 
 impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
     /// Bit of the register that holds the lowest bit of the offset.
-    const OFFSET_SHIFT: u32 = if HEADROOM { 54 } else { 55 };
+    const OFFSET_SHIFT: u32 = Word::BITS - 9 - HEADROOM as u32;
 
     /// Initialises the engine at byte `start` of `data`: ivlCurrRange = 510 and
     /// ivlOffset = read_bits(9).
@@ -168,8 +179,26 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
 
     /// Initialises the engine again at byte `start`, after PCM samples or at a substream.
     pub fn restart(&mut self, start: usize) -> Result<(), InvalidOffset> {
-        self.next = start;
         self.range = 510;
+        self.start_value(start);
+        if self.value >> Self::OFFSET_SHIFT >= 510 {
+            return Err(InvalidOffset);
+        }
+        Ok(())
+    }
+
+    /// Tops the look-ahead up to at least 16 bits.
+    #[inline(always)]
+    pub fn refill(&mut self) {
+        if self.available < 16 {
+            self.append();
+        }
+    }
+
+    /// Loads ivlOffset and the look-ahead after it from byte `start`.
+    #[cfg(target_pointer_width = "64")]
+    fn start_value(&mut self, start: usize) {
+        self.next = start;
         if HEADROOM {
             let mut bytes = 0;
             for k in 0..7 {
@@ -182,12 +211,9 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
             self.value = self.load() << 32;
             self.available = 32 - 9;
         }
-        if self.value >> Self::OFFSET_SHIFT >= 510 {
-            return Err(InvalidOffset);
-        }
-        Ok(())
     }
 
+    #[cfg(target_pointer_width = "64")]
     #[inline(always)]
     fn load(&mut self) -> u64 {
         let at = self.next;
@@ -208,21 +234,56 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
         }
     }
 
-    /// Tops the look-ahead up to at least 16 bits.
-    #[inline(always)]
-    pub fn refill(&mut self) {
-        if self.available < 16 {
-            self.append();
-        }
-    }
-
     /// Appends 32 bits below the look-ahead, which must hold fewer than 23 bits.
+    #[cfg(target_pointer_width = "64")]
     #[inline(always)]
     fn append(&mut self) {
         let word = self.load();
         let shift = Self::OFFSET_SHIFT as i32 - self.available - 32;
         self.value |= word.wrapping_shl(shift as u32);
         self.available += 32;
+    }
+
+    /// Loads ivlOffset and the look-ahead after it from byte `start`.
+    #[cfg(not(target_pointer_width = "64"))]
+    fn start_value(&mut self, start: usize) {
+        let bits = Word::BITS - HEADROOM as u32;
+        self.value = self.window(start * 8) >> HEADROOM as u32;
+        self.next = start * 8 + bits as usize;
+        self.available = Self::OFFSET_SHIFT as i32;
+    }
+
+    /// The 32 stream bits from bit `at`, of which at least the top 25 are valid; bits past the
+    /// end of the data are zero.
+    #[cfg(not(target_pointer_width = "64"))]
+    #[inline(always)]
+    fn window(&self, at: usize) -> u32 {
+        let byte = at / 8;
+        let word = if byte + 4 <= self.data.len() {
+            u32::from_be_bytes([
+                self.data[byte],
+                self.data[byte + 1],
+                self.data[byte + 2],
+                self.data[byte + 3],
+            ])
+        } else {
+            let mut word = 0;
+            for k in 0..4 {
+                word = (word << 8) | u32::from(*self.data.get(byte + k).unwrap_or(&0));
+            }
+            word
+        };
+        word << (at % 8)
+    }
+
+    /// Tops the look-ahead up to the register's capacity, below the offset.
+    #[cfg(not(target_pointer_width = "64"))]
+    #[inline(always)]
+    fn append(&mut self) {
+        let count = Self::OFFSET_SHIFT - self.available as u32;
+        self.value |= self.window(self.next) >> (Word::BITS - count);
+        self.next += count as usize;
+        self.available = Self::OFFSET_SHIFT as i32;
     }
 
     /// DecodeDecision with branchless interval selection and clz renormalisation.
@@ -241,7 +302,7 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
         let row = LPS_ROW[current];
         let lps = (row >> ((self.range >> 3) & 0x18)) & 0xff;
         let mps = self.range - lps;
-        let scaled = u64::from(mps) << Self::OFFSET_SHIFT;
+        let scaled = Word::from(mps) << Self::OFFSET_SHIFT;
         let is_lps = self.value >= scaled;
         // Renormalisation shifts of both outcomes are computed in parallel.
         let shift_lps = lps.leading_zeros() - 23;
@@ -265,18 +326,18 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
     /// DecodeBypass.
     #[inline(always)]
     pub fn bypass(&mut self) -> u32 {
-        let range = u64::from(self.range);
+        let range = Word::from(self.range);
         let bin;
         if HEADROOM {
             self.value <<= 1;
             let scaled = range << Self::OFFSET_SHIFT;
             bin = self.value >= scaled;
-            self.value -= scaled & u64::from(bin).wrapping_neg();
+            self.value -= scaled & Word::from(bin).wrapping_neg();
         } else {
             // The top 10 bits are (ivlOffset << 1) | next bit.
             let scaled = range << (Self::OFFSET_SHIFT - 1);
             bin = self.value >= scaled;
-            self.value -= scaled & u64::from(bin).wrapping_neg();
+            self.value -= scaled & Word::from(bin).wrapping_neg();
             self.value <<= 1;
         }
         self.available -= 1;
@@ -291,7 +352,9 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
     #[inline(always)]
     #[must_use]
     pub fn peek_bypass(&self, count: u32) -> u32 {
-        ((self.value >> (Self::OFFSET_SHIFT - count)) / u64::from(self.range)) as u32
+        #[allow(clippy::unnecessary_cast)] // a u64 register on 64-bit targets
+        let bins = ((self.value >> (Self::OFFSET_SHIFT - count)) / Word::from(self.range)) as u32;
+        bins
     }
 
     /// Consumes `count` bypass bins whose bin string is `bins`, as [`Engine::peek_bypass`]
@@ -299,8 +362,8 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
     #[inline(always)]
     pub fn consume_bypass(&mut self, count: u32, bins: u32) {
         let top = self.value >> (Self::OFFSET_SHIFT - count);
-        let remainder = top - u64::from(bins) * u64::from(self.range);
-        let rest = self.value & ((1u64 << (Self::OFFSET_SHIFT - count)) - 1);
+        let remainder = top - Word::from(bins) * Word::from(self.range);
+        let rest = self.value & ((1 << (Self::OFFSET_SHIFT - count)) - 1);
         self.value = (remainder << Self::OFFSET_SHIFT) | (rest << count);
         self.available -= count as i32;
     }
@@ -358,7 +421,7 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
     #[inline(always)]
     pub fn terminate(&mut self) -> u32 {
         self.range -= 2;
-        let scaled = u64::from(self.range) << Self::OFFSET_SHIFT;
+        let scaled = Word::from(self.range) << Self::OFFSET_SHIFT;
         if self.value >= scaled {
             1
         } else {
@@ -376,7 +439,12 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
     #[inline]
     #[must_use]
     pub fn bits_read(&self) -> usize {
-        (self.next * 8).wrapping_sub(self.available as usize)
+        let next_bit = if cfg!(target_pointer_width = "64") {
+            self.next * 8
+        } else {
+            self.next
+        };
+        next_bit.wrapping_sub(self.available as usize)
     }
 
     /// The byte position after the last bit read, rounded up to a boundary: where PCM samples
@@ -387,11 +455,15 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
         self.bits_read().div_ceil(8)
     }
 
-    /// The next byte the engine would load.
+    /// The next byte the engine would load: on 32-bit targets, the first byte not wholly loaded.
     #[inline]
     #[must_use]
     pub fn next_byte(&self) -> usize {
-        self.next
+        if cfg!(target_pointer_width = "64") {
+            self.next
+        } else {
+            self.next.div_ceil(8)
+        }
     }
 
     /// The slice the engine reads.
@@ -584,8 +656,8 @@ mod tests {
         for _ in 0..1000 {
             assert_eq!(engine.bypass(), 0);
         }
-        assert_eq!(engine.next_byte() % 4, 0);
         assert!(engine.bits_read() > 1000);
+        assert!(engine.next_byte() * 8 >= engine.bits_read());
     }
 
     #[test]

@@ -243,6 +243,7 @@ fn drain(
                     | AccessUnit::Ac3(_)
                     | AccessUnit::MpegAudio(_)
                     | AccessUnit::Dts(_)
+                    | AccessUnit::DtsExtension(_)
                         if matches!(kind, Kind::AudioSeek) =>
                     {
                         fold(

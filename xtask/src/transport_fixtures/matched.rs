@@ -1,4 +1,6 @@
 //! Independently authored TS controls for selected-track seek and audio framing.
+mod xll;
+
 use super::{Codec, PID, PROGRAM, Part, R, Transport, part, source};
 use crate::corpus::write_json;
 use crate::json::{self, Value};
@@ -957,7 +959,7 @@ pub fn author_audio_seek(root: &Path, args: &[String]) -> R<()> {
     manifest(root, FEATURE, cases)
 }
 
-/// Exercise source PTS anchors around a DTS core frame using prior history.
+/// Exercise DTS core history and self-contained XLL seek entries.
 pub fn author_dts_seek(root: &Path, args: &[String]) -> R<()> {
     let [record, reference] = args else {
         return Err("usage: cargo xtask fixture transport-dts-seek --record REFERENCE".into());
@@ -1016,6 +1018,7 @@ pub fn author_dts_seek(root: &Path, args: &[String]) -> R<()> {
             "ts-audio-seek-fold",
         )?);
     }
+    xll::seek_cases(root, FEATURE, Path::new(reference), &mut cases)?;
     manifest(root, FEATURE, cases)
 }
 

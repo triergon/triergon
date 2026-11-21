@@ -12,7 +12,7 @@ when it passes all three gates on every case in its corpus.
 | Gate | Requirement |
 |---|---|
 | Parity | Every declared feature matches the reference on every required case. Missing inputs, crashes, unsupported declared cases and unexplained differences are failures, never omitted rows. |
-| Runtime | `T_triergon / T_reference` at most **1.05** per case, using the upper bound of a paired 95% confidence interval ([early stop](#early-stop)). The optimisation target is **0.80**. Both values are defined in [`harness/policy.json`](../harness/policy.json) and nowhere else; `cargo xtask check` keeps this line and every status row in step with it. |
+| Runtime | `T_triergon / T_reference` at most **1.00** per case, using the upper bound of a paired 95% confidence interval ([early stop](#early-stop)). The optimisation target is **0.80**. Both values are defined in [`harness/policy.json`](../harness/policy.json) and nowhere else; `cargo xtask check` keeps this line and every status row in step with it. |
 | Memory | Peak live heap and total resident peak RSS both strictly lower than the reference, each at the upper bound of a paired 95% interval ([early stop](#early-stop)). |
 
 The harness reads these limits from `harness/policy.json`. Each feature's contract and
@@ -84,7 +84,16 @@ resource limit becomes an explicit, reviewed rule for that case.
   into the worker so the allocation observer can audit the code doing the work.
 - **DTS transport reference.** The `transport-dts` profile enables the MPEG-TS
   demuxer and DTS parser for the [DVB DTS comparison](../harness/features/mpegts-dts-core/contract.json).
-  The worker uses the same transport fold as the formats reference.
+  The legacy packet operation uses the same transport fold as the formats reference.
+  The [grouped DTS-HD comparison](../harness/features/mpegts-dts-hd-grouped/contract.json)
+  uses the demuxer without parsing, then explicitly feeds each aligned finite PES
+  to the public DTS parser and drains it. Its source-clock fold includes original
+  PES headers, physical and elementary ranges, one-use PTS/DTS and the exact
+  reference-clock duration. A small independent fixed-prefix reader supplies the
+  source duration, distinct from the parser's asset-derived duration. The
+  [multiple-extension comparison](../harness/features/mpegts-dts-hd-extensions/contract.json)
+  uses complete demuxer packets, because the explicit parser separates extension
+  substreams. These operations keep the legacy DTS-HD comparison unchanged.
 - **Container scope.** A candidate worker carries only the runner families its
   reference build can demux. `media-worker` reads Matroska for the `matroska` build's
   container harness; `playback-matroska-worker` runs Matroska startup and seek (`feed-`)
@@ -567,11 +576,12 @@ may override that count for diagnostic comparisons.
   grades are built by the dated nightly xtask pins (`NIGHTLY`, the one `cargo xtask
   check-simd` uses) with the AAC decoder's `simd` feature. The AAC workloads of
   `workloads.json` and the AAC lane's output are measured from that worker, through
-  `--candidate-for audio-aac=` and `--codec-worker-for audio-aac=`. On the 32-bit ARM
+  `--candidate-for audio-aac=` and `--codec-worker-for audio-aac=`, and so is AAC in MOV,
+  whose contract names it as the candidate. On the 32-bit ARM
   target LLVM emits no NEON float code from scalar loops, and explicit `std::simd`
   vectors are nightly-only; the decoder's SBR QMF banks need them there. Every other
   worker stays on the stable pin, `codec-worker` included: the video, AC-3, E-AC-3, DTS
-  and file-format workloads, the conformance vectors, the readers and AAC in MOV: the
+  and file-format workloads, the conformance vectors and the readers: the
   nightly compiler builds the video decoders slower on ARMv7
   ([status](status.md#32-bit-armv7)).
   One revision built by a newer compiler or with `-C target-cpu` differs from it by up

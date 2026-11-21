@@ -526,6 +526,42 @@ fn tied_landings_stay_within_the_selected_epoch_and_keep_missing_dts() {
 }
 
 #[test]
+fn seek_picks_the_last_tied_packet_after_a_table_version_change() {
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    ts.pes(PID, 0xc0, &adts(b"first"), Some(90_000), None);
+    ts.tables(&[(0x0f, PID, &[])], 1);
+    ts.pes(PID, 0xc0, &adts(b"last"), Some(90_000), None);
+    ts.pes(PID, 0xc0, &adts(b"tail"), Some(93_000), None);
+    let pool = Budget::new(1 << 20).unwrap();
+    let original = sequential(&pool, &ts.bytes, PacketFormat::Ts188);
+    assert_eq!(original[0].epochs(), original[1].epochs());
+    assert_eq!(
+        original[0].elementary_range().start,
+        original[1].elementary_range().start
+    );
+    let expected: Vec<_> = original[1..].iter().map(snapshot).collect();
+    for explicit in [false, true] {
+        let mut seeking = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+        let target = request(91_000);
+        if explicit {
+            seeking
+                .request_seek_in_epoch(target, original[1].epochs())
+                .unwrap();
+        } else {
+            seeking.request_seek(target).unwrap();
+        }
+        let mut packets = Vec::new();
+        while let Some(event) = next(&mut seeking, &pool, &ts.bytes, 7, 1).unwrap() {
+            if let Event::Packet(packet) = event {
+                packets.push(snapshot(&packet));
+            }
+        }
+        assert_eq!(packets, expected);
+    }
+}
+
+#[test]
 fn epoch_selection_preserves_input_identity_and_seek_preconditions() {
     let ts = changed_video(false);
     let pool = Budget::new(32 << 20).unwrap();

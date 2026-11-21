@@ -191,6 +191,26 @@ CARGO_INCREMENTAL=0 cargo xtask report \
 
 Native Linux parity, runtime and memory qualification remain separate checks.
 
+DTS-HD seeking also supports a lossless XLL stream with no core, one extension
+substream at index zero, one presentation and one active speaker asset. An entry
+must be advertised as construction 17, carry its own static metadata, use coding
+mode 1, and contain one complete
+version 1 XLL frame. Its navigation must signal a DWORD-aligned XLL sync word at offset zero,
+zero initial decoding delay and no smoothing buffer. The common-header checksum
+is checked cooperatively before the seek result is issued. Missing static setup
+or sync, nonzero delay and nonzero sync offset do not establish an entry. Other
+asset layouts, mixing, speaker remapping, secondary decoding and Rev2 DRC are
+unsupported for seeking. Core-bearing DTS-HD remains unsupported even when the
+core predictor-history flag is clear. The same scan bound, index, original packet
+suffix and preroll discard time apply.
+
+The recovery requirements follow [ETSI TS 102 114 V1.6.1](https://www.etsi.org/deliver/etsi_ts/102100_102199/102114/01.06.01_60/ts_102114v010601p.pdf),
+Tables 7-2 and 7-5–7-7 and §7.5.3.4. XLL predictor history is confined to a frame
+(§8.5.2.1 and §8.5.4); the common header and checksum are specified in §8.3.1 and
+Annex B. Annex G.3.1 and Table E-2 identify construction 17 as XLL without a core.
+Annex F.4.3 defines PES alignment and complete access-unit carriage;
+alignment alone does not establish decoder recovery.
+
 Use `Reader::request_seek_in_entities` for consecutive length-known, seekable
 parts of one logical transport stream. The ordered `SeekEntity` list supplies
 source IDs and lengths, and the scan bound applies to their combined size. Feed
@@ -340,13 +360,28 @@ reader can frame one core-bearing DTS-HD unit per aligned finite PES. It
 checks the signalled extension substream order, extents and header CRC and
 leaves the asset payloads intact. `DtsAudioFrame::core_bytes` exposes the core
 prefix, and `bytes` exposes the complete unit. The original PES supplies its
-clock. Extension-only carriage remains outside this path.
-A track with a single extension substream and no core can contain multiple
-units per aligned PES. Each `DtsExtensionFrame` retains the original bytes and
-reports the coded duration when the reference clock and frame duration are
-available. Later frames can reuse the static timing fields. Conflicting
-substream indexes and partial payloads are rejected. The aligned PES limit
-is `ReaderLimits::maximum_dts_hd_pes_bytes`.
+clock.
+A track without a core can carry one to four signalled extension substreams.
+Each `DtsExtensionFrame` contains one complete access unit, including all its
+extension headers, zero alignment padding and opaque asset bytes. The reader
+checks every extension's index, extent and header CRC before publishing the unit.
+Only a single-substream track can contain multiple access units per aligned
+finite PES; a multi-substream track requires exactly one complete unit per PES
+([TS 102 114 V1.6.1 §7.5.2 and F.4.3](https://www.etsi.org/deliver/etsi_ts/102100_102199/102114/01.06.01_60/ts_102114v010601p.pdf)).
+The lowest-index extension supplies the coded duration when its reference clock
+and frame duration are available. Later units can reuse that substream's static
+timing. `Packet::sample_duration` preserves the exact rational span; the integral
+90 kHz duration stays absent when that span is fractional. Only the first unit
+claims the original PES clock, and missing DTS remains absent. Every unit retains
+its intersection within the original PES. The aligned PES limit is
+`ReaderLimits::maximum_dts_hd_pes_bytes`.
+
+The [grouped extension comparison](../../harness/features/mpegts-dts-hd-grouped/contract.json)
+explicitly feeds original PES bytes and source clocks to FFmpeg's DTS parser.
+The [multiple-extension comparison](../../harness/features/mpegts-dts-hd-extensions/contract.json)
+compares the demuxer's complete PES access units: the explicit parser emits each
+extension separately. Both keep the existing [DTS-HD demux comparison](../../harness/features/mpegts-dts-hd/contract.json)
+intact. Comparison projections do not alter public packets.
 
 For DVB AC-3, an elementary `AC-3` registration can corroborate descriptor `0x6a`.
 
@@ -791,6 +826,39 @@ Specification basis:
   D.5 (AC-3 and E-AC-3 descriptors).
 
 Verification:
+
+- The [DTS seek comparison](../../harness/features/mpegts-dts-seek/contract.json)
+  contains the two DTS core history cases and twelve authored XLL cases. XLL covers
+  short extension headers in TS188 and long extension headers in M2TS192, both
+  seek policies at 90,000 and 91,920 source ticks, explicit and missing source DTS,
+  and an indexed backward seek after draining to EOF. Each suffix includes every
+  payload byte and its source clocks. The fixture author is
+  `cargo xtask fixture transport-dts-seek --record REFERENCE`; it records folds
+  through the FFmpeg TS audio seek worker and reproduces the existing core cases.
+  FFmpeg identifies the DVB extension descriptor as data and preserves the aligned
+  full PES payload. These inputs contain only self-contained XLL entries with
+  checked recovery navigation; the independent reader tests cover refusals.
+  Synthetic bodies exercise framing and recovery metadata, not audio decoding.
+  Run `CARGO_INCREMENTAL=0 cargo xtask build-workers --only transport-worker`, then
+  `CARGO_INCREMENTAL=0 cargo xtask report --contract harness/features/mpegts-dts-seek/contract.json --manifest harness/features/mpegts-dts-seek/corpus.json --corpus . --output DIR`.
+  Adding `--benchmark --memory --require-slice-acceptance` applies the complete
+  per-case runtime, live-heap and total-RSS contract on each required native target.
+  XLL runtime and memory remain unmeasured.
+- `CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test container_reader seek::dts_hd`
+  checks DTS-HD seek metadata, full original packet and PES provenance, exact clocks,
+  small input/work grants, TS188/M2TS192, previous/preroll landings, index reuse,
+  tied timestamps and explicit refusals. Synthetic payloads test recovery syntax,
+  not decoded audio.
+- The ignored test `fate_lossless_only_entries_decode_the_exact_pcm_suffix` uses
+  FATE `dts/dcadec-suite/xll_51_24_48_none.dtshd`, SHA-256
+  `c445bb746c6afc920761b55b00932053d64a96d3d08cd9cad4c759a892fae4cd`.
+  Set `TRIERGON_DTS_HD_XLL` to that local file and optionally `TRIERGON_FFMPEG`
+  to a decoder binary, then run
+  `CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test container_reader fate_lossless_only_entries -- --ignored`.
+  It checks every source field of three seek suffixes and compares their complete
+  PCM bytes with sequential decoding through the FFmpeg command-line interface.
+  The sample stays outside the repository. This is functional coverage, not
+  runtime or memory qualification.
 
 - Integration tests under `tests/` use independently authored transport
   streams in `tests/data/` (listed in `tests/data/manifest.json`) with

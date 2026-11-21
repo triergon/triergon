@@ -16,10 +16,12 @@ static void quote(const char *s) {
 }
 static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return(uint64_t)t.tv_sec*1000000000+(uint64_t)t.tv_nsec;}
 #include "reference_ts.h"
+#include "reference_ts_dts_hd.h"
 
 int main(int argc, char **argv)
 {
-    if (argc < 3 || strncmp(argv[1], "ts-au-", 6))
+    const int dts_hd = argc >= 3 && !strncmp(argv[1], DTS_HD_PREFIX, sizeof(DTS_HD_PREFIX) - 1);
+    if (argc < 3 || (!dts_hd && strncmp(argv[1], "ts-au-", 6)))
         return 2;
     FILE *file = fopen(argv[2], "rb");
     if (!file)
@@ -32,7 +34,8 @@ int main(int argc, char **argv)
     uint8_t *bytes = malloc((size_t)size);
     size_t read = bytes ? fread(bytes, 1, (size_t)size, file) : 0;
     fclose(file);
-    int status = read == (size_t)size ? ts_main(argc, argv, bytes, size) : 2;
+    int status = read != (size_t)size ? 2 : dts_hd
+        ? dts_hd_main(argc, argv, bytes, size) : ts_main(argc, argv, bytes, size);
     free(bytes);
     return status;
 }
