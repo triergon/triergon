@@ -501,11 +501,11 @@ impl Direct {
                     }
                     let checkpoint = &self.index.checkpoints.as_slice()[self.checkpoint];
                     let pid = self.index.map.map().streams.as_slice()[0].pid;
-                    reader
-                        .stream
-                        .as_mut()
-                        .ok_or(Error::SourceMismatch)?
-                        .resume_elementary_offset(pid, checkpoint.elementary)?;
+                    let crate::reader::Transport::Open { stream, .. } = &mut reader.transport
+                    else {
+                        return Err(Error::SourceMismatch);
+                    };
+                    stream.resume_elementary_offset(pid, checkpoint.elementary)?;
                     reader.lanes.as_mut_slice()[0].resume_independent(
                         checkpoint.elementary,
                         checkpoint.frames,

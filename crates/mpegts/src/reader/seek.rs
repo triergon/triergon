@@ -849,12 +849,12 @@ impl Reader {
         self.seek_entities = entities;
         self.seek_index = index;
         self.seek = seek;
-        if let Some(direct) = &self.seek.as_slice()[0].direct {
-            input = self
-                .input
-                .as_mut()
-                .expect("seek input")
-                .request_range(direct.offset())?;
+        if let Some(offset) = self.seek.as_slice()[0]
+            .direct
+            .as_ref()
+            .map(physical::Direct::offset)
+        {
+            input = self.input_mut()?.request_range(offset)?;
         }
         Ok(input)
     }
@@ -1049,11 +1049,7 @@ impl Reader {
                         physical::Direct::new(index.physical.as_ref(), landing, source, caps)
                     });
                     let input = if let Some(direct) = &direct {
-                        replay
-                            .input
-                            .as_mut()
-                            .expect("replay input")
-                            .request_range(direct.offset())?
+                        replay.input_mut()?.request_range(direct.offset())?
                     } else {
                         replay.request()?
                     };

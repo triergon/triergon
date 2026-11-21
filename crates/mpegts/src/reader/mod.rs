@@ -164,6 +164,23 @@ enum PacketTracks {
     Closed,
 }
 
+/// The input and transport state the reader reads from.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "the open transport is the common case and stays inline"
+)]
+enum Transport {
+    /// Transport packets are being read.
+    Open {
+        input: InputCursor,
+        stream: TransportStream,
+    },
+    /// The transport finished and released its storage; lane fragments remain.
+    Released { input: InputCursor },
+    /// Closed or failed: every call reports this error.
+    Stopped(Error),
+}
+
 /// Incremental TS188/M2TS192 reader delivering complete source AUs, separately
 /// from every original transport event. This performs no I/O or decoder-feed
 /// injection. Unsupported carriages retain source facts and report a typed gap.
@@ -174,8 +191,7 @@ pub struct Reader {
     window: usize,
     limits: ReaderLimits,
     packet_tracks: PacketTracks,
-    input: Option<InputCursor>,
-    stream: Option<TransportStream>,
+    transport: Transport,
     lanes: BudgetVec<Lane>,
     tracks: BudgetVec<Track>,
     staged_tracks: BudgetVec<Track>,
@@ -192,7 +208,6 @@ pub struct Reader {
     next_entity: Option<NextEntity>,
     end: Option<SourceLocation>,
     finished: bool,
-    failure: Option<Error>,
     deferred_fragment: bool,
     storage: Option<StorageScan>,
     seek: BudgetVec<seek::Seeking>,
@@ -208,7 +223,7 @@ impl std::fmt::Debug for Reader {
             .field("limits", &self.limits)
             .field("tracks", &self.lanes.len())
             .field("finished", &self.finished)
-            .field("failure", &self.failure)
+            .field("failure", &self.healthy().err())
             .finish_non_exhaustive()
     }
 }
@@ -248,7 +263,7 @@ impl Reader {
         new.streams
             .iter()
             .position(|entry| entry.pid == stream.pid)
-            .and_then(|position| self.stream.as_ref()?.route_state(position, stream.pid))
+            .and_then(|position| self.stream()?.route_state(position, stream.pid))
             .is_some_and(|(epochs, _)| {
                 epochs.configuration == lane.track.epoch
                     && !matches!(lane.run, PesRun::Active(old, _) if old != epochs)
@@ -303,8 +318,7 @@ impl Reader {
             window: input_window,
             limits,
             packet_tracks: PacketTracks::All,
-            input: Some(input),
-            stream: Some(stream),
+            transport: Transport::Open { input, stream },
             lanes: BudgetVec::new(pool),
             tracks: BudgetVec::new(pool),
             staged_tracks: BudgetVec::new(pool),
@@ -321,7 +335,6 @@ impl Reader {
             next_entity: None,
             end: None,
             finished: false,
-            failure: None,
             deferred_fragment: false,
             storage: None,
             seek: BudgetVec::new(pool),
@@ -394,7 +407,44 @@ impl Reader {
     }
 
     pub(crate) fn continuity_source(&self) -> Option<(&InputCursor, Option<&TransportStream>)> {
-        Some((self.input.as_ref()?, self.stream.as_ref()))
+        match &self.transport {
+            Transport::Open { input, stream } => Some((input, Some(stream))),
+            Transport::Released { input } => Some((input, None)),
+            Transport::Stopped(_) => None,
+        }
+    }
+
+    fn input(&self) -> Result<&InputCursor> {
+        match &self.transport {
+            Transport::Open { input, .. } | Transport::Released { input } => Ok(input),
+            Transport::Stopped(error) => Err(*error),
+        }
+    }
+
+    fn input_mut(&mut self) -> Result<&mut InputCursor> {
+        match &mut self.transport {
+            Transport::Open { input, .. } | Transport::Released { input } => Ok(input),
+            Transport::Stopped(error) => Err(*error),
+        }
+    }
+
+    fn stream(&self) -> Option<&TransportStream> {
+        match &self.transport {
+            Transport::Open { stream, .. } => Some(stream),
+            Transport::Released { .. } | Transport::Stopped(_) => None,
+        }
+    }
+
+    /// Drops the finished transport's storage and keeps the input.
+    fn release_transport(&mut self) {
+        let placeholder = Transport::Stopped(Error::Closed);
+        self.transport = match std::mem::replace(&mut self.transport, placeholder) {
+            Transport::Open { input, stream } => {
+                drop(stream);
+                Transport::Released { input }
+            }
+            other => other,
+        };
     }
     /// The tracks of the selected program announced so far.
     pub fn tracks(&self) -> &[Track] {
@@ -404,12 +454,7 @@ impl Reader {
     ///
     /// Fails with the reader's stopping error once it has failed or been closed.
     pub fn request(&self) -> Result<InputRequest> {
-        self.healthy()?;
-        Ok(self
-            .input
-            .as_ref()
-            .ok_or(Error::Invalid("MPEG-TS reader closed"))?
-            .request())
+        Ok(self.input()?.request())
     }
     /// Supplies input for the current request.
     ///
@@ -417,11 +462,7 @@ impl Reader {
     /// answer
     /// the current request.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
-        self.healthy()?;
-        self.input
-            .as_mut()
-            .ok_or(Error::Invalid("MPEG-TS reader closed"))?
-            .provide(window)?;
+        self.input_mut()?.provide(window)?;
         if self.storage.is_some() && !window.bytes().is_empty() {
             // An early reply can add backing storage while a growth audit yields.
             self.storage = None;
@@ -454,10 +495,7 @@ impl Reader {
     }
 
     fn finish_input(&mut self, source: SourceId, token: InputToken) -> Result<()> {
-        let input = self
-            .input
-            .as_mut()
-            .ok_or(Error::Invalid("MPEG-TS reader closed"))?;
+        let input = self.input_mut()?;
         let result = input.finish(source, token);
         self.caps = input.capabilities();
         if let Err(error) = result
@@ -531,11 +569,7 @@ impl Reader {
         token: InputToken,
         failure: SourceFailure,
     ) -> Result<()> {
-        self.healthy()?;
-        self.input
-            .as_mut()
-            .ok_or(Error::Invalid("MPEG-TS reader closed"))?
-            .fail(source, token, failure)?;
+        self.input_mut()?.fail(source, token, failure)?;
         self.stop(match failure {
             SourceFailure::Transport => Error::Transport,
             SourceFailure::Cancelled => Error::Cancelled,
@@ -563,12 +597,13 @@ impl Reader {
         Ok(request)
     }
     fn healthy(&self) -> Result<()> {
-        self.failure.map_or(Ok(()), Err)
+        match self.transport {
+            Transport::Stopped(error) => Err(error),
+            Transport::Open { .. } | Transport::Released { .. } => Ok(()),
+        }
     }
     fn stop(&mut self, error: Error) {
-        self.failure = Some(error);
-        self.input = None;
-        self.stream = None;
+        self.transport = Transport::Stopped(error);
         self.lanes = BudgetVec::new(&self.pool);
         self.tracks = BudgetVec::new(&self.pool);
         self.staged_tracks = BudgetVec::new(&self.pool);
@@ -797,7 +832,7 @@ impl Reader {
                             TraceEvent::Pat(table) => {
                                 self.tsid = Some(table.header.extension);
                                 self.phase = if self.map.is_some()
-                                    && !self.stream.as_ref().expect("active transport").has_active_map()
+                                    && !self.stream().is_some_and(TransportStream::has_active_map)
                                 {
                                     Phase::DrainAll { index: 0, retained: 0 }
                                 } else {
@@ -908,7 +943,7 @@ impl Reader {
                                 // No transport or framer can produce more bytes.
                                 // Release opaque parser storage before auditing
                                 // the remaining owners for fragment publication.
-                                self.stream = None;
+                                self.release_transport();
                                 self.boundary = None;
                                 self.active = None;
                                 self.phase = Phase::Fragments(0);
@@ -944,10 +979,13 @@ impl Reader {
                             // Remember the exact open PES in a reused route.
                             // Physical offsets can restart in every entity.
                             let (epochs, pending_header) = self
-                                .stream
-                                .as_ref()
-                                .expect("active transport")
-                                .route_state(index, source.map().streams.as_slice()[index].pid)
+                                .stream()
+                                .and_then(|stream| {
+                                    stream.route_state(
+                                        index,
+                                        source.map().streams.as_slice()[index].pid,
+                                    )
+                                })
                                 .ok_or(Error::Invalid("MPEG-TS track route missing"))?;
                             let stream = &source.map().streams.as_slice()[index];
                             let unlabelled_dts_core =
@@ -1011,8 +1049,7 @@ impl Reader {
                         // still holds the PES that began before the program change.
                         if let PesRun::BeforeBoundary(start) = previous.run
                             && self
-                                .stream
-                                .as_ref()
+                                .stream()
                                 .and_then(|stream| {
                                     stream.route_state(index, lane.track.stream().pid)
                                 })
@@ -1080,10 +1117,8 @@ impl Reader {
                     let clock = ClockContext {
                         key,
                         quarantined: self
-                            .stream
-                            .as_ref()
-                            .expect("active transport")
-                            .clock_is_quarantined(),
+                            .stream()
+                            .is_some_and(TransportStream::clock_is_quarantined),
                     };
                     self.queued_pes = Some((index, source.clone(), clock));
                     self.phase = Phase::Publish;
@@ -1103,11 +1138,7 @@ impl Reader {
                     let source = self.pending.take().expect("published source");
                     match source.event() {
                         TraceEvent::Pat(_)
-                            if !self
-                                .stream
-                                .as_ref()
-                                .expect("active transport")
-                                .has_active_map() =>
+                            if !self.stream().is_some_and(TransportStream::has_active_map) =>
                         {
                             self.map = None;
                             self.tracks.clear();
@@ -1169,14 +1200,9 @@ impl Reader {
                         .ok_or(Error::Invalid("MPEG-TS missing source end"))?,
                 ));
             }
-            let stream = self
-                .stream
-                .as_mut()
-                .ok_or(Error::Invalid("MPEG-TS reader closed"))?;
-            let input = self
-                .input
-                .as_mut()
-                .ok_or(Error::Invalid("MPEG-TS reader closed"))?;
+            let Transport::Open { input, stream } = &mut self.transport else {
+                return Err(Error::Invalid("MPEG-TS reader closed"));
+            };
             let mut observed = false;
             let result = stream.poll_observing::<OBSERVING>(input, work, cancel, |event| {
                 observed = true;
@@ -1225,8 +1251,9 @@ impl Reader {
                 }
                 Step::Yield => return Ok(Step::Yield),
                 Step::End(location) => {
-                    let stream = self.stream.as_mut().expect("active transport");
-                    let input = self.input.as_mut().expect("active input");
+                    let Transport::Open { input, stream } = &mut self.transport else {
+                        return Err(Error::Invalid("MPEG-TS reader closed"));
+                    };
                     if let Some(next) = self.next_entity {
                         let Some(end) = stream.media_entity_end(input, work, cancel)? else {
                             return Ok(Step::Yield);
@@ -1255,8 +1282,11 @@ impl Reader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<TraceEvent>> {
-        let stream = self.stream.as_ref().expect("blocked transport");
-        let Some(floor) = stream.blocked_pes_growth_floor()? else {
+        let floor = match self.stream() {
+            Some(stream) => stream.blocked_pes_growth_floor()?,
+            None => None,
+        };
+        let Some(floor) = floor else {
             self.storage = None;
             return Err(error);
         };
@@ -1274,7 +1304,9 @@ impl Reader {
                 return Ok(Step::Yield);
             }
             let limit = crate::limit(scan.bytes(), self.pool.limit());
-            let stream = self.stream.as_mut().expect("blocked transport");
+            let Transport::Open { stream, .. } = &mut self.transport else {
+                return Err(error);
+            };
             return Ok(Step::Ready(stream.refuse_blocked_pes_growth(limit)));
         }
         self.storage = Some(scan);

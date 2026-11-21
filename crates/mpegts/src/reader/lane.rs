@@ -370,7 +370,10 @@ impl StorageCursor {
         let item = match *self {
             Self::Transport(cursor) => {
                 let mut next = cursor;
-                let item = next.step(reader.stream.as_ref().expect("blocked transport"))?;
+                let Some(stream) = reader.stream() else {
+                    return Err(Error::Invalid("MPEG-TS storage audit changed during scan"));
+                };
+                let item = next.step(stream)?;
                 *self = if next == TransportStorageCursor::End {
                     Self::Map
                 } else {
@@ -416,7 +419,7 @@ impl StorageCursor {
                     *self = Self::MapStream(index + 1);
                     Some(StorageItem::Bytes(&stream.descriptor_bytes))
                 } else {
-                    *self = if reader.stream.is_some() {
+                    *self = if reader.stream().is_some() {
                         Self::Boundary
                     } else {
                         Self::Input
@@ -461,14 +464,14 @@ impl StorageCursor {
             Self::Input => {
                 *self = Self::Lane(0);
                 reader
-                    .input
-                    .as_ref()
+                    .input()
+                    .ok()
                     .and_then(triergon_core::InputCursor::buffered_owner)
                     .map(StorageItem::Bytes)
             }
             Self::Lane(index) => {
                 if let Some(lane) = reader.lanes.as_slice().get(index) {
-                    let live = reader.stream.is_some();
+                    let live = reader.stream().is_some();
                     if lane.input.is_some()
                         || lane.build.is_some()
                         || (!live && (lane.framer.is_some() || lane.residue.is_some()))
@@ -572,7 +575,7 @@ pub(super) struct StorageScan {
 
 impl StorageScan {
     pub(super) fn new(reader: &super::Reader) -> Result<Self> {
-        if reader.stream.is_some()
+        if reader.stream().is_some()
             || reader.boundary.is_some()
             || !reader
                 .pending
