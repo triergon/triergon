@@ -794,7 +794,7 @@ fields from MPEG extension descriptors (`0x3f`, extension IDs `0x17`/`0x18`).
 They check exact lengths, linkage counts and video reserved bits; linkage tags
 borrow the original bytes and retain order and duplicates. These opt-in views
 do not change `validate_selected_syntax` or PMT admission. Unknown descriptors
-remain opaque. Base/enhancement association, codec admission, enhancement framing
+remain opaque. Codec admission, enhancement framing
 and decoding remain unsupported. H.222.0 (08/2023) Table 2-34 assigns LCEVC
 stream type `0x36`; `0x33` is VVC.
 
@@ -803,6 +803,31 @@ Table 2-45, §§2.6.90–91 (Tables 2-109–110) and §§2.6.137–140
 (Tables 2-142–143); §2.1.131 defines the default reserved-one bits.
 Profile and HDR fields retain encoded values without asserting codec conformance.
 Five authored tests in `tests/lcevc.rs` check these source views.
+
+`TraceEvent::require_lcevc_association` explicitly resolves one enhancement PID
+of type `0x36` in an active PMT. It returns a borrowed `psi::LcevcAssociation`
+with the exact PMT, configuration epoch, base and enhancement entries, and encoded
+video fields. The map retains physical source ranges and the caller's descriptor
+namespace. MPEG extension tag `0x3f` has its standard meaning in every private
+namespace; DVB extension tag `0x7f` does not substitute for it. Only elementary
+descriptor loops participate. The matching rule is H.222.0 §§2.6.138 and 2.6.140:
+the linkage descriptor identifies the base by the enhancement's video descriptor
+tag. The same-program placement rules also appear in the official
+[LCEVC amendment](https://www.itu.int/rec/T-REC-H.222.0-202212-S!Amd1/en), §2.25.1.
+
+This view supports MPEG-1/2, AVC and HEVC base stream types. Other base types and
+multiple video descriptors on the selected enhancement return `Unsupported`.
+Missing links, self links, malformed descriptor syntax and distinct base
+entries sharing the selected tag return explicit errors. Repeated tag
+occurrences on a single base remain equivalent and their raw order is preserved.
+One base can serve multiple enhancements, with equal or distinct tags. Program
+descriptors provide no fallback. Two complete scans are charged to the supplied `WorkBudget`; a short
+grant spends no work and can be retried. No allocation or reader state changes
+occur. Relationships stay attached to the borrowed PMT event across replacements;
+each new PMT must be resolved separately. Optional codec lookup and strict reader
+admission are unchanged. Eight authored tests in `tests/lcevc_association.rs` check
+source identity, namespaces, replacements, exact refusals and work admission.
+These are functional checks; reference parity and performance are unmeasured.
 
 | Area | Coverage |
 | --- | --- |
