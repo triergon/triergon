@@ -1,0 +1,27 @@
+{
+ "name": "gate-run-armv7-ca7e19e1-20261121-182818-shard-1",
+ "path": "gate-run-armv7-ca7e19e1-20261121-182818-shard-1",
+ "retention": "retained",
+ "reason": "Fixed-pair progressive playback comparisons on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/ca7e19e1c5b3cc3d85655889ede642a4b44e4690-armv7-20261121-182818/shard-1/07aab5d569fbe8cbb875415c74463b8d1d7309edf2e76204ec868deacaf3d6f7.tar.zst",
+ "sha256": "07aab5d569fbe8cbb875415c74463b8d1d7309edf2e76204ec868deacaf3d6f7",
+ "bytes": 3597755,
+ "results": [
+  {
+   "path": "memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "5ee68566844e6c33d710a58baef2bb17f0938e54dc703072fc30b00cd116c69c",
+   "status": 0,
+   "report_sha256": "244934ca8a88c65eb4b013c636cb3ed449a9ce56b00b4f0f3ca8adb69895f669",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "fedbe8b334746120c008436acdcb26c6a37fe7b60e4644fe140a0477a504b943",
+   "status": 0,
+   "report_sha256": "def43a19e72165946d3fd371a3c639bfb4c2eec5d1605035e2a147c76b565659",
+   "cases_checked": true
+  }
+ ]
+}

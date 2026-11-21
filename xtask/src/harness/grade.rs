@@ -1739,7 +1739,7 @@ mod tests {
             ("matroska-audio-clocks", 10),
             ("matroska-legacy-aac", 4),
             ("mp4-forward", 51),
-            ("ts-program", 35),
+            ("ts-program", 36),
             ("raw-annex-b", 7),
             ("mpegts-pes", 99),
             ("subtitle-pgs", 319),

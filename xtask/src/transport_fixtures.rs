@@ -4,6 +4,7 @@
 pub mod dts_discovery;
 pub mod dts_hd;
 pub mod matched;
+pub mod program;
 pub mod vvc;
 
 use std::ffi::OsString;

@@ -684,6 +684,15 @@ impl Engine {
         }
         Ok(engine)
     }
+    pub(crate) fn with_ts_input_context(
+        mut self,
+        context: ts::compat::input::InputContext,
+    ) -> Self {
+        if let Self::Ts(ts) = &mut self {
+            ts.native_context = Some(context);
+        }
+        self
+    }
     pub(crate) fn ts_native_context(
         input: InputCursor,
         format: ts::PacketFormat,
@@ -694,12 +703,10 @@ impl Engine {
         context: ts::compat::input::InputContext,
     ) -> Result<Self> {
         context.validate_cursor(&input)?;
-        let mut engine =
-            Self::ts_with_native(input, format, program, limits, policy, selection.into())?;
-        if let Self::Ts(t) = &mut engine {
-            t.native_context = Some(context);
-        }
-        Ok(engine)
+        Ok(
+            Self::ts_with_native(input, format, program, limits, policy, selection.into())?
+                .with_ts_input_context(context),
+        )
     }
     /// Assemble explicitly selected PIDs from one TS188 program. The input
     /// carrier order determines completed packet order. Remaining packets drain
@@ -719,6 +726,19 @@ impl Engine {
                 "multiplexed native playback requires TS188",
             ));
         }
+        Self::ts_native_program(
+            input, format, program, limits, policy, namespace, selections,
+        )
+    }
+    pub(crate) fn ts_native_program(
+        input: InputCursor,
+        format: ts::PacketFormat,
+        program: u16,
+        limits: ts::ParseLimits,
+        policy: SourceTimePolicy,
+        namespace: DescriptorNamespace,
+        selections: &[TsNativeTrackSelection],
+    ) -> Result<Self> {
         if selections.is_empty() {
             return Err(Error::Invalid("native program selection is empty"));
         }
