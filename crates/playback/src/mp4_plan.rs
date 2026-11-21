@@ -13,12 +13,12 @@ use std::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
 };
-use triergon_core::container::MediaKind;
+use triergon_core::container::{CodecId, MediaKind, TrackId, TrackInfo};
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, Reservation, Rounding, Time, TimeBase, WorkBudget,
+    Budget, BudgetVec, Bytes, Charged, Error, Reservation, Rounding, Time, TimeBase, WorkBudget,
 };
 use triergon_isobmff::{
-    self as iso, CursorStatus, Next, Sample,
+    self as iso, BuildStatus, CursorStatus, Next, Sample,
     boxes::BoxView,
     compat::mov::{
         clock::{MediaClock, SourceTimeBase},
@@ -27,6 +27,7 @@ use triergon_isobmff::{
             DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, PacketOccurrence, StreamView,
         },
     },
+    config::{ConfigurationLimits, EntryConfiguration, codec_id},
     interleave::{PhysicalInterleaveLimits, PhysicalSampleCursor, SourceTrack},
     movie::{EditList, SampleDescription},
     table::SampleCursor,
@@ -146,8 +147,13 @@ pub struct PlanTrack {
     pub descriptions: BudgetVec<SampleDescription>,
     /// The edit list, if the track has one.
     pub edits: Option<EditList>,
+    /// What [`PreparedMp4::identify_tracks`] read of the first sample entry.
+    identity: Option<Charged<Box<EntryConfiguration>>>,
 }
 impl PlanTrack {
+    fn first_description(&self) -> Option<&SampleDescription> {
+        self.descriptions.as_slice().first()
+    }
     pub(crate) fn configuration(
         &self,
         description_index: u32,
@@ -164,6 +170,35 @@ impl PlanTrack {
             description: description.clone(),
             revision,
         })
+    }
+}
+/// The track as its first sample entry describes it, as [`triergon_isobmff::Track`]
+/// reports it. Until [`PreparedMp4::identify_tracks`] has read the entry, the codec is
+/// the one its code alone names (an `mp4a` entry is [`CodecId::Other`]) and the
+/// configuration is empty.
+impl TrackInfo for PlanTrack {
+    fn id(&self) -> TrackId {
+        TrackId(u64::from(self.snapshot.track_id))
+    }
+    fn kind(&self) -> MediaKind {
+        iso::media_kind(&self.snapshot.handler)
+    }
+    fn codec_tag(&self) -> &[u8] {
+        self.first_description()
+            .map_or(&[], |entry| entry.format.as_slice())
+    }
+    fn codec(&self) -> CodecId {
+        match (&self.identity, self.first_description()) {
+            (Some(identity), _) => identity.codec(),
+            (None, Some(entry)) => codec_id(&self.snapshot.handler, &entry.format, None),
+            (None, None) => CodecId::Other,
+        }
+    }
+    fn configuration(&self) -> &[u8] {
+        match (&self.identity, self.first_description()) {
+            (Some(identity), Some(entry)) => identity.bytes(entry),
+            _ => &[],
+        }
     }
 }
 /// One sample of a track, in the plan's order.
@@ -235,6 +270,39 @@ impl PreparedMp4 {
         Ok(Some(extent.bytes().slice(start..end as usize)?))
     }
 
+    /// Reads each track's first sample entry for its [`TrackInfo`]: the object type an
+    /// `mp4a` or `mp4s` entry's `esds` states, and the codec configuration record, within
+    /// `limits`. True once every track is read; false when `work` is spent. Reads no
+    /// input. Fails with `Backpressure` when the pool refuses the result's storage.
+    pub fn identify_tracks(
+        &mut self,
+        limits: ConfigurationLimits,
+        work: &mut WorkBudget,
+    ) -> Result<bool> {
+        for track in self.tracks.as_mut_slice() {
+            let Some(entry) = track.descriptions.as_slice().first() else {
+                continue;
+            };
+            let identity = if let Some(identity) = &mut track.identity {
+                identity
+            } else {
+                if !work.try_charge(1) {
+                    return Ok(false);
+                }
+                let identity = EntryConfiguration::new(
+                    track.snapshot.handler,
+                    entry,
+                    limits,
+                    iso::Limits::default(),
+                );
+                track.identity.insert(Charged::boxed(&self.pool, identity)?)
+            };
+            if identity.poll(work)? == BuildStatus::Yield {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
     /// What the opener read before the media.
     pub fn read_scope(&self) -> crate::mp4_open::MetadataReadScope {
         self.read_scope
@@ -873,6 +941,7 @@ impl<'a> Mp4IndexJob<'a> {
                             .edits()
                             .map(|e| EditList::parse(e.raw().clone(), iso::Limits::default()))
                             .transpose()?,
+                        identity: None,
                     },
                 )?;
                 self.description = 1;
@@ -1324,7 +1393,7 @@ impl PreparedMp4 {
 impl MovieSeekJob<'_> {
     /// Maps within `w`, and returns whether the mapping is complete.
     pub fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
-        Ok(self.locator.poll(w, c)? == iso::BuildStatus::Ready)
+        Ok(self.locator.poll(w, c)? == BuildStatus::Ready)
     }
     /// The command. Fails as the edit search does before it is complete.
     pub fn finish(self) -> Result<MovieSeekCommand> {

@@ -11,9 +11,13 @@ use crate::engine::mp4::Mp4Engine;
 use crate::engine::ts::{Delivery as TsDelivery, TsEngine};
 use crate::event::EngineStep;
 use crate::input::SourceReply;
-use crate::{Format, Result, SeekIntent, TrackKey, TrackKind, io::provide, mp4_plan::PreparedMp4};
+use crate::{
+    Format, Result, SeekIntent, TrackKey, TrackKind,
+    io::provide,
+    mp4_plan::{PlanTrack, PreparedMp4},
+};
 use std::sync::atomic::AtomicBool;
-use triergon_core::container::{MediaKind, TrackInfo};
+use triergon_core::container::{CodecId, ColourDescription, MediaKind, TrackId, TrackInfo};
 use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, SourceCapabilities, SourceId, WorkBudget,
 };
@@ -21,7 +25,7 @@ use triergon_isobmff::compat::mov::packets::PacketCursor;
 use triergon_matroska::Reader;
 use triergon_mpegts::compat::pes::DemuxClock;
 use triergon_mpegts::psi::DescriptorNamespace;
-use triergon_mpegts::stream::TransportStream;
+use triergon_mpegts::stream::{ProgramStream, TransportStream};
 use triergon_mpegts::{self as mpegts, clock::SourceTimePolicy};
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct TrackFact {
@@ -36,6 +40,75 @@ pub(crate) fn track_kind(kind: MediaKind) -> TrackKind {
         MediaKind::Audio => TrackKind::Audio,
         MediaKind::Subtitle => TrackKind::Subtitle,
         MediaKind::Data | MediaKind::Unknown => TrackKind::Other,
+    }
+}
+
+/// The format-neutral view of a track of an engine: a borrow of the format's own
+/// track, never a copy.
+#[derive(Clone, Copy, Debug)]
+pub enum Track<'a> {
+    /// A Matroska track.
+    Matroska(&'a triergon_matroska::Track),
+    /// A track of an MP4 plan.
+    Mp4(&'a PlanTrack),
+    /// An elementary stream of the transport stream's active program map.
+    Ts {
+        /// The program number.
+        program: u16,
+        /// The stream.
+        stream: ProgramStream<'a>,
+    },
+}
+
+impl Track<'_> {
+    /// The key this track's events carry.
+    pub fn key(&self) -> TrackKey {
+        match self {
+            Self::Matroska(track) => TrackKey::Matroska(track.number),
+            Self::Mp4(track) => TrackKey::Mp4(track.snapshot.track_id),
+            Self::Ts { program, stream } => TrackKey::Ts {
+                program: *program,
+                pid: stream.pid(),
+            },
+        }
+    }
+
+    fn info(&self) -> &dyn TrackInfo {
+        match self {
+            Self::Matroska(track) => *track,
+            Self::Mp4(track) => *track,
+            Self::Ts { stream, .. } => stream,
+        }
+    }
+}
+
+impl TrackInfo for Track<'_> {
+    fn id(&self) -> TrackId {
+        self.info().id()
+    }
+    fn kind(&self) -> MediaKind {
+        self.info().kind()
+    }
+    fn codec_tag(&self) -> &[u8] {
+        self.info().codec_tag()
+    }
+    fn codec(&self) -> CodecId {
+        self.info().codec()
+    }
+    fn configuration(&self) -> &[u8] {
+        self.info().configuration()
+    }
+    fn language(&self) -> Option<&str> {
+        self.info().language()
+    }
+    fn default_track(&self) -> Option<bool> {
+        self.info().default_track()
+    }
+    fn forced(&self) -> Option<bool> {
+        self.info().forced()
+    }
+    fn colour(&self) -> Option<ColourDescription> {
+        self.info().colour()
     }
 }
 
@@ -309,6 +382,32 @@ impl Engine {
             }
         }
         Ok(())
+    }
+    /// The number of tracks known so far: the Matroska reader's, the MP4 plan's, or
+    /// the streams of the transport stream's active program map, none before its PMT.
+    pub fn track_count(&self) -> usize {
+        match self {
+            Self::Matroska(m) => m.reader.tracks().len(),
+            Self::Mp4(m) => m.plan.tracks.len(),
+            Self::Ts(t) => t
+                .stream
+                .active_program()
+                .map_or(0, |program| program.streams().len()),
+        }
+    }
+    /// The track at `index` of [`Self::track_count`]; `None` past the last.
+    pub fn track(&self, index: usize) -> Option<Track<'_>> {
+        match self {
+            Self::Matroska(m) => m.reader.tracks().get(index).map(Track::Matroska),
+            Self::Mp4(m) => m.plan.tracks.as_slice().get(index).map(Track::Mp4),
+            Self::Ts(t) => {
+                let program = t.stream.active_program()?;
+                Some(Track::Ts {
+                    program: program.program_number(),
+                    stream: program.streams().nth(index)?,
+                })
+            }
+        }
     }
     /// The source the engine reads.
     pub fn source(&self) -> SourceId {

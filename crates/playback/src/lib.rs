@@ -18,7 +18,7 @@ pub mod mp4_plan;
 pub mod pes_feed;
 mod player;
 mod sample_sort;
-pub use engine::Engine;
+pub use engine::{Engine, Track};
 pub use event::{
     DemuxTimes, EngineStep, Event, Mp4EmptyPacket, Mp4Event, Mp4MissingSample, Mp4Packet,
     Mp4ShortPacket, Packet, TsEvent,
