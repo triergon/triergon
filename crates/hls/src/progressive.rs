@@ -10,10 +10,11 @@ use triergon_mpegts::psi::{PatTable, ProgramMap};
 use triergon_mpegts::stream::{FaultKind, TraceEvent};
 use triergon_mpegts::transport::ContinuityOutcome;
 use triergon_mpegts::{AssemblyStep, ParseLimits};
+use triergon_playback::compat::pes::AdmittedCarriage;
 use triergon_playback::{
-    Source, SourceReply, TrackKey, TsNativeConfiguration,
+    Source, SourceReply, TrackKey,
     io::SourceOwner,
-    pes_feed::{NativePacket, PesInput, SpentLists, TsEngine, TsPayloadStep},
+    pes_feed::{FeedPacket, FeedStep, PesInput, SpentLists, TsEngine},
 };
 
 const TS_CLOCK_RATE: u32 = 90_000;
@@ -81,7 +82,7 @@ enum NextAudioTime {
 struct Transport<S: Source> {
     engine: TsEngine,
     request: Option<InputRequest>,
-    pending: Option<TsPayloadStep>,
+    pending: Option<FeedStep>,
     source: SourceOwner<S>,
 }
 
@@ -140,7 +141,7 @@ impl<S: Source> Transport<S> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         maximum_payload_bytes: usize,
-    ) -> Result<TsPayloadStep> {
+    ) -> Result<FeedStep> {
         while work.remaining() != 0 {
             if let Some(event) = self.pending.take() {
                 work.try_charge(1);
@@ -150,13 +151,13 @@ impl<S: Source> Transport<S> {
                 let reply = self.source.poll(request, work, cancel)?;
                 if !self.provide(&reply)? {
                     if work.remaining() == 0 {
-                        return Ok(TsPayloadStep::Yield);
+                        return Ok(FeedStep::Yield);
                     }
                     let request = self
                         .request
                         .clone()
                         .ok_or(Error::Invalid("missing TS input request"))?;
-                    return Ok(TsPayloadStep::NeedInput(request));
+                    return Ok(FeedStep::NeedInput(request));
                 }
                 continue;
             }
@@ -178,19 +179,19 @@ impl<S: Source> Transport<S> {
                 continue;
             }
             match step {
-                TsPayloadStep::NeedInput(request) => {
+                FeedStep::NeedInput(request) => {
                     let request = carrier_aligned_request(request);
                     if work.remaining() == 0 {
                         self.request = Some(request.clone());
-                        return Ok(TsPayloadStep::NeedInput(request));
+                        return Ok(FeedStep::NeedInput(request));
                     }
                     self.request = Some(request);
                 }
-                TsPayloadStep::Yield if work.remaining() < before => {}
+                FeedStep::Yield if work.remaining() < before => {}
                 other => return Ok(other),
             }
         }
-        Ok(TsPayloadStep::Yield)
+        Ok(FeedStep::Yield)
     }
 }
 
@@ -323,17 +324,17 @@ impl<S: Source> TsProgressiveReader<S> {
             Phase::Read => {
                 let transport = self.transport.as_mut().ok_or(Error::Closed)?;
                 match transport.poll(work, cancel, self.limits.transport.pes_bytes)? {
-                    event @ (TsPayloadStep::Event(_)
-                    | TsPayloadStep::Configuration(_)
-                    | TsPayloadStep::Refusal { .. }
-                    | TsPayloadStep::Packet { .. }
-                    | TsPayloadStep::EntityEnd(_)) => self.on_event(event)?,
-                    TsPayloadStep::NeedInput(request) => {
+                    event @ (FeedStep::Event(_)
+                    | FeedStep::Configuration(_)
+                    | FeedStep::Refusal { .. }
+                    | FeedStep::Packet { .. }
+                    | FeedStep::EntityEnd(_)) => self.on_event(event)?,
+                    FeedStep::NeedInput(request) => {
                         return Ok(TsProgressiveStep::NeedInput(request));
                     }
-                    TsPayloadStep::End => self.end_transport()?,
-                    TsPayloadStep::Yield => {}
-                    TsPayloadStep::AwaitEntity => {
+                    FeedStep::End => self.end_transport()?,
+                    FeedStep::Yield => {}
+                    FeedStep::AwaitEntity => {
                         return Err(Error::Invalid("unexpected TS entity boundary"));
                     }
                 }
@@ -390,15 +391,15 @@ impl<S: Source> TsProgressiveReader<S> {
         Ok(TsProgressiveStep::Yield)
     }
 
-    fn on_event(&mut self, event: TsPayloadStep) -> Result<()> {
+    fn on_event(&mut self, event: FeedStep) -> Result<()> {
         match event {
-            TsPayloadStep::Event(event) => self.on_transport(event.source)?,
-            TsPayloadStep::Configuration(config) => self.configure(config)?,
-            TsPayloadStep::Packet { packet, clock } => match packet {
-                NativePacket::Owned(packet) => self.on_owned_packet(packet, &clock)?,
-                NativePacket::Compact(packet) => self.on_packet(packet, &clock)?,
+            FeedStep::Event(event) => self.on_transport(event.source)?,
+            FeedStep::Configuration(config) => self.configure(config)?,
+            FeedStep::Packet { packet, clock } => match packet {
+                FeedPacket::Owned(packet) => self.on_owned_packet(packet, &clock)?,
+                FeedPacket::Compact(packet) => self.on_packet(packet, &clock)?,
             },
-            TsPayloadStep::Refusal { track, error, .. }
+            FeedStep::Refusal { track, error, .. }
                 if self
                     .tracks
                     .as_ref()
@@ -413,7 +414,7 @@ impl<S: Source> TsProgressiveReader<S> {
 
     /// Makes the reader of a configured track, once per track.
     #[cold]
-    fn configure(&mut self, config: TsNativeConfiguration) -> Result<()> {
+    fn configure(&mut self, config: AdmittedCarriage) -> Result<()> {
         let tracks = self
             .tracks
             .as_ref()
@@ -736,7 +737,7 @@ mod tests {
         let mut transport = Transport {
             engine: TsEngine::progressive(input, ParseLimits::default(), true).unwrap(),
             request: None,
-            pending: Some(TsPayloadStep::Refusal {
+            pending: Some(FeedStep::Refusal {
                 track,
                 error,
                 source_event_ordinal: 109,
@@ -747,14 +748,14 @@ mod tests {
         let mut work = WorkBudget::new(0);
         assert!(matches!(
             transport.poll(&mut work, &cancel, 0),
-            Ok(TsPayloadStep::Yield)
+            Ok(FeedStep::Yield)
         ));
         assert!(transport.pending.is_some());
         assert_eq!(work.spent(), 0);
 
         let mut work = WorkBudget::new(1);
         assert!(
-            matches!(transport.poll(&mut work, &cancel, 0), Ok(TsPayloadStep::Refusal {
+            matches!(transport.poll(&mut work, &cancel, 0), Ok(FeedStep::Refusal {
             track: actual_track, error: actual_error, source_event_ordinal: 109,
         }) if actual_track == track && actual_error == error)
         );
@@ -831,8 +832,8 @@ mod tests {
                     .poll(&mut WorkBudget::new(65536), cancel, 64 * 1024)
                     .unwrap()
                 {
-                    TsPayloadStep::NeedInput(request) => return request,
-                    TsPayloadStep::Yield => {}
+                    FeedStep::NeedInput(request) => return request,
+                    FeedStep::Yield => {}
                     _ => panic!("expected an input request"),
                 }
             }
@@ -968,8 +969,8 @@ mod tests {
                 .poll(&mut WorkBudget::new(65536), &cancel, 64 * 1024)
                 .unwrap()
             {
-                TsPayloadStep::Yield => {}
-                TsPayloadStep::Event(event) => {
+                FeedStep::Yield => {}
+                FeedStep::Event(event) => {
                     assert!(matches!(event.source, TraceEvent::Diagnostic(fault)
                         if fault.kind == FaultKind::Transport && fault.error == Error::Truncated));
                     truncated = true;

@@ -4,7 +4,7 @@
 //! end of the source.
 //!
 //! TS188 uses `Engine::ts_native_program_v1` with every selection. M2TS192 starts
-//! through `NativeStartup::new_m2ts_prefix_v2`, which admits one registered
+//! through `Startup::new_m2ts_prefix`, which admits one registered
 //! carriage. Times are 90 kHz ticks of the native projection; the duration is the
 //! demuxer's raw 90 kHz duration and the flags its packet flags.
 
@@ -20,9 +20,13 @@ use triergon_mpegts::{
 };
 use triergon_playback::{
     ByteSource, ClockChoice, Engine, Event, Format, Player, PlayerPolicy, Progress, Selection,
-    TsNativeCarriage, TsNativeSelection, TsNativeTrackSelection,
+    TsNativeSelection,
     io::{SelectedInput, SourceOwner},
-    native_startup::{NativeStartup, StartupStep},
+};
+use triergon_playback::{
+    compat::pes::Carriage,
+    compat::pes::PidSelection,
+    compat::pes::startup::{Startup, StartupStep},
 };
 
 pub const PREFIX: &str = "ts-program-";
@@ -33,24 +37,24 @@ const WORK: u64 = 1 << 16;
 const NAMESPACE: DescriptorNamespace =
     DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile);
 
-fn carriage(name: &str) -> Option<TsNativeCarriage> {
+fn carriage(name: &str) -> Option<Carriage> {
     Some(match name {
-        "avc" => TsNativeCarriage::Registered(RegisteredCarriage::Avc),
-        "hevc" => TsNativeCarriage::Registered(RegisteredCarriage::Hevc),
-        "aac" => TsNativeCarriage::Registered(RegisteredCarriage::AacAdts),
-        "latm" => TsNativeCarriage::Registered(RegisteredCarriage::AacLatm),
-        "audio" => TsNativeCarriage::AudioFromPmt,
-        "dvb-ac3" => TsNativeCarriage::PrivateAudio(PrivateAudioCarriage::DvbAc3Tag),
-        "dvb-eac3" => TsNativeCarriage::PrivateAudio(PrivateAudioCarriage::DvbEac3Tag),
-        "ac3" => TsNativeCarriage::PrivateAudio(PrivateAudioCarriage::PrivateType81Ac3),
-        "eac3" => TsNativeCarriage::PrivateAudio(PrivateAudioCarriage::PrivateType87Eac3),
-        "dvbsub" => TsNativeCarriage::DvbSubtitles,
+        "avc" => Carriage::Registered(RegisteredCarriage::Avc),
+        "hevc" => Carriage::Registered(RegisteredCarriage::Hevc),
+        "aac" => Carriage::Registered(RegisteredCarriage::AacAdts),
+        "latm" => Carriage::Registered(RegisteredCarriage::AacLatm),
+        "audio" => Carriage::AudioFromPmt,
+        "dvb-ac3" => Carriage::PrivateAudio(PrivateAudioCarriage::DvbAc3Tag),
+        "dvb-eac3" => Carriage::PrivateAudio(PrivateAudioCarriage::DvbEac3Tag),
+        "ac3" => Carriage::PrivateAudio(PrivateAudioCarriage::PrivateType81Ac3),
+        "eac3" => Carriage::PrivateAudio(PrivateAudioCarriage::PrivateType87Eac3),
+        "dvbsub" => Carriage::DvbSubtitles,
         _ => return None,
     })
 }
 
 /// `FORMAT:PID=CARRIAGE,...`, for example `ts188:256=avc,257=audio`.
-fn selections(argument: &str) -> Result<(PacketFormat, Vec<TsNativeTrackSelection>)> {
+fn selections(argument: &str) -> Result<(PacketFormat, Vec<PidSelection>)> {
     let invalid = || format!("invalid program selection {argument:?}");
     let (format, list) = argument.split_once(':').ok_or_else(invalid)?;
     let format = match format {
@@ -61,7 +65,7 @@ fn selections(argument: &str) -> Result<(PacketFormat, Vec<TsNativeTrackSelectio
     let mut selections = Vec::new();
     for item in list.split(',') {
         let (pid, name) = item.split_once('=').ok_or_else(invalid)?;
-        selections.push(TsNativeTrackSelection {
+        selections.push(PidSelection {
             pid: pid.parse()?,
             carriage: carriage(name).ok_or_else(invalid)?,
         });
@@ -86,7 +90,7 @@ fn player(
     pool: &Budget,
     raw: &Bytes,
     format: PacketFormat,
-    selections: &[TsNativeTrackSelection],
+    selections: &[PidSelection],
 ) -> Result<Player<ByteSource>> {
     let cancel = AtomicBool::new(false);
     let id = SourceId(42);
@@ -105,15 +109,15 @@ fn player(
         Player::new(engine, source, Selection::All, PlayerPolicy::default())?
     } else {
         let [
-            TsNativeTrackSelection {
+            PidSelection {
                 pid,
-                carriage: TsNativeCarriage::Registered(carriage),
+                carriage: Carriage::Registered(carriage),
             },
         ] = selections
         else {
             return Err("M2TS192 admits one registered carriage".into());
         };
-        let mut startup = NativeStartup::new_m2ts_prefix_v2(SelectedInput {
+        let mut startup = Startup::new_m2ts_prefix(SelectedInput {
             input,
             source,
             format: Format::Ts(format),

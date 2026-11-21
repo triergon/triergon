@@ -17,9 +17,10 @@ use triergon_mpegts::{
     AssemblyStep, ParseLimits, clock::SourceTimePolicy, compat::pes::RegisteredCarriage,
     psi::DescriptorNamespace,
 };
+use triergon_playback::compat::pes::Carriage;
 use triergon_playback::{
     ByteSource, ClockChoice, Engine, Event, Player, PlayerPolicy, Progress, Selection, State,
-    TrackKey, TsNativeCarriage, io::SourceOwner,
+    TrackKey, io::SourceOwner,
 };
 
 fn payload(out: &mut String, bytes: &[u8]) {
@@ -183,14 +184,14 @@ fn check_segment(raw: &[u8], expected: &str, service: u16, raster: AvcRaster) {
                             matches!(config.track, TrackKey::Ts { program, .. } if program == service)
                         );
                         match config.carriage {
-                            TsNativeCarriage::Registered(RegisteredCarriage::Avc) => {
+                            Carriage::Registered(RegisteredCarriage::Avc) => {
                                 assert!(video.is_none());
                                 video = Some(
                                     AvcTsReader::new(&pool, config, AvcTsLimits::default())
                                         .unwrap(),
                                 );
                             }
-                            TsNativeCarriage::Registered(RegisteredCarriage::AacAdts) => {
+                            Carriage::Registered(RegisteredCarriage::AacAdts) => {
                                 assert!(audio.is_none());
                                 audio = Some(HlsAac::new(&pool, config, 8191).unwrap());
                             }

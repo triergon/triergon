@@ -13,8 +13,9 @@ use triergon_mpegts::{
 };
 use triergon_playback::{
     ByteSource, ClockChoice, Delivery, Engine, Event, Player, PlayerPolicy, Progress, Selection,
-    TrackKey, TsEvent, TsNativeCarriage, TsNativeTrackSelection, io::SourceOwner,
+    TrackKey, TsEvent, io::SourceOwner,
 };
+use triergon_playback::{compat::pes::Carriage, compat::pes::PidSelection};
 
 const ENTITY: SourceId = SourceId(77);
 const NAMESPACE: DescriptorNamespace =
@@ -22,25 +23,25 @@ const NAMESPACE: DescriptorNamespace =
 const MIXED: &[u8] = include_bytes!("fixtures/ts/program-private-avc-dvb.ts");
 const RETYPE: &[u8] = include_bytes!("fixtures/ts/program-pmt-retype.ts");
 const EOF: &[u8] = include_bytes!("fixtures/ts/program-eof-avc-aac.ts");
-const AVC: TsNativeTrackSelection = TsNativeTrackSelection {
+const AVC: PidSelection = PidSelection {
     pid: 256,
-    carriage: TsNativeCarriage::Registered(RegisteredCarriage::Avc),
+    carriage: Carriage::Registered(RegisteredCarriage::Avc),
 };
-const AAC: TsNativeTrackSelection = TsNativeTrackSelection {
+const AAC: PidSelection = PidSelection {
     pid: 257,
-    carriage: TsNativeCarriage::Registered(RegisteredCarriage::AacAdts),
+    carriage: Carriage::Registered(RegisteredCarriage::AacAdts),
 };
-const AC3: TsNativeTrackSelection = TsNativeTrackSelection {
+const AC3: PidSelection = PidSelection {
     pid: 257,
-    carriage: TsNativeCarriage::PrivateAudio(PrivateAudioCarriage::DvbAc3Tag),
+    carriage: Carriage::PrivateAudio(PrivateAudioCarriage::DvbAc3Tag),
 };
-const FOLLOW_AUDIO: TsNativeTrackSelection = TsNativeTrackSelection {
+const FOLLOW_AUDIO: PidSelection = PidSelection {
     pid: 257,
-    carriage: TsNativeCarriage::AudioFromPmt,
+    carriage: Carriage::AudioFromPmt,
 };
-const DVB: TsNativeTrackSelection = TsNativeTrackSelection {
+const DVB: PidSelection = PidSelection {
     pid: 258,
-    carriage: TsNativeCarriage::DvbSubtitles,
+    carriage: Carriage::DvbSubtitles,
 };
 
 fn budget() -> Budget {
@@ -49,7 +50,7 @@ fn budget() -> Budget {
 
 fn engine(
     budget: &Budget,
-    selections: &[TsNativeTrackSelection],
+    selections: &[PidSelection],
     format: PacketFormat,
     namespace: DescriptorNamespace,
 ) -> triergon_playback::Result<Engine> {
@@ -76,7 +77,7 @@ fn engine(
 
 fn player(
     raw: &[u8],
-    selections: &[TsNativeTrackSelection],
+    selections: &[PidSelection],
     selection: Selection,
     quantum: usize,
 ) -> (Player<ByteSource>, Budget) {
@@ -85,7 +86,7 @@ fn player(
 
 fn player_with_namespace(
     raw: &[u8],
-    selections: &[TsNativeTrackSelection],
+    selections: &[PidSelection],
     selection: Selection,
     quantum: usize,
     namespace: DescriptorNamespace,
@@ -205,7 +206,7 @@ fn independent_ts_segments_discover_tracks_and_emit_configuration_before_packets
                 RETYPE,
                 [
                     Some(AC3.carriage),
-                    Some(TsNativeCarriage::Registered(RegisteredCarriage::AacLatm)),
+                    Some(Carriage::Registered(RegisteredCarriage::AacLatm)),
                 ],
             ),
         ] {
@@ -498,7 +499,7 @@ fn selected_audio_follows_pmt_and_matches_native_carrier_order() {
             configurations,
             [
                 AC3.carriage,
-                TsNativeCarriage::Registered(RegisteredCarriage::AacLatm)
+                Carriage::Registered(RegisteredCarriage::AacLatm)
             ]
         );
         assert_eq!(
@@ -552,7 +553,7 @@ fn missing_dvb_context_preserves_private_source_and_later_latm_recovers() {
             Event::PesCarriage(config) => {
                 assert_eq!(
                     config.carriage,
-                    TsNativeCarriage::Registered(RegisteredCarriage::AacLatm)
+                    Carriage::Registered(RegisteredCarriage::AacLatm)
                 );
                 audio.push("latm configuration");
             }
@@ -612,7 +613,7 @@ fn seeking_replays_the_current_audio_configurations_in_a_new_generation() {
         carriages,
         [
             AC3.carriage,
-            TsNativeCarriage::Registered(RegisteredCarriage::AacLatm)
+            Carriage::Registered(RegisteredCarriage::AacLatm)
         ]
     );
 }
@@ -624,7 +625,7 @@ fn selections_reject_duplicate_and_out_of_scope_pids_and_strides() {
         engine(&b, &[AVC, AVC], PacketFormat::Ts188, NAMESPACE),
         Err(Error::Invalid("duplicate native program selection PID"))
     ));
-    let invalid = TsNativeTrackSelection { pid: 0x1fff, ..AVC };
+    let invalid = PidSelection { pid: 0x1fff, ..AVC };
     assert!(matches!(
         engine(&b, &[invalid], PacketFormat::Ts188, NAMESPACE),
         Err(Error::Invalid(_))

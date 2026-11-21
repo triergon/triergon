@@ -11,13 +11,13 @@ const IDR: &[u8] = &[0, 0, 1, 0x65, 0x88, 0x84];
 
 fn fixture() -> (Budget, AvcTsReader) {
     let pool = Budget::new(64 * 1024).unwrap();
-    let config = TsNativeConfiguration {
+    let config = AdmittedCarriage {
         track: TrackKey::Ts {
             program: 31,
             pid: 256,
         },
         configuration_epoch: 1,
-        carriage: TsNativeCarriage::Registered(RegisteredCarriage::Avc),
+        carriage: Carriage::Registered(RegisteredCarriage::Avc),
     };
     let reader = AvcTsReader::new(&pool, config, AvcTsLimits::default()).unwrap();
     (pool, reader)

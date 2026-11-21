@@ -16,7 +16,8 @@ use triergon_mpegts::{
         PrivateAudioCarriage,
     },
 };
-use triergon_playback::{TrackKey, TsNativeCarriage, TsNativeConfiguration, pes_feed::PesInput};
+use triergon_playback::{TrackKey, pes_feed::PesInput};
+use triergon_playback::{compat::pes::AdmittedCarriage, compat::pes::Carriage};
 
 const PES_CORRUPT: u32 = 2;
 const MAXIMUM_SYNCFRAME_BYTES: usize = 4096;
@@ -37,7 +38,7 @@ struct PendingPes {
 /// their bytes, and their timestamps describe only applicable PES facts.
 pub(crate) struct HlsDolby {
     pool: Budget,
-    config: TsNativeConfiguration,
+    config: AdmittedCarriage,
     reader: Result<Ac3FrameReader>,
     pending: Option<PendingPes>,
     source_clock_epoch: Option<(SourceId, u64)>,
@@ -49,12 +50,12 @@ pub(crate) struct HlsDolby {
 }
 
 impl HlsDolby {
-    pub(crate) fn new(pool: &Budget, config: TsNativeConfiguration) -> Result<Self> {
+    pub(crate) fn new(pool: &Budget, config: AdmittedCarriage) -> Result<Self> {
         let selection = match config.carriage {
-            TsNativeCarriage::PrivateAudio(
+            Carriage::PrivateAudio(
                 PrivateAudioCarriage::DvbAc3Tag | PrivateAudioCarriage::PrivateType81Ac3,
             ) => Ac3StreamSelection::Ac3Only,
-            TsNativeCarriage::PrivateAudio(
+            Carriage::PrivateAudio(
                 PrivateAudioCarriage::DvbEac3Tag | PrivateAudioCarriage::PrivateType87Eac3,
             ) => Ac3StreamSelection::Eac3Only,
             _ => {
@@ -326,13 +327,13 @@ mod tests {
             .unwrap();
             let reader = HlsDolby::new(
                 &pool,
-                TsNativeConfiguration {
+                AdmittedCarriage {
                     track: TrackKey::Ts {
                         program: 1,
                         pid: 257,
                     },
                     configuration_epoch: EPOCHS.configuration,
-                    carriage: TsNativeCarriage::PrivateAudio(carriage),
+                    carriage: Carriage::PrivateAudio(carriage),
                 },
             )
             .unwrap();

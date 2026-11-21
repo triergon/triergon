@@ -11,15 +11,15 @@ use triergon_mpegts::{
     AssemblyStep,
     compat::pes::{DemuxPacket, DemuxTimeView, RegisteredCarriage},
 };
-use triergon_playback::{TsNativeCarriage, TsNativeConfiguration, pes_feed::SpentLists};
+use triergon_playback::pes_feed::SpentLists;
+use triergon_playback::{compat::pes::AdmittedCarriage, compat::pes::Carriage};
 
 /// The legacy AVC/AAC reader uses concrete lanes. Only the codec-negotiated
 /// reader needs the variant dispatch or larger lane and output storage.
 pub(super) trait LaneAssembler: Sized {
     type Unit;
 
-    fn bind(pool: &Budget, config: TsNativeConfiguration, limits: HlsSegmentLimits)
-    -> Result<Self>;
+    fn bind(pool: &Budget, config: AdmittedCarriage, limits: HlsSegmentLimits) -> Result<Self>;
     fn push(&mut self, packet: &mut Option<DemuxPacket>, clock: DemuxTimeView) -> Result<bool>;
     fn finish(&mut self);
     fn poll(
@@ -52,11 +52,7 @@ impl VideoPicture for AvcTsAccessUnit {
 impl LaneAssembler for AvcTsReader {
     type Unit = AvcTsAccessUnit;
 
-    fn bind(
-        pool: &Budget,
-        config: TsNativeConfiguration,
-        limits: HlsSegmentLimits,
-    ) -> Result<Self> {
+    fn bind(pool: &Budget, config: AdmittedCarriage, limits: HlsSegmentLimits) -> Result<Self> {
         Self::new(pool, config, limits.avc)
     }
 
@@ -93,7 +89,7 @@ impl LaneAssembler for AvcTsReader {
 impl LaneAssembler for HlsAac {
     type Unit = HlsAacFrame;
 
-    fn bind(pool: &Budget, config: TsNativeConfiguration, _: HlsSegmentLimits) -> Result<Self> {
+    fn bind(pool: &Budget, config: AdmittedCarriage, _: HlsSegmentLimits) -> Result<Self> {
         Self::new(pool, config, 8191)
     }
 
@@ -188,16 +184,12 @@ pub(super) enum VideoAssembler {
 impl LaneAssembler for VideoAssembler {
     type Unit = HlsMediaVideoUnit;
 
-    fn bind(
-        pool: &Budget,
-        config: TsNativeConfiguration,
-        limits: HlsSegmentLimits,
-    ) -> Result<Self> {
+    fn bind(pool: &Budget, config: AdmittedCarriage, limits: HlsSegmentLimits) -> Result<Self> {
         match config.carriage {
-            TsNativeCarriage::Registered(RegisteredCarriage::Avc) => {
+            Carriage::Registered(RegisteredCarriage::Avc) => {
                 AvcTsReader::bind(pool, config, limits).map(Self::Avc)
             }
-            TsNativeCarriage::Registered(RegisteredCarriage::Hevc) => {
+            Carriage::Registered(RegisteredCarriage::Hevc) => {
                 HlsHevc::new(pool, config, limits.avc).map(Self::Hevc)
             }
             _ => Err(Error::Unsupported("HLS video carriage")),
@@ -280,16 +272,12 @@ pub(super) enum AudioAssembler {
 impl LaneAssembler for AudioAssembler {
     type Unit = HlsMediaAudioUnit;
 
-    fn bind(
-        pool: &Budget,
-        config: TsNativeConfiguration,
-        limits: HlsSegmentLimits,
-    ) -> Result<Self> {
+    fn bind(pool: &Budget, config: AdmittedCarriage, limits: HlsSegmentLimits) -> Result<Self> {
         match config.carriage {
-            TsNativeCarriage::Registered(RegisteredCarriage::AacAdts) => {
+            Carriage::Registered(RegisteredCarriage::AacAdts) => {
                 HlsAac::bind(pool, config, limits).map(Self::Aac)
             }
-            TsNativeCarriage::PrivateAudio(_) => HlsDolby::new(pool, config).map(Self::Dolby),
+            Carriage::PrivateAudio(_) => HlsDolby::new(pool, config).map(Self::Dolby),
             _ => Err(Error::Unsupported("HLS audio carriage")),
         }
     }

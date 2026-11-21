@@ -12,9 +12,10 @@ use triergon_mpegts::{
     },
 };
 use triergon_playback::{
-    TrackKey, TsNativeCarriage, TsNativeConfiguration,
+    TrackKey,
     pes_feed::{PesInput, SpentLists},
 };
+use triergon_playback::{compat::pes::AdmittedCarriage, compat::pes::Carriage};
 
 const PREFIX_BYTES: usize = 7;
 const MAXIMUM_ADTS_BYTES: usize = 0x1fff;
@@ -147,7 +148,7 @@ impl PendingPes {
 /// frames own their charge independently of the reader.
 pub struct HlsAac {
     pool: Budget,
-    config: TsNativeConfiguration,
+    config: AdmittedCarriage,
     maximum_frame_bytes: usize,
     pending: Option<PendingPes>,
     clock_epoch: Option<u64>,
@@ -166,10 +167,10 @@ pub struct HlsAac {
 impl HlsAac {
     pub fn new(
         pool: &Budget,
-        config: TsNativeConfiguration,
+        config: AdmittedCarriage,
         maximum_frame_bytes: usize,
     ) -> Result<Self> {
-        if config.carriage != TsNativeCarriage::Registered(RegisteredCarriage::AacAdts) {
+        if config.carriage != Carriage::Registered(RegisteredCarriage::AacAdts) {
             return Err(Error::Unsupported("HLS AAC needs selected ADTS carriage"));
         }
         if !matches!(config.track, TrackKey::Ts { program, pid } if program != 0 && pid <= 0x1ffe)
@@ -538,10 +539,10 @@ mod tests {
         program: 1,
         pid: 257,
     };
-    const CONFIG: TsNativeConfiguration = TsNativeConfiguration {
+    const CONFIG: AdmittedCarriage = AdmittedCarriage {
         track: TRACK,
         configuration_epoch: 2,
-        carriage: TsNativeCarriage::Registered(RegisteredCarriage::AacAdts),
+        carriage: Carriage::Registered(RegisteredCarriage::AacAdts),
     };
     const EPOCHS: SourceEpochs = SourceEpochs {
         clock: 0,
@@ -676,7 +677,7 @@ mod tests {
             };
             let mut wrong_track = HlsAac::new(
                 pool,
-                TsNativeConfiguration {
+                AdmittedCarriage {
                     configuration_epoch: CONFIG.configuration_epoch + 1,
                     ..CONFIG
                 },

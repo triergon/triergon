@@ -21,7 +21,7 @@ pub enum StartupStep {
     NeedEof,
     Ready,
 }
-pub struct NativeStartup<S: Source> {
+pub struct Startup<S: Source> {
     input: Option<InputCursor>,
     source: Option<SourceOwner<S>>,
     format: PacketFormat,
@@ -31,13 +31,13 @@ pub struct NativeStartup<S: Source> {
     context: Option<InputContext>,
     failed: bool,
 }
-pub struct PreparedNative<S: Source> {
+pub struct BoundInput<S: Source> {
     input: InputCursor,
     source: SourceOwner<S>,
     format: PacketFormat,
     context: InputContext,
 }
-impl<S: Source> NativeStartup<S> {
+impl<S: Source> Startup<S> {
     pub fn new(selected: SelectedInput<S>) -> Result<Self> {
         let Format::Ts(format) = selected.format else {
             return Err(Error::Invalid("native startup requires TS selection"));
@@ -58,7 +58,7 @@ impl<S: Source> NativeStartup<S> {
     }
     /// Read one bounded M2TS probe from a fresh selected Source. The cursor
     /// must admit an 8 KiB input window. Individual replies may be smaller.
-    pub fn new_m2ts_prefix_v2(selected: SelectedInput<S>) -> Result<Self> {
+    pub fn new_m2ts_prefix(selected: SelectedInput<S>) -> Result<Self> {
         if selected.format != Format::Ts(PacketFormat::M2ts192)
             || !selected.input.buffered().is_empty()
             || selected.input.request().maximum < InputBootstrap::M2TS_PREFIX_BYTES
@@ -211,11 +211,11 @@ impl<S: Source> NativeStartup<S> {
             }
         }
     }
-    pub fn finish(mut self) -> Result<PreparedNative<S>> {
+    pub fn finish(mut self) -> Result<BoundInput<S>> {
         if self.failed {
             return Err(Error::Closed);
         }
-        Ok(PreparedNative {
+        Ok(BoundInput {
             context: self
                 .context
                 .take()
@@ -327,7 +327,7 @@ impl PrefixRead {
     }
 }
 
-impl<S: Source> PreparedNative<S> {
+impl<S: Source> BoundInput<S> {
     pub fn context(&self) -> &InputContext {
         &self.context
     }

@@ -13,6 +13,7 @@ use triergon_mpegts::{
     PacketFormat,
     clock::{SourceTimePolicy, SourceTimeStatus},
 };
+use triergon_playback::compat::pes::PrivateAudioSelection;
 use triergon_playback::{ByteSource, Source, SourceReply};
 use triergon_playback::{
     io::{Probe, ProbeProgress, SelectedInput, SourceOwner},
@@ -2033,7 +2034,7 @@ fn private_audio_player(
         1,
         triergon_mpegts::ParseLimits::default(),
         SourceTimePolicy::RelativeEpochZero,
-        TsNativePrivateAudioSelection { pid: 257, carriage },
+        PrivateAudioSelection { pid: 257, carriage },
     )
     .unwrap();
     let source = SourceOwner::new(
@@ -2179,7 +2180,7 @@ fn private_audio_policy_and_legacy_constructor_replay_the_same_packets_after_see
             random_access: true,
         };
         let io = byte_input(&pool(), ID, raw, 188, capabilities, 188).unwrap();
-        let audio = compat::pes::PrivateAudioSelection {
+        let audio = PrivateAudioSelection {
             pid: 257,
             carriage: triergon_mpegts::compat::pes::PrivateAudioCarriage::DvbAc3Tag,
         };
@@ -2272,7 +2273,7 @@ fn private_audio_does_not_admit_m2ts_by_construction() {
             1,
             triergon_mpegts::ParseLimits::default(),
             SourceTimePolicy::RelativeEpochZero,
-            TsNativePrivateAudioSelection {
+            PrivateAudioSelection {
                 pid: 257,
                 carriage: Carriage::DvbAc3Tag
             },

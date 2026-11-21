@@ -115,7 +115,7 @@ video and audio tracks.
 | MP4 / MOV | `mp4_open::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `Engine::mp4`, `Engine::mp4_progressive`, `Engine::mp4_native_terminal_v1`, `Mp4RangeOpen` / `Mp4RangePlayer` |
 | MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_native_seek` / `apply_mp4_native_seek`, progressive variants, `PreparedMp4::movie_seek` |
 | MP4 catalogue replacement | `catalogue::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
-| TS / M2TS | `Engine::ts`, `ts_with_namespace`, `ts_segmented`, `ts_native`, `compat::pes::open_private_audio`, `ts_native_program_v1`, `ts_native_segment_v1`; `native_startup::NativeStartup` |
+| TS / M2TS | `Engine::ts`, `ts_with_namespace`, `ts_segmented`, `ts_native`, `compat::pes::open_private_audio`, `ts_native_program_v1`, `ts_native_segment_v1`; `compat::pes::startup::Startup` |
 | PES feed | `pes_feed`: the feed [`triergon-hls`](../hls/README.md) reads HLS segments and progressive TS188 input from |
 | Sink handoff | `pump::{Pump, Sink, CatalogueSink, Feed}` |
 
@@ -216,7 +216,7 @@ physical end, or as an unsupported layout once the source passes its start.
 **MPEG-TS.** `ts_native_program_v1` selects up to 64 PIDs of one program.
 Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB
 admission, and a subtitle track when a DVB namespace names DVB subtitling or
-teletext; stream type `0x90` (PGS) is a subtitle track. M2TS prefix startup (`NativeStartup::new_m2ts_prefix_v2`) needs an
+teletext; stream type `0x90` (PGS) is a subtitle track. M2TS prefix startup (`compat::pes::startup::Startup::new_m2ts_prefix`) needs an
 8 KiB input window. The DVB native PES parser caps a continued segment at
 65,536 bytes. PES outputs reuse their payload storage's budget handle, which
 remains valid while a caller retains an output after closing the player.

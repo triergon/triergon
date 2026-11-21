@@ -14,9 +14,10 @@ use triergon_mpegts::compat::pes::{
     RegisteredCarriage,
 };
 use triergon_playback::{
-    TrackKey, TsNativeCarriage, TsNativeConfiguration,
+    TrackKey,
     pes_feed::{PesInput, SpentLists},
 };
+use triergon_playback::{compat::pes::AdmittedCarriage, compat::pes::Carriage};
 
 pub use triergon_framing::avc::AvcRaster;
 
@@ -241,7 +242,7 @@ fn remember<T>(
 pub struct AvcTsReader {
     pool: Budget,
     limits: AvcTsLimits,
-    config: TsNativeConfiguration,
+    config: AdmittedCarriage,
     source_clock_epoch: Option<(SourceId, u64)>,
     pending_pes: Option<PendingPes>,
     input: Option<Chunk>,
@@ -270,8 +271,8 @@ pub struct AvcTsReader {
 }
 
 impl AvcTsReader {
-    pub fn new(pool: &Budget, config: TsNativeConfiguration, limits: AvcTsLimits) -> Result<Self> {
-        if config.carriage != TsNativeCarriage::Registered(RegisteredCarriage::Avc) {
+    pub fn new(pool: &Budget, config: AdmittedCarriage, limits: AvcTsLimits) -> Result<Self> {
+        if config.carriage != Carriage::Registered(RegisteredCarriage::Avc) {
             return Err(Error::Unsupported("HLS AVC needs selected AVC carriage"));
         }
         if !matches!(config.track, TrackKey::Ts { program, pid } if program != 0 && (1..0x1fff).contains(&pid))
@@ -317,7 +318,7 @@ impl AvcTsReader {
 
     pub(crate) fn new_progressive(
         pool: &Budget,
-        config: TsNativeConfiguration,
+        config: AdmittedCarriage,
         limits: AvcTsLimits,
     ) -> Result<Self> {
         let mut reader = Self::new(pool, config, limits)?;

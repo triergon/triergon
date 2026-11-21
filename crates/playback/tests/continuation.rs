@@ -11,6 +11,7 @@ use triergon_bridge::{
 use triergon_core::{
     Budget, Bytes, Error as C, InputCursor, SourceCapabilities, SourceId, Time, WorkBudget,
 };
+use triergon_playback::compat::pes::startup;
 use triergon_playback::{ByteSource, Source, SourceReply};
 use triergon_playback::{
     io::{SelectedInput, SourceOwner},
@@ -578,7 +579,7 @@ fn native_setup(
     quantum: usize,
     known: bool,
 ) -> (
-    native_startup::NativeStartup<StartupSource>,
+    startup::Startup<StartupSource>,
     Budget,
     Arc<AtomicBool>,
     Arc<AtomicUsize>,
@@ -604,7 +605,7 @@ fn native_setup(
     )
     .unwrap();
     (
-        native_startup::NativeStartup::new(SelectedInput {
+        startup::Startup::new(SelectedInput {
             input,
             source: SourceOwner::new(source),
             format: Format::Ts(triergon_mpegts::PacketFormat::M2ts192),
@@ -615,12 +616,10 @@ fn native_setup(
         reads,
     )
 }
-fn prepared_native() -> (native_startup::PreparedNative<StartupSource>, Budget) {
+fn prepared_native() -> (startup::BoundInput<StartupSource>, Budget) {
     let (mut setup, b, _, _) = native_setup(16 << 10, true);
     for _ in 0..10_000 {
-        if setup.advance(&mut WorkBudget::new(1), &off()).unwrap()
-            == native_startup::StartupStep::Ready
-        {
+        if setup.advance(&mut WorkBudget::new(1), &off()).unwrap() == startup::StartupStep::Ready {
             return (setup.finish().unwrap(), b);
         }
     }
@@ -678,19 +677,18 @@ fn native_startup_pending_eof_is_never_completed_from_declared_length() {
     allow.store(false, Ordering::Relaxed);
     assert_eq!(
         s.advance(&mut WorkBudget::new(1), &off()).unwrap(),
-        native_startup::StartupStep::NeedEof
+        startup::StartupStep::NeedEof
     );
     for _ in 0..10 {
         assert_eq!(
             s.advance(&mut WorkBudget::new(1), &off()).unwrap(),
-            native_startup::StartupStep::NeedEof
+            startup::StartupStep::NeedEof
         );
     }
     assert_eq!(reads.load(Ordering::Relaxed), 11);
     allow.store(true, Ordering::Relaxed);
     for _ in 0..10_000 {
-        if s.advance(&mut WorkBudget::new(1), &off()).unwrap() == native_startup::StartupStep::Ready
-        {
+        if s.advance(&mut WorkBudget::new(1), &off()).unwrap() == startup::StartupStep::Ready {
             assert_eq!(s.finish().unwrap().context().inspected_bytes(), 576);
             return;
         }
@@ -708,7 +706,7 @@ fn native_startup_short_read_is_refusal_and_not_quantum_as_eof() {
                     refused = true;
                     break;
                 }
-                Ok(native_startup::StartupStep::Ready) => panic!("partial window admitted"),
+                Ok(startup::StartupStep::Ready) => panic!("partial window admitted"),
                 Ok(_) => {}
                 Err(e) => panic!("wrong {e:?}"),
             }
@@ -725,7 +723,7 @@ fn native_startup_work_zero_and_cancel_do_not_perform_source_reads() {
     for _ in 0..10 {
         assert_eq!(
             s.advance(&mut WorkBudget::new(0), &off()).unwrap(),
-            native_startup::StartupStep::Yield
+            startup::StartupStep::Yield
         );
     }
     assert_eq!(reads.load(Ordering::Relaxed), 0);
@@ -1865,7 +1863,7 @@ fn prefix_setup(
     known: bool,
     quantum: usize,
 ) -> (
-    native_startup::NativeStartup<SequentialStartup>,
+    startup::Startup<SequentialStartup>,
     Budget,
     Arc<AtomicUsize>,
 ) {
@@ -1886,7 +1884,7 @@ fn prefix_setup(
         16 << 10,
     )
     .unwrap();
-    let startup = native_startup::NativeStartup::new_m2ts_prefix_v2(SelectedInput {
+    let startup = startup::Startup::new_m2ts_prefix(SelectedInput {
         input,
         source: SourceOwner::new(source),
         format: Format::Ts(triergon_mpegts::PacketFormat::M2ts192),
@@ -1895,12 +1893,9 @@ fn prefix_setup(
     (startup, budget, next)
 }
 
-fn open_prefix(
-    mut startup: native_startup::NativeStartup<SequentialStartup>,
-) -> Player<SequentialStartup> {
+fn open_prefix(mut startup: startup::Startup<SequentialStartup>) -> Player<SequentialStartup> {
     for _ in 0..30_000 {
-        if startup.advance(&mut WorkBudget::new(31), &off()).unwrap()
-            == native_startup::StartupStep::Ready
+        if startup.advance(&mut WorkBudget::new(31), &off()).unwrap() == startup::StartupStep::Ready
         {
             let prepared = startup.finish().unwrap();
             assert!(prepared.context().is_prefix());
@@ -1966,7 +1961,7 @@ fn native_m2ts_prefix_pressure_keeps_the_completed_reply() {
     drop(lease);
     assert_eq!(
         startup.advance(&mut WorkBudget::new(31), &off()).unwrap(),
-        native_startup::StartupStep::Yield
+        startup::StartupStep::Yield
     );
     assert_eq!(next.load(Ordering::Relaxed), 13);
     let mut player = open_prefix(startup);
@@ -1989,7 +1984,7 @@ fn native_m2ts_prefix_requires_the_actual_complete_unambiguous_window() {
         let (mut startup, budget, _) = prefix_setup(raw, false, 1024);
         let failure = loop {
             match startup.advance(&mut WorkBudget::new(1024), &off()) {
-                Ok(native_startup::StartupStep::Yield) => {}
+                Ok(startup::StartupStep::Yield) => {}
                 Err(error) => break error,
                 _ => panic!("unproven prefix became ready"),
             }

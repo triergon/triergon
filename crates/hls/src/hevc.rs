@@ -18,7 +18,8 @@ use triergon_mpegts::{
     AssemblyStep,
     compat::pes::{DemuxPacket, DemuxPayloadKind, DemuxSpan, DemuxTimeView, RegisteredCarriage},
 };
-use triergon_playback::{TrackKey, TsNativeCarriage, TsNativeConfiguration, pes_feed::PesInput};
+use triergon_playback::{TrackKey, pes_feed::PesInput};
+use triergon_playback::{compat::pes::AdmittedCarriage, compat::pes::Carriage};
 use triergon_raw_video::RawVideoConfigTracker;
 
 const ELEMENTARY: SourceId = SourceId(0);
@@ -115,7 +116,7 @@ enum Entry {
 }
 
 struct Active {
-    config: TsNativeConfiguration,
+    config: AdmittedCarriage,
     source_epoch: Option<(SourceId, u64)>,
     last_pes: Option<SourceLocation>,
     reader: RawAnnexBReader,
@@ -137,10 +138,10 @@ pub(crate) struct HlsHevc {
 impl HlsHevc {
     pub(crate) fn new(
         pool: &Budget,
-        config: TsNativeConfiguration,
+        config: AdmittedCarriage,
         limits: AvcTsLimits,
     ) -> Result<Self> {
-        if config.carriage != TsNativeCarriage::Registered(RegisteredCarriage::Hevc) {
+        if config.carriage != Carriage::Registered(RegisteredCarriage::Hevc) {
             return Err(Error::Unsupported("HLS HEVC needs selected HEVC carriage"));
         }
         if !matches!(config.track, TrackKey::Ts { program, pid } if program != 0 && (1..0x1fff).contains(&pid))
@@ -510,13 +511,13 @@ mod tests {
         configuration: 2,
         clock: 3,
     };
-    const CONFIG: TsNativeConfiguration = TsNativeConfiguration {
+    const CONFIG: AdmittedCarriage = AdmittedCarriage {
         track: TrackKey::Ts {
             program: 1,
             pid: 257,
         },
         configuration_epoch: EPOCHS.configuration,
-        carriage: TsNativeCarriage::Registered(RegisteredCarriage::Hevc),
+        carriage: Carriage::Registered(RegisteredCarriage::Hevc),
     };
 
     // The first three NALs of the authored fixture are VPS, SPS and PPS.

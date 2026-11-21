@@ -9,7 +9,7 @@ use crate::{Engine, Result};
 use triergon_core::InputCursor;
 use triergon_mpegts::ParseLimits;
 
-pub use crate::engines::{NativePacket, TsEngine, TsPayloadStep};
+pub use crate::engines::{FeedPacket, FeedStep, TsEngine};
 pub use crate::ts_payload::{PesFacts, PesInput, SpentLists};
 
 /// A player engine over one independent TS188 segment with an in-band PAT and
