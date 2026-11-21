@@ -447,13 +447,8 @@ impl AvcConfigParser {
         cancel: &AtomicBool,
     ) -> Result<BuildStep<AvcConfiguration>> {
         let mut ready = None;
-        match self.step_into(work, cancel, &mut ready)? {
-            ConfigProgress::Ready => Ok(BuildStep::Ready(
-                ready.ok_or(Error::Invalid("missing published configuration"))?,
-            )),
-            ConfigProgress::Yield => Ok(BuildStep::Yield),
-            ConfigProgress::Complete => Ok(BuildStep::Complete),
-        }
+        self.step_into(work, cancel, &mut ready)?
+            .into_build_step(ready)
     }
 
     /// Publishes into an empty caller-provided slot without returning the record.

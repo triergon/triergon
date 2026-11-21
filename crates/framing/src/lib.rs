@@ -31,6 +31,8 @@ mod canonical;
 mod inline_storage;
 mod record_input;
 
+use triergon_core::{Error, Result};
+
 /// One step of a work-bounded job that requests no input.
 ///
 /// `Ready` occurs exactly once; later calls return `Complete` unless the job was
@@ -54,4 +56,17 @@ pub enum ConfigProgress {
     Yield,
     /// The configuration was already published; the slot remains empty.
     Complete,
+}
+
+impl ConfigProgress {
+    /// The [`BuildStep`] of a parser that published into `ready`.
+    pub(crate) fn into_build_step<T>(self, ready: Option<T>) -> Result<BuildStep<T>> {
+        match self {
+            Self::Ready => ready
+                .map(BuildStep::Ready)
+                .ok_or(Error::Invalid("missing published configuration")),
+            Self::Yield => Ok(BuildStep::Yield),
+            Self::Complete => Ok(BuildStep::Complete),
+        }
+    }
 }
