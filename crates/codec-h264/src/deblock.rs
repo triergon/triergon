@@ -724,8 +724,12 @@ impl Progress {
     }
 }
 
-/// Note that macroblock `addr` is decoded; filter the rows that became ready.
+/// Note that macroblock `addr` is decoded; filter the rows that became ready. An inter
+/// macroblock's motion summary is taken here, while its motion is still in cache.
 pub(crate) fn mb_done(pic: &mut CurPic, addr: usize) {
+    if pic.mbs[addr].kind.is_inter() {
+        pic.dbk.uni[addr] = uniform_motion(&pic.motion, addr);
+    }
     // A row of macroblock pairs under MBAFF.
     let r = pic.w.split(addr >> usize::from(pic.mbaff)).1;
     let p = &mut pic.dbk;
@@ -801,7 +805,7 @@ fn advance(pic: &mut CurPic, all: bool) {
             if pic.mbs[addr].slice == 0 {
                 continue;
             }
-            deblock_mb(&pic, &mut dbk.uni, addr, &vy, &vc, y, cb, cr);
+            deblock_mb(&pic, &dbk.uni, addr, &vy, &vc, y, cb, cr);
         }
         start += 1;
     }
@@ -893,7 +897,7 @@ fn internal_bs(ctx: &BsCtx<'_>, q: usize, t8: bool) -> ([[u8; 4]; 4], [[u8; 4]; 
 #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 fn deblock_mb(
     pic: &PicView<'_>,
-    uni: &mut [Uni],
+    uni: &[Uni],
     addr: usize,
     vy: &View,
     vc: &View,
@@ -908,9 +912,6 @@ fn deblock_mb(
     }
     let field_pic = pic.structure != 0;
     let q_intra = q.kind.is_intra();
-    if !q_intra {
-        uni[addr] = uniform_motion(pic.motion, addr);
-    }
     let ctx = BsCtx {
         mbs: pic.mbs,
         motion: pic.motion,

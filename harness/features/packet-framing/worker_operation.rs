@@ -158,6 +158,8 @@ fn receive_failure_words(input: usize, code: i32) -> [u64; 3] {
 struct Retained {
     inline: [Option<NalPacketOutput>; Retained::INLINE],
     inline_len: usize,
+    // Where an output past the inline slots is published before it spills.
+    staged: Option<NalPacketOutput>,
     spilled: Option<BudgetVec<NalPacketOutput>>,
 }
 
@@ -171,16 +173,39 @@ impl Retained {
             // constant is zero-filled whole.
             inline: std::array::from_fn(|_| None),
             inline_len: 0,
+            staged: None,
             spilled: None,
         }
     }
 
-    fn push(&mut self, pool: &Budget, value: NalPacketOutput, following: &[Event]) -> Result<()> {
-        if let Some(slot) = self.inline.get_mut(self.inline_len) {
-            *slot = Some(value);
-            self.inline_len += 1;
-            return Ok(());
+    /// The empty slot the next output is published into, so that it is not
+    /// moved again: the next inline slot while one is free, else the staging
+    /// slot that `keep` moves into the vector.
+    fn slot(&mut self) -> &mut Option<NalPacketOutput> {
+        match self.inline.get_mut(self.inline_len) {
+            Some(slot) => slot,
+            None => &mut self.staged,
         }
+    }
+
+    /// Keeps the output just published into [`slot`](Self::slot).
+    fn keep(&mut self, pool: &Budget, following: &[Event]) -> Result<&NalPacketOutput> {
+        if self.inline_len < Self::INLINE {
+            self.inline_len += 1;
+            return self.inline[self.inline_len - 1]
+                .as_ref()
+                .ok_or(Error::Invalid("missing published packet"));
+        }
+        self.spill(pool, following)
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn spill(&mut self, pool: &Budget, following: &[Event]) -> Result<&NalPacketOutput> {
+        let value = self
+            .staged
+            .take()
+            .ok_or(Error::Invalid("missing published packet"))?;
         let spilled = self.spilled.get_or_insert_with(|| BudgetVec::new(pool));
         if spilled.is_empty() {
             // Each complete-packet action publishes at most one output. Read only
@@ -199,7 +224,10 @@ impl Retained {
                 Err(error) => return Err(error),
             }
         }
-        spilled.try_push(value).map_err(|e| e.error)
+        spilled.try_push(value).map_err(|e| e.error)?;
+        spilled
+            .last()
+            .ok_or(Error::Invalid("missing published packet"))
     }
 
     fn iter(&self) -> impl Iterator<Item = &NalPacketOutput> {
@@ -310,30 +338,27 @@ fn operation(case: &Case) -> Result<Outcome> {
             Err(Error::Invalid("packet after drain requires flush")) if drained => continue,
             Err(error) => return Err(error),
         };
-        let mut ready = None;
+        let slot = kept.slot();
         loop {
-            match job.step_into(&mut WorkBudget::new(QUANTUM), &CANCEL, &mut ready) {
+            match job.step_into(&mut WorkBudget::new(QUANTUM), &CANCEL, slot) {
                 Ok(NalPacketProgress::Yield) => (),
                 Ok(NalPacketProgress::Complete) => {
                     return Err(Error::Invalid("packet publication missing"));
                 }
                 Ok(NalPacketProgress::Ready) => {
-                    let packet = ready
-                        .take()
-                        .ok_or(Error::Invalid("missing published packet"))?;
+                    let packet = kept.keep(&case.pool, &case.events[index + 1..])?;
                     packet_digest(
                         &mut outcome.digest,
                         2,
                         index as i64,
                         outcome.packets,
-                        &packet,
+                        packet,
                     );
                     outcome.bytes = outcome
                         .bytes
                         .checked_add(packet.bytes().len() as u64)
                         .ok_or(Error::Overflow)?;
                     outcome.packets = outcome.packets.checked_add(1).ok_or(Error::Overflow)?;
-                    kept.push(&case.pool, packet, &case.events[index + 1..])?;
                     break;
                 }
                 Err(error) => {

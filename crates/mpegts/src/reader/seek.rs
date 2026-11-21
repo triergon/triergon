@@ -103,6 +103,7 @@ struct Landing {
     offset: u64,
     epochs: SourceEpochs,
     byte_run: u64,
+    pes_offset: u64,
 }
 
 #[derive(Default)]
@@ -194,13 +195,18 @@ pub(super) enum PictureDelivery {
     Full,
     Scan,
     Discard,
-    Landing { offset: u64, byte_run: u64 },
+    Landing {
+        offset: u64,
+        byte_run: u64,
+        publish_headers: bool,
+    },
 }
 
 pub(super) struct SeekProbe {
     pub offset: u64,
     pub epochs: SourceEpochs,
     pub byte_run: u64,
+    pub pes_offset: u64,
     pub ticks: Option<i128>,
     pub time: Option<Time>,
     pub random_access: bool,
@@ -313,10 +319,12 @@ fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
             ));
         }
     };
+    let pes = packet.sources()[0].pes.pes();
     Ok(SeekProbe {
         offset,
         epochs: packet.epochs(),
-        byte_run: packet.sources()[0].pes.pes().byte_run_epoch,
+        byte_run: pes.byte_run_epoch,
+        pes_offset: pes.elementary_offset,
         ticks: clock.and_then(|clock| clock.pts.ticks90),
         time,
         random_access,
@@ -343,18 +351,11 @@ impl Seeking {
         match self.phase {
             Phase::Scan(_) if self.full_scan => PictureDelivery::Full,
             Phase::Scan(_) => PictureDelivery::Scan,
-            // Keep header-only groups from the selected epoch available for
-            // decoder setup. Coded packets before the landing are discarded
-            // by advance_seek, in their original decode order.
-            Phase::Replay { .. }
-                if self.selected_epochs.is_some() && track == self.request.track =>
-            {
-                PictureDelivery::Full
-            }
             Phase::Replay { landing, .. } if track == self.request.track => {
                 PictureDelivery::Landing {
                     offset: landing.offset,
                     byte_run: landing.byte_run,
+                    publish_headers: self.selected_epochs.is_some(),
                 }
             }
             Phase::Replay { .. } => PictureDelivery::Discard,
@@ -390,6 +391,7 @@ impl Scan {
             offset,
             epochs,
             byte_run,
+            pes_offset,
             ticks,
             time,
             random_access,
@@ -419,6 +421,7 @@ impl Scan {
                 offset,
                 epochs,
                 byte_run,
+                pes_offset,
             };
             if let Some(index) = &mut self.index
                 && !index.record(point)
@@ -918,10 +921,12 @@ impl Reader {
                     },
                     Step::Ready(Event::Packet(packet)),
                 ) => {
+                    let pes = packet.sources()[0].pes.pes();
                     if packet.track() != request.track
                         || packet.elementary_range().start != landing.offset
                         || packet.epochs() != landing.epochs
-                        || packet.sources()[0].pes.pes().byte_run_epoch != landing.byte_run
+                        || pes.byte_run_epoch != landing.byte_run
+                        || pes.elementary_offset != landing.pes_offset
                     {
                         *skipped = true;
                         continue;
