@@ -57,16 +57,15 @@ pub(crate) struct PicState {
     pub(crate) ctb_slice_idx: BudgetVec<u16>,
     pub(crate) sao: BudgetVec<SaoParams>,
     pub(crate) slices: BudgetVec<SliceInfo>,
-    pub(crate) ctx_wpp: [u8; ctx::NUM],
-    pub(crate) ctx_ds: [u8; ctx::NUM],
-    pub(crate) ctx_wpp_valid: bool,
-    pub(crate) ctx_ds_valid: bool,
+    /// Contexts saved after the second CTB of a row for wavefront synchronisation (9.3.1).
+    pub(crate) ctx_wpp: Option<[u8; ctx::NUM]>,
+    /// Contexts saved at the end of a slice segment for a dependent one that follows.
+    pub(crate) ctx_ds: Option<[u8; ctx::NUM]>,
     /// qPY_PREV carried into a dependent slice segment.
     pub(crate) ds_last_qp: i32,
     pub(crate) any_deblock: bool,
     pub(crate) any_sao: bool,
     pub(crate) any_nofilter: bool,
-    pub(crate) decoded_ctbs: usize,
     /// Decoded CTBs per CTB row, and the next rows to deblock / to SAO (in-loop filters
     /// run row by row during decoding, see decoder::filter_ready).
     pub(crate) row_done: BudgetVec<u16>,
@@ -89,15 +88,12 @@ impl PicState {
             ctb_slice_idx: BudgetVec::new(budget),
             sao: BudgetVec::new(budget),
             slices: BudgetVec::new(budget),
-            ctx_wpp: [0; ctx::NUM],
-            ctx_ds: [0; ctx::NUM],
-            ctx_wpp_valid: false,
-            ctx_ds_valid: false,
+            ctx_wpp: None,
+            ctx_ds: None,
             ds_last_qp: 0,
             any_deblock: false,
             any_sao: false,
             any_nofilter: false,
-            decoded_ctbs: 0,
             row_done: BudgetVec::new(budget),
             filt_next: 0,
             sao_next: 0,
@@ -143,12 +139,11 @@ impl PicState {
         refill(&mut self.sao, sao, SaoParams::default());
         refill(&mut self.row_done, row_done, 0);
         self.slices.clear();
-        self.ctx_wpp_valid = false;
-        self.ctx_ds_valid = false;
+        self.ctx_wpp = None;
+        self.ctx_ds = None;
         self.any_deblock = false;
         self.any_sao = false;
         self.any_nofilter = false;
-        self.decoded_ctbs = 0;
         self.filt_next = 0;
         self.sao_next = 0;
         Ok(())

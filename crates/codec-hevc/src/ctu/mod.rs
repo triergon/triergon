@@ -357,13 +357,15 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                     self.init_ctx();
                 } else if pps.entropy_coding_sync && first_in_row_of_tile {
                     let tr_avail = self.nb_ok[3];
-                    if tr_avail && self.st.ctx_wpp_valid {
-                        self.c = self.st.ctx_wpp;
-                    } else {
-                        self.init_ctx();
+                    match self.st.ctx_wpp {
+                        Some(saved) if tr_avail => self.c = saved,
+                        _ => self.init_ctx(),
                     }
-                } else if first && self.sh.dependent_slice_segment && self.st.ctx_ds_valid {
-                    self.c = self.st.ctx_ds;
+                } else if first
+                    && self.sh.dependent_slice_segment
+                    && let Some(saved) = self.st.ctx_ds
+                {
+                    self.c = saved;
                 } else {
                     self.init_ctx();
                 }
@@ -380,7 +382,6 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                 self.sao_syntax(ctb_x, rs / pic_w_ctb)?;
             }
             self.coding_quadtree(x_ctb, y_ctb, self.log2_ctb, 0)?;
-            self.st.decoded_ctbs += 1;
             let ry = (rs / pic_w_ctb) as usize;
             self.st.row_done[ry] = self.st.row_done[ry].saturating_add(1);
             if self.st.row_done[ry] as u32 >= pic_w_ctb {
@@ -399,15 +400,13 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                         && layout.tile_id[layout.ctb_addr_rs_to_ts[rs as usize - 2] as usize]
                             != tile))
             {
-                self.st.ctx_wpp = self.c;
-                self.st.ctx_wpp_valid = true;
+                self.st.ctx_wpp = Some(self.c);
             }
             let end = self.cabac.terminate();
             self.ctb_ts += 1;
             if end == 1 {
                 if pps.dependent_slice_segments_enabled {
-                    self.st.ctx_ds = self.c;
-                    self.st.ctx_ds_valid = true;
+                    self.st.ctx_ds = Some(self.c);
                     self.st.ds_last_qp = self.last_qp_y;
                 }
                 return Ok(());
