@@ -8,6 +8,7 @@ use crate::subframe::{HIST, SubBuf, adpcm, joint_copy, read_indices, sat24};
 use crate::tables::{JOINT_SCALE, SCALE_6BIT, STEP_LOSSLESS, STEP_LOSSY};
 use crate::vq::HF_VQ;
 
+/// SYNC96 (Table 6-1).
 pub(crate) const X96_SYNC: u32 = 0x1D95_F262;
 const MAX_CH: usize = 5;
 
@@ -22,31 +23,6 @@ pub(crate) struct X96Header {
     pub bhuff: [u8; MAX_CH],
     /// SEL96 by ABITS96 - 2 (ABITS96 2..=11).
     pub sel: [[u8; 10]; MAX_CH],
-}
-
-/// Locate SYNC96: 32-bit aligned, its distance to the frame end equals FSIZE96.
-pub(crate) fn find(frame: &[u8], from_bit: usize) -> Option<usize> {
-    let end = frame.len() * 8;
-    let mut p = from_bit.div_ceil(32) * 32;
-    while p + 64 <= end {
-        let byte = p / 8;
-        if u32::from_be_bytes([
-            frame[byte],
-            frame[byte + 1],
-            frame[byte + 2],
-            frame[byte + 3],
-        ]) == X96_SYNC
-        {
-            let mut b = BitReader::new(frame);
-            b.seek(p + 32);
-            let fsize96 = b.read(12) as usize + 1;
-            if frame.len() - byte == fsize96 {
-                return Some(p);
-            }
-        }
-        p += 32;
-    }
-    None
 }
 
 impl X96Header {

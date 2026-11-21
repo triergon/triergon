@@ -163,7 +163,9 @@ impl FrameDecoder {
         // Core-embedded extensions (clause 6).
         if f.h.ext_audio
             && f.h.ext_audio_id == 6
-            && find_sync32(f.data, core_end, 0x4700_4A03).is_some()
+            && aligned_syncs(f.data, core_end, XXCH_SYNC, 4)
+                .next()
+                .is_some()
         {
             // XXCH inside the core substream (clause 6.5) is not implemented: no selected
             // vector carries it (every 7.1 vector puts XXCH in the extension substream).
@@ -185,7 +187,7 @@ impl FrameDecoder {
         let mut have_x96 = false;
         if f.h.ext_audio
             && f.h.ext_audio_id == 2
-            && let Some(pos) = x96::find(f.data, core_end)
+            && let Some(pos) = find_x96(f.data, core_end)
         {
             have_x96 = self.decode_x96(&f, pos)?;
         }
@@ -450,41 +452,44 @@ fn amode_speakers(amode: u8) -> Option<&'static [Speaker]> {
     })
 }
 
-/// Locate the XCh sync (Table 6-17): 32-bit aligned, at distance XChFSIZE+1 (or, for
-/// legacy streams, XChFSIZE) bytes from the end of the frame.
-fn find_xch(frame: &[u8], from_bit: usize) -> Option<usize> {
-    let end = frame.len() * 8;
-    let mut p = from_bit.div_ceil(32) * 32;
-    while p + 64 <= end {
-        let byte = p / 8;
-        if frame[byte..byte + 4] == [0x5A, 0x5A, 0x5A, 0x5A] {
-            let mut b = BitReader::new(frame);
-            b.seek(p + 32);
-            let fs = b.read(10) as usize;
-            let dist = frame.len() - byte;
-            if dist == fs + 1 || dist == fs {
-                return Some(p);
-            }
-        }
-        p += 32;
-    }
-    None
+/// XCh sync word (Table 6-17).
+const XCH_SYNC: u32 = 0x5A5A_5A5A;
+/// XXCh sync word (clause 6.5).
+const XXCH_SYNC: u32 = 0x4700_4A03;
+
+/// Bit positions of the 32-bit aligned occurrences of `sync` at or after `from_bit` that
+/// leave at least `room` bytes, the sync word included, in `frame`.
+fn aligned_syncs(
+    frame: &[u8],
+    from_bit: usize,
+    sync: u32,
+    room: usize,
+) -> impl Iterator<Item = usize> + '_ {
+    (from_bit.div_ceil(32) * 4..)
+        .step_by(4)
+        .take_while(move |&byte| byte + room <= frame.len())
+        .filter(move |&byte| frame[byte..byte + 4] == sync.to_be_bytes())
+        .map(|byte| byte * 8)
 }
 
-/// First 32-bit aligned occurrence of `sync` at or after `from_bit`.
-fn find_sync32(frame: &[u8], from_bit: usize, sync: u32) -> Option<usize> {
-    let mut byte = from_bit.div_ceil(32) * 4;
-    while byte + 4 <= frame.len() {
-        if u32::from_be_bytes([
-            frame[byte],
-            frame[byte + 1],
-            frame[byte + 2],
-            frame[byte + 3],
-        ]) == sync
-        {
-            return Some(byte * 8);
-        }
-        byte += 4;
-    }
-    None
+/// The XCh sync whose distance to the frame end is XChFSIZE + 1 (or, for legacy
+/// streams, XChFSIZE) bytes.
+fn find_xch(frame: &[u8], from_bit: usize) -> Option<usize> {
+    aligned_syncs(frame, from_bit, XCH_SYNC, 8).find(|&p| {
+        let mut b = BitReader::new(frame);
+        b.seek(p + 32);
+        let fs = b.read(10) as usize;
+        let dist = frame.len() - p / 8;
+        dist == fs + 1 || dist == fs
+    })
+}
+
+/// The X96 sync (SYNC96) whose distance to the frame end is FSIZE96 bytes.
+fn find_x96(frame: &[u8], from_bit: usize) -> Option<usize> {
+    aligned_syncs(frame, from_bit, x96::X96_SYNC, 8).find(|&p| {
+        let mut b = BitReader::new(frame);
+        b.seek(p + 32);
+        let fsize96 = b.read(12) as usize + 1;
+        frame.len() - p / 8 == fsize96
+    })
 }
