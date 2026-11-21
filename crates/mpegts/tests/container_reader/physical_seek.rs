@@ -1,7 +1,7 @@
 //! Authored physical offsets are independent of the reader's elementary view.
 use super::*;
 use std::ops::Range;
-use triergon_core::container::{SeekMethod, SeekPolicy, SeekReceipt, SeekRequest};
+use triergon_core::container::{SeekMethod, SeekPolicy, SeekRequest};
 use triergon_mpegts::clock::{SourceClockAnchor, SourceClockSample, SourceTimePolicy};
 
 const FRAMES: usize = 10;
@@ -71,6 +71,12 @@ struct Source<'a> {
     reads: Vec<Range<u64>>,
 }
 
+struct ObservedSeek {
+    method: SeekMethod,
+    scanned_bytes: u64,
+    replays_from_start: bool,
+}
+
 impl<'a> Source<'a> {
     fn new(bytes: &'a [u8], chunk: usize, grant: u64, limits: ReaderLimits) -> Self {
         let pool = Budget::new(2 << 20).unwrap();
@@ -135,12 +141,20 @@ impl<'a> Source<'a> {
         panic!("physical seek did not progress");
     }
 
-    fn suffix(&mut self) -> Result<(Option<SeekReceipt>, Vec<String>), Error> {
+    fn suffix(&mut self) -> Result<(Option<ObservedSeek>, Vec<String>), Error> {
         let mut result = None;
         let mut packets = Vec::new();
         while let Some(event) = self.next()? {
             match event {
-                Event::Seek(value) => assert!(result.replace(value).is_none()),
+                Event::Seek(value) => assert!(
+                    result
+                        .replace(ObservedSeek {
+                            method: value.method,
+                            scanned_bytes: value.scanned_bytes,
+                            replays_from_start: value.replays_from_start,
+                        })
+                        .is_none()
+                ),
                 Event::Packet(packet) => packets.push(facts(&packet)),
                 Event::Other(_) => (),
             }
