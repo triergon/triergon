@@ -72,7 +72,7 @@ mod collect {
                     let _ = write!(
                         stats,
                         "el{}/{} ch{} seq{} sh{} maxsfb{} grp{} cb{:#x} tns{} pulse{} pred{} ltp{}; ",
-                        e.kind,
+                        e.kind as u8,
                         e.tag,
                         c,
                         cd.info.window_sequence,

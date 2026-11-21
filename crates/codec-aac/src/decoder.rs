@@ -12,14 +12,36 @@ use crate::{ltp, pred, sbr};
 use triergon_bitstream::CachedBitReader;
 use triergon_codec::{AudioFrame, Budget, ChannelLayout, Charged, Reservation, Speaker};
 
-pub(crate) const ID_SCE: u8 = 0;
-pub(crate) const ID_CPE: u8 = 1;
-pub(crate) const ID_CCE: u8 = 2;
-pub(crate) const ID_LFE: u8 = 3;
-pub(crate) const ID_DSE: u8 = 4;
-pub(crate) const ID_PCE: u8 = 5;
-pub(crate) const ID_FIL: u8 = 6;
-pub(crate) const ID_END: u8 = 7;
+/// The syntactic elements of a raw data block, by their 3-bit `id_syn_ele` (ISO/IEC
+/// 14496-3 Table 4.85).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ElementId {
+    Sce = 0,
+    Cpe = 1,
+    Cce = 2,
+    Lfe = 3,
+    Dse = 4,
+    Pce = 5,
+    Fil = 6,
+    End = 7,
+}
+
+impl ElementId {
+    /// The element the low three bits of `bits` name.
+    #[inline(always)]
+    fn from_bits(bits: u32) -> ElementId {
+        match bits & 7 {
+            0 => ElementId::Sce,
+            1 => ElementId::Cpe,
+            2 => ElementId::Cce,
+            3 => ElementId::Lfe,
+            4 => ElementId::Dse,
+            5 => ElementId::Pce,
+            6 => ElementId::Fil,
+            _ => ElementId::End,
+        }
+    }
+}
 
 const EXT_SBR_DATA: u32 = 13;
 const EXT_SBR_DATA_CRC: u32 = 14;
@@ -76,15 +98,15 @@ impl ChannelState {
 }
 
 /// SBR state for an element of `kind` at core sampling-frequency index `sf_index`.
-fn new_sbr(budget: &Budget, sf_index: usize, kind: u8) -> Result<Charged<Box<sbr::Sbr>>> {
-    let s = sbr::Sbr::new(SAMPLE_RATES[sf_index], kind == ID_CPE, budget)?;
+fn new_sbr(budget: &Budget, sf_index: usize, kind: ElementId) -> Result<Charged<Box<sbr::Sbr>>> {
+    let s = sbr::Sbr::new(SAMPLE_RATES[sf_index], kind == ElementId::Cpe, budget)?;
     Ok(Charged::boxed(budget, s)?)
 }
 
 /// One output slot: syntactic element + speakers of its channel(s).
 #[derive(Clone, Debug)]
 pub(crate) struct Slot {
-    pub kind: u8,
+    pub kind: ElementId,
     pub tag: u8,
     pub speakers: [Option<Speaker>; 2],
 }
@@ -92,7 +114,7 @@ pub(crate) struct Slot {
 /// Element instance state (channels + SBR).
 #[derive(Debug)]
 pub(crate) struct ElementState {
-    pub kind: u8,
+    pub kind: ElementId,
     pub tag: u8,
     pub ch: [ChannelState; 2],
     pub sbr: Option<Charged<Box<sbr::Sbr>>>,
@@ -112,7 +134,7 @@ pub(crate) struct ElementState {
 }
 
 impl ElementState {
-    fn new(budget: &Budget, aot: u8, kind: u8, tag: u8) -> Result<ElementState> {
+    fn new(budget: &Budget, aot: u8, kind: ElementId, tag: u8) -> Result<ElementState> {
         Ok(ElementState {
             kind,
             tag,
@@ -123,7 +145,7 @@ impl ElementState {
             sbr: None,
             out: [[0.0; 2048]; 2],
             decoded: false,
-            nch: if kind == ID_CPE { 2 } else { 1 },
+            nch: if kind == ElementId::Cpe { 2 } else { 1 },
             cd: [
                 Charged::boxed(budget, ChannelData::new())?,
                 Charged::boxed(budget, ChannelData::new())?,
@@ -156,7 +178,7 @@ impl ElementState {
         }
         *out = [[0.0; 2048]; 2];
         *decoded = false;
-        *nch = if *kind == ID_CPE { 2 } else { 1 };
+        *nch = if *kind == ElementId::Cpe { 2 } else { 1 };
         for cd in cd {
             let cd: &mut ChannelData = cd;
             *cd = ChannelData::new();
@@ -428,7 +450,7 @@ impl Core {
         let mut entries: Vec<(Speaker, usize, usize)> = Vec::new();
         for (i, s) in slots.iter().enumerate() {
             let mut sp = s.speakers;
-            if self.ps_active && s.kind == ID_SCE && slots.len() == 1 {
+            if self.ps_active && s.kind == ElementId::Sce && slots.len() == 1 {
                 sp = [Some(Speaker::FrontLeft), Some(Speaker::FrontRight)];
             }
             for (c, x) in sp.iter().enumerate() {
@@ -489,7 +511,7 @@ impl Core {
         Ok(())
     }
 
-    fn element_index(&self, kind: u8, tag: u8, occurrence: usize) -> Option<usize> {
+    fn element_index(&self, kind: ElementId, tag: u8, occurrence: usize) -> Option<usize> {
         // map to a slot
         let slot = if self.channel_config != 0 {
             // FFmpeg maps fixed configurations by element order, ignoring tags.
@@ -547,9 +569,9 @@ impl Core {
             if br.left() < 3 {
                 return Err(DecodeError::InvalidData("missing END element"));
             }
-            let id = br.read(3) as u8;
+            let id = ElementId::from_bits(br.read(3));
             match id {
-                ID_SCE | ID_LFE | ID_CPE => {
+                ElementId::Sce | ElementId::Lfe | ElementId::Cpe => {
                     let tag = br.read(4) as u8;
                     let o = occ[id as usize];
                     let mut ei = if fixed_raw {
@@ -569,17 +591,27 @@ impl Core {
                         occ[id as usize] += 1;
                         self.element_index(id, tag, o)
                     };
-                    if ei.is_none() && self.channel_config == 2 && id == ID_SCE && o < 2 && !RAW {
+                    if ei.is_none()
+                        && self.channel_config == 2
+                        && id == ElementId::Sce
+                        && o < 2
+                        && !RAW
+                    {
                         // FFmpeg maps SCEs of a channel_configuration 2 stream to FL then FR
                         // (probed); the CPE slot's channel o carries them.
-                        if let Some(i) = self.element_index(ID_CPE, 0, 0) {
+                        if let Some(i) = self.element_index(ElementId::Cpe, 0, 0) {
                             self.elements[i].bs_tag = tag;
                             self.decode_sce(br, &cfg, i, o)?;
                             last_elem = Some(i);
                             continue;
                         }
                     }
-                    if ei.is_none() && self.channel_config == 1 && id == ID_CPE && o == 0 && !RAW {
+                    if ei.is_none()
+                        && self.channel_config == 1
+                        && id == ElementId::Cpe
+                        && o == 0
+                        && !RAW
+                    {
                         // FFmpeg switches a channel_configuration 1 stream to stereo when a
                         // CPE appears (probed).
                         self.switch_layout(
@@ -596,18 +628,18 @@ impl Core {
                         "element not in channel configuration",
                     ))?;
                     self.elements[ei].bs_tag = tag;
-                    if id == ID_CPE {
+                    if id == ElementId::Cpe {
                         self.decode_cpe(br, &cfg, ei)?;
                     } else {
                         self.decode_sce(br, &cfg, ei, 0)?;
                     }
                     last_elem = Some(ei);
                 }
-                ID_CCE => {
+                ElementId::Cce => {
                     crate::cce::parse_cce::<RAW>(self, br, &cfg)?;
                     last_elem = None;
                 }
-                ID_DSE => {
+                ElementId::Dse => {
                     br.skip(4);
                     let align = br.bit();
                     let mut count = br.read(8) as usize;
@@ -621,7 +653,7 @@ impl Core {
                     br.skip(count * 8);
                     last_elem = None;
                 }
-                ID_PCE => {
+                ElementId::Pce => {
                     let p = parse_pce(br, block_start)?;
                     // The out-of-band program stays in effect for raw access units.
                     if !RAW && self.channel_config == 0 && self.pce.as_ref() != Some(&p) {
@@ -632,7 +664,7 @@ impl Core {
                     }
                     last_elem = None;
                 }
-                ID_FIL => {
+                ElementId::Fil => {
                     let fil_start = br.position() - 3;
                     let mut count = br.read(4) as usize;
                     if count == 15 {
@@ -691,8 +723,7 @@ impl Core {
                         }
                     }
                 }
-                ID_END => break,
-                _ => unreachable!(),
+                ElementId::End => break,
             }
             if br.overrun() {
                 return Err(DecodeError::InvalidData("raw_data_block overrun"));
@@ -802,7 +833,7 @@ impl Core {
         out: &mut AudioFrame,
         blocks: usize,
     ) -> Result<bool> {
-        let is_cpe = self.elements[ei].kind == ID_CPE;
+        let is_cpe = self.elements[ei].kind == ElementId::Cpe;
         // A mono stream whose very first frame carries SBR is output as stereo (FFmpeg assumes
         // HE-AAC v2 for implicitly signalled mono SBR).
         let to_stereo = self.frames_out == 0 && !self.ps_active && !is_cpe && self.slots.len() == 1;
@@ -862,8 +893,8 @@ impl Core {
                 continue;
             }
             let (kind, tag) = (
-                if !RAW && e.ch_decoded == [true, false] && e.kind == ID_CPE {
-                    ID_SCE
+                if !RAW && e.ch_decoded == [true, false] && e.kind == ElementId::Cpe {
+                    ElementId::Sce
                 } else {
                     e.kind
                 },
@@ -881,7 +912,7 @@ impl Core {
                     };
                     let (cd, st) = (&mut e.cd[c], &mut e.ch[c]);
                     process_channel(&mut self.fb, &cfg, cd, st, out, &self.cce, kind, tag, c);
-                } else if e.kind == ID_CPE {
+                } else if e.kind == ElementId::Cpe {
                     for v in &mut e.out[c][..1024] {
                         *v = 0.0;
                     }
@@ -904,15 +935,15 @@ impl Core {
             }
             // Every element has its SBR state once SBR runs.
             if let (true, Some(s)) = (self.sbr_active, e.sbr.as_mut()) {
-                let ps = self.ps_active && e.kind == ID_SCE;
-                let nch = if e.kind == ID_CPE { 2 } else { 1 };
+                let ps = self.ps_active && e.kind == ElementId::Sce;
+                let nch = if e.kind == ElementId::Cpe { 2 } else { 1 };
                 let (o0, o1) = e.out.split_at_mut(1);
                 s.process(
                     &mut o0[0],
                     &mut o1[0],
                     nch,
                     ps,
-                    e.kind == ID_CPE,
+                    e.kind == ElementId::Cpe,
                     &mut self.qmf,
                 );
                 if ps {
@@ -984,7 +1015,7 @@ pub(crate) fn process_channel(
     st: &mut ChannelState,
     out: &mut [f32],
     cce: &[Charged<Box<crate::cce::CceState>>],
-    kind: u8,
+    kind: ElementId,
     tag: u8,
     ch_in_elem: usize,
 ) {
@@ -1018,17 +1049,17 @@ fn fixed_config_slots(cfg: u8, layout: FixedLayout) -> Vec<Slot> {
         FrontRightOfCenter, LowFrequency, SideLeft, SideRight, TopFrontLeft, TopFrontRight,
     };
     let sce = |s| Slot {
-        kind: ID_SCE,
+        kind: ElementId::Sce,
         tag: 0,
         speakers: [Some(s), None],
     };
     let cpe = |a, b| Slot {
-        kind: ID_CPE,
+        kind: ElementId::Cpe,
         tag: 0,
         speakers: [Some(a), Some(b)],
     };
     let lfe = Slot {
-        kind: ID_LFE,
+        kind: ElementId::Lfe,
         tag: 0,
         speakers: [Some(LowFrequency), None],
     };
@@ -1129,12 +1160,12 @@ fn pce_slots(p: &Pce, adts: bool) -> (Vec<Slot>, bool) {
         && kinds(&back) == [true]
         && p.lfe.len() <= 1;
     let sce = |t, s| Slot {
-        kind: ID_SCE,
+        kind: ElementId::Sce,
         tag: t,
         speakers: [Some(s), None],
     };
     let cpe = |t, a, b| Slot {
-        kind: ID_CPE,
+        kind: ElementId::Cpe,
         tag: t,
         speakers: [Some(a), Some(b)],
     };
@@ -1239,7 +1270,7 @@ fn pce_slots(p: &Pce, adts: bool) -> (Vec<Slot>, bool) {
     }
     for (k, &t) in p.lfe.iter().enumerate() {
         slots.push(Slot {
-            kind: ID_LFE,
+            kind: ElementId::Lfe,
             tag: t,
             speakers: [
                 Some(if k == 0 { LowFrequency } else { LowFrequency2 }),
@@ -1286,13 +1317,17 @@ fn pce_slots(p: &Pce, adts: bool) -> (Vec<Slot>, bool) {
         // FFmpeg falls back to an unspecified layout in PCE element order
         let mut ordered = Vec::new();
         for e in p.front.iter().chain(&p.side).chain(&p.back) {
-            let kind = if e.is_cpe { ID_CPE } else { ID_SCE };
+            let kind = if e.is_cpe {
+                ElementId::Cpe
+            } else {
+                ElementId::Sce
+            };
             if let Some(s) = slots.iter().find(|s| s.kind == kind && s.tag == e.tag) {
                 ordered.push(s.clone());
             }
         }
         for s in &slots {
-            if s.kind == ID_LFE {
+            if s.kind == ElementId::Lfe {
                 ordered.push(s.clone());
             }
         }
@@ -1367,7 +1402,7 @@ pub(crate) mod tests {
     fn a_renewed_element_is_a_new_one() {
         let budget = Budget::new(1 << 30).unwrap();
         for aot in [AOT_LC, AOT_MAIN, AOT_LTP] {
-            for kind in [ID_SCE, ID_CPE] {
+            for kind in [ElementId::Sce, ElementId::Cpe] {
                 let fresh = || {
                     let mut e = ElementState::new(&budget, aot, kind, 3).unwrap();
                     e.sbr = Some(new_sbr(&budget, 4, kind).unwrap());
@@ -1380,7 +1415,7 @@ pub(crate) mod tests {
                 (e.decoded, e.nch, e.bs_tag, e.ch_decoded) = (true, 2, 9, [true; 2]);
                 e.cd[0].global_gain = 120;
                 e.renew();
-                assert_eq!(without_pools(&e), without_pools(&fresh()), "{aot} {kind}");
+                assert_eq!(without_pools(&e), without_pools(&fresh()), "{aot} {kind:?}");
             }
         }
     }
@@ -1394,13 +1429,13 @@ pub(crate) mod tests {
         // with the largest state.
         let element = [AOT_MAIN, AOT_LTP]
             .into_iter()
-            .flat_map(|aot| [ID_SCE, ID_CPE].map(|kind| (aot, kind)))
+            .flat_map(|aot| [ElementId::Sce, ElementId::Cpe].map(|kind| (aot, kind)))
             .map(|(aot, kind)| {
                 charge_of(|b| {
                     let mut e = Charged::boxed(b, ElementState::new(b, aot, kind, 0)?)?;
                     e.sbr = Some(Charged::boxed(
                         b,
-                        sbr::Sbr::new(48_000, kind == ID_CPE, b)?,
+                        sbr::Sbr::new(48_000, kind == ElementId::Cpe, b)?,
                     )?);
                     Ok(e)
                 })

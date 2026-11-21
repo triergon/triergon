@@ -4,7 +4,7 @@
 //! target's TNS (cc_domain 0 / 1); independently switched CCEs are added in the time domain
 //! after the target's filterbank. The coupling channel's own spectrum is TNS-filtered first.
 
-use crate::decoder::{Core, ID_CPE};
+use crate::decoder::{Core, ElementId};
 use crate::error::{DecodeError, Result};
 use crate::huffman::books;
 use crate::ics::{ChannelData, CoreCfg, MAX_SFB, ZERO_HCB, parse_ics};
@@ -163,13 +163,13 @@ pub(crate) fn parse_cce<const RAW: bool>(
 }
 
 /// For each target channel (element index ei, channel ch) find the gain list index.
-fn list_for(c: &CceState, kind: u8, tag: u8, ch: usize) -> Option<usize> {
+fn list_for(c: &CceState, kind: ElementId, tag: u8, ch: usize) -> Option<usize> {
     let mut idx = 0;
     for t in c.targets.iter() {
         let tkind = if t.is_cpe {
-            ID_CPE
+            ElementId::Cpe
         } else {
-            crate::decoder::ID_SCE
+            ElementId::Sce
         };
         if tkind == kind && t.tag == tag {
             if !t.is_cpe {
@@ -190,7 +190,7 @@ fn list_for(c: &CceState, kind: u8, tag: u8, ch: usize) -> Option<usize> {
 /// Spectral-domain (dependently switched) coupling into a target channel.
 pub(crate) fn apply_spectral(
     cce: &[Charged<Box<CceState>>],
-    kind: u8,
+    kind: ElementId,
     tag: u8,
     ch: usize,
     cd: &mut ChannelData,
@@ -230,7 +230,7 @@ pub(crate) fn apply_spectral(
 /// Time-domain (independently switched) coupling into a target channel's output.
 pub(crate) fn apply_time(
     cce: &[Charged<Box<CceState>>],
-    kind: u8,
+    kind: ElementId,
     tag: u8,
     ch: usize,
     out: &mut [f32],
