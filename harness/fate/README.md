@@ -71,3 +71,22 @@ program 769 and the reference emits 23 PES packets and 36 access units. The
 candidate PES operation requires a program-level reader on both sources. The
 candidate access-unit operation reports a PSI diagnostic for `pmtchange.ts` and
 a transport diagnostic for `loewe.ts`. These comparisons remain open.
+
+Run the source-only program reader controls with the hash-pinned originals in
+`.research/fate-samples/mpegts`:
+
+```sh
+CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test original_program -- --ignored
+```
+
+The controls assert the same source events for one-byte and 32 KiB delivery.
+They independently check original carrier bytes, PES payload ranges, encoded
+PTS/DTS, PCR/OPCR and accepted-section CRCs. With explicit program 4 or automatic
+sole-program selection, `pmtchange.ts` yields PMT versions 29 and 30 and five
+replacement routes in each version. It yields four complete video PES packets
+(138,514 payload bytes) and diagnostics for five CRC-valid table-ID `0xc0`
+sections on PMT PID 73 and one truncated audio PES. The regular sync grid of
+`loewe.ts` starts at offset one. The aligned reader reports 532 transport faults
+through EOF and discovers no tracks. The original inputs also cover open
+compatibility work on PMT merging, foreign-table filtering, incomplete audio and
+unaligned startup.

@@ -103,6 +103,10 @@ MPEG-TS identities. On `pmtchange.ts` and `loewe.ts`, the pinned reference
 probe reports program and stream metadata. The existing candidate PES operation
 requires a program-level reader for both sources. Access-unit comparisons
 remain open for a PSI diagnostic and a transport diagnostic respectively.
+The [original-input controls](../harness/fate/README.md) verify PMT replacement
+on `pmtchange.ts` and transport faults on the unaligned `loewe.ts` sync grid
+under two delivery granularities. Probe metadata and full packet-fold parity
+remain open on both inputs.
 
 ## Subtitle text comparisons
 

@@ -21,6 +21,11 @@ The crate exposes two views:
   including its handling of damaged and headerless PES. It is fed from the same
   transport packets and never rewrites source facts.
 
+`Reader::new_with_packet_tracks` with an empty selection reads a program's
+source events and discovers all its tracks without framing access units. The
+[original-input controls](../../harness/fate/README.md) cover PMT replacement,
+encoded clocks, PES payload ranges, and diagnostics for unaligned input.
+
 The non-default `reference-trace` feature adds `reference_trace`, the projections
 that exist only to compare traces with FFmpeg: `recovery` (packets from rejected
 carriers), `catalogue` (programs and streams), `dvb` and `input`.
