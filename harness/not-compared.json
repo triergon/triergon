@@ -55,9 +55,15 @@
     "triergon-codec-ac3": [
       {
         "name": "decoder-options",
-        "entry_points": ["DecoderOptions", "Decoder::with_options", "Compat::Specification", "CrcPolicy::Reject", "NoiseMode::Off"],
-        "degree": "unit-tests",
-        "needs": "the ac3 and eac3 lanes graded with each option against the reference decoder configured alike; the gate grades the default options only"
+        "entry_points": ["DecoderOptions", "Decoder::with_options", "CrcPolicy::Reject", "NoiseMode::Off"],
+        "degree": "step",
+        "needs": "The CRC and dither-free lanes compare these options. FFmpeg crccheck can emit a different number of frames, and exact dither-free AC-3 PCM and error-free strips still have open cases."
+      },
+      {
+        "name": "decoder-modes",
+        "entry_points": ["Compat::Specification"],
+        "degree": "no-reference",
+        "needs": "FFmpeg 9.0.2 has no option for the A/52 mode. Its decoder refuses reduced-rate E-AC-3 and does not expose the specification mode's strict dependent-substream and end-of-frame handling or dither generator."
       },
       {
         "name": "frame-info",
@@ -68,8 +74,8 @@
       {
         "name": "bit-position-trace",
         "entry_points": ["Decoder::set_trace", "Decoder::trace", "Trace"],
-        "degree": "no-reference",
-        "needs": "none: bit positions of syntax elements for the stream tools behind the reference-trace feature, which no reference reports; the derived streams they produce are pinned"
+        "degree": "step",
+        "needs": "The dither-stripped stream pins exercise the trace product. Exact AC-3 PCM and complete reference decoding of all stripped inputs remain open."
       }
     ],
     "triergon-codec-dca": [
@@ -90,8 +96,8 @@
       {
         "name": "crc-policy",
         "entry_points": ["CrcPolicy", "Decoder::with_crc_policy"],
-        "degree": "unit-tests",
-        "needs": "damaged FLAC files decoded with CrcPolicy::Reject, against the reference with CRC checking enabled"
+        "degree": "step",
+        "needs": "The flac-crc-reject lane compares Reject with FFmpeg crccheck. Frame counts differ where the reference logs a damaged frame and still emits PCM."
       }
     ],
     "triergon-codec-h264": [
@@ -265,21 +271,21 @@
     "triergon-session": [
       {
         "name": "track-decoding",
-        "entry_points": ["TrackDecoder", "TrackDecoder::aac_access_units_with_layout_in", "audio_decoder", "video_decoder"],
-        "degree": "outside-gate",
-        "needs": "a gate item grading the lanes that decode through TrackDecoder (flac, mp3, mp2, mp1, vorbis, opus, aac-mov) and aac-access-units; the timed file workloads require equal work, not equal output"
+        "entry_points": ["TrackDecoder", "TrackDecoder::aac_access_units_with_layout_in", "TrackDecoder::reset", "audio_decoder", "video_decoder"],
+        "degree": "step",
+        "needs": "The file, configured AAC and session lanes exercise these entry points. The Opus file lane checks PCM after multi-packet trim. Reset PCM differences and the session parity gaps remain open."
       },
       {
         "name": "audio-session",
         "entry_points": ["AudioSession", "PcmBlock", "StreamSelection", "QueueLimits", "Discard", "OnRefusal"],
-        "degree": "unit-tests",
-        "needs": "a worker operation feeding demuxed packets through AudioSession and folding its PCM blocks and times against the reference's decoded frames; cargo xtask session-queues compares two revisions only"
+        "degree": "step",
+        "needs": "The session lanes compare PCM, device output and block clocks. Damaged input, trim and drain timestamps, rate changes and reset behaviour have open parity cases."
       },
       {
         "name": "video-session",
         "entry_points": ["VideoSession", "VideoSession::latest", "VideoSession::canvas"],
-        "degree": "unit-tests",
-        "needs": "a worker operation feeding demuxed packets through VideoSession and folding its published pictures and times against the reference's decoded frames; cargo xtask session-queues compares two revisions only"
+        "degree": "step",
+        "needs": "The session lanes compare RGBA output and reported timestamps. Unsupported profiles and an AVC mid-GOP reset remain open. Clocked video with defined input PTS still needs coverage."
       }
     ],
     "triergon-shape": [
