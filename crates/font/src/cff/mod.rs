@@ -204,50 +204,8 @@ impl Cff {
                 cff.encoding = cff.read_encoding(bytes, top.encoding)?;
             }
         }
-        let font_dicts = top.ros || version == Version::Cff2;
-        if font_dicts {
-            let mut array = Reader::at(
-                bytes,
-                top.fd_array.ok_or(Error::Invalid("CFF without FDArray"))?,
-            )?;
-            let fonts = Index::parse(&mut array, version)?;
-            let ceiling = match version {
-                Version::Cff1 => MAX_CFF_FONT_DICTS,
-                Version::Cff2 => MAX_CFF2_FONT_DICTS,
-            };
-            if fonts.len() == 0 || fonts.len() > ceiling {
-                return Err(Error::Invalid("CFF FDArray size"));
-            }
-            charge(
-                work,
-                usize::try_from(fonts.len()).map_err(|_| Error::Overflow)?,
-            )?;
-            cff.font_dicts
-                .try_reserve_exact(usize::try_from(fonts.len()).map_err(|_| Error::Overflow)?)?;
-            for i in 0..fonts.len() {
-                let font = cff.font_dict_entries(fonts.get(bytes, i)?, Kind::Font, work)?;
-                // A Font DICT with its own ROS has no Private DICT to FreeType.
-                let (location, matrix) = (font.private.filter(|_| !font.ros), font.matrix);
-                // FreeType concatenates with the Top DICT's matrix only when the
-                // Top DICT has one, and normalises copies of it again.
-                let matrix = match (matrix, top.matrix) {
-                    (Some(own), Some(_)) => own.after(&top_matrix),
-                    (Some(own), None) => own,
-                    (None, _) => top_matrix,
-                };
-                let private = cff.private_dict(bytes, location, work)?;
-                cff.font_dicts
-                    .try_push(FontDict {
-                        private,
-                        matrix: matrix.normalized(),
-                    })
-                    .map_err(|e| e.error)?;
-            }
-            match top.fd_select {
-                Some(offset) => cff.fd_select = Some(cff.check_fd_select(bytes, offset)?),
-                None if fonts.len() == 1 => {}
-                None => return Err(Error::Invalid("CFF without FDSelect")),
-            }
+        if top.ros || version == Version::Cff2 {
+            cff.read_font_dicts(bytes, &top, top_matrix, work)?;
         } else {
             let private = cff.private_dict(bytes, top.private, work)?;
             cff.font_dicts
@@ -258,6 +216,59 @@ impl Cff {
                 .map_err(|e| e.error)?;
         }
         Ok(cff)
+    }
+
+    /// Reads the FDArray of a CID-keyed or CFF2 face, each Font DICT with
+    /// its Private DICT and its matrix after the Top DICT's normalised
+    /// `top_matrix`, and the FDSelect that chooses among them.
+    fn read_font_dicts(
+        &mut self,
+        bytes: &[u8],
+        top: &Top,
+        top_matrix: FontMatrix,
+        work: &mut WorkBudget,
+    ) -> Result<()> {
+        let version = self.version;
+        let mut array = Reader::at(
+            bytes,
+            top.fd_array.ok_or(Error::Invalid("CFF without FDArray"))?,
+        )?;
+        let fonts = Index::parse(&mut array, version)?;
+        let ceiling = match version {
+            Version::Cff1 => MAX_CFF_FONT_DICTS,
+            Version::Cff2 => MAX_CFF2_FONT_DICTS,
+        };
+        if fonts.len() == 0 || fonts.len() > ceiling {
+            return Err(Error::Invalid("CFF FDArray size"));
+        }
+        let count = usize::try_from(fonts.len()).map_err(|_| Error::Overflow)?;
+        charge(work, count)?;
+        self.font_dicts.try_reserve_exact(count)?;
+        for i in 0..fonts.len() {
+            let font = self.font_dict_entries(fonts.get(bytes, i)?, Kind::Font, work)?;
+            // A Font DICT with its own ROS has no Private DICT to FreeType.
+            let (location, matrix) = (font.private.filter(|_| !font.ros), font.matrix);
+            // FreeType concatenates with the Top DICT's matrix only when the
+            // Top DICT has one, and normalises copies of it again.
+            let matrix = match (matrix, top.matrix) {
+                (Some(own), Some(_)) => own.after(&top_matrix),
+                (Some(own), None) => own,
+                (None, _) => top_matrix,
+            };
+            let private = self.private_dict(bytes, location, work)?;
+            self.font_dicts
+                .try_push(FontDict {
+                    private,
+                    matrix: matrix.normalized(),
+                })
+                .map_err(|e| e.error)?;
+        }
+        match top.fd_select {
+            Some(offset) => self.fd_select = Some(self.check_fd_select(bytes, offset)?),
+            None if fonts.len() == 1 => {}
+            None => return Err(Error::Invalid("CFF without FDSelect")),
+        }
+        Ok(())
     }
 
     pub(crate) const fn glyph_count(&self) -> u32 {
@@ -1006,6 +1017,17 @@ mod tests {
         .build()
     }
 
+    /// `table`, a whole name-keyed CFF table, at 1000 units per em.
+    fn parsed(table: &[u8]) -> Result<Cff> {
+        let budget = Budget::new(1 << 20).unwrap();
+        let whole = Table {
+            offset: 0,
+            len: table.len(),
+        };
+        let mut work = WorkBudget::new(1 << 20);
+        Cff::parse(table, whole, Version::Cff1, 1000, 0, &budget, &mut work)
+    }
+
     /// The points of glyph 1 at the 16.16 `scale`, hinted or not.
     fn points(table: &[u8], scale: i64, hinted: bool) -> Vec<(i32, i32)> {
         try_points(table, scale, hinted).unwrap()
@@ -1013,13 +1035,8 @@ mod tests {
 
     /// The points of glyph 1, or why it does not load.
     fn try_points(table: &[u8], scale: i64, hinted: bool) -> Result<Vec<(i32, i32)>> {
-        let budget = Budget::new(1 << 20).unwrap();
-        let mut work = WorkBudget::new(1 << 20);
-        let whole = Table {
-            offset: 0,
-            len: table.len(),
-        };
-        let cff = Cff::parse(table, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        let cff = parsed(table).unwrap();
+        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
         let mut outline = Outline::new(&budget);
         let (glyph, scale) = (GlyphId(1), Scale { x: scale, y: scale });
         let limits = Limits::default();
@@ -1080,12 +1097,8 @@ mod tests {
     #[test]
     fn a_missing_or_empty_private_dict_reads_as_none() {
         let glyph = table(&rectangle(0, &[50]), Vec::new());
-        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-        let whole = Table {
-            offset: 0,
-            len: glyph.len(),
-        };
-        let cff = Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        let cff = parsed(&glyph).unwrap();
+        let mut work = WorkBudget::new(1 << 20);
         // Offset zero with a size, size zero, or none: nothing is read.
         for location in [Some((5, 0)), Some((0, 40)), None] {
             let private = cff.private_dict(&glyph, location, &mut work).unwrap();
@@ -1098,12 +1111,8 @@ mod tests {
     /// over a variation store of one region that weighs one.
     fn cff2_points(glyph: &str) -> Result<Vec<(i32, i32)>> {
         let table = table(glyph, Vec::new());
+        let mut cff = parsed(&table)?;
         let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-        let whole = Table {
-            offset: 0,
-            len: table.len(),
-        };
-        let mut cff = Cff::parse(&table, whole, Version::Cff1, 1000, 0, &budget, &mut work)?;
         cff.version = Version::Cff2;
         cff.scalars.try_push(0x10000).map_err(|e| e.error)?;
         cff.variation_data.try_push((0, 1)).map_err(|e| e.error)?;
@@ -1153,13 +1162,7 @@ mod tests {
 
     #[test]
     fn top_dict_entries_read_as_freetype_reads_them() {
-        let glyph = table(&rectangle(0, &[50]), Vec::new());
-        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-        let whole = Table {
-            offset: 0,
-            len: glyph.len(),
-        };
-        let cff = Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        let cff = parsed(&table(&rectangle(0, &[50]), Vec::new())).unwrap();
         let top =
             |bytes: &[u8]| cff.font_dict_entries(bytes, dict::Kind::Top, &mut WorkBudget::new(100));
         // An offset reads the first of its operands.
@@ -1190,14 +1193,8 @@ mod tests {
 
     #[test]
     fn a_failed_private_dict_reparse_keeps_what_it_read_unsanitised() {
-        let glyph = table(&rectangle(0, &[50]), Vec::new());
-        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-        let whole = Table {
-            offset: 0,
-            len: glyph.len(),
-        };
-        let mut cff =
-            Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        let mut cff = parsed(&table(&rectangle(0, &[50]), Vec::new())).unwrap();
+        let mut work = WorkBudget::new(1 << 20);
         cff.version = Version::Cff2;
         // BlueShift 2000, then a blend whose blend vector cannot be built.
         let bytes = [28, 0x07, 0xd0, 12, 10, 139, 139, 140, 23];
@@ -1217,15 +1214,7 @@ mod tests {
 
     #[test]
     fn private_dict_entries_freetype_reads_need_their_operand() {
-        let parse = |private: Vec<u8>| {
-            let glyph = table(&rectangle(0, &[50]), private);
-            let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-            let whole = Table {
-                offset: 0,
-                len: glyph.len(),
-            };
-            Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).map(|_| ())
-        };
+        let parse = |private: Vec<u8>| parsed(&table(&rectangle(0, &[50]), private)).map(|_| ());
         // StdHW, StdVW, ForceBold, ForceBoldThreshold, lenIV,
         // ExpansionFactor, initialRandomSeed, defaultWidthX, nominalWidthX.
         for operator in [
