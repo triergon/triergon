@@ -350,23 +350,25 @@ See [A/53 Part 3 §5.5.2 and §5.7](https://www.atsc.org/wp-content/uploads/2023
 and [A/52 Annex G §3.3](https://www.atsc.org/wp-content/uploads/2021/04/A52-2018.pdf).
 
 Existing framers delimit the complete source bytes before decoder-feed conversion.
-MPEG-1/2 video stream types `0x01` and `0x02` admit a bounded self-contained
-intra-picture profile. Each finite, aligned video PES (`0xe0`–`0xef`) must have
+MPEG-1/2 video stream types `0x01` and `0x02` admit a bounded
+picture profile. MPEG-1 admits I pictures; MPEG-2 admits progressive I/P/B
+pictures. Each finite, aligned video PES (`0xe0`–`0xef`) must have
 one payload span containing a sequence header with default matrices, an optional
-GOP header, one I-picture header, ordered slice start codes and a final sequence-end
+GOP header, one picture header, ordered slice start codes and a final sequence-end
 code. MPEG-2 additionally requires Main Profile / Main Level, progressive 4:2:0
 frame pictures with base dimensions and frame rate, no repeated fields and no
 composite display extension. Heights above 2800, user data, other extensions,
-P/B/field pictures, multiple pictures per PES, split pictures and unbounded PES
-are unsupported by this access-unit profile. Source PES assembly still retains
+MPEG-1 P/B pictures, field pictures, multiple pictures per PES, split pictures and
+unbounded PES are unsupported by this access-unit profile. Source PES assembly still retains
 unbounded video byte runs.
 
 `AccessUnit::MpegVideo` retains the original bytes, private elementary range,
-sequence dimensions, temporal reference, picture start-code offset, slice count
-and MPEG version. Packet provenance retains the complete original PES scope,
+sequence dimensions, temporal reference, picture coding type, picture start-code
+offset, slice count and MPEG version. Packet provenance retains the complete original PES scope,
 source timestamps and carrier locations. The sequence frame-rate code supplies
-an exact duration; I-picture coding supplies the sync flag. Slice payloads remain
-opaque coded bytes: framing does not validate decoded pixels or establish a
+an exact duration; I-picture coding supplies the sync flag, while P/B pictures
+are non-sync. Source decode order and independent PTS/DTS are retained. Slice
+payloads remain opaque coded bytes: framing does not validate decoded pixels or establish a
 MPEG video decoder. Seeking is not supported for this profile.
 
 The syntax follows [H.262 (02/2000)](https://www.itu.int/rec/T-REC-H.262-200002-S/en)
@@ -374,8 +376,9 @@ The syntax follows [H.262 (02/2000)](https://www.itu.int/rec/T-REC-H.262-200002-
 [H.222.0 (10/2014)](https://www.itu.int/rec/T-REC-H.222.0-201410-S/en)
 §2.4.3.6 and Table 2-34. The independent
 [comparison](../../harness/features/mpegts-mpeg-video/contract.json) selects
-16×16 pictures in TS188 and M2TS192 at 25 and 30000/1001 fps, with two separately
-timestamped PES packets per input. Its parser-enabled `NOFILLIN` reference leaves
+16×16 pictures in TS188 and M2TS192 at 25 and 30000/1001 fps: eight inputs
+contain two I pictures and four contain three pictures in I/P/B decode order.
+The synthetic P/B slices use intra macroblocks; motion decoding is not tested. Its parser-enabled `NOFILLIN` reference leaves
 packet duration zero without stream discovery; this comparison projection does
 not erase the source picture's sequence-derived duration. Native performance and
 memory qualification for these cases remain unmeasured. The dedicated

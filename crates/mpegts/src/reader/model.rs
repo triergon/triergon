@@ -387,8 +387,16 @@ impl DtsExtensionFrame {
     }
 }
 
-/// A self-contained intra picture. Headers establish carriage facts only;
-/// coded slice payloads have not been decoded or checked for pixel correctness.
+/// Picture coding type from H.262 section 6.2.3.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MpegPictureCoding {
+    #[default]
+    Intra,
+    Predictive,
+    Bidirectional,
+}
+
+/// A picture with sequence setup and its original coded slices.
 #[derive(Debug)]
 pub struct MpegVideoPicture {
     pub(super) bytes: Bytes,
@@ -396,6 +404,7 @@ pub struct MpegVideoPicture {
     pub width: u16,
     pub height: u16,
     pub temporal_reference: u16,
+    pub coding: MpegPictureCoding,
     /// Picture start-code offset in the private elementary view.
     pub picture_offset: u64,
     pub slice_count: u8,
@@ -591,7 +600,10 @@ impl PacketInfo for Packet {
     }
     fn random_access(&self) -> RandomAccess {
         match &self.0.unit {
-            AccessUnit::MpegVideo(_) => RandomAccess::Sync,
+            AccessUnit::MpegVideo(unit) if unit.coding == MpegPictureCoding::Intra => {
+                RandomAccess::Sync
+            }
+            AccessUnit::MpegVideo(_) => RandomAccess::NotSync,
             AccessUnit::Video(unit) if unit.random_access => RandomAccess::Sync,
             AccessUnit::Video(unit) if unit.has_vcl => RandomAccess::NotSync,
             _ => RandomAccess::Unknown,

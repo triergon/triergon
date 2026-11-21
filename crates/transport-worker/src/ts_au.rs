@@ -7,7 +7,9 @@ use crate::ts::{au_recovery, confirm_control_only_entity, fold_payload};
 use crate::ts_input::{self, FIRST_SOURCE, Request};
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
-use triergon_core::container::{ContainerReader, Event, PacketInfo, TrackId, TrackInfo};
+use triergon_core::container::{
+    ContainerReader, Event, PacketInfo, RandomAccess, TrackId, TrackInfo,
+};
 use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputWindow, Rounding, SourceCapabilities, SourceId,
     SourceLocation, Step, TimeBase, WorkBudget,
@@ -222,7 +224,10 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
                 u64::from(unit.random_access),
                 PositionSource::AlignedPayload,
             ),
-            AccessUnit::MpegVideo(_) => (1, PositionSource::AlignedPayload),
+            AccessUnit::MpegVideo(_) => (
+                u64::from(packet.random_access() == RandomAccess::Sync),
+                PositionSource::AlignedPayload,
+            ),
             AccessUnit::Loas(_) => (0, PositionSource::AlignedPayload),
             // DVB subtitle bytes start after the two-byte PES wrapper.
             AccessUnit::DvbSubtitle(_) => (1, PositionSource::FirstPes),

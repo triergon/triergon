@@ -1,4 +1,4 @@
-//! Synthetic 16×16 intra-picture carriage, authored from H.262 syntax tables.
+//! Synthetic 16×16 I/P/B picture carriage, authored from H.262 syntax tables.
 use super::{Codec, Input, PID, R, Transport, manifest, part};
 use crate::corpus::write_json;
 use crate::json::Value;
@@ -26,6 +26,10 @@ fn unit(out: &mut Vec<u8>, code: u8, fields: &[(u32, u8)]) {
 }
 
 fn picture(mpeg2: bool, temporal_reference: u32, rate: u32) -> Vec<u8> {
+    typed_picture(mpeg2, temporal_reference, rate, 1)
+}
+
+fn typed_picture(mpeg2: bool, temporal_reference: u32, rate: u32, kind: u32) -> Vec<u8> {
     let mut bytes = Vec::new();
     // H.262 §6.2.2.1: dimensions, aspect, rate, bitrate, marker, VBV,
     // constrained parameters and both default quantisation matrices.
@@ -66,20 +70,24 @@ fn picture(mpeg2: bool, temporal_reference: u32, rate: u32) -> Vec<u8> {
             ],
         );
     }
-    // §6.2.3: temporal reference, intra coding, unspecified VBV delay,
+    // §6.2.3: temporal reference, picture coding type, unspecified VBV delay,
     // no extra information; byte-alignment zero bits.
-    unit(
-        &mut bytes,
-        0,
-        &[(temporal_reference, 10), (1, 3), (65535, 16), (0, 1)],
-    );
+    let mut header = vec![(temporal_reference, 10), (kind, 3), (65535, 16)];
+    if kind >= 2 {
+        header.extend([(0, 1), (7, 3)]);
+    }
+    if kind == 3 {
+        header.extend([(0, 1), (7, 3)]);
+    }
+    header.push((0, 1));
+    unit(&mut bytes, 0, &header);
     if mpeg2 {
         unit(
             &mut bytes,
             0xb5,
             &[
                 (8, 4),
-                (65535, 16),
+                (if kind == 1 { 65535 } else { 0x1111 }, 16),
                 (0, 2),
                 (3, 2),
                 (0, 1),
@@ -104,7 +112,10 @@ fn picture(mpeg2: bool, temporal_reference: u32, rate: u32) -> Vec<u8> {
             (2, 5),
             (0, 1),
             (1, 1),
-            (1, 1),
+            (
+                if kind == 1 { 1 } else { 0b00011 },
+                if kind == 1 { 1 } else { 5 },
+            ),
             (0b10010, 5),
             (0b10010, 5),
             (0b10010, 5),
@@ -191,6 +202,47 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
                 cases.push(row);
             }
         }
+    }
+    for (m2ts, name) in [
+        (false, "mpeg2-ipb-ts188-25"),
+        (true, "mpeg2-ipb-m2ts192-25"),
+        (false, "mpeg2-ipb-ts188-30000-1001"),
+        (true, "mpeg2-ipb-m2ts192-30000-1001"),
+    ] {
+        let rate = if name.ends_with("-25") { 3 } else { 4 };
+        let codec = Codec {
+            name: "mpeg2",
+            stream_type: 2,
+            stream_id: 0xe0,
+            dvb: false,
+            bytes: Vec::new(),
+            first: 0,
+            header: 0,
+        };
+        let mut ts = Transport::new();
+        ts.tables(&codec, &[])?;
+        let tick = if rate == 3 { 3600 } else { 3003 };
+        // Decode order I, P, B; presentation order I, B, P.
+        for (index, kind, temporal) in [(0, 1, 0), (1, 2, 2), (2, 3, 1)] {
+            let bytes = typed_picture(true, temporal, rate, kind);
+            let mut packet = part(
+                &bytes,
+                Some(90000 + temporal as u64 * tick),
+                Some(84000 + index * tick),
+            );
+            packet.aligned = true;
+            ts.pes_at(PID, 0xe0, &packet)?;
+        }
+        let input = Input {
+            name,
+            m2ts,
+            data: ts.finish(m2ts),
+        };
+        let row = input.record(root, FEATURE, name, &[], &reference, "ts-au-fold")?;
+        if row.get("reference_refusal").is_some() {
+            return Err(format!("{name}: reference did not reach EOF"));
+        }
+        cases.push(row);
     }
     manifest(root, FEATURE, cases)?;
     write_json(

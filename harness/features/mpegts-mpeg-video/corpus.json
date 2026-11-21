@@ -129,6 +129,70 @@
         "bytes": 104,
         "digest": 1719576178856187872
       }
+    },
+    {
+      "id": "mpeg2-ipb-ts188-25",
+      "profile": "mpeg2-ipb-ts188-25",
+      "file": "harness/features/mpegts-mpeg-video/inputs/mpeg2-ipb-ts188-25.ts",
+      "sha256": "74b99a23a28ad2d4502d916b2f36c4d121b4cc0668e8c30edb6872e11ceca232",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 158,
+        "digest": 5303478833086833759
+      }
+    },
+    {
+      "id": "mpeg2-ipb-m2ts192-25",
+      "profile": "mpeg2-ipb-m2ts192-25",
+      "file": "harness/features/mpegts-mpeg-video/inputs/mpeg2-ipb-m2ts192-25.m2ts",
+      "sha256": "35da26d7452e4e0e8bc20892dff09ab272c0472575f9795f0d83f14621b1717e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 158,
+        "digest": 7164726401384699367
+      }
+    },
+    {
+      "id": "mpeg2-ipb-ts188-30000-1001",
+      "profile": "mpeg2-ipb-ts188-30000-1001",
+      "file": "harness/features/mpegts-mpeg-video/inputs/mpeg2-ipb-ts188-30000-1001.ts",
+      "sha256": "fe38aad80b591e41c131db1fe282838b6b9609b8a9e330df1f5cb5298c773abc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 158,
+        "digest": 1157876734894884138
+      }
+    },
+    {
+      "id": "mpeg2-ipb-m2ts192-30000-1001",
+      "profile": "mpeg2-ipb-m2ts192-30000-1001",
+      "file": "harness/features/mpegts-mpeg-video/inputs/mpeg2-ipb-m2ts192-30000-1001.m2ts",
+      "sha256": "6a061d4f423ef201db49deb4470a4f479fcd29bcaf8f9efc22dc15bfc6f033fa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 158,
+        "digest": 3019124303192749746
+      }
     }
   ]
 }

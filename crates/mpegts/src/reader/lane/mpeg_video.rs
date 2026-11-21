@@ -1,16 +1,16 @@
-//! One self-contained intra picture in one aligned, finite, single-span PES.
+//! One picture with sequence setup in one aligned, finite, single-span PES.
 //!
 //! H.262 §§6.2.1–6.2.4 and Table 6-1 define the start codes and header
 //! fields. H.222.0 Table 2-34 identifies stream types 1 and 2; PES alignment
 //! alone never proves a picture boundary. Slice payloads remain coded bytes.
 use super::Piece;
-use crate::reader::MpegVideoPicture;
+use crate::reader::{MpegPictureCoding, MpegVideoPicture};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::bits_at;
 use triergon_core::{BudgetVec, Error, Result, Time, WorkBudget};
 
 const PROFILE: Error = Error::Unsupported(
-    "MPEG video requires a self-contained intra picture in one aligned finite single-span PES",
+    "MPEG video requires one supported picture in an aligned finite single-span PES",
 );
 
 #[derive(Default)]
@@ -35,6 +35,7 @@ pub(super) struct Reader {
     rate: u8,
     picture_offset: usize,
     temporal_reference: u16,
+    coding: MpegPictureCoding,
     slices: u8,
     last_slice: u8,
     mpeg2: bool,
@@ -111,6 +112,7 @@ impl Reader {
             width: self.width,
             height: self.height,
             temporal_reference: self.temporal_reference,
+            coding: self.coding,
             picture_offset: piece.range.start + self.picture_offset as u64,
             slice_count: self.slices,
             mpeg2: self.mpeg2,
@@ -166,9 +168,19 @@ impl Reader {
             (Phase::AfterSequence | Phase::Setup | Phase::Group, 0x00)
                 if stream_type == 1 || self.mpeg2 =>
             {
-                if data.len() != 4 || bits(10, 3)? != 1 || bits(29, 3)? != 0 {
-                    return Err(PROFILE);
-                }
+                // H.262 §6.2.3: predictive headers carry forward and, for B,
+                // backward vector fields before extra_bit_picture. MPEG-2
+                // uses zero full-pel flags and legacy f_codes set to seven.
+                self.coding = match bits(10, 3)? {
+                    1 if data.len() == 4 && bits(29, 3)? == 0 => MpegPictureCoding::Intra,
+                    2 if self.mpeg2 && data.len() == 5 && bits(29, 11)? == 0b011_1000_0000 => {
+                        MpegPictureCoding::Predictive
+                    }
+                    3 if self.mpeg2 && data.len() == 5 && bits(29, 11)? == 0b011_1011_1000 => {
+                        MpegPictureCoding::Bidirectional
+                    }
+                    _ => return Err(PROFILE),
+                };
                 self.picture_offset = self.start;
                 self.temporal_reference = bits(0, 10)? as u16;
                 self.phase = if self.mpeg2 {

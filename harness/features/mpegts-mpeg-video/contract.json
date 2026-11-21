@@ -8,11 +8,11 @@
   "worker_operation": "ts-au-",
   "reference": "ffmpeg-transport-mpeg-video",
   "contract": [
-    "Preloaded TS188 or M2TS192 with one program, one MPEG-1 or MPEG-2 video PID and two finite aligned PES packets in original order. Each PES contains sequence setup, exactly one intra picture and one coded slice and an explicit sequence-end code in a single payload span.",
-    "MPEG-2 uses Main Profile / Main Level, progressive 4:2:0 frame pictures, base dimensions and frame rate, no repeated fields and default matrices. MPEG-1 uses default matrices. Slice payloads remain coded bytes; no decoder is invoked.",
+    "Preloaded TS188 or M2TS192 with one program and one MPEG-1 or MPEG-2 video PID. Each aligned finite single-span PES contains sequence setup, exactly one picture, one coded slice and an explicit sequence-end code. MPEG-1 cases contain two I pictures; MPEG-2 cases contain two I pictures or three pictures in I/P/B decode order with I/B/P presentation order.",
+    "MPEG-2 uses Main Profile / Main Level, progressive 4:2:0 frame pictures, base dimensions and frame rate, no repeated fields and default matrices. Predictive picture headers have zero full-pel flags, legacy vector codes set to seven and no extra information. MPEG-1 uses default matrices and I pictures. Synthetic slices use intra macroblocks; slice payloads remain coded bytes and no decoder is invoked.",
     "Read through physical EOF and drain the public parser-enabled reference. Fold stream index, PID, signed PTS and DTS, duration, position, flags, payload size, exact bytes and all side data with the existing transport AU comparison.",
     "Both workers must match independently recorded reference folds; retained transport and framing corpus inputs and expectations are unchanged. Additional grammar and carriage forms require separate comparisons.",
-    "Runtime requires each case upper paired 95% confidence bound at most 1.00; peak heap and total kernel-bound RSS must each be strictly lower, on both required targets with at least 30 pairs. Correctness observations alone do not establish those gates."
+    "Apply the shared native acceptance policy in harness/policy.json on both required targets."
   ],
   "required_profiles": [
     "mpeg1-ts188-25",
@@ -22,7 +22,11 @@
     "mpeg2-ts188-25",
     "mpeg2-ts188-30000-1001",
     "mpeg2-m2ts192-25",
-    "mpeg2-m2ts192-30000-1001"
+    "mpeg2-m2ts192-30000-1001",
+    "mpeg2-ipb-ts188-25",
+    "mpeg2-ipb-m2ts192-25",
+    "mpeg2-ipb-ts188-30000-1001",
+    "mpeg2-ipb-m2ts192-30000-1001"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",
