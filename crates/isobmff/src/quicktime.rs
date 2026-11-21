@@ -139,7 +139,9 @@ impl SoundDescriptionV0 {
             return Err(Error::Unsupported("QT v0 compressed/nonzero packet layout"));
         }
         if !(1..=2).contains(&self.channels) {
-            return Err(Error::Unsupported("QT v0 selected PCM channel count"));
+            return Err(Error::Unsupported(
+                "QT v0 PCM channel count other than 1 or 2",
+            ));
         }
         if self.sample_rate_16_16 == 0 {
             return Err(Error::Invalid("QT PCM zero source sample rate"));
@@ -147,7 +149,11 @@ impl SoundDescriptionV0 {
         let (encoding, bytes) = match (&self.entry.format, self.sample_bits) {
             (b"raw ", 8) => (PcmEncoding::Unsigned8, 1_usize),
             (b"twos", 16) => (PcmEncoding::Signed16BigEndian, 2_usize),
-            _ => return Err(Error::Unsupported("QT v0 selected PCM coding/width")),
+            _ => {
+                return Err(Error::Unsupported(
+                    "QT v0 PCM other than 8-bit raw or 16-bit twos",
+                ));
+            }
         };
         Ok(PcmLayout {
             encoding,

@@ -83,9 +83,7 @@ impl MediaClock {
             });
         }
         if source_base.denominator() > u64::from(i32::MAX.unsigned_abs()) {
-            return Err(Error::Unsupported(
-                "native unobserved large media timescale",
-            ));
+            return Err(Error::Unsupported("media timescale above i32::MAX"));
         }
         Ok(Self {
             source_base: source_base.into(),
@@ -167,9 +165,7 @@ impl SchedulingClock {
         // Keep the wide diagnostic value when the scheduling clock itself does
         // not fit the demux signed field.
         match exact.map(i64::try_from) {
-            Some(Ok(i64::MIN)) => Err(Error::Unsupported(
-                "native exact scheduling sentinel collision unreviewed",
-            )),
+            Some(Ok(i64::MIN)) => Err(Error::Unsupported("exact scheduling time equals i64::MIN")),
             Some(Ok(value)) => Ok(Self::ExactMicroseconds(value)),
             Some(Err(_)) | None => Ok(Self::RescaleOverflow {
                 exact_microseconds: exact,

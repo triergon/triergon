@@ -104,7 +104,7 @@ pub(crate) fn check_dts_sample_entry(
         {
             None
         }
-        _ => return Err(Error::Unsupported("DTS QuickTime sample entry profile")),
+        _ => return Err(Error::Unsupported("DTS QuickTime sample entry layout")),
     };
     Ok(DtsCoreDescription {
         sample_entry_rate_hz,
@@ -162,9 +162,7 @@ fn check_ddts(format: [u8; 4], entry_rate: u32, b: &[u8]) -> Result<(u32, u32)> 
 pub(crate) fn dts_object_type(object_type: u8) -> Result<bool> {
     match object_type {
         0xa9 | 0xaa => Ok(true),
-        0xab | 0xac | 0xb2 | 0xb3 => {
-            Err(Error::Unsupported("DTS object type without selected core"))
-        }
+        0xab | 0xac | 0xb2 | 0xb3 => Err(Error::Unsupported("DTS object type without a core")),
         _ => Ok(false),
     }
 }

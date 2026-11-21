@@ -287,13 +287,13 @@ impl<'a> IndexCursor<'a> {
                 let occurrence = self
                     .cursor
                     .occurrence()
-                    .ok_or(Error::Invalid("no ready native packet"))?;
+                    .ok_or(Error::Invalid("no ready packet"))?;
                 // Public AVIndexEntry has key/discard bits, independently of
                 // AVPacket's disposable hint. Preserve that hint on the retained
                 // occurrence, while the separately typed index keeps its own ABI.
                 let admitted = 5 | if self.dependency_table { 16 } else { 0 };
                 if occurrence.demux.flags & !admitted != 0 {
-                    return Err(Error::Unsupported("native index packet flag projection"));
+                    return Err(Error::Unsupported("index packet flags"));
                 }
                 let size = occurrence
                     .source
@@ -304,9 +304,7 @@ impl<'a> IndexCursor<'a> {
                 // A conservative positive signed30-bit view. Source size stays
                 // u64 and is never truncated to fit a demux bitfield.
                 if size > 0x1fff_ffff {
-                    return Err(Error::Unsupported(
-                        "native index signed size representation",
-                    ));
+                    return Err(Error::Unsupported("index signed size"));
                 }
                 let key = occurrence.demux.flags & 1 != 0;
                 let run = source_run.map(|(fragment, run, _)| (fragment, run));
@@ -359,9 +357,7 @@ impl<'a> IndexCursor<'a> {
                 if !starts_at_zero
                     && (self.next == 0 || (run.is_some() && run != self.run && !continued_run))
                 {
-                    return Err(Error::Unsupported(
-                        "native index no-key append distance carry",
-                    ));
+                    return Err(Error::Unsupported("index no-key append distance carry"));
                 }
                 // Demux partition controls distinguish within-run counting
                 // from append initialization: [3] gives 0,1,2; [1,2] gives
@@ -386,7 +382,7 @@ impl<'a> IndexCursor<'a> {
                     1 => 1,
                     2 => -2,
                     3 => -1,
-                    _ => return Err(Error::Invalid("native index flags")),
+                    _ => return Err(Error::Invalid("index flags")),
                 };
                 let carry = source_run.map(|(_, _, flags)| RunCarry {
                     flags,
@@ -400,13 +396,13 @@ impl<'a> IndexCursor<'a> {
                 let entry = EntryFields {
                     ordinal: self.next,
                     position: i64::try_from(occurrence.source.range.start)
-                        .map_err(|_| Error::Unsupported("native index signed position"))?,
+                        .map_err(|_| Error::Unsupported("index signed position"))?,
                     timestamp: occurrence.demux.dts_field.signed_ticks(),
                     flags,
                     raw_flag_bits,
                     size: u32::try_from(size).map_err(|_| Error::Overflow)?,
                     min_distance: i32::try_from(distance)
-                        .map_err(|_| Error::Unsupported("native index signed distance"))?,
+                        .map_err(|_| Error::Unsupported("index signed distance"))?,
                 };
                 self.next = next;
                 self.distance = distance;
@@ -425,7 +421,7 @@ impl<'a> IndexCursor<'a> {
         let fields = self
             .ready
             .take()
-            .ok_or(Error::Invalid("no ready native index entry"))?;
+            .ok_or(Error::Invalid("no ready index entry"))?;
         let occurrence = self.cursor.take_occurrence()?;
         Ok(IndexEntry {
             ordinal: fields.ordinal,
@@ -442,13 +438,11 @@ impl<'a> IndexCursor<'a> {
 
     /// The ready entry, before it is taken or skipped.
     fn ready_entry(&self) -> Result<(EntryFields, &PacketOccurrence)> {
-        let fields = self
-            .ready
-            .ok_or(Error::Invalid("no ready native index entry"))?;
+        let fields = self.ready.ok_or(Error::Invalid("no ready index entry"))?;
         let occurrence = self
             .cursor
             .occurrence()
-            .ok_or(Error::Invalid("no ready native packet"))?;
+            .ok_or(Error::Invalid("no ready packet"))?;
         Ok((fields, occurrence))
     }
 
@@ -630,7 +624,7 @@ impl<'a> SeekJob<'a> {
     }
     fn build(context: Context<'a>, timestamp: i64) -> Result<Self> {
         if timestamp == i64::MIN {
-            return Err(Error::Unsupported("native seek null timestamp argument"));
+            return Err(Error::Unsupported("seek timestamp is the null value"));
         }
         let index = if let Some(plans) = context.encoded_edits {
             IndexCursor::new_encoded_regular(
@@ -705,7 +699,7 @@ impl<'a> SeekJob<'a> {
                     let (fields, occurrence) = self.index.ready_entry()?;
                     let (timestamp, key) = (fields.timestamp, fields.flags & 1 != 0);
                     if timestamp == i64::MIN {
-                        return Err(Error::Unsupported("native seek null index clock"));
+                        return Err(Error::Unsupported("seek over a null index clock"));
                     }
                     // A secondary track can replay its non-sync prefix. The
                     // primary needs a preceding key.
@@ -766,7 +760,7 @@ impl<'a> SeekJob<'a> {
                         .is_some_and(|minimum| self.index_timestamp >= i128::from(minimum))
                     {
                         return Err(Error::Unsupported(
-                            "native seek overlapping index clock query",
+                            "seek query between overlapping index clocks",
                         ));
                     }
                     if self.best.is_none()
@@ -775,7 +769,7 @@ impl<'a> SeekJob<'a> {
                             .as_ref()
                             .is_none_or(|entry| entry.flags & 1 == 0 && !self.allow_initial_prefix)
                     {
-                        return Err(Error::Unsupported("native seek no observed key fallback"));
+                        return Err(Error::Unsupported("seek fallback is not a key packet"));
                     }
                     self.ready = true;
                     return Ok(BuildStatus::Ready);
@@ -871,14 +865,14 @@ impl<'a> SeekJob<'a> {
             return Err(error);
         }
         if !self.ready {
-            return Err(Error::Invalid("native seek plan not ready"));
+            return Err(Error::Invalid("seek plan not ready"));
         }
         let used_first_fallback = self.best.is_none();
         let selected = self
             .best
             .take()
             .or_else(|| self.first.take())
-            .ok_or(Error::Invalid("missing native seek selection"))?;
+            .ok_or(Error::Invalid("missing seek selection"))?;
         let resume = if used_first_fallback {
             self.first_resume.take()
         } else {
@@ -962,9 +956,7 @@ impl SeekCursor<'_> {
                 CursorStatus::Yield => return Ok(CursorStatus::Yield),
                 CursorStatus::End => {
                     if !self.reached {
-                        return Err(Error::Invalid(
-                            "native seek selection vanished during replay",
-                        ));
+                        return Err(Error::Invalid("seek selection vanished during replay"));
                     }
                     self.ended = true;
                     return Ok(CursorStatus::End);
@@ -991,9 +983,7 @@ impl SeekCursor<'_> {
                             || row.demux != selected.demux
                             || row.clock_origin != selected.clock_origin
                         {
-                            return Err(Error::Invalid(
-                                "native seek replay selection disagreement",
-                            ));
+                            return Err(Error::Invalid("seek replay selects another entry"));
                         }
                         self.reached = true;
                     }
@@ -1010,7 +1000,7 @@ impl SeekCursor<'_> {
         }
         self.ready
             .take()
-            .ok_or(Error::Invalid("no ready native seek occurrence"))
+            .ok_or(Error::Invalid("no ready seek occurrence"))
     }
 }
 
@@ -1213,7 +1203,7 @@ impl<'a> GlobalSeekJob<'a> {
             .iter()
             .position(|t| t.track_id == track_id)
             .filter(|&at| projection.includes(at))
-            .ok_or(Error::Invalid("native seek reference track absent"))?;
+            .ok_or(Error::Invalid("seek reference track absent"))?;
         let base = MediaClock::from_source(tracks[reference_index].media_base)?.demux_base;
         let mut owned = BudgetVec::new(pool);
         owned.try_reserve_exact(tracks.len())?;
@@ -1223,14 +1213,12 @@ impl<'a> GlobalSeekJob<'a> {
         resumes.try_reserve_exact(tracks.len())?;
         for (i, track) in tracks.iter().enumerate() {
             if tracks[..i].iter().any(|t| t.track_id == track.track_id) {
-                return Err(Error::Invalid("duplicate native seek track"));
+                return Err(Error::Invalid("duplicate seek track"));
             }
             if projection.includes(i) {
                 let track_base = MediaClock::from_source(track.media_base)?.demux_base;
                 if matches!(mode, GlobalSeekMode::SameBase) && track_base != base {
-                    return Err(Error::Unsupported(
-                        "native global seek unequal timebase rescale",
-                    ));
+                    return Err(Error::Unsupported("global seek across unequal time bases"));
                 }
             }
             owned.try_push(*track).map_err(|e| e.error)?;
@@ -1426,7 +1414,7 @@ impl<'a> GlobalSeekJob<'a> {
                 ..
             } => reference,
             GlobalStage::Failed(error) => return Err(error),
-            _ => return Err(Error::Invalid("native global seek plan not ready")),
+            _ => return Err(Error::Invalid("global seek plan not ready")),
         };
         let setup = self.setup;
         let mut anchors = self.anchors;
@@ -1436,7 +1424,7 @@ impl<'a> GlobalSeekJob<'a> {
             let mut kept = BudgetVec::new(&setup.pool);
             kept.try_reserve_exact(resumes.len())?;
             for resume in resumes.as_mut_slice() {
-                kept.try_push(resume.take().ok_or(Error::Invalid("native seek resume"))?)
+                kept.try_push(resume.take().ok_or(Error::Invalid("seek resume"))?)
                     .map_err(|e| e.error)?;
             }
             Some(kept)

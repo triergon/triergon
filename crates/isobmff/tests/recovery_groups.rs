@@ -370,7 +370,7 @@ fn unknown_recovery_syntax_lengths_parameters_and_dangling_indexes_are_not_repai
     assert!(matches!(
         RecoveryDescriptions::parse(modern, Syntax::Versions0And1, RecoveryLimits::default()),
         Err(Error::Unsupported(
-            "recovery version2 requires explicit draft profile"
+            "sgpd version 2 needs the 2026 draft syntax"
         ))
     ));
     let mut unknown = valid.payload().to_vec();

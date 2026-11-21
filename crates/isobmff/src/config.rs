@@ -651,7 +651,7 @@ pub fn check_dts_core_description(
             }
             Ok(Some(check_dts_sample_entry(description, config.as_ref())?))
         }
-        b"dtse" | b"dtsx" => Err(Error::Unsupported("DTS entry without selected core")),
+        b"dtse" | b"dtsx" => Err(Error::Unsupported("DTS entry without a core")),
         _ => Ok(None),
     }
 }

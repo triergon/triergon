@@ -950,8 +950,8 @@ impl<'a> DescriptionIndexCursor<'a> {
                         packet,
                         self.next,
                         event.demux_index_distance,
-                        "description recovery native index flags",
-                        "description recovery native signed index position",
+                        "description recovery index flags",
+                        "description recovery signed index position",
                     )?;
                     self.next += 1;
                     Some(entry)

@@ -426,7 +426,7 @@ fn range_playback_keeps_non_sync_video_but_seeks_to_sync() {
     let cancel = AtomicBool::new(false);
     assert!(matches!(
         seek(-513).poll(&mut WorkBudget::new(4096), &cancel),
-        Err(Error::Unsupported("native seek no observed key fallback"))
+        Err(Error::Unsupported("seek fallback is not a key packet"))
     ));
     let mut at_sync = seek(-512);
     assert_eq!(
@@ -465,7 +465,7 @@ fn range_playback_keeps_non_sync_video_but_seeks_to_sync() {
         .unwrap();
     assert!(matches!(
         before_sync.poll(&mut work, &cancel),
-        Err(Error::Unsupported("native seek no observed key fallback"))
+        Err(Error::Unsupported("seek fallback is not a key packet"))
     ));
     let mut at_sync = cursor
         .prepare_checked_range_seek(tracks[0].track_id, -512, SeekLimits::default())

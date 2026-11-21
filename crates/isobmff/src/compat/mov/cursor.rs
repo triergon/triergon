@@ -352,7 +352,7 @@ impl<'a> Slot<'a> {
         }
         if let Some(previous) = self.previous_clock {
             if previous.sample.checked_add(1) != Some(sample.ordinal) {
-                return Err(Error::Unsupported("native predecessor source ordinal gap"));
+                return Err(Error::Unsupported("predecessor source ordinal gap"));
             }
             let dts = previous
                 .dts
@@ -384,7 +384,7 @@ impl<'a> Slot<'a> {
             return Ok((0, ClockOrigin::FrontSourceMediaStart));
         }
         Err(Error::Unsupported(
-            "native first origin needs complete-source context",
+            "first origin needs a complete-source context",
         ))
     }
     /// Project the next occurrence into `head`. `micros`, when given, converts
@@ -451,7 +451,7 @@ impl<'a> Slot<'a> {
                 (
                     sample
                         .dts_ticks
-                        .ok_or(Error::Unsupported("native source DTS unknown"))?,
+                        .ok_or(Error::Unsupported("source DTS unknown"))?,
                     ClockOrigin::SourceClock,
                 )
             };
@@ -466,7 +466,7 @@ impl<'a> Slot<'a> {
                 let run = self
                     .cursor
                     .active_fragment_run()
-                    .ok_or(Error::Invalid("native fragment sample has no source run"))?;
+                    .ok_or(Error::Invalid("fragment sample has no source run"))?;
                 self.starts_fragment_run = self.append_run != Some(run);
                 if self.starts_fragment_run {
                     // Actual reference-demux partition controls distinguish trun
@@ -825,7 +825,7 @@ impl<'a> PacketCursor<'a> {
                 .iter()
                 .any(|prior| prior.track_id == track.track_id)
             {
-                return Err(Error::Invalid("duplicate native track ID"));
+                return Err(Error::Invalid("duplicate track ID"));
             }
         }
         let regular_samples = tracks.iter().try_fold(0u64, |total, track| {
@@ -1034,13 +1034,13 @@ impl<'a> PacketCursor<'a> {
             || self.failed.is_some()
             || self.ready.is_some()
         {
-            return Err(Error::Invalid("front native index not exhausted"));
+            return Err(Error::Invalid("front index not exhausted"));
         }
         let slot = self
             .slots
             .as_slice()
             .get(at)
-            .ok_or(Error::Invalid("front native track"))?;
+            .ok_or(Error::Invalid("front track"))?;
         Ok(crate::compat::mov::front_movie::FrontTrack::from_index(
             slot.track.track_id,
             slot.track.media_base,
@@ -1214,7 +1214,7 @@ impl<'a> PacketCursor<'a> {
     fn set_resume_points(&mut self, starts: &[ResumePoint], limits: PacketLimits) -> Result<u64> {
         let projection = self.projection;
         if starts.len() != projection.len(self.slots.len()) {
-            return Err(Error::Invalid("native resume track coverage"));
+            return Err(Error::Invalid("resume track coverage"));
         }
         if self.recording_seek_checkpoints && starts.iter().any(|start| start.occurrence != 0) {
             self.discard_seek_checkpoints();
@@ -1225,7 +1225,7 @@ impl<'a> PacketCursor<'a> {
         count(skipped, limits.max_occurrences)?;
         for (i, start) in starts.iter().enumerate() {
             if starts[..i].iter().any(|p| p.track_id == start.track_id) {
-                return Err(Error::Invalid("duplicate native resume track"));
+                return Err(Error::Invalid("duplicate resume track"));
             }
             count(start.occurrence, limits.max_occurrences)?;
             let slot = self
@@ -1237,7 +1237,7 @@ impl<'a> PacketCursor<'a> {
                     (projection.includes(index) && slot.track.track_id == start.track_id)
                         .then_some(slot)
                 })
-                .ok_or(Error::Invalid("unknown native resume track"))?;
+                .ok_or(Error::Invalid("unknown resume track"))?;
             slot.resume_remaining = start.occurrence;
         }
         Ok(skipped)
@@ -1247,18 +1247,16 @@ impl<'a> PacketCursor<'a> {
     pub(crate) fn ready_source_run(&self) -> Result<Option<(usize, usize, u32)>> {
         let (slot, ready) = self
             .ready_slot()
-            .ok_or(Error::Invalid("no ready native occurrence"))?;
+            .ok_or(Error::Invalid("no ready occurrence"))?;
         if ready.source.fragment_flags.is_none() {
             return Ok(None);
         }
-        let (fragment, run) = slot
-            .append_run
-            .ok_or(Error::Invalid("native source run absent"))?;
+        let (fragment, run) = slot.append_run.ok_or(Error::Invalid("source run absent"))?;
         let index = slot
             .track
             .fragments
             .get(fragment)
-            .ok_or(Error::Invalid("native source fragment absent"))?;
+            .ok_or(Error::Invalid("source fragment absent"))?;
         Ok(Some((fragment, run, index.run_flags(run)?)))
     }
     /// The ready packet, without taking it.
@@ -1513,9 +1511,7 @@ impl<'a> PacketCursor<'a> {
                 Phase::Initialize | Phase::Fill | Phase::Select | Phase::End
             )
         {
-            return Err(Error::Invalid(
-                "native replay needs complete checked tables",
-            ));
+            return Err(Error::Invalid("replay needs complete checked tables"));
         }
         let mut replay = self.fork_checked_slots(self.slots.as_slice())?;
         if !self.recording_seek_checkpoints {
@@ -1575,9 +1571,7 @@ impl<'a> PacketCursor<'a> {
     /// `Error::Invalid` once the replay has started.
     pub fn resume_checked_replay(mut self, starts: &[ResumePoint]) -> Result<Self> {
         if !matches!(self.phase, Phase::Initialize) || self.at != 0 {
-            return Err(Error::Invalid(
-                "native resume positions need a fresh replay",
-            ));
+            return Err(Error::Invalid("resume positions need a fresh replay"));
         }
         self.generated = self.set_resume_points(starts, self.limits)?;
         Ok(self)
@@ -1588,7 +1582,7 @@ impl<'a> PacketCursor<'a> {
     /// check and stops recording seek checkpoints. `Error::Invalid` before a clean end.
     pub fn rewind_at_end(&mut self) -> Result<()> {
         if !matches!(self.phase, Phase::End) || self.failed.is_some() {
-            return Err(Error::Invalid("native occurrence rewind needs a clean end"));
+            return Err(Error::Invalid("occurrence rewind needs a clean end"));
         }
         for slot in self.slots.as_mut_slice() {
             slot.append_run = None;
@@ -1616,7 +1610,7 @@ impl<'a> PacketCursor<'a> {
         self.ready
             .take()
             .and_then(|at| self.slots.as_mut_slice()[at].head.take())
-            .ok_or(Error::Invalid("no ready native packet"))
+            .ok_or(Error::Invalid("no ready packet"))
     }
     /// Advances to the next packet across the tracks. `Yield` can also follow a
     /// sample that an encoded edit drops; poll again. `Error::Invalid` for a sample
@@ -1679,7 +1673,7 @@ impl<'a> PacketCursor<'a> {
                     if range.start > range.end
                         || (self.at > 0 && self.media[self.at - 1].end > range.start)
                     {
-                        return Err(Error::Invalid("native media extents order/overlap"));
+                        return Err(Error::Invalid("media extents order/overlap"));
                     }
                     self.at += 1;
                 }
@@ -1757,7 +1751,7 @@ impl<'a> PacketCursor<'a> {
                     self.validated = self.validated.checked_add(1).ok_or(Error::Overflow)?;
                     count(self.validated, self.limits.max_source_samples)?;
                     if ordinal <= self.previous_ordinal {
-                        return Err(Error::Invalid("native source ordinal order"));
+                        return Err(Error::Invalid("source ordinal order"));
                     }
                     self.previous_ordinal = ordinal;
                     if let [extent] = self.media
@@ -1768,7 +1762,7 @@ impl<'a> PacketCursor<'a> {
                         // A single extent needs no search state. Charge the same
                         // lookup and bounds check as the resumable path.
                         if range.start < extent.start {
-                            return Err(Error::Invalid("native sample outside mdat"));
+                            return Err(Error::Invalid("sample outside mdat"));
                         }
                         require_range_within(&range, extent.clone())?;
                         continue;
@@ -1786,7 +1780,7 @@ impl<'a> PacketCursor<'a> {
                         let extent = end
                             .checked_sub(1)
                             .and_then(|at| self.media.get(at))
-                            .ok_or(Error::Invalid("native sample outside mdat"))?;
+                            .ok_or(Error::Invalid("sample outside mdat"))?;
                         require_range_within(&range, extent.clone())?;
                         continue;
                     }
@@ -1802,7 +1796,7 @@ impl<'a> PacketCursor<'a> {
                     let range = self
                         .checking
                         .as_ref()
-                        .ok_or(Error::Invalid("native pending validation"))?;
+                        .ok_or(Error::Invalid("pending validation"))?;
                     if self.low < self.high {
                         let mid = self.low + (self.high - self.low) / 2;
                         if self.media[mid].start <= range.start {
@@ -1824,7 +1818,7 @@ impl<'a> PacketCursor<'a> {
                                 .low
                                 .checked_sub(1)
                                 .and_then(|at| self.media.get(at))
-                                .ok_or(Error::Invalid("native sample outside mdat"))?;
+                                .ok_or(Error::Invalid("sample outside mdat"))?;
                             require_range_within(range, extent.clone())?;
                         }
                         self.checking = None;
@@ -1891,9 +1885,7 @@ impl<'a> PacketCursor<'a> {
                     let budget = self.slots.budget().clone();
                     let slot = &mut self.slots.as_mut_slice()[self.at];
                     if slot.saw_fragment && slot.track.table.sample_count() != 0 {
-                        return Err(Error::Unsupported(
-                            "native mixed regular/fragment clock profile",
-                        ));
+                        return Err(Error::Unsupported("mixed regular and fragment clocks"));
                     }
                     slot.edited = if slot.encoded_edit.is_some() {
                         None
@@ -2014,9 +2006,7 @@ impl<'a> PacketCursor<'a> {
                         CursorStatus::Yield => return Ok(CursorStatus::Yield),
                         CursorStatus::End => {
                             if slot.resume_remaining != 0 {
-                                return Err(Error::Invalid(
-                                    "native resume position outside occurrences",
-                                ));
+                                return Err(Error::Invalid("resume position outside occurrences"));
                             }
                             slot.ended = true;
                         }
@@ -2087,7 +2077,7 @@ impl<'a> PacketCursor<'a> {
                             let incumbent = slots[best]
                                 .head
                                 .as_ref()
-                                .ok_or(Error::Invalid("native selector head missing"))?;
+                                .ok_or(Error::Invalid("selector head missing"))?;
                             if self.front_source {
                                 contender.demux.source_range.start
                                     < incumbent.demux.source_range.start

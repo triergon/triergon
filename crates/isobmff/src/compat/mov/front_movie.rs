@@ -67,7 +67,7 @@ impl FrontSample {
         };
         if has_more_samples_in_media && !(self.run_start && self.run.index == 0) {
             return Err(Error::Unsupported(
-                "native zero read outside first fragment run remains unmodeled",
+                "zero read outside the first fragment run",
             ));
         }
         Ok(Some(boundary))
@@ -163,9 +163,7 @@ impl FrontFragment {
     /// Takes the ready sample; `Error::Invalid` when none is ready.
     pub fn take_sample(&mut self) -> Result<FrontSample> {
         match &mut self.ready {
-            Ok(ready) => ready
-                .take()
-                .ok_or(Error::Invalid("front native sample not ready")),
+            Ok(ready) => ready.take().ok_or(Error::Invalid("front sample not ready")),
             Err(error) => Err(*error),
         }
     }
@@ -224,11 +222,11 @@ impl FrontTrack {
     /// sample out of ordinal order.
     pub fn project(&self, head: &FrontSample) -> Result<(Self, PacketOccurrence)> {
         if head.track != self.track {
-            return Err(Error::Invalid("native continuation track mismatch"));
+            return Err(Error::Invalid("continuation track mismatch"));
         }
         if self.regular_samples != 0 {
             return Err(Error::Unsupported(
-                "native edited/mixed regular fragment continuation",
+                "edited or mixed regular and fragment continuation",
             ));
         }
         let edit = self.edit;

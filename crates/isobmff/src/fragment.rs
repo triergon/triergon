@@ -669,9 +669,7 @@ impl FragmentBuilder {
                     .ok_or(Error::Invalid("run index"))?;
                 if run.wire.constant_extents() {
                     if self.reject_zero_size && run.wire.count != 0 && defaults.size == 0 {
-                        return Err(Error::Invalid(
-                            "zero-size fragment sample in native MOV header",
-                        ));
+                        return Err(Error::Invalid("zero-size fragment sample while opening"));
                     }
                     self.total_bytes = u64::from(run.wire.count)
                         .checked_mul(u64::from(defaults.size))
@@ -685,9 +683,7 @@ impl FragmentBuilder {
                     loop {
                         let value = run.wire.values(self.sample, defaults)?;
                         if self.reject_zero_size && value.size == 0 {
-                            return Err(Error::Invalid(
-                                "zero-size fragment sample in native MOV header",
-                            ));
+                            return Err(Error::Invalid("zero-size fragment sample while opening"));
                         }
                         self.total_bytes = self
                             .total_bytes

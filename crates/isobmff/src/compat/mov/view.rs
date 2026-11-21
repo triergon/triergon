@@ -107,7 +107,7 @@ impl StreamView {
     ) -> Result<Self> {
         let [entry] = table.descriptions() else {
             return Err(Error::Unsupported(
-                "zero-scale native catalogue description count",
+                "zero-timescale catalogue description count",
             ));
         };
         if header.timescale != 0
@@ -115,7 +115,7 @@ impl StreamView {
             || entry.format != *b"raw "
             || table.sample_count() == 0
         {
-            return Err(Error::Unsupported("zero-scale native raw-video catalogue"));
+            return Err(Error::Unsupported("zero-timescale raw-video catalogue"));
         }
         let clock = MediaClock::for_zero_scale(profile)?;
         let mut view = Self::with_projection_base(header, entry, clock.demux_base)?;
@@ -130,7 +130,7 @@ impl StreamView {
             match major_brand {
                 Some(brand) if brand == *b"qt  " => {}
                 Some(_) => self.vendor_id = None,
-                None => return Err(Error::Unsupported("native major-brand context absent")),
+                None => return Err(Error::Unsupported("major-brand context absent")),
             }
         }
         Ok(self)
@@ -147,13 +147,11 @@ impl StreamView {
         let entry = table
             .descriptions()
             .first()
-            .ok_or(Error::Invalid("native catalogue has no sample entry"))?;
+            .ok_or(Error::Invalid("catalogue has no sample entry"))?;
         let mut view = Self::new(header, entry)?;
         if view.codec == "rawvideo" && table.sample_count() == 0 {
             if !has_fragments {
-                return Err(Error::Unsupported(
-                    "native empty nonfragmented video catalogue profile",
-                ));
+                return Err(Error::Unsupported("empty nonfragmented video catalogue"));
             }
             view.vendor_id = None;
         }
@@ -180,9 +178,7 @@ impl StreamView {
                 fields::slice(entry.raw().payload(), 0, 78)?;
                 let vendor = fields::fourcc(entry.raw().payload(), 12)?;
                 if vendor != [0; 4] {
-                    return Err(Error::Unsupported(
-                        "native raw-video nonzero vendor projection",
-                    ));
+                    return Err(Error::Unsupported("raw video with a nonzero vendor"));
                 }
                 ("rawvideo", 0, Some(vendor), entry.raw().bytes().len())
             }
@@ -196,9 +192,7 @@ impl StreamView {
                 )
             }
             _ => {
-                return Err(Error::Unsupported(
-                    "native codec/carriage catalogue projection",
-                ));
+                return Err(Error::Unsupported("codec/carriage catalogue"));
             }
         };
         let mdhd = header.raw_mdhd.payload();
@@ -206,14 +200,14 @@ impl StreamView {
         let language_at = match version {
             0 => 20,
             1 => 32,
-            _ => return Err(Error::Unsupported("native media header version")),
+            _ => return Err(Error::Unsupported("media header version")),
         };
         let packed = fields::u16_at(mdhd, language_at)?;
         let mut language = [0; 3];
         for (i, byte) in language.iter_mut().enumerate() {
             let value = u8::try_from((packed >> (10 - 5 * i)) & 31).map_err(|_| Error::Overflow)?;
             if !(1..=26).contains(&value) || packed & 0x8000 != 0 {
-                return Err(Error::Unsupported("native legacy/unmapped media language"));
+                return Err(Error::Unsupported("legacy/unmapped media language"));
             }
             *byte = value + 0x60;
         }
@@ -221,9 +215,7 @@ impl StreamView {
         // Other QuickTime Pascal/component-name layouts are not silently treated
         // as this ISO-shaped, null-terminated handler-name observation profile.
         if fields::u32_at(hdlr, 4)? != 0 || fields::slice(hdlr, 12, 12)? != [0; 12] {
-            return Err(Error::Unsupported(
-                "native legacy handler catalogue projection",
-            ));
+            return Err(Error::Unsupported("legacy handler catalogue"));
         }
         let tail = hdlr.get(24..).ok_or(Error::Truncated)?;
         if tail.len() > 256 {
@@ -235,9 +227,9 @@ impl StreamView {
         let name_len = tail
             .iter()
             .position(|&c| c == 0)
-            .ok_or(Error::Unsupported("native unterminated handler name"))?;
+            .ok_or(Error::Unsupported("unterminated handler name"))?;
         if !tail[..name_len].iter().all(u8::is_ascii) {
-            return Err(Error::Unsupported("native non-ASCII handler projection"));
+            return Err(Error::Unsupported("non-ASCII handler name"));
         }
         let name_start = usize::from(header.raw_hdlr.header().header_size) + 24;
         Ok(Self {
@@ -262,7 +254,7 @@ impl StreamView {
 
 fn demux_field(time: Option<Time>, base: TimeBase) -> Result<ClockField> {
     let ticks = time
-        .ok_or(Error::Unsupported("native clock origin unresolved"))?
+        .ok_or(Error::Unsupported("clock origin unresolved"))?
         .to_ticks(base, Rounding::NearestAway)?;
     ClockField::from_exact_ticks(ticks)
 }
@@ -311,7 +303,7 @@ impl PacketProjector {
         decode_start: Time,
     ) -> Result<PacketView> {
         if edit.entry.rate_integer != 1 || edit.entry.rate_fraction != 0 {
-            return Err(Error::Unsupported("native non-unit edit point projection"));
+            return Err(Error::Unsupported("non-unit edit point"));
         }
         self.project_inner(source, Clock::DemuxEdit(edit, decode_start))
     }
@@ -320,7 +312,7 @@ impl PacketProjector {
     /// ctts-v0 unsigned semantics. Never call this for a fragment trun offset.
     pub(crate) fn project_regular(&self, source: &Sample, shift: i64) -> Result<PacketView> {
         if source.fragment_flags.is_some() {
-            return Err(Error::Invalid("regular native clock applied to fragment"));
+            return Err(Error::Invalid("regular clock applied to fragment"));
         }
         self.project_inner(source, Clock::Regular { shift })
     }
@@ -334,7 +326,7 @@ impl PacketProjector {
         minimum: i64,
     ) -> Result<PacketView> {
         if source.fragment_flags.is_none() || minimum > 0 {
-            return Err(Error::Invalid("fragment native clock context"));
+            return Err(Error::Invalid("fragment clock context"));
         }
         self.project_inner(
             source,
@@ -346,9 +338,7 @@ impl PacketProjector {
     }
     fn project_inner(&self, source: &Sample, clock: Clock) -> Result<PacketView> {
         if source.partial_sync || source.dependency.is_some() || source.access == Access::Unknown {
-            return Err(Error::Unsupported(
-                "native dependency/recovery flag profile not frozen",
-            ));
+            return Err(Error::Unsupported("dependency or recovery flags"));
         }
         // Packet clocks stay in media-base ticks. Only an edit mapping needs
         // exact time; converting ticks to exact time and back in the same base
@@ -368,9 +358,7 @@ impl PacketProjector {
                 (composition, dts)
             }
             Clock::Regular { shift } => {
-                let ticks = source
-                    .dts_ticks
-                    .ok_or(Error::Unsupported("native DTS unknown"))?;
+                let ticks = source.dts_ticks.ok_or(Error::Unsupported("DTS unknown"))?;
                 (
                     ticks.checked_add(raw_offset()).ok_or(Error::Overflow)?,
                     ticks
@@ -381,7 +369,7 @@ impl PacketProjector {
             Clock::Source(_) | Clock::DemuxEdit(..) => source
                 .cts_ticks
                 .zip(source.dts_ticks)
-                .ok_or(Error::Unsupported("native clock origin unresolved"))?,
+                .ok_or(Error::Unsupported("clock origin unresolved"))?,
         };
         let (edit, demux_edit_start) = match clock {
             Clock::Source(edit) => (edit, None),
@@ -404,9 +392,7 @@ impl PacketProjector {
                     return Err(Error::Invalid("empty edit has no packet occurrence"));
                 }
                 if self.sync_entries == Some(0) || source.composition_offset.is_some() {
-                    return Err(Error::Unsupported(
-                        "native edited/reordered or empty-sync profile not frozen",
-                    ));
+                    return Err(Error::Unsupported("edited, reordered or empty-sync track"));
                 }
                 let pts = Time::from_ticks(pts, self.media_base)?;
                 let dts = Time::from_ticks(dts, self.media_base)?;

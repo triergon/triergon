@@ -631,9 +631,7 @@ fn native_seekable_header_rejects_zero_size_fragment_samples() {
                         TestView::NativeRecovery,
                         true
                     ),
-                    Err(Error::Invalid(
-                        "zero-size fragment sample in native MOV header"
-                    ))
+                    Err(Error::Invalid("zero-size fragment sample while opening"))
                 ));
                 let (mut source, _, _) =
                     try_make_source_mode(raw, true, chunk, work, true, TestView::Source, true)
@@ -691,9 +689,7 @@ fn native_header_rejects_explicit_and_default_zero_size_before_first_media() {
         }
         assert!(matches!(
             try_make_source_mode(&changed, false, 7, 1, true, TestView::NativeRecovery, false),
-            Err(Error::Invalid(
-                "zero-size fragment sample in native MOV header"
-            ))
+            Err(Error::Invalid("zero-size fragment sample while opening"))
         ));
         let (mut source, _, _) = make_mode(&changed, false, 7, 1, true, false);
         let output = collect(&mut source, 1).unwrap();

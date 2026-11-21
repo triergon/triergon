@@ -98,7 +98,7 @@ impl PcmStream {
         header_binding(header)?;
         if major_brand != Some(*b"qt  ") {
             return Err(Error::Unsupported(
-                "PCM native view needs QuickTime major brand",
+                "PCM view needs the QuickTime major brand",
             ));
         }
         let entry = table
@@ -110,7 +110,7 @@ impl PcmStream {
         if initial.revision() != 0 || initial.vendor() != [0; 4] || entry.data_reference_index != 1
         {
             return Err(Error::Unsupported(
-                "PCM unobserved revision/vendor/data reference",
+                "PCM description revision, vendor or data reference other than 0, 0 and 1",
             ));
         }
         let clock = MediaClock::from_source(header.time_base()?)?;
@@ -125,13 +125,17 @@ impl PcmStream {
         for (i, item) in language.iter_mut().enumerate() {
             let word = (packed >> (10 - 5 * i)) & 31;
             if !(1..=26).contains(&word) || packed & 0x8000 != 0 {
-                return Err(Error::Unsupported("PCM unobserved media language"));
+                return Err(Error::Unsupported(
+                    "PCM media language other than a packed ISO code",
+                ));
             }
             *item = u8::try_from(word).map_err(|_| Error::Overflow)? + 0x60;
         }
         let b = header.raw_hdlr.payload();
         if fields::u32_at(b, 4)? != 0 || fields::slice(b, 12, 12)? != [0; 12] {
-            return Err(Error::Unsupported("PCM unobserved handler layout"));
+            return Err(Error::Unsupported(
+                "PCM handler with nonzero predefined or reserved fields",
+            ));
         }
         let tail = b.get(24..).ok_or(Error::Truncated)?;
         if tail.len() > 256 {
@@ -145,7 +149,7 @@ impl PcmStream {
             .position(|x| *x == 0)
             .ok_or(Error::Unsupported("PCM handler name terminator"))?;
         if !tail[..length].iter().all(u8::is_ascii) {
-            return Err(Error::Unsupported("PCM unobserved handler encoding"));
+            return Err(Error::Unsupported("PCM handler name not ASCII"));
         }
         let start = usize::from(header.raw_hdlr.header().header_size)
             .checked_add(24)
@@ -465,7 +469,7 @@ impl<'a> PcmCursor<'a> {
                             }
                             b"ctts" | b"stss" | b"stps" | b"sdtp" => {
                                 return Err(Error::Unsupported(
-                                    "PCM unobserved composition/access table",
+                                    "PCM track with a composition or access table",
                                 ));
                             }
                             _ => (),
@@ -551,7 +555,7 @@ impl<'a> PcmCursor<'a> {
                 || (group.consumed != 0 && sample.range.start != group.source_range.end)
             {
                 return Err(Error::Unsupported(
-                    "PCM native grouping needs complete unit source frames",
+                    "PCM source samples are not consecutive one-tick sync frames",
                 ));
             }
             if group.consumed == 0 {
@@ -679,7 +683,7 @@ impl Grouping {
         // This bounded view does not guess a short demux request outside media.
         if start < media.start || end > media.end {
             return Err(Error::Unsupported(
-                "PCM native request outside established media",
+                "PCM packet read outside the media extent",
             ));
         }
         Ok(Group {

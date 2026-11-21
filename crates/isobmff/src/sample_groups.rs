@@ -113,7 +113,7 @@ impl RecoveryDescriptions {
         }
         if version == 2 && syntax != RecoverySyntax::Mpeg2026Draft {
             return Err(Error::Unsupported(
-                "recovery version2 requires explicit draft profile",
+                "sgpd version 2 needs the 2026 draft syntax",
             ));
         }
         let kind = RecoveryKind::parse(fields::fourcc(body, 4)?)?;

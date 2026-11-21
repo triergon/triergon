@@ -290,7 +290,9 @@ impl<'a> EncodedStreamJob<'a> {
         }
         if !matches!(major,Some(x) if x==*b"isom"||x==*b"iso2"||x==*b"mp41"||x==*b"mp42"||(metadata_receiver&&x==*b"qt  "))
         {
-            return Err(Error::Unsupported("encoded native major-brand profile"));
+            return Err(Error::Unsupported(
+                "encoded track major brand other than isom, iso2, mp41 or mp42",
+            ));
         }
         let at = usize::try_from(
             description
@@ -941,7 +943,9 @@ fn metadata(
     for (i, v) in language.iter_mut().enumerate() {
         let c = ((packed >> (10 - 5 * i)) & 31) as u8;
         if metadata_source.is_none() && (!(1..=26).contains(&c) || packed & 0x8000 != 0) {
-            return Err(Error::Unsupported("encoded native language profile"));
+            return Err(Error::Unsupported(
+                "encoded track language other than a packed ISO code",
+            ));
         }
         *v = c + 0x60;
     }

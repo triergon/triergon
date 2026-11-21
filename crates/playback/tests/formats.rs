@@ -3820,9 +3820,7 @@ fn native_range_open_refuses_late_unprojectable_metadata_before_playback() {
     });
     assert!(matches!(
         result,
-        Some(Err(C::Unsupported(
-            "native dependency/recovery flag profile not frozen"
-        )))
+        Some(Err(C::Unsupported("dependency or recovery flags")))
     ));
     assert!(calls.lock().unwrap().is_empty());
 }
@@ -3956,7 +3954,7 @@ fn range_media_projection_keeps_packets_and_both_seek_paths() {
     assert_eq!(
         refusal,
         Some(C::Unsupported(
-            "native edit reordered/zero-delta/recovery profile"
+            "edit over reordered, zero-delta or recovery samples"
         ))
     );
     drop(complete);
@@ -4315,7 +4313,7 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
             assert_eq!(packet.source.sample.description_index, description);
             assert!(matches!(
                 config.track.demux_stream,
-                Err(C::Unsupported("native codec/carriage catalogue projection"))
+                Err(C::Unsupported("codec/carriage catalogue"))
             ));
             let mut children = config
                 .description
@@ -4678,7 +4676,9 @@ fn native_range_seek_refusals_leave_the_current_player_untouched() {
         .unwrap();
     assert!(matches!(
         job.poll(&mut WorkBudget::new(10_000), &off()),
-        Err(C::Unsupported("native seek overlapping index clock query"))
+        Err(C::Unsupported(
+            "seek query between overlapping index clocks"
+        ))
     ));
     drop(job);
     assert!(player.current(&current));

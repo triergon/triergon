@@ -166,7 +166,7 @@ fn select(
     let mut unordered: Option<i64> = None;
     for (at, entry) in entries.iter().enumerate() {
         if entry.timestamp == i64::MIN {
-            return Err(Error::Unsupported("native seek null index clock"));
+            return Err(Error::Unsupported("seek over a null index clock"));
         }
         let key = entry.flags & 1 != 0;
         if at == 0 && !key && fragments {
@@ -185,11 +185,11 @@ fn select(
     }
     if unordered.is_some_and(|least| target >= least) {
         return Err(Error::Unsupported(
-            "native seek overlapping index clock query",
+            "seek query between overlapping index clocks",
         ));
     }
     best.or(first.filter(|&at| entries[at].flags & 1 != 0 || prefix))
-        .ok_or(Error::Unsupported("native seek no observed key fallback"))
+        .ok_or(Error::Unsupported("seek fallback is not a key packet"))
 }
 
 fn rows(cursor: &mut PacketCursor<'_>, count: usize) -> Result<Vec<Row>, Error> {
@@ -442,7 +442,7 @@ fn malformed_tables_refuse_as_full_scans_do() {
     check(
         "chunk offset past i64::MAX",
         &movie,
-        Error::Unsupported("native index signed position"),
+        Error::Unsupported("index signed position"),
     );
 
     // r-front-stco's last sample declares 0x2000_0000 bytes, one more than an
@@ -456,7 +456,7 @@ fn malformed_tables_refuse_as_full_scans_do() {
     check(
         "sample size past 0x1fff_ffff",
         &movie,
-        Error::Unsupported("native index signed size representation"),
+        Error::Unsupported("index signed size"),
     );
 
     // f-tfdt64's fragments start at 2^63 ticks: the first entry's timestamp
@@ -474,7 +474,7 @@ fn malformed_tables_refuse_as_full_scans_do() {
     check(
         "timestamp at i64::MIN",
         &movie,
-        Error::Unsupported("native seek null index clock"),
+        Error::Unsupported("seek over a null index clock"),
     );
 
     // f-explicit's two fragments in reverse order: the second's ordinals,
@@ -485,6 +485,6 @@ fn malformed_tables_refuse_as_full_scans_do() {
     check(
         "fragment ordinals out of order",
         &movie,
-        Error::Invalid("native source ordinal order"),
+        Error::Invalid("source ordinal order"),
     );
 }

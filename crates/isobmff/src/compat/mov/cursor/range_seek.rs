@@ -277,14 +277,14 @@ impl<'a> PacketCursor<'a> {
             return Ok(None);
         }
         if timestamp == i64::MIN {
-            return Err(Error::Unsupported("native seek null timestamp argument"));
+            return Err(Error::Unsupported("seek timestamp is the null value"));
         }
         let reference = self
             .slots
             .as_slice()
             .iter()
             .position(|slot| slot.track.track_id == video)
-            .ok_or(Error::Invalid("native seek reference track absent"))?;
+            .ok_or(Error::Invalid("seek reference track absent"))?;
         let mut slots = BudgetVec::new(self.slots.budget());
         slots.try_reserve_exact(self.slots.len())?;
         Ok(Some(RangeSeekJob {
@@ -570,7 +570,7 @@ impl<'a> RangeSeekJob<'a> {
                     let (best, fallback) = (seek.best.take(), seek.fallback);
                     let landing = self.finish_track(best, |job, head, ordinal, timestamp| {
                         if head.demux.flags & 1 == 0 {
-                            return Err(Error::Unsupported("native seek no observed key fallback"));
+                            return Err(Error::Unsupported("seek fallback is not a key packet"));
                         }
                         let mut occurrence = head.clone();
                         occurrence.scheduling_clock = SchedulingClock::SingleTrack;
@@ -765,7 +765,7 @@ fn opus_recovery<'a>(
 /// checkpoint has a defined decode time above the null value.
 fn search_target(points: &[Checkpoint<'_>], target: i64) -> Result<i64> {
     if target == i64::MIN {
-        return Err(Error::Unsupported("native seek null timestamp argument"));
+        return Err(Error::Unsupported("seek timestamp is the null value"));
     }
     Ok(target.saturating_sub(points[0].slot.seek_offset()))
 }

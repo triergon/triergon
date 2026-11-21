@@ -563,8 +563,8 @@ impl DirectIndexCursor<'_> {
                         &r.demux,
                         self.next,
                         distance,
-                        "direct recovery native index flags",
-                        "native index signed position",
+                        "direct recovery index flags",
+                        "index signed position",
                     )?;
                     self.latch.ready = Some(DirectIndexEntry {
                         entry,

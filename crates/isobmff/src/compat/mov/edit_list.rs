@@ -126,7 +126,8 @@ struct EditTicks {
     end: i64,
 }
 
-const EDIT_PROFILE: Error = Error::Unsupported("native edit reordered/zero-delta/recovery profile");
+const EDIT_PROFILE: Error =
+    Error::Unsupported("edit over reordered, zero-delta or recovery samples");
 
 /// One step of [`EditCursor::prepare_emit`].
 #[derive(Debug)]
@@ -172,7 +173,7 @@ impl<'a> EditCursor<'a> {
     ) -> Result<Self> {
         if table.sample_count() == 0 || edits.is_empty() || table.sync_entry_count() == Some(0) {
             return Err(Error::Unsupported(
-                "native edited empty source/list/sync profile",
+                "edited track with an empty source, list or sync table",
             ));
         }
         let zero = Time::new(0, 1)?;
@@ -211,7 +212,7 @@ impl<'a> EditCursor<'a> {
     pub fn take_occurrence(&mut self) -> Result<EditOccurrence> {
         self.ready
             .take()
-            .ok_or(Error::Invalid("no ready native occurrence"))
+            .ok_or(Error::Invalid("no ready occurrence"))
     }
     /// Advances to the next packet. Failures are sticky. `Error::Unsupported` for
     /// an edit whose rate is not one, a media edit with a negative start or zero
@@ -247,9 +248,9 @@ impl<'a> EditCursor<'a> {
         Ok(step)
     }
     fn begin_emit(&mut self) -> Result<()> {
-        self.first = self.preceding_sync.ok_or(Error::Unsupported(
-            "native edit has no preceding declared sync",
-        ))?;
+        self.first = self
+            .preceding_sync
+            .ok_or(Error::Unsupported("edit has no preceding declared sync"))?;
         self.active_ticks = self.edit_ticks();
         self.scan = self.table.cursor();
         self.phase = Phase::Emit;
@@ -324,7 +325,7 @@ impl<'a> EditCursor<'a> {
                 occurrence
                     .demux
                     .dts
-                    .ok_or(Error::Unsupported("native terminal DTS unknown"))?,
+                    .ok_or(Error::Unsupported("terminal DTS unknown"))?,
             );
             let full_end = dts
                 .checked_add(i128::from(occurrence.demux.duration))
@@ -469,9 +470,7 @@ impl<'a> EditCursor<'a> {
                     }
                     let entry = self.edits.entry(self.next_edit)?;
                     if entry.rate_integer != 1 || entry.rate_fraction != 0 {
-                        return Err(Error::Unsupported(
-                            "native non-unit edit occurrence profile",
-                        ));
+                        return Err(Error::Unsupported("non-unit edit occurrence"));
                     }
                     // Source movie_cursor remains the exact rational edit sum.
                     // Demux edits accumulate separately rounded media ticks.
@@ -496,19 +495,15 @@ impl<'a> EditCursor<'a> {
                         let previous = self
                             .pending
                             .as_ref()
-                            .ok_or(Error::Invalid("native gap has no retained predecessor"))?;
-                        let active = self
-                            .active
-                            .ok_or(Error::Invalid("native gap has no media edit"))?;
+                            .ok_or(Error::Invalid("gap has no retained predecessor"))?;
+                        let active = self.active.ok_or(Error::Invalid("gap has no media edit"))?;
                         if self.next_edit != self.edits.len()
                             || self.generated <= self.table.sample_count()
                             || !previous.source.is_container_sync()
                             || previous.source.dts_ticks
                                 != Some(i128::from(active.entry.media_time))
                         {
-                            return Err(Error::Unsupported(
-                                "native unreviewed nonleading empty edit profile",
-                            ));
+                            return Err(Error::Unsupported("empty edit after the first"));
                         }
                         let mut endpoint = previous.clone();
                         self.generated = self.generated.checked_add(1).ok_or(Error::Overflow)?;
@@ -531,9 +526,7 @@ impl<'a> EditCursor<'a> {
                         continue;
                     }
                     if entry.media_time < 0 || entry.segment_duration == 0 {
-                        return Err(Error::Unsupported(
-                            "native negative/zero-duration media edit profile",
-                        ));
+                        return Err(Error::Unsupported("negative or zero-duration media edit"));
                     }
                     self.source_start =
                         Time::from_ticks(i128::from(entry.media_time), self.media_base)?;
@@ -556,7 +549,7 @@ impl<'a> EditCursor<'a> {
                             .is_none_or(|end| self.source_start >= end)
                         {
                             return Err(Error::Unsupported(
-                                "native edit starts outside known source samples",
+                                "edit starts outside known source samples",
                             ));
                         }
                         self.begin_emit()?;

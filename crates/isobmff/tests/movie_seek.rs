@@ -303,7 +303,7 @@ fn checked_seek_retains_a_non_sync_fragment_prefix_without_marking_it_sync() {
         .unwrap();
     assert_eq!(
         prefix.poll(&mut work, &cancel),
-        Err(Error::Unsupported("native seek no observed key fallback"))
+        Err(Error::Unsupported("seek fallback is not a key packet"))
     );
     let mut at_sync = cursor
         .prepare_checked_range_seek(7, 10, SeekLimits::default())
