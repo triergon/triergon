@@ -744,7 +744,9 @@ fn unsupported_hevc_initial_array_retains_raw_source_and_has_no_fake_output() {
     let mut refusal = WorkBudget::new(1);
     assert!(matches!(
         writer.step(&mut refusal, &cancel),
-        Err(Error::Unsupported("pinned HEVC decoder array type"))
+        Err(Error::Unsupported(
+            "HEVC configuration array of an unsupported type"
+        ))
     ));
     assert_eq!(refusal.remaining(), 0);
     let r = writer.take_receiver_rejection().unwrap();

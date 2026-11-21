@@ -244,7 +244,9 @@ impl<'a> NalPacketConfigWriter<'a> {
                     Ok(false) => return Ok(BuildStep::Yield),
                     Err(declared) => {
                         self.rejected_array = Some(declared);
-                        return Err(Error::Unsupported("pinned HEVC decoder array type"));
+                        return Err(Error::Unsupported(
+                            "HEVC configuration array of an unsupported type",
+                        ));
                     }
                 },
                 Phase::Size => {

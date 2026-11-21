@@ -872,10 +872,10 @@ fn facts(out: &NalPacketOutput) -> String {
 fn strict_packets_keep_every_poll_and_fact_across_work_plans() {
     // Recorded on `main` at `0f154393` from the strict compact path, per plan.
     const DIGESTS: [u64; 4] = [
-        13_338_352_700_024_966_442,
-        8_938_238_107_557_535_556,
-        928_101_546_738_566_266,
-        6_227_540_478_076_583_636,
+        18_162_546_289_750_802_832,
+        11_702_714_044_796_952_646,
+        5_833_519_113_651_228_672,
+        17_684_624_257_594_431_046,
     ];
     let packets: [(Codec, &[u8]); 8] = [
         (Codec::Avc, &[0, 0, 0, 3, 0x65, 0xb8, 128]),

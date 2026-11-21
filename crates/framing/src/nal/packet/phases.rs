@@ -163,7 +163,11 @@ impl PacketPlan {
         {
             Ok(true) => {}
             Ok(false) => return Ok(YIELD),
-            Err(_) => return Err(Error::Unsupported("pinned HEVC decoder array type")),
+            Err(_) => {
+                return Err(Error::Unsupported(
+                    "HEVC configuration array of an unsupported type",
+                ));
+            }
         }
         self.offset = 0;
         self.phase = if state.length_width.is_some() {
@@ -258,7 +262,7 @@ impl PacketPlan {
         }
         if self.length == 0 {
             state.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyHevcNal);
-            return Err(Error::Invalid("pinned HEVC empty NAL"));
+            return Err(Error::Invalid("empty HEVC NAL unit"));
         }
         if self.look_nals == state.session.limits.maximum_nals {
             return Err(Error::Limit {
@@ -319,7 +323,7 @@ impl PacketPlan {
         let width = usize::from(width.bytes());
         if self.offset == 0 && bytes.is_empty() && state.codec == Codec::Avc {
             state.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyAvcPacket);
-            return Err(Error::Invalid("pinned AVC empty packet"));
+            return Err(Error::Invalid("empty AVC packet"));
         }
         if self.offset == bytes.len() && self.prefix_read == 0 {
             self.phase = PlanPhase::Reserve;
