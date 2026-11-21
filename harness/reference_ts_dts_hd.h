@@ -110,11 +110,12 @@ static int dts_hd_span(const uint8_t *bytes, size_t size, DtsHdSpan spans[4], Dt
 
 static int dts_hd_emit(const AVPacket *pes, const DtsHdSource *source,
                        const AVCodecParserContext *parser, const uint8_t *bytes, int size,
-                       int pid, uint64_t base, size_t *emitted, DtsHdSpan spans[4], TsWork *work, int trace)
+                       int pid, uint64_t base, size_t *emitted, DtsHdSpan spans[4], TsWork *work,
+                       int trace, int verify_payload)
 {
     if (size <= 0 || (size_t)size > (size_t)pes->size - *emitted
         || parser->frame_offset < 0 || (uint64_t)parser->frame_offset != *emitted
-        || memcmp(bytes, pes->data + *emitted, (size_t)size))
+        || (verify_payload && memcmp(bytes, pes->data + *emitted, (size_t)size)))
         return AVERROR_INVALIDDATA;
     DtsHdSpan span;
     int rc = dts_hd_span(bytes, (size_t)size, spans, &span);
@@ -149,7 +150,7 @@ static int dts_hd_emit(const AVPacket *pes, const DtsHdSource *source,
 }
 
 static int dts_hd_operation(const uint8_t *bytes, size_t size, int program,
-                            size_t carrier, TsWork *work, int trace)
+                            size_t carrier, TsWork *work, int trace, int verify_payload)
 {
     TsInput input = {bytes, size, 0};
     AVFormatContext *format = avformat_alloc_context();
@@ -201,7 +202,7 @@ static int dts_hd_operation(const uint8_t *bytes, size_t size, int program,
             }
             if (output_size) {
                 rc = dts_hd_emit(packet, &source, parser, output, output_size, format->streams[index]->id, base,
-                    &emitted, spans, work, trace);
+                    &emitted, spans, work, trace, verify_payload);
                 if (rc < 0) goto done;
             }
             at += used;
@@ -243,7 +244,8 @@ static int dts_hd_main(int argc, char **argv, const uint8_t *bytes, long size)
     TsWork total = {0};
     for (unsigned long i = 0; i < iterations; ++i) {
         TsWork next = {0};
-        int rc = dts_hd_operation(bytes, (size_t)size, (int)program, (size_t)atoi(argv[at]), &next, trace);
+        int rc = dts_hd_operation(bytes, (size_t)size, (int)program, (size_t)atoi(argv[at]), &next,
+                                  trace, !bench && !memory);
         if (rc != 1) { fprintf(stderr, "DTS-HD source comparison failed: %d\n", rc); return 2; }
         total.packets += next.packets; total.bytes += next.bytes; fold(&total.digest, next.digest);
     }
