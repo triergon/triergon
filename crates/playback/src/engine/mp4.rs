@@ -90,21 +90,7 @@ impl Mp4Engine {
         plan: PreparedMp4,
         maximum_packet: usize,
     ) -> Result<Self> {
-        if !input.budget().same_pool(&plan.pool) {
-            return Err(Error::ForeignPool);
-        }
-        if input.source() != plan.source {
-            return Err(Error::SourceMismatch);
-        }
-        if input.generation() != plan.opening_generation {
-            return Err(Error::StaleGeneration {
-                expected: plan.opening_generation,
-                received: input.generation(),
-            });
-        }
-        if input.capabilities().length != plan.source_length {
-            return Err(Error::Invalid("plan source extent changed"));
-        }
+        Self::check_binding(&input, &plan)?;
         if maximum_packet == 0 {
             return Err(Error::Invalid("zero packet policy"));
         }
@@ -130,6 +116,29 @@ impl Mp4Engine {
             )?);
         }
         Ok(engine)
+    }
+
+    /// Whether `plan` was indexed from `input`'s pool, source, generation and length.
+    // Inlined, so that each caller compiles the four tests in its own frame: one
+    // call for both cost 26 instructions per open, which is timed.
+    #[inline(always)]
+    pub(crate) fn check_binding(input: &InputCursor, plan: &PreparedMp4) -> Result<()> {
+        if !input.budget().same_pool(&plan.pool) {
+            return Err(Error::ForeignPool);
+        }
+        if input.source() != plan.source {
+            return Err(Error::SourceMismatch);
+        }
+        if input.generation() != plan.opening_generation {
+            return Err(Error::StaleGeneration {
+                expected: plan.opening_generation,
+                received: input.generation(),
+            });
+        }
+        if input.capabilities().length != plan.source_length {
+            return Err(Error::Invalid("plan source extent changed"));
+        }
+        Ok(())
     }
 
     /// Starts replaying the plan from the landing, or from its start without one.

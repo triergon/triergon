@@ -309,24 +309,8 @@ impl Engine {
         {
             return Err(Error::Invalid("Matroska engine needs an unstarted reader"));
         }
-        // The four checks `Mp4Engine::new` makes before the engine exists. One
-        // function for both cost 26 instructions per open, which is timed.
         if let Self::Mp4(r) = self {
-            if !r.input.budget().same_pool(&r.plan.pool) {
-                return Err(Error::ForeignPool);
-            }
-            if r.input.source() != r.plan.source {
-                return Err(Error::SourceMismatch);
-            }
-            if r.input.generation() != r.plan.opening_generation {
-                return Err(Error::StaleGeneration {
-                    expected: r.plan.opening_generation,
-                    received: r.input.generation(),
-                });
-            }
-            if r.input.capabilities().length != r.plan.source_length {
-                return Err(Error::Invalid("plan source extent changed"));
-            }
+            Mp4Engine::check_binding(&r.input, &r.plan)?;
         }
         Ok(())
     }
