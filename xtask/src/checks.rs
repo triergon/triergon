@@ -84,23 +84,16 @@ pub fn link_targets(text: &str) -> Vec<&str> {
 /// Harness data parses, and recorded gates keep their declared values.
 pub fn design(root: &Path) -> Result<String, Vec<String>> {
     let mut errors = Vec::new();
-    let research = root.join("research");
-    for path in walk::files(&research, &|rel| {
+    let mut data = Vec::new();
+    for path in walk::files(&root.join("harness"), &|rel| {
         rel.extension().is_some_and(|e| e == "json")
     }) {
         let rel = path.strip_prefix(root).expect("walked under root");
-        if let Err(error) = read_json(&path) {
-            errors.push(format!("{}: {error}", rel.display()));
+        match read_json(&path) {
+            Ok(document) => data.push((rel.display().to_string(), document)),
+            Err(error) => errors.push(format!("{}: {error}", rel.display())),
         }
     }
-    let gates = match (
-        read_json(&root.join("harness/policy.json")),
-        read_json(&root.join("harness/module-gates.json")),
-    ) {
-        (Ok(_), Ok(gates)) => gates,
-        (Err(error), _) => return Err(vec![format!("harness/policy.json: {error}")]),
-        (_, Err(error)) => return Err(vec![format!("harness/module-gates.json: {error}")]),
-    };
     errors.extend(runtime_mentions(root));
     errors.extend(policy_values(root));
     errors.extend(contract_fields(root));
@@ -108,24 +101,15 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
     for generator in crate::generators::GENERATORS {
         errors.extend(generator.check(root));
     }
-    let modules = gates
-        .get("modules")
-        .and_then(Value::as_array)
-        .unwrap_or_default();
-    if modules
+    let fate = data
         .iter()
-        .any(|m| m.get("accepted").is_some_and(Value::truthy))
-    {
-        errors.push("a module was marked accepted without implementation evidence".into());
-    }
-    let fate = match read_json(&root.join("harness/fate/index.json")) {
-        Ok(fate) => fate,
-        Err(error) => return Err(vec![format!("harness/fate/index.json: {error}")]),
+        .find(|(path, _)| path == "harness/fate/index.json")
+        .and_then(|(_, index)| index.get("cases"))
+        .and_then(Value::as_array);
+    let Some(cases) = fate else {
+        errors.push("harness/fate/index.json: no FATE cases".into());
+        return Err(errors);
     };
-    let cases = fate
-        .get("cases")
-        .and_then(Value::as_array)
-        .unwrap_or_default();
     let mapped = |c: &Value| {
         c.get("status").and_then(Value::as_str) != Some("unmapped")
             || c.get("rights").and_then(Value::as_str) != Some("unreviewed")
@@ -135,9 +119,9 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
     }
     if errors.is_empty() {
         Ok(format!(
-            "Design integrity OK: JSON, {} unaccepted module gates, {} unmapped FATE identities.\n\
+            "Design integrity OK: {} harness data files, {} unmapped FATE identities.\n\
              This is not a feature-parity, performance, memory or FATE pass.",
-            modules.len(),
+            data.len(),
             cases.len()
         ))
     } else {
@@ -925,16 +909,14 @@ mod tests {
     #[test]
     fn design_reports_invalid_json_and_gate_changes() {
         let root = walk::scratch("design");
-        fs::create_dir_all(root.join("research/sub")).unwrap();
+        fs::create_dir_all(root.join("harness/sub")).unwrap();
         fs::create_dir_all(root.join("harness/fate")).unwrap();
         fs::create_dir_all(root.join("harness/features")).unwrap();
         let policy = r#"{"runtime": {"ratio_max": 1.2, "optimisation_target": 0.8, "minimum_pairs": 30},
             "memory": {"peak_live_heap_ratio_max_exclusive": 1.0,
                        "total_resident_peak_rss_ratio_max_exclusive": 1.0},
             "qualification_targets": ["thumbv7neon-unknown-linux-gnueabihf", "aarch64-unknown-linux-gnu"]}"#;
-        let gates = r#"{"modules": [{"accepted": false}, {"accepted": false}]}"#;
         fs::write(root.join("harness/policy.json"), policy).unwrap();
-        fs::write(root.join("harness/module-gates.json"), gates).unwrap();
         fs::write(
             root.join("harness/fate/index.json"),
             r#"{"cases": [{"status": "unmapped", "rights": "unreviewed"}]}"#,
@@ -942,24 +924,27 @@ mod tests {
         .unwrap();
         stated_policy(&root);
         let ok = design(&root).unwrap();
-        assert!(ok.starts_with(
-            "Design integrity OK: JSON, 2 unaccepted module gates, 1 unmapped FATE identities."
-        ));
-        fs::write(root.join("research/sub/bad.json"), "{").unwrap();
+        assert!(
+            ok.starts_with(
+                "Design integrity OK: 2 harness data files, 1 unmapped FATE identities."
+            )
+        );
+        fs::write(root.join("harness/sub/bad.json"), "{").unwrap();
         fs::write(
             root.join("harness/policy.json"),
-            policy.replace("1.2", "1.25"),
+            policy.replace("1.2,", "1.25,"),
         )
         .unwrap();
         fs::write(
-            root.join("harness/module-gates.json"),
-            gates.replace("false}]", "true}]"),
+            root.join("harness/fate/index.json"),
+            r#"{"cases": [{"status": "mapped", "rights": "unreviewed"}]}"#,
         )
         .unwrap();
         let errors = design(&root).unwrap_err();
         assert_eq!(errors.len(), 3, "{errors:?}");
-        assert!(errors[0].starts_with("research/sub/bad.json: "));
+        assert!(errors[0].starts_with("harness/sub/bad.json: "));
         assert!(errors.contains(&"docs/quality.md: does not state the policy value 1.25".into()));
+        assert!(errors.contains(&"FATE index misrepresents coverage/rights".into()));
         fs::remove_dir_all(root).unwrap();
     }
 

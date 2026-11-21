@@ -1005,7 +1005,6 @@ pub(crate) fn gate_key(
     let shared = [
         "harness/fate/index.json",
         "harness/fate/map.json",
-        "harness/module-gates.json",
         "harness/comparison-rules.json",
     ]
     .map(|path| root.join(path));
