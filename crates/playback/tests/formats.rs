@@ -1648,7 +1648,9 @@ fn real_movie_edit_seek_maps_exact_source_point_before_playback_fence() {
         panic!("frozen edit fixture must contain this movie point")
     };
     assert_eq!(point.requested_movie_time, Time::new(1, 2).unwrap());
+    #[cfg(feature = "reference-trace")]
     assert!(command.raw_edits().is_some());
+    #[cfg(feature = "reference-trace")]
     assert!(command.raw_media_clock().payload().len() >= 20);
     let target = point.source_time;
     assert!(matches!(
@@ -2469,6 +2471,7 @@ fn indexed_mp4_seek_starts_at_late_sync_and_republishes_its_configuration() {
     assert!(!job.poll(&mut WorkBudget::new(0), &off()).unwrap());
     while !job.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
     let command = job.finish().unwrap();
+    #[cfg(feature = "reference-trace")]
     assert_eq!(command.sync_ordinal(), 4);
     assert_eq!(command.start_offset(), 815);
     assert!(
@@ -2632,6 +2635,7 @@ fn indexed_mp4_seek_keeps_selected_subtitle_prefix_and_only_late_video() {
     let mut job = p.prepare_mp4_sync_seek(request, selection).unwrap();
     while !job.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
     let command = job.finish().unwrap();
+    #[cfg(feature = "reference-trace")]
     assert_eq!(command.sync_ordinal(), 4);
     assert_eq!(command.start_offset(), 1175);
     assert!(
@@ -2719,6 +2723,7 @@ fn indexed_mp4_seek_reads_aac_preroll_and_matches_the_encoded_suffix() {
     let mut job = p.prepare_mp4_sync_seek(request, Selection::All).unwrap();
     while !job.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
     let command = job.finish().unwrap();
+    #[cfg(feature = "reference-trace")]
     assert_eq!(command.sync_ordinal(), 17);
     assert_eq!(command.start_offset(), first_offset);
     calls.lock().unwrap().clear();

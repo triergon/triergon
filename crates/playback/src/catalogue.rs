@@ -84,7 +84,15 @@ pub struct RetiredCatalogue {
     pub(crate) engine: Option<Engine>,
     pub(crate) queue: BudgetVec<Option<Output>>,
     pub(crate) head: usize,
+    #[cfg_attr(
+        not(feature = "reference-trace"),
+        expect(dead_code, reason = "read only by the comparison accessor")
+    )]
     pub(crate) pending: Option<Event>,
+    #[cfg_attr(
+        not(feature = "reference-trace"),
+        expect(dead_code, reason = "read only by the comparison accessor")
+    )]
     pub(crate) pending_source: Option<SourceId>,
     pub(crate) request: Option<InputRequest>,
     pub(crate) seek: Option<SeekIntent>,
@@ -92,6 +100,7 @@ pub struct RetiredCatalogue {
 impl RetiredCatalogue {
     /// Cursor into the retired engine's current owned plan, not a physical I/O
     /// position or an inferred native demuxer cursor.
+    #[cfg(feature = "reference-trace")]
     pub fn indexed_row_cursor(&self) -> Option<usize> {
         match self.engine.as_ref() {
             Some(Engine::Mp4(engine)) => Some(engine.row),
@@ -110,9 +119,11 @@ impl RetiredCatalogue {
         self.head += 1;
         out
     }
+    #[cfg(feature = "reference-trace")]
     pub fn pending_event(&self) -> Option<&Event> {
         self.pending.as_ref()
     }
+    #[cfg(feature = "reference-trace")]
     pub fn pending_source(&self) -> Option<SourceId> {
         self.pending_source
     }

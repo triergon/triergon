@@ -407,6 +407,7 @@ fn catalogue_all_valid_original_movies_replace_without_rewriting_source_facts() 
         assert!(!p.current(&retained));
         assert_eq!(retained.source_id(), SourceId(8201));
         assert_eq!(retired.queued(), 2);
+        #[cfg(feature = "reference-trace")]
         assert_eq!(retired.indexed_row_cursor(), Some(3));
         let mut ordinal = 2;
         while let Some(output) = retired.pop() {
@@ -624,6 +625,7 @@ fn catalogue_selection_storage_pressure_retries_before_retiring_any_owner() {
 }
 
 #[test]
+#[cfg(feature = "reference-trace")]
 fn catalogue_empty_retirement_under_pressure_retains_unqueued_configuration() {
     let b = Budget::new(64 << 20).unwrap();
     let (mut p, old) = player(&b, SourceId(8801), &gold::CASES[0], PlayerPolicy::default());
@@ -1162,6 +1164,7 @@ fn catalogue_existing_seek_intent_is_retained_but_not_applied_to_new_source_cloc
         .unwrap()
         .unwrap();
     assert_eq!(retired.seek_intent(), Some(intent));
+    #[cfg(feature = "reference-trace")]
     assert!(matches!(retired.pending_event(), Some(Event::Seek(x)) if *x == intent));
     assert_eq!(p.seek_intent(), None);
     let out = collect(&mut p, 1).unwrap();
@@ -1538,6 +1541,7 @@ fn progressive_range_seek_promotes_the_same_fragmented_entity_through_the_pump()
         }
     }
     let command = job.finish().unwrap();
+    #[cfg(feature = "reference-trace")]
     assert_eq!(command.sync_ordinal(), 4);
     assert_eq!(command.start_offset(), 1647);
     assert_eq!(old.polls.load(Ordering::Relaxed), old_polls);

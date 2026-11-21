@@ -597,6 +597,7 @@ fn matroska_hevc_ac3_and_eac3_match_complete_feed_packets_and_source_pts() {
                         MatroskaHevcDolbyPayload::Dolby { family, raw } => {
                             assert_eq!(*family, [Ac3Family::Ac3, Ac3Family::Eac3][track - 1]);
                             assert!(std::ptr::eq(*raw, packet.packet.data.as_ref()));
+                            #[cfg(feature = "reference-trace")]
                             assert_eq!(output.demux_duration_ns().unwrap(), Some(32_000_000));
                         }
                     }

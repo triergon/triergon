@@ -202,6 +202,7 @@ impl Engine {
         }))
     }
 
+    #[cfg(feature = "reference-trace")]
     pub fn delivers_demux_pes(&self) -> bool {
         matches!(self, Self::Ts(t) if t.delivery.discovers_tracks() || !t.pes_tracks.as_slice().is_empty())
     }

@@ -249,6 +249,7 @@ impl MatroskaHevcDolbyPacket<'_> {
     /// the final CRC-valid independent syncframe of an admitted Dolby packet.
     /// The fallback checks up to 32 complete syncframes. The typed source
     /// keeps its original container timing.
+    #[cfg(feature = "reference-trace")]
     pub fn demux_duration_ns(&self) -> Result<Option<u64>> {
         let timing = self.source.packet.timing;
         if let Some(declared) = triergon_matroska::compat::clock::packet_timing(timing)?.duration {
@@ -261,6 +262,7 @@ impl MatroskaHevcDolbyPacket<'_> {
     }
 }
 
+#[cfg(any(test, feature = "reference-trace"))]
 fn dolby_duration_ns(family: Ac3Family, raw: &[u8], scale_ns: u64) -> Option<u64> {
     let frame = dolby_final_syncframe(family, raw)?;
     syncframe_duration_ns(frame.coded_samples(), frame.sample_rate_hz, scale_ns)

@@ -19,5 +19,10 @@ triergon-playback = { path = "../playback" }
 triergon-raw-video = { path = "../raw-video" }
 triergon-subtitles = { path = "../subtitles" }
 
+[features]
+# Comparison-only projections the harness compares against the reference; not
+# shipped behaviour.
+reference-trace = []
+
 [lints]
 workspace = true

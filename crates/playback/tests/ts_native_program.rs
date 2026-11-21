@@ -145,6 +145,7 @@ fn segment_player(raw: &[u8], quantum: usize) -> (Player<ByteSource>, Budget) {
         NAMESPACE,
     )
     .unwrap();
+    #[cfg(feature = "reference-trace")]
     assert!(engine.delivers_demux_pes());
     let source = ByteSource::new(
         ENTITY,

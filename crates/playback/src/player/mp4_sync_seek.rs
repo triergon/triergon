@@ -62,6 +62,10 @@ pub struct Mp4SyncSeekCommand {
     request: Mp4SyncSeekRequest,
     landing: Mp4SyncLanding,
     offset: u64,
+    #[cfg_attr(
+        not(feature = "reference-trace"),
+        expect(dead_code, reason = "read only by the comparison accessor")
+    )]
     sync_ordinal: u64,
 }
 
@@ -69,6 +73,7 @@ impl Mp4SyncSeekCommand {
     pub fn start_offset(&self) -> u64 {
         self.offset
     }
+    #[cfg(feature = "reference-trace")]
     pub fn sync_ordinal(&self) -> u64 {
         self.sync_ordinal
     }

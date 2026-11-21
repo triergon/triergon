@@ -225,6 +225,7 @@ impl PreparedMp4 {
     pub fn tracks(&self) -> &[PlanTrack] {
         self.tracks.as_slice()
     }
+    #[cfg(feature = "reference-trace")]
     pub fn raw_roots(&self) -> &[BoxView] {
         self.raw_roots.as_slice()
     }
@@ -287,6 +288,7 @@ impl PreparedMp4 {
             None
         }
     }
+    #[cfg(feature = "reference-trace")]
     pub fn config(&self, row: &SourceRow, revision: u64) -> Result<Mp4Configuration> {
         self.track(row.track_id)?
             .configuration(row.sample.description_index, revision)
@@ -1200,16 +1202,26 @@ pub struct MovieSeekCommand {
     pub(crate) generation: u64,
     pub(crate) pool: Budget,
     pub(crate) track: u32,
+    #[cfg_attr(
+        not(feature = "reference-trace"),
+        expect(dead_code, reason = "read only by the comparison accessor")
+    )]
     raw_media_clock: BoxView,
+    #[cfg_attr(
+        not(feature = "reference-trace"),
+        expect(dead_code, reason = "read only by the comparison accessor")
+    )]
     raw_edits: Option<BoxView>,
 }
 impl MovieSeekCommand {
     pub fn point(&self) -> &iso::seek::MoviePoint {
         &self.point
     }
+    #[cfg(feature = "reference-trace")]
     pub fn raw_media_clock(&self) -> &BoxView {
         &self.raw_media_clock
     }
+    #[cfg(feature = "reference-trace")]
     pub fn raw_edits(&self) -> Option<&BoxView> {
         self.raw_edits.as_ref()
     }
