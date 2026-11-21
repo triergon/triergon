@@ -1,7 +1,7 @@
 //! Open bitstream units of AV1 v1.0.0 with Errata 1 (§5.3): headers, sizes and
 //! payload spans. Payloads stay unread: no operating point is selected, no
 //! trailing bits are removed and no frame is assembled.
-use crate::retryable;
+use crate::{freeze_started, retryable, started};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
@@ -458,10 +458,8 @@ impl Av1ObuReader {
         }
     }
 
-    fn buffer(&mut self) -> Result<&mut BudgetVec<u8>> {
-        self.output
-            .as_mut()
-            .ok_or(Error::Invalid("missing AV1 OBU builder"))
+    fn buffer(&mut self) -> &mut BudgetVec<u8> {
+        started(&mut self.output, self.cursor.budget())
     }
 
     fn step_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<Av1Obu>> {
@@ -592,11 +590,8 @@ impl Av1ObuReader {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    if self.output.is_none() {
-                        self.output = Some(BudgetVec::new(self.cursor.budget()));
-                    }
                     let count = self.wire_length;
-                    self.buffer()?.try_reserve_exact(count)?;
+                    started(&mut self.output, self.cursor.budget()).try_reserve_exact(count)?;
                     self.phase = Phase::Prefix;
                 }
                 Phase::Prefix => {
@@ -617,15 +612,12 @@ impl Av1ObuReader {
                     }
                     let start = self.prefix_copied;
                     let end = start.checked_add(count).ok_or(Error::Overflow)?;
-                    let output = self
-                        .output
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing AV1 OBU builder"))?;
-                    output.try_extend_from_slice(&self.prefix[start..end])?;
+                    started(&mut self.output, self.cursor.budget())
+                        .try_extend_from_slice(&self.prefix[start..end])?;
                     self.prefix_copied = end;
                 }
                 Phase::Payload => {
-                    let length = self.buffer()?.len();
+                    let length = self.buffer().len();
                     let remaining = self
                         .wire_length
                         .checked_sub(length)
@@ -636,7 +628,7 @@ impl Av1ObuReader {
                     }
                     match self.cursor.read_span(remaining.min(4096), work, cancel)? {
                         Step::Ready(bytes) => {
-                            self.buffer()?.try_extend_from_slice(bytes.as_ref())?;
+                            self.buffer().try_extend_from_slice(bytes.as_ref())?;
                         }
                         Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                         Step::Yield => return Ok(Step::Yield),
@@ -665,17 +657,7 @@ impl Av1ObuReader {
                         .offset
                         .checked_add(u64::try_from(self.prefix_len).map_err(|_| Error::Overflow)?)
                         .ok_or(Error::Overflow)?;
-                    let output = self
-                        .output
-                        .take()
-                        .ok_or(Error::Invalid("missing AV1 OBU builder"))?;
-                    let wire = match output.freeze() {
-                        Ok(wire) => wire,
-                        Err(rejected) => {
-                            self.output = Some(rejected.value);
-                            return Err(rejected.error);
-                        }
-                    };
+                    let wire = freeze_started(&mut self.output, self.cursor.budget())?;
                     let facts = Av1ObuFacts {
                         source: self.cursor.source(),
                         generation: self.cursor.generation(),
