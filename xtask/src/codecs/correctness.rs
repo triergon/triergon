@@ -1263,25 +1263,7 @@ pub fn grade(a: &Grade) -> Result<(), String> {
                 )?)
             };
             let decoded = if session_video {
-                let timeline = output
-                    .as_ref()
-                    .and_then(|row| row.get("timeline"))
-                    .and_then(Value::as_array)
-                    .unwrap_or_default();
-                session::base(&lane, v)
-                    .map_err(Stop::Fatal)
-                    .and_then(|base| {
-                        session::timeline(
-                            a,
-                            &path,
-                            &base,
-                            timeline,
-                            v.get("reset_at")
-                                .and(output.as_ref())
-                                .and_then(|row| row.get("reference_timeline"))
-                                .and_then(Value::as_array),
-                        )
-                    })
+                session::video_timeline(a, &path, &lane, v, output.as_ref())
             } else if video_extensions(&lane).is_some() {
                 video::decoder(&a.ffprobe, &a.ffmpeg, &a.example(&lane)?, &lane, &path)
             } else {

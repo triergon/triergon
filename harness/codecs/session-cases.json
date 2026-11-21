@@ -2525,6 +2525,15 @@
    "source_sha256": "8211fabe2b5d6448420e31cae63839be4f876ad9a54a70a2a53bf31620e74537",
    "tail_source": ".research/codec-inputs/al_sbr_cm_48_2.adts",
    "tail_source_sha256": "0d17bc6adcb8dbebc4c5f1dc447d8631d0b1e0797ba5c3a4884e0e58230440d8"
+  },
+  {
+   "lane": "track-reset",
+   "name": "reset-track-reset-serenity_english_5.1_1536_small.eac3",
+   "path": ".research/codec-derived/ac3/serenity_english_5.1_1536_small.eac3",
+   "bytes": 99328,
+   "sha256": "3d81c22610a2602b7799ec5e59c2677e8ab23e03e4abc03c2a16b683aa3d5f0a",
+   "base_lane": "eac3",
+   "reset_at": "12,24"
   }
  ]
 }

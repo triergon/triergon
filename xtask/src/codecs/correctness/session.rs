@@ -267,6 +267,50 @@ pub(super) fn timeline(
     ]))
 }
 
+pub(super) fn video_timeline(
+    a: &Grade,
+    path: &str,
+    lane: &str,
+    vector: &Value,
+    output: Option<&Value>,
+) -> Result<Value, Stop> {
+    let base = base(lane, vector)?;
+    let output_rows = |key| {
+        output
+            .and_then(|row| row.get(key))
+            .and_then(Value::as_array)
+    };
+    let clock = timeline(
+        a,
+        path,
+        &base,
+        output_rows("timeline").unwrap_or_default(),
+        vector
+            .get("reset_at")
+            .and_then(|_| output_rows("reference_timeline")),
+    )?;
+    if let Some(output) = output
+        && output.get("status").and_then(Value::as_str) == Some("reference-produced-nothing")
+        && clock.get("reference_frames").and_then(python::int) == Some(0)
+        && output
+            .get("ours_stderr_tail")
+            .and_then(Value::as_str)
+            .is_some_and(|error| {
+                error.contains("Error: Unsupported(") || error.contains("Error: Invalid(")
+            })
+        && output
+            .get("reference_stderr_tail")
+            .and_then(Value::as_str)
+            .is_some_and(|error| !error.is_empty())
+    {
+        return Ok(Value::object([
+            ("status", Value::str("ffmpeg-refused")),
+            ("timeline", clock),
+        ]));
+    }
+    Ok(clock)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
