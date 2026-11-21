@@ -70,8 +70,11 @@ pub const RAW_MPEG2_TIME_BASE: (u32, u32) = (1, 1_200_000);
 /// One output frame's caption bytes and times, in the extractor's time base.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CaptionFrame<'a> {
+    /// Presentation time in ticks; `None` when the frame has none.
     pub pts: Option<i64>,
+    /// Duration in ticks; `None` when unknown.
     pub duration: Option<i64>,
+    /// The frame's `cc_data` constructs, three bytes each, in decode order.
     pub data: &'a [u8],
 }
 
@@ -95,9 +98,13 @@ pub enum VideoCoding {
 /// container times.
 #[derive(Clone, Copy, Debug)]
 pub struct VideoPacket<'a> {
+    /// The packet's bytes.
     pub data: &'a [u8],
+    /// Presentation time in the extractor's time base, if known.
     pub pts: Option<i64>,
+    /// Decode time in the extractor's time base, if known.
     pub dts: Option<i64>,
+    /// The container's duration in the extractor's time base, if known.
     pub duration: Option<i64>,
 }
 

@@ -97,7 +97,9 @@ pub enum DataField {
     /// The field of the first construct of the first packet.
     #[default]
     Auto,
+    /// Field 1 (`cc_type` 0).
     First,
+    /// Field 2 (`cc_type` 1).
     Second,
 }
 
@@ -137,6 +139,8 @@ pub struct Subtitle {
 }
 
 impl Subtitle {
+    /// An empty subtitle whose lines are charged to `pool`, for
+    /// [`Decoder::decode`] to fill.
     #[must_use]
     pub fn new(pool: &Budget) -> Self {
         Self {
@@ -157,6 +161,7 @@ impl Subtitle {
         })
     }
 
+    /// Whether the packet produced no event line.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.ends.is_empty()
@@ -255,6 +260,8 @@ pub struct Decoder {
 }
 
 impl Decoder {
+    /// A decoder with the screen empty and `options` applied; its text is
+    /// charged to `pool`.
     #[must_use]
     pub fn new(pool: &Budget, options: Options) -> Self {
         Self {

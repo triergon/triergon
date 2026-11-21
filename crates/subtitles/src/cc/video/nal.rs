@@ -44,7 +44,9 @@ impl Framing {
 /// The video coding.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Codec {
+    /// H.264 (ITU-T H.264).
     H264,
+    /// HEVC (ITU-T H.265).
     Hevc,
 }
 
