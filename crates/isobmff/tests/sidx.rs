@@ -1,10 +1,6 @@
 mod common;
 use triergon_core::{Budget, Error, Time, WorkBudget};
-use triergon_isobmff::{
-    Limits,
-    boxes::BoxView,
-    index::{IndexStep, SegmentIndex},
-};
+use triergon_isobmff::{Limits, Next, boxes::BoxView, index::SegmentIndex};
 
 fn index_box(
     budget: &Budget,
@@ -60,9 +56,9 @@ fn normative_sidx_cursor_preserves_references_sap_and_exact_movie_times() {
     let mut cursor = index.cursor();
     assert!(matches!(
         cursor.poll(&mut WorkBudget::new(0)).unwrap(),
-        IndexStep::Yield
+        Next::Yield
     ));
-    let IndexStep::Reference(first) = cursor.poll(&mut WorkBudget::new(1)).unwrap() else {
+    let Next::Item(first) = cursor.poll(&mut WorkBudget::new(1)).unwrap() else {
         panic!()
     };
     assert_eq!(first.range, 188..228);
@@ -71,7 +67,7 @@ fn normative_sidx_cursor_preserves_references_sap_and_exact_movie_times() {
     assert_eq!(first.presentation_duration, Time::new(1, 2).unwrap());
     assert!(first.starts_with_sap);
     assert_eq!(first.sap_type, 1);
-    let IndexStep::Reference(second) = cursor.poll(&mut WorkBudget::new(1)).unwrap() else {
+    let Next::Item(second) = cursor.poll(&mut WorkBudget::new(1)).unwrap() else {
         panic!()
     };
     assert_eq!(second.range, 228..252);
@@ -81,7 +77,7 @@ fn normative_sidx_cursor_preserves_references_sap_and_exact_movie_times() {
     assert_eq!(second.sap_delta_ticks, 7);
     assert!(matches!(
         cursor.poll(&mut WorkBudget::new(1)).unwrap(),
-        IndexStep::End
+        Next::End
     ));
     assert_eq!(budget.used(), before);
 }
@@ -99,8 +95,7 @@ fn sidx_large_unsigned_time_and_sparse_offsets_do_not_narrow_to_i64_or_u32() {
     );
     let end = raw.header().end().unwrap().unwrap();
     let index = SegmentIndex::parse(raw, Limits::default()).unwrap();
-    let IndexStep::Reference(reference) = index.cursor().poll(&mut WorkBudget::new(1)).unwrap()
-    else {
+    let Next::Item(reference) = index.cursor().poll(&mut WorkBudget::new(1)).unwrap() else {
         panic!()
     };
     assert_eq!(reference.range.start, end + (1u64 << 32) + 9);

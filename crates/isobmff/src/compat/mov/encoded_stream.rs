@@ -1,9 +1,9 @@
 //! Admission of an encoded sample entry: its stream view, configuration and
 //! the metadata the demuxer reads from the movie.
 use crate::{
-    Limits,
-    boxes::{BoxChildren, BoxStep, BoxView},
-    compat::mov::{clocks::MediaClock, edit_list::CursorStatus, view::StreamView},
+    CursorStatus, Limits, Next,
+    boxes::{BoxChildren, BoxView},
+    compat::mov::{clocks::MediaClock, view::StreamView},
     config::{
         ConfigurationLimits, DtsCoreDescription, EsdsProfile, EsdsWalk, check_configuration_size,
         check_dts_sample_entry, check_mp4a_dts, dts_entry_children, dts_object_type,
@@ -495,8 +495,8 @@ impl<'a> EncodedStreamJob<'a> {
             };
             if let Some(step) = wave_step {
                 match step {
-                    BoxStep::Yield => return Ok(CursorStatus::Yield),
-                    BoxStep::Box(raw) => {
+                    Next::Yield => return Ok(CursorStatus::Yield),
+                    Next::Item(raw) => {
                         self.inspect_box()?;
                         let w = self
                             .wave_fields
@@ -590,7 +590,7 @@ impl<'a> EncodedStreamJob<'a> {
                             _ => {}
                         }
                     }
-                    BoxStep::End => {
+                    Next::End => {
                         let w = self
                             .wave_fields
                             .as_mut()
@@ -613,8 +613,8 @@ impl<'a> EncodedStreamJob<'a> {
             }
             if let Some(children) = &mut self.children {
                 match children.poll(work)? {
-                    BoxStep::Yield => return Ok(CursorStatus::Yield),
-                    BoxStep::Box(raw) => {
+                    Next::Yield => return Ok(CursorStatus::Yield),
+                    Next::Item(raw) => {
                         self.inspect_box()?;
                         if raw.header().kind == *b"wave" && self.requires_wave {
                             if self.wave_fields.is_some() {
@@ -672,7 +672,7 @@ impl<'a> EncodedStreamJob<'a> {
                             self.accept_configuration(raw)?;
                         }
                     }
-                    BoxStep::End => {
+                    Next::End => {
                         self.children = None;
                         if self.kind == EncodedEntryKind::Dts {
                             continue;

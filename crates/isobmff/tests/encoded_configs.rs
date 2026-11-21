@@ -5,13 +5,10 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
 use triergon_isobmff::{
-    Sample, SampleStep,
-    compat::mov::{
-        encoded::{
-            EncodedConfigProfile, EncodedConfigSequence, EncodedConfigStep, EncodedCreation,
-            EncodedInitial, EncodedStream, EncodedStreamJob,
-        },
-        packets::CursorStatus,
+    CursorStatus, Next, Sample,
+    compat::mov::encoded::{
+        EncodedConfigProfile, EncodedConfigSequence, EncodedConfigStep, EncodedCreation,
+        EncodedInitial, EncodedStream, EncodedStreamJob,
     },
     config::ConfigurationLimits,
     movie::TrackHeader,
@@ -102,9 +99,9 @@ impl Source {
         let mut out = Vec::new();
         for _ in 0..100000 {
             match c.poll(&mut WorkBudget::new(1)).unwrap() {
-                SampleStep::Yield => {}
-                SampleStep::Sample(s) => out.push(s),
-                SampleStep::End => return out,
+                Next::Yield => {}
+                Next::Item(s) => out.push(s),
+                Next::End => return out,
             }
         }
         panic!("sample progress")

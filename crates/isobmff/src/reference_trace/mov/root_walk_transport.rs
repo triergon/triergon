@@ -4,8 +4,8 @@
 //! translated or linked. Source geometry/bytes remain independently factual.
 use super::transport_window::{CAPACITY, Revisit, Window};
 use crate::{
-    BuildStatus, Limits,
-    boxes::{BoxChildren, BoxHeader, BoxStep, BoxView},
+    BuildStatus, Limits, Next,
+    boxes::{BoxChildren, BoxHeader, BoxView},
     fields,
     reference_trace::mov::raw_video_transport::{ModeledInitialRead, ModeledOpenState},
     table::recovery::{DescriptionContext, DescriptionRecoveryTable},
@@ -402,8 +402,8 @@ impl<'a> RootWalkTransportBuilder<'a> {
                     .as_mut()
                     .ok_or(Error::Invalid("v4 missing transport source iterator"))?;
                 match children.poll(work)? {
-                    BoxStep::Yield => return Ok(BuildStatus::Yield),
-                    BoxStep::Box(raw) => {
+                    Next::Yield => return Ok(BuildStatus::Yield),
+                    Next::Item(raw) => {
                         small_plain(raw.header(), self.context.physical_length)?;
                         if raw.header().kind == *b"free" && self.level != 5 {
                             continue;
@@ -449,7 +449,7 @@ impl<'a> RootWalkTransportBuilder<'a> {
                         }
                         self.matched += 1;
                     }
-                    BoxStep::End => {
+                    Next::End => {
                         if self.matched != expected(self.level).len() {
                             return Err(Error::Unsupported("v4 incomplete transport metadata"));
                         }

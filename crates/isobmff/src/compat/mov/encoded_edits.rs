@@ -2,11 +2,10 @@
 //! decoder configuration and clocks remain unchanged. No decoder/AU claim.
 //! Admission scans real metadata once before any occurrence is published.
 use crate::{
-    Access, Sample, SampleStep,
+    Access, CursorStatus, Next, Sample,
     boxes::BoxView,
     compat::mov::{
         clocks::ClockField,
-        edit_list::CursorStatus,
         encoded_stream::{EncodedEntryKind, EncodedStream},
         view::PacketView,
     },
@@ -1323,9 +1322,9 @@ impl<'a> EncodedEditJob<'a> {
                 continue;
             }
             match self.cursor.poll(work)? {
-                SampleStep::Yield => return Ok(CursorStatus::Yield),
-                SampleStep::Sample(s) => self.pending = Some(s),
-                SampleStep::End => self.scan_done = true,
+                Next::Yield => return Ok(CursorStatus::Yield),
+                Next::Item(s) => self.pending = Some(s),
+                Next::End => self.scan_done = true,
             }
         }
     }

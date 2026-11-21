@@ -6,11 +6,9 @@
 //! invalid-data. This models that transition, not an observed demux I/O state.
 //! A physical length or read quantum by itself establishes no such transition.
 use crate::{
-    BuildStatus,
+    BuildStatus, CursorStatus,
     boxes::BoxView,
-    compat::mov::{
-        cursor::PacketLimits, edit_list::CursorStatus, field_recovery::RecoveryTrackHeader,
-    },
+    compat::mov::{cursor::PacketLimits, field_recovery::RecoveryTrackHeader},
     reference_trace::mov::{
         raw_video_transport::ModeledOpenState,
         root_walk_transport::{RootWalkTransportModel, RootWalkTransportProfile},

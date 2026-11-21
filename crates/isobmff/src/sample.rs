@@ -112,18 +112,3 @@ pub(crate) struct SampleSpan {
     pub(crate) fragment: bool,
     pub(crate) offset_minimum: Option<i32>,
 }
-
-/// One step of a walk over sample spans.
-#[derive(Debug)]
-pub(crate) enum SpanStep {
-    Span(SampleSpan),
-    Yield,
-    End,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum SampleStep {
-    Sample(Sample),
-    Yield,
-    End,
-}

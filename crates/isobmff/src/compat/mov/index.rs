@@ -4,14 +4,13 @@
 //! Regression guards were observed failing before implementation activation.
 use crate::compat::mov::cursor::{PlainPrepare, PlainStart, TrackProjection, TrackResume};
 use crate::{
-    BuildStatus,
+    BuildStatus, CursorStatus,
     compat::mov::{
         clocks::MediaClock,
         cursor::{
             ClockOrigin, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, PacketOccurrence,
             ResumePoint,
         },
-        edit_list::CursorStatus,
     },
     seek::{OpusRecoveryLanding, OpusRecoverySeek},
 };

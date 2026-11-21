@@ -13,9 +13,10 @@ use triergon_core::{
     SourceLocation, Step, Time, TimeBase, WorkBudget,
 };
 use triergon_isobmff::{
+    CursorStatus,
     compat::mov::{
         front::FrontReadBoundary,
-        packets::{CursorStatus, PacketCursor, PacketOccurrence},
+        packets::{PacketCursor, PacketOccurrence},
         recovery::{RecoverySampleExtent, RecoverySampleRead, RunRecoveryProfile, ShortSample},
     },
     payload::{SampleReader, SourcePacket},
@@ -2562,9 +2563,10 @@ impl RawEvent {
         match self {
             Self::NativeTs { packet, .. } => packet.payload_len,
             Self::Matroska(MkvEvent::Packet(p)) => p.packet.data.len(),
-            Self::Matroska(MkvEvent::Envelope(
-                triergon_matroska::ElementEvent::Leaf { data, .. },
-            )) => data.len(),
+            Self::Matroska(MkvEvent::Envelope(triergon_matroska::ElementEvent::Leaf {
+                data,
+                ..
+            })) => data.len(),
             Self::Mp4(Mp4Event::Packet(p)) => p.source.payload.len(),
             Self::Mp4(Mp4Event::NativeShortPacket(p)) => p.prefix.payload.len(),
             Self::Mp4Root(raw) => raw.bytes().len(),

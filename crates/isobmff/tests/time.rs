@@ -2,7 +2,7 @@ mod common;
 use common::child;
 use triergon_core::{Budget, Time, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    Limits, SampleStep,
+    Limits, Next,
     movie::{EditList, MovieHeader, TrackHeader},
 };
 
@@ -33,9 +33,9 @@ fn prime_scale_edit_mapping_keeps_the_independent_fraction_exact() {
     let mut locate = table.locate(2).unwrap();
     let sample = loop {
         match locate.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Sample(s) => break s,
-            SampleStep::Yield => {}
-            SampleStep::End => panic!(),
+            Next::Item(s) => break s,
+            Next::Yield => {}
+            Next::End => panic!(),
         }
     };
     let times = sample.source_times(header.time_base().unwrap()).unwrap();

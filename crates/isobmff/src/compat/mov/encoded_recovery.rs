@@ -2,8 +2,8 @@
 //! Source prerequisites are not decoder claims. reference does not apply these group
 //! kinds in this operation; no source distance, mapping, clock or key is erased.
 use crate::{
-    BuildStatus, Limits,
-    boxes::{BoxChildren, BoxStep},
+    BuildStatus, Limits, Next,
+    boxes::BoxChildren,
     compat::mov::encoded_metadata::DependencyView,
     fields,
     sample_groups::{
@@ -287,8 +287,8 @@ impl RecoveryWalk {
                 return Ok(self.finished);
             };
             match children.poll(work)? {
-                BoxStep::Yield => return Ok(false),
-                BoxStep::End => {
+                Next::Yield => return Ok(false),
+                Next::End => {
                     for (slot, group) in self.facts.groups.iter().enumerate() {
                         let count = group
                             .descriptions
@@ -305,7 +305,7 @@ impl RecoveryWalk {
                     self.finished = true;
                     return Ok(true);
                 }
-                BoxStep::Box(raw) => {
+                Next::Item(raw) => {
                     let description = match raw.header().kind {
                         x if x == *b"sgpd" => true,
                         x if x == *b"sbgp" => false,

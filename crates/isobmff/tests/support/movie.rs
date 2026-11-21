@@ -2,7 +2,7 @@ use crate::common;
 use std::ops::Range;
 use triergon_core::{Budget, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Limits, SampleStep,
+    BuildStatus, Limits, Next,
     boxes::BoxView,
     fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
     movie::EditList,
@@ -22,7 +22,7 @@ pub fn regular(pool: &Budget, name: &str) -> (SampleTable, Vec<Range<u64>>) {
     let table = common::table(common::child(&minf, b"stbl").unwrap(), pool, 1).unwrap();
     let mut cursor = table.cursor();
     for expected in case.samples {
-        let SampleStep::Sample(actual) = cursor.poll(&mut WorkBudget::new(1)).unwrap() else {
+        let Next::Item(actual) = cursor.poll(&mut WorkBudget::new(1)).unwrap() else {
             panic!()
         };
         assert_eq!(actual.ordinal, expected.ordinal);

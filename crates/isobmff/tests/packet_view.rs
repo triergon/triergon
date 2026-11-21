@@ -2,7 +2,7 @@ mod common;
 use common::child;
 use triergon_core::{Budget, Time, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    Limits, SampleStep,
+    Limits, Next,
     compat::mov::{
         edits::ProjectedEdit,
         packets::{PacketProjector, PacketView, StreamView},
@@ -28,9 +28,9 @@ fn source_sample(name: &str, ordinal: u64) -> (triergon_isobmff::Sample, Option<
     let mut locate = table.locate(ordinal).unwrap();
     let sample = loop {
         match locate.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Sample(s) => break s,
-            SampleStep::Yield => {}
-            SampleStep::End => panic!(),
+            Next::Item(s) => break s,
+            Next::Yield => {}
+            Next::End => panic!(),
         }
     };
     (sample, table.sync_entry_count())

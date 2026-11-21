@@ -8,10 +8,10 @@ use std::{
 };
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Limits,
+    BuildStatus, CursorStatus, Limits,
     boxes::{BoxHeader, BoxView},
     compat::mov::{
-        packets::{CursorStatus, PacketLimits},
+        packets::PacketLimits,
         recovery::{
             DescriptionContext, DescriptionRead, DescriptionRecoveryBuilder,
             DescriptionRecoveryProfile, DescriptionRecoveryTable, RecoveryTrackHeader,

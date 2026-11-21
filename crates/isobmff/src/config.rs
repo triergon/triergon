@@ -1,8 +1,8 @@
 //! Codec configuration in sample entries: AudioSpecificConfig and the object type
 //! of an `esds` elementary stream descriptor, and DTS signalling.
 use crate::{
-    Limits,
-    boxes::{BoxChildren, BoxStep, BoxView},
+    Limits, Next,
+    boxes::{BoxChildren, BoxView},
     fields,
     movie::{EntryLayout, SampleDescription},
 };
@@ -297,14 +297,6 @@ pub struct AacConfiguration {
     pub bytes: Bytes,
 }
 
-/// Progress when reading a sample description already in memory.
-#[derive(Debug)]
-pub enum AacConfigurationStep {
-    Yield,
-    Ready(AacConfiguration),
-    End,
-}
-
 pub(crate) enum AudioDescriptionStep {
     Yield,
     Aac(AacConfiguration),
@@ -370,16 +362,16 @@ impl AacConfigurationJob {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<AacConfigurationStep> {
+    ) -> Result<Next<AacConfiguration>> {
         if let Some(error) = self.failed {
             return Err(error);
         }
         let Some(walk) = self.walk.as_mut() else {
-            return Ok(AacConfigurationStep::End);
+            return Ok(Next::End);
         };
         let result = Self::advance(walk, work, cancel);
         match result {
-            Ok(AacConfigurationStep::Ready(_)) => self.walk = None,
+            Ok(Next::Item(_)) => self.walk = None,
             Err(error) => {
                 self.failed = Some(error);
                 self.walk = None;
@@ -393,18 +385,17 @@ impl AacConfigurationJob {
         walk: &mut EsdsDescriptionWalk,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<AacConfigurationStep> {
+    ) -> Result<Next<AacConfiguration>> {
         if cancel.load(std::sync::atomic::Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
         if !walk.scan_configuration(work)? {
-            return Ok(AacConfigurationStep::Yield);
+            return Ok(Next::Yield);
         }
         if cancel.load(std::sync::atomic::Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        walk.take_aac_configuration()
-            .map(AacConfigurationStep::Ready)
+        walk.take_aac_configuration().map(Next::Item)
     }
 }
 
@@ -514,8 +505,8 @@ impl EsdsDescriptionWalk {
             let nested = self.wave.is_some();
             let children = self.wave.as_mut().unwrap_or(&mut self.children);
             match children.poll(work)? {
-                BoxStep::Yield => return Ok(false),
-                BoxStep::End if nested => {
+                Next::Yield => return Ok(false),
+                Next::End if nested => {
                     if !self.wave_fields.complete(!self.quicktime_extended_sound)
                         || self.esds.is_none()
                     {
@@ -523,7 +514,7 @@ impl EsdsDescriptionWalk {
                     }
                     self.wave = None;
                 }
-                BoxStep::End => {
+                Next::End => {
                     if self.quicktime_extended_sound && !self.seen_wave {
                         return Err(Error::Unsupported(
                             "QuickTime AAC requires wave configuration",
@@ -531,7 +522,7 @@ impl EsdsDescriptionWalk {
                     }
                     self.scanned = true;
                 }
-                BoxStep::Box(raw) => {
+                Next::Item(raw) => {
                     self.inspected_boxes =
                         self.inspected_boxes.checked_add(1).ok_or(Error::Overflow)?;
                     if self.inspected_boxes > self.limits.max_child_boxes {
@@ -641,15 +632,15 @@ pub fn check_dts_core_description(
             let mut config = None;
             loop {
                 match children.poll(&mut work)? {
-                    BoxStep::Box(raw) if raw.header().kind == *b"ddts" => {
+                    Next::Item(raw) if raw.header().kind == *b"ddts" => {
                         check_configuration_size(&raw, limits)?;
                         if config.replace(raw).is_some() {
                             return Err(Error::Unsupported("encoded duplicate configuration box"));
                         }
                     }
-                    BoxStep::Box(_) => {}
-                    BoxStep::End => break,
-                    BoxStep::Yield => return Err(Error::Overflow),
+                    Next::Item(_) => {}
+                    Next::End => break,
+                    Next::Yield => return Err(Error::Overflow),
                 }
             }
             Ok(Some(check_dts_sample_entry(description, config.as_ref())?))
@@ -813,14 +804,14 @@ mod aac_entry_tests {
             let cancel = AtomicBool::new(false);
             assert!(matches!(
                 job.poll(&mut WorkBudget::new(0), &cancel).unwrap(),
-                AacConfigurationStep::Yield
+                Next::Yield
             ));
             let config = (0..200)
                 .find_map(
                     |_| match job.poll(&mut WorkBudget::new(16), &cancel).unwrap() {
-                        AacConfigurationStep::Ready(config) => Some(config),
-                        AacConfigurationStep::Yield => None,
-                        AacConfigurationStep::End => panic!("AAC configuration missing"),
+                        Next::Item(config) => Some(config),
+                        Next::Yield => None,
+                        Next::End => panic!("AAC configuration missing"),
                     },
                 )
                 .expect("AAC configuration");
@@ -832,7 +823,7 @@ mod aac_entry_tests {
             assert_eq!(config.bytes.as_ref(), ASC);
             assert!(matches!(
                 job.poll(&mut WorkBudget::new(0), &cancel).unwrap(),
-                AacConfigurationStep::End
+                Next::End
             ));
         }
     }
@@ -861,9 +852,9 @@ mod aac_entry_tests {
         let config = (0..200)
             .find_map(
                 |_| match job.poll(&mut WorkBudget::new(16), &cancel).unwrap() {
-                    AacConfigurationStep::Ready(config) => Some(config),
-                    AacConfigurationStep::Yield => None,
-                    AacConfigurationStep::End => panic!("AAC configuration missing"),
+                    Next::Item(config) => Some(config),
+                    Next::Yield => None,
+                    Next::End => panic!("AAC configuration missing"),
                 },
             )
             .unwrap();
@@ -889,7 +880,7 @@ mod aac_entry_tests {
         let cancel = AtomicBool::new(false);
         assert!(matches!(
             job.poll(&mut WorkBudget::new(16), &cancel).unwrap(),
-            AacConfigurationStep::Yield
+            Next::Yield
         ));
         assert_eq!(
             job.poll(&mut WorkBudget::new(1024), &AtomicBool::new(true))

@@ -236,12 +236,9 @@ pub struct RecoverySourceCursor<'a> {
     unknown_access: bool,
 }
 impl RecoverySourceCursor<'_> {
-    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         match self.inner.poll(work)? {
-            SampleStep::Sample(source) => Ok(SampleStep::Sample(recovery_access(
-                source,
-                self.unknown_access,
-            ))),
+            Next::Item(source) => Ok(Next::Item(recovery_access(source, self.unknown_access))),
             other => Ok(other),
         }
     }
@@ -266,7 +263,7 @@ impl RecoveryPacketCursor<'_> {
         &mut self,
         work: &mut WorkBudget,
         cancel: &std::sync::atomic::AtomicBool,
-    ) -> Result<crate::compat::mov::edit_list::CursorStatus> {
+    ) -> Result<crate::CursorStatus> {
         self.inner.poll(work, cancel)
     }
     pub fn take_occurrence(&mut self) -> Result<RecoveryOccurrence> {
@@ -301,7 +298,7 @@ impl RecoveryIndexCursor<'_> {
         &mut self,
         work: &mut WorkBudget,
         cancel: &std::sync::atomic::AtomicBool,
-    ) -> Result<crate::compat::mov::edit_list::CursorStatus> {
+    ) -> Result<crate::CursorStatus> {
         self.inner.poll(work, cancel)
     }
     pub fn take_entry(&mut self) -> Result<RecoveryIndexEntry> {

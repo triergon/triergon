@@ -5,13 +5,13 @@
 //! postroll and expanded-index terminal duration are separate observation rules.
 //! This cursor never changes the unique source index or injects expected packets.
 use crate::{
-    Access, Sample, SampleStep,
+    Access, CursorStatus, Next, Sample,
     compat::mov::{
         clocks::ClockField,
         view::{PacketProjector, PacketView, ProjectedEdit},
     },
     movie::EditList,
-    table::{DecodeDeltas, DeltaStep, SampleCursor, SampleTable},
+    table::{DecodeDeltas, SampleCursor, SampleTable},
 };
 use triergon_core::{Error, Result, Rounding, Time, TimeBase, WorkBudget};
 
@@ -50,13 +50,6 @@ pub struct EditOccurrence {
     pub source: Sample,
     pub demux: PacketView,
     pub(crate) duration_basis: DurationBasis,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CursorStatus {
-    Yield,
-    Ready,
-    End,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -202,9 +195,9 @@ impl<'a> EditCursor<'a> {
         }
         result
     }
-    fn scan_sample(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    fn scan_sample(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         let step = self.scan.poll(work)?;
-        if let SampleStep::Sample(sample) = &step {
+        if let Next::Item(sample) = &step {
             self.scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
             count_limit(self.scanned, self.limits.max_scanned_samples)?;
             if sample.composition_offset.is_some()
@@ -419,7 +412,7 @@ impl<'a> EditCursor<'a> {
             }
             self.generated = self.generated.checked_add(1).ok_or(Error::Overflow)?;
             count_limit(self.generated, self.limits.max_occurrences)?;
-            if let DeltaStep::Delta(_) = self.duration_scan.poll(work)? {
+            if let Next::Item(_) = self.duration_scan.poll(work)? {
                 self.scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
                 count_limit(self.scanned, self.limits.max_scanned_samples)?;
             }
@@ -523,8 +516,8 @@ impl<'a> EditCursor<'a> {
                     self.phase = Phase::Find;
                 }
                 Phase::Find => match self.scan_sample(work)? {
-                    SampleStep::Yield => return Ok(CursorStatus::Yield),
-                    SampleStep::End => {
+                    Next::Yield => return Ok(CursorStatus::Yield),
+                    Next::End => {
                         if self
                             .last_source_end
                             .is_none_or(|end| self.source_start >= end)
@@ -535,7 +528,7 @@ impl<'a> EditCursor<'a> {
                         }
                         self.begin_emit()?;
                     }
-                    SampleStep::Sample(sample) => {
+                    Next::Item(sample) => {
                         let dts = Time::from_ticks(
                             sample
                                 .dts_ticks
@@ -573,12 +566,12 @@ impl<'a> EditCursor<'a> {
                             count_limit(self.scanned, self.limits.max_scanned_samples)?;
                         }
                         let source = match self.scan_sample(work)? {
-                            SampleStep::Yield => return Ok(CursorStatus::Yield),
-                            SampleStep::End => {
+                            Next::Yield => return Ok(CursorStatus::Yield),
+                            Next::End => {
                                 self.phase = Phase::Advance;
                                 continue;
                             }
-                            SampleStep::Sample(source) => source,
+                            Next::Item(source) => source,
                         };
                         if source.ordinal < self.first {
                             continue;
@@ -612,16 +605,16 @@ impl<'a> EditCursor<'a> {
                     // source occurrence scan; neither source samples nor runs
                     // are expanded. Keep the occurrence across a one-token work yield.
                     let delta = match self.duration_scan.poll(work)? {
-                        DeltaStep::Yield => {
+                        Next::Yield => {
                             self.staging = Some(next);
                             return Ok(CursorStatus::Yield);
                         }
-                        DeltaStep::Delta(delta) => {
+                        Next::Item(delta) => {
                             self.scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
                             count_limit(self.scanned, self.limits.max_scanned_samples)?;
                             Some(delta)
                         }
-                        DeltaStep::End => None,
+                        Next::End => None,
                     };
                     if let Some(delta) = delta {
                         next.demux.duration = i64::from(delta);

@@ -1,8 +1,8 @@
 //! Pin-bound demux header outcomes over immutable source sample entries.
 //! This is neither codec validation nor an ISO/QuickTime validity rule.
 use crate::{
-    BuildStatus, Limits,
-    boxes::{BoxChildren, BoxStep, BoxView},
+    BuildStatus, Limits, Next,
+    boxes::{BoxChildren, BoxView},
     movie::{EntryLayout, SampleDescription, TrackHeader},
     table::SampleTable,
 };
@@ -130,9 +130,9 @@ impl SampleEntryHeaderJob {
                     .ok_or(Error::Invalid("v7 child cursor absent"))?
                     .poll(work)?
                 {
-                    BoxStep::Yield => return Ok(BuildStatus::Yield),
-                    BoxStep::Box(raw) => self.pending = Some(raw),
-                    BoxStep::End => {
+                    Next::Yield => return Ok(BuildStatus::Yield),
+                    Next::Item(raw) => self.pending = Some(raw),
+                    Next::End => {
                         self.children = None;
                         self.ready = true;
                         return Ok(BuildStatus::Ready);

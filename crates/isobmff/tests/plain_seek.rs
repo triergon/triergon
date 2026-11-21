@@ -8,9 +8,9 @@ mod support;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus,
+    BuildStatus, CursorStatus,
     compat::mov::{
-        packets::{CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
+        packets::{DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
         seek::{
             GlobalSeekJob, GlobalSeekPlan, IndexCursor, IndexEntry, IndexLimits, SeekJob,
             SeekLanding, SeekLimits,

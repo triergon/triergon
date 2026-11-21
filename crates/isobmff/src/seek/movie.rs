@@ -2,7 +2,7 @@
 //! Apple QTFF point conversion/CTS and original compact indexes; no demux
 //! occurrence projection, display-duration inference or packet sorting.
 use crate::{
-    BuildStatus, Sample, SampleStep,
+    BuildStatus, Next, Sample,
     interleave::{SourceTrack, TrackSampleCursor},
     movie::{EditEntry, EditList},
     sample_groups::{
@@ -277,12 +277,12 @@ impl<'a> SourceCompositionLookup<'a> {
                 return Ok(BuildStatus::Ready);
             }
             let sample = match self.cursor.poll(work)? {
-                SampleStep::Yield => return Ok(BuildStatus::Yield),
-                SampleStep::End => {
+                Next::Yield => return Ok(BuildStatus::Yield),
+                Next::End => {
                     self.done = true;
                     continue;
                 }
-                SampleStep::Sample(sample) => sample,
+                Next::Item(sample) => sample,
             };
             let scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
             count_limit(scanned, self.maximum)?;

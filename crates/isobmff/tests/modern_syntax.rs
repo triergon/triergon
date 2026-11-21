@@ -4,7 +4,7 @@
 mod common;
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Limits, SampleStep,
+    BuildStatus, Limits, Next,
     boxes::BoxView,
     fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
     table::{SampleTable, SampleTableBuilder},
@@ -549,12 +549,12 @@ fn independent_fragment_boundaries_preserve_source_clocks_and_ranges() {
                             let mut found = None;
                             for _ in 0..1000 {
                                 match cursor.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                                    SampleStep::Yield => {}
-                                    SampleStep::Sample(value) => {
+                                    Next::Yield => {}
+                                    Next::Item(value) => {
                                         found = Some(value);
                                         break;
                                     }
-                                    SampleStep::End => {
+                                    Next::End => {
                                         panic!("missing boundary sample: {}", case.name)
                                     }
                                 }
@@ -575,12 +575,12 @@ fn independent_fragment_boundaries_preserve_source_clocks_and_ranges() {
                             let mut located = None;
                             for _ in 0..1000 {
                                 match locator.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                                    SampleStep::Yield => {}
-                                    SampleStep::Sample(value) => {
+                                    Next::Yield => {}
+                                    Next::Item(value) => {
                                         located = Some(value);
                                         break;
                                     }
-                                    SampleStep::End => panic!("missing located fragment sample"),
+                                    Next::End => panic!("missing located fragment sample"),
                                 }
                             }
                             assert_eq!(located, Some(sample));
@@ -588,12 +588,12 @@ fn independent_fragment_boundaries_preserve_source_clocks_and_ranges() {
                         let mut ended = false;
                         for _ in 0..1000 {
                             match cursor.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                                SampleStep::Yield => {}
-                                SampleStep::End => {
+                                Next::Yield => {}
+                                Next::End => {
                                     ended = true;
                                     break;
                                 }
-                                SampleStep::Sample(_) => panic!("extra fragment sample"),
+                                Next::Item(_) => panic!("extra fragment sample"),
                             }
                         }
                         assert!(ended, "bounded fragment cursor failed to finish");
@@ -699,12 +699,12 @@ fn independent_ctts_boundaries_preserve_sign_bits_and_compact_runs() {
                             let mut found = None;
                             for _ in 0..1000 {
                                 match locator.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                                    SampleStep::Yield => {}
-                                    SampleStep::Sample(value) => {
+                                    Next::Yield => {}
+                                    Next::Item(value) => {
                                         found = Some(value);
                                         break;
                                     }
-                                    SampleStep::End => panic!("missing located composition sample"),
+                                    Next::End => panic!("missing located composition sample"),
                                 }
                             }
                             let sample = found.expect("bounded composition locator stalled");
@@ -725,7 +725,7 @@ fn independent_ctts_boundaries_preserve_sign_bits_and_compact_runs() {
                             if case.sample_count == 1 {
                                 assert_eq!(
                                     table.cursor().poll(&mut WorkBudget::new(quantum)).unwrap(),
-                                    SampleStep::Sample(sample)
+                                    Next::Item(sample)
                                 );
                             }
                         }

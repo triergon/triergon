@@ -12,7 +12,7 @@ use triergon_framing::{
     hevc::{HvcConfigLimits, HvcConfigParser, HvcConfigSource},
     nal::{NalPacket, NalPacketConfiguration, NalPacketLimits, NalPacketOutput, NalPacketSession},
 };
-use triergon_isobmff::{Limits, boxes::BoxStep, movie::EntryLayout};
+use triergon_isobmff::{Limits, Next, movie::EntryLayout};
 use triergon_playback::{
     io::{SelectedInput, SourceOwner},
     mp4_open::{Mp4Open, OpenProgress},
@@ -120,9 +120,9 @@ pub fn annex_b_session(pool: &Budget, packet: &Mp4Packet) -> NalPacketSession {
         .unwrap();
     let record = (0..STEPS)
         .find_map(|_| match children.poll(&mut WorkBudget::new(1)).unwrap() {
-            BoxStep::Box(raw) if matches!(&raw.header().kind, b"avcC" | b"hvcC") => Some(raw),
-            BoxStep::Box(_) | BoxStep::Yield => None,
-            BoxStep::End => panic!("sample entry has no avcC or hvcC"),
+            Next::Item(raw) if matches!(&raw.header().kind, b"avcC" | b"hvcC") => Some(raw),
+            Next::Item(_) | Next::Yield => None,
+            Next::End => panic!("sample entry has no avcC or hvcC"),
         })
         .expect("sample entry walk did not make bounded progress");
     let header = record.header();

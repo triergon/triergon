@@ -3,9 +3,9 @@ use common::{child, roots};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, InputCursor, SourceCapabilities, SourceId, Step, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Limits,
+    BuildStatus, CursorStatus, Limits,
     compat::mov::{
-        packets::{CursorStatus, PacketLimits},
+        packets::PacketLimits,
         recovery::{
             DescriptionContext, DescriptionEvent, DescriptionRead, DescriptionRecoveryBuilder,
             DescriptionRecoveryProfile, DescriptionRecoveryTable, PhysicalRead,

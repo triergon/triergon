@@ -1,10 +1,9 @@
 //! Sparse restart states for tracks that passed the demux range scan.
 use super::{PacketCursor, Phase, Slot, count};
 use crate::{
-    BuildStatus,
+    BuildStatus, CursorStatus,
     compat::mov::{
         clocks::SchedulingClock,
-        edit_list::CursorStatus,
         index::{IndexEntry, SeekLanding, SeekLimits},
     },
     seek::OpusRecoverySeek,

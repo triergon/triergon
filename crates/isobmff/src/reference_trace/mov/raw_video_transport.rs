@@ -3,8 +3,8 @@
 //! Own model from passive public callback controls; no demux bodies consulted.
 use super::transport_window::{CAPACITY, Revisit, Window};
 use crate::{
-    BuildStatus, Limits,
-    boxes::{BoxChildren, BoxHeader, BoxStep, BoxView},
+    BuildStatus, Limits, Next,
+    boxes::{BoxChildren, BoxHeader, BoxView},
     fields,
     table::recovery::{DescriptionContext, DescriptionRecoveryTable},
 };
@@ -404,8 +404,8 @@ impl<'a> RawVideoTransportBuilder<'a> {
                     .as_mut()
                     .ok_or(Error::Invalid("v3 missing transport source iterator"))?;
                 match children.poll(work)? {
-                    BoxStep::Yield => return Ok(BuildStatus::Yield),
-                    BoxStep::Box(raw) => {
+                    Next::Yield => return Ok(BuildStatus::Yield),
+                    Next::Item(raw) => {
                         small_plain(raw.header(), self.context.physical_length)?;
                         if raw.header().kind == *b"free" && self.level != 5 {
                             continue;
@@ -451,7 +451,7 @@ impl<'a> RawVideoTransportBuilder<'a> {
                         }
                         self.matched += 1;
                     }
-                    BoxStep::End => {
+                    Next::End => {
                         if self.matched != expected(self.level).len() {
                             return Err(Error::Unsupported("v3 incomplete transport metadata"));
                         }

@@ -9,16 +9,16 @@ use triergon_core::{
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_isobmff::{
+    CursorStatus, Next,
     compat::mov::{
         edits::{
             EncodedEditContext as EditContext, EncodedEditJob as EditJob,
             EncodedEditLimits as EditLimits, EncodedEditPlan,
         },
         encoded::{EncodedSelection as DescriptionSelection, EncodedStreamJob as ConfigurationJob},
-        packets::CursorStatus,
         seek::SeekLimits,
     },
-    config::{AacConfigurationJob, AacConfigurationStep, ConfigurationLimits, ObjectTypeScan},
+    config::{AacConfigurationJob, ConfigurationLimits, ObjectTypeScan},
 };
 use triergon_playback::{
     ByteSource, Format, Mp4Event, Mp4NativeSeekRequest, Mp4Packet, Mp4RangeOpen, Mp4RangePlayer,
@@ -243,12 +243,12 @@ fn prepare_tracks(
             let mut config = AacConfigurationJob::new(entry, ConfigurationLimits::default())?;
             loop {
                 match config.poll(&mut work(), cancel)? {
-                    AacConfigurationStep::Yield => {}
-                    AacConfigurationStep::Ready(config) => {
+                    Next::Yield => {}
+                    Next::Item(config) => {
                         result.configuration(entry.format, config.bytes.as_ref());
                         break;
                     }
-                    AacConfigurationStep::End => return Err("missing AAC configuration".into()),
+                    Next::End => return Err("missing AAC configuration".into()),
                 }
             }
             None

@@ -3,12 +3,14 @@
 //! description rule is bounded to a single catalogue entry and an immediate
 //! valid second chunk row. Raw declarations and demux read coordinates differ.
 use super::*;
-use crate::compat::mov::{
-    cursor::PacketLimits,
-    edit_list::CursorStatus,
-    field_recovery::RecoveryTrackHeader,
-    index::IndexLimits,
-    view::{PacketProjector, PacketView},
+use crate::{
+    CursorStatus,
+    compat::mov::{
+        cursor::PacketLimits,
+        field_recovery::RecoveryTrackHeader,
+        index::IndexLimits,
+        view::{PacketProjector, PacketView},
+    },
 };
 use std::{
     ops::Range,
@@ -271,9 +273,9 @@ impl DirectCursor<'_> {
         }
         let mut source = self.source;
         let declaration = match source.poll(work)? {
-            SampleStep::Yield => return Err(Error::Invalid("internal v2 yield sentinel")),
-            SampleStep::End => return Ok(None),
-            SampleStep::Sample(s) => s,
+            Next::Yield => return Err(Error::Invalid("internal v2 yield sentinel")),
+            Next::End => return Ok(None),
+            Next::Item(s) => s,
         };
         let mut next = self.state;
         if next.left == 0 {

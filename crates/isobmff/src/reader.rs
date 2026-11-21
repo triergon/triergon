@@ -18,8 +18,8 @@ use crate::fragment::FragmentCursorPosition;
 use crate::open::{Movie, MovieOpen, MovieTrack, OpenLimits, OpenStep};
 use crate::table::SampleCursorPosition;
 use crate::{
-    Access, Limits, Sample, SampleStep,
-    boxes::{BoxChildren, BoxHeader, BoxStep, BoxView},
+    Access, Limits, Next, Sample,
+    boxes::{BoxChildren, BoxHeader, BoxView},
     config::{ConfigurationLimits, dts_entry_children},
     fields,
     movie::{EditList, EntryLayout, MovieHeader, SampleDescription, TrackHeader},
@@ -246,25 +246,25 @@ impl Track {
         if let Some(position) = self.regular {
             let mut cursor = self.source.table().resume(position);
             match cursor.poll(work)? {
-                SampleStep::Sample(sample) => {
+                Next::Item(sample) => {
                     self.regular = Some(cursor.position());
                     self.head = Some(sample);
                     return Ok(true);
                 }
-                SampleStep::Yield => return Ok(false),
-                SampleStep::End => self.regular = None,
+                Next::Yield => return Ok(false),
+                Next::End => self.regular = None,
             }
         }
         while let Some(fragment) = self.source.fragments().get(self.fragment) {
             let mut cursor = fragment.resume(self.fragment_position);
             match cursor.poll(work)? {
-                SampleStep::Sample(sample) => {
+                Next::Item(sample) => {
                     self.fragment_position = cursor.position();
                     self.head = Some(sample);
                     return Ok(true);
                 }
-                SampleStep::Yield => return Ok(false),
-                SampleStep::End => {
+                Next::Yield => return Ok(false),
+                Next::End => {
                     self.fragment += 1;
                     self.fragment_position = FragmentCursorPosition::default();
                 }
@@ -822,15 +822,15 @@ fn step_entry_scan(
             *active = None;
         }
         Some(EntryScan::Record(children, record)) => match children.poll(work) {
-            Ok(BoxStep::Yield) => return Ok(true),
-            Ok(BoxStep::Box(raw)) if raw.header().kind == *record => {
+            Ok(Next::Yield) => return Ok(true),
+            Ok(Next::Item(raw)) if raw.header().kind == *record => {
                 let start = usize::from(raw.header().header_size);
                 let bytes = raw.bytes().slice(start..raw.bytes().len())?;
                 track.configuration = Some(Configuration::Record(bytes));
                 *active = None;
             }
-            Ok(BoxStep::Box(_)) => {}
-            Ok(BoxStep::End) | Err(_) => *active = None,
+            Ok(Next::Item(_)) => {}
+            Ok(Next::End) | Err(_) => *active = None,
         },
         None => {}
     }

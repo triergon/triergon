@@ -6,10 +6,10 @@ use std::{
 };
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Limits, SampleStep,
+    BuildStatus, CursorStatus, Limits, Next,
     boxes::BoxView,
     compat::mov::{
-        packets::{CursorStatus, PacketLimits},
+        packets::PacketLimits,
         recovery::{
             DirectAssociation, DirectContext, DirectRead, DirectRecoveryProfile,
             RecoveryTrackHeader, RunRecoveryBuilder, RunRecoveryProfile, RunRecoveryTable,
@@ -125,9 +125,9 @@ fn raw_description_counts_ranges_and_configuration_are_not_repaired() {
     let mut raw_rows = Vec::new();
     loop {
         match source.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Yield => {}
-            SampleStep::End => break,
-            SampleStep::Sample(s) => raw_rows.push(s),
+            Next::Yield => {}
+            Next::End => break,
+            Next::Item(s) => raw_rows.push(s),
         }
     }
     assert_eq!(raw_rows.len(), 6);

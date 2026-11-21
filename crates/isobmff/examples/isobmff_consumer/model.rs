@@ -14,10 +14,10 @@ use triergon_core::{
     Time, WorkBudget, blocking::Feed,
 };
 use triergon_isobmff::{
-    BuildStatus, Limits, Sample, SampleStep,
-    boxes::{BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView, MediaDataPolicy},
+    BuildStatus, CursorStatus, Limits, Next, Sample,
+    boxes::{BoxEvent, BoxHeader, BoxReader, BoxView, MediaDataPolicy},
     compat::mov::{
-        packets::{CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, StreamView},
+        packets::{DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, StreamView},
         recovery::{
             DescriptionContext, DescriptionRead, DescriptionRecoveryBuilder,
             DescriptionRecoveryProfile, PartialSampleReader, PayloadBounds, RecoveryTrackHeader,
@@ -237,9 +237,9 @@ fn children(raw: &BoxView, skip: usize, budget: &Budget) -> Result<BudgetVec<Box
     let mut out = BudgetVec::new(budget);
     loop {
         match cursor.poll(&mut WorkBudget::new(4096))? {
-            BoxStep::Box(raw) => append(&mut out, raw)?,
-            BoxStep::Yield => {}
-            BoxStep::End => return Ok(out),
+            Next::Item(raw) => append(&mut out, raw)?,
+            Next::Yield => {}
+            Next::End => return Ok(out),
         }
     }
 }
@@ -254,13 +254,13 @@ fn lookup<const N: usize>(
     let mut duplicate = [false; N];
     loop {
         match cursor.poll(&mut WorkBudget::new(4096))? {
-            BoxStep::Box(child) => {
+            Next::Item(child) => {
                 if let Some(at) = kinds.iter().position(|&kind| child.header().kind == *kind) {
                     duplicate[at] |= found[at].replace(child).is_some();
                 }
             }
-            BoxStep::End => break,
-            BoxStep::Yield => {}
+            Next::End => break,
+            Next::Yield => {}
         }
     }
     Ok(std::array::from_fn(|at| {
@@ -1262,9 +1262,9 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
         Ok(())
     }
     pub fn index_trace(&self, model: &Model, out: &mut String) -> Result<()> {
-        use triergon_isobmff::index::{
-            FragmentRandomAccessStep, IndexStep, MovieFragmentRandomAccessTail, SegmentIndex,
-            TrackFragmentRandomAccess,
+        use triergon_isobmff::{
+            Next,
+            index::{MovieFragmentRandomAccessTail, SegmentIndex, TrackFragmentRandomAccess},
         };
         out.push_str("{\"schema\":33,\"operation\":\"source-index-audit-v33\",\"verified_targets\":false,\"indexes\":[");
         let mut first = true;
@@ -1283,9 +1283,9 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
                 let mut cursor = index.cursor();
                 loop {
                     match cursor.poll(&mut WorkBudget::new(self.quantum))? {
-                        IndexStep::Yield => {}
-                        IndexStep::End => break,
-                        IndexStep::Reference(r) => {
+                        Next::Yield => {}
+                        Next::End => break,
+                        Next::Item(r) => {
                             if !entry_first {
                                 out.push(',');
                             }
@@ -1303,9 +1303,9 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
                         let mut cursor = index.cursor();
                         loop {
                             match cursor.poll(&mut WorkBudget::new(self.quantum))? {
-                                FragmentRandomAccessStep::Yield => {}
-                                FragmentRandomAccessStep::End => break,
-                                FragmentRandomAccessStep::Entry(e) => {
+                                Next::Yield => {}
+                                Next::End => break,
+                                Next::Item(e) => {
                                     if !entry_first {
                                         out.push(',');
                                     }
@@ -1533,9 +1533,9 @@ impl<T: Read + Seek> Driver<'_, T> {
                 let mut cursor = plan.cursor();
                 loop {
                     match cursor.poll(&mut WorkBudget::new(driver.quantum), &driver.cancel)? {
-                        SampleStep::Yield => {}
-                        SampleStep::End => break,
-                        SampleStep::Sample(s) => {
+                        Next::Yield => {}
+                        Next::End => break,
+                        Next::Item(s) => {
                             if !first {
                                 out.push(',');
                             }
@@ -1558,9 +1558,9 @@ impl<T: Read + Seek> Driver<'_, T> {
                         let mut locate = record.table.locate(ordinal)?;
                         loop {
                             match locate.poll(&mut WorkBudget::new(driver.quantum))? {
-                                SampleStep::Sample(s) => break s,
-                                SampleStep::Yield => {}
-                                SampleStep::End => {
+                                Next::Item(s) => break s,
+                                Next::Yield => {}
+                                Next::End => {
                                     return Err(Error::Invalid("followup locator exhausted").into());
                                 }
                             }
@@ -1585,12 +1585,12 @@ impl<T: Read + Seek> Driver<'_, T> {
                                 let mut locate = f.locate(ordinal)?;
                                 loop {
                                     match locate.poll(&mut WorkBudget::new(driver.quantum))? {
-                                        SampleStep::Sample(s) => {
+                                        Next::Item(s) => {
                                             found = Some(s);
                                             break;
                                         }
-                                        SampleStep::Yield => {}
-                                        SampleStep::End => {
+                                        Next::Yield => {}
+                                        Next::End => {
                                             return Err(Error::Invalid(
                                                 "fragment followup locator exhausted",
                                             )
@@ -1641,9 +1641,9 @@ impl<T: Read + Seek> Driver<'_, T> {
                 )?);
                 loop {
                     match cursor.poll(&mut WorkBudget::new(self.quantum))? {
-                        SampleStep::Yield => {}
-                        SampleStep::End => break,
-                        SampleStep::Sample(s) => {
+                        Next::Yield => {}
+                        Next::End => break,
+                        Next::Item(s) => {
                             let p = self.packet(s, model.media.as_slice())?;
                             drain.packets = drain.packets.checked_add(1).ok_or(Error::Overflow)?;
                             drain.bytes = drain
@@ -1836,13 +1836,13 @@ impl<T: Read + Seek> Driver<'_, T> {
                 let mut cursor = plan.cursor();
                 loop {
                     match cursor.poll(&mut WorkBudget::new(driver.quantum), &driver.cancel)? {
-                        SampleStep::Yield => {}
-                        SampleStep::End => {
+                        Next::Yield => {}
+                        Next::End => {
                             complete = true;
                             break;
                         }
-                        SampleStep::Sample(_) if stats.packets >= u64::from(r.count) => break,
-                        SampleStep::Sample(sample) => {
+                        Next::Item(_) if stats.packets >= u64::from(r.count) => break,
+                        Next::Item(sample) => {
                             let packet = driver.packet(sample, model.media.as_slice())?;
                             fold_source(stats, &packet)?;
                             if let Some(out) = trace.as_deref_mut() {

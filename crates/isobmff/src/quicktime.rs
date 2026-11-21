@@ -15,7 +15,7 @@ use triergon_core::{Budget, Error, InputCursor, InputToken, Result, SourceId, St
 /// Literal source fields, including values outside the selected PCM layout.
 /// Version 1/2 is refused before reusing any version-0 field offsets.
 #[derive(Clone, Debug)]
-pub struct QtSoundDescriptionV0 {
+pub struct SoundDescriptionV0 {
     entry: SampleDescription,
     revision: u16,
     vendor: [u8; 4],
@@ -26,19 +26,19 @@ pub struct QtSoundDescriptionV0 {
     sample_rate_16_16: u32,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum QtPcmEncodingV0 {
+pub enum PcmEncoding {
     Unsigned8,
     Signed16BigEndian,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct QtPcmLayoutV0 {
-    encoding: QtPcmEncodingV0,
+pub struct PcmLayout {
+    encoding: PcmEncoding,
     channels: u16,
     frame_bytes: usize,
     sample_rate_16_16: u32,
 }
-impl QtPcmLayoutV0 {
-    pub fn encoding(self) -> QtPcmEncodingV0 {
+impl PcmLayout {
+    pub fn encoding(self) -> PcmEncoding {
         self.encoding
     }
     pub fn channels(self) -> u16 {
@@ -51,7 +51,7 @@ impl QtPcmLayoutV0 {
         self.sample_rate_16_16
     }
 }
-impl QtSoundDescriptionV0 {
+impl SoundDescriptionV0 {
     /// The handler is required: `raw ` is also a visual entry coding name.
     pub fn parse(header: &TrackHeader, entry: &SampleDescription) -> Result<Self> {
         if header.handler != *b"soun"
@@ -111,7 +111,7 @@ impl QtSoundDescriptionV0 {
     pub fn sample_rate_fraction(&self) -> (u32, u32) {
         (self.sample_rate_16_16, 65536)
     }
-    pub fn pcm_layout(&self) -> Result<QtPcmLayoutV0> {
+    pub fn pcm_layout(&self) -> Result<PcmLayout> {
         if self.compression_id != 0 || self.packet_size != 0 {
             return Err(Error::Unsupported("QT v0 compressed/nonzero packet layout"));
         }
@@ -122,11 +122,11 @@ impl QtSoundDescriptionV0 {
             return Err(Error::Invalid("QT PCM zero source sample rate"));
         }
         let (encoding, bytes) = match (&self.entry.format, self.sample_bits) {
-            (b"raw ", 8) => (QtPcmEncodingV0::Unsigned8, 1_usize),
-            (b"twos", 16) => (QtPcmEncodingV0::Signed16BigEndian, 2_usize),
+            (b"raw ", 8) => (PcmEncoding::Unsigned8, 1_usize),
+            (b"twos", 16) => (PcmEncoding::Signed16BigEndian, 2_usize),
             _ => return Err(Error::Unsupported("QT v0 selected PCM coding/width")),
         };
-        Ok(QtPcmLayoutV0 {
+        Ok(PcmLayout {
             encoding,
             channels: self.channels,
             frame_bytes: usize::from(self.channels)
@@ -140,20 +140,20 @@ impl QtSoundDescriptionV0 {
 /// Complete source sample and its layout; no demux packet aggregation, clock
 /// repair, sample deletion or decoded-audio operation is implied.
 #[derive(Debug)]
-pub struct QtPcmSourcePacketV0 {
+pub struct PcmSourcePacket {
     packet: SourcePacket,
-    description: QtSoundDescriptionV0,
-    layout: QtPcmLayoutV0,
+    description: SoundDescriptionV0,
+    layout: PcmLayout,
     complete_frames: usize,
 }
-impl QtPcmSourcePacketV0 {
+impl PcmSourcePacket {
     pub fn packet(&self) -> &SourcePacket {
         &self.packet
     }
-    pub fn description(&self) -> &QtSoundDescriptionV0 {
+    pub fn description(&self) -> &SoundDescriptionV0 {
         &self.description
     }
-    pub fn layout(&self) -> QtPcmLayoutV0 {
+    pub fn layout(&self) -> PcmLayout {
         self.layout
     }
     pub fn complete_frames(&self) -> usize {
@@ -164,20 +164,20 @@ impl QtPcmSourcePacketV0 {
 /// Reuses the shared fallible incremental source reader, including its bounded
 /// payload allocation, source/range binding, yields and retained-capacity storage.
 #[derive(Debug)]
-pub struct QtPcmSampleReaderV0 {
+pub struct PcmSampleReader {
     inner: Option<SampleReader>,
-    description: Option<QtSoundDescriptionV0>,
-    layout: QtPcmLayoutV0,
+    description: Option<SoundDescriptionV0>,
+    layout: PcmLayout,
     pool: Budget,
     source: SourceId,
     token: InputToken,
     position: u64,
     failed: Option<Error>,
 }
-impl QtPcmSampleReaderV0 {
+impl PcmSampleReader {
     pub fn new(
         input: &mut InputCursor,
-        description: QtSoundDescriptionV0,
+        description: SoundDescriptionV0,
         sample: Sample,
         media: Range<u64>,
         maximum_packet: usize,
@@ -227,7 +227,7 @@ impl QtPcmSampleReaderV0 {
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Step<QtPcmSourcePacketV0>> {
+    ) -> Result<Step<PcmSourcePacket>> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -242,7 +242,7 @@ impl QtPcmSampleReaderV0 {
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Step<QtPcmSourcePacketV0>> {
+    ) -> Result<Step<PcmSourcePacket>> {
         if !input.budget().same_pool(&self.pool) {
             return Err(Error::ForeignPool);
         }
@@ -282,7 +282,7 @@ impl QtPcmSampleReaderV0 {
             Step::Ready(packet) => {
                 let frames = packet.payload.len() / self.layout.frame_bytes;
                 self.inner = None;
-                Ok(Step::Ready(QtPcmSourcePacketV0 {
+                Ok(Step::Ready(PcmSourcePacket {
                     packet,
                     layout: self.layout,
                     description: self

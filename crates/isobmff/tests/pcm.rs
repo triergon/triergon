@@ -6,10 +6,8 @@ use triergon_core::{
     SourceFailure, SourceId, Step, WorkBudget,
 };
 use triergon_isobmff::{
-    compat::mov::{
-        packets::CursorStatus,
-        pcm::{PcmCursor, PcmLimits, PcmPacket, PcmProfile, PcmReader, PcmStream},
-    },
+    CursorStatus,
+    compat::mov::pcm::{PcmCursor, PcmLimits, PcmPacket, PcmProfile, PcmReader, PcmStream},
     movie::TrackHeader,
     table::SampleTable,
 };

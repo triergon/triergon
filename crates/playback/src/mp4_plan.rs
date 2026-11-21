@@ -18,17 +18,16 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Reservation, Rounding, Time, TimeBase, WorkBudget,
 };
 use triergon_isobmff::{
-    self as iso, Sample, SampleStep,
+    self as iso, CursorStatus, Next, Sample,
     boxes::BoxView,
     compat::mov::{
         clock::{MediaClock, SourceTimeBase},
         edits::FragmentAacTrimJob,
         packets::{
-            CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, PacketOccurrence,
-            StreamView,
+            DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, PacketOccurrence, StreamView,
         },
     },
-    interleave::{InterleaveStatus, PhysicalInterleaveLimits, PhysicalSampleCursor, SourceTrack},
+    interleave::{PhysicalInterleaveLimits, PhysicalSampleCursor, SourceTrack},
     movie::{EditList, SampleDescription},
     table::SampleCursor,
 };
@@ -878,8 +877,8 @@ impl<'a> Mp4IndexJob<'a> {
                         .ok_or(Error::Invalid("first sample media extent missing"))?
                         .end;
                     match probe.poll(w)? {
-                        SampleStep::Yield => return Ok(false),
-                        SampleStep::Sample(sample)
+                        Next::Yield => return Ok(false),
+                        Next::Item(sample)
                             if !sample.range.is_empty()
                                 && sample.range.start >= p.source_length.unwrap_or(media_end) =>
                         {
@@ -958,15 +957,15 @@ impl<'a> Mp4IndexJob<'a> {
                     result => result?,
                 };
                 match step {
-                    InterleaveStatus::Yield => {}
-                    InterleaveStatus::Ready => {
+                    CursorStatus::Yield => {}
+                    CursorStatus::Ready => {
                         let r = source.take_sample()?;
                         self.pending_source = Some(SourceRow {
                             track_id: r.track_id,
                             sample: r.sample,
                         });
                     }
-                    InterleaveStatus::End => {
+                    CursorStatus::End => {
                         p.forward_regular_extents =
                             source.deferred_media().then_some(self.limits.media_extents);
                         if self.source_track_order {

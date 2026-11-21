@@ -9,8 +9,8 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Error, InputCursor, Step, WorkBudget};
 use triergon_isobmff::{
-    self as iso, BuildStatus, SampleStep,
-    boxes::{BoxChildren, BoxEvent, BoxReader, BoxStep, BoxView},
+    self as iso, BuildStatus, Next,
+    boxes::{BoxChildren, BoxEvent, BoxReader, BoxView},
     fragment::{FragmentBuilder, FragmentContext, ImplicitBase, OwnedFragmentCursor},
 };
 
@@ -486,11 +486,11 @@ impl ProgressiveState {
                 }
                 if let Some(scan) = self.scan.as_mut() {
                     match scan.poll(w)? {
-                        BoxStep::Yield => {}
-                        BoxStep::End => {
+                        Next::Yield => {}
+                        Next::End => {
                             return Err(Error::Invalid("progressive traf missing tfhd"));
                         }
-                        BoxStep::Box(raw) => {
+                        Next::Item(raw) => {
                             if raw.header().kind == *b"tfhd" {
                                 let id = word(raw.payload(), 4)?;
                                 let at = engine
@@ -546,8 +546,8 @@ impl ProgressiveState {
                     .ok_or(Error::Invalid("moof children"))?
                     .poll(w)?
                 {
-                    BoxStep::Yield => {}
-                    BoxStep::Box(raw) => {
+                    Next::Yield => {}
+                    Next::Item(raw) => {
                         if raw.header().kind == *b"traf" {
                             if self.retained >= self.limits.fragments_per_batch {
                                 return Err(Error::Limit {
@@ -559,7 +559,7 @@ impl ProgressiveState {
                             self.traf = Some(raw);
                         }
                     }
-                    BoxStep::End => {
+                    Next::End => {
                         self.children = None;
                         self.moof = None;
                         self.phase = Phase::Roots;
@@ -579,24 +579,24 @@ impl ProgressiveState {
                     let step = match &mut current.cursor {
                         SourceCursor::Physical(cursor) => cursor.poll(w)?,
                         SourceCursor::Native(cursor) => match cursor.poll(w, c)? {
-                            iso::compat::mov::packets::CursorStatus::Yield => SampleStep::Yield,
-                            iso::compat::mov::packets::CursorStatus::End => SampleStep::End,
-                            iso::compat::mov::packets::CursorStatus::Ready => {
+                            iso::CursorStatus::Yield => Next::Yield,
+                            iso::CursorStatus::End => Next::End,
+                            iso::CursorStatus::Ready => {
                                 let head = cursor.take_sample()?;
                                 let source = head.source().clone();
                                 current.native = Some(head);
-                                SampleStep::Sample(source)
+                                Next::Item(source)
                             }
                         },
                     };
                     match step {
-                        SampleStep::Yield => {}
-                        SampleStep::End => {
+                        Next::Yield => {}
+                        Next::End => {
                             self.cursors.as_mut_slice()[self.fill] = None;
                             self.retained -= 1;
                             self.fill += 1;
                         }
-                        SampleStep::Sample(sample) => {
+                        Next::Item(sample) => {
                             current.head = Some(SourceRow {
                                 track_id: current.cursor.index().track_id(),
                                 sample,

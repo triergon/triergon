@@ -38,9 +38,11 @@ pub mod table;
 mod fields;
 mod reader;
 mod sample;
+mod step;
 
 pub use reader::{Packet, Reader, ReaderEvent, ReaderLimits, Track, media_kind};
-pub use sample::{Access, CompositionOffset, Sample, SampleStep, SourceTimes};
+pub use sample::{Access, CompositionOffset, Sample, SourceTimes};
+pub use step::{BuildStatus, CursorStatus, Next};
 
 use triergon_core::{Error, Result};
 
@@ -59,12 +61,6 @@ impl Default for Limits {
             max_descriptions: 256,
         }
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BuildStatus {
-    Yield,
-    Ready,
 }
 
 pub(crate) fn policy(count: u32, maximum: u32) -> Result<()> {

@@ -11,7 +11,7 @@ use triergon_isobmff::{
     reference_trace::mov::sample_entry::{PrivateCatalogueProfile, PrivateConfigurationJob},
 };
 use triergon_isobmff::{
-    Limits, SampleStep,
+    CursorStatus, Limits, Next,
     boxes::BoxView,
     compat::mov::{
         edits::{EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditProfile},
@@ -19,7 +19,7 @@ use triergon_isobmff::{
             EncodedConfigProfile, EncodedInitial, EncodedMetadataProfile, EncodedSelection,
             EncodedStreamJob,
         },
-        packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
+        packets::{DemuxTrack, PacketCursor, PacketLimits},
     },
     config::ConfigurationLimits,
     movie::{EditList, TrackHeader},
@@ -159,9 +159,9 @@ fn first(table: &SampleTable) -> triergon_isobmff::Sample {
     let mut c = table.cursor();
     loop {
         match c.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Sample(v) => return v,
-            SampleStep::Yield => {}
-            SampleStep::End => panic!("no sample"),
+            Next::Item(v) => return v,
+            Next::Yield => {}
+            Next::End => panic!("no sample"),
         }
     }
 }

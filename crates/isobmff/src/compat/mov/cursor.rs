@@ -8,16 +8,16 @@
 //! appending a run.
 //! No demux implementation code, expanded sample array, I/O or payload storage.
 use crate::{
-    Sample, SampleStep,
+    CursorStatus, Next, Sample,
     compat::mov::{
         clocks::{MediaClock, SchedulingClock},
-        edit_list::{CursorStatus, DurationBasis, EditCursor, EditLimits, EmitPrepare, EmitStart},
+        edit_list::{DurationBasis, EditCursor, EditLimits, EmitPrepare, EmitStart},
         view::{PacketProjector, PacketView},
     },
     fragment::{FragmentCursor, FragmentIndex},
     interleave::{SourceTrack, TrackSampleCursor, TrackSpans},
     movie::EditList,
-    sample::{SpanStep, require_range_within},
+    sample::require_range_within,
     table::{SampleCursor, SampleTable},
 };
 use std::{
@@ -353,9 +353,9 @@ impl<'a> Slot<'a> {
         let clock = self.clock()?;
         let (source, demux, edit, clock_origin) = if let Some(plan) = self.encoded_edit {
             let sample = match self.cursor.poll(work)? {
-                SampleStep::Yield => return Ok(CursorStatus::Yield),
-                SampleStep::End => return Ok(CursorStatus::End),
-                SampleStep::Sample(s) => s,
+                Next::Yield => return Ok(CursorStatus::Yield),
+                Next::End => return Ok(CursorStatus::End),
+                Next::Item(s) => s,
             };
             let Some((demux, sequence)) = plan.project(&sample)? else {
                 return Ok(CursorStatus::Yield);
@@ -386,9 +386,9 @@ impl<'a> Slot<'a> {
             }
         } else {
             let sample = match self.cursor.poll(work)? {
-                SampleStep::Sample(sample) => sample,
-                SampleStep::Yield => return Ok(CursorStatus::Yield),
-                SampleStep::End => return Ok(CursorStatus::End),
+                Next::Item(sample) => sample,
+                Next::Yield => return Ok(CursorStatus::Yield),
+                Next::End => return Ok(CursorStatus::End),
             };
             let view = PacketProjector::new(
                 self.track.media_base,
@@ -1612,8 +1612,8 @@ impl<'a> PacketCursor<'a> {
                         && self.forward_regular.is_none();
                     let maximum = if whole { u64::MAX } else { 1 };
                     let span = match spans.poll(maximum, work)? {
-                        SpanStep::Yield => return Ok(CursorStatus::Yield),
-                        SpanStep::End => {
+                        Next::Yield => return Ok(CursorStatus::Yield),
+                        Next::End => {
                             if !work.try_charge(1) {
                                 return Ok(CursorStatus::Yield);
                             }
@@ -1629,7 +1629,7 @@ impl<'a> PacketCursor<'a> {
                             self.stepping = 0;
                             continue;
                         }
-                        SpanStep::Span(span) => span,
+                        Next::Item(span) => span,
                     };
                     if whole {
                         // A span that lies in one extent passes every sample's

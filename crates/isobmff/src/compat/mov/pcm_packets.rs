@@ -2,12 +2,12 @@
 //! Original source descriptions, sample ranges and unit decode clocks survive.
 //! This is neither a replacement source Sample nor an audio decoder.
 use crate::{
-    Access, Limits, Sample, SampleStep,
-    boxes::{BoxChildren, BoxStep, BoxView},
-    compat::mov::{clocks::MediaClock, edit_list::CursorStatus, view::StreamView},
+    Access, CursorStatus, Limits, Next, Sample,
+    boxes::{BoxChildren, BoxView},
+    compat::mov::{clocks::MediaClock, view::StreamView},
     fields,
     movie::TrackHeader,
-    quicktime::{QtPcmEncodingV0, QtSoundDescriptionV0},
+    quicktime::{PcmEncoding, SoundDescriptionV0},
     table::{
         SampleCursor, SampleTable,
         rows::{Offsets, Words},
@@ -72,7 +72,7 @@ fn header_binding(header: &TrackHeader) -> Result<()> {
 #[derive(Clone, Debug)]
 pub struct PcmStream {
     demux: StreamView,
-    initial: QtSoundDescriptionV0,
+    initial: SoundDescriptionV0,
 }
 impl PcmStream {
     pub fn new(
@@ -91,7 +91,7 @@ impl PcmStream {
             .descriptions()
             .first()
             .ok_or(Error::Invalid("PCM initial description absent"))?;
-        let initial = QtSoundDescriptionV0::parse(header, entry)?;
+        let initial = SoundDescriptionV0::parse(header, entry)?;
         let layout = initial.pcm_layout()?;
         if initial.revision() != 0 || initial.vendor() != [0; 4] || entry.data_reference_index != 1
         {
@@ -141,8 +141,8 @@ impl PcmStream {
             demux: StreamView {
                 track_id: header.track_id,
                 codec: match layout.encoding() {
-                    QtPcmEncodingV0::Unsigned8 => "pcm_u8",
-                    QtPcmEncodingV0::Signed16BigEndian => "pcm_s16be",
+                    PcmEncoding::Unsigned8 => "pcm_u8",
+                    PcmEncoding::Signed16BigEndian => "pcm_s16be",
                 },
                 media_type: 1,
                 time_base: clock.demux_base,
@@ -161,7 +161,7 @@ impl PcmStream {
     pub fn demux(&self) -> &StreamView {
         &self.demux
     }
-    pub fn initial(&self) -> &QtSoundDescriptionV0 {
+    pub fn initial(&self) -> &SoundDescriptionV0 {
         &self.initial
     }
 }
@@ -170,8 +170,8 @@ impl PcmStream {
 /// A request may overlap another source chunk; its source interval never expands.
 #[derive(Clone, Debug)]
 pub struct PcmPacket {
-    initial: QtSoundDescriptionV0,
-    description: QtSoundDescriptionV0,
+    initial: SoundDescriptionV0,
+    description: SoundDescriptionV0,
     raw_table: BoxView,
     samples: Range<u64>,
     source_range: Range<u64>,
@@ -185,10 +185,10 @@ pub struct PcmPacket {
     generation: InputToken,
 }
 impl PcmPacket {
-    pub fn source_description(&self) -> &QtSoundDescriptionV0 {
+    pub fn source_description(&self) -> &SoundDescriptionV0 {
         &self.description
     }
-    pub fn initial_description(&self) -> &QtSoundDescriptionV0 {
+    pub fn initial_description(&self) -> &SoundDescriptionV0 {
         &self.initial
     }
     pub fn source_table(&self) -> &BoxView {
@@ -251,7 +251,7 @@ struct Group {
     first: u64,
     source_range: Range<u64>,
     demux_range: Range<u64>,
-    description: QtSoundDescriptionV0,
+    description: SoundDescriptionV0,
 }
 
 /// Source-table traversal and grouping are work bounded and allocate no index.
@@ -266,7 +266,7 @@ pub struct PcmCursor<'a> {
     children: Option<BoxChildren>,
     stsc: Option<Words>,
     offsets: Option<Offsets>,
-    initial: QtSoundDescriptionV0,
+    initial: SoundDescriptionV0,
     media: Range<u64>,
     limits: PcmLimits,
     pool: Budget,
@@ -309,7 +309,7 @@ impl<'a> PcmCursor<'a> {
             .descriptions()
             .first()
             .ok_or(Error::Invalid("PCM initial description absent"))?;
-        let initial = QtSoundDescriptionV0::parse(header, entry)?;
+        let initial = SoundDescriptionV0::parse(header, entry)?;
         initial.pcm_layout()?;
         Ok(Self {
             header,
@@ -392,8 +392,8 @@ impl<'a> PcmCursor<'a> {
                     ..Limits::default()
                 };
                 match children.poll(work)? {
-                    BoxStep::Yield => return Ok(CursorStatus::Yield),
-                    BoxStep::Box(raw) => match &raw.header().kind {
+                    Next::Yield => return Ok(CursorStatus::Yield),
+                    Next::Item(raw) => match &raw.header().kind {
                         b"stsc" => {
                             if self.stsc.is_some() {
                                 return Err(Error::Invalid("PCM duplicate stsc"));
@@ -413,7 +413,7 @@ impl<'a> PcmCursor<'a> {
                         }
                         _ => (),
                     },
-                    BoxStep::End => {
+                    Next::End => {
                         if self.stsc.is_none() || self.offsets.is_none() {
                             return Err(Error::Invalid("PCM chunk tables absent"));
                         }
@@ -446,11 +446,11 @@ impl<'a> PcmCursor<'a> {
             }
             if self.pending.is_none() {
                 match self.source_cursor.poll(work)? {
-                    SampleStep::Yield => return Ok(CursorStatus::Yield),
-                    SampleStep::End => {
+                    Next::Yield => return Ok(CursorStatus::Yield),
+                    Next::End => {
                         return Err(Error::Invalid("PCM source sample count ended early"));
                     }
-                    SampleStep::Sample(sample) => self.pending = Some(sample),
+                    Next::Item(sample) => self.pending = Some(sample),
                 }
             }
             if !work.try_charge(1) {
@@ -568,7 +568,7 @@ impl<'a> PcmCursor<'a> {
                 .map_err(|_| Error::Overflow)?,
             )
             .ok_or(Error::Invalid("PCM description absent"))?;
-        let description = QtSoundDescriptionV0::parse(self.header, entry)?;
+        let description = SoundDescriptionV0::parse(self.header, entry)?;
         description.pcm_layout()?;
         let initial_bytes =
             u64::try_from(self.initial.pcm_layout()?.frame_bytes()).map_err(|_| Error::Overflow)?;

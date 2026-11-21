@@ -1,8 +1,9 @@
 //! Explicit empirical reference description view. Raw source tables/configuration/clocks are
 //! never repaired. The cursor emits an event even for a missing demux entry.
 use super::*;
-use crate::compat::mov::{
-    cursor::PacketLimits, edit_list::CursorStatus, index::IndexLimits, view::PacketView,
+use crate::{
+    CursorStatus,
+    compat::mov::{cursor::PacketLimits, index::IndexLimits, view::PacketView},
 };
 use std::{
     ops::Range,
@@ -598,9 +599,9 @@ impl Direct<'_> {
         }
         let mut source = self.source;
         let declaration = match source.poll(work)? {
-            SampleStep::Yield => return Ok(None),
-            SampleStep::End => return Ok(None),
-            SampleStep::Sample(s) => s,
+            Next::Yield => return Ok(None),
+            Next::End => return Ok(None),
+            Next::Item(s) => s,
         };
         bounded(
             self.state.ordinal.checked_add(1).ok_or(Error::Overflow)?,

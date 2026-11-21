@@ -1,6 +1,6 @@
 //! ETSI TS 126 244 V18.0.0 §13.4: compact source segment-index references.
 //! SAP declarations and byte/time candidates do not establish decoder recovery.
-use crate::{Limits, boxes::BoxView, fields, policy};
+use crate::{Limits, Next, boxes::BoxView, fields, policy};
 use std::ops::Range;
 use triergon_core::{Error, Result, Time, TimeBase, WorkBudget};
 
@@ -18,13 +18,6 @@ pub struct SegmentReference {
     pub sap_delta_ticks: u32,
     pub raw_size_word: u32,
     pub raw_sap_word: u32,
-}
-
-#[derive(Debug)]
-pub enum IndexStep {
-    Reference(SegmentReference),
-    Yield,
-    End,
 }
 
 /// Keeps the complete source box and a compact fixed-width table. Targets must
@@ -131,12 +124,12 @@ pub struct SegmentIndexCursor<'a> {
 impl SegmentIndexCursor<'_> {
     /// One reference per work unit. Arithmetic, source slices and time creation
     /// all succeed before cursor state changes; repeated failures cannot skip rows.
-    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<IndexStep> {
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<SegmentReference>> {
         if self.record == u32::from(self.index.count) {
-            return Ok(IndexStep::End);
+            return Ok(Next::End);
         }
         if !work.try_charge(1) {
-            return Ok(IndexStep::Yield);
+            return Ok(Next::Yield);
         }
         let at = usize::try_from(self.record)
             .map_err(|_| Error::Overflow)?
@@ -172,6 +165,6 @@ impl SegmentIndexCursor<'_> {
         self.record = ordinal;
         self.byte = end;
         self.time = next_time;
-        Ok(IndexStep::Reference(reference))
+        Ok(Next::Item(reference))
     }
 }

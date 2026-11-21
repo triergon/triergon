@@ -3,11 +3,10 @@
 //! track state originates in an exhausted from-start demux index, never a clock
 //! guessed from a file name, EOF position, caller token or reference packet.
 use crate::{
-    Sample, SampleStep,
+    CursorStatus, Next, Sample,
     compat::mov::{
         clocks::{MediaClock, SchedulingClock},
         cursor::{ClockOrigin, FragmentEdit, PacketOccurrence, PredecessorClock, PreviousClock},
-        edit_list::CursorStatus,
         view::PacketProjector,
     },
     fragment::{FragmentIndex, OwnedFragmentCursor},
@@ -115,14 +114,14 @@ impl FrontFragment {
             return Ok(CursorStatus::Ready);
         }
         match self.cursor.poll(work)? {
-            SampleStep::Yield => Ok(CursorStatus::Yield),
-            SampleStep::End if self.scanning => {
+            Next::Yield => Ok(CursorStatus::Yield),
+            Next::End if self.scanning => {
                 self.cursor.restart();
                 self.scanning = false;
                 Ok(CursorStatus::Yield)
             }
-            SampleStep::End => Ok(CursorStatus::End),
-            SampleStep::Sample(sample) if self.scanning => {
+            Next::End => Ok(CursorStatus::End),
+            Next::Item(sample) if self.scanning => {
                 if let Some(offset) = sample.composition_offset {
                     self.minimum = self.minimum.min(i64::from(i32::from_be_bytes(
                         offset.raw_bits().to_be_bytes(),
@@ -130,7 +129,7 @@ impl FrontFragment {
                 }
                 Ok(CursorStatus::Yield)
             }
-            SampleStep::Sample(sample) => {
+            Next::Item(sample) => {
                 self.ready = Ok(Some(FrontSample {
                     sample,
                     track: self.cursor.index().track_id(),

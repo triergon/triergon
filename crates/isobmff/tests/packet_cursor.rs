@@ -6,7 +6,8 @@ use std::{
 };
 use triergon_core::{Budget, Error, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    compat::mov::packets::{CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
+    CursorStatus,
+    compat::mov::packets::{DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
     movie::TrackHeader,
     table::SampleTable,
 };

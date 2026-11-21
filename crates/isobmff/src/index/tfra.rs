@@ -1,7 +1,7 @@
 //! Historical primary Adobe F4V10.1 §§2.16.1-.2 syntax and MPEG m76694
 //! table9 Original corroboration. Compact source hints; no demux-clock or
 //! decoder-recovery claim, including for an empty tfra table.
-use crate::{Limits, boxes::BoxView, fields, policy};
+use crate::{Limits, Next, boxes::BoxView, fields, policy};
 use std::ops::Range;
 use triergon_core::{Error, Result, WorkBudget};
 
@@ -13,13 +13,6 @@ pub struct FragmentRandomAccessEntry {
     pub traf_number: u32,
     pub trun_number: u32,
     pub sample_number: u32,
-}
-
-#[derive(Debug)]
-pub enum FragmentRandomAccessStep {
-    Entry(FragmentRandomAccessEntry),
-    Yield,
-    End,
 }
 
 /// Retains the complete original box. Header/bounds validation is constant
@@ -164,20 +157,20 @@ pub struct FragmentRandomAccessCursor<'a> {
 impl FragmentRandomAccessCursor<'_> {
     /// One bounded row per unit. A bad record is sticky and cannot be skipped
     /// on retry. No ordering, range-target or source-clock inference is made.
-    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<FragmentRandomAccessStep> {
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<FragmentRandomAccessEntry>> {
         if let Some(error) = self.failed {
             return Err(error);
         }
         if self.row == self.index.count {
-            return Ok(FragmentRandomAccessStep::End);
+            return Ok(Next::End);
         }
         if !work.try_charge(1) {
-            return Ok(FragmentRandomAccessStep::Yield);
+            return Ok(Next::Yield);
         }
         match self.index.entry(self.row) {
             Ok(entry) => {
                 self.row = entry.ordinal;
-                Ok(FragmentRandomAccessStep::Entry(entry))
+                Ok(Next::Item(entry))
             }
             Err(error) => {
                 self.failed = Some(error);

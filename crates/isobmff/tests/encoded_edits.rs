@@ -6,7 +6,7 @@ use triergon_core::{
     WorkBudget,
 };
 use triergon_isobmff::{
-    BuildStatus, Limits,
+    BuildStatus, CursorStatus, Limits,
     compat::mov::{
         edits::{
             EditCursor, EditLimits, EncodedEditContext, EncodedEditJob, EncodedEditLimits,
@@ -17,7 +17,7 @@ use triergon_isobmff::{
             EncodedMetadataProfile, EncodedRecoveryProfile, EncodedSelection, EncodedStream,
             EncodedStreamJob, EncodedStreamProfile,
         },
-        packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
+        packets::{DemuxTrack, PacketCursor, PacketLimits},
         seek::{GlobalSeekJob, IndexCursor, IndexLimits, SeekLimits},
     },
     config::{ConfigurationLimits, check_dts_core_description},
@@ -1890,7 +1890,7 @@ fn without_sdtp_keeps_existing_aac_roll_observation() {
     let p = Source::new(ORIGINAL, b"soun");
     let mut source = p.table.cursor();
     match source.poll(&mut WorkBudget::new(1)).unwrap() {
-        triergon_isobmff::SampleStep::Sample(s) => assert_eq!(s.dependency, None),
+        triergon_isobmff::Next::Item(s) => assert_eq!(s.dependency, None),
         _ => panic!("original source first sample absent"),
     }
     let expected = rows(&p, p.plan(1).unwrap());

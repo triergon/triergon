@@ -3,8 +3,8 @@
 //! typed recovery parsers validate their own source grammar; one real mapping
 //! row is inspected per work unit, with no sample array or inferred defaults.
 use crate::{
-    Limits,
-    boxes::{BoxChildren, BoxStep},
+    Limits, Next,
+    boxes::BoxChildren,
     fields,
     sample_groups::{RecoveryDescriptions, RecoveryLimits, RecoveryMappings, RecoverySyntax},
     table::SampleTable,
@@ -88,12 +88,12 @@ impl EmptyRecoveryWalk {
                 return Ok(true);
             };
             match children.poll(work)? {
-                BoxStep::Yield => return Ok(false),
-                BoxStep::End => {
+                Next::Yield => return Ok(false),
+                Next::End => {
                     self.children = None;
                     return Ok(true);
                 }
-                BoxStep::Box(raw) => {
+                Next::Item(raw) => {
                     let description = match raw.header().kind {
                         x if x == *b"sgpd" => true,
                         x if x == *b"sbgp" => false,

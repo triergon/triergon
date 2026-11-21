@@ -3,7 +3,7 @@ use common::{child, roots};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, Time, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Limits, SampleStep,
+    BuildStatus, Limits, Next,
     boxes::BoxView,
     compat::mov::recovery::{RunKind, RunRecoveryBuilder, RunRecoveryProfile, RunRecoveryTable},
     interleave::{PhysicalInterleaveLimits, PhysicalSampleCursor, SourceTrack},
@@ -43,18 +43,15 @@ fn build(bytes: &[u8], pool: &Budget, quantum: u64) -> Result<RunRecoveryTable, 
 }
 fn clock_prefix(table: &RunRecoveryTable) -> Vec<(u64, i128, i128)> {
     let mut cursor = table.source_prefix_cursor();
-    assert_eq!(
-        cursor.poll(&mut WorkBudget::new(0)).unwrap(),
-        SampleStep::Yield
-    );
+    assert_eq!(cursor.poll(&mut WorkBudget::new(0)).unwrap(), Next::Yield);
     let mut rows = Vec::new();
     loop {
         match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Sample(v) => {
+            Next::Item(v) => {
                 rows.push((v.ordinal, v.dts_ticks.unwrap(), v.cts_ticks.unwrap()));
             }
-            SampleStep::Yield => {}
-            SampleStep::End => break,
+            Next::Yield => {}
+            Next::End => break,
         }
     }
     rows

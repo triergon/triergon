@@ -6,7 +6,7 @@ mod wire;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, Time, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, SampleStep,
+    BuildStatus, Next,
     interleave::SourceTrack,
     movie::EditList,
     sample_groups::{
@@ -22,8 +22,9 @@ use triergon_isobmff::{
 
 #[test]
 fn duration_scan_preserves_seek_restarts_with_a_tight_pool() {
-    use triergon_isobmff::compat::mov::packets::{
-        CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits,
+    use triergon_isobmff::{
+        CursorStatus,
+        compat::mov::packets::{DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
     };
     let metadata = Budget::new(1 << 20).unwrap();
     let table = fragment_sample_table(&metadata);
@@ -97,10 +98,11 @@ fn duration_scan_preserves_seek_restarts_with_a_tight_pool() {
 
 #[test]
 fn complete_fragment_edit_offsets_the_packet_and_resume_clocks() {
-    use triergon_isobmff::compat::mov::packets::{
-        CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, ResumePoint,
-    };
     use triergon_isobmff::compat::mov::seek::{SeekJob, SeekLimits};
+    use triergon_isobmff::{
+        CursorStatus,
+        compat::mov::packets::{DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, ResumePoint},
+    };
     let pool = Budget::new(65536).unwrap();
     let table = fragment_sample_table(&pool);
     assert_eq!(table.sample_count(), 0);
@@ -246,9 +248,12 @@ fn leading_empty_fragment_edit_delays_packets_without_shifting_the_seek_query() 
 
 #[test]
 fn checked_seek_retains_a_non_sync_fragment_prefix_without_marking_it_sync() {
-    use triergon_isobmff::compat::mov::{
-        packets::{CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
-        seek::{IndexCursor, IndexLimits, SeekLimits},
+    use triergon_isobmff::{
+        CursorStatus,
+        compat::mov::{
+            packets::{DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
+            seek::{IndexCursor, IndexLimits, SeekLimits},
+        },
     };
     let pool = Budget::new(65536).unwrap();
     let table = fragment_sample_table(&pool);
@@ -339,10 +344,11 @@ fn fragment_sample_table(pool: &Budget) -> triergon_isobmff::table::SampleTable 
 
 #[test]
 fn complete_fragment_seek_preserves_the_edited_predecessor_clock_between_runs() {
-    use triergon_isobmff::compat::mov::packets::{
-        CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits,
-    };
     use triergon_isobmff::compat::mov::seek::{SeekJob, SeekLimits};
+    use triergon_isobmff::{
+        CursorStatus,
+        compat::mov::packets::{DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
+    };
     let pool = Budget::new(65536).unwrap();
     let table = fragment_sample_table(&pool);
     let fragments = [fixture::fragment_runs(
@@ -587,8 +593,7 @@ fn duplicate_and_unknown_source_clocks_never_produce_a_fabricated_target() {
         fixture::fragment(&pool, 2, 8192, 2, Some(0), &[0]),
     ];
     for (index, fragment) in duplicate.iter().enumerate() {
-        let SampleStep::Sample(sample) = fragment.cursor().poll(&mut WorkBudget::new(1)).unwrap()
-        else {
+        let Next::Item(sample) = fragment.cursor().poll(&mut WorkBudget::new(1)).unwrap() else {
             panic!()
         };
         assert_eq!(sample.ordinal, u64::try_from(index + 1).unwrap());
@@ -611,7 +616,7 @@ fn duplicate_and_unknown_source_clocks_never_produce_a_fabricated_target() {
     );
     let unknown = [fixture::fragment(&pool, 1, 4096, 1, None, &[0])];
     let mut source = unknown[0].cursor();
-    let SampleStep::Sample(sample) = source.poll(&mut WorkBudget::new(1)).unwrap() else {
+    let Next::Item(sample) = source.poll(&mut WorkBudget::new(1)).unwrap() else {
         panic!()
     };
     assert_eq!((sample.dts_ticks, sample.cts_ticks), (None, None));
@@ -706,9 +711,9 @@ fn repeated_movie_edit_and_roll_mapping_feed_real_source_seek_with_config_return
                 .poll(&mut WorkBudget::new(quantum), &AtomicBool::new(false))
                 .unwrap()
             {
-                SampleStep::Sample(s) => out.push(s),
-                SampleStep::Yield => {}
-                SampleStep::End => break,
+                Next::Item(s) => out.push(s),
+                Next::Yield => {}
+                Next::End => break,
             }
         }
         assert_eq!(out.iter().map(|s| s.ordinal).collect::<Vec<_>>(), [3, 4, 5]);
@@ -798,9 +803,9 @@ fn inherited_fragment_prol_drives_cross_fragment_preroll_in_original_decode_orde
                 .poll(&mut WorkBudget::new(quantum), &AtomicBool::new(false))
                 .unwrap()
             {
-                SampleStep::Sample(s) => out.push(s),
-                SampleStep::Yield => {}
-                SampleStep::End => break,
+                Next::Item(s) => out.push(s),
+                Next::Yield => {}
+                Next::End => break,
             }
         }
         assert_eq!(

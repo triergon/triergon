@@ -2,7 +2,7 @@ mod common;
 use common::{child, fixtures::CASES};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Limits, SampleStep,
+    BuildStatus, Limits, Next,
     fragment::{FragmentBuilder, FragmentContext, ImplicitBase, Trex},
 };
 
@@ -49,9 +49,9 @@ fn sourced_absolute_base_fragments_match_independent_source_facts() {
             for expected in wanted {
                 let actual = loop {
                     match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-                        SampleStep::Sample(value) => break value,
-                        SampleStep::Yield => {}
-                        SampleStep::End => panic!(),
+                        Next::Item(value) => break value,
+                        Next::Yield => {}
+                        Next::End => panic!(),
                     }
                 };
                 assert_eq!(actual.ordinal, expected.ordinal);
@@ -68,9 +68,9 @@ fn sourced_absolute_base_fragments_match_independent_source_facts() {
             }
             loop {
                 match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-                    SampleStep::End => break,
-                    SampleStep::Yield => {}
-                    SampleStep::Sample(_) => panic!(),
+                    Next::End => break,
+                    Next::Yield => {}
+                    Next::Item(_) => panic!(),
                 }
             }
         }
@@ -111,9 +111,9 @@ fn selected_draft_signed_trun_preserves_frozen_source_and_raw_bits() {
         for wanted in case.samples.iter().filter(|s| s.ordinal >= first).take(3) {
             let source = loop {
                 match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-                    SampleStep::Yield => {}
-                    SampleStep::Sample(value) => break value,
-                    SampleStep::End => panic!("missing frozen signed-trun sample"),
+                    Next::Yield => {}
+                    Next::Item(value) => break value,
+                    Next::End => panic!("missing frozen signed-trun sample"),
                 }
             };
             assert_eq!(source.ordinal, wanted.ordinal);
@@ -142,9 +142,9 @@ fn selected_draft_signed_trun_preserves_frozen_source_and_raw_bits() {
         }
         loop {
             match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-                SampleStep::Yield => {}
-                SampleStep::End => break,
-                SampleStep::Sample(_) => panic!("extra signed-trun sample"),
+                Next::Yield => {}
+                Next::End => break,
+                Next::Item(_) => panic!("extra signed-trun sample"),
             }
         }
     }
@@ -206,12 +206,12 @@ fn required_moof_relative_fragment_preserves_frozen_source_ranges_and_tfdt() {
                 let mut actual = None;
                 for _ in 0..10_000 {
                     match cursor.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                        SampleStep::Yield => {}
-                        SampleStep::Sample(sample) => {
+                        Next::Yield => {}
+                        Next::Item(sample) => {
                             actual = Some(sample);
                             break;
                         }
-                        SampleStep::End => panic!("missing frozen source sample"),
+                        Next::End => panic!("missing frozen source sample"),
                     }
                 }
                 let actual = actual.expect("bounded sample cursor must make progress");
@@ -235,12 +235,12 @@ fn required_moof_relative_fragment_preserves_frozen_source_ranges_and_tfdt() {
             let mut ended = false;
             for _ in 0..10_000 {
                 match cursor.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                    SampleStep::Yield => {}
-                    SampleStep::End => {
+                    Next::Yield => {}
+                    Next::End => {
                         ended = true;
                         break;
                     }
-                    SampleStep::Sample(_) => panic!("unexpected extra source sample"),
+                    Next::Item(_) => panic!("unexpected extra source sample"),
                 }
             }
             assert!(ended, "bounded sample cursor must reach its declared end");
@@ -315,7 +315,7 @@ fn legacy_implicit_traf_chaining_uses_source_bytes_and_leaves_missing_time_unkno
     assert_eq!(end, (1u64 << 32) + 132);
     let second = original_index(&budget, 2, &[None], ImplicitBase::PreviousTraf(end));
     assert_eq!(second.track_id(), 2);
-    let SampleStep::Sample(sample) = second.cursor().poll(&mut WorkBudget::new(1)).unwrap() else {
+    let Next::Item(sample) = second.cursor().poll(&mut WorkBudget::new(1)).unwrap() else {
         panic!()
     };
     assert_eq!(sample.range, end..end + 4);
@@ -434,12 +434,12 @@ fn original_modern_fragment_profiles_preserve_facts_and_unknown_clocks() {
                         let mut found = None;
                         for _ in 0..10_000 {
                             match cursor.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                                SampleStep::Yield => {}
-                                SampleStep::Sample(value) => {
+                                Next::Yield => {}
+                                Next::Item(value) => {
                                     found = Some(value);
                                     break;
                                 }
-                                SampleStep::End => panic!("missing original source sample"),
+                                Next::End => panic!("missing original source sample"),
                             }
                         }
                         let sample = found.expect("bounded original fragment cursor stalled");
@@ -475,12 +475,12 @@ fn original_modern_fragment_profiles_preserve_facts_and_unknown_clocks() {
                     let mut ended = false;
                     for _ in 0..10_000 {
                         match cursor.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                            SampleStep::Yield => {}
-                            SampleStep::End => {
+                            Next::Yield => {}
+                            Next::End => {
                                 ended = true;
                                 break;
                             }
-                            SampleStep::Sample(_) => panic!("extra original source sample"),
+                            Next::Item(_) => panic!("extra original source sample"),
                         }
                     }
                     assert!(ended, "bounded original fragment cursor did not finish");

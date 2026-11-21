@@ -1,7 +1,7 @@
 //! Resolve a regular Opus sample's declared recovery on the source clock.
 
 use crate::{
-    BuildStatus, Sample, SampleStep,
+    BuildStatus, Next, Sample,
     sample_groups::{RecoveryLimits, RecoveryLookup, RecoveryScope},
     table::{SampleLocator, SampleTable},
 };
@@ -92,9 +92,9 @@ impl<'a> OpusRecoverySeek<'a> {
             .as_mut()
             .ok_or(Error::Invalid("missing Opus preroll sample"))?;
         let sample = match locator.poll(work)? {
-            SampleStep::Yield => return Ok(None),
-            SampleStep::Sample(sample) => sample,
-            SampleStep::End => return Err(Error::Invalid("missing Opus preroll sample")),
+            Next::Yield => return Ok(None),
+            Next::Item(sample) => sample,
+            Next::End => return Err(Error::Invalid("missing Opus preroll sample")),
         };
         let start = sample
             .dts_ticks

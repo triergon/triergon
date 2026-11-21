@@ -15,11 +15,11 @@ use crate::{
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, InputCursor, Time, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus,
+    BuildStatus, CursorStatus,
     compat::mov::{
         clock::MediaClock,
         edits::EncodedEditPlan,
-        packets::{CursorStatus, PacketCursor},
+        packets::PacketCursor,
         seek::{GlobalSeekJob, RangeSeekJob, SeekLanding},
     },
 };

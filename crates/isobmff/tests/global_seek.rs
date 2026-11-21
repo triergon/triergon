@@ -5,9 +5,9 @@ mod support;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus,
+    BuildStatus, CursorStatus,
     compat::mov::{
-        packets::{CursorStatus, DemuxProfile},
+        packets::DemuxProfile,
         seek::{
             GlobalSeekJob, GlobalSeekPlan, IndexCursor, IndexEntry, IndexLimits, SeekJob,
             SeekLimits,

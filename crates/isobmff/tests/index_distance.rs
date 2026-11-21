@@ -4,10 +4,13 @@ mod common;
 mod support;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};
-use triergon_isobmff::compat::mov::{
-    clock::ClockOrigin,
-    packets::{CursorStatus, DemuxProfile, PacketCursor, PacketLimits},
-    seek::{IndexCursor, IndexEntry, IndexLimits},
+use triergon_isobmff::{
+    CursorStatus,
+    compat::mov::{
+        clock::ClockOrigin,
+        packets::{DemuxProfile, PacketCursor, PacketLimits},
+        seek::{IndexCursor, IndexEntry, IndexLimits},
+    },
 };
 
 fn entries(pool: &Budget, movie: &support::Movie, track: usize, quantum: u64) -> Vec<IndexEntry> {

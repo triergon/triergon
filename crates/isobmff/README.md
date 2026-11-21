@@ -88,8 +88,8 @@ use triergon_core::{
     Step, WorkBudget,
 };
 use triergon_isobmff::{
-    BuildStatus, Limits, SampleStep,
-    boxes::{BoxEvent, BoxReader, BoxStep, BoxView},
+    BuildStatus, Limits, Next,
+    boxes::{BoxEvent, BoxReader, BoxView},
     payload::SampleReader,
     table::SampleTableBuilder,
 };
@@ -132,9 +132,9 @@ let child = |parent: &BoxView, kind: &[u8; 4]| -> triergon_core::Result<BoxView>
     let mut children = parent.children(0, Limits::default())?;
     loop {
         match children.poll(&mut WorkBudget::new(1 << 16))? {
-            BoxStep::Box(b) if &b.header().kind == kind => return Ok(b),
-            BoxStep::Box(_) | BoxStep::Yield => {}
-            BoxStep::End => return Err(Error::Invalid("missing box")),
+            Next::Item(b) if &b.header().kind == kind => return Ok(b),
+            Next::Item(_) | Next::Yield => {}
+            Next::End => return Err(Error::Invalid("missing box")),
         }
     }
 };
@@ -151,9 +151,9 @@ let mdat = mdat.ok_or("no mdat")?;
 let mut samples = table.cursor();
 loop {
     let sample = match samples.poll(&mut work)? {
-        SampleStep::Sample(sample) => sample,
-        SampleStep::Yield => { work = WorkBudget::new(1 << 16); continue }
-        SampleStep::End => break,
+        Next::Item(sample) => sample,
+        Next::Yield => { work = WorkBudget::new(1 << 16); continue }
+        Next::End => break,
     };
     let mut read = SampleReader::new(&mut input, sample, mdat.clone(), 1 << 20)?;
     let packet = loop {
@@ -185,7 +185,7 @@ of all tracks in file order through `PhysicalSampleCursor`.
 | Seek | `SourceSeekPlanner`, `MovieSourceSeekPlanner`, `SourceCompositionLookup` |
 | Segment/fragment indexes | `SegmentIndex` (`sidx`), `TrackFragmentRandomAccess` (`tfra`), `MovieFragmentRandomAccessTail` (`mfro`) |
 | Recovery groups | `RecoveryDescriptions` (`sgpd`), `RecoveryMappings` (`sbgp`), `RecoveryLookup` |
-| Codec configuration | `SampleDescription::extensions`, `AacConfigurationJob`, `ObjectTypeScan`, `check_dts_core_description`, `QtSoundDescriptionV0` |
+| Codec configuration | `SampleDescription::extensions`, `AacConfigurationJob`, `ObjectTypeScan`, `check_dts_core_description`, `SoundDescriptionV0` |
 | Whole movie | `open::MovieOpen` → `open::Movie`, under `open::OpenLimits`; `new_progressive` stops at the first media after a front movie, `new_recovery` admits terminal media declarations |
 | Neutral reader | `Reader`, `ReaderLimits`, `Track`, `Packet`, `ReaderEvent` |
 | FFmpeg-compatible packets | `compat::mov::packets::{PacketCursor, StreamView}`, `compat::mov::edits::EditCursor` |
@@ -331,7 +331,7 @@ view, `sdtp` may carry flag 1 with version 0 and exactly one byte per sample.
 | Edit lists | `elst` v0/v1; empty edits; rate-one point mapping |
 | Seek and indexes | sync/preroll plans, movie-time and composition targets, `sidx`, `tfra`/`mfro`, `roll`/`prol` groups |
 | Codec configuration | AAC `AudioSpecificConfig` (incl. QuickTime `wave`), DTS core signalling, AC-3/E-AC-3, opaque `avcC`/`hvcC`/`av1C`/`vpcC` |
-| QuickTime PCM | v0 unsigned 8-bit and signed 16-bit big-endian (`QtPcmSampleReaderV0`) |
+| QuickTime PCM | v0 unsigned 8-bit and signed 16-bit big-endian (`PcmSampleReader`) |
 | FFmpeg-compatible view | AVC, HEVC, AV1, VP9, AAC, AC-3, E-AC-3, DTS (`compat::mov::encoded::EncodedEntryKind`), raw video, `tx3g`, PCM |
 
 ## Behaviour and limits

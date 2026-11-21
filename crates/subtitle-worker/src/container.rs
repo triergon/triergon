@@ -12,8 +12,8 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
+use triergon::isobmff::CursorStatus;
 use triergon::isobmff::compat::mov::edits::{EditCursor, EditLimits};
-use triergon::isobmff::compat::mov::packets::CursorStatus;
 use triergon::{
     AnyReader, Budget, Bytes, CodecId, ContainerReader, Event, InputWindow, MediaKind, PacketInfo,
     SourceCapabilities, SourceId, Step, TimeBase, TrackId, TrackInfo, WorkBudget,

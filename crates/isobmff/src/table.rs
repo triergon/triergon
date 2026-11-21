@@ -1,12 +1,12 @@
 //! Regular sample-table seam. Sequential O(samples + source runs); bounded seek
 //! locator works over source run/chunk tables without a per-sample index allocation.
 use crate::{
-    Access, BuildStatus, Limits, Sample, SampleStep,
-    boxes::{BoxChildren, BoxStep, BoxView},
+    Access, BuildStatus, Limits, Next, Sample,
+    boxes::{BoxChildren, BoxView},
     fields,
     movie::SampleDescription,
     policy,
-    sample::{SampleSpan, SpanStep},
+    sample::SampleSpan,
 };
 use recovery::{InitialDescriptionDiagnostic, RunCoverage, RunKind, SyncDiagnostic};
 use rows::{Offsets, Sizes, Words};
@@ -428,8 +428,8 @@ impl SampleTableBuilder {
             match self.stage {
                 Stage::Ready => return Ok(BuildStatus::Ready),
                 Stage::Boxes => match self.boxes.poll(work)? {
-                    BoxStep::Yield => return Ok(BuildStatus::Yield),
-                    BoxStep::Box(raw) => match &raw.header().kind {
+                    Next::Yield => return Ok(BuildStatus::Yield),
+                    Next::Item(raw) => match &raw.header().kind {
                         b"stsd" => single(&mut self.parts.stsd, raw)?,
                         b"stts" => single(&mut self.parts.stts, raw)?,
                         b"ctts" => single(&mut self.parts.ctts, raw)?,
@@ -442,7 +442,7 @@ impl SampleTableBuilder {
                         b"sdtp" => single(&mut self.parts.dependency, raw)?,
                         _ => {} // Full raw stbl remains owned, including all opaque metadata.
                     },
-                    BoxStep::End => {
+                    Next::End => {
                         if self.parts.compact.is_some() && self.parts.sizes.is_some() {
                             return Err(Error::Invalid("both stsz and stz2"));
                         }
@@ -492,8 +492,8 @@ impl SampleTableBuilder {
                         .ok_or(Error::Invalid("missing description cursor"))?
                         .poll(work)?
                     {
-                        BoxStep::Yield => return Ok(BuildStatus::Yield),
-                        BoxStep::Box(raw) => {
+                        Next::Yield => return Ok(BuildStatus::Yield),
+                        Next::Item(raw) => {
                             let ordinal = u32::try_from(descriptions.len())
                                 .map_err(|_| Error::Overflow)?
                                 .checked_add(1)
@@ -504,7 +504,7 @@ impl SampleTableBuilder {
                             self.pending_description =
                                 Some(SampleDescription::parse(raw, ordinal)?);
                         }
-                        BoxStep::End => {
+                        Next::End => {
                             if descriptions.len() != self.description_count as usize {
                                 return Err(Error::Invalid("sample description count mismatch"));
                             }
@@ -883,13 +883,17 @@ impl SampleRanges<'_> {
     /// The next at most `maximum` samples, all in one chunk, charging a work
     /// unit for each. A span stops before a sample whose end would overflow, and
     /// the next step reports that sample's error.
-    pub(crate) fn next_span(&mut self, maximum: u64, work: &mut WorkBudget) -> Result<SpanStep> {
+    pub(crate) fn next_span(
+        &mut self,
+        maximum: u64,
+        work: &mut WorkBudget,
+    ) -> Result<Next<SampleSpan>> {
         let left = self.table.sample_count() - self.ordinal;
         if left == 0 {
-            return Ok(SpanStep::End);
+            return Ok(Next::End);
         }
         if !work.try_charge(1) {
-            return Ok(SpanStep::Yield);
+            return Ok(Next::Yield);
         }
         self.chunks.enter(self.table)?;
         let start = self.chunks.byte;
@@ -906,7 +910,7 @@ impl SampleRanges<'_> {
         self.chunks.chunk_left -= u32::try_from(count).map_err(|_| Error::Overflow)?;
         let first = self.ordinal + 1;
         self.ordinal += count;
-        Ok(SpanStep::Span(SampleSpan {
+        Ok(Next::Item(SampleSpan {
             first,
             count,
             range: start..end,
@@ -948,17 +952,17 @@ impl<'a> SampleCursor<'a> {
         self.ordinal
     }
     #[inline]
-    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         if self.ordinal == self.table.sample_count() {
-            return Ok(SampleStep::End);
+            return Ok(Next::End);
         }
         if !work.try_charge(1) {
-            return Ok(SampleStep::Yield);
+            return Ok(Next::Yield);
         }
         let mut next = *self;
         let sample = next.advance()?;
         *self = next;
-        Ok(SampleStep::Sample(sample))
+        Ok(Next::Item(sample))
     }
     fn advance(&mut self) -> Result<Sample> {
         let ordinal = self.enter()?;
@@ -1065,14 +1069,6 @@ pub(crate) struct DecodeDeltas<'a> {
     delta: u32,
 }
 
-/// One step of [`DecodeDeltas`].
-#[derive(Debug)]
-pub(crate) enum DeltaStep {
-    Delta(u32),
-    Yield,
-    End,
-}
-
 impl<'a> DecodeDeltas<'a> {
     pub(crate) fn new(table: &'a SampleTable) -> Self {
         Self {
@@ -1084,12 +1080,12 @@ impl<'a> DecodeDeltas<'a> {
         }
     }
     /// The next sample's decode delta, for a work unit.
-    pub(crate) fn poll(&mut self, work: &mut WorkBudget) -> Result<DeltaStep> {
+    pub(crate) fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<u32>> {
         if self.ordinal == self.table.sample_count() {
-            return Ok(DeltaStep::End);
+            return Ok(Next::End);
         }
         if !work.try_charge(1) {
-            return Ok(DeltaStep::Yield);
+            return Ok(Next::Yield);
         }
         if self.left == 0 {
             self.left = self.table.stts.word(self.run, 0)?;
@@ -1101,7 +1097,7 @@ impl<'a> DecodeDeltas<'a> {
             .checked_sub(1)
             .ok_or(Error::Invalid("time run exhausted"))?;
         self.ordinal += 1;
-        Ok(DeltaStep::Delta(self.delta))
+        Ok(Next::Item(self.delta))
     }
 }
 
@@ -1145,13 +1141,13 @@ pub struct SampleLocator<'a> {
     done: bool,
 }
 impl SampleLocator<'_> {
-    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         if self.done {
-            return Ok(SampleStep::End);
+            return Ok(Next::End);
         }
         loop {
             if !work.try_charge(1) {
-                return Ok(SampleStep::Yield);
+                return Ok(Next::Yield);
             }
             match self.phase {
                 LocatePhase::Decode => {
@@ -1254,7 +1250,7 @@ impl SampleLocator<'_> {
                         self.cto,
                     )?;
                     self.done = true;
-                    return Ok(SampleStep::Sample(value));
+                    return Ok(Next::Item(value));
                 }
             }
         }

@@ -5,7 +5,7 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, TimeBase, WorkBudget,
 };
 use triergon_isobmff::{
-    Limits,
+    CursorStatus, Limits,
     compat::mov::{
         edits::{
             EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
@@ -15,7 +15,7 @@ use triergon_isobmff::{
             DependedOn, DependencyCause, DependencyObservation, EncodedMetadataProfile,
             EncodedRecoveryProfile, EncodedSelection, EncodedStream, EncodedStreamJob,
         },
-        packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
+        packets::{DemuxTrack, PacketCursor, PacketLimits},
         seek::{IndexCursor, IndexLimits},
     },
     config::ConfigurationLimits,

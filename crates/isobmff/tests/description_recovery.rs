@@ -6,10 +6,10 @@ use std::{
 };
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Limits, SampleStep,
+    BuildStatus, CursorStatus, Limits, Next,
     boxes::BoxView,
     compat::mov::{
-        packets::{CursorStatus, PacketLimits},
+        packets::PacketLimits,
         recovery::{
             DescriptionAssociation, DescriptionContext, DescriptionEmission, DescriptionEvent,
             DescriptionRead, DescriptionRecoveryBuilder, DescriptionRecoveryProfile,
@@ -131,9 +131,9 @@ fn all_zero_rows_retain_raw_configuration_and_all_source_ordinals() {
     let mut raw_rows = Vec::new();
     loop {
         match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Yield => {}
-            SampleStep::Sample(s) => raw_rows.push(s),
-            SampleStep::End => break,
+            Next::Yield => {}
+            Next::Item(s) => raw_rows.push(s),
+            Next::End => break,
         }
     }
     assert_eq!(raw_rows.len(), 6);

@@ -4,7 +4,7 @@
 //! an explicit caller requirement in container samples, not inferred codec or
 //! sample-group semantics. Demux edit occurrences and clocks are separate.
 use crate::{
-    Access, BuildStatus, Sample, SampleStep, fragment::FragmentLocator, interleave::SourceTrack,
+    Access, BuildStatus, Next, Sample, fragment::FragmentLocator, interleave::SourceTrack,
     table::SampleLocator,
 };
 use std::{
@@ -77,7 +77,7 @@ enum LocatedIn<'a> {
     Fragment(FragmentLocator<'a>),
 }
 impl LocatedIn<'_> {
-    fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         match self {
             Self::Regular(cursor) => cursor.poll(work),
             Self::Fragment(cursor) => cursor.poll(work),
@@ -134,7 +134,7 @@ impl<'a> IndexedLookup<'a> {
             _ => None,
         }
     }
-    fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         loop {
             if let Some(active) = &mut self.active {
                 return active.poll(work);
@@ -143,7 +143,7 @@ impl<'a> IndexedLookup<'a> {
                 return Err(Error::Unsupported("source seek ordinal not indexed"));
             };
             if !work.try_charge(1) {
-                return Ok(SampleStep::Yield);
+                return Ok(Next::Yield);
             }
             self.fragment = self.fragment.checked_add(1).ok_or(Error::Overflow)?;
             if index.track_id() != self.source.track_id() || index.sample_count() == 0 {
@@ -300,11 +300,11 @@ impl<'a> SourceSeekPlanner<'a> {
                         .ok_or(Error::Invalid("missing seek target lookup"))?
                         .poll(work)?
                     {
-                        SampleStep::Yield => return Ok(BuildStatus::Yield),
-                        SampleStep::End => {
+                        Next::Yield => return Ok(BuildStatus::Yield),
+                        Next::End => {
                             return Err(Error::Invalid("seek target lookup exhausted"));
                         }
-                        SampleStep::Sample(sample) => {
+                        Next::Item(sample) => {
                             self.sync_ordinal = sample.ordinal;
                             self.target = Some(sample);
                             self.lookup = None;
@@ -340,11 +340,11 @@ impl<'a> SourceSeekPlanner<'a> {
                         .ok_or(Error::Invalid("missing seek sync lookup"))?
                         .poll(work)?
                     {
-                        SampleStep::Yield => return Ok(BuildStatus::Yield),
-                        SampleStep::End => {
+                        Next::Yield => return Ok(BuildStatus::Yield),
+                        Next::End => {
                             return Err(Error::Invalid("seek sync lookup exhausted"));
                         }
-                        SampleStep::Sample(sample) => {
+                        Next::Item(sample) => {
                             let located = self
                                 .lookup
                                 .take()
@@ -411,11 +411,11 @@ impl<'a> SourceSeekPlanner<'a> {
                             .ok_or(Error::Invalid("missing seek range lookup"))?
                             .poll(work)?
                         {
-                            SampleStep::Yield => return Ok(BuildStatus::Yield),
-                            SampleStep::End => {
+                            Next::Yield => return Ok(BuildStatus::Yield),
+                            Next::End => {
                                 return Err(Error::Invalid("seek range lookup exhausted"));
                             }
-                            SampleStep::Sample(sample) => {
+                            Next::Item(sample) => {
                                 // The lookup stays to continue to the next sample.
                                 self.pending = Some(sample);
                                 self.extent = 0;
@@ -526,7 +526,7 @@ pub struct SourceSeekSamples<'a> {
     failed: Option<Error>,
 }
 impl SourceSeekSamples<'_> {
-    pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<SampleStep> {
+    pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Next<Sample>> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -536,12 +536,12 @@ impl SourceSeekSamples<'_> {
         }
         result
     }
-    fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<SampleStep> {
+    fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Next<Sample>> {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
         if self.done {
-            return Ok(SampleStep::End);
+            return Ok(Next::End);
         }
         IndexedLookup::locate(&mut self.lookup, self.source, self.next)?;
         match self
@@ -550,7 +550,7 @@ impl SourceSeekSamples<'_> {
             .ok_or(Error::Invalid("missing planned sample lookup"))?
             .poll(work)?
         {
-            SampleStep::Sample(sample) => {
+            Next::Item(sample) => {
                 if sample.ordinal != self.next {
                     return Err(Error::Invalid("planned sample ordinal changed"));
                 }
@@ -560,10 +560,10 @@ impl SourceSeekSamples<'_> {
                 } else {
                     self.next = self.next.checked_add(1).ok_or(Error::Overflow)?;
                 }
-                Ok(SampleStep::Sample(sample))
+                Ok(Next::Item(sample))
             }
-            SampleStep::End => Err(Error::Invalid("planned sample lookup exhausted")),
-            SampleStep::Yield => Ok(SampleStep::Yield),
+            Next::End => Err(Error::Invalid("planned sample lookup exhausted")),
+            Next::Yield => Ok(Next::Yield),
         }
     }
 }

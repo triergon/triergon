@@ -1,7 +1,7 @@
 //! Pin-bound startup clock view over validated source fragments.
 //! Unsigned tfdt and exact i128 source endpoints never become demux fields.
 use crate::{
-    BuildStatus, Sample, SampleStep,
+    BuildStatus, Next, Sample,
     boxes::BoxView,
     compat::mov::clocks::ClockField,
     fragment::{FragmentCursor, FragmentIndex},
@@ -185,9 +185,9 @@ impl<'a> FragmentClockJob<'a> {
                     .ok_or(Error::Invalid("v6 clock cursor absent"))?
                     .poll(work)?
                 {
-                    SampleStep::Yield => return Ok(BuildStatus::Yield),
-                    SampleStep::Sample(sample) => self.pending = Some(sample),
-                    SampleStep::End => {
+                    Next::Yield => return Ok(BuildStatus::Yield),
+                    Next::Item(sample) => self.pending = Some(sample),
+                    Next::End => {
                         let tfdt = self
                             .index
                             .decode_time()

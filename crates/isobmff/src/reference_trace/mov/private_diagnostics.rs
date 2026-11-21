@@ -2,8 +2,8 @@
 //! addresses are never invented. Reference read-demand spans borrow the REAL
 //! enclosing source table; short children never become validated codec boxes.
 use crate::{
-    BuildStatus, Limits,
-    boxes::{BoxChildren, BoxStep, BoxView},
+    BuildStatus, Limits, Next,
+    boxes::{BoxChildren, BoxView},
     movie::EntryLayout,
     table::SampleTable,
 };
@@ -329,13 +329,13 @@ impl PrivateDiagnosticJob {
                     return Err(Error::Invalid("diagnostic child cursor invariant"));
                 };
                 match children.poll(work)? {
-                    BoxStep::Yield => return Ok(BuildStatus::Yield),
-                    BoxStep::End => {
+                    Next::Yield => return Ok(BuildStatus::Yield),
+                    Next::End => {
                         self.children = None;
                         self.done = true;
                         continue;
                     }
-                    BoxStep::Box(raw) => {
+                    Next::Item(raw) => {
                         self.ordinal = self.ordinal.checked_add(1).ok_or(Error::Overflow)?;
                         self.pending = Some(raw);
                     }

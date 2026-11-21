@@ -2,7 +2,7 @@ mod common;
 use common::{child, fixtures::CASES};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    Limits, SampleStep,
+    Limits, Next,
     movie::{EditList, MovieHeader, TrackHeader},
     table::{SampleTable, SampleTableBuilder, SampleTablePolicy, SyncSamplePolicy},
 };
@@ -66,8 +66,7 @@ fn bounded_sync_keeps_only_the_reachable_prefix() {
             );
             let mut cursor = table.cursor();
             for ordinal in 1..=table.sample_count() {
-                let SampleStep::Sample(sample) = cursor.poll(&mut WorkBudget::new(1)).unwrap()
-                else {
+                let Next::Item(sample) = cursor.poll(&mut WorkBudget::new(1)).unwrap() else {
                     panic!("missing sample {ordinal}");
                 };
                 assert_eq!(sample.ordinal, ordinal);
@@ -113,13 +112,13 @@ fn exercise(case: &common::fixtures::Case) -> Result<(), Error> {
             let mut cursor = index.cursor();
             loop {
                 match cursor.poll(&mut WorkBudget::new(1))? {
-                    SampleStep::Sample(s) => {
+                    Next::Item(s) => {
                         if !media.iter().any(|r| s.require_within(r.clone()).is_ok()) {
                             return Err(Error::Invalid("sample outside source mdat"));
                         }
                     }
-                    SampleStep::End => break,
-                    SampleStep::Yield => {}
+                    Next::End => break,
+                    Next::Yield => {}
                 }
             }
             continue;
@@ -133,11 +132,11 @@ fn exercise(case: &common::fixtures::Case) -> Result<(), Error> {
         let mut cursor = index.cursor();
         assert!(matches!(
             cursor.poll(&mut WorkBudget::new(0))?,
-            SampleStep::Yield | SampleStep::End
+            Next::Yield | Next::End
         ));
         for expected in wanted {
             let actual = match cursor.poll(&mut WorkBudget::new(1))? {
-                SampleStep::Sample(s) => s,
+                Next::Item(s) => s,
                 other => panic!("{other:?}"),
             };
             assert_eq!(actual.ordinal, expected.ordinal, "{}", case.name);
@@ -163,17 +162,14 @@ fn exercise(case: &common::fixtures::Case) -> Result<(), Error> {
             let mut locate = index.locate(expected.ordinal)?;
             let located = loop {
                 match locate.poll(&mut WorkBudget::new(1))? {
-                    SampleStep::Sample(s) => break s,
-                    SampleStep::Yield => {}
-                    SampleStep::End => panic!("missing located sample"),
+                    Next::Item(s) => break s,
+                    Next::Yield => {}
+                    Next::End => panic!("missing located sample"),
                 }
             };
             assert_eq!(actual, located);
         }
-        assert!(matches!(
-            cursor.poll(&mut WorkBudget::new(1))?,
-            SampleStep::End
-        ));
+        assert!(matches!(cursor.poll(&mut WorkBudget::new(1))?, Next::End));
         assert!(index.locate(0).is_err());
         assert!(index.locate(index.sample_count() + 1).is_err());
         if let Ok(edts) = child(track, b"edts") {
@@ -247,12 +243,12 @@ fn required_signed_ctts_v1_preserves_raw_bits_and_negative_source_time() {
                 let mut actual = None;
                 for _ in 0..10_000 {
                     match cursor.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                        SampleStep::Yield => {}
-                        SampleStep::Sample(value) => {
+                        Next::Yield => {}
+                        Next::Item(value) => {
                             actual = Some(value);
                             break;
                         }
-                        SampleStep::End => panic!("missing required source sample"),
+                        Next::End => panic!("missing required source sample"),
                     }
                 }
                 let actual = actual.expect("bounded signed source cursor must make progress");
@@ -290,12 +286,12 @@ fn required_signed_ctts_v1_preserves_raw_bits_and_negative_source_time() {
                 let mut located = None;
                 for _ in 0..10_000 {
                     match locator.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                        SampleStep::Yield => {}
-                        SampleStep::Sample(value) => {
+                        Next::Yield => {}
+                        Next::Item(value) => {
                             located = Some(value);
                             break;
                         }
-                        SampleStep::End => panic!("missing located signed sample"),
+                        Next::End => panic!("missing located signed sample"),
                     }
                 }
                 assert_eq!(located, Some(actual));
@@ -303,12 +299,12 @@ fn required_signed_ctts_v1_preserves_raw_bits_and_negative_source_time() {
             let mut ended = false;
             for _ in 0..10_000 {
                 match cursor.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                    SampleStep::Yield => {}
-                    SampleStep::End => {
+                    Next::Yield => {}
+                    Next::End => {
                         ended = true;
                         break;
                     }
-                    SampleStep::Sample(_) => panic!("unexpected extra signed source sample"),
+                    Next::Item(_) => panic!("unexpected extra signed source sample"),
                 }
             }
             assert!(ended);
@@ -350,9 +346,9 @@ fn sparse_co64_offsets_never_narrow_to_host_slice_indices() {
     let mut locate = index.locate(6).unwrap();
     let sample = loop {
         match locate.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Sample(s) => break s,
-            SampleStep::Yield => {}
-            SampleStep::End => panic!(),
+            Next::Item(s) => break s,
+            Next::Yield => {}
+            Next::End => panic!(),
         }
     };
     assert_eq!(sample.range, SPARSE_OFFSET + 60..SPARSE_LENGTH);

@@ -6,8 +6,8 @@
 mod sidx;
 mod tfra;
 
-pub use sidx::{IndexStep, SegmentIndex, SegmentIndexCursor, SegmentReference};
+pub use sidx::{SegmentIndex, SegmentIndexCursor, SegmentReference};
 pub use tfra::{
-    FragmentRandomAccessCursor, FragmentRandomAccessEntry, FragmentRandomAccessStep,
-    MovieFragmentRandomAccessTail, TrackFragmentRandomAccess,
+    FragmentRandomAccessCursor, FragmentRandomAccessEntry, MovieFragmentRandomAccessTail,
+    TrackFragmentRandomAccess,
 };

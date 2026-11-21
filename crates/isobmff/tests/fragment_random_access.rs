@@ -1,9 +1,9 @@
 mod common;
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    Limits,
+    Limits, Next,
     boxes::BoxView,
-    index::{FragmentRandomAccessStep, MovieFragmentRandomAccessTail, TrackFragmentRandomAccess},
+    index::{MovieFragmentRandomAccessTail, TrackFragmentRandomAccess},
 };
 
 fn raw(pool: &Budget, kind: &[u8; 4], body: &[u8], start: u64) -> BoxView {
@@ -75,11 +75,9 @@ fn primary_tfra_all_number_widths_preserve_source_bits_order_and_sparse_offsets(
                     let mut cursor = index.cursor();
                     assert!(matches!(
                         cursor.poll(&mut WorkBudget::new(0)).unwrap(),
-                        FragmentRandomAccessStep::Yield
+                        Next::Yield
                     ));
-                    let FragmentRandomAccessStep::Entry(first) =
-                        cursor.poll(&mut WorkBudget::new(1)).unwrap()
-                    else {
+                    let Next::Item(first) = cursor.poll(&mut WorkBudget::new(1)).unwrap() else {
                         panic!()
                     };
                     assert_eq!(
@@ -90,15 +88,13 @@ fn primary_tfra_all_number_widths_preserve_source_bits_order_and_sparse_offsets(
                         [first.traf_number, first.trun_number, first.sample_number],
                         numbers
                     );
-                    let FragmentRandomAccessStep::Entry(second) =
-                        cursor.poll(&mut WorkBudget::new(1)).unwrap()
-                    else {
+                    let Next::Item(second) = cursor.poll(&mut WorkBudget::new(1)).unwrap() else {
                         panic!()
                     };
                     assert_eq!((second.time_ticks, second.moof_offset), (0, 128));
                     assert!(matches!(
                         cursor.poll(&mut WorkBudget::new(0)).unwrap(),
-                        FragmentRandomAccessStep::End
+                        Next::End
                     ));
                     assert_eq!(pool.used(), before);
                 }
@@ -115,7 +111,7 @@ fn tfra_empty_truncated_reserved_and_zero_numbers_never_grant_recovery() {
     assert_eq!(empty.entry_count(), 0);
     assert!(matches!(
         empty.cursor().poll(&mut WorkBudget::new(1)).unwrap(),
-        FragmentRandomAccessStep::End
+        Next::End
     ));
     // Parse validates bounded layout. Invalid 1-based record coordinates fail
     // when polled and cannot be skipped by retrying the same cursor.

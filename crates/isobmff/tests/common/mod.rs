@@ -3,8 +3,8 @@ pub mod fixtures;
 
 use triergon_core::{Budget, Bytes, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Limits,
-    boxes::{BoxStep, BoxView},
+    BuildStatus, Limits, Next,
+    boxes::BoxView,
     table::{SampleTable, SampleTableBuilder},
 };
 
@@ -17,9 +17,9 @@ pub fn children(parent: &BoxView, skip: usize) -> Result<Vec<BoxView>, Error> {
     let mut output = Vec::new();
     loop {
         match cursor.poll(&mut WorkBudget::new(7))? {
-            BoxStep::Box(value) => output.push(value),
-            BoxStep::End => return Ok(output),
-            BoxStep::Yield => {}
+            Next::Item(value) => output.push(value),
+            Next::End => return Ok(output),
+            Next::Yield => {}
         }
     }
 }

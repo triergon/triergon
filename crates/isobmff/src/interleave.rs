@@ -4,10 +4,10 @@
 //! demux packet schedule. This module implements an explicitly selected physical
 //! address order. It does not claim the reference MOV reader's default interleaving.
 use crate::{
-    Sample, SampleStep,
+    CursorStatus, Next, Sample,
     boxes::BoxHeader,
     fragment::{FragmentCursor, FragmentIndex, RunPosition},
-    sample::SpanStep,
+    sample::SampleSpan,
     table::{SampleCursor, SampleRanges, SampleTable, TimingRunPolicy, TimingRunSurplus},
 };
 use std::{
@@ -120,7 +120,7 @@ impl<'a> TrackSampleCursor<'a> {
         })
     }
     #[inline]
-    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -130,25 +130,25 @@ impl<'a> TrackSampleCursor<'a> {
         }
         result
     }
-    fn poll_inner(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    fn poll_inner(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         loop {
             if let Some(regular) = &mut self.regular {
                 match regular.poll(work)? {
-                    SampleStep::End => self.regular = None,
+                    Next::End => self.regular = None,
                     other => return Ok(other),
                 }
             }
             if let Some(current) = &mut self.current {
                 match current.poll(work)? {
-                    SampleStep::End => self.current = None,
+                    Next::End => self.current = None,
                     other => return Ok(other),
                 }
             }
             let Some(fragment) = self.source.fragments.get(self.next_fragment) else {
-                return Ok(SampleStep::End);
+                return Ok(Next::End);
             };
             if !work.try_charge(1) {
-                return Ok(SampleStep::Yield);
+                return Ok(Next::Yield);
             }
             self.next_fragment += 1;
             if fragment.track_id() == self.source.track_id {
@@ -180,25 +180,25 @@ impl<'a> TrackSpans<'a> {
     }
     /// The next span of at most `maximum` samples, charging a work unit for each
     /// sample and for each run and fragment index passed.
-    pub(crate) fn poll(&mut self, maximum: u64, work: &mut WorkBudget) -> Result<SpanStep> {
+    pub(crate) fn poll(&mut self, maximum: u64, work: &mut WorkBudget) -> Result<Next<SampleSpan>> {
         loop {
             if let Some(regular) = &mut self.regular {
                 match regular.next_span(maximum, work)? {
-                    SpanStep::End => self.regular = None,
+                    Next::End => self.regular = None,
                     other => return Ok(other),
                 }
             }
             if let Some((index, position)) = &mut self.current {
                 match index.next_span(position, maximum, work)? {
-                    SpanStep::End => self.current = None,
+                    Next::End => self.current = None,
                     other => return Ok(other),
                 }
             }
             let Some(fragment) = self.source.fragments.get(self.next_fragment) else {
-                return Ok(SpanStep::End);
+                return Ok(Next::End);
             };
             if !work.try_charge(1) {
-                return Ok(SpanStep::Yield);
+                return Ok(Next::Yield);
             }
             self.next_fragment += 1;
             if fragment.track_id() == self.source.track_id {
@@ -226,14 +226,6 @@ impl Default for PhysicalInterleaveLimits {
 pub struct InterleavedSample {
     pub track_id: u32,
     pub sample: Sample,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum InterleaveStatus {
-    Yield,
-    Ready,
-    /// All supplied source indexes ended. This is not an I/O EOF observation.
-    End,
 }
 
 #[derive(Debug)]
@@ -482,7 +474,7 @@ impl<'a> PhysicalSampleCursor<'a> {
             .take()
             .ok_or(Error::Invalid("no ready interleaved sample"))
     }
-    pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<InterleaveStatus> {
+    pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -492,17 +484,13 @@ impl<'a> PhysicalSampleCursor<'a> {
         }
         result
     }
-    fn poll_inner(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<InterleaveStatus> {
+    fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             if self.ready.is_some() {
-                return Ok(InterleaveStatus::Ready);
+                return Ok(CursorStatus::Ready);
             }
             match self.phase {
                 Phase::ValidateMedia => {
@@ -515,7 +503,7 @@ impl<'a> PhysicalSampleCursor<'a> {
                         continue;
                     }
                     if !work.try_charge(1) {
-                        return Ok(InterleaveStatus::Yield);
+                        return Ok(CursorStatus::Yield);
                     }
                     let extent = &media[self.index];
                     if extent.start > extent.end
@@ -537,22 +525,22 @@ impl<'a> PhysicalSampleCursor<'a> {
                         continue;
                     }
                     if !work.try_charge(1) {
-                        return Ok(InterleaveStatus::Yield);
+                        return Ok(CursorStatus::Yield);
                     }
                     self.phase = Phase::ValidateRead;
                 }
                 Phase::ValidateRead => {
                     let slot = &mut self.slots.as_mut_slice()[self.index];
                     match slot.cursor.poll(work)? {
-                        SampleStep::Yield => return Ok(InterleaveStatus::Yield),
-                        SampleStep::End => {
+                        Next::Yield => return Ok(CursorStatus::Yield),
+                        Next::End => {
                             slot.cursor = TrackSampleCursor::new(slot.source);
                             self.index += 1;
                             self.previous_start = None;
                             self.previous_ordinal = None;
                             self.phase = Phase::ValidateEnter;
                         }
-                        SampleStep::Sample(sample) => {
+                        Next::Item(sample) => {
                             self.validated =
                                 self.validated.checked_add(1).ok_or(Error::Overflow)?;
                             if self.validated > self.limits.max_samples {
@@ -587,7 +575,7 @@ impl<'a> PhysicalSampleCursor<'a> {
                         .ok_or(Error::Invalid("missing media validation sample"))?;
                     if self.extent_low < self.extent_high {
                         if !work.try_charge(1) {
-                            return Ok(InterleaveStatus::Yield);
+                            return Ok(CursorStatus::Yield);
                         }
                         let mid = self.extent_low + (self.extent_high - self.extent_low) / 2;
                         if media[mid].start <= sample.range.start {
@@ -648,7 +636,7 @@ impl<'a> PhysicalSampleCursor<'a> {
                         continue;
                     }
                     if !work.try_charge(1) {
-                        return Ok(InterleaveStatus::Yield);
+                        return Ok(CursorStatus::Yield);
                     }
                     let slot = &self.slots.as_slice()[self.index];
                     if slot.ended || slot.head.is_some() {
@@ -662,9 +650,9 @@ impl<'a> PhysicalSampleCursor<'a> {
                 Phase::ReadHead => {
                     let slot = &mut self.slots.as_mut_slice()[self.index];
                     match slot.cursor.poll(work)? {
-                        SampleStep::Yield => return Ok(InterleaveStatus::Yield),
-                        SampleStep::Sample(sample) => slot.head = Some(sample),
-                        SampleStep::End => slot.ended = true,
+                        Next::Yield => return Ok(CursorStatus::Yield),
+                        Next::Item(sample) => slot.head = Some(sample),
+                        Next::End => slot.ended = true,
                     }
                     self.index += 1;
                     self.phase = Phase::Fill;
@@ -689,7 +677,7 @@ impl<'a> PhysicalSampleCursor<'a> {
                         continue;
                     }
                     if !work.try_charge(1) {
-                        return Ok(InterleaveStatus::Yield);
+                        return Ok(CursorStatus::Yield);
                     }
                     let slots = self.slots.as_slice();
                     if let Some(head) = &slots[self.index].head {
@@ -717,9 +705,9 @@ impl<'a> PhysicalSampleCursor<'a> {
                         continue;
                     };
                     match slot.cursor.poll(work)? {
-                        SampleStep::Yield => return Ok(InterleaveStatus::Yield),
-                        SampleStep::End => self.index += 1,
-                        SampleStep::Sample(sample) => {
+                        Next::Yield => return Ok(CursorStatus::Yield),
+                        Next::End => self.index += 1,
+                        Next::Item(sample) => {
                             self.ready = Some(InterleavedSample {
                                 track_id: slot.source.track_id,
                                 sample,
@@ -727,7 +715,7 @@ impl<'a> PhysicalSampleCursor<'a> {
                         }
                     }
                 }
-                Phase::End => return Ok(InterleaveStatus::End),
+                Phase::End => return Ok(CursorStatus::End),
             }
         }
     }

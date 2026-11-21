@@ -5,10 +5,10 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
 use triergon_isobmff::{
+    CursorStatus,
     boxes::BoxView,
-    compat::mov::{
-        encoded::{EncodedEntryKind, EncodedStream, EncodedStreamJob, EncodedStreamProfile},
-        packets::CursorStatus,
+    compat::mov::encoded::{
+        EncodedEntryKind, EncodedStream, EncodedStreamJob, EncodedStreamProfile,
     },
     config::ConfigurationLimits,
     movie::TrackHeader,
@@ -100,8 +100,7 @@ fn config(data: &Source, kind: &[u8; 4], skip: usize) -> BoxView {
         .children(skip, triergon_isobmff::Limits::default())
         .unwrap();
     loop {
-        if let triergon_isobmff::boxes::BoxStep::Box(b) =
-            scan.poll(&mut WorkBudget::new(16)).unwrap()
+        if let triergon_isobmff::Next::Item(b) = scan.poll(&mut WorkBudget::new(16)).unwrap()
             && b.header().kind == *kind
         {
             return b;

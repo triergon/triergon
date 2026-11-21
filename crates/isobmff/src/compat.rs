@@ -67,7 +67,6 @@ pub mod mov {
         pub use super::cursor::{
             DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, PacketOccurrence, ResumePoint,
         };
-        pub use super::edit_list::CursorStatus;
         pub use super::view::{PacketProjector, PacketView, StreamView};
     }
 
@@ -194,7 +193,7 @@ pub mod mov {
     pub mod pcm {
         //! QuickTime PCM packets.
         //!
-        //! [`PcmStream`] admits one track of [`QtSoundDescriptionV0`](crate::quicktime::QtSoundDescriptionV0)
+        //! [`PcmStream`] admits one track of [`SoundDescriptionV0`](crate::quicktime::SoundDescriptionV0)
         //! samples. [`PcmCursor`] groups them into the [`PcmPacket`]s the demuxer emits,
         //! which do not match the source samples, and [`PcmReader`] reads one packet's
         //! bytes as a [`PcmPayload`].

@@ -1,5 +1,5 @@
 //! Adobe F4V 10.1 §1.3 / Apple QTFF atom bounds. UUID syntax stays opaque (G01).
-use crate::{Limits, fields, policy};
+use crate::{Limits, Next, fields, policy};
 use std::ops::Range;
 use triergon_core::{Bytes, Error, Result, WorkBudget};
 
@@ -147,12 +147,6 @@ impl BoxView {
 }
 
 #[derive(Debug)]
-pub enum BoxStep {
-    Box(BoxView),
-    Yield,
-    End,
-}
-#[derive(Debug)]
 pub struct BoxChildren {
     parent: BoxView,
     position: usize,
@@ -161,12 +155,12 @@ pub struct BoxChildren {
 }
 impl BoxChildren {
     /// One unit bounds one header/slice operation. Position changes only on success.
-    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<BoxStep> {
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<BoxView>> {
         if self.position == self.parent.bytes.len() {
-            return Ok(BoxStep::End);
+            return Ok(Next::End);
         }
         if !work.try_charge(1) {
-            return Ok(BoxStep::Yield);
+            return Ok(Next::Yield);
         }
         let next_count = self.count.checked_add(1).ok_or(Error::Overflow)?;
         policy(next_count, self.limits.max_boxes)?;
@@ -191,6 +185,6 @@ impl BoxChildren {
         let view = BoxView::checked(self.parent.bytes.slice(self.position..end)?, header)?;
         self.position = end;
         self.count = next_count;
-        Ok(BoxStep::Box(view))
+        Ok(Next::Item(view))
     }
 }

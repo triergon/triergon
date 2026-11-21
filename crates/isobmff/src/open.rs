@@ -6,8 +6,8 @@
 //! [`InputCursor`]. A source without random access can stop at the first media
 //! after a front movie, which [`Movie::read_scope`] records.
 use crate::{
-    BuildStatus, Limits,
-    boxes::{BoxChildren, BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView},
+    BuildStatus, Limits, Next,
+    boxes::{BoxChildren, BoxEvent, BoxHeader, BoxReader, BoxView},
     fields,
     fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
     movie::{EditList, MovieHeader, TrackHeader},
@@ -179,13 +179,13 @@ impl Walk {
             .children
             .poll(w)?
         {
-            BoxStep::Yield => Ok(false),
-            BoxStep::End => {
+            Next::Yield => Ok(false),
+            Next::End => {
                 self.frames.as_mut_slice()[at] = None;
                 self.depth -= 1;
                 Ok(self.depth == 0)
             }
-            BoxStep::Box(raw) => {
+            Next::Item(raw) => {
                 self.seen = self.seen.checked_add(1).ok_or(Error::Overflow)?;
                 if self.seen > l.format.max_boxes {
                     return Err(Error::Limit {
@@ -762,8 +762,8 @@ impl MovieOpen {
         }
         if let Some(refs) = self.refs.as_mut() {
             match refs.poll(w)? {
-                BoxStep::Yield => return Ok(OpenStep::Yield),
-                BoxStep::Box(raw) => {
+                Next::Yield => return Ok(OpenStep::Yield),
+                Next::Item(raw) => {
                     if self.references.len() >= self.limits.format.max_descriptions as usize {
                         return Err(Error::Limit {
                             requested: self.references.len() + 1,
@@ -774,7 +774,7 @@ impl MovieOpen {
                         Some(raw.header().kind == *b"url " && raw.payload() == [0, 0, 0, 1]);
                     return Ok(OpenStep::Yield);
                 }
-                BoxStep::End => {
+                Next::End => {
                     let dref = p.dref.as_ref().ok_or(Error::Invalid("missing dref"))?;
                     if fields::u32_at(dref.payload(), 4)? as usize != self.references.len() {
                         return Err(Error::Invalid("data reference count"));
@@ -1047,8 +1047,8 @@ impl MovieOpen {
         }
         if let Some(scan) = self.fragment_scan.as_mut() {
             match scan.poll(w)? {
-                BoxStep::Yield => return Ok(OpenStep::Yield),
-                BoxStep::Box(raw) if raw.header().kind == *b"tfhd" => {
+                Next::Yield => return Ok(OpenStep::Yield),
+                Next::Item(raw) if raw.header().kind == *b"tfhd" => {
                     let id = fields::u32_at(raw.payload(), 4)?;
                     let at = self
                         .tracks
@@ -1098,8 +1098,8 @@ impl MovieOpen {
                     self.fragment_scan = None;
                     return Ok(OpenStep::Yield);
                 }
-                BoxStep::Box(_) => return Ok(OpenStep::Yield),
-                BoxStep::End => return Err(Error::Invalid("traf missing tfhd")),
+                Next::Item(_) => return Ok(OpenStep::Yield),
+                Next::End => return Err(Error::Invalid("traf missing tfhd")),
             }
         }
         if self.fragment_children.is_none() {
@@ -1112,13 +1112,13 @@ impl MovieOpen {
             .ok_or(Error::Invalid("fragment children missing"))?
             .poll(w)?
         {
-            BoxStep::Yield => {}
-            BoxStep::Box(raw) if raw.header().kind == *b"traf" => {
+            Next::Yield => {}
+            Next::Item(raw) if raw.header().kind == *b"traf" => {
                 self.fragment_scan = Some(raw.children(0, self.limits.format)?);
                 self.fragment_raw = Some(raw);
             }
-            BoxStep::Box(_) => {}
-            BoxStep::End => {
+            Next::Item(_) => {}
+            Next::End => {
                 self.fragment_children = None;
                 self.fragment_moof += 1;
             }

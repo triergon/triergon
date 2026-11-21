@@ -6,7 +6,7 @@ use common::{collect, off, run_open};
 use triergon_core::{
     Budget, Bytes, InputCursor, Result, SourceCapabilities, SourceId, Time, WorkBudget,
 };
-use triergon_isobmff::{Limits, boxes::BoxStep, config::ConfigurationLimits, movie::EntryLayout};
+use triergon_isobmff::{Limits, Next, config::ConfigurationLimits, movie::EntryLayout};
 use triergon_mpegts::{
     PacketFormat, ParseLimits, TraceEvent,
     clock::SourceTimePolicy,
@@ -432,11 +432,11 @@ fn avc_configuration(packet: &Mp4Packet) -> Vec<u8> {
         .unwrap();
     loop {
         match children.poll(&mut WorkBudget::new(64)).unwrap() {
-            BoxStep::Box(child) if child.header().kind == *b"avcC" => {
+            Next::Item(child) if child.header().kind == *b"avcC" => {
                 return child.bytes()[usize::from(child.header().header_size)..].to_vec();
             }
-            BoxStep::Box(_) | BoxStep::Yield => {}
-            BoxStep::End => panic!("no avcC"),
+            Next::Item(_) | Next::Yield => {}
+            Next::End => panic!("no avcC"),
         }
     }
 }

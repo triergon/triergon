@@ -6,10 +6,10 @@ mod support;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, SampleStep,
+    BuildStatus, CursorStatus, Next,
     compat::mov::{
         clock::ClockOrigin,
-        packets::{CursorStatus, DemuxProfile, PacketOccurrence},
+        packets::{DemuxProfile, PacketOccurrence},
         seek::{IndexCursor, IndexEntry, IndexLimits, SeekJob, SeekLimits, SeekPlan},
     },
     interleave::SourceTrack,
@@ -247,7 +247,7 @@ fn signed_cts_demux_clock_selection_preserves_version_bits_and_source_time() {
     let movie = support::parse(&pool, include_bytes!("fixtures/r-ctts-v1.mov"));
     let mut source = movie.tracks[0].table.cursor();
     let first = loop {
-        if let SampleStep::Sample(s) = source.poll(&mut WorkBudget::new(1)).unwrap() {
+        if let Next::Item(s) = source.poll(&mut WorkBudget::new(1)).unwrap() {
             break s;
         }
     };

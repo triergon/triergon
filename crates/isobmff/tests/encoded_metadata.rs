@@ -5,12 +5,10 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
 use triergon_isobmff::{
-    compat::mov::{
-        encoded::{
-            EncodedCreationSource, EncodedMetadataProfile, EncodedSelection, EncodedStream,
-            EncodedStreamJob,
-        },
-        packets::CursorStatus,
+    CursorStatus,
+    compat::mov::encoded::{
+        EncodedCreationSource, EncodedMetadataProfile, EncodedSelection, EncodedStream,
+        EncodedStreamJob,
     },
     config::ConfigurationLimits,
     movie::TrackHeader,

@@ -5,10 +5,10 @@ mod support;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};
 use triergon_isobmff::{
-    SampleStep,
+    CursorStatus, Next,
     compat::mov::{
         clock::ClockOrigin,
-        packets::{CursorStatus, DemuxProfile},
+        packets::DemuxProfile,
         seek::{IndexCursor, IndexLimits},
     },
     interleave::{SourceTrack, TrackSampleCursor},
@@ -36,9 +36,9 @@ fn check(
         let mut ended = false;
         for _ in 0..4096 {
             match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-                SampleStep::Yield => {}
-                SampleStep::Sample(sample) => samples.push(sample),
-                SampleStep::End => {
+                Next::Yield => {}
+                Next::Item(sample) => samples.push(sample),
+                Next::End => {
                     ended = true;
                     break;
                 }

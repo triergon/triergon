@@ -3,10 +3,10 @@ use common::{child, roots};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    Access, BuildStatus, Limits, SampleStep,
+    Access, BuildStatus, CursorStatus, Limits, Next,
     boxes::BoxView,
     compat::mov::{
-        packets::{CursorStatus, PacketLimits},
+        packets::PacketLimits,
         recovery::{RecoveryTrackHeader, RunRecoveryBuilder, RunRecoveryProfile, RunRecoveryTable},
         seek::IndexLimits,
     },
@@ -147,9 +147,9 @@ fn malformed_positive_stss_keeps_raw_order_and_source_access_unknown() {
     let mut n = 0;
     loop {
         match c.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Yield => {}
-            SampleStep::End => break,
-            SampleStep::Sample(s) => {
+            Next::Yield => {}
+            Next::End => break,
+            Next::Item(s) => {
                 assert_eq!(s.access, Access::Unknown);
                 n += 1;
             }

@@ -9,11 +9,7 @@ use triergon_framing::{
         Av1TemporalUnitJob, Av1TemporalUnitLimits,
     },
 };
-use triergon_isobmff::{
-    Access, Limits,
-    boxes::{BoxChildren, BoxStep},
-    movie::EntryLayout,
-};
+use triergon_isobmff::{Access, Limits, Next, boxes::BoxChildren, movie::EntryLayout};
 use triergon_matroska::{Configuration, TypedPacket as MatroskaPacket};
 
 /// The player or sink keeps the original packet (and its clock) for the lifetime
@@ -191,14 +187,14 @@ impl Av1BridgeSetup {
         }
         if let Some(entry) = &mut self.entry {
             match entry.poll(work)? {
-                BoxStep::Yield => return Ok(BuildStep::Yield),
-                BoxStep::End => {
+                Next::Yield => return Ok(BuildStep::Yield),
+                Next::End => {
                     self.entry = None;
                     if self.record.is_none() {
                         return Err(Error::Invalid("AV1 sample entry has no av1C"));
                     }
                 }
-                BoxStep::Box(boxed) => {
+                Next::Item(boxed) => {
                     if boxed.header().kind == *b"av1C" {
                         if self.record.is_some() {
                             return Err(Error::Invalid("duplicate av1C"));

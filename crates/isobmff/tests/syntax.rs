@@ -1,8 +1,8 @@
 mod common;
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    Limits,
-    boxes::{BoxHeader, BoxStep, BoxView, HeaderRead},
+    Limits, Next,
+    boxes::{BoxHeader, BoxView, HeaderRead},
 };
 
 #[test]
@@ -70,15 +70,15 @@ fn child_work_yield_does_not_skip_a_box() {
     let mut children = parent.children(0, Limits::default()).unwrap();
     assert!(matches!(
         children.poll(&mut WorkBudget::new(0)).unwrap(),
-        BoxStep::Yield
+        Next::Yield
     ));
     match children.poll(&mut WorkBudget::new(1)).unwrap() {
-        BoxStep::Box(b) => assert_eq!(b.header().start, 108),
+        Next::Item(b) => assert_eq!(b.header().start, 108),
         _ => panic!(),
     }
     assert!(matches!(
         children.poll(&mut WorkBudget::new(1)).unwrap(),
-        BoxStep::End
+        Next::End
     ));
 }
 
@@ -110,9 +110,9 @@ fn retained_sample_entry_keeps_the_shared_core_charge_alive() {
         let mut count = 0;
         loop {
             match children.poll(&mut WorkBudget::new(1)).unwrap() {
-                BoxStep::Box(_) => count += 1,
-                BoxStep::Yield => {}
-                BoxStep::End => break,
+                Next::Item(_) => count += 1,
+                Next::Yield => {}
+                Next::End => break,
             }
         }
         assert_eq!(count, 11);

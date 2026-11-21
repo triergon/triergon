@@ -2,11 +2,11 @@ mod common;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    Limits, Sample, SampleStep,
+    CursorStatus, Limits, Next, Sample,
     boxes::BoxView,
     compat::mov::{
         edits::{EditCursor, EditLimits},
-        packets::{CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
+        packets::{DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
     },
     movie::{EditList, MovieHeader, TrackHeader},
     table::SampleTable,
@@ -146,9 +146,9 @@ fn unique_samples(table: &SampleTable) -> Vec<Sample> {
     let mut result = Vec::new();
     loop {
         match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Sample(sample) => result.push(sample),
-            SampleStep::Yield => {}
-            SampleStep::End => return result,
+            Next::Item(sample) => result.push(sample),
+            Next::Yield => {}
+            Next::End => return result,
         }
     }
 }

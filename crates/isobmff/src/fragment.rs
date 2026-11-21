@@ -4,10 +4,10 @@
 //! named flag semantics. Selected signed trun v1 uses FDAM3 replacement8.8.8.2
 //! and MPEG m76694 table9 Original, experimentally. Final clauses/brands stay open.
 use crate::{
-    Access, BuildStatus, Limits, Sample, SampleStep,
-    boxes::{BoxChildren, BoxStep, BoxView},
+    Access, BuildStatus, Limits, Next, Sample,
+    boxes::{BoxChildren, BoxView},
     fields, policy,
-    sample::{SampleSpan, SpanStep},
+    sample::SampleSpan,
 };
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
@@ -484,11 +484,11 @@ impl FragmentBuilder {
                     continue;
                 }
                 match self.boxes.poll(work)? {
-                    BoxStep::Yield => return Ok(BuildStatus::Yield),
-                    BoxStep::End => {
+                    Next::Yield => return Ok(BuildStatus::Yield),
+                    Next::End => {
                         self.phase = Phase::Initialize;
                     }
-                    BoxStep::Box(raw) => match &raw.header().kind {
+                    Next::Item(raw) => match &raw.header().kind {
                         b"tfhd" => {
                             if self.header.is_some() {
                                 return Err(Error::Invalid("duplicate tfhd"));
@@ -735,13 +735,13 @@ impl FragmentIndex {
         position: &mut RunPosition,
         maximum: u64,
         work: &mut WorkBudget,
-    ) -> Result<SpanStep> {
+    ) -> Result<Next<SampleSpan>> {
         loop {
             let Some(run) = self.runs.as_slice().get(position.run) else {
-                return Ok(SpanStep::End);
+                return Ok(Next::End);
             };
             if !work.try_charge(1) {
-                return Ok(SpanStep::Yield);
+                return Ok(Next::Yield);
             }
             if position.sample == run.wire.count {
                 position.run = position.run.checked_add(1).ok_or(Error::Overflow)?;
@@ -776,7 +776,7 @@ impl FragmentIndex {
                 .ok_or(Error::Overflow)?;
             position.sample += count;
             position.byte = end;
-            return Ok(SpanStep::Span(SampleSpan {
+            return Ok(Next::Item(SampleSpan {
                 first,
                 count: u64::from(count),
                 range: start..end,
@@ -801,12 +801,12 @@ impl FragmentCursor<'_> {
     pub(crate) fn run_index(&self) -> usize {
         self.run
     }
-    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         let Advance::Sample(next) = self.advance(work)? else {
-            return Ok(SampleStep::Yield);
+            return Ok(Next::Yield);
         };
         let Some(next) = next else {
-            return Ok(SampleStep::End);
+            return Ok(Next::End);
         };
         let values = next.values;
         let cto_ticks = values.cto.map(|value| value.ticks()).unwrap_or(0);
@@ -832,7 +832,7 @@ impl FragmentCursor<'_> {
             fragment_flags: Some(values.flags),
         };
         self.commit(&next);
-        Ok(SampleStep::Sample(sample))
+        Ok(Next::Item(sample))
     }
     /// Steps past the next sample without building it, as [`poll`](Self::poll)
     /// does.
@@ -981,7 +981,7 @@ impl FragmentLocator<'_> {
     pub(crate) fn passed_sync(&self) -> Option<u64> {
         self.passed_sync
     }
-    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -991,14 +991,14 @@ impl FragmentLocator<'_> {
         }
         result
     }
-    fn poll_inner(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    fn poll_inner(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         if self.done {
-            return Ok(SampleStep::End);
+            return Ok(Next::End);
         }
         loop {
             if self.cursor.is_none() {
                 if !work.try_charge(1) {
-                    return Ok(SampleStep::Yield);
+                    return Ok(Next::Yield);
                 }
                 if self.low < self.high {
                     let middle = self.low + (self.high - self.low) / 2;
@@ -1081,20 +1081,20 @@ impl FragmentLocator<'_> {
                         }
                         continue;
                     }
-                    RunSkip::Yield => return Ok(SampleStep::Yield),
+                    RunSkip::Yield => return Ok(Next::Yield),
                     RunSkip::End => {
                         return Err(Error::Invalid("fragment locator exhausted unexpectedly"));
                     }
                 }
             }
             match cursor.poll(work)? {
-                SampleStep::Sample(sample) if sample.ordinal == self.target => {
+                Next::Item(sample) if sample.ordinal == self.target => {
                     self.done = true;
-                    return Ok(SampleStep::Sample(sample));
+                    return Ok(Next::Item(sample));
                 }
-                SampleStep::Sample(_) => {}
-                SampleStep::Yield => return Ok(SampleStep::Yield),
-                SampleStep::End => {
+                Next::Item(_) => {}
+                Next::Yield => return Ok(Next::Yield),
+                Next::End => {
                     return Err(Error::Invalid("fragment locator exhausted unexpectedly"));
                 }
             }
@@ -1142,7 +1142,7 @@ impl OwnedFragmentCursor {
     pub fn index(&self) -> &FragmentIndex {
         &self.index
     }
-    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         let mut cursor = FragmentCursor {
             index: &self.index,
             run: self.run,

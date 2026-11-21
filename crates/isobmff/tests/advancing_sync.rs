@@ -4,11 +4,11 @@ use common::{child, fixtures::CASES};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Limits, Sample, SampleStep,
+    BuildStatus, CursorStatus, Limits, Next, Sample,
     boxes::BoxView,
     compat::mov::{
         edits::{EditCursor, EditLimits},
-        packets::{CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, ResumePoint},
+        packets::{DemuxProfile, DemuxTrack, PacketCursor, ResumePoint},
         seek::GlobalSeekJob,
     },
     movie::{EditList, MovieHeader, TrackHeader},
@@ -65,15 +65,15 @@ fn authored_stbl(
 fn next(cursor: &mut SampleCursor<'_>) -> Option<Sample> {
     let mut work = WorkBudget::new(1);
     match cursor.poll(&mut work).unwrap() {
-        SampleStep::Sample(sample) => {
+        Next::Item(sample) => {
             assert_eq!(work.spent(), 1, "one existing sample unit");
             Some(sample)
         }
-        SampleStep::End => {
+        Next::End => {
             assert_eq!(work.spent(), 0, "End does not consume a sample unit");
             None
         }
-        SampleStep::Yield => panic!("one sample unit must suffice"),
+        Next::Yield => panic!("one sample unit must suffice"),
     }
 }
 
@@ -293,9 +293,9 @@ fn check_membership(sync: Option<&[u32]>, partial: Option<&[u32]>) {
         let mut locator = table.locate(ordinal).unwrap();
         let located = loop {
             match locator.poll(&mut WorkBudget::new(1)).unwrap() {
-                SampleStep::Sample(value) => break value,
-                SampleStep::Yield => {}
-                SampleStep::End => panic!("missing random source sample"),
+                Next::Item(value) => break value,
+                Next::Yield => {}
+                Next::End => panic!("missing random source sample"),
             }
         };
         assert_eq!(located, samples[ordinal as usize - 1]);
@@ -352,10 +352,7 @@ fn zero_work_clone_and_restart_preserve_independent_row_positions() {
     let mut cursor = table.cursor();
     for sample in &expected[..2] {
         let mut empty = WorkBudget::new(0);
-        assert!(matches!(
-            cursor.poll(&mut empty).unwrap(),
-            SampleStep::Yield
-        ));
+        assert!(matches!(cursor.poll(&mut empty).unwrap(), Next::Yield));
         assert_eq!(empty.spent(), 0);
         assert_eq!(next(&mut cursor).as_ref(), Some(sample));
     }
@@ -489,7 +486,7 @@ fn membership_polling_does_not_change_owned_capacity_or_source_bytes() {
             assert_eq!(budget.used(), baseline);
         }
         let mut empty = WorkBudget::new(0);
-        assert!(matches!(cursor.poll(&mut empty).unwrap(), SampleStep::End));
+        assert!(matches!(cursor.poll(&mut empty).unwrap(), Next::End));
         assert_eq!(empty.spent(), 0);
     }
     assert_eq!(table.raw().bytes().as_ref(), original);

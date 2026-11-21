@@ -5,7 +5,7 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, TimeBase, WorkBudget,
 };
 use triergon_isobmff::{
-    Limits, SampleStep,
+    CursorStatus, Limits, Next,
     compat::mov::{
         edits::{
             EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
@@ -15,7 +15,7 @@ use triergon_isobmff::{
             EncodedConfigProfile, EncodedMetadataProfile, EncodedSelection, EncodedStream,
             EncodedStreamJob,
         },
-        packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
+        packets::{DemuxTrack, PacketCursor, PacketLimits},
         seek::{IndexCursor, IndexLimits},
     },
     config::ConfigurationLimits,
@@ -285,7 +285,7 @@ fn reserved_depended_on_field_is_not_a_false_or_true_repair() {
         Error::Unsupported("encoded V4 reserved depended-on value")
     );
     let mut c = s.table.cursor();
-    if let SampleStep::Sample(sample) = c.poll(&mut WorkBudget::new(1)).unwrap() {
+    if let Next::Item(sample) = c.poll(&mut WorkBudget::new(1)).unwrap() {
         assert_eq!(sample.dependency, Some(0x2e));
     } else {
         panic!("source sample unexpectedly absent");

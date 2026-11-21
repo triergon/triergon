@@ -3927,9 +3927,9 @@ fn range_configs(
     major_brand: Option<[u8; 4]>,
     input: &mut InputCursor,
 ) -> Vec<triergon_isobmff::compat::mov::encoded::EncodedStream> {
-    use triergon_isobmff::compat::mov::{
-        encoded::{EncodedSelection, EncodedStreamJob},
-        packets::CursorStatus,
+    use triergon_isobmff::{
+        CursorStatus,
+        compat::mov::encoded::{EncodedSelection, EncodedStreamJob},
     };
     let cancel = off();
     track
@@ -3973,9 +3973,9 @@ fn encoded_range_open(
 fn encoded_plans<S: triergon_playback::Source>(
     opened: &mut mp4_open::OpenedMp4<S>,
 ) -> Vec<Option<triergon_isobmff::compat::mov::edits::EncodedEditPlan>> {
-    use triergon_isobmff::compat::mov::{
-        edits::{EncodedEditContext, EncodedEditJob},
-        packets::CursorStatus,
+    use triergon_isobmff::{
+        CursorStatus,
+        compat::mov::edits::{EncodedEditContext, EncodedEditJob},
     };
     let cancel = off();
     let mut plans = Vec::new();
@@ -4181,7 +4181,7 @@ fn range_projection_does_not_admit_a_demux_clock_for_data_tracks() {
 
 #[test]
 fn range_media_projection_checks_excluded_sample_extents() {
-    use triergon_isobmff::{Limits, boxes::BoxStep};
+    use triergon_isobmff::{Limits, Next};
 
     let (opened, _) = open(RTP_HINTS, 97, 4096).unwrap();
     let hint = &opened.movie.tracks()[1];
@@ -4189,11 +4189,11 @@ fn range_media_projection_checks_excluded_sample_extents() {
     let mut children = hint.table().raw().children(0, Limits::default()).unwrap();
     let offset = loop {
         match children.poll(&mut WorkBudget::new(16)).unwrap() {
-            BoxStep::Box(view) if view.header().kind == *b"stco" => {
+            Next::Item(view) if view.header().kind == *b"stco" => {
                 break view.header().start as usize + usize::from(view.header().header_size) + 8;
             }
-            BoxStep::Box(_) | BoxStep::Yield => {}
-            BoxStep::End => panic!("hint track has no chunk offsets"),
+            Next::Item(_) | Next::Yield => {}
+            Next::End => panic!("hint track has no chunk offsets"),
         }
     };
     let mut invalid = rtp_hints_with_wide_clock();
@@ -4288,8 +4288,7 @@ fn edited_visual_description_fixture(
 #[test]
 fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
     use triergon_isobmff::{
-        Limits, SampleStep,
-        boxes::BoxStep,
+        Limits, Next,
         compat::mov::{
             edits::{EncodedEditContext, EncodedEditJob},
             encoded::{
@@ -4341,8 +4340,7 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
         }
         let configs = range_configs(track, opened.movie.major_brand(), &mut opened.input);
         let table = track.table();
-        let SampleStep::Sample(first) = table.cursor().poll(&mut WorkBudget::new(64)).unwrap()
-        else {
+        let Next::Item(first) = table.cursor().poll(&mut WorkBudget::new(64)).unwrap() else {
             panic!("expected the first source sample");
         };
         let refusal = Some(C::Unsupported("encoded codec requires range playback"));
@@ -4421,7 +4419,7 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
                 .description
                 .extensions(EntryLayout::Visual, Limits::default())
                 .unwrap();
-            let BoxStep::Box(config_box) = children.poll(&mut WorkBudget::new(64)).unwrap() else {
+            let Next::Item(config_box) = children.poll(&mut WorkBudget::new(64)).unwrap() else {
                 panic!("missing visual configuration box");
             };
             assert_eq!(config_box.header().kind, *config_kind);

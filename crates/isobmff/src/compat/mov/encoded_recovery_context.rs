@@ -3,8 +3,8 @@
 //! grouping kinds that have demux key/config effects outside this operation.
 use crate::compat::mov::encoded_recovery::RecoveryWalk;
 use crate::{
-    Limits,
-    boxes::{BoxChildren, BoxStep, BoxView},
+    Limits, Next,
+    boxes::{BoxChildren, BoxView},
     compat::mov::{encoded_contexts::SourceProfileFault, encoded_recovery::RecoveryFacts},
     fields,
     table::SampleTable,
@@ -61,9 +61,9 @@ impl RecoveryContextReceiver {
             }
             if let Some(scan) = &mut self.scan {
                 match scan.poll(work)? {
-                    BoxStep::Yield => return Ok(false),
-                    BoxStep::End => self.scan = None,
-                    BoxStep::Box(raw) => {
+                    Next::Yield => return Ok(false),
+                    Next::End => self.scan = None,
+                    Next::Item(raw) => {
                         let atom = raw.header().kind;
                         if atom == *b"sgpd" || atom == *b"sbgp" {
                             let kind = fields::fourcc(raw.payload(), 4)?;
