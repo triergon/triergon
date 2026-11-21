@@ -6,11 +6,85 @@ use super::{
 };
 use crate::clock::ClockKey;
 use crate::compat::adts;
-use crate::stream::{CarrierObservation, TraceEvent, TransportStream};
+use crate::stream::{CarrierObservation, FaultKind, TraceEvent, TransportStream};
 use crate::transport::ContinuityOutcome;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{Event, ReaderStep, TrackId};
 use triergon_core::{BudgetVec, Error, Result, SourceLocation, Step, WorkBudget};
+
+/// A transport event on its way to the caller.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "an unshared event stays inline until it is shared or returned"
+)]
+pub(super) enum InFlight {
+    /// No event is being admitted.
+    Idle,
+    /// Not shared yet. Carriers and ordinary continuity events stay here until they are returned.
+    Raw { event: TraceEvent, step: RawStep },
+    /// Shared and being admitted to the lanes.
+    Source {
+        source: SourceEvent,
+        step: Admission,
+    },
+}
+
+/// The work unit an unshared event pays next.
+#[derive(Clone, Copy)]
+pub(super) enum RawStep {
+    /// Share the event, or start an inline one.
+    Prepare,
+    /// The begin unit of an inline event.
+    Begin,
+    /// The publish unit of an inline event.
+    Publish,
+}
+
+/// How far a shared source event has been admitted to the lanes.
+pub(super) enum Admission {
+    /// Choose how the event is admitted.
+    Begin,
+    /// Keep or interrupt each lane from `index` on before a boundary, or drain them for
+    /// `Finished`; then build lanes from `rebuild`.
+    DrainAll {
+        index: usize,
+        /// Lanes kept so far; they are moved to the front.
+        retained: usize,
+        rebuild: Option<SourceEvent>,
+        /// A drained lane holds an unfinished tail that needs a storage audit.
+        deferred_fragment: bool,
+    },
+    /// Build or reuse the lane of stream `index` of `map`.
+    Build { index: usize, map: SourceEvent },
+    /// Restart lane `index` for a new PES run, then feed it the PES.
+    DrainLane(usize),
+    /// Restart lane `index` after a fault on its PID.
+    FaultLane(usize),
+    /// Queue the PES for lane `index`.
+    Feed(usize),
+    /// Audit storage for the unfinished tail of lane `index`, or of a later one.
+    Fragments(usize),
+    /// Publish the unfinished tail of lane `index`.
+    FragmentOutput(usize),
+    /// Commit the event and return it; `rebuilt` is the map the lanes were built from.
+    Publish { rebuilt: Option<SourceEvent> },
+}
+
+/// Lane work owed after a source event has been published.
+pub(super) enum LaneWork {
+    /// Nothing is owed.
+    Idle,
+    /// Push the published PES into `lane`.
+    Push {
+        lane: usize,
+        source: SourceEvent,
+        clock: ClockContext,
+    },
+    /// Report the lanes from this index on that have no framer for their stream.
+    Unsupported(usize),
+    /// Step this lane until it wants more payload.
+    Step(usize),
+}
 
 /// What the step loop does next.
 #[allow(
@@ -24,18 +98,30 @@ enum Flow {
     Return(ReaderStep<Reader>),
 }
 
-#[derive(Clone, Copy)]
-pub(super) enum Phase {
-    Prepare,
-    Begin,
-    DrainAll { index: usize, retained: usize },
-    Build(usize),
-    DrainLane(usize),
-    FaultLane(usize),
-    Feed(usize),
-    Fragments(usize),
-    FragmentOutput(usize),
-    Publish,
+/// The outcome of one admission call.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "returned by value in place, as an `Option<ReaderStep>` would be"
+)]
+enum Admitted {
+    /// The event stays in flight.
+    Kept(Flow),
+    /// The publish work unit is paid; `rebuilt` is the map the lanes were built from.
+    Publish { rebuilt: Option<SourceEvent> },
+}
+
+/// What one lane step produced.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "returned by value in place, as an `Option<ReaderStep>` would be"
+)]
+enum LaneOutput {
+    /// A step for the caller.
+    Ready(ReaderStep<Reader>),
+    /// The lane holds an unfinished tail that waits for the storage audit.
+    Deferred,
+    /// The lane wants more payload or has ended.
+    Done,
 }
 
 impl Reader {
@@ -154,7 +240,7 @@ impl Reader {
         draining: bool,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<ReaderStep<Self>>> {
+    ) -> Result<LaneOutput> {
         let delivery = self
             .seek
             .as_slice()
@@ -164,34 +250,25 @@ impl Reader {
                     self.lanes.as_slice()[index].track.stream().pid.into(),
                 ))
             });
+        let ready = |event| Ok(LaneOutput::Ready(Step::Ready(Event::Other(event))));
         loop {
             match self.lanes.as_mut_slice()[index].step(draining, delivery, work, cancel)? {
                 LaneStep::PictureProbe(picture) => self.observe_seek_picture(picture)?,
-                LaneStep::Packet(packet) => return Ok(Some(Step::Ready(Self::output(packet)))),
+                LaneStep::Packet(packet) => {
+                    return Ok(LaneOutput::Ready(Step::Ready(Self::output(packet))));
+                }
                 LaneStep::IncompleteVideo(video) => {
-                    return Ok(Some(Step::Ready(Event::Other(
-                        ReaderEvent::IncompleteVideo(video),
-                    ))));
+                    return ready(ReaderEvent::IncompleteVideo(video));
                 }
-                LaneStep::LatmPes(packet) => {
-                    return Ok(Some(Step::Ready(Event::Other(ReaderEvent::LatmPes(
-                        packet,
-                    )))));
-                }
-                LaneStep::UnframedAudio(audio) => {
-                    return Ok(Some(Step::Ready(Event::Other(ReaderEvent::UnframedAudio(
-                        audio,
-                    )))));
-                }
-                LaneStep::Yield => return Ok(Some(Step::Yield)),
-                LaneStep::DeferredFragment => {
-                    self.deferred_fragment = true;
-                    return Ok(None);
-                }
-                LaneStep::End | LaneStep::NeedPayload => return Ok(None),
+                LaneStep::LatmPes(packet) => return ready(ReaderEvent::LatmPes(packet)),
+                LaneStep::UnframedAudio(audio) => return ready(ReaderEvent::UnframedAudio(audio)),
+                LaneStep::Yield => return Ok(LaneOutput::Ready(Step::Yield)),
+                LaneStep::DeferredFragment => return Ok(LaneOutput::Deferred),
+                LaneStep::End | LaneStep::NeedPayload => return Ok(LaneOutput::Done),
             }
         }
     }
+
     // One loop per observer, kept out of line so each carrier event is built in the caller's
     // return slot. Only the transport poll and the inline fast return depend on the observer;
     // admission and lane work are compiled once.
@@ -209,29 +286,27 @@ impl Reader {
             if work.remaining() == 0 {
                 return Ok(Step::Yield);
             }
-            if self.raw.is_some() {
-                match self.share_raw(work, SEEKING)? {
+            if !matches!(self.flight, InFlight::Idle) {
+                let flow = match std::mem::replace(&mut self.flight, InFlight::Idle) {
+                    InFlight::Idle => Flow::Continue,
+                    InFlight::Raw { event, step } => self.share_raw(event, step, work, SEEKING)?,
+                    InFlight::Source { source, step } => {
+                        self.admit(source, step, work, cancel, SEEKING)?
+                    }
+                };
+                match flow {
                     Flow::Continue => continue,
                     Flow::Return(step) => return Ok(step),
                 }
             }
-            if self.pending.is_some() {
-                match self.admit(work, cancel, SEEKING)? {
-                    Flow::Continue => continue,
-                    Flow::Return(step) => return Ok(step),
-                }
-            }
-            if self.queued_pes.is_some() || self.unsupported_at.is_some() || self.active.is_some() {
+            if !matches!(self.lane_work, LaneWork::Idle) {
                 match self.run_lane_work(work, cancel)? {
                     Flow::Continue => continue,
                     Flow::Return(step) => return Ok(step),
                 }
             }
-            if self.finished {
-                return Ok(Step::End(
-                    self.end
-                        .ok_or(Error::Invalid("MPEG-TS missing source end"))?,
-                ));
+            if let super::Ending::Finished(at) = self.ending {
+                return Ok(Step::End(at));
             }
             let Transport::Open { input, stream } = &mut self.transport else {
                 return Err(Error::Invalid("MPEG-TS reader closed"));
@@ -263,11 +338,12 @@ impl Reader {
                             return Err(Error::Cancelled);
                         }
                         work.take(3);
-                        self.phase = Phase::Publish;
                         return Ok(Self::inline_source(event));
                     }
-                    self.raw = Some(event);
-                    self.phase = Phase::Prepare;
+                    self.flight = InFlight::Raw {
+                        event,
+                        step: RawStep::Prepare,
+                    };
                 }
                 Step::NeedInput(request) => {
                     if request.maximum == 0
@@ -293,334 +369,419 @@ impl Reader {
     }
 
     /// Shares a transport event that needs storage, or moves an inline one through its begin and
-    /// publish work units.
-    fn share_raw(&mut self, work: &mut WorkBudget, seeking: bool) -> Result<Flow> {
-        let Some(raw) = &self.raw else {
-            return Ok(Flow::Continue);
-        };
-        if matches!(self.phase, Phase::Prepare) {
-            if !work.try_charge(1) {
-                return Ok(Flow::Return(Step::Yield));
-            }
-            if !Self::is_inline_source(raw) {
-                let charge = Shared::<TraceEvent>::reserve(&self.pool).map_err(|error| {
-                    if matches!(error, Error::Backpressure { .. } | Error::Limit { .. })
-                        && let TraceEvent::Diagnostic(fault) = raw
-                        && fault.kind == crate::stream::FaultKind::Pes
-                        && matches!(fault.error, Error::Limit { .. })
-                    {
-                        // Return the permanent limit directly when a
-                        // shared diagnostic would exceed the budget.
-                        fault.error
-                    } else {
-                        error
-                    }
-                })?;
-                let event = self.raw.take().expect("raw source");
-                self.pending = Some(SourceEvent(Shared::new(event, charge)));
-            }
-            self.phase = Phase::Begin;
-        }
-        if self.raw.is_some() {
-            // Inline source events keep the original begin and publish
-            // work boundaries.
-            if !work.try_charge(1) {
-                return Ok(Flow::Return(Step::Yield));
-            }
-            if matches!(self.phase, Phase::Begin) {
-                self.phase = Phase::Publish;
-                return Ok(Flow::Continue);
-            }
-            let raw = self.raw.take().expect("inline source");
-            if seeking {
-                return Ok(Flow::Continue);
-            }
-            return Ok(Flow::Return(Self::inline_source(raw)));
-        }
-        Ok(Flow::Continue)
-    }
-
-    /// Admits the pending source event to the lanes, one resumable phase after another, and
-    /// publishes it.
-    fn admit(&mut self, work: &mut WorkBudget, cancel: &AtomicBool, seeking: bool) -> Result<Flow> {
-        match self.phase {
-            Phase::Prepare => unreachable!("pending source is prepared"),
-            Phase::Begin => {
-                if let Some(step) = self.begin(work)? {
-                    return Ok(Flow::Return(step));
-                }
-            }
-            Phase::DrainAll { index, retained } => {
-                if let Flow::Return(step) = self.drain_all(index, retained, work, cancel)? {
-                    return Ok(Flow::Return(step));
-                }
-                if matches!(self.phase, Phase::Fragments(_)) {
-                    return Ok(Flow::Continue);
-                }
-            }
-            Phase::Build(index) => {
-                if let Some(step) = self.build_lane(index, work)? {
-                    return Ok(Flow::Return(step));
-                }
-            }
-            Phase::DrainLane(index) | Phase::FaultLane(index) => {
-                if let Some(step) = self.restart_lane(index, work)? {
-                    return Ok(Flow::Return(step));
-                }
-            }
-            Phase::Fragments(index) => {
-                if let Some(step) = self.fragments(index, work, cancel)? {
-                    return Ok(Flow::Return(step));
-                }
-            }
-            Phase::FragmentOutput(index) => {
-                if let Some(step) = self.lane_step(index, true, work, cancel)? {
-                    return Ok(Flow::Return(step));
-                }
-                self.phase = Phase::Fragments(index + 1);
-            }
-            Phase::Feed(_) | Phase::Publish => {}
-        }
-        // Source admission can advance through queueing and publication
-        // under the same grant. Each phase remains resumable.
-        if let Phase::Feed(index) = self.phase
-            && let Some(step) = self.feed(index, work, cancel)?
-        {
-            return Ok(Flow::Return(step));
-        }
-        if matches!(self.phase, Phase::Publish) {
-            return self.publish(work, cancel, seeking);
-        }
-        Ok(Flow::Continue)
-    }
-
-    /// Chooses how the pending source event is admitted.
-    fn begin(&mut self, work: &mut WorkBudget) -> Result<Option<ReaderStep<Self>>> {
-        if !work.try_charge(1) {
-            return Ok(Some(Step::Yield));
-        }
-        let source = self.pending.as_ref().expect("pending source");
-        match source.event() {
-            TraceEvent::Pat(table) => {
-                self.tsid = Some(table.header.extension);
-                self.phase = if self.map.is_some()
-                    && !self.stream().is_some_and(TransportStream::has_active_map)
-                {
-                    Phase::DrainAll { index: 0, retained: 0 }
-                } else {
-                    Phase::Publish
-                };
-            }
-            TraceEvent::ProgramMap { active: true, configuration_epoch, .. }
-                if self.map.as_ref().is_none_or(|map| !matches!(map.event(), TraceEvent::ProgramMap { configuration_epoch: old, .. } if old == configuration_epoch)) => {
-                    self.rebuild = Some(source.clone());
-                    self.phase = Phase::DrainAll { index: 0, retained: 0 };
-                }
-            TraceEvent::Discontinuity { .. } | TraceEvent::Finished => {
-                self.rebuild = None;
-                self.phase = Phase::DrainAll { index: 0, retained: 0 };
-            }
-            TraceEvent::Timeline { .. } => {
-                self.rebuild = self.map.clone();
-                self.phase = Phase::DrainAll { index: 0, retained: 0 };
-            }
-            TraceEvent::Continuity { pid, outcome: ContinuityOutcome::SignalledDiscontinuity } => {
-                self.phase = self.lanes.as_slice().iter()
-                    .position(|lane| lane.track.stream().pid == *pid)
-                    .map_or(Phase::Publish, Phase::FaultLane);
-            }
-            TraceEvent::Pes(pes) | TraceEvent::UnboundedAdtsPes(adts::UnboundedPes(pes)) => {
-                if let Some(index) = self.lanes.as_slice().iter().position(|lane| lane.track.stream().pid == pes.pid) {
-                    let lane = &mut self.lanes.as_mut_slice()[index];
-                    if let PesRun::BeforeBoundary(start) = lane.run {
-                        lane.run = PesRun::Idle;
-                        if let Some(boundary) = &self.boundary
-                            && pes.header_source_ranges.as_slice().first().is_some_and(|range| {
-                                range.entity == start.source && range.offset == start.offset
-                            })
-                        {
-                            let event = ReaderEvent::InterruptedPes {
-                                source: source.clone(),
-                                boundary: boundary.clone(),
-                            };
-                            self.phase = Phase::Publish;
-                            return Ok(Some(Step::Ready(Event::Other(event))));
-                        }
-                    }
-                    self.phase = match lane.run {
-                        PesRun::Active(epochs, byte_run)
-                            if epochs != pes.epochs || byte_run != pes.byte_run_epoch => Phase::DrainLane(index),
-                        _ => Phase::Feed(index),
-                    };
-                } else { self.phase = Phase::Publish; }
-            }
-            TraceEvent::Diagnostic(fault) if matches!(fault.kind, crate::stream::FaultKind::Pes | crate::stream::FaultKind::Continuity | crate::stream::FaultKind::Transport) => {
-                if let Some(index) = self.lanes.as_slice().iter().position(|lane| Some(lane.track.stream().pid) == fault.pid) {
-                    self.phase = Phase::FaultLane(index);
-                } else if fault.pid.is_none() {
-                    self.rebuild = self.map.clone();
-                    self.phase = Phase::DrainAll { index: 0, retained: 0 };
-                } else { self.phase = Phase::Publish; }
-            }
-            TraceEvent::Diagnostic(fault) if fault.kind == crate::stream::FaultKind::Program => {
-                self.rebuild = self.map.clone();
-                self.phase = Phase::DrainAll { index: 0, retained: 0 };
-            }
-            _ => self.phase = Phase::Publish,
-        }
-        Ok(None)
-    }
-
-    /// Keeps or interrupts every lane before a boundary; on `Finished`, drains them instead.
-    #[inline(never)]
-    fn drain_all(
+    /// publish work units. The event is back in flight unless it was returned.
+    fn share_raw(
         &mut self,
-        index: usize,
-        mut retained: usize,
+        event: TraceEvent,
+        mut step: RawStep,
         work: &mut WorkBudget,
-        cancel: &AtomicBool,
+        seeking: bool,
     ) -> Result<Flow> {
-        if index < self.lanes.len() {
-            let cause = self.pending.as_ref().expect("pending boundary");
-            if matches!(cause.event(), TraceEvent::Finished) {
-                if let Some(step) = self.lane_step(index, true, work, cancel)? {
-                    return Ok(Flow::Return(step));
-                }
-            } else {
-                if !work.try_charge(1) {
-                    return Ok(Flow::Return(Step::Yield));
-                }
-                if self.keeps_lane(index, cause) {
-                    self.lanes.as_mut_slice().swap(index, retained);
-                    retained += 1;
-                } else if let Some(elementary_range) = self.lanes.as_slice()[index].unpublished() {
-                    let event = ReaderEvent::Interrupted {
-                        track: self.lanes.as_slice()[index].track.clone(),
-                        elementary_range,
-                        cause: cause.clone(),
-                    };
-                    self.phase = Phase::DrainAll {
-                        index: index + 1,
-                        retained,
-                    };
-                    return Ok(Flow::Return(Step::Ready(Event::Other(event))));
-                }
+        if let RawStep::Prepare = step {
+            if !work.try_charge(1) {
+                self.flight = InFlight::Raw { event, step };
+                return Ok(Flow::Return(Step::Yield));
             }
-            self.phase = Phase::DrainAll {
-                index: index + 1,
-                retained,
+            if !Self::is_inline_source(&event) {
+                let charge = match Shared::<TraceEvent>::reserve(&self.pool) {
+                    Ok(charge) => charge,
+                    Err(error) => {
+                        let error = match &event {
+                            // Return the permanent limit directly when a
+                            // shared diagnostic would exceed the budget.
+                            TraceEvent::Diagnostic(fault)
+                                if matches!(
+                                    error,
+                                    Error::Backpressure { .. } | Error::Limit { .. }
+                                ) && fault.kind == FaultKind::Pes
+                                    && matches!(fault.error, Error::Limit { .. }) =>
+                            {
+                                fault.error
+                            }
+                            _ => error,
+                        };
+                        self.flight = InFlight::Raw { event, step };
+                        return Err(error);
+                    }
+                };
+                self.flight = InFlight::Source {
+                    source: SourceEvent(Shared::new(event, charge)),
+                    step: Admission::Begin,
+                };
+                return Ok(Flow::Continue);
+            }
+            step = RawStep::Begin;
+        }
+        // Inline source events keep the original begin and publish
+        // work boundaries.
+        if !work.try_charge(1) {
+            self.flight = InFlight::Raw { event, step };
+            return Ok(Flow::Return(Step::Yield));
+        }
+        if let RawStep::Begin = step {
+            self.flight = InFlight::Raw {
+                event,
+                step: RawStep::Publish,
             };
             return Ok(Flow::Continue);
         }
-        if self.deferred_fragment
-            && matches!(
-                self.pending.as_ref().expect("pending boundary").event(),
-                TraceEvent::Finished
-            )
-        {
-            // No transport or framer can produce more bytes.
-            // Release opaque parser storage before auditing
-            // the remaining owners for fragment publication.
-            self.release_transport();
-            self.boundary = None;
-            self.active = None;
-            self.phase = Phase::Fragments(0);
+        if seeking {
             return Ok(Flow::Continue);
         }
-        if !matches!(
-            self.pending.as_ref().expect("pending boundary").event(),
-            TraceEvent::Finished
-        ) {
-            self.boundary = self.pending.clone();
-            self.lanes.truncate(retained);
-            self.staged_tracks.clear();
+        Ok(Flow::Return(Self::inline_source(event)))
+    }
+
+    /// Admits `source` to the lanes from `step` on and publishes it. Unless it is published, the
+    /// event is back in flight, also after an error.
+    fn admit(
+        &mut self,
+        source: SourceEvent,
+        mut step: Admission,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        seeking: bool,
+    ) -> Result<Flow> {
+        match self.admission(&source, &mut step, work, cancel) {
+            Ok(Admitted::Publish { rebuilt }) => Ok(self.publish(source, rebuilt, seeking)),
+            Ok(Admitted::Kept(flow)) => {
+                self.flight = InFlight::Source { source, step };
+                Ok(flow)
+            }
+            Err(error) => {
+                self.flight = InFlight::Source { source, step };
+                Err(error)
+            }
         }
-        self.active = None;
-        self.phase = if self.rebuild.is_some() {
-            Phase::Build(0)
-        } else {
-            Phase::Publish
+    }
+
+    /// Runs one resumable admission phase, then queueing and the publish work unit when the
+    /// phase leads to them under the same grant.
+    fn admission(
+        &mut self,
+        source: &SourceEvent,
+        step: &mut Admission,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Admitted> {
+        let keep = |flow| Ok(Admitted::Kept(flow));
+        let yielded = || Ok(Admitted::Kept(Flow::Return(Step::Yield)));
+        let ready = |event| {
+            Ok(Admitted::Kept(Flow::Return(Step::Ready(Event::Other(
+                event,
+            )))))
         };
-        Ok(Flow::Continue)
+        match step {
+            Admission::Begin => {
+                if !work.try_charge(1) {
+                    return yielded();
+                }
+                let (next, interrupted) = self.begin(source);
+                *step = next;
+                if let Some(event) = interrupted {
+                    return ready(event);
+                }
+            }
+            Admission::DrainAll {
+                index,
+                retained,
+                rebuild,
+                deferred_fragment,
+            } => {
+                if *index < self.lanes.len() {
+                    if matches!(source.event(), TraceEvent::Finished) {
+                        match self.lane_step(*index, true, work, cancel)? {
+                            LaneOutput::Ready(step) => return keep(Flow::Return(step)),
+                            LaneOutput::Deferred => *deferred_fragment = true,
+                            LaneOutput::Done => (),
+                        }
+                    } else {
+                        if !work.try_charge(1) {
+                            return yielded();
+                        }
+                        if let Some(event) = self.keep_or_interrupt(*index, retained, source) {
+                            *index += 1;
+                            return ready(event);
+                        }
+                    }
+                    *index += 1;
+                    return keep(Flow::Continue);
+                }
+                if matches!(source.event(), TraceEvent::Finished) {
+                    if *deferred_fragment {
+                        // No transport or framer can produce more bytes.
+                        // Release opaque parser storage before auditing
+                        // the remaining owners for fragment publication.
+                        self.release_transport();
+                        self.boundary = None;
+                        *step = Admission::Fragments(0);
+                        return keep(Flow::Continue);
+                    }
+                } else {
+                    self.boundary = Some(source.clone());
+                    self.lanes.truncate(*retained);
+                    self.staged_tracks.clear();
+                }
+                *step = match rebuild.take() {
+                    Some(map) => Admission::Build { index: 0, map },
+                    None => Admission::Publish { rebuilt: None },
+                };
+            }
+            Admission::Build { index, map } => {
+                if *index < map.map().streams.len() {
+                    if !work.try_charge(1) {
+                        return yielded();
+                    }
+                    self.build_lane(*index, map)?;
+                    *index += 1;
+                } else {
+                    self.lane_work = LaneWork::Unsupported(0);
+                    *step = match std::mem::replace(step, Admission::Begin) {
+                        Admission::Build { map, .. } => Admission::Publish { rebuilt: Some(map) },
+                        other => other,
+                    };
+                }
+            }
+            Admission::DrainLane(index) | Admission::FaultLane(index) => {
+                let index = *index;
+                let fault = matches!(step, Admission::FaultLane(_));
+                if !work.try_charge(1) {
+                    return yielded();
+                }
+                let interrupted = self.restart_lane(index, source)?;
+                *step = if fault {
+                    Admission::Publish { rebuilt: None }
+                } else {
+                    Admission::Feed(index)
+                };
+                if let Some(event) = interrupted {
+                    return ready(event);
+                }
+            }
+            Admission::Fragments(index) => {
+                let index = *index;
+                if index == self.lanes.len() {
+                    *step = Admission::Publish { rebuilt: None };
+                } else if self.lanes.as_slice()[index].has_incomplete() {
+                    if !self.audit_fragment(index, source, work, cancel)? {
+                        return yielded();
+                    }
+                    *step = Admission::FragmentOutput(index);
+                } else {
+                    if !work.try_charge(1) {
+                        return yielded();
+                    }
+                    *step = Admission::Fragments(index + 1);
+                }
+            }
+            Admission::FragmentOutput(index) => {
+                if let LaneOutput::Ready(output) = self.lane_step(*index, true, work, cancel)? {
+                    return keep(Flow::Return(output));
+                }
+                *step = Admission::Fragments(*index + 1);
+            }
+            Admission::Feed(_) | Admission::Publish { .. } => (),
+        }
+        // Source admission can advance through queueing and publication
+        // under the same grant. Each phase remains resumable.
+        if let Admission::Feed(index) = *step {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !work.try_charge(1) {
+                return yielded();
+            }
+            self.feed(index, source)?;
+            *step = Admission::Publish { rebuilt: None };
+        }
+        if let Admission::Publish { rebuilt } = step {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !work.try_charge(1) {
+                return yielded();
+            }
+            return Ok(Admitted::Publish {
+                rebuilt: rebuilt.take(),
+            });
+        }
+        keep(Flow::Continue)
+    }
+
+    /// Chooses how `source` is admitted, and returns the PES it interrupts when its lane's run
+    /// began before a boundary.
+    fn begin(&mut self, source: &SourceEvent) -> (Admission, Option<ReaderEvent>) {
+        let drain = |rebuild| Admission::DrainAll {
+            index: 0,
+            retained: 0,
+            rebuild,
+            deferred_fragment: false,
+        };
+        let publish = Admission::Publish { rebuilt: None };
+        let lane_of = |reader: &Self, pid: u16| {
+            reader
+                .lanes
+                .as_slice()
+                .iter()
+                .position(|lane| lane.track.stream().pid == pid)
+        };
+        let next = match source.event() {
+            TraceEvent::Pat(table) => {
+                self.tsid = Some(table.header.extension);
+                if self.map.is_some() && !self.stream().is_some_and(TransportStream::has_active_map)
+                {
+                    drain(None)
+                } else {
+                    publish
+                }
+            }
+            TraceEvent::ProgramMap {
+                active: true,
+                configuration_epoch,
+                ..
+            } if self.map.as_ref().is_none_or(|map| {
+                !matches!(map.event(), TraceEvent::ProgramMap { configuration_epoch: old, .. }
+                    if old == configuration_epoch)
+            }) =>
+            {
+                drain(Some(source.clone()))
+            }
+            TraceEvent::Discontinuity { .. } | TraceEvent::Finished => drain(None),
+            TraceEvent::Timeline { .. } => drain(self.map.clone()),
+            TraceEvent::Continuity {
+                pid,
+                outcome: ContinuityOutcome::SignalledDiscontinuity,
+            } => lane_of(self, *pid).map_or(publish, Admission::FaultLane),
+            TraceEvent::Pes(pes) | TraceEvent::UnboundedAdtsPes(adts::UnboundedPes(pes)) => {
+                let Some(index) = lane_of(self, pes.pid) else {
+                    return (publish, None);
+                };
+                let lane = &mut self.lanes.as_mut_slice()[index];
+                if let PesRun::BeforeBoundary(start) = lane.run {
+                    lane.run = PesRun::Idle;
+                    if let Some(boundary) = &self.boundary
+                        && pes
+                            .header_source_ranges
+                            .as_slice()
+                            .first()
+                            .is_some_and(|range| {
+                                range.entity == start.source && range.offset == start.offset
+                            })
+                    {
+                        let event = ReaderEvent::InterruptedPes {
+                            source: source.clone(),
+                            boundary: boundary.clone(),
+                        };
+                        return (publish, Some(event));
+                    }
+                }
+                match lane.run {
+                    PesRun::Active(epochs, byte_run)
+                        if epochs != pes.epochs || byte_run != pes.byte_run_epoch =>
+                    {
+                        Admission::DrainLane(index)
+                    }
+                    _ => Admission::Feed(index),
+                }
+            }
+            TraceEvent::Diagnostic(fault)
+                if matches!(
+                    fault.kind,
+                    FaultKind::Pes | FaultKind::Continuity | FaultKind::Transport
+                ) =>
+            {
+                if let Some(index) = fault.pid.and_then(|pid| lane_of(self, pid)) {
+                    Admission::FaultLane(index)
+                } else if fault.pid.is_none() {
+                    drain(self.map.clone())
+                } else {
+                    publish
+                }
+            }
+            TraceEvent::Diagnostic(fault) if fault.kind == FaultKind::Program => {
+                drain(self.map.clone())
+            }
+            _ => publish,
+        };
+        (next, None)
+    }
+
+    /// Before a boundary, moves lane `index` to the kept prefix or reports its unpublished bytes
+    /// as interrupted by `cause`.
+    fn keep_or_interrupt(
+        &mut self,
+        index: usize,
+        retained: &mut usize,
+        cause: &SourceEvent,
+    ) -> Option<ReaderEvent> {
+        if self.keeps_lane(index, cause) {
+            self.lanes.as_mut_slice().swap(index, *retained);
+            *retained += 1;
+            return None;
+        }
+        let lane = &self.lanes.as_slice()[index];
+        lane.unpublished()
+            .map(|elementary_range| ReaderEvent::Interrupted {
+                track: lane.track.clone(),
+                elementary_range,
+                cause: cause.clone(),
+            })
     }
 
     /// Builds or reuses the lane of stream `index` of the new program map.
     #[inline(never)]
-    fn build_lane(
-        &mut self,
-        index: usize,
-        work: &mut WorkBudget,
-    ) -> Result<Option<ReaderStep<Self>>> {
-        let source = self.rebuild.as_ref().expect("pending map");
-        if index < source.map().streams.len() {
-            if !work.try_charge(1) {
-                return Ok(Some(Step::Yield));
-            }
-            self.lanes
-                .try_reserve_exact(source.map().streams.len() - self.lanes.len())?;
-            self.staged_tracks
-                .try_reserve_exact(source.map().streams.len() - self.staged_tracks.len())?;
-            // Remember the exact open PES in a reused route.
-            // Physical offsets can restart in every entity.
-            let (epochs, pending_header) = self
-                .stream()
-                .and_then(|stream| {
-                    stream.route_state(index, source.map().streams.as_slice()[index].pid)
-                })
-                .ok_or(Error::Invalid("MPEG-TS track route missing"))?;
-            let stream = &source.map().streams.as_slice()[index];
-            let unlabelled_dts_core = self.limits.unlabelled_dts_core.is_some_and(|selection| {
-                selection.program == source.map().header.extension
-                    && selection.pid == stream.pid
-                    && stream.stream_type == crate::psi::PES_PRIVATE_DATA
-                    && stream.descriptor_bytes.is_empty()
-                    && source.map().program_descriptors.is_empty()
-            });
-            let track = Track {
-                source: source.clone(),
-                // A PMT cannot have more entries than the 13-bit PID space.
-                index: u16::try_from(index).map_err(|_| Error::Overflow)?,
-                epoch: epochs.configuration,
-                unlabelled_dts_core,
-            };
-            let retained = self.lanes.as_slice()[index..]
-                .iter()
-                .position(|lane| lane.track.stream().pid == track.stream().pid);
-            let position = if let Some(retained) = retained {
-                let position = index + retained;
-                self.lanes.as_mut_slice()[position].track = track.clone();
-                position
-            } else {
-                let frame = self.frames_track(track.stream().pid);
-                let mut lane = Lane::new(&self.pool, track.clone(), self.limits, frame)?;
-                if let Some(start) = pending_header {
-                    lane.run = PesRun::BeforeBoundary(start);
-                }
-                let position = self.lanes.len();
-                self.lanes.try_push(lane).map_err(|e| e.error)?;
-                position
-            };
-            self.lanes.as_mut_slice().swap(index, position);
-            self.staged_tracks.try_push(track).map_err(|e| e.error)?;
-            self.phase = Phase::Build(index + 1);
+    fn build_lane(&mut self, index: usize, source: &SourceEvent) -> Result<()> {
+        let map = source.map();
+        self.lanes
+            .try_reserve_exact(map.streams.len() - self.lanes.len())?;
+        self.staged_tracks
+            .try_reserve_exact(map.streams.len() - self.staged_tracks.len())?;
+        // Remember the exact open PES in a reused route.
+        // Physical offsets can restart in every entity.
+        let stream = &map.streams.as_slice()[index];
+        let (epochs, pending_header) = self
+            .stream()
+            .and_then(|transport| transport.route_state(index, stream.pid))
+            .ok_or(Error::Invalid("MPEG-TS track route missing"))?;
+        let unlabelled_dts_core = self.limits.unlabelled_dts_core.is_some_and(|selection| {
+            selection.program == map.header.extension
+                && selection.pid == stream.pid
+                && stream.stream_type == crate::psi::PES_PRIVATE_DATA
+                && stream.descriptor_bytes.is_empty()
+                && map.program_descriptors.is_empty()
+        });
+        let track = Track {
+            source: source.clone(),
+            // A PMT cannot have more entries than the 13-bit PID space.
+            index: u16::try_from(index).map_err(|_| Error::Overflow)?,
+            epoch: epochs.configuration,
+            unlabelled_dts_core,
+        };
+        let retained = self.lanes.as_slice()[index..]
+            .iter()
+            .position(|lane| lane.track.stream().pid == track.stream().pid);
+        let position = if let Some(retained) = retained {
+            let position = index + retained;
+            self.lanes.as_mut_slice()[position].track = track.clone();
+            position
         } else {
-            self.unsupported_at = Some(0);
-            self.phase = Phase::Publish;
-        }
-        Ok(None)
+            let frame = self.frames_track(track.stream().pid);
+            let mut lane = Lane::new(&self.pool, track.clone(), self.limits, frame)?;
+            if let Some(start) = pending_header {
+                lane.run = PesRun::BeforeBoundary(start);
+            }
+            let position = self.lanes.len();
+            self.lanes.try_push(lane).map_err(|e| e.error)?;
+            position
+        };
+        self.lanes.as_mut_slice().swap(index, position);
+        self.staged_tracks.try_push(track).map_err(|e| e.error)?;
+        Ok(())
     }
 
-    /// Replaces lane `index` with a fresh one after a PES run change or a fault on its PID.
+    /// Replaces lane `index` with a fresh one, and returns its unpublished bytes as interrupted
+    /// by `cause`.
     #[inline(never)]
-    fn restart_lane(
-        &mut self,
-        index: usize,
-        work: &mut WorkBudget,
-    ) -> Result<Option<ReaderStep<Self>>> {
-        let fault = matches!(self.phase, Phase::FaultLane(_));
-        if !work.try_charge(1) {
-            return Ok(Some(Step::Yield));
-        }
+    fn restart_lane(&mut self, index: usize, cause: &SourceEvent) -> Result<Option<ReaderEvent>> {
         let previous = &self.lanes.as_slice()[index];
         let track = previous.track.clone();
         let interrupted = previous
@@ -628,7 +789,7 @@ impl Reader {
             .map(|elementary_range| ReaderEvent::Interrupted {
                 track: track.clone(),
                 elementary_range,
-                cause: self.pending.as_ref().expect("pending PES").clone(),
+                cause: cause.clone(),
             });
         let frame = self.frames_track(track.stream().pid);
         let mut lane = Lane::new(&self.pool, track, self.limits, frame)?;
@@ -643,58 +804,33 @@ impl Reader {
             lane.run = previous.run;
         }
         self.lanes.as_mut_slice()[index] = lane;
-        self.phase = if fault {
-            Phase::Publish
-        } else {
-            Phase::Feed(index)
-        };
-        Ok(interrupted.map(|event| Step::Ready(Event::Other(event))))
+        Ok(interrupted)
     }
 
-    /// Audits storage for and copies the unfinished tail of lane `index` after `Finished`.
+    /// Audits the storage the unfinished tail of lane `index` may use; `false` when the audit
+    /// yields.
     #[inline(never)]
-    fn fragments(
+    fn audit_fragment(
         &mut self,
         index: usize,
+        finished: &SourceEvent,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<ReaderStep<Self>>> {
-        if index == self.lanes.len() {
-            self.phase = Phase::Publish;
-        } else if self.lanes.as_slice()[index].has_incomplete() {
-            let mut storage = match self.storage.take() {
-                Some(storage) => storage,
-                None => StorageScan::new(self)?,
-            };
-            if !storage.step(self, work, cancel)? {
-                self.storage = Some(storage);
-                return Ok(Some(Step::Yield));
-            }
-            self.lanes.as_mut_slice()[index].set_reader_storage(storage.bytes());
-            self.phase = Phase::FragmentOutput(index);
-        } else {
-            if !work.try_charge(1) {
-                return Ok(Some(Step::Yield));
-            }
-            self.phase = Phase::Fragments(index + 1);
+    ) -> Result<bool> {
+        let mut storage = match self.storage.take() {
+            Some(storage) => storage,
+            None => StorageScan::new(self, finished)?,
+        };
+        if !storage.step(self, work, cancel)? {
+            self.storage = Some(storage);
+            return Ok(false);
         }
-        Ok(None)
+        self.lanes.as_mut_slice()[index].set_reader_storage(storage.bytes());
+        Ok(true)
     }
 
-    /// Queues the pending PES for lane `index` with its clock.
-    fn feed(
-        &mut self,
-        index: usize,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<Option<ReaderStep<Self>>> {
-        if cancel.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled);
-        }
-        if !work.try_charge(1) {
-            return Ok(Some(Step::Yield));
-        }
-        let source = self.pending.as_ref().expect("pending PES");
+    /// Queues the PES of `source` for lane `index` with its clock.
+    fn feed(&mut self, index: usize, source: &SourceEvent) -> Result<()> {
         let pes = source.pes();
         let track = &self.lanes.as_slice()[index].track;
         let key = ClockKey {
@@ -709,29 +845,25 @@ impl Reader {
                 .stream()
                 .is_some_and(TransportStream::clock_is_quarantined),
         };
-        self.queued_pes = Some((index, source.clone(), clock));
-        self.phase = Phase::Publish;
-        Ok(None)
+        self.lane_work = LaneWork::Push {
+            lane: index,
+            source: source.clone(),
+            clock,
+        };
+        Ok(())
     }
 
-    /// Commits the pending source event's effects and returns it.
+    /// Commits the effects of `source` and returns it, unless a seek replay withholds it.
     fn publish(
         &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
+        source: SourceEvent,
+        rebuilt: Option<SourceEvent>,
         seeking: bool,
-    ) -> Result<Flow> {
-        if cancel.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled);
-        }
-        if !work.try_charge(1) {
-            return Ok(Flow::Return(Step::Yield));
-        }
-        if let Some(map) = self.rebuild.take() {
+    ) -> Flow {
+        if let Some(map) = rebuilt {
             self.map = Some(map);
             self.tracks = std::mem::replace(&mut self.staged_tracks, BudgetVec::new(&self.pool));
         }
-        let source = self.pending.take().expect("published source");
         match source.event() {
             TraceEvent::Pat(_) if !self.stream().is_some_and(TransportStream::has_active_map) => {
                 self.map = None;
@@ -744,56 +876,82 @@ impl Reader {
                 self.tsid = None;
                 self.boundary = None;
             }
-            TraceEvent::Finished => self.finished = true,
+            TraceEvent::Finished => {
+                if let super::Ending::Ended(at) = self.ending {
+                    self.ending = super::Ending::Finished(at);
+                }
+            }
             _ => (),
         }
         if seeking && !self.seek.as_slice()[0].publishes_source(source.event()) {
-            return Ok(Flow::Continue);
+            return Flow::Continue;
         }
-        Ok(Flow::Return(Step::Ready(Event::Other(
-            ReaderEvent::Source(source),
-        ))))
+        Flow::Return(Step::Ready(Event::Other(ReaderEvent::Source(source))))
     }
 
     /// Pushes a queued PES into its lane, reports unsupported lanes after a rebuild, or steps the
-    /// active lane.
+    /// active lane. The work stays owed unless it is done, also after an error.
     fn run_lane_work(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Flow> {
-        if let Some((index, source, key)) = self.queued_pes.take() {
-            let mut source = Some(source);
-            match self.lanes.as_mut_slice()[index].push(&mut source, key, work) {
-                Ok(true) => self.active = Some(index),
-                retry => {
-                    self.queued_pes = Some((index, source.expect("queued PES on retry"), key));
-                    retry?;
+        match std::mem::replace(&mut self.lane_work, LaneWork::Idle) {
+            LaneWork::Idle => Ok(Flow::Continue),
+            LaneWork::Push {
+                lane,
+                source,
+                clock,
+            } => match self.lanes.as_mut_slice()[lane].push(source, clock, work) {
+                Ok(None) => {
+                    self.lane_work = LaneWork::Step(lane);
+                    Ok(Flow::Continue)
+                }
+                Ok(Some(source)) => {
+                    self.lane_work = LaneWork::Push {
+                        lane,
+                        source,
+                        clock,
+                    };
+                    Ok(Flow::Return(Step::Yield))
+                }
+                Err(refused) => {
+                    self.lane_work = LaneWork::Push {
+                        lane,
+                        source: refused.value,
+                        clock,
+                    };
+                    Err(refused.error)
+                }
+            },
+            LaneWork::Unsupported(index) => {
+                if !work.try_charge(1) {
+                    self.lane_work = LaneWork::Unsupported(index);
                     return Ok(Flow::Return(Step::Yield));
                 }
+                if index + 1 < self.lanes.len() {
+                    self.lane_work = LaneWork::Unsupported(index + 1);
+                }
+                if let Some(lane) = self.lanes.as_slice().get(index)
+                    && let Some(error) = lane.unsupported
+                {
+                    return Ok(Flow::Return(Step::Ready(Event::Other(
+                        ReaderEvent::Unsupported {
+                            track: lane.track.clone(),
+                            error,
+                        },
+                    ))));
+                }
+                Ok(Flow::Continue)
             }
-            return Ok(Flow::Continue);
+            LaneWork::Step(lane) => match self.lane_step(lane, false, work, cancel) {
+                Ok(LaneOutput::Ready(step)) => {
+                    self.lane_work = LaneWork::Step(lane);
+                    Ok(Flow::Return(step))
+                }
+                Ok(LaneOutput::Deferred | LaneOutput::Done) => Ok(Flow::Continue),
+                Err(error) => {
+                    self.lane_work = LaneWork::Step(lane);
+                    Err(error)
+                }
+            },
         }
-        if let Some(index) = self.unsupported_at {
-            if !work.try_charge(1) {
-                return Ok(Flow::Return(Step::Yield));
-            }
-            self.unsupported_at = (index + 1 < self.lanes.len()).then_some(index + 1);
-            if let Some(lane) = self.lanes.as_slice().get(index)
-                && let Some(error) = lane.unsupported
-            {
-                return Ok(Flow::Return(Step::Ready(Event::Other(
-                    ReaderEvent::Unsupported {
-                        track: lane.track.clone(),
-                        error,
-                    },
-                ))));
-            }
-            return Ok(Flow::Continue);
-        }
-        if let Some(index) = self.active {
-            if let Some(step) = self.lane_step(index, false, work, cancel)? {
-                return Ok(Flow::Return(step));
-            }
-            self.active = None;
-        }
-        Ok(Flow::Continue)
     }
 
     /// Continues with the queued next entity, or records the logical end of the source.
@@ -807,7 +965,7 @@ impl Reader {
         let Transport::Open { input, stream } = &mut self.transport else {
             return Err(Error::Invalid("MPEG-TS reader closed"));
         };
-        if let Some(next) = self.next_entity {
+        if let super::Ending::Continues(next) = self.ending {
             let Some(end) = stream.media_entity_end(input, work, cancel)? else {
                 return Ok(Flow::Return(Step::Yield));
             };
@@ -818,10 +976,10 @@ impl Reader {
             end.validate_continuation(input)?;
             self.source = next.source;
             self.caps = next.capabilities;
-            self.next_entity = None;
+            self.ending = super::Ending::Open;
         } else {
             stream.end_of_source()?;
-            self.end = Some(location);
+            self.ending = super::Ending::Ended(location);
         }
         Ok(Flow::Continue)
     }

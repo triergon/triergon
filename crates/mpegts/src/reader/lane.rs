@@ -26,8 +26,8 @@ use std::{
 };
 use triergon_core::container::CodecId;
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, InputRequest, InputWindow, Result, SourceCapabilities,
-    SourceId, SourceLocation, Step, Time, WorkBudget,
+    Budget, BudgetVec, Bytes, Error, InputRequest, InputWindow, Refused, Result,
+    SourceCapabilities, SourceId, SourceLocation, Step, Time, WorkBudget,
 };
 use triergon_framing::{
     aac::{AacAdtsCarrierLimits, AacAdtsCarrierReader, AacAdtsStreamLimits, AacAdtsStreamReader},
@@ -338,6 +338,16 @@ struct Input {
     offset: usize,
 }
 
+/// Whether a PES can join a lane.
+enum Prepared {
+    /// The lane frames nothing from it.
+    Ignored,
+    /// The work grant is spent.
+    Yield,
+    /// Its piece is reserved and covers the lane's bytes up to `end`.
+    Piece { end: u64, serial: u64 },
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum StorageCursor {
     Transport(TransportStorageCursor),
@@ -574,13 +584,11 @@ pub(super) struct StorageScan {
 }
 
 impl StorageScan {
-    pub(super) fn new(reader: &super::Reader) -> Result<Self> {
+    /// The audit after `finished`, the source event being admitted, which it counts.
+    pub(super) fn new(reader: &super::Reader, finished: &SourceEvent) -> Result<Self> {
         if reader.stream().is_some()
             || reader.boundary.is_some()
-            || !reader
-                .pending
-                .as_ref()
-                .is_some_and(|source| matches!(source.event(), crate::stream::TraceEvent::Finished))
+            || !matches!(finished.event(), crate::stream::TraceEvent::Finished)
         {
             return Err(Error::Invalid("MPEG-TS fragment audit before source EOF"));
         }
@@ -1230,22 +1238,58 @@ impl Lane {
             .expect("pending fragment")
             .reader_storage = Some(bytes);
     }
-    // Admission leaves the queued source available on yield or error.
+    /// Admits the PES of `source`: `Ok(None)` once admitted or ignored, `Ok(Some(source))` when
+    /// the work grant is spent; a refusal returns the source with the error.
     pub(super) fn push(
         &mut self,
-        pending: &mut Option<SourceEvent>,
+        source: SourceEvent,
         clock: ClockContext,
         work: &mut WorkBudget,
-    ) -> Result<bool> {
+    ) -> std::result::Result<Option<SourceEvent>, Refused<SourceEvent>> {
+        let (end, serial) = match self.prepare_piece(source.pes(), work) {
+            Ok(Prepared::Piece { end, serial }) => (end, serial),
+            Ok(Prepared::Ignored) => return Ok(None),
+            Ok(Prepared::Yield) => return Ok(Some(source)),
+            Err(error) => {
+                return Err(Refused {
+                    error,
+                    value: source,
+                });
+            }
+        };
+        let pes = source.pes();
+        let payload_len = pes.payload_len;
+        let run = PesRun::Active(pes.epochs, pes.byte_run_epoch);
+        if let Err(rejected) = self.pieces.try_push(Piece {
+            range: self.supplied..end,
+            source,
+            clock,
+            serial,
+        }) {
+            return Err(Refused {
+                error: rejected.error,
+                value: rejected.value.source,
+            });
+        }
+        match &mut self.framer {
+            Some(Framer::DtsHd(reader)) => reader.begin_pes(payload_len),
+            Some(Framer::DtsExtension(reader)) => reader.begin_pes(payload_len),
+            _ => (),
+        }
+        self.serial = serial;
+        self.run = run;
+        self.input = self.framer.as_ref().map(|_| Input { span: 0, offset: 0 });
+        Ok(None)
+    }
+
+    /// Checks `pes` against the lane, pays its work unit and reserves its piece.
+    fn prepare_piece(&mut self, pes: &crate::pes::Pes, work: &mut WorkBudget) -> Result<Prepared> {
         if self.framer.is_none() && self.residue.is_none() {
-            return Ok(true);
+            return Ok(Prepared::Ignored);
         }
         if self.input.is_some() {
             return Err(Error::Invalid("MPEG-TS PES mailbox occupied"));
         }
-        let source = pending.as_ref().expect("queued PES");
-        let pes = source.pes();
-        let payload_len = pes.payload_len;
         match &self.framer {
             Some(Framer::DtsHd(reader)) => reader.check_pes(pes)?,
             Some(Framer::DtsExtension(reader)) => reader.check_pes(pes)?,
@@ -1268,7 +1312,7 @@ impl Lane {
             && pes.payload_len == 0
             && matches!(self.framer, Some(Framer::LatmPes))
         {
-            return Ok(true);
+            return Ok(Prepared::Ignored);
         }
         if pes.header.stream_id != 0xbd {
             if self.track.stream().descriptor_namespace() == DescriptorNamespace::Atsc
@@ -1287,7 +1331,7 @@ impl Lane {
             });
         }
         if !work.try_charge(1) {
-            return Ok(false);
+            return Ok(Prepared::Yield);
         }
         let end = self
             .supplied
@@ -1304,25 +1348,7 @@ impl Lane {
         }
         self.pieces.try_reserve_exact(1)?;
         let serial = self.serial.checked_add(1).ok_or(Error::Overflow)?;
-        let run = PesRun::Active(pes.epochs, pes.byte_run_epoch);
-        if let Err(rejected) = self.pieces.try_push(Piece {
-            range: self.supplied..end,
-            source: pending.take().expect("admitted PES"),
-            clock,
-            serial,
-        }) {
-            *pending = Some(rejected.value.source);
-            return Err(rejected.error);
-        }
-        match &mut self.framer {
-            Some(Framer::DtsHd(reader)) => reader.begin_pes(payload_len),
-            Some(Framer::DtsExtension(reader)) => reader.begin_pes(payload_len),
-            _ => (),
-        }
-        self.serial = serial;
-        self.run = run;
-        self.input = self.framer.as_ref().map(|_| Input { span: 0, offset: 0 });
-        Ok(true)
+        Ok(Prepared::Piece { end, serial })
     }
     fn check_video_residue_extent(&self, end: u64) -> Result<()> {
         let size = usize::try_from(end).map_err(|_| Error::Overflow)?;

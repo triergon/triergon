@@ -5,16 +5,16 @@ mod limits;
 mod model;
 mod seek;
 use crate::compat::adts;
-use crate::stream::{CarrierObservation, TraceEvent, TransportStream};
-use advance::Phase;
+use crate::stream::{CarrierObservation, TransportStream};
+use advance::{InFlight, LaneWork};
 use lane::{Lane, StorageScan};
 pub use limits::{AudioEofPolicy, DvbSubtitleTailPolicy, ReaderLimits};
+use model::Shared;
 pub use model::{
     Ac3AccessUnit, AccessUnit, DtsAudioFrame, DtsExtensionFrame, DvbSubtitleUnit, IncompleteVideo,
     LoasFrame, MpegAudioFrame, Packet, PacketClock, PayloadSource, ReaderEvent, SourceEvent, Track,
     UnframedAudio,
 };
-use model::{ClockContext, Shared};
 pub use seek::SeekEntity;
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{ContainerReader, Event, ReaderStep, SeekRequest, TrackId};
@@ -37,6 +37,19 @@ struct NextEntity {
     source: SourceId,
     capabilities: SourceCapabilities,
     transition: EntityTransition,
+}
+
+/// How the current entity ends.
+#[derive(Clone, Copy)]
+enum Ending {
+    /// No end has been declared.
+    Open,
+    /// The current entity is complete; the reader continues with this one.
+    Continues(NextEntity),
+    /// The transport reached the logical end here and drains its assemblers.
+    Ended(SourceLocation),
+    /// `Finished` has been published.
+    Finished(SourceLocation),
 }
 
 enum PacketTracks {
@@ -77,19 +90,11 @@ pub struct Reader {
     tracks: BudgetVec<Track>,
     staged_tracks: BudgetVec<Track>,
     map: Option<SourceEvent>,
-    raw: Option<TraceEvent>,
-    pending: Option<SourceEvent>,
-    phase: Phase,
-    rebuild: Option<SourceEvent>,
-    active: Option<usize>,
-    queued_pes: Option<(usize, SourceEvent, ClockContext)>,
-    unsupported_at: Option<usize>,
+    flight: InFlight,
+    lane_work: LaneWork,
     tsid: Option<u16>,
     boundary: Option<SourceEvent>,
-    next_entity: Option<NextEntity>,
-    end: Option<SourceLocation>,
-    finished: bool,
-    deferred_fragment: bool,
+    ending: Ending,
     storage: Option<StorageScan>,
     seek: BudgetVec<seek::Seeking>,
     seek_index: Option<Shared<seek::SeekIndex>>,
@@ -103,7 +108,7 @@ impl std::fmt::Debug for Reader {
             .field("source", &self.source)
             .field("limits", &self.limits)
             .field("tracks", &self.lanes.len())
-            .field("finished", &self.finished)
+            .field("finished", &matches!(self.ending, Ending::Finished(_)))
             .field("failure", &self.healthy().err())
             .finish_non_exhaustive()
     }
@@ -162,19 +167,11 @@ impl Reader {
             tracks: BudgetVec::new(pool),
             staged_tracks: BudgetVec::new(pool),
             map: None,
-            raw: None,
-            pending: None,
-            phase: Phase::Begin,
-            rebuild: None,
-            active: None,
-            queued_pes: None,
-            unsupported_at: None,
+            flight: InFlight::Idle,
+            lane_work: LaneWork::Idle,
             tsid: None,
             boundary: None,
-            next_entity: None,
-            end: None,
-            finished: false,
-            deferred_fragment: false,
+            ending: Ending::Open,
             storage: None,
             seek: BudgetVec::new(pool),
             seek_index: None,
@@ -376,7 +373,7 @@ impl Reader {
         capabilities: SourceCapabilities,
         transition: EntityTransition,
     ) -> Result<()> {
-        if self.next_entity.is_some() || self.end.is_some() {
+        if !matches!(self.ending, Ending::Open) {
             return Err(Error::Invalid(
                 "MPEG-TS entity completion already specified",
             ));
@@ -386,7 +383,7 @@ impl Reader {
         }
         token.request().checked_add(1).ok_or(Error::Overflow)?;
         self.finish_input(source, token)?;
-        self.next_entity = Some(NextEntity {
+        self.ending = Ending::Continues(NextEntity {
             source: next,
             capabilities,
             transition,
@@ -446,15 +443,13 @@ impl Reader {
         self.lanes = BudgetVec::new(&self.pool);
         self.tracks = BudgetVec::new(&self.pool);
         self.staged_tracks = BudgetVec::new(&self.pool);
-        self.pending = None;
-        self.raw = None;
+        self.flight = InFlight::Idle;
         self.map = None;
-        self.rebuild = None;
-        self.active = None;
-        self.queued_pes = None;
-        self.unsupported_at = None;
+        self.lane_work = LaneWork::Idle;
         self.boundary = None;
-        self.next_entity = None;
+        if let Ending::Continues(_) = self.ending {
+            self.ending = Ending::Open;
+        }
         self.storage = None;
         self.seek = BudgetVec::new(&self.pool);
         self.seek_index = None;

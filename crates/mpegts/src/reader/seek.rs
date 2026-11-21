@@ -14,8 +14,8 @@ use triergon_core::container::{
     TrackId, TrackInfo,
 };
 use triergon_core::{
-    Budget, BudgetVec, Charged, Error, InputRequest, Result, SourceCapabilities, SourceId, Step,
-    Time, WorkBudget,
+    Budget, BudgetVec, Charged, Error, InputRequest, Result, SourceCapabilities, SourceId,
+    SourceLocation, Step, Time, WorkBudget,
 };
 use triergon_framing::{
     aac, dts,
@@ -184,7 +184,10 @@ enum Phase {
         skipped: bool,
     },
     Deliver(Packet),
-    Retained(RetainedOutput),
+    Retained {
+        output: RetainedOutput,
+        end: SourceLocation,
+    },
 }
 
 pub(super) struct Seeking {
@@ -406,7 +409,7 @@ impl Seeking {
                 }
             }
             Phase::Replay { .. } => PictureDelivery::Discard,
-            Phase::Deliver(_) | Phase::Retained(_) => PictureDelivery::Full,
+            Phase::Deliver(_) | Phase::Retained { .. } => PictureDelivery::Full,
         }
     }
 }
@@ -532,7 +535,9 @@ impl Reader {
                 *skipped = true;
                 Ok(())
             }
-            Phase::Deliver(_) | Phase::Retained(_) => unreachable!("a seek probe precedes landing"),
+            Phase::Deliver(_) | Phase::Retained { .. } => {
+                unreachable!("a seek probe precedes landing")
+            }
         }
     }
 
@@ -924,15 +929,14 @@ impl Reader {
                 }
                 continue;
             }
-            if let Phase::Retained(output) = &mut seek.phase {
+            if let Phase::Retained { output, end } = &mut seek.phase {
                 work.try_charge(1);
                 if let Some(event) = output.next(&mut self.tracks) {
                     return Ok(Step::Ready(event));
                 }
+                let end = *end;
                 self.seek = BudgetVec::new(&self.pool);
-                return Ok(Step::End(
-                    self.end.ok_or(Error::Invalid("retained seek end"))?,
-                ));
+                return Ok(Step::End(end));
             }
             if matches!(seek.phase, Phase::Deliver(_)) {
                 work.try_charge(1);
@@ -1029,7 +1033,10 @@ impl Reader {
                             seek_result(request, landing, Some(end.offset), retain.skipped);
                         let tracks =
                             std::mem::replace(&mut self.tracks, BudgetVec::new(&self.pool));
-                        seek.phase = Phase::Retained(retain.finish(result, tracks));
+                        seek.phase = Phase::Retained {
+                            output: retain.finish(result, tracks),
+                            end,
+                        };
                         continue;
                     }
                     let (source, caps) = self
