@@ -1,5 +1,5 @@
 use crate::nal::{Codec, NalHeader};
-use crate::retryable;
+use crate::{freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
@@ -201,7 +201,7 @@ pub struct NalReader {
     limits: ReaderLimits,
     compact_annex_b: bool,
     phase: Phase,
-    buffer: Option<BudgetVec<u8>>,
+    buffer: BudgetVec<u8>,
     current: Option<NalFraming>,
     next: Option<NalFraming>,
     prefix_offset: u64,
@@ -240,7 +240,7 @@ impl NalReader {
                 Framing::LengthPrefixed(_) => Phase::Length,
                 Framing::AnnexB => Phase::AnnexPrefix,
             },
-            buffer: None,
+            buffer: BudgetVec::new(pool),
             current: None,
             next: None,
             prefix_offset: 0,
@@ -324,7 +324,7 @@ impl NalReader {
         if self.cursor.buffered_owner().is_some() {
             return Err(Error::Invalid("NAL reader has buffered input"));
         }
-        Ok(self.buffer.as_ref().map_or(0, BudgetVec::capacity))
+        Ok(self.buffer.capacity())
     }
 
     /// The pool input windows and NAL units are charged to.
@@ -380,10 +380,7 @@ impl NalReader {
             return Ok(false);
         }
         let maximum = self.limits.maximum_nal_bytes;
-        let buffer = self
-            .buffer
-            .as_mut()
-            .ok_or(Error::Invalid("missing NAL builder"))?;
+        let buffer = &mut self.buffer;
         match self
             .cursor
             .consume_response(request, bytes.len(), work, cancel, || {
@@ -438,7 +435,7 @@ impl NalReader {
             );
         }
         self.failure = Some(error);
-        self.buffer = None;
+        self.buffer = BudgetVec::new(self.cursor.budget());
         self.pending_byte = None;
         self.next = None;
     }
@@ -479,12 +476,6 @@ impl NalReader {
         result
     }
 
-    fn buffer(&mut self) -> Result<&mut BudgetVec<u8>> {
-        self.buffer
-            .as_mut()
-            .ok_or(Error::Invalid("missing NAL builder"))
-    }
-
     fn check_padding(&self, count: usize) -> Result<()> {
         if count > self.limits.maximum_padding_bytes {
             return Err(Error::Limit {
@@ -513,7 +504,7 @@ impl NalReader {
     }
 
     fn append_byte(&mut self, byte: u8) -> Result<()> {
-        let count = self.buffer()?.len().checked_add(1).ok_or(Error::Overflow)?;
+        let count = self.buffer.len().checked_add(1).ok_or(Error::Overflow)?;
         if count > self.limits.maximum_nal_bytes {
             return Err(Error::Limit {
                 requested: count,
@@ -521,7 +512,7 @@ impl NalReader {
             });
         }
         self.reserve_compact_payload(1)?;
-        self.buffer()?
+        self.buffer
             .try_push(byte)
             .map_err(|rejected| rejected.error)
     }
@@ -531,7 +522,7 @@ impl NalReader {
             return Ok(());
         }
         let maximum = self.limits.maximum_nal_bytes;
-        reserve_nal_bytes(self.buffer()?, maximum, count)
+        reserve_nal_bytes(&mut self.buffer, maximum, count)
     }
 
     fn observed_prefix(&self, leading_zero_bytes: usize) -> Result<NalFraming> {
@@ -653,10 +644,7 @@ impl NalReader {
                         Framing::AnnexB if self.compact_annex_b => 0,
                         Framing::AnnexB => self.limits.maximum_nal_bytes,
                     };
-                    if self.buffer.is_none() {
-                        self.buffer = Some(BudgetVec::new(self.cursor.budget()));
-                    }
-                    self.buffer()?.try_reserve_exact(capacity)?;
+                    self.buffer.try_reserve_exact(capacity)?;
                     self.phase = match self.framing {
                         Framing::LengthPrefixed(_) => Phase::LengthPayload,
                         Framing::AnnexB => Phase::AnnexPayload,
@@ -665,7 +653,7 @@ impl NalReader {
                 Phase::LengthPayload => {
                     let remaining = self
                         .declared_length
-                        .checked_sub(self.buffer()?.len())
+                        .checked_sub(self.buffer.len())
                         .ok_or(Error::Overflow)?;
                     if remaining == 0 {
                         self.phase = Phase::Finish;
@@ -675,7 +663,7 @@ impl NalReader {
                     // caller grants a very large step budget/window.
                     match self.cursor.read_span(remaining.min(4096), work, cancel)? {
                         Step::Ready(bytes) => {
-                            self.buffer()?.try_extend_from_slice(bytes.as_ref())?;
+                            self.buffer.try_extend_from_slice(bytes.as_ref())?;
                         }
                         Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                         Step::Yield => return Ok(Step::Yield),
@@ -689,11 +677,10 @@ impl NalReader {
                         let count = nonzero_prefix_len(&window[..maximum]);
                         if count != 0 {
                             self.reserve_compact_payload(count)?;
-                            let buffer = self
-                                .buffer
-                                .as_mut()
-                                .ok_or(Error::Invalid("missing NAL builder"))?;
-                            match self.cursor.read_append(buffer, count, work, cancel)? {
+                            match self
+                                .cursor
+                                .read_append(&mut self.buffer, count, work, cancel)?
+                            {
                                 Step::Ready(_) => continue,
                                 Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                                 Step::Yield => return Ok(Step::Yield),
@@ -710,7 +697,7 @@ impl NalReader {
                             self.check_padding(self.trailing_zero_bytes)?;
                             self.next = Some(self.observed_prefix(0)?);
                             self.zeroes = 0;
-                            if self.buffer()?.is_empty() {
+                            if self.buffer.is_empty() {
                                 return Err(Error::Invalid("empty Annex B NAL"));
                             }
                             self.phase = Phase::Finish;
@@ -770,20 +757,10 @@ impl NalReader {
                         return Ok(Step::Yield);
                     }
                     let codec = self.codec;
-                    let header = NalHeader::parse(codec, self.buffer()?.as_slice())?;
+                    let header = NalHeader::parse(codec, self.buffer.as_slice())?;
                     let framing = self.current.ok_or(Error::Invalid("missing NAL framing"))?;
                     let payload_offset = framing.payload_offset()?;
-                    let buffer = self
-                        .buffer
-                        .take()
-                        .ok_or(Error::Invalid("missing NAL builder"))?;
-                    let bytes = match buffer.freeze() {
-                        Ok(bytes) => bytes,
-                        Err(rejected) => {
-                            self.buffer = Some(rejected.value);
-                            return Err(rejected.error);
-                        }
-                    };
+                    let bytes = freeze_whole(&mut self.buffer)?;
                     let facts = NalFacts {
                         source: self.cursor.source(),
                         framing,

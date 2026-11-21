@@ -346,6 +346,9 @@ impl RawAnnexBReader {
     /// [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the reader
     /// keeps its progress. Every other error is final and returned again by each later
     /// call.
+    // Out of line: inlined into a caller's per-packet dispatch, it slows that
+    // caller's other paths.
+    #[inline(never)]
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
