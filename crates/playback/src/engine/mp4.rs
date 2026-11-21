@@ -45,6 +45,10 @@ pub(crate) enum Mp4RangeLanding<'a> {
 }
 
 /// How an MP4 engine chooses its rows after a seek.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "the replay is polled in place per packet; a box would add a load to each"
+)]
 #[derive(Debug)]
 pub(crate) enum SeekReplay {
     /// In plan order.
