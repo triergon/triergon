@@ -25,12 +25,8 @@ impl Substream {
                 self.expstr[LFE][blk] = br.read(1) as u8;
             }
         }
-        if blk == 0 {
-            for ch in self.coded_channels().collect::<ArrayVec6>().iter() {
-                if self.expstr[*ch][0] == REUSE && !eac3 {
-                    return Err(bad("exponent reuse in block 0"));
-                }
-            }
+        if blk == 0 && !eac3 && self.coded_channels().any(|ch| self.expstr[ch][0] == REUSE) {
+            return Err(bad("exponent reuse in block 0"));
         }
         // Channel bandwidth codes.
         for ch in 0..nfch {
@@ -102,38 +98,13 @@ impl Substream {
     }
 }
 
-/// Resolve the exponent group count (7.1.3) for D15/D25/D45.
+/// Exponents per group (7.1.3) of the D15, D25 and D45 strategies.
 #[inline]
 fn grp_size(strategy: u8) -> usize {
     match strategy {
         1 => 1,
         2 => 2,
         _ => 4,
-    }
-}
-
-/// Small stack vector of coded channel indices.
-struct ArrayVec6 {
-    v: [usize; 6],
-    n: usize,
-}
-
-impl FromIterator<usize> for ArrayVec6 {
-    fn from_iter<I: IntoIterator<Item = usize>>(iter: I) -> Self {
-        let mut a = ArrayVec6 { v: [0; 6], n: 0 };
-        for x in iter {
-            if a.n < 6 {
-                a.v[a.n] = x;
-                a.n += 1;
-            }
-        }
-        a
-    }
-}
-
-impl ArrayVec6 {
-    fn iter(&self) -> core::slice::Iter<'_, usize> {
-        self.v[..self.n].iter()
     }
 }
 
