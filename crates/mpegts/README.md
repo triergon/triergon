@@ -132,6 +132,14 @@ every stream.
 
 Other streams emit `ReaderEvent::Unsupported`; their PMTs and PES remain source events.
 
+Set `ReaderLimits::probe_unlabelled_dts_core` to admit one descriptor-free
+private-data route in a program with empty program descriptors. The first
+`private_stream_1` PES must start with two complete canonical big-endian DTS
+core frames whose sample-rate, channel-mode and block-count fields agree.
+The probe charges bounded work, preserves the original table and PES facts
+and applies again at framing resets. A failed initial probe reports the
+route as unsupported and later PES cannot rescue it.
+
 ### Packets, events and timing
 
 `Packet` implements `PacketInfo` and retains its PMT, source configuration epoch,
