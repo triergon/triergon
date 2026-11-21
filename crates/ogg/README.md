@@ -78,8 +78,9 @@ point; of Theora, the intra frames. DTS equals PTS.
 
 `compat::clock::packet_timing` reports FFmpeg's clock instead (skip samples, discard
 padding and FFmpeg's Vorbis durations); its documentation lists the differences.
-When an initial Opus audio page is lost, it uses the first surviving page's
-granule-derived start if later than the header anchor.
+For the first nonterminal Opus audio page, it uses the granule-derived start
+if later than the header anchor. This includes cropped streams and the first
+surviving page after initial audio loss.
 
 ## Seeking
 
