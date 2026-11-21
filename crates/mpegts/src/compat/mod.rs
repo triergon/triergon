@@ -33,6 +33,7 @@ pub mod adts {
     /// Admission of an ADTS PES with a zero packet-length field.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum PesPolicy {
+        /// Refuse a length-zero ADTS PES with the specification's unbounded non-video PES error.
         #[default]
         Strict,
         /// Assemble the original bytes until a following PES start or logical
@@ -45,10 +46,12 @@ pub mod adts {
     pub struct UnboundedPes(pub(crate) Pes);
 
     impl UnboundedPes {
+        /// The assembled PES: original header, payload spans and source ranges.
         pub fn pes(&self) -> &Pes {
             &self.0
         }
 
+        /// The specification error a strict reader reports for this PES.
         pub fn rejection(&self) -> Error {
             crate::pes::UNBOUNDED_NON_VIDEO
         }
@@ -67,7 +70,9 @@ pub mod dts {
     /// PMT and PES data.
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub struct UnlabelledCore {
+        /// The program number whose PMT lists the stream; must be nonzero.
         pub program: u16,
+        /// The 13-bit elementary PID of the stream, in the elementary PID range.
         pub pid: u16,
     }
 }
@@ -84,6 +89,7 @@ pub mod latm {
     /// Choose LOAS envelope framing or the demuxer's unsplit PES boundaries.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum PacketPolicy {
+        /// Frame each LOAS envelope as an access unit.
         #[default]
         Strict,
         /// Emit each validated, nonempty LATM PES as a separate observation.
@@ -114,22 +120,28 @@ pub mod latm {
             }
         }
 
+        /// The track the PES belongs to.
         pub fn track_info(&self) -> &Track {
             &self.track
         }
 
+        /// The original PES event.
         pub fn source(&self) -> &SourceEvent {
             &self.source
         }
 
+        /// The clock the PES timestamps belong to.
         pub fn clock_key(&self) -> ClockKey {
             self.clock_key
         }
 
+        /// Whether the program clock was quarantined at this PES, leaving its timestamps
+        /// unresolved.
         pub fn clock_is_quarantined(&self) -> bool {
             self.clock_quarantined
         }
 
+        /// The original PES.
         pub fn pes(&self) -> &Pes {
             let TraceEvent::Pes(pes) = self.source.event() else {
                 unreachable!("LATM packet owns its source PES");

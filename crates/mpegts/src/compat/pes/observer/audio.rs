@@ -6,11 +6,16 @@ use crate::psi::Descriptors;
 use crate::{ParseLimits, checked_pid, limit};
 use triergon_core::{Budget, Error, Result};
 
+/// How a private-audio PID carries AC-3 or E-AC-3, as identified from its PMT entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PrivateAudioCarriage {
+    /// Stream type 0x06 with a DVB AC-3 descriptor.
     DvbAc3Tag,
+    /// Stream type 0x06 with a DVB enhanced AC-3 descriptor.
     DvbEac3Tag,
+    /// Private stream type 0x81, read as AC-3.
     PrivateType81Ac3,
+    /// Private stream type 0x87, read as E-AC-3.
     PrivateType87Eac3,
 }
 
@@ -18,7 +23,9 @@ pub enum PrivateAudioCarriage {
 /// admission. Their source storage and namespaces remain the caller's facts.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PrivateAudioDescriptors<'a> {
+    /// The program info descriptor loop bytes.
     pub program: &'a [u8],
+    /// The elementary stream descriptor loop bytes.
     pub elementary: &'a [u8],
 }
 
@@ -181,6 +188,12 @@ impl DemuxObserver {
         })
     }
 
+    /// As [`new_private_audio`](Self::new_private_audio), for an independent media segment: an
+    /// elementary registration descriptor (`AC-3` or `EAC3`) may confirm the carriage and is
+    /// required for stream type 0x06.
+    ///
+    /// Fails as [`new_private_audio`](Self::new_private_audio) does, and with `Unsupported` for
+    /// another registration or a missing one on stream type 0x06.
     pub fn new_hls_private_audio(
         profile: DemuxProfile,
         scope: DemuxScope,

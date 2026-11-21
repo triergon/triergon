@@ -3,21 +3,31 @@ use crate::checked_pid;
 use crate::transport::TransportPacket;
 use triergon_core::{Error, Result};
 
+/// How one packet relates to the previous packet on its PID.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ContinuityOutcome {
+    /// The first packet since creation or [`Continuity::reset`].
     First,
     /// Counter continuity, even if the packet's raw discontinuity flag is true.
     Continuous,
+    /// A payload-carrying packet repeating the previous one byte for byte (PCR bytes excepted);
+    /// do not assemble its payload again.
     Duplicate,
+    /// A further copy after a duplicate; only one duplicate is permitted.
     ExcessDuplicate,
     /// An actual counter break permitted by the packet's discontinuity flag.
     /// This does not by itself establish a program clock discontinuity.
     SignalledDiscontinuity,
+    /// The counter broke without a discontinuity indicator.
     Lost {
+        /// The 4-bit counter value that continuity required.
         expected: u8,
+        /// The 4-bit counter value the packet carried.
         actual: u8,
     },
+    /// The packet has its transport error indicator set or is scrambled; the state was reset.
     Damaged,
+    /// A null packet (PID 0x1FFF), which carries no continuity.
     Null,
 }
 
@@ -32,6 +42,9 @@ pub struct Continuity {
 }
 
 impl Continuity {
+    /// Continuity state for `pid` with no packet seen.
+    ///
+    /// Fails with `Invalid` for a PID above 0x1FFE.
     pub fn new(pid: u16) -> Result<Self> {
         checked_pid(pid)?;
         Ok(Self {
@@ -42,6 +55,7 @@ impl Continuity {
             previous: [0; 188],
         })
     }
+    /// Forgets the previous packet, so the next observed packet is [`ContinuityOutcome::First`].
     pub fn reset(&mut self) {
         self.counter = None;
         self.payload = false;

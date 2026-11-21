@@ -4,12 +4,16 @@
 use super::Descriptor;
 use triergon_core::{Error, Result};
 
+/// A registration descriptor (tag 5), borrowed from its descriptor bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Registration<'a> {
+    /// The 32-bit format identifier, as four source bytes.
     pub format_identifier: [u8; 4],
+    /// The additional identification bytes after the format identifier; may be empty.
     pub additional_identification_info: &'a [u8],
 }
 
+/// One entry of an ISO 639 language descriptor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LanguageEntry {
     /// Original ISO 639/ISO 8859-1 bytes, without UTF-8 conversion or lookup.
@@ -18,6 +22,7 @@ pub struct LanguageEntry {
     pub audio_type: u8,
 }
 
+/// Iterator over the 4-byte entries of an ISO 639 language descriptor.
 #[derive(Clone, Debug)]
 pub struct LanguageEntries<'a> {
     remaining: &'a [u8],
@@ -40,58 +45,95 @@ impl Iterator for LanguageEntries<'_> {
 impl ExactSizeIterator for LanguageEntries<'_> {}
 impl std::iter::FusedIterator for LanguageEntries<'_> {}
 
+/// An AVC video descriptor (tag 0x28).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AvcVideo {
+    /// The 8-bit `profile_idc`.
     pub profile_idc: u8,
     /// Constraint set flags 0 through 5, in source order.
     pub constraint_set_flags: [bool; 6],
+    /// The 2-bit `AVC_compatible_flags`.
     pub compatible_flags: u8,
+    /// The 8-bit `level_idc`.
     pub level_idc: u8,
+    /// `AVC_still_present`: the stream may contain AVC still pictures.
     pub still_present: bool,
+    /// `AVC_24_hour_picture_flag`: the stream may contain pictures presented more than 24 hours
+    /// after decoding.
     pub picture_24h: bool,
+    /// `Frame_Packing_SEI_not_present_flag`.
     pub frame_packing_sei_not_present: bool,
 }
 
+/// An HEVC video descriptor (tag 0x38).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HevcVideo {
+    /// The 2-bit `profile_space`.
     pub profile_space: u8,
+    /// The tier flag: `true` for the High tier.
     pub high_tier: bool,
+    /// The 5-bit `profile_idc`.
     pub profile_idc: u8,
+    /// The 32 profile compatibility flags, first flag in the most significant bit.
     pub profile_compatibility_indication: u32,
+    /// `progressive_source_flag`.
     pub progressive_source: bool,
+    /// `interlaced_source_flag`.
     pub interlaced_source: bool,
+    /// `non_packed_constraint_flag`.
     pub non_packed_constraint: bool,
+    /// `frame_only_constraint_flag`.
     pub frame_only_constraint: bool,
     /// Copied profile-tier-level source bits; these are not reserved-zero bits.
     pub copied_44bits: u64,
+    /// The 8-bit `level_idc`.
     pub level_idc: u8,
+    /// `HEVC_still_present_flag`.
     pub still_present: bool,
+    /// `HEVC_24hr_picture_present_flag`.
     pub picture_24h: bool,
+    /// `sub_pic_hrd_params_not_present_flag`.
     pub sub_pic_hrd_params_not_present: bool,
     /// Raw two-bit value. Descriptor signalling alone does not validate HDR video.
     pub hdr_wcg_idc: u8,
+    /// The minimum and maximum temporal ID, when the temporal layer subset flag is set; minimum
+    /// never exceeds maximum.
     pub temporal_ids: Option<(u8, u8)>,
 }
 
+/// A DVB AC-3 descriptor (tag 0x6A), borrowed from its descriptor bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbAc3<'a> {
+    /// The component type byte, when its flag is set.
     pub component_type: Option<u8>,
+    /// The `bsid` byte, when its flag is set.
     pub bsid: Option<u8>,
+    /// The `mainid` byte, when its flag is set.
     pub mainid: Option<u8>,
+    /// The `asvc` byte, when its flag is set.
     pub asvc: Option<u8>,
     /// DVB recommends zero; retain the source bits rather than repair them.
     pub reserved_flags: u8,
+    /// The additional info bytes after the optional fields; may be empty.
     pub additional_info: &'a [u8],
 }
 
+/// A DVB enhanced AC-3 descriptor (tag 0x7A), borrowed from its descriptor bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbEac3<'a> {
+    /// The component type byte, when its flag is set.
     pub component_type: Option<u8>,
+    /// The `bsid` byte, when its flag is set.
     pub bsid: Option<u8>,
+    /// The `mainid` byte, when its flag is set.
     pub mainid: Option<u8>,
+    /// The `asvc` byte, when its flag is set.
     pub asvc: Option<u8>,
+    /// The `mixinfoexists` flag.
     pub mix_info_exists: bool,
+    /// The `substream1` to `substream3` bytes, each present when its flag is set.
     pub substreams: [Option<u8>; 3],
+    /// The additional info bytes after the optional fields; may be empty.
     pub additional_info: &'a [u8],
 }
 
@@ -107,6 +149,9 @@ fn audio_field(data: &[u8], position: &mut usize, present: bool) -> Result<Optio
 }
 
 impl<'a> Descriptor<'a> {
+    /// Parses this descriptor as a registration descriptor.
+    ///
+    /// Fails with `Invalid` when the tag is not 5 or the body is shorter than 4 bytes.
     pub fn registration(self) -> Result<Registration<'a>> {
         if self.tag != 5 {
             return Err(Error::Invalid("registration descriptor tag"));
@@ -119,6 +164,9 @@ impl<'a> Descriptor<'a> {
             additional_identification_info: &self.data[4..],
         })
     }
+    /// Parses this descriptor as an ISO 639 language descriptor and iterates its entries.
+    ///
+    /// Fails with `Invalid` when the tag is not 10 or the body length is not a multiple of 4.
     pub fn languages(self) -> Result<LanguageEntries<'a>> {
         if self.tag != 10 {
             return Err(Error::Invalid("language descriptor tag"));

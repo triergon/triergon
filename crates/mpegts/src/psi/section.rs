@@ -9,6 +9,7 @@ pub(crate) const POINTER_FIELD: &str = "PSI pointer";
 
 pub use triergon_bitstream::crc::Crc32Mpeg as PsiCrc32;
 
+/// One complete PSI section as assembled from transport payloads.
 #[derive(Debug)]
 pub struct Section {
     pid: u16,
@@ -18,15 +19,20 @@ pub struct Section {
     crc: Option<u32>,
 }
 impl Section {
+    /// The 13-bit PID that carried the section.
     pub fn pid(&self) -> u16 {
         self.pid
     }
+    /// The whole section bytes, from the table ID through the end of the section.
     pub fn bytes(&self) -> &Bytes {
         &self.source
     }
+    /// Where the section bytes lie in the source, one range per contiguous source run.
     pub fn source_ranges(&self) -> &[SourceRange] {
         self.ranges.as_slice()
     }
+    /// The CRC-32 remainder over the whole section for PAT and PMT sections (0 when the CRC
+    /// matches); `None` for other table IDs.
     pub fn crc_remainder(&self) -> Option<u32> {
         self.crc
     }
@@ -100,6 +106,9 @@ pub struct SectionAssembler {
 }
 
 impl SectionAssembler {
+    /// An assembler for the sections on `pid`, charging retained bytes to `budget`.
+    ///
+    /// Fails with `Invalid` for a PID above 0x1FFE or invalid `limits`.
     pub fn new(pid: u16, budget: Budget, limits: ParseLimits) -> Result<Self> {
         checked_pid(pid)?;
         limits.validate()?;
@@ -167,9 +176,11 @@ impl SectionAssembler {
         });
         Ok(())
     }
+    /// Declares logical end of the source; a later poll finishes or reports a partial section.
     pub fn end_of_source(&mut self) {
         self.ended = true;
     }
+    /// The bytes received so far for the section in progress; empty between sections.
     pub fn partial_bytes(&self) -> &[u8] {
         self.buffer.as_ref().map_or(&[], |buffer| buffer.as_slice())
     }
@@ -190,6 +201,17 @@ impl SectionAssembler {
         self.fault = None;
         self.ended = false;
     }
+    /// Advances assembly within `work`: returns a complete section, `NeedPayload` when the pushed
+    /// payload is drained, `Yield` when `work` is spent, or `Finished` after
+    /// [`end_of_source`](Self::end_of_source).
+    ///
+    /// Fails with `Invalid` for a bad section length, pointer or stuffing, `Truncated` for a
+    /// section
+    /// cut off by the end of the source, `Limit` beyond the section size limit, and `Cancelled`
+    /// when
+    /// `cancel` is set. `Backpressure`, `Allocation` and `Cancelled` can be retried; any other
+    /// error
+    /// is returned by every later poll.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,

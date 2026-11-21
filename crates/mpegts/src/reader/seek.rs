@@ -25,7 +25,9 @@ use triergon_framing::{
 /// A length-known, seekable part of the original contiguous transport stream.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SeekEntity {
+    /// The source entity this part is read from.
     pub source: SourceId,
+    /// The entity's length in bytes.
     pub length: u64,
 }
 

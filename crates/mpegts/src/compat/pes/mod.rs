@@ -70,6 +70,7 @@ pub use observer::{
 /// How to handle the reserved bits of a program clock reference.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum PcrPolicy {
+    /// Reject a PCR whose reserved bits are not all set or whose extension exceeds 299.
     #[default]
     Strict,
     /// Retain the original bits while accepting a valid PCR base and

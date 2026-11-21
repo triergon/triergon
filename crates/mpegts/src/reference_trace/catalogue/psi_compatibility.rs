@@ -10,10 +10,15 @@ use crate::psi::{
 use crate::stream::{FaultKind, TraceFault};
 use crate::transport::{NullCarrierRun, TransportPacket};
 
+/// A PSI table the demuxer accepts and the source view refuses or defers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PsiCompatibility {
+    /// A current PAT section routes its PMT PIDs before the whole multi-section table is complete.
     CurrentPatSectionBeforeWholeTable,
+    /// A PMT whose descriptor loop overruns is read up to the malformed descriptor, keeping the
+    /// stream identities before it.
     PmtDescriptorStopsAfterStreamIdentity,
+    /// A PMT section with a nonzero section or last section number.
     PmtNonzeroSection,
 }
 impl PsiCompatibility {
@@ -35,43 +40,67 @@ impl PsiCompatibility {
         }
     }
 }
+/// A set of [`PsiCompatibility`] policies.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PsiCompatibilityPolicies(u8);
 impl PsiCompatibilityPolicies {
+    /// No policy.
     pub const NONE: Self = Self(0);
+    /// Every policy.
     pub const ALL: Self = Self(7);
+    /// The set holding only `policy`.
     pub fn one(policy: PsiCompatibility) -> Self {
         Self(policy.bit())
     }
+    /// Whether the set holds `policy`.
     pub fn contains(self, policy: PsiCompatibility) -> bool {
         self.0 & policy.bit() != 0
     }
 }
+/// Why the source view did not accept a section that a policy admitted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PsiCompatibilitySourceStatus {
+    /// The section belongs to a current PAT that the source has not completed.
     IncompleteCurrentPat {
+        /// The section's 8-bit number.
         section_number: u8,
+        /// The table's 8-bit last section number.
         last_section_number: u8,
     },
+    /// The PMT is on a PID that only an incomplete PAT names, so the source view did not route it.
     NotRoutedByStrictIncompletePat {
+        /// Ordinal of the source event of the PAT section that names the PID.
         pat_source_event_ordinal: u64,
     },
+    /// The source view rejected the PMT with a diagnostic.
     RejectedPmt {
+        /// The layer of the source diagnostic.
         kind: FaultKind,
+        /// The source's error.
         error: Error,
+        /// Where the diagnostic points in the source.
         location: triergon_core::SourceLocation,
+        /// The 13-bit PID of the PMT.
         pid: u16,
+        /// Ordinal of the source diagnostic event.
         source_event_ordinal: u64,
+        /// The clock and configuration epochs of the diagnostic event.
         epochs: crate::SourceEpochs,
     },
 }
+/// Where one admitted section is recorded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PsiCompatibilityRecord {
+    /// Index into [`Catalogue::psi_compatibility_evidence`].
     pub evidence_index: usize,
+    /// Index into [`Catalogue::evidence`] of the retained section.
     pub catalogue_evidence_index: usize,
+    /// The policy that admitted the section.
     pub policy: PsiCompatibility,
+    /// The source context the section was admitted under.
     pub context: SourceContext,
 }
+/// One section a policy admitted, with its source status, bytes and carriers.
 #[derive(Debug)]
 pub struct PsiCompatibilityEvidence {
     record: PsiCompatibilityRecord,
@@ -81,27 +110,37 @@ pub struct PsiCompatibilityEvidence {
     descriptor_stop: Option<usize>,
 }
 impl PsiCompatibilityEvidence {
+    /// Where the section is recorded.
     pub fn record(&self) -> PsiCompatibilityRecord {
         self.record
     }
+    /// Why the source view did not accept the section.
     pub fn source_status(&self) -> PsiCompatibilitySourceStatus {
         self.source_status
     }
+    /// The section header as on the wire.
     pub fn wire_header(&self) -> SectionHeader {
         self.header
     }
+    /// The whole section bytes.
     pub fn section_bytes(&self) -> &Bytes {
         self.input.section.bytes()
     }
+    /// Where the section bytes lie in the source.
     pub fn source_ranges(&self) -> &[SourceRange] {
         self.input.section.source_ranges()
     }
+    /// Section byte offset of the malformed descriptor the demuxer stopped at, under
+    /// [`PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity`].
     pub fn descriptor_stop_offset(&self) -> Option<usize> {
         self.descriptor_stop
     }
+    /// Number of transport carriers retained for the section.
     pub fn carrier_count(&self) -> usize {
         self.input.carriers.len()
     }
+    /// The retained carrier at `index`, with its source context; `None` beyond
+    /// [`carrier_count`](Self::carrier_count).
     pub fn carrier(&self, index: usize) -> Option<(&TransportPacket, SourceContext)> {
         self.input
             .carriers
@@ -539,11 +578,13 @@ impl Catalogue {
         self.compatibility = Some(CompatibilityState::new(&self.budget, policies));
         Ok(())
     }
+    /// The sections the enabled policies admitted, in source order; empty when none are enabled.
     pub fn psi_compatibility_evidence(&self) -> &[PsiCompatibilityEvidence] {
         self.compatibility
             .as_ref()
             .map_or(&[], |s| s.evidence.as_slice())
     }
+    /// Whether an incomplete current PAT routes `pid` as a PMT PID, and that PAT is still pending.
     pub fn has_psi_compatibility_route(&self, pid: u16) -> bool {
         self.compatibility
             .as_ref()
@@ -1330,6 +1371,10 @@ impl Catalogue {
             }
         }
     }
+    /// Work units [`finish_psi_compatibility`](Self::finish_psi_compatibility) charges.
+    ///
+    /// Fails with `Invalid` when PSI compatibility is not enabled, and with `Overflow` when the
+    /// count does not fit in a `u64`.
     pub fn required_psi_compatibility_finish_work(&self) -> Result<u64> {
         let state = self
             .compatibility

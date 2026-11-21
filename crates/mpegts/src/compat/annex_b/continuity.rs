@@ -18,9 +18,13 @@ const UNOBSERVED: Error = Error::Unsupported("unobserved video continuity contex
 /// its complete original bytes and the event retains any strict diagnostic.
 #[derive(Debug)]
 pub struct ContinuityEvidence {
+    /// The last selected carrier before the change, with its complete original bytes.
     pub carrier: TransportPacket,
+    /// The source context of that carrier.
     pub carrier_context: SourceContext,
+    /// The source event that admitted the change.
     pub event: SourceEvent,
+    /// The source context of that event.
     pub context: SourceContext,
 }
 
@@ -38,6 +42,7 @@ struct ResidueData {
 }
 
 impl ContinuityResidue {
+    /// Where the source ended: the logical EOF the residue was proved at.
     pub fn source_end(&self) -> SourceLocation {
         self.0.end
     }
@@ -54,14 +59,17 @@ impl ContinuityResidue {
         self.0.chunks.as_slice()
     }
 
+    /// The carriers and events that admitted each continuity change, in source order.
     pub fn evidence(&self) -> &[ContinuityEvidence] {
         self.0.evidence.as_slice()
     }
 
+    /// Total payload bytes across the chunks.
     pub fn payload_len(&self) -> usize {
         self.0.bytes
     }
 
+    /// The payload bytes, one slice per chunk payload span, in parser order.
     pub fn payload(&self) -> impl Iterator<Item = &[u8]> {
         self.chunks().iter().flat_map(DemuxPacket::payload)
     }

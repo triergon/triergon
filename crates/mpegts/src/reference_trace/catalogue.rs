@@ -26,23 +26,34 @@ pub use psi_compatibility::{
     PsiCompatibilitySourceStatus,
 };
 
+/// One program of the catalogue, from the PAT.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Program {
+    /// The 16-bit program number.
     pub program: u16,
+    /// The 13-bit PID of the program's PMT.
     pub pmt_pid: u16,
     /// Demux AVProgram default when no valid PMT was observed; not a source PCR.
     pub pcr_pid: u16,
+    /// Index into [`Catalogue::evidence`] of the section the entry was read from.
     pub evidence: usize,
 }
+/// One elementary stream of the selected program, from its PMT.
 #[derive(Debug)]
 pub struct Stream {
+    /// The 13-bit elementary PID.
     pub pid: u16,
+    /// The 8-bit PMT stream type.
     pub stream_type: u8,
+    /// The ISO 639 language codes of the first language descriptor, comma separated; empty without
+    /// one.
     pub language: BudgetVec<u8>,
+    /// Index into [`Catalogue::evidence`] of the section the entry was read from.
     pub evidence: usize,
     codec: CatalogueCodec,
 }
 impl Stream {
+    /// The codec the demuxer opens for the stream.
     pub fn codec(&self) -> CatalogueCodec {
         self.codec
     }
@@ -50,14 +61,21 @@ impl Stream {
 /// Demux catalogue identity, never a source namespace or codec configuration.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CatalogueCodec {
+    /// AVC video.
     Avc,
+    /// HEVC video.
     Hevc,
+    /// AAC in ADTS.
     AacAdts,
+    /// AAC in LATM.
     AacLatm,
+    /// AC-3 audio.
     Ac3,
+    /// E-AC-3 audio.
     Eac3,
 }
 impl CatalogueCodec {
+    /// The codec name the demuxer reports.
     pub fn name(self) -> &'static str {
         match self {
             Self::Avc => "h264",
@@ -68,6 +86,7 @@ impl CatalogueCodec {
             Self::Eac3 => "eac3",
         }
     }
+    /// The demuxer's media type code: 0 for video, 1 for audio.
     pub fn media_type(self) -> i32 {
         match self {
             Self::Avc | Self::Hevc => 0,
@@ -75,11 +94,16 @@ impl CatalogueCodec {
         }
     }
 }
+/// The source sections one catalogue entry was read from.
 #[derive(Debug)]
 pub struct CatalogueEvidence {
+    /// The section bytes.
     pub bytes: BudgetVec<Bytes>,
+    /// Where those bytes lie in the source.
     pub ranges: BudgetVec<SourceRange>,
 }
+/// The demuxer's programs and streams of one physical entity, built from strict PAT and PMT
+/// events.
 #[derive(Debug)]
 pub struct Catalogue {
     budget: Budget,
@@ -99,6 +123,11 @@ pub struct Catalogue {
     selected_carriage: bool,
 }
 impl Catalogue {
+    /// A catalogue of `program` for TS188 AVC and HEVC streams; see
+    /// [`new_selected_carriage`](Self::new_selected_carriage) for audio and M2TS.
+    ///
+    /// Fails with `Invalid` for program 0 or invalid `limits`, and with `Unsupported` when
+    /// `limits` allow more than 64 programs, 64 streams or 4096 source spans.
     pub fn new(budget: Budget, limits: ParseLimits, program: u16) -> Result<Self> {
         limits.validate()?;
         if limits.programs > 64 || limits.streams > 64 || limits.source_spans > 4096 {
@@ -171,12 +200,15 @@ impl Catalogue {
             )),
         }
     }
+    /// The programs, in the demuxer's order.
     pub fn programs(&self) -> &[Program] {
         self.programs.as_slice()
     }
+    /// The streams of the selected program, in the demuxer's order.
     pub fn streams(&self) -> &[Stream] {
         self.streams.as_slice()
     }
+    /// The retained source sections that the `evidence` indices name.
     pub fn evidence(&self) -> &[CatalogueEvidence] {
         self.evidence.as_slice()
     }
@@ -184,9 +216,11 @@ impl Catalogue {
     pub fn has_pending_current_pat(&self) -> bool {
         self.pending_pat.is_some()
     }
+    /// Whether logical EOF has been observed.
     pub fn is_ended(&self) -> bool {
         self.ended
     }
+    /// The error that stopped the catalogue; every later call returns it.
     pub fn fault(&self) -> Option<Error> {
         self.fault
     }
@@ -215,6 +249,13 @@ impl Catalogue {
         )
         .map_err(|_| Error::Overflow)
     }
+    /// Admits one strict source event when `work` covers [`required_work`](Self::required_work);
+    /// `false` leaves the event unconsumed.
+    ///
+    /// Fails with `Unsupported` for a source shape outside the catalogue's profile, such as a
+    /// rejected PMT or an entity discontinuity, with `Invalid` for an inconsistent table or after
+    /// logical EOF, and with `Cancelled` when `cancel` is set. Errors are returned by every later
+    /// call.
     pub fn observe(
         &mut self,
         event: &TraceEvent,

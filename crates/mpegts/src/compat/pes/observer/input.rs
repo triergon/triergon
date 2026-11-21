@@ -18,6 +18,9 @@ impl DemuxObserver {
         }
     }
 
+    /// As [`push`](Self::push), for an observer bound to `input`; the carrier is refused intact
+    /// when
+    /// `input` is not the bound source and request.
     #[allow(
         clippy::result_large_err,
         reason = "recover the original charged inline carrier"

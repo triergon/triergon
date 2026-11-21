@@ -10,9 +10,13 @@ use triergon_core::{Budget, BudgetVec, BudgetVecIntoIter, BytesView};
 /// independent retention uses `bytes.into_bytes()`.
 #[derive(Clone, Copy, Debug)]
 pub struct DemuxSpanView<'a> {
+    /// The span's bytes, borrowed from the carrier or cursor.
     pub bytes: BytesView<'a>,
+    /// Where the span's bytes lie in the source.
     pub source: SourceRange,
+    /// The whole transport carrier the span was taken from.
     pub transport: SourceRange,
+    /// The source context of that carrier.
     pub context: SourceContext,
 }
 

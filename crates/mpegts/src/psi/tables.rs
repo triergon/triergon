@@ -6,13 +6,21 @@ use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 /// A PMT section other than section 0 of 0.
 pub(crate) const PMT_PROGRAM_IDENTITY: &str = "PMT single-section program identity";
 
+/// The long-form header fields shared by PAT and PMT sections.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SectionHeader {
+    /// The 8-bit table ID: 0 for a PAT, 2 for a PMT.
     pub table_id: u8,
+    /// The 16-bit table ID extension: the transport stream ID of a PAT, the program number of a
+    /// PMT.
     pub extension: u16,
+    /// The 5-bit version number.
     pub version: u8,
+    /// The current/next indicator: `true` for the table in force, `false` for the next one.
     pub current_next: bool,
+    /// The 8-bit number of this section.
     pub section_number: u8,
+    /// The 8-bit number of the last section of the table; never below `section_number`.
     pub last_section_number: u8,
 }
 
@@ -34,31 +42,45 @@ fn header(section: &Section, id: u8) -> Result<SectionHeader> {
     })
 }
 
+/// One step of incremental table parsing.
 #[derive(Debug)]
 pub enum TableStep<T> {
+    /// The parsed table, returned once.
     Output(T),
+    /// The work budget ran out; poll again with more work.
     Yield,
+    /// Nothing more to return: the table was already returned, or the input completed no table.
     Done,
 }
+/// One program loop entry of a PAT.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ProgramAssociation {
+    /// The 16-bit program number; 0 names the network PID.
     pub program_number: u16,
+    /// The 13-bit PID of the program's PMT, or of the network information table for program 0.
     pub pid: u16,
 }
 impl ProgramAssociation {
+    /// Whether this entry names the network PID (program number 0) rather than a PMT.
     pub fn is_network_pid(self) -> bool {
         self.program_number == 0
     }
 }
 
+/// One parsed PAT section.
 #[derive(Debug)]
 pub struct PatSection {
+    /// The section header; its extension is the transport stream ID.
     pub header: SectionHeader,
+    /// The whole section bytes, CRC included.
     pub source: Bytes,
+    /// The program loop entries in section order; program numbers are unique.
     pub programs: BudgetVec<ProgramAssociation>,
+    /// Where the section bytes lie in the source, one range per contiguous source run.
     pub source_ranges: BudgetVec<SourceRange>,
 }
 
+/// Incremental parser of one PAT section's program loop.
 #[derive(Debug)]
 pub struct PatReader {
     budget: Budget,
@@ -71,6 +93,11 @@ pub struct PatReader {
 }
 
 impl PatReader {
+    /// A parser of `section`, charging its tables to `budget`.
+    ///
+    /// Fails with `Invalid` when the section uses another byte pool, is not a long-form PAT section
+    /// with a valid CRC and reserved bits, or has a partial program entry, and with `Limit` when it
+    /// lists more programs than `limits` allows.
     pub fn new(section: &Section, budget: &Budget, limits: ParseLimits) -> Result<Self> {
         limits.validate()?;
         if !section.bytes().belongs_to(budget) {
@@ -97,6 +124,11 @@ impl PatReader {
             done: false,
         })
     }
+    /// Parses program entries within `work` and returns the section once complete, then `Done`.
+    ///
+    /// Fails with `Invalid` for a PID outside 0x0010..=0x1FFE, unset reserved bits or a duplicate
+    /// program number, with `Cancelled` when `cancel` is set, and when the budget refuses the
+    /// table.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,
@@ -148,15 +180,20 @@ impl PatReader {
     }
 }
 
+/// One elementary stream entry of a PMT.
 #[derive(Clone, Debug)]
 pub struct ElementaryStream {
+    /// The 8-bit stream type.
     pub stream_type: u8,
+    /// The 13-bit elementary PID.
     pub pid: u16,
+    /// The entry's descriptor loop bytes; may be empty.
     pub descriptor_bytes: Bytes,
     pub(super) namespace: super::DescriptorNamespace,
     pub(super) dvb: super::dvb::DvbSummary,
 }
 impl ElementaryStream {
+    /// Iterates the entry's descriptors.
     pub fn descriptors(&self) -> Descriptors<'_> {
         Descriptors::new(self.descriptor_bytes.as_ref())
     }
@@ -172,18 +209,26 @@ impl ElementaryStream {
     }
 }
 
+/// One parsed single-section PMT.
 #[derive(Debug)]
 pub struct ProgramMap {
+    /// The section header; its extension is the program number.
     pub header: SectionHeader,
+    /// The whole section bytes, CRC included.
     pub source: Bytes,
+    /// The 13-bit PID that carries the program's PCR.
     pub pcr_pid: u16,
+    /// The program info descriptor loop bytes; may be empty.
     pub program_descriptors: Bytes,
     /// Caller-supplied interpretation, distinct from raw on-wire facts.
     pub descriptor_namespace: super::DescriptorNamespace,
+    /// The elementary stream entries in section order; their PIDs are unique.
     pub streams: BudgetVec<ElementaryStream>,
+    /// Where the section bytes lie in the source, one range per contiguous source run.
     pub source_ranges: BudgetVec<SourceRange>,
 }
 
+/// Incremental parser of one PMT section's descriptor and elementary stream loops.
 #[derive(Debug)]
 pub struct PmtReader {
     budget: Budget,
@@ -206,6 +251,12 @@ pub struct PmtReader {
 }
 
 impl PmtReader {
+    /// A parser of `section` with no descriptor namespace; see
+    /// [`new_with_namespace`](Self::new_with_namespace).
+    ///
+    /// Fails with `Invalid` when the section uses another byte pool, is not a valid PMT section 0
+    /// of 0
+    /// for a nonzero program, or has unset reserved bits or an overlong program info length.
     pub fn new(section: &Section, budget: &Budget, limits: ParseLimits) -> Result<Self> {
         Self::new_with_namespace(
             section,
@@ -266,6 +317,13 @@ impl PmtReader {
             done: false,
         })
     }
+    /// Parses descriptors and stream entries within `work` and returns the map once complete, then
+    /// `Done`.
+    ///
+    /// Fails with `Invalid` for malformed entries or descriptors, a reserved or duplicate
+    /// elementary PID
+    /// or an HEVC descriptor outside an HEVC stream, with `Limit` beyond the stream or descriptor
+    /// limits, with `Cancelled` when `cancel` is set, and when the budget refuses the table.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,

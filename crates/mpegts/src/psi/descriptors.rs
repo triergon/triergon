@@ -6,8 +6,11 @@ pub(crate) const DESCRIPTOR_LENGTH: &str = "descriptor length";
 /// Borrowed source view. Its storage is the charged section/descriptor Bytes.
 #[derive(Clone, Copy, Debug)]
 pub struct Descriptor<'a> {
+    /// The 8-bit descriptor tag.
     pub tag: u8,
+    /// The descriptor body after the tag and length bytes.
     pub data: &'a [u8],
+    /// The whole descriptor: tag, length and body.
     pub source: &'a [u8],
 }
 
@@ -32,12 +35,16 @@ impl Descriptor<'_> {
     }
 }
 
+/// Iterator over the descriptors of a descriptor loop, in source order.
+///
+/// Yields one `Invalid` error and stops when a descriptor header or body overruns the loop.
 #[derive(Debug)]
 pub struct Descriptors<'a> {
     remaining: &'a [u8],
     failed: bool,
 }
 impl<'a> Descriptors<'a> {
+    /// Iterates the descriptors in the loop bytes `data`.
     pub fn new(data: &'a [u8]) -> Self {
         Self {
             remaining: data,

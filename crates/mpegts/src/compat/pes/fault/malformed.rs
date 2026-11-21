@@ -14,11 +14,16 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputToken, Result, SourceLocation, Step, WorkBudget,
 };
 
+/// The malformation a reported carrier was discarded for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MalformedInputKind {
+    /// The adaptation field control takes the reserved value 0.
     ReservedAdaptationControl,
+    /// The adaptation field length overruns the packet or contradicts its control.
     AdaptationLengthOverrun,
+    /// The payload unit does not start with the PES start code prefix.
     PesStartCode,
+    /// The PES header is longer than the declared PES packet length.
     PesHeaderLength,
 }
 impl MalformedInputKind {
@@ -43,21 +48,27 @@ pub struct MalformedInputFact {
     diagnostic: SourceContext,
 }
 impl MalformedInputFact {
+    /// The malformation the carrier was discarded for.
     pub fn kind(&self) -> MalformedInputKind {
         self.kind
     }
+    /// The carrier, when the transport inspector accepted it and only its PES syntax is malformed.
     pub fn accepted_transport(&self) -> Option<&TransportPacket> {
         self.carrier.as_ref()
     }
+    /// The source's diagnostic for the malformation; a rejected carrier's bytes stay in it.
     pub fn source_fault(&self) -> &TraceFault {
         &self.fault
     }
+    /// The source context the carrier was issued with.
     pub fn input_context(&self) -> SourceContext {
         self.input
     }
+    /// The source context of the matching diagnostic.
     pub fn diagnostic_context(&self) -> SourceContext {
         self.diagnostic
     }
+    /// The carrier's original bytes, prefix included.
     pub fn source_bytes(&self) -> &Bytes {
         self.carrier.as_ref().map_or_else(
             || {
@@ -80,8 +91,11 @@ impl MalformedInputFact {
     reason = "original charged carriers remain inline"
 )]
 pub enum MalformedSourceDisposition {
+    /// Pass the event on unchanged.
     Forward,
+    /// Hold the event until the matching source diagnostic arrives.
     AwaitDiagnostic,
+    /// The event completes a reported discard.
     Reported(MalformedInputFact),
 }
 
@@ -95,15 +109,19 @@ pub struct MalformedSourceEvent<'a> {
     context: SourceContext,
 }
 impl MalformedSourceEvent<'_> {
+    /// The issued source event.
     pub fn event(&self) -> &TraceEvent {
         &self.event
     }
+    /// The source context the event was issued with.
     pub fn context(&self) -> SourceContext {
         self.context
     }
+    /// The input cursor the event was read from.
     pub fn input(&self) -> &InputCursor {
         self.input
     }
+    /// Whether the source has quarantined the program clock.
     pub fn clock_is_quarantined(&self) -> bool {
         self.completion.stream.clock_is_quarantined()
     }
@@ -113,6 +131,10 @@ impl MalformedSourceEvent<'_> {
         let origin = self.completion.stream.trace_origin(self.input)?;
         observer.hold_terminal_diagnostic(&self.event, &origin, self.context)
     }
+    /// Work units [`observe`](Self::observe) charges for this event; a smaller grant leaves it
+    /// available.
+    ///
+    /// Fails with `Overflow` when the count does not fit in a `u64`.
     pub fn required_work(&self) -> Result<u64> {
         MalformedInputCompletion::required_work(&self.event)
     }
@@ -133,6 +155,7 @@ impl MalformedSourceEvent<'_> {
             cancel,
         )
     }
+    /// The issued source event, released from the completion.
     pub fn into_event(self) -> TraceEvent {
         self.event
     }
@@ -148,15 +171,19 @@ pub struct NoPacketsConfirmation {
     discarded: u64,
 }
 impl NoPacketsConfirmation {
+    /// Where the physical input ended.
     pub fn physical_end(&self) -> SourceLocation {
         self.end.location()
     }
+    /// The source context of the source `Finished` event.
     pub fn source_finished(&self) -> SourceContext {
         self.finished
     }
+    /// Number of physical carriers accounted for.
     pub fn physical_carriers(&self) -> u64 {
         self.carriers
     }
+    /// Number of carriers discarded as malformed.
     pub fn discarded_carriers(&self) -> u64 {
         self.discarded
     }
@@ -209,6 +236,11 @@ pub struct MalformedInputCompletion {
     confirmed: bool,
 }
 impl MalformedInputCompletion {
+    /// A completion for `program` bound to `input` before its first byte, with no descriptor
+    /// namespace; see [`new_with_namespace`](Self::new_with_namespace).
+    ///
+    /// Fails with `Invalid` for program 0, and as
+    /// [`new_with_namespace`](Self::new_with_namespace) does.
     pub fn new(
         input: &InputCursor,
         format: PacketFormat,
@@ -228,6 +260,11 @@ impl MalformedInputCompletion {
             DescriptorNamespace::Unspecified,
         )
     }
+    /// A completion for `program` bound to `input` before its first byte, reading PMTs in
+    /// `namespace`.
+    ///
+    /// Fails with `Invalid` once `input` has advanced, and when the transport stream cannot be
+    /// created for `format`, `limits` and `program`.
     pub fn new_with_namespace(
         input: &InputCursor,
         format: PacketFormat,
@@ -270,9 +307,11 @@ impl MalformedInputCompletion {
             confirmed: false,
         })
     }
+    /// Number of carriers discarded as malformed so far.
     pub fn discarded_carriers(&self) -> u64 {
         self.discarded
     }
+    /// The clock and configuration epochs of the source parser.
     pub fn source_epochs(&self) -> crate::SourceEpochs {
         self.stream.source_epochs()
     }
@@ -743,6 +782,11 @@ impl MalformedInputCompletion {
         self.last = Some(context);
         Ok(Some(result))
     }
+    /// Seals the physical end of the input once the source parser reaches it; `None` when it is not
+    /// reached yet or `work` is spent.
+    ///
+    /// Fails with `Invalid` when the end was sealed already, an event is pending, or the end does
+    /// not follow the last accounted carrier, and with `Cancelled` when `cancel` is set.
     pub fn seal_physical_end(
         &mut self,
         input: &mut InputCursor,

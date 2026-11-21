@@ -40,6 +40,7 @@ pub enum AudioEofPolicy {
 /// Reporting of an overlong final DVB subtitle segment in a validated finite PES.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum DvbSubtitleTailPolicy {
+    /// Fail with `Truncated`.
     #[default]
     RejectTruncated,
     /// Report complete preceding segments as a source event with the original PES.
@@ -67,16 +68,23 @@ struct NextEntity {
 /// transports with several programs require an explicit selection.
 #[derive(Clone, Copy, Debug)]
 pub struct ReaderLimits {
+    /// The packet format of the source: 188-byte TS or 192-byte M2TS.
     pub format: PacketFormat,
+    /// The program number to read; `None` selects the sole media program of the PAT. Must not be 0.
     pub program: Option<u16>,
+    /// Out-of-band interpretation of private descriptors, applied to every PMT.
     pub descriptor_namespace: DescriptorNamespace,
+    /// Limits for transport packets, PSI sections, tables and PES packets.
     pub transport: ParseLimits,
+    /// Limits for AVC and HEVC Annex B access-unit framing.
     pub video: RawAnnexBLimits,
     /// Maximum bytes in one audio syncframe. E-AC-3 groups have a derived bound.
     pub maximum_audio_frame_bytes: usize,
     /// Maximum bytes in a finite aligned DVB DTS-HD PES.
     pub maximum_dts_hd_pes_bytes: usize,
+    /// Reporting of unfinished audio bytes at logical source EOF.
     pub audio_eof_policy: AudioEofPolicy,
+    /// Handling of private-audio payload that no framer is admitted for.
     pub unframed_audio_policy: UnframedAudioPolicy,
     /// Explicit DTS core identity for one unlabelled private-data route.
     pub unlabelled_dts_core: Option<crate::compat::dts::UnlabelledCore>,
@@ -88,10 +96,18 @@ pub struct ReaderLimits {
     pub adts_pes_policy: adts::PesPolicy,
     /// LOAS envelope framing by default. PES preservation emits source events.
     pub latm_packet_policy: latm::PacketPolicy,
+    /// Reporting of an overlong final DVB subtitle segment.
     pub dvb_subtitle_tail_policy: DvbSubtitleTailPolicy,
+    /// Reporting of an unframed AVC or HEVC run at logical source EOF.
     pub video_eof_policy: VideoEofPolicy,
+    /// Maximum access units one ADTS stream delivers between resets; must be nonzero. A further
+    /// unit fails with `Limit`.
     pub maximum_access_units: usize,
+    /// Maximum PES packets that contribute to one access unit; must be nonzero. A larger access
+    /// unit
+    /// fails with `Limit`.
     pub maximum_pes_per_access_unit: usize,
+    /// Input window, in bytes, of the elementary-stream framers; must be nonzero.
     pub elementary_input_window: usize,
     /// Largest physical byte extent examined by a seek. Zero disables seeking.
     pub maximum_seek_scan_bytes: u64,
@@ -240,6 +256,12 @@ impl Reader {
             })
     }
 
+    /// A reader of the transport stream in `source`, charging its state to `pool`, with an input
+    /// window of `input_window` bytes.
+    ///
+    /// Fails with `Invalid` when a count or byte limit in `limits` is zero, `program` is 0 or the
+    /// unlabelled DTS core selection names program 0 or a reserved PID, and when the transport
+    /// limits or the input window are invalid.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -374,9 +396,13 @@ impl Reader {
     pub(crate) fn continuity_source(&self) -> Option<(&InputCursor, Option<&TransportStream>)> {
         Some((self.input.as_ref()?, self.stream.as_ref()))
     }
+    /// The tracks of the selected program announced so far.
     pub fn tracks(&self) -> &[Track] {
         self.tracks.as_slice()
     }
+    /// The input the reader needs next.
+    ///
+    /// Fails with the reader's stopping error once it has failed or been closed.
     pub fn request(&self) -> Result<InputRequest> {
         self.healthy()?;
         Ok(self
@@ -385,6 +411,11 @@ impl Reader {
             .ok_or(Error::Invalid("MPEG-TS reader closed"))?
             .request())
     }
+    /// Supplies input for the current request.
+    ///
+    /// Fails with the stopping error once the reader has stopped, and when the window does not
+    /// answer
+    /// the current request.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.healthy()?;
         self.input
@@ -397,6 +428,12 @@ impl Reader {
         }
         Ok(())
     }
+    /// Declares definitive end of the current entity's input. During a seek over a planned sequence
+    /// of entities, this moves on to the next entity instead.
+    ///
+    /// Fails with the stopping error once the reader has stopped, and when `source` and `token` do
+    /// not
+    /// match the current request; a `Truncated` result also stops the reader.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
         if let Some(next) = self.seek_entities.as_deref().and_then(|plan| plan.next()) {
@@ -483,6 +520,11 @@ impl Reader {
         }
         Ok(())
     }
+    /// Reports that the current request failed; the reader stops with `Transport` or `Cancelled`.
+    ///
+    /// Fails with the stopping error once the reader has stopped, and when `source` and `token` do
+    /// not
+    /// match the current request.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -544,6 +586,11 @@ impl Reader {
         self.seek_index = None;
         self.seek_entities = None;
     }
+    /// Advances within `work` to the next packet, other source event or progress step.
+    ///
+    /// Backpressure is returned as a step. Any other error except `Allocation` stops the reader and
+    /// is
+    /// returned by every later call.
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
         self.step_observing::<false>(work, cancel, |_| ())
     }

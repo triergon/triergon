@@ -11,15 +11,23 @@ const HALF_PERIOD27: i128 = PERIOD90 * SCALE27 / 2;
 /// Source clock identity; not an I/O token, parser generation or byte-run epoch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ClockKey {
+    /// The transport stream ID from the PAT.
     pub tsid: u16,
+    /// The program number whose PMT names the clock.
     pub program: u16,
+    /// The 13-bit PID that carries the program's PCR.
     pub pcr_pid: u16,
+    /// The source clock epoch: 0 at the start, advanced at each accepted PCR discontinuity and
+    /// each explicit stream discontinuity.
     pub epoch: u64,
 }
 
+/// A clock sample that anchors source timestamps, unwrapped and exact.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceClockSample {
+    /// A PTS-domain sample in 90 kHz ticks.
     Pts90(i128),
+    /// A PCR-domain sample in 27 MHz ticks.
     Pcr27(i128),
 }
 
@@ -27,35 +35,54 @@ pub enum SourceClockSample {
 /// peer output. PCR fractions remain exact rather than rounded to 90-kHz ticks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourceClockAnchor {
+    /// The clock the anchor belongs to; timestamps of another clock stay unresolved.
     pub key: ClockKey,
+    /// The anchoring sample.
     pub sample: SourceClockSample,
     /// Inclusive distance bound, strictly below half the source clock period.
     pub maximum_distance27: u64,
 }
 
+/// How [`source_timestamp`] lifts a 33-bit timestamp to an unwrapped tick count.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceTimePolicy {
+    /// Leave every timestamp unresolved.
     Unanchored,
+    /// Take the raw 33-bit value as the tick count, as if the clock started at epoch zero.
     RelativeEpochZero,
+    /// Unwrap to the instant nearest the caller's anchor, within its bound.
     Bounded(SourceClockAnchor),
 }
 
+/// The outcome of interpreting one source timestamp.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceTimeStatus {
+    /// The source carried no timestamp.
     Absent,
+    /// The policy is [`SourceTimePolicy::Unanchored`], so no tick count is chosen.
     AnchorBoundMissing,
+    /// The tick count is the raw value under [`SourceTimePolicy::RelativeEpochZero`].
     RelativeEpochChoice,
+    /// The tick count is unwrapped relative to the anchor and within its bound.
     Anchored,
+    /// The timestamp lies exactly half a clock period from the anchor, so neither unwrap is nearer.
     AmbiguousHalfPeriod,
+    /// The anchor belongs to a different [`ClockKey`].
     AnchorIdentityMismatch,
+    /// The nearest unwrap lies further from the anchor than its bound.
     OutsideAnchorBound,
 }
 
+/// One source timestamp with its interpretation; the raw value is always kept.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourceTimestamp {
+    /// The raw 33-bit PTS or DTS in 90 kHz ticks, `None` when the source carried none.
     pub raw33: Option<u64>,
+    /// The unwrapped tick count in 90 kHz ticks, when `status` resolved one.
     pub ticks90: Option<i128>,
+    /// `ticks90` as an exact time, when resolved.
     pub exact: Option<Time>,
+    /// Why the timestamp is or is not resolved.
     pub status: SourceTimeStatus,
 }
 

@@ -221,6 +221,7 @@ impl<'a> TransportObservation<'a> {
         Self(ObservedTransport::Continuation(carrier, source))
     }
 
+    /// The carrier's 13-bit PID.
     pub fn pid(self) -> u16 {
         match self.0 {
             ObservedTransport::Packet(packet) => packet.pid,
@@ -228,6 +229,7 @@ impl<'a> TransportObservation<'a> {
         }
     }
 
+    /// Where the carrier starts in the source, when it is attached to a source entity.
     pub fn source_location(self) -> Option<SourceLocation> {
         match self.0 {
             ObservedTransport::Packet(packet) => packet.source_id.map(|source| SourceLocation {
@@ -304,30 +306,41 @@ pub struct RejectedTransport {
     envelope: Envelope,
 }
 impl RejectedTransport {
+    /// The rejected carrier's original bytes, prefix included.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// The storage that holds the rejected carrier; the same bytes as [`bytes`](Self::bytes).
     pub fn backing_bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// The packet format the carrier was inspected as.
     pub fn format(&self) -> PacketFormat {
         self.format
     }
+    /// Byte offset of the carrier's first byte (prefix included) in the source entity.
     pub fn source_offset(&self) -> u64 {
         self.offset
     }
+    /// The source entity, when the carrier was inspected from one.
     pub fn source_id(&self) -> Option<SourceId> {
         self.entity
     }
+    /// The first fault that rejected the carrier.
     pub fn error(&self) -> Error {
         self.error
     }
+    /// A second fault found after the first, when inspection continued past it.
     pub fn secondary_error(&self) -> Option<Error> {
         self.secondary
     }
+    /// Whether inspection checked every header, adaptation and stuffing field despite the first
+    /// fault,
+    /// so no further fault can be hidden.
     pub fn fully_checked(&self) -> bool {
         self.complete_check
     }
+    /// Where the carrier lies in the source, when it is attached to a source entity.
     pub fn source_range(&self) -> Option<SourceRange> {
         self.entity.map(|entity| SourceRange {
             entity,
@@ -340,13 +353,16 @@ impl RejectedTransport {
     }
 }
 
+/// The outcome of inspecting one transport carrier.
 #[derive(Debug)]
 #[allow(
     clippy::large_enum_variant,
     reason = "one inline owned carrier; all backing storage is already charged"
 )]
 pub enum TransportInspection {
+    /// The carrier is well formed.
     Accepted(TransportPacket),
+    /// The carrier is malformed; its original bytes and fault are kept.
     Rejected(RejectedTransport),
 }
 
@@ -381,6 +397,13 @@ pub struct TransportInspector {
     complete_check: bool,
 }
 impl TransportInspector {
+    /// An inspector for the single carrier `bytes` at `location`, in `format`.
+    ///
+    /// Refuses `bytes` with `ForeignPool` when they are not charged to `budget`, with `Invalid`
+    /// when
+    /// their length is not one packet of `format`, and with `Overflow` when the carrier's end
+    /// offset
+    /// does not fit in a `u64`.
     pub fn new(
         bytes: Bytes,
         format: PacketFormat,
@@ -445,6 +468,7 @@ impl TransportInspector {
             complete_check: false,
         })
     }
+    /// The carrier under inspection, until [`poll`](Self::poll) delivers it.
     pub fn backing_bytes(&self) -> Option<&Bytes> {
         self.bytes.as_ref()
     }
@@ -469,6 +493,11 @@ impl TransportInspector {
             Ok(next)
         }
     }
+    /// Inspects the carrier within `work`: returns the accepted packet or the rejection once, then
+    /// `Finished`, or `Yield` when `work` is spent.
+    ///
+    /// Fails with `Cancelled` when `cancel` is set. Malformed syntax is a
+    /// [`TransportInspection::Rejected`] output, not an error.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,

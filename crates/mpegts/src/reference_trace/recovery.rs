@@ -27,10 +27,12 @@ mod selected;
 pub use lifecycle::{PatRoute, PatSelection, PmtBinding, PmtBindingJob};
 pub use selected::{DiagnosticCarrier, DiagnosticHeader, DiagnosticPacket, SelectedFault};
 
+/// Which rejected carriers a [`RecoveryObserver`] assembles packets from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RejectedPolicy {
     /// This carriage profile has no observed rejected-carrier operation.
     NoRejectedCarrier,
+    /// A fully checked TS188 AVC unit start rejected only for an OPCR without a PCR.
     OpcrWithoutPcr,
 }
 
@@ -41,51 +43,76 @@ pub struct EncodedHeader {
     pts: u64,
 }
 impl EncodedHeader {
+    /// The PES header bytes as encoded in the rejected carrier.
     pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_ref()
     }
+    /// The encoded 33-bit PTS.
     pub fn encoded_pts_raw33(&self) -> u64 {
         self.pts
     }
+    /// Always `None`: an encoded DTS is never used.
     pub fn encoded_dts_raw33(&self) -> Option<u64> {
         None
     }
+    /// The storage that holds the header bytes.
     pub fn backing_bytes(&self) -> &Bytes {
         &self.bytes
     }
 }
 
+/// A packet the demuxer emits from a carrier the source view rejected.
 #[derive(Debug)]
 pub struct RecoveredPacket {
+    /// The demux profile the packet was cut under.
     pub profile: DemuxProfile,
+    /// The program number of the observed scope.
     pub program: u16,
+    /// The 13-bit PID of the observed scope.
     pub pid: u16,
+    /// Where the rejected carrier begins in the source.
     pub source_origin: SourceLocation,
+    /// The clock and configuration epochs of the observed scope.
     pub source_epochs: SourceEpochs,
+    /// The demuxer's byte position of the packet.
     pub position: i64,
+    /// The demuxer's packet flags, as in [`DemuxPacket::flags`].
     pub flags: u32,
+    /// The demuxer's duration in 90 kHz ticks; 0 is its unknown sentinel.
     pub duration90_raw: i64,
+    /// The PES stream ID of the observed scope.
     pub stream_id: u8,
+    /// The unchanged rejected carrier and its source fault.
     pub rejection: RejectedTransport,
+    /// The source context the rejection was pushed with.
     pub context: SourceContext,
+    /// The PES header as encoded in the carrier.
     pub encoded_header: EncodedHeader,
+    /// Where the header bytes lie in the source.
     pub header_source_ranges: BudgetVec<SourceRange>,
+    /// Payload bytes after the header.
     pub payload_len: usize,
+    /// The payload spans.
     pub spans: BudgetVec<DemuxSpan>,
 }
 impl RecoveredPacket {
+    /// The payload bytes, one slice per span.
     pub fn payload(&self) -> impl Iterator<Item = &[u8]> {
         self.spans.as_slice().iter().map(AsRef::as_ref)
     }
 }
+/// One packet of a [`RecoveryObserver`].
 #[derive(Debug)]
 #[allow(
     clippy::large_enum_variant,
     reason = "one owned inline observation; dynamic storage is charged, no Box"
 )]
 pub enum DemuxObservation {
+    /// A packet of accepted input, from the wrapped observer.
     Accepted(DemuxPacket),
+    /// A packet from a carrier the source view rejected.
     FromRejectedCarrier(RecoveredPacket),
+    /// A packet from a selected carrier with a source diagnostic.
     FromSelectedDiagnostic(DiagnosticPacket),
 }
 
@@ -127,6 +154,10 @@ pub struct RecoveryObserver {
     fault: Option<Error>,
 }
 impl RecoveryObserver {
+    /// An observer of a registered carriage on the scope's PID that also assembles packets from
+    /// rejected carriers under `policy`.
+    ///
+    /// Fails as [`DemuxObserver::new_registered`] does.
     pub fn new(
         profile: DemuxProfile,
         scope: DemuxScope,
@@ -208,6 +239,10 @@ impl RecoveryObserver {
         })
     }
 
+    /// Binds the observer to the input positions `context` found; see
+    /// [`DemuxObserver::bind_input`].
+    ///
+    /// Fails with `Invalid` after input was pushed, and as [`DemuxObserver::bind_input`] does.
     pub fn bind_input(
         &mut self,
         context: &crate::compat::input::InputContext,
@@ -220,6 +255,9 @@ impl RecoveryObserver {
         }
         self.inner.bind_input(context, input)
     }
+    /// Checks that `input` is the source and request the observer is bound to.
+    ///
+    /// Fails with `SourceMismatch` or `Invalid` when it is not, or beyond the bound extent.
     pub fn validate_input(&self, input: &triergon_core::InputCursor) -> Result<()> {
         self.inner.validate_input(Some(input))
     }
@@ -231,6 +269,7 @@ impl RecoveryObserver {
             && self.fault.is_none()
             && self.inner.recovery_idle()
     }
+    /// The selected program and PID of the wrapped observer.
     pub fn scope(&self) -> DemuxScope {
         self.inner.scope()
     }
@@ -259,9 +298,11 @@ impl RecoveryObserver {
         self.entity_first = true;
         Ok(true)
     }
+    /// The rejected-carrier policy.
     pub fn policy(&self) -> RejectedPolicy {
         self.policy
     }
+    /// The rejected carrier held for assembly, if any.
     pub fn pending_rejection(&self) -> Option<&RejectedTransport> {
         self.pending.as_ref().and_then(|p| match p {
             RecoveryPending::Opcr(p) => Some(&p.rejection),
@@ -269,6 +310,11 @@ impl RecoveryObserver {
             RecoveryPending::TransportFault(_) => None,
         })
     }
+    /// Pushes the next accepted carrier of the selected PID in source order.
+    ///
+    /// Refuses the carrier intact while a pushed input is not drained, out of source order, before
+    /// a pending PMT binding resolves, once the observer has failed, or when it is bound to an
+    /// input.
     #[allow(
         clippy::result_large_err,
         reason = "recover original charged carrier without allocating a Box"
@@ -280,6 +326,7 @@ impl RecoveryObserver {
     ) -> std::result::Result<(), Refused<TransportPacket>> {
         self.push_accepted_bound(packet, context, None)
     }
+    /// As [`push_accepted`](Self::push_accepted), for an observer bound to `input`.
     #[allow(
         clippy::result_large_err,
         reason = "recover original charged inline carrier"
@@ -355,6 +402,11 @@ impl RecoveryObserver {
         self.entity_first = false;
         Ok(())
     }
+    /// Pushes a carrier the source view rejected, to assemble its packet under the policy.
+    ///
+    /// Refuses the rejection intact with `Unsupported` outside the policy's carrier shape, with
+    /// `Invalid` while input is not drained or out of source order, and with `ForeignPool` for
+    /// another byte pool.
     #[allow(
         clippy::result_large_err,
         reason = "recover original charged rejection, error and full storage inline"
@@ -439,12 +491,18 @@ impl RecoveryObserver {
         }));
         Ok(())
     }
+    /// Declares logical end of the source.
+    ///
+    /// Fails with `Invalid` while a pushed input is not drained, and as
+    /// [`DemuxObserver::end_of_source`] does.
     pub fn end_of_source(&mut self) -> Result<()> {
         if self.pending.is_some() {
             return Err(Error::Invalid("native recovery input not drained"));
         }
         self.inner.end_of_source()
     }
+    /// Advances within `work` and returns the next packet; see [`DemuxObserver::poll`] for the
+    /// steps and errors.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,
@@ -452,6 +510,7 @@ impl RecoveryObserver {
     ) -> Result<AssemblyStep<DemuxObservation>> {
         self.poll_bound(work, cancel, None)
     }
+    /// As [`poll`](Self::poll), for an observer bound to `input`.
     pub fn poll_with_input(
         &mut self,
         input: &triergon_core::InputCursor,

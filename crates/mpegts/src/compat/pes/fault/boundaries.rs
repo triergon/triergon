@@ -23,15 +23,19 @@ pub struct TransportTailConfirmation {
     finished: SourceContext,
 }
 impl TransportTailConfirmation {
+    /// The source's diagnostic for the excluded final carrier.
     pub fn source_fault(&self) -> &TraceFault {
         &self.fault
     }
+    /// The source context of that diagnostic.
     pub fn diagnostic_context(&self) -> SourceContext {
         self.diagnostic
     }
+    /// Where the physical input ended.
     pub fn physical_end(&self) -> SourceLocation {
         self.end
     }
+    /// The source context of the source `Finished` event.
     pub fn source_finished(&self) -> SourceContext {
         self.finished
     }
@@ -362,6 +366,8 @@ impl TransportFaultRecovery {
     pub fn awaiting_terminal_completion(&self) -> bool {
         matches!(self.boundaries.tail, Some(Tail::Pending(_)))
     }
+    /// The confirmation, once [`confirm_terminal_finished`](Self::confirm_terminal_finished) has
+    /// issued it.
     pub fn terminal_confirmation(&self) -> Option<&TransportTailConfirmation> {
         match self.boundaries.tail.as_ref() {
             Some(Tail::Confirmed(confirmation)) => Some(confirmation),

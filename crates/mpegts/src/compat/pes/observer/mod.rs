@@ -40,11 +40,17 @@ use pes_list::PesList;
 /// selected lifecycle APIs admit only their checked boundary contracts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DemuxScope {
+    /// The program number whose PMT lists the PID; must be nonzero.
     pub program: u16,
+    /// The 13-bit PID to observe.
     pub pid: u16,
+    /// The PMT stream type of the PID.
     pub stream_type: u8,
+    /// The PES stream ID the carriage expects.
     pub stream_id: u8,
+    /// The source entity the carriers come from.
     pub entity: SourceId,
+    /// The clock and configuration epochs of the selection, carried on every packet.
     pub epochs: SourceEpochs,
 }
 
@@ -53,9 +59,13 @@ pub struct DemuxScope {
 /// this enum does not parse or identify codec access units/configuration.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RegisteredCarriage {
+    /// AVC video: stream type 0x1B with stream ID 0xE0.
     Avc,
+    /// HEVC video: stream type 0x24 with stream ID 0xE0.
     Hevc,
+    /// AAC in ADTS: stream type 0x0F with stream ID 0xC0.
     AacAdts,
+    /// AAC in LATM: stream type 0x11 with stream ID 0xC0.
     AacLatm,
 }
 impl RegisteredCarriage {
@@ -114,24 +124,38 @@ pub fn selected_track_kind(
 /// run, never a demux-invented epoch. Event ordinals are not core I/O tokens.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourceContext {
+    /// Ordinal of the strict-source event that delivered the carrier.
     pub source_event_ordinal: u64,
+    /// The clock and configuration epochs of that event.
     pub epochs: SourceEpochs,
+    /// The uninterrupted elementary byte run the carrier belongs to; `None` when unknown.
     pub byte_run_epoch: Option<u64>,
 }
 
+/// Why a [`DemuxPacket`] ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DemuxBoundary {
+    /// Its declared PES length was reached.
     FiniteLength,
+    /// The next PES start on the PID ended it.
     NextPesStart,
+    /// Logical end of the source ended it.
     LogicalEof,
+    /// A continuation carrier held more bytes than the declared length left; the excess continues
+    /// as a headerless continuation.
     FiniteOverrun,
 }
 
+/// What a [`DemuxPacket`]'s payload holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DemuxPayloadKind {
+    /// The whole declared payload of a finite PES.
     DeclaredComplete,
+    /// Part of the declared payload of a finite PES that ended early.
     DeclaredIncomplete,
+    /// The payload of a PES whose length field is zero.
     Unbounded,
+    /// Payload continuing an earlier packet, without a header of its own.
     HeaderlessContinuation,
 }
 
@@ -140,8 +164,11 @@ pub enum DemuxPayloadKind {
 #[derive(Debug)]
 pub struct DemuxSpan {
     pub(crate) bytes: Bytes,
+    /// Where the span's bytes lie in the source.
     pub source: SourceRange,
+    /// The whole transport carrier the span was taken from.
     pub transport: SourceRange,
+    /// The source context of that carrier.
     pub context: SourceContext,
 }
 impl AsRef<[u8]> for DemuxSpan {
@@ -166,31 +193,48 @@ impl DemuxSpan {
 /// PES-start sync even when the physical payload starts in a later packet.
 #[derive(Debug)]
 pub struct DemuxPacket {
+    /// The demux profile the packet was cut under.
     pub profile: DemuxProfile,
+    /// The program number of the observed scope.
     pub program: u16,
+    /// The 13-bit PID of the observed scope.
     pub pid: u16,
+    /// Where the carrier that started the packet begins in the source.
     pub source_origin: SourceLocation,
+    /// The clock and configuration epochs of the observed scope.
     pub source_epochs: SourceEpochs,
+    /// The demuxer's byte position of the packet: the carrier that started it, under the input's
+    /// position basis.
     pub position: i64,
+    /// The demuxer's packet flags: 2 marks a corrupt or incomplete packet, otherwise 0.
     pub flags: u32,
     /// Demux raw90-kHz duration; zero is its unknown sentinel, not source time.
     pub duration90_raw: i64,
     /// Explicit MPEGTS stream-ID side-data byte, retained on continuations.
     pub stream_id: u8,
+    /// Why the packet ended.
     pub boundary: DemuxBoundary,
+    /// What the payload holds.
     pub payload_kind: DemuxPayloadKind,
     /// Original valid causal PES header, including raw33/None. It is retained
     /// even for a continuation whose demux output has no applicable time header.
     pub source_header: PesHeader,
+    /// Where the causal header's bytes lie in the source.
     pub header_source_ranges: BudgetVec<SourceRange>,
+    /// Whether the timestamps of `source_header` apply to this payload; `false` for a headerless
+    /// continuation.
     pub time_header_applies: bool,
+    /// Total payload bytes across `spans`.
     pub payload_len: usize,
+    /// The payload spans in stream order.
     pub spans: BudgetVec<DemuxSpan>,
 }
 impl DemuxPacket {
+    /// The payload bytes, one slice per span, in stream order.
     pub fn payload(&self) -> impl Iterator<Item = &[u8]> {
         self.spans.as_slice().iter().map(AsRef::as_ref)
     }
+    /// The causal header when its timestamps apply to this payload.
     pub fn time_header(&self) -> Option<&PesHeader> {
         self.time_header_applies.then_some(&self.source_header)
     }
@@ -200,21 +244,39 @@ impl DemuxPacket {
 /// carrier facts as `DemuxPacket`. Its payload exposes borrowed range views.
 #[derive(Debug)]
 pub struct CompactDemuxPacket {
+    /// The demux profile the packet was cut under.
     pub profile: DemuxProfile,
+    /// The program number of the observed scope.
     pub program: u16,
+    /// The 13-bit PID of the observed scope.
     pub pid: u16,
+    /// Where the carrier that started the packet begins in the source.
     pub source_origin: SourceLocation,
+    /// The clock and configuration epochs of the observed scope.
     pub source_epochs: SourceEpochs,
+    /// The demuxer's byte position of the packet: the carrier that started it, under the input's
+    /// position basis.
     pub position: i64,
+    /// The demuxer's packet flags: 2 marks a corrupt or incomplete packet, otherwise 0.
     pub flags: u32,
+    /// The demuxer's duration in 90 kHz ticks; 0 is its unknown sentinel, not source time.
     pub duration90_raw: i64,
+    /// The PES stream ID, kept on continuations.
     pub stream_id: u8,
+    /// Why the packet ended.
     pub boundary: DemuxBoundary,
+    /// What the payload holds.
     pub payload_kind: DemuxPayloadKind,
+    /// The original causal PES header, kept even when its timestamps do not apply.
     pub source_header: PesHeader,
+    /// Where the causal header's bytes lie in the source.
     pub header_source_ranges: BudgetVec<SourceRange>,
+    /// Whether the timestamps of `source_header` apply to this payload; `false` for a headerless
+    /// continuation.
     pub time_header_applies: bool,
+    /// Total payload bytes across `payload`.
     pub payload_len: usize,
+    /// The payload spans as borrowed range views.
     pub payload: CompactPayload,
 }
 
@@ -245,6 +307,8 @@ impl CompactDemuxPacket {
     }
 }
 
+/// How a ready continuation carrier was handled by
+/// [`DemuxObserver::append_ready_continuation`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReadyContinuation {
     /// Retry through the regular input state machine.
@@ -465,6 +529,10 @@ impl DemuxObserver {
         Self::admitted(profile, scope, budget, limits)
     }
 
+    /// An observer of AVC video on the scope's PID: stream type 0x1B with stream ID 0xE0.
+    ///
+    /// Fails with `Invalid` for program 0, a PID above 0x1FFE or invalid `limits`, and with
+    /// `Unsupported` for another stream type or stream ID.
     pub fn new(
         profile: DemuxProfile,
         scope: DemuxScope,
@@ -573,17 +641,21 @@ impl DemuxObserver {
         self.entity_first = false;
     }
 
+    /// The demux profile packets are cut under.
     #[cfg(feature = "reference-trace")]
     pub fn profile(&self) -> DemuxProfile {
         self.profile
     }
+    /// The operation name the observer's packets are recorded under in comparison traces.
     #[cfg(feature = "reference-trace")]
     pub fn operation(&self) -> &'static str {
         "ArchivedNativePesPacketsV1"
     }
+    /// The selected program and PID this observer cuts.
     pub fn scope(&self) -> DemuxScope {
         self.scope
     }
+    /// The bounds the observer enforces.
     pub fn limits(&self) -> ParseLimits {
         self.limits
     }
@@ -596,6 +668,14 @@ impl DemuxObserver {
         self.ended = true;
         Ok(())
     }
+    /// Advances within `work`: returns the next demux packet, `NeedPayload` when the pushed carrier
+    /// is drained, `Yield` when `work` is spent, or `Finished` after logical EOF.
+    ///
+    /// Fails with `Invalid` when the observer is bound to an input (use
+    /// [`poll_with_input`](Self::poll_with_input)) or delivers compact payloads, with `Unsupported`
+    /// for a context outside the demuxer contract this observer reproduces, with `Limit` beyond
+    /// its limits, and with `Cancelled` when `cancel` is set. Any error other than `Backpressure`,
+    /// `Allocation` or `Cancelled` is returned by every later poll.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,
@@ -603,6 +683,10 @@ impl DemuxObserver {
     ) -> Result<AssemblyStep<DemuxPacket>> {
         self.poll_bound(work, cancel, None)
     }
+    /// As [`poll`](Self::poll), for an observer bound to `input` with
+    /// [`bind_input`](Self::bind_input).
+    ///
+    /// Also fails when `input` is not the bound source and request.
     pub fn poll_with_input(
         &mut self,
         input: &triergon_core::InputCursor,

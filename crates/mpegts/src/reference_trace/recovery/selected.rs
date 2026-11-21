@@ -4,15 +4,22 @@ use crate::pes::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS};
 use crate::stream::{FaultKind, TraceFault};
 use crate::transport::{PCR_ENCODING, SCRAMBLED_PAYLOAD, TRANSPORT_ERROR_INDICATOR};
 
+/// The source fault of a selected AVC carrier that the demuxer still emits a packet for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SelectedFault {
+    /// The PCR's reserved bits or extension are invalid.
     PcrEncoding,
+    /// The carrier has its transport error indicator set.
     TransportError,
+    /// The carrier's transport scrambling control is nonzero.
     Scrambling,
+    /// The PES PTS has invalid marker bits.
     TimestampMarkers,
+    /// The PES header's timing flags take the forbidden value.
     ForbiddenTimeFlags,
 }
 impl SelectedFault {
+    /// The error the source view reports for this fault.
     pub fn source_error(self) -> Error {
         match self {
             Self::PcrEncoding => Error::Invalid(PCR_ENCODING),
@@ -22,6 +29,7 @@ impl SelectedFault {
             Self::ForbiddenTimeFlags => Error::Invalid(FORBIDDEN_TIME_FLAGS),
         }
     }
+    /// The layer the source view reports this fault in.
     pub fn source_layer(self) -> FaultKind {
         match self {
             Self::TimestampMarkers | Self::ForbiddenTimeFlags => FaultKind::Pes,
@@ -29,22 +37,27 @@ impl SelectedFault {
         }
     }
 }
+/// The carrier a [`DiagnosticPacket`] was assembled from.
 #[derive(Debug)]
 #[allow(
     clippy::large_enum_variant,
     reason = "one charged original input inline; no uncharged Box"
 )]
 pub enum DiagnosticCarrier {
+    /// A carrier the transport inspector accepted.
     Transport(TransportPacket),
+    /// A carrier the transport inspector rejected.
     Rejected(RejectedTransport),
 }
 impl DiagnosticCarrier {
+    /// The carrier's original bytes, prefix included.
     pub fn backing_bytes(&self) -> &Bytes {
         match self {
             Self::Transport(p) => &p.source,
             Self::Rejected(p) => p.bytes(),
         }
     }
+    /// Byte offset of the carrier's first byte in the source entity.
     pub fn source_offset(&self) -> u64 {
         match self {
             Self::Transport(p) => p.source_offset,
@@ -61,44 +74,69 @@ pub struct DiagnosticHeader {
     pub(crate) time_flags: u8,
 }
 impl DiagnosticHeader {
+    /// The raw PES header bytes, as encoded in the carrier.
     pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_ref()
     }
+    /// The storage that holds the header bytes.
     pub fn backing_bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// The encoded 33-bit PTS, when present.
     pub fn encoded_pts_raw33(&self) -> Option<u64> {
         self.pts
     }
+    /// Whether a PTS is present with valid marker bits.
     pub fn markers_valid(&self) -> bool {
         self.markers_valid
     }
+    /// The 2-bit `PTS_DTS_flags` value of the header.
     pub fn time_flags(&self) -> u8 {
         self.time_flags
     }
 }
+/// A packet the demuxer emits from a selected carrier with a source diagnostic.
 #[derive(Debug)]
 pub struct DiagnosticPacket {
+    /// The demux profile the packet was cut under.
     pub profile: DemuxProfile,
+    /// The program number of the observed scope.
     pub program: u16,
+    /// The 13-bit PID of the observed scope.
     pub pid: u16,
+    /// Where the carrier begins in the source.
     pub source_origin: SourceLocation,
+    /// The clock and configuration epochs of the carrier's input.
     pub source_epochs: SourceEpochs,
+    /// The demuxer's byte position of the packet.
     pub position: i64,
+    /// The demuxer's packet flags, as in [`DemuxPacket::flags`].
     pub flags: u32,
+    /// The demuxer's duration in 90 kHz ticks; 0 is its unknown sentinel.
     pub duration90_raw: i64,
+    /// The PES stream ID of the observed scope.
     pub stream_id: u8,
+    /// The fault the packet was assembled despite.
     pub selected_fault: SelectedFault,
+    /// The source's own diagnostic for the fault.
     pub source_fault: TraceFault,
+    /// The unchanged carrier.
     pub carrier: DiagnosticCarrier,
+    /// The source context the carrier was pushed with.
     pub input_context: SourceContext,
+    /// The source context of the matching diagnostic.
     pub diagnostic_context: SourceContext,
+    /// The PES header as encoded in the carrier.
     pub encoded_header: DiagnosticHeader,
+    /// Where the header bytes lie in the source.
     pub header_source_ranges: BudgetVec<SourceRange>,
+    /// Payload bytes after the header.
     pub payload_len: usize,
+    /// The payload spans.
     pub spans: BudgetVec<DemuxSpan>,
 }
 impl DiagnosticPacket {
+    /// The payload bytes, one slice per span.
     pub fn payload(&self) -> impl Iterator<Item = &[u8]> {
         self.spans.as_slice().iter().map(AsRef::as_ref)
     }

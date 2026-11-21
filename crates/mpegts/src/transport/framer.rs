@@ -24,22 +24,27 @@ pub struct NullCarrierRun {
 }
 
 impl NullCarrierRun {
+    /// The run's source bytes: whole packets, prefixes included.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
 
+    /// The packet format of the run.
     pub fn format(&self) -> PacketFormat {
         self.format
     }
 
+    /// Where the run's first packet starts in the source.
     pub fn start(&self) -> SourceLocation {
         self.start
     }
 
+    /// The number of packets in the run.
     pub fn len(&self) -> usize {
         self.bytes.len() / self.format.bytes()
     }
 
+    /// Whether the run holds no packets.
     pub fn is_empty(&self) -> bool {
         self.bytes.is_empty()
     }
@@ -72,20 +77,29 @@ fn plain_null(ts: &[u8]) -> bool {
     }
 }
 
+/// The outcome of one [`TransportFramer::push`].
 #[derive(Debug)]
 #[allow(
     clippy::large_enum_variant,
     reason = "one bounded inline packet per poll; boxing would introduce another allocation and budget owner"
 )]
 pub enum FrameState {
+    /// A complete, accepted transport packet.
     Packet(TransportPacket),
+    /// All supplied bytes were taken into a partial packet; supply more input.
     NeedInput,
+    /// The work budget ran out; push the same input again.
     Yield,
+    /// The packet failed; see [`TransportFramer::take_rejection`] for a rejected carrier.
     Error(Error),
 }
+/// The result of one [`TransportFramer::push`]: how many input bytes it took and what it produced.
 #[derive(Debug)]
 pub struct FrameStep {
+    /// Input bytes consumed from the front of the supplied slice; honour it on every state, errors
+    /// included.
     pub consumed: usize,
+    /// What the push produced.
     pub state: FrameState,
 }
 
@@ -122,6 +136,8 @@ enum BufferedCarrier {
     Progressive,
 }
 
+/// Frames 188- or 192-byte transport packets from contiguous input, fed by slices or by an input
+/// cursor.
 #[derive(Debug)]
 pub struct TransportFramer {
     budget: Budget,
@@ -143,6 +159,7 @@ pub struct TransportFramer {
 }
 
 impl TransportFramer {
+    /// A framer for `format` that charges its partial-packet carry to `budget`.
     pub fn new(budget: Budget, format: PacketFormat) -> Self {
         Self {
             carry: Some(BudgetVec::new(&budget)),
@@ -179,6 +196,7 @@ impl TransportFramer {
         self.buffered_carrier = BufferedCarrier::Progressive;
     }
 
+    /// Drops any partial packet, pending inspection and rejection, and forgets the input position.
     pub fn discard(&mut self) {
         self.carry = Some(BudgetVec::new(&self.budget));
         self.start = None;
@@ -191,6 +209,8 @@ impl TransportFramer {
         self.rejection = None;
         self.push_ack = None;
     }
+    /// Byte offset of the packet being framed, or else of the last complete packet; `None` before
+    /// any input.
     pub fn pending_or_last_packet_offset(&self) -> Option<u64> {
         self.start.or(self.last_packet_offset)
     }

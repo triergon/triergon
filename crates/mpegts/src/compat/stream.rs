@@ -11,9 +11,6 @@
 //!
 //! [`TransportStream`]: crate::stream::TransportStream
 //! [`ElementaryStream::codec`]: crate::psi::ElementaryStream::codec
-//!
-//! The demuxer's programs and streams: the PAT and PMT sections it accepts,
-//! and its reading of a PMT entry (codec, video, decoder configuration).
 use crate::psi::{Descriptor, ElementaryStream, PES_PRIVATE_DATA, Section, SectionAssembler};
 use crate::transport::TransportPacket;
 use crate::{AssemblyStep, ParseLimits, limit};
@@ -24,9 +21,11 @@ use triergon_core::{Budget, BudgetVec, Error, Result, SourceId, WorkBudget};
 /// One PMT the demuxer accepted.
 #[derive(Debug)]
 pub struct Program {
+    /// The program number.
     pub number: u16,
     /// `None` when the PMT names PID 0x1fff (no PCR).
     pub pcr_pid: Option<u16>,
+    /// The PMT's elementary stream entries, in section order.
     pub streams: BudgetVec<ElementaryStream>,
 }
 
@@ -65,6 +64,9 @@ enum Route {
 }
 
 impl ProgramReader {
+    /// A reader of the PAT on PID 0 and the PMTs it names, charging its state to `budget`.
+    ///
+    /// Fails when `limits` is invalid.
     pub fn new(budget: Budget, limits: ParseLimits) -> Result<Self> {
         Ok(Self {
             pat: SectionAssembler::new(0, budget.clone(), limits)?,

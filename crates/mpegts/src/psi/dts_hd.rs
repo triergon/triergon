@@ -8,18 +8,26 @@ const DTS_HD_EXTENSION: u8 = 0x0e;
 /// Signalled DTS-HD substreams and the original descriptor bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbDtsHd<'a> {
+    /// The whole descriptor: tag, length and body.
     pub source: &'a [u8],
+    /// The core substream, when signalled; it always has exactly one asset.
     pub core: Option<DvbDtsHdSubstream<'a>>,
+    /// The four extension substreams, each present when its flag is set.
     pub extensions: [Option<DvbDtsHdSubstream<'a>>; 4],
+    /// Trailing additional info bytes; may be empty.
     pub additional: &'a [u8],
 }
 
 /// One advertised DTS-HD substream. The flags describe all its assets together.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbDtsHdSubstream<'a> {
+    /// The 5-bit channel count field.
     pub channels: u8,
+    /// Whether an LFE channel is present.
     pub lfe: bool,
+    /// The 4-bit sample rate code.
     pub sample_rate_code: u8,
+    /// Whether samples have more than 16 bits.
     pub more_than_16_bits: bool,
     assets: &'a [u8],
 }
@@ -27,15 +35,22 @@ pub struct DvbDtsHdSubstream<'a> {
 /// One DTS-HD asset's signalling. The bit rate code keeps its source units.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbDtsHdAsset {
+    /// The 5-bit asset construction field.
     pub construction: u8,
+    /// Whether the asset uses a variable bit rate.
     pub variable_bit_rate: bool,
+    /// Whether the bit rate code is scaled.
     pub scaled_bit_rate: bool,
+    /// The 13-bit bit rate code.
     pub bit_rate_code: u16,
+    /// The component type byte, when its flag is set.
     pub component_type: Option<u8>,
+    /// The ISO 639 language code bytes, when present.
     pub language: Option<[u8; 3]>,
 }
 
 impl<'a> DvbDtsHdSubstream<'a> {
+    /// Iterates the substream's assets in source order; the parser checked their count and extent.
     pub fn assets(self) -> impl Iterator<Item = DvbDtsHdAsset> + 'a {
         let mut remaining = self.assets;
         std::iter::from_fn(move || {

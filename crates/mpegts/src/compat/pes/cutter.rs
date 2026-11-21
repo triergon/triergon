@@ -19,14 +19,18 @@ const PCR_LEAD: u64 = 12_654;
 /// when it started and its data bytes, which are never empty.
 #[derive(Debug)]
 pub struct CutPes {
+    /// The PES stream ID from the packet's header.
     pub stream_id: u8,
+    /// The raw 33-bit PTS in 90 kHz ticks, when the header carries one.
     pub pts_raw33: Option<u64>,
+    /// The raw 33-bit DTS in 90 kHz ticks, when the header carries one.
     pub dts_raw33: Option<u64>,
     /// The base of the last PCR on the program's PCR PID before the packet's
     /// unit start, if any.
     pub pcr_base: Option<u64>,
     /// [`DemuxBoundary::FiniteLength`] when the declared length was reached.
     pub boundary: DemuxBoundary,
+    /// The PES payload bytes after the header; never empty.
     pub data: Bytes,
 }
 
@@ -108,6 +112,7 @@ impl PesCutter {
         })
     }
 
+    /// The 13-bit PID this cutter cuts.
     pub fn pid(&self) -> u16 {
         self.pid
     }

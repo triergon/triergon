@@ -12,18 +12,23 @@ pub(crate) const TRANSPORT_ERROR_INDICATOR: &str = "TS transport error indicator
 /// A PCR whose reserved bits are not all set or whose extension exceeds 299.
 pub(crate) const PCR_ENCODING: &str = "PCR reserved bits/extension";
 
+/// Transport packet size on the wire.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PacketFormat {
+    /// Plain 188-byte transport packets.
     Ts188,
+    /// 192-byte M2TS packets: an opaque 4-byte prefix before each 188-byte transport packet.
     M2ts192,
 }
 impl PacketFormat {
+    /// Bytes per packet on the wire, prefix included: 188 or 192.
     pub fn bytes(self) -> usize {
         match self {
             Self::Ts188 => 188,
             Self::M2ts192 => 192,
         }
     }
+    /// Bytes before the sync byte of each packet: 0 for TS, 4 for M2TS.
     pub fn prefix_bytes(self) -> usize {
         self.bytes() - 188
     }
@@ -42,9 +47,12 @@ impl PacketFormat {
     }
 }
 
+/// A program clock reference (PCR or OPCR) as encoded in an adaptation field.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Pcr {
+    /// 33-bit base in 90 kHz units.
     pub base: u64,
+    /// 9-bit extension in 27 MHz units, 0 to 299.
     pub extension: u16,
 }
 impl Pcr {
@@ -52,20 +60,31 @@ impl Pcr {
     pub fn ticks_27mhz(self) -> u64 {
         self.base * 300 + u64::from(self.extension)
     }
+    /// The clock count as an exact time of 27 MHz ticks; never fails, as the rate is fixed and
+    /// nonzero.
     pub fn raw_time(self) -> Result<Time> {
         Time::new(i128::from(self.ticks_27mhz()), 27_000_000)
     }
 }
 
+/// A decoded adaptation field of one accepted transport packet.
 #[derive(Clone, Debug)]
 pub struct Adaptation {
+    /// Adaptation field bytes, from the adaptation field length byte to the end of the field.
     pub source: Bytes,
+    /// The discontinuity indicator.
     pub discontinuity: bool,
+    /// The random access indicator.
     pub random_access_indicator: bool,
+    /// The elementary stream priority indicator.
     pub elementary_priority: bool,
+    /// The program clock reference, when the PCR flag is set.
     pub pcr: Option<Pcr>,
+    /// The original program clock reference, when the OPCR flag is set.
     pub opcr: Option<Pcr>,
+    /// The signed splice countdown, when the splicing point flag is set.
     pub splice_countdown: Option<i8>,
+    /// The transport private data bytes, without their length byte, when present.
     pub private_data: Option<Bytes>,
     /// Preserved raw extension. Full extension interpretation remains separate.
     pub extension: Option<Bytes>,
@@ -79,33 +98,49 @@ impl Adaptation {
     }
 }
 
+/// One accepted transport packet: its header fields, adaptation field and payload, sliced from the
+/// source bytes.
 #[derive(Clone, Debug)]
 pub struct TransportPacket {
     /// Whole source packet (including the opaque four-byte prefix, if present).
     pub source: Bytes,
+    /// Byte offset of the packet's first byte (prefix included) in the source entity.
     pub source_offset: u64,
     /// Attached by the InputCursor adapter. Detached packet syntax may omit it.
     pub source_id: Option<SourceId>,
+    /// The opaque 4-byte M2TS prefix; `None` for 188-byte packets.
     pub prefix: Option<Bytes>,
+    /// The 13-bit packet identifier.
     pub pid: u16,
+    /// The payload unit start indicator.
     pub payload_unit_start: bool,
+    /// The transport priority bit.
     pub transport_priority: bool,
+    /// The transport error indicator.
     pub transport_error: bool,
+    /// The 2-bit transport scrambling control; 0 means not scrambled.
     pub scrambling: u8,
+    /// The 4-bit continuity counter.
     pub continuity_counter: u8,
+    /// The adaptation field, when the adaptation field control signals one.
     pub adaptation: Option<Adaptation>,
+    /// The payload bytes after the header and adaptation field, when the adaptation field control
+    /// signals a payload.
     pub payload: Option<Bytes>,
+    /// Byte offset of the payload's first byte in the source entity.
     pub payload_source_offset: u64,
     pub(crate) sync: usize,
     pub(crate) pcr_range: Option<Range<usize>>,
 }
 
 impl TransportPacket {
+    /// Whether the adaptation field sets the discontinuity indicator; `false` without one.
     pub fn discontinuity_indicator(&self) -> bool {
         self.adaptation
             .as_ref()
             .is_some_and(|field| field.discontinuity)
     }
+    /// Whether this is a null packet (PID 0x1FFF).
     pub fn is_null(&self) -> bool {
         self.pid == 0x1fff
     }

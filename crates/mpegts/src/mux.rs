@@ -17,16 +17,25 @@ const PCR_HZ_PER_90K: i64 = 300;
 const PAT_PERIOD: i64 = 27_000_000 / 10;
 const SDT_PERIOD: i64 = 27_000_000 / 2;
 
+/// Identifiers, PIDs and service names of the single program a [`Muxer`] writes.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MuxConfig {
+    /// The 16-bit transport stream ID written in the PAT and SDT.
     pub transport_stream_id: u16,
+    /// The 16-bit original network ID written in the SDT.
     pub original_network_id: u16,
+    /// The 16-bit program number of the single program; must be nonzero.
     pub program_number: u16,
+    /// The 13-bit PID of the PMT, in 0x0020..0x1FFF.
     pub pmt_pid: u16,
+    /// The 13-bit PID of the video stream, which also carries the PCR; in 0x0020..0x1FFF and
+    /// distinct from `pmt_pid`.
     pub video_pid: u16,
     /// 0x01 (ISO/IEC 11172-2 video, normative default) or 0x02 (FFmpeg's choice).
     pub stream_type: u8,
+    /// The SDT service provider name; printable ASCII.
     pub provider_name: String,
+    /// The SDT service name; printable ASCII. With `provider_name`, at most 158 bytes.
     pub service_name: String,
 }
 
@@ -65,6 +74,11 @@ const CC_SDT: usize = 2;
 const CC_VIDEO: usize = 3;
 
 impl Muxer {
+    /// A muxer for the program `cfg` describes, with its PAT, PMT and SDT serialised once.
+    ///
+    /// Fails with `Unsupported` when a name is not printable ASCII or the names do not fit one SDT
+    /// packet, the program number is 0, a PID is outside 0x0020..0x1FFF or the two PIDs are equal,
+    /// or the stream type is not 0x01 or 0x02.
     pub fn new(cfg: &MuxConfig) -> Result<Muxer> {
         // One complete SDT is supported per packet: 4-byte TS header, pointer,
         // 25 bytes of section/descriptor/CRC overhead, then the two names.

@@ -16,14 +16,25 @@ use triergon_core::{
     WorkBudget,
 };
 
+/// How [`PacketCompletion`] classified one physical carrier.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ControlCarrierKind {
+    /// A carrier on the PAT PID 0x0000.
     PatPid,
-    PmtSection { association: usize },
+    /// A carrier on a PMT PID that a PAT declared; its sections must be valid PMTs of that program.
+    PmtSection {
+        /// Index into [`PacketCompletion::raw_pat_facts`] of the PAT that declared the PID.
+        association: usize,
+    },
+    /// A null packet without a unit start.
     NullPid,
+    /// A carrier without payload.
     NoPayload,
+    /// A payload carrier of any other kind; it needs a scoped packet observer and prevents a
+    /// no-media confirmation.
     RequiresScopedPacketObserver,
 }
+/// One physical carrier admitted by [`PacketCompletion`], with its classification.
 #[derive(Debug)]
 pub struct PhysicalCarrier {
     packet: TransportPacket,
@@ -31,12 +42,15 @@ pub struct PhysicalCarrier {
     kind: ControlCarrierKind,
 }
 impl PhysicalCarrier {
+    /// The carrier with its original bytes and parsed fields.
     pub fn packet(&self) -> &TransportPacket {
         &self.packet
     }
+    /// The source context the carrier was issued with.
     pub fn context(&self) -> SourceContext {
         self.context
     }
+    /// How the carrier was classified.
     pub fn kind(&self) -> ControlCarrierKind {
         self.kind
     }
@@ -48,22 +62,27 @@ pub struct PhysicalNullRun {
     first_context: SourceContext,
 }
 impl PhysicalNullRun {
+    /// The null carriers of the run.
     pub fn run(&self) -> &NullCarrierRun {
         &self.run
     }
+    /// The source context of the run's first carrier.
     pub fn first_context(&self) -> SourceContext {
         self.first_context
     }
 }
+/// One PAT section admitted by [`PacketCompletion`]; a raw fact, not an accepted table.
 #[derive(Debug)]
 pub struct ControlPatFact {
     section: PatSection,
     context: SourceContext,
 }
 impl ControlPatFact {
+    /// The decoded PAT section.
     pub fn section(&self) -> &PatSection {
         &self.section
     }
+    /// The source context the section was issued with.
     pub fn context(&self) -> SourceContext {
         self.context
     }
@@ -89,25 +108,33 @@ pub struct NoMediaConfirmation {
     source_finished: SourceContext,
 }
 impl NoMediaConfirmation {
+    /// The source entity the confirmation covers.
     pub fn source(self) -> SourceId {
         self.source
     }
+    /// Length in bytes of the covered input: the offset of its physical end.
     pub fn source_bytes(self) -> u64 {
         self.source_bytes
     }
+    /// Number of physical carriers, null runs counted per carrier.
     pub fn physical_carriers(self) -> usize {
         self.physical_carriers
     }
+    /// Number of PAT sections admitted.
     pub fn pat_facts(self) -> usize {
         self.pat_facts
     }
+    /// Number of PMT sections assembled on the PAT's PMT PIDs.
     pub fn pmt_sections(self) -> usize {
         self.pmt_sections
     }
+    /// The source context of the source `Finished` event.
     pub fn source_finished(self) -> SourceContext {
         self.source_finished
     }
 }
+/// Confirms that one physical input carried only control traffic: PAT, PMT, null and no-payload
+/// carriers.
 #[derive(Debug)]
 pub struct PacketCompletion {
     budget: Budget,
@@ -139,6 +166,10 @@ fn check_cancel(cancel: &AtomicBool) -> Result<()> {
     }
 }
 impl PacketCompletion {
+    /// A TS188 completion for `program`, charging its evidence to `budget`; see
+    /// [`new_for_format`](Self::new_for_format) for M2TS.
+    ///
+    /// Fails with `Invalid` for program 0 or invalid `limits`.
     pub fn new(budget: Budget, limits: ParseLimits, program: u16) -> Result<Self> {
         if program == 0 {
             return Err(Error::Invalid("packet completion selected program"));
@@ -172,18 +203,23 @@ impl PacketCompletion {
     pub fn physical_carriers(&self) -> &[PhysicalCarrier] {
         self.carriers.as_slice()
     }
+    /// Null carrier runs admitted compactly, in source order.
     pub fn physical_null_runs(&self) -> &[PhysicalNullRun] {
         self.null_runs.as_slice()
     }
+    /// Number of physical carriers admitted, individually and within null runs.
     pub fn physical_carrier_count(&self) -> usize {
         self.carriers.len() + self.compact_carrier_count
     }
+    /// Every PAT section admitted, in source order.
     pub fn raw_pat_facts(&self) -> &[ControlPatFact] {
         self.pats.as_slice()
     }
+    /// The source faults observed, with their contexts, in source order.
     pub fn source_diagnostics(&self) -> &[(TraceFault, SourceContext)] {
         self.diagnostics.as_slice()
     }
+    /// The confirmation, once [`confirm_no_media`](Self::confirm_no_media) has issued it.
     pub fn confirmation(&self) -> Option<NoMediaConfirmation> {
         self.confirmation
     }
@@ -198,9 +234,11 @@ impl PacketCompletion {
         value.format = format;
         Ok(value)
     }
+    /// The error that stopped the completion; every later call returns it.
     pub fn fault(&self) -> Option<Error> {
         self.fault
     }
+    /// The first reason the input cannot be confirmed as control-only, if any.
     pub fn empty_refusal(&self) -> Option<Error> {
         self.no_media_blocker
     }
@@ -212,6 +250,11 @@ impl PacketCompletion {
                 && r.kind != ControlCarrierKind::RequiresScopedPacketObserver
         })
     }
+    /// Work units [`observe_issued`](Self::observe_issued) charges to admit `event`; a smaller
+    /// grant
+    /// leaves the event unconsumed.
+    ///
+    /// Fails with `Overflow` when the count does not fit in a `u64`.
     pub fn required_work(&self, event: &TraceEvent) -> Result<u64> {
         let bytes = match event {
             TraceEvent::Transport(_) => self.format.bytes(),
@@ -771,6 +814,10 @@ impl PacketCompletion {
         self.compact_carrier_count += run.len();
         Ok(())
     }
+    /// Work units that [`seal_physical_end`](Self::seal_physical_end) and
+    /// [`confirm_no_media`](Self::confirm_no_media) each charge.
+    ///
+    /// Fails with `Overflow` when the count does not fit in a `u64`.
     pub fn required_end_work(&self) -> Result<u64> {
         u64::try_from(
             self.carriers

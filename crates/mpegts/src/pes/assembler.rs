@@ -113,6 +113,7 @@ impl SpanGrowthAudit {
     }
 }
 
+/// Bounded, incremental assembly of the PES packets on one PID from its transport payloads.
 #[derive(Debug)]
 pub struct PesAssembler {
     pid: u16,
@@ -144,6 +145,10 @@ pub struct PesAssembler {
 pub(crate) const UNBOUNDED_NON_VIDEO: Error = Error::Invalid("unbounded non-video PES");
 
 impl PesAssembler {
+    /// An assembler for `pid`, charging retained tables to `budget` and bounded by `limits`.
+    ///
+    /// `video` admits unbounded (zero-length) PES packets with a video stream ID. Packets carry
+    /// `epochs` unchanged. Fails with `Invalid` for a PID above 0x1FFE or invalid `limits`.
     pub fn new(
         pid: u16,
         video: bool,
@@ -243,6 +248,7 @@ impl PesAssembler {
     pub fn end_of_source(&mut self) {
         self.ended = true;
     }
+    /// The header bytes received so far for the PES in progress; empty before a start.
     pub fn partial_header(&self) -> &[u8] {
         self.header
             .as_ref()
@@ -415,6 +421,16 @@ impl PesAssembler {
         self.span_growth = SpanGrowth::Credit(0);
         self.validated_spans = 0;
     }
+    /// Advances assembly within `work`: returns a completed PES, `NeedPayload` when the pushed
+    /// payload is drained, `Yield` when `work` is spent, or `Finished` after
+    /// [`end_of_source`](Self::end_of_source).
+    ///
+    /// Fails with `Invalid` or `Unsupported` for malformed PES syntax, `Truncated` for a packet cut
+    /// off by a new start or by the end of the source, `Limit` when
+    /// [`ParseLimits`](crate::ParseLimits)
+    /// or the budget cannot hold the packet, and `Cancelled` when `cancel` is set. `Backpressure`,
+    /// `Allocation` and `Cancelled` can be retried; any other error is returned by every later
+    /// poll.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,

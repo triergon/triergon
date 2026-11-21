@@ -70,6 +70,10 @@ impl std::fmt::Debug for ContinuityReader {
 }
 
 impl ContinuityReader {
+    /// A continuity reader over `source`, with the same arguments as [`Reader::new`]; the source
+    /// reader always uses [`VideoEofPolicy::ReportUnframed`].
+    ///
+    /// Fails as [`Reader::new`] does.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -87,6 +91,9 @@ impl ContinuityReader {
         })
     }
 
+    /// The input the source reader needs next.
+    ///
+    /// Fails with the reader's stopping error once it has failed or been closed.
     pub fn request(&self) -> Result<InputRequest> {
         self.reader.request()
     }

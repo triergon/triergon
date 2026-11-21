@@ -25,7 +25,9 @@ pub(crate) mod basis {
     )]
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub enum PositionBasis {
+        /// Packet positions point at each sync byte, after any M2TS prefix.
         SyncStart,
+        /// Packet positions point at each carrier's first byte, prefix included.
         CarrierStart,
     }
 }
@@ -45,6 +47,7 @@ impl Extent {
     }
 }
 
+/// The carrier grid and position basis found at the start of one input, bound to its request.
 #[derive(Clone, Debug)]
 pub struct InputContext {
     source: SourceId,
@@ -56,6 +59,7 @@ pub struct InputContext {
     inspected_bytes: usize,
 }
 impl InputContext {
+    /// The position basis the demuxer reports packet positions in.
     #[cfg(feature = "reference-trace")]
     pub fn basis(&self) -> PositionBasis {
         self.basis
@@ -64,9 +68,11 @@ impl InputContext {
     pub fn is_prefix(&self) -> bool {
         matches!(self.extent, Extent::Prefix(_))
     }
+    /// Bytes of the initial window inspected to find the grid.
     pub fn inspected_bytes(&self) -> usize {
         self.inspected_bytes
     }
+    /// The initial window's bytes.
     pub fn backing_bytes(&self) -> &Bytes {
         &self.backing
     }
@@ -171,10 +177,14 @@ impl InputBinding {
     }
 }
 
+/// One step of [`InputBootstrap::poll`].
 #[derive(Debug)]
 pub enum InputStep {
+    /// A finite input needs [`InputBootstrap::observe_entity_eof`] before its grid can be decided.
     NeedEntityEof,
+    /// The work budget ran out; poll again.
     Yield,
+    /// The grid was found.
     Ready(InputContext),
 }
 
@@ -197,9 +207,16 @@ pub struct InputBootstrap {
     ready: Option<InputContext>,
 }
 impl InputBootstrap {
+    /// Largest initial window, in bytes, that a bootstrap inspects.
     pub const MAX_BORROWED_BYTES: usize = 16 * 1024;
+    /// Exact size, in bytes, of the initial window for [`InputBootstrap::new_m2ts_prefix`].
     pub const M2TS_PREFIX_BYTES: usize = 8192;
 
+    /// A bootstrap over the whole finite input in `window`, which `input` has buffered at offset 0.
+    ///
+    /// Fails with `Invalid` when the window is not the cursor's initial buffered window for the
+    /// current request, `SourceMismatch` for another source, `ForeignPool` for another byte pool,
+    /// and `Limit` when the window exceeds [`MAX_BORROWED_BYTES`](Self::MAX_BORROWED_BYTES).
     pub fn new(input: &InputCursor, window: &InputWindow, format: PacketFormat) -> Result<Self> {
         Self::with_extent(
             input,
@@ -306,9 +323,18 @@ impl InputBootstrap {
         self.eof = true;
         Ok(())
     }
+    /// Bytes of the window inspected so far.
     pub fn inspected_bytes(&self) -> usize {
         self.inspected
     }
+    /// Scores sync bytes within `work` until the grid is decided.
+    ///
+    /// Returns `NeedEntityEof` until a finite input's EOF is observed, `Yield` when `work` is
+    /// spent,
+    /// and the context once found, again on every later poll. Fails with `Unsupported` when the
+    /// input is not a whole number of packets, a sync byte is missing or another packet size
+    /// competes with the format's grid; with `Cancelled` when `cancel` is set; and when `input` is
+    /// not the bootstrap's source and request.
     pub fn poll(
         &mut self,
         input: &InputCursor,

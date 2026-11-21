@@ -7,9 +7,13 @@ use crate::psi::{DescriptorNamespace, Descriptors};
 use crate::{ParseLimits, checked_pid, limit};
 use triergon_core::{Budget, Error, Result};
 
+/// The PMT descriptor loops of a DVB subtitle stream.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DvbSubtitlesDescriptors<'a> {
+    /// The program info descriptor loop bytes; must be empty.
     pub program: &'a [u8],
+    /// The elementary stream descriptor loop bytes: exactly one single-service DVB subtitling
+    /// descriptor.
     pub elementary: &'a [u8],
 }
 
@@ -77,6 +81,12 @@ fn preflight(
 }
 
 impl DemuxObserver {
+    /// An observer of DVB subtitles on the scope's PID: stream type 0x06 with stream ID 0xBD.
+    ///
+    /// Fails with `Invalid` for program 0, a PID above 0x1FFE, invalid `limits` or malformed
+    /// descriptors, with `Limit` beyond the descriptor or section limits, and with `Unsupported`
+    /// without a DVB namespace or unless `descriptors` hold exactly one single-service subtitling
+    /// descriptor.
     pub fn new_dvb_subtitles(
         profile: DemuxProfile,
         scope: DemuxScope,

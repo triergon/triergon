@@ -4,16 +4,24 @@ use crate::{ParseLimits, SourceRange, limit};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Refused, Result, WorkBudget};
 
+/// Where part of one PAT section lies in the source.
 #[derive(Clone, Copy, Debug)]
 pub struct PatSourceRange {
+    /// The section number the range belongs to.
     pub section_number: u8,
+    /// The source range.
     pub range: SourceRange,
 }
+/// A complete current PAT assembled from all its sections.
 #[derive(Debug)]
 pub struct PatTable {
+    /// The header shared by the table's sections; its extension is the transport stream ID.
     pub header: SectionHeader,
+    /// The program entries of all sections, in section order; program numbers are unique.
     pub programs: BudgetVec<ProgramAssociation>,
+    /// The bytes of each section, in section number order.
     pub source_sections: BudgetVec<Bytes>,
+    /// Where each section lies in the source, in section number order.
     pub source_ranges: BudgetVec<PatSourceRange>,
 }
 #[derive(Debug)]
@@ -33,6 +41,7 @@ struct Build {
     sources: BudgetVec<Bytes>,
     ranges: BudgetVec<PatSourceRange>,
 }
+/// Collects the sections of the current PAT version into a complete [`PatTable`].
 #[derive(Debug)]
 pub struct PatCollector {
     budget: Budget,
@@ -43,6 +52,9 @@ pub struct PatCollector {
     building: Option<Build>,
 }
 impl PatCollector {
+    /// An empty collector charging its tables to `budget`.
+    ///
+    /// Fails when `limits` is invalid.
     pub fn new(budget: Budget, limits: ParseLimits) -> Result<Self> {
         limits.validate()?;
         Ok(Self {
@@ -54,6 +66,7 @@ impl PatCollector {
             building: None,
         })
     }
+    /// Drops every retained version and pending section, as after a loss of continuity.
     pub fn discard(&mut self) {
         self.versions = [None, None];
         self.active = None;
@@ -98,6 +111,14 @@ impl PatCollector {
         self.input = Some(section);
         Ok(())
     }
+    /// Advances collection of the submitted section within `work`.
+    ///
+    /// Returns a [`PatTable`] when the section completes the current version, `Yield` when `work`
+    /// is spent, and `Done` when the section is consumed without completing a table: a non-current
+    /// section, a repeat, or a section that leaves its version incomplete. Fails with `Invalid` for
+    /// sections of one version that conflict,
+    /// with `Limit` beyond the program limit or a third concurrent version, with `Cancelled` when
+    /// `cancel` is set, and when the budget refuses the table.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,

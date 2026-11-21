@@ -11,6 +11,7 @@ use triergon_core::{Error, Result, WorkBudget};
 /// parser operation and from any diagnostic correct_ts_overflow=0 observation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DemuxProfile {
+    /// The demuxer's PES packet output, one packet per PES as it cuts them.
     PesPackets,
 }
 #[cfg(feature = "reference-trace")]
@@ -19,31 +20,42 @@ impl DemuxProfile {
     pub fn label(self) -> &'static str {
         "ArchivedPesV1"
     }
+    /// The revision of the reference demuxer this profile reproduces.
     pub fn reference_revision(self) -> &'static str {
         "d32b387f2b0a484599d4587d651891f0c63c4238"
     }
+    /// SHA-256 digest, in hex, of the reference worker that recorded the profile's traces.
     pub fn worker_sha256(self) -> &'static str {
         "19c06e53c62852b409eec9771cb11d9d7f5164b4618545a449d7e993f99346df"
     }
+    /// The operation name the profile is recorded under in comparison traces.
     pub fn operation(self) -> &'static str {
         "mpegts-native-pes-observation-v1"
     }
+    /// The demuxer's format flags in the reference run.
     pub fn flags(self) -> u32 {
         48
     }
+    /// Whether the reference run kept the demuxer's default timestamp overflow correction.
     pub fn default_overflow_correction(self) -> bool {
         true
     }
+    /// Whether the reference run probed stream information before reading packets.
     pub fn find_stream_info(self) -> bool {
         false
     }
 }
 
+/// Where a placed timestamp came from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TimestampOrigin {
+    /// The header carried no timestamp.
     Absent,
+    /// The PES header's PTS.
     SourcePts,
+    /// The PES header's DTS.
     SourceDts,
+    /// The PES header's PTS, standing in for the DTS of a PTS-only header as the demuxer does.
     PtsOnlyCompatibility,
 }
 
@@ -51,33 +63,52 @@ pub enum TimestampOrigin {
 /// state, never a source anchor or a clock/configuration/I/O epoch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ClockOrigin {
+    /// The program's first 33-bit timestamp, in 90 kHz ticks, which opened the interval.
     pub first_reference_raw90: u64,
+    /// Start of the 2^33-tick interval timestamps are placed in, in 90 kHz ticks; may be negative.
     pub interval_origin90: i128,
 }
 
 /// A separate view, not replacement packet fields or a source/demux waiver.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DemuxTimeView {
+    /// The demux profile the time was placed under.
     pub profile: DemuxProfile,
+    /// The program number of the clock.
     pub program: u16,
+    /// The 13-bit PID of the PES.
     pub pid: u16,
+    /// The clock and configuration epochs of the PES.
     pub source_epochs: SourceEpochs,
+    /// The PES header's raw 33-bit PTS, when present.
     pub source_pts_raw33: Option<u64>,
+    /// The PES header's raw 33-bit DTS, when present.
     pub source_dts_raw33: Option<u64>,
+    /// The PTS placed in the demuxer's interval, in 90 kHz ticks.
     pub pts90: Option<i128>,
+    /// The DTS placed in the demuxer's interval, in 90 kHz ticks; the PTS when the header has no
+    /// DTS.
     pub dts90: Option<i128>,
+    /// Where `pts90` came from.
     pub pts_origin: TimestampOrigin,
+    /// Where `dts90` came from.
     pub dts_origin: TimestampOrigin,
+    /// The interval the timestamps were placed in; `None` until a timestamp opens one.
     pub origin: Option<ClockOrigin>,
 }
 
 /// Demux encoded-header time, without validated source timestamp fields.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EncodedTimeView {
+    /// The PTS as encoded in the faulted header, 33 bits.
     pub encoded_pts_raw33: u64,
+    /// Always `None`: an encoded DTS is not placed.
     pub encoded_dts_raw33: Option<u64>,
+    /// The encoded PTS placed in the demuxer's interval, in 90 kHz ticks.
     pub pts90: i128,
+    /// Equal to `pts90`, as for a PTS-only header.
     pub dts90: i128,
+    /// The interval the PTS was placed in.
     pub origin: ClockOrigin,
 }
 
@@ -229,6 +260,9 @@ impl DemuxClock {
             origin,
         }))
     }
+    /// A clock for `program` with no interval opened yet.
+    ///
+    /// Fails with `Invalid` for program 0.
     pub fn new(program: u16) -> Result<Self> {
         if program == 0 {
             return Err(Error::Invalid("native clock selected program"));
@@ -238,6 +272,7 @@ impl DemuxClock {
             origin: None,
         })
     }
+    /// The program number this clock places timestamps for.
     pub fn selected_program(&self) -> u16 {
         self.program
     }
@@ -347,13 +382,23 @@ impl DemuxClock {
 /// Optional encoded time for a rejected source header, never source PTS/DTS.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DiagnosticTimeView {
+    /// The PTS as encoded in the rejected header, 33 bits, when present.
     pub encoded_pts_raw33: Option<u64>,
+    /// Always `None`: an encoded DTS is not placed.
     pub encoded_dts_raw33: Option<u64>,
+    /// The encoded PTS placed in the demuxer's interval, in 90 kHz ticks, when present.
     pub pts90: Option<i128>,
+    /// Equal to `pts90`, as for a PTS-only header.
     pub dts90: Option<i128>,
+    /// The interval in use; `None` until a timestamp opens one.
     pub origin: Option<ClockOrigin>,
 }
 impl DemuxClock {
+    /// Places the optional encoded PTS of a rejected header in this clock's interval; `None` when
+    /// `work` is spent.
+    ///
+    /// Fails with `Invalid` for a PID above 0x1FFE or a value wider than 33 bits, and with
+    /// `Cancelled` when `cancel` is set.
     #[cfg(feature = "reference-trace")]
     pub fn project_diagnostic_header(
         &mut self,

@@ -26,14 +26,19 @@ pub use malformed::{
 /// The sole transport fault admitted by this compatibility policy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransportFaultKind {
+    /// The carrier has its transport error indicator set.
     TransportError,
+    /// The carrier's transport scrambling control is nonzero.
     Scrambling,
 }
 
 /// Additional finite-PES recovery choices. Source validation stays strict.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PesFaultPolicy {
+    /// Admit a finite PES whose PTS has bad marker bits or whose timing flags are forbidden, after
+    /// its matching source diagnostic.
     pub timing_headers: bool,
+    /// Admit a carrier rejected only for its PCR or OPCR encoding, once fully checked.
     pub rejected_clock_fields: bool,
     /// The PCR PID from the active source PMT. Only a selected AVC PID is admitted.
     pub source_pcr_pid: Option<u16>,
@@ -45,11 +50,17 @@ pub struct PesFaultPolicy {
 /// A source fault retained by finite-PES extraction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PesFaultKind {
+    /// The carrier has its transport error indicator set.
     TransportError,
+    /// The carrier's transport scrambling control is nonzero.
     Scrambling,
+    /// The PES PTS has invalid marker bits.
     TimestampMarkers,
+    /// The PES header's timing flags take the forbidden value.
     ForbiddenTimeFlags,
+    /// The PCR's reserved bits or extension are invalid.
     PcrEncoding,
+    /// The adaptation field carries an OPCR without a PCR.
     OpcrWithoutPcr,
 }
 impl PesFaultKind {
@@ -79,16 +90,20 @@ impl PesFaultKind {
     reason = "charged source storage stays inline"
 )]
 pub enum PesFaultCarrier {
+    /// An accepted transport packet.
     Transport(TransportPacket),
+    /// A carrier the transport inspector rejected.
     Rejected(crate::transport::RejectedTransport),
 }
 impl PesFaultCarrier {
+    /// The carrier's original bytes, prefix included.
     pub fn backing_bytes(&self) -> &Bytes {
         match self {
             Self::Transport(packet) => &packet.source,
             Self::Rejected(packet) => packet.bytes(),
         }
     }
+    /// Byte offset of the carrier's first byte in the source entity.
     pub fn source_offset(&self) -> u64 {
         match self {
             Self::Transport(packet) => packet.source_offset,
@@ -128,15 +143,19 @@ pub struct PesFaultHeader {
     time_flags: u8,
 }
 impl PesFaultHeader {
+    /// The raw PES header bytes, as encoded in the carrier.
     pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_ref()
     }
+    /// The storage that holds the header bytes.
     pub fn backing_bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// The encoded 33-bit PTS, when the timing flags make it applicable.
     pub fn encoded_pts_raw33(&self) -> Option<u64> {
         self.pts
     }
+    /// Always `None`: an encoded DTS is never used.
     pub fn encoded_dts_raw33(&self) -> Option<u64> {
         None
     }
@@ -144,6 +163,7 @@ impl PesFaultHeader {
     pub fn markers_valid(&self) -> Option<bool> {
         self.markers_valid
     }
+    /// The 2-bit `PTS_DTS_flags` value of the header.
     pub fn time_flags(&self) -> u8 {
         self.time_flags
     }
@@ -153,25 +173,43 @@ impl PesFaultHeader {
 /// validated source PES, a codec AU, or a source PCR/PTS/DTS anchor.
 #[derive(Debug)]
 pub struct PesFaultPacket {
+    /// The program number of the observed scope.
     pub program: u16,
+    /// The 13-bit PID of the observed scope.
     pub pid: u16,
+    /// Where the faulted carrier begins in the source.
     pub source_origin: SourceLocation,
+    /// The clock and configuration epochs of the carrier's input.
     pub source_epochs: SourceEpochs,
+    /// The demuxer's byte position of the packet.
     pub position: i64,
+    /// The demuxer's packet flags, as in [`DemuxPacket::flags`]; 0 for these packets.
     pub flags: u32,
+    /// The demuxer's duration in 90 kHz ticks; 0, its unknown sentinel.
     pub duration90_raw: i64,
+    /// The PES stream ID of the observed scope.
     pub stream_id: u8,
+    /// The source fault the packet was extracted despite.
     pub kind: PesFaultKind,
+    /// The source's own diagnostic for the fault.
     pub source_fault: TraceFault,
+    /// The unchanged carrier.
     pub carrier: PesFaultCarrier,
+    /// The source context the carrier was pushed with.
     pub input_context: SourceContext,
+    /// The source context of the matching diagnostic.
     pub diagnostic_context: SourceContext,
+    /// The PES header as encoded in the carrier.
     pub encoded_header: PesFaultHeader,
+    /// Where the header bytes lie in the source.
     pub header_source_ranges: BudgetVec<SourceRange>,
+    /// Payload bytes after the header.
     pub payload_len: usize,
+    /// The payload spans.
     pub spans: BudgetVec<DemuxSpan>,
 }
 impl PesFaultPacket {
+    /// The payload bytes, one slice per span.
     pub fn payload(&self) -> impl Iterator<Item = &[u8]> {
         self.spans.as_slice().iter().map(AsRef::as_ref)
     }
@@ -183,12 +221,15 @@ pub struct TransportFaultHeader {
     pts: u64,
 }
 impl TransportFaultHeader {
+    /// The raw PES header bytes, as encoded in the damaged carrier.
     pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_ref()
     }
+    /// The storage that holds the header bytes.
     pub fn backing_bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// The encoded 33-bit PTS.
     pub fn encoded_pts_raw33(&self) -> u64 {
         self.pts
     }
@@ -202,25 +243,43 @@ impl TransportFaultHeader {
 /// Payload bytes may be damaged or scrambled; this is neither source PES nor an AU.
 #[derive(Debug)]
 pub struct TransportFaultPacket {
+    /// The program number of the observed scope.
     pub program: u16,
+    /// The 13-bit PID of the observed scope.
     pub pid: u16,
+    /// Where the faulted carrier begins in the source.
     pub source_origin: SourceLocation,
+    /// The clock and configuration epochs of the carrier's input.
     pub source_epochs: SourceEpochs,
+    /// The demuxer's byte position of the packet.
     pub position: i64,
+    /// The demuxer's packet flags, as in [`DemuxPacket::flags`]; 0 for these packets.
     pub flags: u32,
+    /// The demuxer's duration in 90 kHz ticks; 0, its unknown sentinel.
     pub duration90_raw: i64,
+    /// The PES stream ID of the observed scope.
     pub stream_id: u8,
+    /// The transport fault the packet was extracted despite.
     pub kind: TransportFaultKind,
+    /// The source's own diagnostic for the fault.
     pub source_fault: TraceFault,
+    /// The unchanged carrier, with its fault flags.
     pub carrier: TransportPacket,
+    /// The source context the carrier was pushed with.
     pub input_context: SourceContext,
+    /// The source context of the matching diagnostic.
     pub diagnostic_context: SourceContext,
+    /// The PES header as encoded in the carrier.
     pub encoded_header: TransportFaultHeader,
+    /// Where the header bytes lie in the source.
     pub header_source_ranges: BudgetVec<SourceRange>,
+    /// Payload bytes after the header.
     pub payload_len: usize,
+    /// The payload spans.
     pub spans: BudgetVec<DemuxSpan>,
 }
 impl TransportFaultPacket {
+    /// The payload bytes, one slice per span; they may be damaged or scrambled.
     pub fn payload(&self) -> impl Iterator<Item = &[u8]> {
         self.spans.as_slice().iter().map(AsRef::as_ref)
     }
@@ -233,8 +292,11 @@ impl TransportFaultPacket {
     reason = "charged inputs and outputs stay inline"
 )]
 pub enum RecoveredPes {
+    /// A packet of ordinary input, from the wrapped observer.
     Accepted(DemuxPacket),
+    /// A finite PES extracted from a carrier with a transport error or scrambling.
     Faulted(TransportFaultPacket),
+    /// A finite PES extracted despite a timing-header or clock-field fault.
     PesFault(PesFaultPacket),
 }
 
@@ -294,6 +356,7 @@ impl TransportFaultRecovery {
             boundaries: boundaries::Boundaries::default(),
         })
     }
+    /// The selected program and PID of the wrapped observer.
     pub fn scope(&self) -> DemuxScope {
         self.inner.scope()
     }
@@ -303,6 +366,12 @@ impl TransportFaultRecovery {
             .as_ref()
             .is_some_and(|job| job.diagnostic.is_none())
     }
+    /// Pushes the next carrier of the selected PID. A carrier with a fault this policy admits is
+    /// held
+    /// until its source diagnostic arrives; any other carrier goes to the wrapped observer.
+    ///
+    /// Refuses the carrier intact while a pushed carrier is not drained, after a terminal boundary,
+    /// or once the recovery has failed.
     #[allow(
         clippy::result_large_err,
         reason = "return the original charged carrier inline"
@@ -350,6 +419,10 @@ impl TransportFaultRecovery {
             .ok_or(Error::Invalid("no transport fault awaiting diagnostic"))?
             .confirm(fault, context)
     }
+    /// Declares logical end of the source.
+    ///
+    /// Fails with `Invalid` while a pushed carrier is not drained, and with the recovery's stopping
+    /// error once it has failed.
     pub fn end_of_source(&mut self) -> Result<()> {
         if let Some(error) = self.fault {
             return Err(error);
@@ -395,6 +468,13 @@ impl TransportFaultRecovery {
         )?);
         Ok(())
     }
+    /// Advances within `work`: returns an accepted or recovered packet, `NeedPayload` when more
+    /// input
+    /// or the pending carrier's diagnostic is needed, `Yield` when `work` is spent, or `Finished`.
+    ///
+    /// Fails with `Unsupported` for a fault outside the admitted contexts and with the wrapped
+    /// observer's errors. Any error other than `Backpressure`, `Allocation` or `Cancelled` is
+    /// returned by every later call.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,

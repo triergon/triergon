@@ -6,8 +6,10 @@ use triergon_core::{Error, Result};
 /// Neither a tag, a filename, registration nor a private_data_specifier proves DVB.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum DescriptorNamespace {
+    /// No out-of-band context: DVB and ATSC private descriptors stay opaque.
     #[default]
     Unspecified,
+    /// The caller has identified the transport as DVB, with the evidence it relies on.
     Dvb(DvbNamespaceEvidence),
     /// The caller has identified the transport as ATSC. Private audio
     /// stream types follow A/53 Part 3 §5.7 in this namespace.
@@ -18,20 +20,26 @@ pub enum DescriptorNamespace {
 /// operation contract. These variants record its declaration, not on-wire proof.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DvbNamespaceEvidence {
+    /// The caller declared a DVB transport profile for the input.
     CallerDeclaredTransportProfile,
+    /// An out-of-band service contract establishes DVB signalling.
     OutOfBandServiceContract,
 }
 
 /// Original descriptor TLV and body borrowed from charged PMT storage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbSubtitling<'a> {
+    /// The whole descriptor: tag, length and body.
     pub source: &'a [u8],
+    /// The descriptor body: a whole number of 8-byte service entries.
     pub data: &'a [u8],
 }
 impl<'a> DvbSubtitling<'a> {
+    /// The number of 8-byte service entries, at most 31.
     pub fn service_count(self) -> usize {
         self.data.len() / 8
     }
+    /// Iterates the service entries in source order.
     pub fn services(self) -> DvbSubtitlingServices<'a> {
         DvbSubtitlingServices {
             remaining: self.data,
@@ -39,14 +47,18 @@ impl<'a> DvbSubtitling<'a> {
     }
 }
 
+/// One 8-byte service entry of a DVB subtitling descriptor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbSubtitlingService<'a> {
+    /// The entry's 8 source bytes.
     pub source: &'a [u8],
     /// Raw ISO 639-2/ISO 8859-1 bytes, including unrecognised/malformed codes.
     pub language_code: [u8; 3],
     /// Original byte, including reserved/unrecognised values.
     pub subtitling_type: u8,
+    /// The 16-bit composition page ID.
     pub composition_page_id: u16,
+    /// The 16-bit ancillary page ID.
     pub ancillary_page_id: u16,
 }
 impl<'a> DvbSubtitlingService<'a> {
@@ -67,6 +79,7 @@ impl<'a> DvbSubtitlingService<'a> {
     }
 }
 
+/// Iterator over the service entries of a DVB subtitling descriptor.
 #[derive(Clone, Debug)]
 pub struct DvbSubtitlingServices<'a> {
     remaining: &'a [u8],
@@ -106,17 +119,23 @@ impl<'a> Descriptor<'a> {
 /// Source signalling, not an assertion of payload/decoder conformance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CodecIdentification {
+    /// The signalling does not identify the codec.
     Unknown,
+    /// Stream type 0x06 with DVB subtitling services and no DVB audio descriptor.
     DvbSubtitles,
+    /// DVB subtitling services together with a DVB AC-3 or E-AC-3 descriptor on the same stream.
     ConflictingDvbSignalling,
 }
 
+/// Counts of the DVB subtitling signalling on one elementary stream.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct DvbSubtitlingSignalling {
     /// All occurrences, including empty and duplicate descriptors.
     pub descriptors: usize,
     /// All entries in source order, without deduplication/selection.
     pub services: usize,
+    /// Whether the stream also carries a DVB AC-3 or E-AC-3 descriptor alongside subtitling
+    /// services.
     pub audio_conflict: bool,
 }
 
@@ -125,10 +144,12 @@ pub struct DvbSubtitlingSignalling {
 #[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DvbViewProfile {
+    /// The view of a stream that signals a single subtitling service.
     SingleService,
 }
 #[cfg(feature = "reference-trace")]
 impl DvbViewProfile {
+    /// The revision of the reference demuxer that this view profile reproduces.
     pub fn reference_revision(self) -> &'static str {
         match self {
             Self::SingleService => "d32b387f2b0a484599d4587d651891f0c63c4238",
@@ -136,10 +157,13 @@ impl DvbViewProfile {
     }
 }
 
+/// The single-service view of a DVB subtitling descriptor, as the reference demuxer exports it.
 #[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbSingleServiceView<'a> {
+    /// The view profile this view follows.
     pub profile: DvbViewProfile,
+    /// The service entry the view is taken from.
     pub source: DvbSubtitlingService<'a>,
     /// compID_be, ancillaryID_be, type. Raw language stays in `source`.
     pub bytes: [u8; 5],
@@ -175,6 +199,7 @@ impl DvbSummary {
 }
 
 impl ElementaryStream {
+    /// The descriptor namespace the PMT was parsed with.
     pub fn descriptor_namespace(&self) -> DescriptorNamespace {
         self.namespace
     }
@@ -190,6 +215,8 @@ impl ElementaryStream {
             audio_conflict: self.dvb.services != 0 && self.dvb.audio_present,
         })
     }
+    /// What the stream's DVB signalling identifies, from its stream type and subtitling
+    /// descriptors.
     pub fn codec_identification(&self) -> CodecIdentification {
         let Some(facts) = self.dvb_subtitling_signalling() else {
             return CodecIdentification::Unknown;

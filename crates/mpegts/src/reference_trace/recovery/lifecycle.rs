@@ -16,24 +16,31 @@ pub struct PatRoute {
     programs: usize,
 }
 impl PatRoute {
+    /// The source entity the PAT was read from.
     pub fn entity(self) -> SourceId {
         self.entity
     }
+    /// The 16-bit transport stream ID of the PAT.
     pub fn tsid(self) -> u16 {
         self.tsid
     }
+    /// The selected program number.
     pub fn program(self) -> u16 {
         self.program
     }
+    /// The 13-bit PID of the selected program's PMT.
     pub fn pmt_pid(self) -> u16 {
         self.pmt_pid
     }
+    /// The 5-bit PAT version.
     pub fn version(self) -> u8 {
         self.version
     }
+    /// The source context the PAT was issued with.
     pub fn context(self) -> SourceContext {
         self.context
     }
+    /// Number of programs in the PAT, network entries excluded.
     pub fn program_count(self) -> usize {
         self.programs
     }
@@ -57,6 +64,9 @@ pub struct PatSelection<'a> {
     done: bool,
 }
 impl<'a> PatSelection<'a> {
+    /// A selection of program `requested` from the complete PAT `table`.
+    ///
+    /// Fails with `Invalid` for program 0.
     pub fn new(
         table: &'a PatTable,
         requested: u16,
@@ -83,6 +93,12 @@ impl<'a> PatSelection<'a> {
             done: false,
         })
     }
+    /// Checks the table within `work` and returns the route to the requested program once (`None`
+    /// when the PAT does not list it), then `Done`.
+    ///
+    /// Fails with `Invalid` for an incomplete or non-current table, inconsistent byte accounting or
+    /// a duplicate program, with `Unsupported` for sections from several entities, with
+    /// `ForeignPool` for another byte pool, and with `Cancelled` when `cancel` is set.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,
@@ -211,10 +227,15 @@ impl<'a> PatSelection<'a> {
 /// whenever its raw sections/descriptors are needed after the borrowed job.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PmtBinding {
+    /// The PAT route the PMT was bound through.
     pub route: PatRoute,
+    /// The 5-bit PMT version.
     pub version: u8,
+    /// The 13-bit PCR PID of the PMT.
     pub pcr_pid: u16,
+    /// The observer scope bound to the PMT's stream.
     pub scope: DemuxScope,
+    /// The source context the PMT was issued with.
     pub context: SourceContext,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -240,6 +261,7 @@ pub struct PmtBindingJob<'a> {
     done: bool,
 }
 impl RecoveryObserver {
+    /// The current PMT binding, once one has been made.
     pub fn pmt_binding(&self) -> Option<PmtBinding> {
         self.pmt_binding
     }
@@ -247,6 +269,10 @@ impl RecoveryObserver {
         self.pmt_binding
             .is_none_or(|b| c.source_event_ordinal > b.context.source_event_ordinal)
     }
+    /// Starts binding the observer to the first PMT `map` of the selected program.
+    ///
+    /// Fails with `Unsupported` while the observer is not drained, and with `Invalid` when the
+    /// observer is already bound or has received input.
     pub fn bind_selected_pmt<'a>(
         &'a mut self,
         route: PatRoute,
@@ -255,6 +281,11 @@ impl RecoveryObserver {
     ) -> Result<PmtBindingJob<'a>> {
         PmtBindingJob::begin(self, route, map, context, Mode::Initial)
     }
+    /// Starts rebinding a drained, bound observer to a later PMT `map` of the selected program.
+    ///
+    /// Fails with `Unsupported` while the observer is not drained, and with `Invalid` when it is
+    /// not
+    /// bound yet.
     pub fn rebind_drained_selected_pmt<'a>(
         &'a mut self,
         route: PatRoute,
@@ -300,9 +331,16 @@ impl<'a> PmtBindingJob<'a> {
             done: false,
         })
     }
+    /// The observer's scope before the binding completes.
     pub fn current_scope(&self) -> DemuxScope {
         self.observer.scope()
     }
+    /// Checks the PMT within `work` and returns the binding once, then `Done`.
+    ///
+    /// Fails with `Invalid` or `Unsupported` when the PMT does not match the route, the scope or
+    /// the
+    /// previous binding, with `ForeignPool` for another byte pool, and with `Cancelled` when
+    /// `cancel` is set.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,
