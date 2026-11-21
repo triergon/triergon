@@ -400,29 +400,35 @@ struct Findings {
 }
 
 /// Where a build stands. Each stage owns what it reads and what the stages before it
-/// found.
+/// found, and changes in place.
 #[derive(Debug)]
 enum Stage {
-    /// Collecting the tables among the `stbl` children.
-    Boxes {
-        boxes: BoxChildren,
+    /// Collecting the tables among the `stbl` children, then parsing the `stsd`
+    /// entries into `descriptions`.
+    Collect {
         parts: Parts,
         descriptions: BudgetVec<SampleDescription>,
+        children: Children,
     },
-    /// Parsing the `stsd` entries; `pending` is one parsed but not yet stored.
-    Descriptions {
-        entries: BoxChildren,
-        parts: Parts,
-        descriptions: BudgetVec<SampleDescription>,
-        pending: Option<SampleDescription>,
-    },
-    /// Checking the rows of the built table, one per work unit.
+    /// Checking the rows of the built table, one per work unit; the table is ready
+    /// once `rows` reaches [`Check::Done`].
     Validate {
         table: SampleTable,
         rows: RowCheck,
     },
-    Ready(SampleTable),
     Failed(Error),
+}
+
+/// The children a collecting [`SampleTableBuilder`] reads.
+#[derive(Debug)]
+enum Children {
+    /// The `stbl` children.
+    Tables(BoxChildren),
+    /// The `stsd` entries; `pending` is one parsed but not yet stored.
+    Entries {
+        entries: BoxChildren,
+        pending: Option<SampleDescription>,
+    },
 }
 
 /// Checks one `stbl` into a [`SampleTable`] under a work budget, one table row per work
@@ -493,10 +499,10 @@ impl SampleTableBuilder {
             policy,
             acceptance: Acceptance::Strict,
             description_count: 0,
-            stage: Stage::Boxes {
-                boxes,
+            stage: Stage::Collect {
                 parts: Parts::default(),
                 descriptions: BudgetVec::new(&budget),
+                children: Children::Tables(boxes),
             },
             findings: Findings::default(),
         })
@@ -521,172 +527,109 @@ impl SampleTableBuilder {
     }
     fn poll_inner(&mut self, work: &mut WorkBudget) -> Result<BuildStatus> {
         loop {
-            let complete = match &mut self.stage {
-                Stage::Boxes { boxes, parts, .. } => match boxes.poll(work)? {
-                    Next::Yield => return Ok(BuildStatus::Yield),
-                    Next::Item(raw) => {
-                        parts.insert(raw)?;
-                        false
-                    }
-                    Next::End => true,
-                },
-                Stage::Descriptions {
-                    entries,
+            match &mut self.stage {
+                Stage::Collect {
+                    parts,
                     descriptions,
-                    pending,
-                    ..
-                } => {
-                    if let Some(value) = pending.take() {
-                        if !work.try_charge(1) {
-                            *pending = Some(value);
-                            return Ok(BuildStatus::Yield);
-                        }
-                        if let Err(rejected) = descriptions.try_push(value) {
-                            *pending = Some(rejected.value);
-                            return Err(rejected.error);
-                        }
-                        continue;
-                    }
-                    match entries.poll(work)? {
+                    children,
+                } => match children {
+                    Children::Tables(boxes) => match boxes.poll(work)? {
                         Next::Yield => return Ok(BuildStatus::Yield),
-                        Next::Item(raw) => {
-                            let ordinal = u32::try_from(descriptions.len())
-                                .map_err(|_| Error::Overflow)?
-                                .checked_add(1)
-                                .ok_or(Error::Overflow)?;
-                            if ordinal > self.description_count {
-                                return Err(Error::Invalid("extra sample description"));
-                            }
-                            *pending = Some(SampleDescription::parse(raw, ordinal)?);
-                            false
-                        }
+                        Next::Item(raw) => parts.insert(raw)?,
                         Next::End => {
-                            if descriptions.len() != self.description_count as usize {
-                                return Err(Error::Invalid("sample description count mismatch"));
+                            if parts.compact.is_some() && parts.sizes.is_some() {
+                                return Err(Error::Invalid("both stsz and stz2"));
                             }
-                            true
+                            if let Some(ctts) = &parts.ctts {
+                                let (version, flags) = fields::full(ctts.payload())?;
+                                if version > 1 || flags != 0 {
+                                    return Err(Error::Unsupported("ctts version/flags"));
+                                }
+                            }
+                            let stsd = required(parts.stsd.as_ref())?;
+                            fields::full_zero(stsd.payload())?;
+                            self.description_count = fields::u32_at(stsd.payload(), 4)?;
+                            if self.description_count == 0 {
+                                return Err(Error::Invalid("empty sample descriptions"));
+                            }
+                            policy(self.description_count, self.limits.max_descriptions)?;
+                            *children = Children::Entries {
+                                entries: stsd.children(8, self.limits)?,
+                                pending: None,
+                            };
+                        }
+                    },
+                    Children::Entries { entries, pending } => {
+                        if let Some(value) = pending.take() {
+                            if !work.try_charge(1) {
+                                *pending = Some(value);
+                                return Ok(BuildStatus::Yield);
+                            }
+                            if let Err(rejected) = descriptions.try_push(value) {
+                                *pending = Some(rejected.value);
+                                return Err(rejected.error);
+                            }
+                            continue;
+                        }
+                        match entries.poll(work)? {
+                            Next::Yield => return Ok(BuildStatus::Yield),
+                            Next::Item(raw) => {
+                                let ordinal = u32::try_from(descriptions.len())
+                                    .map_err(|_| Error::Overflow)?
+                                    .checked_add(1)
+                                    .ok_or(Error::Overflow)?;
+                                if ordinal > self.description_count {
+                                    return Err(Error::Invalid("extra sample description"));
+                                }
+                                *pending = Some(SampleDescription::parse(raw, ordinal)?);
+                            }
+                            Next::End => {
+                                if descriptions.len() != self.description_count as usize {
+                                    return Err(Error::Invalid(
+                                        "sample description count mismatch",
+                                    ));
+                                }
+                                let empty = BudgetVec::new(descriptions.budget());
+                                let table = build(
+                                    &self.raw,
+                                    self.limits,
+                                    self.acceptance,
+                                    parts,
+                                    mem::replace(descriptions, empty),
+                                )?;
+                                self.stage = Stage::Validate {
+                                    table,
+                                    rows: RowCheck::new(Check::Decode),
+                                };
+                            }
                         }
                     }
+                },
+                Stage::Validate { rows, .. } if rows.check == Check::Done => {
+                    return Ok(BuildStatus::Ready);
                 }
                 Stage::Validate { table, rows } => {
-                    if rows.check == Check::Done {
-                        true
-                    } else {
-                        if !work.try_charge(1) {
-                            return Ok(BuildStatus::Yield);
-                        }
-                        self.findings.check_row(
-                            table,
-                            rows,
-                            self.policy,
-                            self.acceptance,
-                            self.description_count,
-                        )?;
-                        false
+                    if !work.try_charge(1) {
+                        return Ok(BuildStatus::Yield);
                     }
+                    self.findings.check_row(
+                        table,
+                        rows,
+                        self.policy,
+                        self.acceptance,
+                        self.description_count,
+                    )?;
                 }
-                Stage::Ready(_) => return Ok(BuildStatus::Ready),
                 Stage::Failed(error) => return Err(*error),
-            };
-            if complete {
-                // The stage's work is done. The builder counts as failed until the
-                // next stage is in place; `poll` records the error if that fails.
-                let finished = mem::replace(&mut self.stage, Stage::Failed(Error::Cancelled));
-                self.stage = self.next_stage(finished)?;
             }
         }
     }
-    /// The stage that follows `finished`, whose work is complete.
-    fn next_stage(&mut self, finished: Stage) -> Result<Stage> {
-        Ok(match finished {
-            Stage::Boxes {
-                parts,
-                descriptions,
-                ..
-            } => {
-                if parts.compact.is_some() && parts.sizes.is_some() {
-                    return Err(Error::Invalid("both stsz and stz2"));
-                }
-                if let Some(ctts) = &parts.ctts {
-                    let (version, flags) = fields::full(ctts.payload())?;
-                    if version > 1 || flags != 0 {
-                        return Err(Error::Unsupported("ctts version/flags"));
-                    }
-                }
-                let stsd = required(parts.stsd.as_ref())?;
-                fields::full_zero(stsd.payload())?;
-                self.description_count = fields::u32_at(stsd.payload(), 4)?;
-                if self.description_count == 0 {
-                    return Err(Error::Invalid("empty sample descriptions"));
-                }
-                policy(self.description_count, self.limits.max_descriptions)?;
-                Stage::Descriptions {
-                    entries: stsd.children(8, self.limits)?,
-                    parts,
-                    descriptions,
-                    pending: None,
-                }
-            }
-            Stage::Descriptions {
-                parts,
-                descriptions,
-                ..
-            } => {
-                // All constructors below only inspect fixed headers/checked row extents.
-                let stts = Words::parse(required(parts.stts.as_ref())?, 8, self.limits)?;
-                let stsc = Words::parse(required(parts.stsc.as_ref())?, 12, self.limits)?;
-                let sizes = Sizes::parse(
-                    parts
-                        .sizes
-                        .clone()
-                        .or_else(|| parts.compact.clone())
-                        .ok_or(Error::Invalid("missing sample size table"))?,
-                )?;
-                let offsets = Offsets::parse(required(parts.offsets.as_ref())?, self.limits)?;
-                let ctts = parts
-                    .ctts
-                    .clone()
-                    .map(|v| Words::parse_ctts(v, self.limits))
-                    .transpose()?;
-                let sync = parts
-                    .sync
-                    .clone()
-                    .map(|v| Words::parse(v, 4, self.limits))
-                    .transpose()?;
-                let partial = parts
-                    .partial
-                    .clone()
-                    .map(|v| Words::parse(v, 4, self.limits))
-                    .transpose()?;
-                if let Some(raw) = &parts.dependency {
-                    if self.acceptance != Acceptance::LegacyDependencyFlags
-                        || raw.payload().get(..4) != Some(&[0, 0, 0, 1])
-                    {
-                        fields::full_zero(raw.payload())?;
-                    }
-                    fields::exact_rows(raw.payload(), 4, sizes.count, 1)?;
-                }
-                Stage::Validate {
-                    table: SampleTable {
-                        raw: self.raw.clone(),
-                        descriptions,
-                        stts,
-                        ctts,
-                        stsc,
-                        sizes,
-                        offsets,
-                        sync,
-                        partial,
-                        dependency: parts.dependency,
-                        timing_run_surplus: TimingRunSurplus::default(),
-                        unused_sync_entries: 0,
-                    },
-                    rows: RowCheck::new(Check::Decode),
-                }
-            }
-            Stage::Validate { table, .. } => Stage::Ready(table),
-            settled @ (Stage::Ready(_) | Stage::Failed(_)) => settled,
-        })
+    /// The table once the rows are checked.
+    fn built(&self) -> Option<&SampleTable> {
+        match &self.stage {
+            Stage::Validate { table, rows } if rows.check == Check::Done => Some(table),
+            _ => None,
+        }
     }
     /// The table; the error that stopped the build, or `Error::Invalid` before
     /// [`BuildStatus::Ready`].
@@ -697,7 +640,7 @@ impl SampleTableBuilder {
             ));
         }
         let mut table = match self.stage {
-            Stage::Ready(table) => table,
+            Stage::Validate { table, rows } if rows.check == Check::Done => table,
             Stage::Failed(error) => return Err(error),
             _ => return Err(Error::Invalid("sample table builder not ready")),
         };
@@ -716,6 +659,64 @@ impl SampleTableBuilder {
         }
         Ok(table)
     }
+}
+
+/// The table `parts` and `descriptions` make, its fixed headers and row extents
+/// checked.
+fn build(
+    raw: &BoxView,
+    limits: Limits,
+    acceptance: Acceptance,
+    parts: &Parts,
+    descriptions: BudgetVec<SampleDescription>,
+) -> Result<SampleTable> {
+    let stts = Words::parse(required(parts.stts.as_ref())?, 8, limits)?;
+    let stsc = Words::parse(required(parts.stsc.as_ref())?, 12, limits)?;
+    let sizes = Sizes::parse(
+        parts
+            .sizes
+            .clone()
+            .or_else(|| parts.compact.clone())
+            .ok_or(Error::Invalid("missing sample size table"))?,
+    )?;
+    let offsets = Offsets::parse(required(parts.offsets.as_ref())?, limits)?;
+    let ctts = parts
+        .ctts
+        .clone()
+        .map(|v| Words::parse_ctts(v, limits))
+        .transpose()?;
+    let sync = parts
+        .sync
+        .clone()
+        .map(|v| Words::parse(v, 4, limits))
+        .transpose()?;
+    let partial = parts
+        .partial
+        .clone()
+        .map(|v| Words::parse(v, 4, limits))
+        .transpose()?;
+    if let Some(dependency) = &parts.dependency {
+        if acceptance != Acceptance::LegacyDependencyFlags
+            || dependency.payload().get(..4) != Some(&[0, 0, 0, 1])
+        {
+            fields::full_zero(dependency.payload())?;
+        }
+        fields::exact_rows(dependency.payload(), 4, sizes.count, 1)?;
+    }
+    Ok(SampleTable {
+        raw: raw.clone(),
+        descriptions,
+        stts,
+        ctts,
+        stsc,
+        sizes,
+        offsets,
+        sync,
+        partial,
+        dependency: parts.dependency.clone(),
+        timing_run_surplus: TimingRunSurplus::default(),
+        unused_sync_entries: 0,
+    })
 }
 
 impl Findings {

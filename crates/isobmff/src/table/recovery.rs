@@ -97,11 +97,20 @@ impl RunRecoveryBuilder {
         }
         self.inner.poll(work)
     }
+    /// [`poll`](Self::poll), with the table once it is built.
+    pub(crate) fn poll_table(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &std::sync::atomic::AtomicBool,
+    ) -> Result<Option<&SampleTable>> {
+        self.poll(work, cancel)?;
+        Ok(self.inner.built())
+    }
     /// Returns the table once [`poll`](Self::poll) has returned [`BuildStatus::Ready`];
     /// fails with `Error::Invalid` before that, or with the failure `poll` returned.
     pub fn finish(self) -> Result<RunRecoveryTable> {
         let storage = match self.inner.stage {
-            Stage::Ready(table) => table,
+            Stage::Validate { table, rows } if rows.check == Check::Done => table,
             Stage::Failed(error) => return Err(error),
             _ => return Err(Error::Invalid("run recovery builder not ready")),
         };
