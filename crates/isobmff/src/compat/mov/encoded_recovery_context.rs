@@ -79,7 +79,7 @@ impl RecoveryContextReceiver {
                             let kind = fields::fourcc(raw.payload(), 4)?;
                             if kind == *b"sync" || (atom == *b"sbgp" && kind == *b"rap ") {
                                 return Err(Error::Unsupported(
-                                    "V7 native-effect sample group not implemented",
+                                    "encoded sample group that changes key frames",
                                 ));
                             }
                             self.groups = self.groups.checked_add(1).ok_or(Error::Overflow)?;
@@ -88,17 +88,18 @@ impl RecoveryContextReceiver {
                 }
                 continue;
             }
-            let strict = self
-                .strict
-                .as_mut()
-                .ok_or(Error::Invalid("V7 strict recovery invariant"))?;
+            let strict = self.strict.as_mut().ok_or(Error::Invalid(
+                "encoded context view recovery walk invariant",
+            ))?;
             match strict.poll(work, cancel) {
                 Ok(false) => return Ok(false),
                 Ok(true) => {
                     let validated = self
                         .strict
                         .take()
-                        .ok_or(Error::Invalid("V7 recovery commit invariant"))?
+                        .ok_or(Error::Invalid(
+                            "encoded context view recovery commit invariant",
+                        ))?
                         .finish()?;
                     self.ready = Some(RecoveryObservation {
                         raw: self.raw.clone(),
@@ -135,6 +136,6 @@ impl RecoveryContextReceiver {
     pub(crate) fn finish(mut self) -> Result<RecoveryObservation> {
         self.ready
             .take()
-            .ok_or(Error::Invalid("V7 recovery not ready"))
+            .ok_or(Error::Invalid("encoded context view recovery not ready"))
     }
 }

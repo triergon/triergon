@@ -172,7 +172,9 @@ impl EsdsDemand {
                             es: tag == 3,
                         }
                     } else if tag == 4 {
-                        return Err(Error::Unsupported("V7 raw ESDS codec effect not admitted"));
+                        return Err(Error::Unsupported(
+                            "private diagnostic esds DecoderConfigDescriptor not admitted",
+                        ));
                     } else {
                         EsdsPhase::Done
                     }
@@ -255,7 +257,7 @@ impl PrivateDiagnosticJob {
             return Err(Error::ForeignPool);
         }
         if table.descriptions().len() != 1 || table.descriptions()[0].format != *b"raw " {
-            return Err(Error::Unsupported("V7 diagnostic raw-visual context"));
+            return Err(Error::Unsupported("private diagnostic raw-visual context"));
         }
         Ok(Self {
             pool: pool.clone(),
@@ -314,7 +316,7 @@ impl PrivateDiagnosticJob {
                 return Err(Error::Cancelled);
             }
             if self.finished {
-                return Err(Error::Invalid("V7 diagnostics already taken"));
+                return Err(Error::Invalid("private diagnostics already taken"));
             }
             if let Some(i) = self.emitting.iter().position(Option::is_some) {
                 if !work.try_charge(1) {
@@ -414,7 +416,7 @@ impl PrivateDiagnosticJob {
                 }
                 k if k == *b"dOps" => {
                     if body.len() < 11 || body[0] != 0 || self.demux_size != 0 {
-                        return Err(Error::Unsupported("V7 diagnostic Opus context"));
+                        return Err(Error::Unsupported("private diagnostic Opus context"));
                     }
                     self.demux_size = 19;
                 }
@@ -436,7 +438,7 @@ impl PrivateDiagnosticJob {
                         ));
                     } else {
                         return Err(Error::Unsupported(
-                            "V7 VP version1 diagnostic/native effects unadmitted",
+                            "private diagnostic vpcC version 1 effects not admitted",
                         ));
                     }
                 }
@@ -507,7 +509,7 @@ impl PrivateDiagnosticJob {
             return Err(Error::Cancelled);
         }
         if !self.done || self.finished || self.emitting.iter().any(Option::is_some) {
-            return Err(Error::Invalid("V7 diagnostics not ready"));
+            return Err(Error::Invalid("private diagnostics not ready"));
         }
         self.finished = true;
         let events = std::mem::replace(&mut self.output, BudgetVec::new(&self.pool));

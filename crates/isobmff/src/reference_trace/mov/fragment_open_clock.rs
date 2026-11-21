@@ -106,7 +106,9 @@ impl<'a> FragmentClockJob<'a> {
         }
         let start = index
             .decode_time()
-            .ok_or(Error::Unsupported("v6 explicit tfdt required"))?
+            .ok_or(Error::Unsupported(
+                "fragment open clock needs an explicit tfdt",
+            ))?
             .ticks();
         if index.sample_count() > maximum {
             return Err(Error::Limit {
@@ -115,7 +117,9 @@ impl<'a> FragmentClockJob<'a> {
             });
         }
         if index.decode_end().is_none() {
-            return Err(Error::Unsupported("v6 source decode endpoint unknown"));
+            return Err(Error::Unsupported(
+                "fragment open clock source decode endpoint unknown",
+            ));
         }
         let demux_start = ClockField::from_exact_ticks(i128::from(start))?.signed_ticks();
         Ok(Self {
@@ -156,7 +160,7 @@ impl<'a> FragmentClockJob<'a> {
         }
         if input.position() != self.position {
             return Err(Error::Invalid(
-                "v6 input moved during startup clock inspection",
+                "input moved during startup clock inspection",
             ));
         }
         Ok(())
@@ -194,7 +198,7 @@ impl<'a> FragmentClockJob<'a> {
         }
         input.read_into(&mut [], work, cancel)?;
         if self.finished {
-            return Err(Error::Invalid("v6 startup clock already finished"));
+            return Err(Error::Invalid("startup clock already finished"));
         }
         if self.ready.is_some() {
             return Ok(BuildStatus::Ready);
@@ -207,7 +211,7 @@ impl<'a> FragmentClockJob<'a> {
                 match self
                     .cursor
                     .as_mut()
-                    .ok_or(Error::Invalid("v6 clock cursor absent"))?
+                    .ok_or(Error::Invalid("startup clock cursor absent"))?
                     .poll(work)?
                 {
                     Next::Yield => return Ok(BuildStatus::Yield),
@@ -216,7 +220,7 @@ impl<'a> FragmentClockJob<'a> {
                         let tfdt = self
                             .index
                             .decode_time()
-                            .ok_or(Error::Invalid("v6 tfdt disappeared"))?;
+                            .ok_or(Error::Invalid("startup clock tfdt disappeared"))?;
                         self.ready = Some(FragmentClockResult {
                             raw_traf: self.index.raw().clone(),
                             raw_tfdt: tfdt.raw().clone(),
@@ -226,7 +230,7 @@ impl<'a> FragmentClockJob<'a> {
                             source_end: self
                                 .index
                                 .decode_end()
-                                .ok_or(Error::Invalid("v6 endpoint disappeared"))?,
+                                .ok_or(Error::Invalid("startup clock endpoint disappeared"))?,
                             demux_start: self.demux_start,
                             demux_end: self.rejected.is_none().then_some(self.demux_end),
                             rejected_source_ordinal: self.rejected,
@@ -242,7 +246,7 @@ impl<'a> FragmentClockJob<'a> {
             let sample = self
                 .pending
                 .take()
-                .ok_or(Error::Invalid("v6 pending duration absent"))?;
+                .ok_or(Error::Invalid("startup clock pending duration absent"))?;
             if self.rejected.is_none() {
                 match self.demux_end.checked_add(i64::from(sample.duration_ticks)) {
                     Some(end) => self.demux_end = end,
@@ -260,7 +264,7 @@ impl<'a> FragmentClockJob<'a> {
         let result = self
             .ready
             .take()
-            .ok_or(Error::Invalid("v6 native startup clock not ready"))?;
+            .ok_or(Error::Invalid("native startup clock not ready"))?;
         self.finished = true;
         Ok(result)
     }

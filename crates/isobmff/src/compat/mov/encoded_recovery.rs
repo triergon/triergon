@@ -254,16 +254,14 @@ impl RecoveryWalk {
                             )?;
                             if count == 0 {
                                 return source_result(
-                                    Err(Error::Invalid("encoded V5 empty recovery run")),
+                                    Err(Error::Invalid("encoded empty recovery run")),
                                     source.raw(),
                                     &mut self.error_backing,
                                 );
                             }
                             if index >= 65536 {
                                 return source_result(
-                                    Err(Error::Unsupported(
-                                        "encoded V5 fragment recovery namespace",
-                                    )),
+                                    Err(Error::Unsupported("encoded fragment recovery namespace")),
                                     source.raw(),
                                     &mut self.error_backing,
                                 );
@@ -273,7 +271,7 @@ impl RecoveryWalk {
                                 .ok_or(Error::Overflow)?;
                             if *covered > self.facts.samples {
                                 return source_result(
-                                    Err(Error::Invalid("encoded V5 recovery exceeds samples")),
+                                    Err(Error::Invalid("encoded recovery exceeds samples")),
                                     source.raw(),
                                     &mut self.error_backing,
                                 );
@@ -284,9 +282,7 @@ impl RecoveryWalk {
                         }
                         if *covered != self.facts.samples {
                             return source_result(
-                                Err(Error::Unsupported(
-                                    "encoded V5 incomplete recovery coverage",
-                                )),
+                                Err(Error::Unsupported("encoded incomplete recovery coverage")),
                                 source.raw(),
                                 &mut self.error_backing,
                             );
@@ -326,9 +322,7 @@ impl RecoveryWalk {
                             .map_or(0, RecoveryDescriptions::entry_count);
                         if self.maximum_indices[slot] > count {
                             self.error_backing = group.mappings.as_ref().map(|s| s.raw().clone());
-                            return Err(Error::Invalid(
-                                "encoded V5 unresolved recovery description",
-                            ));
+                            return Err(Error::Invalid("encoded unresolved recovery description"));
                         }
                     }
                     self.children = None;
@@ -351,9 +345,7 @@ impl RecoveryWalk {
                         x if x == *b"prol" => 1,
                         _ => {
                             return source_result(
-                                Err(Error::Unsupported(
-                                    "encoded V5 other sample-group semantics",
-                                )),
+                                Err(Error::Unsupported("encoded other sample-group semantics")),
                                 &raw,
                                 &mut self.error_backing,
                             );
@@ -362,7 +354,7 @@ impl RecoveryWalk {
                     let bit = 1u8 << (slot + if description { 0 } else { 2 });
                     if self.seen & bit != 0 {
                         return source_result(
-                            Err(Error::Invalid("encoded V5 duplicate recovery context")),
+                            Err(Error::Invalid("encoded duplicate recovery context")),
                             &raw,
                             &mut self.error_backing,
                         );
@@ -384,7 +376,7 @@ impl RecoveryWalk {
                         {
                             return source_result(
                                 Err(Error::Unsupported(
-                                    "encoded V5 variable or extended recovery entries",
+                                    "encoded variable or extended recovery entries",
                                 )),
                                 &raw,
                                 &mut self.error_backing,
@@ -405,7 +397,7 @@ impl RecoveryWalk {
                         )?;
                         if !self.extended && source.grouping_parameter().is_some_and(|p| p != 0) {
                             return source_result(
-                                Err(Error::Unsupported("encoded V5 recovery grouping parameter")),
+                                Err(Error::Unsupported("encoded recovery grouping parameter")),
                                 &raw,
                                 &mut self.error_backing,
                             );
@@ -424,7 +416,7 @@ impl RecoveryWalk {
     }
     pub(crate) fn finish(self) -> Result<RecoveryFacts> {
         if !self.finished {
-            return Err(Error::Invalid("encoded V5 recovery not ready"));
+            return Err(Error::Invalid("encoded recovery not ready"));
         }
         Ok(self.facts)
     }

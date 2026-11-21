@@ -43,26 +43,24 @@ impl PhysicalRead {
         _profile: PhysicalReadProfile,
     ) -> Result<Self> {
         let physical_length = input.capabilities().length.ok_or(Error::Unsupported(
-            "v4 physical read needs known source length",
+            "physical read needs a known source length",
         ))?;
         if !input.capabilities().random_access {
             return Err(Error::Unsupported(
-                "v4 physical read needs the pinned random-access source",
+                "physical read needs a random-access source",
             ));
         }
         let packet = event
             .packet
             .as_ref()
-            .ok_or(Error::Invalid("v4 suppressed native read"))?;
+            .ok_or(Error::Invalid("physical read of an event without a packet"))?;
         let requested = packet.source_range.clone();
         let size = requested
             .end
             .checked_sub(requested.start)
             .ok_or(Error::Overflow)?;
         if size == 0 {
-            return Err(Error::Unsupported(
-                "v4 physical prefix requires a positive native request",
-            ));
+            return Err(Error::Unsupported("physical read of an empty packet"));
         }
         let size = usize::try_from(size).map_err(|_| Error::Overflow)?;
         if size > maximum_packet {
@@ -72,11 +70,13 @@ impl PhysicalRead {
             });
         }
         if declared_media.start > declared_media.end || declared_media.end > physical_length {
-            return Err(Error::Unsupported("v4 physical source/media binding"));
+            return Err(Error::Unsupported(
+                "physical read media extent outside the source",
+            ));
         }
         if event.read != DescriptionRead::Available || requested.start >= physical_length {
             return Err(Error::Unsupported(
-                "v4 no positive physical prefix; native terminal transition remains separate",
+                "physical read packet not available before the physical end",
             ));
         }
         let available = requested.start..requested.end.min(physical_length);
@@ -203,7 +203,7 @@ impl PhysicalReader {
             || event.range_error != plan.source_range_error
             || event.read != DescriptionRead::Available
         {
-            return Err(Error::Unsupported("v4 physical read event/source binding"));
+            return Err(Error::Unsupported("physical read event/source binding"));
         }
         let size = usize::try_from(
             plan.requested
@@ -274,7 +274,7 @@ impl PhysicalReader {
         }
         require_token(input.token(), &self.token)?;
         if input.position() != self.position {
-            return Err(Error::Invalid("v4 input changed outside physical reader"));
+            return Err(Error::Invalid("input changed outside physical reader"));
         }
         input.read_into(&mut [], work, cancel)?;
         if work.remaining() == 0 {
@@ -284,7 +284,7 @@ impl PhysicalReader {
             let buffer = self
                 .buffer
                 .as_mut()
-                .ok_or(Error::Invalid("v4 physical reader completed"))?;
+                .ok_or(Error::Invalid("physical reader completed"))?;
             if buffer.len() == self.length {
                 if work.remaining() == 0 {
                     return Ok(Step::Yield);
@@ -298,7 +298,7 @@ impl PhysicalReader {
                 let buffer = self
                     .buffer
                     .take()
-                    .ok_or(Error::Invalid("v4 physical buffer absent"))?;
+                    .ok_or(Error::Invalid("physical buffer absent"))?;
                 let payload = match buffer.freeze() {
                     Ok(payload) => payload,
                     Err(failure) => {

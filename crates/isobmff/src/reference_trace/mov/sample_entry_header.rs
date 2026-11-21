@@ -145,7 +145,7 @@ impl SampleEntryHeaderJob {
             return Err(Error::Cancelled);
         }
         if self.finished {
-            return Err(Error::Invalid("v7 header already taken"));
+            return Err(Error::Invalid("sample entry header already taken"));
         }
         if self.ready {
             return Ok(BuildStatus::Ready);
@@ -158,7 +158,7 @@ impl SampleEntryHeaderJob {
                 match self
                     .children
                     .as_mut()
-                    .ok_or(Error::Invalid("v7 child cursor absent"))?
+                    .ok_or(Error::Invalid("sample entry child cursor absent"))?
                     .poll(work)?
                 {
                     Next::Yield => return Ok(BuildStatus::Yield),
@@ -176,7 +176,7 @@ impl SampleEntryHeaderJob {
             let raw = self
                 .pending
                 .take()
-                .ok_or(Error::Invalid("v7 pending child absent"))?;
+                .ok_or(Error::Invalid("sample entry pending child absent"))?;
             self.inspected = self.inspected.checked_add(1).ok_or(Error::Overflow)?;
             // A failed demux header still does not skip later source syntax.
             if self.rejection.is_none()
@@ -256,12 +256,14 @@ impl SampleEntryHeaderJob {
             return Err(self.poison(Error::Cancelled));
         }
         if !self.ready || self.finished {
-            return Err(Error::Invalid("v7 header not ready or already taken"));
+            return Err(Error::Invalid(
+                "sample entry header not ready or already taken",
+            ));
         }
         let description = self
             .description
             .take()
-            .ok_or(Error::Invalid("v7 entry absent"))?;
+            .ok_or(Error::Invalid("sample entry absent"))?;
         self.finished = true;
         Ok(SampleEntryHeader {
             description,

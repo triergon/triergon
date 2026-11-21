@@ -520,14 +520,14 @@ fn direct_description_cannot_enter_the_run_cursor_surface() {
     assert!(matches!(
         t.packet_cursor(&p, &h, &m, PacketLimits::default()),
         Err(Error::Unsupported(
-            "initial-description recovery requires explicit v2 cursor"
+            "initial-description recovery requires the direct packet cursor"
         ))
     ));
     assert_eq!(p.used(), before);
     assert!(matches!(
         t.index_cursor(&p, &h, &m, IndexLimits::default()),
         Err(Error::Unsupported(
-            "initial-description recovery requires explicit v2 cursor"
+            "initial-description recovery requires the direct packet cursor"
         ))
     ));
     assert_eq!(p.used(), before);

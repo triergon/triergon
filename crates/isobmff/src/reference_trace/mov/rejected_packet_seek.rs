@@ -162,7 +162,7 @@ impl<'a> InitialOperationJob<'a> {
         if input.capabilities().length != Some(model.physical_length())
             || !input.capabilities().random_access
         {
-            return Err(Error::Unsupported("v5 rejected seek source capabilities"));
+            return Err(Error::Unsupported("rejected seek source capabilities"));
         }
         let cursor = table.root_walk_packet_cursor(
             input.budget(),
@@ -217,12 +217,16 @@ impl<'a> InitialOperationJob<'a> {
             });
         }
         if input.position() != self.position {
-            return Err(Error::Invalid("v5 input moved during initial operation"));
+            return Err(Error::Invalid(
+                "input moved during the rejected seek's initial operation",
+            ));
         }
         if input.capabilities().length != Some(self.model.physical_length())
             || !input.capabilities().random_access
         {
-            return Err(Error::Unsupported("v5 source capability changed"));
+            return Err(Error::Unsupported(
+                "rejected seek source capability changed",
+            ));
         }
         Ok(())
     }
@@ -257,7 +261,9 @@ impl<'a> InitialOperationJob<'a> {
         }
         input.read_into(&mut [], work, cancel)?;
         if self.finished {
-            return Err(Error::Invalid("v5 initial operation already finished"));
+            return Err(Error::Invalid(
+                "rejected seek initial operation already finished",
+            ));
         }
         if self.ready.is_some() {
             return Ok(BuildStatus::Ready);
@@ -269,7 +275,7 @@ impl<'a> InitialOperationJob<'a> {
             let cursor = self
                 .cursor
                 .as_mut()
-                .ok_or(Error::Invalid("v5 probe cursor absent"))?;
+                .ok_or(Error::Invalid("rejected seek probe cursor absent"))?;
             match cursor.poll(work, cancel)? {
                 CursorStatus::Yield => return Ok(BuildStatus::Yield),
                 CursorStatus::End => {
@@ -286,7 +292,7 @@ impl<'a> InitialOperationJob<'a> {
         let event = self
             .pending
             .as_ref()
-            .ok_or(Error::Invalid("v5 first event absent"))?;
+            .ok_or(Error::Invalid("rejected seek first event absent"))?;
         let open = self.model.modeled_open_state();
         let packet = event.packet.as_ref();
         let reject = if let Some(packet) = packet {
@@ -325,7 +331,7 @@ impl<'a> InitialOperationJob<'a> {
             return Ok(BuildStatus::Ready);
         }
         let offset = packet
-            .ok_or(Error::Invalid("v5 rejected packet absent"))?
+            .ok_or(Error::Invalid("rejected seek packet absent"))?
             .source_range
             .start;
         // Health/token/cancellation were checked above. The actual core operation
@@ -335,7 +341,7 @@ impl<'a> InitialOperationJob<'a> {
             Err(error) => return Err(error),
             Ok(_) => {
                 return Err(Error::Invalid(
-                    "v5 out-of-source request unexpectedly accepted",
+                    "rejected seek out-of-source request accepted",
                 ));
             }
         };
@@ -343,7 +349,7 @@ impl<'a> InitialOperationJob<'a> {
         let event = self
             .pending
             .take()
-            .ok_or(Error::Invalid("v5 first event absent"))?;
+            .ok_or(Error::Invalid("rejected seek first event absent"))?;
         self.cursor = None;
         self.ready = Some(InitialOperation {
             rejected: Some(RejectedPacketSeek {
@@ -351,7 +357,7 @@ impl<'a> InitialOperationJob<'a> {
                 source_mdhd: self
                     .mdhd
                     .take()
-                    .ok_or(Error::Invalid("v5 source clock absent"))?,
+                    .ok_or(Error::Invalid("rejected seek source clock absent"))?,
                 event,
                 source_error: error,
                 open,
@@ -387,7 +393,7 @@ impl<'a> InitialOperationJob<'a> {
                 self.mdhd = None;
                 Ok(ready)
             }
-            _ => Err(self.poison(Error::Invalid("v5 initial operation not ready"))),
+            _ => Err(self.poison(Error::Invalid("rejected seek initial operation not ready"))),
         }
     }
 }

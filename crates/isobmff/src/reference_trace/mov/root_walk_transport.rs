@@ -21,9 +21,9 @@ use std::{
 };
 use triergon_core::{Budget, Error, Result, WorkBudget};
 
-const CONSUMPTION_BOUNDS: &str = "v4 modeled metadata consumption bounds";
-const PLAIN_ATOMS: &str = "v4 modeled transport requires bounded plain source atoms";
-const RGB24_FIELDS: &str = "v4 unreviewed RGB24 entry fields";
+const CONSUMPTION_BOUNDS: &str = "root-walk transport metadata consumption bounds";
+const PLAIN_ATOMS: &str = "root-walk transport requires bounded plain source atoms";
+const RGB24_FIELDS: &str = "root-walk transport unreviewed RGB24 entry fields";
 
 /// Selects the root-walk transport model; pass it to [`RootWalkTransportBuilder::new`].
 #[derive(Clone, Copy, Debug)]
@@ -155,7 +155,7 @@ impl RootWalkTransportModel {
             || media != [self.media.clone()]
         {
             return Err(Error::Unsupported(
-                "v4 modeled transport source/configuration binding",
+                "root-walk transport source/configuration binding",
             ));
         }
         Ok(())
@@ -165,7 +165,9 @@ impl RootWalkTransportModel {
 impl Window {
     fn forward_skip(&mut self, target: u64, context: DescriptionContext) -> Result<bool> {
         if target < self.cursor || target > context.physical_length {
-            return Err(Error::Unsupported("v4 symbolic source skip bounds"));
+            return Err(Error::Unsupported(
+                "root-walk transport symbolic source skip bounds",
+            ));
         }
         if target > self.end && target.checked_sub(self.end).ok_or(Error::Overflow)? > DISCARD_BOUND
         {
@@ -251,10 +253,14 @@ impl<'a> RootWalkTransportBuilder<'a> {
         let mut extents = roots.iter().filter(|header| header.kind == *b"mdat");
         let media = extents
             .next()
-            .ok_or(Error::Unsupported("v4 missing source media"))?
+            .ok_or(Error::Unsupported(
+                "root-walk transport missing source media",
+            ))?
             .payload_range()?;
         if extents.next().is_some() {
-            return Err(Error::Unsupported("v4 multiple media extents"));
+            return Err(Error::Unsupported(
+                "root-walk transport multiple media extents",
+            ));
         }
         if context.physical_length > i64::MAX as u64
             || movie.header().end()?.is_none_or(|end| end > CAPACITY)
@@ -268,7 +274,7 @@ impl<'a> RootWalkTransportBuilder<'a> {
             || table.descriptions().len() != 1
         {
             return Err(Error::Unsupported(
-                "v4 bounded raw-video source-operation domain",
+                "root-walk transport outside its bounded raw-video domain",
             ));
         }
         let entry = table.descriptions()[0].raw().clone();
@@ -336,7 +342,9 @@ impl<'a> RootWalkTransportBuilder<'a> {
             if !self.root_ready {
                 if self.root_at == self.roots.len() {
                     if self.root_kind != 3 || self.root_end != self.context.physical_length {
-                        return Err(Error::Unsupported("v4 incomplete source root carriage"));
+                        return Err(Error::Unsupported(
+                            "root-walk transport incomplete source root carriage",
+                        ));
                     }
                     self.root_ready = true;
                     self.children = Some(self.movie.children(
@@ -354,23 +362,29 @@ impl<'a> RootWalkTransportBuilder<'a> {
                 let header = &self.roots[self.root_at];
                 small_plain(header, self.context.physical_length, PLAIN_ATOMS)?;
                 if header.start != self.root_end {
-                    return Err(Error::Unsupported("v4 discontinuous source root carriage"));
+                    return Err(Error::Unsupported(
+                        "root-walk transport discontinuous source root carriage",
+                    ));
                 }
                 self.root_end = header
                     .end()?
-                    .ok_or(Error::Unsupported("v4 unknown root end"))?;
+                    .ok_or(Error::Unsupported("root-walk transport unknown root end"))?;
                 if header.kind != *b"free" {
                     let wanted = [*b"ftyp", *b"moov", *b"mdat"]
                         .get(usize::from(self.root_kind))
                         .copied();
                     if wanted != Some(header.kind) {
-                        return Err(Error::Unsupported("v4 unreviewed source root order"));
+                        return Err(Error::Unsupported(
+                            "root-walk transport unreviewed source root order",
+                        ));
                     }
                     if (self.root_kind == 0 && header != self.ftyp.header())
                         || (self.root_kind == 1 && header != self.movie.header())
                         || (self.root_kind == 2 && header.payload_range()? != self.media)
                     {
-                        return Err(Error::Unsupported("v4 metadata/root range binding"));
+                        return Err(Error::Unsupported(
+                            "root-walk transport metadata/root range binding",
+                        ));
                     }
                     self.root_kind += 1;
                 }
@@ -378,10 +392,9 @@ impl<'a> RootWalkTransportBuilder<'a> {
                 continue;
             }
             if !self.source_ready {
-                let children = self
-                    .children
-                    .as_mut()
-                    .ok_or(Error::Invalid("v4 missing transport source iterator"))?;
+                let children = self.children.as_mut().ok_or(Error::Invalid(
+                    "root-walk transport missing source iterator",
+                ))?;
                 match children.poll(work)? {
                     Next::Yield => return Ok(BuildStatus::Yield),
                     Next::Item(raw) => {
@@ -390,40 +403,52 @@ impl<'a> RootWalkTransportBuilder<'a> {
                             continue;
                         }
                         if expected(self.level).get(self.matched) != Some(&raw.header().kind) {
-                            return Err(Error::Unsupported("v4 unreviewed metadata child order"));
+                            return Err(Error::Unsupported(
+                                "root-walk transport unreviewed metadata child order",
+                            ));
                         }
                         if self.level == 2
                             && raw.header().kind == *b"hdlr"
                             && fields::fourcc(raw.payload(), 8)? != *b"vide"
                         {
-                            return Err(Error::Unsupported("v4 nonvisual source handler"));
+                            return Err(Error::Unsupported(
+                                "root-walk transport nonvisual source handler",
+                            ));
                         }
                         if self.level == 3
                             && raw.header().kind == *b"dinf"
                             && raw.payload()
                                 != b"\0\0\0\x1cdref\0\0\0\0\0\0\0\x01\0\0\0\x0curl \0\0\0\x01"
                         {
-                            return Err(Error::Unsupported("v4 unreviewed source data reference"));
+                            return Err(Error::Unsupported(
+                                "root-walk transport unreviewed source data reference",
+                            ));
                         }
                         if self.level == 3
                             && raw.header().kind == *b"stbl"
                             && (raw.header() != self.table.header()
                                 || raw.bytes().as_ref() != self.table.bytes().as_ref())
                         {
-                            return Err(Error::Unsupported("v4 source table binding"));
+                            return Err(Error::Unsupported(
+                                "root-walk transport source table binding",
+                            ));
                         }
                         if self.level == 4
                             && raw.header().kind == *b"stsd"
                             && (fields::u32_at(raw.payload(), 0)? != 0
                                 || fields::u32_at(raw.payload(), 4)? != 1)
                         {
-                            return Err(Error::Unsupported("v4 unreviewed source catalogue"));
+                            return Err(Error::Unsupported(
+                                "root-walk transport unreviewed source catalogue",
+                            ));
                         }
                         if self.level == 5
                             && (raw.header() != self.entry.header()
                                 || raw.bytes().as_ref() != self.entry.bytes().as_ref())
                         {
-                            return Err(Error::Unsupported("v4 source entry binding"));
+                            return Err(Error::Unsupported(
+                                "root-walk transport source entry binding",
+                            ));
                         }
                         if raw.header().kind == next_kind(self.level) {
                             self.next = Some(raw);
@@ -432,17 +457,18 @@ impl<'a> RootWalkTransportBuilder<'a> {
                     }
                     Next::End => {
                         if self.matched != expected(self.level).len() {
-                            return Err(Error::Unsupported("v4 incomplete transport metadata"));
+                            return Err(Error::Unsupported(
+                                "root-walk transport incomplete metadata",
+                            ));
                         }
                         if self.level == 5 {
                             self.source_ready = true;
                             self.children = None;
                             continue;
                         }
-                        let next = self
-                            .next
-                            .take()
-                            .ok_or(Error::Unsupported("v4 missing transport metadata child"))?;
+                        let next = self.next.take().ok_or(Error::Unsupported(
+                            "root-walk transport missing metadata child",
+                        ))?;
                         self.level += 1;
                         self.matched = 0;
                         self.children = Some(next.children(
@@ -473,7 +499,7 @@ impl<'a> RootWalkTransportBuilder<'a> {
                 1 => {
                     self.revisit = self.window.revisit_set(
                         self.entry.header().start,
-                        "v4 unreviewed forward entry revisit",
+                        "root-walk transport unreviewed forward entry revisit",
                     )?;
                     self.next_anchor = self.revisit.first_anchor;
                 }
@@ -499,15 +525,14 @@ impl<'a> RootWalkTransportBuilder<'a> {
                     {
                         self.tail_at += 1;
                     }
-                    let header = self
-                        .roots
-                        .get(self.tail_at)
-                        .ok_or(Error::Unsupported("v4 incomplete symbolic root walk"))?;
+                    let header = self.roots.get(self.tail_at).ok_or(Error::Unsupported(
+                        "root-walk transport incomplete symbolic root walk",
+                    ))?;
                     let payload = header.payload_range()?;
                     let candidate = self
                         .candidate
                         .as_mut()
-                        .ok_or(Error::Invalid("v4 missing symbolic path"))?;
+                        .ok_or(Error::Invalid("root-walk transport missing symbolic path"))?;
                     match self.tail_phase {
                         0 => {
                             candidate.consume(payload.start, self.context, CONSUMPTION_BOUNDS)?;
@@ -544,17 +569,21 @@ impl<'a> RootWalkTransportBuilder<'a> {
                                 self.tail_phase = 0;
                             }
                         }
-                        _ => return Err(Error::Invalid("v4 invalid symbolic atom phase")),
+                        _ => {
+                            return Err(Error::Invalid(
+                                "root-walk transport invalid symbolic atom phase",
+                            ));
+                        }
                     }
                 }
                 4 => {
                     let candidate = self
                         .candidate
                         .take()
-                        .ok_or(Error::Invalid("v4 missing completed path"))?;
+                        .ok_or(Error::Invalid("root-walk transport missing completed path"))?;
                     if self.logical_position.is_some_and(|p| p != candidate.cursor) {
                         return Err(Error::Unsupported(
-                            "v4 path-dependent logical operation end",
+                            "root-walk transport path-dependent logical operation end",
                         ));
                     }
                     self.logical_position = Some(candidate.cursor);
@@ -579,7 +608,7 @@ impl<'a> RootWalkTransportBuilder<'a> {
                         self.action = 2;
                     }
                 }
-                _ => return Err(Error::Invalid("v4 invalid transport replay action")),
+                _ => return Err(Error::Invalid("root-walk transport invalid replay action")),
             }
             if self.action < 2 {
                 self.action += 1;
@@ -593,7 +622,7 @@ impl<'a> RootWalkTransportBuilder<'a> {
             return Err(error);
         }
         if !self.ready {
-            return Err(Error::Invalid("v4 transport builder not ready"));
+            return Err(Error::Invalid("root-walk transport builder not ready"));
         }
         Ok(RootWalkTransportModel {
             ftyp: self.ftyp,
@@ -605,11 +634,11 @@ impl<'a> RootWalkTransportBuilder<'a> {
             open: ModeledOpenState {
                 source_position_min: self
                     .source_min
-                    .ok_or(Error::Invalid("v4 empty modeled window set"))?,
+                    .ok_or(Error::Invalid("root-walk transport empty window set"))?,
                 source_position_max: self.source_max,
                 logical_position: self
                     .logical_position
-                    .ok_or(Error::Invalid("v4 missing modeled logical end"))?,
+                    .ok_or(Error::Invalid("root-walk transport missing logical end"))?,
                 possible_windows: self.windows,
                 entry_revisit: self.revisit.kind,
             },

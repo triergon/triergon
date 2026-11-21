@@ -272,28 +272,28 @@ fn dangling_index_is_rejected_before_any_packet() {
     let s = Source::new(fixture("dangling-description"));
     assert_eq!(
         s.plan(1).unwrap_err(),
-        Error::Invalid("encoded V5 unresolved recovery description")
+        Error::Invalid("encoded unresolved recovery description")
     );
 }
 #[test]
 fn zero_count_run_is_rejected_before_any_packet() {
     assert_eq!(
         Source::new(fixture("empty-run")).plan(1).unwrap_err(),
-        Error::Invalid("encoded V5 empty recovery run")
+        Error::Invalid("encoded empty recovery run")
     );
 }
 #[test]
 fn too_many_source_samples_in_map_is_rejected() {
     assert_eq!(
         Source::new(fixture("coverage-over")).plan(1).unwrap_err(),
-        Error::Invalid("encoded V5 recovery exceeds samples")
+        Error::Invalid("encoded recovery exceeds samples")
     );
 }
 #[test]
 fn incomplete_source_coverage_remains_explicitly_unadmitted() {
     assert_eq!(
         Source::new(fixture("coverage-under")).plan(1).unwrap_err(),
-        Error::Unsupported("encoded V5 incomplete recovery coverage")
+        Error::Unsupported("encoded incomplete recovery coverage")
     );
 }
 #[test]
@@ -302,7 +302,7 @@ fn fragment_namespace_cannot_resolve_as_regular_track_description() {
         Source::new(fixture("fragment-namespace"))
             .plan(1)
             .unwrap_err(),
-        Error::Unsupported("encoded V5 fragment recovery namespace")
+        Error::Unsupported("encoded fragment recovery namespace")
     );
 }
 #[test]
@@ -311,7 +311,7 @@ fn unknown_grouping_parameter_stays_visible_and_unadmitted() {
         Source::new(fixture("grouping-parameter"))
             .plan(1)
             .unwrap_err(),
-        Error::Unsupported("encoded V5 recovery grouping parameter")
+        Error::Unsupported("encoded recovery grouping parameter")
     );
 }
 #[test]
@@ -320,7 +320,7 @@ fn variable_lengths_do_not_trigger_repeated_prefix_parsing() {
         Source::new(fixture("variable-length-unadmitted"))
             .plan(1)
             .unwrap_err(),
-        Error::Unsupported("encoded V5 variable or extended recovery entries")
+        Error::Unsupported("encoded variable or extended recovery entries")
     );
 }
 #[test]
@@ -329,7 +329,7 @@ fn duplicate_context_does_not_silently_replace_prior_backing() {
         Source::new(fixture("duplicate-description"))
             .plan(1)
             .unwrap_err(),
-        Error::Invalid("encoded V5 duplicate recovery context")
+        Error::Invalid("encoded duplicate recovery context")
     );
 }
 #[test]
@@ -338,7 +338,7 @@ fn unknown_group_semantics_do_not_get_roll_fallback() {
         Source::new(fixture("unknown-group-unadmitted"))
             .plan(1)
             .unwrap_err(),
-        Error::Unsupported("encoded V5 other sample-group semantics")
+        Error::Unsupported("encoded other sample-group semantics")
     );
 }
 #[test]
@@ -356,7 +356,7 @@ fn old_actual_membership_refusal_is_unchanged() {
     .unwrap();
     assert_eq!(
         finish(&mut old, &mut i, 1).unwrap_err(),
-        Error::Unsupported("encoded V4 nonempty recovery descriptions")
+        Error::Unsupported("encoded dependency view nonempty recovery descriptions")
     );
 }
 #[test]

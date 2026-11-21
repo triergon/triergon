@@ -131,7 +131,7 @@ fn reserved_depended_on_field_is_not_a_false_or_true_repair() {
     ));
     assert_eq!(
         s.plan(1).unwrap_err(),
-        Error::Unsupported("encoded V4 reserved depended-on value")
+        Error::Unsupported("encoded dependency view reserved depended-on value")
     );
     let mut c = s.table.cursor();
     if let Next::Item(sample) = c.poll(&mut WorkBudget::new(1)).unwrap() {

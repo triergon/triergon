@@ -210,7 +210,7 @@ impl RunRecoveryTable {
     ) -> Result<RecoveryPacketCursor<'a>> {
         if self.initial_description.is_some() {
             return Err(Error::Unsupported(
-                "initial-description recovery requires explicit v2 cursor",
+                "initial-description recovery requires the direct packet cursor",
             ));
         }
         let inner = crate::compat::mov::cursor::PacketCursor::new_complete_source(
@@ -237,7 +237,7 @@ impl RunRecoveryTable {
     ) -> Result<RecoveryIndexCursor<'a>> {
         if self.initial_description.is_some() {
             return Err(Error::Unsupported(
-                "initial-description recovery requires explicit v2 cursor",
+                "initial-description recovery requires the direct packet cursor",
             ));
         }
         let mut inner = crate::compat::mov::index::IndexCursor::new_complete_source(

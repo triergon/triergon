@@ -59,7 +59,7 @@ impl DescriptionContext {
     ) -> Result<DescriptionRead> {
         if terminal_media.start > terminal_media.end || terminal_media.end != self.physical_length {
             return Err(Error::Unsupported(
-                "v3 availability needs one physical terminal media extent",
+                "description recovery availability needs one physical terminal media extent",
             ));
         }
         Ok(if start < self.physical_length {
@@ -220,10 +220,10 @@ impl DescriptionRecoveryBuilder {
             .inner
             .table
             .as_ref()
-            .ok_or(Error::Invalid("v3 missing raw storage"))?;
+            .ok_or(Error::Invalid("description recovery missing raw storage"))?;
         if table.descriptions().len() != 1 {
             return Err(Error::Unsupported(
-                "v3 single native catalogue entry profile",
+                "description recovery needs one sample description",
             ));
         }
         while self.at < table.stsc.count {
@@ -239,13 +239,17 @@ impl DescriptionRecoveryBuilder {
                 2 | u32::MAX => {
                     if self.at != 0 {
                         return Err(Error::Unsupported(
-                            "v3 noninitial missing/all-ones catalogue domain",
+                            "description recovery noninitial missing/all-ones catalogue domain",
                         ));
                     }
                     self.special = Some(description);
                     self.invalid = self.invalid.checked_add(1).ok_or(Error::Overflow)?;
                 }
-                _ => return Err(Error::Unsupported("v3 unobserved raw description value")),
+                _ => {
+                    return Err(Error::Unsupported(
+                        "description recovery unobserved raw description value",
+                    ));
+                }
             }
             self.at += 1;
         }
@@ -253,12 +257,12 @@ impl DescriptionRecoveryBuilder {
             && (self.invalid != 1 || table.stsc.count < 2 || table.stsc.word(1, 0)? != 2)
         {
             return Err(Error::Unsupported(
-                "v3 mixed/missing immediate successor for special description",
+                "description recovery mixed/missing immediate successor for special description",
             ));
         }
         if self.invalid != 0 && table.ctts.as_ref().is_some_and(|t| t.count > 2) {
             return Err(Error::Unsupported(
-                "v3 direct composition domain has more than two rows",
+                "description recovery direct composition domain has more than two rows",
             ));
         }
         self.ready = true;
@@ -271,7 +275,7 @@ impl DescriptionRecoveryBuilder {
             return Err(e);
         }
         if !self.ready {
-            return Err(Error::Invalid("v3 builder not ready"));
+            return Err(Error::Invalid("description recovery builder not ready"));
         }
         Ok(DescriptionRecoveryTable {
             base: self.inner.finish()?,
@@ -324,7 +328,7 @@ impl DescriptionRecoveryTable {
     pub fn description_diagnostic(&self, row: u32) -> Result<Option<DescriptionRowDiagnostic>> {
         let table = &self.base.storage;
         if row >= table.stsc.count {
-            return Err(Error::Invalid("v3 diagnostic row"));
+            return Err(Error::Invalid("description recovery diagnostic row"));
         }
         let raw = table.stsc.word(row, 8)?;
         if raw == 1 {
@@ -402,7 +406,7 @@ impl DescriptionRecoveryTable {
             || media[0].end != context.physical_length
         {
             return Err(Error::Unsupported(
-                "v3 direct needs one physical terminal media extent",
+                "description recovery needs one physical terminal media extent",
             ));
         }
         self.direct_cursor(
@@ -410,7 +414,7 @@ impl DescriptionRecoveryTable {
             media,
             limits,
             context,
-            "v3 direct composition domain has more than two rows",
+            "description recovery direct composition domain has more than two rows",
             false,
         )
     }
@@ -501,7 +505,7 @@ impl DescriptionRecoveryTable {
             || media[0].end > context.physical_length
         {
             return Err(Error::Unsupported(
-                "v4 needs one declared media extent inside the physical source",
+                "physical recovery needs one declared media extent inside the physical source",
             ));
         }
         self.direct_cursor(
@@ -509,7 +513,7 @@ impl DescriptionRecoveryTable {
             media,
             limits,
             context,
-            "v4 direct composition domain has more than two rows",
+            "physical recovery direct composition domain has more than two rows",
             true,
         )
     }
@@ -788,11 +792,9 @@ impl Direct<'_> {
             modeled_transport_read,
         };
         self.state.byte = read_sample.range.end;
-        self.state.left = self
-            .state
-            .left
-            .checked_sub(1)
-            .ok_or(Error::Invalid("v3 zero observed chunk count"))?;
+        self.state.left = self.state.left.checked_sub(1).ok_or(Error::Invalid(
+            "description recovery zero observed chunk count",
+        ))?;
         self.state.ordinal += 1;
         self.state.distance = distance;
         self.state.demux_started |= !suppressed;
@@ -823,7 +825,7 @@ impl DescriptionPacketCursor<'_> {
     /// Takes the ready event; fails with the sticky failure, or with `Error::Invalid` when
     /// no event is ready.
     pub fn take_event(&mut self) -> Result<DescriptionEvent> {
-        self.latch.take("v3 no ready event")
+        self.latch.take("description recovery no ready event")
     }
     fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         if let Some(legacy) = &mut self.legacy {
@@ -873,7 +875,7 @@ impl DescriptionPacketCursor<'_> {
         let direct = self
             .direct
             .as_mut()
-            .ok_or(Error::Invalid("v3 missing engine"))?;
+            .ok_or(Error::Invalid("description recovery missing engine"))?;
         if direct.ended() {
             return Ok(CursorStatus::End);
         }
@@ -943,7 +945,7 @@ impl<'a> DescriptionIndexCursor<'a> {
     /// Takes the ready event; fails with the sticky failure, or with `Error::Invalid` when
     /// no event is ready.
     pub fn take_event(&mut self) -> Result<DescriptionIndexEvent> {
-        self.latch.take("v3 no ready index event")
+        self.latch.take("description recovery no ready index event")
     }
     fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         match self.inner.poll(work, cancel)? {
@@ -958,8 +960,8 @@ impl<'a> DescriptionIndexCursor<'a> {
                         packet,
                         self.next,
                         event.demux_index_distance,
-                        "v3 native index flags",
-                        "v3 native signed index position",
+                        "description recovery native index flags",
+                        "description recovery native signed index position",
                     )?;
                     self.next += 1;
                     Some(entry)

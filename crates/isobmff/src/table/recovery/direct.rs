@@ -150,7 +150,7 @@ impl RunRecoveryTable {
             || self.descriptions().len() != 1
         {
             return Err(Error::Unsupported(
-                "v2 direct observation requires one terminal media extent/catalogue entry",
+                "direct recovery requires one terminal media extent/catalogue entry",
             ));
         }
         if limits.max_tracks == 0 || media.len() > limits.max_media_extents {
@@ -162,7 +162,7 @@ impl RunRecoveryTable {
         bounded(self.storage.sample_count(), limits.max_source_samples)?;
         if self.storage.ctts.as_ref().is_some_and(|t| t.count > 2) {
             return Err(Error::Unsupported(
-                "v2 direct composition shift with more than two rows",
+                "direct recovery composition shift with more than two rows",
             ));
         }
         let base = header.demux_projection_base()?;
@@ -321,7 +321,7 @@ impl DirectCursor<'_> {
         }
         let mut source = self.source;
         let declaration = match source.poll(work)? {
-            Next::Yield => return Err(Error::Invalid("internal v2 yield sentinel")),
+            Next::Yield => return Err(Error::Invalid("internal direct recovery yield sentinel")),
             Next::End => return Ok(None),
             Next::Item(s) => s,
         };
@@ -391,7 +391,7 @@ impl DirectCursor<'_> {
         next.left = next
             .left
             .checked_sub(1)
-            .ok_or(Error::Invalid("v2 zero projected chunk count"))?;
+            .ok_or(Error::Invalid("direct recovery zero projected chunk count"))?;
         next.ordinal += 1;
         self.source = source;
         self.state = next;
@@ -449,7 +449,7 @@ impl DirectPacketCursor<'_> {
         let c = self
             .direct
             .as_mut()
-            .ok_or(Error::Invalid("missing v2 cursor engine"))?;
+            .ok_or(Error::Invalid("missing direct recovery cursor engine"))?;
 
         if c.state.ordinal == c.table.storage.sample_count()
             || (c.state.left == 0 && c.state.chunk == c.table.storage.offsets.table.count)
@@ -470,7 +470,7 @@ impl DirectPacketCursor<'_> {
     /// Takes the ready packet; fails with the sticky failure, or with `Error::Invalid` when
     /// no packet is ready.
     pub fn take_occurrence(&mut self) -> Result<DirectOccurrence> {
-        self.latch.take("no ready v2 observation")
+        self.latch.take("no ready direct recovery observation")
     }
 }
 /// One entry of FFmpeg's index under direct recovery, with the declared sample it stands
@@ -563,7 +563,7 @@ impl DirectIndexCursor<'_> {
                         &r.demux,
                         self.next,
                         distance,
-                        "v2 direct native index flags",
+                        "direct recovery native index flags",
                         "native index signed position",
                     )?;
                     self.latch.ready = Some(DirectIndexEntry {
@@ -583,6 +583,6 @@ impl DirectIndexCursor<'_> {
     /// Takes the ready entry; fails with the sticky failure, or with `Error::Invalid` when no
     /// entry is ready.
     pub fn take_entry(&mut self) -> Result<DirectIndexEntry> {
-        self.latch.take("no ready v2 index")
+        self.latch.take("no ready direct recovery index")
     }
 }

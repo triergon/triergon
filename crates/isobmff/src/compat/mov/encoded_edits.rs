@@ -959,7 +959,9 @@ impl<'a> EncodedEditJob<'a> {
                     && !self.dependency_recovery
                     && s.dependency.is_some_and(|raw| raw & 0x0c == 12)
                 {
-                    return Err(Error::Unsupported("encoded V4 reserved depended-on value"));
+                    return Err(Error::Unsupported(
+                        "encoded dependency view reserved depended-on value",
+                    ));
                 }
                 let d = s
                     .dts_ticks
@@ -1110,7 +1112,9 @@ impl<'a> EncodedEditJob<'a> {
             self.recovery_observation = Some(
                 self.recovery_contexts
                     .take()
-                    .ok_or(Error::Invalid("V7 recovery result invariant"))?
+                    .ok_or(Error::Invalid(
+                        "encoded context view recovery result invariant",
+                    ))?
                     .finish()?,
             );
         }

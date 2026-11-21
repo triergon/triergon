@@ -22,9 +22,9 @@ use std::{
 };
 use triergon_core::{Budget, Error, Result, WorkBudget};
 
-const CONSUMPTION_BOUNDS: &str = "v3 modeled metadata consumption bounds";
-const PLAIN_ATOMS: &str = "v3 modeled transport requires bounded plain source atoms";
-const RGB24_FIELDS: &str = "v3 unreviewed RGB24 entry fields";
+const CONSUMPTION_BOUNDS: &str = "raw-video transport metadata consumption bounds";
+const PLAIN_ATOMS: &str = "raw-video transport requires bounded plain source atoms";
+const RGB24_FIELDS: &str = "raw-video transport unreviewed RGB24 entry fields";
 
 /// Selects the raw-video transport model; pass it to [`RawVideoTransportBuilder::new`].
 #[derive(Clone, Copy, Debug)]
@@ -217,7 +217,7 @@ impl RawVideoTransportModel {
             || media != [self.media.clone()]
         {
             return Err(Error::Unsupported(
-                "v3 modeled transport source/configuration binding",
+                "raw-video transport source/configuration binding",
             ));
         }
         Ok(())
@@ -284,7 +284,9 @@ impl<'a> RawVideoTransportBuilder<'a> {
         let media = roots
             .last()
             .filter(|header| header.kind == *b"mdat")
-            .ok_or(Error::Unsupported("v3 media is not terminal"))?
+            .ok_or(Error::Unsupported(
+                "raw-video transport media is not terminal",
+            ))?
             .payload_range()?;
         if context.physical_length > CAPACITY
             || context.physical_length == 0
@@ -297,7 +299,9 @@ impl<'a> RawVideoTransportBuilder<'a> {
             || roots.len() > CHILD_LIMIT as usize
             || table.descriptions().len() != 1
         {
-            return Err(Error::Unsupported("v3 small raw-video transport domain"));
+            return Err(Error::Unsupported(
+                "raw-video transport outside its small domain",
+            ));
         }
         let entry = table.descriptions()[0].raw().clone();
         visual_entry(&entry, RGB24_FIELDS)?;
@@ -355,7 +359,9 @@ impl<'a> RawVideoTransportBuilder<'a> {
             if !self.root_ready {
                 if self.root_at == self.roots.len() {
                     if self.root_kind != 3 || self.root_end != self.context.physical_length {
-                        return Err(Error::Unsupported("v3 incomplete source root carriage"));
+                        return Err(Error::Unsupported(
+                            "raw-video transport incomplete source root carriage",
+                        ));
                     }
                     self.root_ready = true;
                     self.children = Some(self.movie.children(
@@ -373,36 +379,43 @@ impl<'a> RawVideoTransportBuilder<'a> {
                 let header = &self.roots[self.root_at];
                 small_plain(header, self.context.physical_length, PLAIN_ATOMS)?;
                 if header.start != self.root_end {
-                    return Err(Error::Unsupported("v3 discontinuous source root carriage"));
+                    return Err(Error::Unsupported(
+                        "raw-video transport discontinuous source root carriage",
+                    ));
                 }
                 self.root_end = header
                     .end()?
-                    .ok_or(Error::Unsupported("v3 unknown root end"))?;
+                    .ok_or(Error::Unsupported("raw-video transport unknown root end"))?;
                 if header.kind != *b"free" {
                     let wanted = [*b"ftyp", *b"moov", *b"mdat"]
                         .get(usize::from(self.root_kind))
                         .copied();
                     if wanted != Some(header.kind) {
-                        return Err(Error::Unsupported("v3 unreviewed source root order"));
+                        return Err(Error::Unsupported(
+                            "raw-video transport unreviewed source root order",
+                        ));
                     }
                     if (self.root_kind == 0 && header != self.ftyp.header())
                         || (self.root_kind == 1 && header != self.movie.header())
                         || (self.root_kind == 2 && header.payload_range()? != self.media)
                     {
-                        return Err(Error::Unsupported("v3 metadata/root range binding"));
+                        return Err(Error::Unsupported(
+                            "raw-video transport metadata/root range binding",
+                        ));
                     }
                     self.root_kind += 1;
                 } else if self.root_kind == 3 {
-                    return Err(Error::Unsupported("v3 media is not terminal"));
+                    return Err(Error::Unsupported(
+                        "raw-video transport media is not terminal",
+                    ));
                 }
                 self.root_at += 1;
                 continue;
             }
             if !self.source_ready {
-                let children = self
-                    .children
-                    .as_mut()
-                    .ok_or(Error::Invalid("v3 missing transport source iterator"))?;
+                let children = self.children.as_mut().ok_or(Error::Invalid(
+                    "raw-video transport missing source iterator",
+                ))?;
                 match children.poll(work)? {
                     Next::Yield => return Ok(BuildStatus::Yield),
                     Next::Item(raw) => {
@@ -411,40 +424,52 @@ impl<'a> RawVideoTransportBuilder<'a> {
                             continue;
                         }
                         if expected(self.level).get(self.matched) != Some(&raw.header().kind) {
-                            return Err(Error::Unsupported("v3 unreviewed metadata child order"));
+                            return Err(Error::Unsupported(
+                                "raw-video transport unreviewed metadata child order",
+                            ));
                         }
                         if self.level == 2
                             && raw.header().kind == *b"hdlr"
                             && fields::fourcc(raw.payload(), 8)? != *b"vide"
                         {
-                            return Err(Error::Unsupported("v3 nonvisual source handler"));
+                            return Err(Error::Unsupported(
+                                "raw-video transport nonvisual source handler",
+                            ));
                         }
                         if self.level == 3
                             && raw.header().kind == *b"dinf"
                             && raw.payload()
                                 != b"\0\0\0\x1cdref\0\0\0\0\0\0\0\x01\0\0\0\x0curl \0\0\0\x01"
                         {
-                            return Err(Error::Unsupported("v3 unreviewed source data reference"));
+                            return Err(Error::Unsupported(
+                                "raw-video transport unreviewed source data reference",
+                            ));
                         }
                         if self.level == 3
                             && raw.header().kind == *b"stbl"
                             && (raw.header() != self.table.header()
                                 || raw.bytes().as_ref() != self.table.bytes().as_ref())
                         {
-                            return Err(Error::Unsupported("v3 source table binding"));
+                            return Err(Error::Unsupported(
+                                "raw-video transport source table binding",
+                            ));
                         }
                         if self.level == 4
                             && raw.header().kind == *b"stsd"
                             && (fields::u32_at(raw.payload(), 0)? != 0
                                 || fields::u32_at(raw.payload(), 4)? != 1)
                         {
-                            return Err(Error::Unsupported("v3 unreviewed source catalogue"));
+                            return Err(Error::Unsupported(
+                                "raw-video transport unreviewed source catalogue",
+                            ));
                         }
                         if self.level == 5
                             && (raw.header() != self.entry.header()
                                 || raw.bytes().as_ref() != self.entry.bytes().as_ref())
                         {
-                            return Err(Error::Unsupported("v3 source entry binding"));
+                            return Err(Error::Unsupported(
+                                "raw-video transport source entry binding",
+                            ));
                         }
                         if raw.header().kind == next_kind(self.level) {
                             self.next = Some(raw);
@@ -453,17 +478,18 @@ impl<'a> RawVideoTransportBuilder<'a> {
                     }
                     Next::End => {
                         if self.matched != expected(self.level).len() {
-                            return Err(Error::Unsupported("v3 incomplete transport metadata"));
+                            return Err(Error::Unsupported(
+                                "raw-video transport incomplete metadata",
+                            ));
                         }
                         if self.level == 5 {
                             self.source_ready = true;
                             self.children = None;
                             continue;
                         }
-                        let next = self
-                            .next
-                            .take()
-                            .ok_or(Error::Unsupported("v3 missing transport metadata child"))?;
+                        let next = self.next.take().ok_or(Error::Unsupported(
+                            "raw-video transport missing metadata child",
+                        ))?;
                         self.level += 1;
                         self.matched = 0;
                         self.children = Some(next.children(
@@ -494,7 +520,7 @@ impl<'a> RawVideoTransportBuilder<'a> {
                 1 => {
                     self.revisit = self.window.revisit_set(
                         self.entry.header().start,
-                        "v3 unreviewed forward entry revisit",
+                        "raw-video transport unreviewed forward entry revisit",
                     )?;
                     self.next_anchor = self.revisit.first_anchor;
                 }
@@ -514,7 +540,7 @@ impl<'a> RawVideoTransportBuilder<'a> {
                             self.next_anchor.checked_add(1).ok_or(Error::Overflow)?;
                     }
                 }
-                _ => return Err(Error::Invalid("v3 invalid transport replay action")),
+                _ => return Err(Error::Invalid("raw-video transport invalid replay action")),
             }
             if self.action < 2 {
                 self.action += 1;
@@ -528,7 +554,7 @@ impl<'a> RawVideoTransportBuilder<'a> {
             return Err(error);
         }
         if !self.ready {
-            return Err(Error::Invalid("v3 transport builder not ready"));
+            return Err(Error::Invalid("raw-video transport builder not ready"));
         }
         Ok(RawVideoTransportModel {
             ftyp: self.ftyp,
@@ -540,7 +566,7 @@ impl<'a> RawVideoTransportBuilder<'a> {
             open: ModeledOpenState {
                 source_position_min: self
                     .source_min
-                    .ok_or(Error::Invalid("v3 empty modeled window set"))?,
+                    .ok_or(Error::Invalid("raw-video transport empty window set"))?,
                 source_position_max: self.source_max,
                 logical_position: self.media.start,
                 possible_windows: self.windows,

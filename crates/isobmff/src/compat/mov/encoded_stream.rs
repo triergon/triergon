@@ -367,7 +367,7 @@ impl<'a> EncodedStreamJob<'a> {
                 if view == DescriptionView::RangePlayback {
                     "QuickTime range playback sample entry"
                 } else {
-                    "encoded V4 QuickTime AudioV1/mp4a profile only"
+                    "encoded QuickTime entry other than sound-v1 AAC"
                 },
             ));
         }
@@ -521,10 +521,9 @@ impl<'a> EncodedStreamJob<'a> {
                     Ok(false) => return Ok(CursorStatus::Yield),
                     Ok(true) => {}
                 }
-                let (raw, walker) = self
-                    .pending_esds
-                    .take()
-                    .ok_or(Error::Invalid("V7 config pending invariant"))?;
+                let (raw, walker) = self.pending_esds.take().ok_or(Error::Invalid(
+                    "encoded context view configuration pending invariant",
+                ))?;
                 if walker.dsi.is_none() {
                     return Err(Error::Unsupported(
                         "encoded AAC decoder-specific config absent",

@@ -44,7 +44,7 @@ impl EmptyRecoveryWalk {
                 if pending.row == pending.source.run_count() {
                     if pending.covered != self.samples {
                         return Err(Error::Unsupported(
-                            "encoded V4 explicit group coverage profile",
+                            "encoded dependency view partial group coverage",
                         ));
                     }
                     self.pending = None;
@@ -69,17 +69,21 @@ impl EmptyRecoveryWalk {
                 let count = fields::u32_at(b, at)?;
                 let index = fields::u32_at(b, at + 4)?;
                 if count == 0 {
-                    return Err(Error::Invalid("encoded V4 empty group run"));
+                    return Err(Error::Invalid("encoded dependency view empty group run"));
                 }
                 if index != 0 {
-                    return Err(Error::Unsupported("encoded V4 actual recovery membership"));
+                    return Err(Error::Unsupported(
+                        "encoded dependency view sample in a recovery group",
+                    ));
                 }
                 pending.covered = pending
                     .covered
                     .checked_add(u64::from(count))
                     .ok_or(Error::Overflow)?;
                 if pending.covered > self.samples {
-                    return Err(Error::Invalid("encoded V4 group exceeds source samples"));
+                    return Err(Error::Invalid(
+                        "encoded dependency view group exceeds source samples",
+                    ));
                 }
                 pending.row += 1;
                 continue;
@@ -105,13 +109,15 @@ impl EmptyRecoveryWalk {
                         x if x == *b"prol" => 1,
                         _ => {
                             return Err(Error::Unsupported(
-                                "encoded V4 other sample-group semantics",
+                                "encoded dependency view other sample-group semantics",
                             ));
                         }
                     } + if description { 0 } else { 2 };
                     let bit = 1u8 << slot;
                     if self.seen & bit != 0 {
-                        return Err(Error::Invalid("encoded V4 duplicate recovery context"));
+                        return Err(Error::Invalid(
+                            "encoded dependency view duplicate recovery context",
+                        ));
                     }
                     self.seen |= bit;
                     if description {
@@ -122,14 +128,14 @@ impl EmptyRecoveryWalk {
                         )?;
                         if parsed.entry_count() != 0 {
                             return Err(Error::Unsupported(
-                                "encoded V4 nonempty recovery descriptions",
+                                "encoded dependency view nonempty recovery descriptions",
                             ));
                         }
                     } else {
                         let parsed = RecoveryMappings::parse(raw, self.limits)?;
                         if parsed.grouping_parameter().is_some_and(|n| n != 0) {
                             return Err(Error::Unsupported(
-                                "encoded V4 recovery grouping parameter",
+                                "encoded dependency view recovery grouping parameter",
                             ));
                         }
                         self.pending = Some(MappingRows {

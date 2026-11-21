@@ -179,7 +179,9 @@ fn original_terminal_only_refusal_is_unchanged() {
     );
     assert!(matches!(
         old,
-        Err(Error::Unsupported("v3 media is not terminal"))
+        Err(Error::Unsupported(
+            "raw-video transport media is not terminal"
+        ))
     ));
     assert!(source.model(64, 1).is_ok());
 }

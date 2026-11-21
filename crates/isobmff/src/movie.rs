@@ -260,7 +260,7 @@ impl EditEntry {
             return Ok(None);
         }
         if self.rate_integer != 1 || self.rate_fraction != 0 {
-            return Err(Error::Unsupported("non-unit edit presentation remains G04"));
+            return Err(Error::Unsupported("edit presentation at a non-unit rate"));
         }
         let source_start = Time::from_ticks(i128::from(self.media_time), media_base)?;
         Ok(Some(

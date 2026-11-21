@@ -269,7 +269,7 @@ fn a_taken_result_is_not_published_twice() {
     j.try_finish(&AtomicBool::new(false)).unwrap();
     assert_eq!(
         j.try_finish(&AtomicBool::new(false)).unwrap_err(),
-        Error::Invalid("v7 header not ready or already taken")
+        Error::Invalid("sample entry header not ready or already taken")
     );
 }
 #[test]
