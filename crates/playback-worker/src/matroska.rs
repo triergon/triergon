@@ -4,7 +4,10 @@
 use crate::runner::Result;
 use triergon_core::WorkBudget;
 use triergon_framing::{
-    AacConfigLimits, AvcAnnexBLimits, AvcConfigLimits, BuildStep, HvcConfigLimits,
+    BuildStep,
+    aac::AacConfigLimits,
+    avc::{AvcAnnexBLimits, AvcConfigLimits},
+    hevc::HvcConfigLimits,
 };
 use triergon_playback::matroska_feed::{
     MatroskaDolbyLimits, MatroskaFeedLimits, MatroskaHevcDolbyLimits,

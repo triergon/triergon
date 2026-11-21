@@ -3,12 +3,13 @@ use triergon_core::{
     Budget, Bytes, Error, InputWindow, SourceCapabilities, SourceId, Step, Time, WorkBudget,
 };
 use triergon_framing::{
-    AacConfigLimits, Ac3Family, AvcAnnexBLimits, AvcConfigLimits, BuildStep, HvcConfigLimits,
+    BuildStep,
+    aac::AacConfigLimits,
+    ac3::Ac3Family,
+    avc::{AvcAnnexBLimits, AvcConfigLimits},
+    hevc::HvcConfigLimits,
 };
-use triergon_matroska::{
-    incremental::ElementEvent,
-    typed::{Configuration, Event},
-};
+use triergon_matroska::{Configuration, Event, element::ElementEvent};
 use triergon_playback::{
     ByteSource, Delivery, Engine, Output, Player, PlayerPolicy, Progress, RawEvent, Selection,
     TrackKey,
@@ -59,7 +60,7 @@ fn player_with_policy(
         input,
         quantum,
         policy,
-        triergon_matroska::typed::PayloadOwnership::OwnedExact,
+        triergon_matroska::PayloadOwnership::OwnedExact,
     )
 }
 
@@ -67,7 +68,7 @@ fn player_with_ownership(
     input: &[u8],
     quantum: usize,
     policy: PlayerPolicy,
-    ownership: triergon_matroska::typed::PayloadOwnership,
+    ownership: triergon_matroska::PayloadOwnership,
 ) -> (Player<ByteSource>, Budget) {
     let (engine, source, pool) = matroska_source(input, quantum, ownership);
     (
@@ -79,10 +80,10 @@ fn player_with_ownership(
 fn matroska_source(
     input: &[u8],
     quantum: usize,
-    ownership: triergon_matroska::typed::PayloadOwnership,
+    ownership: triergon_matroska::PayloadOwnership,
 ) -> (Engine, SourceOwner<ByteSource>, Budget) {
     let pool = Budget::new(2 << 20).unwrap();
-    let reader = triergon_matroska::typed::Reader::new_with_payload_ownership(
+    let reader = triergon_matroska::Reader::new_with_payload_ownership(
         &pool,
         ID,
         SourceCapabilities {
@@ -192,11 +193,8 @@ fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
             b"A_AAC/MPEG4/LC",
         ),
     ] {
-        let (engine, source, pool) = matroska_source(
-            input,
-            7,
-            triergon_matroska::typed::PayloadOwnership::OwnedExact,
-        );
+        let (engine, source, pool) =
+            matroska_source(input, 7, triergon_matroska::PayloadOwnership::OwnedExact);
         let cancel = AtomicBool::new(false);
         let mut discovery = MatroskaDiscovery::new(
             engine,
@@ -983,7 +981,7 @@ fn shared_source_blocks_preserve_the_feed_and_keep_the_full_owner_charged() {
             INPUT,
             quantum,
             PlayerPolicy::default(),
-            triergon_matroska::typed::PayloadOwnership::SharedBounded,
+            triergon_matroska::PayloadOwnership::SharedBounded,
         );
         let outputs = collect_with_work(&mut shared, 8192);
         assert_eq!(outputs.iter().map(event_key).collect::<Vec<_>>(), expected);
@@ -1023,11 +1021,8 @@ fn shared_source_blocks_preserve_the_feed_and_keep_the_full_owner_charged() {
 #[test]
 fn direct_player_defers_queue_storage_and_retries_fifo_pressure() {
     let (mut eager, eager_pool) = player(4096);
-    let (engine, source, pool) = matroska_source(
-        INPUT,
-        4096,
-        triergon_matroska::typed::PayloadOwnership::OwnedExact,
-    );
+    let (engine, source, pool) =
+        matroska_source(INPUT, 4096, triergon_matroska::PayloadOwnership::OwnedExact);
     let policy = PlayerPolicy::default();
     let mut direct = Player::new_direct(engine, source, Selection::All, policy).unwrap();
     let queue_charge = policy.slots * size_of::<Option<Output>>();
@@ -1118,13 +1113,8 @@ fn compact_discovery_replays_every_output_and_reduces_prefix_storage() {
 
     let fixture = include_bytes!("fixtures/mkv-feed/hevc-no-default-duration-discovery.mkv");
     let cancel = AtomicBool::new(false);
-    let make_source = || {
-        matroska_source(
-            fixture,
-            7,
-            triergon_matroska::typed::PayloadOwnership::OwnedExact,
-        )
-    };
+    let make_source =
+        || matroska_source(fixture, 7, triergon_matroska::PayloadOwnership::OwnedExact);
     let tail = |player: &mut Player<MatroskaStartupSource<ByteSource>>| {
         let mut keys = Vec::new();
         let mut slot = None;
@@ -1255,11 +1245,8 @@ fn hevc_discovery_checks_repeated_parameter_sets() {
         (&pps_declared_as_sei, MatroskaDiscoveryCutoff::SourceEnd),
         (&sei_declared_as_pps, MatroskaDiscoveryCutoff::SourceEnd),
     ] {
-        let (engine, source, _) = matroska_source(
-            fixture,
-            7,
-            triergon_matroska::typed::PayloadOwnership::OwnedExact,
-        );
+        let (engine, source, _) =
+            matroska_source(fixture, 7, triergon_matroska::PayloadOwnership::OwnedExact);
         let cancel = AtomicBool::new(false);
         let mut discovery = MatroskaCompactDiscovery::for_av_feed(
             engine,
@@ -1289,11 +1276,8 @@ fn hevc_repeated_configuration_preserves_packet_clocks() {
     };
 
     let clocks = |input: &[u8]| {
-        let (engine, source, pool) = matroska_source(
-            input,
-            7,
-            triergon_matroska::typed::PayloadOwnership::OwnedExact,
-        );
+        let (engine, source, pool) =
+            matroska_source(input, 7, triergon_matroska::PayloadOwnership::OwnedExact);
         let cancel = AtomicBool::new(false);
         let mut discovery = MatroskaCompactDiscovery::for_av_feed(
             engine,
@@ -1354,11 +1338,8 @@ fn av_discovery_hands_off_before_pgs_and_delivers_every_late_packet() {
     };
 
     let fixture = include_bytes!("fixtures/matroska-subtitle-probe/known-anchor.mkv");
-    let (engine, source, _) = matroska_source(
-        fixture,
-        7,
-        triergon_matroska::typed::PayloadOwnership::OwnedExact,
-    );
+    let (engine, source, _) =
+        matroska_source(fixture, 7, triergon_matroska::PayloadOwnership::OwnedExact);
     let cancel = AtomicBool::new(false);
     let mut discovery = MatroskaCompactDiscovery::for_av_feed(
         engine,
@@ -1659,7 +1640,7 @@ fn player_refuses_a_matroska_reader_that_has_read_input() {
         random_access: true,
     };
     let reader = |pool: &Budget| {
-        triergon_matroska::typed::Reader::new(
+        triergon_matroska::Reader::new(
             pool,
             ID,
             capabilities,
@@ -1707,11 +1688,8 @@ fn compact_replay_prepares_the_same_aac_spans_as_the_output_feed() {
         MatroskaCompactDiscovery, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
     };
 
-    let (engine, source, pool) = matroska_source(
-        INPUT,
-        4096,
-        triergon_matroska::typed::PayloadOwnership::OwnedExact,
-    );
+    let (engine, source, pool) =
+        matroska_source(INPUT, 4096, triergon_matroska::PayloadOwnership::OwnedExact);
     let mut discovery = MatroskaCompactDiscovery::new(
         engine,
         source,

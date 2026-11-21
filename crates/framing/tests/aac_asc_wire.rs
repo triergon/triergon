@@ -2,8 +2,11 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    AacAdtsParameters, AacAscParser, AacAudioSpecificConfig, AacConfigLimits, AacExtensionSignal,
-    AacPceElement, AacPceElementKind, AacSource, BuildStep,
+    BuildStep,
+    aac::{
+        AacAdtsParameters, AacAscParser, AacAudioSpecificConfig, AacConfigLimits,
+        AacExtensionSignal, AacPceElement, AacPceElementKind, AacSource,
+    },
 };
 
 fn limits() -> AacConfigLimits {

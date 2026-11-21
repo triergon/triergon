@@ -8,7 +8,7 @@ use crate::{CrcPolicy, DecodeError, FrameInfo, subframe};
 use triergon_bitstream::CachedBitReader;
 use triergon_bitstream::crc::crc16_a52;
 use triergon_codec::{Budget, StorageError};
-use triergon_framing::FlacFrameHeader;
+use triergon_framing::flac::FlacFrameHeader;
 
 /// Everything a frame decodes against: the stream parameters, the channel buffers and
 /// the CRC policy.

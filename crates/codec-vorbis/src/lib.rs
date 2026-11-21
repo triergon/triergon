@@ -27,7 +27,7 @@ use triergon_codec::{
     AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, DecodeFailure, DownmixLevels,
     Reservation, StorageError,
 };
-use triergon_framing::{VorbisHeaders, VorbisIdentification};
+use triergon_framing::vorbis::{VorbisHeaders, VorbisIdentification};
 
 use floor0::Coefficients;
 use floor1::Points;

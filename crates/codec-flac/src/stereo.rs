@@ -2,7 +2,7 @@
 //! mid/side frames, whose side channel has one bit more than the frame's sample size.
 use crate::output::Output;
 use crate::sample::Sample;
-use triergon_framing::FlacChannelAssignment;
+use triergon_framing::flac::FlacChannelAssignment;
 
 /// The decorrelated channel pair of a stereo frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

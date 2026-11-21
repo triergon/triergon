@@ -5,8 +5,11 @@ use super::{
 };
 use crate::{Result, hls_avc::syntax as avc, raw_video::hevc_syntax as hevc};
 use triergon_core::Error;
-use triergon_framing::{AvcAnnexBConfig, Codec, NalHeader};
-use triergon_matroska::typed::Packet;
+use triergon_framing::{
+    avc::AvcAnnexBConfig,
+    nal::{Codec, NalHeader},
+};
+use triergon_matroska::TypedPacket as Packet;
 
 /// One timing projection for an ordered progressive AVC feed, beginning at
 /// an admitted IDR. Observe each checked sample once.

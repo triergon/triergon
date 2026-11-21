@@ -7,7 +7,7 @@ use crate::slice::{SliceType, parse_slice_header, peek_pps_id};
 use std::collections::BTreeSet;
 use triergon_bitstream::BitReader;
 use triergon_codec::{Budget, BudgetVec};
-use triergon_framing::AnnexBUnits;
+use triergon_framing::nal::AnnexBUnits;
 
 #[derive(Debug, Default, Clone)]
 pub struct StreamFeatures {

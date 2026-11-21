@@ -19,8 +19,8 @@ use crate::stream::Limits;
 use crate::syntax::{Gap, Length, Plan, Probe, SeekBasis, SeekContext, Syntax, TrackFacts};
 use triergon_core::container::{CodecId, Trim};
 use triergon_core::{Budget, BudgetVec, Result};
-use triergon_framing::{
-    LameTag, MpegAudioHeader, MpegInfoFrame, MpegInfoKind, MpegLayer, mpeg_info_frame,
+use triergon_framing::mpeg_audio::{
+    self, LameTag, MpegAudioHeader, MpegInfoFrame, MpegInfoKind, MpegLayer,
 };
 
 /// Samples the reference decoder outputs before the first encoded sample, plus the one
@@ -186,7 +186,7 @@ impl Syntax for MpegAudio {
         offset: u64,
         source_len: Option<u64>,
     ) -> bool {
-        let Some(description) = mpeg_info_frame(frame, header) else {
+        let Some(description) = mpeg_audio::info_frame(frame, header) else {
             return false;
         };
         let consistent = match (description.bytes, source_len) {

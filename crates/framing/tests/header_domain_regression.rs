@@ -1,5 +1,5 @@
 use triergon_core::Error;
-use triergon_framing::{Codec, NalHeader};
+use triergon_framing::nal::{Codec, NalHeader};
 #[test]
 fn every_hevc_fixed_header_preserves_error_priority_and_fields() {
     assert_eq!(NalHeader::parse(Codec::Hevc, &[]), Err(Error::Truncated));

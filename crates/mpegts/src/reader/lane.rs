@@ -30,9 +30,10 @@ use triergon_core::{
     SourceId, SourceLocation, Step, Time, WorkBudget,
 };
 use triergon_framing::{
-    AacAdtsCarrierLimits, AacAdtsCarrierReader, AacAdtsStreamLimits, AacAdtsStreamReader,
-    Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, Codec, RawAnnexBReader,
-    probe_dts_core_header,
+    aac::{AacAdtsCarrierLimits, AacAdtsCarrierReader, AacAdtsStreamLimits, AacAdtsStreamReader},
+    ac3::{Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection},
+    dts,
+    nal::{Codec, RawAnnexBReader},
 };
 
 // Keep concrete readers inline; their containing BudgetVec charges the whole state.
@@ -76,7 +77,7 @@ impl Framer {
                 .input_wait_storage()?
                 .1
                 .get(index)
-                .map(triergon_framing::NalUnit::bytes),
+                .map(triergon_framing::nal::NalUnit::bytes),
             Self::Eac3(reader) => reader.input_wait_backing(index),
             _ => None,
         })
@@ -266,7 +267,7 @@ impl Framer {
             Self::MpegAudio(reader) => map(reader.step(work, cancel)?, AccessUnit::MpegAudio),
             Self::Dts(reader) => map(
                 reader.step(work, cancel, |prefix| {
-                    let header = probe_dts_core_header(prefix)?;
+                    let header = dts::probe_core_header(prefix)?;
                     Ok((header.window, header.frame_bytes))
                 })?,
                 |frame| {
@@ -1049,7 +1050,7 @@ impl Build {
                 return Err(Error::Cancelled);
             }
             let facts = nal.facts();
-            let triergon_framing::NalFraming::AnnexB {
+            let triergon_framing::nal::NalFraming::AnnexB {
                 leading_zero_bytes,
                 start_code_bytes,
                 ..

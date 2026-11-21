@@ -4,11 +4,11 @@ use triergon_core::{
     Budget, Bytes, Error, InputRequest, InputWindow, SourceCapabilities, SourceFailure, SourceId,
     Step, WorkBudget,
 };
-use triergon_framing::{
-    DtsCarrierTail, DtsCoreField as F, DtsExtentRelation, DtsInspectionSourceStatus as Status,
-    DtsNormalBoundary, DtsNormalLimits, DtsNormalSourceFrame, DtsNormalSourceReader,
-    DtsPackedLimits, DtsPackedPayload, DtsPackedPayloadJob, DtsPacking as P, DtsSourceIdentity,
-    FieldObservation, inspect_dts_header_bits,
+use triergon_framing::dts::{
+    self, DtsCarrierTail, DtsCoreField as F, DtsExtentRelation,
+    DtsInspectionSourceStatus as Status, DtsNormalBoundary, DtsNormalLimits, DtsNormalSourceFrame,
+    DtsNormalSourceReader, DtsPackedLimits, DtsPackedPayload, DtsPackedPayloadJob, DtsPacking as P,
+    DtsSourceIdentity, FieldObservation,
 };
 #[path = "../examples/support/dts_bits24.rs"]
 mod dts_bits24;
@@ -255,7 +255,7 @@ fn all448_payload_controls_keep_every_bit_all_tails_and_unused_high_values() {
                         for (i, expected) in bits.iter().enumerate() {
                             assert_eq!(output.bit(i).unwrap(), *expected);
                         }
-                        let header = inspect_dts_header_bits(
+                        let header = dts::inspect_header_bits(
                             output.storage_bytes().as_ref(),
                             output.valid_bits(),
                         )
@@ -446,7 +446,7 @@ fn all27_header_fields_follow_independently_authored_conditional_source_widths()
                 &[0x7f, 0xfe, 0x80, 0x01, 0xfc, 0x7c]
             }
         );
-        let header = inspect_dts_header_bits(&source, source.len() * 8).unwrap();
+        let header = dts::inspect_header_bits(&source, source.len() * 8).unwrap();
         let mut position = 0;
         for (i, field) in F::ALL.into_iter().enumerate() {
             if i == 19 && !cpf {
@@ -483,7 +483,7 @@ fn every_exact_bit_prefix_keeps_presence_and_never_uses_storage_alignment_zeros(
         let expected = values(96, cpf);
         let source = author(expected);
         for available in 0..=source.len() * 8 {
-            let h = inspect_dts_header_bits(&source, available).unwrap();
+            let h = dts::inspect_header_bits(&source, available).unwrap();
             let mut position = 0;
             for (i, field) in F::ALL.into_iter().enumerate() {
                 if i == 19 && !cpf && available >= 39 {
@@ -511,7 +511,7 @@ fn every_exact_bit_prefix_keeps_presence_and_never_uses_storage_alignment_zeros(
         }
     }
     assert!(matches!(
-        inspect_dts_header_bits(&[0; 1], 9),
+        dts::inspect_header_bits(&[0; 1], 9),
         Err(Error::Invalid(_))
     ));
 }
@@ -526,7 +526,7 @@ fn seven_low14_words_do_not_turn_six_alignment_zeros_into_header_presence() {
         assert_eq!(output.storage_bytes().len(), 13);
         assert_eq!(output.alignment_zero_bits(), 6);
         let h =
-            inspect_dts_header_bits(output.storage_bytes().as_ref(), output.valid_bits()).unwrap();
+            dts::inspect_header_bits(output.storage_bytes().as_ref(), output.valid_bits()).unwrap();
         assert_eq!(h.source_status(), Status::Truncated);
         assert!(!h.syntax_complete());
         assert_eq!(h.field(F::DialogWord), FieldObservation::NotReached);
@@ -547,7 +547,7 @@ fn source_header_errors_and_future_fields_stay_distinct_from_native_permissivene
         let mut fields = values(96, true);
         fields[index] = raw;
         let source = author(fields);
-        let h = inspect_dts_header_bits(&source, 120).unwrap();
+        let h = dts::inspect_header_bits(&source, 120).unwrap();
         assert_eq!(h.value(F::ALL[index]), Some(raw));
         assert_eq!(h.source_status(), status);
         assert!(h.syntax_complete());
@@ -557,7 +557,7 @@ fn source_header_errors_and_future_fields_stay_distinct_from_native_permissivene
 #[test]
 fn full24_projection_matches_frozen_source_domains_and_stays_null_when_incomplete() {
     let source = author(values(96, true));
-    let h = inspect_dts_header_bits(&source, 120).unwrap();
+    let h = dts::inspect_header_bits(&source, 120).unwrap();
     let expected = [
         1, 32, 1, 32, 96, 2, 8, 15, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 7, 0, 0, 0, 0, 0,
     ];
@@ -570,7 +570,7 @@ fn full24_projection_matches_frozen_source_domains_and_stays_null_when_incomplet
     );
     for available in 0..120 {
         assert_eq!(
-            dts_bits24::fields(&inspect_dts_header_bits(&source, available).unwrap()),
+            dts_bits24::fields(&dts::inspect_header_bits(&source, available).unwrap()),
             None
         );
     }

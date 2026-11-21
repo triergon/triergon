@@ -2,11 +2,8 @@
 use std::path::Path;
 use std::process::Command;
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, SourceId, WorkBudget};
-use triergon_framing::{
-    DtsCoreField, DtsHeaderInspector, DtsInspectionIdentity, DtsInspectionStep,
-    inspect_dts_header_bits,
-};
+use triergon_core::{Budget, Bytes, SourceId, Step, WorkBudget};
+use triergon_framing::dts::{self, DtsCoreField, DtsHeaderInspector, DtsSourceIdentity};
 
 fn output(command: &mut Command) -> Vec<u8> {
     let done = command.output().unwrap();
@@ -68,7 +65,7 @@ fn compare_file(path: &Path, stream: &str, packets: usize) {
     assert_eq!(sizes.lines().count(), packets);
     for size in sizes.lines() {
         let (packet, rest) = raw.split_at(size.parse().unwrap());
-        let identity = DtsInspectionIdentity {
+        let identity = DtsSourceIdentity {
             source: SourceId(1),
             generation: 0,
             offset: u64::try_from(source.len() - raw.len()).unwrap(),
@@ -81,12 +78,12 @@ fn compare_file(path: &Path, stream: &str, packets: usize) {
                 .step(&mut WorkBudget::new(128), &AtomicBool::new(false))
                 .unwrap()
             {
-                DtsInspectionStep::Ready(value) => break value,
-                DtsInspectionStep::Yield => {}
+                Step::Ready(value) => break value,
+                Step::Yield => {}
                 step => panic!("complete corpus packet produced {step:?}"),
             }
         };
-        let packed = inspect_dts_header_bits(packet, packet.len() * 8).unwrap();
+        let packed = dts::inspect_header_bits(packet, packet.len() * 8).unwrap();
         assert!(owned.syntax_complete() && packed.syntax_complete());
         assert_eq!(owned.issues().bits(), packed.issues());
         assert_eq!(owned.views(), packed.views());

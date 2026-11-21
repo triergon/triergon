@@ -11,7 +11,7 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, InputCursor, InputRequest, InputWindow, SourceCapabilities, SourceId,
     Step, WorkBudget, nonzero_prefix_len,
 };
-use triergon_framing::{Codec, NalHeader, RawAnnexBLimits, RawAnnexBReader};
+use triergon_framing::nal::{Codec, NalHeader, RawAnnexBLimits, RawAnnexBReader};
 
 const MAXIMUM_PROBE_WINDOW: usize = 4096;
 
@@ -636,7 +636,7 @@ impl Signatures {
 mod tests {
     use super::Signatures;
     use crate::Result;
-    use triergon_framing::Codec;
+    use triergon_framing::nal::Codec;
 
     const MAXIMUM_NALS: usize = 64;
 

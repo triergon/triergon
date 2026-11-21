@@ -3,7 +3,7 @@
 //! and bit rate, scalefactor selection and grouped quantizers.
 
 use triergon_bitstream::CachedBitReader;
-use triergon_framing::{MpegAudioHeader, MpegVersion};
+use triergon_framing::mpeg_audio::{MpegAudioHeader, MpegVersion};
 
 use crate::subband::{dequantize, joint_bound, scalefactor};
 use crate::synthesis::Synthesis;

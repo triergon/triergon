@@ -13,7 +13,7 @@ use triergon_core::container::{Event, PacketInfo, ReaderStep};
 use triergon_core::{
     Budget, BudgetVec, Charged, Error, Result, SourceCapabilities, SourceId, Step,
 };
-use triergon_framing::MpegLayer;
+use triergon_framing::mpeg_audio::MpegLayer;
 
 const WIDTH: usize = 188;
 // Video publication can look ahead into the next PES. Keep two bounded PES

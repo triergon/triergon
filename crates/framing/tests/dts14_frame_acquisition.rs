@@ -4,7 +4,7 @@ use triergon_core::{
     Budget, Bytes, Error, InputWindow, SourceCapabilities, SourceFailure, SourceId, Step,
     WorkBudget,
 };
-use triergon_framing::{
+use triergon_framing::dts::{
     Dts14BoundaryEvidence, Dts14SyncFrame, Dts14SyncLimits, Dts14SyncReader, DtsWordOrder,
 };
 

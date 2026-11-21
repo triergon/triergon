@@ -4,13 +4,11 @@ use crate::{Output, Result};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Error, WorkBudget};
 use triergon_framing::{
-    AacAdtsParameters, AacAscParser, AacConfigLimits, AacSource, Ac3Family, Ac3FrameDetails,
-    BuildStep, probe_ac3_header,
+    BuildStep,
+    aac::{AacAdtsParameters, AacAscParser, AacConfigLimits, AacSource},
+    ac3::{self, Ac3Family, Ac3FrameDetails},
 };
-use triergon_matroska::{
-    matroska::{LegacyAacProfile, Track},
-    typed::Packet,
-};
+use triergon_matroska::{LegacyAacProfile, Track, TypedPacket as Packet};
 
 #[derive(Default)]
 pub(super) struct AudioProbe {
@@ -58,7 +56,7 @@ impl AudioProbe {
                 && (1..=i32::MAX as u64).contains(&track.channels);
             return Ok(Some(
                 declared
-                    || probe_ac3_header(payload).is_ok_and(|header| {
+                    || ac3::probe_header(payload).is_ok_and(|header| {
                         header.family == family
                             && header.frame_bytes <= payload.len()
                             && !matches!(

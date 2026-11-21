@@ -5,7 +5,8 @@ use crate::{Mp4Packet, Result};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error};
 use triergon_framing::{
-    AacAdtsOutput, AacAdtsParameters, AacAdtsWriter, AacAudioSpecificConfig, AacSource, BuildStep,
+    BuildStep,
+    aac::{AacAdtsOutput, AacAdtsParameters, AacAdtsWriter, AacAudioSpecificConfig, AacSource},
 };
 pub struct AacBridge {
     pool: Budget,

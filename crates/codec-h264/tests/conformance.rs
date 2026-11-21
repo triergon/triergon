@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 use triergon_codec_h264::{DecodeError, Decoder, Picture};
-use triergon_framing::AnnexBUnits;
+use triergon_framing::nal::AnnexBUnits;
 
 fn vectors_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.research/fate-samples/h264-conformance")

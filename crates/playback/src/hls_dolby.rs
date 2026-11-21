@@ -10,7 +10,7 @@ use triergon_core::{
     Budget, BudgetVecIntoIter, Error, InputWindow, Result, SourceCapabilities, SourceId, Step,
     Time, WorkBudget,
 };
-use triergon_framing::{Ac3FrameDetails, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection};
+use triergon_framing::ac3::{Ac3FrameDetails, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection};
 use triergon_mpegts::{
     AssemblyStep,
     compat::pes::{

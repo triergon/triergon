@@ -2,8 +2,10 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    AvcConfigArrayKind, AvcConfigLimits, AvcConfigParser, AvcConfigSource, AvcConfiguration,
     BuildStep,
+    avc::{
+        AvcConfigArrayKind, AvcConfigLimits, AvcConfigParser, AvcConfigSource, AvcConfiguration,
+    },
 };
 use triergon_harness_protocol::unhex;
 

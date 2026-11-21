@@ -5,7 +5,7 @@ use super::{RawVideoConfigTracker, RawVideoConfiguration, RawVideoSource, State 
 use crate::{Error, Result, input::Source};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Rounding, SourceLocation, Step, Time, WorkBudget};
-use triergon_framing::RawAccessUnit;
+use triergon_framing::nal::RawAccessUnit;
 
 /// A caller-supplied cadence is an ordered submission clock for a sink that
 /// wants it, such as a local sample player. It is separate from display order
@@ -212,7 +212,7 @@ mod tests {
     use super::*;
     use crate::ByteSource;
     use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId};
-    use triergon_framing::{Codec, RawAnnexBLimits, RawAnnexBReader};
+    use triergon_framing::nal::{Codec, RawAnnexBLimits, RawAnnexBReader};
 
     #[test]
     fn configuration_pressure_retains_pending_packet_and_submission_clock() {

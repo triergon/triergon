@@ -1,11 +1,11 @@
 //! Operation guards.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, InputWindow, SourceCapabilities, SourceId, WorkBudget};
+use triergon_framing::dts::{Dts14CarrierLimits, Dts14SyncLimits, DtsWordOrder};
 use triergon_framing::reference_trace::dts::{
     FactAssociationJob, ParserClockDisposition, ParserOperation, ParserOperationEvent,
     ParserOperationLane, ParserOperationLimits, ParserOperationStep, ParserOperationTerminal,
 };
-use triergon_framing::{Dts14CarrierLimits, Dts14SyncLimits, DtsWordOrder};
 
 const VARIABLE: &[u8] = include_bytes!("../fixtures/dts-native-v1/variable-big.bin");
 fn limits() -> ParserOperationLimits {

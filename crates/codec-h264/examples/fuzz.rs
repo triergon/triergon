@@ -3,7 +3,7 @@
 //! Usage: fuzz [--iters N] FILE...
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use triergon_codec_h264::Decoder;
-use triergon_framing::AnnexBUnits;
+use triergon_framing::nal::AnnexBUnits;
 
 fn decode(data: &[u8]) {
     let mut dec = Decoder::new();

@@ -14,7 +14,7 @@ use triergon_core::{
     Budget, BudgetVec, BudgetVecIntoIter, Bytes, Error, InputWindow, Result, SourceCapabilities,
     SourceId, SourceLocation, Step, WorkBudget,
 };
-use triergon_framing::{
+use triergon_framing::nal::{
     Codec, NalFraming, NalHeader, RawAccessUnit, RawAnnexBLimits, RawAnnexBReader, ReaderLimits,
 };
 use triergon_mpegts::{

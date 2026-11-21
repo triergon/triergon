@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 use triergon_codec_h264::{DecodeError, Decoder};
-use triergon_framing::AnnexBUnits;
+use triergon_framing::nal::AnnexBUnits;
 use triergon_harness_protocol::md5::hex_digest;
 
 enum Edit {

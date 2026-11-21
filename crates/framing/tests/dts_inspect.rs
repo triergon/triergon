@@ -1,14 +1,13 @@
 //! Original bit-authored controls; the production implementation is not an oracle.
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, Bytes, Error, SourceId, Time, WorkBudget};
-use triergon_framing::{
-    DtsCoreField as F, DtsHeaderInspector, DtsInspection, DtsInspectionIdentity,
-    DtsInspectionIssues as I, DtsInspectionSourceStatus as S, DtsInspectionStep, FieldObservation,
-    inspect_dts_header_bits,
+use triergon_core::{Budget, Bytes, Error, SourceId, Step, Time, WorkBudget};
+use triergon_framing::dts::{
+    self, DtsCoreField as F, DtsHeaderInspector, DtsInspection, DtsInspectionIssues as I,
+    DtsInspectionSourceStatus as S, DtsSourceIdentity, FieldObservation,
 };
 
-fn identity() -> DtsInspectionIdentity {
-    DtsInspectionIdentity {
+fn identity() -> DtsSourceIdentity {
+    DtsSourceIdentity {
         source: SourceId(4201),
         generation: 19,
         offset: 73,
@@ -75,10 +74,10 @@ fn finish(job: &mut DtsHeaderInspector, quantum: u64) -> DtsInspection {
             .step(&mut WorkBudget::new(quantum), &AtomicBool::new(false))
             .unwrap()
         {
-            DtsInspectionStep::Yield => {}
-            DtsInspectionStep::Ready(value) => return value,
-            DtsInspectionStep::End(_) => panic!("publication missing"),
-            DtsInspectionStep::NeedInput(_) => panic!("owned record requested input"),
+            Step::Yield => {}
+            Step::Ready(value) => return value,
+            Step::End(_) => panic!("publication missing"),
+            Step::NeedInput(_) => panic!("owned record requested input"),
         }
     }
     panic!("bounded progress failed");
@@ -114,7 +113,7 @@ fn all_prefix_lengths_preserve_missing_bits_without_zero_padding() {
         );
         for length in 0..=raw.len() {
             let value = inspect(&raw[..length], 1);
-            let packed = inspect_dts_header_bits(&raw, length * 8).unwrap();
+            let packed = dts::inspect_header_bits(&raw, length * 8).unwrap();
             assert_eq!(packed.views(), value.views());
             assert_eq!(packed.issues(), value.issues().bits());
             assert_eq!(packed.source_status(), value.source_status());
@@ -246,7 +245,7 @@ fn coded_and_normal_windows_follow_the_block_count_domain_in_both_inspectors() {
             let samples = (count >= 5).then_some(32 * (count + 1));
             let normal_count = matches!(count, 7 | 15 | 31 | 63 | 127);
             let owned = inspect(&raw, 1);
-            let packed = inspect_dts_header_bits(&raw, raw.len() * 8).unwrap();
+            let packed = dts::inspect_header_bits(&raw, raw.len() * 8).unwrap();
             assert_eq!(owned.field(F::BlockCount).value(), Some(count));
             assert_eq!(packed.value(F::BlockCount), Some(count));
             assert_eq!(packed.views(), owned.views());
@@ -263,11 +262,11 @@ fn coded_and_normal_windows_follow_the_block_count_domain_in_both_inspectors() {
             );
 
             // NBLKS spans bits 39..46. Body bytes beyond the prefix remain available.
-            let partial = inspect_dts_header_bits(&raw, 45).unwrap();
+            let partial = dts::inspect_header_bits(&raw, 45).unwrap();
             assert_eq!(partial.value(F::BlockCount), None);
             assert_eq!(partial.views().coded_window_samples, None);
             assert_eq!(partial.issues() & I::BLOCK_COUNT, 0);
-            let complete = inspect_dts_header_bits(&raw, 46).unwrap();
+            let complete = dts::inspect_header_bits(&raw, 46).unwrap();
             assert_eq!(complete.value(F::BlockCount), Some(count));
             assert_eq!(complete.views().coded_window_samples, samples);
             assert_eq!(complete.views().normal_window, None);
@@ -326,7 +325,7 @@ fn arbitrary_work_quanta_and_zero_work_keep_the_same_source_facts() {
     assert!(matches!(
         job.step(&mut WorkBudget::new(0), &AtomicBool::new(false))
             .unwrap(),
-        DtsInspectionStep::Yield
+        Step::Yield
     ));
     assert_eq!(pool.used(), before);
     let expected = finish(&mut job, 1);
@@ -334,7 +333,7 @@ fn arbitrary_work_quanta_and_zero_work_keep_the_same_source_facts() {
         .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
         .unwrap()
     {
-        DtsInspectionStep::End(end) => {
+        Step::End(end) => {
             assert_eq!(end.source, identity().source);
             assert_eq!(end.offset, identity().offset + raw.len() as u64);
         }
@@ -368,21 +367,18 @@ fn publication_charges_each_source_bit_then_validation_and_publication() {
         let cancel = AtomicBool::new(false);
         for _ in 1..charges {
             let mut work = WorkBudget::new(1);
-            assert!(matches!(
-                job.step(&mut work, &cancel).unwrap(),
-                DtsInspectionStep::Yield
-            ));
+            assert!(matches!(job.step(&mut work, &cancel).unwrap(), Step::Yield));
             assert_eq!(work.spent(), 1);
         }
         let mut work = WorkBudget::new(2);
         assert!(matches!(
             job.step(&mut work, &cancel).unwrap(),
-            DtsInspectionStep::Ready(_)
+            Step::Ready(_)
         ));
         assert_eq!(work.spent(), 1);
         assert!(matches!(
             job.step(&mut work, &cancel).unwrap(),
-            DtsInspectionStep::End(_)
+            Step::End(_)
         ));
         assert_eq!(work.spent(), 1);
     }
@@ -472,7 +468,7 @@ fn source_identity_limit_foreign_pool_and_retained_capacity_are_checked() {
             maximum: 15
         })
     ));
-    let overflow = DtsInspectionIdentity {
+    let overflow = DtsSourceIdentity {
         offset: u64::MAX,
         ..identity()
     };
@@ -510,7 +506,7 @@ fn all_frozen396_inputs_keep_every_independent_complete_raw_field() {
         };
         let value = inspect(&raw, 1);
         assert_eq!(value.source_bytes().as_ref(), raw, "{}", parts[0]);
-        let packed = inspect_dts_header_bits(&raw, raw.len() * 8).unwrap();
+        let packed = dts::inspect_header_bits(&raw, raw.len() * 8).unwrap();
         assert_eq!(
             packed.source_status(),
             value.source_status(),

@@ -4,8 +4,8 @@ use triergon_codec::{AudioDecoder, AudioFrame, Budget, DecodeFailure, DownmixLev
 use triergon_core::container::{PacketInfo, TrackInfo};
 use triergon_core::{BudgetVec, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    AacAscFacts, AacAscParser, AacAudioSpecificConfig, AacConfigLimits, AacSource, BuildStep,
-    aac_fixed_channel_count, indexed_aac_frequency,
+    BuildStep,
+    aac::{self, AacAscFacts, AacAscParser, AacAudioSpecificConfig, AacConfigLimits, AacSource},
 };
 
 use crate::compat::aac::Policy;
@@ -153,7 +153,7 @@ impl AacAccessUnitConfig {
     /// from parsed AudioSpecificConfig facts.
     pub fn from_asc(facts: AacAscFacts) -> Result<Self, DecodeFailure> {
         validate_raw_aac_lc(facts)?;
-        if aac_fixed_channel_count(facts.channel_configuration).is_none() {
+        if aac::fixed_channel_count(facts.channel_configuration).is_none() {
             return Err(DecodeFailure("unsupported raw AAC-LC configuration".into()));
         }
         Ok(Self {
@@ -195,7 +195,7 @@ fn validate_raw_aac_lc(facts: AacAscFacts) -> Result<(), DecodeFailure> {
     if facts.outer_object_type.code != 2
         || facts.core_object_type.code != 2
         || facts.core_frequency.explicit_hz.is_some()
-        || indexed_aac_frequency(facts.core_frequency.index) != Some(facts.core_frequency.hz)
+        || aac::indexed_frequency(facts.core_frequency.index) != Some(facts.core_frequency.hz)
         || facts.ga.frame_length_flag
         || facts.ga.core_coder_delay.is_some()
         || facts.ga.extension_flag3 == Some(true)

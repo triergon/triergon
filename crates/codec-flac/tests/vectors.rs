@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 use triergon::{Budget, ContainerReader, PacketInfo};
 use triergon_codec_flac::{AudioFrame, Decoder};
-use triergon_framing::{canonical_flac_configuration, flac_stream_info};
+use triergon_framing::flac;
 
 /// The configuration and frames of a native FLAC file, read by the elementary reader up
 /// to its first error; `None` when it does not open as FLAC.
@@ -21,7 +21,7 @@ fn read(path: &Path) -> Option<(Vec<u8>, Vec<Vec<u8>>)> {
     let track = source.reader().track(0)?;
     let budget = Budget::new(1 << 20).ok()?;
     let mut configuration = triergon_codec::BudgetVec::new(&budget);
-    if canonical_flac_configuration(track.configuration(), &mut configuration).is_err() {
+    if flac::canonical_configuration(track.configuration(), &mut configuration).is_err() {
         configuration.clear();
     }
     Some((configuration.to_vec(), frames))
@@ -71,7 +71,7 @@ fn check_md5(max_bytes: u64) {
             let Some((configuration, frames)) = read(&path) else {
                 continue;
             };
-            let Ok(info) = flac_stream_info(&configuration) else {
+            let Ok(info) = flac::stream_info(&configuration) else {
                 continue;
             };
             let mut decoder = Decoder::new(&configuration).unwrap();

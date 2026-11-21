@@ -199,7 +199,7 @@ fn facts(packet: &Packet) -> String {
             unit.random_access,
             unit.nals()
                 .iter()
-                .map(triergon_framing::NalUnit::facts)
+                .map(triergon_framing::nal::NalUnit::facts)
                 .collect::<Vec<_>>(),
         )),
         _ => None,

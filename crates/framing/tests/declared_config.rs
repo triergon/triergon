@@ -2,8 +2,11 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    BuildStep, Codec, ConfigInspection, DeclaredConfigArray, DeclaredConfigLimits,
-    DeclaredConfigNal, DeclaredConfigParser, DeclaredConfiguration, LengthSize,
+    BuildStep,
+    nal::{
+        Codec, ConfigInspection, DeclaredConfigArray, DeclaredConfigLimits, DeclaredConfigNal,
+        DeclaredConfigParser, DeclaredConfiguration, LengthSize,
+    },
 };
 
 fn limits() -> DeclaredConfigLimits {

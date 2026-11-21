@@ -8,7 +8,7 @@ use crate::stream::Limits;
 use crate::syntax::{Gap, Length, Probe, Syntax, TrackFacts};
 use triergon_core::container::CodecId;
 use triergon_core::{Budget, BudgetVec, Error, Result};
-use triergon_framing::{AacAdtsHeader, inspect_aac_adts_header};
+use triergon_framing::aac::{self, AacAdtsHeader};
 
 /// ADTS stream facts.
 #[derive(Debug)]
@@ -42,7 +42,7 @@ impl Syntax for Adts {
                 && bytes.get(1).is_none_or(|&b| b & 0xf6 == 0xf0);
             return if sync { Probe::Short } else { Probe::Invalid };
         }
-        let Ok(header) = inspect_aac_adts_header(bytes) else {
+        let Ok(header) = aac::inspect_adts_header(bytes) else {
             return Probe::Invalid;
         };
         let header_bytes = if header.protection_absent() { 7 } else { 9 };

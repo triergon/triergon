@@ -8,7 +8,7 @@ use super::{
 };
 use crate::Result;
 use triergon_core::{Budget, Error};
-use triergon_framing::indexed_aac_frequency;
+use triergon_framing::aac;
 
 impl MatroskaTrackFeed {
     /// Prepare one bounded prefix in the same generation as this feed.
@@ -50,7 +50,7 @@ impl MatroskaTrackFeed {
         let mut timing = NativePacketTiming::demux(packet.source)?;
         if timing.duration_ns.is_none() && *infer_duration {
             // Indexed AAC-LC cores admitted by this feed have 1024 samples.
-            let rate = indexed_aac_frequency(params.frequency_index)
+            let rate = aac::indexed_frequency(params.frequency_index)
                 .ok_or(Error::Invalid("AAC clock frequency"))?;
             timing.duration_ns =
                 syncframe_duration_ns(1024, rate, packet.source.packet.timing.scale_ns);

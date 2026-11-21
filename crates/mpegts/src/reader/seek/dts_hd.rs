@@ -7,9 +7,7 @@
 use super::Packet;
 use triergon_bitstream::{BitCursor, BitSource};
 use triergon_core::{Error, Result, WorkBudget};
-use triergon_framing::{
-    DtsFrameExtentLimits, probe_dts_core_header, probe_dts_extension_substream_extent,
-};
+use triergon_framing::dts::{self, DtsFrameExtentLimits};
 
 const UNSUPPORTED: Error = Error::Unsupported("MPEG-TS DTS-HD seek recovery layout");
 
@@ -83,7 +81,7 @@ pub(super) fn entry(packet: &Packet) -> Result<Option<Header>> {
         {
             return Err(UNSUPPORTED);
         }
-        let header = probe_dts_core_header(bytes)?;
+        let header = dts::probe_core_header(bytes)?;
         // Construction 14 has no internal core extensions (Table E-2).
         if header.extension != 0 || header.frame_bytes % 4 != 0 {
             return Err(UNSUPPORTED);
@@ -106,7 +104,7 @@ pub(super) fn entry(packet: &Packet) -> Result<Option<Header>> {
 }
 
 fn entry_bytes(bytes: &[u8], core: bool) -> Result<Option<Header>> {
-    let extent = probe_dts_extension_substream_extent(
+    let extent = dts::probe_extension_substream_extent(
         bytes,
         DtsFrameExtentLimits {
             maximum_header_bytes: 4096,

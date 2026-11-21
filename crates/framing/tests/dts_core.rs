@@ -4,8 +4,8 @@ use triergon_core::{
     Budget, Bytes, Error, InputRequest, InputWindow, SourceCapabilities, SourceFailure, SourceId,
     Step, Time, WorkBudget,
 };
-use triergon_framing::{
-    DtsCoreFrame, DtsCoreFrameLimits, DtsCoreFrameReader, DtsCoreHeader, probe_dts_core_header,
+use triergon_framing::dts::{
+    self, DtsCoreFrame, DtsCoreFrameLimits, DtsCoreFrameReader, DtsCoreHeader,
 };
 use triergon_harness_protocol::unhex;
 
@@ -383,7 +383,7 @@ fn independent_188_header_sources_all_reach_the_declared_result_and_facts() {
         let row: Vec<_> = line.split('\t').collect();
         assert_eq!(row.len(), 4);
         count += 1;
-        match probe_dts_core_header(&unhex(row[1])) {
+        match dts::probe_core_header(&unhex(row[1])) {
             Ok(header) if row[2] == "ok" => {
                 if fields(header) != object(&tsv_json(row[3])) {
                     mismatches.push(format!("{} facts differ", row[0]));
@@ -467,7 +467,7 @@ fn independent_17_stream_sources_all_preserve_bytes_facts_and_partial_outputs() 
 
 #[test]
 fn raw_presence_open_bitrate_user_modes_and_versioned_dialog_are_distinct() {
-    let get = |id: &str| probe_dts_core_header(&fixture(HEADERS, id)).unwrap();
+    let get = |id: &str| dts::probe_core_header(&fixture(HEADERS, id)).unwrap();
     let absent = get("rate-13-blocks-15");
     assert_eq!(absent.hcrc, None);
     assert_eq!(absent.header_bits, 104);
@@ -494,7 +494,7 @@ fn raw_presence_open_bitrate_user_modes_and_versioned_dialog_are_distinct() {
 #[test]
 fn complete_header_does_not_finish_a_body_and_payload_syncs_are_opaque() {
     let bytes = fixture(STREAMS, "minimum");
-    let header = probe_dts_core_header(&bytes[..13]).unwrap();
+    let header = dts::probe_core_header(&bytes[..13]).unwrap();
     assert_eq!(header.frame_bytes, 96);
     let incomplete = drive(&bytes[..13], 1, 1, true, limits());
     assert_eq!(incomplete.terminal, "truncated");
@@ -795,7 +795,7 @@ fn termination_future_encoder_and_extension_sources_keep_required_gaps_explicit(
         "extension-7",
         "reserved-extension-sync",
     ] {
-        let error = probe_dts_core_header(&fixture(HEADERS, id)).unwrap_err();
+        let error = dts::probe_core_header(&fixture(HEADERS, id)).unwrap_err();
         assert_eq!(class(error), "unsupported", "{id}");
     }
     let observed = drive(

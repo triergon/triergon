@@ -2,8 +2,11 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    AacAdtsFrame, AacAdtsOutput, AacAdtsParameters, AacAdtsParser, AacAdtsWriter, AacAscParser,
-    AacConfigLimits, AacSource, BuildStep, inspect_aac_adts_header,
+    BuildStep,
+    aac::{
+        self, AacAdtsFrame, AacAdtsOutput, AacAdtsParameters, AacAdtsParser, AacAdtsWriter,
+        AacAscParser, AacConfigLimits, AacSource,
+    },
 };
 fn source() -> AacSource {
     AacSource {
@@ -216,7 +219,7 @@ fn fixed_source_view_retains_every_unselected_profile_and_block_layout() {
     for profile in [0, 2, 3] {
         let mut raw = literal(false, None, 3, 2, 0, 0, &[0]);
         raw[2] = (raw[2] & 63) | (profile << 6);
-        let h = inspect_aac_adts_header(&raw).unwrap();
+        let h = aac::inspect_adts_header(&raw).unwrap();
         assert_eq!(h.profile_code(), profile);
         assert_eq!(h.raw_prefix().as_slice(), &raw[..7]);
         assert!(matches!(
@@ -228,7 +231,7 @@ fn fixed_source_view_retains_every_unselected_profile_and_block_layout() {
         for blocks in 1..4 {
             let mut raw = literal(false, crc, 3, 2, 0, 0, &[0; 16]);
             raw[6] |= blocks;
-            let h = inspect_aac_adts_header(&raw).unwrap();
+            let h = aac::inspect_adts_header(&raw).unwrap();
             assert_eq!(h.raw_blocks_minus_one(), blocks);
             assert_eq!(h.single_block_header_bytes(), None);
             assert!(matches!(

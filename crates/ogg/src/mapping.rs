@@ -17,8 +17,9 @@ use core::ops::Range;
 use triergon_core::container::{CodecId, MediaKind, RandomAccess};
 use triergon_core::{Budget, BudgetVec, Error, Result, TimeBase};
 use triergon_framing::{
-    FlacFrameHeader, FlacStreamInfo, OPUS_RATE, OpusHead, VorbisIdentification, VorbisModes,
-    opus_packet_samples, vorbis_header_type,
+    flac::{FlacFrameHeader, FlacStreamInfo},
+    opus::{self, OpusHead},
+    vorbis::{self, VorbisIdentification, VorbisModes},
 };
 
 /// The mapping a logical stream's first packet identifies.
@@ -61,7 +62,7 @@ const UNKNOWN_TAG: usize = 8;
 impl Mapping {
     /// The mapping and its identifying magic (the codec tag) of a first packet.
     pub fn identify(first: &[u8]) -> (Mapping, &[u8]) {
-        if vorbis_header_type(first) == Some(1) {
+        if vorbis::header_type(first) == Some(1) {
             return (Mapping::Vorbis, &first[..7]);
         }
         if first.starts_with(b"OpusHead") {
@@ -203,7 +204,7 @@ impl Timeline {
                 *previous = Previous::Block(size);
                 durations
             }
-            Timeline::Opus { .. } => Durations::uniform(opus_packet_samples(packet).ok()),
+            Timeline::Opus { .. } => Durations::uniform(opus::packet_samples(packet).ok()),
             Timeline::Flac => {
                 Durations::uniform(FlacFrameHeader::parse(packet).ok().map(|h| h.block_size))
             }
@@ -361,7 +362,7 @@ impl Configuration {
             }
             Mapping::Opus => {
                 let head = OpusHead::parse(packet)?;
-                config.sample_rate = Some(OPUS_RATE);
+                config.sample_rate = Some(opus::SAMPLE_RATE);
                 config.channels = Some(head.channels);
                 config.append(packet)?;
                 config.configuration = 0..packet.len();
@@ -461,7 +462,7 @@ impl Configuration {
             Headers::Flac(_) => {
                 let start = self.bytes.len();
                 self.append(packet)?;
-                if packet[0] & 0x7f == triergon_framing::FLAC_VORBIS_COMMENT {
+                if packet[0] & 0x7f == triergon_framing::flac::VORBIS_COMMENT {
                     self.comments = Some(start + 4..self.bytes.len());
                 }
                 self.configuration = 0..self.bytes.len();
@@ -550,7 +551,7 @@ impl Headers {
         match self {
             Headers::Vorbis(read) => {
                 let expected = if read == 1 { 3 } else { 5 };
-                if vorbis_header_type(packet) != Some(expected) {
+                if vorbis::header_type(packet) != Some(expected) {
                     return Err(Error::Invalid("Vorbis header packet order"));
                 }
                 Ok(if read == 1 {
@@ -716,7 +717,7 @@ fn ogg_flac_first(packet: &[u8]) -> Result<(&[u8], u16)> {
     }
     let native = &rest[4..];
     if !native.starts_with(b"fLaC")
-        || native.get(4).map(|kind| kind & 0x7f) != Some(triergon_framing::FLAC_STREAMINFO)
+        || native.get(4).map(|kind| kind & 0x7f) != Some(triergon_framing::flac::STREAMINFO)
         || native.len() < 8 + FlacStreamInfo::BYTES
     {
         return Err(Error::Invalid("Ogg FLAC STREAMINFO"));

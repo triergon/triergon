@@ -7,7 +7,7 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, Time, WorkBudget};
-use triergon_framing::{AacAdtsHeader, inspect_aac_adts_header};
+use triergon_framing::aac::{self, AacAdtsHeader};
 use triergon_mpegts::{
     AssemblyStep,
     compat::pes::{
@@ -456,7 +456,7 @@ impl HlsAac {
     }
 
     fn inspect_prefix(&self) -> Result<AacAdtsHeader> {
-        let header = inspect_aac_adts_header(&self.prefix)?;
+        let header = aac::inspect_adts_header(&self.prefix)?;
         if header.syncword() != 0xfff || header.layer() != 0 {
             return Err(Error::Invalid("ADTS sync/layer"));
         }
@@ -1103,7 +1103,7 @@ mod tests {
             };
             assert_eq!(work.spent(), expected.len() as u64 + 3);
             assert_eq!(frame.bytes.as_ref(), expected);
-            assert_eq!(frame.header, inspect_aac_adts_header(expected).unwrap());
+            assert_eq!(frame.header, aac::inspect_adts_header(expected).unwrap());
             assert!(frame.bytes.shares_storage_with(&backing));
             assert!(frame.bytes.belongs_to(&fixture.pool));
             frames.push(frame);

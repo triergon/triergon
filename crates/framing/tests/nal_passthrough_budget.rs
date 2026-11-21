@@ -1,7 +1,8 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, SourceLocation, WorkBudget};
 use triergon_framing::{
-    BuildStep, Codec, NalPacket, NalPacketConfiguration, NalPacketLimits, NalPacketSession,
+    BuildStep,
+    nal::{Codec, NalPacket, NalPacketConfiguration, NalPacketLimits, NalPacketSession},
 };
 
 #[test]

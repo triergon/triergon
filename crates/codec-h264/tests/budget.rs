@@ -3,7 +3,7 @@
 
 use triergon_codec::{Budget, StorageError};
 use triergon_codec_h264::{DecodeError, Decoder, Limits, Picture};
-use triergon_framing::AnnexBUnits;
+use triergon_framing::nal::AnnexBUnits;
 
 /// 80x48 (5x3 macroblocks), one IDR and one P picture.
 fn stream() -> Vec<u8> {

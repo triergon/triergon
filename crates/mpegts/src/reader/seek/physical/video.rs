@@ -7,8 +7,9 @@
 //! this proves available setup and independence, not successful decoding.
 use triergon_bitstream::{BitSource, Rbsp};
 use triergon_framing::{
-    AvcReading, AvcSliceDepth, Codec, NalHeader, RawAccessUnit, avc, hevc, read_avc_pps,
-    read_avc_slice_header, read_avc_sps, skip_hevc_profile_tier_level,
+    avc::{self, AvcReading, AvcSliceDepth},
+    hevc,
+    nal::{Codec, NalHeader, RawAccessUnit, skip_hevc_profile_tier_level},
 };
 
 pub(super) fn nals(unit: &RawAccessUnit) -> Option<usize> {
@@ -39,8 +40,9 @@ pub(super) fn nals(unit: &RawAccessUnit) -> Option<usize> {
                     return None;
                 }
             }
-            let sps = read_avc_sps(&sps.bytes()[1..], AvcReading::Strict, false, |_, _| {}).ok()?;
-            let pps = read_avc_pps(&pps.bytes()[1..], AvcReading::Strict).ok()?;
+            let sps =
+                avc::read_sps(&sps.bytes()[1..], AvcReading::Strict, false, |_, _| {}).ok()?;
+            let pps = avc::read_pps(&pps.bytes()[1..], AvcReading::Strict).ok()?;
             if !sps.frame_mbs_only
                 || sps.separate_colour_plane
                 || pps.sps_id != sps.id
@@ -62,7 +64,7 @@ pub(super) fn nals(unit: &RawAccessUnit) -> Option<usize> {
                 }
                 let payload = &slice.bytes()[1..];
                 let first_mb = Rbsp::new(payload).exp_golomb(32).ok()?;
-                let header = read_avc_slice_header(
+                let header = avc::read_slice_header(
                     payload,
                     true,
                     true,

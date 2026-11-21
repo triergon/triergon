@@ -10,11 +10,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::crc::crc16_a52;
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    Ac3Family, Ac3FrameDetails, Ac3FrameHeader, BuildStep, HevcAnnexBAccessUnit, HevcAnnexBConfig,
-    HevcAnnexBJob, HevcAnnexBLimits, HvcConfigLimits, HvcConfigParser, HvcConfigSource,
-    probe_ac3_header,
+    BuildStep,
+    ac3::{self, Ac3Family, Ac3FrameDetails, Ac3FrameHeader},
+    hevc::{
+        HevcAnnexBAccessUnit, HevcAnnexBConfig, HevcAnnexBJob, HevcAnnexBLimits, HvcConfigLimits,
+        HvcConfigParser, HvcConfigSource,
+    },
 };
-use triergon_matroska::typed::{Configuration, Packet};
+use triergon_matroska::{Configuration, TypedPacket as Packet};
 
 #[derive(Clone, Copy, Debug)]
 pub struct MatroskaHevcDolbyLimits {
@@ -265,7 +268,7 @@ fn dolby_duration_ns(family: Ac3Family, raw: &[u8], scale_ns: u64) -> Option<u64
 
 fn dolby_final_syncframe(family: Ac3Family, mut raw: &[u8]) -> Option<Ac3FrameHeader> {
     for _ in 0..32 {
-        let header = probe_ac3_header(raw).ok()?;
+        let header = ac3::probe_header(raw).ok()?;
         if header.family != family
             || matches!(
                 header.details,
@@ -363,7 +366,7 @@ impl<'a> DolbyJob<'a> {
             }
             self.frames = self.frames.checked_add(1).ok_or(Error::Overflow)?;
             check_limit(self.frames, self.maximum_syncframes)?;
-            let header = probe_ac3_header(remaining)?;
+            let header = ac3::probe_header(remaining)?;
             if header.family != self.codec.family()
                 || matches!(self.codec, DolbyCodec::Ac3Bsid(bsid) if bsid != header.bsid)
             {
@@ -423,7 +426,7 @@ mod tests {
         let mut dependent = data.to_vec();
         dependent[2] = (dependent[2] & 0x3f) | 0x40;
         assert!(matches!(
-            probe_ac3_header(&dependent).unwrap().details,
+            ac3::probe_header(&dependent).unwrap().details,
             Ac3FrameDetails::Eac3 { stream_type: 1, .. }
         ));
         assert_eq!(duration(&dependent, 1_000_000), None);

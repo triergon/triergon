@@ -26,7 +26,7 @@ use triergon_core::{
     InputWindow, Result, SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step,
     WorkBudget,
 };
-use triergon_framing::RawAnnexBLimits;
+use triergon_framing::nal::RawAnnexBLimits;
 
 /// Reporting of unfinished audio bytes at logical source EOF.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

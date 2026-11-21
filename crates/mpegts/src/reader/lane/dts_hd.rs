@@ -7,9 +7,8 @@ use triergon_core::{
     Budget, Error, InputCursor, InputRequest, InputWindow, Result, SourceCapabilities, SourceId,
     Step, Time, WorkBudget,
 };
-use triergon_framing::{
-    DtsCoreHeader, DtsExtensionSubstreamExtent, DtsFrameExtentLimits, probe_dts_core_header,
-    probe_dts_extension_substream_extent,
+use triergon_framing::dts::{
+    self, DtsCoreHeader, DtsExtensionSubstreamExtent, DtsFrameExtentLimits,
 };
 
 struct HeaderCrc {
@@ -125,7 +124,7 @@ impl Reader {
         if self.validation.is_none() {
             let size = self.pes_bytes;
             let frame = match self.input.step(work, cancel, |prefix| {
-                Ok((probe_dts_core_header(prefix)?, size))
+                Ok((dts::probe_core_header(prefix)?, size))
             })? {
                 Step::Ready(frame) => frame,
                 Step::Yield => return Ok(Step::Yield),
@@ -203,7 +202,7 @@ impl Validation {
                 return Err(Error::Invalid("DTS-HD substream alignment"));
             }
             let tail = bytes.get(aligned..).ok_or(Error::Truncated)?;
-            let ext = probe_dts_extension_substream_extent(
+            let ext = dts::probe_extension_substream_extent(
                 tail,
                 DtsFrameExtentLimits {
                     maximum_header_bytes: 4096,
@@ -406,7 +405,7 @@ fn next_extension(
     extensions: u8,
 ) -> Result<ExtensionPacket> {
     let tail = &bytes[cursor..];
-    let extent = probe_dts_extension_substream_extent(
+    let extent = dts::probe_extension_substream_extent(
         tail,
         DtsFrameExtentLimits {
             maximum_header_bytes: 4096,
@@ -464,7 +463,7 @@ impl ExtensionPacket {
                 return Err(Error::Invalid("DTS-HD substream alignment"));
             }
             let tail = bytes.get(aligned..).ok_or(Error::Truncated)?;
-            let extent = probe_dts_extension_substream_extent(
+            let extent = dts::probe_extension_substream_extent(
                 tail,
                 DtsFrameExtentLimits {
                     maximum_header_bytes: 4096,

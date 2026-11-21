@@ -11,7 +11,7 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, BytesView, Error, Result, SourceId, WorkBudget};
-use triergon_framing::{Codec, NalHeader};
+use triergon_framing::nal::{Codec, NalHeader};
 use triergon_mpegts::compat::pes::{
     CompactDemuxPacket, DemuxPacket, DemuxPayloadKind, DemuxTimeView, PayloadCursor,
     RegisteredCarriage,

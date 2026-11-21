@@ -3,7 +3,7 @@ use triergon_core::{
     Budget, Bytes, Error, InputRequest, InputWindow, SourceCapabilities, SourceFailure, SourceId,
     Step, WorkBudget,
 };
-use triergon_framing::{Codec, RawAnnexBLimits, RawAnnexBReader};
+use triergon_framing::nal::{Codec, RawAnnexBLimits, RawAnnexBReader};
 use triergon_playback::{ByteSource, Source, SourceReply, raw_video::RawVideoSource};
 
 const SOURCE: SourceId = SourceId(72);

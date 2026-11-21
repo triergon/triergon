@@ -17,7 +17,8 @@ use triergon_core::{
     Time, WorkBudget,
 };
 use triergon_framing::{
-    MpegChannelMode, MpegLayer, MpegVersion, indexed_aac_frequency, probe_dts_core_header,
+    aac, dts,
+    mpeg_audio::{MpegChannelMode, MpegLayer, MpegVersion},
 };
 
 /// A length-known, seekable part of the original contiguous transport stream.
@@ -270,7 +271,7 @@ fn latm_entry(multiplex: &[u8]) -> Option<()> {
     if asc >> 11 != 2 || asc & 7 != 0 || !(1..=7).contains(&((asc >> 3) & 15)) {
         return None;
     }
-    indexed_aac_frequency(((asc >> 7) & 15) as u8)?;
+    aac::indexed_frequency(((asc >> 7) & 15) as u8)?;
     if bits.read(3).ok()? != 0 {
         return None;
     }
@@ -312,7 +313,7 @@ fn packet_probe(packet: Packet) -> Result<Probing> {
             time.is_some() && mpeg_audio_entry(frame)?,
         ),
         AccessUnit::Dts(frame) => {
-            let header = probe_dts_core_header(frame.bytes().as_ref())?;
+            let header = dts::probe_core_header(frame.bytes().as_ref())?;
             if header.frame_bytes != frame.bytes().len() {
                 let descriptor = packet.track_info().stream().dvb_dts_hd()?;
                 if !descriptor.is_some_and(|descriptor| {

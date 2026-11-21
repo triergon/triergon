@@ -1,7 +1,7 @@
 //! Pieces Layers I and II share: scalefactors, sample requantization and the joint
 //! stereo bound (ISO/IEC 11172-3 2.4.3.2 and 2.4.3.3).
 
-use triergon_framing::{MpegAudioHeader, MpegChannelMode};
+use triergon_framing::mpeg_audio::{MpegAudioHeader, MpegChannelMode};
 
 /// Scalefactor `index` of Table B.1 (a 6-bit field): `2^(1 - index / 3)`.
 pub(crate) fn scalefactor(index: u32) -> f32 {

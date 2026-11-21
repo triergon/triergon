@@ -4,7 +4,10 @@
 
 use triergon_bitstream::runs;
 use triergon_codec::{BudgetVec, StorageError};
-use triergon_framing::{self as framing, hevc, start_code};
+use triergon_framing::{
+    hevc,
+    nal::{self as framing, start_code},
+};
 
 /// The decoder's view of a NAL unit header (clause 7.3.1.2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

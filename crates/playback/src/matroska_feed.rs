@@ -31,14 +31,14 @@ pub use probe_clock::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    AacAdtsParameters, AacAscParser, AacConfigLimits, AacSource, AvcAnnexBAccessUnit,
-    AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits, AvcConfigLimits, AvcConfigParser,
-    AvcConfigSource, BuildStep,
+    BuildStep,
+    aac::{AacAdtsParameters, AacAscParser, AacConfigLimits, AacSource},
+    avc::{
+        AvcAnnexBAccessUnit, AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits, AvcConfigLimits,
+        AvcConfigParser, AvcConfigSource,
+    },
 };
-use triergon_matroska::{
-    matroska::LegacyAacProfile,
-    typed::{Configuration, Event, Packet},
-};
+use triergon_matroska::{Configuration, Event, LegacyAacProfile, TypedPacket as Packet};
 pub use video_clock::MatroskaAvcClock;
 pub use video_seek::MatroskaVideoSeekGate;
 

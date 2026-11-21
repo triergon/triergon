@@ -6,7 +6,7 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, Result,
     SourceCapabilities, SourceId, Step, WorkBudget,
 };
-use triergon_framing::{MpegAudioHeader, MpegLayer, MpegVersion};
+use triergon_framing::mpeg_audio::{MpegAudioHeader, MpegLayer, MpegVersion};
 
 const HEADER: usize = 4;
 

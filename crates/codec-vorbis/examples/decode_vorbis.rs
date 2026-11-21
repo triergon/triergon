@@ -20,7 +20,7 @@ use triergon::ogg::ReaderEvent;
 use triergon::{AnyOther, Budget, CodecId, ContainerReader, Event, MediaKind, PacketInfo, TrackId};
 use triergon_codec::{AudioDecoder, AudioFrame, ChannelLayout};
 use triergon_codec_vorbis::{Decoder, Limits};
-use triergon_framing::VorbisHeaders;
+use triergon_framing::vorbis::VorbisHeaders;
 
 /// The decoder of the current link and the configuration it was built from.
 struct Current {

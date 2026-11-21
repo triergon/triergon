@@ -6,7 +6,10 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, Result, Rounding, TimeBase, WorkBudget};
-use triergon_framing::{AacAscParser, AacConfigLimits, AacSource, BuildStep};
+use triergon_framing::{
+    BuildStep,
+    aac::{AacAscParser, AacConfigLimits, AacSource},
+};
 
 enum Phase {
     Description(AudioDescription),

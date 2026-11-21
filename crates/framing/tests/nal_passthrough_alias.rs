@@ -1,8 +1,11 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, SourceLocation, WorkBudget};
 use triergon_framing::{
-    BuildStep, Codec, NalPacket, NalPacketConfiguration, NalPacketFields, NalPacketLimits,
-    NalPacketOrigin, NalPacketOutput, NalPacketSession,
+    BuildStep,
+    nal::{
+        Codec, NalPacket, NalPacketConfiguration, NalPacketFields, NalPacketLimits,
+        NalPacketOrigin, NalPacketOutput, NalPacketSession,
+    },
 };
 
 fn fields() -> NalPacketFields {

@@ -7,7 +7,7 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputRequest, InputWindow, Result, SourceCapabilities,
     SourceId, SourceLocation, Step, WorkBudget,
 };
-use triergon_framing::{
+use triergon_framing::ac3::{
     Ac3Frame, Ac3FrameDetails, Ac3FrameFacts, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection,
 };
 
@@ -496,7 +496,7 @@ fn require(pool: &Budget, retained: usize, additional: usize) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use triergon_framing::probe_ac3_header;
+    use triergon_framing::ac3;
 
     const FRAME_BYTES: usize = 32;
     const GROUP_BYTES: usize = 2 * FRAME_BYTES;
@@ -516,7 +516,7 @@ mod tests {
             source: SourceId(0),
             generation: 1,
             offset: 0,
-            header: probe_ac3_header(&frame).unwrap(),
+            header: ac3::probe_header(&frame).unwrap(),
         };
         let primary = Bytes::copy_from_slice(pool, &frame).unwrap();
         let frame = syncframe(true);
@@ -526,7 +526,7 @@ mod tests {
             .try_push(DependentSyncframe {
                 facts: Ac3FrameFacts {
                     offset: FRAME_BYTES as u64,
-                    header: probe_ac3_header(&frame).unwrap(),
+                    header: ac3::probe_header(&frame).unwrap(),
                     ..first
                 },
                 pending_bytes: Some(Bytes::copy_from_slice(pool, &frame).unwrap()),

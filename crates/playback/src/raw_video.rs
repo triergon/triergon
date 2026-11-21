@@ -7,7 +7,7 @@ use crate::{
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Error, SourceFailure, SourceLocation, Step, WorkBudget};
-use triergon_framing::{RawAccessUnit, RawAnnexBReader};
+use triergon_framing::nal::{RawAccessUnit, RawAnnexBReader};
 
 mod config;
 mod feed;

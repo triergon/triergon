@@ -892,7 +892,10 @@ fn aac_packets() -> (Vec<Mp4Packet>, Budget, Bytes, u64) {
 }
 #[test]
 fn real_aac_mp4_adts_bridge_uses_source_asc_and_keeps_whole_raw_packet() {
-    use triergon_framing::*;
+    use triergon_framing::{
+        BuildStep,
+        aac::{AacAscParser, AacConfigLimits, AacSource},
+    };
     let (packets, b, asc, offset) = aac_packets();
     assert!(!packets.is_empty());
     let cfg = packets[0].configuration.clone();
@@ -943,7 +946,10 @@ fn real_aac_mp4_adts_bridge_uses_source_asc_and_keeps_whole_raw_packet() {
 }
 #[test]
 fn aac_bridge_refuses_configuration_change_before_packet_conversion() {
-    use triergon_framing::*;
+    use triergon_framing::{
+        BuildStep,
+        aac::{AacAscParser, AacConfigLimits, AacSource},
+    };
     let (mut packets, b, asc, offset) = aac_packets();
     let mut p = packets.remove(0);
     let cfg = p.configuration.clone();
@@ -976,7 +982,7 @@ fn aac_bridge_refuses_configuration_change_before_packet_conversion() {
 #[test]
 fn mp4_playback_feeds_real_simulator_decoders_across_clock_and_seek() {
     use triergon_core::Rounding;
-    use triergon_framing::{AacAscParser, AacConfigLimits, AacSource};
+    use triergon_framing::aac::{AacAscParser, AacConfigLimits, AacSource};
     use triergon_session::{
         AudioCodec, AudioSession, PcmBlock, QueueLimits, SessionState, StreamSelection, VideoCodec,
         VideoSession,
@@ -1207,7 +1213,7 @@ fn matroska_utf8_text_bridge_runs_real_reader_without_core_or_native_field_repai
     )
     .unwrap();
     let out = collect(&mut p, 1).unwrap();
-    let output=out.into_iter().find(|o|matches!(o.event(),RawEvent::Matroska(triergon_matroska::typed::Event::Packet(p))if p.configuration.tracks()[p.packet.track].codec.as_ref()=="S_TEXT/UTF8")).unwrap();
+    let output=out.into_iter().find(|o|matches!(o.event(),RawEvent::Matroska(triergon_matroska::Event::Packet(p))if p.configuration.tracks()[p.packet.track].codec.as_ref()=="S_TEXT/UTF8")).unwrap();
     assert_eq!(output.source_id(), ID);
     let source = TextSource::from_output(output).unwrap_or_else(|e| panic!("{:?}", e.error));
     let packet = source.matroska().unwrap();
@@ -2041,7 +2047,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     use matroska_feed::{
         MatroskaBitmapClockProbe, MatroskaBitmapCodec, MatroskaBitmapTrack, MatroskaDvbStep,
     };
-    use triergon_matroska::typed::Event;
+    use triergon_matroska::Event;
     use triergon_subtitles::{dvb, pgs};
 
     fn element(id: &[u8], data: &[u8]) -> Vec<u8> {
@@ -2428,7 +2434,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
 fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
     use bitmap_bridge::{PgsBridge, PgsQueueAction, PgsStep};
     use matroska_feed::{MatroskaBitmapClockProbe, MatroskaBitmapTrack};
-    use triergon_matroska::typed::Event;
+    use triergon_matroska::Event;
     use triergon_subtitles::pgs;
 
     type Timing = (Option<i64>, Option<i64>);
@@ -2652,7 +2658,7 @@ fn matroska_discovery_stops_on_canvas_or_limits_and_replays_the_same_source() {
         MatroskaBitmapClockProbe, MatroskaBitmapTrack, MatroskaDiscovered, MatroskaDiscovery,
         MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
     };
-    use triergon_matroska::typed::Event;
+    use triergon_matroska::Event;
 
     struct Counted {
         inner: ByteSource,
@@ -2902,7 +2908,7 @@ fn matroska_discovery_observes_timed_audio_without_caller_confirmation() {
     use matroska_feed::{
         MatroskaDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
     };
-    use triergon_matroska::typed::Event;
+    use triergon_matroska::Event;
 
     let cases: [(&[u8], &[usize], usize); 2] = [
         (
@@ -2976,7 +2982,7 @@ fn matroska_discovery_observes_video_and_keeps_decode_order() {
     use matroska_feed::{
         MatroskaDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
     };
-    use triergon_matroska::typed::Event;
+    use triergon_matroska::Event;
 
     use MatroskaDiscoveryCutoff::{SourceEnd, StreamsReady};
 

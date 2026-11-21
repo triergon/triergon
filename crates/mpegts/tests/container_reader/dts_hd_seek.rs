@@ -697,7 +697,7 @@ fn core_history_alone_cannot_establish_dts_hd_recovery() {
     // TS 102 114 Table 5-1 places HFLAG at bit 87 of the core header.
     set(&mut core, 87, 1, 0);
     assert_eq!(
-        triergon_framing::probe_dts_core_header(&core)
+        triergon_framing::dts::probe_core_header(&core)
             .unwrap()
             .history,
         0

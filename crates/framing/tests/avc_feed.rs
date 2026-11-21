@@ -1,8 +1,12 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    AacAdtsParameters, AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits, AvcConfigLimits,
-    AvcConfigParser, AvcConfigSource, BuildStep, inspect_aac_adts_header,
+    BuildStep,
+    aac::{self, AacAdtsParameters},
+    avc::{
+        AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits, AvcConfigLimits, AvcConfigParser,
+        AvcConfigSource,
+    },
 };
 
 const LIMITS: AvcAnnexBLimits = AvcAnnexBLimits {
@@ -158,7 +162,7 @@ fn adts_header_for_a_borrowed_access_unit_checks_the_thirteen_bit_wire_limit() {
     };
     let header = params.header_for_payload(8184).unwrap();
     assert_eq!(
-        inspect_aac_adts_header(&header).unwrap().frame_length(),
+        aac::inspect_adts_header(&header).unwrap().frame_length(),
         8191
     );
     assert_eq!(

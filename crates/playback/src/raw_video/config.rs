@@ -5,7 +5,7 @@ use crate::hls_avc::syntax as avc;
 pub use crate::hls_avc::syntax::AvcVuiTiming;
 pub use hevc::HevcVuiTiming;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId};
-use triergon_framing::{Codec, NalHeader, RawAccessUnit};
+use triergon_framing::nal::{Codec, NalHeader, RawAccessUnit};
 
 /// Exact active NAL bodies, without start codes or Annex B padding.
 /// Dimensions use the AVC frame crop or HEVC conformance window.
@@ -285,7 +285,7 @@ mod tests {
     use super::*;
     use std::sync::atomic::AtomicBool;
     use triergon_core::{InputWindow, SourceCapabilities, Step, WorkBudget};
-    use triergon_framing::{RawAnnexBLimits, RawAnnexBReader};
+    use triergon_framing::nal::{RawAnnexBLimits, RawAnnexBReader};
 
     const SOURCE: SourceId = SourceId(77);
     static NO: AtomicBool = AtomicBool::new(false);

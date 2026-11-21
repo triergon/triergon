@@ -8,7 +8,7 @@ use triergon_core::{
     Budget, Bytes, Error, InputRequest, InputWindow, SourceCapabilities, SourceId, Step, Time,
     WorkBudget,
 };
-use triergon_framing::{VorbisHeaders, flac_stream_info};
+use triergon_framing::{flac, vorbis::VorbisHeaders};
 use triergon_ogg::compat::clock::{ReferenceTiming, packet_timing};
 use triergon_ogg::page::{BEGIN_OF_STREAM, CONTINUED, END_OF_STREAM, write_page};
 use triergon_ogg::{Limits, Packet, Reader, ReaderEvent};
@@ -605,7 +605,7 @@ fn ogg_flac_rebuilds_the_native_stream_header() {
     let configuration = track.configuration();
     assert!(configuration.starts_with(b"fLaC\x00\x00\x00\x22"));
     assert!(configuration.ends_with(&comment));
-    assert_eq!(flac_stream_info(configuration).unwrap().sample_rate, 44100);
+    assert_eq!(flac::stream_info(configuration).unwrap().sample_rate, 44100);
     assert_eq!(track.comments(), Some(&comment[4..]));
     let delivered = packets(&events);
     let times: Vec<_> = delivered

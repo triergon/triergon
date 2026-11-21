@@ -11,7 +11,8 @@
 use triergon_bitstream::{BitError, BitSource};
 use triergon_core::{Budget, BudgetVec};
 use triergon_framing::{
-    AnnexBUnits, Codec as Coding, avc, hevc, skip_vui_to_timing, split_length_prefixed,
+    avc, hevc,
+    nal::{AnnexBUnits, Codec as Coding, skip_vui_to_timing, split_length_prefixed},
 };
 
 /// How an access unit delimits its NAL units.

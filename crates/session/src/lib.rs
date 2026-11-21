@@ -99,13 +99,13 @@ pub fn audio_configuration(
     out.clear();
     match codec {
         AudioCodec::Flac => {
-            triergon_framing::canonical_flac_configuration(track_configuration, out)
+            triergon_framing::flac::canonical_configuration(track_configuration, out)
         }
         AudioCodec::Opus => {
-            triergon_framing::canonical_opus_configuration(track_configuration, out)
+            triergon_framing::opus::canonical_configuration(track_configuration, out)
         }
         AudioCodec::Vorbis => {
-            triergon_framing::canonical_vorbis_configuration(track_configuration, out)
+            triergon_framing::vorbis::canonical_configuration(track_configuration, out)
         }
         AudioCodec::Ac3 | AudioCodec::Eac3 | AudioCodec::Aac | AudioCodec::Dts => Ok(()),
         AudioCodec::MpegAudio => Ok(()),

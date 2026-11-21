@@ -4,9 +4,12 @@ use triergon_core::{
     WorkBudget,
 };
 use triergon_framing::{
-    Ac3ConfigKind, Ac3ConfigLimits, Ac3ConfigParser, Ac3Configuration, Ac3Family, Ac3Frame,
-    Ac3FrameDetails, Ac3FrameHeader, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, BuildStep,
-    probe_ac3_header,
+    BuildStep,
+    ac3::{
+        self, Ac3ConfigKind, Ac3ConfigLimits, Ac3ConfigParser, Ac3Configuration, Ac3Family,
+        Ac3Frame, Ac3FrameDetails, Ac3FrameHeader, Ac3FrameLimits, Ac3FrameReader,
+        Ac3StreamSelection,
+    },
 };
 use triergon_harness_protocol::unhex;
 
@@ -135,7 +138,7 @@ fn authored_header_matrix_matches_primary_tables_and_fraction_duration() {
         let row: Vec<_> = line.split('\t').collect();
         assert_eq!(row.len(), 15);
         let input = unhex(row[1]);
-        let result = probe_ac3_header(&input);
+        let result = ac3::probe_header(&input);
         if row[14] != "ok" {
             assert_eq!(class(result.err().unwrap()), row[14], "{}", row[0]);
         } else {
@@ -487,7 +490,7 @@ fn complete_frame_parts_preserve_request_through_declines_and_pressure() {
         .unwrap()
         .unwrap();
     assert_eq!(output.bytes().as_ref(), input.as_slice());
-    assert_eq!(output.facts().header, probe_ac3_header(&input).unwrap());
+    assert_eq!(output.facts().header, ac3::probe_header(&input).unwrap());
     assert_eq!(output.facts().offset, 0);
     assert_eq!(output.facts().generation, request.token.generation());
     assert_eq!(reader.position(), input.len() as u64);
@@ -873,7 +876,7 @@ fn reduced_rate_field_presence_and_dependent_sample_span_are_source_facts() {
             .skip(1)
             .find(|line| line.split('\t').next() == Some(id))
             .unwrap();
-        probe_ac3_header(&unhex(row.split('\t').nth(1).unwrap())).unwrap()
+        ac3::probe_header(&unhex(row.split('\t').nth(1).unwrap())).unwrap()
     };
     let reduced = find("eac3-reduced-1");
     assert_eq!(reduced.eac3_fscod2(), Some(1));

@@ -7,9 +7,10 @@ use triergon_core::{
     Budget, Bytes, InputCursor, Result, SourceCapabilities, SourceId, SourceLocation, WorkBudget,
 };
 use triergon_framing::{
-    AvcConfigLimits, AvcConfigParser, AvcConfigSource, BuildStep, HvcConfigLimits, HvcConfigParser,
-    HvcConfigSource, NalPacket, NalPacketConfiguration, NalPacketLimits, NalPacketOutput,
-    NalPacketSession,
+    BuildStep,
+    avc::{AvcConfigLimits, AvcConfigParser, AvcConfigSource},
+    hevc::{HvcConfigLimits, HvcConfigParser, HvcConfigSource},
+    nal::{NalPacket, NalPacketConfiguration, NalPacketLimits, NalPacketOutput, NalPacketSession},
 };
 use triergon_isobmff::{BoxStep, EntryLayout, Limits};
 use triergon_playback::{

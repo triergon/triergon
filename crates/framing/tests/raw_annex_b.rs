@@ -3,7 +3,7 @@ use triergon_core::{
     Budget, Bytes, Error, InputWindow, SourceCapabilities, SourceFailure, SourceId, Step,
     WorkBudget,
 };
-use triergon_framing::{Codec, RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};
+use triergon_framing::nal::{Codec, RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};
 
 const ID: SourceId = SourceId(712);
 static OFF: AtomicBool = AtomicBool::new(false);
@@ -18,7 +18,7 @@ fn independent_resume_preserves_elementary_offsets_and_nal_limit() {
     let bytes = Bytes::copy_from_slice(&pool, &raw).unwrap();
     for maximum in [5, 6] {
         let limits = RawAnnexBLimits {
-            nal: triergon_framing::ReaderLimits {
+            nal: triergon_framing::nal::ReaderLimits {
                 maximum_nal_units: maximum,
                 ..RawAnnexBLimits::default().nal
             },

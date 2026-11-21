@@ -20,7 +20,7 @@ use triergon_codec::{
     AudioDecoder, AudioFrame, Budget, ChannelLayout, Charged, DecodeFailure, DownmixLevels,
     Reservation, Speaker, StorageError,
 };
-use triergon_framing::{MpegAudioHeader, MpegLayer};
+use triergon_framing::mpeg_audio::{MpegAudioHeader, MpegLayer};
 
 use layer3::Layer3;
 use synthesis::Synthesis;

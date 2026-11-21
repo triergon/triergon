@@ -4,9 +4,12 @@ use triergon_core::{
     WorkBudget,
 };
 use triergon_framing::{
-    AnnexBConfigParser, AnnexBWriter, BuildStep, Codec, ConfigEncoding, ConfigInspection,
-    ConfigLimits, Configuration, Framing, LengthSize, NalFraming, NalHeader, NalReader, NalUnit,
-    ParameterSetKind, ReaderLimits,
+    BuildStep,
+    nal::{
+        AnnexBConfigParser, AnnexBWriter, Codec, ConfigEncoding, ConfigInspection, ConfigLimits,
+        Configuration, Framing, LengthSize, NalFraming, NalHeader, NalReader, NalUnit,
+        ParameterSetKind, ReaderLimits,
+    },
 };
 use triergon_harness_protocol::unhex;
 
@@ -597,7 +600,7 @@ fn annex_b_config_keeps_duplicates_order_source_and_classification() {
             config
                 .parameter_sets()
                 .iter()
-                .map(triergon_framing::ParameterSet::kind)
+                .map(triergon_framing::nal::ParameterSet::kind)
                 .collect::<Vec<_>>(),
             kinds
         );

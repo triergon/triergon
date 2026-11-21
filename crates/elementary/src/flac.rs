@@ -10,9 +10,7 @@ use crate::syntax::{Gap, Length, Plan, Prelude, Probe, SeekContext, Syntax, Trac
 use triergon_bitstream::crc::crc16_a52;
 use triergon_core::container::{CodecId, SeekMethod};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};
-use triergon_framing::{
-    FLAC_STREAMINFO, FLAC_VORBIS_COMMENT, FlacBlocking, FlacFrameHeader, FlacStreamInfo,
-};
+use triergon_framing::flac::{self, FlacBlocking, FlacFrameHeader, FlacStreamInfo};
 
 /// The kind of a metadata block (RFC 9639 section 8.1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -309,12 +307,12 @@ impl Syntax for Flac {
                     .and_then(|block| block.body.as_ref());
                 let last = if comment.is_some() { 0 } else { 0x80 };
                 configuration.try_extend_from_slice(b"fLaC")?;
-                configuration.try_extend_from_slice(&[last | FLAC_STREAMINFO, 0, 0, 34])?;
+                configuration.try_extend_from_slice(&[last | flac::STREAMINFO, 0, 0, 34])?;
                 configuration.try_extend_from_slice(&body[..FlacStreamInfo::BYTES])?;
                 if let Some(comment) = comment {
                     let len = u32::try_from(comment.len()).map_err(|_| Error::Overflow)?;
                     let [_, a, b, c] = len.to_be_bytes();
-                    configuration.try_extend_from_slice(&[0x80 | FLAC_VORBIS_COMMENT, a, b, c])?;
+                    configuration.try_extend_from_slice(&[0x80 | flac::VORBIS_COMMENT, a, b, c])?;
                     configuration.try_extend_from_slice(comment)?;
                 }
                 (

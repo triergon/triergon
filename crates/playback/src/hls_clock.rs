@@ -242,13 +242,13 @@ fn step_on_frame_grid(tick: TimeBase, pts: i64, duration: Time, step: i128) -> R
 mod tests {
     use super::*;
     use triergon_core::Bytes;
-    use triergon_framing::inspect_aac_adts_header;
+    use triergon_framing::aac;
 
     fn frame(pool: &Budget, ticks: Option<i128>) -> HlsAacFrame {
         let bytes = [0xff, 0xf1, 0x50, 0x80, 0x01, 0x1f, 0xfc, 0];
         HlsAacFrame {
             bytes: Bytes::copy_from_slice(pool, &bytes).unwrap(),
-            header: inspect_aac_adts_header(&bytes).unwrap(),
+            header: aac::inspect_adts_header(&bytes).unwrap(),
             pts: ticks.map(|ticks| Time::new(ticks * 1024, 44100).unwrap()),
             dts: None,
             duration: Time::new(1024, 44100).unwrap(),

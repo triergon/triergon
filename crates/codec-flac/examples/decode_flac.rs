@@ -76,7 +76,7 @@ fn main() -> ExitCode {
                 .map_err(|e| e.to_string())
                 .and_then(|pool| {
                     let mut configuration = triergon_codec::BudgetVec::new(&pool);
-                    triergon_framing::canonical_flac_configuration(
+                    triergon_framing::flac::canonical_configuration(
                         track.configuration(),
                         &mut configuration,
                     )

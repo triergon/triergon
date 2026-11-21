@@ -1,7 +1,6 @@
 use triergon_core::Error;
-use triergon_framing::{
-    DtsExtensionSubstreamExtent, DtsFrameExtent, DtsFrameExtentLimits, probe_dts_core_header,
-    probe_dts_extension_substream_extent, probe_dts_frame_extent,
+use triergon_framing::dts::{
+    self, DtsExtensionSubstreamExtent, DtsFrameExtent, DtsFrameExtentLimits,
 };
 
 const LIMITS: DtsFrameExtentLimits = DtsFrameExtentLimits {
@@ -39,11 +38,11 @@ fn reads_literal_short_and_long_size_fields() {
         ),
     ] {
         assert_eq!(
-            probe_dts_extension_substream_extent(input, LIMITS),
+            dts::probe_extension_substream_extent(input, LIMITS),
             Ok(expected)
         );
         assert_eq!(
-            probe_dts_frame_extent(input, LIMITS),
+            dts::probe_frame_extent(input, LIMITS),
             Ok(DtsFrameExtent::Extension(expected))
         );
         assert_eq!(
@@ -66,7 +65,7 @@ fn reads_literal_short_and_long_size_fields() {
             1,
         ),
     ] {
-        let extent = probe_dts_extension_substream_extent(input, LIMITS).unwrap();
+        let extent = dts::probe_extension_substream_extent(input, LIMITS).unwrap();
         assert_eq!(
             (
                 extent.header_bytes,
@@ -83,11 +82,11 @@ fn every_incomplete_size_prefix_is_truncated() {
     for input in [SHORT, LONG] {
         for end in 0..input.len() {
             assert_eq!(
-                probe_dts_extension_substream_extent(&input[..end], LIMITS),
+                dts::probe_extension_substream_extent(&input[..end], LIMITS),
                 Err(Error::Truncated)
             );
             assert_eq!(
-                probe_dts_frame_extent(&input[..end], LIMITS),
+                dts::probe_frame_extent(&input[..end], LIMITS),
                 Err(Error::Truncated)
             );
         }
@@ -98,7 +97,7 @@ fn every_incomplete_size_prefix_is_truncated() {
 fn checks_exact_limits_without_requiring_body_bytes() {
     for (input, header, frame) in [(SHORT, 32, 512), (LONG, 4096, 1 << 20)] {
         assert!(
-            probe_dts_frame_extent(
+            dts::probe_frame_extent(
                 input,
                 DtsFrameExtentLimits {
                     maximum_header_bytes: header,
@@ -126,7 +125,7 @@ fn checks_exact_limits_without_requiring_body_bytes() {
             ),
         ] {
             assert_eq!(
-                probe_dts_frame_extent(input, limits),
+                dts::probe_frame_extent(input, limits),
                 Err(Error::Limit { requested, maximum })
             );
         }
@@ -141,7 +140,7 @@ fn checks_exact_limits_without_requiring_body_bytes() {
             },
         ] {
             assert!(matches!(
-                probe_dts_frame_extent(input, limits),
+                dts::probe_frame_extent(input, limits),
                 Err(Error::Invalid(_))
             ));
         }
@@ -165,13 +164,13 @@ fn rejects_overlapping_size_fields_crc_and_payload() {
         let minimum = if long { 12 } else { 11 };
         for header in 1..minimum {
             assert!(matches!(
-                probe_dts_frame_extent(&prefix(long, header, 512), LIMITS),
+                dts::probe_frame_extent(&prefix(long, header, 512), LIMITS),
                 Err(Error::Invalid(_))
             ));
         }
         for frame in [1, 31, 32] {
             assert!(matches!(
-                probe_dts_frame_extent(&prefix(long, 32, frame), LIMITS),
+                dts::probe_frame_extent(&prefix(long, 32, frame), LIMITS),
                 Err(Error::Invalid(_))
             ));
         }
@@ -184,7 +183,7 @@ fn size_fields_cross_byte_and_short_long_boundaries() {
         for header in [32, 63, 64, 127, 128, 255, 256] {
             for frame in [257, 511, 512, 1023, 1024, 32768, 65535, 65536] {
                 let extent =
-                    probe_dts_extension_substream_extent(&prefix(long, header, frame), LIMITS)
+                    dts::probe_extension_substream_extent(&prefix(long, header, frame), LIMITS)
                         .unwrap();
                 assert_eq!((extent.header_bytes, extent.frame_bytes), (header, frame));
             }
@@ -200,45 +199,45 @@ fn leaves_source_bytes_and_opaque_trailing_data_untouched() {
     input[100..100 + LONG.len()].copy_from_slice(LONG);
     input[512..512 + LONG.len()].copy_from_slice(LONG);
     let before = input.clone();
-    let extent = probe_dts_frame_extent(&input, LIMITS).unwrap();
+    let extent = dts::probe_frame_extent(&input, LIMITS).unwrap();
     assert_eq!(extent.frame_bytes(), 512);
     assert_eq!(input, before);
     assert_eq!(
-        probe_dts_frame_extent(&input[512..], LIMITS)
+        dts::probe_frame_extent(&input[512..], LIMITS)
             .unwrap()
             .frame_bytes(),
         1 << 20
     );
     // The five remaining prefix bits and arbitrary following bytes are opaque.
     input[8] |= 0x1f;
-    assert_eq!(probe_dts_frame_extent(&input, LIMITS), Ok(extent));
+    assert_eq!(dts::probe_frame_extent(&input, LIMITS), Ok(extent));
 }
 
 #[test]
 fn reuses_core_validation_without_accepting_extensions_as_core() {
     for end in 4..=15 {
         assert_eq!(
-            probe_dts_frame_extent(&CORE[..end], LIMITS),
-            probe_dts_core_header(&CORE[..end]).map(DtsFrameExtent::Core)
+            dts::probe_frame_extent(&CORE[..end], LIMITS),
+            dts::probe_core_header(&CORE[..end]).map(DtsFrameExtent::Core)
         );
     }
-    let header = probe_dts_core_header(CORE).unwrap();
+    let header = dts::probe_core_header(CORE).unwrap();
     assert_eq!(
-        probe_dts_frame_extent(CORE, LIMITS),
+        dts::probe_frame_extent(CORE, LIMITS),
         Ok(DtsFrameExtent::Core(header))
     );
     assert_eq!(
-        probe_dts_core_header(SHORT),
+        dts::probe_core_header(SHORT),
         Err(Error::Unsupported("DTS extension-substream input"))
     );
     let mut termination = CORE[..15].to_vec();
     termination[4] &= 0x7f;
     assert_eq!(
-        probe_dts_frame_extent(&termination, LIMITS),
-        probe_dts_core_header(&termination).map(DtsFrameExtent::Core)
+        dts::probe_frame_extent(&termination, LIMITS),
+        dts::probe_core_header(&termination).map(DtsFrameExtent::Core)
     );
     assert!(matches!(
-        probe_dts_frame_extent(
+        dts::probe_frame_extent(
             CORE,
             DtsFrameExtentLimits {
                 maximum_frame_bytes: header.frame_bytes - 1,
@@ -248,7 +247,7 @@ fn reuses_core_validation_without_accepting_extensions_as_core() {
         Err(Error::Limit { .. })
     ));
     assert!(matches!(
-        probe_dts_frame_extent(
+        dts::probe_frame_extent(
             CORE,
             DtsFrameExtentLimits {
                 maximum_header_bytes: 1,
@@ -269,7 +268,7 @@ fn rejects_unknown_sync_and_other_carriers_without_search() {
         &[0, 0x64, 0x58, 0x20, 0x25][..],
     ] {
         assert!(matches!(
-            probe_dts_frame_extent(input, LIMITS),
+            dts::probe_frame_extent(input, LIMITS),
             Err(Error::Invalid(_))
         ));
     }

@@ -11,8 +11,10 @@ use triergon_core::{
     SourceId, Time, TimeBase, WorkBudget,
 };
 use triergon_framing::{
-    AacAscParser, AacConfigLimits, AacSource, Ac3ConfigKind, Ac3ConfigLimits, Ac3ConfigParser,
-    Ac3Configuration, BuildStep, OPUS_RATE, aac_fixed_channel_count, indexed_aac_frequency,
+    BuildStep,
+    aac::{self, AacAscParser, AacConfigLimits, AacSource},
+    ac3::{Ac3ConfigKind, Ac3ConfigLimits, Ac3ConfigParser, Ac3Configuration},
+    opus,
 };
 
 pub(crate) mod fragment_aac;
@@ -358,7 +360,7 @@ impl EncodedEditPlan {
             .ok_or(Error::Overflow)?;
         let end = if next > self.end {
             let padding = next.checked_sub(self.end).ok_or(Error::Overflow)?;
-            let pcm_base = TimeBase::new(1, u64::from(OPUS_RATE))?;
+            let pcm_base = TimeBase::new(1, u64::from(opus::SAMPLE_RATE))?;
             let ticks = Time::from_ticks(padding, self.media_base)?
                 .to_ticks(pcm_base, Rounding::NearestAway)?;
             u32::try_from(ticks).map_err(|_| Error::Overflow)?
@@ -906,9 +908,9 @@ impl<'a> EncodedEditJob<'a> {
                     let program = self.range_playback && channel_configuration == 0;
                     if a >> 3 != 2
                         || c & 7 != 0
-                        || (!program && aac_fixed_channel_count(channel_configuration).is_none())
+                        || (!program && aac::fixed_channel_count(channel_configuration).is_none())
                         || (!self.range_playback && channel_configuration > 7)
-                        || indexed_aac_frequency(index).map(u64::from)
+                        || aac::indexed_frequency(index).map(u64::from)
                             != Some(self.context.media_base.denominator())
                         || self.context.media_base.numerator() != 1
                     {

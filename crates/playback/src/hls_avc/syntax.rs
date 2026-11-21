@@ -1,6 +1,6 @@
 use triergon_bitstream::{BitError, BitSource};
 use triergon_core::{Error, Result};
-use triergon_framing::{Codec, SyntaxError, skip_avc_scaling_matrix, skip_vui_to_timing};
+use triergon_framing::nal::{Codec, SyntaxError, skip_avc_scaling_matrix, skip_vui_to_timing};
 
 /// Read RBSP prefixes without copying or decoding their uninspected suffixes.
 struct Rbsp<'a>(triergon_bitstream::Rbsp<'a>);

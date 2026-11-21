@@ -2,7 +2,7 @@ use super::{
     AccessUnit, CodecId, Drive, Error, Event, PID, PacketInfo, ReaderEvent, ReaderLimits,
     TraceEvent, TrackInfo, Transport,
 };
-use triergon_framing::{MpegLayer, MpegVersion};
+use triergon_framing::mpeg_audio::{MpegLayer, MpegVersion};
 
 fn silence<const N: usize>(header: [u8; 4]) -> [u8; N] {
     let mut frame = [0; N];

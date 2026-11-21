@@ -4,7 +4,7 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputWindow, SourceCapabilities, SourceFailure, SourceId,
     SourceLocation, Step, WorkBudget,
 };
-use triergon_framing::{AacAdtsFrame, AacAdtsStreamLimits, AacAdtsStreamReader};
+use triergon_framing::aac::{AacAdtsFrame, AacAdtsStreamLimits, AacAdtsStreamReader};
 
 fn limits() -> AacAdtsStreamLimits {
     AacAdtsStreamLimits {

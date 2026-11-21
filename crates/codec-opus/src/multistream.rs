@@ -4,7 +4,7 @@
 use crate::DecodeError;
 use triergon_codec::layout::{native_order, vorbis_order};
 use triergon_codec::{BudgetVec, ChannelLayout};
-use triergon_framing::OpusHead;
+use triergon_framing::opus::OpusHead;
 
 /// No stream feeds this channel: it is silent.
 const SILENT: u8 = 255;

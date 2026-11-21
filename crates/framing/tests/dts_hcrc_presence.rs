@@ -1,15 +1,14 @@
 //! Source-presence clarification, independent of native validity.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, Step, WorkBudget};
-use triergon_framing::{
-    DtsCoreField as F, DtsHeaderInspector, DtsInspection, DtsInspectionIdentity,
-    DtsInspectionIssues as I, DtsInspectionStep, DtsPackedLimits, DtsPackedPayloadJob, DtsPacking,
-    DtsSourceIdentity, FieldObservation, inspect_dts_header_bits,
+use triergon_framing::dts::{
+    self, DtsCoreField as F, DtsHeaderInspector, DtsInspection, DtsInspectionIssues as I,
+    DtsPackedLimits, DtsPackedPayloadJob, DtsPacking, DtsSourceIdentity, FieldObservation,
 };
 use triergon_harness_protocol::unhex;
 
-fn identity() -> DtsInspectionIdentity {
-    DtsInspectionIdentity {
+fn identity() -> DtsSourceIdentity {
+    DtsSourceIdentity {
         source: SourceId(7162),
         generation: 23,
         offset: 91,
@@ -22,8 +21,8 @@ fn finish(job: &mut DtsHeaderInspector, quantum: u64) -> DtsInspection {
             .step(&mut WorkBudget::new(quantum), &AtomicBool::new(false))
             .unwrap()
         {
-            DtsInspectionStep::Yield => {}
-            DtsInspectionStep::Ready(value) => return value,
+            Step::Yield => {}
+            Step::Ready(value) => return value,
             _ => panic!("owned inspection publication missing"),
         }
     }
@@ -242,7 +241,7 @@ fn packed_swapped_and_bit_prefixes_never_invent_crc_presence_or_values() {
                         };
                     assert_eq!(payload.valid_bits(), valid);
                     let packed =
-                        inspect_dts_header_bits(payload.storage_bytes().as_ref(), valid).unwrap();
+                        dts::inspect_header_bits(payload.storage_bytes().as_ref(), valid).unwrap();
                     assert_eq!(packed.field(F::Hcrc), expected_hcrc(cpf, valid));
                     // The byte inspector gets only whole valid source bytes. Storage
                     // alignment zeros are never supplied as additional logical bits.
@@ -254,7 +253,7 @@ fn packed_swapped_and_bit_prefixes_never_invent_crc_presence_or_values() {
                     }
                     for visible in 0..=valid {
                         let partial =
-                            inspect_dts_header_bits(payload.storage_bytes().as_ref(), visible)
+                            dts::inspect_header_bits(payload.storage_bytes().as_ref(), visible)
                                 .unwrap();
                         assert_eq!(partial.field(F::Hcrc), expected_hcrc(cpf, visible));
                         if visible < primary.len() {
@@ -285,7 +284,7 @@ fn presence_publication_obeys_work_cancel_source_bounds_and_owner_release() {
             assert!(matches!(
                 job.step(&mut WorkBudget::new(0), &AtomicBool::new(false))
                     .unwrap(),
-                DtsInspectionStep::Yield
+                Step::Yield
             ));
             assert_eq!(pool.used(), used);
             let value = finish(&mut job, 1);

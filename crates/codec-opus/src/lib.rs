@@ -25,7 +25,7 @@ use triergon_codec::{
     AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, Charged, DecodeFailure,
     DownmixLevels, Reservation, StorageError,
 };
-use triergon_framing::{OPUS_RATE, OpusHead};
+use triergon_framing::opus::{self, OpusHead};
 
 /// Bounds of one decoder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -232,7 +232,7 @@ impl Decoder {
 
     fn finish(&self, samples: usize, out: &mut AudioFrame) {
         self.mapping.finish(samples, &mut out.planes);
-        out.sample_rate = OPUS_RATE;
+        out.sample_rate = opus::SAMPLE_RATE;
         out.layout = self.mapping.layout();
         out.samples_per_channel = samples;
     }

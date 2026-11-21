@@ -5,12 +5,16 @@ use triergon_core::{
     Step, WorkBudget,
 };
 use triergon_framing::{
-    AacAdtsCarrier, AacAdtsCarrierBoundary, AacAdtsCarrierLimits, AacAdtsCarrierReader,
-    AacAscParser, AacAscScopeParser, AacConfigLimits, AacDecoderChannelReason,
-    AacDecoderConfigDecision, AacDecoderConfigPolicy, AacDecoderConfigRefusal, AacSource,
-    BuildStep, HvcConfigLimits, HvcConfigParser, HvcConfigSource, HvcConfiguration,
-    HvcDecoderConfigOutput, HvcDecoderConfigWriter, aac_decoder_channel_view,
-    aac_decoder_configuration_view,
+    BuildStep,
+    aac::{
+        self, AacAdtsCarrier, AacAdtsCarrierBoundary, AacAdtsCarrierLimits, AacAdtsCarrierReader,
+        AacAscParser, AacAscScopeParser, AacConfigLimits, AacDecoderChannelReason,
+        AacDecoderConfigDecision, AacDecoderConfigPolicy, AacDecoderConfigRefusal, AacSource,
+    },
+    hevc::{
+        HvcConfigLimits, HvcConfigParser, HvcConfigSource, HvcConfiguration,
+        HvcDecoderConfigOutput, HvcDecoderConfigWriter,
+    },
 };
 
 fn hvcc(kind: u8, empty: bool) -> Vec<u8> {
@@ -577,7 +581,7 @@ fn decoder_channel_choice_keeps_signalled_mono_and_raw_bytes_unchanged() {
                 let f = o.facts();
                 assert_eq!(f.core_channels, 1);
                 assert_eq!(f.signalled_render_channels(), 1);
-                let view = aac_decoder_channel_view(f);
+                let view = aac::decoder_channel_view(f);
                 assert_eq!(view.channels, 2);
                 assert_eq!(view.reason, AacDecoderChannelReason::SbrMonoDecoderChoice);
                 assert_eq!(o.source_bytes().as_ref(), raw);
@@ -699,7 +703,7 @@ fn carrier_known_length_mismatch_is_failure_not_a_final_fragment() {
         Err(Error::Truncated)
     ));
 }
-fn parse_asc(pool: &Budget, raw: &[u8]) -> triergon_framing::AacAudioSpecificConfig {
+fn parse_asc(pool: &Budget, raw: &[u8]) -> aac::AacAudioSpecificConfig {
     let mut p = AacAscParser::new(
         pool,
         source(),
@@ -728,11 +732,11 @@ fn explicit_decoder_limits_do_not_reject_or_rewrite_source_frequency_and_pce() {
     let f = parse_asc(&pool, &[0x17, 0x80, 0x5d, 0xc0, 0x38]);
     assert_eq!(f.facts().core_frequency.hz, 48000);
     assert_eq!(
-        aac_decoder_configuration_view(&f, p).unwrap(),
+        aac::decoder_configuration_view(&f, p).unwrap(),
         AacDecoderConfigDecision::Refused(AacDecoderConfigRefusal::ExplicitFrequency)
     );
     assert!(matches!(
-        aac_decoder_configuration_view(
+        aac::decoder_configuration_view(
             &f,
             AacDecoderConfigPolicy {
                 allow_explicit_core_frequency: true,
@@ -744,14 +748,14 @@ fn explicit_decoder_limits_do_not_reject_or_rewrite_source_frequency_and_pce() {
     let c = parse_asc(&pool, include_bytes!("aac-fixtures/compat-pce-93.bin"));
     assert_eq!(c.facts().core_channels, 93);
     assert_eq!(
-        aac_decoder_configuration_view(&c, p).unwrap(),
+        aac::decoder_configuration_view(&c, p).unwrap(),
         AacDecoderConfigDecision::Refused(AacDecoderConfigRefusal::Channels {
             declared: 93,
             maximum: 64
         })
     );
     assert!(matches!(
-        aac_decoder_configuration_view(
+        aac::decoder_configuration_view(
             &c,
             AacDecoderConfigPolicy {
                 maximum_channels: 93,
@@ -769,7 +773,7 @@ fn explicit_ps_false_and_lc_mono_do_not_acquire_the_sbr_decoder_choice() {
         &[0x11, 0x88, 0x56, 0xe5, 0x85, 0x48, 0x00][..],
     ] {
         let o = parse_asc(&pool, raw);
-        let v = aac_decoder_channel_view(o.facts());
+        let v = aac::decoder_channel_view(o.facts());
         assert_eq!(v.channels, 1);
         assert_eq!(v.reason, AacDecoderChannelReason::Signalled);
     }
@@ -805,7 +809,7 @@ fn two_scope_pce_live_set_that_cannot_fit_is_limit_not_permanent_backpressure() 
     let mut raw = include_bytes!("aac-fixtures/compat-pce-93.bin").to_vec();
     let bits = raw.len() * 8;
     raw.push(0);
-    let metadata = 70 * size_of::<triergon_framing::AacPceElement>();
+    let metadata = 70 * size_of::<aac::AacPceElement>();
     let maximum =
         Budget::control_storage_bytes() + Bytes::owner_overhead_bytes() + raw.len() + 2 * metadata
             - 1;

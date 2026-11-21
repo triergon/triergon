@@ -1,6 +1,6 @@
 //! Source-domain projection fixed by the original 24-member diagnostic plan.
 use std::io::{self, Write};
-use triergon_framing::{DtsCoreField as F, DtsPackedHeader};
+use triergon_framing::dts::{DtsCoreField as F, DtsPackedHeader};
 pub const NAMES: [&str; 24] = [
     "normal_frame",
     "deficit_samples",

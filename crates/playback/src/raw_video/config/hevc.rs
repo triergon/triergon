@@ -4,7 +4,7 @@
 use super::Sps;
 use triergon_bitstream::{BitError, BitSource};
 use triergon_core::{Error, Result};
-use triergon_framing::{Codec, NalHeader, skip_hevc_profile_tier_level, skip_vui_to_timing};
+use triergon_framing::nal::{Codec, NalHeader, skip_hevc_profile_tier_level, skip_vui_to_timing};
 
 pub(crate) fn vps(payload: &[u8]) -> Result<u8> {
     Ok(Rbsp::new(payload).fixed(4)? as u8)

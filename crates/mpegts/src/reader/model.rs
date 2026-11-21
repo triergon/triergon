@@ -8,7 +8,10 @@ use std::sync::{Arc, atomic::AtomicUsize};
 use triergon_core::container::{CodecId, MediaKind, PacketInfo, RandomAccess, TrackId, TrackInfo};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Reservation, Result, Time, TimeBase};
 use triergon_framing::{
-    AacAdtsCarrier, AacAdtsFrame, Ac3Frame, Ac3FrameFacts, MpegAudioHeader, RawAccessUnit,
+    aac::{AacAdtsCarrier, AacAdtsFrame},
+    ac3::{Ac3Frame, Ac3FrameFacts},
+    mpeg_audio::MpegAudioHeader,
+    nal::RawAccessUnit,
 };
 
 #[derive(Debug)]
@@ -453,8 +456,10 @@ impl AccessUnit {
                 unit.nals()
                     .first()
                     .map_or(unit.range.start, |nal| match nal.facts().framing {
-                        triergon_framing::NalFraming::AnnexB { prefix_offset, .. } => prefix_offset,
-                        triergon_framing::NalFraming::LengthPrefixed { .. } => {
+                        triergon_framing::nal::NalFraming::AnnexB { prefix_offset, .. } => {
+                            prefix_offset
+                        }
+                        triergon_framing::nal::NalFraming::LengthPrefixed { .. } => {
                             unreachable!("raw reader uses Annex B")
                         }
                     })

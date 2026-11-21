@@ -2,7 +2,7 @@
 //! Usage: decode IN.264 OUT.yuv   (per-picture JSON lines on stderr)
 use std::io::{Read, Write};
 use triergon_codec_h264::{Decoder, Picture};
-use triergon_framing::AnnexBUnits;
+use triergon_framing::nal::AnnexBUnits;
 
 /// Offset of the last 0x000001 start code (including a preceding zero byte), if any.
 fn last_start_code(b: &[u8]) -> Option<usize> {

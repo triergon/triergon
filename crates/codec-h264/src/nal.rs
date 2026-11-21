@@ -13,15 +13,15 @@ pub(crate) struct NalHeader {
 
 /// `None` for an empty unit or a set forbidden_zero_bit.
 pub(crate) fn parse_header(nal: &[u8]) -> Option<NalHeader> {
-    match triergon_framing::NalHeader::parse(triergon_framing::Codec::Avc, nal).ok()? {
-        triergon_framing::NalHeader::Avc {
+    match triergon_framing::nal::NalHeader::parse(triergon_framing::nal::Codec::Avc, nal).ok()? {
+        triergon_framing::nal::NalHeader::Avc {
             nal_ref_idc,
             nal_unit_type,
         } => Some(NalHeader {
             nal_ref_idc,
             nal_unit_type,
         }),
-        triergon_framing::NalHeader::Hevc { .. } => None,
+        triergon_framing::nal::NalHeader::Hevc { .. } => None,
     }
 }
 
@@ -53,7 +53,7 @@ mod tests {
         let s = [
             0, 0, 0, 1, 0x67, 1, 2, 0, 0, 1, 0x68, 0, 0, 3, 1, 0, 0, 0, 0, 1, 0x65, 9,
         ];
-        let v: Vec<&[u8]> = triergon_framing::AnnexBUnits::new(&s).collect();
+        let v: Vec<&[u8]> = triergon_framing::nal::AnnexBUnits::new(&s).collect();
         assert_eq!(
             v,
             vec![&[0x67u8, 1, 2][..], &[0x68, 0, 0, 3, 1][..], &[0x65, 9][..]]

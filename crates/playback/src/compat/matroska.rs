@@ -1,11 +1,8 @@
 //! Matroska AAC initialization against FFmpeg revision `d32b387f`.
 
 use triergon_core::{Error, Result};
-use triergon_framing::{AacAdtsParameters, indexed_aac_frequency};
-use triergon_matroska::{
-    matroska::LegacyAacProfile,
-    typed::{Configuration, InitializationOrigin},
-};
+use triergon_framing::aac::{self, AacAdtsParameters};
+use triergon_matroska::{Configuration, InitializationOrigin, LegacyAacProfile};
 
 /// Derive a two-byte AudioSpecificConfig for a legacy AAC-LC track with an
 /// indexed sampling frequency and one through six channels. If the track
@@ -59,7 +56,7 @@ pub(crate) fn legacy_aac_lc_parameters(
     }
     let frequency = (0..13)
         .find(|&index| {
-            indexed_aac_frequency(index)
+            aac::indexed_frequency(index)
                 .is_some_and(|hz| f64::from(hz).to_bits() == descriptor.sample_rate.to_bits())
         })
         .ok_or(Error::Unsupported("legacy Matroska AAC sampling frequency"))?;

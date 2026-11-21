@@ -12,7 +12,10 @@ use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputWindow, Rounding, SourceCapabilities, SourceId,
     SourceLocation, Step, TimeBase, WorkBudget,
 };
-use triergon_framing::{Ac3Family, Ac3FrameHeader, MpegLayer};
+use triergon_framing::{
+    ac3::{Ac3Family, Ac3FrameHeader},
+    mpeg_audio::MpegLayer,
+};
 use triergon_harness_protocol::digest::signed;
 use triergon_mpegts::compat::adts::{PacketPolicy, PesPolicy};
 use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, ContinuityResidue};
@@ -88,7 +91,7 @@ fn ac3_header(packet: &Packet) -> Option<Ac3FrameHeader> {
     match packet.access_unit() {
         AccessUnit::Ac3(frame) => Some(frame.facts().header),
         AccessUnit::IncompleteAudio { bytes, .. } if is_ac3(packet) => {
-            triergon_framing::probe_ac3_header(bytes.as_ref()).ok()
+            triergon_framing::ac3::probe_header(bytes.as_ref()).ok()
         }
         _ => None,
     }

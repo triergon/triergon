@@ -1,6 +1,10 @@
 //! Recognising an elementary stream from its first bytes.
 use triergon_bitstream::crc::crc16_a52;
-use triergon_framing::{FlacBlocking, FlacFrameHeader, MpegAudioHeader, probe_ac3_header};
+use triergon_framing::{
+    ac3,
+    flac::{FlacBlocking, FlacFrameHeader},
+    mpeg_audio::MpegAudioHeader,
+};
 
 /// The elementary stream formats this crate reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -106,7 +110,7 @@ fn mpeg_frame(b: &[u8]) -> Option<(MpegAudioHeader, usize)> {
 }
 
 fn ac3_frame(b: &[u8]) -> Option<((), usize)> {
-    let header = probe_ac3_header(b).ok()?;
+    let header = ac3::probe_header(b).ok()?;
     (header.frame_bytes > 0).then_some(((), header.frame_bytes))
 }
 

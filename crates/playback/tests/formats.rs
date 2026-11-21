@@ -1652,7 +1652,7 @@ fn real_encoded_matroska_uses_old183_reader_after_sequential_probe() {
     let packets: Vec<_> = out
         .iter()
         .filter_map(|o| {
-            if let RawEvent::Matroska(triergon_matroska::typed::Event::Packet(p)) = o.event() {
+            if let RawEvent::Matroska(triergon_matroska::Event::Packet(p)) = o.event() {
                 Some(p)
             } else {
                 None
@@ -2333,7 +2333,10 @@ fn native_pressure_retries_instead_of_disabling_the_observer() {
 
 #[test]
 fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
-    use triergon_framing::{Av1ConfigLimits, Av1ObuLimits, Av1TemporalUnitLimits, BuildStep};
+    use triergon_framing::{
+        BuildStep,
+        av1::{Av1ConfigLimits, Av1ObuLimits, Av1TemporalUnitLimits},
+    };
     use triergon_playback::av1_bridge::{Av1BridgeSetup, Av1Input};
 
     let mp4_raw = include_bytes!("fixtures/av1/six-frames.mp4");
@@ -2415,7 +2418,7 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
                         ));
                         continue;
                     }
-                    RawEvent::Matroska(triergon_matroska::typed::Event::Configuration(config)) => {
+                    RawEvent::Matroska(triergon_matroska::Event::Configuration(config)) => {
                         assert_eq!(packets, 0);
                         let track = config
                             .tracks()
@@ -2438,7 +2441,7 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
                     RawEvent::Mp4(Mp4Event::Packet(packet)) => {
                         (Av1Input::Mp4(packet), packet.source.payload.as_ref())
                     }
-                    RawEvent::Matroska(triergon_matroska::typed::Event::Packet(packet)) => {
+                    RawEvent::Matroska(triergon_matroska::Event::Packet(packet)) => {
                         (Av1Input::Matroska(packet), packet.packet.data.as_ref())
                     }
                     _ => continue,
@@ -2492,8 +2495,7 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
                     .unwrap()
                 );
                 let replay = first_packet(&mut mkv);
-                let RawEvent::Matroska(triergon_matroska::typed::Event::Packet(packet)) =
-                    replay.event()
+                let RawEvent::Matroska(triergon_matroska::Event::Packet(packet)) = replay.event()
                 else {
                     panic!("seek did not return an AV1 packet");
                 };
@@ -2850,7 +2852,7 @@ fn indexed_mp4_seek_reads_aac_preroll_and_matches_the_encoded_suffix() {
 
 #[test]
 fn combined_playback_probe_opens_real_sequential_mp4() {
-    use triergon_framing::RawAnnexBLimits;
+    use triergon_framing::nal::RawAnnexBLimits;
     use triergon_playback::io::{
         PlaybackInput, PlaybackInputKind, PlaybackProbe, PlaybackProbeStep, RawVideoProbeLimits,
     };

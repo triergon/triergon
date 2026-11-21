@@ -7,7 +7,18 @@ use std::ops::Range;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::compat::nal::*;
-use triergon_framing::*;
+use triergon_framing::{
+    BuildStep, ConfigProgress,
+    avc::{
+        AvcConfigArray, AvcConfigArrayKind, AvcConfigFields, AvcConfigLimits, AvcConfigNal,
+        AvcConfigParser, AvcConfigSource, AvcConfiguration,
+    },
+    hevc::{
+        HvcConfigArray, HvcConfigFields, HvcConfigLimits, HvcConfigNal, HvcConfigParser,
+        HvcConfigSource, HvcConfiguration,
+    },
+    nal::NalHeader,
+};
 use triergon_harness_protocol::unhex;
 
 type Outcome<T> = Result<T, Error>;

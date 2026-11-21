@@ -10,7 +10,7 @@ use crate::{
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, InputCursor, InputToken, Result, SourceId, WorkBudget};
-use triergon_framing::{OPUS_RATE, OpusHead};
+use triergon_framing::opus::{self, OpusHead};
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodedStreamProfile;
@@ -1661,7 +1661,7 @@ fn opus_configuration(pool: &Budget, entry: &SampleDescription, config: &BoxView
     let coded_channels = u16::from(head.streams) + u16::from(head.coupled_streams);
     if fields::u16_at(sample_entry, 16)? != coded_channels
         || fields::u16_at(sample_entry, 18)? != 16
-        || fields::u32_at(sample_entry, 24)? != OPUS_RATE << 16
+        || fields::u32_at(sample_entry, 24)? != opus::SAMPLE_RATE << 16
     {
         return Err(Error::Invalid("Opus sample entry audio fields"));
     }

@@ -1,7 +1,6 @@
 //! New static resource regression + source-semantic equivalence controls.
-use triergon_framing::{
-    DtsCoreField as F, DtsInspectionViews, DtsNormalSourceFrame, DtsPackedHeader,
-    inspect_dts_header_bits,
+use triergon_framing::dts::{
+    self, DtsCoreField as F, DtsInspectionViews, DtsNormalSourceFrame, DtsPackedHeader,
 };
 
 fn authored(cpf: bool) -> Vec<u8> {
@@ -69,12 +68,12 @@ fn all226_prefixes_ignore_every_unobserved_bit_in_equality_and_all27_descriptors
         let source = authored(cpf);
         for available in 0..=source.len() * 8 {
             controls += 1;
-            let baseline = inspect_dts_header_bits(&source, available).unwrap();
+            let baseline = dts::inspect_header_bits(&source, available).unwrap();
             let mut poisoned = source.clone();
             for bit in available..source.len() * 8 {
                 poisoned[bit / 8] ^= 1 << (7 - bit % 8);
             }
-            let observed = inspect_dts_header_bits(&poisoned, available).unwrap();
+            let observed = dts::inspect_header_bits(&poisoned, available).unwrap();
             assert_eq!(observed, baseline, "cpf{cpf} bits{available}");
             for field in F::ALL {
                 assert_eq!(observed.field(field), baseline.field(field));
@@ -89,11 +88,11 @@ fn all226_prefixes_ignore_every_unobserved_bit_in_equality_and_all27_descriptors
 fn cached_header_excludes_complete_body_lookahead_after104_or120_syntax_bits() {
     for cpf in [false, true] {
         let source = authored(cpf);
-        let header = inspect_dts_header_bits(&source, source.len() * 8).unwrap();
+        let header = dts::inspect_header_bits(&source, source.len() * 8).unwrap();
         for tail in [[0, 0], [0xff, 0xff], [0x7f, 0xfe]] {
             let mut body = source.clone();
             body.extend(tail);
-            let observed = inspect_dts_header_bits(&body, body.len() * 8).unwrap();
+            let observed = dts::inspect_header_bits(&body, body.len() * 8).unwrap();
             assert_eq!(observed, header);
             assert_eq!(
                 observed.required_header_bits(),

@@ -11,8 +11,8 @@ use crate::{
     },
 };
 use triergon_core::{Budget, Error};
-use triergon_framing::Ac3Family;
-use triergon_matroska::typed::Packet;
+use triergon_framing::ac3::Ac3Family;
+use triergon_matroska::TypedPacket as Packet;
 
 impl MatroskaHevcDolbyFeed {
     /// Prepare one bounded prefix in the same generation as this feed.

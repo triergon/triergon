@@ -7,7 +7,10 @@
 use super::nal::{LastPayload, Timing, vui_timing};
 use triergon_bitstream::{BitError, BitSource, Rbsp};
 use triergon_core::{Budget, BudgetVec, Result};
-use triergon_framing::{Codec as Coding, picture_output::HevcLimits, skip_hevc_profile_tier_level};
+use triergon_framing::{
+    nal::{Codec as Coding, skip_hevc_profile_tier_level},
+    picture_output::HevcLimits,
+};
 
 /// The largest `sps_max_dec_pic_buffering_minus1` the reference takes, after
 /// raising it to `sps_max_num_reorder_pics`; an SPS above it is not taken

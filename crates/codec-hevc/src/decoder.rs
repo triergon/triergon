@@ -20,7 +20,7 @@ use triergon_codec::{
 use triergon_framing::picture_output::{
     DecodedPictures, HevcLimits, HevcPicture, Leave, Marking, NewPicture, Parity, View,
 };
-use triergon_framing::{AnnexBUnits, hevc};
+use triergon_framing::{hevc, nal::AnnexBUnits};
 
 /// Storage limits of one decoder.
 #[derive(Clone, Copy, Debug)]

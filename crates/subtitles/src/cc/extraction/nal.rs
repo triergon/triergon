@@ -185,7 +185,7 @@ use triergon_framing::picture_output::{
     DecodedPictures, HevcLimits, HevcPicture, LateOutput, Leave, Marking, NewPicture, Parity,
     PictureId,
 };
-use triergon_framing::{AvcPocSyntax, hevc as kinds};
+use triergon_framing::{avc::AvcPocSyntax, hevc as kinds};
 
 /// H.264: the pictures before this index wait for at least one more
 /// (probes p27, p51).
@@ -534,7 +534,7 @@ enum Tables {
 #[derive(Debug)]
 enum Replaced {
     AvcSps(u8, Option<avc::Sps>),
-    AvcPps(u8, Option<triergon_framing::AvcPps>),
+    AvcPps(u8, Option<triergon_framing::avc::AvcPps>),
     HevcSps(hevc::ReplacedSps),
     HevcPps(u8, Option<hevc::Pps>),
 }

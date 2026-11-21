@@ -1,5 +1,5 @@
 use super::*;
-use triergon_framing::{AnnexBUnits, Codec, NalHeader};
+use triergon_framing::nal::{AnnexBUnits, Codec, NalHeader};
 
 // Real coded first pictures, with SEI omitted explicitly. The direct profile
 // carries only its local parameter chain and one independent coded picture.
@@ -256,12 +256,12 @@ fn direct_video_preserves_bounded_anchored_clocks_and_output_limits() {
         let (ts, offsets) = input_video(kind, true, |_| picture(kind, true));
         let limits = ReaderLimits {
             maximum_access_units: FRAMES,
-            video: triergon_framing::RawAnnexBLimits {
-                nal: triergon_framing::ReaderLimits {
+            video: triergon_framing::nal::RawAnnexBLimits {
+                nal: triergon_framing::nal::ReaderLimits {
                     maximum_nal_units: FRAMES * 5,
-                    ..triergon_framing::RawAnnexBLimits::default().nal
+                    ..triergon_framing::nal::RawAnnexBLimits::default().nal
                 },
-                ..triergon_framing::RawAnnexBLimits::default()
+                ..triergon_framing::nal::RawAnnexBLimits::default()
             },
             time_policy: SourceTimePolicy::Bounded(SourceClockAnchor {
                 key: triergon_mpegts::clock::ClockKey {

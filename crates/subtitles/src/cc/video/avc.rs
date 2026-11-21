@@ -3,9 +3,8 @@
 
 use super::nal::{LastPayload, Timing};
 use triergon_core::{Budget, BudgetVec, Result};
-use triergon_framing::{
-    AvcPocSyntax, AvcPps, AvcReading, AvcSliceDepth, AvcSliceHeader, AvcSps, avc_slice_pps_id,
-    read_avc_pps, read_avc_slice_header, read_avc_sps,
+use triergon_framing::avc::{
+    self, AvcPocSyntax, AvcPps, AvcReading, AvcSliceDepth, AvcSliceHeader, AvcSps,
 };
 
 /// The largest `max_num_reorder_frames` of a sequence the reference takes; an
@@ -85,7 +84,7 @@ impl Tables {
         }
         self.last_sps.remember(payload)?;
         let mut offsets = [0i32; 255];
-        let Ok(fields) = read_avc_sps(payload, AvcReading::Lenient, true, |at, offset| {
+        let Ok(fields) = avc::read_sps(payload, AvcReading::Lenient, true, |at, offset| {
             offsets[at] = offset;
         }) else {
             return Ok(None);
@@ -114,7 +113,7 @@ impl Tables {
             return Ok(None);
         }
         self.last_pps.remember(payload)?;
-        let Ok(pps) = read_avc_pps(payload, AvcReading::Lenient) else {
+        let Ok(pps) = avc::read_pps(payload, AvcReading::Lenient) else {
             return Ok(None);
         };
         Ok(Some((pps.id, slot(&mut self.pps, pps.id)?.replace(pps))))
@@ -145,10 +144,10 @@ impl Tables {
         let (&header, payload) = nal.split_first()?;
         let idr = header & 0x1f == 5;
         let reference = header & 0x60 != 0;
-        let pps_id = avc_slice_pps_id(payload, AvcReading::Lenient).ok()?;
+        let pps_id = avc::slice_pps_id(payload, AvcReading::Lenient).ok()?;
         let pps = self.pps.get(usize::from(pps_id))?.as_ref()?;
         let sps = self.sps(pps.sps_id)?;
-        let header = read_avc_slice_header(
+        let header = avc::read_slice_header(
             payload,
             reference,
             idr,

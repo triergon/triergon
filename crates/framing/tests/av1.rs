@@ -4,8 +4,12 @@ use triergon_core::{
     WorkBudget,
 };
 use triergon_framing::{
-    Av1ConfigLimits, Av1ConfigParser, Av1Configuration, Av1Obu, Av1ObuFraming, Av1ObuLimits,
-    Av1ObuReader, BuildStep, Vp9ConfigContext, Vp9ConfigLimits, Vp9ConfigParser, Vp9Configuration,
+    BuildStep,
+    av1::{
+        Av1ConfigLimits, Av1ConfigParser, Av1Configuration, Av1Obu, Av1ObuFraming, Av1ObuLimits,
+        Av1ObuReader,
+    },
+    vp9::{Vp9ConfigContext, Vp9ConfigLimits, Vp9ConfigParser, Vp9Configuration},
 };
 use triergon_harness_protocol::unhex;
 
@@ -853,8 +857,8 @@ fn atomic_obu_cancel_releases_scratch_and_retained_input_without_resuming() {
     assert_eq!(source.as_ref(), &[0x2a, 2, 0x12, 0x80]);
 }
 
-fn temporal_limits() -> triergon_framing::Av1TemporalUnitLimits {
-    triergon_framing::Av1TemporalUnitLimits {
+fn temporal_limits() -> triergon_framing::av1::Av1TemporalUnitLimits {
+    triergon_framing::av1::Av1TemporalUnitLimits {
         maximum_sample_bytes: 512,
         maximum_output_bytes: 512,
         maximum_obus: 8,
@@ -863,11 +867,12 @@ fn temporal_limits() -> triergon_framing::Av1TemporalUnitLimits {
 
 fn temporal_unit<'a>(
     input: &'a [u8],
-    config: Option<triergon_framing::Av1TemporalUnitConfig<'a>>,
+    config: Option<triergon_framing::av1::Av1TemporalUnitConfig<'a>>,
     key: bool,
     units: u64,
-) -> Result<triergon_framing::Av1TemporalUnit<'a>, Error> {
-    let mut job = triergon_framing::Av1TemporalUnitJob::new(input, config, key, temporal_limits())?;
+) -> Result<triergon_framing::av1::Av1TemporalUnit<'a>, Error> {
+    let mut job =
+        triergon_framing::av1::Av1TemporalUnitJob::new(input, config, key, temporal_limits())?;
     let cancel = AtomicBool::new(false);
     for _ in 0..8 {
         match job.step(&mut WorkBudget::new(units), &cancel)? {
@@ -887,7 +892,7 @@ fn temporal_unit<'a>(
 
 #[test]
 fn temporal_unit_borrows_the_complete_sample_and_in_band_configuration() {
-    use triergon_framing::Av1TemporalUnitConfig;
+    use triergon_framing::av1::Av1TemporalUnitConfig;
     let pool = Budget::new(1 << 20).unwrap();
     let record = parse_config(&pool, &unhex("81000c000a01b12a02c1807a0100"), 1).unwrap();
     let config = Av1TemporalUnitConfig::new(&record).unwrap();
@@ -980,7 +985,7 @@ fn temporal_unit_rejects_ambiguous_and_malformed_envelopes() {
 
 #[test]
 fn temporal_unit_fences_yield_cancel_and_enforces_both_size_limits() {
-    use triergon_framing::Av1TemporalUnitJob;
+    use triergon_framing::av1::Av1TemporalUnitJob;
     let input = unhex("1200320199");
     let cancel = AtomicBool::new(false);
     let mut limits = temporal_limits();

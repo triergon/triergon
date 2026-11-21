@@ -3,9 +3,8 @@
 mod dts24;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, Step, WorkBudget};
-use triergon_framing::{
-    DtsCoreField, DtsHeaderInspector, DtsInspection, DtsInspectionIdentity, FieldObservation,
-    probe_dts_core_header,
+use triergon_framing::dts::{
+    self, DtsCoreField, DtsHeaderInspector, DtsInspection, DtsSourceIdentity, FieldObservation,
 };
 
 fn authored(cpf: u32, version: u32, rate: u32) -> Vec<u8> {
@@ -58,7 +57,7 @@ fn inspect(source: &[u8]) -> DtsInspection {
     let pool = Budget::new(65536).unwrap();
     let mut job = DtsHeaderInspector::new(
         &pool,
-        DtsInspectionIdentity {
+        DtsSourceIdentity {
             source: SourceId(24),
             generation: 1,
             offset: 0,
@@ -83,7 +82,7 @@ fn inspect(source: &[u8]) -> DtsInspection {
 #[test]
 fn all24_values_follow_the_preregistered_literal_primary_field_domains() {
     let source = authored(1, 6, 22);
-    let h = probe_dts_core_header(&source).unwrap();
+    let h = dts::probe_core_header(&source).unwrap();
     let expected = [
         1, 32, 1, 64, 112, 9, 8, 22, 1, 1, 1, 1, 2, 1, 1, 2, 0, 1, 6, 2, 5, 1, 1, 11,
     ];
@@ -98,7 +97,7 @@ fn no_complete_projection_is_manufactured_for_any_missing_cpf1_prefix() {
     let source = authored(1, 6, 22);
     for end in 0..source.len() {
         assert!(matches!(
-            probe_dts_core_header(&source[..end]),
+            dts::probe_core_header(&source[..end]),
             Err(Error::Truncated)
         ));
         assert!(dts24::from_inspection(&inspect(&source[..end])).is_none());
@@ -108,7 +107,7 @@ fn no_complete_projection_is_manufactured_for_any_missing_cpf1_prefix() {
 fn native_named_source_observation_does_not_convert_rejection_to_acceptance() {
     for (version, rate) in [(12, 22), (6, 31)] {
         let source = authored(1, version, rate);
-        assert!(probe_dts_core_header(&source).is_err());
+        assert!(dts::probe_core_header(&source).is_err());
         let observation = inspect(&source);
         assert!(observation.syntax_complete());
         let view = dts24::from_inspection(&observation).unwrap();
@@ -120,7 +119,7 @@ fn native_named_source_observation_does_not_convert_rejection_to_acceptance() {
 #[test]
 fn hcrc_absence_is_not_a_coded_zero_or_an_extra_native_member() {
     let source = authored(0, 6, 22);
-    let h = probe_dts_core_header(&source).unwrap();
+    let h = dts::probe_core_header(&source).unwrap();
     assert_eq!(h.hcrc, None);
     assert_eq!(h.header_bits, 104);
     assert_eq!(
@@ -168,7 +167,7 @@ fn original396_source_inputs_stay_unchanged_and_strict_success_matches_inspectio
         };
         let observation = inspect(&source);
         assert_eq!(observation.source_bytes().as_ref(), source);
-        if let Ok(h) = probe_dts_core_header(&source) {
+        if let Ok(h) = dts::probe_core_header(&source) {
             assert_eq!(
                 dts24::from_inspection(&observation),
                 Some(dts24::from_core(&h))

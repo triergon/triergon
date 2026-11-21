@@ -4,7 +4,7 @@ mod discovery;
 use discovery::{Discovered, PackingProbe, ProbeStep};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Error, WorkBudget};
-use triergon_framing::DtsPacking as P;
+use triergon_framing::dts::DtsPacking as P;
 
 fn source_prefix(packing: P, high: [u16; 3]) -> Vec<u8> {
     match packing {

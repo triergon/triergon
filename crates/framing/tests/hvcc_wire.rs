@@ -2,8 +2,9 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    BuildStep, HvcConfigLimits, HvcConfigParser, HvcConfigSource, HvcConfiguration, LengthSize,
-    inspect_hvc_config_prefix,
+    BuildStep,
+    hevc::{self, HvcConfigLimits, HvcConfigParser, HvcConfigSource, HvcConfiguration},
+    nal::LengthSize,
 };
 fn limits() -> HvcConfigLimits {
     HvcConfigLimits {
@@ -112,7 +113,7 @@ fn parse(data: &[u8]) -> Result<HvcConfiguration, Error> {
 #[test]
 fn complete_prefix_fields_are_literal_full_width_source_facts() {
     let bytes = prefix(4, 0);
-    let h = inspect_hvc_config_prefix(&bytes).unwrap();
+    let h = hevc::inspect_config_prefix(&bytes).unwrap();
     assert_eq!(h.raw_prefix().as_slice(), bytes);
     assert_eq!(
         (
@@ -162,7 +163,7 @@ fn every_temporal_flag_combination_is_independent_of_length_and_nesting() {
                 for code in 0..4 {
                     let mut b = prefix(4, 0);
                     b[21] = (rate << 6) | (layers << 3) | (u8::from(nested) << 2) | code;
-                    let h = inspect_hvc_config_prefix(&b).unwrap();
+                    let h = hevc::inspect_config_prefix(&b).unwrap();
                     assert_eq!(
                         (
                             h.constant_frame_rate(),
@@ -260,7 +261,7 @@ fn one_two_four_widths_are_parsed_three_is_explicit_unsupported() {
     }
     let b = prefix(3, 0);
     assert_eq!(
-        inspect_hvc_config_prefix(&b)
+        hevc::inspect_config_prefix(&b)
             .unwrap()
             .length_size_minus_one(),
         2

@@ -2,7 +2,7 @@ use super::{
     AccessUnit, Drive, Event, PID, PacketInfo, ReaderEvent, ReaderLimits, Time, Transport,
 };
 use super::{AudioEofPolicy, CodecId, Error, TraceEvent, TrackInfo, audio_eof_namespace};
-use triergon_framing::Ac3FrameDetails;
+use triergon_framing::ac3::Ac3FrameDetails;
 
 const EAC3_TAG: &[u8] = &[0x7a, 1, 0];
 const CODED_TS: &[u8] = include_bytes!("../../../../harness/fixtures/hls/dvb-hevc-eac3-32000.ts");

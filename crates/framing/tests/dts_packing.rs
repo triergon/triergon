@@ -1,12 +1,12 @@
 //! Original bit-string packing fixtures from ETSI TS102114 V1.2.1 §5.3 prose.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, Step, WorkBudget};
-use triergon_framing::{
-    Dts14BitPayload, Dts14BitUnpacker, DtsInspectionIdentity, DtsPackingLimits, DtsWordOrder,
+use triergon_framing::dts::{
+    Dts14BitPayload, Dts14BitUnpacker, DtsPackingLimits, DtsSourceIdentity, DtsWordOrder,
 };
 
-fn identity() -> DtsInspectionIdentity {
-    DtsInspectionIdentity {
+fn identity() -> DtsSourceIdentity {
+    DtsSourceIdentity {
         source: SourceId(1414),
         generation: 9,
         offset: 65,
@@ -375,7 +375,7 @@ fn odd_sizes_foreign_pool_limits_offsets_and_impossible_owner_capacity_fail_expl
         ),
         Err(Error::Limit { .. })
     ));
-    let overflowing = DtsInspectionIdentity {
+    let overflowing = DtsSourceIdentity {
         offset: u64::MAX,
         ..identity()
     };

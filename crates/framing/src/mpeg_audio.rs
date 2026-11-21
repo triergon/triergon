@@ -2,7 +2,7 @@
 //!
 //! [`MpegAudioHeader`] reads the 32-bit header of ISO/IEC 11172-3 section 2.4.2.3 and its
 //! ISO/IEC 13818-3 low sampling frequency extension, including the unofficial MPEG-2.5
-//! rates. [`MpegAudioInfoFrame`] reads a Xing or Info frame (with its LAME tag) or a VBRI
+//! rates. [`info_frame`] reads a Xing or Info frame (with its LAME tag) or a VBRI
 //! frame: a valid frame whose payload describes the stream instead of carrying audio.
 use triergon_core::{Error, Result};
 
@@ -240,7 +240,7 @@ pub struct MpegInfoFrame {
 }
 
 /// The information frame carried by `frame`, one whole frame with header `header`.
-pub fn mpeg_info_frame(frame: &[u8], header: &MpegAudioHeader) -> Option<MpegInfoFrame> {
+pub fn info_frame(frame: &[u8], header: &MpegAudioHeader) -> Option<MpegInfoFrame> {
     if header.layer != MpegLayer::III {
         return None;
     }
@@ -321,7 +321,7 @@ pub fn mpeg_info_frame(frame: &[u8], header: &MpegAudioHeader) -> Option<MpegInf
 
 /// Check the CRC of a frame whose header says it carries one (ISO/IEC 11172-3 2.4.3.1):
 /// the CRC covers the last two header bytes and the first `protected` bytes after it.
-pub fn mpeg_audio_crc_ok(frame: &[u8], protected: usize) -> Result<bool> {
+pub fn crc_ok(frame: &[u8], protected: usize) -> Result<bool> {
     let stored = frame.get(4..6).ok_or(Error::Truncated)?;
     let body = frame.get(6..6 + protected).ok_or(Error::Truncated)?;
     let crc = triergon_bitstream::crc::crc16_a52(0xffff, &frame[2..4]);
@@ -373,11 +373,11 @@ mod tests {
         let lame = at + 16 + 100 + 4;
         frame[lame..lame + 9].copy_from_slice(b"LAME3.100");
         frame[lame + 21..lame + 24].copy_from_slice(&[0x24, 0x01, 0x23]);
-        let info = mpeg_info_frame(&frame, &header).unwrap();
+        let info = info_frame(&frame, &header).unwrap();
         assert_eq!(info.kind, MpegInfoKind::Info);
         assert_eq!((info.frames, info.bytes), (Some(100), Some(41700)));
         let tag = info.lame.unwrap();
         assert_eq!((tag.encoder_delay, tag.encoder_padding), (576, 291));
-        assert!(mpeg_info_frame(&frame[..30], &header).is_none());
+        assert!(info_frame(&frame[..30], &header).is_none());
     }
 }

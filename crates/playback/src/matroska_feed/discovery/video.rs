@@ -4,10 +4,12 @@ use crate::{Output, Result, raw_video::hevc_syntax as hevc};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, WorkBudget};
 use triergon_framing::{
-    AvcConfigLimits, AvcConfigParser, AvcConfigSource, BuildStep, Codec, HvcConfigLimits,
-    HvcConfigParser, HvcConfigSource, HvcConfiguration, LengthSize,
+    BuildStep,
+    avc::{AvcConfigLimits, AvcConfigParser, AvcConfigSource},
+    hevc::{HvcConfigLimits, HvcConfigParser, HvcConfigSource, HvcConfiguration},
+    nal::{Codec, LengthSize},
 };
-use triergon_matroska::{matroska::Track, typed::Packet};
+use triergon_matroska::{Track, TypedPacket as Packet};
 
 #[derive(Clone, Copy)]
 enum TrackProbe {

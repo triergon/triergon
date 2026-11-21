@@ -6,7 +6,7 @@ use crate::{
     raw_video::hevc_syntax as hevc,
 };
 use triergon_core::Error;
-use triergon_framing::{Codec, HevcAnnexBConfig};
+use triergon_framing::{hevc::HevcAnnexBConfig, nal::Codec};
 
 /// One timing projection for an ordered HEVC feed from a random-access
 /// picture. Observe each packet once, in the original decode order.

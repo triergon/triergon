@@ -1,7 +1,7 @@
 use super::{
     AccessUnit, Drive, Error, Event, PID, PacketInfo, ReaderEvent, ReaderLimits, Transport, adts,
 };
-use triergon_framing::AacAdtsCarrierBoundary;
+use triergon_framing::aac::AacAdtsCarrierBoundary;
 use triergon_mpegts::compat::adts::PacketPolicy;
 
 fn fragment_policy() -> ReaderLimits {

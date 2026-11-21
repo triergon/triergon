@@ -13,7 +13,7 @@ use crate::packet_fold::{Packet, Work, drive};
 use crate::runner::Result;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId, Step, WorkBudget};
-use triergon_framing::{Codec, RawAnnexBLimits};
+use triergon_framing::nal::{Codec, RawAnnexBLimits};
 use triergon_playback::{
     ByteSource,
     raw_video::{

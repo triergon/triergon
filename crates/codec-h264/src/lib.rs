@@ -54,7 +54,7 @@ use triergon_bitstream::BitReader;
 use triergon_codec::{
     Budget, BudgetVec, Colour, DecodeFailure, PictureView, StorageError, VideoDecoder,
 };
-use triergon_framing::AnnexBUnits;
+use triergon_framing::nal::AnnexBUnits;
 use triergon_framing::picture_output::levels::max_dpb_mbs;
 use triergon_framing::picture_output::{
     AvcPicture, DecodedPictures, Leave, Marking, NewPicture, PictureId, View,
