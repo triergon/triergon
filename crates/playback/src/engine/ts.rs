@@ -63,9 +63,40 @@ impl Delivery {
     }
 }
 
+/// Whether a TS engine's observers are bound to a startup context of its input.
+pub(crate) enum Binding {
+    /// They take carrier positions from the events alone.
+    Free,
+    /// Bound to `context`; `grid_lost` once an M2TS prefix input lost its carrier
+    /// grid, after which every selected track is refused.
+    Bound {
+        /// The startup context of the input.
+        context: ts::compat::input::InputContext,
+        /// Whether the carrier grid was lost.
+        grid_lost: bool,
+    },
+}
+
+impl Binding {
+    #[inline]
+    fn is_bound(&self) -> bool {
+        matches!(self, Self::Bound { .. })
+    }
+
+    #[inline]
+    fn grid_lost(&self) -> bool {
+        matches!(
+            self,
+            Self::Bound {
+                grid_lost: true,
+                ..
+            }
+        )
+    }
+}
+
 pub struct TsEngine {
-    pub(crate) native_context: Option<ts::compat::input::InputContext>,
-    pub(crate) native_prefix_failed: bool,
+    pub(crate) binding: Binding,
     pub(crate) input: InputCursor,
     pub(crate) stream: TransportStream,
     pub(crate) format: ts::PacketFormat,
@@ -109,8 +140,7 @@ impl TsEngine {
             program => DemuxClock::new(program).map(Some),
         };
         Ok(Self {
-            native_context: None,
-            native_prefix_failed: false,
+            binding: Binding::Free,
             stream,
             source_pes_clock: clock()?,
             input,
@@ -239,7 +269,10 @@ impl TsEngine {
         )?;
         Ok(Self {
             pes_tracks: PesTracks::Inline(Some(PesTrack::new(selection))),
-            native_context: Some(context),
+            binding: Binding::Bound {
+                context,
+                grid_lost: false,
+            },
             ..engine
         })
     }
@@ -363,7 +396,7 @@ impl TsEngine {
                 }
                 ReadyContinuation::Unhandled => {}
             }
-            let pushed = if self.native_context.is_some() {
+            let pushed = if self.binding.is_bound() {
                 observer.push_with_input(packet, context, &self.input)
             } else {
                 observer.push(packet, context)
@@ -552,7 +585,9 @@ impl TsEngine {
     /// Refuses every native track once an M2TS input loses its carrier grid.
     #[cold]
     fn refuse_after_lost_grid(&mut self) {
-        self.native_prefix_failed = true;
+        if let Binding::Bound { grid_lost, .. } = &mut self.binding {
+            *grid_lost = true;
+        }
         for track in self.pes_tracks.as_mut_slice() {
             track.refuse(Error::Unsupported("native M2TS carrier grid lost"));
         }
@@ -584,14 +619,14 @@ impl TsEngine {
             };
             if let Some(observer) = track.observer.as_mut() {
                 let result = if observer.uses_compact_payloads() {
-                    let step = if self.native_context.is_some() {
+                    let step = if self.binding.is_bound() {
                         observer.poll_compact_payload_with_input(&self.input, w, c)
                     } else {
                         observer.poll_compact_payload(w, c)
                     };
                     step.map(|step| map_payload(step, FeedPacket::Compact))
                 } else {
-                    let step = if self.native_context.is_some() {
+                    let step = if self.binding.is_bound() {
                         observer.poll_with_input(&self.input, w, c)
                     } else {
                         observer.poll(w, c)
@@ -664,11 +699,13 @@ impl TsEngine {
                     fault.error,
                     Error::Invalid("TS sync byte") | Error::Truncated
                 )
-                && !self.native_prefix_failed
-                && self
-                    .native_context
-                    .as_ref()
-                    .is_some_and(triergon_mpegts::compat::input::InputContext::is_prefix)
+                && matches!(
+                    &self.binding,
+                    Binding::Bound {
+                        context,
+                        grid_lost: false,
+                    } if context.is_prefix()
+                )
             {
                 self.refuse_after_lost_grid();
             }
@@ -760,14 +797,14 @@ impl TsEngine {
             if self.delivery.discovers_tracks() && self.pes_adopting == 0 {
                 self.pes_tracks = self.discover_tracks(map)?;
             }
-            if !self.native_prefix_failed
+            if !self.binding.grid_lost()
                 && let Some(track) = self.pes_tracks.as_slice().get(self.pes_adopting)
             {
                 let observer = self.observer_for(track.selection, map, *configuration_epoch);
                 let track = &mut self.pes_tracks.as_mut_slice()[self.pes_adopting];
                 match observer {
                     Ok((mut observer, carriage)) => {
-                        if let Some(context) = self.native_context.as_ref() {
+                        if let Binding::Bound { context, .. } = &self.binding {
                             observer.bind_input(context, &self.input)?;
                         }
                         track.observer = Some(observer);
@@ -902,7 +939,7 @@ impl TsEngine {
                     ReadyContinuation::Unhandled => match observer.push_borrowed(
                         packet,
                         context,
-                        self.native_context.as_ref().map(|_| &self.input),
+                        self.binding.is_bound().then_some(&self.input),
                     ) {
                         Ok(()) => self.pes_active = Some(index),
                         Err(error) => {
