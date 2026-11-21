@@ -4,8 +4,8 @@
 use crate::nal::packet::{
     NalConfigurationRefusal, copy_annex_b_segment, copy_annex_b_whole, start_annex_b_output,
 };
+use crate::retryable;
 use crate::{BuildStep, avc::AvcConfigArrayKind, nal::NalPacketConfiguration};
-use crate::{freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
@@ -93,7 +93,8 @@ impl NalPacketConfigRejection {
         -1_094_995_529
     }
 }
-#[derive(Clone, Copy)]
+// A byte tag: a niche tag in the output would be decoded on every round.
+#[repr(u8)]
 enum Phase {
     /// Admit the HEVC decoder arrays.
     Arrays,
@@ -101,10 +102,9 @@ enum Phase {
     Size,
     /// Charge and allocate the output.
     Reserve,
-    /// Copy the start codes and NAL payloads.
-    Copy,
-    /// Publish the output.
-    Publish,
+    /// Copy the start codes and NAL payloads into the output, then publish it once
+    /// it is `filled`.
+    Write { output: BudgetVec<u8>, filled: bool },
     /// Published: every later step reports completion.
     Complete,
     /// Failed: every later step returns the error.
@@ -117,8 +117,6 @@ enum Phase {
 pub struct NalPacketConfigWriter<'a> {
     config: &'a NalPacketConfiguration,
     length_prefixed: bool,
-    /// The extradata, empty until it is sized and reserved.
-    output: BudgetVec<u8>,
     maximum: usize,
     total: usize,
     array: usize,
@@ -155,7 +153,6 @@ impl<'a> NalPacketConfigWriter<'a> {
         Ok(Self {
             config: configuration,
             length_prefixed: configuration.width().is_some(),
-            output: BudgetVec::new(pool),
             maximum: maximum_output_bytes,
             total: 0,
             array: 0,
@@ -225,7 +222,6 @@ impl<'a> NalPacketConfigWriter<'a> {
             && !retryable(e)
         {
             self.phase = Phase::Failed(e);
-            self.output = BudgetVec::new(self.config.bytes().budget());
         }
         r
     }
@@ -244,7 +240,7 @@ impl<'a> NalPacketConfigWriter<'a> {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            match self.phase {
+            match &mut self.phase {
                 Phase::Arrays => match self.config.admit_hevc_arrays(&mut self.array, work) {
                     Ok(true) => self.phase = Phase::Size,
                     Ok(false) => return Ok(BuildStep::Yield),
@@ -298,58 +294,81 @@ impl<'a> NalPacketConfigWriter<'a> {
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
-                    self.output = start_annex_b_output(self.config.bytes().budget(), self.total)?;
-                    self.phase = Phase::Copy;
-                }
-                Phase::Copy => {
-                    let output = &mut self.output;
-                    let (config, length_prefixed) = (self.config, self.length_prefixed);
-                    if self.index == 0 && self.copied == 0 {
-                        let entries = if length_prefixed {
-                            config.config_nal_count()
-                        } else {
-                            1
-                        };
-                        let copies = (0..)
-                            .map_while(|index| Self::nal(config, length_prefixed, index))
-                            .filter(|&(selected, ..)| selected)
-                            .map(|(_, payload, prefix)| Ok((prefix, payload)));
-                        if copy_annex_b_whole(output, self.total, entries, copies, work, cancel)? {
-                            self.phase = Phase::Publish;
-                            continue;
-                        }
-                    }
-                    let Some((selected, b, prefix)) =
-                        Self::nal(config, length_prefixed, self.index)
-                    else {
-                        self.phase = Phase::Publish;
-                        continue;
+                    self.phase = Phase::Write {
+                        output: start_annex_b_output(self.config.bytes().budget(), self.total)?,
+                        filled: false,
                     };
-                    if selected
-                        && !copy_annex_b_segment(prefix, b, output, &mut self.copied, work, cancel)?
-                    {
-                        return Ok(BuildStep::Yield);
-                    }
-                    if !work.try_charge(1) {
-                        return Ok(BuildStep::Yield);
-                    }
-                    self.index += 1;
-                    self.copied = 0;
                 }
-                Phase::Publish => {
+                Phase::Write { output, filled } => {
+                    if !*filled {
+                        let (config, length_prefixed) = (self.config, self.length_prefixed);
+                        if self.index == 0 && self.copied == 0 {
+                            let entries = if length_prefixed {
+                                config.config_nal_count()
+                            } else {
+                                1
+                            };
+                            let copies = (0..)
+                                .map_while(|index| Self::nal(config, length_prefixed, index))
+                                .filter(|&(selected, ..)| selected)
+                                .map(|(_, payload, prefix)| Ok((prefix, payload)));
+                            if copy_annex_b_whole(
+                                output, self.total, entries, copies, work, cancel,
+                            )? {
+                                *filled = true;
+                                continue;
+                            }
+                        }
+                        let Some((selected, b, prefix)) =
+                            Self::nal(config, length_prefixed, self.index)
+                        else {
+                            *filled = true;
+                            continue;
+                        };
+                        if selected
+                            && !copy_annex_b_segment(
+                                prefix,
+                                b,
+                                output,
+                                &mut self.copied,
+                                work,
+                                cancel,
+                            )?
+                        {
+                            return Ok(BuildStep::Yield);
+                        }
+                        if !work.try_charge(1) {
+                            return Ok(BuildStep::Yield);
+                        }
+                        self.index += 1;
+                        self.copied = 0;
+                        continue;
+                    }
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
-                    let bytes = freeze_whole(&mut self.output)?;
-                    self.phase = Phase::Complete;
-                    return Ok(BuildStep::Ready(NalPacketConfigOutput {
-                        bytes,
-                        source: self.config.bytes().clone(),
-                        source_refusal: self.config.refusal(),
-                    }));
+                    let Phase::Write { output, .. } =
+                        std::mem::replace(&mut self.phase, Phase::Complete)
+                    else {
+                        unreachable!("the writer is writing")
+                    };
+                    return match output.freeze() {
+                        Ok(bytes) => Ok(BuildStep::Ready(NalPacketConfigOutput {
+                            bytes,
+                            source: self.config.bytes().clone(),
+                            source_refusal: self.config.refusal(),
+                        })),
+                        Err(refused) => {
+                            self.phase = Phase::Write {
+                                output: refused.value,
+                                filled: true,
+                            };
+                            Err(refused.error)
+                        }
+                    };
                 }
                 Phase::Complete => return Ok(BuildStep::Complete),
-                Phase::Failed(error) => return Err(error),
+                &mut Phase::Failed(error) => return Err(error),
             }
         }
     }
