@@ -1,9 +1,7 @@
 //! The fourth stage: a laid-out event placed in the frame. Its position by
 //! `\pos` or `\move`, a scroll, or its alignment and margins; its rotation
-//! origin (`calculate_rotation_params`); the runs its drawn glyphs are
-//! composited in; and each glyph's placement and effects as it is drawn
-//! (`render_and_combine_glyphs` up to drawing). Drawing them is the
-//! painter's.
+//! origin; the runs its drawn glyphs are composited in; and each glyph's
+//! placement and effects as it is drawn. Drawing them is the painter's.
 
 use std::ops::Range;
 
@@ -33,8 +31,8 @@ pub(super) struct PlacedGlyph {
     glyph: usize,
 }
 
-/// A run of glyphs composited together (libass's `CombinedBitmapInfo`
-/// before drawing), as the glyph that starts it sets it.
+/// A run of glyphs composited together, before drawing, as the glyph that
+/// starts it sets it.
 #[derive(Debug)]
 pub(super) struct PlacedRun {
     /// The colours, faded.
@@ -175,8 +173,8 @@ impl Anchor {
     /// The event's box for collision handling, in frame pixels: its lines
     /// and their borders, with VSFilter's biased roundings. The border on
     /// both sides is doubled in wrapping `int` arithmetic, as libass doubles
-    /// it (`ass_render.c:3001-3003`), so a border beyond 2^30 pixels gives
-    /// the box libass gives where `int` overflow wraps.
+    /// it, so a border beyond 2^30 pixels gives the box libass gives where
+    /// `int` overflow wraps.
     pub(super) fn event_box(&self, layout: &Layout, par: f64) -> collisions::Rect {
         let (lines, text_box) = (&layout.lines, &layout.text_box);
         let top = (self.y - lines.first().asc - f64::from(lines.border_top)) as i32;
@@ -189,7 +187,7 @@ impl Anchor {
     }
 }
 
-/// `get_base_point`: the point of the box the alignment anchors.
+/// The point of the box the alignment anchors.
 fn base_point(bbox: &TextBox, halign: HAlign, valign: VAlign) -> (f64, f64) {
     let x = match halign {
         HAlign::Left => bbox.x_min,
@@ -273,7 +271,7 @@ fn position(
     (x, y)
 }
 
-/// `ass_apply_fade`: a positive fade raises the alpha towards transparent.
+/// `colour` faded: a positive fade raises its alpha towards transparent.
 pub(super) fn apply_fade(colour: Rgba, fade: i32) -> Rgba {
     if fade <= 0 {
         return colour;
@@ -393,8 +391,8 @@ impl<'a> Placer<'a> {
     }
 
     /// What `placed` is drawn with: its outline, its position in the frame
-    /// and offset from the rotation origin displaced by its shadow
-    /// (`calculate_rotation_params`), and the effects its state gives it.
+    /// and offset from the rotation origin displaced by its shadow, and the
+    /// effects its state gives it.
     pub(super) fn glyph(&self, placed: &PlacedGlyph) -> Option<GlyphDrawing<'a>> {
         let c = &self.text.chars()[placed.char];
         let style = self.text.style(c);

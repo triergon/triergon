@@ -1,9 +1,8 @@
-//! The second stage: an event's text shaped as libass's complex shaper does
-//! (`ass_shaper_find_runs`, `ass_shaper_shape`): each character's script and
-//! face, runs of one face, script and style, bidi levels per paragraph, and
-//! OpenType shaping of each run at the drawn size, which gives each
-//! character a cluster of glyphs. The bidi levels give the visual order of
-//! each line once lines are known (`ass_shaper_reorder`).
+//! The second stage: an event's text shaped as libass's complex shaper
+//! does: each character's script and face, runs of one face, script and
+//! style, bidi levels per paragraph, and OpenType shaping of each run at the
+//! drawn size, which gives each character a cluster of glyphs. The bidi
+//! levels give the visual order of each line once lines are known.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -80,8 +79,7 @@ pub(super) struct Cluster {
     /// The face of the character's font its glyphs come from.
     pub(super) face: u16,
     /// Shaping gave the character a glyph; a drawing always has one. A
-    /// character a ligature took or HarfBuzz hid is not shown (libass's
-    /// `skip`).
+    /// character a ligature took or HarfBuzz hid is not shown.
     pub(super) visible: bool,
 }
 
@@ -163,8 +161,8 @@ impl Features {
     }
 }
 
-/// The characters of context a shaping call reads on either side of its item
-/// (HarfBuzz's `HB_BUFFER_CONTEXT_LENGTH`, as `triergon-shape` keeps it).
+/// The characters of context a shaping call reads on either side of its item:
+/// the five HarfBuzz reads, as `triergon-shape` keeps them.
 const CONTEXT: usize = 5;
 /// Work units charged per shaping call beyond its characters: sizing the
 /// face and finding the plan.
@@ -261,7 +259,7 @@ impl VerticalFonts {
     }
 }
 
-/// What finding runs gives a character (`ass_shaper_find_runs`).
+/// What finding runs gives a character.
 #[derive(Clone, Copy, Debug)]
 struct Itemised {
     script: WritingScript,
@@ -279,8 +277,8 @@ const fn is_shaping_control(symbol: u32) -> bool {
     matches!(symbol, 0x200c | 0x200d)
 }
 
-/// Code points HarfBuzz replaces by an empty glyph whatever the font maps them
-/// to (libass's `is_harfbuzz_ignorable`).
+/// Code points HarfBuzz replaces by an empty glyph whatever the font maps
+/// them to.
 const fn is_ignorable(symbol: u32) -> bool {
     match symbol >> 8 {
         0x00 => symbol == 0x00ad,
@@ -296,8 +294,8 @@ const fn is_ignorable(symbol: u32) -> bool {
     }
 }
 
-/// The language libass shapes a script in when the script names none
-/// (`script_to_language`); `c` for the rest, the C locale's default.
+/// The language libass shapes a script in when the script names none; `c`
+/// for the rest, the C locale's default.
 fn script_language(script: WritingScript) -> &'static str {
     match &script.to_bytes() {
         b"Arab" => "ar",
@@ -431,7 +429,7 @@ impl Shaper {
         super::fit(&mut self.counts)
     }
 
-    /// `ass_shaper_find_runs`: scripts, faces and shape runs.
+    /// Each character's script, face and shape run.
     fn find_runs(
         &mut self,
         text: &Text,
@@ -532,7 +530,7 @@ impl Shaper {
     }
 
     /// The item starting at character `start`: the characters after it of
-    /// its shape run and bidi level, up to a drawing (`shape_harfbuzz`).
+    /// its shape run and bidi level, up to a drawing.
     fn item(&self, chars: &[Char], levels: &[Level], start: usize) -> Range<usize> {
         let (run, level) = (self.items[start].run, levels[start]);
         let mut end = start + 1;
@@ -714,8 +712,8 @@ impl Shaper {
     }
 }
 
-/// `ass_shaper_determine_script`: Common and Inherited scripts take the
-/// script before them, or after them at the start.
+/// Common and Inherited scripts take the script before them, or after them
+/// at the start.
 fn inherit_scripts(items: &mut [Itemised]) {
     let inherits = |s: WritingScript| s == WritingScript::COMMON || s == WritingScript::INHERITED;
     let mut last = WritingScript::UNKNOWN;
@@ -747,11 +745,11 @@ fn inherit_scripts(items: &mut [Itemised]) {
 }
 
 impl Bidi {
-    /// `ass_shaper_reorder`: the character shown at each position into
-    /// `order`, each line reordered on its own and, without whole-text
-    /// layout, each run and letter-spaced character within it; `starts_run`
-    /// tells where runs start once lines are trimmed. The levels are
-    /// reordered in `levels`, a copy.
+    /// The character shown at each position into `order`, each line
+    /// reordered on its own and, without whole-text layout, each run and
+    /// letter-spaced character within it; `starts_run` tells where runs
+    /// start once lines are trimmed. The levels are reordered in `levels`, a
+    /// copy.
     pub(super) fn visual_order(
         &self,
         text: &Text,

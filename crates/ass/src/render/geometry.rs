@@ -1,8 +1,6 @@
 //! The renderer's settings and the frame geometry they give a script: the
-//! content area, the pixel aspect, the layout resolution and the mapping from
-//! script to frame coordinates (libass's `ass_reconfigure`, `ass_layout_res`,
-//! the PAR correction of `ass_start_frame`, `x2scr_*`, `y2scr_*` and
-//! `init_font_scale`).
+//! content area, the pixel aspect, the layout resolution, the mapping from
+//! script to frame coordinates and each event's scales.
 
 use triergon_core::{Error, Result};
 
@@ -175,9 +173,9 @@ pub(super) struct Canvas {
     pub width: i32,
     pub height: i32,
     pub storage: Option<(i32, i32)>,
-    /// `frame_content_width` and `frame_content_height`.
+    /// The frame's width and height less its margins.
     pub content: (i32, i32),
-    /// `fit_width` and `fit_height`.
+    /// The largest area of the content area's aspect that fits the frame.
     pub fit: (f64, f64),
 }
 
@@ -256,8 +254,8 @@ impl Canvas {
         }
     }
 
-    /// `ass_layout_res`: the script's layout resolution, else the storage
-    /// size, else the play resolution corrected by a pixel aspect set by hand.
+    /// The script's layout resolution, else the storage size, else the play
+    /// resolution corrected by a pixel aspect set by hand.
     fn layout_res(&self, play_res: (i32, i32), script: Option<(i32, i32)>) -> (i32, i32) {
         if let Some(layout) = script {
             return layout;
@@ -290,14 +288,15 @@ pub(super) struct Geometry<'c> {
     pub canvas: &'c Canvas,
     /// The script's play resolution after libass's defaults.
     pub play_res: (i32, i32),
-    /// `ass_layout_res`.
+    /// The layout resolution: the script's, the storage size or the play
+    /// resolution corrected.
     pub layout_res: (i32, i32),
-    /// `par_scale_x`: x is laid out divided by it and stretched by it again
-    /// when glyphs are drawn.
+    /// The pixel aspect: x is laid out divided by it and stretched by it
+    /// again when glyphs are drawn.
     pub par: f64,
 }
 
-/// The scales of one event (`init_font_scale`).
+/// The scales of one event.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Scales {
     /// Script pixels to frame pixels, before the pixel aspect.

@@ -1,7 +1,6 @@
-//! The first stage: an event's text evaluated at a time (libass's
-//! `parse_events`), each character with the font it asks for and its glyph
-//! state scaled to the frame, and where its style runs start
-//! (`split_style_runs`).
+//! The first stage: an event's text evaluated at a time, each character
+//! with the font it asks for and its glyph state scaled to the frame, and
+//! where its style runs start.
 
 use std::ops::Range;
 
@@ -124,8 +123,8 @@ impl GlyphStyle {
         style
     }
 
-    /// `fix_glyph_scaling`: the glyph is drawn at [`DRAWN_SIZE`] and scaled to
-    /// its size, so FreeType's grid fitting cannot move it.
+    /// The glyph is drawn at [`DRAWN_SIZE`] and scaled to its size, so
+    /// FreeType's grid fitting cannot move it.
     fn fix_scaling(&mut self) {
         if self.size == 0.0 {
             return;
@@ -236,9 +235,9 @@ impl Text {
         &self.styles[c.style]
     }
 
-    /// Reads the characters of `context`'s event, whose text is `source`
-    /// (`parse_events`). `None` when a character's font has no face, which
-    /// libass treats as a failed event.
+    /// Reads the characters of `context`'s event, whose text is `source`.
+    /// `None` when a character's font has no face, which libass treats as a
+    /// failed event.
     pub(super) fn read<'s>(
         &mut self,
         context: &mut Context<'s>,

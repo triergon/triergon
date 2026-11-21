@@ -48,8 +48,8 @@ use text::{DrawingText, Evaluated, Text};
 pub struct Frame<'r> {
     /// The images, in drawing order.
     pub images: &'r [Image],
-    /// How they differ from the previous frame's (`ass_render_frame`'s
-    /// `detect_change`).
+    /// How they differ from the previous frame's, as `ass_render_frame`
+    /// reports it.
     pub change: Change,
 }
 
@@ -250,11 +250,11 @@ impl Renderer {
                 boxes.try_push(event).map_err(|e| e.error)?;
             }
         }
-        // libass sorts by layer and read order with qsort (`cmp_event_layer`),
-        // which glibc runs as a stable merge sort, and a ReadOrder repeats (0
-        // for every event of a whole script): equal keys keep the script's
-        // order. Boxes are collected in that order, so the event index
-        // completes the key and the sort needs no scratch.
+        // libass sorts by layer and read order with qsort, which glibc runs
+        // as a stable merge sort, and a ReadOrder repeats (0 for every event
+        // of a whole script): equal keys keep the script's order. Boxes are
+        // collected in that order, so the event index completes the key and
+        // the sort needs no scratch.
         boxes
             .as_mut_slice()
             .sort_unstable_by_key(|b| (b.layer, b.read_order, b.event));
@@ -304,8 +304,8 @@ impl Renderer {
 }
 
 impl Pipeline {
-    /// `ass_render_event`: the event's images appended to the frame's and
-    /// its box; `None` when libass renders nothing for it.
+    /// The event's images appended to the frame's, and its box; `None` when
+    /// libass renders nothing for it.
     fn render_event(
         &mut self,
         script: &Script,
@@ -442,7 +442,7 @@ impl Pipeline {
         }
         let clipping = clipping(geometry, &evaluated.state);
         let mask = self.vector_clip(geometry, &evaluated.state, room.scales, script, work)?;
-        images::render_text(
+        images::text_images(
             &self.combined,
             &clipping,
             !opaque_background,
@@ -455,8 +455,7 @@ impl Pipeline {
     /// The vector clip drawn in the frame, if the event has one whose
     /// drawing can be placed. A drawing without a contour gives a mask
     /// without pixels, which empties every image a regular clip clips and
-    /// leaves those of an inverse clip, as `blend_vector_clip` does with the
-    /// empty bitmap libass keeps for it (`ass_render.c:700-813`).
+    /// leaves those of an inverse clip, as libass does.
     fn vector_clip(
         &mut self,
         geometry: &Geometry<'_>,
@@ -501,8 +500,8 @@ impl Pipeline {
     }
 }
 
-/// `add_background`: the box of a `BorderStyle` 4 event around its
-/// collision box and positive shadow, in the faded back colour.
+/// The box of a `BorderStyle` 4 event around its collision box and
+/// positive shadow, in the faded back colour.
 fn background(
     geometry: &Geometry<'_>,
     evaluated: &Evaluated<'_>,

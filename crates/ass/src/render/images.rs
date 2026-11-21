@@ -1,8 +1,7 @@
 //! The images a frame is drawn from (libass's `ASS_Image` list): each
 //! run's shadow, border and fill clipped by the event's clip rectangle and
-//! split for `\kf` karaoke (`render_text`, `render_glyph`,
-//! `render_glyph_i`), multiplied by a vector clip (`blend_vector_clip`), and
-//! the opaque background of `BorderStyle` 4 (`add_background`).
+//! split for `\kf` karaoke, multiplied by a vector clip, and the opaque
+//! background of `BorderStyle` 4.
 
 use std::sync::Arc;
 
@@ -28,8 +27,8 @@ pub enum ImageKind {
     Background,
 }
 
-/// How a frame differs from the one rendered before it, as libass's
-/// `ass_detect_change` reports it: a player may keep showing the previous
+/// How a frame differs from the one rendered before it, as
+/// `ass_render_frame` reports it: a player may keep showing the previous
 /// images when nothing changed, or move them when only positions did.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Change {
@@ -42,8 +41,8 @@ pub enum Change {
 }
 
 impl Change {
-    /// `ass_detect_change`: image by image, the greatest difference; a list
-    /// longer or shorter than the previous one is new content.
+    /// Image by image, the greatest difference; a list longer or shorter
+    /// than the previous one is new content.
     pub(super) fn between(previous: &[Image], current: &[Image]) -> Self {
         if previous.len() != current.len() {
             return Self::Content;
@@ -67,7 +66,7 @@ enum Part {
 
 /// Where an image's pixels come from: a part of a composited run, which
 /// the composite cache gives for an equal key as long as anything holds
-/// it, or pixels made for this image alone, which `blend_vector_clip`
+/// it, or pixels made for this image alone, which [`apply_vector_clip`]
 /// makes for every clipped image.
 #[derive(Clone, Debug)]
 enum Source {
@@ -98,10 +97,9 @@ pub struct Image {
 }
 
 impl Image {
-    /// `ass_image_compare`: other content when the size, stride, colour or
-    /// bitmap differ, else other positions when the place differs. libass
-    /// compares the bitmap's address: the same pixels of the same cached
-    /// composite (`ass_render.c:3286-3306`).
+    /// Other content when the size, stride, colour or bitmap differ, else
+    /// other positions when the place differs. libass compares the bitmap's
+    /// address: the same pixels of the same cached composite.
     fn compare(&self, other: &Self) -> Change {
         let same_pixels = match (&self.source, &other.source) {
             (Source::Run(a, p), Source::Run(b, q)) => {
@@ -157,8 +155,7 @@ impl Image {
         })
     }
 
-    /// Moves the image down by `shift` rows, cutting it to the frame's
-    /// `height` (libass's `shift_event`).
+    /// Moves the image down by `shift` rows, cutting it to `frame_height`.
     pub(super) fn shift(&mut self, shift: i32, frame_height: i32) {
         let mut y = self.y.wrapping_add(shift);
         let mut h = self.height as i32;
@@ -198,9 +195,9 @@ pub(super) struct ClipMask {
     pub inverse: bool,
 }
 
-/// `render_text`: the shadows, then the borders, then the fills of every run
-/// (a `\ko` border waits for its syllable), clipped, then the vector clip.
-pub(super) fn render_text(
+/// An event's images: the shadows, then the borders, then the fills of every
+/// run (a `\ko` border waits for its syllable), clipped, then the vector clip.
+pub(super) fn text_images(
     runs: &[Combined],
     clipping: &Clipping,
     with_shadows: bool,
@@ -288,16 +285,16 @@ pub(super) fn render_text(
     }
     if let Some(mask) = mask {
         for image in &mut out.as_mut_slice()[start..] {
-            blend_vector_clip(image, mask, budget)?;
+            apply_vector_clip(image, mask, budget)?;
         }
     }
     Ok(())
 }
 
-/// `blend_vector_clip` on one image: multiplied by the clip (or its inverse)
-/// where they overlap, into new pixels; a regular clip leaves an empty image
-/// where they do not.
-fn blend_vector_clip(image: &mut Image, mask: &ClipMask, budget: &Budget) -> Result<()> {
+/// Multiplies `image` by the vector clip (or its inverse) where they
+/// overlap, into new pixels; a regular clip leaves an empty image where they
+/// do not.
+fn apply_vector_clip(image: &mut Image, mask: &ClipMask, budget: &Budget) -> Result<()> {
     let (ax, ay) = (image.x, image.y);
     let (aw, ah) = (image.width as i32, image.height as i32);
     let clip = &*mask.bitmap.bitmap;
@@ -358,8 +355,8 @@ fn copy(
     Ok(bitmap)
 }
 
-/// `add_background`: the box of a `BorderStyle` 4 event, its positive shadow
-/// added around it, in the back colour.
+/// The box of a `BorderStyle` 4 event, its positive shadow added around it,
+/// in the back colour.
 pub(super) fn background(
     area: Rect,
     frame: (i32, i32),

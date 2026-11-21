@@ -1,17 +1,15 @@
 //! What the renderer keeps between frames within a limit: outlines by
-//! count, glyph bitmaps and composited runs by bytes, as libass 0.17.5
-//! keeps them (`ass_cache.c`).
+//! count, glyph bitmaps and composited runs by bytes, as libass keeps them.
 //!
-//! libass queues a cache's entries by their last use (`ass_cache_get`,
-//! `ass_cache.c:384-445`). Cutting it to a size (`ass_cache_cut`,
-//! `:487-515`), which it does as each frame starts, pops that queue from the
-//! oldest: an entry nothing else holds goes, and one still held, by the
-//! previous frame's images or by another entry's key, leaves the queue but
-//! stays in the cache, findable and counted, until its last holder lets go
-//! (`ass_cache_dec_ref`, `:469-485`) or a lookup queues it again. The cut
-//! stops once the cache counts at most the limit. Whatever the previous
-//! frame's images show therefore survives the cut, so an equal key finds the
-//! same value in the next frame, and a value is identified by itself.
+//! A cache queues its entries by their last use. Cutting it to a size, which
+//! the renderer does as each frame starts, pops that queue from the oldest:
+//! an entry nothing else holds goes, and one still held, by the previous
+//! frame's images or by another entry's key, leaves the queue but stays in
+//! the cache, findable and counted, until its last holder lets go or a
+//! lookup queues it again. The cut stops once the cache counts at most the
+//! limit. Whatever the previous frame's images show therefore survives the
+//! cut, so an equal key finds the same value in the next frame, and a value
+//! is identified by itself.
 //!
 //! The renderer's keys hold what libass's do, but for a composite's: it
 //! holds its glyphs' bitmap keys, and through them their outlines, where
@@ -27,8 +25,8 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 
 use triergon_core::{Budget, BudgetVec, Error, Reservation, Result};
 
-/// What libass counts for an entry beyond its value: its item record
-/// (`CACHE_ITEM_SIZE`), six pointers and two sizes.
+/// What libass counts for an entry beyond its value: its record of the
+/// entry, six pointers and two sizes.
 const ITEM_BYTES: usize = sizes::item(size_of::<usize>());
 
 /// No entry: the end of the use queue or of a hash chain.
@@ -322,7 +320,7 @@ pub(super) struct Cache<K, T> {
     /// The entries with a value, each in a shared allocation that lives
     /// until the entry goes.
     values: usize,
-    /// libass's `cache_size`: what the entries kept count, held ones too.
+    /// What the entries kept count, held ones too.
     size: usize,
     limit: usize,
     /// The index's, the values' and the release log's storage.
@@ -358,7 +356,7 @@ impl<K: CacheKey, T> Cache<K, T> {
     }
 
     /// What is kept for `key`, which is now the newest in the use queue,
-    /// queued again if it was cut while held (`ass_cache_get`).
+    /// queued again if it was cut while held.
     pub(super) fn get(&mut self, key: K::View<'_>) -> Option<Found<T>> {
         let at = self.find(&key)?;
         let entry = self.entry_mut(at);
@@ -382,9 +380,8 @@ impl<K: CacheKey, T> Cache<K, T> {
     }
 
     /// Keeps `value` for `key`, absent before, counted as `size` and,
-    /// unless it counts 1 as an outline does, its item record
-    /// (`ass_cache.c:440`); then cuts the cache to its limit if it is past
-    /// it.
+    /// unless it counts 1 as an outline does, `ITEM_BYTES` for its record;
+    /// then cuts the cache to its limit if it is past it.
     ///
     /// # Errors
     ///
@@ -452,7 +449,7 @@ impl<K: CacheKey, T> Cache<K, T> {
         Ok((at, generation))
     }
 
-    /// Cuts the cache to `limit` as `ass_cache_cut` does, and keeps it
+    /// Cuts the cache to `limit` as libass cuts its caches, and keeps it
     /// within `limit` until the next cut.
     ///
     /// libass cuts only when a frame starts, so whatever a frame draws stays
@@ -726,52 +723,55 @@ impl<K: CacheKey, T> Cache<K, T> {
     }
 }
 
-/// The sizes libass counts for its values: its records, in words of the
-/// target, and the pixels and outline points they hold (`ass_cache.h`,
-/// `ass_bitmap.h`, `ass_outline.h`). Each takes the word size, so the
-/// layouts of both targets are checked.
+/// What the caches count for an entry, as libass counts it: an outline 1;
+/// a bitmap its key, bitmap and outline value records, in words of the
+/// target and bytes, its pixels, 8 bytes an outline point and 1 a segment;
+/// a composite its key and value records, a record per glyph and its
+/// pixels; each but an outline also libass's record of the entry. Those
+/// counts make the caches cut in the order libass's do, which the
+/// `cache-eviction.ass` fixture of `ass-render` observes through change
+/// values. Each takes the word size, so both targets' counts are checked.
 pub(super) mod sizes {
     const WORD: usize = size_of::<usize>();
 
-    /// `CacheItem`: six pointers and two sizes (`ass_cache.c:330-336`).
+    /// libass's record of an entry: six pointers and two sizes.
     pub(super) const fn item(word: usize) -> usize {
         8 * word
     }
 
-    /// `Bitmap`: four `int32_t`, a stride and a pointer.
+    /// A bitmap record: four `int32_t`, a stride and a pointer.
     const fn bitmap_record(word: usize) -> usize {
         16 + 2 * word
     }
 
-    /// `BitmapHashKey`: an outline pointer and four vectors.
+    /// A bitmap's key record: an outline pointer and four vectors.
     const fn bitmap_key(word: usize) -> usize {
         word + 32
     }
 
-    /// `OutlineHashValue`: a flag, two `ASS_Outline`s of six words, a box
+    /// An outline's value record: a flag, two outlines of six words, a box
     /// and three `int`s, padded to a word.
     const fn outline_value(word: usize) -> usize {
         (13 * word + 28).next_multiple_of(word)
     }
 
-    /// `CompositeHashKey`: the filter's six `int`s, a count and a pointer.
+    /// A composite's key record: its filter's six `int`s, a count, a pointer.
     const fn composite_key(word: usize) -> usize {
         24 + 2 * word
     }
 
-    /// `CompositeHashValue`: three bitmaps.
+    /// A composite's value record: three bitmap records.
     const fn composite_value(word: usize) -> usize {
         3 * bitmap_record(word)
     }
 
-    /// `BitmapRef`: two bitmap pointers and two vectors.
+    /// A composite key's record of a glyph: two bitmap pointers, two vectors.
     const fn bitmap_ref(word: usize) -> usize {
         2 * word + 16
     }
 
-    /// What `ass_bitmap_construct` counts (`ass_render.c:1572-1573`) for a
-    /// bitmap of `pixels` bytes, stride × height, drawn from outlines of
-    /// `points` points and `segments` segments in all.
+    /// What a bitmap of `pixels` bytes, stride × height, counts when drawn
+    /// from outlines of `points` points and `segments` segments in all.
     pub(in super::super) const fn bitmap(pixels: usize, points: usize, segments: usize) -> usize {
         bitmap_on(WORD, pixels, points, segments)
     }
@@ -783,9 +783,8 @@ pub(super) mod sizes {
             .saturating_add(segments)
     }
 
-    /// What `ass_composite_construct` counts (`ass_render.c:2755-2756`) for
-    /// a composite of `glyphs` glyphs whose fill, border and shadow hold
-    /// `pixels` bytes.
+    /// What a composite of `glyphs` glyphs counts, its fill, border and
+    /// shadow holding `pixels` bytes.
     pub(in super::super) const fn composite(glyphs: usize, pixels: usize) -> usize {
         composite_on(WORD, glyphs, pixels)
     }
@@ -800,16 +799,16 @@ pub(super) mod sizes {
     mod tests {
         use super::*;
 
-        /// libass's records as 64-bit and 32-bit ARM lay them out: `CacheItem`,
-        /// `BitmapHashKey`, `Bitmap`, `OutlineHashValue`, `CompositeHashKey`,
-        /// `CompositeHashValue` and `BitmapRef`.
+        /// libass's records as 64-bit and 32-bit ARM lay them out: an entry's,
+        /// a bitmap's key, a bitmap, an outline's value, a composite's key
+        /// and value, and a composite key's record of a glyph.
         const LAYOUTS: [(usize, [usize; 7]); 2] = [
             (8, [64, 40, 32, 136, 40, 96, 32]),
             (4, [32, 36, 24, 80, 32, 72, 24]),
         ];
 
         #[test]
-        fn records_are_libass_layouts_on_both_targets() {
+        fn entry_counts_hold_for_both_word_sizes() {
             for (word, [item_, key, record, outline, composite, value, reference]) in LAYOUTS {
                 assert_eq!(item(word), item_);
                 assert_eq!(bitmap_key(word), key);

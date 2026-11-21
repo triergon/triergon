@@ -1,7 +1,6 @@
 //! The last stage: an event's placed glyphs drawn and combined run by run,
-//! as libass's `render_and_combine_glyphs` does, through a bitmap cache and
-//! a composite cache: each glyph's fill and border, then each run's fill,
-//! border and shadow composited.
+//! through a bitmap cache and a composite cache: each glyph's fill and
+//! border, then each run's fill, border and shadow composited.
 
 use std::ops::Deref;
 
@@ -25,9 +24,9 @@ use crate::{Karaoke, Rgba, charge};
 /// besides.
 const LOOKUP_UNITS: usize = 1;
 
-/// A run composited (libass's `CompositeHashValue`): its fill, border and
-/// shadow, placed against the run's origin. Images show its bitmaps and are
-/// told apart by it, as libass's are by the composite's buffers.
+/// A run composited: its fill, border and shadow, placed against the run's
+/// origin. Images show its bitmaps and are told apart by it, as libass's
+/// are by the composite's buffers.
 #[derive(Debug)]
 pub(super) struct Composited {
     pub(super) fill: Option<Bitmap>,
@@ -35,14 +34,15 @@ pub(super) struct Composited {
     pub(super) shadow: Option<Bitmap>,
 }
 
-/// One run of glyphs composited together (libass's `CombinedBitmapInfo`),
-/// positioned in the frame.
+/// One run of glyphs composited together, positioned in the frame.
 #[derive(Debug)]
 pub(super) struct Combined {
     /// The colours, faded.
     pub(super) colours: [Rgba; 4],
     pub(super) effect: Option<Karaoke>,
-    /// For `\kf`, the frame column the fill gives way at.
+    /// The karaoke timing the run is drawn with
+    /// ([`PlacedRun::effect_timing`]): for `\kf` the frame column the fill
+    /// gives way at, for the other kinds the syllable's boundary.
     pub(super) effect_timing: i32,
     /// The frame position the composite's bitmaps'
     /// [`position`](Bitmap::position)s count from: the least origin of
@@ -61,9 +61,8 @@ enum BitmapSource {
     Border(KeptOutline, BorderStroke),
 }
 
-/// What identifies a bitmap (libass's `BitmapHashKey`): what it is drawn
-/// from and the quantised transform it is drawn under. Equal keys draw
-/// equal bitmaps.
+/// What identifies a bitmap: what it is drawn from and the quantised
+/// transform it is drawn under. Equal keys draw equal bitmaps.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct BitmapKey {
     source: BitmapSource,
@@ -82,9 +81,9 @@ impl CacheKey for BitmapKey {
     }
 }
 
-/// A bitmap kept (libass's `Bitmap`), empty when it draws nothing, with
-/// the stroked border it was drawn from, which libass's bitmap key holds as
-/// long as the bitmap is kept.
+/// A bitmap kept, empty when it draws nothing, with the stroked border it
+/// was drawn from, which libass's bitmap key holds as long as the bitmap is
+/// kept.
 #[derive(Debug)]
 struct KeptBitmap {
     bitmap: Bitmap,
@@ -104,9 +103,9 @@ impl Deref for SharedBitmap {
     }
 }
 
-/// One glyph of a run's composite key (libass's `BitmapRef`): the keys of
-/// its fill and border bitmaps, each `None` when it draws nothing, and
-/// their origins in the run. libass's key holds the bitmaps themselves;
+/// One glyph of a run's composite key: the keys of its fill and border
+/// bitmaps, each `None` when it draws nothing, and their origins in the
+/// run. libass's key holds the bitmaps themselves;
 /// their keys find the same composite, since an equal key draws an equal
 /// bitmap and the key holds the outlines it names, and they let the
 /// bitmaps leave the cache while the composite stays.
@@ -118,8 +117,8 @@ struct GlyphRef {
     border_origin: Vector,
 }
 
-/// A run's composite key (libass's `CompositeHashKey`): its effects and
-/// every glyph's bitmaps and place in the run.
+/// A run's composite key: its effects and every glyph's bitmaps and place
+/// in the run.
 #[derive(Debug)]
 struct RunKey {
     effects: EffectsKey,
@@ -205,9 +204,8 @@ impl Painter {
         }
     }
 
-    /// Cuts the composites and then the bitmaps to their limits, as
-    /// libass's `check_cache_limits` does when a frame starts
-    /// (`ass_render.c:3021-3026`); nothing but the last frame's images may
+    /// Cuts the composites and then the bitmaps to their limits, as libass
+    /// does when a frame starts; nothing but the last frame's images may
     /// hold them then.
     pub(super) fn cut(&mut self, limits: &CacheLimits) {
         self.composites.cut(limits.composite_bytes);
@@ -223,10 +221,9 @@ impl Painter {
     }
 
     /// The bitmap of `outline` under a plain matrix, placed on its own: a
-    /// vector clip, which libass draws through its bitmap cache too
-    /// (`blend_vector_clip`), and holds while it clips. `None` when the
-    /// matrix cannot be quantised; a drawing that draws nothing gives a
-    /// bitmap without pixels.
+    /// vector clip, which libass draws through its bitmap cache too, and
+    /// holds while it clips. `None` when the matrix cannot be quantised; a
+    /// drawing that draws nothing gives a bitmap without pixels.
     pub(super) fn draw_shape(
         &mut self,
         outline: &KeptOutline,
@@ -295,9 +292,8 @@ impl Painter {
         Ok(())
     }
 
-    /// Places one glyph in `run` and draws its fill and border, as libass's
-    /// `get_bitmap_glyph` does, through the bitmap cache; `None` when it
-    /// draws nothing.
+    /// Places one glyph in `run` and draws its fill and border through the
+    /// bitmap cache; `None` when it draws nothing.
     fn draw_glyph(
         &mut self,
         glyph: &GlyphDrawing<'_>,
@@ -437,8 +433,7 @@ impl GlyphSource for CachedBitmaps<'_> {
         at: Option<Quantized>,
         work: &mut WorkBudget,
     ) -> Result<Option<PlacedBitmap<SharedBitmap>>> {
-        // libass looks the unit square up before it places the box
-        // (`ass_render.c:1531`).
+        // libass looks the unit square up before it places the box.
         let unit_box = self.outlines.unit_box()?;
         let Some(at) = at else {
             return Ok(None);
@@ -480,7 +475,7 @@ impl GlyphSource for CachedBitmaps<'_> {
     }
 }
 
-/// The bitmap cache (libass's `bitmap_cache`).
+/// The glyph and clip bitmaps kept between frames, by their keys.
 #[derive(Debug)]
 struct Bitmaps {
     budget: Budget,
@@ -545,8 +540,7 @@ impl Bitmaps {
     }
 }
 
-/// The bytes libass counts for a bitmap's pixels: its stride times its
-/// height (`bitmap_size`).
+/// The bytes libass counts for a bitmap's pixels: its stride times its height.
 fn pixels(bitmap: &Bitmap) -> usize {
     bitmap.stride().saturating_mul(bitmap.height())
 }

@@ -10,6 +10,12 @@ images libass's `ass_render_frame` gives. It depends on
 [`triergon-font`](../font) for faces, [`triergon-shape`](../shape) for bidi and
 OpenType shaping and [`triergon-raster`](../raster) for outlines and bitmaps.
 
+libass's results are the crate root's contract, as FreeType's are
+`triergon-font`'s. What libass decides about faces, shaping and drawing on
+top of those crates' roots the renderer takes from their `compat::libass`
+modules; `compat::libass` here gives the settings a player hands libass
+(`cache_limits`, as `ass_set_cache_limits` sets them).
+
 ## Usage
 
 ```rust
@@ -161,7 +167,7 @@ the value after the last `=`, the header fields by name, then style fields in th
 style named before the last `.` (ignoring case) or in all styles; values are
 stored as written, without the style line's conversions.
 
-**Override tags.** `Tags` lexes a `{...}` block as `ass_parse_tags` does, including
+**Override tags.** `Tags` lexes a `{...}` block as libass does, including
 VSFilter's argument rules: names match by prefix in libass's order, the rest of a
 plain tag's name is an argument after any parenthesised ones, a backslash inside
 parentheses makes the rest up to the next `)` one argument, and a missing `)` ends
@@ -175,7 +181,7 @@ and `strtoll` saturation clamped to 32 bits, reading from an argument's start.
 tabs are text escapes.
 
 **Evaluation.** `Context` walks an event's text at a time in milliseconds,
-applying blocks and yielding glyphs with a copy of the state, as `parse_events`
+applying blocks and yielding glyphs with a copy of the state, as libass
 does: the first `\pos`/`\move`, `\org`, `\fad`/`\fade` and `\an`/`\a` win; `\t`
 animates with `((t - t1) / (t2 - t1))^accel` and a `\t` inside a `\t` sets the
 power of the tags after it; colours animate per channel; `\r` resets to the
@@ -185,7 +191,7 @@ delay rescaling. `Syllables` gives libass's karaoke syllables from laid-out
 positions.
 
 **Drawings.** `Drawing::parse` reads `m n l b s p c` into a `triergon_raster::Outline`
-of lines and cubic splines in 26.6 fixed point (y down), as `ass_drawing_parse`:
+of lines and cubic splines in 26.6 fixed point (y down), as libass reads them:
 commands before the first valid `m` are ignored, an `n` first rejects the drawing
 (empty), incomplete point groups are consumed and dropped, B-splines are converted
 with libass's integer arithmetic, and a coordinate beyond ±(2^28 − 1) in 26.6 makes
@@ -213,7 +219,7 @@ selective style overrides), in the frame and storage size and margins of its
   libass selects on opening it; a face selected for a character it does not
   map is tried through each of its charmaps in turn and keeps the one that
   maps it, or the last, for every later lookup and for shaping until another
-  such lookup moves it (`ass_font_get_index`). That is how libass draws C1
+  such lookup moves it. That is how libass draws C1
   controls (U+0080 to U+009F) through a Macintosh Roman charmap. The retry is
   `Error::Unsupported` for a face with charmaps FreeType lists and
   `triergon-font` does not read, as is any lookup through a charmap whose
@@ -252,10 +258,10 @@ selective style overrides), in the frame and storage size and margins of its
   other and keep their place on later frames (the record lives with the event
   in the `Script`, and a refused frame changes none); fully transparent
   images are dropped.
-- **Change detection.** `Frame::change` is what libass's `ass_detect_change`
-  reports: `Change::Content` when the image count differs or an image's size,
-  stride, colour or bitmap does, `Change::Positions` when only places do,
-  else `Change::None`. Bitmaps are told apart as libass tells them apart, by
+- **Change detection.** `Frame::change` is the change value libass's
+  `ass_render_frame` reports: `Change::Content` when the image count differs
+  or an image's size, stride, colour or bitmap does, `Change::Positions` when
+  only places do, else `Change::None`. Bitmaps are told apart as libass tells them apart, by
   the cached composite they show: an image shows the same bitmap as one of
   the previous frame when it is the same part and window of the same
   composite. A run finds the composite of an equal key (its effects key, and
@@ -287,7 +293,7 @@ borders and the unit square of opaque boxes), glyph bitmaps (with a
 bitmap that draws nothing) and composited runs are kept between frames in one kind of cache, bounded by
 the outline count and the two byte limits. When a frame
 starts the composites, then the bitmaps, then the outlines are cut as libass
-cuts its caches (`ass_cache_cut`): least recently used first, until what is
+cuts its caches: least recently used first, until what is
 kept fits, never one the previous frame's images or another entry's key
 hold, which leaves the order and goes the moment nothing holds it; a run
 holds its glyphs' bitmaps while it is drawn, and a vector clip its bitmap. A cache is
@@ -324,8 +330,8 @@ convention asks:
 
 - `long`-width behaviour follows each target's libass. libass reads event times
   (`sscanf`'s `%d`), a Matroska packet's ReadOrder and the parameters of a
-  `Banner` or `Scroll` effect (`atoi`) through `strtol`, `parse_bool` calls
-  `strtol`, and the karaoke split rounds with `lrint`. A value beyond `int`
+  `Banner` or `Scroll` effect (`atoi`) through `strtol`, reads a header boolean
+  with `strtol`, and the karaoke split rounds with `lrint`. A value beyond `int`
   saturates at `long`'s range and is then narrowed to `int`, so it differs
   between 64-bit and 32-bit `long`; the crate converts these, and only these,
   through `core::ffi::c_long` in one module.
@@ -334,7 +340,7 @@ convention asks:
   range, and NaN is 0. Those are the casts libass makes for `\pbo` in a
   drawing glyph, an animated `\clip` or `\iclip`, `\fade`'s alpha and the
   delay of a `Banner` or `Scroll` effect (undefined out of range), and a
-  drawing coordinate in 26.6: `double_to_d6`'s `lrint`, whose result is
+  drawing coordinate in 26.6: `lrint(v * 64)`, whose result is
   unspecified beyond `long`'s range, narrowed from `long` to `int` (rounded as
   `triergon_raster::pixels_26_6` rounds). So an out-of-range drawing
   coordinate lies beyond the outline bound and discards the drawing, and a NaN
@@ -353,11 +359,11 @@ The renderer follows the same rule where libass's renderer converts: its
 `lrint`s (`triergon_core::round_ties_even_i32`: glyph boxes, advances and
 metrics), its `lround`s (the layout resolution, `\kf`'s split column, a
 `BorderStyle` 4 shadow, clip and scroll rectangles), its `(int)` casts (the
-collision box, line borders, the baseline shear, the content area) and
-`double_to_d6` (`triergon_raster::pixels_26_6`) all saturate at `int`'s range
-with NaN as 0, also where libass's `long` is 64 bits wide. Collision handling
+collision box, line borders, the baseline shear, the content area) and its
+26.6 conversions (`triergon_raster::pixels_26_6`) all saturate at `int`'s
+range with NaN as 0, also where libass's `long` is 64 bits wide. Collision handling
 sorts the boxes placed so far as libass does on glibc: `qsort` with
-`cmp_rect_y0`, which subtracts their tops in `int` and so overflows, undefined
+a comparison that subtracts their tops in `int` and so overflows, undefined
 in C and wrapping as GCC builds it, for tops 2³¹ or more apart, run as glibc's
 stable merge sort. While the tops lie closer that comparison is a total
 preorder and the crate orders them by value, keeping equal tops in the order

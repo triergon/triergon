@@ -1,6 +1,6 @@
-//! Collision handling (libass's `fix_collisions`): events of one layer that
-//! are placed by their margins move up or down out of each other's way, and
-//! keep the place they were given on later frames.
+//! Collision handling: events of one layer that are placed by their margins
+//! move up or down out of each other's way, and keep the place they were
+//! given on later frames.
 
 use std::ops::Range;
 
@@ -10,8 +10,7 @@ use super::images::Image;
 use crate::{Event, EventState, VAlign, charge};
 
 /// Where an event was placed by collision handling, kept with the event
-/// across frames (libass's `ASS_RenderPriv`). A record made by another
-/// renderer counts as none.
+/// across frames. A record made by another renderer counts as none.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Placed {
     renderer: u32,
@@ -35,7 +34,7 @@ impl Placed {
     }
 }
 
-/// One rendered event's box and images (libass's `EventImages`).
+/// One rendered event's box and images.
 #[derive(Debug)]
 pub(super) struct EventBox {
     pub event: usize,
@@ -122,8 +121,8 @@ impl Rect {
         !(self.y0 >= other.y1 || other.y0 >= self.y1 || self.x0 >= other.x1 || other.x0 >= self.x1)
     }
 
-    /// `cmp_rect_y0`: the difference of the tops in `int`, which wraps for
-    /// tops 2³¹ or more apart.
+    /// The difference of the tops in `int`, which wraps for tops 2³¹ or
+    /// more apart.
     const fn cmp_y0(&self, other: &Self) -> i32 {
         self.y0.wrapping_sub(other.y0)
     }
@@ -159,7 +158,7 @@ impl Fixed {
         self.boxes.try_push(rect).map_err(|e| e.error)
     }
 
-    /// Sorts the boxes as libass does on glibc: `qsort` with `cmp_rect_y0`,
+    /// Sorts the boxes as libass does on glibc: `qsort` by [`Rect::cmp_y0`],
     /// which glibc runs as a stable merge sort. While no two tops lie 2³¹ or
     /// more apart that orders them by value, boxes with equal tops in the
     /// order they were added; otherwise the order follows the sort's splits
@@ -174,7 +173,7 @@ impl Fixed {
         Ok(())
     }
 
-    /// Adds `rect` and sorts the boxes (`fit_rect`).
+    /// Adds `rect` and sorts the boxes.
     fn insert(&mut self, rect: Rect, work: &mut WorkBudget) -> Result<()> {
         self.push(rect)?;
         self.sort(work)
@@ -228,7 +227,7 @@ fn merge_sort(boxes: &mut [Rect], scratch: &mut [Rect]) {
     boxes[k..j].copy_from_slice(&first[i..]);
 }
 
-/// `shift_event`.
+/// Moves `event`'s box and images down by `shift` rows.
 fn shift(event: &mut EventBox, images: &mut [Image], shift: i32, frame_height: i32) {
     for image in &mut images[event.images.clone()] {
         image.shift(shift, frame_height);
@@ -236,8 +235,8 @@ fn shift(event: &mut EventBox, images: &mut [Image], shift: i32, frame_height: i
     event.rect = event.rect.shifted(shift);
 }
 
-/// `fit_rect`: the shift that moves `s` clear of every fixed box it meets,
-/// down or up; the moved box joins them.
+/// The shift that moves `s` clear of every fixed box it meets, down or up;
+/// the moved box joins them.
 fn fit(s: Rect, fixed: &mut Fixed, up: bool, work: &mut WorkBudget) -> Result<i32> {
     let mut shift: i32 = 0;
     let meets = |f: &Rect, shift: i32| {
@@ -264,7 +263,7 @@ fn fit(s: Rect, fixed: &mut Fixed, up: bool, work: &mut WorkBudget) -> Result<i3
     Ok(shift)
 }
 
-/// `fix_collisions` over the events of one layer and their records: those
+/// Collision handling over the events of one layer and their records: those
 /// placed before keep their place unless it changed height or now overlaps,
 /// the others move clear of them. Charged each event against those placed
 /// before it, and the sorts. `used` is reserved for every event before any
@@ -337,7 +336,7 @@ mod tests {
 
     #[test]
     fn tops_far_apart_sort_as_glibc_merges_them() {
-        // `cmp_rect_y0` wraps between the last box and the second, which
+        // `Rect::cmp_y0` wraps between the last box and the second, which
         // then compares below it: glibc's merge sort leaves the order as it
         // is, where sorting by value would move the last box first.
         let mut boxes = tops([-2_147_482_658, 989, -2_147_482_736]);

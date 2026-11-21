@@ -1,8 +1,7 @@
-//! Outlines as libass's outline cache builds them (`ass_outline_construct`):
-//! a glyph loaded at its drawn size without hinting, with libass's
-//! synthetic styles and decoration lines, or a drawing parsed, with its
-//! advance and the face's ascent and descent; and a glyph's border
-//! stroked.
+//! Outlines as libass's outline cache builds them: a glyph loaded at its
+//! drawn size without hinting, with libass's synthetic styles and
+//! decoration lines, or a drawing parsed, with its advance and the face's
+//! ascent and descent; and a glyph's border stroked.
 
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
@@ -58,7 +57,7 @@ impl Hash for KeptOutline {
     }
 }
 
-/// A border outline (libass's `BorderHashKey`): a glyph's outline stroked.
+/// A border outline: a glyph's outline stroked.
 #[derive(Debug)]
 struct BorderKey {
     glyph: KeptOutline,
@@ -95,7 +94,7 @@ pub(super) struct GlyphKey {
 /// the face and loading the glyph.
 const OUTLINE_UNITS: usize = 64;
 
-/// An outline's key in the cache (libass's `OutlineHashKey`).
+/// An outline's key in the cache.
 #[derive(Debug)]
 enum OutlineKey {
     Glyph(GlyphKey),
@@ -156,7 +155,7 @@ impl Outlines {
         }
     }
 
-    /// Cuts the cache to `limit` outlines (`ass_cache_cut`).
+    /// Cuts the cache to `limit` outlines.
     pub(super) fn cut(&mut self, limit: usize) {
         self.cache.cut(limit);
     }
@@ -228,7 +227,7 @@ impl Outlines {
     }
 
     /// The unit square opaque boxes are drawn from, which libass keeps as
-    /// an outline (`ass_render.c:1294-1309`, `1423`).
+    /// an outline.
     pub(super) fn unit_box(&mut self) -> Result<KeptOutline> {
         if let Some(Found::Value(found)) = self.cache.get(KeyRef::UnitBox) {
             return Ok(KeptOutline(found));
@@ -283,7 +282,7 @@ impl Outlines {
         let synthesis = libass::synthesis(source, font.weight(), font.slant());
         libass::synthesize(&sized, scratch, synthesis)?;
         // A glyph an `@` font draws rotated advances by its linear vertical
-        // advance (`d16_to_d6`, in `int`).
+        // advance, 16.16 rounded to 26.6 in `int`.
         let advance = if decorations.rotate {
             (metrics.linear_vertical_advance as i32).wrapping_add(512) >> 10
         } else {

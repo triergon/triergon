@@ -101,7 +101,7 @@ Translated from libass 0.17.5, module by module:
 | `text.rs`, `number.rs`, `c_long.rs` | `ass_utf8_get_char`, `ass_get_next_char`, `ass_strtod`, `mystrtoi32`, `parse_int_header` |
 | `drawing.rs` | `ass_drawing.c` |
 | `karaoke.rs` | `ass_process_karaoke_effects` |
-| `render/` | `ass_render_frame` and its stages in `ass_render.c`, `ass_shaper.c`, `ass_font.c` and `ass_cache.c`: text and wrapping (`wrap_lines_smart`), shaping, layout, outlines, bitmaps, placement, collisions (`fix_collisions`), images and caches |
+| `render/`, `compat/libass.rs` | `ass_render_frame` and its stages in `ass_render.c`, `ass_shaper.c`, `ass_font.c` and `ass_cache.c`: text and wrapping (`wrap_lines_smart`), shaping, layout, outlines, bitmaps, placement, collisions (`fix_collisions`), images and caches |
 
 ## triergon-raster
 

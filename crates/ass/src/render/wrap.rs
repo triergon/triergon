@@ -1,8 +1,7 @@
-//! Breaking an event's text into lines as libass does (`wrap_lines_smart`):
-//! a hard break after every `\N`, a soft one before a word that overflows
-//! (`wrap_lines_naive`), soft breaks moved back while that evens out the
-//! lines (`wrap_lines_rebalance`), the whitespace at the ends of each line
-//! trimmed (`trim_whitespace`) and the lines measured (`measure_text`).
+//! Breaking an event's text into lines as libass does: a hard break after
+//! every `\N`, a soft one before a word that overflows, soft breaks moved
+//! back while that evens out the lines, the whitespace at the ends of each
+//! line trimmed and the lines measured.
 
 use std::ops::Range;
 
@@ -51,9 +50,8 @@ pub(super) trait WrapText {
 pub(super) struct Line {
     /// Its characters, in text order.
     pub(super) chars: Range<usize>,
-    /// Those left after its leading and trailing whitespace is trimmed
-    /// (libass's `skip`); empty, at the line's end, for a line of
-    /// whitespace.
+    /// Those left after its leading and trailing whitespace is trimmed;
+    /// empty, at the line's end, for a line of whitespace.
     pub(super) shown: Range<usize>,
     /// Its ascent and descent in pixels.
     pub(super) asc: f64,
@@ -113,8 +111,8 @@ impl Lines {
         &self.lines[0]
     }
 
-    /// `wrap_lines_smart` over `chars`, which are not none: breaks,
-    /// balanced unless `\q1`, then the lines trimmed and measured.
+    /// Breaks `chars`, which are not none, into lines, balanced unless
+    /// `\q1`, then trims and measures the lines.
     pub(super) fn wrap(
         &mut self,
         chars: &impl WrapText,
@@ -128,8 +126,8 @@ impl Lines {
         self.measure(chars, wrapping)
     }
 
-    /// `wrap_lines_naive`: a hard break after every `\N`, a soft one after
-    /// the last space before a character that overflows.
+    /// A hard break after every `\N`, a soft one after the last space
+    /// before a character that overflows.
     fn break_naively(&mut self, chars: &impl WrapText, wrapping: &Wrapping<'_>) -> Result<()> {
         let starts = &mut self.starts;
         starts.clear();
@@ -166,10 +164,9 @@ impl Lines {
         Ok(())
     }
 
-    /// `wrap_lines_rebalance`: moves soft breaks back by a word while that
-    /// evens out the two lines around them; each pass over the text is
-    /// charged, as breaks only move back and a pass may move each by one
-    /// word.
+    /// Moves soft breaks back by a word while that evens out the two lines
+    /// around them; each pass over the text is charged, as breaks only move
+    /// back and a pass may move each by one word.
     fn rebalance(&mut self, chars: &impl WrapText, work: &mut WorkBudget) -> Result<()> {
         let starts = self.starts.as_mut_slice();
         loop {
@@ -213,9 +210,9 @@ impl Lines {
         }
     }
 
-    /// `measure_text`: each line's ascent and descent, the height and the
-    /// border extents. A line counts what trimming left of it, or, when
-    /// that is nothing, all of it, at half height if it is only a `\n`.
+    /// Each line's ascent and descent, the height and the border extents. A
+    /// line counts what trimming left of it, or, when that is nothing, all
+    /// of it, at half height if it is only a `\n`.
     fn measure(&mut self, chars: &impl WrapText, wrapping: &Wrapping<'_>) -> Result<()> {
         let scales = wrapping.scales;
         let starts = self.starts.as_slice();
@@ -270,8 +267,8 @@ impl Lines {
     }
 }
 
-/// `trim_whitespace` on one line: its leading spaces and `\n`s, and its
-/// trailing ones after its first character, are hidden.
+/// The characters of one line left shown: its leading spaces and `\n`s, and
+/// its trailing ones after its first character, are hidden.
 fn shown(chars: &impl WrapText, line: Range<usize>) -> Range<usize> {
     let is_space = |&i: &usize| chars.is_space(i);
     let lead = line.clone().take_while(is_space).count();

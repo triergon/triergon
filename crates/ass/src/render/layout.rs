@@ -1,8 +1,7 @@
 //! The third stage: a shaped event laid out as libass does. Every glyph's
-//! outline and metrics (`retrieve_glyphs`), the pen positions on one line
-//! (`preliminary_layout`), the lines ([`super::wrap`]), karaoke timing, the
-//! visual order (`reorder_text`), alignment (`align_lines`), the text box
-//! (`compute_string_bbox`) and the baseline shear (`apply_baseline_shear`).
+//! outline and metrics, the pen positions on one line, the lines
+//! ([`super::wrap`]), karaoke timing, the visual order, alignment, the text
+//! box and the baseline shear.
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget, round_ties_even_i32};
 use triergon_raster::{Vector, pixels_26_6};
@@ -47,8 +46,8 @@ pub(super) struct LaidGlyph {
     pub(super) pos: Vector,
 }
 
-/// A character's karaoke at the event's time: libass's `effect_type` and
-/// `effect_timing` after `ass_process_karaoke_effects`.
+/// A character's karaoke at the event's time, as its syllable
+/// ([`Syllables`]) times it.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Timing {
     pub(super) effect: Option<Karaoke>,
@@ -230,8 +229,8 @@ impl Layout {
         self.lines.fit()
     }
 
-    /// `retrieve_glyphs`: every glyph's outline, box, advance (for drawings)
-    /// and ascent and descent at its scale, cluster by cluster.
+    /// Every glyph's outline, box, advance (for drawings) and ascent and
+    /// descent at its scale, cluster by cluster.
     fn measure_glyphs(
         &mut self,
         input: &Input<'_, '_>,
@@ -254,9 +253,8 @@ impl Layout {
 
     /// Each cluster's advance: as shaped, or a drawing's width; widened
     /// after italic text that gives way to upright text to the box of the
-    /// last glyph with a width (`retrieve_glyphs`'s italic correction); and
-    /// letter spacing. Then each character's pen position on one unbroken
-    /// line (`preliminary_layout`).
+    /// last glyph with a width (the italic correction); and letter spacing.
+    /// Then each character's pen position on one unbroken line.
     fn measure_clusters(&mut self, text: &Text, shaped: &Shaped) -> Result<()> {
         let chars = text.chars();
         let own = |i: usize| &self.glyphs[shaped.clusters[i].glyphs.start];
@@ -298,8 +296,8 @@ impl Layout {
     }
 
     /// Each character's place in its line (shown, drawn, starting a run)
-    /// and its karaoke, timed by `ass_process_karaoke_effects` over its pen
-    /// position on one unbroken line.
+    /// and its karaoke, timed by [`Syllables`] over its pen position on one
+    /// unbroken line.
     fn lay_out_chars(&mut self, text: &Text, shaped: &Shaped, elapsed: i64) -> Result<()> {
         let chars = text.chars();
         self.karaoke.clear();
@@ -351,8 +349,7 @@ impl Layout {
         Ok(())
     }
 
-    /// `reorder_text`: the glyphs of shown characters placed in visual
-    /// order, line by line.
+    /// The glyphs of shown characters placed in visual order, line by line.
     fn reorder(&mut self, shaped: &Shaped, line_spacing: f64) {
         let mut pen = Vector::default();
         for (k, line) in self.lines.lines.iter().enumerate() {
@@ -403,7 +400,7 @@ impl Layout {
         width
     }
 
-    /// `align_lines`: each line shifted for its alignment and justification.
+    /// Each line shifted for its alignment and justification.
     fn align(
         &mut self,
         text: &Text,
@@ -443,7 +440,7 @@ impl Layout {
         }
     }
 
-    /// `compute_string_bbox`: the shown characters' extent, and the lines'.
+    /// The shown characters' extent, and the lines'.
     fn measure_text_box(&self, shaped: &Shaped) -> TextBox {
         let y_min = -self.lines.first().asc;
         let (mut x_min, mut x_max) = (32000.0_f64, -32000.0_f64);
@@ -467,10 +464,9 @@ impl Layout {
         }
     }
 
-    /// `apply_baseline_shear`: `\fay` raises each glyph by the advance before
-    /// it on its line or run, in visual order. libass resets at a run only
-    /// without the track's whole-text layout feature, which is never set
-    /// here.
+    /// `\fay` raises each glyph by the advance before it on its line or run,
+    /// in visual order. libass resets at a run only without the track's
+    /// whole-text layout feature, which is never set here.
     fn shear(&mut self, text: &Text, shaped: &Shaped) {
         for line in self.lines.lines.iter() {
             let mut shear: i32 = 0;
