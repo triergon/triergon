@@ -24,7 +24,8 @@ assert!(report.picture.key && out.len() == report.ts_bytes && out.len() % 188 ==
 
 `SessionConfig` holds `width`, `height`, `bit_rate`, `max_rate`, `vbv_bits`, `gop` and
 `mux` (a `mux::MuxConfig`). `SessionConfig::with_rate_rule(width, height, b)` sets
-`max_rate = b·7/5`, `vbv_bits = b/7`, `gop = 30` and the default multiplex. The
+`max_rate = b·7/5` (saturating), `vbv_bits = b/7`, `gop = 30` and the default
+multiplex. The
 component crates are re-exported as `pixel`, `mpeg1` and `mux`. `Session` also gives
 `geometry()`, `converted()` (the last converted input), `reconstruction()` and
 `vbv_underflow_bits()`.
@@ -55,11 +56,13 @@ comparison is on Linux AArch64.
   | `CaptureError` | Cause |
   |---|---|
   | `Pixel` | geometry not even, zero or above 4094; RGBA shorter than `width × height × 4` |
-  | `Encoder` | rate or intra period outside the encodable range |
+  | `Encoder` | rate, VBV buffer or intra period outside the encodable range; encoder storage refused |
   | `Mux` | a `MuxConfig` field the writer cannot represent (names, PIDs, program number, stream type) |
   | `Sink` | the sink refused or partially wrote the frame (`Sink::send` returned `false`) |
-  | `Closed` | an earlier `Sink` failure poisoned the session; open a new one |
+  | `Closed` | an earlier `Sink` failure closed the session; open a new one |
 
+  A `Pixel` or `Encoder` error from `encode` leaves the session as it was, so the
+  frame can be retried; a `Sink` failure closes it.
 - Planes and output buffers are plain `Vec`s owned by the session and reused across
   frames.
 

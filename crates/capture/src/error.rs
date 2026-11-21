@@ -1,19 +1,21 @@
 use std::fmt;
 
+/// The result of opening a session or capturing a frame.
 pub type Result<T> = std::result::Result<T, CaptureError>;
 
-/// Every failure is explicit; nothing is retried or replaced silently.
+/// Why a capture session refused to open or to capture a frame. Nothing is retried
+/// or replaced silently.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CaptureError {
-    /// Geometry or RGBA input length.
+    /// The frame geometry, or an RGBA frame shorter than it.
     Pixel(triergon_pixel::Error),
-    /// Rate, intra period or picture geometry.
+    /// Rates or an intra period the encoder refuses, or encoder storage refused.
     Encoder(triergon_codec_mpeg1::Error),
-    /// A declared multiplex field cannot be represented by the supported wire profile.
+    /// A multiplex field the writer cannot represent.
     Mux(triergon_core::Error),
-    /// The output sink refused or partially accepted the bytes of a frame.
+    /// The sink refused or only partly wrote a frame's bytes.
     Sink,
-    /// A previous failure poisoned the session; the caller must open a new one.
+    /// An earlier sink failure closed the session; open a new one.
     Closed,
 }
 
@@ -36,13 +38,9 @@ impl From<triergon_pixel::Error> for CaptureError {
         Self::Pixel(e)
     }
 }
+
 impl From<triergon_codec_mpeg1::Error> for CaptureError {
     fn from(e: triergon_codec_mpeg1::Error) -> Self {
         Self::Encoder(e)
-    }
-}
-impl From<triergon_core::Error> for CaptureError {
-    fn from(e: triergon_core::Error) -> Self {
-        Self::Mux(e)
     }
 }
