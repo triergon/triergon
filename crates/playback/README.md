@@ -57,6 +57,9 @@ format is unknown; its `PlaybackInput` holds a `SelectedInput` or a
 Both probes accept the MP4 opening boxes `ftyp`, `styp`, `moov`, `free`,
 `wide` and `mdat`. For transport streams they examine a 389-byte prefix and
 require exactly one of the TS188 and M2TS192 three-sync patterns to match.
+The raw Annex B probe selects AVC or HEVC at the first slice after its
+parameter sets. It reads each NAL's first five bytes and skips the rest of the
+NAL body in word-sized steps, charging one work unit per byte either way.
 MP4 needs an open and index step first: `mp4_open::Mp4Open` →
 `mp4_plan::Mp4IndexJob` → `Engine::mp4`.
 Indexed MP4 packets share immutable track metadata. A complete sample in a
