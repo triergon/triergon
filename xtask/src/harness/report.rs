@@ -1343,6 +1343,8 @@ pub(crate) fn collect(
             }
             if options.memory {
                 let index = rows.len();
+                let pinned_refusal =
+                    expected_for(case, &target).is_some_and(parity::pins_zero_output_refusal);
                 let registered = options.baseline_worker.is_none();
                 let workers = super::memory::WorkerPaths {
                     candidate: &candidate,
@@ -1368,6 +1370,7 @@ pub(crate) fn collect(
                                 memory_pairs,
                                 options.seed,
                                 &operation,
+                                pinned_refusal,
                             )
                         },
                     )?;
