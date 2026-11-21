@@ -82,8 +82,8 @@ fn scan_in_place_pending_best_cancel_reset_retained_alias() {
             feed.supply(&mut reader, r).unwrap();
         }
         if reader
-            .scan
-            .as_ref()
+            .seek_stage
+            .scan()
             .is_some_and(|s| s.best.is_some() && s.best_configuration.is_some())
             && reader.position() < fixture.raw.len() as u64
         {
@@ -124,11 +124,11 @@ fn scan_in_place_layout_and_late_fault_priority() {
     assert!(size_of::<Reader>() <= 10048);
     assert!(size_of::<PacketBatchJob>() <= 3408);
     println!(
-        "SCAN_INPLACE_LAYOUT|reader={}|batch={}|scan={}|scan_offset={}",
+        "SCAN_INPLACE_LAYOUT|reader={}|batch={}|scan={}|stage_offset={}",
         size_of::<Reader>(),
         size_of::<PacketBatchJob>(),
         size_of::<ScanState>(),
-        std::mem::offset_of!(Reader, scan)
+        std::mem::offset_of!(Reader, seek_stage)
     );
     let fixture = repeated(3, 256);
     let end = fixture.raw.len() - 1;

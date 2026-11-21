@@ -1,6 +1,8 @@
 //! Header refill is canonical and disabled while resolving, opening, seeking or
 //! scanning.
+use crate::reader::seeking::ScanState;
 use crate::reader::*;
+use crate::seek::plan::{LandingPlan, ScanPlan, SeekPlan};
 
 fn reader() -> Reader {
     let pool = Budget::new(128 * 1024).unwrap();
@@ -51,18 +53,42 @@ fn header_refill_is_canonical_and_disabled_for_resolver_opening_seek_and_scan() 
     reader.resolver = Some(Resolver::new(ResolvePurpose::Opening, &reader.pool));
     disabled(&reader);
     reader.resolver = None;
-    for mode in [
-        SeekMode::Plan,
-        SeekMode::Cue,
-        SeekMode::Scan,
-        SeekMode::Epoch,
-        SeekMode::InitialConfiguration,
-        SeekMode::Receipt,
+    let policy = ScanPlan {
+        start: 0,
+        stop: None,
+        target_ns: 0,
+        allow_first_after_target: false,
+        allow_first_after_negative_preroll: false,
+        replay_whole_cluster: false,
+    };
+    let plan = SeekPlan {
+        requested_ns: 0,
+        discard_until_ns: 0,
+        preroll_ns: 0,
+        subtitle_recovery_delay_ns: 0,
+        landing: LandingPlan::Scan(policy),
+    };
+    let receipt = SeekReceipt {
+        requested_ns: 0,
+        actual_ns: 0,
+        scanned_bytes: 0,
+        used_index: false,
+        discard_until_ns: 0,
+        preroll_ns: 0,
+        replays_from_start: false,
+    };
+    for stage in [
+        SeekStage::Plan(None),
+        SeekStage::Cue(plan),
+        SeekStage::Scan(ScanState::new(policy, plan, 0, false)),
+        SeekStage::Epoch(receipt),
+        SeekStage::InitialConfiguration(receipt),
+        SeekStage::Receipt(receipt),
     ] {
-        reader.seek_mode = mode;
+        reader.seek_stage = stage;
         disabled(&reader);
     }
-    reader.seek_mode = SeekMode::None;
+    reader.seek_stage = SeekStage::Idle;
     reader.scan_remaining = Some(100);
     disabled(&reader);
     reader.scan_remaining = None;

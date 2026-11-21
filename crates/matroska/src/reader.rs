@@ -59,7 +59,7 @@ mod seek_index;
 mod seeking;
 pub use blocking::BlockingReader;
 use resolving::{Opening, ResolvePurpose, Resolver};
-use seeking::{ReplayPrefix, ScanContext, ScanSimple, ScanState, SeekMode, SubtitleRecovery};
+use seeking::{ReplayPrefix, ScanContext, ScanSimple, SeekStage, SubtitleRecovery};
 mod projection;
 use projection::{LegacyEvent, LegacyProjection, PacketProjection, TypedProjection};
 
@@ -178,13 +178,9 @@ pub struct Reader {
     resolver: Option<Resolver>,
     pending_seek: Option<SeekRequest>,
     recovery_audio: RecoveryAudio,
-    seek_mode: SeekMode,
-    plan: Option<SeekPlanJob>,
-    seek_plan: Option<crate::seek::plan::SeekPlan>,
-    scan: Option<ScanState>,
+    seek_stage: SeekStage,
     subtitle_recovery: Option<SubtitleRecovery>,
     replay_prefix: Option<ReplayPrefix>,
-    seek_receipt: Option<SeekReceipt>,
     demux_read_bytes: u64,
     scan_remaining: Option<u64>,
     seek_metadata_bytes: u64,
@@ -254,13 +250,9 @@ impl Reader {
             resolver: None,
             pending_seek: None,
             recovery_audio: RecoveryAudio::Overlap,
-            seek_mode: SeekMode::None,
-            plan: None,
-            seek_plan: None,
-            scan: None,
+            seek_stage: SeekStage::Idle,
             subtitle_recovery: None,
             replay_prefix: None,
-            seek_receipt: None,
             demux_read_bytes: 0,
             scan_remaining: None,
             seek_metadata_bytes: 0,
@@ -458,13 +450,9 @@ impl Reader {
         self.resolver = None;
         self.pending_seek = None;
         self.recovery_audio = RecoveryAudio::Overlap;
-        self.seek_mode = SeekMode::None;
-        self.plan = None;
-        self.seek_plan = None;
-        self.scan = None;
+        self.seek_stage = SeekStage::Idle;
         self.subtitle_recovery = None;
         self.replay_prefix = None;
-        self.seek_receipt = None;
         self.scan_remaining = None;
         self.seek_metadata_bytes = 0;
         self.demux_read_bytes = 0;
@@ -587,8 +575,7 @@ impl Reader {
         if self.resolver.is_some()
             || self.opening.is_some()
             || self.pending_seek.is_some()
-            || !matches!(self.seek_mode, SeekMode::None)
-            || self.scan.is_some()
+            || !matches!(self.seek_stage, SeekStage::Idle)
             || self.scan_remaining.is_some()
             || !matches!(&self.state, State::Envelope)
         {
@@ -646,13 +633,9 @@ impl Reader {
         if self.pending_seek.is_none() || self.resolver.is_some() || self.opening.is_some() {
             return Ok(None);
         }
-        let stop = match self.seek_mode {
-            SeekMode::Scan => self
-                .scan
-                .as_ref()
-                .required("missing active scan")?
-                .read_ahead_stop(),
-            SeekMode::Epoch => {
+        let stop = match &self.seek_stage {
+            SeekStage::Scan(scan) => scan.read_ahead_stop(),
+            SeekStage::Epoch(_) => {
                 let State::Epoch(job) = &self.state else {
                     return Err(Error::Invalid("missing active epoch"));
                 };
@@ -679,13 +662,9 @@ impl Reader {
         if self.pending_seek.is_none() || self.resolver.is_some() || self.opening.is_some() {
             return Ok(None);
         }
-        let stop = match self.seek_mode {
-            SeekMode::Scan => self
-                .scan
-                .as_ref()
-                .required("missing active scan")?
-                .read_ahead_stop(),
-            SeekMode::Epoch => {
+        let stop = match &self.seek_stage {
+            SeekStage::Scan(scan) => scan.read_ahead_stop(),
+            SeekStage::Epoch(_) => {
                 let State::Epoch(job) = &self.state else {
                     return Err(Error::Invalid("missing active epoch"));
                 };
@@ -1598,9 +1577,9 @@ crate::storage::usage::storage!(Reader, |s| [
     s.seek_targets,
     s.state,
     s.resolver,
-    s.scan,
+    s.seek_stage.scan(),
     s.seek_index.as_deref(),
-    s.plan,
+    s.seek_stage.plan_job(),
     crate::storage::usage::Charge(s.adapter_storage)
 ]);
 

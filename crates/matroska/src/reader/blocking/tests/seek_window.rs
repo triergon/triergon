@@ -103,7 +103,7 @@ fn seek_window_epoch_certificate_keeps_public_hint_and_stops_before_replay() {
         {
             ParseStep::NeedInput(request) => {
                 if sought
-                    && matches!(reader.seek_mode, SeekMode::Epoch)
+                    && matches!(reader.seek_stage, SeekStage::Epoch(_))
                     && request.offset == reader.first_cluster.as_ref().unwrap().offset()
                     && request.maximum == 1
                 {
