@@ -26,6 +26,7 @@ pub struct SectionHeader {
 
 fn header(section: &Section, id: u8) -> Result<SectionHeader> {
     let data = section.bytes().as_ref();
+    // Sharing PSI field views added 10 instructions to reordered progressive TS playback.
     if data.len() < 12 || data[0] != id || section.crc_remainder() != Some(0) {
         return Err(Error::Invalid("PSI table identity/CRC"));
     }
