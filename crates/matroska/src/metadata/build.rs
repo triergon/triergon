@@ -289,12 +289,11 @@ impl DocumentJob {
             .get(index)
             .required("missing metadata node")?;
         let at = node.header as usize;
-        let (_, a, _) = ebml::vint(&raw[at..], true)?;
-        let (size, b, unknown) = ebml::vint(&raw[at + a..], false)?;
-        if unknown {
+        let head = ebml::header(&raw[at..])?;
+        let Some(size) = head.size else {
             return Err(Error::Invalid("unknown metadata child size"));
-        }
-        let start = at.checked_add(a + b).ok_or(Error::Overflow)?;
+        };
+        let start = at.checked_add(head.len).ok_or(Error::Overflow)?;
         let end = start
             .checked_add(usize::try_from(size).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
