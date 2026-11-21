@@ -1,9 +1,8 @@
-//! Isolated harness adapter. Serialization and process startup are outside timed work.
+//! The Matroska comparison worker: the traces, folds, timings and memory windows
+//! the harness compares with the reference. Serialization and process startup stay
+//! outside timed work.
 #![deny(unsafe_code)]
 #![cfg_attr(not(test), no_main)]
-// Pending: these rewrites change the generated code of measured hot paths and are
-// adopted with an A/B timing run.
-#![allow(clippy::redundant_closure_for_method_calls)]
 mod catalogue;
 use std::{
     fmt::Write as _,
@@ -21,7 +20,12 @@ use triergon_matroska::reference_trace::seek_initial_trim;
 use triergon_matroska::timing::ExactTime;
 use triergon_matroska::{BlockingReader as Demuxer, Limits, compat::clock::packet_timing};
 
-// Explicit private operation binding. Library defaults remain OwnedExact.
+/// The error a mode reports on stderr before the worker exits with failure.
+type Error = Box<dyn std::error::Error>;
+type Outcome = Result<(), Error>;
+
+/// A reader whose packets share their input windows (`SharedBounded`); the library
+/// default is `OwnedExact`.
 fn open_shared<R: Read>(source: R, limits: Limits) -> triergon_matroska::Result<Demuxer<R>> {
     Demuxer::open_with_payload_ownership(
         source,
@@ -30,6 +34,8 @@ fn open_shared<R: Read>(source: R, limits: Limits) -> triergon_matroska::Result<
     )
 }
 
+/// A seekable reader over the whole input, held as one charged allocation that the
+/// packets share.
 fn open_owned(
     data: Vec<u8>,
     limits: Limits,
@@ -45,6 +51,7 @@ fn open_owned(
     )
 }
 
+/// The reference's codec name for a CodecID, or the CodecID itself.
 fn codec(s: &str) -> &str {
     match s {
         "V_MPEG4/ISO/AVC" => "h264",
@@ -62,7 +69,8 @@ fn codec(s: &str) -> &str {
     }
 }
 
-fn sample_count(ns: u64, rate: f64) -> Result<u64, Box<dyn std::error::Error>> {
+/// `ns` nanoseconds as a rounded count of samples at an integral `rate` in Hz.
+fn sample_count(ns: u64, rate: f64) -> Result<u64, Error> {
     if rate.fract() != 0.0 || !(1.0..=u32::MAX as f64).contains(&rate) {
         return Err("unsupported sample-trim rate".into());
     }
@@ -70,11 +78,13 @@ fn sample_count(ns: u64, rate: f64) -> Result<u64, Box<dyn std::error::Error>> {
         (u128::from(ns) * u128::from(rate as u32) + 500_000_000) / 1_000_000_000,
     )?)
 }
+/// The samples to trim from the start and end of a packet: the CodecDelay on a
+/// track's `first` packet, then negative or positive DiscardPadding.
 fn trims(
     track: &triergon_matroska::Track,
     p: &triergon_matroska::Packet,
     first: bool,
-) -> Result<(u64, u64), Box<dyn std::error::Error>> {
+) -> Result<(u64, u64), Error> {
     let mut start = if first && track.kind == 2 {
         // Opus pre-skip is expressed in 48 kHz samples (RFC 7845 §5.1).
         let rate = if track.codec == "A_OPUS" {
@@ -101,6 +111,7 @@ fn trims(
     Ok((start, end))
 }
 
+/// A reader that returns at most `maximum` bytes per call.
 struct Short<R> {
     inner: R,
     maximum: usize,
@@ -112,6 +123,7 @@ impl<R: Read> Read for Short<R> {
     }
 }
 
+/// An exact time as a JSON rational, or `null`.
 fn exact(value: Option<ExactTime>) -> String {
     value.map_or("null".into(), |t| {
         format!(
@@ -122,7 +134,8 @@ fn exact(value: Option<ExactTime>) -> String {
     })
 }
 
-fn trace_source<R: Read>(mut demux: Demuxer<R>) -> Result<(), Box<dyn std::error::Error>> {
+/// Every packet's track and exact source time.
+fn trace_source<R: Read>(mut demux: Demuxer<R>) -> Outcome {
     let mut out = String::from("{\"schema\":1,\"packets\":[");
     let mut first = true;
     while let Some(p) = demux.next_packet(&AtomicBool::new(false))? {
@@ -154,7 +167,8 @@ fn decoder_packet(track: &triergon_matroska::Track, packet: &triergon_matroska::
         && packet.discard_padding_ns == 0)
 }
 
-fn trace_colour_source<R: Read>(d: Demuxer<R>) -> Result<(), Box<dyn std::error::Error>> {
+/// Every track's raw TrackEntry and source colour fields.
+fn trace_colour_source<R: Read>(d: Demuxer<R>) -> Outcome {
     let mut out = String::from("{\"schema\":1,\"tracks\":[");
     for (i, t) in d.tracks().iter().enumerate() {
         if i != 0 {
@@ -219,16 +233,15 @@ fn trace_colour_source<R: Read>(d: Demuxer<R>) -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
-fn trace<R: Read>(
-    mut d: Demuxer<R>,
-    initial_trim: bool,
-    codec_packets: bool,
-    metadata: u8,
-) -> Result<(), Box<dyn std::error::Error>> {
+/// The demux trace: tracks, then every packet in the reference's clock with its
+/// sample trims and payload, under `view`. `initial_trim` applies CodecDelay to each
+/// track's first packet.
+fn trace<R: Read>(mut d: Demuxer<R>, initial_trim: bool, view: View) -> Outcome {
+    let catalogue = view.metadata == Metadata::Catalogue;
     let mut out = format!(
         "{{\"schema\":{},\"operation\":{},\"tracks\":[",
-        if metadata == 2 { 2 } else { 1 },
-        quoted(if metadata == 2 {
+        if catalogue { 2 } else { 1 },
+        quoted(if catalogue {
             "container-catalogue-demux-v1"
         } else {
             "container-demux-v1"
@@ -251,7 +264,7 @@ fn trace<R: Read>(
             t.default,
             t.forced
         )?;
-        if metadata != 2 {
+        if !catalogue {
             write!(
                 out,
                 ",\"language\":{},\"name\":{}",
@@ -259,7 +272,7 @@ fn trace<R: Read>(
                 quoted(&t.name)
             )?;
         }
-        if metadata != 0 {
+        if view.metadata != Metadata::None {
             write!(
                 out,
                 ",\"colour\":{:?}",
@@ -273,7 +286,7 @@ fn trace<R: Read>(
     let mut first = true;
     let mut seen = vec![false; d.tracks().len()];
     while let Some(p) = d.next_packet(&cancel)? {
-        if codec_packets && !decoder_packet(&d.tracks()[p.track], &p) {
+        if view.codec_packets && !decoder_packet(&d.tracks()[p.track], &p) {
             continue;
         }
         let clock = packet_timing(p.timing)?;
@@ -290,13 +303,13 @@ fn trace<R: Read>(
             p.track,
             clock
                 .pts
-                .map(|t| t.rounded_ns())
+                .map(ExactTime::rounded_ns)
                 .transpose()?
                 .map_or("null".into(), |v| v.to_string()),
             p.dts_ns.map_or("null".into(), |v| v.to_string()),
             clock
                 .duration
-                .map(|t| t.rounded_duration_ns())
+                .map(ExactTime::rounded_duration_ns)
                 .transpose()?
                 .map_or("null".into(), |v| v.to_string()),
             p.keyframe,
@@ -309,7 +322,7 @@ fn trace<R: Read>(
         }
     }
     out.push(']');
-    if metadata == 2 {
+    if catalogue {
         catalogue::CatalogueView::new(&d)?.output(Some(&mut out), &mut 0)?;
     }
     out.push('}');
@@ -317,13 +330,18 @@ fn trace<R: Read>(
     Ok(())
 }
 
+/// Demuxes the input `iterations` times, after a block-start seek to `seek` when
+/// given, folding what `view` traces; returns the packets, payload bytes and digest.
+#[expect(
+    clippy::redundant_closure_for_method_calls,
+    reason = "method paths change this measured loop's code"
+)]
 fn run(
     data: &mut Vec<u8>,
     iterations: u32,
     seek: Option<i64>,
-    codec_packets: bool,
-    metadata: u8,
-) -> Result<(u64, u64, u64), Box<dyn std::error::Error>> {
+    view: View,
+) -> Result<(u64, u64, u64), Error> {
     let mut packets = 0;
     let mut bytes = 0;
     let mut digest = 0_u64;
@@ -339,7 +357,7 @@ fn run(
         for t in d.tracks() {
             fold_bytes(&mut digest, codec(&t.codec).as_bytes());
             fold_bytes(&mut digest, &t.codec_private);
-            if metadata != 2 {
+            if view.metadata != Metadata::Catalogue {
                 fold_bytes(&mut digest, t.language.as_bytes());
                 fold_bytes(&mut digest, t.name.as_bytes());
             }
@@ -354,7 +372,7 @@ fn run(
             ] {
                 fold(&mut digest, value);
             }
-            if metadata != 0 {
+            if view.metadata != Metadata::None {
                 for value in t.colour.unwrap_or_default().trace_fields()? {
                     fold(&mut digest, value as u64);
                 }
@@ -362,7 +380,7 @@ fn run(
         }
         let mut seen = vec![false; d.tracks().len()];
         while let Some(p) = d.next_packet(&cancel)? {
-            if codec_packets && !decoder_packet(&d.tracks()[p.track], &p) {
+            if view.codec_packets && !decoder_packet(&d.tracks()[p.track], &p) {
                 continue;
             }
             packets += 1;
@@ -390,10 +408,10 @@ fn run(
                 fold(&mut digest, value);
             }
         }
-        if metadata == 2 {
+        if view.metadata == Metadata::Catalogue {
             catalogue::CatalogueView::new(&d)?.output(None, &mut digest)?;
         }
-        // Match the old reverse-local drop order: bookkeeping before reader.
+        // Release the bookkeeping before the reader hands the input back.
         drop(seen);
         *data = d
             .into_inner()
@@ -425,21 +443,28 @@ extern "C" fn main(
     triergon_worker_entry::enter(worker_main)
 }
 
-type Outcome = Result<(), Box<dyn std::error::Error>>;
-
-/// What a demux fold or trace carries beyond the default view: only the packets a
-/// decoder receives (`codec-`), track colour (`metadata-`, 1) or the catalogue
-/// (`catalogue-`, 2).
+/// What a demux fold or trace carries beyond the default view.
 #[derive(Clone, Copy)]
 struct View {
+    /// Only the packets a decoder receives (`codec-`).
     codec_packets: bool,
-    metadata: u8,
+    metadata: Metadata,
+}
+
+/// The metadata a demux fold or trace adds to the tracks and packets.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Metadata {
+    None,
+    /// The colour fields of each track (`metadata-`).
+    Colour,
+    /// The catalogue in place of track languages and names (`catalogue-`).
+    Catalogue,
 }
 
 impl View {
     const PLAIN: Self = Self {
         codec_packets: false,
-        metadata: 0,
+        metadata: Metadata::None,
     };
 
     /// The view a mode's prefix names, and the mode without it.
@@ -449,11 +474,11 @@ impl View {
             metadata,
         };
         if let Some(rest) = mode.strip_prefix("codec-") {
-            (view(true, 0), rest)
+            (view(true, Metadata::None), rest)
         } else if let Some(rest) = mode.strip_prefix("metadata-") {
-            (view(false, 1), rest)
+            (view(false, Metadata::Colour), rest)
         } else if let Some(rest) = mode.strip_prefix("catalogue-") {
-            (view(false, 2), rest)
+            (view(false, Metadata::Catalogue), rest)
         } else {
             (Self::PLAIN, mode)
         }
@@ -505,19 +530,12 @@ fn entry() -> Outcome {
 /// through CHUNK-byte reads.
 #[inline(never)]
 fn traced(data: Vec<u8>, short: Option<&[String]>, view: View) -> Outcome {
-    let (codec_packets, metadata) = (view.codec_packets, view.metadata);
     match short {
-        None => trace(
-            open_owned(data, Limits::default())?,
-            true,
-            codec_packets,
-            metadata,
-        ),
+        None => trace(open_owned(data, Limits::default())?, true, view),
         Some(words) => trace(
             open_shared(self::short(&data, words)?, Limits::default())?,
             true,
-            codec_packets,
-            metadata,
+            view,
         ),
     }
 }
@@ -535,10 +553,7 @@ fn source(mode: &str, data: Vec<u8>, words: &[String]) -> Outcome {
 }
 
 /// The input read at most `CHUNK` bytes per call (the first word).
-fn short<'a>(
-    data: &'a Vec<u8>,
-    words: &[String],
-) -> Result<Short<Cursor<&'a Vec<u8>>>, Box<dyn std::error::Error>> {
+fn short<'a>(data: &'a Vec<u8>, words: &[String]) -> Result<Short<Cursor<&'a Vec<u8>>>, Error> {
     let n: usize = words.first().ok_or("missing chunk")?.parse()?;
     if n == 0 {
         return Err("zero chunk".into());
@@ -549,7 +564,8 @@ fn short<'a>(
     })
 }
 
-fn seek_target(words: &[String], at: usize) -> Result<i64, Box<dyn std::error::Error>> {
+/// The seek target in nanoseconds at word `at`.
+fn seek_target(words: &[String], at: usize) -> Result<i64, Error> {
     Ok(words.get(at).ok_or("missing seek target")?.parse()?)
 }
 
@@ -566,7 +582,7 @@ fn bench(mut data: Vec<u8>, words: &[String], seek: bool, view: View) -> Outcome
     } else {
         None
     };
-    let (packets, bytes, digest) = run(&mut data, n, seek, view.codec_packets, view.metadata)?;
+    let (packets, bytes, digest) = run(&mut data, n, seek, view)?;
     let ns = start.elapsed().as_nanos();
     println!(
         "{{\"schema\":1,\"iterations\":{n},\"elapsed_ns\":{ns},\"packets\":{packets},\"bytes\":{bytes},\"digest\":{digest}}}"
@@ -591,7 +607,7 @@ fn memory(mut data: Vec<u8>, words: &[String], seek: Option<bool>, view: View) -
             } else {
                 None
             };
-            run(&mut data, 1, seek, view.codec_packets, view.metadata)?
+            run(&mut data, 1, seek, view)?
         }
     };
     output.write_all(b"TRIERGON_END_V1\n")?;
@@ -619,7 +635,7 @@ fn seek_trace(data: Vec<u8>, words: &[String], playback: bool) -> Outcome {
         at_block_start(&mut demux, 0, target, &cancel)?
     };
     let initial_trim = seek_initial_trim(&demux, 0, &landing)?;
-    trace(demux, initial_trim, false, 0)
+    trace(demux, initial_trim, View::PLAIN)
 }
 
 /// `inflate FILE [OUTPUT_BYTES [EXPANSION_RATIO [WORK]]]`.

@@ -1,12 +1,40 @@
-//! Independent source-fact serialization. No serialization work enters timing.
-use std::{fmt::Write as _, io::Read, sync::atomic::AtomicBool};
+//! The segment metadata as source facts (`catalogue-source`) and as the reference's
+//! catalogue of global, track, chapter and attachment dictionaries (`catalogue-`
+//! views). Only the folds of the catalogue run inside timed work.
+use crate::Error;
+use std::{borrow::Cow, fmt::Write as _, io::Read, sync::atomic::AtomicBool};
 use triergon_harness_protocol::{
     digest::{fold, fold_bytes},
     hex, quoted,
 };
-use triergon_matroska::{BlockingReader as Demuxer, metadata::Document};
+use triergon_matroska::BlockingReader as Demuxer;
+use triergon_matroska::metadata::{self, Chapter, Document, Element, SimpleTag};
 
-fn document(out: &mut String, d: &Document) -> Result<(), Box<dyn std::error::Error>> {
+// Element IDs (RFC 9559) the catalogue reads.
+const DATE_UTC: u64 = 0x4461;
+const DURATION: u64 = 0x4489;
+const TAG_LANGUAGE: u64 = 0x447a;
+const ATTACHED_FILE: u64 = 0x61a7;
+const FILE_DATA: u64 = 0x465c;
+const FILE_NAME: u64 = 0x466e;
+const FILE_MEDIA_TYPE: u64 = 0x4660;
+const FILE_DESCRIPTION: u64 = 0x467e;
+const FILE_UID: u64 = 0x46ae;
+const TAG_TRACK_UID: u64 = 0x63c5;
+const TAG_CHAPTER_UID: u64 = 0x63c4;
+const TAG_ATTACHMENT_UID: u64 = 0x63c6;
+
+// The reference's stream disposition bits.
+const DEFAULT: u32 = 1;
+const DUB: u32 = 2;
+const ORIGINAL: u32 = 4;
+const COMMENT: u32 = 8;
+const FORCED: u32 = 64;
+const HEARING_IMPAIRED: u32 = 128;
+const VISUAL_IMPAIRED: u32 = 256;
+
+/// One document's kind, raw bytes and every node with its decoded value.
+fn document(out: &mut String, d: &Document) -> Result<(), Error> {
     write!(
         out,
         "{{\"kind\":{},\"source_offset\":{},\"raw\":{},\"nodes\":[",
@@ -38,12 +66,12 @@ fn document(out: &mut String, d: &Document) -> Result<(), Box<dyn std::error::Er
             } else {
                 "null".into()
             },
-            if e.id() == 0x4461 {
+            if e.id() == DATE_UTC {
                 e.sint()?.to_string()
             } else {
                 "null".into()
             },
-            if e.id() == 0x4489 {
+            if e.id() == DURATION {
                 quoted(&format!("{:016x}", e.float()?.to_bits()))
             } else {
                 "null".into()
@@ -53,7 +81,9 @@ fn document(out: &mut String, d: &Document) -> Result<(), Box<dyn std::error::Er
     out.push_str("]}");
     Ok(())
 }
-pub fn source<R: Read>(mut d: Demuxer<R>) -> Result<(), Box<dyn std::error::Error>> {
+/// `catalogue-source`: after reading every packet, the documents in source order and
+/// every track's source fields and flags.
+pub fn source<R: Read>(mut d: Demuxer<R>) -> Result<(), Error> {
     while d.next_packet(&AtomicBool::new(false))?.is_some() {}
     let mut out = String::from("{\"schema\":1,\"documents\":[");
     let mut documents: Vec<_> = d.metadata_documents().iter().collect();
@@ -96,12 +126,10 @@ pub fn source<R: Read>(mut d: Demuxer<R>) -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-use std::borrow::Cow;
-use triergon_matroska::metadata::{self, Chapter, Element, SimpleTag};
-type Error = Box<dyn std::error::Error>;
 type Pair<'a> = (Cow<'a, str>, Cow<'a, str>);
 
-/// Dictionaries commonly contain just one borrowed title. Keep that case inline.
+/// A tag dictionary: keys match without ASCII case and a later value replaces an
+/// earlier one. Dictionaries commonly hold just one borrowed title, kept inline.
 #[derive(Default)]
 pub enum Dictionary<'a> {
     #[default]
@@ -153,6 +181,8 @@ impl<'a> Dictionary<'a> {
         *self = Self::Rows(rows);
         Ok(())
     }
+    /// Folds the entries in key order into `digest` and, with `out`, writes them as
+    /// JSON pairs.
     fn output(&self, mut out: Option<&mut String>, digest: &mut u64) -> Result<(), Error> {
         match self {
             Self::Empty => {
@@ -204,8 +234,11 @@ struct AttachmentView<'a> {
     tags: Dictionary<'a>,
     data: &'a [u8],
 }
+/// The catalogue the reference builds from the tracks and segment metadata.
 pub struct CatalogueView<'a> {
     global: Dictionary<'a>,
+    /// Each track's TrackUID, disposition bits and tags. A tuple: a named struct here
+    /// changes the frame of the measured `catalogue-bench` loop.
     tracks: Vec<(u64, u32, Dictionary<'a>)>,
     chapters: Vec<ChapterView<'a>>,
     attachments: Vec<AttachmentView<'a>>,
@@ -248,6 +281,8 @@ fn civil_from_days(days: i32) -> (i32, i32, i32) {
     };
     (era * 400 + year_of_era + i32::from(month <= 2), month, day)
 }
+/// A SimpleTag and its nested tags as `PARENT/NAME` keys, with `-LANGUAGE` for a
+/// TagLanguage other than `und`.
 fn flatten_tag<'a>(
     tag: SimpleTag<'a>,
     prefix: &str,
@@ -260,7 +295,7 @@ fn flatten_tag<'a>(
         Cow::Owned(format!("{prefix}/{name}"))
     };
     if let Some(value) = tag.text()? {
-        let language = tag.0.string(0x447a)?.unwrap_or("und");
+        let language = tag.0.string(TAG_LANGUAGE)?.unwrap_or("und");
         let output_key = if language != "und" && !language.is_empty() {
             Cow::Owned(format!("{key}-{language}"))
         } else {
@@ -279,6 +314,7 @@ fn tag_values<'a>(tag: metadata::Tag<'a>, out: &mut Dictionary<'a>) -> Result<()
     }
     Ok(())
 }
+/// The last nonzero UID of element `kind` among a tag's Targets.
 fn target_id(target: Option<Element<'_>>, kind: u64) -> Result<Option<u64>, Error> {
     Ok(target
         .and_then(|e| e.children().filter(|v| v.id() == kind).last())
@@ -287,6 +323,7 @@ fn target_id(target: Option<Element<'_>>, kind: u64) -> Result<Option<u64>, Erro
         .filter(|v| *v != 0))
 }
 impl<'a> CatalogueView<'a> {
+    /// The catalogue of a reader that has read its segment metadata.
     pub fn new<R: Read>(d: &'a Demuxer<R>) -> Result<Self, Error> {
         let mut this = Self {
             global: Dictionary::default(),
@@ -295,30 +332,32 @@ impl<'a> CatalogueView<'a> {
             attachments: Vec::new(),
         };
         for t in d.tracks() {
-            let mut flags = u32::from(t.default) | if t.forced { 64 } else { 0 };
+            let mut disposition =
+                if t.default { DEFAULT } else { 0 } | if t.forced { FORCED } else { 0 };
             for (value, bit) in [
-                (t.original, 4),
-                (t.commentary, 8),
-                (t.hearing_impaired, 128),
-                (t.visual_impaired, 256),
+                (t.original, ORIGINAL),
+                (t.commentary, COMMENT),
+                (t.hearing_impaired, HEARING_IMPAIRED),
+                (t.visual_impaired, VISUAL_IMPAIRED),
             ] {
                 if value == Some(true) {
-                    flags |= bit;
+                    disposition |= bit;
                 }
             }
             if t.original == Some(false) {
-                flags |= 2;
+                disposition |= DUB;
             }
             let mut tags = Dictionary::default();
-            // The pinned native dictionary omits the exact undefined code. The
-            // source track retains it, and later explicit tags can override it.
+            // The reference's track dictionary omits the language `und` in exactly
+            // that case. The source track keeps it, and later explicit tags can
+            // override it.
             if t.language.as_ref() != "und" {
                 tags.set("language", t.language.as_ref())?;
             }
             if !t.name.is_empty() {
                 tags.set("title", t.name.as_str())?;
             }
-            this.tracks.push((t.uid, flags, tags));
+            this.tracks.push((t.uid, disposition, tags));
         }
         let mut last_start = i64::MIN;
         for doc in d.metadata_documents() {
@@ -351,25 +390,26 @@ impl<'a> CatalogueView<'a> {
                 }
             }
             if doc.kind() == metadata::ATTACHMENTS {
-                for e in doc.root().children().filter(|e| e.id() == 0x61a7) {
-                    let data = e.field(0x465c).ok_or("missing attachment data")?.raw();
+                for e in doc.root().children().filter(|e| e.id() == ATTACHED_FILE) {
+                    let data = e.field(FILE_DATA).ok_or("missing attachment data")?.raw();
                     if data.is_empty() {
                         continue;
                     }
                     let mut tags = Dictionary::default();
                     tags.set(
                         "filename",
-                        e.string(0x466e)?.ok_or("missing attachment filename")?,
+                        e.string(FILE_NAME)?.ok_or("missing attachment filename")?,
                     )?;
                     tags.set(
                         "mimetype",
-                        e.string(0x4660)?.ok_or("missing attachment MIME")?,
+                        e.string(FILE_MEDIA_TYPE)?
+                            .ok_or("missing attachment MIME")?,
                     )?;
-                    if let Some(v) = e.string(0x467e)? {
+                    if let Some(v) = e.string(FILE_DESCRIPTION)? {
                         tags.set("title", v)?;
                     }
                     this.attachments.push(AttachmentView {
-                        uid: e.number(0x46ae)?.ok_or("missing attachment UID")?,
+                        uid: e.number(FILE_UID)?.ok_or("missing attachment UID")?,
                         tags,
                         data,
                     });
@@ -379,9 +419,9 @@ impl<'a> CatalogueView<'a> {
         for doc in d.metadata_documents() {
             for tag in doc.tags() {
                 let target = tag.targets().map(|v| v.0);
-                let track = target_id(target, 0x63c5)?;
-                let chapter = target_id(target, 0x63c4)?;
-                let attachment = target_id(target, 0x63c6)?;
+                let track = target_id(target, TAG_TRACK_UID)?;
+                let chapter = target_id(target, TAG_CHAPTER_UID)?;
+                let attachment = target_id(target, TAG_ATTACHMENT_UID)?;
                 if let Some(uid) = attachment {
                     for a in &mut this.attachments {
                         if a.uid == uid {
@@ -395,9 +435,9 @@ impl<'a> CatalogueView<'a> {
                         }
                     }
                 } else if let Some(uid) = track {
-                    for (id, _, dict) in &mut this.tracks {
+                    for (id, _, tags) in &mut this.tracks {
                         if *id == uid {
-                            tag_values(tag, dict)?;
+                            tag_values(tag, tags)?;
                         }
                     }
                 } else {
@@ -407,6 +447,8 @@ impl<'a> CatalogueView<'a> {
         }
         Ok(this)
     }
+    /// Folds the catalogue into `digest` and, with `out`, appends it as the trace's
+    /// `catalogue` member.
     pub fn output(&self, mut out: Option<&mut String>, digest: &mut u64) -> Result<(), Error> {
         if let Some(o) = out.as_deref_mut() {
             o.push_str(",\"catalogue\":{\"global\":");
@@ -416,13 +458,13 @@ impl<'a> CatalogueView<'a> {
         if let Some(o) = out.as_deref_mut() {
             o.push_str(",\"tracks\":[");
         }
-        for (i, (_, flags, tags)) in self.tracks.iter().enumerate() {
-            fold(digest, u64::from(*flags));
+        for (i, (_, disposition, tags)) in self.tracks.iter().enumerate() {
+            fold(digest, u64::from(*disposition));
             if let Some(o) = out.as_deref_mut() {
                 if i != 0 {
                     o.push(',');
                 }
-                write!(o, "{{\"disposition\":{flags},\"tags\":")?;
+                write!(o, "{{\"disposition\":{disposition},\"tags\":")?;
             }
             tags.output(out.as_deref_mut(), digest)?;
             if let Some(o) = out.as_deref_mut() {
