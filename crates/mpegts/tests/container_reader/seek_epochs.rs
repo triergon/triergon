@@ -222,16 +222,13 @@ fn clock_and_configuration_selection_preserves_the_exact_decode_suffix() {
                 let mut timeline = 0;
                 while let Some(event) = next(&mut seeking, &pool, &raw, 127, 17).unwrap() {
                     match event {
-                        Event::Seek(receipt) => {
+                        Event::Seek(result) => {
                             assert!(!landed);
-                            assert_eq!(receipt.requested, target.target);
-                            assert_eq!(
-                                receipt.landing,
-                                landing.clock().unwrap().pts.exact.unwrap()
-                            );
-                            assert_eq!(receipt.discard_until, target.target);
-                            assert_eq!(receipt.method, SeekMethod::BoundedScan);
-                            assert_eq!(receipt.scanned_bytes, raw.len() as u64);
+                            assert_eq!(result.requested, target.target);
+                            assert_eq!(result.landing, landing.clock().unwrap().pts.exact.unwrap());
+                            assert_eq!(result.discard_until, target.target);
+                            assert_eq!(result.method, SeekMethod::BoundedScan);
+                            assert_eq!(result.scanned_bytes, raw.len() as u64);
                             assert_eq!(
                                 map_version,
                                 Some(landing.track_info().program_map().header.version)
@@ -311,7 +308,7 @@ fn selected_video_epoch_needs_its_own_preceding_random_access_picture() {
 }
 
 #[test]
-fn replay_refuses_a_changed_landing_without_a_seek_receipt() {
+fn replay_refuses_a_changed_landing_without_a_seek_result() {
     let make = |pts| {
         let mut ts = Transport::new();
         ts.tables(&[(0x0f, PID, &[])], 0);
@@ -509,10 +506,10 @@ fn tied_landings_stay_within_the_selected_epoch_and_keep_missing_dts() {
     let mut landed = false;
     while let Some(event) = next(&mut seeking, &pool, &ts.bytes, 7, 1).unwrap() {
         match event {
-            Event::Seek(receipt) => {
+            Event::Seek(result) => {
                 assert!(!landed);
-                assert_eq!(receipt.landing, clock(90_000));
-                assert_eq!(receipt.discard_until, clock(90_000));
+                assert_eq!(result.landing, clock(90_000));
+                assert_eq!(result.discard_until, clock(90_000));
                 landed = true;
             }
             Event::Packet(packet) => {
