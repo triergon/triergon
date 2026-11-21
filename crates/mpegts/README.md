@@ -218,6 +218,10 @@ Layer I/II, AVC or HEVC stream, the index can also hold restart checkpoints at
 in-band PAT/PMT carriers; a later seek compares those carriers byte for byte and
 reads no earlier bytes. Other landings replay the entity prefix.
 
+Construction-14 DTS-HD seeking also accepts a complete core and aligned XLL
+asset with static mode-zero navigation and component mask `0x201`. The core
+must have clear predictor history and the XLL recovery header must validate.
+
 The picture seek corpus includes an AVC to HEVC change on one TS188 PID.
 Playback preroll retains the in-band HEVC parameter sets and emits all
 twelve pictures through EOF. The [case](../../harness/features/mpegts-previous-picture/corpus.json)
