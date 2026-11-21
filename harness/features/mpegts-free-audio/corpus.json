@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "mpeg1-layer3",
+      "profile": "mpeg1-layer3",
+      "file": "harness/features/mpegts-free-audio/inputs/mpeg1-layer3.ts",
+      "sha256": "654a40adc6ca76bf1078e36e01c697a6c901a7b6501ae709bba7693dd969a1a2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 16980,
+        "digest": 12912296017534052218
+      }
+    },
+    {
+      "id": "mpeg1-layer3-split-header",
+      "profile": "mpeg1-layer3-split-header",
+      "file": "harness/features/mpegts-free-audio/inputs/mpeg1-layer3-split-header.m2ts",
+      "sha256": "64a6339f5afc9d49c145cfcb056340ca77df19ac6996c6ccab7a7375d00352ad",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 16980,
+        "digest": 8198491156401470770
+      }
+    },
+    {
+      "id": "mpeg1-layer1-padding",
+      "profile": "mpeg1-layer1-padding",
+      "file": "harness/features/mpegts-free-audio/inputs/mpeg1-layer1-padding.ts",
+      "sha256": "66db5b74707eaefec6f6bd2c073203633ad5a2ab0af63d03086430ac6e35f333",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "layer1-padding"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 392,
+        "digest": 11623776861355888868
+      }
+    },
+    {
+      "id": "mpeg1-layer1-padding-across-pes",
+      "profile": "mpeg1-layer1-padding-across-pes",
+      "file": "harness/features/mpegts-free-audio/inputs/mpeg1-layer1-padding-across-pes.ts",
+      "sha256": "eb062f43e2c48789342a65db3b1e2e39e67ceedefd67e867a01c73db49c8f7c5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "layer1-padding"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 392,
+        "digest": 4298237064361673253
+      }
+    },
+    {
+      "id": "mpeg2-layer2",
+      "profile": "mpeg2-layer2",
+      "file": "harness/features/mpegts-free-audio/inputs/mpeg2-layer2.ts",
+      "sha256": "81893f4ce3031deadbf7b04f803c6bdadf88891ecfe6a4e1d94cddfdd5328be1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 768,
+        "digest": 9737913900276368184
+      }
+    },
+    {
+      "id": "mpeg1-layer2-pts-dts",
+      "profile": "mpeg1-layer2-pts-dts",
+      "file": "harness/features/mpegts-free-audio/inputs/mpeg1-layer2-pts-dts.ts",
+      "sha256": "631db24ffd240dbaffb936404b029c14c42b27baaef6286f878faa7b38491033",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 768,
+        "digest": 7838786538033963912
+      }
+    },
+    {
+      "id": "mpeg2-layer1",
+      "profile": "mpeg2-layer1",
+      "file": "harness/features/mpegts-free-audio/inputs/mpeg2-layer1.ts",
+      "sha256": "4d1380bce64965791983fc1c6789ccf0f759761a733ebe74017fa0b1c8b5bb77",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 384,
+        "digest": 7853765717423845632
+      }
+    },
+    {
+      "id": "mpeg2-layer3",
+      "profile": "mpeg2-layer3",
+      "file": "harness/features/mpegts-free-audio/inputs/mpeg2-layer3.ts",
+      "sha256": "190dd92dc1fbf61123d0bf30d782f07de8054095f893c93b53bd4cfdd889976d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 384,
+        "digest": 18161591388617128944
+      }
+    }
+  ]
+}

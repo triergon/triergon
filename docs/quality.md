@@ -36,7 +36,7 @@ resource limit becomes an explicit, reviewed rule for that case.
   refused. With `TRIERGON_DOWNLOAD_CACHE` set, verified downloads are also kept in that
   directory under their hash and reused before any network access. CI keeps this
   cache between runs.
-- **Reference builds.** Each prepare command (`prepare-ffmpeg`, `fonts prepare`,
+- **Reference builds.** Each prepare command (`prepare-ffmpeg`, `prepare-mpg123`, `fonts prepare`,
   `shape prepare`, `raster prepare`, `ass prepare`) keys its build by the SHA-256 of
   what the build depends on besides its own directory: the xtask code that defines it
   (with its pinned source hashes, configure flags and link steps) and the worker link
@@ -82,6 +82,9 @@ resource limit becomes an explicit, reviewed rule for that case.
   capture output independently, and `capture` (gating) and `capture-small` for the
   capture comparison. The two capture profiles link FFmpeg's component libraries
   into the worker so the allocation observer can audit the code doing the work.
+- **DTS transport reference.** The `transport-dts` profile enables the MPEG-TS
+  demuxer and DTS parser for the [DVB DTS comparison](../harness/features/mpegts-dts-core/contract.json).
+  The worker uses the same transport fold as the formats reference.
 - **Container scope.** A candidate worker carries only the runner families its
   reference build can demux. `media-worker` reads Matroska for the `matroska` build's
   container harness; `playback-matroska-worker` runs Matroska startup and seek (`feed-`)

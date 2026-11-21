@@ -3117,17 +3117,46 @@ done
                     continue;
                 }
                 let id = &args[index + 1];
-                let inputs = format!("harness/features/{id}/inputs");
-                if !root.join(&inputs).is_dir() {
+                let directory = root.join(format!("harness/features/{id}/inputs"));
+                if !directory.is_dir() {
                     continue;
                 }
-                let corpus = format!("{id}={inputs}");
+                let prefix = format!("{id}=");
+                let mut feature_args = owned(&["--feature", id]);
+                for pair in args.windows(2) {
+                    if matches!(pair[0].as_str(), "--corpus" | "--manifest")
+                        && pair[1].starts_with(&prefix)
+                    {
+                        feature_args.extend_from_slice(pair);
+                    }
+                }
+                // A manifest can locate its inputs without a corpus override.
+                // Check the paths and pins the generated preflight actually uses.
+                let inputs = crate::harness::preflight::inputs(
+                    root,
+                    &feature_args,
+                    &crate::checks::read_json,
+                )
+                .unwrap();
+                let mut pinned = inputs
+                    .iter()
+                    .filter_map(|input| Some((&input.path, input.sha256.as_deref()?)))
+                    .peekable();
                 assert!(
-                    args.windows(2)
-                        .any(|pair| pair[0] == "--corpus" && pair[1] == corpus),
-                    "{}: preflight of {id} without --corpus {corpus}",
+                    pinned.peek().is_some(),
+                    "{}: preflight of {id} has no pinned inputs",
                     item.name
                 );
+                for (file, pin) in pinned {
+                    assert!(
+                        file.starts_with(&directory),
+                        "{}: preflight of {id} resolves {} outside {}",
+                        item.name,
+                        file.display(),
+                        directory.display()
+                    );
+                    assert_eq!(sha256::file_hex(file).unwrap(), pin, "{}", file.display());
+                }
             }
         }
     }

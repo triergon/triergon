@@ -14,3 +14,15 @@ payloads are opaque markers rather than decodable media.
 | `pmt-pointer-then-clean-pusi.ts` | `ts188-basic.ts` with an overrunning-pointer section inserted on the PMT PID before its PMT, whose continuity counter is advanced |
 
 `corpus.json` pins each file by SHA-256.
+
+
+The authored `dts-core-mono.dts` input contains 12 canonical 512-byte frames
+from a synthetic sine wave. The generated audio carries the repository's
+MIT or Apache-2.0 terms. The DTS transport controls rewrap these bytes without
+decoding. Its SHA-256 is
+`a1db20abc4bce08a504108de2998337f4d906eda3373acdc3abab39fcaaf1330`.
+
+```sh
+ffmpeg -f lavfi -i 'sine=frequency=523:sample_rate=48000:duration=0.128' \
+  -c:a dca -strict experimental -b:a 384k -f dts dts-core-mono.dts
+```

@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "id": "mpegts-free-audio",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "mpegts-free-format-frames",
+  "candidate": "transport-worker",
+  "worker_operation": "ts-free-audio-",
+  "reference": "mpg123-ts",
+  "contract": [
+    "Start with one preloaded TS188 or M2TS192 entity and select the program and elementary PID. Read that track's free-format MPEG audio frames through EOF.",
+    "The reference uses FFmpeg MPEG-TS with NOFILLIN and NOPARSE and no stream discovery. Feed each selected PES payload to mpg123's frame-by-frame parser and recover the original header and body through its public API. No audio samples are decoded.",
+    "Both workers fold every frame in order, including the applicable unclaimed source PTS and DTS, elementary byte offset, sample rate, samples per frame, byte length and every header and payload byte. The reference rejects skipped bytes and incomplete frames.",
+    "The reference reads the encoded clocks at the PES position reported by FFmpeg so a PTS-only PES keeps its absent DTS.",
+    "For layer1-padding, mpg123 resynchronizes at the next free-format Layer I header. Its body view covers one padding byte when Layer I requires one four-byte slot. The reference verifies the header and body against the retained PES payload, folds the remaining three source bytes, and requires the next reported frame to begin at the complete prior extent.",
+    "Controls cover all three layers for MPEG-1 and MPEG-2, including Layer I padding, distinct encoded PTS and DTS, and a coded 400 kb/s MPEG-1 Layer III stream with both ordinary PES splits and a header split across an M2TS PES boundary."
+  ],
+  "required_profiles": [
+    "mpeg1-layer3",
+    "mpeg1-layer3-split-header",
+    "mpeg1-layer1-padding",
+    "mpeg1-layer1-padding-across-pes",
+    "mpeg2-layer2",
+    "mpeg1-layer2-pts-dts",
+    "mpeg2-layer1",
+    "mpeg2-layer3"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

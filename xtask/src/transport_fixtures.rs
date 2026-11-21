@@ -1,6 +1,8 @@
 //! MPEG-TS AU controls, authored independently of the container and codec crates.
 //! PES requests remain separate rows; their input bytes never change.
 
+pub mod matched;
+
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -257,7 +259,7 @@ impl Transport {
 
     fn tables_for(&mut self, streams: &[(&Codec, u16, &[u8])]) -> R<()> {
         for (codec, _, descriptors) in streams {
-            if codec.dvb
+            if codec.name == "dvb-ac3"
                 && (descriptors.len() < 3
                     || descriptors[0] != 0x6a
                     || usize::from(descriptors[1]) + 2 != descriptors.len())
@@ -1032,6 +1034,49 @@ fn startup_pointer_case(codec: &Codec, table: &str, offset: usize) -> R<Case> {
     Ok(case)
 }
 
+fn mpeg_audio_cases() -> R<Vec<Case>> {
+    // Silent frames with a zero allocation table (Layers I/II) or zero side
+    // information and main data (Layer III). Lengths come from the frame
+    // header's bitrate, sample rate and layer in ISO/IEC 11172-3 / 13818-3.
+    let mut cases = Vec::new();
+    for (name, stream_type, header, size) in [
+        ("mpeg1-layer1", 0x03, [0xff, 0xff, 0x14, 0xc0], 32),
+        ("mpeg1-layer1-44100", 0x03, [0xff, 0xff, 0x10, 0xc0], 32),
+        ("mpeg1-layer2", 0x03, [0xff, 0xfd, 0x44, 0xc0], 192),
+        ("mpeg2-layer2", 0x04, [0xff, 0xf5, 0x44, 0xc0], 192),
+        ("mpeg2-layer3", 0x04, [0xff, 0xf3, 0x44, 0xc0], 96),
+    ] {
+        let mut frame = vec![0; size];
+        frame[..4].copy_from_slice(&header);
+        let codec = Codec {
+            name,
+            stream_type,
+            stream_id: 0xc0,
+            dvb: false,
+            bytes: Vec::new(),
+            first: 0,
+            header: 4,
+        };
+        let repeated = frame.repeat(3);
+        cases.push(authored_case(
+            &codec,
+            "multiple-per-pes",
+            &[part(&repeated, Some(90_000), None)],
+            false,
+        )?);
+        cases.push(authored_case(
+            &codec,
+            "header-across-pes",
+            &[
+                part(&repeated[..2], Some(90_000), None),
+                part(&repeated[2..], None, None),
+            ],
+            true,
+        )?);
+    }
+    Ok(cases)
+}
+
 fn all_cases(root: &Path) -> R<Vec<Case>> {
     let mut cases = original(root)?;
     for codec in [
@@ -1108,6 +1153,7 @@ fn all_cases(root: &Path) -> R<Vec<Case>> {
     cases.push(startup_pointer_case(&aac, "pmt", 188)?);
     cases.extend(latm_cases(&aac)?);
     cases.extend(adts_unbounded_cases(&aac)?);
+    cases.extend(mpeg_audio_cases()?);
     Ok(cases)
 }
 
@@ -1133,6 +1179,7 @@ fn contract(cases: &[Case]) -> R<Value> {
                 "The 97 retained PES input/argument tuples preserve their 272 request associations and use parser-enabled AU expectations. Opaque, damaged and unsupported inputs remain observations that may fail; they are never reclassified as genuine access units or removed.",
                 "Additional controls reuse pinned coded AVC, HEVC, AAC-LC and AC-3 bytes with independently authored PAT/PMT, PES packetization and source clocks. They include multiple AUs per PES, one AU across PES, header-only and truncated EOF, missing clocks, PTS/DTS, 33-bit wrap, M2TS192 and interleaved AC-3/AAC source clocks with delayed AC-3 output. Ordered controls cover ADTS across entities, an M2TS initialization section and AC-3 lookahead at a discontinuity. DVB AC-3 has explicit caller-declared descriptor namespace.",
                 "The coded 32 kHz DVB E-AC-3 control reuses the complete TS188 fixture. It compares both streams in the selected program with an explicit caller-declared DVB namespace.",
+                "The MPEG audio controls cover MPEG-1 Layers I/II and MPEG-2 Layers II/III, including fractional 90 kHz durations, multiple frames in one PES, a header split between PES packets and a 192-byte carrier. The reference formats build enables its MPEG audio parser.",
                 "The ATSC audio controls use direct private stream types 0x81 and 0x87 with two complete syncframes in one PES and an explicit caller-declared ATSC namespace.",
                 "The ADTS fragment controls compare opaque bytes across consecutive PES packets, leading bytes before a complete envelope and trailing bytes at logical EOF, including shared and separate PES timestamps. The candidate uses the ADTS packet policy and keeps fragments separate from complete access units.",
                 "The Annex B EOF policy can report an unframed run of validated AVC or HEVC PES bytes with no start code. The candidate folds that observation as opaque parser output, separately from complete video access units.",
@@ -1621,7 +1668,7 @@ mod tests {
     fn original_inputs_arguments_and_all272_request_associations_are_unchanged() {
         let original = read_json(&root().join(ORIGINAL)).unwrap();
         let generated = all_cases(root()).unwrap();
-        assert_eq!(generated.len(), 169);
+        assert_eq!(generated.len(), 179);
         for (old, new) in cases(&original).unwrap().iter().zip(&generated) {
             assert!(new.bytes.is_none());
             for key in [
@@ -1867,7 +1914,7 @@ mod tests {
         assert_eq!(au.prefix, "ts-au-");
         assert_eq!(au.candidate, "transport-worker");
         assert_eq!(au.reference, "ffmpeg-formats-native");
-        assert_eq!(au.cases.len(), 169);
+        assert_eq!(au.cases.len(), 179);
         let contract = read_json(&au.contract).unwrap();
         assert_eq!(
             contract.get("required_profiles"),

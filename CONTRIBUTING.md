@@ -5,7 +5,7 @@
 You need Rust (see `rust-version` in `Cargo.toml`; `build-workers` and the full check
 also install the dated nightly toolchain pinned in xtask, which builds the AAC codec
 worker and the SIMD lane), Python 3, a C compiler,
-a C++ compiler and `make` (for the FFmpeg, FreeType, HarfBuzz, FriBidi and libass builds),
+a C++ compiler and `make` (for the FFmpeg, FreeType, HarfBuzz, FriBidi, libass and mpg123 builds),
 `pkg-config` and zlib headers (NASM on x86), and `zstd` (for zstd-compressed evidence sets
 and their test). The references are only needed for differential and performance work.
 
@@ -75,7 +75,7 @@ benchmarks assume it.
   `harness/codecs/`, the capture input generator `harness/capture/generate_inputs.py`
   (numpy's PCG64 generator and float draws; the cited capture inputs must not change)
   and fixture authoring scripts. C is used only for workers that link a reference
-  (FFmpeg, FreeType, HarfBuzz, FriBidi and libass).
+  (FFmpeg, FreeType, HarfBuzz, FriBidi, libass and mpg123).
 
 ## Changing behaviour
 

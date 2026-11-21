@@ -8,7 +8,7 @@ continuity, assembles PSI sections and PAT/PMT tables, and assembles PES
 packets with their raw timestamps. `Reader` composes those source facts with
 the existing framers to implement `ContainerReader` over complete access units.
 A PES is a byte run, never an access-unit packet. Decoding belongs to the codec
-crates. The crate does no I/O and does not seek. The `mux` module writes a
+crates. The crate does no I/O. The `mux` module writes a
 single-program stream for one video elementary stream ([Writing TS](#writing-ts)).
 
 The crate exposes two views:
@@ -130,8 +130,17 @@ reuse the parser's original bytes.
 opens a sequential TS188 source. Set `ReaderLimits::format` for M2TS192, and
 `program` to select a program explicitly. Without a selection, the PAT must
 contain exactly one media program. `ContainerReader` supplies the normal
-input-window, work, cancellation, backpressure and reset protocol. Seeking
-returns `Error::Unsupported` without changing reader state.
+input-window, work, cancellation, backpressure and reset protocol.
+
+`Reader::request_seek` scans one seekable, length-known entity for the last
+coded AVC or HEVC random-access picture at or before the requested presentation
+time. It is bounded by `ReaderLimits::maximum_seek_scan_bytes` (64 MiB by default).
+It preserves original packet bytes, clocks and source ranges by retaining a
+bounded single-track suffix or by replaying the entity. An `Event::Seek` precedes
+the landing packet and carries the requested discard time for `PlaybackPreroll`.
+Decoder setup is the caller's
+responsibility. Seek refuses unresolved random-access timestamps, changes
+of the selected track's source epoch, ambiguous clock wraps, and continued entities.
 
 Use `Reader::new_with_packet_tracks` when the caller has already chosen the
 elementary PIDs. Only those PIDs allocate access-unit framers and produce
@@ -166,9 +175,27 @@ physical coordinates. Call `finish` on the last entity to drain the logical
 stream. A reset starts the current entity again with fresh transport state.
 The boundary semantics follow [RFC 8216 sections 3 and 4.3.2.3](https://www.rfc-editor.org/rfc/rfc8216#section-3).
 
-The admitted carriages are AVC and HEVC Annex B, single-block ADTS AAC-LC,
-LATM in LOAS, AC-3 and E-AC-3 with explicitly declared DVB or ATSC signalling,
-and DVB subtitle segments.
+The admitted carriages are AVC and HEVC Annex B, MPEG-1 and MPEG-2 audio,
+single-block ADTS AAC-LC, LATM in LOAS, AC-3 and E-AC-3 with explicitly
+declared DVB or ATSC signalling, DVB-signalled DTS core, and DVB subtitle segments.
+
+For MPEG audio, PMT stream types `0x03` and `0x04` select Layer I, II and III
+frame parsing in audio PES packets (`0xc0`–`0xdf`). The reader can assemble a
+frame across PES boundaries and retains its original bytes and PES ranges.
+`MpegAudioFrame::header` exposes the coded layer, rate and sample count.
+The packet's sample duration is exact. When the bitrate index is zero, the
+reader confirms two consecutive frame spacings with matching version, layer
+and sample rate. It accounts for the original padding slots and bounds each
+frame by `ReaderLimits::maximum_audio_frame_bytes`. The header exposed to the
+caller retains the zero bitrate index. MPEG-2.5 rates are unsupported.
+See [H.222.0 Tables 2-22 and 2-34](https://www.itu.int/rec/T-REC-H.222.0-201808-S/en).
+
+For DTS core, select a DVB descriptor namespace and carry the DTS descriptor
+(`0x7b`) on a private-data PMT entry (`0x06`). The reader frames canonical normal
+DTS core packets, including headers and bodies split across PES packets.
+`DtsAudioFrame` carries the exact sample span and original frame bytes. The
+packet retains its source clocks and PES ranges.
+See [ETSI EN 300 468 Annex G](https://www.etsi.org/deliver/etsi_en/300400_300499/300468/01.18.01_60/en_300468v011801p.pdf).
 For ATSC, set `ReaderLimits::descriptor_namespace` to `DescriptorNamespace::Atsc`
 to interpret `0x81` as AC-3 and `0x87` as E-AC-3. Both require PES stream ID
 `0xbd`. ATSC E-AC-3 supports a six-block independent syncframe with its
@@ -180,7 +207,7 @@ See [A/53 Part 3 §5.5.2 and §5.7](https://www.atsc.org/wp-content/uploads/2023
 and [A/52 Annex G §3.3](https://www.atsc.org/wp-content/uploads/2021/04/A52-2018.pdf).
 
 Existing framers delimit the complete source bytes before decoder-feed conversion.
-MPEG audio/video, other subtitle carriages and ambiguous private streams currently emit
+MPEG-1/2 video, other subtitle carriages and ambiguous private streams currently emit
 `ReaderEvent::Unsupported`. Their original PMTs and PES remain available as source events.
 For DVB AC-3, an elementary `AC-3` registration can corroborate descriptor `0x6a`.
 
@@ -609,7 +636,7 @@ pipeline ([triergon-capture](../capture/README.md#conformance)).
   stream type and stream ID (`DemuxScope`). Contexts outside the observed
   profile return `Error::Unsupported`.
 - **Not handled.** SI tables beyond PAT/PMT (their packets are still reported),
-  ATSC/Blu-ray signalling, descrambling, seeking, multi-program PES output.
+  ATSC/Blu-ray signalling, descrambling, multi-program PES output.
 
 ## Conformance
 

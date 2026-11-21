@@ -793,7 +793,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 15] = [
+const PROFILE_REFERENCES: [ProfileReference; 18] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -816,6 +816,42 @@ const PROFILE_REFERENCES: [ProfileReference; 15] = [
         packages: CONTAINER_PACKAGES,
         options: CONTAINER_OPTIONS,
         identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-formats",
+        binary: "ffmpeg-ts-seek-worker",
+        source: "harness/reference_ts_matched.c",
+        record: "ffmpeg-ts-seek",
+        kind: "FFmpeg MPEG-TS access-unit scan and replay by preceding picture",
+        libraries: "ts_seek_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-transport-dts",
+        binary: "ffmpeg-transport-dts-worker",
+        source: "harness/reference_ts_worker.c",
+        record: "ffmpeg-transport-dts",
+        kind: "FFmpeg MPEG-TS and DTS core access units",
+        libraries: "transport_dts_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: crate::mpg123::CACHE,
+        linked: &[".research/reference-formats"],
+        binary: "mpg123-ts-worker",
+        source: "harness/reference_ts_matched.c",
+        define: Some("-DTRIERGON_REFERENCE_MPG123=1"),
+        record: "mpg123-ts",
+        kind: "FFmpeg MPEG-TS demuxer and mpg123 free-format frame parser",
+        libraries: "ts_free_audio_reference",
+        packages: &["libavformat", "libavcodec", "libavutil", "libmpg123"],
+        options: CONTAINER_OPTIONS,
+        prepared: Some(crate::mpg123::verify),
         ..REFERENCE
     },
     ProfileReference {

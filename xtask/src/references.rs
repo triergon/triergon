@@ -82,9 +82,10 @@ pub struct Build {
     links: &'static [&'static str],
 }
 
-pub const BUILDS: [Build; 10] = [
+pub const BUILDS: [Build; 12] = [
     ffmpeg("ffmpeg-matroska", ".research/reference"),
     ffmpeg("ffmpeg-formats", ".research/reference-formats"),
+    ffmpeg("ffmpeg-transport-dts", ".research/reference-transport-dts"),
     ffmpeg("ffmpeg-video", ".research/reference-video"),
     ffmpeg("ffmpeg-subtitles", ".research/reference-subtitles"),
     ffmpeg("ffmpeg-decode", ".research/reference-decode"),
@@ -110,6 +111,12 @@ pub const BUILDS: [Build; 10] = [
         directory: ".research/libass",
         recipe: &["xtask/src/raster/reference.rs"],
         links: &["freetype", "harfbuzz"],
+    },
+    Build {
+        name: "mpg123",
+        directory: crate::mpg123::CACHE,
+        recipe: &["xtask/src/mpg123.rs"],
+        links: &[],
     },
 ];
 

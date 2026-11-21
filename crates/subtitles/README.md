@@ -132,11 +132,12 @@ sample-description defaults and font table. `tx3g_semantics::SemanticJob`
 resolves all defined sample modifiers into style runs, highlight, karaoke,
 hyperlink, blink, wrap, scroll and disparity intents; see
 [TX3G-SEMANTICS.md](src/text/TX3G-SEMANTICS.md). `compat::mov_text::Decoder`
-converts a sample to the ASS event and header FFmpeg's mov_text decoder emits.
-Where a style record or the highlight starts or ends it writes FFmpeg's override
-tags in FFmpeg's order and digits, also at a NUL that ends the visible text but
-not at the end of the text; a font name it would write that is not UTF-8, or
-holds U+FFFE, refuses the sample as such text does.
+converts a sample to the ASS event and header FFmpeg's mov_text decoder emits. Each
+packet stages its event prefix in a 64-byte buffer and writes the text and tags
+straight to the event's output. Where a style record or the highlight starts or ends
+it writes FFmpeg's override tags in FFmpeg's order and digits, also at a NUL that
+ends the visible text but not at the end of the text; a font name it would write
+that is not UTF-8, or holds U+FFFE, refuses the sample as such text does.
 
 **Charsets.** Selected explicitly with `text::Encoding` or a label resolver;
 there is no detection from content, language or file name.
@@ -147,6 +148,12 @@ there is no detection from content, language or file name.
 | Single-byte | ASCII, ISO-8859-1, Windows-1251, Windows-1252 (`Charset::from_label`) |
 | Multibyte | GBK/CP936, Big5, Shift-JIS, EUC-KR, Windows-932/949/950 (`MultibyteCharset::from_label`) |
 | FFmpeg/glibc labels | `compat::charset::receiver_charset` and `receiver_charset_with_glibc_euc_kr` map ASS charset labels to the repertoire the reference build accepts |
+
+`charset::CharsetJob` counts the output first, allocates it exactly, then
+encodes. A single-byte profile counts and encodes up to 4096 source bytes a step,
+at a unit per source byte counted and per source and output byte encoded, as a
+byte-at-a-time conversion would charge; a step ends before a character the work
+budget does not cover in full.
 
 Standalone ASCII bytes decode directly in the multibyte profiles. Historical
 Shift-JIS decodes 0x5C as yen and 0x7E as overline.
