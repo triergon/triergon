@@ -7,9 +7,11 @@ configuration in encoded edit plans. It parses boxes, sample tables, fragments,
 edit lists and seek indexes, and reads sample payloads by byte range. It does no
 I/O of its own, decodes no codec, and does not apply edits to presentation.
 
-`Reader` implements the core `ContainerReader` over the source view, so the crate
-works in generic code and inside `triergon::AnyReader`. The modules below stay
-available for finer control.
+`Reader` is the way to open a file and read its packets. It implements the core
+`ContainerReader` over the source view, so the crate works in generic code and
+inside `triergon::AnyReader` (see [Container reader](#container-reader)). The
+modules are the parts it is built from, for a caller that needs a table, a
+fragment, a seek plan or FFmpeg's packet order on its own.
 
 `media_kind(&handler)` classifies an `hdlr` handler code without allocating,
 using the same mapping as `Track`'s kind. Unknown handlers stay unknown.
@@ -46,8 +48,44 @@ that traversal. Each replay has its own entry limit.
 
 ## Usage
 
-All parsers are polled. Each `poll` takes a `WorkBudget` (and usually a cancel
-flag). Readers of the input return the core `Step`, whose `NeedInput` the shared
+Every packet of a file, through `Reader`:
+
+```rust
+use std::sync::atomic::AtomicBool;
+use triergon_core::container::{ContainerReader, Event, PacketInfo};
+use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget};
+use triergon_isobmff::{Reader, ReaderLimits};
+
+# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/r-multitrack.mov");
+let file = std::fs::read(path)?; // any transport; the reader does no I/O
+let pool = Budget::new(64 << 20)?;
+let caps = SourceCapabilities { length: Some(file.len() as u64), random_access: true };
+let mut reader = Reader::new(&pool, SourceId(1), caps, ReaderLimits::default(), 64 * 1024)?;
+let cancel = AtomicBool::new(false);
+let mut bytes_read = 0;
+loop {
+    match reader.step(&mut WorkBudget::new(1 << 16), &cancel)? {
+        // packet.track(), packet.pts(), packet.dts(), packet.random_access(), packet.sample()
+        Step::Ready(Event::Packet(packet)) => bytes_read += packet.payload().len(),
+        Step::Ready(_) => {} // root boxes, tracks becoming available, seek receipts
+        Step::NeedInput(req) => match file.get(usize::try_from(req.offset)?..) {
+            Some(rest) if !rest.is_empty() => {
+                let bytes = Bytes::copy_from_slice(&pool, &rest[..rest.len().min(req.maximum)])?;
+                reader.provide(&InputWindow::new(req.source, req.token, req.offset, bytes)?)?;
+            }
+            _ => reader.finish(req.source, req.token)?,
+        },
+        Step::Yield => {} // step budget spent
+        Step::Backpressure(_) => {} // drop retained packets, then step again
+        Step::End(_) => break,
+    }
+}
+assert!(bytes_read > 0 && !reader.tracks().is_empty());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The modules are polled the same way. Each `poll` takes a `WorkBudget` (and usually a
+cancel flag). Readers of the input return the core `Step`, whose `NeedInput` the shared
 `InputCursor` satisfies. Walks over parsed boxes and tables return `Next`
 (`Item`, `Yield`, `End`); builders return `BuildStatus` and are then finished;
 cursors whose items are taken separately return `CursorStatus`.
@@ -82,6 +120,9 @@ starts each track's packets from the state its own seek reached at the selected
 entry instead of replaying the track from its first sample. Source seek plans
 continue a fragment run's lookup from one sample to the next and step over the
 samples before a target without building them.
+
+The same file through the modules: its root boxes, one track's sample table, and
+that track's samples read by byte range.
 
 ```rust
 use std::sync::atomic::AtomicBool;
