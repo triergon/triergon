@@ -1,0 +1,1366 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "charset-big5-ascii",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-big5-ascii.assp",
+      "sha256": "8953c87303e227f94cf41b1dcee0a2f9ab2f7d2103aa03ba1740b1c905377c9b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 5485960554702752338
+      }
+    },
+    {
+      "id": "charset-big5-empty",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-big5-empty.assp",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-big5-invalid-trail",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-big5-invalid-trail.assp",
+      "sha256": "e0db046aabbae85860a0f4c0d5db8ea7ae57c31b8b70a2e5c79ba57d24f4a033",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-big5-nomapping-a15a",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-big5-nomapping-a15a.assp",
+      "sha256": "ba95a34555b115493cf828b8741753b30d1b67159e8f083352a164c24eeab208",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057370656
+      }
+    },
+    {
+      "id": "charset-big5-nomapping-a1c3",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-big5-nomapping-a1c3.assp",
+      "sha256": "6072945cfbe4ae90374cf2117c4549a3cf7da056425c5ad083777e18706324a6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057384434
+      }
+    },
+    {
+      "id": "charset-big5-nomapping-a1c5",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-big5-nomapping-a1c5.assp",
+      "sha256": "ec145050e41089b809952db41e7e515aafc0a03655cc878c69f3a3cab8620273",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 22,
+        "digest": 15697189562099617538
+      }
+    },
+    {
+      "id": "charset-big5-nomapping-a1fe",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-big5-nomapping-a1fe.assp",
+      "sha256": "baf7d8bd8b4471f3ee93018b4576eb41bf39c87605ff1175f7ab19522e4b67ea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057384321
+      }
+    },
+    {
+      "id": "charset-big5-nomapping-a240",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-big5-nomapping-a240.assp",
+      "sha256": "14038c176fcf5cdf0698c7c142855e5502024c8704ee671d65c12ec5778b6312",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057384366
+      }
+    },
+    {
+      "id": "charset-big5-nomapping-a2cc",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-big5-nomapping-a2cc.assp",
+      "sha256": "3609efc1c134622a6a9c69245fb20fc00bb2e3570b28f0f50eb95324955253d8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057373240
+      }
+    },
+    {
+      "id": "charset-big5-nomapping-a2ce",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-big5-nomapping-a2ce.assp",
+      "sha256": "e09ad893044c998692cdc6827d89c056222e86eb95f5cdb3ef5352fded509fc0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057373244
+      }
+    },
+    {
+      "id": "charset-big5-nul",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-big5-nul.assp",
+      "sha256": "1c1c14657e4f0fef6537383dde8c456afeeb6aced8330f080092662c04dec2f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 5197631164129563586
+      }
+    },
+    {
+      "id": "charset-big5-punctuation",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-big5-punctuation.assp",
+      "sha256": "0c68c2957620805899197a5fef3932702786ed3a923179bfb640249d855aff62",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 9852829747044743313
+      }
+    },
+    {
+      "id": "charset-big5-truncated",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-big5-truncated.assp",
+      "sha256": "2571a005eaaa804eee690b8a024af6718497f34ffd01a48951a5eb872e2c522a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-cp932-ascii",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp932-ascii.assp",
+      "sha256": "8953c87303e227f94cf41b1dcee0a2f9ab2f7d2103aa03ba1740b1c905377c9b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp932",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 5485960554702752338
+      }
+    },
+    {
+      "id": "charset-cp932-empty",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp932-empty.assp",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp932",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-cp932-extension-boundary",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp932-extension-boundary.assp",
+      "sha256": "b4a3722cc0a0344e41da325490709e2b8803f3e6fb204dc7bfa3819f000e9be7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp932",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057381485
+      }
+    },
+    {
+      "id": "charset-cp932-invalid-trail",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp932-invalid-trail.assp",
+      "sha256": "ea0ed581063d923dba43c733bf20513b834b4d16d0a9f26f64a3ec66fc8863b4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp932",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-cp932-nul",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp932-nul.assp",
+      "sha256": "1c1c14657e4f0fef6537383dde8c456afeeb6aced8330f080092662c04dec2f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp932",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 5197631164129563586
+      }
+    },
+    {
+      "id": "charset-cp932-truncated",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp932-truncated.assp",
+      "sha256": "b136ee1d78e2a4d3407391b8de4cf397f4d6973d94a176a40f41213661f97455",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp932",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-cp932-yen-overline-wave",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp932-yen-overline-wave.assp",
+      "sha256": "73248521c7540f31c276d5e796cfb5ccc9383456468f59aa9ef6af9966485384",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp932",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 25,
+        "digest": 15537596512926976331
+      }
+    },
+    {
+      "id": "charset-cp949-ascii",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp949-ascii.assp",
+      "sha256": "8953c87303e227f94cf41b1dcee0a2f9ab2f7d2103aa03ba1740b1c905377c9b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp949",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 5485960554702752338
+      }
+    },
+    {
+      "id": "charset-cp949-empty",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp949-empty.assp",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp949",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-cp949-invalid-trail",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp949-invalid-trail.assp",
+      "sha256": "ea0ed581063d923dba43c733bf20513b834b4d16d0a9f26f64a3ec66fc8863b4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp949",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-cp949-nul",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp949-nul.assp",
+      "sha256": "1c1c14657e4f0fef6537383dde8c456afeeb6aced8330f080092662c04dec2f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp949",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 5197631164129563586
+      }
+    },
+    {
+      "id": "charset-cp949-truncated",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp949-truncated.assp",
+      "sha256": "b136ee1d78e2a4d3407391b8de4cf397f4d6973d94a176a40f41213661f97455",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp949",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-cp949-uhc-extension",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp949-uhc-extension.assp",
+      "sha256": "8b4bbc3cb264216c38a2c41eddef2d1ba7c393a5a924de568178fb3b18268842",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp949",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057379131
+      }
+    },
+    {
+      "id": "charset-cp950-ascii",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp950-ascii.assp",
+      "sha256": "8953c87303e227f94cf41b1dcee0a2f9ab2f7d2103aa03ba1740b1c905377c9b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 5485960554702752338
+      }
+    },
+    {
+      "id": "charset-cp950-empty",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp950-empty.assp",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-cp950-extension-boundary",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp950-extension-boundary.assp",
+      "sha256": "b51b85e4262627a2417a6dc01e247eef8e7df5ad9336d01333ea2a76b6ad5d4e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-cp950-invalid-trail",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp950-invalid-trail.assp",
+      "sha256": "ea0ed581063d923dba43c733bf20513b834b4d16d0a9f26f64a3ec66fc8863b4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-cp950-nomapping-a15a",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp950-nomapping-a15a.assp",
+      "sha256": "ba95a34555b115493cf828b8741753b30d1b67159e8f083352a164c24eeab208",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057370656
+      }
+    },
+    {
+      "id": "charset-cp950-nomapping-a1c3",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp950-nomapping-a1c3.assp",
+      "sha256": "6072945cfbe4ae90374cf2117c4549a3cf7da056425c5ad083777e18706324a6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057384434
+      }
+    },
+    {
+      "id": "charset-cp950-nomapping-a1c5",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp950-nomapping-a1c5.assp",
+      "sha256": "ec145050e41089b809952db41e7e515aafc0a03655cc878c69f3a3cab8620273",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 22,
+        "digest": 15697189562099617538
+      }
+    },
+    {
+      "id": "charset-cp950-nomapping-a1fe",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp950-nomapping-a1fe.assp",
+      "sha256": "baf7d8bd8b4471f3ee93018b4576eb41bf39c87605ff1175f7ab19522e4b67ea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057384321
+      }
+    },
+    {
+      "id": "charset-cp950-nomapping-a240",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp950-nomapping-a240.assp",
+      "sha256": "14038c176fcf5cdf0698c7c142855e5502024c8704ee671d65c12ec5778b6312",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057384366
+      }
+    },
+    {
+      "id": "charset-cp950-nomapping-a2cc",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp950-nomapping-a2cc.assp",
+      "sha256": "3609efc1c134622a6a9c69245fb20fc00bb2e3570b28f0f50eb95324955253d8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057373240
+      }
+    },
+    {
+      "id": "charset-cp950-nomapping-a2ce",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp950-nomapping-a2ce.assp",
+      "sha256": "e09ad893044c998692cdc6827d89c056222e86eb95f5cdb3ef5352fded509fc0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057373244
+      }
+    },
+    {
+      "id": "charset-cp950-nul",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp950-nul.assp",
+      "sha256": "1c1c14657e4f0fef6537383dde8c456afeeb6aced8330f080092662c04dec2f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 5197631164129563586
+      }
+    },
+    {
+      "id": "charset-cp950-punctuation",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp950-punctuation.assp",
+      "sha256": "0c68c2957620805899197a5fef3932702786ed3a923179bfb640249d855aff62",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 9852829747044743313
+      }
+    },
+    {
+      "id": "charset-cp950-truncated",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-cp950-truncated.assp",
+      "sha256": "b136ee1d78e2a4d3407391b8de4cf397f4d6973d94a176a40f41213661f97455",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-euc-kr-ascii",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-euc-kr-ascii.assp",
+      "sha256": "8953c87303e227f94cf41b1dcee0a2f9ab2f7d2103aa03ba1740b1c905377c9b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "euc-kr",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 5485960554702752338
+      }
+    },
+    {
+      "id": "charset-euc-kr-empty",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-euc-kr-empty.assp",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "euc-kr",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-euc-kr-invalid-trail",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-euc-kr-invalid-trail.assp",
+      "sha256": "e0db046aabbae85860a0f4c0d5db8ea7ae57c31b8b70a2e5c79ba57d24f4a033",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "euc-kr",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-euc-kr-nul",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-euc-kr-nul.assp",
+      "sha256": "1c1c14657e4f0fef6537383dde8c456afeeb6aced8330f080092662c04dec2f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "euc-kr",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 5197631164129563586
+      }
+    },
+    {
+      "id": "charset-euc-kr-truncated",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-euc-kr-truncated.assp",
+      "sha256": "2571a005eaaa804eee690b8a024af6718497f34ffd01a48951a5eb872e2c522a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "euc-kr",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-euc-kr-uhc-extension",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-euc-kr-uhc-extension.assp",
+      "sha256": "8b4bbc3cb264216c38a2c41eddef2d1ba7c393a5a924de568178fb3b18268842",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "euc-kr",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18139156264057339169
+      }
+    },
+    {
+      "id": "charset-gbk-ascii",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-gbk-ascii.assp",
+      "sha256": "8953c87303e227f94cf41b1dcee0a2f9ab2f7d2103aa03ba1740b1c905377c9b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "gbk",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 5485960554702752338
+      }
+    },
+    {
+      "id": "charset-gbk-empty",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-gbk-empty.assp",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "gbk",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-gbk-extension-boundary",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-gbk-extension-boundary.assp",
+      "sha256": "d6ca53ddb7d3ff4a2afaeb034fbcc9d8c87c6ab3cf7322697eac2ca84aff0cc4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "gbk",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-gbk-invalid-trail",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-gbk-invalid-trail.assp",
+      "sha256": "ea0ed581063d923dba43c733bf20513b834b4d16d0a9f26f64a3ec66fc8863b4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "gbk",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-gbk-nul",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-gbk-nul.assp",
+      "sha256": "1c1c14657e4f0fef6537383dde8c456afeeb6aced8330f080092662c04dec2f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "gbk",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 5197631164129563586
+      }
+    },
+    {
+      "id": "charset-gbk-truncated",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-gbk-truncated.assp",
+      "sha256": "b136ee1d78e2a4d3407391b8de4cf397f4d6973d94a176a40f41213661f97455",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "gbk",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-iso-8859-1-c1-controls",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-iso-8859-1-c1-controls.assp",
+      "sha256": "6cd5c0d3da68d70971664cc81d0e5b21d1a4735fafdc4b2186d0e028ae2a16bd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "iso-8859-1",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 276,
+        "digest": 11665302700122482080
+      }
+    },
+    {
+      "id": "charset-label-big-5",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-big-5.assp",
+      "sha256": "0f230ba2d3a5c9bd0893b39184ce43174d5cb8ac51e6f4f5ac80ec4eaf95032c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big-5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 9956907376397578626
+      }
+    },
+    {
+      "id": "charset-label-big5",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-big5.assp",
+      "sha256": "0f230ba2d3a5c9bd0893b39184ce43174d5cb8ac51e6f4f5ac80ec4eaf95032c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "big5",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 9956907376397578626
+      }
+    },
+    {
+      "id": "charset-label-cp932",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-cp932.assp",
+      "sha256": "ad0aeaa54614d76a6af6caf238480483f0caaebac4e444089e8f7e90a0afe029",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp932",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 9956907376424122630
+      }
+    },
+    {
+      "id": "charset-label-cp936",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-cp936.assp",
+      "sha256": "c8e632befce5a79a183f564a759f7634522c37f4ab15f6885113ba1dc5b257aa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp936",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 9956907376397578626
+      }
+    },
+    {
+      "id": "charset-label-cp949",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-cp949.assp",
+      "sha256": "2dc23edfbfa5e27e51fdbb62dcbfd55d946844b1ad2850e0c73754df9ad37cb3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp949",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 9956907376622416194
+      }
+    },
+    {
+      "id": "charset-label-cp950",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-cp950.assp",
+      "sha256": "0f230ba2d3a5c9bd0893b39184ce43174d5cb8ac51e6f4f5ac80ec4eaf95032c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "cp950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 9956907376397578626
+      }
+    },
+    {
+      "id": "charset-label-euc-kr",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-euc-kr.assp",
+      "sha256": "2dc23edfbfa5e27e51fdbb62dcbfd55d946844b1ad2850e0c73754df9ad37cb3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "euc-kr",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 9956907376622416194
+      }
+    },
+    {
+      "id": "charset-label-euc_kr",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-euc_kr.assp",
+      "sha256": "2dc23edfbfa5e27e51fdbb62dcbfd55d946844b1ad2850e0c73754df9ad37cb3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "euc_kr",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-label-gbk",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-gbk.assp",
+      "sha256": "c8e632befce5a79a183f564a759f7634522c37f4ab15f6885113ba1dc5b257aa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "gbk",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 9956907376397578626
+      }
+    },
+    {
+      "id": "charset-label-shift-jis",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-shift-jis.assp",
+      "sha256": "ad0aeaa54614d76a6af6caf238480483f0caaebac4e444089e8f7e90a0afe029",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "shift-jis",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 9956907376424122630
+      }
+    },
+    {
+      "id": "charset-label-shift_jis",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-shift_jis.assp",
+      "sha256": "ad0aeaa54614d76a6af6caf238480483f0caaebac4e444089e8f7e90a0afe029",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "shift_jis",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 9956907376424122630
+      }
+    },
+    {
+      "id": "charset-label-sjis",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-sjis.assp",
+      "sha256": "ad0aeaa54614d76a6af6caf238480483f0caaebac4e444089e8f7e90a0afe029",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "sjis",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 9956907376424122630
+      }
+    },
+    {
+      "id": "charset-label-windows-932",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-windows-932.assp",
+      "sha256": "ad0aeaa54614d76a6af6caf238480483f0caaebac4e444089e8f7e90a0afe029",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "windows-932",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-label-windows-936",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-windows-936.assp",
+      "sha256": "c8e632befce5a79a183f564a759f7634522c37f4ab15f6885113ba1dc5b257aa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "windows-936",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 9956907376397578626
+      }
+    },
+    {
+      "id": "charset-label-windows-949",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-windows-949.assp",
+      "sha256": "2dc23edfbfa5e27e51fdbb62dcbfd55d946844b1ad2850e0c73754df9ad37cb3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "windows-949",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-label-windows-950",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-label-windows-950.assp",
+      "sha256": "0f230ba2d3a5c9bd0893b39184ce43174d5cb8ac51e6f4f5ac80ec4eaf95032c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "windows-950",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-latin1-c1-controls",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-latin1-c1-controls.assp",
+      "sha256": "6cd5c0d3da68d70971664cc81d0e5b21d1a4735fafdc4b2186d0e028ae2a16bd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "latin1",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 276,
+        "digest": 11665302700122482080
+      }
+    },
+    {
+      "id": "charset-shift_jis-ascii",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-shift_jis-ascii.assp",
+      "sha256": "8953c87303e227f94cf41b1dcee0a2f9ab2f7d2103aa03ba1740b1c905377c9b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "shift_jis",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 5485960554702752338
+      }
+    },
+    {
+      "id": "charset-shift_jis-empty",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-shift_jis-empty.assp",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "shift_jis",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-shift_jis-invalid-trail",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-shift_jis-invalid-trail.assp",
+      "sha256": "ea0ed581063d923dba43c733bf20513b834b4d16d0a9f26f64a3ec66fc8863b4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "shift_jis",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-shift_jis-nul",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-shift_jis-nul.assp",
+      "sha256": "1c1c14657e4f0fef6537383dde8c456afeeb6aced8330f080092662c04dec2f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "shift_jis",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 5197631164129563586
+      }
+    },
+    {
+      "id": "charset-shift_jis-truncated",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-shift_jis-truncated.assp",
+      "sha256": "b136ee1d78e2a4d3407391b8de4cf397f4d6973d94a176a40f41213661f97455",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "shift_jis",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-shift_jis-yen-overline-wave",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-shift_jis-yen-overline-wave.assp",
+      "sha256": "73248521c7540f31c276d5e796cfb5ccc9383456468f59aa9ef6af9966485384",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "shift_jis",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 9852828901065562728
+      }
+    },
+    {
+      "id": "charset-windows-1251-text",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-windows-1251-text.assp",
+      "sha256": "04f7c758ee5f44da4086b2ef287a078a7f3fdf2aefd6d1be2bc299338da6d2fc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "windows-1251",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 304,
+        "digest": 8792396418951503262
+      }
+    },
+    {
+      "id": "charset-windows-1251-undefined",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-windows-1251-undefined.assp",
+      "sha256": "64517ff0b4c0fae1fe9cc556e2194072c7da9a221c6d602852d8d64e6d6cbc5c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "windows-1251",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "charset-windows-1252-text",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-windows-1252-text.assp",
+      "sha256": "5c4946b2d4aad5355b56d5565ff1678d633d997393741de7744d2df0f569c1e9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "windows-1252",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 283,
+        "digest": 7502895639965640420
+      }
+    },
+    {
+      "id": "charset-windows-1252-undefined",
+      "profile": "receiver",
+      "file": "harness/features/charset-packets/inputs/charset-windows-1252-undefined.assp",
+      "sha256": "732bdbfd1a2848d7fc56f3d2cc56864b100aea267d334f5d3871f3a41e912039",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "glibc",
+        "windows-1252",
+        "packet"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    }
+  ]
+}

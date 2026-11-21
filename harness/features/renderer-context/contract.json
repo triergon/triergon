@@ -1,0 +1,97 @@
+{
+  "schema": 1,
+  "id": "renderer-context",
+  "gate": "required",
+  "operation": "renderer-context",
+  "candidate": "subtitle-views-worker",
+  "worker_operation": "renderer-context-",
+  "reference": "ffmpeg-subtitle-views-native",
+  "runner": "cargo xtask report",
+  "contract": [
+    "Open Matroska, select the first ASS or SSA track and collect the header and font attachments in container order. Compare kind 2 header bytes and per font filename and data by MIME metadata. Track tags and non-font attachments reach the builder."
+  ],
+  "required_profiles": [
+    "attachments",
+    "streams",
+    "text-attachments"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "parity_timeout_seconds": 120,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "ass-raw-order-overrides",
+        "ass-ssa-empty-layer",
+        "ass-private-verbatim",
+        "ass-unknown-charset-opaque",
+        "ass-empty-not-clear",
+        "ass-known-duration-unknown-start",
+        "ass-private-present-empty",
+        "ass-invalid-utf8-unvalidated",
+        "attachments",
+        "ass-stream-basic",
+        "ass-stream-fonts",
+        "ass-stream-read-order-overflow",
+        "ass-stream-read-order",
+        "ass-stream-styles",
+        "ass-render-stream-change",
+        "ass-render-stream-fallback",
+        "ass-render-stream-fonts"
+      ],
+      "cause": "paired runtime, heap and total RSS collections are pending on isolated gate hosts"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "ass-raw-order-overrides",
+        "ass-ssa-empty-layer",
+        "ass-private-verbatim",
+        "ass-unknown-charset-opaque",
+        "ass-empty-not-clear",
+        "ass-known-duration-unknown-start",
+        "ass-private-present-empty",
+        "ass-invalid-utf8-unvalidated",
+        "attachments",
+        "ass-stream-basic",
+        "ass-stream-fonts",
+        "ass-stream-read-order-overflow",
+        "ass-stream-read-order",
+        "ass-stream-styles",
+        "ass-render-stream-change",
+        "ass-render-stream-fallback",
+        "ass-render-stream-fonts"
+      ],
+      "cause": "paired runtime, heap and total RSS collections are pending on isolated gate hosts"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "ass-raw-order-overrides",
+        "ass-ssa-empty-layer",
+        "ass-private-verbatim",
+        "ass-unknown-charset-opaque",
+        "ass-empty-not-clear",
+        "ass-known-duration-unknown-start",
+        "ass-private-present-empty",
+        "ass-invalid-utf8-unvalidated",
+        "attachments",
+        "ass-stream-basic",
+        "ass-stream-fonts",
+        "ass-stream-read-order-overflow",
+        "ass-stream-read-order",
+        "ass-stream-styles",
+        "ass-render-stream-change",
+        "ass-render-stream-fallback",
+        "ass-render-stream-fonts"
+      ],
+      "cause": "paired runtime, heap and total RSS collections are pending on isolated gate hosts"
+    }
+  ]
+}

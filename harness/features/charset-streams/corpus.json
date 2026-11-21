@@ -1,0 +1,1587 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "utf-8-bytes",
+      "profile": "utf-8",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-8",
+        "UTF-8",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 128,
+        "digest": 14774233805492925760
+      }
+    },
+    {
+      "id": "utf-8-1024",
+      "profile": "utf-8",
+      "file": "harness/features/charset-streams/inputs/utf-8-1024.bin",
+      "sha256": "5de33f1273173a11f812586b5b03e100bd78dca16c2f066e296a525909b86e8b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-8",
+        "UTF-8",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 17890334696793739252
+      }
+    },
+    {
+      "id": "utf-8-8192",
+      "profile": "utf-8",
+      "file": "harness/features/charset-streams/inputs/utf-8-8192.bin",
+      "sha256": "98ca75b8c15af1d5c985097cf2ced1865990e927f0e7d90ddc40d8c6c02f056d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-8",
+        "UTF-8",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8192,
+        "digest": 9877814305307937999
+      }
+    },
+    {
+      "id": "utf-8-65536",
+      "profile": "utf-8",
+      "file": "harness/features/charset-streams/inputs/utf-8-65536.bin",
+      "sha256": "bce4765b77e1f92269f9a46c4b332ba404102db188fc8ba025700c3e6b3070e0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-8",
+        "UTF-8",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 65536,
+        "digest": 16477389194514463735
+      }
+    },
+    {
+      "id": "utf-16-bytes",
+      "profile": "utf-16",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-16",
+        "UTF-16",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 0,
+        "digest": 11382079830559985536
+      }
+    },
+    {
+      "id": "utf-16-1024",
+      "profile": "utf-16",
+      "file": "harness/features/charset-streams/inputs/utf-16-1024.bin",
+      "sha256": "d31cf10f1bcd3b3c41fd5ce6d31692d876cda5ee431d5e691eee72bf0cc1f641",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-16",
+        "UTF-16",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 797,
+        "digest": 16650930191923678783
+      }
+    },
+    {
+      "id": "utf-16-8192",
+      "profile": "utf-16",
+      "file": "harness/features/charset-streams/inputs/utf-16-8192.bin",
+      "sha256": "192f450ee965b2c79956b1794aa764bba5d9390e4bdb92c0e03381e84337f25c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-16",
+        "UTF-16",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 6183,
+        "digest": 1524919764707361992
+      }
+    },
+    {
+      "id": "utf-16-65536",
+      "profile": "utf-16",
+      "file": "harness/features/charset-streams/inputs/utf-16-65536.bin",
+      "sha256": "f2b1ba495830df090ac1c8ac8ac64e5ec4df1a6ee35a2a0a58bc7adae1aaf006",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-16",
+        "UTF-16",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 50806,
+        "digest": 10493413451148961305
+      }
+    },
+    {
+      "id": "utf-16be-bytes",
+      "profile": "utf-16be",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-16be",
+        "UTF-16BE",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 0,
+        "digest": 11382079830559985536
+      }
+    },
+    {
+      "id": "utf-16be-1024",
+      "profile": "utf-16be",
+      "file": "harness/features/charset-streams/inputs/utf-16be-1024.bin",
+      "sha256": "b13b747741995a48183ab6270db158c5fdf8b64835c9b4f021ff68395dd5864f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-16be",
+        "UTF-16BE",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 728,
+        "digest": 17454449084186279375
+      }
+    },
+    {
+      "id": "utf-16be-8192",
+      "profile": "utf-16be",
+      "file": "harness/features/charset-streams/inputs/utf-16be-8192.bin",
+      "sha256": "e8ba6f28f05497c7efdefee4461ccbcf95caa83fca0630cf2ba42c614fc397a2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-16be",
+        "UTF-16BE",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 6280,
+        "digest": 5933185768594952515
+      }
+    },
+    {
+      "id": "utf-16be-65536",
+      "profile": "utf-16be",
+      "file": "harness/features/charset-streams/inputs/utf-16be-65536.bin",
+      "sha256": "447d3dbbea770db9a69c19bbde18308762b7dcfdd014621e6de08bc04b4640e9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-16be",
+        "UTF-16BE",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 50376,
+        "digest": 9007858484681452663
+      }
+    },
+    {
+      "id": "utf-16le-bytes",
+      "profile": "utf-16le",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-16le",
+        "UTF-16LE",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 0,
+        "digest": 11382079830559985536
+      }
+    },
+    {
+      "id": "utf-16le-1024",
+      "profile": "utf-16le",
+      "file": "harness/features/charset-streams/inputs/utf-16le-1024.bin",
+      "sha256": "41cfa5b4622676cd5381e3a5800ce93a78d2124dede640dcd87f7c9e113be946",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-16le",
+        "UTF-16LE",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 796,
+        "digest": 6121190893869852577
+      }
+    },
+    {
+      "id": "utf-16le-8192",
+      "profile": "utf-16le",
+      "file": "harness/features/charset-streams/inputs/utf-16le-8192.bin",
+      "sha256": "a9622438b2643fdec93e1aff3b630aeb780af9804b87a9f047e4dc2c3f3c8950",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-16le",
+        "UTF-16LE",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 6508,
+        "digest": 9173079358506634649
+      }
+    },
+    {
+      "id": "utf-16le-65536",
+      "profile": "utf-16le",
+      "file": "harness/features/charset-streams/inputs/utf-16le-65536.bin",
+      "sha256": "d7cb88e390ee58899fe027206493cf198b4dcd3f1f5e985abd90d79122a70ee4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-16le",
+        "UTF-16LE",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 50516,
+        "digest": 7881230291847009631
+      }
+    },
+    {
+      "id": "ascii-bytes",
+      "profile": "ascii",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ascii",
+        "US-ASCII",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 128,
+        "digest": 14774233805492925760
+      }
+    },
+    {
+      "id": "ascii-1024",
+      "profile": "ascii",
+      "file": "harness/features/charset-streams/inputs/ascii-1024.bin",
+      "sha256": "57567c6f70f8040627dd2350d7443846a4cb318887733dd1432cdf40c1dc6da2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ascii",
+        "US-ASCII",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 8643370932702935058
+      }
+    },
+    {
+      "id": "ascii-8192",
+      "profile": "ascii",
+      "file": "harness/features/charset-streams/inputs/ascii-8192.bin",
+      "sha256": "0e0d15a965d75fdc5d5031eaa1123596e00976fd23d316d654f5f07437b8b310",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ascii",
+        "US-ASCII",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8192,
+        "digest": 13376884591092638327
+      }
+    },
+    {
+      "id": "ascii-65536",
+      "profile": "ascii",
+      "file": "harness/features/charset-streams/inputs/ascii-65536.bin",
+      "sha256": "aaa892c5e367bbbda384d1cc4a2f9e923bada4af7d945269313a5005af65bb6d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ascii",
+        "US-ASCII",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 65536,
+        "digest": 8187960647461626902
+      }
+    },
+    {
+      "id": "iso-8859-1-bytes",
+      "profile": "iso-8859-1",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "iso-8859-1",
+        "ISO-8859-1",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 384,
+        "digest": 12142315804272388480
+      }
+    },
+    {
+      "id": "iso-8859-1-1024",
+      "profile": "iso-8859-1",
+      "file": "harness/features/charset-streams/inputs/iso-8859-1-1024.bin",
+      "sha256": "6a69b9578838c1a17b3307e2c26a590900c6884a1ac1c69b93db398248ecb6d2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "iso-8859-1",
+        "ISO-8859-1",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1029,
+        "digest": 4501798346121892112
+      }
+    },
+    {
+      "id": "iso-8859-1-8192",
+      "profile": "iso-8859-1",
+      "file": "harness/features/charset-streams/inputs/iso-8859-1-8192.bin",
+      "sha256": "621fb10d78fa5d6cb70e5549e79ef59632326e428eaf2d76f526f9a4c4f0dc28",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "iso-8859-1",
+        "ISO-8859-1",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8254,
+        "digest": 17965873055405860738
+      }
+    },
+    {
+      "id": "iso-8859-1-65536",
+      "profile": "iso-8859-1",
+      "file": "harness/features/charset-streams/inputs/iso-8859-1-65536.bin",
+      "sha256": "3155acdc1f59a53de0dd724a87902b3156b8356a88db8c7bf3e30234817163df",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "iso-8859-1",
+        "ISO-8859-1",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 65990,
+        "digest": 8278377862485673969
+      }
+    },
+    {
+      "id": "cp1251-bytes",
+      "profile": "cp1251",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp1251",
+        "CP1251",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 400,
+        "digest": 844696316537510623
+      }
+    },
+    {
+      "id": "cp1251-1024",
+      "profile": "cp1251",
+      "file": "harness/features/charset-streams/inputs/cp1251-1024.bin",
+      "sha256": "31c72549a270294bafbdee801f2c922b69824b1f14faa1f938aeff3591268325",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp1251",
+        "CP1251",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1063,
+        "digest": 8546750633711171126
+      }
+    },
+    {
+      "id": "cp1251-8192",
+      "profile": "cp1251",
+      "file": "harness/features/charset-streams/inputs/cp1251-8192.bin",
+      "sha256": "db8c33004ece0b48b8144830d761c2a18c15b890040c7caebe08fda30cc48bc1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp1251",
+        "CP1251",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8531,
+        "digest": 16203799783307019636
+      }
+    },
+    {
+      "id": "cp1251-65536",
+      "profile": "cp1251",
+      "file": "harness/features/charset-streams/inputs/cp1251-65536.bin",
+      "sha256": "b6fede934ef21994c24e2a56a0c95efe891ccac33f16909dd1fbffd76044b4f5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp1251",
+        "CP1251",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 68195,
+        "digest": 4169588018606071632
+      }
+    },
+    {
+      "id": "cp1252-bytes",
+      "profile": "cp1252",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp1252",
+        "CP1252",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 391,
+        "digest": 9593634865197991303
+      }
+    },
+    {
+      "id": "cp1252-1024",
+      "profile": "cp1252",
+      "file": "harness/features/charset-streams/inputs/cp1252-1024.bin",
+      "sha256": "4a9e6471a6f5f4f97c0878513fc2094076c231249a879d11b6766cc78292dd9a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp1252",
+        "CP1252",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1030,
+        "digest": 6174580990003043085
+      }
+    },
+    {
+      "id": "cp1252-8192",
+      "profile": "cp1252",
+      "file": "harness/features/charset-streams/inputs/cp1252-8192.bin",
+      "sha256": "ab89b7c12f2fb0ebdcb422602ce35ff9a815da71d7cb3e582fb7165f2ee807c8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp1252",
+        "CP1252",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8256,
+        "digest": 4476038778559778960
+      }
+    },
+    {
+      "id": "cp1252-65536",
+      "profile": "cp1252",
+      "file": "harness/features/charset-streams/inputs/cp1252-65536.bin",
+      "sha256": "dc23d948e5654011e685500283e3a38f86bc516f90dd3dd5fbd1675f486bbbb2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp1252",
+        "CP1252",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 65973,
+        "digest": 2244848747943758521
+      }
+    },
+    {
+      "id": "gbk-bytes",
+      "profile": "gbk",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "gbk",
+        "GBK",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 131,
+        "digest": 4198597673088014402
+      }
+    },
+    {
+      "id": "gbk-pairs",
+      "profile": "gbk",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "gbk",
+        "GBK",
+        "pairs"
+      ],
+      "expected": {
+        "packets": 65536,
+        "bytes": 99014,
+        "digest": 7365534381433240032
+      }
+    },
+    {
+      "id": "gbk-1024",
+      "profile": "gbk",
+      "file": "harness/features/charset-streams/inputs/gbk-1024.bin",
+      "sha256": "98d6add2a01d937b48c080516b101c924f1c98f8810db140b16843d44019685c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "gbk",
+        "GBK",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1065,
+        "digest": 16103108549359855582
+      }
+    },
+    {
+      "id": "gbk-8192",
+      "profile": "gbk",
+      "file": "harness/features/charset-streams/inputs/gbk-8192.bin",
+      "sha256": "dbf2b16300cf1058be76b84aaad448c8ba1f5b2c511c157cce8566e6edc1b6f0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "gbk",
+        "GBK",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8459,
+        "digest": 2646922419665643957
+      }
+    },
+    {
+      "id": "gbk-65536",
+      "profile": "gbk",
+      "file": "harness/features/charset-streams/inputs/gbk-65536.bin",
+      "sha256": "4ce154e824a4577b974c7e8e69217fed27f8d1add06fdb93ba12ee7e6385269e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "gbk",
+        "GBK",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 67814,
+        "digest": 6460195700035601611
+      }
+    },
+    {
+      "id": "big5-bytes",
+      "profile": "big5",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "big5",
+        "BIG5",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 130,
+        "digest": 5399830465608152869
+      }
+    },
+    {
+      "id": "big5-pairs",
+      "profile": "big5",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "big5",
+        "BIG5",
+        "pairs"
+      ],
+      "expected": {
+        "packets": 65536,
+        "bytes": 75212,
+        "digest": 16944356409950247880
+      }
+    },
+    {
+      "id": "big5-1024",
+      "profile": "big5",
+      "file": "harness/features/charset-streams/inputs/big5-1024.bin",
+      "sha256": "d818713e11790e7c623d66a765f1b68130ee956dd08bdf49f371650df7985167",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "big5",
+        "BIG5",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1092,
+        "digest": 8365890895439735635
+      }
+    },
+    {
+      "id": "big5-8192",
+      "profile": "big5",
+      "file": "harness/features/charset-streams/inputs/big5-8192.bin",
+      "sha256": "64c4dda2f9cc0a881afb282fffcf1fb678dd3424ad259b1355759791431f7f66",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "big5",
+        "BIG5",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8721,
+        "digest": 16220430416561236211
+      }
+    },
+    {
+      "id": "big5-65536",
+      "profile": "big5",
+      "file": "harness/features/charset-streams/inputs/big5-65536.bin",
+      "sha256": "7c94050c1168fa1ebb6db76c013d7b8370ee1d0403c3af23cbebfdd20d6e7d00",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "big5",
+        "BIG5",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 69917,
+        "digest": 11820420529053026827
+      }
+    },
+    {
+      "id": "shift_jis-bytes",
+      "profile": "shift_jis",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "shift_jis",
+        "SHIFT_JIS",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 320,
+        "digest": 12518258771777805836
+      }
+    },
+    {
+      "id": "shift_jis-pairs",
+      "profile": "shift_jis",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "shift_jis",
+        "SHIFT_JIS",
+        "pairs"
+      ],
+      "expected": {
+        "packets": 65536,
+        "bytes": 142752,
+        "digest": 13785562036370117045
+      }
+    },
+    {
+      "id": "shift_jis-1024",
+      "profile": "shift_jis",
+      "file": "harness/features/charset-streams/inputs/shift_jis-1024.bin",
+      "sha256": "67765f2a5aa6d248ea7da991771479e717bddb85de2e06df57b078bb7f5d7561",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "shift_jis",
+        "SHIFT_JIS",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1063,
+        "digest": 12369212635676326285
+      }
+    },
+    {
+      "id": "shift_jis-8192",
+      "profile": "shift_jis",
+      "file": "harness/features/charset-streams/inputs/shift_jis-8192.bin",
+      "sha256": "d41be30af5c646442c0490a2e76ccb049b818ff9b34bbc097a76838e0d1923cb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "shift_jis",
+        "SHIFT_JIS",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8444,
+        "digest": 3277762086197320230
+      }
+    },
+    {
+      "id": "shift_jis-65536",
+      "profile": "shift_jis",
+      "file": "harness/features/charset-streams/inputs/shift_jis-65536.bin",
+      "sha256": "b05738a0071b66ce4c1d2852d046be181b0189b641a21e4fa925d1d72f66b5a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "shift_jis",
+        "SHIFT_JIS",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 67807,
+        "digest": 11677920899890020371
+      }
+    },
+    {
+      "id": "euc-kr-bytes",
+      "profile": "euc-kr",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "euc-kr",
+        "EUC-KR",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 192,
+        "digest": 16372822870578186064
+      }
+    },
+    {
+      "id": "euc-kr-pairs",
+      "profile": "euc-kr",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "euc-kr",
+        "EUC-KR",
+        "pairs"
+      ],
+      "expected": {
+        "packets": 65536,
+        "bytes": 85950,
+        "digest": 18216909723645972107
+      }
+    },
+    {
+      "id": "euc-kr-1024",
+      "profile": "euc-kr",
+      "file": "harness/features/charset-streams/inputs/euc-kr-1024.bin",
+      "sha256": "914845437b9735c7f6a7bf1dfef495d93209ad13127cbabbcc99e3475fca9405",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "euc-kr",
+        "EUC-KR",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1085,
+        "digest": 639656921019673799
+      }
+    },
+    {
+      "id": "euc-kr-8192",
+      "profile": "euc-kr",
+      "file": "harness/features/charset-streams/inputs/euc-kr-8192.bin",
+      "sha256": "4f504edc2cbc83ffcc79163fb2cc691b1ae4a91f7e1957c976b084c7e75a0ce0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "euc-kr",
+        "EUC-KR",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8587,
+        "digest": 11737732859601668949
+      }
+    },
+    {
+      "id": "euc-kr-65536",
+      "profile": "euc-kr",
+      "file": "harness/features/charset-streams/inputs/euc-kr-65536.bin",
+      "sha256": "7cea0101c0ff23d006666317ebd15ab372513ab90efddac1ffbd3f4110d15f3a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "euc-kr",
+        "EUC-KR",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 68842,
+        "digest": 17243672271910263733
+      }
+    },
+    {
+      "id": "cp932-bytes",
+      "profile": "cp932",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp932",
+        "CP932",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 317,
+        "digest": 5050995052648636732
+      }
+    },
+    {
+      "id": "cp932-pairs",
+      "profile": "cp932",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp932",
+        "CP932",
+        "pairs"
+      ],
+      "expected": {
+        "packets": 65536,
+        "bytes": 149784,
+        "digest": 15810590252205304742
+      }
+    },
+    {
+      "id": "cp932-1024",
+      "profile": "cp932",
+      "file": "harness/features/charset-streams/inputs/cp932-1024.bin",
+      "sha256": "c47e8746e867b07740610b13558b59f9dc79433c7dea6c341d188c87eb2c5cb9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp932",
+        "CP932",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1068,
+        "digest": 6062045108697394105
+      }
+    },
+    {
+      "id": "cp932-8192",
+      "profile": "cp932",
+      "file": "harness/features/charset-streams/inputs/cp932-8192.bin",
+      "sha256": "3c7734ef82dd89943e4677a8ef1c3a1776fee563de95d4d7b781731f5b6cdfbf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp932",
+        "CP932",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8487,
+        "digest": 5483155588785512702
+      }
+    },
+    {
+      "id": "cp932-65536",
+      "profile": "cp932",
+      "file": "harness/features/charset-streams/inputs/cp932-65536.bin",
+      "sha256": "eae26d1635f9ca0f07e32778bd605575211e65ba2626af92cdd18f30020143d4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp932",
+        "CP932",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 67819,
+        "digest": 8751323684082679356
+      }
+    },
+    {
+      "id": "cp949-bytes",
+      "profile": "cp949",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp949",
+        "CP949",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 128,
+        "digest": 14774233805492925760
+      }
+    },
+    {
+      "id": "cp949-pairs",
+      "profile": "cp949",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp949",
+        "CP949",
+        "pairs"
+      ],
+      "expected": {
+        "packets": 65536,
+        "bytes": 83741,
+        "digest": 10826403123138565269
+      }
+    },
+    {
+      "id": "cp949-1024",
+      "profile": "cp949",
+      "file": "harness/features/charset-streams/inputs/cp949-1024.bin",
+      "sha256": "0eb24604c4c698e88b9fe76ba91432aa9e3609de90039a92456cbcde3d0b7a64",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp949",
+        "CP949",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1079,
+        "digest": 15167965295301081889
+      }
+    },
+    {
+      "id": "cp949-8192",
+      "profile": "cp949",
+      "file": "harness/features/charset-streams/inputs/cp949-8192.bin",
+      "sha256": "5ee641686bef3a60a07dc8a3075c8739a31be1c89c951f01720b924f83c2db6d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp949",
+        "CP949",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8620,
+        "digest": 5299166774297196257
+      }
+    },
+    {
+      "id": "cp949-65536",
+      "profile": "cp949",
+      "file": "harness/features/charset-streams/inputs/cp949-65536.bin",
+      "sha256": "620047e67350f4d3e4601867059b8daeddd3d6a85ee0d2792182440ec2839cba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp949",
+        "CP949",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 68973,
+        "digest": 15078857539135407236
+      }
+    },
+    {
+      "id": "cp950-bytes",
+      "profile": "cp950",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp950",
+        "CP950",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 130,
+        "digest": 5399830465608152869
+      }
+    },
+    {
+      "id": "cp950-pairs",
+      "profile": "cp950",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp950",
+        "CP950",
+        "pairs"
+      ],
+      "expected": {
+        "packets": 65536,
+        "bytes": 75212,
+        "digest": 16944356409950247880
+      }
+    },
+    {
+      "id": "cp950-1024",
+      "profile": "cp950",
+      "file": "harness/features/charset-streams/inputs/cp950-1024.bin",
+      "sha256": "af53a7cca9f4e316ad830ce1c4af05fac73fca945dd2a5a1d4f9ad04e608f9df",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp950",
+        "CP950",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1095,
+        "digest": 1688790522727597989
+      }
+    },
+    {
+      "id": "cp950-8192",
+      "profile": "cp950",
+      "file": "harness/features/charset-streams/inputs/cp950-8192.bin",
+      "sha256": "3fb097f1f0e4463752ffd9a1e9d2e8b8b99ce65efee5b908126ef0b85894ce03",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp950",
+        "CP950",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8710,
+        "digest": 6464163685447816549
+      }
+    },
+    {
+      "id": "cp950-65536",
+      "profile": "cp950",
+      "file": "harness/features/charset-streams/inputs/cp950-65536.bin",
+      "sha256": "ecfffd78b53130ed7704ef20b25d1e97c6083826d6ce9632ef95622ed35316e3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp950",
+        "CP950",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 69819,
+        "digest": 13344678681017818779
+      }
+    },
+    {
+      "id": "big5-receiver-bytes",
+      "profile": "big5-receiver",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "big5-receiver",
+        "BIG5",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 130,
+        "digest": 5399830465608152869
+      }
+    },
+    {
+      "id": "big5-receiver-pairs",
+      "profile": "big5-receiver",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "big5-receiver",
+        "BIG5",
+        "pairs"
+      ],
+      "expected": {
+        "packets": 65536,
+        "bytes": 75212,
+        "digest": 16944356409950247880
+      }
+    },
+    {
+      "id": "big5-receiver-1024",
+      "profile": "big5-receiver",
+      "file": "harness/features/charset-streams/inputs/big5-receiver-1024.bin",
+      "sha256": "8b2a7152864401e886b88db6fc65aeb318aca86833b8b8ba8f01f9fd9e291edb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "big5-receiver",
+        "BIG5",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1092,
+        "digest": 4989055622405872800
+      }
+    },
+    {
+      "id": "big5-receiver-8192",
+      "profile": "big5-receiver",
+      "file": "harness/features/charset-streams/inputs/big5-receiver-8192.bin",
+      "sha256": "1d175b5106b1f0912da97cb36a8a5a1287a8e76235c23c14c56c07daa8c7a869",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "big5-receiver",
+        "BIG5",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8711,
+        "digest": 2895733337588542979
+      }
+    },
+    {
+      "id": "big5-receiver-65536",
+      "profile": "big5-receiver",
+      "file": "harness/features/charset-streams/inputs/big5-receiver-65536.bin",
+      "sha256": "c3262fd95db1d1bdedb99affaadb97842bf9832ea92cf6fb5079b1ff2a3d9f41",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "big5-receiver",
+        "BIG5",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 69873,
+        "digest": 5289197802905323433
+      }
+    },
+    {
+      "id": "kr-c1-bytes",
+      "profile": "kr-c1",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "kr-c1",
+        "EUC-KR",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 192,
+        "digest": 16372822870578186064
+      }
+    },
+    {
+      "id": "kr-c1-pairs",
+      "profile": "kr-c1",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "kr-c1",
+        "EUC-KR",
+        "pairs"
+      ],
+      "expected": {
+        "packets": 65536,
+        "bytes": 85950,
+        "digest": 18216909723645972107
+      }
+    },
+    {
+      "id": "kr-c1-1024",
+      "profile": "kr-c1",
+      "file": "harness/features/charset-streams/inputs/kr-c1-1024.bin",
+      "sha256": "0253481c608a0d312732223058c2231be08bd3dba45e59793eb23d486bd0ef8a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "kr-c1",
+        "EUC-KR",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1076,
+        "digest": 3289777109842113128
+      }
+    },
+    {
+      "id": "kr-c1-8192",
+      "profile": "kr-c1",
+      "file": "harness/features/charset-streams/inputs/kr-c1-8192.bin",
+      "sha256": "92baae7de895efeb2c6ee08e05b8d631a22cdb7364efda06a40e14916e9c555b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "kr-c1",
+        "EUC-KR",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8563,
+        "digest": 10022658894460086158
+      }
+    },
+    {
+      "id": "kr-c1-65536",
+      "profile": "kr-c1",
+      "file": "harness/features/charset-streams/inputs/kr-c1-65536.bin",
+      "sha256": "fa7af53c0d17b95baa6c2ff2112db5584fee26a3c37ad12db17d5ac6fbe1faab",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "kr-c1",
+        "EUC-KR",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 68855,
+        "digest": 6730369883069817204
+      }
+    },
+    {
+      "id": "kr-receiver-bytes",
+      "profile": "kr-receiver",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "kr-receiver",
+        "EUC-KR",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 192,
+        "digest": 16372822870578186064
+      }
+    },
+    {
+      "id": "kr-receiver-pairs",
+      "profile": "kr-receiver",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "kr-receiver",
+        "EUC-KR",
+        "pairs"
+      ],
+      "expected": {
+        "packets": 65536,
+        "bytes": 85950,
+        "digest": 18216909723645972107
+      }
+    },
+    {
+      "id": "kr-receiver-1024",
+      "profile": "kr-receiver",
+      "file": "harness/features/charset-streams/inputs/kr-receiver-1024.bin",
+      "sha256": "75a5042370e72078f8cf5e51ed3562fff7f7dc6bedd2aee0ab2d2038e06e2c4c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "kr-receiver",
+        "EUC-KR",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1075,
+        "digest": 6857995743015196265
+      }
+    },
+    {
+      "id": "kr-receiver-8192",
+      "profile": "kr-receiver",
+      "file": "harness/features/charset-streams/inputs/kr-receiver-8192.bin",
+      "sha256": "01b449c526334de73f7c743823329984b915a77285966df21080331ee25511cf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "kr-receiver",
+        "EUC-KR",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8645,
+        "digest": 17351900888000626684
+      }
+    },
+    {
+      "id": "kr-receiver-65536",
+      "profile": "kr-receiver",
+      "file": "harness/features/charset-streams/inputs/kr-receiver-65536.bin",
+      "sha256": "c1b8c5d2102bd48e042ca9663b429e73bce814650080fa85ca8d52802709b9f6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "kr-receiver",
+        "EUC-KR",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 68851,
+        "digest": 1230363988897701623
+      }
+    },
+    {
+      "id": "cp932-receiver-bytes",
+      "profile": "cp932-receiver",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp932-receiver",
+        "CP932",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 317,
+        "digest": 5050995052648636732
+      }
+    },
+    {
+      "id": "cp932-receiver-pairs",
+      "profile": "cp932-receiver",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp932-receiver",
+        "CP932",
+        "pairs"
+      ],
+      "expected": {
+        "packets": 65536,
+        "bytes": 149784,
+        "digest": 15810590252205304742
+      }
+    },
+    {
+      "id": "cp932-receiver-1024",
+      "profile": "cp932-receiver",
+      "file": "harness/features/charset-streams/inputs/cp932-receiver-1024.bin",
+      "sha256": "e4df56fedb9fc27efe53a4c6241176d703d2e37b12eaa83a2a963c09b378f113",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp932-receiver",
+        "CP932",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1063,
+        "digest": 13011401142483401620
+      }
+    },
+    {
+      "id": "cp932-receiver-8192",
+      "profile": "cp932-receiver",
+      "file": "harness/features/charset-streams/inputs/cp932-receiver-8192.bin",
+      "sha256": "f927ee33c915fa516642b2b8ecff64c53a5b2e44f5a00cd0deb542981ec7023b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp932-receiver",
+        "CP932",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8478,
+        "digest": 9142268778353154546
+      }
+    },
+    {
+      "id": "cp932-receiver-65536",
+      "profile": "cp932-receiver",
+      "file": "harness/features/charset-streams/inputs/cp932-receiver-65536.bin",
+      "sha256": "9637dc2f0a17860fc20d3b849b8bd436f867596cc4ddefce8cf107a4d59d1f49",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp932-receiver",
+        "CP932",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 67757,
+        "digest": 12483723167197576094
+      }
+    },
+    {
+      "id": "utf-8-invalid",
+      "profile": "utf-8",
+      "file": "harness/features/charset-streams/inputs/utf-8-invalid.bin",
+      "sha256": "ced512c788c599e136910600467aab0c72f06a9cf1eaf9e445005e1eb5509f56",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-8",
+        "UTF-8",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7692
+      }
+    },
+    {
+      "id": "utf-16-invalid",
+      "profile": "utf-16",
+      "file": "harness/features/charset-streams/inputs/utf-16-invalid.bin",
+      "sha256": "891077f5007a1b1fef81e5705eee56ac1e01d4d8804bcafeb76bb59cef41072b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "utf-16",
+        "UTF-16",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7692
+      }
+    },
+    {
+      "id": "gbk-invalid",
+      "profile": "gbk",
+      "file": "harness/features/charset-streams/inputs/gbk-invalid.bin",
+      "sha256": "fcb277b733d81cb1d7e4aeadc69e2fcac1db1596da94e6d6605ab471d3a2295c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "gbk",
+        "GBK",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7692
+      }
+    },
+    {
+      "id": "big5-invalid",
+      "profile": "big5",
+      "file": "harness/features/charset-streams/inputs/big5-invalid.bin",
+      "sha256": "43adc9fddc04b6929207c72e0f3488c688a7e4556dad3418ae18aa15930b47a1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "big5",
+        "BIG5",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7692
+      }
+    },
+    {
+      "id": "shift_jis-invalid",
+      "profile": "shift_jis",
+      "file": "harness/features/charset-streams/inputs/shift_jis-invalid.bin",
+      "sha256": "fcb277b733d81cb1d7e4aeadc69e2fcac1db1596da94e6d6605ab471d3a2295c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "shift_jis",
+        "SHIFT_JIS",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7692
+      }
+    },
+    {
+      "id": "euc-kr-invalid",
+      "profile": "euc-kr",
+      "file": "harness/features/charset-streams/inputs/euc-kr-invalid.bin",
+      "sha256": "e644a2366153c5600dc0232f4aaf4ac062e982a31dfd4b30fe0023a7a6300eb9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "euc-kr",
+        "EUC-KR",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7692
+      }
+    }
+  ]
+}

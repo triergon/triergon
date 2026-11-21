@@ -1,0 +1,4867 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "vobsub-basic",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/basic.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "vobsub-commands",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/commands.idx",
+      "sha256": "810a3d2d332ad4df94f0c7fb1c19ebf2d7c2d254c20723f53e9a1f1bf0dacde1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/commands.idx",
+        ".research/subtitle-corpus/dvd/commands.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/commands.sub",
+          "sha256": "f1f728a3185b998e151e0c0f8fd8b617b2010dd0a40d8b8a37780f7c9a7e9622"
+        }
+      ],
+      "expected": {
+        "packets": 19,
+        "bytes": 152,
+        "digest": 8698603122776745077
+      }
+    },
+    {
+      "id": "vobsub-timing",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/timing.idx",
+      "sha256": "1b12aa0cf536282b51220c43dfe69462f5fffc24906e19ad8221bb6a651f9073",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/timing.idx",
+        ".research/subtitle-corpus/dvd/timing.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/timing.sub",
+          "sha256": "ecaf22501e02304f6de765318b756bc2b93d5d63c1a0fd467c78860425b7e9e2"
+        }
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 152,
+        "digest": 9148076943809851383
+      }
+    },
+    {
+      "id": "vobsub-links",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/links.idx",
+      "sha256": "810a3d2d332ad4df94f0c7fb1c19ebf2d7c2d254c20723f53e9a1f1bf0dacde1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/links.idx",
+        ".research/subtitle-corpus/dvd/links.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/links.sub",
+          "sha256": "7493aa6607c20dd96237928592b53fd4798c046b365887f4a4a0aa77a74cdded"
+        }
+      ],
+      "expected": {
+        "packets": 19,
+        "bytes": 152,
+        "digest": 8698603122776745077
+      }
+    },
+    {
+      "id": "vobsub-pixels",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/pixels.idx",
+      "sha256": "11e0f49ae94964a79724fc740fd356d865e35af4b2c58ae0caff70a594978426",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/pixels.idx",
+        ".research/subtitle-corpus/dvd/pixels.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/pixels.sub",
+          "sha256": "9aefc88554d1e85a6a6e239f3537a2e50e26ffefa923dcab9ebe9615638ffdf3"
+        }
+      ],
+      "expected": {
+        "packets": 40,
+        "bytes": 152,
+        "digest": 2630135544303171290
+      }
+    },
+    {
+      "id": "vobsub-guess-palette",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/guess.idx",
+      "sha256": "93e6380c59815ea7ae8d0591c3eb58bee152b5de13275f97b65adc13af7240a9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/guess.idx",
+        ".research/subtitle-corpus/dvd/guess.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/guess.sub",
+          "sha256": "d377ad5645544993c808816f8445fa72eb8ea0b6e83ee0132250315b5b3e8429"
+        }
+      ],
+      "expected": {
+        "packets": 52,
+        "bytes": 16,
+        "digest": 13496110781242441930
+      }
+    },
+    {
+      "id": "vobsub-guess-palette-pixels",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/guess-pixels.idx",
+      "sha256": "2f8d2e34fba2823d2f8d876cbbee6e5445eff24b78ec0a1a15bc750b1984c833",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/guess-pixels.idx",
+        ".research/subtitle-corpus/dvd/guess-pixels.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/guess-pixels.sub",
+          "sha256": "9aefc88554d1e85a6a6e239f3537a2e50e26ffefa923dcab9ebe9615638ffdf3"
+        }
+      ],
+      "expected": {
+        "packets": 40,
+        "bytes": 16,
+        "digest": 9502382773877435790
+      }
+    },
+    {
+      "id": "vobsub-forced",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/forced.idx",
+      "sha256": "1c0180a49bc5d63587fed2ff43b002a6d59c7a2c94592f49e282dca10117f1a0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/forced.idx",
+        ".research/subtitle-corpus/dvd/forced.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/forced.sub",
+          "sha256": "12fb82f0ac58e80a23b0aeaea7206f087366769f1604d4fb34acfa47306456b4"
+        }
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 152,
+        "digest": 17177020579046846644
+      }
+    },
+    {
+      "id": "vobsub-forced-only",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/forced.idx",
+      "sha256": "1c0180a49bc5d63587fed2ff43b002a6d59c7a2c94592f49e282dca10117f1a0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/forced.idx",
+        ".research/subtitle-corpus/dvd/forced.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/forced.sub",
+          "sha256": "12fb82f0ac58e80a23b0aeaea7206f087366769f1604d4fb34acfa47306456b4"
+        }
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 152,
+        "digest": 17177020579046846644
+      }
+    },
+    {
+      "id": "vobsub-forced-only-off",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/forced.idx",
+      "sha256": "1c0180a49bc5d63587fed2ff43b002a6d59c7a2c94592f49e282dca10117f1a0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/forced.idx",
+        ".research/subtitle-corpus/dvd/forced.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/forced.sub",
+          "sha256": "12fb82f0ac58e80a23b0aeaea7206f087366769f1604d4fb34acfa47306456b4"
+        }
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 152,
+        "digest": 17177020579046846644
+      }
+    },
+    {
+      "id": "vobsub-palette-option-short",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/basic.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "vobsub-palette-option-invalid",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/basic.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "vobsub-palette-option-empty",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/basic.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "vobsub-ifo-palette-vts",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/basic.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/VTS_01_0.IFO",
+          "sha256": "b575d4faf84f8a10d653a70c4c40268b9233f77741380d92323dfc99c14c6e0b"
+        },
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "vobsub-ifo-palette-three-pgcs",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/basic.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/VTS_02_0.IFO",
+          "sha256": "eef4cfe7a990e8980087eeb4e4eacb290fc6a2fc0998994f6d807e4c3ab104ff"
+        },
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "vobsub-ifo-palette-wrong-magic",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/basic.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/VTS_03_0.IFO",
+          "sha256": "bac957c863b7dd3e3ec065f599e377ba44d0994d5c88bea170b32bc6ec120539"
+        },
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "vobsub-ifo-palette-truncated",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/basic.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/VTS_04_0.IFO",
+          "sha256": "db7bf67d0e5e624a7de4c49dbd4edd57e366f59d98cc558d0e8b7ca276c82a0b"
+        },
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "vobsub-ifo-palette-second-pgc",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/basic.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/VTS_05_0.IFO",
+          "sha256": "dee63761791de14599bc72bee391b3cce9a4c2da3c0f09afcba9e2542739c91c"
+        },
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "vobsub-ifo-palette-sector-past-eof",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/basic.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/VTS_06_0.IFO",
+          "sha256": "2d043b1f80991e617c6f52a5a68d45e36f01bf35e43e36f3cf28658853ff627f"
+        },
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "vobsub-ifo-palette-pgc-past-eof",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/basic.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/VTS_07_0.IFO",
+          "sha256": "1594c54b139bbe5ee5b27972334929f55c93fe4de17e7192acdeec82f90ec233"
+        },
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "vobsub-ifo-palette-sector-overflow",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/basic.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/VTS_08_0.IFO",
+          "sha256": "2cc8b750f3bd42444d00267cde1ecb507ac45a409fc8fbf019465741e10690d2"
+        },
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "vobsub-ifo-palette-missing",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/basic.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "vobsub-ifo-and-palette-option",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/basic.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/VTS_01_0.IFO",
+          "sha256": "b575d4faf84f8a10d653a70c4c40268b9233f77741380d92323dfc99c14c6e0b"
+        },
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "vobsub-guess-ifo-palette",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/guess.idx",
+      "sha256": "93e6380c59815ea7ae8d0591c3eb58bee152b5de13275f97b65adc13af7240a9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/guess.idx",
+        ".research/subtitle-corpus/dvd/guess.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/VTS_01_0.IFO",
+          "sha256": "b575d4faf84f8a10d653a70c4c40268b9233f77741380d92323dfc99c14c6e0b"
+        },
+        {
+          "file": ".research/subtitle-corpus/dvd/guess.sub",
+          "sha256": "d377ad5645544993c808816f8445fa72eb8ea0b6e83ee0132250315b5b3e8429"
+        }
+      ],
+      "expected": {
+        "packets": 52,
+        "bytes": 16,
+        "digest": 13496110781242441930
+      }
+    },
+    {
+      "id": "vobsub-reassembly-split",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/reassembly-split.idx",
+      "sha256": "d69ddacb13ca0b81e645152ae7924d6961333777d906c946e2fa78e93e54245d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/reassembly-split.idx",
+        ".research/subtitle-corpus/dvd/reassembly-split.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/reassembly-split.sub",
+          "sha256": "c96b344dc1d6914ebe3f14ef2018b8306a753fef1bf70cf520737b17c3b26268"
+        }
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 152,
+        "digest": 12235052879967172948
+      }
+    },
+    {
+      "id": "vobsub-reassembly-short-start",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/reassembly-short-start.idx",
+      "sha256": "a3a86b7bd1a3c4e4e8865363054aec74edbb0b6ed6df8c0231e2f97546abfb07",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/reassembly-short-start.idx",
+        ".research/subtitle-corpus/dvd/reassembly-short-start.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/reassembly-short-start.sub",
+          "sha256": "58c31cc1b8eb138344b9bd580be91c48a853f7316443689273af07e520522b6f"
+        }
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 152,
+        "digest": 5475545895257153179
+      }
+    },
+    {
+      "id": "vobsub-reassembly-short-start-garbage",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/reassembly-short-start-garbage.idx",
+      "sha256": "ce1b2613844e7e8b44e08c6f4eda8188c20437fff64e5bd45f734b7f9162d2af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/reassembly-short-start-garbage.idx",
+        ".research/subtitle-corpus/dvd/reassembly-short-start-garbage.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/reassembly-short-start-garbage.sub",
+          "sha256": "07936c3f2b7f763c3654fdb620bb7925212f821af66f91b468e4544add5ac70e"
+        }
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 152,
+        "digest": 5145710054149572749
+      }
+    },
+    {
+      "id": "vobsub-reassembly-invalid-control",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/reassembly-invalid-control.idx",
+      "sha256": "4168e68a95ad3a8f9d7ceadf6b6186480187f57ff47cd73e7ffb50c57ea92ab0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/reassembly-invalid-control.idx",
+        ".research/subtitle-corpus/dvd/reassembly-invalid-control.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/reassembly-invalid-control.sub",
+          "sha256": "49a7dd0987b82afb1e05446aa7d221e0d088271b843c3e984eefcf63d9d94b0a"
+        }
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 152,
+        "digest": 16632374165189730361
+      }
+    },
+    {
+      "id": "vobsub-reassembly-valid-control-garbage",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/reassembly-valid-control-garbage.idx",
+      "sha256": "ce1b2613844e7e8b44e08c6f4eda8188c20437fff64e5bd45f734b7f9162d2af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/reassembly-valid-control-garbage.idx",
+        ".research/subtitle-corpus/dvd/reassembly-valid-control-garbage.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/reassembly-valid-control-garbage.sub",
+          "sha256": "8442e88e462841ed947a8b26c32de4dfa67952f074847e113ac2952c04567af0"
+        }
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 152,
+        "digest": 5145710054149572749
+      }
+    },
+    {
+      "id": "vobsub-reassembly-excess",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/reassembly-excess.idx",
+      "sha256": "be9574483a149e7eeb21275c8cac0bbfe210e58b05a7db6a717bb5ba8f03bc1b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/reassembly-excess.idx",
+        ".research/subtitle-corpus/dvd/reassembly-excess.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/reassembly-excess.sub",
+          "sha256": "f6f81ae7b4cc5ffb4ed1c0daba25bfee66a4e75b16d52b0897ffc257e92da7f7"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 152,
+        "digest": 13320369581431072034
+      }
+    },
+    {
+      "id": "vobsub-reassembly-new-unit-while-pending",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/reassembly-new-unit-while-pending.idx",
+      "sha256": "ce1b2613844e7e8b44e08c6f4eda8188c20437fff64e5bd45f734b7f9162d2af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/reassembly-new-unit-while-pending.idx",
+        ".research/subtitle-corpus/dvd/reassembly-new-unit-while-pending.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/reassembly-new-unit-while-pending.sub",
+          "sha256": "e977b3ea1733497186126113fa4d81794cd587c55410f5cf975da3a7c72889ae"
+        }
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 152,
+        "digest": 5145710054149572749
+      }
+    },
+    {
+      "id": "vobsub-reassembly-empty-while-pending",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/reassembly-empty-while-pending.idx",
+      "sha256": "a3a86b7bd1a3c4e4e8865363054aec74edbb0b6ed6df8c0231e2f97546abfb07",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/reassembly-empty-while-pending.idx",
+        ".research/subtitle-corpus/dvd/reassembly-empty-while-pending.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/reassembly-empty-while-pending.sub",
+          "sha256": "3df339d9a2973f16d42fd5fd9eb3ec1bd3ed025453d28eddedadda99bc05ac87"
+        }
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 152,
+        "digest": 5475545895257153179
+      }
+    },
+    {
+      "id": "vobsub-reassembly-declared-size",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/reassembly-declared-size.idx",
+      "sha256": "be9574483a149e7eeb21275c8cac0bbfe210e58b05a7db6a717bb5ba8f03bc1b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/reassembly-declared-size.idx",
+        ".research/subtitle-corpus/dvd/reassembly-declared-size.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/reassembly-declared-size.sub",
+          "sha256": "b267a1618d622912ab6e505816d66e037f3453094c49ab41220b183c877edbda"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 152,
+        "digest": 13320369581431072034
+      }
+    },
+    {
+      "id": "vobsub-reassembly-control-offset",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/reassembly-control-offset.idx",
+      "sha256": "ce1b2613844e7e8b44e08c6f4eda8188c20437fff64e5bd45f734b7f9162d2af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/reassembly-control-offset.idx",
+        ".research/subtitle-corpus/dvd/reassembly-control-offset.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/reassembly-control-offset.sub",
+          "sha256": "0ecafcfba71e95130db510f595a207ff0a0db56ab35cc644622e2d95973dd872"
+        }
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 152,
+        "digest": 5145710054149572749
+      }
+    },
+    {
+      "id": "vobsub-reassembly-control-offset-zero",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/reassembly-control-offset-zero.idx",
+      "sha256": "a3a86b7bd1a3c4e4e8865363054aec74edbb0b6ed6df8c0231e2f97546abfb07",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/reassembly-control-offset-zero.idx",
+        ".research/subtitle-corpus/dvd/reassembly-control-offset-zero.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/reassembly-control-offset-zero.sub",
+          "sha256": "ccc577d7b6290555356d913e7ff95e258f9c41e0b726c73d1fbaa3f95c2d47f8"
+        }
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 152,
+        "digest": 5475545895257153179
+      }
+    },
+    {
+      "id": "vobsub-reassembly-control-header-complete",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/reassembly-control-header-complete.idx",
+      "sha256": "d69ddacb13ca0b81e645152ae7924d6961333777d906c946e2fa78e93e54245d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/reassembly-control-header-complete.idx",
+        ".research/subtitle-corpus/dvd/reassembly-control-header-complete.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/reassembly-control-header-complete.sub",
+          "sha256": "638b96f39976bab10ab849c505089d7702507f52695c8aa976bd35418cacb2c8"
+        }
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 152,
+        "digest": 12235052879967172948
+      }
+    },
+    {
+      "id": "vobsub-reassembly-long-tail",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/reassembly-long-tail.idx",
+      "sha256": "43a8ab92925023af59e74897b5c1475f203ed78b53670d44402edb892d3e1f4b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/reassembly-long-tail.idx",
+        ".research/subtitle-corpus/dvd/reassembly-long-tail.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/reassembly-long-tail.sub",
+          "sha256": "26fa5ca588fb94e1b2987dadff7a6bc83adf1d051286c7ac81b0a386994c8b82"
+        }
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 152,
+        "digest": 5145710054149636237
+      }
+    },
+    {
+      "id": "vobsub-hd",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/hd.idx",
+      "sha256": "a0492f26a72be8b9dd26358c522b3e0d977ddb910d55f0fe2073fb4910efd1c9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/hd.idx",
+        ".research/subtitle-corpus/dvd/hd.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/hd.sub",
+          "sha256": "10ed71f8bd1215e139843fa1a311fae12207f3d421b2b4b6e63ce6d7bbf0e311"
+        }
+      ],
+      "expected": {
+        "packets": 27,
+        "bytes": 152,
+        "digest": 17179449855053282269
+      }
+    },
+    {
+      "id": "vobsub-hd-guess-palette",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/hd-guess.idx",
+      "sha256": "3384d9c00e4f0d391e9d505496aadce0b00b9ccbd6b0e27f614a10f74bdd7831",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/hd-guess.idx",
+        ".research/subtitle-corpus/dvd/hd-guess.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/hd-guess.sub",
+          "sha256": "10ed71f8bd1215e139843fa1a311fae12207f3d421b2b4b6e63ce6d7bbf0e311"
+        }
+      ],
+      "expected": {
+        "packets": 27,
+        "bytes": 16,
+        "digest": 10535707508732142737
+      }
+    },
+    {
+      "id": "vobsub-hd-pixels",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/hd-pixels.idx",
+      "sha256": "2f4dcff6d664f824225751a10b8c1a96c657f7771ed1288f2bb23fc2b3ca04d9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/hd-pixels.idx",
+        ".research/subtitle-corpus/dvd/hd-pixels.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/hd-pixels.sub",
+          "sha256": "4c335279597cedc7fa081e4196dc1d0723f6ff8bf71e411ddde42659a7c4bfa9"
+        }
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 152,
+        "digest": 16155352928480387504
+      }
+    },
+    {
+      "id": "vobsub-colour-carry",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/colour-carry.idx",
+      "sha256": "313680baab14782a20401698b74f7d3beb2ae8c604a09c7fb1663975902cb2b0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/colour-carry.idx",
+        ".research/subtitle-corpus/dvd/colour-carry.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/colour-carry.sub",
+          "sha256": "dfbd222835ada78d9cf2d4baa627be594430f68238988296982b3e78a1802e88"
+        }
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 152,
+        "digest": 13809756840649290411
+      }
+    },
+    {
+      "id": "vobsub-colour-carry-guess",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/colour-carry-guess.idx",
+      "sha256": "f4d76253a7c694132919f180be6500bc0fd2b617faf1c8598fb55349abb27205",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/colour-carry-guess.idx",
+        ".research/subtitle-corpus/dvd/colour-carry-guess.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/colour-carry-guess.sub",
+          "sha256": "dfbd222835ada78d9cf2d4baa627be594430f68238988296982b3e78a1802e88"
+        }
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 16,
+        "digest": 16221390024614649695
+      }
+    },
+    {
+      "id": "vobsub-hd-reassembly-split-early",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/hd-reassembly-split-early.idx",
+      "sha256": "ce1b2613844e7e8b44e08c6f4eda8188c20437fff64e5bd45f734b7f9162d2af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/hd-reassembly-split-early.idx",
+        ".research/subtitle-corpus/dvd/hd-reassembly-split-early.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/hd-reassembly-split-early.sub",
+          "sha256": "12c4cd983a16da8e738bbbca7baaf68d1ae985ca59f823b5c265d3dfa682a037"
+        }
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 152,
+        "digest": 5145710054149572749
+      }
+    },
+    {
+      "id": "vobsub-hd-reassembly-split-before-sequence",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/hd-reassembly-split-before-sequence.idx",
+      "sha256": "ce1b2613844e7e8b44e08c6f4eda8188c20437fff64e5bd45f734b7f9162d2af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/hd-reassembly-split-before-sequence.idx",
+        ".research/subtitle-corpus/dvd/hd-reassembly-split-before-sequence.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/hd-reassembly-split-before-sequence.sub",
+          "sha256": "3c1e74f7b018f3043ceece0729b25623d922ce0136cccd9b03f712b68fab65aa"
+        }
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 152,
+        "digest": 5145710054149572749
+      }
+    },
+    {
+      "id": "vobsub-hd-reassembly-split-at-sequence",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/hd-reassembly-split-at-sequence.idx",
+      "sha256": "7b276dabe66ddb2eebae44ba983af3c49b0555c803fc17a5105e95abdde4a2e1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/hd-reassembly-split-at-sequence.idx",
+        ".research/subtitle-corpus/dvd/hd-reassembly-split-at-sequence.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/hd-reassembly-split-at-sequence.sub",
+          "sha256": "bea0c71e5ae065db6fc6bef447848e035fb4c5c4e61cb78590b1d0e6759768db"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 152,
+        "digest": 7811140179472653020
+      }
+    },
+    {
+      "id": "vobsub-hd-reassembly-fragments",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/hd-reassembly-fragments.idx",
+      "sha256": "a3a86b7bd1a3c4e4e8865363054aec74edbb0b6ed6df8c0231e2f97546abfb07",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/hd-reassembly-fragments.idx",
+        ".research/subtitle-corpus/dvd/hd-reassembly-fragments.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/hd-reassembly-fragments.sub",
+          "sha256": "fee6b1c1c1c92664f7190192138959d87fe95b9f86a5ed87b92b66692eefb0fa"
+        }
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 152,
+        "digest": 5475545895257153179
+      }
+    },
+    {
+      "id": "vobsub-hd-reassembly-control-beyond-size",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/hd-reassembly-control-beyond-size.idx",
+      "sha256": "7b276dabe66ddb2eebae44ba983af3c49b0555c803fc17a5105e95abdde4a2e1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/hd-reassembly-control-beyond-size.idx",
+        ".research/subtitle-corpus/dvd/hd-reassembly-control-beyond-size.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/hd-reassembly-control-beyond-size.sub",
+          "sha256": "642377b65f2e8e9bc8ee56374ee9a68f4aa3c8a134a1f75171f4a338c5357cf0"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 152,
+        "digest": 7811140179472653020
+      }
+    },
+    {
+      "id": "vobsub-hd-reassembly-declared-larger",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/hd-reassembly-declared-larger.idx",
+      "sha256": "7b276dabe66ddb2eebae44ba983af3c49b0555c803fc17a5105e95abdde4a2e1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/hd-reassembly-declared-larger.idx",
+        ".research/subtitle-corpus/dvd/hd-reassembly-declared-larger.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/hd-reassembly-declared-larger.sub",
+          "sha256": "c3f267da0c69069fbc426e852d0c7689bf86c210416daa3e768c5eef6ba36c0b"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 152,
+        "digest": 7811140179472653020
+      }
+    },
+    {
+      "id": "vobsub-hd-reassembly-late-control",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/hd-reassembly-late-control.idx",
+      "sha256": "7b276dabe66ddb2eebae44ba983af3c49b0555c803fc17a5105e95abdde4a2e1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/hd-reassembly-late-control.idx",
+        ".research/subtitle-corpus/dvd/hd-reassembly-late-control.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/hd-reassembly-late-control.sub",
+          "sha256": "62ba6c6888eeec9b12479f1957a82482dba982692c76c40fd25815824c1d2c87"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 152,
+        "digest": 7811140179472653020
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-extended-opcodes-traditional-header",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-extended-opcodes-traditional-header.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-extended-opcodes-traditional-header.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-extended-opcodes-traditional-header.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-extended-opcodes-traditional-header.sub",
+          "sha256": "28ddda324997b366d85a88a4fa8fbc98fb5da728af864ec7689701afcffa4839"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd-header-two-bit-pixels",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-header-two-bit-pixels.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-header-two-bit-pixels.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-header-two-bit-pixels.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-header-two-bit-pixels.sub",
+          "sha256": "59f20cb7081ec3ba3553e3323625f39eb7de2301d10880748e2f690648d6f990"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd-truncated-header-00",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-00.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-00.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-00.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-00.sub",
+          "sha256": "412a191caee466a1b571e4aa2fe6dba921fd682fe7e2305488414b0a0aabb504"
+        }
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 152,
+        "digest": 17895885918390129702
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd-truncated-header-01",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-01.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-01.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-01.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-01.sub",
+          "sha256": "a40f6daaa0d7545dd0978918daaef4d53596e607c4f653711685ceebe6b87975"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd-truncated-header-02",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-02.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-02.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-02.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-02.sub",
+          "sha256": "3ad8ab3a127bdfeb2f9c9aa7aec90b38fdcbee6083088591c95aed3807a9f71e"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd-truncated-header-03",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-03.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-03.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-03.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-03.sub",
+          "sha256": "704d477a6fc28a19b30a5d7e375b3705f2aab8dd230f0b596e88d99d47e0b4f4"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd-truncated-header-04",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-04.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-04.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-04.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-04.sub",
+          "sha256": "fa53eae982d18b437877f1315efec3f099d3bee506911f0b5e443501b451932e"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd-truncated-header-05",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-05.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-05.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-05.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-05.sub",
+          "sha256": "07b2b8dae60785d8e701a13cc974d17579642e682f0b40f49bdaa0435a5f048e"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd-truncated-header-06",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-06.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-06.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-06.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-06.sub",
+          "sha256": "bca0d3164e74a268d75449ebd571556e6fee194a20b00a06d1e4e0c73d927019"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd-truncated-header-07",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-07.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-07.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-07.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-07.sub",
+          "sha256": "f187cb6d71550ca0be30c721b0b4758a9f8d9d4bf37a3c0277c8364e1546ef09"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd-truncated-header-08",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-08.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-08.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-08.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-08.sub",
+          "sha256": "8bec309526b0b601dfebf4c9b2a0061325c21cb44f92b56d6a9c8b89c79f2d83"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd-truncated-header-09",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-09.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-09.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-09.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd-truncated-header-09.sub",
+          "sha256": "f6a33e6cbaac52018cef00d0e90291f1959e1b6466fbb7f487bbd3d85a0c3588"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-all-256-indices",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-all-256-indices.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-all-256-indices.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-all-256-indices.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-all-256-indices.sub",
+          "sha256": "ecb8e9676e18e14625bae4d7a8243a9f247ca7ca21fba6b348fff21d7828f891"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-fields-at-ffffffff",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-fields-at-ffffffff.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-fields-at-ffffffff.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-fields-at-ffffffff.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-fields-at-ffffffff.sub",
+          "sha256": "ec5b9bb02853f59d7212381bba88ba22186e6c75767560034856ff95579e2a8d"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-forced",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-forced.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-forced.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-forced.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-forced.sub",
+          "sha256": "22f349049979bf63c9f1a2a9ad86b0aba9417943fbaa510ee53607a3961b161c"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-000-fill-257-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-fill-257-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-fill-257-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-fill-257-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-fill-257-padding-0.sub",
+          "sha256": "f20efd663ff35304b4ab6f959c864e6382b8cef91bb9a9dc8ebc2e37ea29fbc5"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-000-large-010-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-large-010-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-large-010-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-large-010-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-large-010-padding-0.sub",
+          "sha256": "217388fb6fcc3b62e717ba9cc40c7853389d3c8b4a16082f0393539de1ee03b6"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-000-large-136-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-large-136-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-large-136-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-large-136-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-large-136-padding-0.sub",
+          "sha256": "3af87439ff7546debbe73f5a00a419160770faef1e6529a70758f902fc661960"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-000-single-001-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-single-001-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-single-001-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-single-001-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-single-001-padding-0.sub",
+          "sha256": "eb031a689729a9d7d3ae2dbd73ba06d4f5e9cb6038aa08b3d41ed2f5dad3406b"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-000-single-001-padding-1",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-single-001-padding-1.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-single-001-padding-1.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-single-001-padding-1.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-single-001-padding-1.sub",
+          "sha256": "d890fc162310260d7a03577ff2fca8f405fb53a86d5f373b87946897be9bc184"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-000-small-002-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-small-002-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-small-002-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-small-002-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-small-002-padding-0.sub",
+          "sha256": "7f1090ba825f59d3c1e473197845cc6aa7b417dfa75c87b24d0c9554608b17b7"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-000-small-009-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-small-009-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-small-009-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-small-009-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-000-small-009-padding-0.sub",
+          "sha256": "c392d46ae160cd03e7a476a684f32bc06d07d4c4d3e93e69822d14e50f44986a"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-003-fill-257-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-fill-257-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-fill-257-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-fill-257-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-fill-257-padding-0.sub",
+          "sha256": "dff3901098965771ff6eb8eb23ed31a5426f3771597cb21e404c5f81242208f7"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-003-large-010-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-large-010-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-large-010-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-large-010-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-large-010-padding-0.sub",
+          "sha256": "61f45b1eb73360cfbff82f757877c86ebccc1a9b6bf6bfb713cd776a9da29ed0"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-003-large-136-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-large-136-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-large-136-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-large-136-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-large-136-padding-0.sub",
+          "sha256": "dbe2cb596ad43f3950f096c4e5fa7faa9c10fb6afe46a79b0bed80055e7394c2"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-003-single-001-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-single-001-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-single-001-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-single-001-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-single-001-padding-0.sub",
+          "sha256": "368e6d0a023cfa5c13edf9cd7c15f7841db593576102701e043d12fdebed3b7c"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-003-single-001-padding-1",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-single-001-padding-1.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-single-001-padding-1.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-single-001-padding-1.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-single-001-padding-1.sub",
+          "sha256": "c57d26409ef2242d0f93972f5f04df7ee4e52ab996526f07e86b0c590f98d01a"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-003-small-002-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-small-002-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-small-002-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-small-002-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-small-002-padding-0.sub",
+          "sha256": "4160456f37258d0a9f1073c2f75d8635b499608dd302ddf4828bfe4474d84a57"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-003-small-009-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-small-009-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-small-009-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-small-009-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-003-small-009-padding-0.sub",
+          "sha256": "dae76e33e77cbcfbed2f335bf6a68f0d89be5b37aa8d076f282d43d4fbee35a9"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-004-fill-257-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-fill-257-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-fill-257-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-fill-257-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-fill-257-padding-0.sub",
+          "sha256": "3a2f83ef31b6ba76cb15384587ddac287713952c324a1ba30b0f9948e25dbad1"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-004-large-010-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-large-010-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-large-010-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-large-010-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-large-010-padding-0.sub",
+          "sha256": "c8e55930f8c3e416ee07c1d7c37880cd78188da4edc052baa70a144cd693f854"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-004-large-136-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-large-136-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-large-136-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-large-136-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-large-136-padding-0.sub",
+          "sha256": "2be5573f0f803113eccdc1d817ac09da48b6ee7e4d3f98ad9b012658a00b0035"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-004-single-001-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-single-001-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-single-001-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-single-001-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-single-001-padding-0.sub",
+          "sha256": "a984de3b6e84eb378d466de95561a16fb96ae7b6b4e28d2278c93176f80a247d"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-004-single-001-padding-1",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-single-001-padding-1.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-single-001-padding-1.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-single-001-padding-1.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-single-001-padding-1.sub",
+          "sha256": "66b0dfe4b3b4935834c8048673b7c5bf8b1b9425a728c0caebb9bf069bc92607"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-004-small-002-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-small-002-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-small-002-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-small-002-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-small-002-padding-0.sub",
+          "sha256": "dea6fe18d990b8fea4330c8b29deef00daf9121a67132f6055bef3a24c25b6e0"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-004-small-009-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-small-009-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-small-009-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-small-009-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-004-small-009-padding-0.sub",
+          "sha256": "4c36a873391d5eb0a2027e1ff8c100e2335227ae2ce7aadea9f170582b119371"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-017-fill-257-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-fill-257-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-fill-257-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-fill-257-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-fill-257-padding-0.sub",
+          "sha256": "04edb9cb86851b279d5d07286e564bf25d8a9ac7c45701e80db0798d64ffd243"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-017-large-010-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-large-010-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-large-010-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-large-010-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-large-010-padding-0.sub",
+          "sha256": "3fe540a0e466ca077eb253bf6a699ed76cc9bf959021e927f4c1aff3a0fa6219"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-017-large-136-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-large-136-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-large-136-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-large-136-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-large-136-padding-0.sub",
+          "sha256": "fd502e7297c9deab7038774bb445f5032797d8ca1637dfc5f01abfc47d094ea9"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-017-single-001-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-single-001-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-single-001-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-single-001-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-single-001-padding-0.sub",
+          "sha256": "44574663b1ff725f9b1c9ba69806cac96cf82fbbb26dc7ef145da44e412c3d85"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-017-single-001-padding-1",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-single-001-padding-1.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-single-001-padding-1.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-single-001-padding-1.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-single-001-padding-1.sub",
+          "sha256": "44942ba24128ef4c9ef39bfd3260d5fd46b4538f29619698da6640be7e17cff6"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-017-small-002-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-small-002-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-small-002-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-small-002-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-small-002-padding-0.sub",
+          "sha256": "c33c1147b066cc7f0a2abf78c882330d219364440a0f66fa91cbbc2912dff522"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-017-small-009-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-small-009-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-small-009-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-small-009-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-017-small-009-padding-0.sub",
+          "sha256": "213fc4ba784ed78c75fd1efe66871cfcb5582055934544aac84aac601e466b92"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-255-fill-257-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-fill-257-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-fill-257-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-fill-257-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-fill-257-padding-0.sub",
+          "sha256": "82442a3912f4e21d3bddef4d55765dce6cd5a60c0c881f72fed9084c9ed682c8"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-255-large-010-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-large-010-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-large-010-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-large-010-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-large-010-padding-0.sub",
+          "sha256": "f0c208477e8534cf400134f6606f4b460d02c54eec96f9adf80d4cac504c095d"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-255-large-136-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-large-136-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-large-136-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-large-136-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-large-136-padding-0.sub",
+          "sha256": "8768c26c8561e2ea4779ca414891a6a5baa47e260ab94d13e47a55bb6b113e7d"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-255-single-001-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-single-001-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-single-001-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-single-001-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-single-001-padding-0.sub",
+          "sha256": "5bb701ecb15ed93bd75f7e761131cafa9f0785d284a4caa0e6523b23b38e08e8"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-255-single-001-padding-1",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-single-001-padding-1.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-single-001-padding-1.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-single-001-padding-1.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-single-001-padding-1.sub",
+          "sha256": "43ca12aa13b9baa9db10535de700b341b934a607e6ab60bc60d114fecf211152"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-255-small-002-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-small-002-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-small-002-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-small-002-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-small-002-padding-0.sub",
+          "sha256": "8039c199fadb812650f248423c2e243b4a8404d46e584c670e66f91d9a5aa791"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-index-255-small-009-padding-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-small-009-padding-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-small-009-padding-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-small-009-padding-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-index-255-small-009-padding-0.sub",
+          "sha256": "5112e0cb1f60de0541937183009c45d071c8eaf72348dbbf8c0f0cd79ee5044e"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-missing-YCrCb-palette",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-missing-YCrCb-palette.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-missing-YCrCb-palette.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-missing-YCrCb-palette.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-missing-YCrCb-palette.sub",
+          "sha256": "590ec2af2c68b344eb7470dd8ad4fdef7c3d5cfcfc720923784c041bffb4dcb8"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-missing-contrast",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-missing-contrast.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-missing-contrast.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-missing-contrast.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-missing-contrast.sub",
+          "sha256": "7a227cb95d0af68bd2e3fff4246004db326d3f8db3fac4fd6ab877cb33f18df5"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-mixed-token-forms",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-mixed-token-forms.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-mixed-token-forms.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-mixed-token-forms.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-mixed-token-forms.sub",
+          "sha256": "92209bc7c7b7f74d34205213ecc21e48c5f7b432a994caa53b33df8433551cb2"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-source-hd8-unknown-07-after-fields",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-unknown-07-after-fields.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-unknown-07-after-fields.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-unknown-07-after-fields.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-source-hd8-unknown-07-after-fields.sub",
+          "sha256": "ee8b36f27316763feb7ff4bd48978d8eb5fed8635f94c94b279640392dbeb136"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-colour-grid-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-0.sub",
+          "sha256": "4d8171501342e1d7c9bb8fdc527dd063c25f86bce9df4092b3cd8ea57a9855aa"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-colour-grid-1",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-1.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-1.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-1.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-1.sub",
+          "sha256": "1c725a59bc5b9c3a3188168f36f65785dbbace6c3752296e97abb0623808e581"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-colour-grid-2",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-2.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-2.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-2.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-2.sub",
+          "sha256": "cffb65121df34250a25caad210b8a1753931623c872de217074914acbbbeb9ea"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-colour-grid-3",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-3.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-3.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-3.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-colour-grid-3.sub",
+          "sha256": "d1f2a141c1bf775351f48b8de98ff1d93a209f88798eaac89bd23af93f6b4f8a"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-contrast-replacement",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-contrast-replacement.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-contrast-replacement.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-contrast-replacement.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-contrast-replacement.sub",
+          "sha256": "0e77a43fc0c02b5313106351da9aba6eb06a6c91c31b2969c29cf08c8350906e"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-mode-sticky-after-05",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-mode-sticky-after-05.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-mode-sticky-after-05.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-mode-sticky-after-05.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-mode-sticky-after-05.sub",
+          "sha256": "68859d8155f1998c4606ee0776805ca787bb89bef6ce622cbf9afc5ec84c8f5d"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-palette-not-mode",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-palette-not-mode.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-palette-not-mode.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-palette-not-mode.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-palette-not-mode.sub",
+          "sha256": "a80d8f450909f7916604913a816b5fa3d0194378a967c1edc4f7c389b7daae40"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-palette-replacement",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-palette-replacement.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-palette-replacement.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-palette-replacement.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-palette-replacement.sub",
+          "sha256": "b95757a4f26b548767851bb74870c8e7b58ed888bda8c5796ff4773dd9eac94d"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-traditional-header-extended-commands",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-traditional-header-extended-commands.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-traditional-header-extended-commands.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-traditional-header-extended-commands.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-traditional-header-extended-commands.sub",
+          "sha256": "1867e8adf63ee69c5c7f1b556fc939426748a9c3fe28955a1334bec63d4a768c"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-truncated-83-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-83-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-83-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-83-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-83-0.sub",
+          "sha256": "416185b7313edd379fdbf4c5ac01e6e39b34d90ae391a7552e70abae6d54f59e"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-truncated-83-767",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-83-767.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-83-767.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-83-767.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-83-767.sub",
+          "sha256": "903022f72bdfd77a1d76b40ae2e0b3825eb0f28a1cc5a6684af23c5155d873f7"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-truncated-84-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-84-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-84-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-84-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-84-0.sub",
+          "sha256": "a980d25692e210dcf66b844ad6f14fd1d050545c1b26e1c36eeb483bc8a272da"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-truncated-84-255",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-84-255.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-84-255.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-84-255.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-84-255.sub",
+          "sha256": "f2e38f65128a93ee5dcf53d654a80cbfa358317d04f109302d0dc1f67341ec25"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-truncated-85-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-85-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-85-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-85-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-85-0.sub",
+          "sha256": "e32f1f108cf41ad335357dd9fa27bb4caa8347518c6e730334f32e2ec44487b0"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-truncated-85-5",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-85-5.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-85-5.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-85-5.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-85-5.sub",
+          "sha256": "acaaa8568384401fead88af4bae53105aae0cd6f3e850849e9d5b95b82a6bbfc"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-truncated-86-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-86-0.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-86-0.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-86-0.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-86-0.sub",
+          "sha256": "8bb164b90507408658c993720ecc19aeee84f66d7b8d6c1d478ee06e813e2f61"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-truncated-86-7",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-86-7.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-86-7.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-86-7.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-truncated-86-7.sub",
+          "sha256": "7b396db60a56cebd92cf1133195ca057fa8de884a5d3a51e60af12106c0bc9e7"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-wide-actual-field65552-height1",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-actual-field65552-height1.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-actual-field65552-height1.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-actual-field65552-height1.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-actual-field65552-height1.sub",
+          "sha256": "5526808a4caef78e3424ab889bad2a91415abe0caaae964643b879637013c26e"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-wide-actual-field65552-height2",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-actual-field65552-height2.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-actual-field65552-height2.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-actual-field65552-height2.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-actual-field65552-height2.sub",
+          "sha256": "eeb74b486ad452981aca0298779801fc752fd37dd09329c05945eb2dc3505d56"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-wide-fill-after-prefix",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-fill-after-prefix.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-fill-after-prefix.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-fill-after-prefix.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-fill-after-prefix.sub",
+          "sha256": "d8cad1e3e93db432128d732e89892a399e5e41e82fdb73bf1f37e25447562ff3"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-wide-header-short-field-command",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-header-short-field-command.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-header-short-field-command.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-header-short-field-command.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-header-short-field-command.sub",
+          "sha256": "606dcfb4580e0bee5ca83dfdbc0acda89bf69c6c04327135e57a85a9f4126405"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-wide-odd-fields-five-rows",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-odd-fields-five-rows.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-odd-fields-five-rows.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-odd-fields-five-rows.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-odd-fields-five-rows.sub",
+          "sha256": "22a00008c12d14ee965384717cf20f5767abeee5de170ba210787a72221a90fb"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-additive-wide-rle-short-overshoot",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-rle-short-overshoot.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-rle-short-overshoot.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-rle-short-overshoot.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-additive-wide-rle-short-overshoot.sub",
+          "sha256": "cfa31101587ab64bd570790597c9286bce84eed86934d957bc9ea4118f85fb45"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-policy-eight-04-then-84",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-04-then-84.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-04-then-84.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-04-then-84.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-04-then-84.sub",
+          "sha256": "3ba81585faa96683a71024ebeef64d21cf8b0a67452685e4b12eee4e840a7d81"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-policy-eight-84-then-04",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-84-then-04.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-84-then-04.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-84-then-04.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-84-then-04.sub",
+          "sha256": "a97399e4f71b0d9e490ca74b579fb043a346ce3317bebe26a58dbc279992c13c"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-policy-eight-missing-contrast-forced",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-missing-contrast-forced.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-missing-contrast-forced.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-missing-contrast-forced.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-missing-contrast-forced.sub",
+          "sha256": "e7e1730fced89205e322445dd1ae5c577dbca012d879e6019ebd75c2ebe64cdb"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-policy-eight-missing-palette-forced",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-missing-palette-forced.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-missing-palette-forced.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-missing-palette-forced.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-eight-missing-palette-forced.sub",
+          "sha256": "25e7a05b3d582f270f97136d4d545e360062451bc9ae00f4982721a476de0e1e"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-policy-forced-date-17",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-forced-date-17.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-forced-date-17.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-forced-date-17.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-forced-date-17.sub",
+          "sha256": "c600e6695e811ec540992b9935b197b36ec582fbfe4971415b3c8f740d7c4dba"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-policy-four-04-then-84",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-four-04-then-84.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-four-04-then-84.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-four-04-then-84.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-four-04-then-84.sub",
+          "sha256": "de6645973be0f81a6a8c76e14837405478faee2c725135611d5762d67e1492c0"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-policy-four-84-then-04",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-four-84-then-04.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-four-84-then-04.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-four-84-then-04.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-four-84-then-04.sub",
+          "sha256": "7bd0ce26fb5ee29d8293caf1ad0b82955f54975c2ffdb269b8531e4a9f6a5aee"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-policy-invalid-next-link-after-fields",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-invalid-next-link-after-fields.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-invalid-next-link-after-fields.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-invalid-next-link-after-fields.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-invalid-next-link-after-fields.sub",
+          "sha256": "25c5d90e4df945d11243d2c92eaf15e7840350fe9d19140b946fef19915a06b8"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-policy-negative-known-PTS",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-negative-known-PTS.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-negative-known-PTS.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-negative-known-PTS.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-negative-known-PTS.sub",
+          "sha256": "485728c995c6d4469999067b648064c92e2ce336a4ddc3df895a63c2ebd29505"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-policy-opaque-before-area",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-opaque-before-area.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-opaque-before-area.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-opaque-before-area.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-opaque-before-area.sub",
+          "sha256": "97dd4414235420094ceaabe06defd84b8b646af14933dee730b48b40b7dbdbae"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-policy-ordinary-date-17",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-ordinary-date-17.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-ordinary-date-17.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-ordinary-date-17.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-ordinary-date-17.sub",
+          "sha256": "95fcb667a72e4cab57410ba97e4938ede9c0b890896498a76243542f33654110"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-policy-truncated-area-after-fields",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-truncated-area-after-fields.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-truncated-area-after-fields.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-truncated-area-after-fields.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-truncated-area-after-fields.sub",
+          "sha256": "21597cccb41e2f59a334f4593cf53ebc07f2efa9fe2210e11e5719a43187887d"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-policy-unknown-PTS-keeps-raw",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-unknown-PTS-keeps-raw.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-unknown-PTS-keeps-raw.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-unknown-PTS-keeps-raw.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-policy-unknown-PTS-keeps-raw.sub",
+          "sha256": "485728c995c6d4469999067b648064c92e2ce336a4ddc3df895a63c2ebd29505"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-multi-early-one-row-bad-rle-later-valid",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-one-row-bad-rle-later-valid.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-one-row-bad-rle-later-valid.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-one-row-bad-rle-later-valid.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-one-row-bad-rle-later-valid.sub",
+          "sha256": "d17444a04df94add5fa50a70577a9fa0a87507981c6551c9ac991f0fc67dcf01"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-multi-early-rle-overshoot-later-valid",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-rle-overshoot-later-valid.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-rle-overshoot-later-valid.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-rle-overshoot-later-valid.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-rle-overshoot-later-valid.sub",
+          "sha256": "0404ee11cc39dd67dae8530bc7e1a1e45acd2713f2602c48977671e17482a781"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-multi-early-valid-later-forced-only",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-forced-only.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-forced-only.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-forced-only.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-forced-only.sub",
+          "sha256": "091ff977316546ee1983ba26b22c2ded73a019697f94ea3ad5538c74a93ecb1c"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-multi-early-valid-later-invalid-fields",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-invalid-fields.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-invalid-fields.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-invalid-fields.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-invalid-fields.sub",
+          "sha256": "c5e17a81150a13d7430adde82ae8c57f8306c47a760e9586bc77b24a9b28ded3"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-multi-early-valid-later-one-row",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-one-row.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-one-row.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-one-row.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-one-row.sub",
+          "sha256": "07b016a5f42c310117ad7596463b5dc2c1b72fc3af6e002923ae2fe3e09a7d6e"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-multi-early-valid-later-palette-only",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-palette-only.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-palette-only.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-palette-only.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-palette-only.sub",
+          "sha256": "fa7fb38776a436da020e914ebdb163b4f7100e4ef6c6ea5b962b7d53c9745cd2"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-multi-early-valid-later-rle-overshoot",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-rle-overshoot.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-rle-overshoot.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-rle-overshoot.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-early-valid-later-rle-overshoot.sub",
+          "sha256": "472257762888f5d250bbd6356b9dddb664a154ce3df329f12be21f550cd3f14a"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-multi-two-valid-rasters-last-selected",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-two-valid-rasters-last-selected.idx",
+      "sha256": "e97c249bea2abb94590e86da4e6e60c82d764bf365d0b098e931801868ec723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-two-valid-rasters-last-selected.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-two-valid-rasters-last-selected.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-multi-two-valid-rasters-last-selected.sub",
+          "sha256": "abad85278575933d8652dae421fce7616120975d4e4d7f434218541ca7b2ebcc"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 152,
+        "digest": 13680350087873998351
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-context-eight-contrast-persists",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-eight-contrast-persists.idx",
+      "sha256": "13ea832de7502f3b81dce0a341ec51720557ed128b75b54b195ca0f302f86178",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-eight-contrast-persists.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-eight-contrast-persists.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-eight-contrast-persists.sub",
+          "sha256": "79fa927d543e9eff065e0a2b0ada798c7630b8a38bdf6d043220b1476a5cf7a7"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 16,
+        "digest": 6382413480477656590
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-context-eight-new-yuv-inherited-alpha",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-eight-new-yuv-inherited-alpha.idx",
+      "sha256": "13ea832de7502f3b81dce0a341ec51720557ed128b75b54b195ca0f302f86178",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-eight-new-yuv-inherited-alpha.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-eight-new-yuv-inherited-alpha.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-eight-new-yuv-inherited-alpha.sub",
+          "sha256": "643abf50c1e5665c88ee526cba6d3957807d91c011cfdb2482cee38d13ee305c"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 16,
+        "digest": 6382413480477656590
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-context-eight-to-four-state",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-eight-to-four-state.idx",
+      "sha256": "13ea832de7502f3b81dce0a341ec51720557ed128b75b54b195ca0f302f86178",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-eight-to-four-state.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-eight-to-four-state.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-eight-to-four-state.sub",
+          "sha256": "d6df6a278a3f3db593b27a292b521b2ff27813be9998a932d0dc8560f5d23780"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 16,
+        "digest": 6382413480477656590
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-context-four-selectors-alpha-persist",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-four-selectors-alpha-persist.idx",
+      "sha256": "13ea832de7502f3b81dce0a341ec51720557ed128b75b54b195ca0f302f86178",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-four-selectors-alpha-persist.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-four-selectors-alpha-persist.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-four-selectors-alpha-persist.sub",
+          "sha256": "16d01305a7faa35f25ffd4f6860c9b912832dda58ef35aa584a2e0f5e3db06dc"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 16,
+        "digest": 6382413480477656590
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-context-four-to-eight-state",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-four-to-eight-state.idx",
+      "sha256": "13ea832de7502f3b81dce0a341ec51720557ed128b75b54b195ca0f302f86178",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-four-to-eight-state.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-four-to-eight-state.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-four-to-eight-state.sub",
+          "sha256": "ebf5536212d8db7701c8b98332ac9ca437f6c4c79df0ae007f893f72b1fa379f"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 16,
+        "digest": 6382413480477656590
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-context-full-contrast-clears-inherited-packed",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-full-contrast-clears-inherited-packed.idx",
+      "sha256": "bbe2aa23ebc0bf394961f04c0493648b67d9c06d72dee382cccf5381f151c80b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-full-contrast-clears-inherited-packed.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-full-contrast-clears-inherited-packed.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-full-contrast-clears-inherited-packed.sub",
+          "sha256": "52b97418d72ca981ddf1da0978c2a246310e3008534080c56b0b7e0125259a46"
+        }
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 16,
+        "digest": 4746031792859531967
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-context-late-alpha-persists-next-packet",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-late-alpha-persists-next-packet.idx",
+      "sha256": "13ea832de7502f3b81dce0a341ec51720557ed128b75b54b195ca0f302f86178",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-late-alpha-persists-next-packet.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-late-alpha-persists-next-packet.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-late-alpha-persists-next-packet.sub",
+          "sha256": "2b3a84c6cbcadd1fd1f36558bccb189d4ef311e32e110df13ba41c825652eded"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 16,
+        "digest": 6382413480477656590
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-context-missing-yuv-still-updates-alpha",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-missing-yuv-still-updates-alpha.idx",
+      "sha256": "bbe2aa23ebc0bf394961f04c0493648b67d9c06d72dee382cccf5381f151c80b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-missing-yuv-still-updates-alpha.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-missing-yuv-still-updates-alpha.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-missing-yuv-still-updates-alpha.sub",
+          "sha256": "3c53cc24264fd6f6e4d17a646f6a21d5fcaba5a641d22d6806776de0e97de368"
+        }
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 16,
+        "digest": 4746031792859531967
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-context-packed-alpha-persists",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-packed-alpha-persists.idx",
+      "sha256": "13ea832de7502f3b81dce0a341ec51720557ed128b75b54b195ca0f302f86178",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-packed-alpha-persists.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-packed-alpha-persists.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-packed-alpha-persists.sub",
+          "sha256": "e8062b0cd30b27a851490bf8db4d0fa02cdc01184b1ab236a3499d898f6672fe"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 16,
+        "digest": 6382413480477656590
+      }
+    },
+    {
+      "id": "vobsub-fixture-hd-context-rejected-rle-still-updates-alpha",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-rejected-rle-still-updates-alpha.idx",
+      "sha256": "13ea832de7502f3b81dce0a341ec51720557ed128b75b54b195ca0f302f86178",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-rejected-rle-still-updates-alpha.idx",
+        ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-rejected-rle-still-updates-alpha.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/fixtures/fixture-hd-context-rejected-rle-still-updates-alpha.sub",
+          "sha256": "cd37422bb3b77908731691c5b46cf9b25049d6fb1913e42151d2ec7a57b06cc1"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 16,
+        "digest": 6382413480477656590
+      }
+    },
+    {
+      "id": "vobsub-extent-continuation",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/extent-continuation.idx",
+      "sha256": "9202462f0d1fc29d98bf0af0d79c636e7954b63bb20745829a30794102e0544b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/extent-continuation.idx",
+        ".research/subtitle-corpus/dvd/extent-continuation.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/extent-continuation.sub",
+          "sha256": "3d063bbb5cf8a9953725a343d03867f74b8fa543a4d97d021f804d988af65192"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 152,
+        "digest": 13648221723493100406
+      }
+    },
+    {
+      "id": "vobsub-extent-unlisted",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/extent-unlisted.idx",
+      "sha256": "48b47bc7bd9ded393a5d33d3ad500532b8ae391d84c11b48395866b78d906d3e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/extent-unlisted.idx",
+        ".research/subtitle-corpus/dvd/extent-unlisted.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/extent-unlisted.sub",
+          "sha256": "3d063bbb5cf8a9953725a343d03867f74b8fa543a4d97d021f804d988af65192"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 152,
+        "digest": 7811140179474732872
+      }
+    },
+    {
+      "id": "vobsub-extent-unsorted",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/extent-unsorted.idx",
+      "sha256": "7e8d5534302df05d0c26f5c4e08c1d1fdf5967f9b6751037e86a8b2c3b9b2194",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/extent-unsorted.idx",
+        ".research/subtitle-corpus/dvd/extent-unsorted.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/extent-unsorted.sub",
+          "sha256": "3d063bbb5cf8a9953725a343d03867f74b8fa543a4d97d021f804d988af65192"
+        }
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 152,
+        "digest": 5145711028802309657
+      }
+    },
+    {
+      "id": "vobsub-extent-ties",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/extent-ties.idx",
+      "sha256": "e09beba2d8e3342c67aeb8dd6c8369f2b740f79154d8af5e7d5aac6c41f9fb22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/extent-ties.idx",
+        ".research/subtitle-corpus/dvd/extent-ties.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/extent-ties.sub",
+          "sha256": "3d063bbb5cf8a9953725a343d03867f74b8fa543a4d97d021f804d988af65192"
+        }
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 152,
+        "digest": 3310788542366215943
+      }
+    },
+    {
+      "id": "vobsub-extent-duplicate",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/extent-duplicate.idx",
+      "sha256": "af539d13dca9b9ac900df9a24652d853fa3c20a43a842696dfba2efc461e5af2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/extent-duplicate.idx",
+        ".research/subtitle-corpus/dvd/extent-duplicate.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/extent-duplicate.sub",
+          "sha256": "3d063bbb5cf8a9953725a343d03867f74b8fa543a4d97d021f804d988af65192"
+        }
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 152,
+        "digest": 5362304413542045989
+      }
+    },
+    {
+      "id": "vobsub-extent-misaligned",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/extent-misaligned.idx",
+      "sha256": "5370ae8160eb7744a63a97074ec73bdd209415ca9bda598b11c2abe91a00c1b6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/extent-misaligned.idx",
+        ".research/subtitle-corpus/dvd/extent-misaligned.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/extent-misaligned.sub",
+          "sha256": "3d063bbb5cf8a9953725a343d03867f74b8fa543a4d97d021f804d988af65192"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 152,
+        "digest": 14058247831377158102
+      }
+    },
+    {
+      "id": "vobsub-extent-boundaries",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/extent-boundaries.idx",
+      "sha256": "d2e3370b59e02c68a1c5b83c372c2bb39c2c254061d66f770387c4e8b55f3848",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/extent-boundaries.idx",
+        ".research/subtitle-corpus/dvd/extent-boundaries.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/extent-boundaries.sub",
+          "sha256": "3d063bbb5cf8a9953725a343d03867f74b8fa543a4d97d021f804d988af65192"
+        }
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 152,
+        "digest": 3858945121292156615
+      }
+    },
+    {
+      "id": "vobsub-extent-pes-end",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/extent-pes-end.idx",
+      "sha256": "abe0b0d10d9c43978974babb01a051298aa39e53de3bb8eedaaeace98325653d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/extent-pes-end.idx",
+        ".research/subtitle-corpus/dvd/extent-pes-end.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/extent-pes-end.sub",
+          "sha256": "3d063bbb5cf8a9953725a343d03867f74b8fa543a4d97d021f804d988af65192"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 152,
+        "digest": 14220481352697372999
+      }
+    },
+    {
+      "id": "vobsub-two-tracks-0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/two-tracks.idx",
+      "sha256": "fdd67a3c84d64893a75d5d120f19b5d09cbbe60adaba7391a70b0b0ab1bc764d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/two-tracks.idx",
+        ".research/subtitle-corpus/dvd/two-tracks.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/two-tracks.sub",
+          "sha256": "44183c9881899672be97d26f82703a0a8ed8d43485b577da2fb1ab0fc0b434a2"
+        }
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 304,
+        "digest": 16117341393113041824
+      }
+    },
+    {
+      "id": "vobsub-two-tracks-1",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/two-tracks.idx",
+      "sha256": "fdd67a3c84d64893a75d5d120f19b5d09cbbe60adaba7391a70b0b0ab1bc764d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/two-tracks.idx",
+        ".research/subtitle-corpus/dvd/two-tracks.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/two-tracks.sub",
+          "sha256": "44183c9881899672be97d26f82703a0a8ed8d43485b577da2fb1ab0fc0b434a2"
+        }
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 304,
+        "digest": 16117341393113041824
+      }
+    },
+    {
+      "id": "vobsub-track-spanning",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/track-spanning.idx",
+      "sha256": "73070b269fa76955cf3c05db3bc8155149bb0eed98b5f0f3b42e36f9fe6c6c5b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/track-spanning.idx",
+        ".research/subtitle-corpus/dvd/track-spanning.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/track-spanning.sub",
+          "sha256": "44183c9881899672be97d26f82703a0a8ed8d43485b577da2fb1ab0fc0b434a2"
+        }
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 304,
+        "digest": 2330126816022634561
+      }
+    },
+    {
+      "id": "vobsub-trailing-subpicture",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/trailing-subpicture.idx",
+      "sha256": "4202ec2ad2de10aad7992cfbcff7d7abc2699b68f527f92728849bd80fe153dc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/trailing-subpicture.idx",
+        ".research/subtitle-corpus/dvd/trailing-subpicture.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/trailing-subpicture.sub",
+          "sha256": "897fd9c4620e3d3b98d502e853ce4f35a2e69af1276f51178b54b1a500202207"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 152,
+        "digest": 7811140179473771872
+      }
+    },
+    {
+      "id": "vobsub-trailing-video",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/trailing-video.idx",
+      "sha256": "4202ec2ad2de10aad7992cfbcff7d7abc2699b68f527f92728849bd80fe153dc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/trailing-video.idx",
+        ".research/subtitle-corpus/dvd/trailing-video.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/trailing-video.sub",
+          "sha256": "400710ff2b38ffe345581b7b01a955a5f1a5db6fdf4c231196e56b97f45714a6"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 152,
+        "digest": 7811140179473771872
+      }
+    },
+    {
+      "id": "vobsub-trailing-audio",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/trailing-audio.idx",
+      "sha256": "4202ec2ad2de10aad7992cfbcff7d7abc2699b68f527f92728849bd80fe153dc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/trailing-audio.idx",
+        ".research/subtitle-corpus/dvd/trailing-audio.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/trailing-audio.sub",
+          "sha256": "8c610afb1e7ab681168d5c9cb046b0fe77c765338807c8608ca931339adba2d5"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 152,
+        "digest": 7811140179473771872
+      }
+    },
+    {
+      "id": "vobsub-trailing-navigation",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/trailing-navigation.idx",
+      "sha256": "4202ec2ad2de10aad7992cfbcff7d7abc2699b68f527f92728849bd80fe153dc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/trailing-navigation.idx",
+        ".research/subtitle-corpus/dvd/trailing-navigation.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/trailing-navigation.sub",
+          "sha256": "af53426d0c53db85309fd54cf670097a52538416594d75af16d07b6fb44f498e"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 152,
+        "digest": 7811140179473771872
+      }
+    },
+    {
+      "id": "vobsub-foreign-subpicture",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/foreign-subpicture.idx",
+      "sha256": "ff94ec5bf915fd8bea74eb7e6beda0c0987d3243508eaeffa18c0f66ee544f31",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/foreign-subpicture.idx",
+        ".research/subtitle-corpus/dvd/foreign-subpicture.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/foreign-subpicture.sub",
+          "sha256": "21914e675143cc74039e93f4438069770a35e09b2e6afc1ef86bf6cad4e0c52f"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 304,
+        "digest": 156062224437334384
+      }
+    },
+    {
+      "id": "vobsub-foreign-video",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/foreign-video.idx",
+      "sha256": "ff94ec5bf915fd8bea74eb7e6beda0c0987d3243508eaeffa18c0f66ee544f31",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/foreign-video.idx",
+        ".research/subtitle-corpus/dvd/foreign-video.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/foreign-video.sub",
+          "sha256": "9c8996750cac36bb0a2434fdfae1ca2d6be069939ea616da84b67230cf90ae1c"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 304,
+        "digest": 156062224437334384
+      }
+    },
+    {
+      "id": "vobsub-foreign-audio",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/foreign-audio.idx",
+      "sha256": "ff94ec5bf915fd8bea74eb7e6beda0c0987d3243508eaeffa18c0f66ee544f31",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/foreign-audio.idx",
+        ".research/subtitle-corpus/dvd/foreign-audio.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/foreign-audio.sub",
+          "sha256": "f365e0b271fe9e0d999434e600f5ffe1de47912a49577c17167be0b7339ccc9e"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 304,
+        "digest": 156062224437334384
+      }
+    },
+    {
+      "id": "vobsub-foreign-navigation",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/foreign-navigation.idx",
+      "sha256": "ff94ec5bf915fd8bea74eb7e6beda0c0987d3243508eaeffa18c0f66ee544f31",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/foreign-navigation.idx",
+        ".research/subtitle-corpus/dvd/foreign-navigation.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/foreign-navigation.sub",
+          "sha256": "1a5d8040f8a30fb475b14db2619e30cd56db860e30a9786d90fe856ec794b29e"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 304,
+        "digest": 156062224437334384
+      }
+    },
+    {
+      "id": "vobsub-foreign-padding",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/foreign-padding.idx",
+      "sha256": "ff94ec5bf915fd8bea74eb7e6beda0c0987d3243508eaeffa18c0f66ee544f31",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/foreign-padding.idx",
+        ".research/subtitle-corpus/dvd/foreign-padding.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/foreign-padding.sub",
+          "sha256": "cbb30b48ae7279c61fd1ee757699cd22baf02b30082121c2a25f97a9ee1595fd"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 304,
+        "digest": 156062224437334384
+      }
+    },
+    {
+      "id": "vobsub-idx-header-lines",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-header-lines.idx",
+      "sha256": "79ca0786e7ef8fae8dfd5822e9ebb6361e723bdd4929dcbad6f8b7217eace89e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-header-lines.idx",
+        ".research/subtitle-corpus/dvd/idx-header-lines.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-header-lines.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 71,
+        "digest": 9600698339130324421
+      }
+    },
+    {
+      "id": "vobsub-idx-crlf",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-crlf.idx",
+      "sha256": "e2706aa8864605c3edb8beb707b12a774a73ecae8e20eb2b2850b346407438f5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-crlf.idx",
+        ".research/subtitle-corpus/dvd/idx-crlf.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-crlf.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 40,
+        "digest": 16882920992405131087
+      }
+    },
+    {
+      "id": "vobsub-idx-no-header",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-no-header.idx",
+      "sha256": "86e70c2eeb4561f259d8fb248ff6e95e226bab2809b60e7b36f4af8c955cf8cd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-no-header.idx",
+        ".research/subtitle-corpus/dvd/idx-no-header.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-no-header.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2,
+        "digest": 16769831237948273815
+      }
+    },
+    {
+      "id": "vobsub-idx-delays",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-delays.idx",
+      "sha256": "e52d7b1ad4b9f3051fc4ae46c44fbd2c35a1c03dbd42c6ca0f259080284204e8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-delays.idx",
+        ".research/subtitle-corpus/dvd/idx-delays.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-delays.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 2,
+        "digest": 14278838682735474065
+      }
+    },
+    {
+      "id": "vobsub-idx-timestamp-forms",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-timestamp-forms.idx",
+      "sha256": "00d2af56afd81935e674a0f597e3361238c8c6492d4d35e839b293752caa7de8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-timestamp-forms.idx",
+        ".research/subtitle-corpus/dvd/idx-timestamp-forms.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-timestamp-forms.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 2,
+        "digest": 7143506784236865678
+      }
+    },
+    {
+      "id": "vobsub-idx-track-order-stream0",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-track-order.idx",
+      "sha256": "2695576e939fa1d0625f59afff4580e0d15ab50189ff858af677fef46ac44ac2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-track-order.idx",
+        ".research/subtitle-corpus/dvd/idx-track-order.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-track-order.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 4,
+        "digest": 3520774936055948603
+      }
+    },
+    {
+      "id": "vobsub-idx-track-order-stream1",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-track-order.idx",
+      "sha256": "2695576e939fa1d0625f59afff4580e0d15ab50189ff858af677fef46ac44ac2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-track-order.idx",
+        ".research/subtitle-corpus/dvd/idx-track-order.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-track-order.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 4,
+        "digest": 3520774936055948603
+      }
+    },
+    {
+      "id": "vobsub-idx-empty-track",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-empty-track.idx",
+      "sha256": "535194045d5a59eb8a19511a87b199319e87167f09c13ba9acb983304827c923",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-empty-track.idx",
+        ".research/subtitle-corpus/dvd/idx-empty-track.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-empty-track.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2,
+        "digest": 17557459906096350424
+      }
+    },
+    {
+      "id": "vobsub-idx-repeated-track",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-repeated-track.idx",
+      "sha256": "c95e6b165b2de91050848a2ed94aa695f21f6eed2d91ee7f3bcf66a1581bf20a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-repeated-track.idx",
+        ".research/subtitle-corpus/dvd/idx-repeated-track.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-repeated-track.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 2,
+        "digest": 13732969120657654224
+      }
+    },
+    {
+      "id": "vobsub-idx-no-index",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-no-index.idx",
+      "sha256": "6dc2a045c33be0c039dda31aaa12601adab757b776e23bbf205254a652adc184",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-no-index.idx",
+        ".research/subtitle-corpus/dvd/idx-no-index.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-no-index.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 3,
+        "digest": 3394540480307502264
+      }
+    },
+    {
+      "id": "vobsub-idx-alt",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-alt.idx",
+      "sha256": "3945ddbf41280a87188e3b1054db27ace4bc2afe7261ce4ae0b5aa59a3c1d3d1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-alt.idx",
+        ".research/subtitle-corpus/dvd/idx-alt.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-alt.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2,
+        "digest": 16769831237948273815
+      }
+    },
+    {
+      "id": "vobsub-idx-past-end",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-past-end.idx",
+      "sha256": "cde0a228ed14d445f4b2d7bdac7758f48c0abac4a5d940e6ae1261dd6f281178",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-past-end.idx",
+        ".research/subtitle-corpus/dvd/idx-past-end.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-past-end.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2,
+        "digest": 16769831237948273815
+      }
+    },
+    {
+      "id": "vobsub-idx-palette-lines",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-palette-lines.idx",
+      "sha256": "1e172243cf3ac3af6892e498d5f7367b62e0228158f97f3c21f2ba56aef132b8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-palette-lines.idx",
+        ".research/subtitle-corpus/dvd/idx-palette-lines.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-palette-lines.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 66,
+        "digest": 431567175994661941
+      }
+    },
+    {
+      "id": "vobsub-idx-palette-malformed",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-palette-malformed.idx",
+      "sha256": "f33994519428c1c9008c477fb6383beb19d62828483bffb517f55ee0c04e0547",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-palette-malformed.idx",
+        ".research/subtitle-corpus/dvd/idx-palette-malformed.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-palette-malformed.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 14,
+        "digest": 7781130953577568994
+      }
+    },
+    {
+      "id": "vobsub-idx-palette-empty",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-palette-empty.idx",
+      "sha256": "190bdb2192da5d7ad66b4c2b2485b82fdffcab2ef70017dd1b43ef12509d3f3c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-palette-empty.idx",
+        ".research/subtitle-corpus/dvd/idx-palette-empty.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-palette-empty.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 11,
+        "digest": 8472327048656192135
+      }
+    },
+    {
+      "id": "vobsub-idx-custom-colours",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-custom-colours.idx",
+      "sha256": "434affcf84e08f6d4fff14c9d9434fa0fd34eaa7dd7198680fa88f9be54ef44e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-custom-colours.idx",
+        ".research/subtitle-corpus/dvd/idx-custom-colours.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-custom-colours.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 209,
+        "digest": 8356188881766089451
+      }
+    },
+    {
+      "id": "vobsub-idx-custom-colours-only",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-custom-colours-only.idx",
+      "sha256": "5ad2b525b0e720bb9359ca7ef739f941cc3502fdc142ae09b6509c108a4777c7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-custom-colours-only.idx",
+        ".research/subtitle-corpus/dvd/idx-custom-colours-only.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-custom-colours-only.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 73,
+        "digest": 16432107955440288921
+      }
+    },
+    {
+      "id": "vobsub-idx-size-zero",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-size-zero.idx",
+      "sha256": "06290d0d2c4991e9276c0ada567a790f55fe5aaa6f46f7175d300e36a656bdf3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-size-zero.idx",
+        ".research/subtitle-corpus/dvd/idx-size-zero.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-size-zero.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 150,
+        "digest": 13020013321699979946
+      }
+    },
+    {
+      "id": "vobsub-idx-size-largest",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-size-largest.idx",
+      "sha256": "79bb3317893b4933d1da36607d57cd2844f729f3e4debfd7d030fb81433c1b96",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-size-largest.idx",
+        ".research/subtitle-corpus/dvd/idx-size-largest.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-size-largest.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 156,
+        "digest": 7514625003367568100
+      }
+    },
+    {
+      "id": "vobsub-idx-size-past-largest",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-size-past-largest.idx",
+      "sha256": "6836812b65abdfdee623c3fee7ebbc0ad9b5907382b073ca751c491dcecb1d88",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-size-past-largest.idx",
+        ".research/subtitle-corpus/dvd/idx-size-past-largest.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-size-past-largest.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 156,
+        "digest": 17152847156081040932
+      }
+    },
+    {
+      "id": "vobsub-idx-size-widest",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-size-widest.idx",
+      "sha256": "999a654949f95bf4d23c84beb32b515bf2e9a73aba4841e6fbfbfe0e2552d9a4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-size-widest.idx",
+        ".research/subtitle-corpus/dvd/idx-size-widest.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-size-widest.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 154,
+        "digest": 584243287193328125
+      }
+    },
+    {
+      "id": "vobsub-idx-size-past-widest",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-size-past-widest.idx",
+      "sha256": "6a2d3232d14913f46cbfb1245b93d364cb256e46b7b168db006855486c347677",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-size-past-widest.idx",
+        ".research/subtitle-corpus/dvd/idx-size-past-widest.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-size-past-widest.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 154,
+        "digest": 17820817898853722110
+      }
+    },
+    {
+      "id": "vobsub-idx-delay-forms",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/dvd/idx-delay-forms.idx",
+      "sha256": "37a31311fdbaf60b70e323f47f7227defa919f312f43bd39953a7d5a504dcd45",
+      "rights": "authored-synthetic",
+      "arguments": [
+        ".research/subtitle-corpus/dvd/idx-delay-forms.idx",
+        ".research/subtitle-corpus/dvd/idx-delay-forms.sub"
+      ],
+      "source": "harness/subtitles/dvd_streams.py",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/idx-delay-forms.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 4126003978908901898
+      }
+    },
+    {
+      "id": "fate-vobsub",
+      "profile": "existing",
+      "file": ".research/subtitle-corpus/fate/sub/vobsub.idx",
+      "sha256": "c4d073e2bbf515409e9ee8bf32114b81c1a11178d3bf0d52d88ebab0615525e2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        ".research/subtitle-corpus/fate/sub/vobsub.idx",
+        ".research/subtitle-corpus/fate/sub/vobsub.sub"
+      ],
+      "source": "rsync://fate-suite.ffmpeg.org/fate-suite/sub/vobsub.idx",
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/fate/sub/vobsub.sub",
+          "sha256": "5f6ac43324e5a35c6e525aa0c76bafa9dd965a17ce0880fd7eb69e19b6853c8b"
+        }
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 169,
+        "digest": 10669686468075544499
+      }
+    },
+    {
+      "id": "multi",
+      "profile": "authored",
+      "file": "harness/features/vobsub-index/inputs/multi.idx",
+      "sha256": "27b8e77cb7e43f6da101db661bb281319c7946710b3286dbc60c783c506b83be",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "harness/features/vobsub-index/inputs/multi.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 304,
+        "digest": 10639964393010809041
+      }
+    },
+    {
+      "id": "default-first",
+      "profile": "authored",
+      "file": "harness/features/vobsub-index/inputs/default-first.idx",
+      "sha256": "79d3d3ea2845f2e6ef65936ab7f448514a620412980514258dc82dc4cebc7c17",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "harness/features/vobsub-index/inputs/default-first.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 304,
+        "digest": 4888544944007650513
+      }
+    },
+    {
+      "id": "default-out-of-range",
+      "profile": "authored",
+      "file": "harness/features/vobsub-index/inputs/default-out-of-range.idx",
+      "sha256": "9001b3dda0e75585e9b31e613d034a210f38fe4ca0437d4694d99153fa431dd7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "harness/features/vobsub-index/inputs/default-out-of-range.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 304,
+        "digest": 16558349801029966898
+      }
+    },
+    {
+      "id": "delay-across-track",
+      "profile": "authored",
+      "file": "harness/features/vobsub-index/inputs/delay-across-track.idx",
+      "sha256": "bf7fe88fdbfcdda6f2988a8212aa2150bc7dae2a16d6ee4de57d339cb458c167",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "harness/features/vobsub-index/inputs/delay-across-track.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 304,
+        "digest": 4888544500255329513
+      }
+    },
+    {
+      "id": "missing-index",
+      "profile": "authored",
+      "file": "harness/features/vobsub-index/inputs/missing-index.idx",
+      "sha256": "795275740af737c97b0703182380ed056536e45ab74d4b36a3109641e4cea3db",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "harness/features/vobsub-index/inputs/missing-index.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 153,
+        "digest": 5643091435483401964
+      }
+    },
+    {
+      "id": "malformed-id",
+      "profile": "authored",
+      "file": "harness/features/vobsub-index/inputs/malformed-id.idx",
+      "sha256": "878c90d2c4c2e0821a2ce5816aa080969d0606aa7b7c69e4617c0e2eaf7df582",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "harness/features/vobsub-index/inputs/malformed-id.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 153,
+        "digest": 5643091435483401964
+      }
+    },
+    {
+      "id": "large-index",
+      "profile": "authored",
+      "file": "harness/features/vobsub-index/inputs/large-index.idx",
+      "sha256": "1efbd645a563e68326b0a427781cf24fbef4923900bd5df99f58299f19302013",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "harness/features/vobsub-index/inputs/large-index.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "crlf",
+      "profile": "authored",
+      "file": "harness/features/vobsub-index/inputs/crlf.idx",
+      "sha256": "83ac5787ac4d985e49076d145db135ca2d26096dd4665a4d6d02616dde56cf04",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "harness/features/vobsub-index/inputs/crlf.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 152,
+        "digest": 3869069120873758690
+      }
+    },
+    {
+      "id": "long-timestamp",
+      "profile": "authored",
+      "file": "harness/features/vobsub-index/inputs/long-timestamp.idx",
+      "sha256": "4f64673e095fd4740a46266aa0a9cf96a401c73195e250d55a3da9a54527c927",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "harness/features/vobsub-index/inputs/long-timestamp.idx",
+        ".research/subtitle-corpus/dvd/basic.sub"
+      ],
+      "companions": [
+        {
+          "file": ".research/subtitle-corpus/dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    }
+  ]
+}

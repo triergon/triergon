@@ -1,0 +1,2125 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "bad-two",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "bom",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "box-refusal-then-good",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "clear",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "clear-then-good",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "config-invalid-font-size",
+      "profile": "recorded",
+      "file": "crates/subtitles/tests/native-mov-text-fixtures/config-invalid-font-size/extradata.bin",
+      "sha256": "493d6e5776933237430e9df08210e8a856c621cc4b5bee8dc2257240612ba37e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "config-one-dimension",
+      "profile": "recorded",
+      "file": "crates/subtitles/tests/native-mov-text-fixtures/config-one-dimension/extradata.bin",
+      "sha256": "6990a384abcd8dd6b83bc5773a3b02967db4a3813beac441144f83f6700b3315",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "0f67db4a9d96be97722763494f02c58606918f98ef3eff61634ad9daadbebb4b"
+      }
+    },
+    {
+      "id": "config-too-short",
+      "profile": "recorded",
+      "file": "crates/subtitles/tests/native-mov-text-fixtures/config-too-short/extradata.bin",
+      "sha256": "0679246d6c4216de0daa08e5523fb2674db2b6599c3b72ff946b488a15290b62",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "config-valid-empty-fonts",
+      "profile": "recorded",
+      "file": "crates/subtitles/tests/native-mov-text-fixtures/config-valid-empty-fonts/extradata.bin",
+      "sha256": "4a912dd5e0c6aa1d83811bb3013a1fdad7debb824ac915bc9b2f85b34634e5e2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "3fdaaa983ee9e50b012b46f42e0073bb2d3a0e37395b1f28a70dc150f52e862c"
+      }
+    },
+    {
+      "id": "configured-defaults",
+      "profile": "recorded",
+      "file": "crates/subtitles/tests/native-mov-text-fixtures/configured-defaults/extradata.bin",
+      "sha256": "df42a082ebdbc24355774dc80c4a2a0f568c61c1f475714b557446f0f91f4886",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "29d989598fd3cb3f778a50441eb3135afc0b5b950f2f94b29a02534176053ea9"
+      }
+    },
+    {
+      "id": "configured-style-font",
+      "profile": "recorded",
+      "file": "crates/subtitles/tests/native-mov-text-fixtures/configured-style-font/extradata.bin",
+      "sha256": "d6b4aab2c5a8f5135c394079d8c3f2d1721039c3e91da6c98b97119df2a485f8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "050d41f3d4b9cf7191dc68559ed7d22ef7ea876565ca6fba992cc05e1d956296"
+      }
+    },
+    {
+      "id": "cr-lf-markup",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "duplicate-fonts",
+      "profile": "recorded",
+      "file": "crates/subtitles/tests/native-mov-text-fixtures/duplicate-fonts/extradata.bin",
+      "sha256": "b0fd5c3c13be89f101484b62c2c333e5451b9211e1aa2ff1e5182982f627697c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "96262312ec000b875e41150479905745c9fae7929aab3e3a49d897a98fbc379c"
+      }
+    },
+    {
+      "id": "duplicate-wrap",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "empty-event",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "empty-physical",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "extended-short",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "extended-wrap",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "ffff",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "flush-read-order",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "font-nul",
+      "profile": "recorded",
+      "file": "crates/subtitles/tests/native-mov-text-fixtures/font-nul/extradata.bin",
+      "sha256": "4b3c7fd772767ba5b071bfca50571793b121e055dc931a2516ba768c9616759f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "61b7b74424b7fa70b0006c05fa1bc7ad0dc0636d8312a5de589ae5c112208ec1"
+      }
+    },
+    {
+      "id": "font-utf16",
+      "profile": "recorded",
+      "file": "crates/subtitles/tests/native-mov-text-fixtures/font-utf16/extradata.bin",
+      "sha256": "6f097c1f37a8b0a5058a293169d96c935c06d16eed1c3bfb5fbeb3d7579ee8b8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "highlight-color",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "highlight-empty",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "highlight-inverse",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "invalid-overlong",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "invalid-tail",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "known-zero-duration",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "negative-half",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "noncharacter-fffe",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "nul-invalid-tail",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "one-byte",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-basic",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-box-overrun",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-byte-not-character-count",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-embedded-nul",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-empty-sample",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-empty-with-modifier",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-extended-box-gap",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-line-codepoints-exact",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-lone-surrogate",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-missing-length",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-modifier-order",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-short-box",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-style-highlight-raw",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-text-overrun",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-u16-byte-count-boundary",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-unknown-modifier",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-utf16-odd",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-utf16be-bom",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "overflow-clock",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "overrun-box",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "overstated",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "positive-half",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "rational-clock",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "short-body",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "short-box",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "size0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-adjacent-different",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-adjacent-equal",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-all",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-empty",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-malformed-after-good",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-outside",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-overlap",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-repeated",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-reversed",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-unicode",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-zero-after-good",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "two-packets",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "understated",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "unicode",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "unknown",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "unknown-clock",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "unset-clock",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "utf16be",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "utf16le",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "utf8-refusal-then-good",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "wrap-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "wrap-1",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "wrap-2",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "wrap-nul",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-configuration/inputs/absent.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-base",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/base.bin",
+      "sha256": "6990a384abcd8dd6b83bc5773a3b02967db4a3813beac441144f83f6700b3315",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "0f67db4a9d96be97722763494f02c58606918f98ef3eff61634ad9daadbebb4b"
+      }
+    },
+    {
+      "id": "authored-empty-fonts",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/empty-fonts.bin",
+      "sha256": "bec16cdc07af868c53a87d51b8403b8c119763d06bd57bbac0fb4b04a7f1c938",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "168afe4d1a1f5c5bae8ca320f8739fa8f5d7002327e57a3c74347121c80f2051"
+      }
+    },
+    {
+      "id": "authored-duplicate-font-id",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/duplicate-font-id.bin",
+      "sha256": "835e14cf2a72cf3e99df585c50cb7386d3cf15b320da35e25dfad4ae9cc06fe2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "01c9d57a80801ab050638e62f3f8b3bf5b17170ed0c77f7a4d2e0ae91e0d1a03"
+      }
+    },
+    {
+      "id": "authored-utf16-font",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/utf16-font.bin",
+      "sha256": "6f097c1f37a8b0a5058a293169d96c935c06d16eed1c3bfb5fbeb3d7579ee8b8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "unicode"
+      ],
+      "expected": {
+        "trace_sha256": "3a517c4a2b7f2d6e1a1ec1c7f9eaf5bcbe5e0b2ef21a3ecc7dde3718f8ae5565"
+      }
+    },
+    {
+      "id": "authored-face",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/face.bin",
+      "sha256": "31fc5bb34bc33c07fd65096f6a982852ca8ae5a0469e670bee1f7f153ee43728",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "6602064e80cd1069a2522a5065af83932b8de55880442e675267a99a6cbc9743"
+      }
+    },
+    {
+      "id": "authored-alpha",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/alpha.bin",
+      "sha256": "f8eb6537c3d25026d35f09816d8eed15b3bd4708b8dc6f5e3f2f3a0b6240d24e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "608599dd67aa123b3dbee9b29bdbeea6891d983f77698a71e37c249a8774864c"
+      }
+    },
+    {
+      "id": "authored-sample-entry",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/sample-entry.bin",
+      "sha256": "e1902e0e29497e5384fb2329c820c340b8d38927ee8cf8dcf0f6fb770ffd43d7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sample-entry"
+      ],
+      "expected": {
+        "trace_sha256": "6bcfaf332f6c7fcab6fa88d706e4f65a5ed3fda9ff506f6c951e519c69df2256"
+      }
+    },
+    {
+      "id": "authored-box-to-end",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/box-to-end.bin",
+      "sha256": "4138b902d2706ed478704cd8d40c057aba3d25f8dec5b889fe3017560fe88163",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "52c5fbed0eca57a4b3e48d6baf4a345b939c757435d2ae20423168ee0992d093"
+      }
+    },
+    {
+      "id": "authored-extended-box",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/extended-box.bin",
+      "sha256": "4d6adebfc958f014a348a02be36fb39ac9f582a17c09a1bba59bd0598b47d810",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "07e2bedd22e630158aaa5d4bcc34212d361dde32d5871eb04ee636780f46620a"
+      }
+    },
+    {
+      "id": "authored-opaque-box",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/opaque-box.bin",
+      "sha256": "969b08236a4d64530ccbb6a412b3d2921b9d0b8b5c108ecf2d6928e51bd94a5d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "f51b38bd8c6cd0914b0536b079756e6b5578a2e9f8ef1863871334971d5f7c41"
+      }
+    },
+    {
+      "id": "authored-uuid-box",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/uuid-box.bin",
+      "sha256": "aea60a815665c6c384470483f7ccf5ee5730b74eb8840e777e5800931dd20602",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "f9c3210fcc7a72a5b241a6893515aede1ee26c57cc28f228521d086608725aca"
+      }
+    },
+    {
+      "id": "authored-duplicate-table",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/duplicate-table.bin",
+      "sha256": "f123e995bc9a17b34903be3dec0e5e31192a2a014cc4447bf12387d976f552d5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-flag-high",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/flag-high.bin",
+      "sha256": "880051b3759fa3b1e578cb623274a5607665f83985d0b2697fca352cbadefd73",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "55e51dcd84dbf9b2d9534619802d854f3aa46d26b11ba520bb09c4771cc03d60"
+      }
+    },
+    {
+      "id": "authored-h-left",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/h-left.bin",
+      "sha256": "6990a384abcd8dd6b83bc5773a3b02967db4a3813beac441144f83f6700b3315",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "0f67db4a9d96be97722763494f02c58606918f98ef3eff61634ad9daadbebb4b"
+      }
+    },
+    {
+      "id": "authored-h-right",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/h-right.bin",
+      "sha256": "45254c211bdd4ce50138c4a7235bf1dd7fb2cdaced50ace9a29477413ad1b465",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "77d62f68b72ef6a0c3114098cc2796cff464970e2307ca49fba4fa751ba6bcda"
+      }
+    },
+    {
+      "id": "authored-h-center",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/h-center.bin",
+      "sha256": "6b41990a7c949b7a6b8360647020907c52157ccaa3850c8347210cacb6ca1cdd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "de21e592b19a0ae21d84c092b432f5e0a006d432e71bf5615f92312116657b98"
+      }
+    },
+    {
+      "id": "authored-v-top",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/v-top.bin",
+      "sha256": "1eb29fe8cfa5e5e4d806fac460acb14cfec8958a1ef3d143fb9b1ac445954bca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "0ac2384eb1337772e49d54f57b0673aff066bdcad07eb91309d7f6bd92e431d8"
+      }
+    },
+    {
+      "id": "authored-v-center",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/v-center.bin",
+      "sha256": "564a9ee14ceb7fec9935116bf6e1ad1f30bbf35a2a263c4d84da21ee43dc0ea3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa73bc79ca2743d2d80cc2b07ffffb5755ef664a9ad70b4cba5fb4c32961c630"
+      }
+    },
+    {
+      "id": "authored-v-bottom",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/v-bottom.bin",
+      "sha256": "6990a384abcd8dd6b83bc5773a3b02967db4a3813beac441144f83f6700b3315",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "0f67db4a9d96be97722763494f02c58606918f98ef3eff61634ad9daadbebb4b"
+      }
+    },
+    {
+      "id": "authored-background-red",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/background-red.bin",
+      "sha256": "68acbd14b28787f19fd363fd3b9d0e2bda54ca6ec1ae756a8ee00b4c6ee6252a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "f010c1e3e9ed30bb3ef294c0ec103b98d0386827c98b129e2000ca820054b409"
+      }
+    },
+    {
+      "id": "authored-background-green",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/background-green.bin",
+      "sha256": "9681c93238d0feb4438bc6d34561af8a844cb109cc9fd866c17f8fa58bf13cc6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "ff15899e39140bb40c5d0ae68069ad15abbdd18c65079f7ee0b30419585f07ca"
+      }
+    },
+    {
+      "id": "authored-background-blue",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/background-blue.bin",
+      "sha256": "58d393102064757bfb355d22681007a703a8f0436b28050ba2e8a2330d29e0f5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "ca79e99dd1c8dfee703adbd6de5e27b3ff4c4e5b235e61b454cb8714954d316d"
+      }
+    },
+    {
+      "id": "authored-background-alpha",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/background-alpha.bin",
+      "sha256": "3c1098c4a182984c634445289f9b59933132ac6b2b56c4c7ba917f9a48b82278",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "5d45f895bb9ee4a41cf761fa89f47b8568e079ef7e2a5c0e6f313cf4c0bdde74"
+      }
+    },
+    {
+      "id": "authored-top-min",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/top-min.bin",
+      "sha256": "644862f878bba3bf010b0398e2ef1b45d14c993253866b4a3c5ab3ed55bf6689",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "a19b935f366730212143d2711ec304177575aa99dce3055d27d7d9f85c1ee237"
+      }
+    },
+    {
+      "id": "authored-left-min",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/left-min.bin",
+      "sha256": "85a9ee9204de5fae9d7cb9e8ce620b39c245f1b01c74c67f7ddf5ec701373ab4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "c1bb32ec2cc1f0cbef78dcad690f9b7fac41c401f60347db3317be1bd1f41a2d"
+      }
+    },
+    {
+      "id": "authored-bottom-max",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/bottom-max.bin",
+      "sha256": "b3855cd355159e9ef101643f09e245b1bf9fbcbf88c5f7f9d95ec94ff46b647a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "4e2b467f25de0b72923121812c9009076ef17ae12cfa84825c8b0f7b1f45c9e3"
+      }
+    },
+    {
+      "id": "authored-right-max",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/right-max.bin",
+      "sha256": "f48263b78ed01c5000e24b4556da5f09545cdf44fbaddcefc2a7eca66dfd6fd7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aaee26552bf49cb3b5d4a748e573a4f59ffcc609472a8c6cc514146e4d2c6341"
+      }
+    },
+    {
+      "id": "authored-default-range",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/default-range.bin",
+      "sha256": "0924276ec99e1c9fa627885bb12c5c770825ab294596f8c87e20ee8d4c92dce9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-missing-font",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/missing-font.bin",
+      "sha256": "e813d4b4c218c2f1bb6ef1a436962b500ecaf45cf1c63fbea0a60eac44e16d0a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "5ae3696dbb1d1da16211c44a0b52e2217f9d5be83990356bb7126a90ff5a7520"
+      }
+    },
+    {
+      "id": "authored-face-high",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/face-high.bin",
+      "sha256": "4a39016ca92a765fa75f9090f66263f9a6ddd5ba04c0774bcea21799f312ee36",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "1908930298c43b6ac297156d5d2aaa90ee68121cbaa9d5d6db311f74c75803f9"
+      }
+    },
+    {
+      "id": "authored-font-size-zero",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/font-size-zero.bin",
+      "sha256": "17c665e6333966e0c50e124d205cf5d3b353065586a5da60f8c4d76a7273489a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "f4114608bab2dcb399f9828b5ca81cc6e405a798c2b7f6bbcb204d9fb2e727ba"
+      }
+    },
+    {
+      "id": "authored-font-size-high",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/font-size-high.bin",
+      "sha256": "5355a9368694557592a9a58f04a0578b210fffad27e9bd9192efb53e90afce5a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "f44216ceb807647081030862f71bb846798be54e41e7a8fd583cf70750c8afc7"
+      }
+    },
+    {
+      "id": "authored-bad-justification",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/bad-justification.bin",
+      "sha256": "8226393d8aa5025f26467a38e00a63bf63f717550fbce0cd95949bf051c986f4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-00",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-00.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-01",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-01.bin",
+      "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-02",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-02.bin",
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-03",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-03.bin",
+      "sha256": "709e80c88487a2411e1ee4dfb9f22a861492d20c4765150c0c794abd70f8147c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-04",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-04.bin",
+      "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-05",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-05.bin",
+      "sha256": "8855508aade16ec573d21e6a485dfd0a7624085c1a14b5ecdd6485de0c6839a4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-06",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-06.bin",
+      "sha256": "a476bf4614b7f4c1c99252ee7080bb7101a99be0c2ae118c2d386a6c000711b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-07",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-07.bin",
+      "sha256": "064c4525dc101a8dda64435ef418bf0697347c4bc9ad90851117553571121ecd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-08",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-08.bin",
+      "sha256": "099984f6879aad8a146e646e1caedd8d74ce5ed347c46bce3beb92cb8584c80f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-09",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-09.bin",
+      "sha256": "f9fc2693e2d12ea80912c33f6dcaaf78236cb52d5b54f8d6abb206263289e759",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-10",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-10.bin",
+      "sha256": "0dcefb6b42264b0bc633d48f4cd5734189b89c4d2f8b5db129a82db40801e62f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-11",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-11.bin",
+      "sha256": "d9e425e03dfeb4e991e90e796582262d3ae8a708b78df7bf7c0444037ff93bd9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-12",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-12.bin",
+      "sha256": "2a236a1aead19ddd7815b581ed31a98bc661d4ebd32504193ffe803a9607d166",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-13",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-13.bin",
+      "sha256": "c4c447de1a917e26a5d239ce6998f578dea9b08857cbd6e94a99c1a1da93e477",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-14",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-14.bin",
+      "sha256": "f500431f73f412d59bec0a52a156eee7182a7943aef7dad0de3a5c61fe3d5a32",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-15",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-15.bin",
+      "sha256": "1e565454b4c5a50ad1c6029d82d4f5fce65d6ee0825b3a41251df0d194b7ccea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-16",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-16.bin",
+      "sha256": "6a4ee6177ba730b8107d9d3fb4bc33ad23387a3fbf77bec0ce8bb9ba3bd81e7c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-17",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-17.bin",
+      "sha256": "f793d13f826f17c076b68b732e3ca15b4b513312f05284964429c2d1c6c1e325",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-18",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-18.bin",
+      "sha256": "3aebe8a6a94c555608a4340523f79268b47717c85d370916208d26fb48fbd9a4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-19",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-19.bin",
+      "sha256": "586c3383bd6a761c25239f8410fa400ebb725e8011a2a082cf6ec65a14e5213e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-20",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-20.bin",
+      "sha256": "894d47ded83770a67aa2b3445500c4016dfd950d754f895befc86da99a4fc15a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-21",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-21.bin",
+      "sha256": "cf7e717fd172aafb8c76791d96109640f70289ccff0b36e34ccf6c0b7994421a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-22",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-22.bin",
+      "sha256": "a90b3136700e936e4a16b2863c1ea368c7a915b49440c94f52d0349daa87cda3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-23",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-23.bin",
+      "sha256": "c6325b3c3af7994378ec0f804be3e5cf1387bdcc23b5c365f8d45a1b0bb584c4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-24",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-24.bin",
+      "sha256": "6d39c124deaec88267575bd3c5aa45a5c2fc94ed94e175f16d33cd1174b6a320",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-25",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-25.bin",
+      "sha256": "fda1d3718b894a07352ed93fc2ccd04509ce766b72e2a31c671435354aed33f0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-26",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-26.bin",
+      "sha256": "129d33e8685f59c248517aa8d7d513ce3c8c6008cb329d19820e698a834a4671",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-27",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-27.bin",
+      "sha256": "e3129398068a662a44c5c4df10ac46696dc043dfbe2d967f19f5c8e482070080",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-28",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-28.bin",
+      "sha256": "5d832299a8a84236a79e816f392d420edd9286d45adb90ce90cc75ef634d4664",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-29",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-29.bin",
+      "sha256": "09fc11c1aa6c31dd2fa7b2c4806c6548b7b238fc37682580be96b8ca3b8a6414",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-30",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-30.bin",
+      "sha256": "0d4afd11517a46a64e16dbf9fdac0a8010c4ffa2b89aa4a3c3a346273d7b161a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-31",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-31.bin",
+      "sha256": "c20cf5587d60618b51ea93217e095e92dbff2a948cc72169cdf09d667b9a5d8b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-32",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-32.bin",
+      "sha256": "0c0eea8162c50767f617ff295e7aecbf4c53dc8222424d2cde828d826415036e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-33",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-33.bin",
+      "sha256": "22f9ce008c785d3d31912d0b38845592dd77e13dffcae005659dcad2134b921f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-34",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-34.bin",
+      "sha256": "be5961c510dfb6cf3a14a7de8c7fd1de65134d0bfeb4bd63f05fa09935f73e36",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-35",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-35.bin",
+      "sha256": "3e0bddc29248576806bd952c57e6947659a0540c3f4f5510c0b4a938e577c3d4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-36",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-36.bin",
+      "sha256": "f0685496f78e155c43e96c0ce42a6da77ca0769d58786537a6be915c01d4d31d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-37",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-37.bin",
+      "sha256": "a16fb6a6383f46c06719dbc74b428b338f3241cab0ad5bdb8ed121c530e04a7c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-38",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-38.bin",
+      "sha256": "dfab9ce9f41b2834293917ec40fcd4e1b9c4ef23e4c490abef7d9d9e6c727806",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-39",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-39.bin",
+      "sha256": "6e1075887bad2d144fad16ca6dc40e3523c60f58b808b1930a9c1928f7c02f1f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-40",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-40.bin",
+      "sha256": "a54ec62abefea4c51cfbd2a8c41b27bc90df31a5ee7cf8b3c477277dc8cf7703",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-41",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-41.bin",
+      "sha256": "aaa885c9ef41015e5ae13542705628c894d8eceb260043f2bd6bc428cd45aff9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-42",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-42.bin",
+      "sha256": "95b075feda3569d1a18b91b17d816372cdc2f06970d5f68c1a44d0036c46937c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-43",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-43.bin",
+      "sha256": "a0acbfc8dcffe757e1ec13fe3b8d635d8c48db3c7a2811966152d856ccaad9b0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-44",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-44.bin",
+      "sha256": "e162a9b18365b67096e10366b70ca25333e8e1f1d58c051fd8d2662943c172fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-45",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-45.bin",
+      "sha256": "21db12b13c13a00835a4b6f3c88cde5af98f174eeda0d7cdf816c3d9148473ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-46",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-46.bin",
+      "sha256": "c009f6e9d1c20fe9ca3c2662fda7fc5b46ff271757af8d38abf6d637ec8bf2a4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-truncated-47",
+      "profile": "authored",
+      "file": "harness/features/tx3g-configuration/inputs/truncated-47.bin",
+      "sha256": "493d6e5776933237430e9df08210e8a856c621cc4b5bee8dc2257240612ba37e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "defaults"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    }
+  ]
+}

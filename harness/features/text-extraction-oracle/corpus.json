@@ -1,0 +1,766 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "tx3g-basic",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-basic.tx3g",
+      "sha256": "d5239a037b96623f7a12fb81294a3d2bf2000f5cedc9685270aac9ceb3d82eb8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "1/1000",
+        "1001/1000",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "60f447bab6b7e0c8f6f546c4bf300c34e211a9fb3a715972b76322d3db78c20a"
+      }
+    },
+    {
+      "id": "tx3g-byte-not-character-count",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-byte-not-character-count.tx3g",
+      "sha256": "a679b24c9f7b48550924498b21a2967801b3247db2420f2d366c8bc80692158d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "1/1000",
+        "1001/1000",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "ceb28705872f7c87f9a2314f5573e067ac22fb560a8119de2a83f296e4783c75"
+      }
+    },
+    {
+      "id": "tx3g-utf16be-bom",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-utf16be-bom.tx3g",
+      "sha256": "c04486961aa15790225425bffcc96ed56e70f01f621fd94a8ee8fb5f2051664e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "1/1000",
+        "1001/1000",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "e8c76f7e046e3cf3abf5eeae991d1242908cd3eb8c92b688ae7eb3d852ca6e6b"
+      }
+    },
+    {
+      "id": "tx3g-empty-sample",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-empty-sample.tx3g",
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "1/1000",
+        "1001/1000",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "fde15bc59f54f6a04d6a867e9bfadb8dbd478447da6ef0fc7ef6989ed9c7df89"
+      }
+    },
+    {
+      "id": "tx3g-embedded-nul",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-embedded-nul.tx3g",
+      "sha256": "31091cd2028bb8d810ca51bd801db70d52a21084510b99c1506882ff825f680c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "1/1000",
+        "1001/1000",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "c7e83f1b98f42c5167244b0d20295c63e22ffa4025ae24b250c8503112e05245"
+      }
+    },
+    {
+      "id": "tx3g-line-codepoints-exact",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-line-codepoints-exact.tx3g",
+      "sha256": "fcc96c5a13952180b9f278444c9357d63c0d9102114204f2667eb358ddd3de5f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "1/1000",
+        "1001/1000",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "58456557091669d42c65ea7262d3d2af125747e43e524773596eb6501eacabfa"
+      }
+    },
+    {
+      "id": "tx3g-style-highlight-raw",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-style-highlight-raw.tx3g",
+      "sha256": "1520f9312710b5aa9af3360375207df2b7515527ed4e8190af366be58918eaaf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "1/1000",
+        "1001/1000",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "a3abec931228a7b985a680ad7598be167b8b453267e860748e535866c6ad6a8a"
+      }
+    },
+    {
+      "id": "tx3g-unknown-modifier",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-unknown-modifier.tx3g",
+      "sha256": "9671120987aaffda70db9b0969d24d91f9b2b88ce49c430b03b9a8c2b96e187c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "1/1000",
+        "1001/1000",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "de8c229ce6d26bd3ac1bf93fa68be91c15b367810c423fcab0305930bf2f28f9"
+      }
+    },
+    {
+      "id": "tx3g-modifier-order",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-modifier-order.tx3g",
+      "sha256": "027def7e8785b2e4bf03e98b3fb8e8be495be46bb8a18f4bfee57723ae777db4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "1/1000",
+        "1001/1000",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "cdc8ed4f4621db73f05a2090821f0504086b0907e7725deecd5699f7a9f648cf"
+      }
+    },
+    {
+      "id": "tx3g-empty-with-modifier",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-empty-with-modifier.tx3g",
+      "sha256": "f16e510ffaa45981ce7fbec81997f2b33b6af2348ddcedadd630856d990d163d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "1/1000",
+        "1001/1000",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "26c8bdb1b5c64b59a3ef94192e887d0f475f5440fa6b430c8d07fa7332c24d87"
+      }
+    },
+    {
+      "id": "tx3g-u16-byte-count-boundary",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-u16-byte-count-boundary.tx3g",
+      "sha256": "d271e951c5dd007413ee16193f7f8f864b8daad80dc84bb100ce6e50ac9db9cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "1/1000",
+        "1001/1000",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "1f0c208a9417cb4975466704e5c4a3eee3b33795cd85b66fa1e34c801baa2ffd"
+      }
+    },
+    {
+      "id": "tx3g-missing-length",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-missing-length.tx3g",
+      "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-text-overrun",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-text-overrun.tx3g",
+      "sha256": "6b424025059b83d2c92bbca072011a0cfc7b077b3931b79c8819343950ec4434",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-utf16-odd",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-utf16-odd.tx3g",
+      "sha256": "f5591a3c662b632ac9accac797d99fcad252f5a2016fcbee189d6e362aa5db6d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-lone-surrogate",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-lone-surrogate.tx3g",
+      "sha256": "5bbb45363727954bb0f7e28e7ee5a453a407fce946ac00ffa2463c381b382993",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-short-box",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-short-box.tx3g",
+      "sha256": "3d95d88361be43a00fe221b399acb8ee3e7a68e34da136e67ab21fd0e0598098",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-box-overrun",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-box-overrun.tx3g",
+      "sha256": "1189fafc5b394f7e152638428f17e1bbfcdef87f23a190d7d76dfdc4b9c33dac",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-extended-box-gap",
+      "profile": "tx3g",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/tx3g-extended-box-gap.tx3g",
+      "sha256": "2eaef4427b30b8459e8a2bc4405c2a602e11b93bc9f601a81d59c663bd91cf3e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "tx3g",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "utf8-packet-markup",
+      "profile": "utf8",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/utf8-packet-markup.txt",
+      "sha256": "921d10b100402e565fdd24dbe55e0d394932e7f1aad8410d031a1feecdc21806",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "utf8",
+        "1/3",
+        "2/3",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "68c1722b858026637f3a50155cfcc75b140a7126a3cb2dc320d53ec5f33f337d"
+      }
+    },
+    {
+      "id": "utf8-packet-unknown-time",
+      "profile": "utf8",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/utf8-packet-unknown-time.txt",
+      "sha256": "b23a6a8439c0dde5515893e7c90c1e3233b8616e634470f20dc4928bcf3609bc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "utf8",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "f5457dc033616380fb2cb6489749a393aa062f09a47beaa159292ccfafa4a0c4"
+      }
+    },
+    {
+      "id": "utf8-packet-known-zero-duration",
+      "profile": "utf8",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/utf8-packet-known-zero-duration.txt",
+      "sha256": "f9194e73f9e9459e3450ea10a179cdf77aafa695beecd3b9344a98d111622243",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "utf8",
+        "0/1",
+        "0/1",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "554ee97342eab933790b1f21d6e587af1a7a359960f8aec2d2f74417e6d43142"
+      }
+    },
+    {
+      "id": "utf8-packet-negative-start",
+      "profile": "utf8",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/utf8-packet-negative-start.txt",
+      "sha256": "262121c5372be8af3ae6ff0d3d138d9e6e1249335222c7f0e02535e35073bb0b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "utf8",
+        "-5/7",
+        "1/3",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "897c61252f230926fa13e14d89ca487935ba881c4a32a963a5d54e589e3e481c"
+      }
+    },
+    {
+      "id": "utf8-packet-raw-clock",
+      "profile": "utf8",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/utf8-packet-raw-clock.txt",
+      "sha256": "d8198efa3604d164853468608c55efa148bc56e3564d5a30232bf98b8ab43aeb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "utf8",
+        "1/30000",
+        "1001/90000",
+        "2:180000:3:-6:1001",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "771e9848965b5d6fb9a30da7acbbdb34f5d580e23c90a3f6a3eaf70988d35754"
+      }
+    },
+    {
+      "id": "utf8-packet-bom-nul-content",
+      "profile": "utf8",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/utf8-packet-bom-nul-content.txt",
+      "sha256": "a868fd316a9fb4ddb37e9782f6c31e65ea0ccdd1b9bd50a62cbd6e4b48baa6ac",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "utf8",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "4c2b506d1ae2056e89cfd63ff847badfb38ee896ab854a4ecdfa596f35f406de"
+      }
+    },
+    {
+      "id": "utf8-packet-too-large-scalar",
+      "profile": "utf8",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/utf8-packet-too-large-scalar.txt",
+      "sha256": "fb16995ef3b5d7c2c81b153f945979f1db35ebc62b17616cdc896f8e7836d371",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "utf8",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "utf8-packet-input-limit",
+      "profile": "utf8",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/utf8-packet-input-limit.txt",
+      "sha256": "bef57ec7f53a6d40beb640a780a639c83bc29ac8a9816f1fc6c5c6dcd93c4721",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "utf8",
+        "-",
+        "-",
+        "-",
+        "3",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mkv-vtt-no-addition",
+      "profile": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/mkv-vtt-no-addition.block",
+      "sha256": "32e00c6605adc0a10464fb09b023ddcc7cf8bdff2a2390fcf5e66bcae2cbe28d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "vtt",
+        "5/2",
+        "3/4",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "8547524dae0a3d5722486ace12ba1cc3a4647858da38ee9a81320869be7ba5c6"
+      }
+    },
+    {
+      "id": "mkv-vtt-settings-id-comments",
+      "profile": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/mkv-vtt-settings-id-comments.block",
+      "sha256": "230d8358dc8e8890b4c58deeb62912ee2f20357ae92a5cc861b98e68fe31acb5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "vtt",
+        "1/1",
+        "1/2",
+        "-",
+        "-",
+        "1:616c69676e3a73746172740a6964656e7469666965722d340a4e4f544520617574686f726564206265666f7265206375650a0a"
+      ],
+      "expected": {
+        "trace_sha256": "78529b8be310d1fef988d82e4bd9026c4a666c101b48e80a43d14bc7c398dcb0"
+      }
+    },
+    {
+      "id": "mkv-vtt-present-empty-fields",
+      "profile": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/mkv-vtt-present-empty-fields.block",
+      "sha256": "1e7062a712c1071c78ffc61499f0152a6b98a986ba24f4d35a94c078c5967c45",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "vtt",
+        "-",
+        "-",
+        "-",
+        "-",
+        "1:0a0a"
+      ],
+      "expected": {
+        "trace_sha256": "caa3d5f51729bd4904333869d5611b311f9c1c893e6294b5e3de88f93eade843"
+      }
+    },
+    {
+      "id": "mkv-vtt-relative-inline-time",
+      "profile": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/mkv-vtt-relative-inline-time.block",
+      "sha256": "b551e033c22258989cb174d5564830f0f54fed99cd611cf14b5b4786aae153d3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "vtt",
+        "10/1",
+        "1/1",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "d7de09c9a17e2eae453613b44ca58ba3aca9770be918d3121fe387f072c2c0e1"
+      }
+    },
+    {
+      "id": "mkv-vtt-unknown-addition-opaque",
+      "profile": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/mkv-vtt-unknown-addition-opaque.block",
+      "sha256": "41cf6794ba4200b839c53531555f0f3998df4cbb01a4d5cb0b94e3ca5e23947d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "vtt",
+        "-",
+        "-",
+        "-",
+        "-",
+        "19:756e6b6e6f776e206d617070696e6700ff"
+      ],
+      "expected": {
+        "trace_sha256": "e61568ae6998cf293f1873f57fedb2fe12839c1ad194a40d44d70248356111d0"
+      }
+    },
+    {
+      "id": "mkv-vtt-truncated-addition",
+      "profile": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/mkv-vtt-truncated-addition.block",
+      "sha256": "230d8358dc8e8890b4c58deeb62912ee2f20357ae92a5cc861b98e68fe31acb5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "vtt",
+        "-",
+        "-",
+        "-",
+        "-",
+        "1:616c69676e3a73746172740a6d697373696e67206964656e746966696572207465726d696e61746f72"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "ass-raw-order-overrides",
+      "profile": "ass",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/ass-raw-order-overrides.ass-packet",
+      "sha256": "c72c4f06a81bff80a5c8d3bc782830bbc3ec9fc2d61cdb3837f131996521efad",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "ass",
+        "0/1",
+        "1/1",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "9d8bcd3d7c1ece472a60d74d40214021248cd605f62ab0560bd95c0f645b6906"
+      }
+    },
+    {
+      "id": "ass-ssa-empty-layer",
+      "profile": "ass",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/ass-ssa-empty-layer.ass-packet",
+      "sha256": "5145daa9e15bba0588ae2c82174e61c28ed44fd70e0395fe2c165e2c7543c203",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "ass",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "9b8da1738e74439826b2e0c960d7ceb52d6a82e815de818773d664541123f669"
+      }
+    },
+    {
+      "id": "ass-private-verbatim",
+      "profile": "ass",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/ass-private-verbatim.ass-packet",
+      "sha256": "6547ce7ee01cd7cf3396d897a7dd271e452d62518559d86ae9a6515f3f4d2b1e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "ass",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "13014da8d91a40ed8d0d37b792f0b437cbd7e5a944c7d0ba0ececad518c16965"
+      }
+    },
+    {
+      "id": "ass-unknown-charset-opaque",
+      "profile": "ass",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/ass-unknown-charset-opaque.ass-packet",
+      "sha256": "0028db45df92724f17d1e4b00ee7397d13245e0dff24a209383fba3dfd984802",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "ass",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "13014da8d91a40ed8d0d37b792f0b437cbd7e5a944c7d0ba0ececad518c16965"
+      }
+    },
+    {
+      "id": "ass-empty-not-clear",
+      "profile": "ass",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/ass-empty-not-clear.ass-packet",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "ass",
+        "0/1",
+        "0/1",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "95aaba940f5f9a2a2a0fc4b20a95a3b5e375794d6af8de800ffdbba88500fa8a"
+      }
+    },
+    {
+      "id": "ass-known-duration-unknown-start",
+      "profile": "ass",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/ass-known-duration-unknown-start.ass-packet",
+      "sha256": "9f176723fe9cd303ab5df9076262c0e842f7a66844cb0499018407e0c5dfe999",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "ass",
+        "-",
+        "1/3",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "cdb04e5959c9d294777252698e6570292c58b2bbd9e2448270a68c0aa28cf145"
+      }
+    },
+    {
+      "id": "ass-private-present-empty",
+      "profile": "ass",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/ass-private-present-empty.ass-packet",
+      "sha256": "f21bc9efacb0e3a59c7a6e71700a61249f6f45d6e534544b4e036cfc865f4770",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "ass",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "eeefbaa939cc9e22aaf3313db28b0f1f4cbcbf3aa3336638b0375109c600669e"
+      }
+    },
+    {
+      "id": "ass-invalid-utf8-unvalidated",
+      "profile": "ass",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/ass-invalid-utf8-unvalidated.ass-packet",
+      "sha256": "5bdd5340ff99d1e32b5274f51fc6a21fef461dfab95ef10aa9e6da702d30e6c3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw",
+        "ass",
+        "-",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "333c9b90b0c1689fa86913505102a37c92ba7e587351be386e96d576c7a4e23e"
+      }
+    }
+  ]
+}

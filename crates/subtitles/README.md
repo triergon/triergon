@@ -242,5 +242,19 @@ pinned FFmpeg build, and case by case against the build itself through the
 subtitle runner (`crates/subtitle-worker`, `harness/features/subtitle-*`). Every operation is also exercised at several work quanta,
 under allocation pressure and with cancellation. Gates and the reference build
 are described in [docs/quality.md](../../docs/quality.md); current results are
-in [docs/status.md](../../docs/status.md). Every subtitle feature was measured at
-`f8e1c4d9` on Linux AArch64 and in the ARMv7 user space, and PGS again at `546045db`.
+in [docs/status.md](../../docs/status.md).
+
+The source-view comparisons cover [text extraction](../../harness/features/text-extraction/contract.json),
+[charset streams](../../harness/features/charset-streams/contract.json) and
+[labelled ASS packets](../../harness/features/charset-packets/contract.json),
+[renderer headers and fonts](../../harness/features/renderer-context/contract.json),
+[DVB source packets](../../harness/features/dvb-source/contract.json) and the
+[VobSub index](../../harness/features/vobsub-index/contract.json). A separate
+[carriage comparison](../../harness/features/carriage-trace/contract.json) checks
+the reference-trace stream and packet projection. Independent oracles compare
+the [text fixture facts](../../harness/features/text-extraction-oracle/contract.json),
+[PGS segments](../../harness/features/pgs-segments/contract.json),
+[tx3g configuration](../../harness/features/tx3g-config-oracle/contract.json)
+and [timed text semantics](../../harness/features/tx3g-semantics/contract.json).
+The [tx3g decoder header comparison](../../harness/features/tx3g-configuration/contract.json)
+covers the fields the reference derives from the sample description.

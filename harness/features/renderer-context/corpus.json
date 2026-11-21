@@ -1,0 +1,227 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "ass-raw-order-overrides",
+      "profile": "text-attachments",
+      "file": "harness/features/text-extraction/inputs/ass-raw-order-overrides.mkv",
+      "sha256": "857eb59ce29944647abc5d797a9448677dc594cde6db62d5bd419af566724799",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59589
+      }
+    },
+    {
+      "id": "ass-ssa-empty-layer",
+      "profile": "text-attachments",
+      "file": "harness/features/text-extraction/inputs/ass-ssa-empty-layer.mkv",
+      "sha256": "3def05cbf4c26b08eb6def2d919bcab91a9a02ab27ab3cd8d96c462b54298649",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59589
+      }
+    },
+    {
+      "id": "ass-private-verbatim",
+      "profile": "text-attachments",
+      "file": "harness/features/text-extraction/inputs/ass-private-verbatim.mkv",
+      "sha256": "c8920e097a1224a4fe58b5938eb5e976619bb9f81b53bc846aac97117f541918",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 52,
+        "digest": 13806774522263961925
+      }
+    },
+    {
+      "id": "ass-unknown-charset-opaque",
+      "profile": "text-attachments",
+      "file": "harness/features/text-extraction/inputs/ass-unknown-charset-opaque.mkv",
+      "sha256": "9dc1a754b4097d5b8625ca057803ea3c1483ea7c3449507288c72cc970879147",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59589
+      }
+    },
+    {
+      "id": "ass-empty-not-clear",
+      "profile": "text-attachments",
+      "file": "harness/features/text-extraction/inputs/ass-empty-not-clear.mkv",
+      "sha256": "a3eba3cda4478e64c5434d16a121da68a94168ebf6cc00b5ee3bc6534c821219",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59589
+      }
+    },
+    {
+      "id": "ass-known-duration-unknown-start",
+      "profile": "text-attachments",
+      "file": "harness/features/text-extraction/inputs/ass-known-duration-unknown-start.mkv",
+      "sha256": "c2000f2972a4866ac47e652c25bf1d091f24faa76a06e56ab0c56da981a327a5",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59589
+      }
+    },
+    {
+      "id": "ass-private-present-empty",
+      "profile": "text-attachments",
+      "file": "harness/features/text-extraction/inputs/ass-private-present-empty.mkv",
+      "sha256": "c4e6d5e125727a6268c7b4540477f2b7d4715f74c0deb55429a3cde8b666e230",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59589
+      }
+    },
+    {
+      "id": "ass-invalid-utf8-unvalidated",
+      "profile": "text-attachments",
+      "file": "harness/features/text-extraction/inputs/ass-invalid-utf8-unvalidated.mkv",
+      "sha256": "8a9e589adc7f61ceb61c60a7e06dc4c76ce1cbcc9dd4fe09039c7eb3bce5ec3f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59589
+      }
+    },
+    {
+      "id": "attachments",
+      "profile": "attachments",
+      "file": "harness/features/renderer-context/inputs/attachments.mkv",
+      "sha256": "bfa24a4f55cb6a5a95dad76849d01e0d53f97c125e4c79c5d9af863fff5738ce",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 16,
+        "bytes": 385,
+        "digest": 5617291192911949590
+      }
+    },
+    {
+      "id": "ass-stream-basic",
+      "profile": "streams",
+      "file": "harness/features/renderer-context/inputs/ass-stream-basic.mkv",
+      "sha256": "33ff43148d732b135e3d52ab701a3abf1219df390d3c601bba87354623f12362",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 614,
+        "digest": 14462610330303652399
+      }
+    },
+    {
+      "id": "ass-stream-fonts",
+      "profile": "streams",
+      "file": "harness/features/renderer-context/inputs/ass-stream-fonts.mkv",
+      "sha256": "bf5117633315f1be9664eee2ddc572a55eee2ed3de669e659225d1fcf0250c94",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 937,
+        "digest": 1772868439664710948
+      }
+    },
+    {
+      "id": "ass-stream-read-order-overflow",
+      "profile": "streams",
+      "file": "harness/features/renderer-context/inputs/ass-stream-read-order-overflow.mkv",
+      "sha256": "de09531e5038c7b2aa62c89a87eecd4f04fb05bea109332640718f6ef6e1e884",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 32,
+        "digest": 18211067137938947882
+      }
+    },
+    {
+      "id": "ass-stream-read-order",
+      "profile": "streams",
+      "file": "harness/features/renderer-context/inputs/ass-stream-read-order.mkv",
+      "sha256": "de09531e5038c7b2aa62c89a87eecd4f04fb05bea109332640718f6ef6e1e884",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 32,
+        "digest": 18211067137938947882
+      }
+    },
+    {
+      "id": "ass-stream-styles",
+      "profile": "streams",
+      "file": "harness/features/renderer-context/inputs/ass-stream-styles.mkv",
+      "sha256": "089252b0a97cf3a8ef4d7423acb47c7c57d2e756ac45caa8098004a74ee27ea1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 297,
+        "digest": 1100148899381712413
+      }
+    },
+    {
+      "id": "ass-render-stream-change",
+      "profile": "streams",
+      "file": "harness/features/renderer-context/inputs/ass-render-stream-change.mkv",
+      "sha256": "fdcd629d8f2f7e8bb564a22ce25a1af312ea3ed71d54d390551031635c6588ec",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 538,
+        "digest": 922550874807698678
+      }
+    },
+    {
+      "id": "ass-render-stream-fallback",
+      "profile": "streams",
+      "file": "harness/features/renderer-context/inputs/ass-render-stream-fallback.mkv",
+      "sha256": "5e2e6bc02e544c267fcac15ecee55c9f2516cbc1d514601b421668c869c367d6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 655,
+        "digest": 1246264422427260122
+      }
+    },
+    {
+      "id": "ass-render-stream-fonts",
+      "profile": "streams",
+      "file": "harness/features/renderer-context/inputs/ass-render-stream-fonts.mkv",
+      "sha256": "a9ce224caf648c95440efc7879e8065150e49c75f7cdea3ad212fd3d8631d4ad",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 2388,
+        "digest": 14245016938552156537
+      }
+    }
+  ]
+}

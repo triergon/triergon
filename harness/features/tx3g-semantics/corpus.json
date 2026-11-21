@@ -1,0 +1,2866 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "bad-two-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/bad-two-packet-0.bin",
+      "sha256": "921baec89dac2040734cda700f46485ca066b9b9c02510ddcf5c2c7fc103af36",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "bom-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/bom-packet-0.bin",
+      "sha256": "cd261dad1c3244197d2ab5693ba29c3e2840b079187aa6e544a333db67e8b6ba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "be44f7aa942dbe1e023e764eb92b0574310bd6f25fbd9cd151f7808beb196e7d"
+      }
+    },
+    {
+      "id": "box-refusal-then-good-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/box-refusal-then-good-packet-0.bin",
+      "sha256": "05dc07cdb67da5aa5b9a7e1031588c1c174e179ff27031b05ed5ae06de5733ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "d42189257ccae43213d2c69b1a1889ca05f90a17ec0b0cad10aa02d023920689"
+      }
+    },
+    {
+      "id": "box-refusal-then-good-packet-1",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/box-refusal-then-good-packet-1.bin",
+      "sha256": "faa8ba4c3abf91dc5fb1dde72c3135630aaab8686a3f1c175c9f496cc1bcdc36",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "b16d65bd8ee30f4bcb40c0ee39068638b0ab59f6a512ce6c39ef56f097d395b8"
+      }
+    },
+    {
+      "id": "clear-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/clear-packet-0.bin",
+      "sha256": "87c7bd4e59cba730621564a241e5cbdaa01a55f5c65bb994d0e04e29f2d3aea8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "cc348d76a79337df63d91e75a8aba79ff91a7edfe7651e8106ba49a20443acb0"
+      }
+    },
+    {
+      "id": "clear-then-good-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/clear-then-good-packet-0.bin",
+      "sha256": "87c7bd4e59cba730621564a241e5cbdaa01a55f5c65bb994d0e04e29f2d3aea8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "cc348d76a79337df63d91e75a8aba79ff91a7edfe7651e8106ba49a20443acb0"
+      }
+    },
+    {
+      "id": "clear-then-good-packet-1",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/clear-then-good-packet-1.bin",
+      "sha256": "faa8ba4c3abf91dc5fb1dde72c3135630aaab8686a3f1c175c9f496cc1bcdc36",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "b16d65bd8ee30f4bcb40c0ee39068638b0ab59f6a512ce6c39ef56f097d395b8"
+      }
+    },
+    {
+      "id": "config-invalid-font-size-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/config-invalid-font-size-packet-0.bin",
+      "sha256": "24c60bfc6a102f0c4d008fb4baf2d59730959ebb5d6f975c7c52b292de0aa50b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "config-one-dimension-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/config-one-dimension-packet-0.bin",
+      "sha256": "b26889678c97c1e0aad0ba2c2ac18c3b7abed7aa40b1c762a22fe01b53044855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "6a832e55657be4f2dd4ae70c10d699cdc51f6ae2e1017224b2a103bc0f187112"
+      }
+    },
+    {
+      "id": "config-too-short-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/config-too-short-packet-0.bin",
+      "sha256": "e9cfbca773548d818ba417461d4eafb1f8779e442bd1d22c8950adb00e5696d2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "config-valid-empty-fonts-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/config-valid-empty-fonts-packet-0.bin",
+      "sha256": "b34b6ad5546eaf76b0e31db99531bf1e653b8e84b1c45358f0f3b40e1677d9e5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "configured-defaults-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/configured-defaults-packet-0.bin",
+      "sha256": "ce08fd9972d22d6915f7e060321d28d8eb2fe7e023e0c79c1148b3c6553f09c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "e22ae3e00cfc13673b524fd4900ad183d5695a20cf78a852110c6591cbf11530"
+      }
+    },
+    {
+      "id": "configured-style-font-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/configured-style-font-packet-0.bin",
+      "sha256": "871934316469a34fe1d92ffe359e5d47779fd53a3ff06375988ab8ee3bc82db4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "6a2cf52b518a0f992c225a3532c68381a2f18634110ebbe2cd7bd7698bd0fcdb"
+      }
+    },
+    {
+      "id": "cr-lf-markup-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/cr-lf-markup-packet-0.bin",
+      "sha256": "012c6262d7cfc654e998cc17d80f7141e3b56fd0605eca5aebbfa36b05603696",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "ab969fc5d98a8f3881f60a9a68bc3ed1c932fcfeb846f535284ec777d58a326a"
+      }
+    },
+    {
+      "id": "duplicate-fonts-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/duplicate-fonts-packet-0.bin",
+      "sha256": "bfed9a7356180d9cffb278e3a5b612ad8fa0f5c15ff6748ec2176c55b095a332",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "duplicate-wrap-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/duplicate-wrap-packet-0.bin",
+      "sha256": "8e125e6ee5d2dc9c8bd7785fec0caa9244f5190537d9f546352c87f3f2ac0185",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "empty-event-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/empty-event-packet-0.bin",
+      "sha256": "11a8cf029013f564cbe30fa7dc9468511a536707cc6486dd782aa3216334061e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "84bcd3d6e72a03723a3b39398876b15cd019ca939653c6c709cba740545aefc8"
+      }
+    },
+    {
+      "id": "empty-physical-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/empty-physical-packet-0.bin",
+      "sha256": "ad95131bc0b799c0b1af477fb14fcf26a6a9f76079e48bf090acb7e8367bfd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "extended-short-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/extended-short-packet-0.bin",
+      "sha256": "d31116d9ca811648334aa79d8d018e1e3a34b05a5f5f4e2dc1a3af8bfb7c1ad8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "extended-wrap-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/extended-wrap-packet-0.bin",
+      "sha256": "6939ec8f57a83253fe5046854059e7c58c885f932cdd97d1fbf2ba89f4594178",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "4102aa2ac591d28597198956f26ce4078c7afb33ff74a6c7edfea90d4c74c932"
+      }
+    },
+    {
+      "id": "ffff-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/ffff-packet-0.bin",
+      "sha256": "10ee3a0a88245aaf5d2cf3a39992cdbf23d4e0e53d3d6697a5b7fd5c4a8bd1d3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "fbb122c008d343b18cf7826c21ca0045ed0b2bc9b9b55d4c82f946cdf7429bbc"
+      }
+    },
+    {
+      "id": "flush-read-order-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/flush-read-order-packet-0.bin",
+      "sha256": "5aa46e10bdee98c533396f927c6a07c3a94e37687debaec1da1c9536285505ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "d42189257ccae43213d2c69b1a1889ca05f90a17ec0b0cad10aa02d023920689"
+      }
+    },
+    {
+      "id": "flush-read-order-packet-2",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/flush-read-order-packet-2.bin",
+      "sha256": "faa8ba4c3abf91dc5fb1dde72c3135630aaab8686a3f1c175c9f496cc1bcdc36",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "b16d65bd8ee30f4bcb40c0ee39068638b0ab59f6a512ce6c39ef56f097d395b8"
+      }
+    },
+    {
+      "id": "font-nul-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/font-nul-packet-0.bin",
+      "sha256": "ec4bb83584dc3e48b46e1703e262a88d6016a9ab2c9cd7354b128e8fc2298af3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "69757c38b25aa0886669b7ef8bffc5e8954f19005bac00dd70002b9b1fb14b21"
+      }
+    },
+    {
+      "id": "font-utf16-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/font-utf16-packet-0.bin",
+      "sha256": "0e360476518768992de6c1ce1133707f763cd10f48ca744dabc039a6c677ff82",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "d535f293f8455a922441790d8fb2040e1344ca4d0084276124f7ed218447c80f"
+      }
+    },
+    {
+      "id": "highlight-color-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/highlight-color-packet-0.bin",
+      "sha256": "09f5022b3da420e0c04ca52e56cdf1e7339b2e39a0d55b2b0b4174649b36e42d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "69bb1ab8ce72f3d6862f8a6eb687155416ad388374be91bbba0c2acea8f00bb8"
+      }
+    },
+    {
+      "id": "highlight-empty-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/highlight-empty-packet-0.bin",
+      "sha256": "5f4a9d88e9963d3a9a998f4918c60fdd3123933e4fa4e589b21b5155e30aa08b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "0da7c52978f9764ff7c94746e36c51a236f3ec384422318769b23c489c0f7e25"
+      }
+    },
+    {
+      "id": "highlight-inverse-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/highlight-inverse-packet-0.bin",
+      "sha256": "8f9f7886310d074d4bba75ca48f83fef98640282d2ae0ba76498518d7366617a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "1a158244985593d764a245e4571ff7a5332e4ca455024be7445f4d5869c44475"
+      }
+    },
+    {
+      "id": "invalid-overlong-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/invalid-overlong-packet-0.bin",
+      "sha256": "d712ee93c1d78cee887a2a4420c7ae855c26d3fc9f6d348a796f774275c65ac5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "invalid-tail-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/invalid-tail-packet-0.bin",
+      "sha256": "d408a8c38dd5933ba98e297a80f708ca71f21e8d1af3a63f78132c8bb7549973",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "known-zero-duration-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/known-zero-duration-packet-0.bin",
+      "sha256": "5aa46e10bdee98c533396f927c6a07c3a94e37687debaec1da1c9536285505ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "d42189257ccae43213d2c69b1a1889ca05f90a17ec0b0cad10aa02d023920689"
+      }
+    },
+    {
+      "id": "negative-half-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/negative-half-packet-0.bin",
+      "sha256": "5aa46e10bdee98c533396f927c6a07c3a94e37687debaec1da1c9536285505ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "d42189257ccae43213d2c69b1a1889ca05f90a17ec0b0cad10aa02d023920689"
+      }
+    },
+    {
+      "id": "noncharacter-fffe-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/noncharacter-fffe-packet-0.bin",
+      "sha256": "7a6fc821377e7c2d639308e0a7f94fb3d4e94a09263596a733762f7b3d9f69b1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "ceedea0336fd57cb2827bbf6d8f55981715847e8e0561da59035e49c80a7f478"
+      }
+    },
+    {
+      "id": "nul-invalid-tail-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/nul-invalid-tail-packet-0.bin",
+      "sha256": "29eb29e9422072064e51b3d81791abd68ef4b3ca8240cc69681cfb1a98f9c450",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "one-byte-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/one-byte-packet-0.bin",
+      "sha256": "eed37189a108c4fcf83a77d93e43d7186d3e37f4ea555eb6c54cc887d2387b93",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-basic-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-basic-packet-0.bin",
+      "sha256": "61e20cf4f061bee643a51662f426940b5fb1d4e219459e81bad5a02453dcf21d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "6e3fea0aed723f7ce1154ea258464edf5ec3699cb63599c59b5d9ad11edaa8da"
+      }
+    },
+    {
+      "id": "original177-tx3g-box-overrun-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-box-overrun-packet-0.bin",
+      "sha256": "1fe75b9621fcf319c97ed4c53f35d3fd121f8393e3aa172b7dc9ce80041f1696",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-byte-not-character-count-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-byte-not-character-count-packet-0.bin",
+      "sha256": "ce447c948ee7026786167f3ad55e455df104ef5d7ea0fd98fabbf0d1977c3495",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "b552ba9858caddf291ef010027ccabeb7eee7d1c199cd40731f3f3256dece639"
+      }
+    },
+    {
+      "id": "original177-tx3g-embedded-nul-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-embedded-nul-packet-0.bin",
+      "sha256": "2ea24c55373ce8b375a68841acc634f9f7a8fa8e02d25baef3e9d5c3bdcd579f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "24b747c80e1129ee11ffb3a9bf72f2dfba3e6fb12e2ccfb7a119de38191b87b3"
+      }
+    },
+    {
+      "id": "original177-tx3g-empty-sample-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-empty-sample-packet-0.bin",
+      "sha256": "87c7bd4e59cba730621564a241e5cbdaa01a55f5c65bb994d0e04e29f2d3aea8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "cc348d76a79337df63d91e75a8aba79ff91a7edfe7651e8106ba49a20443acb0"
+      }
+    },
+    {
+      "id": "original177-tx3g-empty-with-modifier-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-empty-with-modifier-packet-0.bin",
+      "sha256": "11a8cf029013f564cbe30fa7dc9468511a536707cc6486dd782aa3216334061e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "84bcd3d6e72a03723a3b39398876b15cd019ca939653c6c709cba740545aefc8"
+      }
+    },
+    {
+      "id": "original177-tx3g-extended-box-gap-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-extended-box-gap-packet-0.bin",
+      "sha256": "c84e38481b6d7bd94c980a7ca7549df1d9bf7961fd9ac64ba39cbaf0dda84081",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "7409b2060cf0fce4f600978a61b7abba3a82ae6cd196de8e359f2ad0974569b5"
+      }
+    },
+    {
+      "id": "original177-tx3g-line-codepoints-exact-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-line-codepoints-exact-packet-0.bin",
+      "sha256": "5f430e85687cd6449e2710ae49f5ec531c3d232b4fa15714edbfc08d3d7e6a7e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "d3ee796fa4fc80b6eb8ab7ec9ff8e430a04c18869b9291b73548b82a5f3b4da5"
+      }
+    },
+    {
+      "id": "original177-tx3g-lone-surrogate-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-lone-surrogate-packet-0.bin",
+      "sha256": "8fc3ddff7d1526e7950a2397f3d2b26458a5f03b3d4280fc7dd1e1da65f0152d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-missing-length-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-missing-length-packet-0.bin",
+      "sha256": "eed37189a108c4fcf83a77d93e43d7186d3e37f4ea555eb6c54cc887d2387b93",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-modifier-order-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-modifier-order-packet-0.bin",
+      "sha256": "1f0c823078dd91ee2b06177911fd8d8c1e1c4ea51318c2adf9f9d23fe6d3cced",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-short-box-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-short-box-packet-0.bin",
+      "sha256": "ce1c154cdd67d2829a725caa21bc0fc93ec78a8399e012ccab5501c66bc3dca4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-style-highlight-raw-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-style-highlight-raw-packet-0.bin",
+      "sha256": "44a5b38fcaac01845347d5877b33c92286b242da0deefc60560a40985c45a451",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "8edd53bb7c44be231a3b577a5671477e7842175b5169194946e147d8a2c0208d"
+      }
+    },
+    {
+      "id": "original177-tx3g-text-overrun-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-text-overrun-packet-0.bin",
+      "sha256": "a0cb4031856b46c6b21fc77ac9087a2cfe75ad32df8d97f5dcd94623fdd74f14",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-u16-byte-count-boundary-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-u16-byte-count-boundary-packet-0.bin",
+      "sha256": "4279e5d2f59fef843bec110c9d76cba6995a073ac98ea669f0fbf8474300a998",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "058e00ca3316952eb769511060d2d0ab93964b1c05541670f2704d49534a6ce3"
+      }
+    },
+    {
+      "id": "original177-tx3g-unknown-modifier-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-unknown-modifier-packet-0.bin",
+      "sha256": "52443594f085765ee762bd189b6de2b0fd81e95d13f7a964207826ffca9ddfeb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "7409b2060cf0fce4f600978a61b7abba3a82ae6cd196de8e359f2ad0974569b5"
+      }
+    },
+    {
+      "id": "original177-tx3g-utf16-odd-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-utf16-odd-packet-0.bin",
+      "sha256": "b4c482cc47de7025996ad3af558af9139f88297cc2ef86e998fe1d1ef317476a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "original177-tx3g-utf16be-bom-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/original177-tx3g-utf16be-bom-packet-0.bin",
+      "sha256": "1d6907d1702a16bb0df5d0a43b2b9ca6e71d43c0c7f7aaa82a618472c0d64885",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "532fa6b22e9330798d624ebcd771140c879130cd5b2731fec31f0ebe0fc2e2bf"
+      }
+    },
+    {
+      "id": "overflow-clock-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/overflow-clock-packet-0.bin",
+      "sha256": "5aa46e10bdee98c533396f927c6a07c3a94e37687debaec1da1c9536285505ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "d42189257ccae43213d2c69b1a1889ca05f90a17ec0b0cad10aa02d023920689"
+      }
+    },
+    {
+      "id": "overrun-box-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/overrun-box-packet-0.bin",
+      "sha256": "07c7c27b1147edb15bde2438ec1997a3802e9ef48006d5b70642f9ae5c8a478c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "overstated-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/overstated-packet-0.bin",
+      "sha256": "a4c1a50884884d55ab2facbaa016596b4aacc7b609781f8c6344fa11f2283b68",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "positive-half-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/positive-half-packet-0.bin",
+      "sha256": "5aa46e10bdee98c533396f927c6a07c3a94e37687debaec1da1c9536285505ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "d42189257ccae43213d2c69b1a1889ca05f90a17ec0b0cad10aa02d023920689"
+      }
+    },
+    {
+      "id": "rational-clock-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/rational-clock-packet-0.bin",
+      "sha256": "5aa46e10bdee98c533396f927c6a07c3a94e37687debaec1da1c9536285505ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "d42189257ccae43213d2c69b1a1889ca05f90a17ec0b0cad10aa02d023920689"
+      }
+    },
+    {
+      "id": "short-body-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/short-body-packet-0.bin",
+      "sha256": "1e144ead41787bf3908b5901539c2976fb5f830a38177fb3ee7f1bf6d1f37726",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "short-box-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/short-box-packet-0.bin",
+      "sha256": "a71eeb5ae500f72b9c7eded49a6a6e290c001e35b64b256510dc9fe6dee6fed4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "size0-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/size0-packet-0.bin",
+      "sha256": "6a110f5446e5ab18af55f11cdee6c5db61e3e0b3199dcc6b127bbbfd9137e7cb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "0da7c52978f9764ff7c94746e36c51a236f3ec384422318769b23c489c0f7e25"
+      }
+    },
+    {
+      "id": "style-adjacent-different-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/style-adjacent-different-packet-0.bin",
+      "sha256": "db5ac403c54cf69ac49b92e37f952abbc56888b6afbe5745e24811cbffa84c6f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "29a1480aa053b8561d981e7a7be7a787dad4b616108ef52e295df9dbfbb1c555"
+      }
+    },
+    {
+      "id": "style-adjacent-equal-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/style-adjacent-equal-packet-0.bin",
+      "sha256": "31e7fe72c397785639dbc1680207dbabd449929870d792864a91b8fd968330ac",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "7e374086b412ceefe4aa562827d952cfe7bfd9ae866898b5ccf76c4287b515d2"
+      }
+    },
+    {
+      "id": "style-all-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/style-all-packet-0.bin",
+      "sha256": "aebb2547067ccc5461410bd7b43e33e7a6ac01c84bbc00688fa84c05b86357f0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "5649ff80b98cfe2487ad69fe6e6eee6cb3463f9068cea851d308178e7eb69076"
+      }
+    },
+    {
+      "id": "style-empty-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/style-empty-packet-0.bin",
+      "sha256": "01dfda13b3c3583b769de2af13059e97653521c2770daf819b8417567c59436d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "03c8c9ea6f12898801a3ad710deb66fb2aa60a8df59fbcd2862b222506a643c1"
+      }
+    },
+    {
+      "id": "style-malformed-after-good-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/style-malformed-after-good-packet-0.bin",
+      "sha256": "6cd2eb1552790c23f1f6e8350a50bd5ee7de8e1d5fac42942e0e668ba11fe241",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-outside-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/style-outside-packet-0.bin",
+      "sha256": "4391443372828808f805df3eada9eb0c045816e094b4960758ca50f3c21a7f09",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-overlap-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/style-overlap-packet-0.bin",
+      "sha256": "fd478eb92162046c078b8bb782071fa977208a86e2e854c7baf6ad01e9ad2ab1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-repeated-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/style-repeated-packet-0.bin",
+      "sha256": "f3c4b1de33652b7f3d21a564b11fa4bfefa1bcedcdbe33c0e62334631f4fe53e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "18fcc2e593bbf973b4122962f97fb63b9ca45df7635107148b9065831e934d61"
+      }
+    },
+    {
+      "id": "style-reversed-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/style-reversed-packet-0.bin",
+      "sha256": "c8e38067bed04e7c480980a817a9d24aa1de537753c694e552cc18e0bf93424c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "style-unicode-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/style-unicode-packet-0.bin",
+      "sha256": "607b0331ce21be6b324873436c059529bdcf7f005c723d71cfe892dfd809b5a6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "52e744604921a4c9325064b777fdc26e6988a6a5e61fd26e606570c609ac0200"
+      }
+    },
+    {
+      "id": "style-zero-after-good-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/style-zero-after-good-packet-0.bin",
+      "sha256": "99f2f5b60b7587d21d11404180010537edd1d978f3611104e398b213b9b52546",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "e0dc56f7770af81050fa452d2c57a371fa463217daaf5dcd35c03eb3d3a07433"
+      }
+    },
+    {
+      "id": "two-packets-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/two-packets-packet-0.bin",
+      "sha256": "5aa46e10bdee98c533396f927c6a07c3a94e37687debaec1da1c9536285505ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "d42189257ccae43213d2c69b1a1889ca05f90a17ec0b0cad10aa02d023920689"
+      }
+    },
+    {
+      "id": "two-packets-packet-1",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/two-packets-packet-1.bin",
+      "sha256": "faa8ba4c3abf91dc5fb1dde72c3135630aaab8686a3f1c175c9f496cc1bcdc36",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "b16d65bd8ee30f4bcb40c0ee39068638b0ab59f6a512ce6c39ef56f097d395b8"
+      }
+    },
+    {
+      "id": "understated-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/understated-packet-0.bin",
+      "sha256": "e9f5f58338f0daf19b6ed81d2aed6d6eb74dac290d2a250e6b060e564289dcbe",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "unicode-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/unicode-packet-0.bin",
+      "sha256": "04762d6f2e1509a175de0a0b1bd0f98ab91988d2750ebe27f402a54b8929a18d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "8bcaea1796a6ad138aca5449eafba0c9fb25a2b0a4321845afaa16fb00056553"
+      }
+    },
+    {
+      "id": "unknown-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/unknown-packet-0.bin",
+      "sha256": "b5a3554b84bf0471995f60c9657e9e7583fcf5597c6259fcfbb7aef30c434bff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "0da7c52978f9764ff7c94746e36c51a236f3ec384422318769b23c489c0f7e25"
+      }
+    },
+    {
+      "id": "unknown-clock-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/unknown-clock-packet-0.bin",
+      "sha256": "5aa46e10bdee98c533396f927c6a07c3a94e37687debaec1da1c9536285505ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "d42189257ccae43213d2c69b1a1889ca05f90a17ec0b0cad10aa02d023920689"
+      }
+    },
+    {
+      "id": "unset-clock-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/unset-clock-packet-0.bin",
+      "sha256": "5aa46e10bdee98c533396f927c6a07c3a94e37687debaec1da1c9536285505ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "d42189257ccae43213d2c69b1a1889ca05f90a17ec0b0cad10aa02d023920689"
+      }
+    },
+    {
+      "id": "utf16be-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/utf16be-packet-0.bin",
+      "sha256": "bfe94d360e521f646c612406c9a7f7beea1f0192f27dcc80e79f9a7a4de5ed4e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "1b66de68d3226553fc9ba0565a9c3f4b0106985e60a4a0e687e0f7c2e6b61845"
+      }
+    },
+    {
+      "id": "utf16le-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/utf16le-packet-0.bin",
+      "sha256": "2065d9df682826b11d984bf5f8f31034dc32f5b50a1723c79dc4a037b135498d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "utf8-refusal-then-good-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/utf8-refusal-then-good-packet-0.bin",
+      "sha256": "9eb8f2e65d8dd791222e090107449686fd3316ef3549fd9def700cd48aa8679c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "utf8-refusal-then-good-packet-1",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/utf8-refusal-then-good-packet-1.bin",
+      "sha256": "faa8ba4c3abf91dc5fb1dde72c3135630aaab8686a3f1c175c9f496cc1bcdc36",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "b16d65bd8ee30f4bcb40c0ee39068638b0ab59f6a512ce6c39ef56f097d395b8"
+      }
+    },
+    {
+      "id": "wrap-0-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/wrap-0-packet-0.bin",
+      "sha256": "066a6b96e1b980f3ae9a8a32569336191d4f4372dd962195f05013dc2666095d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "fc9fdc6c73bf0b1a9c28a3ab18598a8a8cf14a633de01c1ebea669eaad03b128"
+      }
+    },
+    {
+      "id": "wrap-1-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/wrap-1-packet-0.bin",
+      "sha256": "85a095dce4b51ad32182e1dbcd891103a949b95d348151861ea531881c5bb558",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "4102aa2ac591d28597198956f26ce4078c7afb33ff74a6c7edfea90d4c74c932"
+      }
+    },
+    {
+      "id": "wrap-2-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/wrap-2-packet-0.bin",
+      "sha256": "412a1116a953823cdeb8a80cc0b86c7b32e7ba3a867a3f5b5986394d6903f16e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "wrap-nul-packet-0",
+      "profile": "recorded",
+      "file": "harness/features/tx3g-semantics/inputs/wrap-nul-packet-0.bin",
+      "sha256": "665722be0dce00177b0ded4b111c4933158bba354c7e6919fba70f17a2a7fc28",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "cc94bebfa3641218660dec66cf59c63fb732a89f639c2d2c08a9fd8389c7a85f"
+      }
+    },
+    {
+      "id": "tx3g-adjacent_style_runs_remain_distinct_source_records-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-adjacent_style_runs_remain_distinct_source_records-1.bin",
+      "sha256": "0e876d05b64193243b69df2918e6aee9162dc6f51a87617b9f9c8da675c2e5fc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "47f14e69f2df0728ec3792bc893c130e76120c9837c424653eff84acd084893c"
+      }
+    },
+    {
+      "id": "tx3g-all_known_display_flags_and_directions_are_decoded_without_dropping_unknown_bits-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-all_known_display_flags_and_directions_are_decoded_without_dropping_unknown_bits-1.bin",
+      "sha256": "c0750d8c14c94a9b46490afc8c012a8febff696463c254a3d15d53a9e70a2e56",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "5edd5d754fd1718f477708a6a9e7015ec51628b1353947d0f991a6f8863cd8bd"
+      }
+    },
+    {
+      "id": "tx3g-all_known_display_flags_and_directions_are_decoded_without_dropping_unknown_bits-3",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-all_known_display_flags_and_directions_are_decoded_without_dropping_unknown_bits-3.bin",
+      "sha256": "901d4c359ffa1161c1b58912f892b4922624613d07005c8ee73cea26ee18fc30",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "d61be3d0d58a883a9cf6b55837150e6b73b83ad84e0a05d7d89aea1ca140fc6e"
+      }
+    },
+    {
+      "id": "tx3g-all_known_display_flags_and_directions_are_decoded_without_dropping_unknown_bits-5",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-all_known_display_flags_and_directions_are_decoded_without_dropping_unknown_bits-5.bin",
+      "sha256": "8434b3d1cd82a96da72e769199ee7c5af0e0c909b280226c807bc39997ebedd7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "f3ac93a7e858d9a7b7fde8bc7c93340b60255b1f9f4b25e21dd34be1b83e0c32"
+      }
+    },
+    {
+      "id": "tx3g-all_known_display_flags_and_directions_are_decoded_without_dropping_unknown_bits-7",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-all_known_display_flags_and_directions_are_decoded_without_dropping_unknown_bits-7.bin",
+      "sha256": "7ad964973e0bd1f712966c5be2d081da5610be8d9e321520c55a9b51a0c4cb85",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "c9172cedf357c17fa3af64ca5378dd096098449716919b96824a7296226d1fe6"
+      }
+    },
+    {
+      "id": "tx3g-all_line_break_and_nonprinting_scalars_count_in_style_offsets-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-all_line_break_and_nonprinting_scalars_count_in_style_offsets-1.bin",
+      "sha256": "0430e0f1876380f24e2613f6ff66bf293aff411c8a0fe85596c7a4a4a17de2be",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "954e18500742d182021db0ef4e2f15e9d7903ed17f7821d8f5d6a95a4a284001"
+      }
+    },
+    {
+      "id": "tx3g-cancellation_at_every_initial_single_unit_boundary_is_resumable-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-cancellation_at_every_initial_single_unit_boundary_is_resumable-1.bin",
+      "sha256": "42ff93c5b9f194ab2a2b9d4a2fcf81b1888864581945abee76384c94d3b6a3aa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "fd7b57c4a9bb031f18a883a46c25764b7c429c14f21a86db01b4143f0e010f8e"
+      }
+    },
+    {
+      "id": "tx3g-continuous_karaoke_empty_character_range_keeps_the_requested_prefix_during_pause-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-continuous_karaoke_empty_character_range_keeps_the_requested_prefix_during_pause-1.bin",
+      "sha256": "261fc7edaa62c05557ba03be076be2d25637b24ae44d325ecc0dc15d052208b6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "2469e1cd8a75e6ae69089b76bb868fb593f253be277383fac79f19e3ed24d203"
+      }
+    },
+    {
+      "id": "tx3g-continuous_karaoke_resolves_prefix_from_source_display_flag-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-continuous_karaoke_resolves_prefix_from_source_display_flag-1.bin",
+      "sha256": "8ab63482bd5b1e56e3e36142ef2d5da20a0bb96d00abfb16fca1b9e60d984b27",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "dc8cdf0cb3694900581608e528b23b841821b11ca0f50dd91fce6d5fcd6e2a50"
+      }
+    },
+    {
+      "id": "tx3g-continuous_prefix_conflict_is_detected_even_outside_declared_start-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-continuous_prefix_conflict_is_detected_even_outside_declared_start-1.bin",
+      "sha256": "9856da7883bfed30b12169f6a06f25f8669d63e723211df7f03afd1c5602b90c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-default_style_and_all_rgba_bytes_stay_exact_without_renderer_substitution-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-default_style_and_all_rgba_bytes_stay_exact_without_renderer_substitution-1.bin",
+      "sha256": "3d33dc7ec8ce6d4789450158e9f11f5c73dd2e8983092afbff56c09f5c581e83",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "6b0487106a6c859dd93a26f890dbc0e64af05e9a738fb040b89f37617c701b50"
+      }
+    },
+    {
+      "id": "tx3g-derived_run_limit_preserves_real_boundaries_and_never_coalesces_to_pass-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-derived_run_limit_preserves_real_boundaries_and_never_coalesces_to_pass-1.bin",
+      "sha256": "4350bb053a8c030f66638fe2fb708d140a5b4813987e75a570efa893c77a215f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "67fa49ac2e95598216d6a358ff695a4b4df25f6bc68f1738f4a6918b069e2041"
+      }
+    },
+    {
+      "id": "tx3g-disjoint_dynamic_static_and_link_ranges_remain_legal-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-disjoint_dynamic_static_and_link_ranges_remain_legal-1.bin",
+      "sha256": "b5c82e023c18bf3df20e524e5e7d2729a1a5fe6eca54900657651e90d29ef390",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "37f23335b247761884ccc8b6940055629cf0cbf0625bef9a394e13f044394ba2"
+      }
+    },
+    {
+      "id": "tx3g-disparity_minimum_is_widened_before_negation-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-disparity_minimum_is_widened_before_negation-1.bin",
+      "sha256": "ddc78d9d67bf3a6d06fa44c55ff8036a8a3ec7b6c0b26bcbbd118f144e9cc35d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "63c43b57c397b21a7f162738335a9a03b735169a34de6904cd5255e937e6e408"
+      }
+    },
+    {
+      "id": "tx3g-duplicate_and_missing_font_ids_are_explicit_semantic_errors-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-duplicate_and_missing_font_ids_are_explicit_semantic_errors-1.bin",
+      "sha256": "eb9c3526197cf50f5a17f876db37a977a971c3e5a8c2879a80c944d007bc7b86",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-duplicate_and_missing_font_ids_are_explicit_semantic_errors-3",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-duplicate_and_missing_font_ids_are_explicit_semantic_errors-3.bin",
+      "sha256": "7dd38e09372e60b889e4a807567981869df5e4ab77c09f56410e10d0fc046470",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-duplicate_global_modifiers_never_silently_choose_last-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-duplicate_global_modifiers_never_silently_choose_last-1.bin",
+      "sha256": "56377afb6fd9101ad2343fa7ad361ae9766a0944cab98507383cb51087e02ea7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-duplicate_global_modifiers_never_silently_choose_last-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-duplicate_global_modifiers_never_silently_choose_last-2.bin",
+      "sha256": "46554f2c0ae7cea07b9cd61c25af879ce4881d91e93c141b47ad69e5930f5286",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-duplicate_global_modifiers_never_silently_choose_last-3",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-duplicate_global_modifiers_never_silently_choose_last-3.bin",
+      "sha256": "4469b294e572c9b1372a3ffb34adbd943092ebb1d75f1b955578d5f3d91cae54",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-duplicate_global_modifiers_never_silently_choose_last-4",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-duplicate_global_modifiers_never_silently_choose_last-4.bin",
+      "sha256": "bf5762994add79b6a217fe8d080768b7aec7b46970964b7ac4f673b67a6504ea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-duplicate_global_modifiers_never_silently_choose_last-5",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-duplicate_global_modifiers_never_silently_choose_last-5.bin",
+      "sha256": "66ae08efb9cb3378649e63dc39762cc07bfd4c7f72e9ec39561169e59fe23e13",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-duplicate_karaoke_even_empty_and_unordered_times_refuse-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-duplicate_karaoke_even_empty_and_unordered_times_refuse-1.bin",
+      "sha256": "e52793d2b932d836514ec835abf2896a1925443362b2e0500721775d47375b9a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-duplicate_karaoke_even_empty_and_unordered_times_refuse-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-duplicate_karaoke_even_empty_and_unordered_times_refuse-2.bin",
+      "sha256": "b32c89631fc511928133711af26a69e80faf95383c0afc24a5dafb6cad5490e3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-duplicate_karaoke_even_empty_and_unordered_times_refuse-3",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-duplicate_karaoke_even_empty_and_unordered_times_refuse-3.bin",
+      "sha256": "9a2cd023ed073488e32e837bbdab7549719d4a00bbf12bbf98a73bfde2854ffc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-dynamic_colour_is_foreground_while_static_colour_is_background-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-dynamic_colour_is_foreground_while_static_colour_is_background-1.bin",
+      "sha256": "2a78f6585e6c97c618fe8717562332b619a9e220202edb3b14269e5194bfba63",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "69dfc2ae230e05f48f5aa2bf143f8130bac3f5bb0745bd33f59cc8fa75e56693"
+      }
+    },
+    {
+      "id": "tx3g-empty_karaoke_header_start_obeys_known_sample_duration-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-empty_karaoke_header_start_obeys_known_sample_duration-1.bin",
+      "sha256": "2a82b74ed21b52000dcccf3fcb4478b1e7cbed886512b81036a2cd22a5bca682",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "c287a51ecc4e6c1d7ec40156719792ba862e1bb2b8f02f61de9b600b313bad09"
+      }
+    },
+    {
+      "id": "tx3g-empty_text_has_no_runs_and_no_queryable_character-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-empty_text_has_no_runs_and_no_queryable_character-1.bin",
+      "sha256": "a9a52f00a6618c5c1b77e6e2377efb17934aa0d7e58bc1bc24c996644c9dc19c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "1ca8cc351135d6bee60ec8609904bf6b73da2948af8712480de5d39d66c5603b"
+      }
+    },
+    {
+      "id": "tx3g-explicit_clock_absence_keeps_relative_times_unknown_even_with_raw_input_clock-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-explicit_clock_absence_keeps_relative_times_unknown_even_with_raw_input_clock-1.bin",
+      "sha256": "2317c33c4021604e2658ce2820b517c60d1a13cab764e4042577d11a8f0cad9a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "d7cb508b98c27eaacc5a7a4e5eacdd25df658c5284ddd69c0a469d6233e9d009"
+      }
+    },
+    {
+      "id": "tx3g-extended_and_to_end_known_boxes_reuse_existing_physical_box_rules-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-extended_and_to_end_known_boxes_reuse_existing_physical_box_rules-1.bin",
+      "sha256": "7a9fc9863ba0818953a4a79bbcd53885bd44bb920c4a61007e6c00dedb465f93",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "36f23fbd7a515a1e30bdda1022acf6948f17fbac1b4070137bf60246ff1ac3fc"
+      }
+    },
+    {
+      "id": "tx3g-font_names_are_decoded_from_source_utf8_or_utf16_bom_without_selecting_renderer_fallback-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-font_names_are_decoded_from_source_utf8_or_utf16_bom_without_selecting_renderer_fallback-1.bin",
+      "sha256": "ae908ff4ecaabcf91b724e9125161eb48e3b12f641c0076fb43f9cd319848c5a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "5d253a09aeb9c523d413a5b0fbcff04c1158a52bcd7c1e4c18c282faaf17147a"
+      }
+    },
+    {
+      "id": "tx3g-foreign_payload_configuration_and_label_owners_never_enter_the_job-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-foreign_payload_configuration_and_label_owners_never_enter_the_job-1.bin",
+      "sha256": "4a57aaebbd5f7d737ec13d956e47a467403bad9db692011f03bdf997e2bbb16c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "eedcb61883b92e216186c6b69b43371bbaa714790c03638d74728d098b4ad926"
+      }
+    },
+    {
+      "id": "tx3g-full_u16_byte_count_is_not_reduced_to_recommended_2048-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-full_u16_byte_count_is_not_reduced_to_recommended_2048-1.bin",
+      "sha256": "b681ff18020f6c8cb9e01ae6c85e30e95bf0eb40a475dc2b29273b51beb5b952",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "db0f066e0e00ff3f2772c0ada586f6814dd6d64a821992fca82924a9ce50f779"
+      }
+    },
+    {
+      "id": "tx3g-highlight_colour_order_does_not_change_semantic_authority-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-highlight_colour_order_does_not_change_semantic_authority-1.bin",
+      "sha256": "42a9d29f565425b2e72da37e5e4786a3c7e2afa6764acb68634bbcb6fce8fc79",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "30cfd034ef690b3891c794ce521c5e7a79719e6ebee63c23daa825e22761e113"
+      }
+    },
+    {
+      "id": "tx3g-highlight_colour_order_does_not_change_semantic_authority-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-highlight_colour_order_does_not_change_semantic_authority-2.bin",
+      "sha256": "e3f5cda9f133c926b8f6ecb1290be3c389d1ba1f4b2f5feb31dd720aedf0e8dd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "30cfd034ef690b3891c794ce521c5e7a79719e6ebee63c23daa825e22761e113"
+      }
+    },
+    {
+      "id": "tx3g-highlight_n_plus_one_sentinel_is_retained_as_a_derived_endpoint-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-highlight_n_plus_one_sentinel_is_retained_as_a_derived_endpoint-1.bin",
+      "sha256": "70193d7e34f8455c7ea732d42e0d61f397df14a755b86409d79008dfa79db8a5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "9ad38ce21151e1bc3daad3690573caa3479092736acf39691b6a1bd2d360953b"
+      }
+    },
+    {
+      "id": "tx3g-hyperlink_empty_strings_are_preserved_not_invented_absolute_urls-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-hyperlink_empty_strings_are_preserved_not_invented_absolute_urls-1.bin",
+      "sha256": "e245ce5256c04ecd4fa20a9161d93deb796caefdf8b74bcd395299539920b26c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "756ceeb01fe4ba597705e6eed2b6d2f7800b09a4d1712d36a82109863aefafd6"
+      }
+    },
+    {
+      "id": "tx3g-hyperlink_requests_terminal_style_over_base_and_static_highlight-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-hyperlink_requests_terminal_style_over_base_and_static_highlight-1.bin",
+      "sha256": "efc63c23d9d26c9714fd0c580bd990b3f61df62ebdf80452ed1a47945f2098bc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "c11707c189c9fd1b27d350d160689f9ba21c1bb44ccd4d966b9f14ccfee03e9d"
+      }
+    },
+    {
+      "id": "tx3g-hyperlink_utf8_url_alt_fields_are_strict_length_delimited-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-hyperlink_utf8_url_alt_fields_are_strict_length_delimited-1.bin",
+      "sha256": "8a971fdc05c2b8611da6e02056075987c4addae66ef87df49b2972cb9d53e337",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "3e17f036c051fe69e3eded28cbfdec18eda1767bcd17c56804106c17af2d2ea6"
+      }
+    },
+    {
+      "id": "tx3g-hyperlink_utf8_url_alt_fields_are_strict_length_delimited-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-hyperlink_utf8_url_alt_fields_are_strict_length_delimited-2.bin",
+      "sha256": "61977326d57eeb787bae0298056aa5910348bebe25e7cddc058bcc8f93df35fb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-hyperlink_utf8_url_alt_fields_are_strict_length_delimited-3",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-hyperlink_utf8_url_alt_fields_are_strict_length_delimited-3.bin",
+      "sha256": "26433489102cc39e6636ac19ca157a4382e40a5fcfba58b5bd8617af54b18913",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-inverted_and_beyond_text_ranges_refuse_without_clamping-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-inverted_and_beyond_text_ranges_refuse_without_clamping-1.bin",
+      "sha256": "d2314d431c01bfafd863cd3551e887433ff1810bda084c6978c1d1a1c9745ffb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-inverted_and_beyond_text_ranges_refuse_without_clamping-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-inverted_and_beyond_text_ranges_refuse_without_clamping-2.bin",
+      "sha256": "bf9a7a1db083a419a6f0d09c61da8483dd7da012992135646fd6058a3fca6765",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-inverted_and_beyond_text_ranges_refuse_without_clamping-3",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-inverted_and_beyond_text_ranges_refuse_without_clamping-3.bin",
+      "sha256": "bc5675cd14292a8f995b06678c1bae1ce1a38ac754693135315a34e9607c1835",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-karaoke_bounds_use_actual_track_ticks_not_assumed_milliseconds-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-karaoke_bounds_use_actual_track_ticks_not_assumed_milliseconds-1.bin",
+      "sha256": "f47743203afa4451ed56ffbfe04098f8e285ceb55b5c4923347c619abdf6bf9e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "7b436abb2dc84761802cd588e3271acaba0be3b1034125893f646f69c43bfeb2"
+      }
+    },
+    {
+      "id": "tx3g-karaoke_bounds_use_actual_track_ticks_not_assumed_milliseconds-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-karaoke_bounds_use_actual_track_ticks_not_assumed_milliseconds-2.bin",
+      "sha256": "b22ae1ead9b320cce2be266776a3cbfd52cd1dd9c8d59d46727216a498a3d323",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "1d0069f9296d4f5f4d1219489b20bd65155c656c5cac94fba69f29cf2d646238"
+      }
+    },
+    {
+      "id": "tx3g-karaoke_character_ranges_must_be_ordered_nonoverlapping-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-karaoke_character_ranges_must_be_ordered_nonoverlapping-1.bin",
+      "sha256": "9d8697fa8db2bde6fc3a3923e4cfd47d93442acd4f9a434ab42409f0dcd98a3c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-karaoke_character_ranges_must_be_ordered_nonoverlapping-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-karaoke_character_ranges_must_be_ordered_nonoverlapping-2.bin",
+      "sha256": "1fa8e0b483fab5a840ac98489d99331dfe17bade959b5169b89df5f7fdc9edc1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-karaoke_events_have_half_open_time_intervals_and_zero_range_pauses-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-karaoke_events_have_half_open_time_intervals_and_zero_range_pauses-1.bin",
+      "sha256": "db7ea3a7c7218d0aa5074af066554ab1161079578bc89616de8212b83b10e757",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "dfa2ded0f919d86a90e9fb486ed6de51faa3595a819aa6301858e13f03b34d38"
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-1.bin",
+      "sha256": "090bae0046dc93bdf3eb3a43a85f82f712b55141d136d77afc30921bf180bfde",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-2.bin",
+      "sha256": "d2968769d2ad434a276877c889e5fae955e3f5ec6dbe004fa1a22ac382b05386",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-3",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-3.bin",
+      "sha256": "d202d332242e411d7c5bb3e69055cfb5591f2da5befad89c856eb67ed2da9174",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-4",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-4.bin",
+      "sha256": "f7047dbb72365397c09e5220641788537dc1ddd281a4477a0eadfc58ca704315",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-5",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-5.bin",
+      "sha256": "4bd4190578680ed968630c76a2b90ce954ce5eccfff80946efcfdfa256354346",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-6",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-6.bin",
+      "sha256": "9bce665d1a4853717b5bb45118ed6f2c3d6c816958c33aa9681c65cecde46aad",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-7",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-7.bin",
+      "sha256": "098726bb32c0221a267f5c289c0887e7d96a07b043e3f0554f5ce3ce1eae0951",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-8",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-8.bin",
+      "sha256": "16c9dc30da826e7b7900efc7d7dc3e3796a7836d3bfb459f7faf1ffee52f01e5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-9",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-9.bin",
+      "sha256": "38e89a90bae3fef7e58ec3fe3c8682b978ad644b80d39ffb9e4fc5ac5edd6868",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-10",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-10.bin",
+      "sha256": "56ac583ced2b728bfe72e9692d2f99e1d798aca875f91f284912df9a1724cfc7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-11",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-11.bin",
+      "sha256": "34bead01d6e8d50367e1bf978d1487a5891d560086aac0f73544f9f2dd0f8c93",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-12",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-12.bin",
+      "sha256": "742490c5a3b96f6024bf5df548124898a2f8970493b6a01fa2f76ddd2d70873e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-13",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-13.bin",
+      "sha256": "c4af4dc77a12fa227afad25f93136e4088d61596f3769d908470fe49b5ef6cb6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-14",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-known_box_trailing_bytes_and_short_bodies_are_errors-14.bin",
+      "sha256": "5a582a3000948952462b45948c50aab869c8f270db1640dd2137a206c8197fd5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-malformed_advertised_record_counts_do_not_publish_partial_semantics-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-malformed_advertised_record_counts_do_not_publish_partial_semantics-1.bin",
+      "sha256": "6ba60cc9b854c3097e29c79d4f35236fe443532c7b22b328ec16bc6eb6043702",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-malformed_advertised_record_counts_do_not_publish_partial_semantics-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-malformed_advertised_record_counts_do_not_publish_partial_semantics-2.bin",
+      "sha256": "c5dc5d72b2088700a9ecd85a8b34ac3955b54c195c76157ee417cfda5d907f47",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-malformed_advertised_record_counts_do_not_publish_partial_semantics-3",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-malformed_advertised_record_counts_do_not_publish_partial_semantics-3.bin",
+      "sha256": "c95ef832af5a00e53f156fafab947fe5327ce760478340b5c4f2f11547f84e92",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-malformed_late_modifier_never_publishes_partial_semantic_output-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-malformed_late_modifier_never_publishes_partial_semantic_output-1.bin",
+      "sha256": "0ed92bf0f3ee9202c67a4282549e456358be675e9b9507426224394deab1e4a5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-missing_description_does_not_fake_complete_combination_validation-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-missing_description_does_not_fake_complete_combination_validation-1.bin",
+      "sha256": "a8a5eeed746ff698628aff4b720c5a76a48893bd1c63721c2c4548a05f47155c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "0a5044409658029a4d00362c50eb7672835c5307b83ec1130447b649a7f73f03"
+      }
+    },
+    {
+      "id": "tx3g-missing_description_does_not_invent_disparity_zero-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-missing_description_does_not_invent_disparity_zero-1.bin",
+      "sha256": "a51cdf6d0cce85cd3189f92be06179fc4bb9938aaa2d0b4381b3ebfed07a85e3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "7409b2060cf0fce4f600978a61b7abba3a82ae6cd196de8e359f2ad0974569b5"
+      }
+    },
+    {
+      "id": "tx3g-missing_description_does_not_invent_disparity_zero-3",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-missing_description_does_not_invent_disparity_zero-3.bin",
+      "sha256": "4a57aaebbd5f7d737ec13d956e47a467403bad9db692011f03bdf997e2bbb16c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "eedcb61883b92e216186c6b69b43371bbaa714790c03638d74728d098b4ad926"
+      }
+    },
+    {
+      "id": "tx3g-missing_description_keeps_unbound_font_id_and_base_style_unknown-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-missing_description_keeps_unbound_font_id_and_base_style_unknown-1.bin",
+      "sha256": "621b94060cb6db0f5ff47a8e8e41c3fcbdcb49fe19afd37052252294ac2daed1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "091eb1c476a5ee428564be2f9d9aa4346cca3352921d695c0e726e9669ebb63c"
+      }
+    },
+    {
+      "id": "tx3g-missing_duration_does_not_invent_a_time_bound_or_next_packet_end-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-missing_duration_does_not_invent_a_time_bound_or_next_packet_end-1.bin",
+      "sha256": "6cf25809be152efacff8c5e627d75845e869037c77626180eb4d7f2d2d43f655",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "29188281623f86cb6df64efc01be8d7f55a9977fc82babdd800fa41f8d955492"
+      }
+    },
+    {
+      "id": "tx3g-original_duplicate_wrap_fixture_keeps_source_but_strict_semantics_refuses_ambiguity-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-original_duplicate_wrap_fixture_keeps_source_but_strict_semantics_refuses_ambiguity-1.bin",
+      "sha256": "76e24574af1e7a794593ff57553d5c0757df58e424c2b86c3d4dfd8e8470e533",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-original_style_highlight_fixture_resolves_requested_style_and_colour_authority-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-original_style_highlight_fixture_resolves_requested_style_and_colour_authority-1.bin",
+      "sha256": "5f5ca6608534ab4c1973cd0eed7b15f1731270e3c453fdc1d4f1087d15ac2447",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "6cd321e2cf850bb22287089599f1ef27c2ae85ffb1b28154b141ee70322c9823"
+      }
+    },
+    {
+      "id": "tx3g-output_is_taken_once_and_old_owners_survive_job_drop-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-output_is_taken_once_and_old_owners_survive_job_drop-1.bin",
+      "sha256": "4a57aaebbd5f7d737ec13d956e47a467403bad9db692011f03bdf997e2bbb16c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "eedcb61883b92e216186c6b69b43371bbaa714790c03638d74728d098b4ad926"
+      }
+    },
+    {
+      "id": "tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors-1.bin",
+      "sha256": "f3339f27c49b9e018d6906b1db6f5d201f1b7823bbca73acaebba1fd57853002",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors-2.bin",
+      "sha256": "e3ebb5a26fa47b934156b63ad055a21c2ad32d17dd3091707165139913063d9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors-3",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors-3.bin",
+      "sha256": "276f4551c18603721e419f877fc64c7465d5cbd50fa0daf9b989ea4024c2606a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-overlapping_styles_across_separate_boxes_are_not_last_wins-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-overlapping_styles_across_separate_boxes_are_not_last_wins-1.bin",
+      "sha256": "178321b3cd335b11962ea67d2ee2b0870b2d1a8c5e4050bf6938667803f12d41",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-overlaps_within_highlights_links_and_blinks_are_rejected-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-overlaps_within_highlights_links_and_blinks_are_rejected-1.bin",
+      "sha256": "322f7808e444d522529629376b168482a98bc5cc3039f5e8ef13c3cb0e245442",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-overlaps_within_highlights_links_and_blinks_are_rejected-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-overlaps_within_highlights_links_and_blinks_are_rejected-2.bin",
+      "sha256": "6b5fde3264a2f6cf98ea05188bacaf985cd4d8460547471586b35ee1bc3a0b37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-overlaps_within_highlights_links_and_blinks_are_rejected-3",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-overlaps_within_highlights_links_and_blinks_are_rejected-3.bin",
+      "sha256": "01c4386c7575c1912321982e7395b7cb28bb7b3f9b231a64ec643af504a03784",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-pool_pressure_and_repeated_zero_work_retry_do_not_duplicate_modifiers-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-pool_pressure_and_repeated_zero_work_retry_do_not_duplicate_modifiers-1.bin",
+      "sha256": "a57e4b46a897a03cac7e1f485ed541a802f05f477ca2b780192d30e8914df38c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "9ad38ce21151e1bc3daad3690573caa3479092736acf39691b6a1bd2d360953b"
+      }
+    },
+    {
+      "id": "tx3g-positive_event_after_zero_duration_still_conflicts_with_static_or_link-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-positive_event_after_zero_duration_still_conflicts_with_static_or_link-1.bin",
+      "sha256": "0a4c629a850e2090c629b1a9535e377ac8be697cf3643a9675a95f48c81cf6c9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-positive_event_after_zero_duration_still_conflicts_with_static_or_link-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-positive_event_after_zero_duration_still_conflicts_with_static_or_link-2.bin",
+      "sha256": "f8e067695a6fb4d8183b2b2ef7914fc3297e749d6d6e33f0a502ea7dd8c75134",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-query_zero_work_and_cancel_preserve_search_progress-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-query_zero_work_and_cancel_preserve_search_progress-1.bin",
+      "sha256": "14f2a101fd9e1ffe5baa770a73506124eb3fc27125e2a1b3830efba373069e67",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "9d819b49a1e7b992d5de6afb9149f5e2f63b873e8bc7ce9c82fb2141cee28cb2"
+      }
+    },
+    {
+      "id": "tx3g-record_limit_failure_is_sticky_frees_construction_and_publishes_nothing-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-record_limit_failure_is_sticky_frees_construction_and_publishes_nothing-1.bin",
+      "sha256": "aa9d2bcd5dc2c0735b005dc1d17647c6b21818f29a4559be22fbddb1e2895b31",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "6d27e7c832758b74b83f638aaf78d587c5fe87deaeb1bc4c62cd92e9e2ce7f38"
+      }
+    },
+    {
+      "id": "tx3g-retained_source_description_font_and_decoded_owners_release_only_after_output-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-retained_source_description_font_and_decoded_owners_release_only_after_output-1.bin",
+      "sha256": "28a33bcefd05dc67aadfd91f605daa68bb365ead522fc5351802be11aa5e91a8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "9a31074d602bad2097ac0ac789119c710f4d655a0770887060b42d16bacf2491"
+      }
+    },
+    {
+      "id": "tx3g-sample_disparity_overrides_description_and_retains_sixteenth_pixels-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-sample_disparity_overrides_description_and_retains_sixteenth_pixels-1.bin",
+      "sha256": "5fd0c72eca41b5a233966012bbe5e83a719ea556145e327d6de6135b7f0fff37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "7db499d8b8a64796913bfb25bd6a0618b94bced29766555b21c2ff52a01bbf88"
+      }
+    },
+    {
+      "id": "tx3g-sample_styles_override_description_only_on_the_declared_half_open_ranges-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-sample_styles_override_description_only_on_the_declared_half_open_ranges-1.bin",
+      "sha256": "4e40e09be18518ee2b16f59d41f090cba3ff0fcb4a486a1350835c9e922c6cb6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "c7777e26917b7d91ba1f31df0ca65140a77a7e1e808b1d4d61d58c1c9d72e51a"
+      }
+    },
+    {
+      "id": "tx3g-sample_textbox_overrides_description_without_clamping_signed_geometry-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-sample_textbox_overrides_description_without_clamping_signed_geometry-1.bin",
+      "sha256": "38742c14f91b7c3def650dba6fb0b6774187f5e4c7bf814f2097500d85e427d6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "d3029bece68a4d4c38db7f8167f5df6c4b70496d64a0b4f2ef8f2bf222a63718"
+      }
+    },
+    {
+      "id": "tx3g-scroll_delay_uses_track_ticks_and_only_specified_zero_default-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-scroll_delay_uses_track_ticks_and_only_specified_zero_default-1.bin",
+      "sha256": "ecbefad68954f81a87f7da494ad1bb4faf6e99b07075fc75149746e1e0dca5ad",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "49aeb95336f6e146c01e81327cfa46dc18b6a351188024f901f9e880f04ebc2b"
+      }
+    },
+    {
+      "id": "tx3g-scroll_delay_uses_track_ticks_and_only_specified_zero_default-3",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-scroll_delay_uses_track_ticks_and_only_specified_zero_default-3.bin",
+      "sha256": "a51cdf6d0cce85cd3189f92be06179fc4bb9938aaa2d0b4381b3ebfed07a85e3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "7409b2060cf0fce4f600978a61b7abba3a82ae6cd196de8e359f2ad0974569b5"
+      }
+    },
+    {
+      "id": "tx3g-stale_generation_is_rejected_while_original_caller_owners_remain-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-stale_generation_is_rejected_while_original_caller_owners_remain-1.bin",
+      "sha256": "a51cdf6d0cce85cd3189f92be06179fc4bb9938aaa2d0b4381b3ebfed07a85e3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "7409b2060cf0fce4f600978a61b7abba3a82ae6cd196de8e359f2ad0974569b5"
+      }
+    },
+    {
+      "id": "tx3g-static_dynamic_and_dynamic_link_conflicts_are_rejected-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-static_dynamic_and_dynamic_link_conflicts_are_rejected-1.bin",
+      "sha256": "f78e612165766fd703faf92de7fc28ec1080a9443bc7e7d00d92b45ecec1c7ef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-static_dynamic_and_dynamic_link_conflicts_are_rejected-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-static_dynamic_and_dynamic_link_conflicts_are_rejected-2.bin",
+      "sha256": "0d7f3e75a048d69f807b46af86cf99c6537c811201d1ef87f43092483fc9551a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-static_highlight_without_colour_requests_terminal_inversion-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-static_highlight_without_colour_requests_terminal_inversion-1.bin",
+      "sha256": "de6aafdc920cf329ea6640296feec8d9400961a74524548cc4eba0734c87e242",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "d87b67f4716e73cf25630fc72f61847c445eb9b8deee4ae72e7793a9b365649b"
+      }
+    },
+    {
+      "id": "tx3g-style_and_blink_ranges_do_not_adopt_the_highlight_sentinel-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-style_and_blink_ranges_do_not_adopt_the_highlight_sentinel-1.bin",
+      "sha256": "2dad49ebf321b6dfdb98a66f050b7867a0cd23fc74269286cd387e30fa940157",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-style_and_blink_ranges_do_not_adopt_the_highlight_sentinel-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-style_and_blink_ranges_do_not_adopt_the_highlight_sentinel-2.bin",
+      "sha256": "9763248ff28e6e6c0f1f3305c4ccd5b567c1bcb5d112f0e512e46f4d93fd6679",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-unicode_scalar_offsets_are_not_utf8_byte_or_rendered_glyph_offsets-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-unicode_scalar_offsets_are_not_utf8_byte_or_rendered_glyph_offsets-1.bin",
+      "sha256": "aef7df41aeef58200391afcfe36141748eece2748fdb8015a70f19ae882ca0ee",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "19c0e1f2e69416aa9f63fbb25cd7cc902621e7eaa8cc4843363e2299d9715bfb"
+      }
+    },
+    {
+      "id": "tx3g-unknown_configuration_layout_does_not_infer_default_style_or_disparity-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-unknown_configuration_layout_does_not_infer_default_style_or_disparity-1.bin",
+      "sha256": "d34026f41427b180f6fb796838f53451efce5dd55b3c41b20d00836d87a30196",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-unknown_description_keeps_continuous_extent_unresolved-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-unknown_description_keeps_continuous_extent_unresolved-1.bin",
+      "sha256": "61ee2578c97458b4510261a2774ea86777c0cf9a152aaab3b059a939c252b2c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "19054df86ebeab98a5c24889e9be8cffdf4df180b9e417878ddc784420f8944b"
+      }
+    },
+    {
+      "id": "tx3g-unknown_modifiers_remain_full_source_ranges_without_semantic_effect-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-unknown_modifiers_remain_full_source_ranges_without_semantic_effect-1.bin",
+      "sha256": "ff17d44c74bd08a71b5b0f85331674292c1fc639ee26bc6ad8c27e95d88dfcfa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "eedcb61883b92e216186c6b69b43371bbaa714790c03638d74728d098b4ad926"
+      }
+    },
+    {
+      "id": "tx3g-unknown_query_time_is_not_replaced_with_zero-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-unknown_query_time_is_not_replaced_with_zero-1.bin",
+      "sha256": "0df7947c220789424958a57b5c4e4a5eb51a7cafbeb3271242906b786133050a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "6b89d9cd6779f1161b53aa53cf4eee2ce32772fb22aabd1aa1862a0dc62c4e80"
+      }
+    },
+    {
+      "id": "tx3g-unknown_time_after_all_karaoke_ends_is_never_dynamic_in_any_description_context-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-unknown_time_after_all_karaoke_ends_is_never_dynamic_in_any_description_context-1.bin",
+      "sha256": "208f1937e3342a9aa342ab0ce2761a2fb94c43eab828cb90c1532aa294786cf9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "95bb084bb8669be72190720bce1e6cec3149ce10e4885bbcf0415b5bba2dcd26"
+      }
+    },
+    {
+      "id": "tx3g-unknown_time_after_all_karaoke_ends_is_never_dynamic_in_any_description_context-3",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-unknown_time_after_all_karaoke_ends_is_never_dynamic_in_any_description_context-3.bin",
+      "sha256": "8881d0ecd4f6d5c0f0ed4ce06d8a1720cc705a19903712302642c3b9000f4815",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "32545b1257abcf85eee36930ffd95527be9f6e6af946c1124991cb0ee78adf55"
+      }
+    },
+    {
+      "id": "tx3g-unknown_time_character_membership_is_logarithmic_resumable_and_allocation_free-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-unknown_time_character_membership_is_logarithmic_resumable_and_allocation_free-1.bin",
+      "sha256": "6718900bbafb3eb679c1b20afcafed7d54d66b549dfec5a7202549f2f3985e38",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "1b9ea41c4e08c1e520895dc2c6681a71038a16921c9549db7af8e98bdd69ab35"
+      }
+    },
+    {
+      "id": "tx3g-unknown_time_outside_known_noncontinuous_karaoke_keeps_hyperlink_authority-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-unknown_time_outside_known_noncontinuous_karaoke_keeps_hyperlink_authority-1.bin",
+      "sha256": "93ddaa3863c8619ebb38e80843478ade52e0de9ae5ad086ec561bf5b285cd21c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "9b829e4756eb0202536eea8ad40ab559399a6b7820b04f3d4b9295a3c312f1ce"
+      }
+    },
+    {
+      "id": "tx3g-unknown_time_outside_known_noncontinuous_karaoke_keeps_static_highlight-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-unknown_time_outside_known_noncontinuous_karaoke_keeps_static_highlight-1.bin",
+      "sha256": "af25722a065692cbfda1decd11ccd45ad7af6de2e0aeb0c0e1c42657c0b295d2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "09e98dad32c294df83579811b49fba307614280f532ecf5b8a14c348352d11ad"
+      }
+    },
+    {
+      "id": "tx3g-unknown_time_with_only_zero_duration_karaoke_has_no_possible_dynamic_extent-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-unknown_time_with_only_zero_duration_karaoke_has_no_possible_dynamic_extent-1.bin",
+      "sha256": "dd2962c09758d88c61d2279a27985ee3da7c725cf04378dd2ce3f81122f4cc1c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "cc745c57d4e99211a4daa588d9d86d18278c3b1c41b3bd9967516bd5e99f620f"
+      }
+    },
+    {
+      "id": "tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar-1.bin",
+      "sha256": "66bd3262705ece5df9aa476eacd59f02b88f31943dfa6f25e4136b733f8cf315",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "418b116b4e137db493e10fa45cd22a90d50ac38ab3b370e4802dcf54985e9e3b"
+      }
+    },
+    {
+      "id": "tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes-1.bin",
+      "sha256": "cfca9bed937e0b76f4c21f8a70fa6dceadd32752c0e7c79fa0ef0149ae3f397c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "235e9e22a731e0cdef156bc07dc964ca288d78e8d487741bcc05cd6a6756e10b"
+      }
+    },
+    {
+      "id": "tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes-2.bin",
+      "sha256": "0a5dba0211b67ae14b49c056641dd7214147ef415017baa24312b57e6300733d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "4535befa649e2983cd4caafe625e27978f6d4387a8973fbfbd039248dc0bc513"
+      }
+    },
+    {
+      "id": "tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes-3",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes-3.bin",
+      "sha256": "05fdf7316a2ceed41b10cdba93382a269379bd585927c18e3ead64f815afceb6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes-4",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes-4.bin",
+      "sha256": "7044348316538406134e3742a3d6e47a80b57cb17ee0133150f8e99abf4d3338",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes-5",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes-5.bin",
+      "sha256": "26b8bba13811c33cd8d839c634df5718c4792854ca5bf31e8b8dc9a8d6dc7df3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-zero_clock_and_missing_explicit_description_source_are_constructor_errors-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-zero_clock_and_missing_explicit_description_source_are_constructor_errors-1.bin",
+      "sha256": "a51cdf6d0cce85cd3189f92be06179fc4bb9938aaa2d0b4381b3ebfed07a85e3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "7409b2060cf0fce4f600978a61b7abba3a82ae6cd196de8e359f2ad0974569b5"
+      }
+    },
+    {
+      "id": "tx3g-zero_duration_applicability_does_not_relax_source_record_order_or_ranges-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-zero_duration_applicability_does_not_relax_source_record_order_or_ranges-1.bin",
+      "sha256": "d3a92637e8f92043f83cf37ac4b7223b94875a62e1afe4d0b8fa65fe7edfe830",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-zero_duration_applicability_does_not_relax_source_record_order_or_ranges-2",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-zero_duration_applicability_does_not_relax_source_record_order_or_ranges-2.bin",
+      "sha256": "80e89332c2ad28cb79cbe2253477f6615890f78d4cce5be1ab0a1b86f167f498",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tx3g-zero_duration_karaoke_events_are_source_records_but_never_active-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-zero_duration_karaoke_events_are_source_records_but_never_active-1.bin",
+      "sha256": "26b6c182b14a803996439a7fd685d0d50bd81eb12dca83bcfa645af4f8ac2646",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "50788cb6e484c7bee533c0c1f9be29cb5496f1c65524d7458e14cbb2db1cbaf7"
+      }
+    },
+    {
+      "id": "tx3g-zero_duration_only_events_need_no_invented_continuous_context_for_conflicts-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-zero_duration_only_events_need_no_invented_continuous_context_for_conflicts-1.bin",
+      "sha256": "7ecf123c642815f47c29b93be7f890c7906c624861cf8ffdcd438e5b42913f6b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "7d78efdd11e56d9f66604efd68e2cc2a6654ffcd608e82ec74f7386be07ab0bd"
+      }
+    },
+    {
+      "id": "tx3g-zero_duration_only_overlap_does_not_conflict_with_hyperlink-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-zero_duration_only_overlap_does_not_conflict_with_hyperlink-1.bin",
+      "sha256": "dc12872817ce994cf012a59794063926d133e8c7f984a6fcde88b006d924ca06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "e9594dec3cf2ab56b6dd79c00de26d24928be3508bf8f2ce121487372ef8af12"
+      }
+    },
+    {
+      "id": "tx3g-zero_duration_only_overlap_does_not_conflict_with_static_highlight-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-zero_duration_only_overlap_does_not_conflict_with_static_highlight-1.bin",
+      "sha256": "5008b64a5fc6cb2ea63933f1d8a5fce09a460e3816de70f36be61f2fde394184",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "08199d5bbbc405274b1f6e60ee4b7b78690e1306571f9b9aa0e371011bf3584f"
+      }
+    },
+    {
+      "id": "tx3g-zero_duration_tail_never_extends_a_continuous_conflict_prefix-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-zero_duration_tail_never_extends_a_continuous_conflict_prefix-1.bin",
+      "sha256": "c57e00f0afad0570e7b0d0a4f17642d127920cc359641e84360d71b123466775",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "1b21b35111c50c6af6fc73b40cc9291d802a63a82a1bcc1cafc25f0f7cfddd57"
+      }
+    },
+    {
+      "id": "tx3g-zero_font_id_and_sparse_high_ids_do_not_use_truthiness_as_knownness-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-zero_font_id_and_sparse_high_ids_do_not_use_truthiness_as_knownness-1.bin",
+      "sha256": "e799ef0a1ef99a606eceea20b4e34eaf642bee7a91c10401d2eb50471a1eebde",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "2ea17dcb577138eae2b58948658e72cb7b461fda24882cda581ab49a9c42b5d7"
+      }
+    },
+    {
+      "id": "tx3g-zero_length_style_records_are_preserved_and_apply_to_no_character-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-zero_length_style_records_are_preserved_and_apply_to_no_character-1.bin",
+      "sha256": "0387ec7877df23656615a72b715a1e38842899865bc75b7a1ab3b1872a6f3233",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "aebfa9e57d9715b074bcf2c267fe42c949e64bea555e7086dbf6130d09a890c6"
+      }
+    },
+    {
+      "id": "tx3g-zero_work_semantics_performs_no_progress_or_allocation-1",
+      "profile": "subtitle-text",
+      "file": "harness/features/tx3g-semantics/inputs/tx3g-zero_work_semantics_performs_no_progress_or_allocation-1.bin",
+      "sha256": "de6aafdc920cf329ea6640296feec8d9400961a74524548cc4eba0734c87e242",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "90000"
+      ],
+      "expected": {
+        "trace_sha256": "d87b67f4716e73cf25630fc72f61847c445eb9b8deee4ae72e7793a9b365649b"
+      }
+    },
+    {
+      "id": "authored-overlapping-style-and-effects",
+      "profile": "authored",
+      "file": "harness/features/tx3g-semantics/inputs/authored-overlapping-style-and-effects.bin",
+      "sha256": "7add2010c6b53799299c80d68d4854aa25f3eb826eb87ab44025cd767af7ca27",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa5f3ac00a4987a6bc1391f85e06a97ca775bcaab037f15e890df0d8c0fb69da"
+      }
+    },
+    {
+      "id": "authored-dynamic-continuous",
+      "profile": "authored",
+      "file": "harness/features/tx3g-semantics/inputs/authored-dynamic-continuous.bin",
+      "sha256": "4abb7998592d9311bc43955674560b4158e24979849819973c0dc9a70c4ae72a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "f911789bac99925e48eb2dbe88dade823633c6ff3077d7d9075e70c31eae695c"
+      }
+    },
+    {
+      "id": "authored-dynamic-unknown-display",
+      "profile": "authored",
+      "file": "harness/features/tx3g-semantics/inputs/authored-dynamic-unknown-display.bin",
+      "sha256": "e3f06ff60faa52abb8ec109438b83220579610a728679189af66b62ca7766c93",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "c393e014389c6c535fb9d57721c8bdba3a76d0e683bc6d41d776d8e07696a36b"
+      }
+    },
+    {
+      "id": "authored-dynamic-invalid-intersection",
+      "profile": "authored",
+      "file": "harness/features/tx3g-semantics/inputs/authored-dynamic-invalid-intersection.bin",
+      "sha256": "5a4dda50c0532e556552ae670b2dc08eb7dc9220d53744c6d647bdea25a40b2e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-overlapping-same-type",
+      "profile": "authored",
+      "file": "harness/features/tx3g-semantics/inputs/authored-overlapping-same-type.bin",
+      "sha256": "1820af5aed0b19ed780a7d304177eb334d9983c39d043e03b13c714093386f48",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "authored-zero-length-karaoke",
+      "profile": "authored",
+      "file": "harness/features/tx3g-semantics/inputs/authored-zero-length-karaoke.bin",
+      "sha256": "563e24caeaf329adef5c8f9524f3b5c80d9733d7ca78e59c3410c9e2de7f574e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1000"
+      ],
+      "expected": {
+        "trace_sha256": "dff1219a5a2014cc3048e001bf207039f25d2f5e3786f7eb42cf53fb7ab09768"
+      }
+    },
+    {
+      "id": "authored-description-disparity",
+      "profile": "authored",
+      "file": "harness/features/tx3g-semantics/inputs/authored-description-disparity.bin",
+      "sha256": "a5fc6d2f4de5b31c15229bca64390be52d9d1336a113f4683e67f951a45d466e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "-"
+      ],
+      "expected": {
+        "trace_sha256": "2f609300e8d07e01303c34e7b3073df53911fc605517f560b1b0b344dfea6c0f"
+      }
+    }
+  ]
+}
