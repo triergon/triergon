@@ -1,6 +1,7 @@
 //! Selected canonical normal DTS core bitstream headers and frame envelopes.
 //! Original implementation from ETSI TS 102 114 V1.6.1 clauses 3.4/5.3/5.4.2.
 //! Encoded audio and internal extensions remain opaque, unchanged source bytes.
+use crate::dts::reader::{ReaderInput, retryable, source_error};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::{BitCursor, BitSource};
 use triergon_core::{
@@ -326,18 +327,59 @@ impl DtsCoreFrame {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Phase {
-    Header,
+/// The part of a frame's header a [`DtsCoreFrameReader`] reads before it checks
+/// what it has.
+#[derive(Clone, Copy)]
+enum HeaderPart {
+    /// The sync word: the first 4 bytes.
     Sync,
-    PrefixKind,
-    Probe,
+    /// The bytes through `CPF`, which says how long the header is: 11.
+    Kind,
+    /// The whole header: 13 bytes, or 15 with `HCRC`.
+    Whole(usize),
+}
+
+impl HeaderPart {
+    /// The prefix length at which the part is complete.
+    const fn end(self) -> usize {
+        match self {
+            Self::Sync => 4,
+            Self::Kind => 11,
+            Self::Whole(bytes) => bytes,
+        }
+    }
+}
+
+/// The frame a [`DtsCoreFrameReader`] is reading.
+enum Frame {
+    /// Reading the header into the prefix up to the end of the part.
+    Header(HeaderPart),
+    /// The prefix holds the part, which is checked next.
+    Check(HeaderPart),
+    /// Reading the frame's bytes into `buffer`.
+    Body {
+        header: DtsCoreHeader,
+        buffer: BudgetVec<u8>,
+        step: BodyStep,
+    },
+    /// The frame's bytes, to be returned.
+    Ready { header: DtsCoreHeader, bytes: Bytes },
+    /// The source ended after the last frame.
+    Ended(SourceLocation),
+}
+
+/// The steps of reading a frame's bytes.
+enum BodyStep {
+    /// Reserving storage for the frame.
     Reserve,
-    CopyPrefix,
+    /// Copying the header bytes into the frame, `copied` of them so far.
+    CopyPrefix { copied: usize },
+    /// Reading the next span of the frame.
     ReadBody,
-    CopyBody,
+    /// Copying `pending` into the frame, `copied` bytes of it so far.
+    CopyBody { pending: Bytes, copied: usize },
+    /// The frame's bytes are complete.
     Freeze,
-    Publish,
 }
 
 /// Reads the core frames of an aligned stream: canonical big-endian normal
@@ -353,25 +395,27 @@ enum Phase {
 /// [`step`](Self::step) ends the reader, and every later call returns it again,
 /// except `Backpressure` and `Allocation`, after which `step` may be called
 /// again.
-#[derive(Debug)]
 pub struct DtsCoreFrameReader {
-    cursor: Option<InputCursor>,
-    last_request: InputRequest,
+    input: ReaderInput,
     limits: DtsCoreFrameLimits,
-    phase: Phase,
+    frame: Frame,
+    /// The frame's header bytes read so far.
     prefix: [u8; 15],
     prefix_len: usize,
-    prefix_target: usize,
-    prefix_copied: usize,
     frame_offset: u64,
-    header: Option<DtsCoreHeader>,
-    buffer: Option<BudgetVec<u8>>,
-    pending: Option<Bytes>,
-    pending_copied: usize,
-    output: Option<Bytes>,
     completed: usize,
-    ended: Option<SourceLocation>,
-    failure: Option<Error>,
+}
+
+impl std::fmt::Debug for DtsCoreFrameReader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DtsCoreFrameReader")
+            .field("limits", &self.limits)
+            .field("position", &self.position())
+            .field("generation", &self.generation())
+            .field("completed", &self.completed)
+            .field("failure", &self.input.failure())
+            .finish_non_exhaustive()
+    }
 }
 
 impl DtsCoreFrameReader {
@@ -394,49 +438,31 @@ impl DtsCoreFrameReader {
             return Err(Error::Invalid("zero DTS frame/input policy"));
         }
         let cursor = InputCursor::new(pool, source, capabilities, limits.maximum_input_window)?;
-        let last_request = cursor.request();
         Ok(Self {
-            cursor: Some(cursor),
-            last_request,
+            input: ReaderInput::Open(cursor),
             limits,
-            phase: Phase::Header,
+            frame: Frame::Header(HeaderPart::Sync),
             prefix: [0; 15],
             prefix_len: 0,
-            prefix_target: 4,
-            prefix_copied: 0,
             frame_offset: 0,
-            header: None,
-            buffer: None,
-            pending: None,
-            pending_copied: 0,
-            output: None,
             completed: 0,
-            ended: None,
-            failure: None,
         })
     }
     /// [`InputToken::generation`] of the token the reader's requests carry.
     /// After an error, that of the last request.
     pub fn generation(&self) -> u64 {
-        self.cursor.as_ref().map_or(
-            self.last_request.token.generation(),
-            InputCursor::generation,
-        )
+        self.input.generation()
     }
     /// Offset in the source of the next byte the reader consumes. After an
     /// error, the offset of the last request.
     pub fn position(&self) -> u64 {
-        self.cursor
-            .as_ref()
-            .map_or(self.last_request.offset, InputCursor::position)
+        self.input.position()
     }
     /// The request for the bytes at [`position`](Self::position), to be answered
     /// with [`provide`](Self::provide), [`finish`](Self::finish) or
     /// [`fail`](Self::fail). After an error, the last request made.
     pub fn request(&self) -> InputRequest {
-        self.cursor
-            .as_ref()
-            .map_or_else(|| self.last_request.clone(), InputCursor::request)
+        self.input.request()
     }
     /// Answers the current request with `window`, whose bytes the reader shares.
     /// An empty window means "none yet", never the end of the source.
@@ -449,8 +475,7 @@ impl DtsCoreFrameReader {
     /// `maximum_input_window`, does not start at `position`, or arrives while
     /// earlier bytes are unread or after the end of the source.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
-        self.healthy()?;
-        self.cursor_mut()?.provide(window)
+        self.input.cursor()?.provide(window)
     }
     /// Answers the current request with the end of the source, which lies after
     /// the bytes already provided. [`step`](Self::step) then returns `End` once
@@ -462,10 +487,9 @@ impl DtsCoreFrameReader {
     /// the request's; and `Truncated`, which ends the reader, when the source
     /// ends before the length its capabilities declared.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
-        self.healthy()?;
-        let result = self.cursor_mut()?.finish(source, token);
-        if matches!(result, Err(Error::Truncated)) {
-            self.record_failure(Error::Truncated);
+        let result = self.input.cursor()?.finish(source, token);
+        if result == Err(Error::Truncated) {
+            self.stop(Error::Truncated);
         }
         result
     }
@@ -483,32 +507,15 @@ impl DtsCoreFrameReader {
         token: InputToken,
         failure: SourceFailure,
     ) -> Result<()> {
-        self.healthy()?;
-        self.cursor_mut()?.fail(source, token, failure)?;
-        self.record_failure(match failure {
-            SourceFailure::Transport => Error::Transport,
-            SourceFailure::Cancelled => Error::Cancelled,
-        });
+        self.input.cursor()?.fail(source, token, failure)?;
+        self.stop(source_error(failure));
         Ok(())
     }
 
-    fn healthy(&self) -> Result<()> {
-        self.failure.map_or(Ok(()), Err)
-    }
-    fn cursor_mut(&mut self) -> Result<&mut InputCursor> {
-        self.cursor
-            .as_mut()
-            .ok_or(Error::Invalid("missing healthy DTS cursor"))
-    }
-    fn record_failure(&mut self, error: Error) {
-        self.failure = Some(error);
-        if let Some(cursor) = self.cursor.take() {
-            self.last_request = cursor.request();
-        }
-        self.buffer = None;
-        self.pending = None;
-        self.output = None;
-        self.header = None;
+    /// Ends the reader with `error`, dropping the frame it was reading.
+    fn stop(&mut self, error: Error) {
+        self.input.fail_with(error);
+        self.frame = Frame::Header(HeaderPart::Sync);
     }
 
     /// Advances the reader by at most the work left in `work`. `Ready` carries
@@ -529,17 +536,19 @@ impl DtsCoreFrameReader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<DtsCoreFrame>> {
-        self.healthy()?;
-        let result = self.step_inner(work, cancel);
+        if let Some(error) = self.input.failure() {
+            return Err(error);
+        }
+        let result = self.advance(work, cancel);
         if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(error)
         {
-            self.record_failure(error);
+            self.stop(error);
         }
         result
     }
 
-    fn step_inner(
+    fn advance(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -548,282 +557,240 @@ impl DtsCoreFrameReader {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if let Some(end) = self.ended {
+            if let Frame::Ended(end) = self.frame {
                 return Ok(Step::End(end));
             }
             if work.remaining() == 0 {
                 return Ok(Step::Yield);
             }
-            match self.phase {
-                Phase::Header => {
-                    if self.prefix_len == 0 {
-                        self.frame_offset = self.position();
+            match &mut self.frame {
+                Frame::Header(part) => {
+                    let part = *part;
+                    if let Some(step) = self.read_header(part, work, cancel)? {
+                        return Ok(step);
                     }
-                    let cursor = self
-                        .cursor
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing DTS header cursor"))?;
-                    match cursor.read_into(
-                        &mut self.prefix[self.prefix_len..self.prefix_target],
-                        work,
-                        cancel,
-                    )? {
-                        Step::Ready(count) => {
-                            if count == 0 {
-                                return Err(Error::Invalid("empty DTS header read"));
-                            }
-                            if self.completed >= self.limits.maximum_frames {
-                                return Err(Error::Limit {
-                                    requested: self
-                                        .completed
-                                        .checked_add(1)
-                                        .ok_or(Error::Overflow)?,
-                                    maximum: self.limits.maximum_frames,
-                                });
-                            }
-                            self.prefix_len =
-                                self.prefix_len.checked_add(count).ok_or(Error::Overflow)?;
-                            if self.prefix_len == self.prefix_target {
-                                self.phase = match self.prefix_target {
-                                    4 => Phase::Sync,
-                                    11 => Phase::PrefixKind,
-                                    13 | 15 => Phase::Probe,
-                                    _ => return Err(Error::Invalid("DTS prefix target")),
-                                };
-                            }
+                }
+                Frame::Check(part) => {
+                    let part = *part;
+                    if !work.try_charge(1) {
+                        return Ok(Step::Yield);
+                    }
+                    self.frame = match part {
+                        HeaderPart::Sync => {
+                            check_sync(&self.prefix[..4])?;
+                            Frame::Header(HeaderPart::Kind)
                         }
-                        Step::NeedInput(needed) => return Ok(Step::NeedInput(needed)),
-                        Step::Yield => return Ok(Step::Yield),
-                        Step::End(end) => {
-                            if self.prefix_len != 0 {
-                                return Err(Error::Truncated);
-                            }
-                            self.ended = Some(end);
-                            return Ok(Step::End(end));
+                        HeaderPart::Kind => {
+                            Frame::Header(HeaderPart::Whole(if self.prefix[4] & 2 == 0 {
+                                13
+                            } else {
+                                15
+                            }))
                         }
-                    }
-                }
-                Phase::Sync => {
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    check_sync(&self.prefix[..4])?;
-                    self.prefix_target = 11;
-                    self.phase = Phase::Header;
-                }
-                Phase::PrefixKind => {
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    self.prefix_target = if self.prefix[4] & 2 == 0 { 13 } else { 15 };
-                    self.phase = Phase::Header;
-                }
-                Phase::Probe => {
-                    // Fixed <=120-bit inspection; no dynamic prefix/body copy.
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    let header = probe_core_header(&self.prefix[..self.prefix_len])?;
-                    if header.frame_bytes > self.limits.maximum_frame_bytes {
-                        return Err(Error::Limit {
-                            requested: header.frame_bytes,
-                            maximum: self.limits.maximum_frame_bytes,
-                        });
-                    }
-                    let pool = self
-                        .cursor
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing DTS pool"))?
-                        .budget();
-                    let owner = header
-                        .frame_bytes
-                        .checked_add(Bytes::owner_overhead_bytes())
-                        .ok_or(Error::Overflow)?;
-                    let maximum = pool
-                        .limit()
-                        .checked_sub(Budget::control_storage_bytes())
-                        .ok_or(Error::Overflow)?;
-                    if owner > maximum {
-                        return Err(Error::Limit {
-                            requested: owner,
-                            maximum,
-                        });
-                    }
-                    self.header = Some(header);
-                    self.phase = Phase::Reserve;
-                }
-                Phase::Reserve => {
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    let size = self
-                        .header
-                        .ok_or(Error::Invalid("missing DTS allocation size"))?
-                        .frame_bytes;
-                    let pool = self
-                        .cursor
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing DTS reserve pool"))?
-                        .budget();
-                    let mut buffer = self.buffer.take().unwrap_or_else(|| BudgetVec::new(pool));
-                    if !buffer.is_empty() {
-                        self.buffer = Some(buffer);
-                        return Err(Error::Invalid("DTS reserve would move copied bytes"));
-                    }
-                    let reserved = buffer.try_reserve_exact(size);
-                    self.buffer = Some(buffer);
-                    reserved?;
-                    self.prefix_copied = 0;
-                    self.phase = Phase::CopyPrefix;
-                }
-                Phase::CopyPrefix => {
-                    let remaining = self
-                        .prefix_len
-                        .checked_sub(self.prefix_copied)
-                        .ok_or(Error::Overflow)?;
-                    let count = usize::try_from(
-                        work.take(u64::try_from(remaining).map_err(|_| Error::Overflow)?),
-                    )
-                    .map_err(|_| Error::Overflow)?;
-                    if count == 0 {
-                        return Ok(Step::Yield);
-                    }
-                    let end = self
-                        .prefix_copied
-                        .checked_add(count)
-                        .ok_or(Error::Overflow)?;
-                    let buffer = self
-                        .buffer
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing DTS prefix buffer"))?;
-                    let target = buffer.len().checked_add(count).ok_or(Error::Overflow)?;
-                    if target > buffer.capacity() {
-                        return Err(Error::Invalid("DTS prefix exceeds reserved storage"));
-                    }
-                    buffer.try_extend_from_slice(&self.prefix[self.prefix_copied..end])?;
-                    self.prefix_copied = end;
-                    if end == self.prefix_len {
-                        self.phase = Phase::ReadBody;
-                    }
-                }
-                Phase::ReadBody => {
-                    let length = self
-                        .buffer
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing DTS body buffer"))?
-                        .len();
-                    let target = self
-                        .header
-                        .ok_or(Error::Invalid("missing DTS body size"))?
-                        .frame_bytes;
-                    let remaining = target.checked_sub(length).ok_or(Error::Overflow)?;
-                    if remaining == 0 {
-                        self.phase = Phase::Freeze;
-                        continue;
-                    }
-                    match self
-                        .cursor_mut()?
-                        .read_span(remaining.min(MAXIMUM_COPY), work, cancel)?
-                    {
-                        Step::Ready(bytes) => {
-                            if bytes.is_empty() {
-                                return Err(Error::Invalid("empty DTS body span"));
-                            }
-                            self.pending = Some(bytes);
-                            self.pending_copied = 0;
-                            self.phase = Phase::CopyBody;
-                        }
-                        Step::NeedInput(needed) => return Ok(Step::NeedInput(needed)),
-                        Step::Yield => return Ok(Step::Yield),
-                        Step::End(_) => return Err(Error::Truncated),
-                    }
-                }
-                Phase::CopyBody => {
-                    let pending = self
-                        .pending
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing DTS pending body span"))?;
-                    let length = pending.len();
-                    let remaining = length
-                        .checked_sub(self.pending_copied)
-                        .ok_or(Error::Overflow)?;
-                    let count = usize::try_from(work.take(
-                        u64::try_from(remaining.min(MAXIMUM_COPY)).map_err(|_| Error::Overflow)?,
-                    ))
-                    .map_err(|_| Error::Overflow)?;
-                    if count == 0 {
-                        return Ok(Step::Yield);
-                    }
-                    let end = self
-                        .pending_copied
-                        .checked_add(count)
-                        .ok_or(Error::Overflow)?;
-                    let buffer = self
-                        .buffer
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing DTS copy buffer"))?;
-                    let target = buffer.len().checked_add(count).ok_or(Error::Overflow)?;
-                    if target > buffer.capacity() {
-                        return Err(Error::Invalid("DTS body exceeds reserved storage"));
-                    }
-                    buffer.try_extend_from_slice(&pending[self.pending_copied..end])?;
-                    self.pending_copied = end;
-                    if end == length {
-                        self.pending = None;
-                        self.phase = Phase::ReadBody;
-                    }
-                }
-                Phase::Freeze => {
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    let buffer = self
-                        .buffer
-                        .take()
-                        .ok_or(Error::Invalid("missing DTS freeze buffer"))?;
-                    match buffer.freeze() {
-                        Ok(bytes) => {
-                            self.output = Some(bytes);
-                            self.phase = Phase::Publish;
-                        }
-                        Err(failure) => {
-                            self.buffer = Some(failure.value);
-                            return Err(failure.error);
-                        }
-                    }
-                }
-                Phase::Publish => {
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    let header = self
-                        .header
-                        .ok_or(Error::Invalid("missing DTS published header"))?;
-                    let bytes = self
-                        .output
-                        .take()
-                        .ok_or(Error::Invalid("missing DTS published bytes"))?;
-                    if bytes.len() != header.frame_bytes {
-                        return Err(Error::Invalid("DTS output/envelope size disagreement"));
-                    }
-                    let cursor = self
-                        .cursor
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing DTS published source"))?;
-                    let facts = DtsCoreFrameFacts {
-                        source: cursor.source(),
-                        generation: cursor.generation(),
-                        offset: self.frame_offset,
-                        header,
+                        HeaderPart::Whole(_) => self.probe()?,
                     };
-                    self.completed = self.completed.checked_add(1).ok_or(Error::Overflow)?;
-                    self.header = None;
-                    self.prefix_len = 0;
-                    self.prefix_target = 4;
-                    self.phase = Phase::Header;
-                    return Ok(Step::Ready(DtsCoreFrame { bytes, facts }));
                 }
+                Frame::Body {
+                    header,
+                    buffer,
+                    step,
+                } => match step {
+                    BodyStep::Reserve => {
+                        if !work.try_charge(1) {
+                            return Ok(Step::Yield);
+                        }
+                        buffer.try_reserve_exact(header.frame_bytes)?;
+                        *step = BodyStep::CopyPrefix { copied: 0 };
+                    }
+                    BodyStep::CopyPrefix { copied } => {
+                        let remaining = self
+                            .prefix_len
+                            .checked_sub(*copied)
+                            .ok_or(Error::Overflow)?;
+                        let count = usize::try_from(
+                            work.take(u64::try_from(remaining).map_err(|_| Error::Overflow)?),
+                        )
+                        .map_err(|_| Error::Overflow)?;
+                        if count == 0 {
+                            return Ok(Step::Yield);
+                        }
+                        let end = copied.checked_add(count).ok_or(Error::Overflow)?;
+                        let target = buffer.len().checked_add(count).ok_or(Error::Overflow)?;
+                        if target > buffer.capacity() {
+                            return Err(Error::Invalid("DTS prefix exceeds reserved storage"));
+                        }
+                        buffer.try_extend_from_slice(&self.prefix[*copied..end])?;
+                        *step = if end == self.prefix_len {
+                            BodyStep::ReadBody
+                        } else {
+                            BodyStep::CopyPrefix { copied: end }
+                        };
+                    }
+                    BodyStep::ReadBody => {
+                        let remaining = header
+                            .frame_bytes
+                            .checked_sub(buffer.len())
+                            .ok_or(Error::Overflow)?;
+                        if remaining == 0 {
+                            *step = BodyStep::Freeze;
+                            continue;
+                        }
+                        match self.input.cursor()?.read_span(
+                            remaining.min(MAXIMUM_COPY),
+                            work,
+                            cancel,
+                        )? {
+                            Step::Ready(pending) => {
+                                if pending.is_empty() {
+                                    return Err(Error::Invalid("empty DTS body span"));
+                                }
+                                *step = BodyStep::CopyBody { pending, copied: 0 };
+                            }
+                            Step::NeedInput(needed) => return Ok(Step::NeedInput(needed)),
+                            Step::Yield => return Ok(Step::Yield),
+                            Step::End(_) => return Err(Error::Truncated),
+                        }
+                    }
+                    BodyStep::CopyBody { pending, copied } => {
+                        let length = pending.len();
+                        let remaining = length.checked_sub(*copied).ok_or(Error::Overflow)?;
+                        let count = usize::try_from(
+                            work.take(
+                                u64::try_from(remaining.min(MAXIMUM_COPY))
+                                    .map_err(|_| Error::Overflow)?,
+                            ),
+                        )
+                        .map_err(|_| Error::Overflow)?;
+                        if count == 0 {
+                            return Ok(Step::Yield);
+                        }
+                        let end = copied.checked_add(count).ok_or(Error::Overflow)?;
+                        let target = buffer.len().checked_add(count).ok_or(Error::Overflow)?;
+                        if target > buffer.capacity() {
+                            return Err(Error::Invalid("DTS body exceeds reserved storage"));
+                        }
+                        buffer.try_extend_from_slice(&pending[*copied..end])?;
+                        if end == length {
+                            *step = BodyStep::ReadBody;
+                        } else {
+                            *copied = end;
+                        }
+                    }
+                    BodyStep::Freeze => {
+                        if !work.try_charge(1) {
+                            return Ok(Step::Yield);
+                        }
+                        let header = *header;
+                        let empty = BudgetVec::new(buffer.budget());
+                        match std::mem::replace(buffer, empty).freeze() {
+                            Ok(bytes) => self.frame = Frame::Ready { header, bytes },
+                            Err(refused) => {
+                                *buffer = refused.value;
+                                return Err(refused.error);
+                            }
+                        }
+                    }
+                },
+                Frame::Ready { .. } => return self.publish(work),
+                Frame::Ended(end) => return Ok(Step::End(*end)),
             }
         }
+    }
+    /// Reads the prefix on to the end of `part`. `None` once it is there;
+    /// otherwise the step to return.
+    fn read_header(
+        &mut self,
+        part: HeaderPart,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<Step<DtsCoreFrame>>> {
+        if self.prefix_len == 0 {
+            self.frame_offset = self.position();
+        }
+        match self.input.cursor()?.read_into(
+            &mut self.prefix[self.prefix_len..part.end()],
+            work,
+            cancel,
+        )? {
+            Step::Ready(count) => {
+                if count == 0 {
+                    return Err(Error::Invalid("empty DTS header read"));
+                }
+                if self.completed >= self.limits.maximum_frames {
+                    return Err(Error::Limit {
+                        requested: self.completed.checked_add(1).ok_or(Error::Overflow)?,
+                        maximum: self.limits.maximum_frames,
+                    });
+                }
+                self.prefix_len = self.prefix_len.checked_add(count).ok_or(Error::Overflow)?;
+                if self.prefix_len == part.end() {
+                    self.frame = Frame::Check(part);
+                }
+                Ok(None)
+            }
+            Step::NeedInput(needed) => Ok(Some(Step::NeedInput(needed))),
+            Step::Yield => Ok(Some(Step::Yield)),
+            Step::End(end) => {
+                if self.prefix_len != 0 {
+                    return Err(Error::Truncated);
+                }
+                self.frame = Frame::Ended(end);
+                Ok(Some(Step::End(end)))
+            }
+        }
+    }
+    /// The frame whose whole header the prefix holds, with storage for it not yet
+    /// reserved.
+    fn probe(&mut self) -> Result<Frame> {
+        // Reads at most 120 bits from the prefix; nothing is copied yet.
+        let header = probe_core_header(&self.prefix[..self.prefix_len])?;
+        if header.frame_bytes > self.limits.maximum_frame_bytes {
+            return Err(Error::Limit {
+                requested: header.frame_bytes,
+                maximum: self.limits.maximum_frame_bytes,
+            });
+        }
+        let pool = self.input.cursor()?.budget();
+        let owner = header
+            .frame_bytes
+            .checked_add(Bytes::owner_overhead_bytes())
+            .ok_or(Error::Overflow)?;
+        let maximum = pool
+            .limit()
+            .checked_sub(Budget::control_storage_bytes())
+            .ok_or(Error::Overflow)?;
+        if owner > maximum {
+            return Err(Error::Limit {
+                requested: owner,
+                maximum,
+            });
+        }
+        Ok(Frame::Body {
+            header,
+            buffer: BudgetVec::new(pool),
+            step: BodyStep::Reserve,
+        })
+    }
+    /// Returns the ready frame and moves on to the next one.
+    fn publish(&mut self, work: &mut WorkBudget) -> Result<Step<DtsCoreFrame>> {
+        if !work.try_charge(1) {
+            return Ok(Step::Yield);
+        }
+        let next = Frame::Header(HeaderPart::Sync);
+        let Frame::Ready { header, bytes } = std::mem::replace(&mut self.frame, next) else {
+            return Err(Error::Invalid("missing DTS published bytes"));
+        };
+        if bytes.len() != header.frame_bytes {
+            return Err(Error::Invalid("DTS output/envelope size disagreement"));
+        }
+        let facts = DtsCoreFrameFacts {
+            source: self.input.source(),
+            generation: self.input.generation(),
+            offset: self.frame_offset,
+            header,
+        };
+        self.completed = self.completed.checked_add(1).ok_or(Error::Overflow)?;
+        self.prefix_len = 0;
+        Ok(Step::Ready(DtsCoreFrame { bytes, facts }))
     }
 }
