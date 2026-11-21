@@ -30,8 +30,8 @@ encoded clocks, PES payload ranges, and diagnostics for unaligned input.
 traversal with `TransportStream`. Construct it on a seekable `InputCursor` at
 physical zero, poll it with work and cancellation budgets, and satisfy its
 `NeedInput` requests through the same cursor. It copies 1,504 prefix bytes from
-charged windows and charges another 2,632 work units for the bounded unique-grid
-inspection. Success repositions that cursor to the physical TS188 phase;
+charged windows. The unique-grid
+inspection checks at most seven headers per phase. Success repositions that cursor to the physical TS188 phase;
 pass it directly to `TransportStream::poll`. The original entity, length and
 leading bytes remain unchanged. Short, absent or competing grids are errors.
 Later malformed carriers retain the ordinary diagnostics. This operation does
