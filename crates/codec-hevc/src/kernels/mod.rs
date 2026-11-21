@@ -78,7 +78,6 @@ pub(crate) trait Kernels: Sized {
         0
     }
     /// Explicit weighted uni / bi combine (w % 8 == 0). Returns false if not handled.
-    #[allow(clippy::too_many_arguments)]
     #[inline(always)]
     fn simd_wuni(
         _d: &mut [Self],
@@ -94,7 +93,6 @@ pub(crate) trait Kernels: Sized {
     ) -> bool {
         false
     }
-    #[allow(clippy::too_many_arguments)]
     #[inline(always)]
     fn simd_wbi(
         _d: &mut [Self],
@@ -113,7 +111,6 @@ pub(crate) trait Kernels: Sized {
         false
     }
     /// Fused integer-position explicit weighted uni-prediction (w % 8 == 0).
-    #[allow(clippy::too_many_arguments)]
     #[inline(always)]
     fn simd_wcopy(
         _d: &mut [Self],
@@ -133,7 +130,6 @@ pub(crate) trait Kernels: Sized {
         false
     }
     /// Integer-position prediction (output modes 0 / 2), w % 8 == 0. Returns false if not handled.
-    #[allow(clippy::too_many_arguments)]
     #[inline(always)]
     fn simd_int(
         _src: &[Self],
@@ -219,7 +215,6 @@ pub(crate) trait Kernels: Sized {
         0
     }
     /// Whole-block fractional luma / chroma MC (w % 8 == 0). Returns false if not handled.
-    #[allow(clippy::too_many_arguments)]
     #[inline(always)]
     fn simd_block(
         _luma: bool,

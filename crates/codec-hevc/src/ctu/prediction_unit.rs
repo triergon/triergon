@@ -14,7 +14,6 @@ use crate::state::*;
 impl<P: Pixel> SliceDecoder<'_, P> {
     /// Parses a prediction unit, derives its motion, stores it and performs motion
     /// compensation. Returns merge_flag.
-    #[allow(clippy::too_many_arguments)]
     #[inline(never)]
     pub(super) fn prediction_unit(
         &mut self,
@@ -176,7 +175,6 @@ impl<P: Pixel> SliceDecoder<'_, P> {
     // ------------------------------------------------------------------ motion derivation
 
     /// Clause 6.4.2 prediction block availability.
-    #[allow(clippy::too_many_arguments)]
     fn avail_pb(
         &self,
         cu: &Cu,
@@ -203,7 +201,6 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         avail && self.blk(xn as u32, yn as u32).flags & F_INTRA == 0
     }
 
-    #[allow(clippy::too_many_arguments)]
     #[inline(never)]
     fn merge_candidate(
         &self,
@@ -478,7 +475,6 @@ impl<P: Pixel> SliceDecoder<'_, P> {
     }
 
     /// Luma motion vector prediction (8.5.3.2.6 / 8.5.3.2.7).
-    #[allow(clippy::too_many_arguments)]
     #[inline(never)]
     fn amvp(
         &self,

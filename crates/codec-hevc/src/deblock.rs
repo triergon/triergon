@@ -136,7 +136,6 @@ fn store<P: Pixel, const VERT: bool>(
 /// Vertical-edge luma segment processed row by row on the 8 contiguous samples
 /// p3..q3 of each line (same decisions and filters as `luma_segment`).
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 fn luma_segment_v<P: Pixel>(
     d: &mut [P],
     pos: usize,
@@ -248,7 +247,6 @@ fn luma_segment_v<P: Pixel>(
 
 /// Luma segment of 4 lines (8.7.2.5.3 decisions, 8.7.2.5.7 filtering).
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 fn luma_segment<P: Pixel, const VERT: bool>(
     d: &mut [P],
     pos: usize,
@@ -340,7 +338,6 @@ fn luma_segment<P: Pixel, const VERT: bool>(
 }
 
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 fn chroma_segment<P: Pixel>(
     d: &mut [P],
     pos: usize,
@@ -368,7 +365,6 @@ fn chroma_segment<P: Pixel>(
 }
 
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 fn filter_luma<P: Pixel, const VERT: bool>(
     d: &mut [P],
     pos: usize,
@@ -397,7 +393,6 @@ fn filter_luma<P: Pixel, const VERT: bool>(
 }
 
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 fn filter_chroma<P: Pixel>(
     d: &mut [P],
     pos: usize,
@@ -432,7 +427,6 @@ fn filter_chroma<P: Pixel>(
 #[inline(never)]
 /// Deblock the luma rows [ys, ye) (multiples of 16): vertical edges in the band, then the
 /// horizontal edges with y in [ys, ye) (the edge at ys modifies the 3 rows above).
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn deblock_band<P: Pixel>(
     frame: &mut Frame<P>,
     st: &PicState,

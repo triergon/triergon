@@ -201,7 +201,6 @@ fn idst4(coef: &[i32], bd_shift: u32, res: &mut [i32]) {
 /// Compute the residual for a transform block into `res` (row-major, stride n).
 /// `coef` holds scaled coefficients d (clause 8.6.3 output).
 #[inline(never)]
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn inverse_transform(
     coef: &[i32],
     log2: u32,

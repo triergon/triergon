@@ -150,7 +150,6 @@ pub(crate) struct SliceDecoder<'a, P: Pixel> {
 }
 
 impl<'a, P: Pixel> SliceDecoder<'a, P> {
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         sps: &'a Sps,
         pps: &'a Pps,

@@ -919,7 +919,6 @@ fn position(
 /// of band r); SAO of band r needs band r+1 deblocked (its first lines are SAO
 /// neighbours, and the edge at its top modifies band r). `all` processes every remaining
 /// row (end of picture). Filtering a row soon after decoding keeps it in cache.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn filter_ready<P: Pixel>(
     f: &mut Frame<P>,
     st: &mut PicState,
@@ -956,7 +955,6 @@ pub(crate) fn filter_ready<P: Pixel>(
 
 /// SAO of CTB row rr. The band buffer receives the deblocked rows of the band plus the
 /// saved last line of the previous band and the first line of the next one.
-#[allow(clippy::too_many_arguments)]
 fn sao_row<P: Pixel>(
     f: &mut Frame<P>,
     st: &PicState,
@@ -1037,7 +1035,6 @@ fn prepare_band<P: Pixel>(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn decode_slice_generic<P: Pixel>(
     sps: &Sps,
     pps: &Pps,

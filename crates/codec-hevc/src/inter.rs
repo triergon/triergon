@@ -41,7 +41,6 @@ impl<P: Pixel> Default for McScratch<P> {
 /// Returns (samples, index of sample (x, y), stride) covering [x - before, x + w + after) x
 /// [y - before, y + h + after), using edge emulation when needed.
 #[inline]
-#[allow(clippy::too_many_arguments)]
 fn source<'a, P: Pixel>(
     plane: &'a Plane<P>,
     edge: &'a mut [P],
@@ -186,7 +185,6 @@ fn out_rows<'b, P: Pixel, const MODE: u8>(
 /// partial sum lies in [-24*255, 88*255] (sign sums of Table 8-12 coefficients) so the sum is
 /// formed in i16 lanes.
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 fn taps8<P: Pixel, const MODE: u8>(
     src: &[P],
     starts: [usize; 8],
@@ -286,7 +284,6 @@ fn taps8<P: Pixel, const MODE: u8>(
 }
 
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 fn taps4<P: Pixel, const MODE: u8>(
     src: &[P],
     starts: [usize; 4],
@@ -429,7 +426,6 @@ fn hpass4<P: Pixel>(src: &[P], b: usize, c: &[i8; 4], w: usize, shift: u32, t: &
 }
 
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 fn vpass8<P: Pixel, const MODE: u8>(
     t: &[i16],
     b: usize,
@@ -486,7 +482,6 @@ fn vpass8<P: Pixel, const MODE: u8>(
 }
 
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 fn vpass4<P: Pixel, const MODE: u8>(
     t: &[i16],
     b: usize,
@@ -514,7 +509,6 @@ fn vpass4<P: Pixel, const MODE: u8>(
 }
 
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 fn luma_impl<P: Pixel, const MODE: u8>(
     plane: &Plane<P>,
     sc: &mut McScratch<P>,
@@ -641,7 +635,6 @@ fn luma_impl<P: Pixel, const MODE: u8>(
 }
 
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 fn chroma_impl<P: Pixel, const MODE: u8>(
     plane: &Plane<P>,
     sc: &mut McScratch<P>,
@@ -751,7 +744,6 @@ fn chroma_impl<P: Pixel, const MODE: u8>(
 
 /// Luma interpolation (8.5.3.3.3.2) with output stage `mode` (see [`Out`]).
 #[inline(never)]
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn mc_luma<P: Pixel>(
     plane: &Plane<P>,
     sc: &mut McScratch<P>,
@@ -774,7 +766,6 @@ pub(crate) fn mc_luma<P: Pixel>(
 
 /// Chroma interpolation (8.5.3.3.3.3) with output stage `mode` (see [`Out`]).
 #[inline(never)]
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn mc_chroma<P: Pixel>(
     plane: &Plane<P>,
     sc: &mut McScratch<P>,
@@ -797,7 +788,6 @@ pub(crate) fn mc_chroma<P: Pixel>(
 
 /// Integer-position uni-prediction with default weights is an exact copy
 /// ((p << shift3 + offset1) >> shift1 == p).
-#[allow(clippy::too_many_arguments)]
 #[inline(never)]
 pub(crate) fn copy_block<P: Pixel>(
     dst: &mut Plane<P>,
@@ -847,7 +837,6 @@ fn copy_rows<P: Pixel, const W: usize>(
 
 /// Integer-position explicit weighted uni-prediction fused with the copy. Returns false if
 /// the SIMD kernel does not cover the block (caller falls back to the two-pass path).
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn weighted_copy<P: Pixel>(
     dst: &mut Plane<P>,
     x0: usize,
@@ -888,7 +877,6 @@ pub(crate) fn weighted_copy<P: Pixel>(
 }
 
 /// Explicit weighted prediction, uni-directional (8-275).
-#[allow(clippy::too_many_arguments)]
 #[inline(never)]
 pub(crate) fn put_weighted_uni<P: Pixel>(
     plane: &mut Plane<P>,
@@ -933,7 +921,6 @@ pub(crate) fn put_weighted_uni<P: Pixel>(
 }
 
 /// Explicit weighted prediction, bi-directional (8-277).
-#[allow(clippy::too_many_arguments)]
 #[inline(never)]
 pub(crate) fn put_weighted_bi<P: Pixel>(
     plane: &mut Plane<P>,

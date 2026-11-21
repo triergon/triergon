@@ -180,7 +180,6 @@ impl<P: Pixel> SliceDecoder<'_, P> {
 /// Boundary filtering strength (8.7.2.4) between the 4x4 blocks with indices ip and iq
 /// (into blk / motion); sp / sq index the slices containing p and q.
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 fn bs_at(
     blk: &[BlkInfo],
     motion: &[PuMotion],

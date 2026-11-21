@@ -13,6 +13,9 @@
 // Conditions read as the specification writes them: `if c { 1 } else { 0 }` for a
 // context or list index and the negated conjunctions of its availability rules.
 #![allow(clippy::bool_to_int_with_if, clippy::nonminimal_bool)]
+// Sample kernels and per-block steps take their geometry and operands as plain
+// arguments, not parameter structs: the shape the hot paths are measured in.
+#![allow(clippy::too_many_arguments)]
 mod bits;
 mod cabac;
 mod ctu;

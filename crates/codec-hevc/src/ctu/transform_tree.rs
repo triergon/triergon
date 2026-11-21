@@ -9,7 +9,6 @@ use crate::picture::Pixel;
 use crate::state::*;
 
 impl<P: Pixel> SliceDecoder<'_, P> {
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn transform_tree(
         &mut self,
         cu: &Cu,
@@ -107,7 +106,6 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     #[inline(never)]
     fn transform_unit(
         &mut self,

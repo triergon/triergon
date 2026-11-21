@@ -296,7 +296,6 @@ fn ldb(r: &[u8], x: usize) -> U8x8 {
 /// `off` indexes the integer sample position of output (0, 0); `ss` is the source stride.
 /// Requires w % 8 == 0 and 16-sample loads to stay inside `src` (callers guarantee the
 /// 7 / 3 extra columns of filter support plus slack exist, see `inter::source`).
-#[allow(clippy::too_many_arguments)]
 pub(super) fn luma_block(
     src: &[u8],
     off: usize,
@@ -361,7 +360,6 @@ pub(super) fn luma_block(
     let _ = tmp;
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn chroma_block(
     src: &[u8],
     off: usize,
@@ -601,7 +599,6 @@ fn put_hi(v: I32x8, x: usize, y: usize, mode: u8, o: &mut BlockOut16<'_>, k: &Hi
 }
 
 /// Fractional or integer MC for u16 samples (w % 8 == 0). `ntap` is 8 (luma) or 4 (chroma).
-#[allow(clippy::too_many_arguments)]
 pub(super) fn block_hi(
     src: &[u16],
     off: usize,
@@ -733,7 +730,6 @@ pub(super) fn block_hi(
 
 /// Explicit weighted uni-prediction (8-275) on i16 prediction rows (stride 64, offset by
 /// -PRED_OFFSET). Generic over the output sample type via `store`. w % 8 == 0.
-#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 pub(super) fn wuni<T>(
     dst: &mut [T],
@@ -770,7 +766,6 @@ pub(super) fn wuni<T>(
 }
 
 /// Explicit weighted bi-prediction (8-277).
-#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 pub(super) fn wbi<T>(
     dst: &mut [T],
@@ -822,7 +817,6 @@ pub(super) fn store_u16(p: I32x8, d: &mut [u16]) {
 }
 
 /// Fused integer-position explicit weighted uni-prediction: v = p << shift3, then 8-275.
-#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 pub(super) fn wcopy<T: Copy>(
     dst: &mut [T],
