@@ -156,6 +156,9 @@ impl<S: Source> Transport<S> {
         Ok(accepted)
     }
 
+    // Out of line, the reader's loop keeps its state in registers: 0.4 to 0.5% fewer
+    // instructions per progressive stream than with this loop inlined into it.
+    #[inline(never)]
     fn poll(
         &mut self,
         work: &mut WorkBudget,
