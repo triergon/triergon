@@ -52,7 +52,9 @@ For ADTS packets carrying an explicit container priming edit, use
 the decoded PCM. The default AAC decoder uses the encoder signature.
 
 Use `TrackDecoder::aac_access_units_in` to decode raw AAC-LC from a checked
-AudioSpecificConfig with a fixed layout or a Program Configuration Element.
+AudioSpecificConfig with a fixed layout or a Program Configuration Element, or explicit
+stereo HE-AAC with 2× SBR and 1024-sample AAC-LC core frames. The SBR path requires an
+indexed core rate and an extension rate exactly twice that rate; PS is not supported.
 `TrackDecoder::aac_access_units_with_layout_in` accepts
 `compat::aac::Policy::ConventionalSurround` for fixed layouts. Call
 `TrackDecoder::into_decoder` to use the configured decoder in an audio session; with
@@ -64,7 +66,7 @@ one directly.
 | Stream | Input | Output |
 |---|---|---|
 | Video | H.264, HEVC Annex B access units with optional PTS | 1920×1080 RGBA, letterboxed, 8- and 10-bit 4:2:0 sources |
-| Audio | AC-3, E-AC-3, AAC (ADTS or configured raw LC), DTS core, FLAC, Opus, Vorbis, MPEG audio Layer I-III | interleaved stereo s16 at the decoder's rate |
+| Audio | AC-3, E-AC-3, AAC (ADTS, configured raw LC or explicit stereo 2× HE-AAC), DTS core, FLAC, Opus, Vorbis, MPEG audio Layer I-III | interleaved stereo s16 at the decoder's rate |
 | Container track | any `TrackInfo` of a supported codec, its packets | `TrackDecoder`: decoded frames with the container's trims applied |
 
 `TrackDecoder::new(track)` picks the decoder from a track's codec (`audio_codec`) and

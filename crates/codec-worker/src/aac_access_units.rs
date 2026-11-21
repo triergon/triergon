@@ -4,7 +4,6 @@ use std::fs::File;
 use std::io::{Read, Write};
 use triergon::Budget;
 use triergon_codec::{AudioDecoder, AudioFrame, SampleFormat};
-use triergon_codec_aac::RawSbrDecoder;
 use triergon_session::TrackDecoder;
 use triergon_session::compat::aac::Policy;
 
@@ -74,8 +73,12 @@ pub fn decode<const SBR: bool>(
         {
             return Err("unsupported AAC SBR configuration".into());
         }
-        let mut decoder = RawSbrDecoder::new_in(6, 2, &pool).map_err(|error| error.to_string())?;
-        decode_packets::<2048>(data, rate, channels, packets, &mut decoder, out)
+        // The pinned source signals LC while its packets carry 2× SBR. Present the
+        // equivalent explicit HE-AAC configuration to the normal track factory.
+        let mut decoder = TrackDecoder::aac_access_units_in(&[0x2b, 0x11, 0x88, 0x00], &pool)
+            .map_err(|error| error.0)?
+            .into_decoder();
+        decode_packets::<2048>(data, rate, channels, packets, decoder.as_mut(), out)
     } else {
         let mut decoder = TrackDecoder::aac_access_units_with_layout_in(config, layout, &pool)
             .map_err(|error| error.0)?

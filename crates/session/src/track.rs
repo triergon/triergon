@@ -4,8 +4,8 @@ use triergon_codec::{AudioDecoder, AudioFrame, Budget, DecodeFailure, DownmixLev
 use triergon_core::container::{PacketInfo, TrackInfo};
 use triergon_core::{BudgetVec, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    AacAscFacts, AacAscParser, AacAudioSpecificConfig, AacConfigLimits, AacSource, BuildStep,
-    aac_fixed_channel_count, indexed_aac_frequency,
+    AacAscFacts, AacAscParser, AacAudioSpecificConfig, AacConfigLimits, AacExtensionSignal,
+    AacSource, BuildStep, aac_fixed_channel_count, indexed_aac_frequency,
 };
 
 use crate::compat::aac::Policy;
@@ -57,7 +57,7 @@ impl TrackDecoder {
         })
     }
 
-    /// Decode raw AAC-LC from the selected sample description's AudioSpecificConfig.
+    /// Decode raw AAC-LC or explicit stereo 2× HE-AAC from AudioSpecificConfig.
     /// The caller must use a decoder configured for each packet's description.
     /// Use [`Self::new_in`] for ADTS-framed packets.
     pub fn aac_access_units_in(
@@ -67,7 +67,7 @@ impl TrackDecoder {
         Self::aac_access_units_with_layout_in(configuration, Policy::Specification, budget)
     }
 
-    /// Decode configured AAC-LC with a speaker mapping for fixed layouts.
+    /// Decode configured AAC with a speaker mapping for fixed layouts.
     /// An explicit program layout uses the element tags in AudioSpecificConfig.
     pub fn aac_access_units_with_layout_in(
         configuration: &[u8],
@@ -75,7 +75,19 @@ impl TrackDecoder {
         budget: &Budget,
     ) -> Result<Self, DecodeFailure> {
         let parsed = parse_aac_access_unit_config(configuration, budget)?;
-        let decoder: Box<dyn AudioDecoder> = if let Some(program) = parsed.program_config() {
+        let decoder: Box<dyn AudioDecoder> = if parsed.facts().outer_object_type.code == 5 {
+            let facts = parsed.facts();
+            validate_raw_sbr(facts)?;
+            drop(parsed);
+            Box::new(
+                triergon_codec_aac::RawSbrDecoder::new_in(
+                    facts.core_frequency.index,
+                    facts.channel_configuration,
+                    budget,
+                )
+                .map_err(DecodeFailure::from_error)?,
+            )
+        } else if let Some(program) = parsed.program_config() {
             validate_raw_aac_lc(parsed.facts())?;
             let bits = program.facts().source_bits;
             if !bits.start_bit.is_multiple_of(8) || !bits.bit_count.is_multiple_of(8) {
@@ -191,6 +203,34 @@ impl AacAccessUnitConfig {
     }
 }
 
+fn validate_raw_sbr(facts: AacAscFacts) -> Result<(), DecodeFailure> {
+    let extension = facts.extension_frequency;
+    let valid_extension = extension.is_some_and(|frequency| {
+        let rate_matches = facts.core_frequency.hz.checked_mul(2) == Some(frequency.hz);
+        let encoding_matches = match frequency.explicit_hz {
+            Some(hz) => frequency.index == 15 && hz == frequency.hz,
+            None => indexed_aac_frequency(frequency.index) == Some(frequency.hz),
+        };
+        rate_matches && encoding_matches
+    });
+    if facts.outer_object_type.code != 5
+        || facts.core_object_type.code != 2
+        || facts.sbr != AacExtensionSignal::Explicit(true)
+        || facts.ps.is_present()
+        || facts.channel_configuration != 2
+        || facts.core_channels != 2
+        || facts.core_frequency.explicit_hz.is_some()
+        || indexed_aac_frequency(facts.core_frequency.index) != Some(facts.core_frequency.hz)
+        || facts.ga.frame_length_flag
+        || facts.ga.core_coder_delay.is_some()
+        || facts.ga.extension_flag3 == Some(true)
+        || !valid_extension
+    {
+        return Err(DecodeFailure("unsupported raw HE-AAC configuration".into()));
+    }
+    Ok(())
+}
+
 fn validate_raw_aac_lc(facts: AacAscFacts) -> Result<(), DecodeFailure> {
     if facts.outer_object_type.code != 2
         || facts.core_object_type.code != 2
@@ -259,5 +299,24 @@ mod tests {
         drop(decoder);
         let exact = Budget::new(storage).unwrap();
         TrackDecoder::aac_access_units_in(&[0x12, 0x10], &exact).unwrap();
+    }
+
+    #[test]
+    fn sbr_rejects_inconsistent_frequency_facts() {
+        let budget = Budget::new(4 << 20).unwrap();
+        let parsed = parse_aac_access_unit_config(&[0x2b, 0x11, 0x88, 0x00], &budget).unwrap();
+        let mut facts = parsed.facts();
+        assert!(validate_raw_sbr(facts).is_ok());
+        facts.extension_frequency.as_mut().unwrap().hz = 44_100;
+        assert!(validate_raw_sbr(facts).is_err());
+        facts.extension_frequency.as_mut().unwrap().explicit_hz = Some(48_000);
+        facts.extension_frequency.as_mut().unwrap().hz = 48_000;
+        assert!(validate_raw_sbr(facts).is_err());
+        facts = parsed.facts();
+        facts.sbr = AacExtensionSignal::Sync(true);
+        assert!(validate_raw_sbr(facts).is_err());
+        facts = parsed.facts();
+        facts.ps = AacExtensionSignal::Sync(true);
+        assert!(validate_raw_sbr(facts).is_err());
     }
 }
