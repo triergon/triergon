@@ -29,20 +29,30 @@
 //! profile. The tap and complete picture comparisons are separate checks.
 use crate::view::{Colour, PictureView, Plane};
 
+/// Canvas width in pixels.
 pub const CANVAS_WIDTH: usize = 1920;
+/// Canvas height in pixels.
 pub const CANVAS_HEIGHT: usize = 1080;
+/// Bytes of the RGBA canvas.
 pub const CANVAS_BYTES: usize = CANVAS_WIDTH * CANVAS_HEIGHT * 4;
 const BLACK: [u8; 4] = [0, 0, 0, 255];
 
-/// Fitted picture size and its offset inside the canvas.
+/// Where a picture lies on the canvas, in pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Fit {
+    /// Width of the scaled picture.
     pub width: usize,
+    /// Height of the scaled picture.
     pub height: usize,
+    /// Columns of padding to its left.
     pub x: usize,
+    /// Rows of padding above it.
     pub y: usize,
 }
 
+/// The placement of a `width` × `height` picture: the largest size of its
+/// aspect ratio the canvas holds, each dimension rounded to nearest, centred
+/// with offsets rounded down.
 pub fn fit(width: usize, height: usize) -> Fit {
     let (ow, oh) = (CANVAS_WIDTH as u64, CANVAS_HEIGHT as u64);
     let (iw, ih) = (width.max(1) as u64, height.max(1) as u64);
@@ -238,6 +248,10 @@ fn hscale<T: Sample>(src: &[T], f: &Filter, shift: u32, out: &mut [i16]) {
 #[inline(always)]
 fn hscale_fixed<T: Sample, const L: usize>(src: &[T], f: &Filter, shift: u32, out: &mut [i16]) {
     for ((o, &s), c) in out.iter_mut().zip(&f.start).zip(f.coef.chunks_exact(L)) {
+        #[expect(
+            clippy::expect_used,
+            reason = "the slice above has L samples; the loop keeps its measured form"
+        )]
         let taps: &[T; L] = src[s as usize..][..L]
             .try_into()
             .expect("filter inside source");
@@ -627,6 +641,9 @@ impl Wide {
     }
 }
 
+/// The letterbox converter, with the filters and scratch rows it keeps from
+/// one picture to the next. The filters are rebuilt when the width, height or
+/// bit depth of the pictures changes.
 #[derive(Debug, Default)]
 pub struct Scaler {
     key: Option<(usize, usize, u8)>,
@@ -636,7 +653,9 @@ pub struct Scaler {
 }
 
 impl Scaler {
-    /// Writes the complete canvas: black padding and the fitted picture.
+    /// Writes the whole canvas: opaque black padding and `picture` scaled to
+    /// its [`fit`]. Panics unless `rgba` is [`CANVAS_BYTES`] long, and when a
+    /// plane is shorter than the picture's size and offsets say.
     pub fn letterbox(&mut self, picture: &PictureView<'_>, rgba: &mut [u8]) {
         assert_eq!(rgba.len(), CANVAS_BYTES);
         let picture = &reference_crop(picture);
@@ -651,6 +670,7 @@ impl Scaler {
             self.key = Some(key);
             self.plan = Some(Plan::new(picture.width, picture.height, f));
         }
+        #[expect(clippy::expect_used, reason = "the plan was built just above")]
         self.plan.as_mut().expect("plan").run(picture, f, rgba);
     }
 

@@ -1,6 +1,7 @@
 use crate::{Error, Result};
 
-/// Visible size plus the macroblock-aligned coded size MPEG-1 operates on.
+/// A visible picture size and the coded size around it: each dimension
+/// rounded up to a whole number of 16×16 macroblocks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Geometry {
     pub(crate) width: usize,
@@ -10,20 +11,26 @@ pub struct Geometry {
 }
 
 impl Geometry {
+    /// Visible width in pixels.
     pub const fn width(self) -> usize {
         self.width
     }
+    /// Visible height in pixels.
     pub const fn height(self) -> usize {
         self.height
     }
+    /// Coded width in macroblocks.
     pub const fn macroblock_width(self) -> usize {
         self.mb_width
     }
+    /// Coded height in macroblocks.
     pub const fn macroblock_height(self) -> usize {
         self.mb_height
     }
 
-    /// Even sizes up to the 12-bit sequence-header fields are accepted.
+    /// A geometry of `width` × `height` visible pixels. Both must be even and
+    /// from 2 to 4094, the range of the 12-bit MPEG-1 size fields;
+    /// [`Error::Geometry`] otherwise.
     pub fn new(width: u32, height: u32) -> Result<Geometry> {
         if width == 0
             || height == 0
@@ -43,21 +50,27 @@ impl Geometry {
         })
     }
 
+    /// Samples per coded luma row.
     pub fn luma_stride(&self) -> usize {
         self.mb_width * 16
     }
 
+    /// Samples per coded chroma row.
     pub fn chroma_stride(&self) -> usize {
         self.mb_width * 8
     }
 
+    /// Bytes of an RGBA frame of the visible size.
     pub fn rgba_len(&self) -> usize {
         self.width * self.height * 4
     }
 }
 
-/// A YUV 4:2:0 picture stored at the coded (macroblock-aligned) size. Samples
-/// beyond the visible area replicate the nearest visible edge sample.
+/// An 8-bit YUV 4:2:0 picture stored at the coded size of its [`Geometry`]:
+/// rows of [`luma_stride`](Geometry::luma_stride) and
+/// [`chroma_stride`](Geometry::chroma_stride) samples. After
+/// [`pad_edges`](Self::pad_edges) the samples beyond the visible area repeat
+/// the nearest visible one.
 #[derive(Clone, Debug)]
 pub struct Picture {
     pub(crate) geometry: Geometry,
@@ -67,29 +80,35 @@ pub struct Picture {
 }
 
 impl Picture {
+    /// The picture's sizes.
     pub const fn geometry(&self) -> Geometry {
         self.geometry
     }
-    /// Complete coded planes. Mutable slices may change samples, never their
-    /// extent, stride or the validated geometry.
+    /// The coded luma plane, padding included.
     pub fn y(&self) -> &[u8] {
         &self.y
     }
+    /// The coded Cb plane, padding included.
     pub fn cb(&self) -> &[u8] {
         &self.cb
     }
+    /// The coded Cr plane, padding included.
     pub fn cr(&self) -> &[u8] {
         &self.cr
     }
+    /// The coded luma plane, to write samples into.
     pub fn y_mut(&mut self) -> &mut [u8] {
         &mut self.y
     }
+    /// The coded Cb plane, to write samples into.
     pub fn cb_mut(&mut self) -> &mut [u8] {
         &mut self.cb
     }
+    /// The coded Cr plane, to write samples into.
     pub fn cr_mut(&mut self) -> &mut [u8] {
         &mut self.cr
     }
+    /// The visible samples of luma row `row`; `None` when there is no such row.
     pub fn y_row(&self, row: usize) -> Option<&[u8]> {
         if row >= self.geometry.height {
             return None;
@@ -97,6 +116,7 @@ impl Picture {
         let start = row.checked_mul(self.geometry.luma_stride())?;
         self.y.get(start..start.checked_add(self.geometry.width)?)
     }
+    /// The visible samples of Cb row `row`; `None` when there is no such row.
     pub fn cb_row(&self, row: usize) -> Option<&[u8]> {
         if row >= self.geometry.height / 2 {
             return None;
@@ -105,6 +125,7 @@ impl Picture {
         self.cb
             .get(start..start.checked_add(self.geometry.width / 2)?)
     }
+    /// The visible samples of Cr row `row`; `None` when there is no such row.
     pub fn cr_row(&self, row: usize) -> Option<&[u8]> {
         if row >= self.geometry.height / 2 {
             return None;
@@ -114,6 +135,7 @@ impl Picture {
             .get(start..start.checked_add(self.geometry.width / 2)?)
     }
 
+    /// A picture of luma 0 and chroma 128 throughout.
     pub fn new(geometry: Geometry) -> Picture {
         let luma = geometry.luma_stride() * geometry.mb_height * 16;
         let chroma = geometry.chroma_stride() * geometry.mb_height * 8;
@@ -125,7 +147,8 @@ impl Picture {
         }
     }
 
-    /// Replicate the visible right/bottom edges into the coded padding.
+    /// Repeats the last visible column and row through the coded padding to
+    /// their right and below.
     pub fn pad_edges(&mut self) {
         let g = self.geometry;
         pad_plane(
@@ -151,8 +174,8 @@ impl Picture {
         );
     }
 
-    /// The visible planes, tightly packed (Y, then Cb, then Cr): the layout the
-    /// reference worker writes for conversion comparisons.
+    /// The visible samples without padding: every Y row, then every Cb row,
+    /// then every Cr row.
     pub fn visible_yuv420(&self) -> Vec<u8> {
         let g = self.geometry;
         let mut out = Vec::with_capacity(g.width * g.height * 3 / 2);

@@ -14,7 +14,7 @@
 //!   below 16 share this result on both targets. At widths of 2 modulo 4
 //!   from 18 up, the 32-bit reference faults and conversion uses the filter.
 //!
-//! Converter::filtered uses the filtered conversion at every width, as the
+//! [`Converter::filtered`] uses the filtered conversion at every width, as the
 //! AArch64 reference does.
 
 use crate::{Error, Geometry, Picture, Result};
@@ -23,7 +23,9 @@ use crate::{Error, Geometry, Picture, Result};
 /// without a separate flip pass.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Orientation {
+    /// The first row of the buffer is the top of the picture.
     TopDown,
+    /// The first row of the buffer is the bottom of the picture.
     BottomUp,
 }
 
@@ -32,7 +34,9 @@ pub(crate) const fn block_path(geometry: Geometry) -> bool {
     geometry.width >= 16 && geometry.width.is_multiple_of(4)
 }
 
-/// Reusable conversion scratch, sized for one geometry.
+/// An RGBA to YUV 4:2:0 converter with its scratch rows, to reuse from frame
+/// to frame. The scratch is sized for one geometry and replaced when a picture
+/// of another arrives.
 #[derive(Debug)]
 pub struct Converter {
     scratch: Scratch,
@@ -78,6 +82,8 @@ impl Scratch {
 }
 
 impl Converter {
+    /// A converter that takes the block or the filtered path by the picture's
+    /// width, as the module documentation describes.
     pub fn new(geometry: Geometry) -> Converter {
         Converter {
             scratch: Scratch::new(geometry, block_path(geometry)),
@@ -85,7 +91,7 @@ impl Converter {
         }
     }
 
-    /// Use pair averaging and centre-sited vertical filtering at every width.
+    /// A converter that takes the filtered path at every width.
     pub fn filtered(geometry: Geometry) -> Converter {
         Converter {
             scratch: Scratch::new(geometry, false),
@@ -93,8 +99,9 @@ impl Converter {
         }
     }
 
-    /// Convert one RGBA frame into `out` (whose geometry selects the size) and
-    /// replicate the coded padding.
+    /// Converts the first `width * height * 4` bytes of `rgba`, rows in
+    /// `orientation`, into `out`, whose geometry gives the size, and pads its
+    /// edges. A shorter `rgba` is [`Error::InputLength`].
     pub fn convert(
         &mut self,
         rgba: &[u8],
@@ -129,7 +136,7 @@ impl Converter {
     }
 }
 
-/// Convenience wrapper allocating its own scratch.
+/// [`Converter::convert`] with a converter made for this one call.
 pub fn rgba_to_yuv420(rgba: &[u8], orientation: Orientation, out: &mut Picture) -> Result<()> {
     Converter::new(out.geometry).convert(rgba, orientation, out)
 }
