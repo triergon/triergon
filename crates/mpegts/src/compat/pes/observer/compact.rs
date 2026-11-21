@@ -38,31 +38,37 @@ fn record_count(span: &DemuxSpan, grouped: bool) -> usize {
     }
 }
 
-/// The payload of carrier `index` of a run, or the whole stored span; `None` only for a range
-/// outside the span, which admitted carriers and stored spans never have.
 #[inline]
-fn byte_view(span: &DemuxSpan, index: usize, run: bool) -> Option<BytesView<'_>> {
+#[expect(
+    clippy::expect_used,
+    reason = "returning these views as options measured +1.2% on progressive TS188 and +0.9% on HLS playback"
+)]
+fn byte_view(span: &DemuxSpan, index: usize, run: bool) -> BytesView<'_> {
     let range = if run {
         let at = index * TS188_BYTES;
         at + TS_PAYLOAD_START..at + TS188_BYTES
     } else {
         0..span.bytes.len()
     };
-    span.bytes.view(range).ok()
+    span.bytes.view(range).expect(if run {
+        "admitted complete carrier"
+    } else {
+        "complete stored span"
+    })
 }
 
-fn view(span: &DemuxSpan, index: usize, run: bool) -> Option<DemuxSpanView<'_>> {
-    let bytes = byte_view(span, index, run)?;
+fn view(span: &DemuxSpan, index: usize, run: bool) -> DemuxSpanView<'_> {
+    let bytes = byte_view(span, index, run);
     if !run {
-        return Some(DemuxSpanView {
+        return DemuxSpanView {
             bytes,
             source: span.source,
             transport: span.transport,
             context: span.context,
-        });
+        };
     }
     let at = index * TS188_BYTES;
-    Some(DemuxSpanView {
+    DemuxSpanView {
         bytes,
         source: SourceRange {
             offset: span.source.offset + at as u64,
@@ -78,7 +84,7 @@ fn view(span: &DemuxSpan, index: usize, run: bool) -> Option<DemuxSpanView<'_>> 
             source_event_ordinal: span.context.source_event_ordinal + 2 * index as u64,
             ..span.context
         },
-    })
+    }
 }
 
 /// The same logical carrier spans with one backing handle per stored run.
@@ -192,7 +198,7 @@ impl<'a> DemuxSpanViews<'a> {
     #[inline]
     pub fn next_bytes(&mut self) -> Option<BytesView<'a>> {
         let (span, index, run) = self.next_entry()?;
-        byte_view(span, index, run)
+        Some(byte_view(span, index, run))
     }
 }
 
@@ -200,7 +206,7 @@ impl<'a> Iterator for DemuxSpanViews<'a> {
     type Item = DemuxSpanView<'a>;
     fn next(&mut self) -> Option<Self::Item> {
         let (span, index, run) = self.next_entry()?;
-        view(span, index, run)
+        Some(view(span, index, run))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -234,20 +240,31 @@ impl PayloadCursor {
         self.active
     }
     /// Borrow the active range until it is explicitly retired.
+    #[expect(
+        clippy::expect_used,
+        reason = "returning these views as options measured +1.2% on progressive TS188 and +0.9% on HLS playback"
+    )]
     pub fn current(&self) -> Option<DemuxSpanView<'_>> {
-        if !self.active {
-            return None;
-        }
-        view(self.current.as_ref()?, self.index, self.current_count != 1)
+        self.active.then(|| {
+            view(
+                self.current.as_ref().expect("active payload range"),
+                self.index,
+                self.current_count != 1,
+            )
+        })
     }
     /// Borrow the active byte range without constructing its source facts.
     /// The range and backing are identical to `current().map(|span| span.bytes)`.
     #[inline]
+    #[expect(
+        clippy::expect_used,
+        reason = "returning these views as options measured +1.2% on progressive TS188 and +0.9% on HLS playback"
+    )]
     pub fn current_bytes(&self) -> Option<BytesView<'_>> {
-        if !self.active {
-            return None;
-        }
-        byte_view(self.current.as_ref()?, self.index, self.current_count != 1)
+        self.active.then(|| {
+            let span = self.current.as_ref().expect("active payload range");
+            byte_view(span, self.index, self.current_count != 1)
+        })
     }
     /// Admit the next logical range. The caller validates its pool and full
     /// extent before consuming bytes, as with an ordinary span iterator.
