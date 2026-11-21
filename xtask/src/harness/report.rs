@@ -1544,7 +1544,7 @@ fn publish_measurements(
 /// one of its `pending_module_requirements`. An entry with `targets` is open on
 /// those of the contract's `required_targets` only, and must pass elsewhere.
 /// Every id must be a case of the manifest.
-pub(super) fn open_cases(
+pub(crate) fn open_cases(
     contract: &Value,
     manifest: &Value,
     target: &str,
@@ -1589,7 +1589,7 @@ pub(super) fn open_cases(
 /// Prints how many cases pass and which listed open cases still fail. Holds when
 /// every other case passes and every open case still fails: a listed case that
 /// starts to pass must leave the list, so the list only shrinks.
-pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
+pub(crate) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
     let passed = |row: &Value| row.get("parity").and_then(|p| s(p, "status")) == Some("pass");
     let listed = |row: &Value| open.iter().any(|id| s(row, "id") == Some(id));
     let ids = |keep: &dyn Fn(&Value) -> bool| -> Vec<&str> {

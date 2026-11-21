@@ -13,7 +13,7 @@ pub(super) fn field<'a>(value: &'a Value, key: &str) -> Result<&'a Value, String
         .ok_or_else(|| format!("missing {key}"))
 }
 
-pub(super) fn text<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
+pub(crate) fn text<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
     field(value, key)?
         .as_str()
         .filter(|s| !s.is_empty())
@@ -55,7 +55,7 @@ pub(crate) fn put(value: &mut Value, key: &str, replacement: Value) -> Result<()
     Ok(())
 }
 
-pub(super) fn hash<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
+pub(crate) fn hash<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
     let digest = text(value, key)?;
     if digest.len() != 64 || !digest.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(format!("{key} must be a SHA-256"));
@@ -238,7 +238,7 @@ pub(super) fn current_workers(root: &Path, identity: &Value) -> Result<(PathBuf,
 }
 
 /// Bind a contract's additional candidate to its binary and selected sources.
-pub(super) fn candidate_worker(
+pub(crate) fn candidate_worker(
     root: &Path,
     identity: &Value,
     name: &str,

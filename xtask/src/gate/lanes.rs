@@ -105,7 +105,7 @@ fn validate(root: &Path, registry: &Value) -> Result<(), String> {
         if !scheduled.contains(lane.as_str())
             || !(crate::codecs::correctness::is_lane(grade_lane)
                 || crate::codecs::readers::format(lane).is_some()
-                || lane == "reader-ogg-seek")
+                || matches!(lane.as_str(), "reader-ogg-seek" | "imdct"))
         {
             return Err(format!("{lane}: unrecognized or unscheduled lane"));
         }

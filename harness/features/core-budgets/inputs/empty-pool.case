@@ -1,0 +1,4 @@
+storage 0
+reserve a 0
+reserve b 1
+release a

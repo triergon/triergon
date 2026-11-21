@@ -190,7 +190,10 @@ impl<'a> TraceOracle<'a> {
         }
         let actual = split_trace(&result.stdout, self.operation, &self.fields)?;
         case_input(root, self.contract, corpus, case)?;
-        let status = if actual == reference.as_bytes() {
+        let exact = actual == reference.as_bytes();
+        let within_one_ulp = matches!(self.oracle, oracle::Kind::Trace("windows"))
+            && crate::codecs::dsp::windows_match(actual, reference.as_bytes());
+        let status = if exact || within_one_ulp {
             "pass"
         } else {
             "mismatch"

@@ -1,0 +1,1435 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "n-0004",
+      "profile": "imdct",
+      "length": 4,
+      "specs": {
+        "unit-seeded": "80408fbf0c6d0a0413e7f1aa5b488c5c1dec3d74435611cd8a5f02d0dbe73978",
+        "unit-first": "a5551fdc51365ad87078005ef33d0f867b22f7103be6b933e4f307183429b9c8",
+        "unit-last": "9daeeb7404a8f344de836d2fa3ddf127059f9f3694542db467988ab983eb35ac",
+        "scaled-seeded": "5f0383feae9e208d2be309c659f4c48349dc8e63cd53a65cfa22342c670c843f",
+        "scaled-first": "8a18d857c7570f5aeb863064de819e400462a1f3bcfe962fce93ee3ddfb3fdaf",
+        "scaled-last": "f2fa12ab8e8f66920b69624b708ccf6616e4c1909ff6c77a8225796fe025b3eb"
+      }
+    },
+    {
+      "id": "n-0008",
+      "profile": "imdct",
+      "length": 8,
+      "specs": {
+        "unit-seeded": "417dca7dc5f343f5cd0658ec32bcdcc9106a61b6d3aa46db5f3d181fbfbe5ba7",
+        "unit-first": "15a740d00205599f55ae97ba9a719f5aff34d4cd46d8d6d7604a06670ddb1d1e",
+        "unit-last": "92c2375588b7833d363540af0988878f54b59512f25c8e51fb1134e31ddc498b",
+        "scaled-seeded": "bbf277a1d1306f9939e257d25c6b4ef858ee83d326a300939b2dd910a14685b7",
+        "scaled-first": "303eca2dd8cde74cf18565b33385233ce2f577bd2d5c4ff6e97840b9cc7a748c",
+        "scaled-last": "0358a0c162398cef3f8a65c961e78d0ced05eca41cff7ebd907c031387b386a7"
+      }
+    },
+    {
+      "id": "n-0012",
+      "profile": "imdct",
+      "length": 12,
+      "specs": {
+        "unit-seeded": "b29e7a62ad8dc416a583114ed73f1f6a5d9cc81d8ef8e706efdcf7a42e4f141a",
+        "unit-first": "b1c3db62d986c6137c6701c5b3904af82a7de495a125cfbc0e4e34557d50007a",
+        "unit-last": "a8b4c734938905a0f86e842e14805c30e19c6e732a510385db55eb088268bbe4",
+        "scaled-seeded": "00ad536ac253c98d3e19f0c27f51e59120a58e43bf6bc74129980d3b925a85d8",
+        "scaled-first": "dd0fe79b53e7f6b5f09af1372013791c60aef1ea27b2adbfb86d5e5a1f847314",
+        "scaled-last": "e869a89499b14aabe8e14fa3051e634e8e25c1ed8405c92d514000838128df89"
+      }
+    },
+    {
+      "id": "n-0016",
+      "profile": "imdct",
+      "length": 16,
+      "specs": {
+        "unit-seeded": "70bb26e92deacc03b1563f14408957049e73d0758d8381cd0d5a3091ce328c89",
+        "unit-first": "ca3a66467aec4ef4d4dd88c873f323a5e81db1e7526003a80e874ca86461eb9c",
+        "unit-last": "c05be02b9258c2fa3133a831d4d84a281f5b0bf2416e38621877ea7bd30b914a",
+        "scaled-seeded": "d6e1da55d4ab4bf8dddd744bcf2ba1083062ecff375febcc65509a365e7401e1",
+        "scaled-first": "3ce7755593a9142aa4a85aa408ec84ae9bcc8b8b163aaf2da00aae8ca02ef7bf",
+        "scaled-last": "fb89b3da7d683df08ec060397a09b9b437ef11c917bed8dd2988dcfdeda455d3"
+      }
+    },
+    {
+      "id": "n-0020",
+      "profile": "imdct",
+      "length": 20,
+      "specs": {
+        "unit-seeded": "1b0076b7b5bcebf08ea53681fd5dca8f5050915d5cdfa1ce24b7421f8a06cd38",
+        "unit-first": "d1322043c63f1c9f29a2cdf15bbec4792ebc8eb790e7c01f56aeb1154349731e",
+        "unit-last": "80ff82299fc8db25fc89aa24349db98012312052de706344dcfa09e27db0977a",
+        "scaled-seeded": "a9018c97ba58c3f9d3eeccce671c1e8e5a4c1c7ff440955fab1a9045aa4d0467",
+        "scaled-first": "0dac2f858d133d837ab96c420320507146e66f5b64a59f15c79f94a33965d1ce",
+        "scaled-last": "5747e341f7175759127dc9195a46bcde157e9045ec2cd802857fcfd3a7f54cec"
+      }
+    },
+    {
+      "id": "n-0024",
+      "profile": "imdct",
+      "length": 24,
+      "specs": {
+        "unit-seeded": "b47fefda71b6bddd174abc2f26f01508ad80006af67263a32b5a15098d5e16e1",
+        "unit-first": "c96b3308153d3aa3e6d456aa1041da12c3e32ceb228e501386f917971af04275",
+        "unit-last": "4acc5e8a0e87d0bd04fc3eb12dcc6255b8d7798fd4dc0468a309a33e240c302c",
+        "scaled-seeded": "db8393db87ed1df672121971c12f639d1436341143dcc9c260ffabb6606e4f75",
+        "scaled-first": "9fa6a6eb7f76e32206bff6d426022b7bdc7c39849c32c7031934f2c8014b9f55",
+        "scaled-last": "59978f147a5e3a22d5c6077c8d745022cc72abfb121fe709e5fe24823943458e"
+      }
+    },
+    {
+      "id": "n-0032",
+      "profile": "imdct",
+      "length": 32,
+      "specs": {
+        "unit-seeded": "9abc42fe343411ce1a13d3f7f0038539e82f3d29ca3b968f8226aaf90faf9a9e",
+        "unit-first": "55f21bfab35e992c673ce23c825b7dc5bc6e5a237da6e5533edb025c3cb58538",
+        "unit-last": "700f108741c4c3d7cda7bc56b8d6f233a0d65c98154478c5257fec8b0ded4025",
+        "scaled-seeded": "a80c8a3500a60c84a76a2c46845bd9601c3ccadebfdfd2866c43b724b2267ff7",
+        "scaled-first": "542aa15fcdd19af39309543a36a824e9994204e337a9adba2eeb691b796c51d3",
+        "scaled-last": "e0da78525e443131da94b0f88e9eb1be07140eab325987970ee49288856f6f4e"
+      }
+    },
+    {
+      "id": "n-0036",
+      "profile": "imdct",
+      "length": 36,
+      "specs": {
+        "unit-seeded": "2769606a9a5bb0e5139dd9a599fd9f3935d3cf272bd05b8d0da8ca5cb69687e8",
+        "unit-first": "7ff8fa0a28edb6397f0d11e4dc461253752878fc504b89af56dba1adef557d74",
+        "unit-last": "03d0c6e1713efb306b12d06093e5232e7d679a74d225c9f5037373ab550cd16d",
+        "scaled-seeded": "9fc133f66eaf1fc2126c4b8e192ca492a2f0c08770ec065df5ec6f693be091e5",
+        "scaled-first": "32a6feb20c0ade765f7c69654a74e9a0d405c9e42afc9c031dff1070f48836e6",
+        "scaled-last": "4fbf104b8550c77062a76415a89ec8b0ee605fd799c5330014cfd236ecff9e0a"
+      }
+    },
+    {
+      "id": "n-0040",
+      "profile": "imdct",
+      "length": 40,
+      "specs": {
+        "unit-seeded": "117767775141877b6eef1d91d6c53bc6db39bcd6247d04f730679cc2b3994923",
+        "unit-first": "0bf905d9e814e017c7b8842e2e404ff6bdce0fc0843654661f29b5d01741c2e6",
+        "unit-last": "5b7757a9e9287c98b4af00deba557d3ebc3aa0d63e5d958d2660ddeb32b5ee8f",
+        "scaled-seeded": "b99b8dbc1246620cb0dbdd677e7db5bfdd73b89bc5136fb0d6e9cea0092ecead",
+        "scaled-first": "34a47804a486d1dc66146d38393cebf22de34299eeeabe7fe74bee9e9ade7224",
+        "scaled-last": "5ce4d3d4796c2efe3a7a265351597f8b01d594e550fb250e7d2eb2ab4595e08d"
+      }
+    },
+    {
+      "id": "n-0048",
+      "profile": "imdct",
+      "length": 48,
+      "specs": {
+        "unit-seeded": "3d99c5acecd2b322d5b9bd10d9549420d80c0c3a130f03048b57a43ca92a936c",
+        "unit-first": "f637c448487e0506e60a9ae0ffb36697d257758a4dbb605906297db1d0e39812",
+        "unit-last": "d80dd07e7249df5f9ff5cd6ff90219fe3c61c8679ebb9943bd47d666dd6a0c46",
+        "scaled-seeded": "6523c3522a15227167b88e4571c88d4b1e7ebfddf89d15f73aa17e1977acdfe0",
+        "scaled-first": "51b0a29232be61f3880bb18548839b75475a6c5a16ddf8063f0142f6f4958a42",
+        "scaled-last": "81c4794c77bf112855207f31dbfe275763b4c41b02d40fb81707be893c7b2686"
+      }
+    },
+    {
+      "id": "n-0060",
+      "profile": "imdct",
+      "length": 60,
+      "specs": {
+        "unit-seeded": "785266850b19283d173494c9f8e07b321ec46f11a5eb02d41671601e357c8da6",
+        "unit-first": "8ad817d886f22e65535f20829c0004e6dd08bc8d30fd5924f0b002e493fd41d1",
+        "unit-last": "8b4e980de43c5eba7b60563deb516360cbc10110c34e4e2b2221e4e1a9e77170",
+        "scaled-seeded": "45d948d83e158d8d6332f582cb7cd6b40988eb0d3b3a2c6a9dbc5e9d99017d57",
+        "scaled-first": "e816dbc8c67867cf271e57608b075bbdaaa7a0e690214fa6992b0a0f03d4b435",
+        "scaled-last": "6b5cdd040788193883891d4f53c24fff03ab632ffb6da6da46917f63e1ef5734"
+      }
+    },
+    {
+      "id": "n-0064",
+      "profile": "imdct",
+      "length": 64,
+      "specs": {
+        "unit-seeded": "af18f7101eb84ec9c75bfb65f6ea321a2d727a5efc664a4eeddcb05205e53596",
+        "unit-first": "061f338369fc53402c8df5bc96fdfff329e4be9ae0af63d364418cf956c14b04",
+        "unit-last": "48d2db91457cdb28407347a685e6c988c8c87af3919b312a64e4eacd9f99ef9c",
+        "scaled-seeded": "5138f3f5afb0c9e5fcb1054a983cfca05fd2015a4fe31fb33162a95f76fbca1a",
+        "scaled-first": "1b6a9f29dd8dde1120b20cf7781bc33fcc47504622a882787cf7384f6b172aab",
+        "scaled-last": "848c65288a761903aebaec01544e6839b77813d5dc1735bd864602030fbaaf28"
+      }
+    },
+    {
+      "id": "n-0072",
+      "profile": "imdct",
+      "length": 72,
+      "specs": {
+        "unit-seeded": "089ea2f4b95e1ae2a24f402675199965e0d44168ee97deab48a7961269d28ecd",
+        "unit-first": "103b0df6a7f2c321fdc47a9f67e305353236c8a808c8e297c38cb340d2d1c844",
+        "unit-last": "4f7d5f8b7ab3ba667b36e51d0b4876884978e0e195e1903cfe5dd94a04b246a7",
+        "scaled-seeded": "e256adf2e956f2e818e4300076d3bb627838f9eaf4a20fa72d154322a291c943",
+        "scaled-first": "0eebd6233232737e6a38b2a46e3570042d9a9a418f9fe39b05d4496ca239b717",
+        "scaled-last": "829f49800ec5e99b0961a392c898a614ce80c0423a9bfe68e43c0033ba24e5a6"
+      }
+    },
+    {
+      "id": "n-0080",
+      "profile": "imdct",
+      "length": 80,
+      "specs": {
+        "unit-seeded": "acf6604dbe7e30d9c9d4568ad61fe11e3bae7ae82ee57b2a02caa6091dad1168",
+        "unit-first": "eea890e41716be56bf6456af64019441be46af2ec4fb85c1a5a996a1d6a365e2",
+        "unit-last": "e10c2e511c8f78f2935780ca45a6b2fb1fda900f21fa3be8c890198cd2b88de2",
+        "scaled-seeded": "4f47cf0295d7d85f97d4d6ba6cac4dcb7dca4172cf601964cb743ca7393a94fc",
+        "scaled-first": "071ca2657668972fecaf807e49b0533c15c25c0dc34fbaa361f03296330ce2f7",
+        "scaled-last": "3da64eba8e2fbafb190de2edbe1b57ac84379319afbef1f9c5e7038f3b15612b"
+      }
+    },
+    {
+      "id": "n-0096",
+      "profile": "imdct",
+      "length": 96,
+      "specs": {
+        "unit-seeded": "372bc0218513f936b606dc08a176511ba6df59998af81997890f0b05eff80f91",
+        "unit-first": "9bceac95284ba40eff07cb1ce4dae7e64b1989d62cd181ea5949da32aff7fb78",
+        "unit-last": "4c1729b5dfc7ef7db4fef39e5869dd4f37fd23284944e3645cbfc0719cb9299f",
+        "scaled-seeded": "c1151f39f60f428f270bbaeb5406a2ccff2276ae0874d70b655aa5c3fa3a2eb7",
+        "scaled-first": "6901d4d38c0f49603dcb41e53cb3a0fccc4545596766f544e44c2ad89f9563be",
+        "scaled-last": "f7d1bb81c11990a25923b0bfbf6a0ed5a2f2b18fd31b23974044c05e942f855f"
+      }
+    },
+    {
+      "id": "n-0100",
+      "profile": "imdct",
+      "length": 100,
+      "specs": {
+        "unit-seeded": "6757cc05f028fa7ebda1083bb988a8bcdc1b3c4b7f762839371f1136055b5d5a",
+        "unit-first": "01b82a81b02bfb6cca86bebd38e73a1719c5e673cca6c1f3ed82894c88c660c6",
+        "unit-last": "c3aaba1992b7681f6c401caa891bf97ff02f026471f50e10070525d8d6340917",
+        "scaled-seeded": "e4932d2d787365c515b94a5ca85d4bacefc449b6ff4b81d4f4f52658acd0220f",
+        "scaled-first": "eb99d53b42b12b7db105c7601e445f99753f01dfc05b60bed93f4a78146f50f4",
+        "scaled-last": "cbf8f916942f2edf6cc0ab89102a0f4bf2d2ae9d0083ce047a537d3cdb22fda1"
+      }
+    },
+    {
+      "id": "n-0108",
+      "profile": "imdct",
+      "length": 108,
+      "specs": {
+        "unit-seeded": "8429d85ea5b4183e0ceee0dba2e21ca3bd7fa85e692c0ebdc084b2eac6675a72",
+        "unit-first": "e87b8c8792a44f7c9c6af90590235b77456dac38a479a68dd3d9205047633f6f",
+        "unit-last": "144d99efa726f383d8dff199b1beee32c803dc9c1c9df79d6d04a308a862d3d1",
+        "scaled-seeded": "0e6487204fa0355d80e7213549803a8357852b2ef2cd1e3fe62c481c4d79c3f8",
+        "scaled-first": "5fa3e38dd178cbddba8ba6f783be0b0dec47dbe28bf7bcb9150f05be6e36b804",
+        "scaled-last": "16213a8f7e63db3bb61cee70875aeafa891cc64f51d3ddea2b5ba3612649d152"
+      }
+    },
+    {
+      "id": "n-0120",
+      "profile": "imdct",
+      "length": 120,
+      "specs": {
+        "unit-seeded": "7703d426f7b8543ef8389865aa2476bf98da6f87f4a59d380a55aa299650465b",
+        "unit-first": "c45ce04a660e9795b1547da6f2affd0906155145ec55763db9693459863360bd",
+        "unit-last": "b6396f295721ed76c5c3aa1db937e2bd84426cc2e625887c49e9e6af63495449",
+        "scaled-seeded": "d2a7088569a0d2e520d9c0611af729a9e94ca11b3ab163c5a820247981410aa7",
+        "scaled-first": "947731acacbe14bb74dff2f275060ef1af25e88acb6fc969675720337b5d0b95",
+        "scaled-last": "8bd431723982185306f68a1bcdc44c5256db1d0db1af2d72ccef7cce6f6a0a5c"
+      }
+    },
+    {
+      "id": "n-0128",
+      "profile": "imdct",
+      "length": 128,
+      "specs": {
+        "unit-seeded": "4fd8e21cea3ce3403632dda02bf724d47acd17955b8b298a1a70484752aaca45",
+        "unit-first": "4c2b7cf0e68703c166c2a511e0b7c57d5d58571f510f21565bf37d98fc7e07b1",
+        "unit-last": "34087ad0dd48a67e51ba6f4eff97161baa3e7f72dd771be251f5a0948cdbb60d",
+        "scaled-seeded": "8c2ff76c58a8368af2d0019abbc8303d48dba0adf9ef850d18bc1ae409137ba7",
+        "scaled-first": "6b5a0c3831e7364f370b2e70199704194efe6429d6633a3db25bd7fef3aea53d",
+        "scaled-last": "29fe118753d3a114590e012bd35307c26aaa47e732a5d6f51e6b745a26aa3e34"
+      }
+    },
+    {
+      "id": "n-0144",
+      "profile": "imdct",
+      "length": 144,
+      "specs": {
+        "unit-seeded": "fffdfe2940567bacb57652e8970686e996d96199ddb209d2a0c610fc662e0906",
+        "unit-first": "731d47c1701024bd952eb3a7106b036aa74592728cd5bf72abaac38617d7c82c",
+        "unit-last": "208feb5b25e0da1ce870017adefda8c260856d5e2b03432ad614e9472a4df042",
+        "scaled-seeded": "b87d37ffc08ea36826b6750ec0294e914e2312bc4905fdd5e28f4b47833a1dec",
+        "scaled-first": "65954cb9147a2e2a8ff738c2e4b08edf31af494469040c827e8d32dbdfdfb47d",
+        "scaled-last": "b0d416f89c32f2675f694b4c345162ddff83c48702ca577d05f663d2558a47dc"
+      }
+    },
+    {
+      "id": "n-0160",
+      "profile": "imdct",
+      "length": 160,
+      "specs": {
+        "unit-seeded": "cf610f51877234e6095e3f4a2b9b50b47a4b1a2365906abb0f12f319e57b2caf",
+        "unit-first": "5a8fdc4b08a47ff3c366d8610c553065f73793d08e80b570c748a851736b0a4a",
+        "unit-last": "36d6ed1d16d3771c325aefe9813ca6d6d53377112b40f61706d960fce3339889",
+        "scaled-seeded": "3ad0c03ae28fcd448a589a03b749aa5da80ce44b50b9692eec6b2d3a8a7e306f",
+        "scaled-first": "9823621e14c5b2fab67d0e3ce69873649e17984682b187037b48dfe66a588f1b",
+        "scaled-last": "1f96e32e9aa08b5688b0d59f747b869fc844cbca9cd1198b069077dae80098ba"
+      }
+    },
+    {
+      "id": "n-0180",
+      "profile": "imdct",
+      "length": 180,
+      "specs": {
+        "unit-seeded": "a5d3f990d7842bf1938769c334646f20ee086352fd264ed809df87294cb2ae14",
+        "unit-first": "877b8e23b13c54053ebcae09e0f24c2cdc886e9c71d93c865eb2b91fd9bf6310",
+        "unit-last": "6d8af44f802e7850f746bbe845e92613bafc6b348c41d67050c74f706c9f23b0",
+        "scaled-seeded": "e5f63086998b162c0d7b9b4d04c10407c04f2584b121677d0304b74125f4e5f2",
+        "scaled-first": "0b960bb113cfd50b68551a333684da1903721d3f8c003b1ffda38a83ed6ed499",
+        "scaled-last": "b6765f9027371508d13690c99c3b5adc299603bd8277b5edce72bc94de7ccebb"
+      }
+    },
+    {
+      "id": "n-0192",
+      "profile": "imdct",
+      "length": 192,
+      "specs": {
+        "unit-seeded": "55825ad902be0f3765c202418ae786b03278c73a254b69a3d34414512adc1d49",
+        "unit-first": "9278fa6c481121b7cfd49d6f595a9e74c4f9074943b9bd81c1ef48309bf38600",
+        "unit-last": "130fbef4c29092418543410657d9e2a8975185b2726390124fd31674298822f3",
+        "scaled-seeded": "efa4f6228646b77bacab90cfc31184a9aa10b3caa9bf936d87dd69ee05fb7873",
+        "scaled-first": "cd497739130b13710dd114bc0d24d9b3fb2298ff03994bd11270f736788d4da5",
+        "scaled-last": "3b264325b88e10128068269fca9e8723ae37e1ae07a255aa6675be491b003a3f"
+      }
+    },
+    {
+      "id": "n-0200",
+      "profile": "imdct",
+      "length": 200,
+      "specs": {
+        "unit-seeded": "3f5640dba78203ff58fc849ae5d5bc1e6a0bcaabe8076dccc7f0862de57fe046",
+        "unit-first": "5722f6572e776493181504e3e869c1a5f6f0147c54d006e72ffe73d7bc62f053",
+        "unit-last": "08e43e63cd0e3593d3d283d177263ecd22c8ce229ddf978883f05aaf66ac5a46",
+        "scaled-seeded": "961806dcd08eb5cd6b780fd4f1d041432d2251b04e361188a03aec96da740311",
+        "scaled-first": "e9fa27d80d83a75bbc2dbe742946909e3af5442f106336beb16ba9dd39098f4e",
+        "scaled-last": "50a4e2ab01cb8fd9be0977cf66b1b07e915fa9407d3899f6af4aef29f95c360c"
+      }
+    },
+    {
+      "id": "n-0216",
+      "profile": "imdct",
+      "length": 216,
+      "specs": {
+        "unit-seeded": "9f95cca89bf841eb99b0ac5cddc393f8f79b412cef9a194010acf9403db8b5a4",
+        "unit-first": "a8f85a9506f92264a71a3ec7353cc2607faca933043068fa872e902e6ba097d2",
+        "unit-last": "82a9018051e40f66d8013d51908450243d2bdf92152f8b748e74021ec7056da1",
+        "scaled-seeded": "828ebd46ca65800bac1107753a4206c0edf99c30af5c5d4a370a59443e544898",
+        "scaled-first": "2953b7b22f786c7db98a8a75960f61778899baf59239b9771e9cd0930260a4fc",
+        "scaled-last": "db02ee67c1c1e97409ff0a008757146f345a745a13bf4bb05012497f3ac50c4a"
+      }
+    },
+    {
+      "id": "n-0240",
+      "profile": "imdct",
+      "length": 240,
+      "specs": {
+        "unit-seeded": "41928b91f2aeffee8f68e778de2f4d3c068e2115de4cfc4680a9b59df757773f",
+        "unit-first": "fd297f9b089cb232193bee70bc237f925e9944737168fb9ec90b6f39ab3eec20",
+        "unit-last": "23598ee9bf5681c61f388d83eeaae47738fc6985d3c00ea517fd3663ccd317f1",
+        "scaled-seeded": "203f466fe661f8c84629d4f23dc9e3880dfe7ef8a2e3757b0e7ddd6f637a2814",
+        "scaled-first": "d57f150a6eaa244dfe6be12bbd480b50648904c91dc56066da826b463416fab5",
+        "scaled-last": "8b13b44c1e2023df0553a89208552e50ecc91b1da6601a8d2384c2acb58862ba"
+      }
+    },
+    {
+      "id": "n-0256",
+      "profile": "imdct",
+      "length": 256,
+      "specs": {
+        "unit-seeded": "853925597cdca47881fac9a2ce078cf928282647cee5f4858558d6a249ab227c",
+        "unit-first": "2f85675c1a85b57afd1135341411fc3ec9e947f28e787f0b2dd98ebbd43c7bd3",
+        "unit-last": "2e6627059bd2fc141f61946868b24b03ab886c3355731951f7347d273392fb66",
+        "scaled-seeded": "21362272b1301a3001a2d52f45e4a04f89d2b12c58be6c4560c109c5cc9ae5ae",
+        "scaled-first": "4421982bbcd998ce910dddaac6466a3b8e2f8e0433ebea667171a58bee3cc183",
+        "scaled-last": "2683a6ea003315b76005a6f2e940318406652f6b55d4741bbf5b5ebbaa29b559"
+      }
+    },
+    {
+      "id": "n-0288",
+      "profile": "imdct",
+      "length": 288,
+      "specs": {
+        "unit-seeded": "516f6f549f6eb780d9b14f1218847fd0b3b1299abba71a3beb412bda30c316a2",
+        "unit-first": "619a6829cdefe22fc753211305af75364b62e338108068eeb14d598a260cb5e9",
+        "unit-last": "32d4fc816604f49f4c2d4ca42ccb3a5ee5478074dd8fedbaf9a186d00dc29c52",
+        "scaled-seeded": "74ebcdea03438ae02a6efcdde3710894b9d4460aa03a287d79402179bf2935bf",
+        "scaled-first": "d5348e96218d18317d69883f13d115b9b5bcd73311618a9979ff1b06d79073cb",
+        "scaled-last": "cc18f47affedf4daafee94d47d94aae4522d86f4d091d43b065a209605ec7cfb"
+      }
+    },
+    {
+      "id": "n-0300",
+      "profile": "imdct",
+      "length": 300,
+      "specs": {
+        "unit-seeded": "bc4ed83e6c299222ccd96269117d86dba4126bcfb93c9548f676b359ca220986",
+        "unit-first": "8628398beef6b724127782ea54dc8ba7b1d982e90cde607a5c327331c4997fa6",
+        "unit-last": "6b628f0789df2c98b9343215756c3547ac772b4adc509181afb61c47e0d15ef9",
+        "scaled-seeded": "ba50257bbeb45b22c25ee14a2fb72cf30fdc4ac7ce739e1aa5dbfd994c5bccfc",
+        "scaled-first": "98ca8ba751320da139bb22de54b027a4245cb3200932db3d9e0a9a85902cc55b",
+        "scaled-last": "3d4e4c2d72cf9551b609014ae9e1c63a719b7b02bd30237219dcda50964806bc"
+      }
+    },
+    {
+      "id": "n-0320",
+      "profile": "imdct",
+      "length": 320,
+      "specs": {
+        "unit-seeded": "14891691d95f58160547ecf120010f9f4493a56934d235ca2a56502efe510aa7",
+        "unit-first": "24c6ee9065e793bdcfa1fc6c92c9cd1660f52124183d7fe809414aaa73ff5900",
+        "unit-last": "fe804b0e2d8fc5bcda9bc9ba2c70e5790dcec6214a8352439aafda7eb2fd4641",
+        "scaled-seeded": "2adafe9dbad2fce643d669832ffffeb1f3ed1cd97dfa81c4f0c1331046ff7a7c",
+        "scaled-first": "d19c5fa106dd927b15dfdebe79404f23c00c4b16ba1835e5d2513acdaaf40ccb",
+        "scaled-last": "a6957ec8a0b2cb49c124f36d5d35e92cbe3ead865246b540d2dd4763ccf1cc12"
+      }
+    },
+    {
+      "id": "n-0324",
+      "profile": "imdct",
+      "length": 324,
+      "specs": {
+        "unit-seeded": "695e2cd4228a14b8a11fa4b30906f41d0994b84b07d21feea68680994d3041f2",
+        "unit-first": "9aa7b25f7352b6c77b26e754b29708ea4c452bcb8669c59b986d1e25d35f6e4f",
+        "unit-last": "2380fa15b93578706f1f5b8c70fa955586e561c9b10ca11c67cd25c46354e96b",
+        "scaled-seeded": "a5794080b5aab50a934261100f8e1f2ed83f23151e9eef84dcebf5a99fa2f13f",
+        "scaled-first": "dd1733b75efd5ed86c93c5a5d02052dfe70704202ee71e1bb50caffcfa7d5014",
+        "scaled-last": "d1b08679dd56f64336481a30bfa82a11b01e0e724926b57aa459088dac022672"
+      }
+    },
+    {
+      "id": "n-0360",
+      "profile": "imdct",
+      "length": 360,
+      "specs": {
+        "unit-seeded": "a336433a15563b76ce0ee2bffee94e1bf9235dd3f88fcee80a8658dced964c27",
+        "unit-first": "3dda95abe09c702c1ebf73dee7ee54bcf3ebcc5bb3922b613fcb0c11f2ad0c81",
+        "unit-last": "065d92dd5e2ad6b5c47b33eedf5ec45fd154a9f54f5351f57a622a95887f62e4",
+        "scaled-seeded": "7850387cf24f4fa1ea816ac9a5c0260d2e98fd930b6a969efd1b5564cea25289",
+        "scaled-first": "5f9f54e40f0a00eb8931154b8f324bada217a858b9ac3793c31fc94c88c9c347",
+        "scaled-last": "ec519715dfeb9103d70e4a14b212b47a79bff14551d60d78b96d88e5bff509ce"
+      }
+    },
+    {
+      "id": "n-0384",
+      "profile": "imdct",
+      "length": 384,
+      "specs": {
+        "unit-seeded": "294e3dad0b1390751c1f6c7526a7e961734fa5986c3fb2e362fefc02e828f092",
+        "unit-first": "deb5f18d5e726f346c7836119a669b755b60eb23321d70388677720b24067da4",
+        "unit-last": "7ca386efcc8b30239030e7938a1582ac8c72e2c60bf73b0158eb9dfaaa886eb7",
+        "scaled-seeded": "bd004b7b552b6afbdc14a88478fba787051a37cd127b9fb7058cf4be74357a00",
+        "scaled-first": "a74a57b902140ad8e87a8fa295117cddace1b9c5c9873b604e2ebe9793af3223",
+        "scaled-last": "f891693e183e75b28daad837f3ad1a4813fc38e3dc5662e7531a1fb09a79d0c9"
+      }
+    },
+    {
+      "id": "n-0400",
+      "profile": "imdct",
+      "length": 400,
+      "specs": {
+        "unit-seeded": "a6c36609c05fee55f920d2ce1e5cd4df91ab04482cf5f55cc7edac79ed5d909f",
+        "unit-first": "53b0ea62ba4713a93b0ad169f0b90dc3a4eb66a5d53f7bb92ae4362fbacf1de5",
+        "unit-last": "4433a0d16a29571cee23269efc88d9e723c6a1523b8f97a7f97c92d8f2f1c531",
+        "scaled-seeded": "f469e6e0b63aa56d8f4225b3ed6fa4bb7b4a694457241ad6793186c188716485",
+        "scaled-first": "fa6ffc6da6bfbe01cab1a749c21fefa16b660bea3d419dc7201ec9bf8d5ddb5b",
+        "scaled-last": "83cc093bfb15eabe68a1eb889caac7e5ed6addecc746fcb1c564380badd5515e"
+      }
+    },
+    {
+      "id": "n-0432",
+      "profile": "imdct",
+      "length": 432,
+      "specs": {
+        "unit-seeded": "8a17ffc5df319db4cb6f6d1d2e12a7e06f06f5650546b2a07934d3e17d5ba38a",
+        "unit-first": "614d47b4132d4ad8a03b2e820dd34e1dfe436340aaa5e9e28bbd6d2e229a4276",
+        "unit-last": "8ec3955f8650efabcc496360ed49abc7e9758d9b61cbe459826ffb919c3b9606",
+        "scaled-seeded": "e5879b2204050d9077c648bdbf13c54cb9344fab61d8f20b2e20b3b0906b8845",
+        "scaled-first": "0ec8d730ec3ba8f5958b02b1e241cf75e77b2abc21823ca47e1d9e010450eded",
+        "scaled-last": "0e6d535f7610244af4bb1f27f436a2cb344858c4a82509727e6c4bb00f6e43a0"
+      }
+    },
+    {
+      "id": "n-0480",
+      "profile": "imdct",
+      "length": 480,
+      "specs": {
+        "unit-seeded": "9d65c0e0e74819571ef2a8aa52913a0a33c2e11f131d09fec678275a9c3a5555",
+        "unit-first": "075d97ec6d30a7bf8cc820d2246aeafe5d924706461eb7e02cc9f004fc4bf9cf",
+        "unit-last": "b85f8e2cebc2f3887a334be40372c0c6fa9325b72cda743eeacb67952b7d596c",
+        "scaled-seeded": "c62abfe7d7449057f4b8f6f9fb1ac05179b71c81df7da47a61aff0bfb708fc6c",
+        "scaled-first": "ae72f3f72a9c0efecb8679d90344099c8c347bfb92a8bd45ac8c2d79e0bdfa77",
+        "scaled-last": "e5d23089ee7b1c0376ba2309b89dd6188418549f12f513e7c74a75e469251a20"
+      }
+    },
+    {
+      "id": "n-0500",
+      "profile": "imdct",
+      "length": 500,
+      "specs": {
+        "unit-seeded": "ca99113774fa64902062697b5224c73388f7709c941d0209b4fcb0f23565d1f7",
+        "unit-first": "0c1b65308349403637b86bbcf85567bb85906d54ed1d40784709d678be6696c0",
+        "unit-last": "ccb8c3229ac0d9b2cdd7dd6b3ec250f5c207a523bd4e95df3b3acd65abbd1107",
+        "scaled-seeded": "696ed29f4760b7f3d68cc399b215abe727e265a8f4b3bb49cfab3e35be5472fa",
+        "scaled-first": "b10939fa520bb6b4ebcc2b9e9f39da1931b6afbe53d401101a182f6bc5c7a130",
+        "scaled-last": "f330ff74ad4b54119f13f024f4112bab4359ebd860d3d7e86cd52145b1462122"
+      }
+    },
+    {
+      "id": "n-0512",
+      "profile": "imdct",
+      "length": 512,
+      "specs": {
+        "unit-seeded": "1a7353b1e25376443107da35304d11d1b2ba4c2b6f77be53ac7b09b035c3bcc3",
+        "unit-first": "7d5baa6d0f23eac11b0488b3ac37f0d3c40b8240be1a84e91aac5f59ceed5c73",
+        "unit-last": "5bf848e93a8cc6582d6f7811d445a046b19f82fa2380e8eebb2d55daa33e9691",
+        "scaled-seeded": "ab2d1577c320ac1363c9e181a5bcac55447629b5216ad4907cc9437f99a957aa",
+        "scaled-first": "2bad468c6abe686bca8c9729869b88c2dac7b22e1a2687c3f4e09bdbcc080804",
+        "scaled-last": "c2180e9980761c8685f522d94807151d6cd5da717b93a5f2649ac57b800ebe20"
+      }
+    },
+    {
+      "id": "n-0540",
+      "profile": "imdct",
+      "length": 540,
+      "specs": {
+        "unit-seeded": "c0963226650a723cf161b27f24bed1c725bc3314e9bcee0e92da4ae11b666a72",
+        "unit-first": "662151e17bd3392251f6f99976f2261d7ad6a8dd347d6cc0e9c826573f2139fc",
+        "unit-last": "4b97a0918c3d076810307a5a449201b6bc16453caaaf5af034e809c5597bdf9e",
+        "scaled-seeded": "086cb15792c0c2d44ca11183ad863ba90b8cdce61b565502772c4c70e4a54591",
+        "scaled-first": "c5c364c8267a39e32f225f162f6563a27d62edfaa471898ba96282ef74f910d7",
+        "scaled-last": "fc7ee58a49033e7391b31babb2255d6c4ddf4cc7b0e665ee062ba9596a97ae48"
+      }
+    },
+    {
+      "id": "n-0576",
+      "profile": "imdct",
+      "length": 576,
+      "specs": {
+        "unit-seeded": "cfb9e9455745e1d9ee72ba070c44278d288aac868412f2212685685e9d988298",
+        "unit-first": "0c98dfe180d9e3aaa8d181ad54462d0143776888cfe6afc257a30a0ff788d105",
+        "unit-last": "406d923caf4cbf58e5658ec8b3a15f60d9d24dd1e258bc1bc3537b407277442d",
+        "scaled-seeded": "4c87e00f902659c092e998c413b831353057e84c54dd529f726171ab524e2163",
+        "scaled-first": "00d58baf6cd6947478a1c9816decae95e6f708ac8c3075fbd6f8e0ee5bd5a45f",
+        "scaled-last": "473d25dd19f0e7d320838d44b23136d79cc844609ebbd855a79ebc68e7cd5d5d"
+      }
+    },
+    {
+      "id": "n-0600",
+      "profile": "imdct",
+      "length": 600,
+      "specs": {
+        "unit-seeded": "024b12e8bdfd9968b536ee039323c6f654c9b684993cf5b2af8ffcc6f587907b",
+        "unit-first": "a8853d08ca00b66f20ae28ae505e77c879405281a5d4bbe5329625da2878b0fe",
+        "unit-last": "eb401ebe19ae92855d95b24b01adc9e9823bb14e4bcf680847345fffc1b205bd",
+        "scaled-seeded": "25ec767abb804212eadbb25b3ba2eccd545b4b036b5bc4f16a92b922558eb735",
+        "scaled-first": "dc61bcf26bc7b450cde70fd2d82255a99de8d924f69f22d15bab9a83eb860cb5",
+        "scaled-last": "8b448585530fcb64a03d63cea0f08f29bab1512c8ce3c2ca71dc33f8fb90f4ef"
+      }
+    },
+    {
+      "id": "n-0640",
+      "profile": "imdct",
+      "length": 640,
+      "specs": {
+        "unit-seeded": "88b2349345a793d305859862919d8a8a6fdf5f00ae826d5dd0fbf99e083b8046",
+        "unit-first": "093b14544191d0fe1d77d1ea547d1a3e9af5a745ebcef9aef0721117f10b46bb",
+        "unit-last": "0601eefcfa8a409585bcf03ef5bff068c1811b7d65d82b3f7568835d1dface98",
+        "scaled-seeded": "68a88ff6c50500856be56633a4cbcb230f369f8f8cfc9e8982e38a8157982bf9",
+        "scaled-first": "af0294c516d8dc12024670fb4de466f156e5d88462a505593d04792aa1fd74a6",
+        "scaled-last": "9ecbbfb55aaf9bdb26446ca5fcfb838ab5000fafa2ad8c071ad88db733d6feb3"
+      }
+    },
+    {
+      "id": "n-0648",
+      "profile": "imdct",
+      "length": 648,
+      "specs": {
+        "unit-seeded": "9d8bade0fc057069b2895112eea7b26ca55ff65cc7e83911ad9a3ebd49dc46fa",
+        "unit-first": "b1aaf7c182887538db143dd01f395d02143c2fb1371dcaff2895bfaa0ac70831",
+        "unit-last": "ab9d60bf9809cd1ba6e15595f2bd24635ba82ac08ea2d71cb9f8f49bd4294e71",
+        "scaled-seeded": "261fbc7011d5accacbb87f64c7ac974fc34fd9b3783c6e8f976aa897b72a7e16",
+        "scaled-first": "e319a4f4c0ee8f15ba23bc971dd82dc6c80f4440e56dd7be68b7c1975b4f1dda",
+        "scaled-last": "df390f84082a951335b1b23fa9884b93bfc4fc31340ce09f7533cf8f3e639bfb"
+      }
+    },
+    {
+      "id": "n-0720",
+      "profile": "imdct",
+      "length": 720,
+      "specs": {
+        "unit-seeded": "584c22f95b0b6da2d74b29a82469f9c29d5a01b43bb5484f5d407efc6b2503d2",
+        "unit-first": "e8a1a86b1c3400e8bfee652992e6363d44fdb387290cb96ad2242cd337a39f5e",
+        "unit-last": "5fa2c1a7496d7f2c5cd09702266cfa61eb73296e74783c6485ba0a5bda6c1ffe",
+        "scaled-seeded": "a86805029cd0a93361eb02e17b634721af172a57787cd8364a98fe0db78ef384",
+        "scaled-first": "c70709762fd95b69d1c80d59dcc86896f3cb956d0bc60d84f70af262072b4894",
+        "scaled-last": "319e1fb0a651b27e7cbadb073d0cd62b9a92c94048658a74f1938dd18d5449c0"
+      }
+    },
+    {
+      "id": "n-0768",
+      "profile": "imdct",
+      "length": 768,
+      "specs": {
+        "unit-seeded": "95380ac9d520f757371075ad32c933efb2bdc12f4ed116907ecc2fb9ad07f893",
+        "unit-first": "1e9572067e60f2e65db0a9a17d409f4dbd3ae9e6e29b1563e9887d21e6f485b5",
+        "unit-last": "8f2afde764ae3b0130c230a74e9b12287966b6314dc61255aec3a4d1b0e426ac",
+        "scaled-seeded": "5bc2efce43ed6c7aff89cc7df2c9374e259faeede7caef4c829c111ed6e4a8ba",
+        "scaled-first": "296d4d042350bebf1ac8efb3001bdd53940169510e8b12eb0ed1ac21fcd09338",
+        "scaled-last": "39ac759d95f2512f7d5381f6027d181ef4a079e61d7c66bad25a6404e5436576"
+      }
+    },
+    {
+      "id": "n-0800",
+      "profile": "imdct",
+      "length": 800,
+      "specs": {
+        "unit-seeded": "42f4638d8d2bbe4979ed503ad73f29b38177d1703d030bca19db3d0bd71c073c",
+        "unit-first": "aef2e787a264e8c6253b7980d5be20d14492732371b77bfd9486caf3f2d23b76",
+        "unit-last": "497fe6886551202c9ca7dfcb3d41045c3ca33518db3661ff27d7b8f96c0bc456",
+        "scaled-seeded": "15ae10a9259560c0bc786ab7d59734c4b506ef794d80981bd788662f86fcab80",
+        "scaled-first": "74c9c66cc2e62f1013d56e14aa9e9fb8025391466042fbd5433135475327c503",
+        "scaled-last": "b688e1d9021c7c4e6cbe54b57fc0b49f07585ce5574e14dbc0472852b33a34fa"
+      }
+    },
+    {
+      "id": "n-0864",
+      "profile": "imdct",
+      "length": 864,
+      "specs": {
+        "unit-seeded": "e220a232426584be44630b6d760f9de3623945cb7a536e8ccaa1cb73c9d92134",
+        "unit-first": "6b12e1ec1c5a3a108599979146069a576a210f76d98c6e26e42d6b59bf56a7c6",
+        "unit-last": "3495848ee1411cd7cfa09ae0192eb3f9c0b89bf9590ee67cf3cd908e960feb5e",
+        "scaled-seeded": "5bb0093063857697a10a483d759c7bcbafe97a92bdd7263235584f8358854fd5",
+        "scaled-first": "984270ed278ce6cf9102c0265bc89bab27725dadff8c14de7fe93a07f629f12f",
+        "scaled-last": "71b8d2e26122e33d386c97b60bf42d965b5a0a5dc8feb62fea001ded3ba7d6ec"
+      }
+    },
+    {
+      "id": "n-0900",
+      "profile": "imdct",
+      "length": 900,
+      "specs": {
+        "unit-seeded": "3d140959283fc91e5ef4fa2b7026423c75bad2a131d9b33224f7a4800c5ffed4",
+        "unit-first": "360ce6238852ea48aa9f947e4c6b2f45cbfa9dd8ccf8a0b8bcf3595f68f7cb00",
+        "unit-last": "9229f9db68e562627bf8d3421d816d5d1df8153dc098aca1269205c5c20a976c",
+        "scaled-seeded": "da3e7834fcc80737c53f0df2b2d12091eb3ec031bd1dae5d770d60d7628057c7",
+        "scaled-first": "4d0719abb3b77adb9f0f2dd5cc2499eaa2baaa2d78d371c5b87a4d08c60e4f90",
+        "scaled-last": "00507adb2caf7dfe446b65ab22f72efaae989b19fcde17e6d47d24928fd8953b"
+      }
+    },
+    {
+      "id": "n-0960",
+      "profile": "imdct",
+      "length": 960,
+      "specs": {
+        "unit-seeded": "bd11c0e4d23244af743e638b37ac2b092585958654a989a6c1ac22fc993c685c",
+        "unit-first": "5ab58b7b6c266a642efc8c15bec9b3cc715582d480a6685cf1f8e74dbc511f08",
+        "unit-last": "30ad30edc982e4b801e5469055a001fc9fb66a51fc2325288364621b35741e89",
+        "scaled-seeded": "bc8ec3f10c651858bfb894d6ee57a09cc03cd75da146df54214164f77e9956df",
+        "scaled-first": "de69b6675310260711a55fc0fa4b6fdc37c805a6343fe16ea94928be3e0fc4bd",
+        "scaled-last": "27568b2aaca831132c807fb81969fe75e4bd4f55669761f136600432be1c2fb0"
+      }
+    },
+    {
+      "id": "n-0972",
+      "profile": "imdct",
+      "length": 972,
+      "specs": {
+        "unit-seeded": "93cbf781c585f3e5412df2a579896e6feaee3a281e7f3a34f4181b381eeac10b",
+        "unit-first": "6cb1853e9b523fb319be6fccb70b5c73967cba3871fe5c670b89f3cb146662e4",
+        "unit-last": "a6820d6f7f0956891cc3879235e2fa3699a577ca04817b7a5d4d997fa38e2e4a",
+        "scaled-seeded": "574250861c709cc83fee21e2d13f626ddbf4d964aa1b9221c3d19d82754330fb",
+        "scaled-first": "ed66ef9283cce7e6bbadf1a2a8b1c4215d9323ae90c17e56fead8ad9a465fbb2",
+        "scaled-last": "54a5b7d58a4f9d36f607213d03deaa37902637f05c1a1828b1701ddb2f940beb"
+      }
+    },
+    {
+      "id": "n-1000",
+      "profile": "imdct",
+      "length": 1000,
+      "specs": {
+        "unit-seeded": "99cb5596dd4204f2ccc8d1e4e90bf76663625bf3ad57d433de5be937365fcaf3",
+        "unit-first": "8646706f28a880d6d0e618b47bbc250356d9640d7199c2da3601aaf8773d43c0",
+        "unit-last": "2c6b6ec88b8884cc23fc13bbef630025abf2dd40b11e27d8936364fbfe478879",
+        "scaled-seeded": "bf3fba81b6b64749f92c720d382a36b9915588e4956ec6c8cd95eddd4ee2fc43",
+        "scaled-first": "e7b6f77bfed2b45debd53777fe2544b11bb9fd368ef9d881e21dc2620cdc4301",
+        "scaled-last": "a17908318379efa95044b543a3c08f71b8ac0f1c64acbd064085f238f7e07020"
+      }
+    },
+    {
+      "id": "n-1024",
+      "profile": "imdct",
+      "length": 1024,
+      "specs": {
+        "unit-seeded": "9adcbd3f2b4b4a2c75dec4f7fed394efc5b29445298c3ddfb8808310af0c940f",
+        "unit-first": "d7e4b8db556bba604eebd5bdb02b316a174b28ed7774dd18e2f1bdede25c349e",
+        "unit-last": "5d5c1941498f9276ba3e0fd9e2f39c02437d8c351f2bcf4eec23c4d6be94f9df",
+        "scaled-seeded": "f201e39534c13ec8adc8cbe86b79baf54d206a4b60e095799219e1cebc821492",
+        "scaled-first": "bcfa31f4f6380b07545ee31746482da9fb70262d949a83b4b9cf42699d4a8f01",
+        "scaled-last": "76c05c137761af9684299b371b39a87171951ca8c4d2a6cba5c755fc4272adb5"
+      }
+    },
+    {
+      "id": "n-1080",
+      "profile": "imdct",
+      "length": 1080,
+      "specs": {
+        "unit-seeded": "55c75d0c0a5e36cd01caaf07f65be4ab1308d39c6eeca8f5f787b4e82da721fa",
+        "unit-first": "4cc79d600ad5891d8ae165d6d590b4a689f68bf0f72a05ee14fcdcf2ec9d3443",
+        "unit-last": "665738be2c89cca9dd1c9c2bec401ccd3d83ad613c9fc12ed0664604b8fdc3ce",
+        "scaled-seeded": "9f4f4dbce3cb1ed2fae1816bb4fbbf96c455958d322e1c34bf6fc46a83100927",
+        "scaled-first": "09f251e343fe720e3b3fe78af2a0161e74d05aa357ea43fa23ecb82cdea36a00",
+        "scaled-last": "b89a77179ddc332022fea680b3d35c7d4a5812e74ee42d846eb20e8952de5df2"
+      }
+    },
+    {
+      "id": "n-1152",
+      "profile": "imdct",
+      "length": 1152,
+      "specs": {
+        "unit-seeded": "af1635daa3bac7b20ed2d0773907944c16e1ca1a55bf6e6bb27c4f0e11841e45",
+        "unit-first": "6baf8d08cf8c8e5adee3c8172f706da05193d000567488669bc9b5eca4a10ea8",
+        "unit-last": "291064cdbf12617894307fef364cb49ec00b8ac912342dda821891d0d82a2159",
+        "scaled-seeded": "07a3e12a9323125884a64ae66176d116e79ffa50f07b01eddd329e622297c6a0",
+        "scaled-first": "5604d6cb2812fb4c4ffb5c60c0f72f8b9486096fd9da6b7e897b466363488940",
+        "scaled-last": "a8d6451f6c1269954e4715b619640a8b10ee321ea6ecac8634a7b029e9ce7abf"
+      }
+    },
+    {
+      "id": "n-1200",
+      "profile": "imdct",
+      "length": 1200,
+      "specs": {
+        "unit-seeded": "526b8a2b38c86f88fc2d865013261fa1662057fcf2d0505788120203a4cc67ed",
+        "unit-first": "27363e0655550f9a3ef464f84f891a2cb0479b83a9a98d46e1b96116e665f15c",
+        "unit-last": "a1325f735177c91df4fa5dc21513f98bc69f7183529da171d2f7b9b17d2e754a",
+        "scaled-seeded": "81ec6238f59e16847c51fb842f9acb5017ded61ca763dac8202e8b27bde4ee33",
+        "scaled-first": "b5ff1dfc5630d566da75c58decaffbe75793c732c3051c291d792595c5a46039",
+        "scaled-last": "4e75de3279782fe815a650bbb79d889f615b5d2a5d1a11a6f46bcde96c8423bb"
+      }
+    },
+    {
+      "id": "n-1280",
+      "profile": "imdct",
+      "length": 1280,
+      "specs": {
+        "unit-seeded": "6337aab477c755d08c7cfbdca96721025f9367ce8fd2131cb7a5ed688575c016",
+        "unit-first": "bff497c7b8cc630066f8476abbe85446bb124cc6604fa620385b7326ecfd4406",
+        "unit-last": "e599cb8cb35623a024af2111b3d5c7b1c827fca7c0f9f68b8bf9103fb4b238a4",
+        "scaled-seeded": "266c7e4fb12544f1fa59285b3c2732cd0bec915cf0556b3a8307ea5d1de7f606",
+        "scaled-first": "53f378fe36e6aee08dd97f9dcf5ae7f7d7ca29e1e62cb53d11e7dfba553745c2",
+        "scaled-last": "d457e22c24fd071bd3c3376e9ca710d3d6497ea380f7f50ba8bedc1fb34ea800"
+      }
+    },
+    {
+      "id": "n-1296",
+      "profile": "imdct",
+      "length": 1296,
+      "specs": {
+        "unit-seeded": "3ae43da4b25f083a429b30a2c5e5d0a9f656a34ea784e82dd4f7df4de1dd54d5",
+        "unit-first": "a7de94fb4ed4856a6ba532ef890aa23f06cdd6f77cb8593fae4cbc4f9f7ffc0e",
+        "unit-last": "42fac1ba134559528e89d739e36a347d8424e95fdb1ad663ae6162b7547573d4",
+        "scaled-seeded": "af72a7b40cdce25c4f5e038fb5d97b6b26cde996aefb84180e7091568dc84c95",
+        "scaled-first": "4f9252f910523956d668c108e67fe2243325362969676e6527a3d9b6a1e3e252",
+        "scaled-last": "5489459f8fa2e9ec6e7706c9d89b1a63a8530c3442792eb3abd645164a10cbf9"
+      }
+    },
+    {
+      "id": "n-1440",
+      "profile": "imdct",
+      "length": 1440,
+      "specs": {
+        "unit-seeded": "305fd823b46dac7629ef0a128dc4a1535587678142d4d45081dec3de35ecbe38",
+        "unit-first": "5688980b8f26e23890ea6fd723941a4b946c72e0d43124236c4b9f10bec2a54c",
+        "unit-last": "3e41a7d641a430a1d3366211c9eddc8860ea70a223cfc30144c40bca3e97fda4",
+        "scaled-seeded": "99e980d4975fe670aea392a0aa43c0cbe870ab5cf1996aca49f215eb6f4d29a5",
+        "scaled-first": "2b12ea7a8c254b2a3c21a29d71f4a11667c8929b99b59eb931e6d53fd7672e3d",
+        "scaled-last": "74afd59be6ffc96d0f8c09be9158563bdda6e59394d977a2821c9f489244cc54"
+      }
+    },
+    {
+      "id": "n-1500",
+      "profile": "imdct",
+      "length": 1500,
+      "specs": {
+        "unit-seeded": "975f147e100439d13a09f842c910007a35d7ad7e70cdf2ca34994df85eba14f2",
+        "unit-first": "ddbfd52127acdff752e437597ef174a7cf6eb38e3914dee24996c8123bc53001",
+        "unit-last": "a3e1d7cb6e9c3f9c992cfcabe6080b77f8dcb7c5b2de63a542313508dffd8074",
+        "scaled-seeded": "5a137f87879519e6984b58eef93c39da7cc909d54ba5f615ea033eb3c6614d18",
+        "scaled-first": "05bc1d0a2eb8b8d4c05540cfeabe9fbaf451101cd03a188c91a9339cc24807da",
+        "scaled-last": "4d8e13aeb0242d704c72d157f5b1ff594e41171278fec1099a8104a1829ba82e"
+      }
+    },
+    {
+      "id": "n-1536",
+      "profile": "imdct",
+      "length": 1536,
+      "specs": {
+        "unit-seeded": "06199a283911c9a369c389437163dd7949829318072d78928e9990d49ba3d485",
+        "unit-first": "a880830cf7aad717b36a0cf1b3e0f7867e95d20b0e0754dd1a9245666bdee6be",
+        "unit-last": "6b0a6f5261b4eeaf3e2573eb339853c09a7c156b2a56ab7e96e6a4dd4f7d479a",
+        "scaled-seeded": "901828e6b47d617b828612bfcca68efc97ca3bb4607895554af26773c45c69ee",
+        "scaled-first": "4e9dbe686d2704a1e1bd862abc6b6275e53589e9aa58d2090fc7d5a0b98a30fb",
+        "scaled-last": "a665dbde9daa69d3375ee4a8c17d971343ba507b439fa36b3d04a58552ed56c6"
+      }
+    },
+    {
+      "id": "n-1600",
+      "profile": "imdct",
+      "length": 1600,
+      "specs": {
+        "unit-seeded": "e1528dd33f551179a6f2465dbf0f86231b4cc882ab3b298a32f841f3be92dc8f",
+        "unit-first": "ca59b8e6a662f6de580b2f3b31de6b2db3dfb329fea8d526e0952da73294d9c9",
+        "unit-last": "3b709faefcb196f3cbedb67f8dee7c9fe7c38655d31e9bd4fa6e3ce8cc6f83a4",
+        "scaled-seeded": "4f914aeea0bcfdc6092fb4dae55d65719dee4651a0c6239b366f73d77af9d453",
+        "scaled-first": "bf4c5986216091c09854f8628216f247c1d2c6d0a26be687fbb17e1fceecb513",
+        "scaled-last": "91e0a68b30fdf29cf63fe42e9941d8533f3c82bf665ce40761fdaa4014c29bf2"
+      }
+    },
+    {
+      "id": "n-1620",
+      "profile": "imdct",
+      "length": 1620,
+      "specs": {
+        "unit-seeded": "ff284c0d6ea05089cce3d7814acdd8e26eff365d0ec3efe5555060c3f8abf9d6",
+        "unit-first": "94cd7c1663b6672a509cc9d139fb1dd26c674d52b05c7a930f312054fb494f8a",
+        "unit-last": "ae4c96d4c46a644909a2cdac227701f0cd2b19951ff17c23fef9081d3d008a58",
+        "scaled-seeded": "0e44b37745bb967d6c79bd61dc9f0df1653f65717c8149b7f9f24ced11ed3891",
+        "scaled-first": "2499c40eb446876469d4df20ebe2d61cf24b4211a4d57ff65bcdc8ee2156153c",
+        "scaled-last": "14d90a994f3b4c9234b39b6315929c2f469b4f080eae5eb48f254dcc1be38ee7"
+      }
+    },
+    {
+      "id": "n-1728",
+      "profile": "imdct",
+      "length": 1728,
+      "specs": {
+        "unit-seeded": "401c13cb2b32520fd06ae3549a042e19608ec6a68e595efe02dc3dcdf199d61b",
+        "unit-first": "f03a66f9fa0060da149481cd25dcd700177c67d364d1b8bce3628a23ed0b7002",
+        "unit-last": "758913d4fd2e0391e2aea2ab26940d56ea5fdeec2e481bcc5c5007828f3bf258",
+        "scaled-seeded": "160094527758b4d0eaf0de98ca4ed360a1ac4197448b1e430944f4e0eda308ea",
+        "scaled-first": "581baf3ee702b2c0b477e318ccc6a5c21597f11849289442c91eaf804e955524",
+        "scaled-last": "8dc8db6c53a087a50bdeed4addf0e0191e010cb7c2eb418c2bd36bfb123335c8"
+      }
+    },
+    {
+      "id": "n-1800",
+      "profile": "imdct",
+      "length": 1800,
+      "specs": {
+        "unit-seeded": "814acd36eebde1573c79a31d4817925892d73995f583d4e794a72f7c2a242f08",
+        "unit-first": "f5fc3cd7360e91f5c07a99b958cf0ada419a960b3e6a1a8c097ab3f7089b7c09",
+        "unit-last": "ec3baee986efd1e1e5c43383df674da96128ab2aff3f369ee5b88cffa49c6632",
+        "scaled-seeded": "3b4c16c5552b7487ee97d0abf77bddbf3477d5e480ac8feb4033d377147acccf",
+        "scaled-first": "cb436f104ba37bdcf00d82e69516da6aa5d8feb81cac7071814f00e96bd612cd",
+        "scaled-last": "e17212e370247e87c52f48438aac9b7793dcaf22a384f6ca23611dc5fcd7d63e"
+      }
+    },
+    {
+      "id": "n-1920",
+      "profile": "imdct",
+      "length": 1920,
+      "specs": {
+        "unit-seeded": "071abd3823f6c5d692c6aa4d217667c2b4206a907437e8679077c14a01b80c85",
+        "unit-first": "297347d55a4cbaad77fd013f021f7fc83c64a5da3e104aaaae122f3a719a4009",
+        "unit-last": "d60e2dc029b4827a427eb2387d1b5c01bf2359584435a75e7217a06d511e086c",
+        "scaled-seeded": "832bd0f19dbbe6e80bf5724a4b7c4e4c9374456ddeb40b17bef4a2afb1077efe",
+        "scaled-first": "85066a20901e8fd79b301867681c82b62b7d8e86ae799a2169a14e7bf888a6cb",
+        "scaled-last": "8b93e4d5dd07c8b6f48ca5c371a951a8d5f4d4b184136f2b91aeb26b63b22910"
+      }
+    },
+    {
+      "id": "n-1944",
+      "profile": "imdct",
+      "length": 1944,
+      "specs": {
+        "unit-seeded": "641954d3f9e7f97d93f9c97bbbce3ccc95bd71a4f098a9edf85d89fc63c823aa",
+        "unit-first": "938eeea78259843cf993c19ad6a7624c9fcd91b63e61a14735d323466152f6db",
+        "unit-last": "84f55fe4a089b21b4f6eb94069d0e505365ca4406f53f31e71cc702cfbb088a9",
+        "scaled-seeded": "8e4337cfd276470862c7283d67125b24f5f601285bd399f91cabda628f130172",
+        "scaled-first": "06a2d9e0d09fa90dcd0cbf5ba953b7a816c00321512619f29990d388cd7edca0",
+        "scaled-last": "8a6121f0682278ec37a839f0cde9f9521adb0cdedf776c6a4487c507e5792fef"
+      }
+    },
+    {
+      "id": "n-2000",
+      "profile": "imdct",
+      "length": 2000,
+      "specs": {
+        "unit-seeded": "e8a9ca8f9c128fabe626e06155c1a437776d03f1248f9ca55cef52fb67e5fa47",
+        "unit-first": "0de51cf1c1be32960b4ca9208fcd0d0e057bf5995340818d8abddaee079b7baf",
+        "unit-last": "8c964c51aad23314237ec13606d2576e6706afffb3e867084581bebca8077618",
+        "scaled-seeded": "b786ead20de1aca0b4d80382a2aa933fd6e750f61c97733b9d16473ceabc3f0e",
+        "scaled-first": "3a53560f7514c351646ab2dc5208683b9253b25e004cab798747eeb8d36f07ad",
+        "scaled-last": "4fee4a8cd8e51905b989f9e33f3947be8ab30dd9c0bd06ea1ec172698de420e8"
+      }
+    },
+    {
+      "id": "n-2048",
+      "profile": "imdct",
+      "length": 2048,
+      "specs": {
+        "unit-seeded": "5ecf06a0916154898ee7eebcf33d7e0546f21c205a04c657136598f328aedccb",
+        "unit-first": "b5046250bed1f98e4f1e180f14254f4e302036b62a79886c0ae912de9fa1764f",
+        "unit-last": "cd7984b0356a703bad6f77b7028c039f40065ea57df4042a255e7aca272e6e60",
+        "scaled-seeded": "4a30fefe10c16ab1d2a6e2c1a2b76331a95049319efa0b27825c450ffca62bbd",
+        "scaled-first": "fdd5a3f3e3cb607e0175b0593ed12f45cf908719ff320d336e9bf97506c9765d",
+        "scaled-last": "d5cbd2f923e8ddc56c5c75ce119defc5cff0a41909033dc876a709daa3047e4f"
+      }
+    },
+    {
+      "id": "n-2160",
+      "profile": "imdct",
+      "length": 2160,
+      "specs": {
+        "unit-seeded": "ad189520a40a7111f815cba87b024a6f29cdd2dc421a1d7227925bb7c799000f",
+        "unit-first": "f004e65ea5aed5645fdf561a5ce7597af9db89d46f636aa19aa3efbd2bf7e2c1",
+        "unit-last": "b56bafee6281e583aa3778a26207b4f51fad58e20635faf6fc72c66ce5457f8e",
+        "scaled-seeded": "47fbc88d6fbf271babce95c1112a74672dd54e0e72eef363928b55bf718d492b",
+        "scaled-first": "ae06f5da8e6d15524875281f83f3d16096a39f56855e00b2838bc78dd36de5f7",
+        "scaled-last": "43d0e04f69c06aeeba9374c989587528a2573e5a76f8050a6f2f65f0b1597ae2"
+      }
+    },
+    {
+      "id": "n-2304",
+      "profile": "imdct",
+      "length": 2304,
+      "specs": {
+        "unit-seeded": "97d4999e30dde90cc7036163d745e87da2c0a7ea90d3669990420b1dceba6dc7",
+        "unit-first": "eb3a024f2d149af8b2d66249e4ec349c3a6092f082cf4c3a6edb00474db33bf5",
+        "unit-last": "42b708ee9ccc1bde29119a1fdcd663d0d8cd79f032b876ae1601104100367218",
+        "scaled-seeded": "37d1c2baf22bc615c1a8261072896833ba541d2fa93abaa8101680dfe0b3d2e1",
+        "scaled-first": "6a7069d4f8bd9a496ac2bfb4dbd9d441078d1390d9d9f2d123cfd1053557ece8",
+        "scaled-last": "641e1797b298ce8989d489eb1be09cb6e8beb27c6ae7ed9bb1d22c2d6f0404ca"
+      }
+    },
+    {
+      "id": "n-2400",
+      "profile": "imdct",
+      "length": 2400,
+      "specs": {
+        "unit-seeded": "16da29f8e2e5137a0d2d2b7d0678e53f5beaf71fe975ccd679f1fc226294d468",
+        "unit-first": "a47a5b919ccf8c6fb5c8fa97f4229dd5fe39f228bb4063a352649a203914066a",
+        "unit-last": "d3fac50a14cda4aa9138f92ebee70ac134cc250a02ede671b16b6631f6bde36a",
+        "scaled-seeded": "c34ed6238a8ac39ef5068ffef5a2ceed27ebd1e014b4576a0281a30283be7be4",
+        "scaled-first": "61ac4ff0b39b4ef1df6d694f1b8bdf2b25031fff02652c2798c949c4bfe57d9a",
+        "scaled-last": "26ad893b097a8a78e9be906e39feeb22d2da9a6713af333329703a4b548136fc"
+      }
+    },
+    {
+      "id": "n-2500",
+      "profile": "imdct",
+      "length": 2500,
+      "specs": {
+        "unit-seeded": "18ffdcb0011e60175c774dd3ba7d01549d88798368dfba264576e34218011924",
+        "unit-first": "c79a70dd85a0b127520d10f97886effcd6b3ac48cac46b552f4aacc509ec7ed6",
+        "unit-last": "68a1a9c36c503e6b784b3474e8d6c8f6c7eb4007c239ab037f74115ca301c3d7",
+        "scaled-seeded": "3e4069e061856fa1718552e34567656eb8ac4fa38572e2832a31c338be86407f",
+        "scaled-first": "4966e949665d997c8690dcd7e5141a2882f2a5386b333503e18c3781a02fa8a0",
+        "scaled-last": "6ee8c1f38467a639c972e33968ccff3fe8b128380f35e79db5731fb7aaa87f09"
+      }
+    },
+    {
+      "id": "n-2560",
+      "profile": "imdct",
+      "length": 2560,
+      "specs": {
+        "unit-seeded": "e7cfde7499c01d698e8b6c97017b0cba08c4070b353b111542a60c639b8ac530",
+        "unit-first": "c9564d05a5d7f0fcd2c138d0de3a414572ddac111803d8970cf51c3733e2bfdd",
+        "unit-last": "52c7632a2071e973fe243a06fe9df24d2f17064faba9fc2a9ddbe17c0f097bcd",
+        "scaled-seeded": "9c13de7eabe485497aace525fe2cd659a3e16aa5e363452a9811a149aa717f9f",
+        "scaled-first": "41f08cb15a7dcbb81ee5360c106d73154ef95ebd1bf5c3217457d50b40e7e58c",
+        "scaled-last": "bd3a18511e2129a9c228756ef10491360b7dad70cd8c79b04ec7a4200850547d"
+      }
+    },
+    {
+      "id": "n-2592",
+      "profile": "imdct",
+      "length": 2592,
+      "specs": {
+        "unit-seeded": "a3a2a9be13498d9a27c03117f7ef239b405573634a2c4d89859d6dcd7a959933",
+        "unit-first": "a7098a7066d74464d0ceed4dd43b3080d706993095bcd3f4ae9f6644d4736dd2",
+        "unit-last": "df2079a601612213518f9328284cc12fb24a7a1356e7289d749b4e39d4d2f366",
+        "scaled-seeded": "132c8477d9d0de527cef0ecd5f140758760b589b74ea28beb93be2a905889b4e",
+        "scaled-first": "4acddf1171ef0802c4ac7ecc3890f5ec8f22dc708662137e9d4e37c99bb08e3b",
+        "scaled-last": "9affcaa51f638563f393874fe662ab680edf82067672f3caa7dc8877acee3a95"
+      }
+    },
+    {
+      "id": "n-2700",
+      "profile": "imdct",
+      "length": 2700,
+      "specs": {
+        "unit-seeded": "30c8d66d35d3ee35a80afe850d06f02b802d5370adbd3c8af78380aed81eab6b",
+        "unit-first": "8b77a246ae8042dc64fe53b52f7233618d33d4cb32156ece4115d8152526f029",
+        "unit-last": "7540879555c8ecbfdc69016be8f8991fb90ed8619f03942a23ee05b32d893283",
+        "scaled-seeded": "b37fb64f642acb9e5af3edc6d10c2228be91af4190dee90b3d8d8c546bed803a",
+        "scaled-first": "bc950f6af7baaab032126713277395980e7253cd9bb429d9c959c230ffe76a24",
+        "scaled-last": "9fdbf58993f878cd1620e1f18a9d6b1470e16ea98b845cbc36d35bfdd147f15c"
+      }
+    },
+    {
+      "id": "n-2880",
+      "profile": "imdct",
+      "length": 2880,
+      "specs": {
+        "unit-seeded": "12acc13964020679a26a132d9532ce9d5a8cf5b893e864a13fd540744340aeb4",
+        "unit-first": "f1518f210e8b5741905d57468ec34084a1a077394c6e889c01c776187081988d",
+        "unit-last": "f0b74a14d49136842fd16891a4765df5263c808bf7c07b956be74dd49967cab4",
+        "scaled-seeded": "d0a8b983dfab2f2db4a4c0fd79f48af2b0837d3d4e16831afaf26baff48b7711",
+        "scaled-first": "a0a7b2c84f8b7d348fa889166a580dad697d23c02877777867e0148f83046fec",
+        "scaled-last": "e556cf39ee29e45d7a5b577365a79fd1641378ecc9e7b4ae7cb4862c2327f806"
+      }
+    },
+    {
+      "id": "n-2916",
+      "profile": "imdct",
+      "length": 2916,
+      "specs": {
+        "unit-seeded": "d44550a3872d4d9b67c07b405c87a9838f0cdd39912f9273799434b6d3ce1b10",
+        "unit-first": "3f591db73faea4f4f95ad6f18e30477704ff9d9e66835146d5a19ad25604a842",
+        "unit-last": "15f368b7c7e341c66e4ee0525240206ac44121a057311077f81f9a8b30d1c1cf",
+        "scaled-seeded": "86e6f8c0ab65073c80124d52dfe8ea9c876852276bb2d830dca25fb78219f435",
+        "scaled-first": "53f62b107fc908bc22a8a17215465b5a288111c7c3b7db5f2921abd02d40f9c1",
+        "scaled-last": "ab4b657049ddf99a2e280217e814d50491dbcb22ad366b7613c0e10bb438dced"
+      }
+    },
+    {
+      "id": "n-3000",
+      "profile": "imdct",
+      "length": 3000,
+      "specs": {
+        "unit-seeded": "a2eaa8633fcf1241ca25289ab9d9c6640cbb0dec82670e0f936210ea194547e2",
+        "unit-first": "addc379ec0ad09600368d071644ee07f0c4b1e90573c6bfeaabf3c1d1e187a2c",
+        "unit-last": "350a1ba3041d77520d408917dc339fa6db8990e52a6e65929b30533e35a12177",
+        "scaled-seeded": "84684c3538e5f226a8973cf5768c119f918283b0d8c84346cbdb0383b6c0550a",
+        "scaled-first": "0477db0e94ec43dda8fcdbdb4b3ef625594fa8eda50ab193188408e6e355de90",
+        "scaled-last": "59875b56911d235d77b9c14e14f9c3421837ecd930e5b97f44c55237be8bcae0"
+      }
+    },
+    {
+      "id": "n-3072",
+      "profile": "imdct",
+      "length": 3072,
+      "specs": {
+        "unit-seeded": "501d2a36e0c453c2f0a15e98b033d22dd3529c5cf287071c92e153d710a05432",
+        "unit-first": "db4a76ee419e05bf5987564fec17c8a84e631f7277cfd03afa0854a5cafd972d",
+        "unit-last": "638edbcdb060e48c16acf516c7bb854ac723c033b1be1393ab26b5ebb031b055",
+        "scaled-seeded": "2ed9ddb23598b91e73f717d79a6058ffe6a1ab6a73a6ba35e6589466bdbfc2a1",
+        "scaled-first": "426916280eb4a10ac1a9908f424ff97fa48b64b954647f5e6d6b7a835a32464a",
+        "scaled-last": "bd24a08204269bdf7a90d36eeaa73f3d485de1856dc7178808f99a5a4edb87f8"
+      }
+    },
+    {
+      "id": "n-3200",
+      "profile": "imdct",
+      "length": 3200,
+      "specs": {
+        "unit-seeded": "138192e9a9bc7b45b565087e17755d77aa8148424f0b6095e399cb87157d3044",
+        "unit-first": "f150157d9f9165682d44a74cbf6d3ddd52efba2ad4499acccb721267445f7e5b",
+        "unit-last": "1072c08fa9917f772c5b0415d014d22ada400a01d1b55b08db0ffba9b2f75617",
+        "scaled-seeded": "c22b908e4c2bf63e9e2e90141d32aa350e1f935b195540153f2c1becc27d5a18",
+        "scaled-first": "a76115b9cb3900640d397d5acb2e6c43fd3fd4e90a29df44de6d7c24b8a462ca",
+        "scaled-last": "ff42c43ece5ad1c8a43341bfb7c2e9edb395e5445f91ad741ad586ab168c4a24"
+      }
+    },
+    {
+      "id": "n-3240",
+      "profile": "imdct",
+      "length": 3240,
+      "specs": {
+        "unit-seeded": "57a88a38a75e4aafc1abc4c0c3fd6edfb9221f328cc28199afdfe69dd669826b",
+        "unit-first": "b91feaac8015dbd01eede37b68e90aa37e8f12227e679fed7c374f3c7b129344",
+        "unit-last": "e89675a2597b2dfae966e20cf1267888f5d6653aa37181823435a6a4550b4c4c",
+        "scaled-seeded": "8ac5ef748120bc3ca2ef141ae9442557dea108aee6261a56e74e4cb7b1bde0d2",
+        "scaled-first": "a723899f9971ed4dadd7f597626dc052bf5e59fcf92cd451d27fa04dbba95474",
+        "scaled-last": "4447890ad7296c655c9df65ce05227ece3b504f5b03ba2b5465328ecbf536147"
+      }
+    },
+    {
+      "id": "n-3456",
+      "profile": "imdct",
+      "length": 3456,
+      "specs": {
+        "unit-seeded": "cf944ecfae6c785d1c1073ae8b07ad05df764e4387f52966213ace21e3900c22",
+        "unit-first": "995f976068d321fdb67ba5681de3108492c80b58c9bd68bfd2b73d30644e6cee",
+        "unit-last": "1b05effe5323180dcab186559588c31e79f2e50dd667659a9404401983f6715c",
+        "scaled-seeded": "79fc6a44e6c3270c3ee2496a2d2f168707c448f31151166e77149ce298c56f46",
+        "scaled-first": "e53ce8ee4e7814177d325104a18aad2258da46da091a41a641a86c69efc4731f",
+        "scaled-last": "1057e7d96c7ec9f9e775e499b3f0997cf8e13f7091e18d2d6755c4c9af1cfd78"
+      }
+    },
+    {
+      "id": "n-3600",
+      "profile": "imdct",
+      "length": 3600,
+      "specs": {
+        "unit-seeded": "db3611338e42cabcd9bd4ac4aa592dd6dd453e19284b59d3eb71aff053bafd29",
+        "unit-first": "b384ccbad5c013c78bdfd2eadcfcf5850fea7d2c290a75ed8fb687d7d3e7655c",
+        "unit-last": "5d1133722cce20b500cdad6b7721c8eff4f2aabf8080d54f767c4f37366c880d",
+        "scaled-seeded": "22688dabdafb194e6f761688d68be6982f7fefb22c5272e4fe5cd189003bae34",
+        "scaled-first": "fc52fa05c8bd489048a22b6277f23b28fd0c3e48a4efe0df40d7e692b53268fe",
+        "scaled-last": "4b94e99e3bd4dc9664548ab822f0ff615262dfddb964411a49bc81c50f0cbb70"
+      }
+    },
+    {
+      "id": "n-3840",
+      "profile": "imdct",
+      "length": 3840,
+      "specs": {
+        "unit-seeded": "340c7e4f6eaf07e084f486df6960df5e664dfead6719b1d2f34e8fa5bb8a7d6d",
+        "unit-first": "eabce587dfdc26f75db3a134b239ff39c9ec683793932d5c8968f4a4cb4caff3",
+        "unit-last": "5620e2cab276f49fe8419d04634f639f51949859dc1fbb18ac86fb1353e90ac4",
+        "scaled-seeded": "fc9c25aaf4a1ec6d3fa5831170de0ad83a0935d32c4448cfdb12c083a9d8a157",
+        "scaled-first": "b646e858dc1ae3ea0a8d90636db50e9643f22b03f171849b68dc0e3dbd83b47c",
+        "scaled-last": "0c2808c96a47276be5b88f0dd278371e304b6131f5764a43c3a4abc32bb79795"
+      }
+    },
+    {
+      "id": "n-3888",
+      "profile": "imdct",
+      "length": 3888,
+      "specs": {
+        "unit-seeded": "987eb4ea89191a555b8ccd1756dcac3715d9becc8d1c0e823416bdcf37a7ba62",
+        "unit-first": "ce9803c1e17e07f78613252a3c019e2067ca4015a3cec02998a10bba036997b1",
+        "unit-last": "52a5330e285e867140b60434c85965b68156d8e67a837620ad8834d91686a774",
+        "scaled-seeded": "a9294e31e132e6690363d1285c209e0d63a7ae81791c5ea2dabf13cdf0952076",
+        "scaled-first": "9dedddf8a09376aee71fc5dc1e81be06175de4c841769c2de86cae1f51bca603",
+        "scaled-last": "ab9dc24e128757bcd4fa2ecfeebd392f89c12641a2338dc954bb1a9fedb0018f"
+      }
+    },
+    {
+      "id": "n-4000",
+      "profile": "imdct",
+      "length": 4000,
+      "specs": {
+        "unit-seeded": "91a5fc9c93a2ca5c82d2eb0b4ba62512a3f821eaa5fd6456bb2381647b0a822f",
+        "unit-first": "37926c66e740def4dcfa14f1958df55ac72a7fdcdc2bdc358eb172b29a090726",
+        "unit-last": "f70398f07d22b23a425f76964ce92c3ff20c64d37339ed2bea76f58c70a47100",
+        "scaled-seeded": "0a6be71f9844ead12d7cd1f82d8ad5016da53183fe007374232337623f6a1540",
+        "scaled-first": "b4798788ff4bcfea03fa0b8447b1d47cfc327b5fa3971a9872607af6e46d1341",
+        "scaled-last": "316baffabd9a559abe05e9dc3263018e96d06c58a9d43d6ae9cfaa4b62e1b1cb"
+      }
+    },
+    {
+      "id": "n-4096",
+      "profile": "imdct",
+      "length": 4096,
+      "specs": {
+        "unit-seeded": "0dec0de083f384ca038013f2857b0e8867b039cce335828458cfc813cee7361b",
+        "unit-first": "84c3daa53884c1fc11b9f444ca7c5becfd5c2f2f578ac7b1ef5a35211feba41f",
+        "unit-last": "5d3904603d4ecb7c87ede9dce145ee1b4f64f9a422603979c4d12c18166702b5",
+        "scaled-seeded": "61a245d01df91098eeaffa3baa7b02fdb5246797043350c29221841645ce7973",
+        "scaled-first": "522d9da464ffceaad4f1245d2298668a4fd635af68057665f419e50ca1c744b2",
+        "scaled-last": "f1ccac2ee5e75790924f7ad872527f018b38724929e6a39d0ba5ea30a7ee5ef2"
+      }
+    },
+    {
+      "id": "n-4320",
+      "profile": "imdct",
+      "length": 4320,
+      "specs": {
+        "unit-seeded": "16411012f37a306975e254084e901c4df58a6fff1cb40c015a05360865a1728e",
+        "unit-first": "c9fee3299cee299fd181f94ba4652333c37e0c8719acec771e2b728c96ffba9a",
+        "unit-last": "8dcd11c1208aa61a02af61f7f89c93d115a3981e8952e33fdcc9d112aecebf59",
+        "scaled-seeded": "3bd6f2abe08526d6cfee2ff05848dfeed29315a38f99430cf1e35a22b3c1d2c1",
+        "scaled-first": "ca5da07ccee1874bc3346dd45213dfc5fe2d4c4df486d399edbf81627dcafa9a",
+        "scaled-last": "5f12ebd58421a03a3a27277953b0e148d52502a2e6d404bdb4d711cffcc9545a"
+      }
+    },
+    {
+      "id": "n-4500",
+      "profile": "imdct",
+      "length": 4500,
+      "specs": {
+        "unit-seeded": "d1367c5e438f5f1579bd7a5917a9715484ffa6f2587d3f55e23345b893cbbd59",
+        "unit-first": "64b29c93dbc25493b9a69ee3e55419f4ae8cce97576c949f4acf6e430fbfac7d",
+        "unit-last": "0cd5ea6bb1828abd22ab8083c99182fdf62a68d9e63eca14176cb783190b1890",
+        "scaled-seeded": "0a1b8a77bfd60155529b042f7e5e79f32e695cd2a1ca5f767ec663af2497856a",
+        "scaled-first": "b9a2d51c95059d79c553079a623c5a4bb0950e60995257baaa0ba32a0c31e335",
+        "scaled-last": "e17a029230a3dd2cbc3b91423f5712d567c92a76acd8970398d21f1c3027e664"
+      }
+    },
+    {
+      "id": "n-4608",
+      "profile": "imdct",
+      "length": 4608,
+      "specs": {
+        "unit-seeded": "e53efdedb098761f1657e4b871e578a71e447b2bf996b58e6f1e47f0b56936d9",
+        "unit-first": "bf441119c832ee666f2fc23442ae964cec0d630eda4b2e3cc78c6ac53c800d1e",
+        "unit-last": "4300060aa017fd666162ec8c95dc8e1aaafed8eef322956cd457e0ecc5a39fc0",
+        "scaled-seeded": "5cfd019490f18798952e978479414d3b995f7e657cb43a42a62215939e92f8d7",
+        "scaled-first": "c97150905074043e3fe0a3a055264d1b264e302fc2c42ed08ab4eca2bbb41a53",
+        "scaled-last": "1215c39e17d23900372843cce4e194b564bb47e9b188e25df76a71dfeb59f013"
+      }
+    },
+    {
+      "id": "n-4800",
+      "profile": "imdct",
+      "length": 4800,
+      "specs": {
+        "unit-seeded": "63fed48acf6514ff171250fc8eecdb511dd5dcfcd21fdd2fc2191efb749deb67",
+        "unit-first": "a5a8649499a9a54766f88ec05098f35365feb8bae6715bc79105b721372f25bb",
+        "unit-last": "267081ead2d599edea8dfcd3ee534901050cb080a6bd98f46947e7bcb6a6d6e6",
+        "scaled-seeded": "8b1f35f69d73448781910f1d2c9da89fbdc72bd244b7ba231f546e808a13e5f7",
+        "scaled-first": "43b369ff624a69d06afe24879f028de9d25a83503648a29edc94eea5fa12e3d5",
+        "scaled-last": "d178e09749db27ddd58159ce342d0c60854d95d33ff34e65e568524f34efe07b"
+      }
+    },
+    {
+      "id": "n-4860",
+      "profile": "imdct",
+      "length": 4860,
+      "specs": {
+        "unit-seeded": "4ae2683b0fd1c282ca6405af5d340af3b93500d206b45a2c81908ea32abf5904",
+        "unit-first": "b33173c373d6ceed00cb7123fead692b4b763313cac312571a3c030359fe420f",
+        "unit-last": "3531969e744a6fae7001bd27529649eb8ebfd25ce308521532a4eb23ddafdfa3",
+        "scaled-seeded": "92ed6434e6e838ebbd1bc5b14c18175e164365012cc82258682f1d531ed17760",
+        "scaled-first": "62a82942c670e039c7c4cdae579476d1fc7dcd501433eddaec683af3beff03f8",
+        "scaled-last": "5c3e7f06ef00171b1b304f5ce48eca96e2793c951a5331592197113c04d02530"
+      }
+    },
+    {
+      "id": "n-5000",
+      "profile": "imdct",
+      "length": 5000,
+      "specs": {
+        "unit-seeded": "51b06dca0925bc07aebe6919c3c1644a1f740f6c0cfa63ca3bb7ff12f78f76ab",
+        "unit-first": "b94d6a7a9433d097e3bcdb5064715c3198ba5a9d8c7f3325a881e93e82647c73",
+        "unit-last": "fa02c8e797be1346d58661512cca550ef6e1f55bc88043d77511aa4700692edf",
+        "scaled-seeded": "9aa4c85c9e62279ba019a8f86dc9784e8b7a70dbfa725d67f4b8d622d3a51ea6",
+        "scaled-first": "cb73dc595bd5fecd94e56369fd0f3d42d73c89ec43244331c29283d44bccc238",
+        "scaled-last": "04f34e3d9310ac54eff4edad0c3a4b61a0f63d7c86719bebf295ad57efd1494c"
+      }
+    },
+    {
+      "id": "n-5120",
+      "profile": "imdct",
+      "length": 5120,
+      "specs": {
+        "unit-seeded": "23296b63a6420f6366917437d5bc36df88d9429dbbbe6c7cf1840df3c4631add",
+        "unit-first": "be9c886d317b55509f3c7026b3e8be7790e3970cfa272742b78672d31a60ab53",
+        "unit-last": "88de32032324e81856007975605f896f888e4ca3354375e4e44ae53160a6a639",
+        "scaled-seeded": "14a3672c006b7a4a5044128514600f0dd6c7a4a7ea28e37674d2750563e2af72",
+        "scaled-first": "d9b0109aa6968562dcc3afd1546468a0160fb6ca173ca075b482cc2eb0f92509",
+        "scaled-last": "8f9f128c36a08fbd41402bb209aebc557bfa1067381a6665b62d25189b18207e"
+      }
+    },
+    {
+      "id": "n-5184",
+      "profile": "imdct",
+      "length": 5184,
+      "specs": {
+        "unit-seeded": "bbb4f2cecb6044bc148a5d60f03cefd8abe99aae731f50ec368192245b80e4d4",
+        "unit-first": "8bfe9ed48d6e2297f5b3d3373fe3e79184269f97e13fa06a08a00ce8e98f60a0",
+        "unit-last": "f3931f756010a489bd49fddd90c03b9375f39784eeff6b9a3bc68b5580be3d93",
+        "scaled-seeded": "0bfca692021ba90b7b52a7c1bc46e3a449a1467a644e74e60987aedf2636b275",
+        "scaled-first": "6fa0717896b2b6be2ebc85370e5e64d704c4fc2ada099092809a83e6bb721a2e",
+        "scaled-last": "b84505da0c089deefb2836b8a0632d6f680941ee02e8bdd603ca8182370c9fa9"
+      }
+    },
+    {
+      "id": "n-5400",
+      "profile": "imdct",
+      "length": 5400,
+      "specs": {
+        "unit-seeded": "095ba9501d22606cbda7441fa6d483b7ae5950cacc7eae40fb61155155c3dd94",
+        "unit-first": "34987deda0c9a6ca149350439b0453568906f2062ac24f2949c6b0c0cb223ea4",
+        "unit-last": "663fe0ad5463ba5911629cf3afb690f26319f91958461564fb9a14cb661cebff",
+        "scaled-seeded": "b598e6e444ae2f10ea6f35845e168b9eae7e1cdc70b3cfe1d6f7cc436e773e46",
+        "scaled-first": "eb41b49631baffe5eba3a4fbc8b0caa325c6e45b47917cb937f2424e304c9be5",
+        "scaled-last": "8d5ec6cf9f4f30c719d113dbecf2533b271a12466e9b7c8291215340cf6f2196"
+      }
+    },
+    {
+      "id": "n-5760",
+      "profile": "imdct",
+      "length": 5760,
+      "specs": {
+        "unit-seeded": "d4a3fb42e3c6fe22ab517ca283dff9cd55ccdf30441d49dd86b3b7ce427b8b13",
+        "unit-first": "84663e9470c2dd0fd3ee22caf68a0becfa186f5fb375410832f9c7753ffbbd0b",
+        "unit-last": "7419bced1d701b44d42bde1cfbbe291d5bd500176db6b5d721a968fa90d74661",
+        "scaled-seeded": "68f3398d523fd4a51800a8ae758758208203549c47f645c25da83068ef4b5387",
+        "scaled-first": "0f1dfa26344f2341b37e080af6577556ab90a1763137c1b3fc0b4c23f53ce5a1",
+        "scaled-last": "30db9337856164e2797bb4510a1a2d607749d2cec492d02c8b10e14340d67051"
+      }
+    },
+    {
+      "id": "n-5832",
+      "profile": "imdct",
+      "length": 5832,
+      "specs": {
+        "unit-seeded": "841861f96dd3dfd1b6c9f1d58513dc84c93d76798eea0b66bf31e7d4c4440371",
+        "unit-first": "714eeda57c96326d99b163201c7b6a3ea2be7b21b49952b47c412159af1bef9a",
+        "unit-last": "3be730a3aa6b742d4893bfea11e80403cf4a43b65c7deba66427fe9abb052519",
+        "scaled-seeded": "018617323c1bb150fdc3e4214180890543b5f7abe5b0ff431d110cfea681849c",
+        "scaled-first": "590f815bb12e4df89a84e972e94c78bbe5a35373ae847b06c08e87455f6ede25",
+        "scaled-last": "a4e4fe85aa989974789913676efaf0e1167b88eff7e8512d6d40c09d47111dc5"
+      }
+    },
+    {
+      "id": "n-6000",
+      "profile": "imdct",
+      "length": 6000,
+      "specs": {
+        "unit-seeded": "dca96c131d38dac36ce67126814d11a54bb65117ccda6761413d03db9e916889",
+        "unit-first": "81e43e7db33d575af2938997114dff5f9b387432d505d36c8711b646d810ce86",
+        "unit-last": "1e4ecd0a86fe2e227b06edbf6fd2667d416e65eb291e95508cc0e646c4542e03",
+        "scaled-seeded": "8d8fb6689f5d111879d223f6a82bb72dcfe388d36459c565161d4bb71ac23689",
+        "scaled-first": "fddf3760656fbc415727aecfc8b1f7401bdf82a27eedf137f097775eeddaba18",
+        "scaled-last": "02ad395d3545cf1fcf26a753a7dc9f46fb11c95907a1c815b1ae6e0e1bcb2d9a"
+      }
+    },
+    {
+      "id": "n-6144",
+      "profile": "imdct",
+      "length": 6144,
+      "specs": {
+        "unit-seeded": "a7995673474dcf48ef2a90282b34ee19ab84fa8835a57012ed2636cab7080b89",
+        "unit-first": "240bac9928303c77917140b354233ce4720e5db59cc94df79e6d829fe0da619a",
+        "unit-last": "cf908f12d19f6f0f199b4417fd632f4a323c6de9f66390a96356982fb2e2d567",
+        "scaled-seeded": "ec0cb17330f48a794610b75083e7228e0fa4903c8fdf50e65588d7c3580772d2",
+        "scaled-first": "0e39a28b5092ab13fc20bfddc70e7670efe9f2a6a4eaa3cdefc80a798d240dce",
+        "scaled-last": "3d1bfc55317bed51bb2ba50e12ab0cd99f654a9763471884b3e6435fc79ac32f"
+      }
+    },
+    {
+      "id": "n-6400",
+      "profile": "imdct",
+      "length": 6400,
+      "specs": {
+        "unit-seeded": "ed1b9e11a4c0145dbd20e8f384b3c71ee11e8ca2f7ddfffc9e6d043d46c7b5bd",
+        "unit-first": "914b597f10c3044add2b303df30992be7c6e56c7133deaac4854398f5fe35724",
+        "unit-last": "08c2881538c4dea4d90eb8da6efdd0b2a982ba137d4cc9ddbef88495031b0ac1",
+        "scaled-seeded": "18a1046436f148f8cdcd3560b869a92b450203403e45ffb9ad68af4a8afa75ee",
+        "scaled-first": "9fd685099e89ae521737659086dd4b88e38e1fee5a066bebda801d0cb01d8dfe",
+        "scaled-last": "1bdb79c4b6604772b62fc3a5e9d4b6b794815d189292c56f322748a7935588fc"
+      }
+    },
+    {
+      "id": "n-6480",
+      "profile": "imdct",
+      "length": 6480,
+      "specs": {
+        "unit-seeded": "02adb4dbe7f6e8109091e1edaf6dba2768d693ac4a0c2a7635787a78d1f42120",
+        "unit-first": "64ee5c85e44a038c61536e6e08b2392bbe34eb630193667a74ca6537a30a1a4c",
+        "unit-last": "d68c31ab9722481337bba67c9681c1f7de625dd78ffbf40d290185099c5fd595",
+        "scaled-seeded": "5c176388db36c30c724eae272ac1f095134e89c5ec29da70bbe3f48cca0a2c9a",
+        "scaled-first": "b9ec22728705ad912b4ce73df4344511e8dd3288c689b03f60543ce70a621ea4",
+        "scaled-last": "fd818fdbf963ade27a0b908207e1f13dbdbd738fde11da6f4ed7df665f3537b3"
+      }
+    },
+    {
+      "id": "n-6912",
+      "profile": "imdct",
+      "length": 6912,
+      "specs": {
+        "unit-seeded": "0cb2405fe2815ef6548bf559ff3be23408f1d6abd60af0724795dc96b0037fb2",
+        "unit-first": "35ce00af0ef31a4b43890e7096af41d40d963dcd1459cfbde50a150fb7c0d6b7",
+        "unit-last": "6044d8d9c40309d32af081c75d139568bd79a162a87e893d874f1efc60c55687",
+        "scaled-seeded": "f38d38d44152f61ee6aa507f75ae2501833be0b1355e09c716833bfe4bdd9050",
+        "scaled-first": "75d0c78279b7354f5a59b7d55f4ee587eaaf2fbd5cdcd00f7d30e7b08728df10",
+        "scaled-last": "ec977adf50844836052f2190c92d469c4f754128e8f2025676e5ba9fa42a9cb6"
+      }
+    },
+    {
+      "id": "n-7200",
+      "profile": "imdct",
+      "length": 7200,
+      "specs": {
+        "unit-seeded": "10be78d8525da2a0e1faeb2aae77886c888062b76a927477985ebb8ce2a01ca5",
+        "unit-first": "afd6bc0a6a9fb366675f779ffb64d88015b3d112789552b04cb846de1a2c615a",
+        "unit-last": "d6b657be0a0876fa8567397d52db9d64ee64fbcb9c0e93327c74b4e495236b53",
+        "scaled-seeded": "a9068801ae85048881518ce8b3e6d2cf380a91c39f53993a1209a63cbe161427",
+        "scaled-first": "973e62810eab908a1d76b65fd1b81d93c0358c0c182b45cbb7b592fb79849cd8",
+        "scaled-last": "48c809fab130c22c1bfd37b033075c67b394a8b61280d9fef394a301d8aa85cf"
+      }
+    },
+    {
+      "id": "n-7500",
+      "profile": "imdct",
+      "length": 7500,
+      "specs": {
+        "unit-seeded": "8269beb809e94475c32ded72a71de3e7ea0284f0dc61bfe901777ce192fadcb6",
+        "unit-first": "e0eeb71b611c4dd5f4a382bddf8c74f9b1cac6085c8396d6a2c517eafc7c8f2c",
+        "unit-last": "e6c768d26e799a5faa823ce5567018ae8f792f8c303794f4ef2853ac9c3848e3",
+        "scaled-seeded": "fe07f91c0e58ee81cbf60b420fe7268fa73e0e519391ee8f01743be992b7ed93",
+        "scaled-first": "15b49ee4ef105ea9a2d2b6ddd5f5d8d84a0d27a3592f4f23a57837fea78124f4",
+        "scaled-last": "dd12e40f0605f70952257c577b5ffb84222fb5c5421016b81a432458540c2ccf"
+      }
+    },
+    {
+      "id": "n-7680",
+      "profile": "imdct",
+      "length": 7680,
+      "specs": {
+        "unit-seeded": "3d811a8f37f43105b85f0299d128dedda27e5a369c2b04efb026d0ad5ebee809",
+        "unit-first": "a66341b68513616757a5d1c45159ae54c8ab7efe225b1305ea05a5df3fca4fa6",
+        "unit-last": "8a57eaafab4b1ff5be851f231a43d3755c975b17c2cca35b1a06ed5db659ae30",
+        "scaled-seeded": "d600256acfc0c9a5938c34ef29d8305add16f442dc3a25a2d79932a09548ce59",
+        "scaled-first": "4096afde79cd8c3fc0cbde29fab26815ad43a8b2c8a24c2a53f1e4649e61fcc0",
+        "scaled-last": "923943a84a56a020327acfacdd46ed6769fb091e00399bd64a72dccbbd2763ba"
+      }
+    },
+    {
+      "id": "n-7776",
+      "profile": "imdct",
+      "length": 7776,
+      "specs": {
+        "unit-seeded": "62f9be533a9a13121f04a9b6edca6c2982d0b87de8521c70494438e1542ca748",
+        "unit-first": "600421dca2e832b2f70d02694757c2a54d0ffaf13f081d476214fb25a786476f",
+        "unit-last": "d6985f7cc11483b7779718a58f39021a5c826d3459786c8b42e7bfce4e2520f8",
+        "scaled-seeded": "f6efd6691e0796fda8795aee9b71942fa6698304ec7fba1829e11ffc6c42e456",
+        "scaled-first": "2dda74fa403352344a30d2f4496c75a18c571346e854d022dfd07e74d3a46761",
+        "scaled-last": "cabcbb07924d3a30ab44070b632433d56208a4aa5ecfd6e50111c37476596d5a"
+      }
+    },
+    {
+      "id": "n-8000",
+      "profile": "imdct",
+      "length": 8000,
+      "specs": {
+        "unit-seeded": "a3a80fd3676db2c534c309a52fef3c8e6c2015be6527ed5b697c5bc536c4aa8a",
+        "unit-first": "e1a278d01fd76c1cf247264b70a826b52ca778a0efdd34d64db8a5d71dc1cfff",
+        "unit-last": "c48df3e0680ade72cdeda26feb243bf01738ee110a21c5c0753256a922cb9b3f",
+        "scaled-seeded": "983fc71f17b483cb7a5f54538070b4afdc86a059885b05a9a9c03c0975ae7277",
+        "scaled-first": "7fd9375296ffabe0f8ca5fd575a51683db40ce866ae97eedc0ea3b15c5e47a7c",
+        "scaled-last": "d0daaec4375e0dad94af3bfcdb1f9465b2df0e79539ce092e9e1e65d2c2f31dc"
+      }
+    },
+    {
+      "id": "n-8100",
+      "profile": "imdct",
+      "length": 8100,
+      "specs": {
+        "unit-seeded": "a44503ce8a5cf4e8ef72c951b07afb4598862cb8209de448e2318fa4f9ff2343",
+        "unit-first": "adc38b5b26d6801cc2510f5c45944424883e9845d57bfb3d3dd6b26fc8127c53",
+        "unit-last": "ff7882e1fa11300c6b50cdf8853facd06fc7a2640817b168d35557d0fd3b3a90",
+        "scaled-seeded": "a91bb278181f7ecc454b8f2d5fda3e9eee8e9e90eaf17a822be3ea0290d55e03",
+        "scaled-first": "8ace11d5b6121744f1ae0525bdd719a396feb574bcdb78295d21a72c9e07677e",
+        "scaled-last": "df66502d981160b666ad26ee707ab4b566dcbf09e50031a4f2c0fb61bc41e212"
+      }
+    },
+    {
+      "id": "n-8192",
+      "profile": "imdct",
+      "length": 8192,
+      "specs": {
+        "unit-seeded": "52c18178ab352f8cb8212079f1f15154f42f0170ca523ef211d8298e79548b54",
+        "unit-first": "08be0773183cfd328904003e844c3106b6f53e1d816ae409791c1cd1ee0aac24",
+        "unit-last": "50e58ec2d79a4989addd246f45c240230c53e40d758d7dd7a7e8c35b682f64a4",
+        "scaled-seeded": "d4f9de3f3ff8c0970d608b5204d57f3555b9a5a481c9629104d1923b872c22a3",
+        "scaled-first": "088924db55b47cbc8d6713f51498a4ea8413862133f3329df0a5f632686e885e",
+        "scaled-last": "1491ce5e7ece4a0a025e01cd6cf218fa983d4e49eb2a61eb9ec89d9d64a6c947"
+      }
+    }
+  ]
+}

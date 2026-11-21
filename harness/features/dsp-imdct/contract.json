@@ -1,0 +1,166 @@
+{
+  "schema": 1,
+  "id": "dsp-imdct",
+  "candidate": "codec-views-worker",
+  "operation": "dsp",
+  "gate": "required",
+  "contract": [
+    "Compare every sample of both the full inverse MDCT and DCT-IV with the independent float64 cosine definitions and the documented projection of the public av_tx inverse float MDCT.",
+    "Every supported output length through 8192 uses scales 1 and 1/N, one seeded coefficient vector and first and last impulses. Follow the imdct_float numeric rule.",
+    "A length refused by av_tx is compared with the cosine definitions. Reference discrepancies are kept as open cases and never waive the definition comparison."
+  ],
+  "required_profiles": [
+    "imdct"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "parity_timeout_seconds": 45,
+  "iterations": 1,
+  "reference": "ffmpeg-codec-views-native",
+  "runner": "cargo xtask codecs dsp",
+  "pending_module_requirements": [
+    "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required."
+  ],
+  "open_cases": [
+    {
+      "id": "n-0004",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-0012",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-0020",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-0036",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-0060",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-0180",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-0300",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-0360",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-0540",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-0720",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-0900",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-1440",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-1500",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-1620",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-2880",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-4500",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-4860",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-5760",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "n-7500",
+      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ],
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["n-0004", "n-0008", "n-0012", "n-0016", "n-0020", "n-0024", "n-0032", "n-0036", "n-0040", "n-0048", "n-0060", "n-0064", "n-0072", "n-0080", "n-0096", "n-0100", "n-0108", "n-0120", "n-0128", "n-0144", "n-0160", "n-0180", "n-0192", "n-0200", "n-0216", "n-0240", "n-0256", "n-0288", "n-0300", "n-0320", "n-0324", "n-0360", "n-0384", "n-0400", "n-0432", "n-0480", "n-0500", "n-0512", "n-0540", "n-0576", "n-0600", "n-0640", "n-0648", "n-0720", "n-0768", "n-0800", "n-0864", "n-0900", "n-0960", "n-0972", "n-1000", "n-1024", "n-1080", "n-1152", "n-1200", "n-1280", "n-1296", "n-1440", "n-1500", "n-1536", "n-1600", "n-1620", "n-1728", "n-1800", "n-1920", "n-1944", "n-2000", "n-2048", "n-2160", "n-2304", "n-2400", "n-2500", "n-2560", "n-2592", "n-2700", "n-2880", "n-2916", "n-3000", "n-3072", "n-3200", "n-3240", "n-3456", "n-3600", "n-3840", "n-3888", "n-4000", "n-4096", "n-4320", "n-4500", "n-4608", "n-4800", "n-4860", "n-5000", "n-5120", "n-5184", "n-5400", "n-5760", "n-5832", "n-6000", "n-6144", "n-6400", "n-6480", "n-6912", "n-7200", "n-7500", "n-7680", "n-7776", "n-8000", "n-8100", "n-8192"], "cause": "Opus and Vorbis file codec workloads measure the inverse transform used by those decoders."},
+    {"bound": "heap", "cases": ["n-0004", "n-0008", "n-0012", "n-0016", "n-0020", "n-0024", "n-0032", "n-0036", "n-0040", "n-0048", "n-0060", "n-0064", "n-0072", "n-0080", "n-0096", "n-0100", "n-0108", "n-0120", "n-0128", "n-0144", "n-0160", "n-0180", "n-0192", "n-0200", "n-0216", "n-0240", "n-0256", "n-0288", "n-0300", "n-0320", "n-0324", "n-0360", "n-0384", "n-0400", "n-0432", "n-0480", "n-0500", "n-0512", "n-0540", "n-0576", "n-0600", "n-0640", "n-0648", "n-0720", "n-0768", "n-0800", "n-0864", "n-0900", "n-0960", "n-0972", "n-1000", "n-1024", "n-1080", "n-1152", "n-1200", "n-1280", "n-1296", "n-1440", "n-1500", "n-1536", "n-1600", "n-1620", "n-1728", "n-1800", "n-1920", "n-1944", "n-2000", "n-2048", "n-2160", "n-2304", "n-2400", "n-2500", "n-2560", "n-2592", "n-2700", "n-2880", "n-2916", "n-3000", "n-3072", "n-3200", "n-3240", "n-3456", "n-3600", "n-3840", "n-3888", "n-4000", "n-4096", "n-4320", "n-4500", "n-4608", "n-4800", "n-4860", "n-5000", "n-5120", "n-5184", "n-5400", "n-5760", "n-5832", "n-6000", "n-6144", "n-6400", "n-6480", "n-6912", "n-7200", "n-7500", "n-7680", "n-7776", "n-8000", "n-8100", "n-8192"], "cause": "Opus and Vorbis file codec workloads measure the inverse transform used by those decoders."},
+    {"bound": "total_rss", "cases": ["n-0004", "n-0008", "n-0012", "n-0016", "n-0020", "n-0024", "n-0032", "n-0036", "n-0040", "n-0048", "n-0060", "n-0064", "n-0072", "n-0080", "n-0096", "n-0100", "n-0108", "n-0120", "n-0128", "n-0144", "n-0160", "n-0180", "n-0192", "n-0200", "n-0216", "n-0240", "n-0256", "n-0288", "n-0300", "n-0320", "n-0324", "n-0360", "n-0384", "n-0400", "n-0432", "n-0480", "n-0500", "n-0512", "n-0540", "n-0576", "n-0600", "n-0640", "n-0648", "n-0720", "n-0768", "n-0800", "n-0864", "n-0900", "n-0960", "n-0972", "n-1000", "n-1024", "n-1080", "n-1152", "n-1200", "n-1280", "n-1296", "n-1440", "n-1500", "n-1536", "n-1600", "n-1620", "n-1728", "n-1800", "n-1920", "n-1944", "n-2000", "n-2048", "n-2160", "n-2304", "n-2400", "n-2500", "n-2560", "n-2592", "n-2700", "n-2880", "n-2916", "n-3000", "n-3072", "n-3200", "n-3240", "n-3456", "n-3600", "n-3840", "n-3888", "n-4000", "n-4096", "n-4320", "n-4500", "n-4608", "n-4800", "n-4860", "n-5000", "n-5120", "n-5184", "n-5400", "n-5760", "n-5832", "n-6000", "n-6144", "n-6400", "n-6480", "n-6912", "n-7200", "n-7500", "n-7680", "n-7776", "n-8000", "n-8100", "n-8192"], "cause": "Opus and Vorbis file codec workloads measure the inverse transform used by those decoders."}
+  ]
+}

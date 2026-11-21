@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "opus-final-range",
+  "candidate": "codec-views-worker",
+  "operation": "opus-range",
+  "gate": "required",
+  "contract": [
+    "Open one stereo family-0 decoder per RFC 8251 testvector. Decode every packet in order without trimming or dropping a packet.",
+    "Compare each packet index and Decoder::final_range bit for bit against the recorded encoder final range in the RFC 8251 bitstream, as required by RFC 6716 section 6.1."
+  ],
+  "required_profiles": [
+    "rfc8251"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "parity_timeout_seconds": 45,
+  "iterations": 1,
+  "worker_operation": "opus-range-",
+  "oracle": "opus-final-range",
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["testvector01", "testvector02", "testvector03", "testvector04", "testvector05", "testvector06", "testvector07", "testvector08", "testvector09", "testvector10", "testvector11", "testvector12"], "cause": "No pinned reference exposes the final range. The normative Opus vectors record it."},
+    {"bound": "heap", "cases": ["testvector01", "testvector02", "testvector03", "testvector04", "testvector05", "testvector06", "testvector07", "testvector08", "testvector09", "testvector10", "testvector11", "testvector12"], "cause": "No pinned reference exposes the final range. The normative Opus vectors record it."},
+    {"bound": "total_rss", "cases": ["testvector01", "testvector02", "testvector03", "testvector04", "testvector05", "testvector06", "testvector07", "testvector08", "testvector09", "testvector10", "testvector11", "testvector12"], "cause": "No pinned reference exposes the final range. The normative Opus vectors record it."}
+  ]
+}

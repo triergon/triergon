@@ -1,0 +1,193 @@
+{
+  "schema": 1,
+  "directory": "harness/features/dsp-divide/inputs",
+  "cases": [
+    {
+      "id": "divisor-00001",
+      "profile": "boundary",
+      "file": "divisor-00001.case",
+      "sha256": "6b16a47ad55bac76ec6d400f3f7f94a16786789080984110beb85f9cbc282e41",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "7b7818e580bf215cc517a62449ff0ef711b75b1a5d2f27c3ed99b69f5521b6c5"
+      }
+    },
+    {
+      "id": "divisor-04097",
+      "profile": "boundary",
+      "file": "divisor-04097.case",
+      "sha256": "c808c286275ec3cd55e11442e4bad56e7b5a49f24276df7976a44ab03d8cb20d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "64225de8ec83ca9190a2124b89b303dd2dc42f9652d6fb95b5506aff132e56e5"
+      }
+    },
+    {
+      "id": "divisor-08193",
+      "profile": "boundary",
+      "file": "divisor-08193.case",
+      "sha256": "302c0f586b2578d17a5bf4859264e2f6699c4596e73e080820cfc887e19d816b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "19d37ff2d752201ac0fc925ff3164b6e815aff4132654ac63b2784743a55fdb0"
+      }
+    },
+    {
+      "id": "divisor-12289",
+      "profile": "boundary",
+      "file": "divisor-12289.case",
+      "sha256": "3d19e06881a701f6aabf7ee540afbc3a6fbd87807e8d4920a9e34376760f3c7a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "0429b4055d73a9a624f0879b2b0b765eff750d8f4df19cf95c2bda2d49f7af03"
+      }
+    },
+    {
+      "id": "divisor-16385",
+      "profile": "boundary",
+      "file": "divisor-16385.case",
+      "sha256": "c03f6310446b503e4673958537cde559bf215c90cf7a59fd631aa5d55959cb4c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "40050ab48ee006661aafdca27ad6356c663aef8f1e2912012aeea60f68b365c1"
+      }
+    },
+    {
+      "id": "divisor-20481",
+      "profile": "boundary",
+      "file": "divisor-20481.case",
+      "sha256": "37091fae2f5e6dba0ff4b06a4d32dfe0aa1fa400df1524c253e4cace4d08e504",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "1be3f49f89fa1b83e3d5bc8429d77290556d91295247de0122fad1d1ea74e705"
+      }
+    },
+    {
+      "id": "divisor-24577",
+      "profile": "boundary",
+      "file": "divisor-24577.case",
+      "sha256": "d5f1dd89c7e8997de47027246c6c17722c2a6b5e634830f67a29522d6ab3b763",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "c33ec2291dcec65facbd1d4c9375d362266a08cbd06d767bc1c012806d1c99ae"
+      }
+    },
+    {
+      "id": "divisor-28673",
+      "profile": "boundary",
+      "file": "divisor-28673.case",
+      "sha256": "519bd6481ed63aa9da8f9d1dbae7a0b1e9b2b92ea32c470b76ffe802832f4cef",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "ddcfc23b3eea6b0d97770fd3f64b4480c0217b73493edb8d2c866f9ac7fd73ea"
+      }
+    },
+    {
+      "id": "divisor-32769",
+      "profile": "boundary",
+      "file": "divisor-32769.case",
+      "sha256": "437c1e06962e09cd59fe4cf1e61f46dd4e223b91873c60fd865e748aa6a2c183",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "84edaba230d4d371861ef264ef1a3a1f96ea652fa74376866be7537b3d2bb51f"
+      }
+    },
+    {
+      "id": "divisor-36865",
+      "profile": "boundary",
+      "file": "divisor-36865.case",
+      "sha256": "ed09b6cb345064ce4d117c748f5c6aa462164dabbf56a9854bdbfc0e67af9881",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "d1fb485204a9f10232617b77983184a59e9b308c0a25e98455910a9c1a5749ca"
+      }
+    },
+    {
+      "id": "divisor-40961",
+      "profile": "boundary",
+      "file": "divisor-40961.case",
+      "sha256": "adb1d31882dc7d91148eedce1f281b89470ceb0c809a5c2caaed620c602524cf",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "ffeaa51b3929909955ccd44c8342ca3e4a363ea4fa6d71a0e9016934452fbe95"
+      }
+    },
+    {
+      "id": "divisor-45057",
+      "profile": "boundary",
+      "file": "divisor-45057.case",
+      "sha256": "04d142f2f9e93512a902a23a57285d1479821e29580c3692f7c5e87aabe12832",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "b0fa63ee77a5032d3b8dbf6d7290f632dada9c9f173ecb6e0f12cca33f126de1"
+      }
+    },
+    {
+      "id": "divisor-49153",
+      "profile": "boundary",
+      "file": "divisor-49153.case",
+      "sha256": "93bf9e5b441fd0208c083f07e13ae6b436de88ef54d65e18cc0ad203b1e8425a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "6f7668a5a9da7f1da47843902850cf7b83e5e8e82129047641db5383e1385751"
+      }
+    },
+    {
+      "id": "divisor-53249",
+      "profile": "boundary",
+      "file": "divisor-53249.case",
+      "sha256": "73300118c3fcc20fef9a8217cd8dd23e3f3bc499d744b90fff1a14d37a4155d4",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "c14e5dfd99d98c65bfc5ae5795013c09c1a7f5eaf7ba1f7d23e113cf5b66dc7f"
+      }
+    },
+    {
+      "id": "divisor-57345",
+      "profile": "boundary",
+      "file": "divisor-57345.case",
+      "sha256": "967556c9aec9d4cd72144de7ac23a7973d9864b0ba951bb940a318b3566c45d3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "c317a180aecc084e559befa80da4b3b96fb8a36113c4037c4bd5dbf1d38b63aa"
+      }
+    },
+    {
+      "id": "divisor-61441",
+      "profile": "boundary",
+      "file": "divisor-61441.case",
+      "sha256": "b42416d0de8050f591bb4b38596454c017299dc68db5161d2bc67befa9ca7c70",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "9604bf5e9447c1497b4738b1226780a833fb5d5931bfa845d3a6b60c0f52304c"
+      }
+    },
+    {
+      "id": "seeded-pairs",
+      "profile": "seeded",
+      "file": "seeded-pairs.case",
+      "sha256": "62aa292979b46034080e1db7106f125fec96bbfe425ce13dbad82b0fed4520cf",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "05705826df95b0f110e8dfceab1a81f6293ade95eaf2c4f385e032009c9cbd81"
+      }
+    }
+  ]
+}

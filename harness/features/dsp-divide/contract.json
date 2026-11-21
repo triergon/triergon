@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "dsp-divide",
+  "candidate": "codec-views-worker",
+  "operation": "divide",
+  "gate": "required",
+  "contract": [
+    "Compare signed truncation toward zero and unsigned floor division with the independent integer operations.",
+    "For every divisor 1 through 65535 and selected and seeded larger divisors, compare Divisor::get and div_rem throughout the boundary and seeded cases satisfying n times d below 2^31."
+  ],
+  "required_profiles": [
+    "boundary",
+    "seeded"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "parity_timeout_seconds": 45,
+  "iterations": 1,
+  "worker_operation": "divide-",
+  "oracle": "divide",
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["divisor-00001", "divisor-04097", "divisor-08193", "divisor-12289", "divisor-16385", "divisor-20481", "divisor-24577", "divisor-28673", "divisor-32769", "divisor-36865", "divisor-40961", "divisor-45057", "divisor-49153", "divisor-53249", "divisor-57345", "divisor-61441", "seeded-pairs"], "cause": "No public reference exposes these standalone operations. Codec workloads measure the division used by decoders."},
+    {"bound": "heap", "cases": ["divisor-00001", "divisor-04097", "divisor-08193", "divisor-12289", "divisor-16385", "divisor-20481", "divisor-24577", "divisor-28673", "divisor-32769", "divisor-36865", "divisor-40961", "divisor-45057", "divisor-49153", "divisor-53249", "divisor-57345", "divisor-61441", "seeded-pairs"], "cause": "No public reference exposes these standalone operations. Codec workloads measure the division used by decoders."},
+    {"bound": "total_rss", "cases": ["divisor-00001", "divisor-04097", "divisor-08193", "divisor-12289", "divisor-16385", "divisor-20481", "divisor-24577", "divisor-28673", "divisor-32769", "divisor-36865", "divisor-40961", "divisor-45057", "divisor-49153", "divisor-53249", "divisor-57345", "divisor-61441", "seeded-pairs"], "cause": "No public reference exposes these standalone operations. Codec workloads measure the division used by decoders."}
+  ]
+}

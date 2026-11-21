@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "core-budgets",
+  "candidate": "codec-views-worker",
+  "operation": "budget",
+  "gate": "required",
+  "contract": [
+    "Compare verdict, charged capacity and remaining capacity after each storage operation and spent and remaining units after each work charge.",
+    "The storage scripts compare limits and backpressure, reservation resize and teardown, retained capacity across cloned and sliced bytes, vector replacement and freeze. The pool and shared-owner header charge are verified and the target-dependent fixed sizes are projected out of the canonical rows.",
+    "A failed charge preserves the existing accounting. Work take may charge partially while try_charge is all-or-nothing."
+  ],
+  "required_profiles": [
+    "storage",
+    "owner",
+    "work"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "parity_timeout_seconds": 45,
+  "iterations": 1,
+  "worker_operation": "budget-",
+  "oracle": "core-budgets",
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["no-control-space", "empty-pool", "until-release", "room-to-spare", "shared-storage", "freeze-retains-storage", "vector-replacement", "zero-work", "work-exhaustion", "full-width-work"], "cause": "No public reference implements this accounting. The memory gates measure its effect."},
+    {"bound": "heap", "cases": ["no-control-space", "empty-pool", "until-release", "room-to-spare", "shared-storage", "freeze-retains-storage", "vector-replacement", "zero-work", "work-exhaustion", "full-width-work"], "cause": "No public reference implements this accounting. The memory gates measure its effect."},
+    {"bound": "total_rss", "cases": ["no-control-space", "empty-pool", "until-release", "room-to-spare", "shared-storage", "freeze-retains-storage", "vector-replacement", "zero-work", "work-exhaustion", "full-width-work"], "cause": "No public reference implements this accounting. The memory gates measure its effect."}
+  ]
+}

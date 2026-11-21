@@ -6,7 +6,9 @@ mod aac_access_units;
 mod aac_ps_tables;
 mod aac_sources;
 pub mod correctness;
+mod damage;
 pub mod derived;
+pub(crate) mod dsp;
 pub mod equivalence;
 pub mod fuzz;
 pub mod isobmff_reader;
@@ -23,6 +25,7 @@ pub(crate) const INITIALIZED_AAC_REFERENCE: &str = "ffmpeg-aac-initialized-pcm";
 
 pub const USAGE: &str = "usage: cargo xtask codecs <command>
 
+  dsp --output DIR   compare inverse transforms with the public reference and the cosine definition
   aac-access-units --out DIR [--record]
                  prepare the configured AAC-LC workloads and compare every native PCM plane
   aac-ps-tables [--check] [--ffmpeg FF] [--python PY] [--work DIR]
@@ -383,6 +386,16 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
             let a = Args::parse(rest, &["out"], &[])?;
             aac_sources::run(root, &a.path("out")?)?;
         }
+        "dsp" => {
+            let a = Args::parse(rest, &["output"], &["record"])?;
+            let record = a.get("record").is_some();
+            let output = if record {
+                PathBuf::new()
+            } else {
+                a.path("output")?
+            };
+            return dsp::main(root, &output, record);
+        }
         "derive" => {
             let a = Args::parse(rest, &["ffmpeg"], &[])?;
             derived::run(root, &a.path("ffmpeg")?)?;
@@ -411,7 +424,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "only",
                     "lanes",
                 ],
-                &[],
+                &["record-variants"],
             )?;
             let grade = correctness::Grade {
                 manifest: a.path("manifest")?,
@@ -429,7 +442,11 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     .map(|l| l.split(',').map(str::to_owned).collect()),
                 rules: correctness::Rules::load(root)?,
             };
-            correctness::grade(&grade)?;
+            if a.get("record-variants").is_some() {
+                damage::record(&grade)?;
+            } else {
+                correctness::grade(&grade)?;
+            }
         }
         "compare-hevc" => {
             let a = Args::parse(rest, &["decoder", "ffmpeg", "ffprobe"], &[])?;

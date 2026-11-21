@@ -1,0 +1,7 @@
+storage 4096
+reserve a 256
+reserve b 127
+resize a 2048
+release a
+resize b 0
+release b

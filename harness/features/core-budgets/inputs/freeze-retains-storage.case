@@ -1,0 +1,10 @@
+owner 128
+vector a
+grow a 12
+fill a 12
+freeze a
+clone b a
+split c b 3 3
+release a
+release b
+release c

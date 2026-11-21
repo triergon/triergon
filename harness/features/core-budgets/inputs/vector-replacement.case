@@ -1,0 +1,11 @@
+storage 50
+vector a
+grow a 20
+fill a 10
+grow a 21
+grow a 20
+clone b a
+fill a 15
+release b
+fill a 15
+release a

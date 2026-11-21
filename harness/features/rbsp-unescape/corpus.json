@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "directory": "harness/features/rbsp-unescape/inputs",
+  "cases": [
+    {
+      "id": "emulation-prevention",
+      "profile": "placement",
+      "file": "emulation-prevention.case",
+      "sha256": "1c813bfd801ad00bf82c1239ede18390de2efcd1eb35b31bf9633a55c336dd5f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "29c12a817fabf02ff3c3d7a1b6d521ac2d7596cc76a505a0b5256ec2723a5006"
+      }
+    },
+    {
+      "id": "seeded-payloads",
+      "profile": "seeded",
+      "file": "seeded-payloads.case",
+      "sha256": "522ee73f6fbd2a8ce69cd0f06143d3b4b9095eeed6f7229943ec189adae20f35",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "3b46ce72c696c6c95ba82582ba80ae202b7874754885660c75c8f5c3ff43b09d"
+      }
+    },
+    {
+      "id": "avc-aud0",
+      "profile": "annex-b",
+      "file": "avc-aud0.case",
+      "sha256": "c8de8cab38a13735ab63ddc9c1709a672a0fec41b245a16670507e5568fcbe85",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "18ca6fa83e2dd5b7421f3ea09556adf2fcebf562be2123190a167b516976e131"
+      }
+    },
+    {
+      "id": "avc-aud1",
+      "profile": "annex-b",
+      "file": "avc-aud1.case",
+      "sha256": "f89b2dcfc57eb47fd47029d36b8699dab04eda67aa1aff571db329a741cc32eb",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "9461840d155fe0f25b8b2cb9fd084cc0b3784dc86eba59d2532e4d06887fcc65"
+      }
+    },
+    {
+      "id": "hevc-aud0",
+      "profile": "annex-b",
+      "file": "hevc-aud0.case",
+      "sha256": "61fba5641d7ac8b3b3d04bce9f3167ed092ee5f1b8e5a861ea1b01c26af4b0f5",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "b1eba81c8cf789d0cd8b5efb77e455da16b6133de324e0999bfa516cae1fe435"
+      }
+    },
+    {
+      "id": "hevc-aud1",
+      "profile": "annex-b",
+      "file": "hevc-aud1.case",
+      "sha256": "88536fe5a2f68683a6058b82715be05195fb1cdfc312694bf2a984ebaa36929a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "0db33ed8071ef8b3a30655d24fd139accb02a1d32663d03de67917a4a82e9cc5"
+      }
+    },
+    {
+      "id": "hevc-eos",
+      "profile": "annex-b",
+      "file": "hevc-eos.case",
+      "sha256": "43c6e59e6cdafa581082f467f8af56f3a28bfaaddbae5d68fbec3dea48d133e9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "604e4647cea45450442a802f3d59ccbfa2af9cfd83b0c725aed7d848083b4dcd"
+      }
+    },
+    {
+      "id": "mixed-prefixes",
+      "profile": "annex-b",
+      "file": "mixed-prefixes.case",
+      "sha256": "b7fbaa8e74b908d768267a66c0450d5652fae9a7eaf12b0ec22cf30d9788d665",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "ecdf21d11dc7dfaa413a24b8d07f5e87dc48012aede26b74f84092de4ef79911"
+      }
+    }
+  ]
+}
