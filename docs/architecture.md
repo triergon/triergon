@@ -131,7 +131,8 @@ performance gates where it touches hot code.
    use format-owned track classification. Bounded picture and audio seeking scans
    one seekable entity or a declared contiguous sequence. An optional timestamp index
    selects repeat landings within one entity. For independently framed Layer I/II
-   audio with in-band tables, bounded source checkpoints also permit direct
+   audio and self-contained AVC IDR or HEVC IDR_N_LP pictures with in-band tables
+   and local decoder setup, bounded source checkpoints also permit direct
    physical-offset reads. Other landings replay transport state before delivering
    the original packet suffix. Additional carriages and broader direct access
    are open.

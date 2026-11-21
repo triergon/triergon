@@ -172,7 +172,10 @@ descriptors are 16 bytes.
   the base parameter sets and preserves the header and the strict refusal.
 - `RawAnnexBReader` refuses data-partitioned, redundant-picture and extended AVC
   profiles. It adds no timestamps. `append_payload` can consume an interior NAL
-  slice while the reader is waiting for input.
+  slice while the reader is waiting for input. A fresh reader can use `resume_at`
+  at an independently established access-unit boundary, preserving the original
+  elementary coordinate and preceding NAL count. Resumed bytes must carry their
+  own parameter sets; no decoder or picture history is restored.
 - AV1: LEB128 up to 8 bytes and `u32::MAX`. `OneObu` needs an external length;
   AV1 Annex-B (length-delimited) streams are not parsed. Sequence headers are not
   parsed. `Av1TemporalUnitJob` adds a missing temporal delimiter, inserts av1C

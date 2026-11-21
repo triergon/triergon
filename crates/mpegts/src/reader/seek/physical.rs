@@ -4,6 +4,8 @@
 //! PAT/PMT bind its PID, and PES source ranges identify its physical bytes.
 //! Neither a timestamp nor a concatenated elementary offset supplies that proof.
 //! Layer I/II headers delimit frames without Layer III's bit reservoir.
+mod video;
+
 use super::{Landing, Reader, ReaderEvent, Shared};
 use crate::reader::{AccessUnit, Packet, SourceEvent};
 use crate::{ContinuityOutcome, SourceEpochs, TraceEvent, TransportPacket};
@@ -14,6 +16,10 @@ use triergon_core::{
 use triergon_framing::MpegLayer;
 
 const WIDTH: usize = 188;
+// Video publication can look ahead into the next PES. Keep two bounded PES
+// extents and their tables; anything older or larger simply loses direct proof.
+const VIDEO_CARRIERS: usize = 32;
+const HISTORY: usize = 2 * (VIDEO_CARRIERS + 2);
 
 #[derive(Clone, Copy)]
 struct Carrier {
@@ -58,12 +64,11 @@ impl Carrier {
     }
 }
 
-// Fixed storage: two complete table carriers and the independently sourced PES
-// carrier. Its allocation is charged with the enclosing BudgetVec entry.
 struct Checkpoint {
-    carriers: [Carrier; 3],
+    carriers: BudgetVec<Carrier>,
     elementary: u64,
     frames: usize,
+    nals: usize,
 }
 
 pub(super) struct Index {
@@ -80,10 +85,11 @@ pub(super) struct Capture {
     next: u64,
     elementary: u64,
     frames: usize,
+    nals: usize,
     pes: usize,
     maximum: usize,
     valid: bool,
-    carriers: [Option<Carrier>; 3],
+    carriers: [Option<Carrier>; HISTORY],
     pat: Option<SourceEvent>,
     map: Option<SourceEvent>,
     checkpoints: BudgetVec<Checkpoint>,
@@ -111,9 +117,10 @@ impl Capture {
                 next: 0,
                 elementary: 0,
                 frames: 0,
+                nals: 0,
                 pes: 0,
                 valid: true,
-                carriers: [None; 3],
+                carriers: [None; HISTORY],
                 pat: None,
                 map: None,
                 checkpoints: BudgetVec::new(pool),
@@ -138,9 +145,8 @@ impl Capture {
                     self.valid = false;
                     return;
                 };
-                // A fixed 188-byte record, like the continuity duplicate record.
-                self.carriers.rotate_left(1);
-                self.carriers[2] = Some(carrier);
+                let slot = (self.next / WIDTH as u64 % HISTORY as u64) as usize;
+                self.carriers[slot] = Some(carrier);
                 self.next += WIDTH as u64;
                 if packet.pid != 0 && packet.pid != 0x1fff
                     && !self.map.as_ref().is_some_and(|map| {
@@ -167,7 +173,10 @@ impl Capture {
                     configuration_epoch: 2,
                 } if self.map.is_none()
                     && map.streams.len() == 1
-                    && matches!(map.streams.as_slice()[0].stream_type, 0x03 | 0x04)
+                    && matches!(
+                        map.streams.as_slice()[0].stream_type,
+                        0x03 | 0x04 | 0x1b | 0x24
+                    )
                     && (map.pcr_pid == 0x1fff || map.pcr_pid == map.streams.as_slice()[0].pid) =>
                 {
                     self.map = Some(source.clone());
@@ -195,8 +204,21 @@ impl Capture {
     }
 
     fn record_packet(&mut self, packet: &Packet) -> bool {
-        let AccessUnit::MpegAudio(frame) = packet.access_unit() else {
-            return false;
+        let (maximum_carriers, nals) = match packet.access_unit() {
+            AccessUnit::MpegAudio(frame)
+                if matches!(frame.header().layer, MpegLayer::I | MpegLayer::II)
+                    && frame.header().bitrate_kbps != 0
+                    && frame.header().frame_bytes() == Some(packet.payload().len()) =>
+            {
+                (1, 0)
+            }
+            AccessUnit::Video(unit) => {
+                let Some(nals) = video::nals(unit) else {
+                    return false;
+                };
+                (VIDEO_CARRIERS, nals)
+            }
+            _ => return false,
         };
         let [origin] = packet.sources() else {
             return false;
@@ -205,16 +227,20 @@ impl Capture {
         let [header] = pes.header_source_ranges.as_slice() else {
             return false;
         };
-        let [span] = pes.spans() else { return false };
-        let Some(carrier) = self.carriers[2] else {
+        let first = header.offset / WIDTH as u64 * WIDTH as u64;
+        let Some(carrier) = self.carrier(first) else {
             return false;
         };
         let range = packet.elementary_range();
-        let physical = span.source_range();
-        if !matches!(frame.header().layer, MpegLayer::I | MpegLayer::II)
-            || frame.header().bitrate_kbps == 0
-            || frame.header().frame_bytes() != Some(packet.payload().len())
-            || self.pes != self.frames + 1
+        if self.pes < self.frames + 1
+            || pes.spans().is_empty()
+            || pes.spans().len() > maximum_carriers
+            || pes.header.declared_packet_length == 0
+            || usize::from(pes.header.declared_packet_length) + 6
+                != pes.header.as_bytes().len() + pes.payload_len
+            || (nals != 0
+                && (!pes.header.data_alignment_indicator
+                    || !(0xe0..=0xef).contains(&pes.header.stream_id)))
             || packet.epochs()
                 != (SourceEpochs {
                     configuration: 2,
@@ -223,51 +249,104 @@ impl Capture {
             || pes.byte_run_epoch != 0
             || pes.elementary_offset != self.elementary
             || range.start != self.elementary
+            || range.end.checked_sub(range.start) != Some(pes.payload_len as u64)
             || pes.payload_len != packet.payload().len()
             || origin.payload_range != (0..pes.payload_len)
             || header.entity != self.source
-            || physical.entity != self.source
             || header.offset != carrier.offset + carrier.payload as u64
             || header.bytes != pes.header.as_bytes().len()
-            || physical.offset != header.offset + header.bytes as u64
-            || physical.bytes != pes.payload_len
-            || physical.offset + physical.bytes as u64 != carrier.offset + WIDTH as u64
-            || !carrier.pusi
-            || carrier.pid != pes.pid
             || carrier
                 .bytes
                 .get(carrier.payload..carrier.payload + header.bytes)
                 != Some(pes.header.as_bytes())
-            || carrier.bytes.get(carrier.payload + header.bytes..) != Some(packet.payload())
         {
+            return false;
+        }
+        let mut consumed = 0;
+        for (index, span) in pes.spans().iter().enumerate() {
+            let Some(carrier) = self.carrier(first + (index * WIDTH) as u64) else {
+                return false;
+            };
+            let physical = span.source_range();
+            let start = carrier.payload + if index == 0 { header.bytes } else { 0 };
+            let Some(bytes) = carrier.bytes.get(start..) else {
+                return false;
+            };
+            if carrier.pid != pes.pid
+                || carrier.pusi != (index == 0)
+                || physical.entity != self.source
+                || physical.offset != carrier.offset + start as u64
+                || physical.bytes != bytes.len()
+                || span.as_ref() != bytes
+                || packet.payload().get(consumed..consumed + bytes.len()) != Some(bytes)
+            {
+                return false;
+            }
+            consumed += bytes.len();
+        }
+        if consumed != pes.payload_len {
             return false;
         }
         if packet.clock().and_then(|clock| clock.pts.exact).is_some()
-            && let [Some(pat), Some(pmt), Some(pes)] = self.carriers
+            && let Some(pat) = first
+                .checked_sub((2 * WIDTH) as u64)
+                .and_then(|at| self.carrier(at))
+            && let Some(pmt) = first
+                .checked_sub(WIDTH as u64)
+                .and_then(|at| self.carrier(at))
             && let (Some(pat_source), Some(map)) = (&self.pat, &self.map)
             && let TraceEvent::Pat(table) = pat_source.event()
             && pat.offset + WIDTH as u64 == pmt.offset
-            && pmt.offset + WIDTH as u64 == pes.offset
+            && pmt.offset + WIDTH as u64 == first
             && pat.table(0, table.source_sections.as_slice()[0].as_ref())
             && pmt.table(table.programs.as_slice()[0].pid, map.map().source.as_ref())
-            && (self.checkpoints.len() == self.maximum
-                // An input with no usable checkpoint needs no checkpoint table.
+        {
+            if self.checkpoints.len() == self.maximum
                 || (self.checkpoints.is_empty()
                     && self.checkpoints.try_reserve_exact(self.maximum).is_err())
-                || self
-                    .checkpoints
-                    .try_push(Checkpoint {
-                        carriers: [pat, pmt, pes],
-                        elementary: self.elementary,
-                        frames: self.frames,
-                    })
-                    .is_err())
-        {
-            return false;
+            {
+                return false;
+            }
+            let mut carriers = BudgetVec::new(self.checkpoints.budget());
+            if carriers.try_reserve_exact(2 + pes.spans().len()).is_err()
+                || carriers.try_push(pat).is_err()
+                || carriers.try_push(pmt).is_err()
+            {
+                return false;
+            }
+            for index in 0..pes.spans().len() {
+                let Some(carrier) = self.carrier(first + (index * WIDTH) as u64) else {
+                    return false;
+                };
+                if carriers.try_push(carrier).is_err() {
+                    return false;
+                }
+            }
+            if self
+                .checkpoints
+                .try_push(Checkpoint {
+                    carriers,
+                    elementary: self.elementary,
+                    frames: self.frames,
+                    nals: self.nals,
+                })
+                .is_err()
+            {
+                return false;
+            }
         }
+        let Some(total) = self.nals.checked_add(nals) else {
+            return false;
+        };
+        self.nals = total;
         self.elementary = range.end;
         self.frames += 1;
         true
+    }
+
+    fn carrier(&self, offset: u64) -> Option<Carrier> {
+        let carrier = self.carriers[(offset / WIDTH as u64 % HISTORY as u64) as usize]?;
+        (carrier.offset == offset).then_some(carrier)
     }
 
     pub(super) fn finish(mut capture: Charged<Box<Self>>, pool: &Budget) -> Option<Shared<Index>> {
@@ -325,10 +404,17 @@ impl Direct {
     }
 
     pub(super) fn offset(&self) -> u64 {
-        self.index.checkpoints.as_slice()[self.checkpoint].carriers[0].offset
+        self.index.checkpoints.as_slice()[self.checkpoint]
+            .carriers
+            .as_slice()[0]
+            .offset
     }
     pub(super) fn verified(&self) -> bool {
-        self.carriers == 3 && self.restored
+        self.carriers
+            == self.index.checkpoints.as_slice()[self.checkpoint]
+                .carriers
+                .len()
+            && self.restored
     }
 
     pub(super) fn observe(
@@ -341,10 +427,15 @@ impl Direct {
         };
         match event {
             ReaderEvent::Transport(packet) => {
-                let expected = self.index.checkpoints.as_slice()[self.checkpoint]
+                let Some(expected) = self.index.checkpoints.as_slice()[self.checkpoint]
                     .carriers
+                    .as_slice()
                     .get(self.carriers)
-                    .ok_or(Error::SourceMismatch)?;
+                else {
+                    // The ordinary video framer can read the following PES to
+                    // establish the landing picture's final NAL boundary.
+                    return Ok(());
+                };
                 if packet.source_id != Some(self.index.source)
                     || packet.source_offset != expected.offset
                     || packet.source.as_ref() != expected.bytes
@@ -384,10 +475,11 @@ impl Direct {
                         .stream
                         .as_mut()
                         .ok_or(Error::SourceMismatch)?
-                        .resume_audio_offset(pid, checkpoint.elementary)?;
-                    reader.lanes.as_mut_slice()[0].resume_mpeg_audio(
+                        .resume_elementary_offset(pid, checkpoint.elementary)?;
+                    reader.lanes.as_mut_slice()[0].resume_independent(
                         checkpoint.elementary,
                         checkpoint.frames,
+                        checkpoint.nals,
                         self.index.map.clone(),
                     )?;
                     reader.tracks.as_mut_slice()[0] = reader.lanes.as_slice()[0].track.clone();
