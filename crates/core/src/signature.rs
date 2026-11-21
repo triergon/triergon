@@ -80,7 +80,7 @@ pub enum TransportTie {
 #[derive(Clone, Copy, Debug)]
 pub struct Policy {
     /// Types of a first box that select [`Container::Isobmff`].
-    pub opening_boxes: &'static [&'static [u8; 4]],
+    pub opening_boxes: &'static [[u8; 4]],
     /// Whether an Ogg page selects [`Container::Ogg`].
     pub ogg: bool,
     /// How a prefix that fits both transport spacings is resolved.
@@ -102,11 +102,14 @@ pub enum Selection {
 
 /// Selects the container `prefix` starts under `policy`, testing in this order: an
 /// EBML header, an accepted opening box, an Ogg page, transport sync bytes.
+// Inline, so that a caller's constant policy compiles to its own tests: a probe
+// calls this for every window it reads.
+#[inline]
 pub fn select(prefix: &[u8], policy: &Policy) -> Selection {
     if ebml(prefix) {
         return Selection::Container(Container::Matroska);
     }
-    if opening_box(prefix).is_some_and(|kind| policy.opening_boxes.contains(&kind)) {
+    if opening_box(prefix).is_some_and(|kind| policy.opening_boxes.contains(kind)) {
         return Selection::Container(Container::Isobmff);
     }
     if policy.ogg && ogg(prefix) {
@@ -152,12 +155,12 @@ mod tests {
     use super::*;
 
     const FIRST: Policy = Policy {
-        opening_boxes: &[b"ftyp", b"moof"],
+        opening_boxes: &[*b"ftyp", *b"moof"],
         ogg: true,
         transport_tie: TransportTie::Ts188,
     };
     const REFUSING: Policy = Policy {
-        opening_boxes: &[b"ftyp", b"wide"],
+        opening_boxes: &[*b"ftyp", *b"wide"],
         ogg: false,
         transport_tie: TransportTie::Refuse,
     };

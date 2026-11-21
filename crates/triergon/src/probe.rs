@@ -50,7 +50,7 @@ pub fn probe(bytes: &[u8]) -> Probe {
 /// `sidx` or `skip`, no Ogg, and no packet size for such a prefix.
 const POLICY: signature::Policy = signature::Policy {
     opening_boxes: &[
-        b"ftyp", b"styp", b"moov", b"moof", b"mdat", b"free", b"skip", b"sidx",
+        *b"ftyp", *b"styp", *b"moov", *b"moof", *b"mdat", *b"free", *b"skip", *b"sidx",
     ],
     ogg: true,
     transport_tie: TransportTie::Ts188,
