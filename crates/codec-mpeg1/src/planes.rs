@@ -81,5 +81,5 @@ impl Planes {
 /// The `N` samples of `plane` from `at`; a range past the end panics as indexing does.
 #[inline(always)]
 pub(crate) fn samples<const N: usize>(plane: &[u8], at: usize) -> &[u8; N] {
-    &plane[at..][..N].as_chunks::<N>().0[0]
+    &plane[at..at + N].as_chunks::<N>().0[0]
 }
