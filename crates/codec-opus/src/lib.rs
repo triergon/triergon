@@ -91,6 +91,14 @@ impl std::error::Error for DecodeError {}
 /// Output planes follow FFmpeg's channel order. The header's output gain is applied;
 /// its pre-skip is reported as the stream's start [`delay`](AudioDecoder::delay) for the
 /// consumer to discard, as containers may state it themselves.
+///
+/// SILK output may lag its packet: after a start, the SILK resampler holds back up to
+/// 24 samples of the first narrowband frame and releases them ahead of the next frame
+/// once SILK stops or changes its internal rate. That packet's output is longer than
+/// its duration by as many samples, and the first one's shorter. At the end of the
+/// stream the samples still held come out of [`Decoder::flush`] (or
+/// [`AudioDecoder::flush`]); a consumer that skips it loses them. CELT-only streams
+/// hold nothing back.
 #[derive(Debug)]
 pub struct Decoder {
     mapping: Mapping,
@@ -141,9 +149,10 @@ impl Decoder {
         self.mapping.layout()
     }
 
-    /// Range coder state after the last packet, XORed over the streams: the check value
-    /// RFC 6716 test vectors record per packet.
-    #[doc(hidden)]
+    /// The range decoder's final `rng` after the last frame of the last packet, XORed
+    /// with that of its redundant frame and over the streams. A stream whose last frame
+    /// has at most one byte contributes 0, as one does after [`AudioDecoder::reset`].
+    /// The RFC 6716 test vectors record this value per packet.
     pub fn final_range(&self) -> u32 {
         self.streams
             .iter()
