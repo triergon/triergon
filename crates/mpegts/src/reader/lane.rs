@@ -9,8 +9,8 @@ mod unframed_audio;
 use super::model::{ClockContext, PacketData, PayloadSources, Shared, UnframedData};
 use super::seek::{PictureDelivery, SeekProbe};
 use super::{
-    Ac3AccessUnit, AccessUnit, AudioEofPolicy, DtsAudioFrame, IncompleteVideo, LoasFrame, Packet,
-    PacketClock, PayloadSource, ReaderLimits, SourceEvent, Track, UnframedAudio,
+    Ac3AccessUnit, AccessUnit, AudioEofPolicy, DtsAudioFrame, DtsExtensionFrame, IncompleteVideo,
+    LoasFrame, Packet, PacketClock, PayloadSource, ReaderLimits, SourceEvent, Track, UnframedAudio,
 };
 use crate::clock::{SourceTimePolicy, source_timestamp};
 use crate::compat::adts::PacketPolicy;
@@ -45,6 +45,7 @@ enum Framer {
     MpegAudio(mpeg_audio::Reader),
     Dts(aligned_audio::Reader<15, Time>),
     DtsHd(dts_hd::Reader),
+    DtsExtension(dts_hd::ExtensionReader),
     LatmPes,
     Ac3(Ac3FrameReader),
     Eac3(eac3::Reader),
@@ -61,6 +62,7 @@ impl Framer {
             Self::MpegAudio(reader) => reader.input_wait_buffer_capacity()?,
             Self::Dts(reader) => reader.input_wait_buffer_capacity(),
             Self::DtsHd(reader) => reader.input_wait_buffer_capacity(),
+            Self::DtsExtension(reader) => reader.input_wait_buffer_capacity(),
             Self::Ac3(reader) => reader.input_wait_buffer_capacity(),
             Self::Eac3(reader) => reader.input_wait_storage()?,
             // Direct PES carriages do not keep a pending unit between inputs.
@@ -88,6 +90,7 @@ impl Framer {
                 | Self::MpegAudio(_)
                 | Self::Dts(_)
                 | Self::DtsHd(_)
+                | Self::DtsExtension(_)
                 | Self::Ac3(_)
                 | Self::Eac3(_)
         )
@@ -161,11 +164,26 @@ impl Framer {
                 if stream.dvb_descriptor_codec() != Some(CodecId::Dts)
                     && let Some(descriptor) = stream.dvb_dts_hd()?
                 {
+                    if descriptor.core.is_none() {
+                        let index = descriptor
+                            .extensions
+                            .iter()
+                            .position(Option::is_some)
+                            .ok_or(Error::Invalid("DTS-HD extension substream"))?;
+                        return Ok(Self::DtsExtension(dts_hd::ExtensionReader::new(
+                            pool,
+                            source,
+                            caps,
+                            limits.maximum_dts_hd_pes_bytes,
+                            limits.elementary_input_window,
+                            index as u8,
+                        )?));
+                    }
                     Ok(Self::DtsHd(dts_hd::Reader::new(
                         pool,
                         source,
                         caps,
-                        limits.maximum_audio_frame_bytes,
+                        limits.maximum_dts_hd_pes_bytes,
                         limits.elementary_input_window,
                         descriptor,
                     )?))
@@ -265,6 +283,7 @@ impl Framer {
                 },
             ),
             Self::DtsHd(reader) => map(reader.step(work, cancel)?, AccessUnit::Dts),
+            Self::DtsExtension(reader) => map(reader.step(work, cancel)?, AccessUnit::DtsExtension),
             Self::AdtsFragments(reader) => map(reader.step(work, cancel)?, |carrier| match carrier
                 .into_selected_frame()
             {
@@ -286,6 +305,7 @@ impl Framer {
             Self::MpegAudio(reader) => reader.provide(window),
             Self::Dts(reader) => reader.provide(window),
             Self::DtsHd(reader) => reader.provide(window),
+            Self::DtsExtension(reader) => reader.provide(window),
             Self::AdtsFragments(reader) => reader.provide_owned(window),
             Self::Ac3(reader) => reader.provide_owned(window),
             Self::Eac3(reader) => reader.provide(window),
@@ -300,6 +320,7 @@ impl Framer {
             Self::MpegAudio(reader) => reader.finish(request),
             Self::Dts(reader) => reader.finish(request),
             Self::DtsHd(reader) => reader.finish(request),
+            Self::DtsExtension(reader) => reader.finish(request),
             Self::AdtsFragments(reader) => reader.finish(request.source, request.token),
             Self::Ac3(reader) => reader.finish(request.source, request.token),
             Self::Eac3(reader) => reader.finish(request),
@@ -1197,8 +1218,10 @@ impl Lane {
         let source = pending.as_ref().expect("queued PES");
         let pes = source.pes();
         let payload_len = pes.payload_len;
-        if let Some(Framer::DtsHd(reader)) = &self.framer {
-            reader.check_pes(pes)?;
+        match &self.framer {
+            Some(Framer::DtsHd(reader)) => reader.check_pes(pes)?,
+            Some(Framer::DtsExtension(reader)) => reader.check_pes(pes)?,
+            _ => (),
         }
         let stream_type = self.track.stream().stream_type;
         if !(0xc0..=0xdf).contains(&pes.header.stream_id) {
@@ -1258,8 +1281,10 @@ impl Lane {
             *pending = Some(rejected.value.source);
             return Err(rejected.error);
         }
-        if let Some(Framer::DtsHd(reader)) = &mut self.framer {
-            reader.begin_pes(payload_len);
+        match &mut self.framer {
+            Some(Framer::DtsHd(reader)) => reader.begin_pes(payload_len),
+            Some(Framer::DtsExtension(reader)) => reader.begin_pes(payload_len),
+            _ => (),
         }
         self.serial = serial;
         self.run = run;
@@ -1431,6 +1456,9 @@ impl Lane {
                 {
                     let maximum = match framer {
                         Framer::Eac3(reader) => reader.maximum_incomplete_bytes(),
+                        Framer::DtsHd(_) | Framer::DtsExtension(_) => {
+                            self.limits.maximum_dts_hd_pes_bytes
+                        }
                         _ => self.limits.maximum_audio_frame_bytes,
                     };
                     let range = self.unpublished().ok_or(Error::Truncated)?;

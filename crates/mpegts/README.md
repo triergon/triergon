@@ -244,6 +244,12 @@ checks the signalled extension substream order, extents and header CRC and
 leaves the asset payloads intact. `DtsAudioFrame::core_bytes` exposes the core
 prefix, and `bytes` exposes the complete unit. The original PES supplies its
 clock. Extension-only carriage remains outside this path.
+A track with a single extension substream and no core can contain multiple
+units per aligned PES. Each `DtsExtensionFrame` retains the original bytes and
+reports the coded duration when the reference clock and frame duration are
+available. Later frames can reuse the static timing fields. Conflicting
+substream indexes and partial payloads are rejected. The aligned PES limit
+is `ReaderLimits::maximum_dts_hd_pes_bytes`.
 
 For DVB AC-3, an elementary `AC-3` registration can corroborate descriptor `0x6a`.
 

@@ -13,8 +13,8 @@ use crate::{
 };
 use lane::{Lane, LaneStep, PesRun, StorageScan};
 pub use model::{
-    Ac3AccessUnit, AccessUnit, DtsAudioFrame, DvbSubtitleUnit, IncompleteVideo, LoasFrame,
-    MpegAudioFrame, Packet, PacketClock, PayloadSource, ReaderEvent, SourceEvent, Track,
+    Ac3AccessUnit, AccessUnit, DtsAudioFrame, DtsExtensionFrame, DvbSubtitleUnit, IncompleteVideo,
+    LoasFrame, MpegAudioFrame, Packet, PacketClock, PayloadSource, ReaderEvent, SourceEvent, Track,
     UnframedAudio,
 };
 use model::{ClockContext, Shared};
@@ -75,6 +75,8 @@ pub struct ReaderLimits {
     pub video: RawAnnexBLimits,
     /// Maximum bytes in one audio syncframe. E-AC-3 groups have a derived bound.
     pub maximum_audio_frame_bytes: usize,
+    /// Maximum bytes in a finite aligned DVB DTS-HD PES.
+    pub maximum_dts_hd_pes_bytes: usize,
     pub audio_eof_policy: AudioEofPolicy,
     pub unframed_audio_policy: UnframedAudioPolicy,
     /// Framing policy for ADTS. The compatibility policy handles ADTS EOF itself.
@@ -104,6 +106,7 @@ impl Default for ReaderLimits {
             transport: ParseLimits::default(),
             video: RawAnnexBLimits::default(),
             maximum_audio_frame_bytes: 8192,
+            maximum_dts_hd_pes_bytes: 65_535,
             audio_eof_policy: AudioEofPolicy::RejectIncomplete,
             unframed_audio_policy: UnframedAudioPolicy::Strict,
             adts_packet_policy: PacketPolicy::Strict,
@@ -240,6 +243,7 @@ impl Reader {
         input_window: usize,
     ) -> Result<Self> {
         if limits.maximum_audio_frame_bytes == 0
+            || limits.maximum_dts_hd_pes_bytes == 0
             || limits.maximum_access_units == 0
             || limits.maximum_pes_per_access_unit == 0
             || limits.elementary_input_window == 0
