@@ -67,6 +67,17 @@ pub(crate) const fn id_len(id: u32) -> usize {
     (32 - id.leading_zeros()).div_ceil(8) as usize
 }
 
+/// The data size held by the `width` bytes at `at` in `raw`: the size field of
+/// a header that was decoded and bounds-checked before.
+#[inline(always)]
+pub(crate) fn size_at(raw: &[u8], at: usize, width: usize) -> usize {
+    let mut size = usize::from(raw[at] & (0xff_u64 >> width) as u8);
+    for byte in &raw[at + 1..at + width] {
+        size = (size << 8) | usize::from(*byte);
+    }
+    size
+}
+
 /// Widths of the ID and of the data size of an element header that lies
 /// wholly at the start of `bytes`; `None` when it is malformed or incomplete.
 #[inline]

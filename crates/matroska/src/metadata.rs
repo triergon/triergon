@@ -126,11 +126,7 @@ impl<'a> Element<'a> {
                 .map_or(raw.len(), |next| next.header as usize);
             return start..end;
         }
-        let mut length = usize::from(raw[at] & (0xff_u64 >> width) as u8);
-        for byte in &raw[at + 1..at + width] {
-            length = (length << 8) | usize::from(*byte);
-        }
-        start..start + length
+        start..start + ebml::size_at(raw, at, width)
     }
     pub fn raw(self) -> &'a [u8] {
         let raw = self.doc.raw.as_ref();
