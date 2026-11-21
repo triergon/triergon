@@ -1,0 +1,174 @@
+{
+  "schema": 1,
+  "id": "dts-parser-trace",
+  "gate": "required",
+  "operation": "dts-parser-trace",
+  "candidate": "framing-views-worker",
+  "worker_operation": "dts-parser-",
+  "contract": [
+    "Run ParserOperation and ParserHints against the dca parser opened at offset zero with default flags. Feed equally sized contiguous windows with a final short window and explicit EOF flush.",
+    "Fold kind 1 with the packet's physical offset, byte count, duration, latched rate, profile, frame_offset, cur_offset, next_frame_offset and every source byte. Numeric parser hints retain their signed values.",
+    "The candidate folds kind 8 for an unsupported clock and still folds packet bytes and byte hints. Source frame observations, parser clock disposition and hint origin appear only in trace diagnostics. Fold terminal kind 7 on EOF or 8 on a parser-view refusal."
+  ],
+  "required_profiles": [
+    "be14",
+    "le14"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "reference": "ffmpeg-framing-views-native",
+  "runner": "cargo xtask report",
+  "pending_module_requirements": [
+    "Parser clock with EXT_AUDIO or an extension substream sync"
+  ],
+  "open_cases": [
+    {
+      "id": "parser-extension-0",
+      "requirement": "Parser clock with EXT_AUDIO or an extension substream sync"
+    },
+    {
+      "id": "parser-extension-1",
+      "requirement": "Parser clock with EXT_AUDIO or an extension substream sync"
+    },
+    {
+      "id": "parser-extension-2",
+      "requirement": "Parser clock with EXT_AUDIO or an extension substream sync"
+    },
+    {
+      "id": "parser-extension-3",
+      "requirement": "Parser clock with EXT_AUDIO or an extension substream sync"
+    },
+    {
+      "id": "parser-extension-4",
+      "requirement": "Parser clock with EXT_AUDIO or an extension substream sync"
+    },
+    {
+      "id": "parser-extension-5",
+      "requirement": "Parser clock with EXT_AUDIO or an extension substream sync"
+    },
+    {
+      "id": "parser-extension-6",
+      "requirement": "Parser clock with EXT_AUDIO or an extension substream sync"
+    },
+    {
+      "id": "parser-extension-7",
+      "requirement": "Parser clock with EXT_AUDIO or an extension substream sync"
+    },
+    {
+      "id": "parser-extension-substream-sync",
+      "requirement": "Parser clock with EXT_AUDIO or an extension substream sync"
+    }
+  ],
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "parser-extension-0", "parser-extension-1", "parser-extension-2", "parser-extension-3",
+        "parser-extension-4", "parser-extension-5", "parser-extension-6", "parser-extension-7",
+        "parser-extension-substream-sync", "fixed-big-w1", "fixed-big-w7", "fixed-big-w100",
+        "fixed-big-w4096", "fixed-big-wwhole", "fixed-little-w1", "fixed-little-w7",
+        "fixed-little-w100", "fixed-little-w4096", "fixed-little-wwhole", "minimum-big-w1",
+        "minimum-big-w7", "minimum-big-w100", "minimum-big-w4096", "minimum-big-wwhole",
+        "minimum-little-w1", "minimum-little-w7", "minimum-little-w100", "minimum-little-w4096",
+        "minimum-little-wwhole", "primary-sync-example-variable-big-w1", "primary-sync-example-variable-big-w7", "primary-sync-example-variable-big-w100",
+        "primary-sync-example-variable-big-w4096", "primary-sync-example-variable-big-wwhole", "primary-sync-example-variable-little-w1", "primary-sync-example-variable-little-w7",
+        "primary-sync-example-variable-little-w100", "primary-sync-example-variable-little-w4096", "primary-sync-example-variable-little-wwhole", "real-prefix-be-w1",
+        "real-prefix-be-w7", "real-prefix-be-w100", "real-prefix-be-w4096", "real-prefix-be-wwhole",
+        "real-prefix-le-w1", "real-prefix-le-w7", "real-prefix-le-w100", "real-prefix-le-w4096",
+        "real-prefix-le-wwhole", "shifted-big-w1", "shifted-big-w7", "shifted-big-w100",
+        "shifted-big-w4096", "shifted-big-wwhole", "shifted-little-w1", "shifted-little-w7",
+        "shifted-little-w100", "shifted-little-w4096", "shifted-little-wwhole", "variable-big-w1",
+        "variable-big-w7", "variable-big-w100", "variable-big-w4096", "variable-big-wwhole",
+        "variable-little-w1", "variable-little-w7", "variable-little-w100", "variable-little-w4096",
+        "variable-little-wwhole", "latch441-round48-w1", "latch441-round48-w7", "latch441-round48-w100",
+        "latch441-round48-w4096", "latch441-round48-wwhole", "latch48-round441-w1", "latch48-round441-w7",
+        "latch48-round441-w100", "latch48-round441-w4096", "latch48-round441-wwhole", "return-to-initial-w1",
+        "return-to-initial-w7", "return-to-initial-w100", "return-to-initial-w4096", "return-to-initial-wwhole",
+        "exact-little-cpf0-n98-three-w4096", "exact-little-cpf0-n105-three-w4096", "exact-little-cpf0-n112-three-w4096", "exact-little-cpf1-n98-three-w4096",
+        "exact-little-cpf1-n105-three-w4096", "exact-little-cpf1-n112-three-w4096", "exact-big-cpf0-n98-three-w4096", "exact-big-cpf0-n105-three-w4096",
+        "exact-big-cpf0-n112-three-w4096", "exact-big-cpf1-n98-three-w4096", "exact-big-cpf1-n105-three-w4096", "exact-big-cpf1-n112-three-w4096",
+        "unused-high-0-w4096", "unused-high-1-w4096", "unused-high-2-w4096", "unused-high-3-w4096",
+        "unused-high-cycle-w4096", "authored-real-geometry-four-w4096", "interior-normal-sync-w4096", "unresolved-tail-n96-w4096",
+        "unresolved-tail-n97-w4096", "unresolved-tail-n99-w4096", "unresolved-tail-n100-w4096", "unresolved-tail-n101-w4096",
+        "unresolved-tail-n102-w4096", "competing-physical-FSIZE-domain-w4096", "changing-interval-w4096", "odd-final-physical-byte-w4096",
+        "partial-fixed-header-w4096", "extra-complete-word-w4096"
+      ],
+      "cause": "comparison-only parser projection"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "parser-extension-0", "parser-extension-1", "parser-extension-2", "parser-extension-3",
+        "parser-extension-4", "parser-extension-5", "parser-extension-6", "parser-extension-7",
+        "parser-extension-substream-sync", "fixed-big-w1", "fixed-big-w7", "fixed-big-w100",
+        "fixed-big-w4096", "fixed-big-wwhole", "fixed-little-w1", "fixed-little-w7",
+        "fixed-little-w100", "fixed-little-w4096", "fixed-little-wwhole", "minimum-big-w1",
+        "minimum-big-w7", "minimum-big-w100", "minimum-big-w4096", "minimum-big-wwhole",
+        "minimum-little-w1", "minimum-little-w7", "minimum-little-w100", "minimum-little-w4096",
+        "minimum-little-wwhole", "primary-sync-example-variable-big-w1", "primary-sync-example-variable-big-w7", "primary-sync-example-variable-big-w100",
+        "primary-sync-example-variable-big-w4096", "primary-sync-example-variable-big-wwhole", "primary-sync-example-variable-little-w1", "primary-sync-example-variable-little-w7",
+        "primary-sync-example-variable-little-w100", "primary-sync-example-variable-little-w4096", "primary-sync-example-variable-little-wwhole", "real-prefix-be-w1",
+        "real-prefix-be-w7", "real-prefix-be-w100", "real-prefix-be-w4096", "real-prefix-be-wwhole",
+        "real-prefix-le-w1", "real-prefix-le-w7", "real-prefix-le-w100", "real-prefix-le-w4096",
+        "real-prefix-le-wwhole", "shifted-big-w1", "shifted-big-w7", "shifted-big-w100",
+        "shifted-big-w4096", "shifted-big-wwhole", "shifted-little-w1", "shifted-little-w7",
+        "shifted-little-w100", "shifted-little-w4096", "shifted-little-wwhole", "variable-big-w1",
+        "variable-big-w7", "variable-big-w100", "variable-big-w4096", "variable-big-wwhole",
+        "variable-little-w1", "variable-little-w7", "variable-little-w100", "variable-little-w4096",
+        "variable-little-wwhole", "latch441-round48-w1", "latch441-round48-w7", "latch441-round48-w100",
+        "latch441-round48-w4096", "latch441-round48-wwhole", "latch48-round441-w1", "latch48-round441-w7",
+        "latch48-round441-w100", "latch48-round441-w4096", "latch48-round441-wwhole", "return-to-initial-w1",
+        "return-to-initial-w7", "return-to-initial-w100", "return-to-initial-w4096", "return-to-initial-wwhole",
+        "exact-little-cpf0-n98-three-w4096", "exact-little-cpf0-n105-three-w4096", "exact-little-cpf0-n112-three-w4096", "exact-little-cpf1-n98-three-w4096",
+        "exact-little-cpf1-n105-three-w4096", "exact-little-cpf1-n112-three-w4096", "exact-big-cpf0-n98-three-w4096", "exact-big-cpf0-n105-three-w4096",
+        "exact-big-cpf0-n112-three-w4096", "exact-big-cpf1-n98-three-w4096", "exact-big-cpf1-n105-three-w4096", "exact-big-cpf1-n112-three-w4096",
+        "unused-high-0-w4096", "unused-high-1-w4096", "unused-high-2-w4096", "unused-high-3-w4096",
+        "unused-high-cycle-w4096", "authored-real-geometry-four-w4096", "interior-normal-sync-w4096", "unresolved-tail-n96-w4096",
+        "unresolved-tail-n97-w4096", "unresolved-tail-n99-w4096", "unresolved-tail-n100-w4096", "unresolved-tail-n101-w4096",
+        "unresolved-tail-n102-w4096", "competing-physical-FSIZE-domain-w4096", "changing-interval-w4096", "odd-final-physical-byte-w4096",
+        "partial-fixed-header-w4096", "extra-complete-word-w4096"
+      ],
+      "cause": "comparison-only parser projection"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "parser-extension-0", "parser-extension-1", "parser-extension-2", "parser-extension-3",
+        "parser-extension-4", "parser-extension-5", "parser-extension-6", "parser-extension-7",
+        "parser-extension-substream-sync", "fixed-big-w1", "fixed-big-w7", "fixed-big-w100",
+        "fixed-big-w4096", "fixed-big-wwhole", "fixed-little-w1", "fixed-little-w7",
+        "fixed-little-w100", "fixed-little-w4096", "fixed-little-wwhole", "minimum-big-w1",
+        "minimum-big-w7", "minimum-big-w100", "minimum-big-w4096", "minimum-big-wwhole",
+        "minimum-little-w1", "minimum-little-w7", "minimum-little-w100", "minimum-little-w4096",
+        "minimum-little-wwhole", "primary-sync-example-variable-big-w1", "primary-sync-example-variable-big-w7", "primary-sync-example-variable-big-w100",
+        "primary-sync-example-variable-big-w4096", "primary-sync-example-variable-big-wwhole", "primary-sync-example-variable-little-w1", "primary-sync-example-variable-little-w7",
+        "primary-sync-example-variable-little-w100", "primary-sync-example-variable-little-w4096", "primary-sync-example-variable-little-wwhole", "real-prefix-be-w1",
+        "real-prefix-be-w7", "real-prefix-be-w100", "real-prefix-be-w4096", "real-prefix-be-wwhole",
+        "real-prefix-le-w1", "real-prefix-le-w7", "real-prefix-le-w100", "real-prefix-le-w4096",
+        "real-prefix-le-wwhole", "shifted-big-w1", "shifted-big-w7", "shifted-big-w100",
+        "shifted-big-w4096", "shifted-big-wwhole", "shifted-little-w1", "shifted-little-w7",
+        "shifted-little-w100", "shifted-little-w4096", "shifted-little-wwhole", "variable-big-w1",
+        "variable-big-w7", "variable-big-w100", "variable-big-w4096", "variable-big-wwhole",
+        "variable-little-w1", "variable-little-w7", "variable-little-w100", "variable-little-w4096",
+        "variable-little-wwhole", "latch441-round48-w1", "latch441-round48-w7", "latch441-round48-w100",
+        "latch441-round48-w4096", "latch441-round48-wwhole", "latch48-round441-w1", "latch48-round441-w7",
+        "latch48-round441-w100", "latch48-round441-w4096", "latch48-round441-wwhole", "return-to-initial-w1",
+        "return-to-initial-w7", "return-to-initial-w100", "return-to-initial-w4096", "return-to-initial-wwhole",
+        "exact-little-cpf0-n98-three-w4096", "exact-little-cpf0-n105-three-w4096", "exact-little-cpf0-n112-three-w4096", "exact-little-cpf1-n98-three-w4096",
+        "exact-little-cpf1-n105-three-w4096", "exact-little-cpf1-n112-three-w4096", "exact-big-cpf0-n98-three-w4096", "exact-big-cpf0-n105-three-w4096",
+        "exact-big-cpf0-n112-three-w4096", "exact-big-cpf1-n98-three-w4096", "exact-big-cpf1-n105-three-w4096", "exact-big-cpf1-n112-three-w4096",
+        "unused-high-0-w4096", "unused-high-1-w4096", "unused-high-2-w4096", "unused-high-3-w4096",
+        "unused-high-cycle-w4096", "authored-real-geometry-four-w4096", "interior-normal-sync-w4096", "unresolved-tail-n96-w4096",
+        "unresolved-tail-n97-w4096", "unresolved-tail-n99-w4096", "unresolved-tail-n100-w4096", "unresolved-tail-n101-w4096",
+        "unresolved-tail-n102-w4096", "competing-physical-FSIZE-domain-w4096", "changing-interval-w4096", "odd-final-physical-byte-w4096",
+        "partial-fixed-header-w4096", "extra-complete-word-w4096"
+      ],
+      "cause": "comparison-only parser projection"
+    }
+  ]
+}

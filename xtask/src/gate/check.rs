@@ -51,11 +51,25 @@ impl Tree {
         };
         crate::corpus::generate_all(&paths)?;
         crate::framing_bench::generate(&generated.join(".research/fixtures-packet-framing"))?;
+        crate::framing_views::dts::gate_fixtures(root, &generated)?;
         let mut tree = Self::committed(root)?;
         tree.generated = Some(generated);
         for pin in crate::fetch::pins(root)? {
             tree.fetched
                 .insert(format!("{}/{}", pin.directory, pin.file), pin.sha256);
+        }
+        let fate = json::read(&root.join("harness/fate/samples.json"))?;
+        if let Some(samples) = fate.get("samples").and_then(Value::as_array) {
+            for sample in samples {
+                if let (Some(path), Some(pin)) = (
+                    sample.get("path").and_then(Value::as_str),
+                    sample.get("sha256").and_then(Value::as_str),
+                ) && path.starts_with("dts-corpus/")
+                {
+                    tree.fetched
+                        .insert(format!(".research/{path}"), pin.to_owned());
+                }
+            }
         }
         tree.kept = kept_files(root)?;
         Ok(tree)

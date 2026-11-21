@@ -1,0 +1,4596 @@
+{
+  "schema": 1,
+  "directory": ".research/dts-corpus",
+  "cases": [
+    {
+      "id": "matrix-bad-sync",
+      "profile": "matrix",
+      "file": "matrix-bad-sync.dts",
+      "sha256": "2e4e68c622032e3b7f0da5dc91cb9faea0fd3a4d0e95626b64087a35bff0fae3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 26,
+        "digest": 14001562462868970452
+      }
+    },
+    {
+      "id": "matrix-bitrate-0",
+      "profile": "matrix",
+      "file": "matrix-bitrate-0.dts",
+      "sha256": "9c353bcf493abb33278a8de2b99fbd36bb045122a06bbfeb360e12417dd2d3f4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 15060484053813219747
+      }
+    },
+    {
+      "id": "matrix-bitrate-1",
+      "profile": "matrix",
+      "file": "matrix-bitrate-1.dts",
+      "sha256": "e8e4e23563bc4b9412080b57fc1cdf2cc1a905232e79da76b23da4eaad40adcc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 12981117605172515171
+      }
+    },
+    {
+      "id": "matrix-bitrate-10",
+      "profile": "matrix",
+      "file": "matrix-bitrate-10.dts",
+      "sha256": "95f03e0e7126ed4d63dcb5dbbd22ff32a46356e985a9dd5b40a5b7b7dc9b81de",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 16381354689355633381
+      }
+    },
+    {
+      "id": "matrix-bitrate-11",
+      "profile": "matrix",
+      "file": "matrix-bitrate-11.dts",
+      "sha256": "f342131c950c42afdcf73893800ec423dce0d9a157d3b6fdd7eb3653fb388f42",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 14301988240714928805
+      }
+    },
+    {
+      "id": "matrix-bitrate-12",
+      "profile": "matrix",
+      "file": "matrix-bitrate-12.dts",
+      "sha256": "d0c77bde87c58136ff8a2b98adf9c725e5fffc0fdf22fcd9ae34fb2b15c6c408",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 12222621792074224229
+      }
+    },
+    {
+      "id": "matrix-bitrate-13",
+      "profile": "matrix",
+      "file": "matrix-bitrate-13.dts",
+      "sha256": "c96d0eeceb49f93ecfa5ee0f0180d095b6afe93f3d478d8cc7ab037e67fb6a03",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 10143255343433519653
+      }
+    },
+    {
+      "id": "matrix-bitrate-14",
+      "profile": "matrix",
+      "file": "matrix-bitrate-14.dts",
+      "sha256": "e2be66accff1805e8e9b196d298a734c42d187e2390de9d40221755beacb38e0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 8063888894792815077
+      }
+    },
+    {
+      "id": "matrix-bitrate-15",
+      "profile": "matrix",
+      "file": "matrix-bitrate-15.dts",
+      "sha256": "4817ea9899a6ea91710df293277dc92c17139e89e2d237881a2701270b7ce680",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5984522446152110501
+      }
+    },
+    {
+      "id": "matrix-bitrate-16",
+      "profile": "matrix",
+      "file": "matrix-bitrate-16.dts",
+      "sha256": "ec447c31b8e89c3872adfb55223528ffeafea4a86961ad23297e3b1e1409f770",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 7572947045751313703
+      }
+    },
+    {
+      "id": "matrix-bitrate-17",
+      "profile": "matrix",
+      "file": "matrix-bitrate-17.dts",
+      "sha256": "dcfaf1f6b292fa20a40d5cd090743b3aaf334c7e630e76cc2603871b9700a0cd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5493580597110609127
+      }
+    },
+    {
+      "id": "matrix-bitrate-18",
+      "profile": "matrix",
+      "file": "matrix-bitrate-18.dts",
+      "sha256": "8983dfa7410587d64a205f60d1d29bd0920059042ce1da1037bebbf5af31efc2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 3414214148469904551
+      }
+    },
+    {
+      "id": "matrix-bitrate-19",
+      "profile": "matrix",
+      "file": "matrix-bitrate-19.dts",
+      "sha256": "03b31ee9cec8cfd9db3e30fb513fa165126bb7cd1fe6cdbbc4467672768ed563",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 1334847699829199975
+      }
+    },
+    {
+      "id": "matrix-bitrate-2",
+      "profile": "matrix",
+      "file": "matrix-bitrate-2.dts",
+      "sha256": "c8d90ba3479a66b9555f421093e115a97c1ea35afc250771e6cf9188361e9fda",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 10901751156531810595
+      }
+    },
+    {
+      "id": "matrix-bitrate-20",
+      "profile": "matrix",
+      "file": "matrix-bitrate-20.dts",
+      "sha256": "a694237ce5bd42e172b3d6ef8fa75ca66cfd3378f0c9d7318f43f27fbe5d0847",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 17702225324898047015
+      }
+    },
+    {
+      "id": "matrix-bitrate-21",
+      "profile": "matrix",
+      "file": "matrix-bitrate-21.dts",
+      "sha256": "2c880a6b67ae5fdfb614e0ccce14deb8f1dbe75c596b32f0cc3f3bbeafe28653",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 15622858876257342439
+      }
+    },
+    {
+      "id": "matrix-bitrate-22",
+      "profile": "matrix",
+      "file": "matrix-bitrate-22.dts",
+      "sha256": "895006e9f7b4ef0582157efed4f61b147cfbc1d190c3592b9f65cba865dcd323",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 13543492427616637863
+      }
+    },
+    {
+      "id": "matrix-bitrate-23",
+      "profile": "matrix",
+      "file": "matrix-bitrate-23.dts",
+      "sha256": "5e3721e6349accce45d05a4f6c7732493f75e0d92b2278f01e17ead447aef384",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 11464125978975933287
+      }
+    },
+    {
+      "id": "matrix-bitrate-24",
+      "profile": "matrix",
+      "file": "matrix-bitrate-24.dts",
+      "sha256": "4a95d6dfec2063871d48565253d9320b7ffab32a915c17ab8a7bc228ab34f184",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 13052550578575136489
+      }
+    },
+    {
+      "id": "matrix-bitrate-25",
+      "profile": "matrix",
+      "file": "matrix-bitrate-25.dts",
+      "sha256": "f59ee0ee69e5ffc6c112cb51cd03ecf2e97438ae0f15ac81e491ee651287e5c8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 10973184129934431913
+      }
+    },
+    {
+      "id": "matrix-bitrate-26",
+      "profile": "matrix",
+      "file": "matrix-bitrate-26.dts",
+      "sha256": "1e540ac73afb873c99298bc925d0e85d59d4734b6baa2c974e4e358ca66bd7f2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 8893817681293727337
+      }
+    },
+    {
+      "id": "matrix-bitrate-27",
+      "profile": "matrix",
+      "file": "matrix-bitrate-27.dts",
+      "sha256": "c0dec266744e2073eb7d5dfa482085e94ccf9ca01c1d010cb7650e25d2bdd730",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 6814451232653022761
+      }
+    },
+    {
+      "id": "matrix-bitrate-28",
+      "profile": "matrix",
+      "file": "matrix-bitrate-28.dts",
+      "sha256": "039d723f172c9253b4e8ec3f3e5a9aaab6b73f098eec5527103d1cc1a89373f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 4735084784012318185
+      }
+    },
+    {
+      "id": "matrix-bitrate-29",
+      "profile": "matrix",
+      "file": "matrix-bitrate-29.dts",
+      "sha256": "530a7c305fae13d98f5705662782144cb238e3291ec72b04ba073bb852f1afc8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 2655718335371613609
+      }
+    },
+    {
+      "id": "matrix-bitrate-3",
+      "profile": "matrix",
+      "file": "matrix-bitrate-3.dts",
+      "sha256": "dad625cd53c14a5f2c286787b3901100ea21e75e95bf26680c243abdf8ffdfdd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 8822384707891106019
+      }
+    },
+    {
+      "id": "matrix-bitrate-30",
+      "profile": "matrix",
+      "file": "matrix-bitrate-30.dts",
+      "sha256": "75d0b1c823d6491ce0551e30d4d84c71be6c9e10f36db999800d5c1e8ba68c24",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 576351886730909033
+      }
+    },
+    {
+      "id": "matrix-bitrate-31",
+      "profile": "matrix",
+      "file": "matrix-bitrate-31.dts",
+      "sha256": "0e799bbd62b9d3ea2fc5ee94f610c34b3529634c0093325addd783d7853b9f31",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 16943729511799756073
+      }
+    },
+    {
+      "id": "matrix-bitrate-4",
+      "profile": "matrix",
+      "file": "matrix-bitrate-4.dts",
+      "sha256": "2e8d4923ec567fae1eb1a41d8f14d530c9e018cde3ed44849aa667a83f4e18d8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 6743018259250401443
+      }
+    },
+    {
+      "id": "matrix-bitrate-5",
+      "profile": "matrix",
+      "file": "matrix-bitrate-5.dts",
+      "sha256": "273dc385e0d4576ad0644a5bac9b5ecaf41877466568f7ed38bd5d372a22640c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 4663651810609696867
+      }
+    },
+    {
+      "id": "matrix-bitrate-6",
+      "profile": "matrix",
+      "file": "matrix-bitrate-6.dts",
+      "sha256": "fec7e06246a5beb0f4b3be5fcc5ea00805b5fe90f288bad4d7bd9a30d9408d23",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 2584285361968992291
+      }
+    },
+    {
+      "id": "matrix-bitrate-7",
+      "profile": "matrix",
+      "file": "matrix-bitrate-7.dts",
+      "sha256": "b1c4895608e0afffc1da036706f79737910e885f1f2b28556ad7a4c2f15bb87a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 504918913328287715
+      }
+    },
+    {
+      "id": "matrix-bitrate-8",
+      "profile": "matrix",
+      "file": "matrix-bitrate-8.dts",
+      "sha256": "345e8139843fae3f449c5554c89017366d500240b582131985c34f0c399465cd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 2093343512927490917
+      }
+    },
+    {
+      "id": "matrix-bitrate-9",
+      "profile": "matrix",
+      "file": "matrix-bitrate-9.dts",
+      "sha256": "7345fb29dd0377fc87fd22fbf8e14bcbe8d907c4c88db859acbc8b67ad2e7fd3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 13977064286786341
+      }
+    },
+    {
+      "id": "matrix-channel-0",
+      "profile": "matrix",
+      "file": "matrix-channel-0.dts",
+      "sha256": "c0caec729d2e70cfb5306eef4aa18d50445ae4cf8fb2b8d7b66165c218d4673b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5571545045665755301
+      }
+    },
+    {
+      "id": "matrix-channel-1",
+      "profile": "matrix",
+      "file": "matrix-channel-1.dts",
+      "sha256": "4733633c547b2c4f80ee206f94fbfe92186942c7aa5101663315bbaccfaad305",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5778033745908932901
+      }
+    },
+    {
+      "id": "matrix-channel-10",
+      "profile": "matrix",
+      "file": "matrix-channel-10.dts",
+      "sha256": "7d3c977434734e8b055e1d5210280ee375100178d4e26853b89d68e06b5cb725",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 8529763200936396065
+      }
+    },
+    {
+      "id": "matrix-channel-11",
+      "profile": "matrix",
+      "file": "matrix-channel-11.dts",
+      "sha256": "21c2bbece58d3d21642a8192be699cd033a148a12dcb51536fc12469004e7b56",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 8736251901179573665
+      }
+    },
+    {
+      "id": "matrix-channel-12",
+      "profile": "matrix",
+      "file": "matrix-channel-12.dts",
+      "sha256": "ea3ed452c5db7cf203a698716315af8642a26f9e7a494d5f02673a1d225a39a2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 11963798654602582687
+      }
+    },
+    {
+      "id": "matrix-channel-13",
+      "profile": "matrix",
+      "file": "matrix-channel-13.dts",
+      "sha256": "6d5e1098bf218612c0159104aa69d28ff76b44dc981eafe29b483e07ecaf95b9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 12170287354845760287
+      }
+    },
+    {
+      "id": "matrix-channel-14",
+      "profile": "matrix",
+      "file": "matrix-channel-14.dts",
+      "sha256": "9239fbd34f1ac77505caf360b0461a1d0d05cf56e372a5ff791703bdd80052eb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 12376776055088937887
+      }
+    },
+    {
+      "id": "matrix-channel-15",
+      "profile": "matrix",
+      "file": "matrix-channel-15.dts",
+      "sha256": "3bac9c55a64dc9f5ed5bc71f75eb41e3c8e5e4b779b990bdac81ea98391f4ad4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 12583264755332115487
+      }
+    },
+    {
+      "id": "matrix-channel-16",
+      "profile": "matrix",
+      "file": "matrix-channel-16.dts",
+      "sha256": "1e18ba3e3c5e65e589a29bdbb0b4e2d2daa84986a26d2d24f608522727f309ca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 15810811508755124509
+      }
+    },
+    {
+      "id": "matrix-channel-2",
+      "profile": "matrix",
+      "file": "matrix-channel-2.dts",
+      "sha256": "4817ea9899a6ea91710df293277dc92c17139e89e2d237881a2701270b7ce680",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5984522446152110501
+      }
+    },
+    {
+      "id": "matrix-channel-3",
+      "profile": "matrix",
+      "file": "matrix-channel-3.dts",
+      "sha256": "0f9b16b8318dec9ebd38d4e247eabac0f9d43f83c68873c478c5798c029d51c1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 6191011146395288101
+      }
+    },
+    {
+      "id": "matrix-channel-4",
+      "profile": "matrix",
+      "file": "matrix-channel-4.dts",
+      "sha256": "db5eb82ed4fa4d5b9dc9f1814497c9e8d30b9d410c6be2138a8cf529b0c272c4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 9418557899818297123
+      }
+    },
+    {
+      "id": "matrix-channel-5",
+      "profile": "matrix",
+      "file": "matrix-channel-5.dts",
+      "sha256": "18ec2dba1303c6cd0aad68f5a3903d855e0156f15b41ceb8ea658296c3a6ee44",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 9625046600061474723
+      }
+    },
+    {
+      "id": "matrix-channel-6",
+      "profile": "matrix",
+      "file": "matrix-channel-6.dts",
+      "sha256": "7eeaa92c80eaef7ba0f93c80b61324fc0e53158f1367f569c940a740823bf1eb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 9831535300304652323
+      }
+    },
+    {
+      "id": "matrix-channel-63",
+      "profile": "matrix",
+      "file": "matrix-channel-63.dts",
+      "sha256": "5801b3f2dbf22be7f97b101bd3820d4af2146093280a03a9d0d487c014a841be",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 3407186784033962503
+      }
+    },
+    {
+      "id": "matrix-channel-7",
+      "profile": "matrix",
+      "file": "matrix-channel-7.dts",
+      "sha256": "08942a06bcb09108b5725830c14ba7ecb2bbef2d5cb70ea37e52f65d1d5a4b3a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 10038024000547829923
+      }
+    },
+    {
+      "id": "matrix-channel-8",
+      "profile": "matrix",
+      "file": "matrix-channel-8.dts",
+      "sha256": "7ce976bc18e315539883e39bc6f6b9899b360558fd02141a8c85503f04a545d2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 13265570753970838945
+      }
+    },
+    {
+      "id": "matrix-channel-9",
+      "profile": "matrix",
+      "file": "matrix-channel-9.dts",
+      "sha256": "dfbcecbe054a876093b1e31dea0bc7db833be123c193a2870a686b3e82a01951",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 13472059454214016545
+      }
+    },
+    {
+      "id": "matrix-extension-0",
+      "profile": "matrix",
+      "file": "matrix-extension-0.dts",
+      "sha256": "fb155a98946b7d8c93750d6de8c851242bb9f22f48f66dc286af818455d27138",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 16364468835364910533
+      }
+    },
+    {
+      "id": "matrix-extension-1",
+      "profile": "matrix",
+      "file": "matrix-extension-1.dts",
+      "sha256": "d7469caaa86946e9e155bd8a921743f2c486be222da4edf1fe2e52abe146b5dc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 230873466371407365
+      }
+    },
+    {
+      "id": "matrix-extension-2",
+      "profile": "matrix",
+      "file": "matrix-extension-2.dts",
+      "sha256": "39526a8c15b074db2a70c26b7ccd28fed772100aea85f1cead779f72f03501b4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 2544022171087455813
+      }
+    },
+    {
+      "id": "matrix-extension-3",
+      "profile": "matrix",
+      "file": "matrix-extension-3.dts",
+      "sha256": "57d50a019f7ec149b4b5183bb734247ec15502365898160c2ebbddae6a0093f8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 4857170875803504261
+      }
+    },
+    {
+      "id": "matrix-extension-4",
+      "profile": "matrix",
+      "file": "matrix-extension-4.dts",
+      "sha256": "a9e20f07ea0d964020327f38b7c25f519fbd0ae7c73bd04d5fc0009e0a3d283f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 7170319580519552709
+      }
+    },
+    {
+      "id": "matrix-extension-5",
+      "profile": "matrix",
+      "file": "matrix-extension-5.dts",
+      "sha256": "9809c8724cf475cb2911d0581139de602d3df0787cda5e011b36d192543a25ee",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 9483468285235601157
+      }
+    },
+    {
+      "id": "matrix-extension-6",
+      "profile": "matrix",
+      "file": "matrix-extension-6.dts",
+      "sha256": "f9acd13384e6d91603a519e09f9fd84a70db05b694bd22e233e8a83d5036c752",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 11796616989951649605
+      }
+    },
+    {
+      "id": "matrix-extension-7",
+      "profile": "matrix",
+      "file": "matrix-extension-7.dts",
+      "sha256": "6b4fd2a36ea8558dd220a2117c2f816776e48a7cec538c1d07ebf1a8aeb54837",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 14109765694667698053
+      }
+    },
+    {
+      "id": "matrix-fixed-one",
+      "profile": "matrix",
+      "file": "matrix-fixed-one.dts",
+      "sha256": "2e8cd186ee841a5113ff951cd55270a0769da091a4375714ed33a0ee15a5d862",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 9019426305165735941
+      }
+    },
+    {
+      "id": "matrix-hcrc-0",
+      "profile": "matrix",
+      "file": "matrix-hcrc-0.dts",
+      "sha256": "51629032bbe4cf90db85b62c0c1bd2bbfead3224999c75f2bd7c6248387c8a0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 11528646414754462185
+      }
+    },
+    {
+      "id": "matrix-hcrc-57005",
+      "profile": "matrix",
+      "file": "matrix-hcrc-57005.dts",
+      "sha256": "ef44bf9346cacfde00023078f66b1b246d8236135ec734c4923ff2e66ec9aa09",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 2864140828317092423
+      }
+    },
+    {
+      "id": "matrix-invalid-blocks-0",
+      "profile": "matrix",
+      "file": "matrix-invalid-blocks-0.dts",
+      "sha256": "62967fdc3ae8f4907911931006bfeeb722bcd5946ebb0bab838ab1dfd2203913",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 4172053414428038301
+      }
+    },
+    {
+      "id": "matrix-invalid-blocks-4",
+      "profile": "matrix",
+      "file": "matrix-invalid-blocks-4.dts",
+      "sha256": "114c9c18a8931f70d719ec17fc7c618f0a7e465f3fcbdfba1352d3202a4fb286",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 15580198551088612477
+      }
+    },
+    {
+      "id": "matrix-invalid-blocks-5",
+      "profile": "matrix",
+      "file": "matrix-invalid-blocks-5.dts",
+      "sha256": "f22ec35f948f15b358d8c7fd7542afd63728924732deba4c8b40b9e6660a71bc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 9208862798398980213
+      }
+    },
+    {
+      "id": "matrix-invalid-blocks-6",
+      "profile": "matrix",
+      "file": "matrix-invalid-blocks-6.dts",
+      "sha256": "a5209732fb76d881210586c0aad57daeba88143913959a8e64da8c31aa7565a1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 2837527045709347949
+      }
+    },
+    {
+      "id": "matrix-lfe-128",
+      "profile": "matrix",
+      "file": "matrix-lfe-128.dts",
+      "sha256": "5535032a692f2b3cdcee6d3529d180f0efb3374d5a9d078b31675731c6364c6f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 7282015744803710505
+      }
+    },
+    {
+      "id": "matrix-lfe-64",
+      "profile": "matrix",
+      "file": "matrix-lfe-64.dts",
+      "sha256": "d5bf4a7c3b2343020e46b920fef4d9f7508de9f70df105a1d8d06bc1d1ce0f18",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 8579509043455310509
+      }
+    },
+    {
+      "id": "matrix-lfe-invalid",
+      "profile": "matrix",
+      "file": "matrix-lfe-invalid.dts",
+      "sha256": "0b41f7c9187d9c932ac421267e119d5080dd7facbb932154543f575acc897716",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 4728217388586112433
+      }
+    },
+    {
+      "id": "matrix-normal-short-zero",
+      "profile": "matrix",
+      "file": "matrix-normal-short-zero.dts",
+      "sha256": "e71eb6a41bc88f3916eb86789368617c54b6946fe59b5e00392baa35ed360c02",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 17817107429506333229
+      }
+    },
+    {
+      "id": "matrix-pcm-0",
+      "profile": "matrix",
+      "file": "matrix-pcm-0.dts",
+      "sha256": "4817ea9899a6ea91710df293277dc92c17139e89e2d237881a2701270b7ce680",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5984522446152110501
+      }
+    },
+    {
+      "id": "matrix-pcm-1",
+      "profile": "matrix",
+      "file": "matrix-pcm-1.dts",
+      "sha256": "1a08908bf103eb84a2d9a2b87bafaf304e458eeb1ee46599d2f7f0de53550188",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 18255173601729462821
+      }
+    },
+    {
+      "id": "matrix-pcm-2",
+      "profile": "matrix",
+      "file": "matrix-pcm-2.dts",
+      "sha256": "f5699d50bb6597054f4777769d5d7e7814f4b7b2280412b57746aa5a2e707528",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 12079080683597263525
+      }
+    },
+    {
+      "id": "matrix-pcm-3",
+      "profile": "matrix",
+      "file": "matrix-pcm-3.dts",
+      "sha256": "4b4550544910a796778203490c1729aa082db7a1a36fabe8e2c20d16ea912488",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5902987765465064229
+      }
+    },
+    {
+      "id": "matrix-pcm-4",
+      "profile": "matrix",
+      "file": "matrix-pcm-4.dts",
+      "sha256": "fa49e59307556f2bf97b56dd9d92a0a14ae1038a705c71624ae4b95d68efbb52",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5914643017658957219
+      }
+    },
+    {
+      "id": "matrix-pcm-5",
+      "profile": "matrix",
+      "file": "matrix-pcm-5.dts",
+      "sha256": "c32b8e6a5fa70e4d42465df0047398d51b5eb43bd047484b4ad3901519fe86d3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 4887335053047556003
+      }
+    },
+    {
+      "id": "matrix-pcm-6",
+      "profile": "matrix",
+      "file": "matrix-pcm-6.dts",
+      "sha256": "432f73b8511606ebb73106d4f62754478ee48cf60f5c88572e6bcedbb8c33320",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 17157986208624908323
+      }
+    },
+    {
+      "id": "matrix-pcm-7",
+      "profile": "matrix",
+      "file": "matrix-pcm-7.dts",
+      "sha256": "9cfbad1b9cd99a1440945ec2fc5cae49afc163aa55ab9e329033731163f5694b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5833108336971910947
+      }
+    },
+    {
+      "id": "matrix-rate-1-blocks-127",
+      "profile": "matrix",
+      "file": "matrix-rate-1-blocks-127.dts",
+      "sha256": "260db3d7843a5273bf9a3ce7ec3a09234f928d347d56485af280ea0a1343286e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 11398234648602673735
+      }
+    },
+    {
+      "id": "matrix-rate-1-blocks-15",
+      "profile": "matrix",
+      "file": "matrix-rate-1-blocks-15.dts",
+      "sha256": "352ab9c93d68e19b2ac4db0b93d85c554cb8193d18f2837c00ba327b0cf91c27",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 14471361292508905733
+      }
+    },
+    {
+      "id": "matrix-rate-1-blocks-31",
+      "profile": "matrix",
+      "file": "matrix-rate-1-blocks-31.dts",
+      "sha256": "a94f5896359db3bc9733db3e3b164c56927d447044b216dd3459834fadc04d5f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 3680471351051763333
+      }
+    },
+    {
+      "id": "matrix-rate-1-blocks-63",
+      "profile": "matrix",
+      "file": "matrix-rate-1-blocks-63.dts",
+      "sha256": "677123e6066b8b9a10992c8bc4c668715428096952fdaafc3d114828a21ddee4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 545435541847030149
+      }
+    },
+    {
+      "id": "matrix-rate-1-blocks-7",
+      "profile": "matrix",
+      "file": "matrix-rate-1-blocks-7.dts",
+      "sha256": "d3f9db7b552aea39a084a1150573086b340123fbfb18921f7a3156150d7af1de",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 10643434226382701125
+      }
+    },
+    {
+      "id": "matrix-rate-11-blocks-127",
+      "profile": "matrix",
+      "file": "matrix-rate-11-blocks-127.dts",
+      "sha256": "c038beb91ee0cda29f4e2f7caf9fee654c43bb6720966178e06151c33f07f415",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 517410308560488503
+      }
+    },
+    {
+      "id": "matrix-rate-11-blocks-15",
+      "profile": "matrix",
+      "file": "matrix-rate-11-blocks-15.dts",
+      "sha256": "6d26f55e991be7d80f0f44d0dd611eca62a1d4a039d6a90fa65d2beb5c958c2c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 3590536952466720501
+      }
+    },
+    {
+      "id": "matrix-rate-11-blocks-31",
+      "profile": "matrix",
+      "file": "matrix-rate-11-blocks-31.dts",
+      "sha256": "c30645a4d43135e25b7f40646bf575d29c64670577ec59400bdfbc6d42c54205",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 11246391084719129717
+      }
+    },
+    {
+      "id": "matrix-rate-11-blocks-63",
+      "profile": "matrix",
+      "file": "matrix-rate-11-blocks-63.dts",
+      "sha256": "682ab24a9e001f6751fb92766c87fe5bb757c49ea82cc66b2948c79e62ffa494",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 8111355275514396533
+      }
+    },
+    {
+      "id": "matrix-rate-11-blocks-7",
+      "profile": "matrix",
+      "file": "matrix-rate-11-blocks-7.dts",
+      "sha256": "2d8a9dd82e1bbfde151354a3f623cd370bfa2d8ad05be8c050f8fd843797bfaf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 18209353960050067509
+      }
+    },
+    {
+      "id": "matrix-rate-12-blocks-127",
+      "profile": "matrix",
+      "file": "matrix-rate-12-blocks-127.dts",
+      "sha256": "74ffea2f979b633379669c06a1f5221f0a91c82c7a5880cd2b56fd608900f115",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 14770458208123899423
+      }
+    },
+    {
+      "id": "matrix-rate-12-blocks-15",
+      "profile": "matrix",
+      "file": "matrix-rate-12-blocks-15.dts",
+      "sha256": "f8cc9281e90985736ed152bfc41e5e609d9463684940de7dc4cc1420187bee69",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 17843584852030131421
+      }
+    },
+    {
+      "id": "matrix-rate-12-blocks-31",
+      "profile": "matrix",
+      "file": "matrix-rate-12-blocks-31.dts",
+      "sha256": "8aba6b9c73a07defa13766ddedbd483d0aefd53071d61cbb4a5c0642ab8bd039",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 7052694910572989021
+      }
+    },
+    {
+      "id": "matrix-rate-12-blocks-63",
+      "profile": "matrix",
+      "file": "matrix-rate-12-blocks-63.dts",
+      "sha256": "d2d8e80a4c73359bb9b794f8b6702840d5b23e8e8d174b4677eac6a9017e2e18",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 3917659101368255837
+      }
+    },
+    {
+      "id": "matrix-rate-12-blocks-7",
+      "profile": "matrix",
+      "file": "matrix-rate-12-blocks-7.dts",
+      "sha256": "d82d2554153936dc092031ed3f581da4c5ae600069162769af1a326332ffef84",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 14015657785903926813
+      }
+    },
+    {
+      "id": "matrix-rate-13-blocks-127",
+      "profile": "matrix",
+      "file": "matrix-rate-13-blocks-127.dts",
+      "sha256": "f418910ea6e5891b037d28a988f67698fb5ab99fa74ad71e14d1baebbfa0fb77",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 2911395802245878503
+      }
+    },
+    {
+      "id": "matrix-rate-13-blocks-15",
+      "profile": "matrix",
+      "file": "matrix-rate-13-blocks-15.dts",
+      "sha256": "4817ea9899a6ea91710df293277dc92c17139e89e2d237881a2701270b7ce680",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5984522446152110501
+      }
+    },
+    {
+      "id": "matrix-rate-13-blocks-31",
+      "profile": "matrix",
+      "file": "matrix-rate-13-blocks-31.dts",
+      "sha256": "eb099920914b2dfd8fcede8c31493463cab52d79dd9d9f0494e90b97df754630",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 13640376578404519717
+      }
+    },
+    {
+      "id": "matrix-rate-13-blocks-63",
+      "profile": "matrix",
+      "file": "matrix-rate-13-blocks-63.dts",
+      "sha256": "8a66e4b6d04823b4eafc790308245cf7ba83fa8c93c264ee202cbfcf711d2107",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 10505340769199786533
+      }
+    },
+    {
+      "id": "matrix-rate-13-blocks-7",
+      "profile": "matrix",
+      "file": "matrix-rate-13-blocks-7.dts",
+      "sha256": "d1f6d5d05f3d4381c3e30fd8d553d9efa42c1c9fde67242c0871c25c822a0b43",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 2156595380025905893
+      }
+    },
+    {
+      "id": "matrix-rate-2-blocks-127",
+      "profile": "matrix",
+      "file": "matrix-rate-2-blocks-127.dts",
+      "sha256": "80d66d16012b2374ec02b2d158fa3a0c8e20f3a50900b46110aa8b2fb938f516",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 15908575242937010319
+      }
+    },
+    {
+      "id": "matrix-rate-2-blocks-15",
+      "profile": "matrix",
+      "file": "matrix-rate-2-blocks-15.dts",
+      "sha256": "750e4a1ded09aab11004debb2952577744d47bbf3d0f328cd31d8a4e4dd27d68",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 534957813133690701
+      }
+    },
+    {
+      "id": "matrix-rate-2-blocks-31",
+      "profile": "matrix",
+      "file": "matrix-rate-2-blocks-31.dts",
+      "sha256": "0eda42fefff7d800ba81ab25d9988b304110aa994017eab1b9232710a24fb7fa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 8190811945386099917
+      }
+    },
+    {
+      "id": "matrix-rate-2-blocks-63",
+      "profile": "matrix",
+      "file": "matrix-rate-2-blocks-63.dts",
+      "sha256": "5f0146fdb424c6d2403cc3ea8f6fe4c8b264794109b8a139c4894aff9e276a25",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5055776136181366733
+      }
+    },
+    {
+      "id": "matrix-rate-2-blocks-7",
+      "profile": "matrix",
+      "file": "matrix-rate-2-blocks-7.dts",
+      "sha256": "0b322128de33e2386506c3239073f577c9526abea60820ba27006e517ae36b5d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 15153774820717037709
+      }
+    },
+    {
+      "id": "matrix-rate-3-blocks-127",
+      "profile": "matrix",
+      "file": "matrix-rate-3-blocks-127.dts",
+      "sha256": "adf11b93791af2d49eb8bc48aa5dfefddf8bfb7aeca4fd62f7cd4c32a22d2f9c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 3010842300310392343
+      }
+    },
+    {
+      "id": "matrix-rate-3-blocks-15",
+      "profile": "matrix",
+      "file": "matrix-rate-3-blocks-15.dts",
+      "sha256": "c24bc82d491d3bc97f28184568c3b01589b531d694fdef2d7d210fed2a69b08a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 6083968944216624341
+      }
+    },
+    {
+      "id": "matrix-rate-3-blocks-31",
+      "profile": "matrix",
+      "file": "matrix-rate-3-blocks-31.dts",
+      "sha256": "19f56a990a5cbb827e95fe1beacbe0db3c5d33c7abdb6ac1de39c8217b2088ef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 13739823076469033557
+      }
+    },
+    {
+      "id": "matrix-rate-3-blocks-63",
+      "profile": "matrix",
+      "file": "matrix-rate-3-blocks-63.dts",
+      "sha256": "71ec071776ea682078a3125362cc48cbe9cad7300e51490d1b2702af5bc14cc8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 10604787267264300373
+      }
+    },
+    {
+      "id": "matrix-rate-3-blocks-7",
+      "profile": "matrix",
+      "file": "matrix-rate-3-blocks-7.dts",
+      "sha256": "7e8e00205ce578f9f2d56c5021c93364202a4ed7b37726d07c3d903e2b3356d0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 2256041878090419733
+      }
+    },
+    {
+      "id": "matrix-rate-6-blocks-127",
+      "profile": "matrix",
+      "file": "matrix-rate-6-blocks-127.dts",
+      "sha256": "d8c44b69fa4cadbca66971c68257b7aca4127b62c4b0f9dbe3441e3f997ff1df",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 9492020579692693696
+      }
+    },
+    {
+      "id": "matrix-rate-6-blocks-15",
+      "profile": "matrix",
+      "file": "matrix-rate-6-blocks-15.dts",
+      "sha256": "8d740adc87b46f985e54f595993fa7e5e84f405c963d0a2981296f8b2ee16d4d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 12565147223598925694
+      }
+    },
+    {
+      "id": "matrix-rate-6-blocks-31",
+      "profile": "matrix",
+      "file": "matrix-rate-6-blocks-31.dts",
+      "sha256": "98a495b732766ad96be359afef2aa7c9dcb8f202cc18382a2d1a35d84301e3a7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 1774257282141783294
+      }
+    },
+    {
+      "id": "matrix-rate-6-blocks-63",
+      "profile": "matrix",
+      "file": "matrix-rate-6-blocks-63.dts",
+      "sha256": "90298bf8841cbc4e82aa6c6ee71ecd6c567d2262e48d4bfd64293d9a5bf1d8bf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 17085965546646601726
+      }
+    },
+    {
+      "id": "matrix-rate-6-blocks-7",
+      "profile": "matrix",
+      "file": "matrix-rate-6-blocks-7.dts",
+      "sha256": "3fb6640ff8ca6f9e3327ba65a9f4d489597c2c96864645099e5802db3680e694",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 8737220157472721086
+      }
+    },
+    {
+      "id": "matrix-rate-7-blocks-127",
+      "profile": "matrix",
+      "file": "matrix-rate-7-blocks-127.dts",
+      "sha256": "296786fa2621bf740c775a4b7ad194ecbc3167810f472ab77cebcdef96436ce2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 13184540890897904217
+      }
+    },
+    {
+      "id": "matrix-rate-7-blocks-15",
+      "profile": "matrix",
+      "file": "matrix-rate-7-blocks-15.dts",
+      "sha256": "625e0bf03154289059b3a64d03d5fed97b51d6596d3ceb736fbd38b042d586c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 16257667534804136215
+      }
+    },
+    {
+      "id": "matrix-rate-7-blocks-31",
+      "profile": "matrix",
+      "file": "matrix-rate-7-blocks-31.dts",
+      "sha256": "8792a46653826ac7bd34c3bca26ba87a718aa747b341e5be672f717327048649",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5466777593346993815
+      }
+    },
+    {
+      "id": "matrix-rate-7-blocks-63",
+      "profile": "matrix",
+      "file": "matrix-rate-7-blocks-63.dts",
+      "sha256": "219b1396e6508f9e31589cbfe038a6b5b89e82ee007e9db01398b01475311635",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 2331741784142260631
+      }
+    },
+    {
+      "id": "matrix-rate-7-blocks-7",
+      "profile": "matrix",
+      "file": "matrix-rate-7-blocks-7.dts",
+      "sha256": "0decd767bfd40585571d8083bd0b6345671a974c1ebb96e4b52ce025b82e1d21",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 12429740468677931607
+      }
+    },
+    {
+      "id": "matrix-rate-8-blocks-127",
+      "profile": "matrix",
+      "file": "matrix-rate-8-blocks-127.dts",
+      "sha256": "8c3f82ed27595b85aed568ccaef78fa093e0911ac7ea508a2808e78da796b8d7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 17097911455722585731
+      }
+    },
+    {
+      "id": "matrix-rate-8-blocks-15",
+      "profile": "matrix",
+      "file": "matrix-rate-8-blocks-15.dts",
+      "sha256": "470ecbda212d4f8cfa97210a9542999da55d3f8e048c09d21ab100040b4f2b21",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 1724294025919266113
+      }
+    },
+    {
+      "id": "matrix-rate-8-blocks-31",
+      "profile": "matrix",
+      "file": "matrix-rate-8-blocks-31.dts",
+      "sha256": "f50f3686eae033354ce9a607a76ff989010c2f02c882a91a68e411fb19600e14",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 9380148158171675329
+      }
+    },
+    {
+      "id": "matrix-rate-8-blocks-63",
+      "profile": "matrix",
+      "file": "matrix-rate-8-blocks-63.dts",
+      "sha256": "dc079ef87aee819c09a2cd38c5a154afd2657366cc7e79b2a9a83d7bfaa7daaf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 6245112348966942145
+      }
+    },
+    {
+      "id": "matrix-rate-8-blocks-7",
+      "profile": "matrix",
+      "file": "matrix-rate-8-blocks-7.dts",
+      "sha256": "4d821d2a065bad45fd3ac88e22816644d910f3281490e9dd003ec242e5de822f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 16343111033502613121
+      }
+    },
+    {
+      "id": "matrix-raw-flag-audio_sync",
+      "profile": "matrix",
+      "file": "matrix-raw-flag-audio_sync.dts",
+      "sha256": "200a02fea6da185ef270c6a511b0b0c9593d5f07131658f0b71338083a21e9ba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 11174495640758510517
+      }
+    },
+    {
+      "id": "matrix-raw-flag-auxiliary",
+      "profile": "matrix",
+      "file": "matrix-raw-flag-auxiliary.dts",
+      "sha256": "a6c92a943e05b4b29f2885abd5a766861497a2dbb71e026bb447fb5763ab58da",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 9313326556932607393
+      }
+    },
+    {
+      "id": "matrix-raw-flag-dynamic",
+      "profile": "matrix",
+      "file": "matrix-raw-flag-dynamic.dts",
+      "sha256": "746d165cf836efeac65b6f64fd9f56d6a738ad59bf4ce88cf0dc52ecf77b1963",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 852994815564546453
+      }
+    },
+    {
+      "id": "matrix-raw-flag-filter",
+      "profile": "matrix",
+      "file": "matrix-raw-flag-filter.dts",
+      "sha256": "2ddf66a8ed23ad73290500a4462a5a249d6e93195d694812c315facf778dd3f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 10448387069856338085
+      }
+    },
+    {
+      "id": "matrix-raw-flag-hdcd",
+      "profile": "matrix",
+      "file": "matrix-raw-flag-hdcd.dts",
+      "sha256": "ef461e00ea8ce33d6fbb5499c6a0f5f3a0993670e8397b24b4770bdb6fbeda7f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 16872296538397134755
+      }
+    },
+    {
+      "id": "matrix-raw-flag-sum_front",
+      "profile": "matrix",
+      "file": "matrix-raw-flag-sum_front.dts",
+      "sha256": "d4fc8151fb0784a99c9a09736bab4fab009880b073be02d92c906e1d93dcebbf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 2896475987086010853
+      }
+    },
+    {
+      "id": "matrix-raw-flag-sum_surround",
+      "profile": "matrix",
+      "file": "matrix-raw-flag-sum_surround.dts",
+      "sha256": "1668d6beed3d395f37e0842de7f282ab2e7fc4eed2e3a1b9f1c9b35f00e8aaef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 4440499216619060677
+      }
+    },
+    {
+      "id": "matrix-raw-flag-timestamp",
+      "profile": "matrix",
+      "file": "matrix-raw-flag-timestamp.dts",
+      "sha256": "77b15635632c5992bd480e7f480b7a813ec7f0089995c7167ebe8635e5bf965d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 12642130667713104285
+      }
+    },
+    {
+      "id": "matrix-reserved-extension-sync",
+      "profile": "matrix",
+      "file": "matrix-reserved-extension-sync.dts",
+      "sha256": "cc97dabc7799ea4e56530a642efc4195d644bf0af72db51e911afefcc065f650",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 26,
+        "digest": 17765433628177334964
+      }
+    },
+    {
+      "id": "matrix-sampling-code-0",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-0.dts",
+      "sha256": "c04bb026b810dfcdee2dbc3a2e85da6a44a2413b9a7d16f8eaa9f7e310c132d1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 11044258965145353405
+      }
+    },
+    {
+      "id": "matrix-sampling-code-1",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-1.dts",
+      "sha256": "352ab9c93d68e19b2ac4db0b93d85c554cb8193d18f2837c00ba327b0cf91c27",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 14471361292508905733
+      }
+    },
+    {
+      "id": "matrix-sampling-code-10",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-10.dts",
+      "sha256": "0003d7d15f771deb488ad53dc30eae294f96f079ff160dd174b84e0c2caa95bb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 8867471393583645453
+      }
+    },
+    {
+      "id": "matrix-sampling-code-11",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-11.dts",
+      "sha256": "6d26f55e991be7d80f0f44d0dd611eca62a1d4a039d6a90fa65d2beb5c958c2c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 3590536952466720501
+      }
+    },
+    {
+      "id": "matrix-sampling-code-12",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-12.dts",
+      "sha256": "f8cc9281e90985736ed152bfc41e5e609d9463684940de7dc4cc1420187bee69",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 17843584852030131421
+      }
+    },
+    {
+      "id": "matrix-sampling-code-13",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-13.dts",
+      "sha256": "4817ea9899a6ea91710df293277dc92c17139e89e2d237881a2701270b7ce680",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5984522446152110501
+      }
+    },
+    {
+      "id": "matrix-sampling-code-14",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-14.dts",
+      "sha256": "cbbff86a6f39a9cf7c9096a23a55fe4333afd8592aa20629ee440f4c7e6b1d89",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 15688215724229432365
+      }
+    },
+    {
+      "id": "matrix-sampling-code-15",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-15.dts",
+      "sha256": "21502a218954625f2cb96d8f1396f5216fb2b10e33c8b7c0b8686769fd6b31fc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 13177188149088784949
+      }
+    },
+    {
+      "id": "matrix-sampling-code-2",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-2.dts",
+      "sha256": "750e4a1ded09aab11004debb2952577744d47bbf3d0f328cd31d8a4e4dd27d68",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 534957813133690701
+      }
+    },
+    {
+      "id": "matrix-sampling-code-3",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-3.dts",
+      "sha256": "c24bc82d491d3bc97f28184568c3b01589b531d694fdef2d7d210fed2a69b08a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 6083968944216624341
+      }
+    },
+    {
+      "id": "matrix-sampling-code-4",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-4.dts",
+      "sha256": "ca4ff7b44973d710fc43888a948b2fceca9fc403c4c28f3080544e27ed5c657f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 6484195121778759901
+      }
+    },
+    {
+      "id": "matrix-sampling-code-5",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-5.dts",
+      "sha256": "83ae4e46f64d7b25c8a0c1a371463c93cefaf97de35cd15ff3e0c950f2cc099a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 9955865179364499429
+      }
+    },
+    {
+      "id": "matrix-sampling-code-6",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-6.dts",
+      "sha256": "8d740adc87b46f985e54f595993fa7e5e84f405c963d0a2981296f8b2ee16d4d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 12565147223598925694
+      }
+    },
+    {
+      "id": "matrix-sampling-code-7",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-7.dts",
+      "sha256": "625e0bf03154289059b3a64d03d5fed97b51d6596d3ceb736fbd38b042d586c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 16257667534804136215
+      }
+    },
+    {
+      "id": "matrix-sampling-code-8",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-8.dts",
+      "sha256": "470ecbda212d4f8cfa97210a9542999da55d3f8e048c09d21ab100040b4f2b21",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 1724294025919266113
+      }
+    },
+    {
+      "id": "matrix-sampling-code-9",
+      "profile": "matrix",
+      "file": "matrix-sampling-code-9.dts",
+      "sha256": "fc7e0f9704410e21c064025621d5e7afb5743dea6ae196e7eba2dae7d5bf47e2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5395801335997905925
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-0-bytes-1",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-0-bytes-1.dts",
+      "sha256": "620bfdaa346b088fb49998d92f19a7eaf6bfc2fb0aee015753966da1028cb731",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 2,
+        "digest": 788509732218664648
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-0-bytes-10",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-0-bytes-10.dts",
+      "sha256": "960eaaa35666378fddd9be0db545654f1b3d0b84ce4d87a9e2f7599dca0fc64c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 20,
+        "digest": 13078084780145788819
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-0-bytes-11",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-0-bytes-11.dts",
+      "sha256": "5900925895739a0cdec7968f741db602d09ba0a8265858c58f2311dd1e545d1f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 22,
+        "digest": 2978015594452472978
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-0-bytes-12",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-0-bytes-12.dts",
+      "sha256": "4bbe61b2b37c39495e77d15130c29e3cc7400d3d5daa35d51babe872c4696188",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 24,
+        "digest": 17699941346518372835
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-0-bytes-2",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-0-bytes-2.dts",
+      "sha256": "1d8c0d6a3470c686d4d804f952b787e9a4064cd2b77d0963010e367b35120c6e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 4,
+        "digest": 2255262975878781065
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-0-bytes-3",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-0-bytes-3.dts",
+      "sha256": "edaacab5bd7c3e560d5c1e7a383081a8e2cb90c71d58bc354a6da44acf75cd62",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 16449964991182493642
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-0-bytes-4",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-0-bytes-4.dts",
+      "sha256": "cef535f9b83e4c4b6a5c9de61a6bc56f9e30311f6e3bf8dc5519f832d18b1c42",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 5,
+        "digest": 7253889519534038692
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-0-bytes-5",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-0-bytes-5.dts",
+      "sha256": "c9e1177b885ba30ba5e9e041a90118370af04211cd53ed78bac8a67d94334ae2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 4137074419976970537
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-0-bytes-6",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-0-bytes-6.dts",
+      "sha256": "08f93b9a7e455001ced703eb7c6c3363f4ac1fbfcde2ef61dfae6cdd5e04c55d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 7,
+        "digest": 125628589509870114
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-0-bytes-7",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-0-bytes-7.dts",
+      "sha256": "8274e481566533ecd3cf983c1685c7eb3424aa28b908ef7770431d8dc4669228",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 8,
+        "digest": 16557174871324505012
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-0-bytes-8",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-0-bytes-8.dts",
+      "sha256": "ca78bb5233d9a22c91cbbf46325321e03f4bccd4c481973957bd73ad19a3b23a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 16,
+        "digest": 9276059807877246507
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-0-bytes-9",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-0-bytes-9.dts",
+      "sha256": "abf36ce7560c6312bab6575128af02df629149743c778c0e6ae604c5c690c01f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 18,
+        "digest": 1938305985637258928
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-1-bytes-10",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-1-bytes-10.dts",
+      "sha256": "d49b062e2f5b96811de8b4e50774055f6d518ded24495987e310a9b192ec90d4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 20,
+        "digest": 1063389987055698327
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-1-bytes-11",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-1-bytes-11.dts",
+      "sha256": "d66448b0ef0564f448dc0639f407c675e3b6043d2a8d6c80f5c4c9906be6ae2d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 22,
+        "digest": 4518107926297975122
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-1-bytes-12",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-1-bytes-12.dts",
+      "sha256": "035710dc44910dec81a1872a954d92a31c71c9ef0fd3e72a53c79a560c21ac09",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 24,
+        "digest": 4107648741345596699
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-1-bytes-13",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-1-bytes-13.dts",
+      "sha256": "eea7f5d5347be9e1499fd1fd154b55e70be217f8be83046512540723d61574c5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 26,
+        "digest": 7512468273414373108
+      }
+    },
+    {
+      "id": "matrix-short-header-cpf-1-bytes-14",
+      "profile": "matrix",
+      "file": "matrix-short-header-cpf-1-bytes-14.dts",
+      "sha256": "ab013892a3af1355d4057aa695d2409253145c10df78c67f1ed23c8fecacfa29",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 28,
+        "digest": 11910055048135054787
+      }
+    },
+    {
+      "id": "matrix-size-0",
+      "profile": "matrix",
+      "file": "matrix-size-0.dts",
+      "sha256": "b690f5b4769b8a5d4aae9ecca3088c74f1d2834c2bfdb130e8b11402d58bccef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 14,
+        "digest": 18302492955463965011
+      }
+    },
+    {
+      "id": "matrix-size-16383",
+      "profile": "matrix",
+      "file": "matrix-size-16383.dts",
+      "sha256": "8d01be57873b7cd25c80ca4ee44a1a168ff9ddbfe89e8a5ef0efb566c326e315",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 32768,
+        "digest": 13480467083511646579
+      }
+    },
+    {
+      "id": "matrix-size-94",
+      "profile": "matrix",
+      "file": "matrix-size-94.dts",
+      "sha256": "bae4ee61d21bb89e44563e346b87a61808a78367a899ebc29cad6c7c073e85bd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 190,
+        "digest": 9182083522992224102
+      }
+    },
+    {
+      "id": "matrix-size-95",
+      "profile": "matrix",
+      "file": "matrix-size-95.dts",
+      "sha256": "4817ea9899a6ea91710df293277dc92c17139e89e2d237881a2701270b7ce680",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 5984522446152110501
+      }
+    },
+    {
+      "id": "matrix-size-96",
+      "profile": "matrix",
+      "file": "matrix-size-96.dts",
+      "sha256": "6c8a27af586b625a8df4d3eaec1b07734e7c2df33b344e8d6d6a1c04a1f09033",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 194,
+        "digest": 9792164820303263432
+      }
+    },
+    {
+      "id": "matrix-termination-raw",
+      "profile": "matrix",
+      "file": "matrix-termination-raw.dts",
+      "sha256": "76357caf051a5cc0a75e143f82e4d62d0febc33e07312df20e443ac0f71c759d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 875338047303451005
+      }
+    },
+    {
+      "id": "matrix-version-0",
+      "profile": "matrix",
+      "file": "matrix-version-0.dts",
+      "sha256": "f50515e8703e7a2a8fdb33fef2e72e1347a59af2c4defc4ef371e7ad4fbd0fbd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 664222693763845227
+      }
+    },
+    {
+      "id": "matrix-version-1",
+      "profile": "matrix",
+      "file": "matrix-version-1.dts",
+      "sha256": "2c593efa89fc60da51c618ad2a8d1088058272677b7b627a303ad0d8216d68dd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 4401978746565900379
+      }
+    },
+    {
+      "id": "matrix-version-10",
+      "profile": "matrix",
+      "file": "matrix-version-10.dts",
+      "sha256": "cd4f9339ca3f0858dd6a5a99f22c61f320e7a7bdf0d39f015adff86969b55753",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 1148295074365293515
+      }
+    },
+    {
+      "id": "matrix-version-11",
+      "profile": "matrix",
+      "file": "matrix-version-11.dts",
+      "sha256": "45b05966ab3e0e1e52cbd0fbca2abe63b0384811fce0bfb6fd5be8e9f28f86b5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 4886051127167348667
+      }
+    },
+    {
+      "id": "matrix-version-12",
+      "profile": "matrix",
+      "file": "matrix-version-12.dts",
+      "sha256": "20e26b2db0be76e25edad132222167f78e45e3333756df07099b25f0931a7958",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 8623807179969403819
+      }
+    },
+    {
+      "id": "matrix-version-13",
+      "profile": "matrix",
+      "file": "matrix-version-13.dts",
+      "sha256": "327c9cbb8fcae1952a304cd6433148d50970ef1b45d16881cda604c17f7187bf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 12361563232771458971
+      }
+    },
+    {
+      "id": "matrix-version-14",
+      "profile": "matrix",
+      "file": "matrix-version-14.dts",
+      "sha256": "e104b79b132db5f97f069db75a8b05db0117276ec44495763f65e0c2acb9cb08",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 16099319285573514123
+      }
+    },
+    {
+      "id": "matrix-version-15",
+      "profile": "matrix",
+      "file": "matrix-version-15.dts",
+      "sha256": "77e407a733b9aef0c68599b6cd0ead0ebc1a7678241ae301956722021a37c5db",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 1390331264666017659
+      }
+    },
+    {
+      "id": "matrix-version-2",
+      "profile": "matrix",
+      "file": "matrix-version-2.dts",
+      "sha256": "a8c40d520d4ff7bd01a1f8f5557c56180763e37572032b9d8a471e9238ce90e5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 8139734799367955531
+      }
+    },
+    {
+      "id": "matrix-version-3",
+      "profile": "matrix",
+      "file": "matrix-version-3.dts",
+      "sha256": "4dafcbf3598c15128fdd4fcf1640c7a3fc90f54bdc1cee740b7039b7a6ed562b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 11877490852170010683
+      }
+    },
+    {
+      "id": "matrix-version-4",
+      "profile": "matrix",
+      "file": "matrix-version-4.dts",
+      "sha256": "ef7a4b25998fab82a6d783c248d36cab20cc261e2022855c7ac10cb2cea643df",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 15615246904972065835
+      }
+    },
+    {
+      "id": "matrix-version-5",
+      "profile": "matrix",
+      "file": "matrix-version-5.dts",
+      "sha256": "762b98c96bbbb1c6aad4ffd1f3a759b307de3858e0155d4bc8800546b8c658fb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 906258884064569371
+      }
+    },
+    {
+      "id": "matrix-version-6",
+      "profile": "matrix",
+      "file": "matrix-version-6.dts",
+      "sha256": "46aa6fd22834e07bf9fc44fd71b9fd526b78e3ffc9e83d8418f5d9af3f5c08ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 4644014936866624523
+      }
+    },
+    {
+      "id": "matrix-version-7",
+      "profile": "matrix",
+      "file": "matrix-version-7.dts",
+      "sha256": "1c53ceab2449d6f9080677809f38ef9e8e2ddf470654c1274d0d8f17335904f2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 8381770989668679675
+      }
+    },
+    {
+      "id": "matrix-version-8",
+      "profile": "matrix",
+      "file": "matrix-version-8.dts",
+      "sha256": "07809aa8fc0ee320891ea7c3ed00908b549db24f8545c47f9cbddd81df66a805",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 12119527042470734827
+      }
+    },
+    {
+      "id": "matrix-version-9",
+      "profile": "matrix",
+      "file": "matrix-version-9.dts",
+      "sha256": "9cd8ec4e1caf462f3e8f1887323105c55633dcb74517ee92889351f47f625f7f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 15857283095272789979
+      }
+    },
+    {
+      "id": "empty",
+      "profile": "authored",
+      "file": "empty.dts",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "minimum",
+      "profile": "authored",
+      "file": "minimum.dts",
+      "sha256": "a9215aae60d9fb639055c7b978a06f757945d8d3e9dc76b339b1cceabe23649a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 3699277049660928805
+      }
+    },
+    {
+      "id": "hcrc-raw-zero",
+      "profile": "authored",
+      "file": "hcrc-raw-zero.dts",
+      "sha256": "d6eb79a8632c6c8b7fb22b0a8dccb04dcb5102f09d0306aab0ab1c7546f2eb65",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 9148161035574777005
+      }
+    },
+    {
+      "id": "hcrc-raw-nonzero",
+      "profile": "authored",
+      "file": "hcrc-raw-nonzero.dts",
+      "sha256": "1ef1d482cbc2076919c629b1c2ae45e07c2a1d0d8bd4a329a0474ea70f6b5170",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 483655449137407243
+      }
+    },
+    {
+      "id": "maximum",
+      "profile": "authored",
+      "file": "maximum.dts",
+      "sha256": "258960f709bea297b24190b82649a1b09180f96893f72fae6beb46be91432f6c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 32768,
+        "digest": 13374866015512127395
+      }
+    },
+    {
+      "id": "two-frames",
+      "profile": "authored",
+      "file": "two-frames.dts",
+      "sha256": "cfb44e77a064142a1fd5dd1788c7829a681334e04bebea2d26fadd926fca8851",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 384,
+        "digest": 2295169847112023534
+      }
+    },
+    {
+      "id": "good-then-short",
+      "profile": "authored",
+      "file": "good-then-short.dts",
+      "sha256": "b7d0117c4c5869466ead8775d5f3c2ac2a448fa32c171a679502bc9b5db77490",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 216,
+        "digest": 16356281759208653985
+      }
+    },
+    {
+      "id": "good-then-invalid",
+      "profile": "authored",
+      "file": "good-then-invalid.dts",
+      "sha256": "c3843b856434f2ea4eb22000fb408e25746cff83d0c96e23a8341175958b5885",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 208,
+        "digest": 11753777831504012597
+      }
+    },
+    {
+      "id": "good-then-extension",
+      "profile": "authored",
+      "file": "good-then-extension.dts",
+      "sha256": "81a35c4cfbf73d14dc7c34dbe4b2e8a1577eda25fc37ba293d1e110aa8edc3a5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 208,
+        "digest": 659712338082860188
+      }
+    },
+    {
+      "id": "truncated-1",
+      "profile": "authored",
+      "file": "truncated-1.dts",
+      "sha256": "620bfdaa346b088fb49998d92f19a7eaf6bfc2fb0aee015753966da1028cb731",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 2,
+        "digest": 788509732218664648
+      }
+    },
+    {
+      "id": "truncated-3",
+      "profile": "authored",
+      "file": "truncated-3.dts",
+      "sha256": "edaacab5bd7c3e560d5c1e7a383081a8e2cb90c71d58bc354a6da44acf75cd62",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 16449964991182493642
+      }
+    },
+    {
+      "id": "truncated-4",
+      "profile": "authored",
+      "file": "truncated-4.dts",
+      "sha256": "cef535f9b83e4c4b6a5c9de61a6bc56f9e30311f6e3bf8dc5519f832d18b1c42",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 5,
+        "digest": 7253889519534038692
+      }
+    },
+    {
+      "id": "truncated-10",
+      "profile": "authored",
+      "file": "truncated-10.dts",
+      "sha256": "960eaaa35666378fddd9be0db545654f1b3d0b84ce4d87a9e2f7599dca0fc64c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 20,
+        "digest": 13078084780145788819
+      }
+    },
+    {
+      "id": "truncated-12",
+      "profile": "authored",
+      "file": "truncated-12.dts",
+      "sha256": "4bbe61b2b37c39495e77d15130c29e3cc7400d3d5daa35d51babe872c4696188",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 24,
+        "digest": 17699941346518372835
+      }
+    },
+    {
+      "id": "truncated-13",
+      "profile": "authored",
+      "file": "truncated-13.dts",
+      "sha256": "179e3ed59d642a1e77032f466d38db8925bcef93527ca0861fc33383a89704e8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 26,
+        "digest": 13929861609773586388
+      }
+    },
+    {
+      "id": "truncated-14",
+      "profile": "authored",
+      "file": "truncated-14.dts",
+      "sha256": "4829dbec966c57dfd1a33667f410578723819050a14243c1be35a80f58e72340",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 28,
+        "digest": 15409013922003893731
+      }
+    },
+    {
+      "id": "truncated-95",
+      "profile": "authored",
+      "file": "truncated-95.dts",
+      "sha256": "89fe2edb285fb26564335d0c86a801616f8619fd9bdeaa0e08588598cd89024b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 190,
+        "digest": 3309013769326637446
+      }
+    },
+    {
+      "id": "header-prefix-00",
+      "profile": "boundaries",
+      "file": "header-prefix-00.dts",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "header-prefix-01",
+      "profile": "boundaries",
+      "file": "header-prefix-01.dts",
+      "sha256": "620bfdaa346b088fb49998d92f19a7eaf6bfc2fb0aee015753966da1028cb731",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 2,
+        "digest": 788509732218664648
+      }
+    },
+    {
+      "id": "header-prefix-02",
+      "profile": "boundaries",
+      "file": "header-prefix-02.dts",
+      "sha256": "1d8c0d6a3470c686d4d804f952b787e9a4064cd2b77d0963010e367b35120c6e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 4,
+        "digest": 2255262975878781065
+      }
+    },
+    {
+      "id": "header-prefix-03",
+      "profile": "boundaries",
+      "file": "header-prefix-03.dts",
+      "sha256": "edaacab5bd7c3e560d5c1e7a383081a8e2cb90c71d58bc354a6da44acf75cd62",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 16449964991182493642
+      }
+    },
+    {
+      "id": "header-prefix-04",
+      "profile": "boundaries",
+      "file": "header-prefix-04.dts",
+      "sha256": "cef535f9b83e4c4b6a5c9de61a6bc56f9e30311f6e3bf8dc5519f832d18b1c42",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 5,
+        "digest": 7253889519534038692
+      }
+    },
+    {
+      "id": "header-prefix-05",
+      "profile": "boundaries",
+      "file": "header-prefix-05.dts",
+      "sha256": "c9e1177b885ba30ba5e9e041a90118370af04211cd53ed78bac8a67d94334ae2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 4137074419976970537
+      }
+    },
+    {
+      "id": "header-prefix-06",
+      "profile": "boundaries",
+      "file": "header-prefix-06.dts",
+      "sha256": "08f93b9a7e455001ced703eb7c6c3363f4ac1fbfcde2ef61dfae6cdd5e04c55d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 7,
+        "digest": 125628589509870114
+      }
+    },
+    {
+      "id": "header-prefix-07",
+      "profile": "boundaries",
+      "file": "header-prefix-07.dts",
+      "sha256": "8274e481566533ecd3cf983c1685c7eb3424aa28b908ef7770431d8dc4669228",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 8,
+        "digest": 16557174871324505012
+      }
+    },
+    {
+      "id": "header-prefix-08",
+      "profile": "boundaries",
+      "file": "header-prefix-08.dts",
+      "sha256": "ca78bb5233d9a22c91cbbf46325321e03f4bccd4c481973957bd73ad19a3b23a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 16,
+        "digest": 9276059807877246507
+      }
+    },
+    {
+      "id": "header-prefix-09",
+      "profile": "boundaries",
+      "file": "header-prefix-09.dts",
+      "sha256": "abf36ce7560c6312bab6575128af02df629149743c778c0e6ae604c5c690c01f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 18,
+        "digest": 1938305985637258928
+      }
+    },
+    {
+      "id": "header-prefix-10",
+      "profile": "boundaries",
+      "file": "header-prefix-10.dts",
+      "sha256": "960eaaa35666378fddd9be0db545654f1b3d0b84ce4d87a9e2f7599dca0fc64c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 20,
+        "digest": 13078084780145788819
+      }
+    },
+    {
+      "id": "header-prefix-11",
+      "profile": "boundaries",
+      "file": "header-prefix-11.dts",
+      "sha256": "5900925895739a0cdec7968f741db602d09ba0a8265858c58f2311dd1e545d1f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 22,
+        "digest": 2978015594452472978
+      }
+    },
+    {
+      "id": "header-prefix-12",
+      "profile": "boundaries",
+      "file": "header-prefix-12.dts",
+      "sha256": "4bbe61b2b37c39495e77d15130c29e3cc7400d3d5daa35d51babe872c4696188",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 24,
+        "digest": 17699941346518372835
+      }
+    },
+    {
+      "id": "header-prefix-13",
+      "profile": "boundaries",
+      "file": "header-prefix-13.dts",
+      "sha256": "179e3ed59d642a1e77032f466d38db8925bcef93527ca0861fc33383a89704e8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 26,
+        "digest": 13929861609773586388
+      }
+    },
+    {
+      "id": "header-prefix-14",
+      "profile": "boundaries",
+      "file": "header-prefix-14.dts",
+      "sha256": "4829dbec966c57dfd1a33667f410578723819050a14243c1be35a80f58e72340",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 28,
+        "digest": 15409013922003893731
+      }
+    },
+    {
+      "id": "user-defined-amode",
+      "profile": "matrix",
+      "file": "user-defined-amode.dts",
+      "sha256": "910fe6b1369aeba5c693a0d85bf1d437f1128c27336a62cd4ff4f82fa46f6685",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 93,
+        "bytes": 8832,
+        "digest": 8543130015210186209
+      }
+    },
+    {
+      "id": "over-maximum-frame-bytes",
+      "profile": "boundaries",
+      "file": "over-maximum-frame-bytes.dts",
+      "sha256": "a9215aae60d9fb639055c7b978a06f757945d8d3e9dc76b339b1cceabe23649a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "95",
+        "frames"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "below-minimum-fsize",
+      "profile": "boundaries",
+      "file": "below-minimum-fsize.dts",
+      "sha256": "8a297cba86c0312e3c5b909d8b6750c5b56bf6566aba9b4f2d4780bb355c770a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 190,
+        "digest": 10409161890306217478
+      }
+    },
+    {
+      "id": "rate-change",
+      "profile": "boundaries",
+      "file": "rate-change.dts",
+      "sha256": "d07e9d202e251a1e4956e075ce6a6997f687db531d14c0b3a3f2e04eed5e73f6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 576,
+        "digest": 10030994095727307660
+      }
+    },
+    {
+      "id": "interframe-garbage",
+      "profile": "boundaries",
+      "file": "interframe-garbage.dts",
+      "sha256": "5236625344cd65f0440a52ae4e80856e971bd8331fcdee7898795a593f16683e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 388,
+        "digest": 12713556112779374430
+      }
+    },
+    {
+      "id": "core_51_24_48_768_0",
+      "profile": "fate",
+      "file": "core_51_24_48_768_0.core.dts",
+      "sha256": "e5023922b122a661c554c6ca411bf4664b541ac33ecf53b1bc99091f029fd143",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 12288,
+        "digest": 133773651706164727
+      }
+    },
+    {
+      "id": "core_51_24_48_768_0-decoded",
+      "profile": "decoded",
+      "file": "core_51_24_48_768_0.core.dts",
+      "sha256": "e5023922b122a661c554c6ca411bf4664b541ac33ecf53b1bc99091f029fd143",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 12288,
+        "digest": 10530123070406150763
+      }
+    },
+    {
+      "id": "core_51_24_48_768_1",
+      "profile": "fate",
+      "file": "core_51_24_48_768_1.core.dts",
+      "sha256": "4df3d0ff921105a78716c0a2cf5cf6935290719daa7469f6a0db9f4393efea00",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 12288,
+        "digest": 4152622642172825223
+      }
+    },
+    {
+      "id": "core_51_24_48_768_1-decoded",
+      "profile": "decoded",
+      "file": "core_51_24_48_768_1.core.dts",
+      "sha256": "4df3d0ff921105a78716c0a2cf5cf6935290719daa7469f6a0db9f4393efea00",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 12288,
+        "digest": 14548972060872811259
+      }
+    },
+    {
+      "id": "dts",
+      "profile": "fate",
+      "file": "dts.core.dts",
+      "sha256": "a7c8f6f8df1fa822449ac7537afe75735aa858861aae3d2481e1ec14e91e5612",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 509036,
+        "digest": 7376277874326320571
+      }
+    },
+    {
+      "id": "dts-decoded",
+      "profile": "decoded",
+      "file": "dts.core.dts",
+      "sha256": "a7c8f6f8df1fa822449ac7537afe75735aa858861aae3d2481e1ec14e91e5612",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 508,
+        "bytes": 509036,
+        "digest": 7689469043334649135
+      }
+    },
+    {
+      "id": "dts_es",
+      "profile": "fate",
+      "file": "dts_es.core.dts",
+      "sha256": "2e2530d220d51b914d1e7acb63badb5b2dae1578f3274116206fa1aa5e597638",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 501,
+        "bytes": 1006000,
+        "digest": 13537266755718503349
+      }
+    },
+    {
+      "id": "dts_es-decoded",
+      "profile": "decoded",
+      "file": "dts_es.core.dts",
+      "sha256": "2e2530d220d51b914d1e7acb63badb5b2dae1578f3274116206fa1aa5e597638",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 502,
+        "bytes": 1006000,
+        "digest": 16889126678087089194
+      }
+    },
+    {
+      "id": "dtsx_7.1.4_24bit",
+      "profile": "fate",
+      "file": "dtsx_7.1.4_24bit.core.dts",
+      "sha256": "eb5ceab778e7a5aedf0c47627b5de45858a3dd81903b12d153271f4830c09bc2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 8048,
+        "digest": 5964096794902950309
+      }
+    },
+    {
+      "id": "dtsx_7.1.4_24bit-decoded",
+      "profile": "decoded",
+      "file": "dtsx_7.1.4_24bit.core.dts",
+      "sha256": "eb5ceab778e7a5aedf0c47627b5de45858a3dd81903b12d153271f4830c09bc2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 8048,
+        "digest": 3684954049278437913
+      }
+    },
+    {
+      "id": "master_audio_7.1_24bit",
+      "profile": "fate",
+      "file": "master_audio_7.1_24bit.core.dts",
+      "sha256": "fd230401e49b41fbc892246cf22d7b04419104e02978215b50dcba3751c8de5f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 2345,
+        "bytes": 4716128,
+        "digest": 16831554597730893259
+      }
+    },
+    {
+      "id": "master_audio_7.1_24bit-decoded",
+      "profile": "decoded",
+      "file": "master_audio_7.1_24bit.core.dts",
+      "sha256": "fd230401e49b41fbc892246cf22d7b04419104e02978215b50dcba3751c8de5f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 2346,
+        "bytes": 4716128,
+        "digest": 1956798973091433535
+      }
+    },
+    {
+      "id": "x96_51_24_96_1509",
+      "profile": "fate",
+      "file": "x96_51_24_96_1509.core.dts",
+      "sha256": "e902cc493e94aa95024a276ff0d36f5ac76d614ed8c163621d3222112e1cdb93",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 24144,
+        "digest": 10332597286849814637
+      }
+    },
+    {
+      "id": "x96_51_24_96_1509-decoded",
+      "profile": "decoded",
+      "file": "x96_51_24_96_1509.core.dts",
+      "sha256": "e902cc493e94aa95024a276ff0d36f5ac76d614ed8c163621d3222112e1cdb93",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 24144,
+        "digest": 1373346153237472481
+      }
+    },
+    {
+      "id": "x96_xch_61_24_96_3840",
+      "profile": "fate",
+      "file": "x96_xch_61_24_96_3840.core.dts",
+      "sha256": "1674302b733a95f25077101dc5a18de8fe9c624c0bbf4f5d2c70b747de155a5c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 24144,
+        "digest": 3821592106362753461
+      }
+    },
+    {
+      "id": "x96_xch_61_24_96_3840-decoded",
+      "profile": "decoded",
+      "file": "x96_xch_61_24_96_3840.core.dts",
+      "sha256": "1674302b733a95f25077101dc5a18de8fe9c624c0bbf4f5d2c70b747de155a5c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 24144,
+        "digest": 15472485860353803050
+      }
+    },
+    {
+      "id": "x96_xxch_71_24_96_3840",
+      "profile": "fate",
+      "file": "x96_xxch_71_24_96_3840.core.dts",
+      "sha256": "19e3f42286e7616a0c06fba72fb0af51be7eec5dfc98bcb778b921ca89ffd897",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 24144,
+        "digest": 3273483053924066855
+      }
+    },
+    {
+      "id": "x96_xxch_71_24_96_3840-decoded",
+      "profile": "decoded",
+      "file": "x96_xxch_71_24_96_3840.core.dts",
+      "sha256": "19e3f42286e7616a0c06fba72fb0af51be7eec5dfc98bcb778b921ca89ffd897",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 24144,
+        "digest": 12760975994021276315
+      }
+    },
+    {
+      "id": "xbr_51_24_48_3840",
+      "profile": "fate",
+      "file": "xbr_51_24_48_3840.core.dts",
+      "sha256": "8500ec431e95f254eca8f3b6b42a2e243d52dc63526412ca3cdb709a84b1de40",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 24144,
+        "digest": 11850964154154966737
+      }
+    },
+    {
+      "id": "xbr_51_24_48_3840-decoded",
+      "profile": "decoded",
+      "file": "xbr_51_24_48_3840.core.dts",
+      "sha256": "8500ec431e95f254eca8f3b6b42a2e243d52dc63526412ca3cdb709a84b1de40",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 24144,
+        "digest": 2891713020542624581
+      }
+    },
+    {
+      "id": "xbr_xch_61_24_48_3840",
+      "profile": "fate",
+      "file": "xbr_xch_61_24_48_3840.core.dts",
+      "sha256": "cfa5ec0089bd981f36b21aba617149b37299ed149055ed9bb3ab4efcee87bdac",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 24144,
+        "digest": 13602468485826817883
+      }
+    },
+    {
+      "id": "xbr_xch_61_24_48_3840-decoded",
+      "profile": "decoded",
+      "file": "xbr_xch_61_24_48_3840.core.dts",
+      "sha256": "cfa5ec0089bd981f36b21aba617149b37299ed149055ed9bb3ab4efcee87bdac",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 24144,
+        "digest": 6806618166108315856
+      }
+    },
+    {
+      "id": "xbr_xxch_71_24_48_3840",
+      "profile": "fate",
+      "file": "xbr_xxch_71_24_48_3840.core.dts",
+      "sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 24144,
+        "digest": 10072583449741825247
+      }
+    },
+    {
+      "id": "xbr_xxch_71_24_48_3840-decoded",
+      "profile": "decoded",
+      "file": "xbr_xxch_71_24_48_3840.core.dts",
+      "sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 24144,
+        "digest": 1113332316129483091
+      }
+    },
+    {
+      "id": "xch_61_24_48_768",
+      "profile": "fate",
+      "file": "xch_61_24_48_768.core.dts",
+      "sha256": "dc0a4caf2c2bf999772b537994d988e5b5bef316cdd01e82dac67156bbf4e2ba",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 12288,
+        "digest": 1220132590314703189
+      }
+    },
+    {
+      "id": "xch_61_24_48_768-decoded",
+      "profile": "decoded",
+      "file": "xch_61_24_48_768.core.dts",
+      "sha256": "dc0a4caf2c2bf999772b537994d988e5b5bef316cdd01e82dac67156bbf4e2ba",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 12288,
+        "digest": 13273195580657939658
+      }
+    },
+    {
+      "id": "xll_51_16_192_768_0",
+      "profile": "fate",
+      "file": "xll_51_16_192_768_0.core.dts",
+      "sha256": "e92ea6eb72e254d134b2351b4a91e6d55da7f7397825fb042b819c447805a681",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 12288,
+        "digest": 954635637559846325
+      }
+    },
+    {
+      "id": "xll_51_16_192_768_0-decoded",
+      "profile": "decoded",
+      "file": "xll_51_16_192_768_0.core.dts",
+      "sha256": "e92ea6eb72e254d134b2351b4a91e6d55da7f7397825fb042b819c447805a681",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 12288,
+        "digest": 11350985056259832361
+      }
+    },
+    {
+      "id": "xll_51_16_192_768_1",
+      "profile": "fate",
+      "file": "xll_51_16_192_768_1.core.dts",
+      "sha256": "03d51e49c3dbfb9574c3c222b8c9d4d11daef4719882835e030becfbb8308319",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 12288,
+        "digest": 4496001809046968265
+      }
+    },
+    {
+      "id": "xll_51_16_192_768_1-decoded",
+      "profile": "decoded",
+      "file": "xll_51_16_192_768_1.core.dts",
+      "sha256": "03d51e49c3dbfb9574c3c222b8c9d4d11daef4719882835e030becfbb8308319",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 12288,
+        "digest": 14892351227746954301
+      }
+    },
+    {
+      "id": "xll_51_24_48_768",
+      "profile": "fate",
+      "file": "xll_51_24_48_768.core.dts",
+      "sha256": "d168cd189728296889ed5d9fb0b1e5d2cd6a1bcfec5a8088519b4e065f4e58d3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 12288,
+        "digest": 8893270935386247181
+      }
+    },
+    {
+      "id": "xll_51_24_48_768-decoded",
+      "profile": "decoded",
+      "file": "xll_51_24_48_768.core.dts",
+      "sha256": "d168cd189728296889ed5d9fb0b1e5d2cd6a1bcfec5a8088519b4e065f4e58d3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 12288,
+        "digest": 842876280376681601
+      }
+    },
+    {
+      "id": "xll_51_24_48_none",
+      "profile": "fate",
+      "file": "xll_51_24_48_none.core.dts",
+      "sha256": "d1c89e480474356e86370426052e7e389f1dec90a30473356b854b65b8c549d6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 136,
+        "digest": 12208497968525841720
+      }
+    },
+    {
+      "id": "xll_51_24_48_none-decoded",
+      "profile": "decoded",
+      "file": "xll_51_24_48_none.core.dts",
+      "sha256": "d1c89e480474356e86370426052e7e389f1dec90a30473356b854b65b8c549d6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 136,
+        "digest": 375087726570888084
+      }
+    },
+    {
+      "id": "xll_71_24_48_768_0",
+      "profile": "fate",
+      "file": "xll_71_24_48_768_0.core.dts",
+      "sha256": "3c5497ae22b12644fdaa0661c4d203dc131271e93ea10e1b3cdbfd6edf0ba3c0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 12288,
+        "digest": 10076357167995441067
+      }
+    },
+    {
+      "id": "xll_71_24_48_768_0-decoded",
+      "profile": "decoded",
+      "file": "xll_71_24_48_768_0.core.dts",
+      "sha256": "3c5497ae22b12644fdaa0661c4d203dc131271e93ea10e1b3cdbfd6edf0ba3c0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 12288,
+        "digest": 2025962512985875487
+      }
+    },
+    {
+      "id": "xll_71_24_48_768_1",
+      "profile": "fate",
+      "file": "xll_71_24_48_768_1.core.dts",
+      "sha256": "69ea01316c4322248cb02a01219c67ad2a7555b1494544630d9b3bc6b534b968",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 12288,
+        "digest": 4659636390677924305
+      }
+    },
+    {
+      "id": "xll_71_24_48_768_1-decoded",
+      "profile": "decoded",
+      "file": "xll_71_24_48_768_1.core.dts",
+      "sha256": "69ea01316c4322248cb02a01219c67ad2a7555b1494544630d9b3bc6b534b968",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 12288,
+        "digest": 15055985809377910341
+      }
+    },
+    {
+      "id": "xll_71_24_96_768",
+      "profile": "fate",
+      "file": "xll_71_24_96_768.core.dts",
+      "sha256": "c4ea4e1a9cc7357656692dd1376e2a269d69a74b86c421e868cb497cd0bbf16a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 12288,
+        "digest": 8306803650284891891
+      }
+    },
+    {
+      "id": "xll_71_24_96_768-decoded",
+      "profile": "decoded",
+      "file": "xll_71_24_96_768.core.dts",
+      "sha256": "c4ea4e1a9cc7357656692dd1376e2a269d69a74b86c421e868cb497cd0bbf16a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 12288,
+        "digest": 256408995275326311
+      }
+    },
+    {
+      "id": "xll_x96_51_24_96_1509",
+      "profile": "fate",
+      "file": "xll_x96_51_24_96_1509.core.dts",
+      "sha256": "e84b744c459a0c668668e481a16435e65facf2857a958fab90496dbab89b8956",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 24144,
+        "digest": 2353697355055002737
+      }
+    },
+    {
+      "id": "xll_x96_51_24_96_1509-decoded",
+      "profile": "decoded",
+      "file": "xll_x96_51_24_96_1509.core.dts",
+      "sha256": "e84b744c459a0c668668e481a16435e65facf2857a958fab90496dbab89b8956",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 24144,
+        "digest": 11841190295152212197
+      }
+    },
+    {
+      "id": "xll_xch_61_24_48_768",
+      "profile": "fate",
+      "file": "xll_xch_61_24_48_768.core.dts",
+      "sha256": "eb8e3d2edc9cbb7ae2d45739331dd883d9e5a3be6dc335a85e14b5519d6a2fb9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 12288,
+        "digest": 1830332858680017641
+      }
+    },
+    {
+      "id": "xll_xch_61_24_48_768-decoded",
+      "profile": "decoded",
+      "file": "xll_xch_61_24_48_768.core.dts",
+      "sha256": "eb8e3d2edc9cbb7ae2d45739331dd883d9e5a3be6dc335a85e14b5519d6a2fb9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 12288,
+        "digest": 13883395849023254110
+      }
+    },
+    {
+      "id": "xxch_71_24_48_2046",
+      "profile": "fate",
+      "file": "xxch_71_24_48_2046.core.dts",
+      "sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "frames"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 24144,
+        "digest": 10072583449741825247
+      }
+    },
+    {
+      "id": "xxch_71_24_48_2046-decoded",
+      "profile": "decoded",
+      "file": "xxch_71_24_48_2046.core.dts",
+      "sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096",
+        "16384",
+        "decoded"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 24144,
+        "digest": 1113332316129483091
+      }
+    }
+  ]
+}

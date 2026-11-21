@@ -1,10 +1,16 @@
 //! Operation guards.
-use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, Bytes, Error, InputWindow, SourceCapabilities, SourceId, WorkBudget};
-use triergon_framing::dts::{Dts14CarrierLimits, Dts14SyncLimits, DtsWordOrder};
+use std::{
+    ops::Range,
+    sync::atomic::{AtomicBool, Ordering},
+};
+use triergon_core::{
+    Budget, Bytes, Error, InputWindow, Result, SourceCapabilities, SourceId, Step, WorkBudget,
+};
+use triergon_framing::dts::{Dts14CarrierLimits, Dts14SyncFrame, Dts14SyncLimits, DtsWordOrder};
 use triergon_framing::reference_trace::dts::{
-    FactAssociationJob, ParserClockDisposition, ParserOperation, ParserOperationEvent,
+    ParserClockDisposition, ParserOperation, ParserOperationContext, ParserOperationEvent,
     ParserOperationLane, ParserOperationLimits, ParserOperationStep, ParserOperationTerminal,
+    ParserPacket,
 };
 
 const VARIABLE: &[u8] = include_bytes!("../fixtures/dts-native-v1/variable-big.bin");
@@ -251,15 +257,15 @@ fn every_source_frame_has_a_byte_proved_association_without_filling_native_heade
             proof
                 .step(&mut WorkBudget::new(0), &AtomicBool::new(false))
                 .unwrap(),
-            triergon_core::Step::Yield
+            Step::Yield
         ));
         let association = loop {
             match proof
                 .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
                 .unwrap()
             {
-                triergon_core::Step::Yield => {}
-                triergon_core::Step::Ready(v) => break v,
+                Step::Yield => {}
+                Step::Ready(v) => break v,
                 _ => panic!(),
             }
         };
@@ -823,4 +829,172 @@ fn cancellation_drops_ready_slot_without_publishing_its_owner() {
         Err(Error::Cancelled)
     ));
     assert_eq!(pool.used(), Budget::control_storage_bytes());
+}
+
+/// A source frame and the parser packet that contains it, established by comparing
+/// their bytes. It relates the two by position only: the packet's header stays what
+/// the packet reader found, and an opaque packet is not taken for one source frame.
+#[derive(Clone, Debug)]
+struct FactAssociation {
+    source_frame: Dts14SyncFrame,
+    parser_packet: ParserPacket,
+    source_range: Range<u64>,
+    packet_range: Range<u64>,
+}
+impl FactAssociation {
+    /// The source frame.
+    fn source_frame(&self) -> &Dts14SyncFrame {
+        &self.source_frame
+    }
+    /// The parser packet that contains the frame.
+    fn parser_packet(&self) -> &ParserPacket {
+        &self.parser_packet
+    }
+    /// The source offsets of the frame, in bytes; the end is exclusive.
+    fn source_range(&self) -> Range<u64> {
+        self.source_range.clone()
+    }
+    /// The source offsets of the packet, in bytes; the end is exclusive.
+    fn packet_range(&self) -> Range<u64> {
+        self.packet_range.clone()
+    }
+}
+
+/// Checks that a parser packet contains a source frame: that the frame's source
+/// range lies within the packet's and that the packet holds the frame's bytes
+/// there. A packet may span more than one source frame. One work unit is charged
+/// for each byte compared, and the result keeps the bytes of both.
+#[derive(Debug)]
+struct FactAssociationJob {
+    source: Option<Dts14SyncFrame>,
+    packet: Option<ParserPacket>,
+    source_range: Range<u64>,
+    packet_range: Range<u64>,
+    start: usize,
+    checked: usize,
+    failed: Option<Error>,
+    taken: bool,
+}
+impl FactAssociationJob {
+    /// A job for a source frame and a parser packet of the operation that `context`
+    /// describes.
+    ///
+    /// Fails with [`Error::ForeignPool`] when the bytes of either are not charged to
+    /// `pool`, [`Error::SourceMismatch`] when either comes from another source, and
+    /// [`Error::Invalid`] when either carries a cursor generation other than the
+    /// context's or the frame's source range is not within the packet's.
+    fn new(
+        pool: &Budget,
+        context: ParserOperationContext,
+        source: &Dts14SyncFrame,
+        packet: &ParserPacket,
+    ) -> Result<Self> {
+        if !source.physical_bytes().belongs_to(pool) || !packet.source_bytes().belongs_to(pool) {
+            return Err(Error::ForeignPool);
+        }
+        let fact = source.facts();
+        if fact.identity.source != packet.identity().source {
+            return Err(Error::SourceMismatch);
+        }
+        if fact.identity.generation != context.source_generation() || packet.context() != context {
+            return Err(Error::Invalid("DTS association generation context"));
+        }
+        let end = fact
+            .identity
+            .offset
+            .checked_add(u64::try_from(source.physical_bytes().len()).map_err(|_| Error::Overflow)?)
+            .ok_or(Error::Overflow)?;
+        let source_range = fact.identity.offset..end;
+        let packet_range = packet.physical_range();
+        if source_range.start < packet_range.start || source_range.end > packet_range.end {
+            return Err(Error::Invalid(
+                "DTS source frame not contained in parser packet",
+            ));
+        }
+        let start = usize::try_from(source_range.start - packet_range.start)
+            .map_err(|_| Error::Overflow)?;
+        Ok(Self {
+            source: Some(source.clone()),
+            packet: Some(packet.clone()),
+            source_range,
+            packet_range,
+            start,
+            checked: 0,
+            failed: None,
+            taken: false,
+        })
+    }
+    fn abort(&mut self, error: Error) {
+        self.source = None;
+        self.packet = None;
+        self.failed = Some(error);
+    }
+    /// Compares the frame's bytes with the packet's, as far as `work` allows.
+    /// [`Step::Ready`] carries the association, once; [`Step::Yield`] means the work
+    /// is spent. The job reads no input and returns neither [`Step::NeedInput`] nor
+    /// [`Step::End`].
+    ///
+    /// Fails with [`Error::Invalid`] when a byte differs or the association has been
+    /// returned already, and [`Error::Cancelled`] when `cancel` is set. A difference
+    /// and a cancellation are kept and returned by all later calls.
+    fn step(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<FactAssociation>> {
+        if let Some(error) = self.failed {
+            return Err(error);
+        }
+        if cancel.load(Ordering::Relaxed) {
+            self.abort(Error::Cancelled);
+            return Err(Error::Cancelled);
+        }
+        if self.taken {
+            return Err(Error::Invalid("DTS association already taken"));
+        }
+        let source = self
+            .source
+            .as_ref()
+            .ok_or(Error::Invalid("DTS association source absent"))?
+            .physical_bytes();
+        let packet = self
+            .packet
+            .as_ref()
+            .ok_or(Error::Invalid("DTS association packet absent"))?
+            .source_bytes();
+        while self.checked < source.len() {
+            if cancel.load(Ordering::Relaxed) {
+                self.abort(Error::Cancelled);
+                return Err(Error::Cancelled);
+            }
+            if !work.try_charge(1) {
+                return Ok(Step::Yield);
+            }
+            let at = self
+                .start
+                .checked_add(self.checked)
+                .ok_or(Error::Overflow)?;
+            if packet.as_ref().get(at) != source.as_ref().get(self.checked) {
+                self.abort(Error::Invalid("DTS associated source bytes differ"));
+                return Err(Error::Invalid("DTS associated source bytes differ"));
+            }
+            self.checked += 1;
+        }
+        if !work.try_charge(1) {
+            return Ok(Step::Yield);
+        }
+        self.taken = true;
+        Ok(Step::Ready(FactAssociation {
+            source_frame: self
+                .source
+                .take()
+                .ok_or(Error::Invalid("DTS association source absent"))?,
+            parser_packet: self
+                .packet
+                .take()
+                .ok_or(Error::Invalid("DTS association packet absent"))?,
+            source_range: self.source_range.clone(),
+            packet_range: self.packet_range.clone(),
+        }))
+    }
 }

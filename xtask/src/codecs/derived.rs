@@ -39,6 +39,11 @@ pub struct Stream {
 /// Every derived stream, joined with its manifest vector. Each recipe names a
 /// vector below [`DIRECTORY`], and each such vector has exactly one recipe.
 pub fn streams(root: &Path) -> Result<Vec<Stream>, String> {
+    streams_matching(root, "")
+}
+
+/// Join the recipes and pins for one filename suffix, in recipe order.
+pub(crate) fn streams_matching(root: &Path, suffix: &str) -> Result<Vec<Stream>, String> {
     let recipes = json::read(&root.join(RECIPES))?;
     if recipes.get("schema").and_then(Value::as_str) != Some(SCHEMA) {
         return Err(format!("{RECIPES}: not {SCHEMA}"));
@@ -62,6 +67,9 @@ pub fn streams(root: &Path) -> Result<Vec<Stream>, String> {
         .unwrap_or_default()
     {
         let name = text(recipe, "name")?;
+        if !name.ends_with(suffix) {
+            continue;
+        }
         if streams.iter().any(|s| s.name == name) {
             return Err(format!("{RECIPES}: {name} listed twice"));
         }
@@ -112,7 +120,7 @@ pub fn streams(root: &Path) -> Result<Vec<Stream>, String> {
                 .is_some_and(|p| p.starts_with(DIRECTORY))
         })
         .filter_map(|v| v.get("name").and_then(Value::as_str))
-        .filter(|name| !streams.iter().any(|s| s.name == *name))
+        .filter(|name| name.ends_with(suffix) && !streams.iter().any(|s| s.name == *name))
         .collect();
     if !unmade.is_empty() {
         return Err(format!(
@@ -130,43 +138,7 @@ pub fn run(root: &Path, ffmpeg: &Path) -> Result<(), String> {
     let streams = streams(root)?;
     let mut differ = Vec::new();
     for stream in &streams {
-        fetch::fate_sample(&root.join(FATE), &stream.source, &stream.source_sha256)?;
-        let source = root.join(FATE).join(&stream.source);
-        let out = root.join(&stream.path);
-        let parent = out.parent().ok_or("a derived stream without a directory")?;
-        fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
-        let mut partial = out.clone().into_os_string();
-        partial.push(".partial");
-        let partial = PathBuf::from(partial);
-        match &stream.ffmpeg {
-            Some(args) => {
-                let status = Command::new(ffmpeg)
-                    .args(["-nostdin", "-v", "error", "-y", "-i"])
-                    .arg(&source)
-                    .args(args)
-                    .arg(&partial)
-                    .status()
-                    .map_err(|e| format!("{}: {e}", ffmpeg.display()))?;
-                if !status.success() {
-                    let _ = fs::remove_file(&partial);
-                    return Err(format!("{}: ffmpeg {status}", stream.name));
-                }
-            }
-            None => {
-                fs::copy(&source, &partial).map_err(|e| format!("{}: {e}", partial.display()))?;
-            }
-        }
-        let made = sha256::file_hex(&partial).map_err(|e| format!("{}: {e}", partial.display()))?;
-        let bytes = fs::metadata(&partial).map_or(0, |m| m.len());
-        if made == stream.sha256 {
-            fs::rename(&partial, &out).map_err(|e| format!("{}: {e}", out.display()))?;
-            println!("ok {} {bytes} bytes from {}", stream.path, stream.source);
-        } else {
-            let _ = fs::remove_file(&partial);
-            println!(
-                "DIFFERS {}: made {bytes} bytes, SHA-256 {made}; pinned {}",
-                stream.path, stream.sha256
-            );
+        if !make(root, ffmpeg, stream)? {
             differ.push(stream.name.as_str());
         }
     }
@@ -180,6 +152,50 @@ pub fn run(root: &Path, ffmpeg: &Path) -> Result<(), String> {
             streams.len(),
             differ.join(", ")
         ))
+    }
+}
+
+/// Materialize one existing FATE derivation and publish it only if its hash matches.
+pub(crate) fn make(root: &Path, ffmpeg: &Path, stream: &Stream) -> Result<bool, String> {
+    fetch::fate_sample(&root.join(FATE), &stream.source, &stream.source_sha256)?;
+    let source = root.join(FATE).join(&stream.source);
+    let out = root.join(&stream.path);
+    let parent = out.parent().ok_or("a derived stream without a directory")?;
+    fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+    let mut partial = out.clone().into_os_string();
+    partial.push(format!(".{}.partial", std::process::id()));
+    let partial = PathBuf::from(partial);
+    match &stream.ffmpeg {
+        Some(args) => {
+            let status = Command::new(ffmpeg)
+                .args(["-nostdin", "-v", "error", "-y", "-i"])
+                .arg(&source)
+                .args(args)
+                .arg(&partial)
+                .status()
+                .map_err(|e| format!("{}: {e}", ffmpeg.display()))?;
+            if !status.success() {
+                let _ = fs::remove_file(&partial);
+                return Err(format!("{}: ffmpeg {status}", stream.name));
+            }
+        }
+        None => {
+            fs::copy(&source, &partial).map_err(|e| format!("{}: {e}", partial.display()))?;
+        }
+    }
+    let made = sha256::file_hex(&partial).map_err(|e| format!("{}: {e}", partial.display()))?;
+    let bytes = fs::metadata(&partial).map_or(0, |m| m.len());
+    if made == stream.sha256 {
+        fs::rename(&partial, &out).map_err(|e| format!("{}: {e}", out.display()))?;
+        println!("ok {} {bytes} bytes from {}", stream.path, stream.source);
+        Ok(true)
+    } else {
+        let _ = fs::remove_file(&partial);
+        println!(
+            "DIFFERS {}: made {bytes} bytes, SHA-256 {made}; pinned {}",
+            stream.path, stream.sha256
+        );
+        Ok(false)
     }
 }
 

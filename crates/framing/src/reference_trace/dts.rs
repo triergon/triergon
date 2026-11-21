@@ -8,8 +8,7 @@
 //! carries the parser's clock ([`ParserClock`]): the first accepted core sample
 //! rate is latched and later coding windows are rounded in it. That clock is not a
 //! source duration. [`ParserHints`] are the parser's internal byte counters, not
-//! source positions. [`FactAssociationJob`] relates a source frame to the parser
-//! packet that contains it.
+//! source positions.
 //!
 //! Reference: the `dca` parser with default flags at FFmpeg git revision
 //! `d32b387f` on the 9.0 branch.
@@ -18,8 +17,8 @@ mod operation;
 mod parser_view;
 
 pub use operation::{
-    FactAssociation, FactAssociationJob, ParserClock, ParserClockDisposition, ParserOperation,
-    ParserOperationContext, ParserOperationEvent, ParserOperationLane, ParserOperationLimits,
-    ParserOperationStep, ParserOperationTerminal, ParserPacket,
+    ParserClock, ParserClockDisposition, ParserOperation, ParserOperationContext,
+    ParserOperationEvent, ParserOperationLane, ParserOperationLimits, ParserOperationStep,
+    ParserOperationTerminal, ParserPacket,
 };
 pub use parser_view::{ParserHintOrigin, ParserHints};

@@ -41,6 +41,10 @@ struct Test {
 
 const TESTS: &[Test] = &[
     Test {
+        name: "dts::packed_and_canonical_pcm",
+        run: |cx| crate::framing_views::dts::verify_decode_pins(cx.root),
+    },
+    Test {
         name: "transport::ordered_reference_entities",
         run: |cx| crate::harness::build::test_transport_entities(cx.root),
     },

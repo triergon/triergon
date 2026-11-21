@@ -1,12 +1,36 @@
 //! Inputs and reference pins for the framing and ISO BMFF views workers.
 
+pub(crate) mod dts;
+
 use std::path::{Path, PathBuf};
 
 use crate::harness::{features, manifest, oracle_compare, report, worker};
 use crate::json::{self, Value};
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
-    command(root, args, "framing-views")
+    match args {
+        [cmd, id] if cmd == "fixtures" && id == "dts" => {
+            dts::fixtures(root)?;
+            for id in dts::IDS {
+                command(root, &[cmd.clone(), id.into()], "framing-views")?;
+            }
+            Ok(())
+        }
+        [cmd, flag, id] if cmd == "manifest" && flag == "--record" && id == "dts" => {
+            let ordered = ["dts-unpacking"]
+                .into_iter()
+                .chain(dts::IDS.into_iter().filter(|id| *id != "dts-unpacking"));
+            for id in ordered {
+                command(
+                    root,
+                    &[cmd.clone(), flag.clone(), id.into()],
+                    "framing-views",
+                )?;
+            }
+            Ok(())
+        }
+        _ => command(root, args, "framing-views"),
+    }
 }
 
 pub(super) fn command(root: &Path, args: &[String], family: &str) -> Result<(), String> {
@@ -45,6 +69,9 @@ pub(super) fn command(root: &Path, args: &[String], family: &str) -> Result<(), 
         if record {
             if contract.get("oracle").is_some() {
                 oracle_compare::record(root, &contract, &mut listing)?;
+                if contract.get("id").and_then(Value::as_str) == Some("dts-unpacking") {
+                    dts::decode_pins(root, &mut listing, true)?;
+                }
             } else {
                 reference_pins(root, &path, &corpus_path, &contract, &mut listing)?;
             }

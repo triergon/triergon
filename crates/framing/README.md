@@ -113,6 +113,19 @@ assert_eq!(decoder_input, [
 | `vorbis` | `VorbisHeaders`, `VorbisIdentification`, `VorbisModes`, `header_type`, `canonical_configuration` | The three header packets and their Xiph lacing; mode block sizes from the setup header, so a container derives packet durations without decoding |
 | `mpeg_audio` | `MpegAudioHeader`, `info_frame`, `MpegInfoFrame`, `LameTag` | The 32-bit frame header of ISO/IEC 11172-3 and 13818-3 with the MPEG-2.5 rates; Xing, Info and VBRI frames with the LAME tag |
 
+The framing views harness compares aligned DTS core frames and declared extents
+with FFmpeg's DTS parser and `dca_core` filter. Its header oracle checks every
+field, bit range and derived view from both inspectors. The packed-reader
+comparison covers 14-bit big- and little-endian words and 16-bit little-endian
+words. The unpacking oracle checks canonical bytes and physical bit locations,
+with reference-decoded PCM equality on real first-frame repackings. The parser
+trace comparison checks packets, duration, rate, profile and byte hints at
+multiple input window sizes.
+
+Prepare the shared inputs with `cargo xtask framing-views fixtures dts`. The
+[feature results](../../docs/status.md#dts-core-header-inspection) link the five
+contracts and record their open cases.
+
 With the DTS packet corpus in `TRIERGON_DTS_CORPUS` and the pinned `ffmpeg`
 and `ffprobe` on `PATH`, run
 `cargo test -p triergon-framing --test dts_packet_corpus -- --ignored`.
