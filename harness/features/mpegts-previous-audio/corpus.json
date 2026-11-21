@@ -588,6 +588,46 @@
         "bytes": 1152,
         "digest": 1784093346565104
       }
+    },
+    {
+      "id": "mpeg1-layer1-m2ts-multi-carrier-repeated-preroll",
+      "profile": "mpeg1-layer1-m2ts-multi-carrier-repeated-preroll",
+      "file": "harness/features/mpegts-previous-audio/inputs/mpeg1-layer1-m2ts-multi-carrier-repeated-preroll.m2ts",
+      "sha256": "b7c119d66dc38659d00dea980ce6cf28904bf1e5840369ce78b8e313d2a24b38",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "95041",
+        "preroll",
+        "90721"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 3456,
+        "digest": 17954366808726622516
+      }
+    },
+    {
+      "id": "mpeg1-layer2-m2ts-multi-carrier-repeated-preroll",
+      "profile": "mpeg1-layer2-m2ts-multi-carrier-repeated-preroll",
+      "file": "harness/features/mpegts-previous-audio/inputs/mpeg1-layer2-m2ts-multi-carrier-repeated-preroll.m2ts",
+      "sha256": "6d948949d68fff2d4f670b3916ea70f82d22959d56025f837e412ac4dc7463a7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "92161",
+        "preroll",
+        "105121"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 13824,
+        "digest": 12130497425615810704
+      }
     }
   ]
 }

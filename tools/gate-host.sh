@@ -206,13 +206,14 @@ ready() {
 
 run() {
     local shard=$1 out=$2 full=${3:-}
-    local proof=.research/rss-bound
+    local proof=.research/rss-bound no_early_stop=""
+    if [ "${FIXED_REPORT_PAIRS:-0}" = 1 ]; then no_early_stop=--no-early-stop; fi
     [ ! -e /sys/module/triergon_rss_bound ] || sudo rmmod triergon_rss_bound
-    step "timing $shard" inside "cargo xtask gate run --stage timing --shard $shard --output $out $full $(selection)" || true
+    step "timing $shard" inside "cargo xtask gate run --stage timing --shard $shard --output $out $full $no_early_stop $(selection)" || true
     step prove prove "$proof"
     step build-workers-kernel inside "TRIERGON_RSS_KERNEL_PROOF=$proof/RSS-PROOF.json cargo xtask build-workers --all-references"
     step preflight-kernel inside "cargo xtask gate preflight --shard $shard --kernel $(selection)"
-    step "memory $shard" inside "cargo xtask gate run --stage memory --shard $shard --output $out $full $(selection)" || true
+    step "memory $shard" inside "cargo xtask gate run --stage memory --shard $shard --output $out $full $no_early_stop $(selection)" || true
     sudo rmmod triergon_rss_bound
     log DONE
 }

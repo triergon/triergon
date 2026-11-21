@@ -115,6 +115,7 @@ struct Scan {
 
 pub(super) struct SeekIndex {
     track: TrackId,
+    epochs: Option<SourceEpochs>,
     points: BudgetVec<Landing>,
     physical: Option<Shared<physical::Index>>,
 }
@@ -279,12 +280,25 @@ fn packet_probe(packet: Packet) -> Result<Probing> {
         AccessUnit::Dts(frame) => {
             let header = probe_dts_core_header(frame.bytes().as_ref())?;
             if header.frame_bytes != frame.bytes().len() {
-                return Err(Error::Unsupported("MPEG-TS DTS-HD seek"));
+                let descriptor = packet.track_info().stream().dvb_dts_hd()?;
+                if !descriptor.is_some_and(|descriptor| {
+                    descriptor.extensions[0].is_some_and(|extension| {
+                        extension
+                            .assets()
+                            .next()
+                            .is_some_and(|asset| asset.construction == 14)
+                    })
+                }) {
+                    return Err(Error::Unsupported("MPEG-TS DTS-HD seek"));
+                }
+                xll_header = dts_hd::entry(&packet)?;
             }
             // DTS TS 102 114 §5.4.2, HFLAG signals prior predictor history.
             (
                 frame.elementary_range().start,
-                time.is_some() && header.history == 0,
+                time.is_some()
+                    && header.history == 0
+                    && (header.frame_bytes == frame.bytes().len() || xll_header.is_some()),
             )
         }
         AccessUnit::DtsExtension(frame) => {
@@ -361,12 +375,18 @@ impl Seeking {
 }
 
 impl Scan {
-    fn finish_index(&mut self, pool: &Budget, track: TrackId) -> Option<Shared<SeekIndex>> {
+    fn finish_index(
+        &mut self,
+        pool: &Budget,
+        track: TrackId,
+        epochs: Option<SourceEpochs>,
+    ) -> Option<Shared<SeekIndex>> {
         let index = self.index.take()?;
         let charge = Shared::<SeekIndex>::reserve(pool).ok()?;
         Some(Shared::new(
             SeekIndex {
                 track,
+                epochs,
                 points: index.points,
                 physical: index
                     .physical
@@ -510,7 +530,7 @@ impl Reader {
     /// before the landing. The landing and complete following suffix retain
     /// decode order, source clocks and track configurations. The caller supplies
     /// any additional decoder configuration needed at the landing.
-    /// This operation does not use a timestamp-only index or retain the suffix.
+    /// Only an index built for the same explicit pair can be reused.
     /// The source must remain stable between scan and replay.
     ///
     /// # Errors
@@ -525,6 +545,71 @@ impl Reader {
         epochs: SourceEpochs,
     ) -> Result<InputRequest> {
         self.begin_seek(request, None, None, Some(epochs))
+    }
+
+    /// Seek in one explicit epoch and cache at most `maximum_entries` distinct
+    /// landing times. Only requests for this track and epoch pair reuse the index.
+    /// Storage exhaustion or unordered times discard the optional index.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [Self::request_seek_in_epoch], or an invalid limit
+    /// when `maximum_entries` is zero.
+    #[cold]
+    pub fn request_seek_in_epoch_and_index(
+        &mut self,
+        request: SeekRequest,
+        epochs: SourceEpochs,
+        maximum_entries: usize,
+    ) -> Result<InputRequest> {
+        if maximum_entries == 0 {
+            return Err(Error::Invalid("MPEG-TS seek index entry limit"));
+        }
+        self.begin_seek(request, Some(maximum_entries), None, Some(epochs))
+    }
+
+    /// Seek in an explicit clock/configuration pair over ordered contiguous
+    /// entities. Replay preserves original PES coordinates across boundaries.
+    ///
+    /// # Errors
+    ///
+    /// Returns the layout errors of [Self::request_seek_in_entities] and the
+    /// selection errors of [Self::request_seek_in_epoch].
+    #[cold]
+    pub fn request_seek_in_entities_in_epoch(
+        &mut self,
+        request: SeekRequest,
+        entities: &[SeekEntity],
+        epochs: SourceEpochs,
+    ) -> Result<InputRequest> {
+        self.healthy()?;
+        let plan = EntityPlan::new(&self.pool, entities, self.limits.maximum_seek_scan_bytes)?;
+        self.begin_seek(request, None, Some(plan), Some(epochs))
+    }
+
+    /// Cache a bounded explicit-epoch index for this exact ordered entity plan.
+    /// Reuse requires identical source IDs, lengths, order, track and epoch pair.
+    /// Sources must remain stable between requests. Index limits and fallback
+    /// follow [Self::request_seek_in_epoch_and_index].
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [Self::request_seek_in_entities_in_epoch] or an
+    /// invalid limit when `maximum_entries` is zero.
+    #[cold]
+    pub fn request_seek_in_entities_in_epoch_and_index(
+        &mut self,
+        request: SeekRequest,
+        entities: &[SeekEntity],
+        epochs: SourceEpochs,
+        maximum_entries: usize,
+    ) -> Result<InputRequest> {
+        if maximum_entries == 0 {
+            return Err(Error::Invalid("MPEG-TS seek index entry limit"));
+        }
+        self.healthy()?;
+        let plan = EntityPlan::new(&self.pool, entities, self.limits.maximum_seek_scan_bytes)?;
+        self.begin_seek(request, Some(maximum_entries), Some(plan), Some(epochs))
     }
 
     /// Seek and retain an index of up to `maximum_entries` distinct landing
@@ -644,7 +729,7 @@ impl Reader {
             .seek_index
             .as_ref()
             .filter(|index| {
-                selected_epochs.is_none()
+                index.epochs == selected_epochs
                     && index_entries.is_none()
                     && index.track == request.track
                     && match (entities.as_deref(), self.seek_entities.as_deref()) {
@@ -679,8 +764,7 @@ impl Reader {
                     index: index_entries.map(|maximum| IndexBuilder {
                         points: BudgetVec::new(&self.pool),
                         maximum,
-                        physical: (entities.is_none()
-                            && self.limits.format == crate::PacketFormat::Ts188)
+                        physical: (selected_epochs.is_none() && entities.is_none())
                             .then(|| {
                                 physical::Capture::new(&self.pool, self.source, length, maximum)
                                     .ok()
@@ -911,7 +995,8 @@ impl Reader {
                         })
                     })?;
                     if let Some(retain) = seek.retain.take() {
-                        self.seek_index = scan.finish_index(&self.pool, request.track);
+                        self.seek_index =
+                            scan.finish_index(&self.pool, request.track, seek.selected_epochs);
                         let result =
                             seek_result(request, landing, Some(end.offset), retain.skipped);
                         let tracks =
@@ -930,7 +1015,8 @@ impl Reader {
                             }
                             replay => replay?,
                         };
-                    replay.seek_index = scan.finish_index(&self.pool, request.track);
+                    replay.seek_index =
+                        scan.finish_index(&self.pool, request.track, seek.selected_epochs);
                     let direct = replay.seek_index.as_ref().and_then(|index| {
                         physical::Direct::new(index.physical.as_ref(), landing, source, caps)
                     });
@@ -1051,6 +1137,7 @@ mod tests {
         reader.seek_index = Some(Shared::new(
             SeekIndex {
                 track: TrackId(256),
+                epochs: None,
                 points,
                 physical: None,
             },

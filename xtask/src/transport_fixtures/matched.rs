@@ -215,7 +215,7 @@ fn physical_video_seek_cases(root: &Path, reference: &Path, cases: &mut Vec<Valu
     Ok(())
 }
 
-fn epoch_video(root: &Path, configuration: bool, m2ts: bool) -> R<(Input, usize)> {
+fn epoch_video(root: &Path, configuration: bool, m2ts: bool, equal_pts: bool) -> R<(Input, usize)> {
     let (codec, pictures) = pictures(root, false)?;
     if pictures.len() != 12 {
         return Err("epoch control requires all twelve authored source pictures".into());
@@ -224,7 +224,10 @@ fn epoch_video(root: &Path, configuration: bool, m2ts: bool) -> R<(Input, usize)
     ts.tables(&codec, &[])?;
     ts.pcr(89_000, false);
     let mut boundary = 0;
-    for (epoch, base) in [99_000, 90_000].into_iter().enumerate() {
+    for (epoch, base) in [if equal_pts { 90_000 } else { 99_000 }, 90_000]
+        .into_iter()
+        .enumerate()
+    {
         if epoch == 1 {
             if configuration {
                 ts.tables_for_version(&[(&codec, PID, &[0x0a, 4, b'e', b'n', b'g', 0])], 1)?;
@@ -255,7 +258,9 @@ fn epoch_video(root: &Path, configuration: bool, m2ts: bool) -> R<(Input, usize)
     }
     Ok((
         Input {
-            name: if configuration {
+            name: if equal_pts {
+                "avc-equal-pts-epoch"
+            } else if configuration {
                 "avc-configuration-epoch"
             } else {
                 "avc-clock-epoch"
@@ -268,9 +273,9 @@ fn epoch_video(root: &Path, configuration: bool, m2ts: bool) -> R<(Input, usize)
 }
 
 fn epoch_cases(root: &Path, reference: &Path, cases: &mut Vec<Value>) -> R<()> {
-    for configuration in [false, true] {
+    for (configuration, equal_pts) in [(false, false), (true, false), (false, true)] {
         for m2ts in [false, true] {
-            let (input, boundary) = epoch_video(root, configuration, m2ts)?;
+            let (input, boundary) = epoch_video(root, configuration, m2ts, equal_pts)?;
             let start = format!("epoch-start={boundary}");
             let pair = if configuration {
                 "epoch=0:3"
@@ -287,7 +292,7 @@ fn epoch_cases(root: &Path, reference: &Path, cases: &mut Vec<Value>) -> R<()> {
             )?;
             if unfiltered.get("reference_refusal").is_some()
                 || unfiltered.get("expected").and_then(|v| v.get("packets"))
-                    != Some(&Value::int(20))
+                    != Some(&Value::int(if equal_pts { 8 } else { 20 }))
             {
                 return Err("unfiltered epoch control must land in the earlier epoch".into());
             }
@@ -307,13 +312,50 @@ fn epoch_cases(root: &Path, reference: &Path, cases: &mut Vec<Value>) -> R<()> {
                 )?;
                 if row.get("reference_refusal").is_some()
                     || row.get("expected").and_then(|v| v.get("packets")) != Some(&Value::int(8))
-                    || row.get("expected") == unfiltered.get("expected")
+                    || (!equal_pts && row.get("expected") == unfiltered.get("expected"))
                 {
                     return Err(format!(
                         "{id}: epoch control must deliver all eight suffix pictures"
                     ));
                 }
                 cases.push(row);
+                // Split inside the first PES of the selected epoch. The
+                // reference reads the identical logical stream in both runs.
+                // Equal-PTS epochs instead start in distinct entities.
+                for repeat in [false, true] {
+                    let id = format!("{id}-split{}", if repeat { "-indexed" } else { "" });
+                    let split = format!(
+                        "split={}",
+                        boundary
+                            + if equal_pts {
+                                0
+                            } else if m2ts {
+                                192
+                            } else {
+                                188
+                            }
+                    );
+                    let mut options = vec!["256", "112000", policy, pair, &start, &split];
+                    if repeat {
+                        options.push("91000");
+                    }
+                    let row = input.record(
+                        root,
+                        "mpegts-previous-picture",
+                        &id,
+                        &options,
+                        reference,
+                        "ts-seek-fold",
+                    )?;
+                    let expected_packets = if repeat { 20 } else { 8 };
+                    if row.get("reference_refusal").is_some()
+                        || row.get("expected").and_then(|v| v.get("packets"))
+                            != Some(&Value::int(expected_packets))
+                    {
+                        return Err(format!("{id}: incomplete epoch suffix"));
+                    }
+                    cases.push(row);
+                }
             }
         }
     }
@@ -813,7 +855,7 @@ fn physical_audio_seek_cases(
     cases: &mut Vec<Value>,
 ) -> R<()> {
     let pid = PID.to_string();
-    for (name, header, length, step, first, repeated) in [
+    for (name, header, length, step, first, repeated, m2ts) in [
         (
             "mpeg1-layer1-physical-repeated-preroll",
             [0xff, 0xff, 0x14, 0xc0],
@@ -821,6 +863,7 @@ fn physical_audio_seek_cases(
             720,
             7,
             1,
+            false,
         ),
         (
             "mpeg1-layer2-physical-repeated-preroll",
@@ -829,6 +872,25 @@ fn physical_audio_seek_cases(
             2160,
             1,
             7,
+            false,
+        ),
+        (
+            "mpeg1-layer1-m2ts-multi-carrier-repeated-preroll",
+            [0xff, 0xff, 0x94, 0xc0],
+            288,
+            720,
+            7,
+            1,
+            true,
+        ),
+        (
+            "mpeg1-layer2-m2ts-multi-carrier-repeated-preroll",
+            [0xff, 0xfd, 0xe4, 0xc0],
+            1152,
+            2160,
+            1,
+            7,
+            true,
         ),
     ] {
         let codec = Codec {
@@ -848,7 +910,7 @@ fn physical_audio_seek_cases(
         }
         for index in 0..10 {
             // Identical CRC-checked sections bootstrap the program at every
-            // checkpoint. The complete timestamped PES fits in one carrier.
+            // checkpoint, including when the complete PES spans carriers.
             ts.tables(&codec, &[])?;
             let pts = 90_000 + index * step;
             ts.pes(
@@ -858,8 +920,8 @@ fn physical_audio_seek_cases(
         }
         let input = Input {
             name,
-            m2ts: false,
-            data: ts.finish(false),
+            m2ts,
+            data: ts.finish(m2ts),
         };
         let first = (90_001 + first * step).to_string();
         let repeated = (90_001 + repeated * step).to_string();

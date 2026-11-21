@@ -178,14 +178,23 @@ preceding access unit is refused. Clock-wrap ambiguity within the selected epoch
 remains a refusal. These source facts are independent of input generations and
 PMT version numbers.
 
-This operation scans and replays one length-known, seekable entity from its
-start. Replay publishes the original PAT, PMTs and clock transitions, and
+This operation scans and replays from the start.
+`request_seek_in_entities_in_epoch` accepts an ordered `SeekEntity` plan,
+including boundaries inside a PES. Replay publishes the original PAT, PMTs and clock transitions, and
 selected-epoch `VideoHeaders` before the landing, so decoder setup retains its
 source order. The landing packet and the complete following suffix keep their
 bytes, PTS, DTS, track configuration and PES ranges, including subsequent epoch
 changes. The caller supplies any additional decoder configuration needed at the
-landing. Explicit epoch seeks do not use the timestamp-only index or retained
-suffix optimisation. The source must remain stable between scan and replay.
+landing. `request_seek_in_epoch_and_index` and
+`request_seek_in_entities_in_epoch_and_index` cache a bounded index for the
+selected pair. Reuse requires the same track, epoch pair and exact ordered source
+identities and lengths. Equal landing times select the last eligible unit.
+Unordered times or exhausted index bounds fall back to scanning. Explicit epoch
+indexes replay from the start to reconstruct state. Timestamp-only requests never
+reuse an explicit-epoch index. Sources must remain stable between requests.
+Reader tests cover indexed epoch selection across TS188/M2TS192 entity plans,
+codec changes and exact packet suffix facts; these combinations have no matched
+reference or native runtime and memory qualification.
 
 The epoch distinction follows [H.222.0 (08/2023)](https://www.itu.int/rec/T-REC-H.222.0-202308-S/en)
 §2.4.3.5 (a signalled PCR discontinuity starts a new system time base) and
@@ -193,9 +202,10 @@ The epoch distinction follows [H.222.0 (08/2023)](https://www.itu.int/rec/T-REC-
 is a reader policy; it does not alter those source facts or normalize timestamps.
 
 The required [picture comparison](../../harness/features/mpegts-previous-picture/contract.json)
-covers eight explicit-epoch AVC seeks against the pinned FFmpeg formats build:
+covers 36 explicit-epoch AVC seeks against the pinned FFmpeg formats build:
 a clock change or same-codec PMT descriptor change, each in TS188 and M2TS192,
-with both seek policies. Each picture has its own PES. Both workers scan the full
+with both seek policies, ordered entity splits and repeated indexed seeks.
+Equal-PTS controls put overlapping epochs in separate entities. Each picture has its own PES. Both workers scan the full
 stable input through EOF and replay every suffix packet, comparing the requested,
 landing and discard times, PTS, effective DTS, random-access flags and all bytes.
 The candidate selects the source epoch pair; the reference selects landing
@@ -219,16 +229,33 @@ zero initial decoding delay and no smoothing buffer. The common-header checksum
 is checked cooperatively before the seek result is issued. Missing static setup
 or sync, nonzero delay and nonzero sync offset do not establish an entry. Other
 asset layouts, mixing, speaker remapping, secondary decoding and Rev2 DRC are
-unsupported for seeking. Core-bearing DTS-HD remains unsupported even when the
-core predictor-history flag is clear. The same scan bound, index, original packet
+unsupported for seeking. Construction 14 additionally supports a separate canonical
+core without internal extensions, with a clear predictor-history flag and DWORD-aligned
+extension start. The extension must satisfy the same XLL recovery checks and explicitly
+map its backward-compatible core to extension zero and asset zero. Core history alone
+does not establish recovery. The same scan bound, index, original packet
 suffix and preroll discard time apply.
 
 The recovery requirements follow [ETSI TS 102 114 V1.6.1](https://www.etsi.org/deliver/etsi_ts/102100_102199/102114/01.06.01_60/ts_102114v010601p.pdf),
 Tables 7-2 and 7-5–7-7 and §7.5.3.4. XLL predictor history is confined to a frame
 (§8.5.2.1 and §8.5.4); the common header and checksum are specified in §8.3.1 and
-Annex B. Annex G.3.1 and Table E-2 identify construction 17 as XLL without a core.
+Annex B. Annex G.3.1 and Table E-2 identify construction 17 as XLL without a core and
+construction 14 as a separate core plus XLL.
 Annex F.4.3 defines PES alignment and complete access-unit carriage;
 alignment alone does not establish decoder recovery.
+
+The next recovery proofs require all active assets of every selected presentation
+and extension substream to be independently available, with their navigation and
+core dependencies checked together. Inherited static metadata needs a verified
+setup origin included in preroll; PES alignment cannot supply it. Delays and
+smoothing need a bounded earlier decoding origin, while nonzero XLL sync offsets
+need a complete frame and checked alignment at the signalled offset. Speaker
+remapping and mixing need their full mapping and scaling dependencies checked.
+Legacy DRC and dialogue metadata are parsed within the asset descriptor; secondary
+decoding and Rev2 DRC remain unsupported. Authored construction-14 controls test
+packet suffixes and recovery metadata. The pinned transport reference has no DTS
+decoder, so these controls do not establish decoded-PCM parity. Native runtime,
+heap and kernel-bound RSS qualification for this seek profile is unmeasured.
 
 Use `Reader::request_seek_in_entities` for consecutive length-known, seekable
 parts of one logical transport stream. The ordered `SeekEntity` list supplies
@@ -248,7 +275,7 @@ Reset, close and continuation outside a seek plan discard the index.
 a contiguous entity plan. A later seek with exactly the same IDs, lengths and
 order can reuse it for the same selected track.
 
-For one clear TS188 entity containing a single supported elementary stream,
+For one clear TS188 or M2TS192 entity containing a single supported elementary stream,
 the index can also retain physical restart checkpoints. The source must have
 one current PAT section, one unchanged PMT and ordinary continuity without
 duplicates, discontinuities or transport, configuration or clock faults.
@@ -259,7 +286,8 @@ complete PAT and PMT carriers immediately before a timestamped PES.
 The independently framed profiles are:
 
 - MPEG-1/2 Layer I or II audio: exactly one complete frame with an indexed
-  bitrate, including its header and payload in one finite PES carrier.
+  bitrate, including its header and payload in one finite PES of at most 32
+  consecutive carriers.
 - AVC: one progressive IDR picture with its referenced SPS and PPS in the same
   aligned, finite PES. Up to eight ordered I slices are admitted, starting at
   macroblock zero and identifying the same picture.
@@ -272,7 +300,7 @@ access unit's original bytes. Parameter-set and slice headers establish the
 local setup chain and independence; framing does not validate decoded pixels.
 
 The first scan validates the whole entity. Each checkpoint binds the original
-source ID and length, all complete PAT/PMT/PES carrier records, independently
+source ID and length, all complete PAT/PMT/PES carrier records (including opaque M2TS prefix bytes), independently
 parsed PES header and payload ranges, the original active tables, the elementary
 byte coordinate and the preceding access-unit and NAL counts. At most
 `maximum_entries` checkpoints are allocated under the shared budget. Later
@@ -282,15 +310,18 @@ the landing, reconstructs transport state from those in-band tables, and
 restores the original elementary/PES coordinates, source clocks, table
 provenance and output limits. The caller resets its decoder at the independent
 access unit; the resumed bytes carry its configuration. Changed checkpoint
-bytes are a source mismatch. Video framing can read into the following PES to
-establish the final NAL boundary.
+bytes are a source mismatch. Repository-generated M2TS192 Layer I and II
+controls compare forward and backward repeated seeks with reference scan/replay
+through EOF; reader tests prohibit prefix reads and compare original PES ranges
+and complete packet facts for those same inputs. Video framing can read into
+the following PES to establish the final NAL boundary.
 This bootstrap follows H.222.0 §§2.4.3.3, 2.4.3.6–7 and 2.4.4, H.264
 §§7.3.2.1–2, 7.3.3 and 7.4.1.2.4, and H.265 §§7.3.2.1–3, 7.3.6.1 and 7.4.2.4.4.
 
 Other landings replay the entity prefix to reconstruct transport and decoder
 framing state. This includes offsets without a local table/PES proof,
-multi-carrier audio PES, free-format or Layer III audio, video needing prior
-setup or carrying SEI or other IRAP types, M2TS and contiguous entity plans.
+audio PES spanning more than 32 carriers, free-format or Layer III audio, video needing prior
+setup or carrying SEI or other IRAP types, and contiguous entity plans.
 Checkpoint storage refusal preserves replay; pressure during a direct restart
 drops the optional index and restarts replay. Sources must remain stable between
 requests: the bounded byte comparison does not revalidate an unread prefix or
@@ -848,8 +879,9 @@ Specification basis:
 Verification:
 
 - The [DTS seek comparison](../../harness/features/mpegts-dts-seek/contract.json)
-  contains the two DTS core history cases and twelve authored XLL cases. XLL covers
-  short extension headers in TS188 and long extension headers in M2TS192, both
+  contains two DTS core history cases and 24 authored XLL cases. Twelve XLL cases
+  use an extension alone and twelve carry an independently recoverable core.
+  The cases cover short extension headers in TS188 and long extension headers in M2TS192, both
   seek policies at 90,000 and 91,920 source ticks, explicit and missing source DTS,
   and an indexed backward seek after draining to EOF. Each suffix includes every
   payload byte and its source clocks. The fixture author is
@@ -863,7 +895,7 @@ Verification:
   `CARGO_INCREMENTAL=0 cargo xtask report --contract harness/features/mpegts-dts-seek/contract.json --manifest harness/features/mpegts-dts-seek/corpus.json --corpus . --output DIR`.
   Adding `--benchmark --memory --require-slice-acceptance` applies the complete
   per-case runtime, live-heap and total-RSS contract on each required native target.
-  XLL runtime and memory remain unmeasured.
+  [Native results](../../docs/status.md) include both XLL profiles on AArch64 and ARMv7.
 - `CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test container_reader seek::dts_hd`
   checks DTS-HD seek metadata, full original packet and PES provenance, exact clocks,
   small input/work grants, TS188/M2TS192, previous/preroll landings, index reuse,
