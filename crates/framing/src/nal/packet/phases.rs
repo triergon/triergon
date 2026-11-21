@@ -10,7 +10,7 @@ use super::{
 use crate::nal::header::NalHeaderError;
 use crate::{
     avc::{self, AvcConfigArrayKind},
-    nal::{Codec, NalHeader},
+    nal::{Codec, LengthSize, NalHeader},
 };
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -101,9 +101,11 @@ impl PacketPlan {
             let step = match self.phase {
                 PlanPhase::Verify => self.verify_update(state, input, work)?,
                 PlanPhase::Arrays => self.check_arrays(state, work)?,
-                PlanPhase::Lookahead => self.lookahead(state, input.bytes, work, cancel)?,
-                PlanPhase::AvcBuffering => {
-                    self.lookahead_avc_buffering(state, input.bytes, work, cancel)?
+                PlanPhase::Lookahead(width) => {
+                    self.lookahead(state, input.bytes, width, work, cancel)?
+                }
+                PlanPhase::AvcBuffering(width) => {
+                    self.lookahead_avc_buffering(state, input.bytes, width, work, cancel)?
                 }
                 PlanPhase::AvcBufferingInject => {
                     self.inject_for_avc_buffering(state, input, work)?
@@ -174,10 +176,9 @@ impl PacketPlan {
             }
         }
         self.offset = 0;
-        self.phase = if state.length_width.is_some() {
-            PlanPhase::Lookahead
-        } else {
-            PlanPhase::Scan
+        self.phase = match state.length_width {
+            Some(width) => PlanPhase::Lookahead(width),
+            None => PlanPhase::Scan,
         };
         Ok(NEXT)
     }
@@ -246,15 +247,11 @@ impl PacketPlan {
         &mut self,
         state: &mut PacketState<'_>,
         bytes: &[u8],
+        width: LengthSize,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step> {
-        let width = usize::from(
-            state
-                .length_width
-                .ok_or(Error::Invalid("missing packet width"))?
-                .bytes(),
-        );
+        let width = usize::from(width.bytes());
         if self.offset == bytes.len() && self.prefix_read == 0 {
             self.offset = 0;
             self.length = 0;
@@ -314,7 +311,7 @@ impl PacketPlan {
         cancel: &AtomicBool,
     ) -> Result<Step> {
         let bytes = input.bytes.as_ref();
-        let Some(width) = state.length_width else {
+        let Some(length_width) = state.length_width else {
             if !work.try_charge(1) {
                 return Ok(YIELD);
             }
@@ -324,7 +321,7 @@ impl PacketPlan {
             self.phase = PlanPhase::Reserve;
             return Ok(NEXT);
         };
-        let width = usize::from(width.bytes());
+        let width = usize::from(length_width.bytes());
         if self.offset == 0 && bytes.is_empty() && state.codec == Codec::Avc {
             state.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyAvcPacket);
             return Err(Error::Invalid("empty AVC packet"));
@@ -417,7 +414,7 @@ impl PacketPlan {
                     });
                     self.nal = Some(kind);
                     self.nals += 1;
-                    self.phase = PlanPhase::AvcBuffering;
+                    self.phase = PlanPhase::AvcBuffering(length_width);
                     return Ok(NEXT);
                 }
                 7 => {
@@ -508,15 +505,11 @@ impl PacketPlan {
         &mut self,
         state: &mut PacketState<'_>,
         bytes: &[u8],
+        width: LengthSize,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step> {
-        let width = usize::from(
-            state
-                .length_width
-                .ok_or(Error::Invalid("missing packet width"))?
-                .bytes(),
-        );
+        let width = usize::from(width.bytes());
         // Only the rest of this packet can already supply the parameter sets.
         // Charge each length and header. The regular scan still owns the input
         // and reports malformed lengths and headers where it reaches them.

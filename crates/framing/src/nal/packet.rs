@@ -1139,8 +1139,8 @@ impl<M> NalPacketOutput<M> {
 enum PlanPhase {
     Verify,
     Arrays,
-    Lookahead,
-    AvcBuffering,
+    Lookahead(LengthSize),
+    AvcBuffering(LengthSize),
     AvcBufferingInject,
     Scan,
     Inject,
