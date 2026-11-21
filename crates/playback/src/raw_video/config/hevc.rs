@@ -3,10 +3,10 @@
 
 use super::Sps;
 use triergon_core::{Error, Result};
+use triergon_framing::hevc::{check_parameter_sets, read_sps_prefix, read_sps_reorder};
 pub(super) use triergon_framing::hevc::{
     read_pps_ids, read_slice_prefix, read_sps_timing, read_vps_id,
 };
-use triergon_framing::hevc::{check_parameter_sets, read_sps_prefix, read_sps_reorder};
 use triergon_framing::nal::{Codec, NalHeader};
 
 pub(super) fn sps(payload: &[u8]) -> Result<(u8, Sps)> {
