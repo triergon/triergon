@@ -720,8 +720,8 @@ pub fn seek_parity(
     Ok(result)
 }
 
-/// Fold parity: candidate and reference `{prefix}fold` both reach the end of input and
-/// both match the case's independently recorded packet count, byte count and fold.
+/// Fold parity: both workers match the independently pinned packet count, byte
+/// count, fold and completion shape (EOF, or an explicit zero-output refusal).
 ///
 /// A reference that flags its fold host-dependent (its result went through a step
 /// C leaves to the target) passes only in a feature pinned per target
@@ -746,6 +746,17 @@ pub fn feed_parity(
     Ok(result)
 }
 
+pub(super) fn pins_zero_output_refusal(expected: &Value) -> bool {
+    expected.get("eof") == Some(&Value::Bool(false))
+        && ["packets", "bytes", "digest"]
+            .iter()
+            .all(|key| expected.get(key) == Some(&Value::int(0)))
+}
+
+pub(super) fn reports_zero_output_refusal(output: &Value) -> bool {
+    pins_zero_output_refusal(output) && output.get("refusal").and_then(Value::as_str).is_some()
+}
+
 fn feed_result(
     left: &Value,
     right: &Value,
@@ -755,13 +766,22 @@ fn feed_result(
 ) -> Value {
     use crate::generators::{HOST_DEPENDENT, host_dependent as flagged};
     let work = |outcome: &Value| super::comparison::work_summary(data(outcome), work_fields);
-    let complete =
-        |outcome: &Value| ok(outcome) && data(outcome).get("eof") == Some(&Value::Bool(true));
+    // A refusal is a separately pinned shape, never a successful EOF. Require
+    // explicit zero coverage and a refusal on both sides; texts remain diagnostic.
+    let refusal = expected.get("eof") == Some(&Value::Bool(false));
+    let complete = |outcome: &Value| {
+        ok(outcome)
+            && if refusal {
+                pins_zero_output_refusal(expected) && reports_zero_output_refusal(data(outcome))
+            } else {
+                data(outcome).get("eof") == Some(&Value::Bool(true))
+            }
+    };
     let (candidate, reference) = (work(left), work(right));
     let (reference_flag, pinned_flag) = (flagged(data(right)), flagged(expected));
     let mut pinned = expected.clone();
     if let Value::Object(members) = &mut pinned {
-        members.retain(|(key, _)| key != HOST_DEPENDENT);
+        members.retain(|(key, _)| key != HOST_DEPENDENT && key != "eof");
     }
     let pass = complete(left)
         && complete(right)
@@ -822,6 +842,61 @@ mod feed_tests {
         };
         data.push(("eof".into(), Value::Bool(true)));
         Value::object([("status", Value::str("ok")), ("data", Value::Object(data))])
+    }
+
+    #[test]
+    fn refusal_requires_pinned_zero_coverage_and_both_refusals() {
+        let fields = ["packets", "bytes", "digest"];
+        let mut expected = Value::object(fields.map(|key| (key, Value::int(0))));
+        let Value::Object(members) = &mut expected else {
+            unreachable!()
+        };
+        members.push(("eof".into(), Value::Bool(false)));
+        let refused = |eof, refusal: bool, packets| {
+            Value::object([
+                ("status", Value::str("ok")),
+                (
+                    "data",
+                    Value::object([
+                        ("packets", Value::int(packets)),
+                        ("bytes", Value::int(0)),
+                        ("digest", Value::int(0)),
+                        ("eof", Value::Bool(eof)),
+                        (
+                            "refusal",
+                            if refusal {
+                                Value::str("unsupported")
+                            } else {
+                                Value::Null
+                            },
+                        ),
+                    ]),
+                ),
+            ])
+        };
+        let good = refused(false, true, 0);
+        assert_eq!(
+            feed_result(&good, &good, &expected, &[], false).get("status"),
+            Some(&Value::str("pass"))
+        );
+        for bad in [
+            refused(true, true, 0),
+            refused(false, false, 0),
+            refused(false, true, 1),
+        ] {
+            for (left, right) in [(&bad, &good), (&good, &bad)] {
+                assert_eq!(
+                    feed_result(left, right, &expected, &[], false).get("status"),
+                    Some(&Value::str("mismatch"))
+                );
+            }
+        }
+        // An old successful zero-packet pin must still require EOF=true.
+        let success = Value::object(fields.map(|key| (key, Value::int(0))));
+        assert_eq!(
+            feed_result(&good, &good, &success, &[], false).get("status"),
+            Some(&Value::str("mismatch"))
+        );
     }
 
     #[test]

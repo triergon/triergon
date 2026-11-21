@@ -6,7 +6,7 @@ devices and GPU upload; nothing in the crate spawns a process or links a native 
 
 | Host action | Call |
 |---|---|
-| Open a stream | `StreamSelection { video, audio }.load(&mut video_session, &mut audio_session)` (feature `codecs`), or `VideoSession::load` and `AudioSession::load` with the host's own decoders |
+| Open a stream | `StreamSelection { video, audio }.load(&mut video_session, &mut audio_session, audio_configuration)` (feature `codecs`), or `VideoSession::load` and `AudioSession::load` with the host's own decoders |
 | Feed video / audio | `feed(au, pts)`; `Err(FeedError::Backpressure)` means keep the access unit and retry after output progresses |
 | Advance video | `step(clock_ns)` decodes until one picture waits ahead of the clock and publishes it once `clock >= pts`; returns true on a new picture |
 | Show video | `latest()` → `Published { sequence, generation, pts, rgba }` |
@@ -34,4 +34,5 @@ decoder cannot decode reports `Failed`, never a black picture.
   `QueueLimits::AUDIO` (256 units, 4 MiB, 1 MiB per unit). Nothing is dropped silently.
 - Output: two RGBA canvases plus the decoder's DPB.
 - All work is synchronous inside `feed`, `step` and `pull`, so dropping a session is
-  bounded by one access unit's decode. Scaling and downmix: `scale.rs`, `mix.rs`.
+  bounded by one access unit's decode. Scaling: `triergon_pixel::letterbox`; downmix:
+  `mix.rs`.

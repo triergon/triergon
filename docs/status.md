@@ -29,22 +29,7 @@ playback workers, the framing worker on Linux AArch64 and the transport worker o
 with the toolchain's `lld` instead of its default linker, the functions their trained
 orders list first and the rest in module order, so their results reflect the linker,
 the module order and the trained order together. Every other worker and every
-reference links as under `static-toolchain-runtime-v1`, byte for byte as before. The
-other workers keep their link because a trained order made a row worse or would not
-help: the codec worker's file workloads for FLAC, MP3, MP2, Vorbis and Opus took more
-resident memory with an order trained on the corpus's AAC, H.264 and HEVC operations
-(worst total RSS 0.5416 to 0.5607 on Linux AArch64, 0.6158 to 0.6380 on ARMv7); on
-ARMv7 the framing worker's cases kept their resident peaks and two reached the
-reference's; on Linux AArch64 three malformed PSI cases of the transport worker, whose
-code the corpus does not run, held one more 64 KiB window of code; and the ISO BMFF
-worker's operations read only the raw-video and timed-text movies of its comparison.
-
-The blocking facade stops reading as soon as a container signature selects a reader.
-It reserves replay capacity before consuming sequential input and rewinds seekable input.
-Frame-based elementary probing examines up to 64 KiB once. On seekable input,
-the reported length sizes a direct read into the reserved prefix.
-
-The [session queue workloads](../harness/session-queues/README.md) cover five real-payload feed patterns and three queue states. Each comparison checks decoded output before measuring paired runtime, peak heap and total RSS.
+reference links as under `static-toolchain-runtime-v1`.
 
 | Area | Implemented | Verified against the reference | Runtime | Memory | Open |
 |---|---|---|---|---|---|
@@ -63,27 +48,28 @@ The [session queue workloads](../harness/session-queues/README.md) cover five re
 | MPEG-TS VVC PES | Typed VVC kind and codec for stream type `0x33`. Return finite PES or video PES with a zero length field, with original source ranges and clocks. | 2/2 exact pinned-reference controls in the [PES comparison](../harness/features/mpegts-pes/contract.json), three packets and 24 bytes per case. All 97 prior cases and 272 request associations remain. | unmeasured | unmeasured | VVC descriptors, temporal subsets, access-unit framing, seeking, decoding and native qualification |
 | MPEG-TS access units | `ContainerReader` and `AnyReader` for TS188 and M2TS192, with AVC, HEVC, MPEG-1/2 audio Layers I–III, ADTS AAC-LC, LATM in LOAS, signalled AC-3 and E-AC-3, DVB subtitle segments and ordered entities; `Reader` can frame selected PIDs while retaining all source events | 179/179 compatibility folds, including ten MPEG audio controls, LATM PES and opaque observations, and all 272 original request associations. Explicit PID selection has separate reader tests. | 0.91364 (179/179 pass) at `f1fabdc3` | heap ≤0.10713, total RSS ≤0.83297 (179/179 lower, kernel-bound) at `f1fabdc3` | additional carriages, broader seek coverage and full FATE mapping |
 | MPEG-TS free-format audio | Selected MPEG-1 and MPEG-2 Layers I–III with complete four-byte Layer I padding slots and original PES clocks | 8/8 frame folds against the [FFmpeg and mpg123 reference](../harness/features/mpegts-free-audio/contract.json) | 0.73221 (8/8 pass) at `f1fabdc3` | heap ≤0.06797, total RSS ≤0.61800 (8/8 lower, kernel-bound) at `f1fabdc3` | further coded sources beyond the Layer III vector |
-| MPEG-TS DTS core | Canonical normal DTS frames in private-data PES, selected by a DVB descriptor or an explicit program and PID, with original bytes, source clocks and exact duration; opt-in compatibility for PCR reserved bits | 6/6 authored packet folds in the [DTS core comparison](../harness/features/mpegts-dts-core/contract.json) and all 253 packets in the [FATE DTS transport](../harness/features/mpegts-dts-legacy/contract.json) | 0.43543 (7/7 pass) at `f1fabdc3` | heap ≤0.06497, total RSS ≤0.76738 (7/7 lower, kernel-bound) at `f1fabdc3` | automatic identification of unlabelled tracks and other descriptor namespaces |
+| MPEG-TS DTS core | Canonical normal DTS frames in private-data PES, selected by a DVB descriptor or an explicit program and PID, with original bytes, source clocks and exact duration; opt-in compatibility for PCR reserved bits | 6/6 authored packet folds in the [DTS core comparison](../harness/features/mpegts-dts-core/contract.json) and all 253 packets in the [FATE DTS transport](../harness/features/mpegts-dts-legacy/contract.json) | 0.43543 (7/7 pass) at `f1fabdc3` | heap ≤0.06497, total RSS ≤0.76738 (7/7 lower, kernel-bound) at `f1fabdc3` | other descriptor namespaces and unlabelled DTS layouts |
+| MPEG-TS DTS core discovery | Opt-in proof of two complete matching canonical DTS core frames in the first PES of a unique descriptor-free private-data route. The reader preserves the original PMT and PES. | Three admissions and four refusals in the [discovery comparison](../harness/features/mpegts-dts-discovery/contract.json). The raw FATE input yields 253 DTS packets and 254,518 bytes. | 0.257756 (7/7 pass) at `9f0fca33` | heap ≤0.077589, total RSS ≤0.768047 (7/7 lower, kernel-bound) at `9f0fca33` | Word-swapped or 14-bit packing, split initial frames, additional signalling namespaces and decoding |
 | MPEG-TS DTS-HD | DTS-HD access units with a core and extensions, or one to four extensions without a core; grouped units for single-substream aligned finite DVB PES; substream order, extents, alignment and header CRC | 13/13 source packet folds across the [DTS-HD](../harness/features/mpegts-dts-hd/contract.json), [grouped](../harness/features/mpegts-dts-hd-grouped/contract.json) and [multiple-extension](../harness/features/mpegts-dts-hd-extensions/contract.json) comparisons | 0.43360 (13/13 pass) at `f1fabdc3` | heap ≤0.24175, total RSS ≤0.76872 (13/13 lower, kernel-bound) at `f1fabdc3` | broader FATE mapping and other descriptor namespaces |
 | MPEG-TS previous picture | Bounded seek and preroll for AVC and HEVC in one length-known TS188 or M2TS192 entity | 4/4 landing, discard and packet folds against [FFmpeg scan and replay](../harness/features/mpegts-previous-picture/contract.json) | 0.98136 (4/4 pass) at `f1fabdc3` | heap ≤0.49532, total RSS ≤0.66168 (4/4 lower, kernel-bound) at `f1fabdc3` | additional random-access picture profiles |
 | MPEG-TS previous audio | Bounded seek and preroll to a timestamped ADTS AAC-LC or AC-3 frame in one length-known TS188 or M2TS192 entity | 4/4 landing, discard and packet folds against [FFmpeg scan and replay](../harness/features/mpegts-previous-audio/contract.json) | 0.25957 (4/4 pass) at `f1fabdc3` | heap ≤0.11993, total RSS ≤0.67343 (4/4 lower, kernel-bound) at `f1fabdc3` | direct transport offsets beyond the verified Layer I/II profiles |
 | MPEG-TS additional audio seek | Bounded seek and preroll for E-AC-3 and MPEG audio Layer I or II | 8/8 landing, discard and packet folds in the [audio seek comparison](../harness/features/mpegts-previous-audio/contract.json) | 0.26338 (8/8 pass) at `f1fabdc3` | heap ≤0.12121, total RSS ≤0.67545 (8/8 lower, kernel-bound) at `f1fabdc3` | additional audio layouts and larger PES extents |
 | MPEG-TS Layer III seek | Land on a timestamped MPEG-1 or MPEG-2 Layer III frame with an empty reservoir and replay dependent frames | 2/2 reservoir-aware packet folds in the [audio seek comparison](../harness/features/mpegts-previous-audio/contract.json) | 0.19737 (2/2 pass) at `f1fabdc3` | heap ≤0.08861, total RSS ≤0.67266 (2/2 lower, kernel-bound) at `f1fabdc3` | additional Layer III sources |
-| MPEG-TS DTS core seek | Land on a timestamped DTS core frame without predictor history and replay dependent frames | 2/2 packet folds in the [DTS core seek comparison](../harness/features/mpegts-dts-seek/contract.json) | 0.21176 (2/2 pass) at `f1fabdc3` | heap ≤0.11799, total RSS ≤0.75200 (2/2 lower, kernel-bound) at `f1fabdc3` | core-bearing DTS-HD seek |
-| MPEG-TS lossless DTS-HD seek | Bounded previous-entry seek and preroll for one extension-zero XLL asset without a core, with static setup, zero delay, sync at offset zero and a checked common header | 12/12 XLL packet folds in the [DTS seek comparison](../harness/features/mpegts-dts-seek/contract.json), including both policies, TS188/M2TS192, short and long headers, and indexed backward seeks after EOF. The opt-in FATE test also checks decoded PCM suffixes. | 0.24256 (12/12 pass) at `f1fabdc3` | heap ≤0.11628, total RSS ≤0.77261 (12/12 lower, kernel-bound) at `f1fabdc3` | core-bearing DTS-HD; multiple presentations, assets or extension substreams; inherited setup, delayed or smoothed XLL recovery, nonzero sync offset, speaker remapping, mixing, secondary decoding and Rev2 DRC |
+| MPEG-TS DTS core seek | Land on a timestamped DTS core frame without predictor history and replay dependent frames | 2/2 packet folds in the [DTS core seek comparison](../harness/features/mpegts-dts-seek/contract.json) | 0.21176 (2/2 pass) at `f1fabdc3` | heap ≤0.11799, total RSS ≤0.75200 (2/2 lower, kernel-bound) at `f1fabdc3` | core-bearing DTS-HD seek beyond construction-14 XLL |
+| MPEG-TS lossless DTS-HD seek | Bounded previous-entry seek and preroll for one extension-zero XLL asset without a core, with static setup, zero delay, sync at offset zero and a checked common header | 12/12 XLL packet folds in the [DTS seek comparison](../harness/features/mpegts-dts-seek/contract.json), including both policies, TS188/M2TS192, short and long headers, and indexed backward seeks after EOF. The opt-in FATE test also checks decoded PCM suffixes. | 0.24256 (12/12 pass) at `f1fabdc3` | heap ≤0.11628, total RSS ≤0.77261 (12/12 lower, kernel-bound) at `f1fabdc3` | multiple presentations, assets or extension substreams; inherited setup, delayed or smoothed XLL recovery, nonzero sync offset, speaker remapping, mixing, secondary decoding and Rev2 DRC |
 | MPEG-TS core-bearing XLL seek | Bounded seek to a locally recoverable core and construction-14 XLL asset | 12/12 coded packet suffix folds in the [DTS seek comparison](../harness/features/mpegts-dts-seek/contract.json) | 0.271047 (12/12 pass) at `964b36cb` | heap ≤0.169878, total RSS ≤0.766268 (12/12 lower, kernel-bound) at `964b36cb` | decoded PCM suffix parity and broader recovery layouts |
 | MPEG-TS LATM seek | Land on a timestamped AAC-LC LOAS envelope with a complete in-band configuration for one AAC-LC payload | 2/2 landing, discard and packet folds in the [audio seek comparison](../harness/features/mpegts-previous-audio/contract.json) | 0.25012 (2/2 pass) at `f1fabdc3` | heap ≤0.11647, total RSS ≤0.68780 (2/2 lower, kernel-bound) at `f1fabdc3` | other LATM multiplex layouts |
 | MPEG-TS indexed seek | Bounded in-memory landing index for repeated seeks to a selected track in one entity or the same contiguous entity plan | 6/6 repeated landing, discard and packet folds in the [picture](../harness/features/mpegts-previous-picture/contract.json) and [audio](../harness/features/mpegts-previous-audio/contract.json) corpora | 0.93742 (6/6 pass) at `f1fabdc3` | heap ≤0.10222, total RSS ≤0.67958 (6/6 lower, kernel-bound) at `f1fabdc3` | direct transport offsets beyond the verified audio and video profiles |
 | MPEG-TS physical-offset audio seek | Indexed TS188 restart at independently verified PAT/PMT/PES carriers for one Layer I/II frame per finite single-carrier PES, with original clocks, tables and PES ranges; replay for other profiles or absent proofs | 2/2 [audio seek](../harness/features/mpegts-previous-audio/contract.json) comparisons, plus [reader tests](../crates/mpegts/tests/container_reader/physical_seek.rs) for source reads and invalidated checkpoints | 0.38386 (2/2 pass) at `f1fabdc3` | heap ≤0.13953, total RSS ≤0.67780 (2/2 lower, kernel-bound) at `f1fabdc3` | larger audio PES, additional audio profiles and ordered entities |
 | MPEG-TS M2TS physical restart | Verify original 192-byte carriers, including their prefix, for bounded indexed restarts. Admit Layer I/II audio PES of up to 32 contiguous carriers. | 2/2 repeated audio seek folds in the [audio seek comparison](../harness/features/mpegts-previous-audio/contract.json), with reader tests for source offsets and fallback | 0.689698 (2/2 pass) at `964b36cb` | heap ≤0.194086, total RSS ≤0.694675 (2/2 lower, kernel-bound) at `964b36cb` | broader audio and video layouts and ordered entities |
 | MPEG-TS physical-offset video seek | Indexed TS188 restart for locally configured progressive AVC IDR pictures or base-layer HEVC IDR_N_LP slices, one aligned finite PES of at most 32 carriers per access unit; original clocks, tables, bytes and source ranges survive restart | 2/2 [picture seek](../harness/features/mpegts-previous-picture/contract.json) comparisons, plus [reader tests](../crates/mpegts/tests/container_reader/physical_seek_video.rs) for source reads, invalidated checkpoints and budget fallback | 0.62137 (2/2 pass) at `f1fabdc3` | heap ≤0.19783, total RSS ≤0.64771 (2/2 lower, kernel-bound) at `f1fabdc3` | larger video PES, additional random-access profiles and ordered entities |
-| MPEG-TS contiguous entity seek | Bounded picture and audio seeking across declared contiguous parts, with source ranges retained across a split PES | 4/4 split landing, discard and packet folds in the [picture](../harness/features/mpegts-previous-picture/contract.json) and [audio](../harness/features/mpegts-previous-audio/contract.json) corpora | 0.56767 (4/4 pass) at `f1fabdc3` | heap ≤0.09247, total RSS ≤0.67447 (4/4 lower, kernel-bound) at `f1fabdc3` | explicit epoch selection across entity plans |
-| MPEG-TS explicit epoch seek | Bounded seek within a selected source clock and configuration pair in one entity; original decoder setup, decode order and provenance survive replay; timestamp-only seeks still refuse epoch changes | 8/8 [picture seek](../harness/features/mpegts-previous-picture/contract.json) comparisons across both policies and TS188/M2TS192, with clock discontinuities and PMT changes | 0.50617 (8/8 pass) at `f1fabdc3` | heap ≤0.03251, total RSS ≤0.59533 (8/8 lower, kernel-bound) at `f1fabdc3` | indexed epoch selection, multi-entity plans and codec-change reference coverage |
+| MPEG-TS contiguous entity seek | Bounded picture and audio seeking across declared contiguous parts, with source ranges retained across a split PES | 4/4 split landing, discard and packet folds in the [picture](../harness/features/mpegts-previous-picture/contract.json) and [audio](../harness/features/mpegts-previous-audio/contract.json) corpora | 0.56767 (4/4 pass) at `f1fabdc3` | heap ≤0.09247, total RSS ≤0.67447 (4/4 lower, kernel-bound) at `f1fabdc3` | — |
+| MPEG-TS explicit epoch seek | Bounded seek within a selected source clock and configuration pair in one entity; original decoder setup, decode order and provenance survive replay; timestamp-only seeks still refuse epoch changes | 8/8 [picture seek](../harness/features/mpegts-previous-picture/contract.json) comparisons across both policies and TS188/M2TS192, with clock discontinuities and PMT changes | 0.50617 (8/8 pass) at `f1fabdc3` | heap ≤0.03251, total RSS ≤0.59533 (8/8 lower, kernel-bound) at `f1fabdc3` | codec-change reference coverage |
 | MPEG-TS ordered-entity epoch seek | Select an explicit clock and configuration pair across ordered source entities. Index by track, epoch pair and source plan. | 28/28 additional authored folds in the [picture comparison](../harness/features/mpegts-previous-picture/contract.json), including equal-time landings across entity boundaries | 0.515085 (28/28 pass) at `964b36cb` | heap ≤0.036489, total RSS ≤0.591278 (28/28 lower, kernel-bound) at `964b36cb` | additional source and codec-change profiles |
 | MPEG-TS program playback | Selected TS188 program and M2TS192 PID with packet payloads and clock projection | 35/35 packet folds | 0.7796 (35/35 pass, worst `m2ts-entry-hevc-aac-44100-01-video`) | heap ≤0.0880, total RSS ≤0.6980 (35/35 lower) | additional program and carriage profiles |
-| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.0006 (2/3 pass, worst `reordered-48000`, median 0.9996) | heap ≤0.0155, total RSS ≤0.5562 (3/3 lower) | `reordered-48000`'s runtime bound, above the [ceiling](quality.md#gates); broader transport and codec profiles |
+| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 0.9716 at `6de1193f` (3/3 pass, worst `reordered-48000`, median 0.9676) | heap ≤0.0155, total RSS ≤0.4472 (3/3 lower) at `6de1193f` | broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 0.7859 (71/71 pass, worst `dvb-hevc-eac3-32000`) | heap ≤0.0207, total RSS ≤0.6592 (71/71 lower) | other profiles |
-| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core with consistent coded-window diagnostics from owned and packed inspectors | 135/135 AVC/HEVC reference comparisons. At `7c730ff8` on AArch64, both DTS inspectors agreed on all 27 fields and every core matched its reference length and bytes across seven inputs. [DTS corpus and instruction counts](#dts-core-header-inspection). | 0.920327 (135/135 pass) at `964b36cb` | heap ≤0.336667, total RSS ≤0.813201 (135/135 lower, kernel-bound) at `964b36cb` | full AVC/HEVC/ADTS grammar |
+| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS-HD extension substream extents, DTS core with consistent coded-window diagnostics from owned and packed inspectors | 135/135 AVC/HEVC reference comparisons. At `7c730ff8` on AArch64, both DTS inspectors agreed on all 27 fields and every core matched its reference length and bytes across seven inputs. [DTS corpus and instruction counts](#dts-core-header-inspection). | 0.920327 (135/135 pass) at `964b36cb` | heap ≤0.336667, total RSS ≤0.813201 (135/135 lower, kernel-bound) at `964b36cb` | full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SubRip and WebVTT documents as FFmpeg's `srt` and `webvtt` demuxers read them, ASS packets as its `ass` decoder decodes them, with `sub_charenc` charsets including EUC-KR receiver policies, and mov_text and tx3g to ASS | 367/367 cases (`subtitle-text`: 82 captured mov_text cases, 13 authored mov_text sessions for the override tags written where a style record or the highlight starts or ends, the samples of the 79 tx3g tests, 80 charset cases, 17 ASS packets, 96 SubRip and WebVTT documents) on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7). `subtitle-text-host` matches 23/23 SubRip and WebVTT documents with oversized timestamp fields on both targets. | `subtitle-text` 0.8008 (367/367 pass, worst `mov-text-tags-highlight-style-colour`)<br>`subtitle-text-host` 0.0840 (23/23 pass, worst `vtt-seconds-9223372036854775808`) | `subtitle-text` heap ≤0.3360, total RSS ≤0.8121 (367/367 lower)<br>`subtitle-text-host` heap ≤0.0120, total RSS ≤0.7342 (23/23 lower) | FATE coverage |
 | Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 319/319 cases (`subtitle-pgs`: TS, SUP and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.8050 (319/319 pass, worst `rle-long-rows-sup`) | heap ≤0.9654, total RSS ≤0.9225 (319/319 lower) | FATE coverage |
 | Subtitles, PGS capsules | Recorded PGS packet sessions through `compat::pgs::ReceiverDecoder`, with raw PTS, DTS and time base, the forced-only option and hard resets that reopen the decoder | 229/229 cases (`subtitle-pgs-capsules`: capsules of up to 64 complete PGS packets against FFmpeg's `pgssub` decoder), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.7134 (229/229 pass, worst `pgs-original140--compat-cache-rejected-first-then-valid-replacement`) | heap ≤0.5788, total RSS ≤0.6089 (229/229 lower) | — |
@@ -92,7 +78,7 @@ The [session queue workloads](../harness/session-queues/README.md) cover five re
 | Closed captions | CEA-608 captions from A/53 and SCTE 20 user data in MPEG-2 video, A/53 SEI in H.264 and HEVC, and SCC files, to ASS; H.264 and HEVC pictures in decoded-picture output order (`triergon_framing::picture_output`) | 461/461 cases (`subtitle-cc`, the fold and the prepared packets' times; H.264 and HEVC in MP4 and Matroska with parameter sets only in `avcC` or `hvcC` among them), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.6557 (461/461 pass, worst `mpeg2-a53-limit-ts`); whole worker runs over the 112 inputs at `adaa4bc7` take 0.921 of main's instructions in sum (main at `03cc8d3f`) | heap ≤0.1227, total RSS ≤0.7015 (461/461 lower) | FATE coverage; not reproduced: H.264 durations in Matroska without durations when the SPS states a bitstream restriction, after a start hold of depth 3 or more, after a second B picture dropped as late, and at ticks between 1 and 2 ms where the reference picks a multiple of the frame rate; H.264 durations from VUI `pic_struct`; H.264 recovery with `recovery_frame_cnt` 5 in B pyramids; the H.264 start hold when the depth reaches 3 from 1; H.264 `frame_num` going back without an IDR picture; a packet with neither PTS nor DTS; H.264 in MP4 with PTS equal to DTS on every packet while the stream reorders (`h264-hold-depth1` remuxed by FFmpeg, not in the corpus), where the reference prepares 299 caption packets to the extractor's 301, with or without in-band parameter sets, while the same stream in Matroska matches |
 | Teletext | DVB teletext pages to text and ASS, as FFmpeg's libzvbi 0.2.46 decoder emits them | 72/72 cases (`subtitle-teletext`), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.4261 (72/72 pass, worst `teletext-national-ass-cyrillic`) | heap ≤0.6212, total RSS ≤0.6375 (72/72 lower) | FATE coverage |
 | Playback | Matroska, MP4, TS and raw AVC/HEVC feeds, including TS188 private audio through `compat::pes`; seeking and end-of-file continuation | MP4 terminal-media matrix against recorded FFprobe 9.0.2 output (evidence set `playback-terminal-matrix-ffprobe`): 39 inputs in 13 source geometries (12 nonseekable for every input, 1 seekable for the 31 original inputs), 499 rows, each run in debug and in release. `Mp4Open::new_recovery` 499/499 pass: 497 identical packet lists, and 2 seekable reads of a zero-size fragment sample that the opener refuses in the header, where FFprobe also refuses. `Mp4Open::new` 446/499 pass. Packet folds: MP4 forward 51/51 (`mp4-forward`), 769 packets, TS program 35/35 (`ts-program`), raw Annex B 7/7 (`raw-annex-b`) | MP4 forward 0.7670 (51/51 pass, worst `regular-encoded-avc-aac-indexed-seek`), TS program 0.7796 (35/35 pass, worst `m2ts-entry-hevc-aac-44100-01-video`), raw Annex B 0.6286 (7/7 pass, worst `hevc-aud1`) | MP4 forward heap ≤0.6755, total RSS ≤0.7703 (51/51 lower), TS program heap ≤0.0880, total RSS ≤0.6980 (35/35 lower), raw Annex B heap ≤0.1274, total RSS ≤0.6224 (7/7 lower) | other profiles, including additional legacy Matroska AAC profiles |
-| Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10, both with the decoded picture buffer of `triergon_framing::picture_output`; AAC LC, HE, HEv2 (Parametric Stereo from open publications and probes); AC-3 and E-AC-3; DTS core with XCh and X96; storage charged to a budget | 417/417 comparable conformance and FATE vectors; three crafted AAC Parametric Stereo streams covering paths absent from FATE (a 20/34-band change registered while PS is off, IPD/OPD across a change, a PS frame without its SBR element); the audio correctness check `codecs-audio` at `4b87991e` on both targets, using the 71 derived streams reproduced byte for byte by `cargo xtask codecs derive`: AAC 39/39, AC-3 6/6, E-AC-3 6/6, DTS core 22/22, and `xll_51_24_48_none` out of set (no core substream) | 0.9672 (20/20 pass, worst `h264-high-1080p`) | heap ≤0.9410, total RSS ≤0.8334 (20/20 lower) | error concealment, unverified tool paths; four open AAC Parametric Stereo and SBR cases (`harness/codecs/aac/ps-open-manifest.json`); AAC charges in-band reconfiguration when it appears, and a refused access unit leaves the decoder unchanged unless an earlier raw data block or Main-prediction element of it was decoded |
+| Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10, both with the decoded picture buffer of `triergon_framing::picture_output`; AAC Main, LC, LTP, HE, HEv2 (Parametric Stereo from open publications and probes); AC-3 and E-AC-3; DTS core with XCh and X96; storage charged to a budget | 417/417 comparable conformance and FATE vectors; three crafted AAC Parametric Stereo streams covering paths absent from FATE (a 20/34-band change registered while PS is off, IPD/OPD across a change, a PS frame without its SBR element); the audio correctness check `codecs-audio` at `4b87991e` on both targets, using the 71 derived streams reproduced byte for byte by `cargo xtask codecs derive`: AAC 39/39, AC-3 6/6, E-AC-3 6/6, DTS core 22/22, and `xll_51_24_48_none` out of set (no core substream) | 0.9672 (20/20 pass, worst `h264-high-1080p`) | heap ≤0.9410, total RSS ≤0.8334 (20/20 lower) | error concealment, unverified tool paths; four open AAC Parametric Stereo and SBR cases (`harness/codecs/aac/ps-open-manifest.json`); AAC charges in-band reconfiguration when it appears, and a refused access unit leaves the decoder unchanged unless an earlier raw data block or Main-prediction element of it was decoded |
 | Audio codecs in files | FLAC (RFC 9639, 4 to 32 bits, 1 to 8 channels, bit-limited Rice residual partitions); Opus (RFC 6716 and 8251: SILK, CELT, hybrid, families 0, 1 and 255); Vorbis I; MPEG-1, 2 and 2.5 audio Layer I, II and III | 315/321 pass through the container readers (FATE Vorbis, Opus and MP3 conformance, the IETF FLAC testbench, generated streams): FLAC bit-exact, the others within the [numeric rules](../harness/codecs/numeric-rules.json). For the ten timed files, 10/10 pass both FFmpeg grades and 10/10 match main (`838a07a5`) byte for byte on stereo s16 at `a875b007` | 0.9876 (10/10 pass, worst `opus-5.1-256`) | heap ≤0.9043, total RSS ≤0.7020 (10/10 lower) | FLAC `01 - changing samplerate`, `02 - increasing number of channels`, `03 - decreasing number of channels` and MP3 `he_mode` change format mid-stream, which the CLI converts; FLAC `flac_3ch_odd_mask`, whose layout FFmpeg refuses on its stereo output; MP3 `he_free` (free format: FFmpeg finds no two consecutive frames, and the decoder refuses free-format frames), refused by both; runtime toward the target for Opus (Opus 5.1 0.9876; music 0.9545 and speech 0.9225 at `36cead7d`); Opus families 2 and 3 |
 | Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix; container track decoding with trims and start delays | with the codecs | with the codecs | with the codecs | — |
 | Fonts | sfnt and collections; `head`, `hhea`, `maxp`, `hmtx`, `vhea`, `vmtx`, `OS/2`, `name`; `cmap` formats 0, 2, 4, 6, 8, 10, 12, 13, and the glyph-name and encoding charmaps FreeType adds to CFF faces, in its charmap order; `glyf`/`loca`; CFF and CFF2 at the default instance; `kern` format 0; loading at a size as libass does with hinting off (unhinted outlines, synthetic bold and oblique, size metrics, kerning, decoration bands, default-load advances where hinting cannot move them, and the vertical advances libass draws and shapes the glyphs of `@` fonts with); FreeType's default load of CFF, CFF2 and CID-keyed glyphs, hinted by Adobe's hinter as FreeType's CFF driver hints them, of TrueType glyphs without bytecode, through FreeType's auto-hinter with its Latin and dummy writing systems, and of instructed TrueType glyphs, through a TrueType interpreter running their programs as FreeType's does in backward compatibility mode, with the grid-fitted metrics of each; face matching with libass's rules (compared through the renderer's `ass-render` feature) | The gate covers libass's default configuration (hinting off). All 70 faces of 53 corpus files (TrueType including Arabic, Hebrew, Indic and Thai fonts, name-keyed and CID-keyed CFF, CFF2, a 10-face collection, six authored fonts, among them a face for each way FreeType reads vertical metrics and a CFF face with each charmap FreeType adds; 836,345 glyphs) identical to FreeType: names, every charmap FreeType lists with its mappings, libass's text charmap, the kerning of every listed pair, advances and unscaled outlines (`font-outlines` 53/53); at 256 pixels, size metrics, kerning, every glyph's unhinted outline with its synthetic styles, default-load advances, and its linear and scaled vertical advances unhinted and of the default load (`font-hinting-none` 159/159); at that size and at 15.625 and 10 pixels (26.6 heights 1000 and 640), every glyph's default-load metrics and hinted outline, which libass's shaper reads for advances, extents and contour points (`font-hinting-default` 159/159 at `69d4d0f8`: every CFF, CFF2 and CID-keyed face, the auto-hinted authored-cmap-formats and DejaVuMathTeXGyre, and the 43 instructed TrueType files); Linux AArch64 and [32-bit ARMv7](#32-bit-armv7), each with its own FreeType build, and macOS AArch64 before the vertical cases | not measured | not measured | libass's hinting-enabled modes (NATIVE, LIGHT, NORMAL): their nine other sizes are measured, not gated (`font-hinting-modes` 954/954 at `9d14e98c` on both targets, unhinted outlines and default-load advances), and the hinted outlines those modes draw are not compared; the auto-hinter's Indic writing system, for the hinted outlines of the glyphs it styles; the TrueType interpreter's unit vectors set along a line or from the stack (`SPVTL`, `SFVTL`, `SDPVTL`, `SPVFS`, `SFVFS`), whose normalisation matches FreeType's for most directions but not all: FreeType's carry an error of about 2⁻¹⁶ that depends on the direction and on the vector's magnitude within its power of two, which no fixed-point rule tried reproduces (`vectors-normalization`); no corpus glyph differs for it at the compared sizes; the default load at sizes other than 256, 15.625 and 10 pixels (not compared); tricky fonts and programs that leave backward compatibility (`INSTCTRL` selector 3); `cmap` format 14; runtime and memory |
@@ -102,43 +88,28 @@ The [session queue workloads](../harness/session-queues/README.md) cover five re
 | ASS rendering | `Renderer`: the events shown at a time to positioned alpha images as libass's `ass_render_frame` draws them with hinting off and complex shaping: font selection and fallback over attached, embedded and default fonts, shaping and bidi, wrapping, alignment, positioning, scrolling, collisions kept across frames, change detection, glyph and border bitmaps, blur and shadows, clips, karaoke and the image list; storage charged to a budget, and all the work of a frame (evaluation, font selection, shaping, outlines, layout, drawing and collisions) to one per-frame bound, `Settings::work` | Identical to libass on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7), each with its own libass build, and on macOS AArch64 before the cases of `@` fonts, unregistered languages, glyphs without points, the charmap retry, two `@` font styles and vector clips without a contour or beyond libass's reach (macOS was not run with them), configured as a player embeds it (attached fonts, a default family and font file, no system font provider, no hinting, storage smaller than the frame): `ass-render` 100/100 pass over 47 authored scripts and 3 Matroska packet streams (ReadOrder deduplication, flushes, prunes, an embedded font) at 1920×1080 over 1280×720 storage and 1280×720 over anamorphic 720×576 storage, at each fixture's frame times; every image's kind, position, size, colour and alpha bytes, and every frame's change value as `ass_detect_change` reports it (802 frames, including underline and strike-out lines on TrueType, CFF and CFF2 faces with synthetic styles, borders and `@` fonts, frames after a flush and after pruning every event, opaque boxes around different glyphs that draw nothing, vector clips whose drawing has no contour, which empty their event's images, and one whose drawing libass cannot place, which it does not apply, frames whose caches overflow and are cut, C1 controls drawn through a fallback face's Macintosh charmap that the face keeps for later lookups, a style font size of 0, whose glyphs FreeType loads unscaled, `@` fonts drawn rotated and shaped with their vertical advances, a `Language` header HarfBuzz does not register, fallback mark positioning that measures a glyph without points, and a fallback face whose characters libass finds by trying its format 2 and 8 subtables, the Unicode charmap FreeType builds from its glyph names and its CFF encoding in FreeType's order, and two styles of one `@` font that select the same face, whose rotation decisions libass keeps apart); the box behind a `BorderStyle` 4 event, whose type libass leaves uninitialised, is told by its own buffer, also after a collision shift cuts rows off its top, and compared as a type of its own; colliding events whose boxes lie 2^31 or more rows apart, each within `int`'s range (`collision-far-margins.ass`), placed as glibc's merge sort orders them under libass's overflowing comparison, with the far event clipped away, whose 26.6 position leaves `int`'s range and which libass for AArch64 alone draws inside the frame; with libass's cache limits at 1000 glyphs and 24 MiB; `ass-render-host` pins per target the rendering whose libass result C leaves to the target (`border-x-overflow.ass`, a box width that doubles a huge border in wrapping `int`, and `collision-far-tops.ass`, colliding events whose boxes end up 2^31 or more rows apart, sorted as glibc's merge sort sorts them with libass's overflowing comparison): 4/4 pass on ARMv7 | 0.9595 (100/100 pass, worst `font-size-zero-ass-720p`) | heap ≤0.9486, total RSS ≤0.9966 (100/100 lower) | on AArch64, `ass-render-host`'s 4 cases, a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu gives an event box value outside the signed 32-bit range (its top, height, left or width) its low 32 bits, where libass on 32-bit ARM saturates it, and the renderer follows 32-bit ARM, so they are not timed or measured there; settings other than frame and storage size are unverified; libass's simple shaping and hinting modes, selective overrides and track features; of 5,182 generated scripts and 540 fixture mutations rendered frame by frame against libass for ARMv7, 48 scripts and no mutation differ, each for a stated cause: the renderer stops at the default `Settings::work` bound (17), which on ARMv7 is about 9 s of rendering for one frame (a median 33 ns per unit); with the bound lifted, 34 of those frames take 7 to 21 s each there and 110 run out of the 32-bit address space, so the bound refuses only frames no player could show in time; it runs out of the 32-bit address space (19 allocations refused, 8 at the worker's budget) where libass for ARMv7 peaks at 2.6 to 4.1 GB; and in 4, and in earlier frames of 2 of the above, libass for ARMv7 alone departs from libass for AArch64 at 3.7 to 4.0 GB of its 4 GB address space, and the renderer matches libass for AArch64 (`random-2258` from frame 46). Against libass for AArch64, 113 scripts and 1 mutation differ: 79, the mutation among them, that are identical on ARMv7 and differ there through libass's 64-bit `long` narrowing and its low 32 bits of event box values outside the signed 32-bit range, both deliberate divergences; 34 at the work bound, where libass peaks at 3.5 to 23 GB; and `random-1428`, where libass is killed for memory and the renderer refuses at its budget |
 | Capture | RGBA to YUV 4:2:0, MPEG-1 video with retryable motion-search allocation, MPEG-TS mux | 15/15 conversion, encoder and mux comparisons at `c30b9c80`. Conversion is byte-identical to FFmpeg 9.0.2 using `Session::open_filtered` on AArch64 and `Session::open` on ARMv7. | 0.9768 (15/15 pass, worst `c04-motion-960`) | heap ≤0.5904, total RSS ≤0.9683 (15/15 lower, kernel-bound) | FFmpeg's ARMv7 build faults at widths of 2 modulo 4 from 18 up. The converter uses the filtered path at those widths. |
 
+The [original-input inventory](../harness/fate/README.md) classifies 15 unmapped
+MPEG-TS identities. On `pmtchange.ts` and `loewe.ts`, the pinned reference
+probe reports program and stream metadata. The existing candidate PES operation
+requires a program-level reader for both sources. Access-unit comparisons
+remain open for a PSI diagnostic and a transport diagnostic respectively.
+The [original-input controls](../harness/fate/README.md) verify PMT replacement
+on `pmtchange.ts` and transport faults on the unaligned `loewe.ts` sync grid
+under two delivery granularities. Probe metadata and full packet-fold parity
+remain open on both inputs.
+
 ## Subtitle text comparisons
 
 At `f13dcaf3`, a partial gate run of `subtitle-text` per target passed parity,
 runtime, peak heap and total RSS on all 367 cases, every runtime upper bound
-below 0.85. `CharsetJob` converts single-byte charsets up to 4096 source bytes a
-step and charges what a byte-at-a-time conversion charges, and a mov_text
-packet stages its event prefix in 64 bytes instead of 2048, so no packet zeroes
-or moves a 2 KB buffer.
+below 0.85. The table gives the runtime upper bounds of the three cases that were
+above 1.0 on a target at `546045db`.
 
 | Case | Linux AArch64 at `546045db` | at `f13dcaf3` | ARMv7 at `546045db` | at `f13dcaf3` |
 |---|---|---|---|---|
 | `mov-text-tags-ranges` | below 1.0 | 0.7966 | 1.0131 | 0.8471 |
 | `charset-windows-1251-text` | 1.0325 | 0.5442 | below 1.0 | 0.4959 |
 | `charset-windows-1252-text` | 1.0121 | 0.5396 | below 1.0 | 0.4697 |
-
-Per operation, against main `6ed706b8` (least of three runs, the difference of
-1,050- and 50-iteration runs), Windows-1251 text took 46% fewer cycles on
-AArch64 and 45% fewer on ARMv7, and `mov-text-tags-ranges` 8% and 15% fewer.
-Retired instructions fell on 305 of 367 cases on AArch64 and 277 on ARMv7. They
-rose by about 0.9% on the multibyte ASCII charset cases, which take one more
-check per character, and by 13 to 37 instructions per SubRip or WebVTT document
-in the shared worker code; those cases run at about 0.40 and 0.05 of the
-reference. The other subtitle worker items changed by less than 0.04% on
-AArch64, and the playback worker builds to the same bytes.
-
-At `ab677583`, all 390 text cases passed parity, runtime, peak heap and total RSS
-against FFmpeg on each target. Two AArch64 runtime upper bounds exceeded the present
-[ceiling](quality.md#gates), Windows-1251 at 1.01459 and Windows-1252 at 1.00824. All 390 ARMv7
-upper bounds were below it.
-
-Against main `524bf906`, the historical Shift-JIS ASCII packet took 0.49656×
-as long on AArch64 and 0.58920× on ARMv7, with 51.23% and 43.13% fewer retired
-instructions. All 80 charset cases stayed within the +1.5% median screen on
-both targets. Two AArch64 documents and nine ARMv7 documents exceeded that
-screen. Those SubRip and WebVTT inputs use the document parser directly. The two
-AArch64 instruction counts fell by 0.01% each, and the nine ARMv7 counts changed
-by less than 0.003% each. The cause of the document timing shifts is unresolved.
 
 ## DTS core header inspection
 
@@ -170,922 +141,77 @@ A gate run that [reuses](quality.md#reuse) a cited result changes no row: the ro
 the revision and set it was measured with, and the run's `gate-result.json` names that
 set as reused.
 
-At `c945c5e0`, both c6g.4xlarge targets match FFmpeg on all 179 access-unit and
-97 PES cases with 30 timing and 30 kernel-bound memory pairs per case. Every case
-is faster than the reference and below it in both memory bounds. The ten MPEG
-audio controls cover Layer I, II and III frames, including headers split across
-PES packets and fractional 90 kHz durations. The highest runtime bounds among
-those ten cases are 0.3483 on Linux AArch64 and 0.3579 on ARMv7.
-
-The linked workers at `deb6105a` cover 3,092 distinct cases per target across capture,
-framing, containers, file decoding, playback, glyph extents and subtitles. On AArch64,
-3,074 of 3,088 timed cases were as fast as their reference on the upper paired bound;
-3,084 passed the runtime gate, 3,081 used less peak heap and 3,088 used less total RSS.
-Four ASS cases disagreed with libass on overflowing event bounds. On ARMv7, 3,082 of
-3,092 timed cases were as fast as their reference, 3,090 passed runtime, 3,084 used
-less peak heap and 2,957 used less total RSS. All 135 ARMv7 packet-framing resident
-bounds exceeded one. Two glyph-extent cases per target and two AArch64 packet-framing
-cases exceeded the runtime ceiling.
-
-At that revision all ten file-audio inputs passed their numerical comparisons on each
-target. The FLAC corpus contained 182 exact packet comparisons and five documented
-packet differences. It had 183 passing decoded-output comparisons and four open cases.
-These measurements identify the linked binaries at `deb6105a`. The feature tables
-give the published revision for each implementation.
-
-On c6g.4xlarge, the two registered FLAC files were decoded at `0230c88e` and
-`3e3ba929` in 30 paired runs per target. For 16-bit stereo and 24-bit six-channel
-audio, respectively, median decode time on ARMv7 fell by 16.9% and 7.1%
-(upper time ratios 0.83128 and 0.92973). On AArch64 it rose by 0.34% and 0.20%
-(upper ratios 1.00387 and 1.00237). Both output digests matched the preceding build. The file-codec
-rows above use FFmpeg as their reference.
-
-At `414b4cb5`, all 418 Matroska and linked playback cases pass on each c6g.4xlarge
-target, including HLS, MP4 forward and range, progressive TS188, raw Annex B and
-MPEG-TS program playback. Runtime uses paired timing and memory is kernel-bound.
-At `be14c7e6`, all 21 Cues cases pass with 252 compatibility and 252 normal
-playback traces per target. Extra preroll retains its source packet type and clock.
-
-At `2fc2ebb8`, all 418 Matroska and playback cases pass per target on c6g.4xlarge,
-including 252 compatibility and 252 normal playback seek probes. The highest runtime
-upper bounds are 1.0392 on Linux AArch64 and 0.9986 on 32-bit ARMv7.
-Peak heap and kernel-bound total peak RSS are lower in every case. All 10 audio file
-workloads pass per target. `opus-5.1-256` measures 1.0092 on Linux AArch64 and
-0.8575 on ARMv7, with byte-identical output before and after the CELT change.
-On ARMv7 all 89 steps pass. On Linux AArch64 87 pass, with 23 listed
-`subtitle-text-host` and four listed `subtitle-dvd-host` cases still open.
-
-With the PGS fill and clock changes at `47ffada4`, 53 of 53 linked worker steps pass
-on ARMv7 and 51 of 53 on Linux AArch64, with the same open subtitle cases.
-The two subtitle workers change and every other candidate and reference hash matches
-`2fc2ebb8`.
-
-The Opus CELT profile includes `5bacc138` with the CELT changes applied. That build's
-codec worker matches the hash of the Linux AArch64 gate build at `2fc2ebb8`.
-
-At `36cead7d`, all 10 audio file workloads pass per target: `opus-5.1-256` measures 0.9747
-on Linux AArch64, from 1.0444 at `546045db` and 1.0065 at `a875b007`, and 0.8589 on ARMv7.
-A profile of the Linux AArch64 gate build against the reference put 7% of that workload's
-cycles in CELT's de-emphasis, against 3.6% in FFmpeg's NEON de-emphasis. The filter is a
-one-pole recursion, so one addition and one multiplication per sample bound each channel's
-speed, and the decoder ran it per stream: one chain at a time for the 5.1 stream's two mono
-streams and two for each coupled one. When every stream of a packet decodes CELT frames
-alone, it now runs once the streams are decoded, for all six channels in one loop, each
-with its own memory and the same operations in the same order. Counted against `e9596487`,
-the gate build takes 3.2% fewer cycles on `opus-5.1-256` on Linux AArch64 and 2.1% fewer on
-ARMv7, and 0.4% fewer on `opus-music-128-stereo` on both. `opus-speech-24-mono`, whose SILK
-and hybrid frames keep the per-stream de-emphasis, runs the same instructions with 0.7%
-more cycles on Linux AArch64 and 0.8% more on ARMv7; it measures 0.9225 and 0.8999, against
-0.9243 and 0.8755 at `546045db`. Output is unchanged: the workloads' digests, and the 15
-files of FATE's `opus` directory and the three Opus timing inputs decoded to f32 by
-`triergon-session`'s decode example, are byte-identical to `e9596487` on both targets, and
-the other codec workloads run the same instructions in the codec worker. Evidence sets
-`opus-deemphasis-aarch64` and `opus-deemphasis-armv7` hold the counts, the profiles, the
-tests and the byte-for-byte check, and `gate-run-TARGET-36cead7d-*` the gate runs.
-
-At `5bacc138`, all 418 Matroska and playback cases pass on each c6g.4xlarge
-target, including 252 compatibility and 252 normal playback seek probes per target.
-The largest runtime upper bounds are 1.0404 on Linux AArch64 and 0.9935 on 32-bit ARMv7.
-Peak heap and kernel-bound total peak RSS are lower in every case.
-The wider selection passes all 89 steps on ARMv7. On Linux AArch64, 87 pass
-and the other two grades fail only on the listed `subtitle-text-host` and
-`subtitle-dvd-host` cases. The AArch64 `opus-5.1-256` bound
-was 1.0593 before the CELT change.
-
-At `97759e39`, both c6g.4xlarge targets pass all 367 text subtitle cases
-and all 23 oversized timestamp cases. The subtitle worker selects the
-reference target’s decimal field width. At `f8e1c4d9`, that comparison passed
-23/23 on 32-bit ARMv7 and 0/23 on Linux AArch64 with the 32-bit field policy.
-
-At `5af2b1d7`, the `raw-annex-b` item alone passes all 7 cases for parity, runtime, peak
-heap and kernel-bound total peak RSS, on one c6g.4xlarge host per target. Runtime upper
-bounds peak at 0.6427 on Linux AArch64 and 0.5076 on 32-bit ARMv7, both `hevc-aud1`, from
-0.9945 and 0.7526 at `ce55904b`. The HEVC cases carry a 2.3 KB SEI message before their
-first slice. At main `d66c90dd`, `RawVideoProbe` took each byte of that prefix through its
-whole read loop, which accounted for a third of the operation's instructions. The probe now
-reads the five bytes it keeps of each NAL and skips the rest of the body in word-sized
-steps. It still selects at the same byte and charges the same work. The raw-video runner now
-derives the active configuration's picture period when the feed reports a change, instead
-of parsing the HEVC SPS for every packet. On Linux AArch64, an operation on `hevc-aud1`
-takes about 41% fewer instructions and 37% fewer cycles than at `d66c90dd`. The traces of
-all seven cases are byte-identical, and the worker's other runners execute the same
-instruction counts. Sets `gate-run-TARGET-5af2b1d7-*-shard-1` hold the gate outputs, and
-`raw-annex-b-probe-5af2b1d7` holds the counts, profiles and tests.
-
-At `ce55904b`, all 290 cases across nine playback items pass parity, runtime,
-peak heap and kernel-bound total peak RSS on c6g.4xlarge hosts for both targets.
-Runtime upper bounds peak at 0.9945 on Linux AArch64
-and 0.9942 on 32-bit ARMv7. The Matroska comparison includes
-a six-packet HEVC input with repeated parameter sets in CodecPrivate.
-
-At `5514c6a0`, all 290 cases across nine playback items pass parity, runtime,
-peak heap and kernel-bound total peak RSS on c6g.4xlarge hosts for both targets.
-The Matroska startup comparison includes a six-packet HEVC input with repeated
-parameter sets in CodecPrivate. Runtime upper bounds peak at 1.0444 on Linux
-AArch64 and 1.0009 on 32-bit ARMv7. The four playback startup and continuation
-archives contain the per-case results and build identities.
-
-At `bc488ac0`, the 16 Matroska and playback items passed all 418 cases on both
-targets, including the 21 Cues cases and 252 seek probes per target.
-The worst runtime upper bounds were 1.0480 on Linux AArch64 and 0.9967 on 32-bit ARMv7.
-Peak live heap and kernel-bound total peak RSS were lower in every case.
-
-At `41846888`, the configured AAC access-unit comparison is measured from
-`codec-aac-worker`: the AAC decode worker that the gate build makes with the pinned
-nightly and the decoder's `simd` feature, which the AAC codec workloads already use. It
-ran on one c6g.4xlarge host per target from the gate images, as at `d66c90dd`. All 34
-cases pass parity, paired runtime, peak heap and kernel-bound total peak RSS on each
-target. The highest runtime upper bounds are 0.8484 on Linux AArch64 and 0.8772 on 32-bit
-ARMv7, both `aac-rate-96000`, from 0.8681 and 0.9987 with the stable `codec-worker`. Both
-workers decode all 34 ARMv7 workloads to identical PCM and speaker order. On ARMv7 the
-nightly worker takes 12 to 18% fewer user cycles than `codec-worker` on six clips, the
-three slowest among them. The build identity in each set records the worker's toolchain,
-`nightly-2026-10-17`. Sets `aac-access-units-41846888-TARGET` hold the outputs, build
-identities, PCM identities, counts and logs.
-
-At `d66c90dd`, the configured AAC access-unit comparison was measured on one
-c6g.4xlarge host per target from the gate images, as the gate measures a codec workload
-list: parity, then timing alone on CPU 1, then memory under the kernel RSS bound on CPUs
-1–15. All 34 cases pass parity, paired runtime, peak heap and kernel-bound total peak RSS
-on each target. The highest runtime upper bounds are 0.8681 on Linux AArch64 and 0.9987
-on 32-bit ARMv7, both `aac-rate-96000`, against 0.8695 and 1.0074 at `414b4cb5`; the next
-on ARMv7 is `avc-aac-quicktime-surround` at 0.9945. The comparison's candidate is
-`codec-worker`, built by the pinned stable toolchain without the AAC decoder's `simd`
-feature. Sets `aac-access-units-d66c90dd-TARGET` hold the outputs, build identities and
-logs.
-
-At `414b4cb5`, the linked codec, audio reader, ISO BMFF reader and subtitle items
-cover 42 gate steps on six c6g.4xlarge hosts per target. All 42 steps pass on ARMv7.
-On Linux AArch64, 40 pass and the other two fail only on their listed open cases:
-23 text-subtitle timestamp overflow cases and four DVD host cases. The separate
-configured AAC access-unit comparison passes all 34 cases on each target for
-parity, paired runtime, peak heap and kernel-bound total peak RSS.
-
-The rows without a revision come from one full sharded gate run per target at `5b8dd88f`,
-main `133ad93d` with the runtime [ceiling](quality.md#gates) lowered
-([running the gates](quality.md#running-the-gates)), each on eight c6g.4xlarge hosts
-(Graviton2) with kernel `7.0.0-1014-aws`, every worker and reference linked under the link
-policy `static-toolchain-runtime-trained-order-v1` and set `codec-derived-streams` unpacked
-on its hosts: each item timed alone on CPU 1 with the RSS module unloaded, its memory then
-collected under the kernel RSS proof on CPUs 1–15, and graded with the module loaded; no
-result was reused. The ceiling is set on this run. Linux AArch64 ran 165 steps and ARMv7
-162. On Linux AArch64 3 failed: the grades of `ass-render-host` and `subtitle-dvd-host`,
-each only on its contract's listed open cases, and `benchmark-progressive`, where
+The full gate run at `5b8dd88f` ran on eight c6g.4xlarge hosts per target, kernel
+`7.0.0-1014-aws`, with set `codec-derived-streams` unpacked on its hosts: each item
+timed alone on CPU 1 with the RSS module unloaded, its memory then collected under the
+kernel RSS proof on CPUs 1–15, and graded with the module loaded; no result was reused.
+On Linux AArch64 three steps fail: the grades of `ass-render-host` and `subtitle-dvd-host`, each
+only on its contract's listed open cases, and `benchmark-progressive`, where
 `progressive-ts188`'s `reordered-48000` has a runtime bound of 1.0006 (median 0.9996), the
-only timed case above the ceiling on either target. On ARMv7 4 failed. `memory-subtitle-dvb`
-and `grade-subtitle-dvb` fail because 4 of the 241 DVB cases have no memory result
-(`invalid-memory-observation`): in one of the 30 samples of each, the kernel RSS observer
-reported missed events, on the candidate in two cases and on the reference in two. The
-other 237 are lower on both bounds, and timing passes on all 241. `test-checked` and
-`test-release` fail one test, `crates/framing/tests/nal_packet.rs`'s
-`spill_pressure_keeps_a_verified_update_until_resume_or_cancellation` ("spill must pause
-without publishing"), which passes on Linux AArch64. The `codecs-audio` item passes on both
-targets. AAC in MOV, which the gate leaves to `codecs aac-access-units`, was measured at the
-same revision from `codec-aac-worker` on one more c6g.4xlarge host per target as the gate
-measures a codec workload list: 34/34 cases pass runtime on each target, the highest bounds
-0.8468 on Linux AArch64 (median 0.8405) and 0.8771 on ARMv7 (median 0.8750), both
-`aac-rate-96000`. Sets `gate-run-aarch64-5b8dd88f-20261121-085805-shard-1` to `-8` and
+only timed case above the ceiling on either target. On ARMv7, 4 of the 241 DVB cases had
+no memory result (`invalid-memory-observation`) and the workspace tests failed one framing
+test; both were run again at `fa7e4621`. AAC in MOV was measured at the same revision
+from `codec-aac-worker` on one more c6g.4xlarge host per target, as the gate measures a
+codec workload list. Sets `gate-run-aarch64-5b8dd88f-20261121-085805-shard-1` to `-8` and
 `gate-run-armv7-5b8dd88f-20261121-085846-shard-1` to `-8` hold the shards' step records,
 logs, build identities and gate results, and `aac-access-units-5b8dd88f-TARGET` the AAC in
 MOV measurements with the build identity.
 
-The ARMv7 MPEG-TS access unit row at `c1ace6c8` comes from one partial gate run per target of
-the `mpegts-access-units` item (timing, memory and grade) on one c6g.4xlarge host each, built and
-measured as at `5b8dd88f`. Every step passes 179 of 179 cases on both targets. On ARMv7 the
-reduction of exact time without division moves `au-dvb-eac3-32000` from 0.9984 (median
-0.9921) to 0.9643 (median 0.9480). On Linux AArch64 the change compiles to the same
-arithmetic; that case's instruction count is unchanged and its bound is 0.9426 (median
-0.9254), against 0.9381 at `5b8dd88f`, so that target's row stands at the later `f1fabdc3`. Sets
-`gate-run-armv7-c1ace6c8-20261121-125023-shard-1` and
-`gate-run-aarch64-c1ace6c8-20261121-125138-shard-1` hold the outputs, build identities,
-plans, step records and logs, and `time-divide-free-c1ace6c8` the instruction counts of 630
-ARMv7 and 185 Linux AArch64 cases across the transport, subtitle text, MP4 range and Matroska
-legacy AAC corpora (every output digest unchanged), the profiles, and the core tests and
-exact-arithmetic oracle passing on both targets at that revision.
+At `fa7e4621`, a partial gate run on one ARMv7 c6g.4xlarge host, measured as the full
+run is, ran the `subtitle-dvb` item and the workspace and worker tests again; all seven
+steps pass (set `gate-run-armv7-fa7e4621-20261121-125820-shard-1`), and all 241 DVB cases
+are measured with no missed kernel RSS events. At `5b8dd88f` each of the four invalid
+samples had reported missed events: the module counts missed probe hits for the whole
+host, not per process, so one burst voids every session open at that moment.
 
-At `fa7e4621`, a partial gate run on one ARMv7 c6g.4xlarge host, as the full run measures,
-ran the `subtitle-dvb` item and the workspace and worker tests again; all seven steps pass.
-The framing test now frames one segment descriptor more than a packet keeps inline, so it
-spills on every pointer width. Its seven descriptors had fit inline, and it passed on Linux
-AArch64 only because the output's 64-bit storage owner left the output no room. The
-workspace tests pass, 4,845 checked and 4,844 in release, and all 241 DVB cases are
-measured: runtime ≤0.8312, heap ≤0.7118 and total RSS ≤0.8224, all lower, with no missed
-kernel RSS events. At `5b8dd88f` each of the four invalid samples had reported four missed
-events, and their cases ended within ten seconds of one another. The module counts missed
-probe hits for the whole host, not per process, so one burst voided every session open at
-that moment. Set `gate-run-armv7-fa7e4621-20261121-125820-shard-1` holds the run's outputs.
-The `subtitle-dvb` timing and memory results it lists have the same keys as those of
-`gate-run-armv7-5b8dd88f-20261121-085846-shard-4`, so the index lists them in the newer set
-only.
+Sets `gate-run-aarch64-a5837d38-20261118-163537-shard-1` to `-5` and
+`gate-run-armv7-a5837d38-20261118-163631-shard-1` to `-5` hold an earlier run of the 15
+capture items, and sets `gate-run-aarch64-22b82550-20261118-172738-shard-1` to `-5` and
+`gate-run-armv7-01ba2375-20261118-191656-shard-1` to `-5` the memory steps measured from
+its reused timing records.
 
-The earlier full gate run at `a73350ca` was one sharded gate run per target
-([running the gates](quality.md#running-the-gates)), each on eight c6g.4xlarge hosts
-(Graviton2) with kernel `7.0.0-1014-aws` and every worker and reference linked under the
-link policy `static-toolchain-runtime-trained-order-v1`: each item timed alone on CPU 1 with
-the RSS module unloaded, its memory then collected under the kernel RSS proof on CPUs 1–15,
-and graded with the module loaded; no result was reused. Linux AArch64 ran 153 steps and
-ARMv7 150; 3 and 2 failed, each only on its contract's or list's listed open cases. A grade
-then failed on parity alone, so the memory bounds above 1.0 of packet framing and of the
-four `long-movie` PGS cases were in the graded reports' acceptance, not in the step results.
-A grade now fails on a case whose bound fails ([bounds](quality.md#reference-and-corpus)): graded
-again, the PGS grades fail on both targets, and packet framing's total RSS fails as listed
-in its contract's `open_bounds`. Before the run at `5b8dd88f`, the PGS rows were measured
-again at `99f1027b` and, with the Matroska / WebM and other subtitle rows, at `f8e1c4d9`
-(below), and the capture rows at `c30b9c80`. AAC
-in MOV, which the gate does not run, was measured at the same revision on one more
-c6g.4xlarge host per target as the gate measures a codec workload list. Sets
-`gate-run-TARGET-a73350ca-*-shard-1` to `-8` hold the shards' outputs, build identities,
-plans, step records and logs, `aac-access-units-a73350ca-TARGET` the AAC in MOV
-measurements, and `closing-run-ratios-a73350ca` every timed case's paired median and 95%
-bounds with, per feature and target, the cases whose median or bound is above 1.0 and whose
-bound is above 1.20, 1.10 and the [ceiling](quality.md#gates) then in force, and the median
-of the case medians. The run predates the `codecs-audio` item, graded at `bbdefa70`.
+Sets `gate-ass-render-79e0ae13` and `gate-ass-render-host-79e0ae13` hold the timing,
+memory and grade of `ass-render` and `ass-render-host` from the full gate run at
+`79e0ae13`.
 
-The previous runtime [ceiling](quality.md#gates), 1.05, was set on the full sharded gate run
-per target at `31d29945` described below with the PES list and unit reuse, the newest full measurement of
-every item, and on AAC in MOV measured at `4213d042` (0.8717 on Linux AArch64, 1.0062 on
-ARMv7). On Linux AArch64 no timed case had a runtime bound above 1.05; the highest was
-Matroska segment metadata's `chapters-many` at 1.0352. On ARMv7 two `subtitle-pgs` cases were
-above it, `rle-long-rows-sup` at 1.0591 and `state-c0-and-reserved-sup` at 1.0550 (1.0490 and
-1.0496 in a same-day run of that item at `1ebcdadc`); they were not listed as open. The full
-run per target at `546045db` described below puts them at 0.7256 and 0.6435, and no timed case
-there was above 1.05 on either target: the highest were `chapters-many` at 1.0377 on
-Linux AArch64 and ISO BMFF seek's `origin18-nonzero-anchor-second-absent-t1-mid-seek-tiny` at
-1.0221 on ARMv7. A partial run of Matroska segment metadata and the external HDR vector at
-`f12511e4`, which parses metadata documents without a source handle per text field, puts
-`chapters-many` at 0.7906 on Linux AArch64 and 0.6203 on ARMv7; the item's highest case
-there is `chapters-depth`, at 0.9777 and 0.9092. A partial run of subtitle text at
-`f13dcaf3`, which converts single-byte charsets in runs and stages mov_text event prefixes in
-64 bytes, puts `charset-windows-1251-text` at 0.5442 on Linux AArch64 and
-`mov-text-tags-ranges` at 0.8471 on ARMv7; the item's highest case there is
-`mov-text-tags-ranges` on both targets, at 0.7966 and 0.8471. The partial run of ISO BMFF seek
-at `f8661cb0` described below puts `origin18-nonzero-anchor-second-absent-t1-mid-seek-tiny` at
-0.9258 and no case of that item at or above 1.0 on either target.
+At `4b87991e`, for `aac-sce-in-stereo`, FFmpeg starts with zeroed float output planes
+and the comparison checks every sample in both channels: the maximum left error is
+8.196e-08 and the right channel matches exactly. Stereo 16-bit output differs by at most
+one LSB on both targets.
 
-The ceiling before that, 1.10, was set on one more full sharded gate run per target
-at `1c64b775`, measured as the `a73350ca` run was, with set `codec-derived-streams` unpacked
-on its hosts, and on AAC in MOV measured at that revision on one more c6g.4xlarge per
-target; no result was reused. Linux AArch64 ran 156 steps and ARMv7 153. On Linux AArch64
-the grades of `ass-render-host`, `subtitle-dvd-host` and `subtitle-text-host` fail, each only
-on its contract's listed open cases; no step fails on ARMv7. Of 4,316 timed cases on Linux
-AArch64 and 4,362 on ARMv7, none has a runtime bound above 1.10. The highest are
-`ass-render`'s `cache-keys-ass-720p` at 1.0817 (median 1.0782) on Linux AArch64 and
-`aac-hev2-stereo` at 1.0755 (median 1.0711) on ARMv7, where `h264-high-1080p` reaches
-1.0426, `hevc-irap_repeat` 1.0133 and AAC in MOV 1.0176. The only memory bounds above 1.0
-are packet framing's total RSS, listed in its contract's `open_bounds`: one case at 1.0290
-on Linux AArch64, all 135 up to 1.0823 on ARMv7. Sets
-`gate-run-aarch64-1c64b775-20261116-230956-shard-1` to `-8` and
-`gate-run-armv7-1c64b775-20261116-230958-shard-1` to `-8` hold the shards' outputs, build
-identities, plans, step records and logs, `aac-access-units-1c64b775-TARGET` the AAC in MOV
-measurements, and `closing-run-ratios-1c64b775` every timed case's paired median and 95%
-bounds, the cases with a bound above the [ceiling](quality.md#gates) then in force, and per feature and target the worst runtime,
-heap and total RSS bounds. The rows above keep the revisions they name.
+The MPEG-TS progressive playback rows come from the `progressive` item on each target at
+`6de1193f`, the merge of main `6ca0098d` into `4ec296c5`, one c6g.4xlarge host per target:
+the three cases match the reference and the five functional inputs give their ten
+outcomes, and the early stop ended every case at 20 of its 30 timing pairs and 20
+kernel-bound memory pairs. `reordered-48000` has runtime upper bounds of 0.9716 on Linux
+AArch64 (median 0.9676) and 0.7312 on 32-bit ARMv7 (median 0.7249), from 1.0006 and 0.7550
+in the full run at `5b8dd88f`; `later-entry-48000` has 0.8450 and 0.6460, and
+`continuous-44100` 0.4476 and 0.3318. Peak heap is at most 0.0155, and total RSS at most
+0.4472 on AArch64 and 0.6647 on ARMv7. The same item at `4ec296c5`, before the merge, gave
+0.9800 (median 0.9710) and 0.7367. From `4ec296c5` the progressive reader's table, failure
+and end-of-stream paths are out of line, and the playback worker's AArch64 order lays out
+the code of its progressive training operations first ([measuring
+performance](quality.md#measuring-performance)). The other playback items were not
+measured at these revisions, although the AArch64 order of their worker changed with them.
 
-At `2b196e9c`, which keeps `Time`'s 256-bit fallbacks out of line, one more full sharded gate
-run per target was measured the same way. It measured every item again but the capture
-cases' timing, which it reused from `1c64b775`: the change leaves the capture worker byte
-for byte unchanged, as it does the ASS, font, packet framing, rasterising and shaping
-workers. On Linux AArch64 the grades of `ass-render-host`, `subtitle-dvd-host` and
-`subtitle-text-host` fail, each only on its contract's listed open cases; no grade fails
-on ARMv7. The capture memory steps fail on both targets without measuring:
-`capture qualify --stage memory` reads the records of its timing step, which a reused
-timing step did not restore then. No runtime bound crosses 1.10, the ceiling then, and no memory
-bound crosses its limit; per feature,
-the median change of the case medians against `1c64b775` lies within −1.6% and +1.9%
-(+8.1% for the five `subtitle-dvd-host` cases, whose operations take microseconds), as do
-the features whose workers are unchanged, and the changed workers' user-mode instruction
-counts on the link-order training operations are within 0.05% of `2a6a07a7`'s. Sets
-`gate-run-aarch64-2b196e9c-20261117-192110-shard-1` to `-8` and
-`gate-run-armv7-2b196e9c-20261117-192033-shard-1` to `-8` hold the shards' outputs, and
-`link-order-code-size` the instruction counts and the per-feature comparisons. A reused
-timing step now restores those records from its kept set: one partial run per target of the
-15 capture items on five hosts, at `22b82550` on Linux AArch64 and `01ba2375` on ARMv7,
-reused every timing step from the `a5837d38` run (sets
-`gate-run-aarch64-a5837d38-20261118-163537-shard-1` to `-5` and
-`gate-run-armv7-a5837d38-20261118-163631-shard-1` to `-5`, which measured all 30 steps per
-target) and measured every memory step from the restored records, 30 of 30 steps passing on
-both targets (heap ≤0.5904 and total RSS ≤0.9704 on AArch64, ≤0.6086 and ≤0.9766 on ARMv7;
-sets `gate-run-aarch64-22b82550-20261118-172738-shard-1` to `-5` and
-`gate-run-armv7-01ba2375-20261118-191656-shard-1` to `-5`).
-
-The playback rows at `419a8493` (HLS segments, Matroska startup and seek, audio clocks and
-legacy AAC-LC, MP4 forward and range, TS program, MPEG-TS progressive playback and raw
-Annex B) come from one partial gate run per target of the nine items whose workers link
-`triergon-playback`, each on one c6g.4xlarge host from the gate images, measured as the
-`1c64b775` run was; no result was reused. All 26 steps pass on both targets, and every
-case is lower on both heap and total RSS. Sets
-`gate-run-aarch64-419a8493-20261117-190817-shard-1` and
-`gate-run-armv7-419a8493-20261117-190751-shard-1` hold the outputs, build identities,
-plans, step records and logs.
-
-The playback tests cover HEVC startup with exact parameter-set repeats and
-matching truncations of each parameter set that prevent startup. At `6bbb2cb7`,
-all 289 cases in the nine playback gate groups passed parity, runtime and
-kernel-bound heap and total RSS on both targets. Linux AArch64's largest runtime
-bound is 1.0528 for progressive `reordered-48000`, with worst heap 0.8877 and
-total RSS 0.8499. The 32-bit ARMv7 bounds are 0.9999, 0.7849 and 0.9670,
-respectively. The four playback archives in the measured revisions table hold
-the corresponding build identities and per-case evidence.
-
-At `fd22d790`, reusing the admitted AAC payload view keeps the complete
-progressive traces and work counts byte-identical. The nine playback groups
-and the two MPEG-TS groups passed parity, runtime, peak heap and kernel-bound
-total RSS on 555 cases per target on c6g.4xlarge. The largest bounds on Linux AArch64
-were 1.0398 for runtime, 0.8877 for heap and 0.8801 for RSS.
-The 32-bit ARMv7 bounds were 1.0101, 0.7849 and 0.9790, respectively.
-Every runtime upper bound is within the [ceiling](quality.md#gates) then in force. The four AAC payload view archives
-list the corresponding build identities and per-case results.
-
-At `29cb8c54`, each AVC access unit is published in exact storage while the
-reader keeps its assembly buffer, and the progressive traces and work counts stay
-byte-identical. All 289 cases in the nine playback groups passed parity, runtime,
-peak heap and kernel-bound total RSS on both targets, from one partial gate run
-per target on c6g.4xlarge. Linux AArch64's largest runtime bound is 1.0161 for
-progressive `reordered-48000`, with worst heap 0.8877 and total RSS 0.8701. The
-32-bit ARMv7 bounds are 1.0044 (MP4 range `fragmented-before-sync`), 0.7849 and
-0.9825. The two AVC unit storage archives list the build identities and per-case
-results.
-
-At `c4643d6c`, AVC publication transfers the completed assembly buffer and
-copies only the delimiter lookahead. All 289 cases in the nine playback items
-passed exact parity, runtime, peak heap and kernel-bound total RSS on both
-targets on c6g.4xlarge. The worst runtime upper bounds were 1.0386 on Linux
-AArch64 (`reordered-48000`) and 0.9950 on 32-bit ARMv7
-(`fragmented-before-sync`). The AVC buffer transfer archives hold the
-per-case results and build identities.
-
-At `31d29945`, the MPEG-TS observer reuses each consumed PES's span and header
-lists, the progressive reader reuses retired AVC units' storage under the 2×
-size rule, the hottest progressive paths keep their cold branches out of line,
-and the trained orders are recorded again. The progressive and HLS traces and
-work counts stay byte-identical. One full gate run per target on c6g.4xlarge
-passed every step except those on the contract's listed open cases. Progressive
-`reordered-48000` has runtime upper bounds of 1.0064 on Linux AArch64 and 0.7495
-on 32-bit ARMv7. Heap and kernel-bound total RSS are lower than the reference in
-every case except ARMv7 packet framing, whose total RSS stays open at 1.0858. The
-ARMv7 PGS cases at 1.0591 and 1.0550 match a same-day run of the PGS item at
-`1ebcdadc` (1.0490 and 1.0496, same medians). The PES list and unit reuse
-archives hold the per-case results and build identities.
-
-At `273f6992`, each transport feed loop variant is a function of its own and the
-progressive reader keeps table events and owned payloads out of line, so its hot
-path spans fewer instruction-cache lines. Traces and work counts stay
-byte-identical. One full gate run per target on c6g.4xlarge passed every step
-except those on the contract's listed open cases. Progressive `reordered-48000`
-has runtime upper bounds of 0.9652 on Linux AArch64 and 0.7306 on 32-bit ARMv7,
-and no case exceeds the runtime ceiling on either target. Heap and kernel-bound total RSS are
-lower than the reference in every case except ARMv7 packet framing, whose total
-RSS stays open at 1.0835. The run's credentials expired as its shards finished,
-so each shard's output tree was packed, archived and indexed afterwards with the
-gate's own steps; no file in any tree is newer than its shard's end. The feed
-loop split archives hold the per-case results and build identities.
-
-At `546045db`, the PGS receiver writes a run of up to 64 pixels as whole blocks of one
-colour, each as long as the target fills inline: two 32-byte blocks on 32-bit ARM, where a
-longer fill of a non-zero byte becomes a call to the C library's `memset`, and one 64-byte
-block elsewhere. It rescales packet clocks to microseconds in 64-bit arithmetic while the
-product fits, where 128-bit division is a software routine on 32-bit ARM. Traces and work
-counts stay byte-identical; on ARMv7 the RLE-heavy PGS sessions run 21 to 27% fewer
-user-mode instructions and 29 to 38% fewer cycles, and on Linux AArch64 0.3 to 1.5% fewer
-instructions and about 4% fewer cycles. One full gate run per target on c6g.4xlarge, Linux
-AArch64 156 steps and ARMv7 153, passed every step except, on Linux AArch64, the grades of
-`ass-render-host`, `subtitle-dvd-host` and `subtitle-text-host`, each only on its contract's
-listed open cases. On ARMv7 `rle-long-rows-sup` and `state-c0-and-reserved-sup` have
-runtime upper bounds of 0.7256 and 0.6435 (medians 0.7123 and 0.6352), and the highest PGS
-bound is 0.7775 there and 0.7806 on Linux AArch64. Heap and kernel-bound total RSS are lower
-than the reference in every case except ARMv7 packet framing, whose total RSS stays open at
-1.0800. The PGS run fill archives hold the per-case results and build identities.
-
-At `f8661cb0`, a global ISO BMFF seek keeps the seek of the track at hand boxed and takes its
-landing and packet state out of it in place, and a track seek that finds a better sync entry
-refreshes the packet state it keeps there in place, so no seek moves its several kilobytes
-of state whole; checked range seeks refresh their best checkpoint the same way. The box scan
-checks its input binding and sticky failure once per event instead of on every poll, which
-with one-byte windows is once per byte. On ARMv7 the seven tiny-schedule seek cases that were
-above 1.0 at `546045db` run 7.4 to 7.9% fewer user-mode instructions and about 8% fewer
-cycles per seek (`order27-MIN-next-scale1000-cat12` 208k cycles against the reference's 224k,
-`origin18` 129k against 140k). Over every case of the ISO BMFF worker's open and index set
-it runs 0.954 of main's instructions in sum on ARMv7 and 0.948 on Linux AArch64, and over its
-seeks 0.991 and 0.992. Cases with 64 KiB windows run up to 0.8% more instructions, where
-`BudgetVec::freeze` and `BoxView::new` are no longer inlined into the box scan. MP4 forward and
-MP4 range playback, which link the same code, run 0.996 to 0.9996 of main's instructions in sum
-on both targets; the two `fate-shorter-track` cases were not counted. Traces are byte-identical
-on all 476 seek and all 1020 open and index comparisons. One partial gate run of the item per
-target on one c6g.4xlarge passed both steps: on ARMv7 the seven cases have runtime upper bounds
-of 0.9258 to 0.9310 (medians 0.9157 to 0.9208; 1.0029 to 1.0221 at `546045db`), and the highest
-bound of the item is 0.9546 there (`fragmented-two-gops-t1-start-eof-seek-ordinary`, 0.9543 at
-`546045db`) and 0.9136 on Linux AArch64, where the seven run at 0.7569 to 0.7723. Heap and
-kernel-bound total RSS stay lower than the reference in every case. Sets
-`gate-run-TARGET-f8661cb0-*-shard-1` hold the runs.
-
-The playback worker links the same seek code, and its trained orders named the function the
-change replaces. Linked by the stale order on ARMv7, its start-up resident set grew by 64 to
-88 KiB, and `progressive-pending-reverse-ranges` peaked one 64 KiB window higher (median
-2,084 to 2,174 KiB of kernel-bound resident memory over 8 pairs). Both playback orders are
-retrained at `e1ad28b3`, on main's start-up through C's `main`, and `cargo xtask link-order
-check` passes on both targets there. One partial gate run of MP4 forward and MP4 range on
-ARMv7 at `e1ad28b3`, on one c6g.4xlarge, passed every step: the highest runtime upper bounds
-are 0.9045 (`progressive-ten-sequential-batches`) and 0.9763 (`fragmented-before-sync`),
-and the highest total RSS bounds 0.8926 and 0.8844. On Linux AArch64 the playback worker at
-`e1ad28b3` runs 0.9993 of main's instructions in sum over MP4 forward and 0.9967 over MP4
-range (main at `e61dd1db`). Set `gate-run-armv7-e1ad28b3-20261121-024034-shard-1` holds the
-run.
-
-The Matroska / WebM and subtitle rows, earlier capture comparisons and ARMv7 workspace
-tests at `f8e1c4d9` come from one partial gate run per target of 33 items: the
-15 capture cases, the six Matroska feature groups and the external HDR vector, every
-subtitle feature, the workspace tests in both profiles with the worker tests, each on five
-c6g.4xlarge hosts (Graviton2) from the gate images, kernel `7.0.0-1014-aws`, under the link
-policy `static-toolchain-runtime-trained-order-v1`, measured as the full run is; no result
-was reused. On the shard where the release tests ran first, they rebuilt the capture worker
-outside the gate build, so capture `c06`, `c08` and `c11` were timed on that build and
-their memory steps refused the timing; a second partial run of those three items at the
-same revision, on three hosts per target, measured them. Apart from those three steps,
-every step passes on both targets but `subtitle-text-host` and `subtitle-dvd-host` on Linux
-AArch64, which fail only on their listed open cases. A partial run of the same items on
-ARMv7 at `78596bf0`, before `main`'s capture, framing and AAC changes were merged, gave
-worst bounds within 0.006 of these (capture 1.0618, Matroska 0.9725, DVD 0.9753). Sets
-`gate-run-TARGET-f8e1c4d9-*` hold the shards' outputs, build identities, plans, step
-records and logs, `gate-run-armv7-78596bf0-20261116-070135-shard-1` to `-5` the earlier
-ARMv7 run, and `capture-matroska-subtitle-ratios-f8e1c4d9` every case's paired runtime
-ratio and memory bounds with, per feature, the worst bounds and the cases above the present
-[ceiling](quality.md#gates).
-
-The PGS rows were measured before that at `99f1027b`, from one partial gate run of the `subtitle-pgs` item per
-target, each on one c6g.4xlarge (Graviton2) from the gate image, kernel `7.0.0-1014-aws`,
-under the link policy `static-toolchain-runtime-trained-order-v1`: timed alone on CPU 1,
-memory collected under the kernel RSS proof on CPUs 1–15, and graded with the module
-loaded; every step passes 319 of 319 cases. Sets
-`gate-run-aarch64-99f1027b-20261116-050209-shard-1` and
-`gate-run-armv7-99f1027b-20261116-050516-shard-1` hold each target's outputs, build
-identities, plan, step records and logs.
-
-The ARMv7 codec and file-audio rows' timings and memory at `3b1c527c` come from one
-partial gate run of both codec workload lists (`codec-workloads` with its memory parts
-`codec-workloads-1` to `-5`, `codec-file-workloads` with `codec-file-workloads-1` to `-3`)
-on four c6g.4xlarge hosts, built and measured as at `5b8dd88f`. Every step passes. The
-downmix's silent planes, tested on their gains' bits on 32-bit ARM, take `vorbis-q3-5.1`
-from 0.9821 to 0.9740; the multichannel workloads' cycles fall by 0.2% to 0.9% at the same
-instruction counts. The video decoders are unchanged, with the same instruction counts as
-main's; `h264-high-1080p` measures 0.9686, against 0.9836 at `5b8dd88f`. On Linux AArch64
-the change leaves every codec workload's instruction count as main's, and those rows stand
-at their earlier revisions. Sets `gate-run-armv7-3b1c527c-20261121-140206-shard-1` to `-4`
-hold the outputs, build identities, plans, step records and logs, and
-`downmix-silent-3b1c527c` the per-workload instruction counts on both targets.
-
-The ARMv7 codec row's workload timings and memory at `d1526aa0` come from one partial gate
-run of the codec workload items (`codec-workloads` and its memory parts `codec-workloads-1`
-to `-5`) on three c6g.4xlarge hosts, built and measured as at `f9fd4030`. Every step passes.
-Sets `gate-run-armv7-d1526aa0-20261121-034448-shard-1` to `-3` hold the outputs, build
-identities, plans, step records and logs. On Linux AArch64 the change leaves the codec
-workloads' instruction counts within 0.04% of main's (evidence set `h264-cabac32-d1526aa0`),
-and that row stands at its earlier revisions.
-
-The codec rows' workload timings and memory at `fc65d9fc` come from one partial gate run
-per target of the codec workload items (`codec-workloads` and its memory parts
-`codec-workloads-1` to `-5`) on three c6g.4xlarge hosts, built and measured as at `f9fd4030`.
-Every step passes on both targets. Sets `gate-run-aarch64-fc65d9fc-20261121-015034-shard-1`
-to `-3` and `gate-run-armv7-fc65d9fc-20261121-014910-shard-1` to `-3` hold the outputs,
-build identities, plans, step records and logs. The codec conformance, audio correctness,
-Ogg, ISO BMFF and file workload lanes were not part of that run and stand at their earlier
-revisions.
-
-The codec rows at `81edf4c0` come from one partial gate run per target of the items that
-link the AAC decoder or the stereo downmix (`codecs`, `codecs-audio`, both codec workload
-lists' timing and memory, `isobmff-reader`, `ogg-readers` and the tests) on four
-c6g.4xlarge hosts, built and measured as at `f9fd4030`, with set `codec-derived-streams`
-unpacked on their hosts. Every step passes on both targets. Sets
-`gate-run-aarch64-81edf4c0-20261117-225329-shard-1` to `-4` and
-`gate-run-armv7-81edf4c0-20261117-225155-shard-1` to `-4` hold the outputs, build
-identities, plans, step records and logs.
-
-The codec rows' workload timings and memory at `906d0a36` come from one partial gate run per
-target of the H.264-linked items (`codecs`, both codec workload lists' timing and memory and
-the tests) on four c6g.4xlarge hosts, built and measured as at `f9fd4030`. Every step passes
-on both targets. Sets `gate-run-aarch64-906d0a36-20261116-213413-shard-1` to `-4` and
-`gate-run-armv7-906d0a36-20261116-213256-shard-1` to `-4` hold the outputs, build
-identities, plans, step records and logs. The audio, Ogg and ISO BMFF correctness lanes
-were not part of that run and stand at `f9fd4030`.
-
-The codec rows at `f9fd4030` come from one partial gate run per target of the codec items
-(`codecs`, `codecs-audio`, `ogg-readers`, both codec workload lists' timing and memory,
-`isobmff-reader` and the tests), measured as at `c68c9667` below, with `codec-aac-worker`
-and the AAC decode example built by the pinned nightly with codec-aac's `simd` feature and
-every other worker, `codec-worker` included, by stable. Every step passes on both targets.
-Sets `gate-run-aarch64-f9fd4030-20261116-141046-shard-1` to `-3` and
-`gate-run-armv7-f9fd4030-20261116-140926-shard-1` to `-3` hold the outputs, build
-identities, plans, step records and logs. The same items ran at `7f32411b` with the whole
-codec worker built by the nightly; its workload timings are in sets
-`gate-run-aarch64-7f32411b-20261116-112713-shard-1` and
-`gate-run-armv7-7f32411b-20261116-112546-shard-1`.
-
-The codec rows at `c68c9667` come from one partial gate run per target of the codec items
-(`codecs`, `codecs-audio`, `ogg-readers`, both codec workload lists' timing and memory,
-`isobmff-reader` and the tests), on three c6g.4xlarge hosts (Graviton2) per target from
-the gate image, kernel `7.0.0-1014-aws`, under the link policy
-`static-toolchain-runtime-trained-order-v1`, with set `codec-derived-streams` unpacked on
-its hosts. Every step passes on both targets but the ARMv7 timing of `workloads.json`,
-which fails only on its three listed HE-AAC workloads. Sets
-`gate-run-aarch64-c68c9667-20261116-082713-shard-1` to `-3` and
-`gate-run-armv7-c68c9667-20261116-082759-shard-1` to `-3` hold the outputs, build
-identities, plans, step records and logs. The same items were run at `0ac17828`, before
-the AAC decoder's speed changes were merged (sets
-`gate-run-aarch64-0ac17828-20261116-062732-shard-1` to `-3` and
-`gate-run-armv7-0ac17828-20261116-062728-shard-1` to `-3`).
-
-The codec and AAC rows at `4213d042` come from two partial gate runs per target of the
-items that link the AAC decoder and the downmix (`codecs`, `codecs-audio`, both codec
-workload lists' timing and memory, `isobmff-reader`, `ogg-readers` and the tests), on
-c6g.4xlarge hosts (Graviton2) from the gate image, kernel `7.0.0-1014-aws`, under the
-link policy `static-toolchain-runtime-trained-order-v1`. The first run's shard holding
-`codecs-audio` stopped at its preflight, as the gate image lacks the derived audio
-streams; the second run measured that shard's items with set `codec-derived-streams`
-unpacked on its hosts. Every step passes on both targets but the two codec lists' ARMv7
-timing, which fails only on their listed open workloads. Sets
-`gate-run-aarch64-4213d042-20261116-061706-shard-2` and `-shard-3`,
-`gate-run-aarch64-4213d042-20261116-064825-shard-1` and `-shard-2`, and on ARMv7 the same
-shards of runs `061623` and `064649`, hold the outputs, build identities, plans, step
-records and logs. AAC in MOV, which the gate does not run, was measured at the same
-revision on one more c6g.4xlarge per target as the gate measures a codec workload list
-(sets `aac-access-units-4213d042-TARGET`).
-
-The packet framing rows come from the `framing` item on each target at `c2bffebc`. All
-135 cases on each c6g.4xlarge host match the reference, with 30 timing pairs on CPU 1
-and 30 kernel-bound memory pairs per case. The highest paired runtime upper bounds are
-0.9295 on Linux AArch64 (`hevc-drain-flush`) and 0.8560 on 32-bit ARMv7
-(`hevc-irap_repeat`); the medians of the cases' median ratios are 0.8423 and 0.7032.
-Peak heap is lower in every case. Total RSS is lower in every case on both targets: the
-upper bounds run from 0.8089 to 0.8135 on AArch64 and from 0.9257 to 0.9940
-(`avc-config-empty`) on ARMv7. On ARMv7 each run's resident pages fall in one of two
-groups about 30 pages apart, by where libc is loaded (see the packet-framing total RSS
-notes under [32-bit ARMv7](#32-bit-armv7)); over all cases 31% of the framing worker's
-runs fall in the higher group, as at `5ee3eba8`, and its median run holds 306 pages
-against 307 there, so a case's bound moves with how many of its 30 runs land high.
-
-At `5ee3eba8` the same item gave 0.9977 on AArch64 as the highest runtime bound
-(`avc-multi_idr` and `hevc-inband_both`) and 0.9122 on ARMv7. Those two cases and
-`hevc-ps_after` were the only ones whose packets framed more than six segments, the
-size of the inline segment table then: their tables spilled to charged heap storage on
-every packet. A packet job now keeps seven descriptors inline: the table stays within
-128 bytes, where eight made each move of it a call to `memcpy` on AArch64. Start codes
-are copied as fixed-size stores rather than as slices whose length is known only at
-run time, each of which had been a `memcpy` call, and the worker publishes each output
-into its retained slot, so it is not moved again. Per operation over 2,000-operation
-runs on AArch64, the framing worker's cycles fell by 5.2% on average over the 135
-cases and by 9.3% on `avc-multi_idr`, where its first operation in a fresh process
-took 20,400 cycles against 22,400 (the reference: 17,500).
-
-At `217fef73`, before the entry change, the same item gave 0.9964 on AArch64 and
-0.9130 on ARMv7 as the highest runtime bounds, AArch64 total RSS up to 0.9888, and
-ARMv7 total RSS above the reference in all 135 cases, from 1.0429 to 1.0840
-(`rearm-type3`).
-
-At `f6de9851` the same `framing` item was measured on both targets. Each run measured all 135 cases on c6g.4xlarge, with 30 timing pairs of
-50 operations on CPU 1 and 30 kernel-bound memory pairs per case. All cases match the
-reference and pass the runtime and heap bounds. The worst runtime bounds are 1.0176
-on AArch64 for `avc-multi_idr` and 0.9643 on ARMv7 for `hevc-irap_repeat`. Across
-cases, the median of the ratios of median times is 0.9004 on AArch64 and 0.7486 on ARMv7.
-All AArch64 total RSS bounds are lower, including `avc-bad-update` at 0.9844.
-All 135 ARMv7 total RSS bounds were above 1.0, with `avc-header-only-idr` highest at
-1.0836. Sets
-`gate-run-aarch64-f6de9851-20261117-230647-shard-1` and
-`gate-run-armv7-f6de9851-20261117-230647-shard-1` hold the reports, build identities,
-plans and logs.
-
-ARMv7 debugger snapshots of the same two executables cover `avc-header-only-idr`,
-`avc-high-flags` and `hevc-config-unknown_empty`, with 32 runs per executable and case.
-Rust's stack-guard lookup adds a median of 31.5 to 32 resident pages, of which 30.5 to
-31 are libc executable pages. Each shared libc load-address bucket (modulo 64 KiB)
-compares the candidate's median residency before input open with the median of the
-reference's per-run maxima over three stops (before input open, operation start and
-operation end). The median excess across shared buckets is 16.25, 14.5 and 13.5 pages,
-respectively. The packet-framing gate uses the kernel-bound peaks recorded above.
-Since `5ee3eba8` no worker runs that lookup: workers enter through C's `main`.
-
-Every gated feature's contract requires both Linux AArch64 and ARMv7 since `47aa0451`
-([quality](quality.md#reference-and-corpus)). One partial gate run at that revision on three
-c6g.4xlarge hosts ran the 26 items those contracts belong to on ARMv7, measured the same
-way: 72 steps, none failed. Every case of each of those features passes; the only failures
-are the listed open cases of `raster-sweep` (`outlines-71`, `outlines-83`) and
-`ass-parse-host`. The rows above keep the revisions they were measured at. Sets
-`gate-run-armv7-47aa0451-20261118-040605-shard-1` to `-shard-3` hold the outputs, build
-identities, plans, step records and logs.
-
-The rows at `79e0ae13` come from one full sharded gate run per target
-([running the gates](quality.md#running-the-gates)), each on ten c6g.4xlarge hosts
-(Graviton2) with kernel `7.0.0-1014-aws` and every worker and reference linked under the
-link policy `static-toolchain-runtime-v1`: each feature timed alone on CPU 1 with the RSS
-module unloaded, its memory then collected under the kernel RSS proof, and graded with the
-module loaded. The memory of both codec workload lists on both targets comes from a partial
-run of those items at `8154812e` on four c6g.4xlarge hosts per target, under each list's memory run limit for the target. Each
-feature's evidence set, `gate-FEATURE-79e0ae13`, holds its timing, memory and grade outputs
-with every shard's build identities, plan, step records and logs; `gate-run-TARGET-79e0ae13`
-and `gate-run-TARGET-8154812e` hold each run's summary and host times. The rows of MP4
-range, MP4 forward, Matroska startup and seek, Matroska audio clocks and the six Matroska
-feature groups that name `9be327a2` come from a partial run of those items on one
-c6g.4xlarge host per target, the same kernel and link policy, timed on CPU 1 and their
-memory collected under the kernel RSS proof; evidence set
-`gate-playback-containers-9be327a2` holds both targets' graded reports, build identities,
-step records, logs, summaries and host times, and a bundle of the measured source. The
-ARMv7 rows of HLS segments, TS program and raw Annex B that name `359a90b4` come from a
-partial run of those items on one host of the same class, kernel and link policy
-(evidence set `gate-playback-ts-359a90b4`), which measures the playback worker these
-changes left in place of the one measured at `79e0ae13`.
-
-The rows and cells at `4d31df88` come from one partial gate run per target, each on one
-c6g.4xlarge (Graviton2) from the gate image, kernel `7.0.0-1014-aws`, under the same link
-policy and the same stages: the codecs' parity, both codec workload lists' timing and
-memory, the ISO BMFF reader comparison and the Ogg reader comparison, with the
-`ogg-reader-inputs` set unpacked at the repository root; the run also measured the three
-ISO BMFF open and index parts.
-Sets `gate-run-aarch64-4d31df88` and `gate-run-armv7-4d31df88` hold each run's outputs,
-summary and host log.
-The ISO BMFF results at `e2d4a6a3` come from one partial run per
-target on the same host class and image, by `tools/gate-aws.sh`, of every item whose
-worker links the ISO BMFF crate (the three ISO BMFF parts, the seek suite, the reader
-comparison, MP4 forward and range, DVD subtitles and closed captions, and the codecs'
-parity); sets `gate-run-TARGET-e2d4a6a3-*-shard-1` hold them. The playback and subtitle
-rows keep their later runs at `9be327a2` and earlier, whose playback worker this run
-predates; in it each keeps its row's verdicts.
-The MP4 forward, MP4 range and ISO BMFF seek rows at `d7a6d8f7` come from one partial run
-of those items per target on the same host class and image, after the comparison worker
-again resets its input at a seek's landing; sets `gate-run-TARGET-d7a6d8f7-*-shard-1`
-hold them.
-The rows at `d2c391b8` and `6dc6440d` come from partial runs per target on c6g.4xlarge
-hosts from the gate images built at `f71495ea`, under the trained-order link policy. The
-six Matroska feature groups, and on ARMv7 MPEG-TS and MPEG-TS access units, at
-`d2c391b8`, ran on five hosts per target (sets
-`gate-run-aarch64-d2c391b8-20261115-143518-shard-1`, `-2`, `-4` and `-5`, and
-`gate-run-armv7-d2c391b8-20261115-143448-shard-1` to `-5`); `6dc6440d` and `cd7d9d7c`
-keep their media worker, and on ARMv7 their transport worker, byte for byte. The items of the
-workers that main's framing changes reached, Matroska startup and seek and audio clocks,
-MP4 forward and range, TS program, raw Annex B, HLS, progressive playback and, on Linux
-AArch64, packet framing, ran at `6dc6440d` on three hosts per target (sets
-`gate-run-TARGET-6dc6440d-20261115-184229-shard-1` to `-3`); `cd7d9d7c` keeps those
-workers byte for byte. The ARMv7 packet framing row comes from a partial run of that item
-at `cd7d9d7c` on one host, whose framing worker links in module order, byte for byte as
-main's at `7c4057c5` (set `gate-run-armv7-cd7d9d7c-20261115-191630-shard-1`).
-
-At `4b87991e`, the audio correctness check passes all 39 AAC vectors, all six
-AC-3, all six E-AC-3 and all 22 DTS core vectors on both ARM targets, each on
-a c6g.4xlarge. For `aac-sce-in-stereo`, FFmpeg starts with zeroed float output
-planes and the comparison checks every sample in both channels. The maximum
-left error is 8.196e-08 and the right channel matches exactly. Stereo
-16-bit output differs by at most one LSB on both targets. At `81edf4c0`, the
-uninitialized right-plane comparison had RMS error 0.0853.
-
-The codec correctness lanes of AAC, AC-3, E-AC-3 and DTS at `bbdefa70` come from a
-partial run of the item `codecs-audio` on one c6g.4xlarge per target from the gate images
-built at `f71495ea`, with the `codec-derived-streams` set, which the images lack, unpacked at
-the repository root of each host before it got ready; sets
-`gate-run-aarch64-bbdefa70-20261116-025121-shard-1` and
-`gate-run-armv7-bbdefa70-20261116-025121-shard-1` hold their rows, summaries and logs.
-The codec cells at `8d6f2789` come from a partial run on three c6g.4xlarge hosts per target
-from the same images (the codecs' parity, the timing of `workloads.json` and its memory in
-five parts, and the tests; set `gate-run-codecs-8d6f2789`). The closed caption rows come
-from a partial run of `subtitle-cc` at `6d5145d7` on one host per target, measured in the
-same way, with the `subtitle-cc-inputs` set, which the images lack, unpacked at the
-repository root of each host before it got ready; sets
-`gate-run-aarch64-6d5145d7-20261115-071404-shard-2` and
-`gate-run-armv7-6d5145d7-20261115-071435-shard-2` hold them. The tests of `f9b3f138`,
-which corrects a test's count of the caption cases, ran on one more host per target (sets
-`gate-run-TARGET-f9b3f138-*-shard-1`). `8d6f2789` holds the decoded picture output model without the
-Parametric Stereo paths of `4d31df88`, and `4d31df88` the reverse: the codec cells give the
-video workloads at `8d6f2789` and the others at `4d31df88`. The tree that holds both, and
-main's later changes to `BudgetVec` growth, is not measured until the next full gate run.
-
-Most Linux AArch64 rows were measured before on c8g (Graviton4) hosts, not on the
-qualified c6g.4xlarge. On each such row's worst Linux AArch64 case the candidate's
-instruction count at `79e0ae13` stays within 0.4% of the build the row cited,
-but for Matroska audio clocks, whose code got 9.18% cheaper, while the runtime upper bounds
-moved by −0.31 to +0.18, so the moves come from the host class, not the code
-([quality](quality.md#measuring-performance)). The earlier measurements follow.
-
-The Matroska rows used the [gate build](quality.md#measuring-performance)
-at `513149a970caad5b30c61becba1bc2bda1c5e193` on a c8g.large pinned to CPU 1,
-with 30 timing pairs of 50 operations and 30 separate memory pairs per case.
-Codec and decode-session runtime at
-`add6b27` was one unpinned gate-build pass of 30 pairs on a c8g.2xlarge. Capture at
-`576f088f` was measured on c6g.4xlarge on both targets. Timing ran on CPU 1
-with the RSS module unloaded. Peak memory ran under the kernel RSS proof. Each
-case planned 30 pairs per stage and used the [early-stop rule](quality.md#early-stop).
-In that earlier comparison, the AArch64 noise case used timing and memory at
-`6d7a0f3c`, which gave the memory observer the same session timeout as timing.
-An earlier audio codecs in files row used the gate build at
-`ccff5b5734c113c1d88160b84825157508c701c0` on a c8g.2xlarge, unpinned, against the `decode` profile:
-30 timing pairs per workload of `harness/codecs/file-workloads.json`, each demuxing,
-decoding and mixing to stereo s16 on both sides (`cargo xtask codecs time`), 30 heap and
-30 RSS pairs under the native observer (`cargo xtask codecs memory`), and the reader lane
-against the profile's `ffprobe`; the per-workload runtimes its Open cell cited came from
-that pass. The Ogg and audio elementary-stream rows rerun the reader
-lane with both Ogg views at `ccd3090572433e79d8ab65a377fcd9896d2839d9` on the same instance type.
-The codec, decode-session and file-audio timing passes at `add6b27` and `ccff5b57`, and
-the ARMv7 codec timing passes at `78a873dd`, predate the shared paired runner and keep
-their recorded results; the shared validator has not re-graded them, as their records
-hold no warm-ups or module observations. Their pairs were checked pair by pair rather
-than watched over the whole run. A diagnostic
-comparison on a c6g.2xlarge, with the codec workload timed twice by each runner:
+The earlier codec timing passes predate the shared paired runner. A diagnostic comparison
+of the two runners on a c6g.2xlarge, with the codec workload timed twice by each:
 
 | Workload | Earlier runner, `642316cf`: median (upper 95%) | Shared runner, `c21176e0`: median (upper 95%) |
 |---|---|---|
 | `aac-lc-stereo` | 0.7350 (0.7357), 0.7339 (0.7361) | 0.7344 (0.7363), 0.7342 (0.7351) |
 | `c07-ui-static-480-bottomup` | 1.3026 (1.3047) | 1.2978 (1.3001) |
 
-At `be0eff89` the packet-framing rows compared all 135 cases with 30 timing and 30
-kernel-bound memory pairs per case on c6g.4xlarge, the AArch64 worker in the trained
-order recorded from its own training corpus and the ARMv7 worker in the toolchain link;
-the kept sets `packet-framing-be0eff89-aarch64` and `packet-framing-f4f1c7ad-armv7`
-contain those per-case results. At `384de6c9` the AArch64 worker links in its order
-retrained from the same training operations.
-
-At `be0eff89`, `avc-bad-update` was the only AArch64 total RSS miss. Its median
-resident pages are 443 at entry and 459 at peak in Triergon, and 450 at
-entry and 451 at peak in FFmpeg. In three mapping snapshots per worker
-and marker, the candidate's resident executable text grows from 152 to
-216 KiB during the malformed update. The reference stays at 320 KiB.
-The separately collected mappings are in `framing-bad-update-mappings-be0eff89`.
-
-An earlier packet-framing comparison used the gate build at
-`f4f1c7ad1a4f2572e676f48f81ad15aa4e9ebdc5` on c6g.4xlarge.
-Both targets compare all 135 cases with 30 timing pairs of 50 operations on CPU 1
-and 30 kernel-bound memory pairs. The kept sets
-`packet-framing-f4f1c7ad-aarch64` and `packet-framing-f4f1c7ad-armv7`
-contain the per-case results. Both workers use the same input preparation and
-output fold. For `avc-width1`, median resident pages at entry are
-467 versus 450 on AArch64 and 346 versus 329 on ARMv7.
-
-The reference input adapter at `f40c8eb0` uses descriptor reads and bounded
-scratch storage. The earlier `f71495ea` adapter used stdio. In six first-write
-mapping snapshots per build for `avc-width1`, resident libc text at memory entry
-fell from 1088 to 896 KiB on AArch64 and from 756 to 634 KiB on ARMv7.
-Both reference workers rebuilt byte-identically from the same FFmpeg archives
-and compiler arguments. These diagnostic snapshots accompany the kernel-bound
-measurements in `packet-framing-reference-residency-f40c8eb0`.
-
-The earlier matched run at `62e1ad85` also had 0/131 lower total RSS on each
-target. Its two ARMv7 runtime misses, `hevc-irap_repeat` and `hevc-type19`, are
-within the ceiling at `f40c8eb0`. The comparisons at `6ce7109c` and
-`7707d776` used different adapter work on each side.
-
-At `64fc1b08` the ARMv7 total RSS bound tied at 1.0000 for `hevc-type23`,
-with 124/125 cases strictly lower. The tie cleared at `b3d01267`. The
-cause of the change in that case is unknown. The earlier AArch64
-result at `79e0ae13` had a worst runtime of 1.1849 and lower total RSS
-in 77/125 cases. The change to `b3d01267` spans the move to the
-c6g.4xlarge gate host and updates from main.
-
-The measured revisions include the earlier extension comparisons at
-`83993880` and the framing run at `2b997c87`. At `2b997c87`, ARMv7
-total RSS was lower in 125/131 cases and the worst bound was 1.0087.
-
-The MPEG-TS PES, program playback, progressive playback and HLS rows used the
-375-case gate build at `21c9eef2f08a11bb7bd1c457997095326f2bb42d` on a c8g.large pinned to CPU 1.
-All 375 cases passed parity, runtime, peak heap and total RSS with 30 timing
-pairs of 50 operations and 30 memory pairs under the kernel RSS proof.
-All five progressive functional inputs passed their ten outcomes. Each HLS
-video unit passes through `contiguous_feed` inside the measured operation.
-
-The progressive report comparison used the gate build at
-`ec6afe8635509d7e9007fd3d3c20ce2bf1c25835` on a c8g.large pinned to CPU 1.
-All three cases and ten functional outcomes passed with 30 timing pairs of 50
-operations and 30 memory pairs. Grading compact and self-contained reports
-gave the same results.
-
-The MPEG-TS access-unit comparison used the gate build at
-`230d1314464d34a04f5f2614298e5b7009292f0c` on a c8g.xlarge pinned to CPU 1.
-All 169 cases framed all tracks in the chosen program and passed parity, runtime,
-peak heap and total RSS with 30 timing pairs of 50 operations and 30 memory
-pairs under the kernel RSS proof.
-
-The raw Annex B results and the earlier Matroska audio clock comparison used the gate
-build at `b3579f729494a37a4dbebe03c475f7b38484046e` on a c8g.2xlarge pinned to CPU 1,
-with 30 timing pairs and 30 memory pairs under the kernel RSS proof.
-
-In the earlier audio clock comparison, `laced-fractional-cadence` reached 1.4510,
-`laced-unknown-duration` 1.4089, `two-laced-before-first-known-pts` 1.3968 and
-`damaged-lace-before-valid-anchor` 1.3878. Peak heap reached 1.822 on
-`no-absolute-anchor` and 1.321 on `dolby-bad-first`. Total RSS ranged from 1.038 to
-1.043 across all ten cases.
-
-The subtitle rows on Linux AArch64 used the gate build at
-`f263491102d307997d40d40826a6193d8468e87e` on a c8g.xlarge pinned to CPU 1, with 30 timing
-pairs of 50 operations and 30 memory pairs under the kernel RSS proof, graded by `cargo xtask
-grade` against `ffmpeg-subtitles-plain-native`. Its workers are byte-identical to those of
-`8513398b85d27aa093b8212c202b25c32da859bf`: the commit between
-changes only the memory runner, which since drops both workers' cached pages before every
-run. The closed caption rows come from a partial gate run of `subtitle-cc` at
-`6d5145d7f31b002c72f9815130b522964d2abb64`, one c6g.4xlarge per target from the gate images with
-evidence set `subtitle-cc-inputs` unpacked ([running the gates](quality.md#running-the-gates));
-their instruction counts are of whole `sub-trace` runs at `adaa4bc7`, before the video decoders
-moved onto the shared picture output model, which changed the model's field pair step but no
-caption output. Before the picture output model, the row used the gate build at
-`9d048c58fb30c64777f7230eb67c7037a1e1bcf1` on a c8g.xlarge in the same way, where the caption receiver reads `cc_data` as three-byte
-constructs and resolves the field once per packet; on all 205 cases its workers' traces and
-folds are byte-identical to those of `d37da04f`. On the eight `mpeg2-a53-limit` cases, which
-carry large `cc_data`, it executes 0.66 to 0.68 times the reference's instructions on
-AArch64, where `d37da04f` executed 1.58 to 1.64 times, and times at 0.5525 to 0.5724 on the
-c8g.xlarge. On a c6g.4xlarge (Graviton2), natively on AArch64, the same eight cases time at
-0.6272 to 0.6485 in 30 pairs, where `8513398b` gave them 1.3887 to 1.4481. The earlier rows were
-measured at `956c42961f4a27d88f96d5800d59ff1eeb088018` (PGS, closed captions and teletext),
-`03f3efd3a0fde0d558c68f5408c521d632802fb7` (PGS memory),
-`531e2d04ba7386513ff7afe7b44f53b2a93ca9dc` (DVD) and
-`0d70bebfc0799f65df14f170ed97e68c5a35daa7` (DVB). The text row used the gate build at
-`6126b759b9b983afe488c3c362c6e37c2d1425a2` on a c8g.xlarge, whose timing pairs are of 2,000
-operations. The 8 cases added to `subtitle-dvd`, `subtitle-pgs` and `subtitle-teletext` were
-first measured with the gate build at `c79ae2da8b8a0d004d37936100eedd7b46e0a589` on a c8g.xlarge pinned to CPU 1, with
-30 timing pairs and 30 memory pairs under the kernel RSS proof, run as a slice of each
-feature. `cargo xtask grade` does not join a slice with its feature's recorded runs, because
-the slice's contract differs from the registered feature's, so their per-case results come
-from each run's report. Their instruction counts run both workers from paths of equal length.
-These measurements, and the first instruction counts of the four features, are at `c79ae2da`.
-The review commit `821900952ba46678d07300ea7e4bb04ec517f324` was re-checked against main:
-the subtitle gates and worker traces on Linux AArch64 (every existing call identical), parity
-on ARMv7 (A32), and the instruction sums, 0.99996 (`subtitle-dvd`), 0.99991 (`subtitle-dvd-host`),
-0.99981 (`subtitle-pgs`), 0.99983 (`subtitle-pgs-capsules`) and 0.99266 (`subtitle-teletext`)
-of main's on Linux AArch64 and 0.99999, 0.99998, 0.99991 and 0.99753 on ARMv7 (A32), with no case
-above main beyond the run spread. The 13 `mov-text-tags` cases were first measured with the gate build at
-`96f660ba99fa33fbc1a2019cda9e73bec6de287d` on a c8g.xlarge pinned to CPU 1, with 30 timing
-pairs and 30 memory pairs under the kernel RSS proof, run as a slice of the feature.
-`cargo xtask grade` does not join the two runs, because the slice's contract differs from
-the registered feature's, so their per-case results come from each run's report.
-The DVB rows' 10 cases added at `aebbe582` were first measured the same way on a c8g.xlarge
-pinned to CPU 1, as a slice of `subtitle-dvb`, their instruction counts running both workers
-from paths of equal length.
-
-The ADTS AAC decoder can leave priming to a caller with an explicit container
-edit. The default still applies the encoder delay signature. The stereo and
-5.1 AAC-LC workloads were measured earlier with the gate build at `96232af7d9431c2285c6b6d248aa38a133b85fe3`
-on a c8g.large pinned to CPU 1, with 30 timing pairs and 30 memory pairs
-per case. Both matched the reference PCM within the decoder's numeric rules.
-The upper runtime bound was at most 0.7587, peak heap at most 0.7034, and
-total RSS at most 0.4219 of the reference.
-
-ISO BMFF open and index measurements use `cargo xtask isobmff-bench`, with
-`--subset52` selecting the 52-operation set. Packet framing uses `cargo xtask framing`.
-
-The ISO BMFF row used the gate build at `f99d893196908d562c897bccb20c6a972cd25d11`
-on a c8g.large pinned to CPU 1, 30 pairs. Runtime comes from the timing collection and
-memory from a separate collection under the kernel RSS bound; both are in the raw
-samples. This earlier run kept separate verdicts because its grader compared the
-process addresses in the reference diagnostics.
-
-The MP4 forward and range results used the gate build at
-`f5453ef9d88712777aa5b6383250875456e9f334` on a c8g.large pinned to CPU 1, with
-30 timing pairs of 50 complete operations and 30 memory pairs per case.
-All 46 forward and 51 range cases matched and passed runtime, peak heap and
-total RSS. Forward playback covers encoded edit projection with composition
-offsets, fragmented input and unknown movie duration. Three regular AAC cases
-cover priming, trailing trim and a fractional edit endpoint. The fragmented
-cases cover a priming edit with audio in the first or a later fragment, a
-recovered short first AAC packet and an edited MP3 track.
-
-Regular Opus cases cover edit-list trim, variable packet duration and secondary
-audio alignment on a backward video seek.
-The five source-roll cases compare the video landing, both audio ordinals and
-decoder preroll. Broader profile and FATE coverage remain pending.
-
-The earlier QuickTime AAC comparison uses the gate build at
-`907ac3dce61c98bd05f52bfa3ff92497efdd141d` on a c8g.large pinned to CPU 1.
-All three clips pass the accuracy, runtime, peak heap and total RSS gates,
-with 30 timing pairs of four complete decode sessions and 30 separate memory pairs.
-The reference and candidate both fold the complete planar float output in
-64-bit little-endian words.
-
-The expanded AAC comparison uses the gate build at
-`3d422610316d79665c80b48ab8a27a8a57880efe` on the same instance type and CPU,
-with 30 timing pairs of four complete decode sessions and 30 separate memory pairs
-per clip. All 25 clips pass speaker, PCM, runtime, peak heap and total RSS checks.
-The 64, 88.2 and 96 kHz stereo clips exceed the optimization target.
-
-The AAC program comparison uses the gate build at
-`fde36dd91d85ca700538421062ceacd45075c5b8` on the same instance type and CPU
-with 30 timing and 30 memory pairs per clip. The nine added program layouts
-match every PCM plane and ordered speaker. The decoder rejects overlapping
-speaker positions. All 34 clips pass delivery and 31 reach the runtime
-optimization target.
-
 The AAC Parametric Stereo decoder follows Purnhagen (DAFx 2004), Breebaart et al.
 (EURASIP JASP 2005) and 3GPP TS 26.405, with every table and rule they do not print
 recovered from FFmpeg 9.0.2's output by scripted probes
-([harness/codecs/aac/ps](../harness/codecs/aac/ps/README.md)). On AArch64 and on ARMv7
-the aac lane keeps its results (35/36, `aac-sce-in-stereo` as before) and the PS vectors
-stay within the numeric rules at a channel RMS of at most 2.2e-8 (`al_sbr_ps_04_new` from
-1.1e-6 to 1.7e-8). Three crafted streams of unrecovered paths are open cases
-([aac/ps-open-manifest.json](../harness/codecs/aac/ps-open-manifest.json)). Instruction
-counts against the previous decoder (perf stat totals): the PS vectors take 7 to 18 % fewer
-on AArch64 and 0.6 to 3.3 % fewer on ARMv7 (`thumbv7neon-unknown-linux-gnueabihf`); HE-AAC
-without PS and the frozen `aac-lc-5.1` and `aac-lc-stereo` workloads take at most as many
-as before on both, 0.014 % fewer at most, so the AAC timing rows measured before it held.
+([harness/codecs/aac/ps](../harness/codecs/aac/ps/README.md)).
 
-The downmix's conversion to s16 (`mix::to_s16`) also runs fewer instructions on AArch64,
-the codec gate target. There the floor was one `frintm`, but the loop clamped in `f32`,
-converted and clamped again, two samples at a time; the integer form folds the scale
-into a fixed-point `fcvtzs`, saturates with `sqsub` and narrows with `sqxtn`, four
-samples at a time. The gate build at `f0744418` against `b89e5844` on a c6g.4xlarge
-(`cargo xtask count`, median of three rounds) runs fewer instructions on every audio
-workload, while `b89e5844` against itself moves by at most 0.01%. The 577 decoder
-outputs are byte-identical and the conversion gives the floor's result for every
-`f32`, so the AArch64 codec timing rows measured before it held:
+On AArch64, the integer `mix::to_s16` (a fixed-point `fcvtzs`, saturated with `sqsub`
+and narrowed with `sqxtn`, four samples at a time) was counted at `f0744418` against
+`b89e5844` on a c6g.4xlarge (`cargo xtask count`, median of three rounds); the last
+column is `b89e5844` against itself. The 577 decoder outputs are byte-identical and the
+conversion gives the floor's result for every `f32`:
 
 | Workload | Instructions | Cycles | Instructions, main against main |
 |---|---:|---:|---:|
@@ -1109,8 +235,7 @@ The rasterising rows on Linux compare the gate build at
 features of `cargo xtask raster compare --all` and the SIMD diagnostic, with the font
 and shaping comparisons and the crate's tests, on a c7i.2xlarge (x86_64) and a
 c7g.2xlarge (AArch64), and the four features and the tests in the ARMv7 user space on
-a c6g.2xlarge. The 64-bit raw samples also hold the instruction counts and paired
-timing of the reference built with and without zeroed automatic variables.
+a c6g.2xlarge.
 
 The ASS rendering runtime and memory are graded against `libass-player-native`: libass linked as a
 player links it, none of its sources compiled into the worker, with
@@ -1123,204 +248,25 @@ libass's side copies the script inside its span. Both features are timed by the 
 runner that times the codecs and capture. Memory is measured under the `linux-glibc-v4`
 observer; font files libass maps during an operation count toward its total RSS.
 `ass-render-host` is timed and measured on ARMv7 only; on AArch64 its 4 cases are a
-deliberate divergence. Earlier, at `5b3e03f0e9410853152043d033b4f4d757e98a40` on a
-c6g.2xlarge, natively on AArch64 unpinned and in the ARMv7 user space pinned to CPU 1, with
-30 timing pairs and 30 memory pairs per case, graded together by `cargo xtask grade` after
-`cargo xtask ass compare --all` passed at the same commit on both targets, the median of the
-per-case medians over the 76 `ass-render` cases was 0.813 on AArch64 (5 cases above 1.0,
-the highest upper bound 1.0658) and 0.790 on ARMv7 (the highest upper bound 0.9427), and
-`ass-render-host` on ARMv7 had a worst upper bound of 0.8688, peak heap 0.614 and total RSS
-0.866.
+deliberate divergence.
 
-The ASS rendering rows at `eaff16ba` come from one partial gate run per target of the items
-the rasteriser reaches (`ass-render`, `ass-render-host`, `font-shape-raster-ass` and the
-tests) on two c6g.4xlarge hosts each, built and measured as the full runs at `1c64b775`. Every
-step passes on both targets but, on Linux AArch64, `ass-render-host`'s grade, on its contract's
-four listed open cases. At `1c64b775` the two `cache-keys` cases on Linux AArch64 ran fewer
-user-mode instructions than libass (0.91 to 0.92 of them) in more cycles: the last pass of the
-generic 16×16 tile fill, which turns each row's coverage into bytes, compiled to a scalar store
-per pixel where it is inlined, about a quarter of the fill's cycles and 6% of the case's,
-while libass's C fill is vectorised. That pass now maps each row as a whole array, which
-compiles to vector code on AArch64 and to the same code on ARMv7, and draws the same bytes. On
-Linux AArch64 `cache-keys-ass-720p` has a bound of 1.0256 (median 1.0241, from 1.0782) and
-`cache-keys-ass-1080p` 1.0118 (median 1.0094, from 1.0647), both stopped after 20 pairs; no
-case's median rose, the median of the case medians fell from 0.8096 to 0.7594, and 2 cases
-have a bound above 1.0, from 8. On ARMv7 the median of the case medians is 0.6081, against
-0.6076 at `1c64b775`, and the largest move of a median is `charmap-retry-ass-720p`'s, from
-0.6815 to 0.7008, a case whose own bound is 0.7881. Set `ass-cache-keys-stage-eaff16ba` holds
-the counts and cycle profiles of both renderer builds and libass on the `cache-keys` cases and
-the fold digests of every case from both builds, all identical; set
-`ass-render-ratios-eaff16ba` every case's runtime and memory bounds on both targets with the
-comparison against `1c64b775`; sets `gate-run-aarch64-eaff16ba-20261117-185337-shard-1` and
-`-2` and `gate-run-armv7-eaff16ba-20261117-190254-shard-1` and `-2` the outputs, build
-identities, plans, step records and logs.
+The font and shaping results at `69d4d0f8` come from a partial gate run
+(`font-shape-raster-ass`, `ass-render`, `ass-render-host`) on one c6g.4xlarge per target:
+every comparison passes but the open cases its contract lists. The reference matches every
+probe's ARMv7 record under `harness/fonts/probes` and `harness/shape/probes` on both
+targets, and the candidate matches the reference but for the three vector probes
+(`vectors-normalization`, `vectors-from-stack`, `projections`).
 
-The `ass-render` rows at `0e2366db` come from one partial gate run of that item per target on
-one c6g.4xlarge host each, built and measured as the full runs; every step passes on both
-targets. At `d66c90dd` the two `cache-keys` cases on Linux AArch64 still ran fewer user-mode
-cycles than libass in a longer timed span: about 190,000 calls per iteration of the outlined
-atomic helpers the default AArch64 target links (`__aarch64_ldadd8_relax` and the like), some
-7% of the renderer's cycles, where libass makes none. They came from the caches' bookkeeping:
-each insertion and cut locked the release log several times (21,000 locks per iteration),
-each lookup of a bitmap or a border copied its key's shared outline handle, a run's composite
-key copied its glyphs' bitmap keys, and each stroked border grew its outlines by doubling,
-every step a budget charge, and was then shrunk. A value now tells its cache it was let go
-only when the cache lent it, cut while held; the log says without a lock whether it holds
-records; lookups borrow their keys; a composite key takes its glyphs' keys; and the raster
-context strokes into a scratch shape it keeps and returns the border in storage of its exact
-size. Per iteration of `cache-keys-ass-720p` the helper calls fall to 100,000 (1,100 locks),
-user-mode instructions by 7.8% and cycles by 8.0%, and the timed span by 7.4%; every
-`ass-render` and `ass-render-host` fold is identical to the earlier build's, and
-`raster-worker` folds every required raster case identically, in up to 1.6% fewer
-user-mode instructions and at most 0.0001% more. On Linux AArch64 `cache-keys-ass-720p` has a bound of 0.9543 (median 0.9496,
-from 1.0241 at `eaff16ba`) and `cache-keys-ass-1080p` 0.9510 (median 0.9478, from 1.0094); no
-case has a bound above 1.0, the highest is `wrap-ass-720p`'s 0.9580, and the median of the
-case medians fell from 0.7594 to 0.7451. On ARMv7 the highest bound is 0.7839
-(`positioning-ass-1080p`) and the median of the case medians fell from 0.6081 to 0.5987. On
-either target no total RSS bound rose by more than 0.0010 and no heap bound by more than
-0.0019. Set `ass-cache-keys-stage-0e2366db` holds the counts, helper calls and cycle
-profiles of both builds and libass on the `cache-keys` cases, every fold from both builds and
-`raster-worker`'s counts; set `ass-render-ratios-0e2366db` every case's runtime and memory
-bounds on both targets with the comparison against `eaff16ba`; sets
-`gate-run-aarch64-0e2366db-20261121-072940-shard-1` and
-`gate-run-armv7-0e2366db-20261121-073050-shard-1` the outputs, build identities, plans, step
-records and logs. `ass-render-host` on ARMv7 was not run again; its row stays at `eaff16ba`.
+The generated-script and mutation counts in the ASS rendering row come from a
+frame-by-frame render of 5,722 generated scripts and fixture mutations at
+`3469d84e360ac2217d603effa4d1a9fd70a87ea1` on both targets, each against that target's
+libass build. Every case finished within libass's time limit.
 
-The shaping cases that need the interpreter (the corpus's Bitstream Vera, DejaVu Sans
-and Vera Latin, and the samples `c` with U+0308 and `x` with U+0301) were compared at
-`dc792ea4b25af0e64db6b73b47ce66dc89b6e045` against main at `51977abacdfe2e8086c124e37c0ad303168423f3` on the same host class and targets: `shape-libass` 209/209,
-`shape-text` 208/209 and `shape-text-all` 1,789/1,790 with every other feature as on main, and
-every `shape-libass` and `ass-render` case within main's instruction spread.
-
-The TrueType interpreter was compared at `218065d60fb7520fc5e636c8451b46a4d6bda61f` against main at
-`2886a3fd7b84392b75a98369e8426e0dd6f9edda` on a c6g.4xlarge, natively on AArch64 and on the ARMv7 Thumb-2 target, with
-`fonts compare --all`, `shape compare --all` and `ass compare --all`: no case fails that passes
-on main and every passing case folds as on main; `font-hinting-default` gains the 43 instructed
-TrueType files. Every `shape-libass` and `ass-render` case runs the same number of instructions as
-at `e110f29cb904c0a4f3925fc90a2d1a10a67aeff4` within that commit's own spread, so the `ass-render` runtime and kernel-bound memory
-collected at `e110f29cb904c0a4f3925fc90a2d1a10a67aeff4` on both targets stood for it. Against main,
-the two `hinted-extents` cases, whose glyphs are now hinted, run more instructions, and every case
-runs a fixed few hundred more at start-up (the interpreter's relocations). Its probes
-(`harness/fonts/probes`) are recorded on ARMv7.
-
-The font program's single run per face, the control value program's run at each size request,
-the default load at 26.6 heights 1000 and 640, zero pixels per em, each outline's orientation, the
-underline and strike-out fixtures and HarfBuzz's CFF and CFF2 extents were measured at `69d4d0f8` by
-a partial gate run (`font-shape-raster-ass`, `ass-render`, `ass-render-host`) on one c6g.4xlarge
-per target: every comparison passes but the open cases its contract lists, `shape-extents` 9/9
-among them, and `ass-render`'s 22
-new cases are within the runtime ceiling and lower than libass in peak heap and total RSS on both
-targets, `decorations-bands.ass` at 720p the highest in both (heap 0.9485 and total RSS 0.9971 on
-AArch64, 0.9754 and 0.9981 on ARMv7). The reference matches every probe's ARMv7 record under
-`harness/fonts/probes` and `harness/shape/probes` on both targets, and the candidate matches the
-reference but for the three vector probes (`vectors-normalization`, `vectors-from-stack`, `projections`).
-`random-3310` and `random-8005`, two generated scripts whose shaping reads hinted extents of
-instructed TrueType glyphs, render as libass does on both targets at `9d14e98c`.
-
-The auto-hinter's CJK writing system was compared at `204d212285ace2400a36774544188b687b06eff6`
-against main at `b78dd86f2eebb7417c758b0a5757500039d718bf` on a c6g.4xlarge, natively on AArch64
-and on the ARMv7 Thumb-2 target, with `fonts compare --all`, `shape compare --all` and
-`ass compare --all`: no case fails that passes on main and every passing case folds as on
-main; `font-hinting-default` gains DejaVuMathTeXGyre and `shape-libass` NotoEmoji's six cases.
-
-The font, shaping and ASS rendering comparisons on Linux compare `cc09ffa8f270f0bbbe2a5de0db4dbf3ffb45be03`
-with FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 on a c6g.2xlarge:
-`cargo xtask fonts compare`, `shape compare` and `ass compare` natively on AArch64 and in the ARMv7
-user space, each target with its own reference builds, with the rasterising features and the crates'
-tests on AArch64. The commits after it change only this file, the evidence index, and, merged
-from main, the check of the revisions this file cites. The same
-comparisons at `a1aa6f0e1981d07ce9d27efcdc5b6815839f5481`, before the FontMatrix was applied in
-32 bits and main's ASS renderer timing was merged, at
-`ec9a4f1627b2734efbd4134ceb86c3a71740815d`, before the linear advances and the FontMatrix's
-rounding and check followed 32-bit FreeType, and at `cf5c7504c077ff47ab5da521261e5c7a04046f16`, before
-the auto-hinter followed 32-bit FreeType's arithmetic and the CFF DICT readers its operand rules,
-gave the same results, with the xtask
-tests, clippy and rustfmt at `5061518644d081ede35891bfbfc21d5b6256e6c7`. The comparisons before the auto-hinter, at
-`b531944603a96d8fad9a1bb50e99cd538528280e`, `e551b607466657b4d604d8c107cad8735dd09e75` and, before the ASS renderer's latest changes,
-`43c12afaf83f69076d430d830c7f247e51881c3e`, have `font-hinting-none` 155/159,
-`font-hinting-default` 8/53 and `shape-libass` 193/201 with the other results the same; at the
-last, the archived first ARMv7 run has the FreeType reference timing out on one NotoSansCJK
-case of `font-hinting-none`, which its second run passes. The earlier comparisons at
-`8058a77c444958ba82dcf4b5783720fc9aafe66f`, `8786192bac7b0abea286ee999c8e03073a6ac796`,
-`944fd7cfc7712f505bd66e046afaa77f7eee6aac`, `a6e984526d20029e75b48650e9cc317f192da776`,
-`354f7d735ac22df3b63e7849eb5869488c087bd9`, `b5bc0d90f1e2427849e43b4c00d2f0ef15ce2506` and
-`8e137d8d5c4e6dbe76c5289a769242cea9beda2d` are kept for the steps between.
-
-The ASS rendering comparison on Linux runs `cargo xtask ass compare --all` and the crate's tests
-at `01ccb49792cf1d4d05b74addf35dc616763b88e0` with each target's libass build on an r6g.2xlarge,
-natively on AArch64 and in the ARMv7 user space; the pins recorded on each target are identical.
-The frame-by-frame run of 5,722 generated scripts and fixture mutations, which the remaining
-counts and causes come from, renders them at `3469d84e360ac2217d603effa4d1a9fd70a87ea1` on both
-targets; `01ccb497` changes only a fixture, its pins and a test. Every case finished within libass's
-time limit. The work-bound scripts' frames were timed on ARMv7 on one CPU of the
-idle host. Before these changes 1,497 generated scripts and 67 mutations differed against libass
-for AArch64 (`fedfb790bfb52131389cb7c5134bab7ab813b55f`), and 1,069 scripts and 38 mutations
-against libass for ARMv7 at `28e5ccf0ecb5419f7105d52c91ebe8d6c09f053c`, before the font work
-merged at `642316cf260e427f8d2044adc2253e427dd13d2a`; that earlier set also holds the replay of
-libass's collision sort, the conversions GCC compiles for each target, and libass for ARMv7
-against libass for AArch64 where it runs out of memory.
-
-The collision boxes' top-down merge sort was measured at
-`1d2ae4a0287972ac3402bd2e717e5b7fdaa086ff` on both targets:
-
-- Comparison: `cargo xtask ass compare --all` passes every gate, with `ass-render` 76/76, and the
-  crate's tests pass.
-- Generated scripts: against libass for AArch64 the same 115 scripts and 1 mutation differ.
-  Against libass for ARMv7 49 scripts and no mutation differ. The one fewer is `random-9675`,
-  one of the 4 where libass for ARMv7 departs near the end of its address space; in this run
-  libass renders it as the renderer does.
-- Equivalence with its parent (`cargo xtask ass equivalence --random 5182`): every frame alike
-  on AArch64. On ARMv7, 3 cases differ with each side on one thread in its own process, and 124
-  on 4 threads. Each is a frame that one side or both refuse for storage at the end of the
-  32-bit address space. The same build differs from itself in 128 and 131 such cases between
-  4 threads and one.
-- Instruction counts: every `ass-render` and `ass-render-host` case is within 0.02% of its
-  parent's.
-
-`collision-far-margins.ass` was added at `02e3a75a86bd5c22900d972c02055e23a37103ab`. There
-`cargo xtask ass compare --all` and the crate's tests give the results above on both targets,
-and libass for AArch64 and for ARMv7 record the same pins for every `ass-render` case. The
-merge sort with its first run rounded up instead renders that case's 1080p frames otherwise.
-
-The bidi resolver written from UAX #9 was measured at
-`81a17b4edf5e24611eab70ac1ddf9b3cf4c37603` on AArch64, against main at
-`8a3f711f8d014411ea64d5b8967367ac3aedbac1`:
-
-- Comparison: `cargo xtask shape compare` and `cargo xtask ass compare --all` give the
-  shaping and ASS results above, and the crates' tests, `cargo xtask shape ucd --check` and
-  rustdoc with `-D warnings` pass.
-- Conformance (`cargo xtask shape conformance`): Unicode 14.0.0's `BidiTest.txt` (770,241
-  cases) and `BidiCharacterTest.txt` (91,707) pass.
-- Generated texts against FriBidi, through both shape workers' dumps, 20 seeds of 50,000
-  lines: 3,000,000 simple shaping lines of Arabic letters of every joining type, marks,
-  joiners and formatting characters, 6,000,000 resolutions of deep-nesting lines of every
-  class, with bracket pairs, line starts and each base direction, and 1,500,000 such lines
-  through simple shaping, where a line may hold a paragraph separator, are all identical, as
-  they are through main's shape worker.
-- Equivalence with main (`cargo xtask ass equivalence --random 5182`): every frame alike
-  (5,674 cases, 229,509 frames). The peak storage is lower in 4,622 cases and higher in 981,
-  by at most 24,808 bytes (0.08%).
-- Instruction counts: no `shape-bidi`, `shape-simple` or `ass-render` case runs more than
-  main's; the sums are 10.1% lower for `shape-bidi`, 24.6% for `shape-simple` and 0.14% for
-  `ass-render`.
-
-On ARMv7, in the armhf user space, at the same commit: `cargo xtask shape compare` and
-`cargo xtask ass compare --all` give the shaping and ASS results above, both conformance files
-pass, and one seed of the generated texts (50,000 lines through each set and base direction) is
-identical to FriBidi. No `shape-bidi`, `shape-simple` or `ass-render` case runs more instructions
-than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` and 0.12% for
-`ass-render`.
-
-The container, playback, MPEG-TS, HLS and closed caption rows were checked again with the
-code-size change at `4fc96a499ecc1c1a8a6a23d11485123cc4e817a7`, linked before the link
-policy, on a c8g.2xlarge pinned to CPU 1: parity, 30 timing pairs and 30 kernel-bound memory pairs per case, graded with the
-module loaded; the release tests and the worker tests pass. Every case passes runtime and
-peak heap and is lower in total RSS. In that run, three cases had no valid memory
-observation: in one pair each of `tags-binary` and `track-disabled` (Matroska segment
-metadata) and `fate-witch-realtime` (closed captions), the kernel bound recorded an error
-while it observed the reference. Their memory was collected again, 30 pairs each, on
-another c8g.2xlarge with byte-identical workers and references: total RSS ≤0.9310, ≤0.9308
-and ≤0.7770, every observation valid. The worst upper bounds of runtime and total RSS:
+The container, playback, MPEG-TS, HLS and closed caption features were measured at
+`4fc96a499ecc1c1a8a6a23d11485123cc4e817a7`, linked before the link policy, on a
+c8g.2xlarge pinned to CPU 1, with 30 timing pairs and 30 kernel-bound memory pairs per
+case. Every case passed peak heap and was lower in total RSS. The worst upper bounds of
+runtime and total RSS:
 
 | Feature | Cases | Runtime | Total RSS |
 |---|---:|---:|---:|
@@ -1334,12 +280,6 @@ and ≤0.7770, every observation valid. The worst upper bounds of runtime and to
 | Matroska's six feature groups | 115 | 1.1312 | 0.9841 |
 | External HDR vector | 1 | 0.9783 | 0.8676 |
 | `subtitle-cc` | 201 | 0.5290 | 0.7773 |
-
-`subtitle-cc` then had 201 cases and four open `hevc-eos-ts` cases; its rows have since been
-measured again. The ISO BMFF worker, and every
-reference worker, are byte-identical to those of `4dbbd545d2d452220cd0e35ff11807f6c2fd2703`,
-measured the same way on the same host: ISO BMFF passes all 972 outputs (runtime ≤0.8972,
-peak heap ≤0.316, total RSS ≤0.7433, all lower).
 
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
@@ -1370,6 +310,12 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Full gate run, ARMv7, shard 8 of 8 | `5b8dd88fde60314257060bf7f594d1886812219d` | [`8b98600c1057fe6f025b4835b560cf30936987bb59be2b6defa289fe058cee85`](../harness/evidence/sets/gate-run-armv7-5b8dd88f-20261121-085846-shard-8.json) |
 | AAC in MOV, ARMv7 | `5b8dd88fde60314257060bf7f594d1886812219d` | [`d41dcd07c77d98b3e036ca752d5a9de348e87f77f55fe62457abebaaae5b82c4`](../harness/evidence/sets/aac-access-units-5b8dd88f-armv7.json) |
 | Subtitles, DVB and workspace tests, partial gate run, ARMv7 | `fa7e4621bc8717bab7b75a4a9c2b0a078d34557c` | [`eb1d42b3994493e10615a3214061bbf96828c4a562e4a49b3695cc8e685c62ed`](../harness/evidence/sets/gate-run-armv7-fa7e4621-20261121-125820-shard-1.json) |
+| MPEG-TS and framing regressions, part 1, Linux AArch64 | `6a43f20bbf94a52514caae4034f2a2cc09c74fdb` | [`63258f960ec833225c04f71397692052fb28088125a56bbae3120940b92bd932`](../harness/evidence/sets/gate-run-aarch64-6a43f20b-20261121-164146-shard-1.json) |
+| MPEG-TS and framing regressions, part 2, Linux AArch64 | `6a43f20bbf94a52514caae4034f2a2cc09c74fdb` | [`636bdd78c4db2f6d07a239e4e690b2eb5ae36eb3c772686980d735d27e648cb5`](../harness/evidence/sets/gate-run-aarch64-6a43f20b-20261121-164146-shard-2.json) |
+| MPEG-TS DTS core discovery, Linux AArch64 | `9f0fca339f1ed5c804b8078b92d6f5f4713d4cc2` | [`d17505cdcb5becfef3b22a9ba1829c1de2885e6a3bf8d127650c13a944b1d8df`](../harness/evidence/sets/gate-run-aarch64-9f0fca33-20261121-170345-shard-1.json) |
+| MPEG-TS and framing regressions, part 1, 32-bit ARMv7 | `6a43f20bbf94a52514caae4034f2a2cc09c74fdb` | [`23c224643e34ea086133420f1a858e2efb1954243ceaa46f0320bb9291e81ddc`](../harness/evidence/sets/gate-run-armv7-6a43f20b-20261121-164144-shard-1.json) |
+| MPEG-TS and framing regressions, part 2, 32-bit ARMv7 | `6a43f20bbf94a52514caae4034f2a2cc09c74fdb` | [`085bbd0af9ee7bd36a3249dc58fb07aae08a7c38acecab2860148209c54700c9`](../harness/evidence/sets/gate-run-armv7-6a43f20b-20261121-164144-shard-2.json) |
+| MPEG-TS DTS core discovery, 32-bit ARMv7 | `9f0fca339f1ed5c804b8078b92d6f5f4713d4cc2` | [`c628b846f063ca9b8834ee94680781823735504757c8f875b0a2bb4d6bbcd109`](../harness/evidence/sets/gate-run-armv7-9f0fca33-20261121-170343-shard-1.json) |
 | MPEG-TS carriage, seeking and packet framing, Linux AArch64 | `f1fabdc3007bcb0f4c8e67513cc2467f117e7a17` | [`bc72513ce5633bfc8f90ec399aadd6800a94d14b2ca93bde6286fb60a3473662`](../harness/evidence/sets/gate-run-aarch64-f1fabdc3-20261121-122538-shard-1.json) |
 | MPEG-TS carriage, seeking and packet framing, 32-bit ARMv7 | `f1fabdc3007bcb0f4c8e67513cc2467f117e7a17` | [`dfc9af54bcac2ada0061455341aa7bdcaa563942c7b3c7e0d1e4b85ecb3f4a5d`](../harness/evidence/sets/gate-run-armv7-f1fabdc3-20261121-122538-shard-1.json) |
 | MPEG-TS expanded seeking and packet framing, Linux AArch64 | `964b36cbaae627396b4ce46d2817eb9a3d2902e2` | [`fe988bbd9345bff6926f6aa3dd39224843839e337dd4cf57ff017d29e541fecd`](../harness/evidence/sets/gate-run-aarch64-964b36cb-20261121-142623-shard-1.json) |
@@ -1531,6 +477,10 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Playback with HEVC parameter-set repeats, Linux AArch64, shard 2 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`2ab05fbb4a99c88d03cec697104d3360ee92dd45f398fcb8949a2c3e17125d4b`](../harness/evidence/sets/gate-run-aarch64-6bbb2cb7-20261118-104943-shard-2.json) |
 | Playback with HEVC parameter-set repeats, ARMv7, shard 1 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`caa758a1e3348d4fccfdca6414ac504a39e8457a5fce1774402dce5bc645889e`](../harness/evidence/sets/gate-run-armv7-6bbb2cb7-20261118-105014-shard-1.json) |
 | Playback with HEVC parameter-set repeats, ARMv7, shard 2 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`43ee65711daba9295f1f963771cd120531eace54aba94b9032e08fb06232b470`](../harness/evidence/sets/gate-run-armv7-6bbb2cb7-20261118-105014-shard-2.json) |
+| MPEG-TS progressive playback, Linux AArch64 | `6de1193fbc8dd0676d09cd4ee36cf295cec84b9a` | [`aa36b628d6313a7cfd91c1fffa5c5274ed0abbbf12d66df114263ab74587f491`](../harness/evidence/sets/gate-run-aarch64-6de1193f-20261121-153915-shard-1.json) |
+| MPEG-TS progressive playback, 32-bit ARMv7 | `6de1193fbc8dd0676d09cd4ee36cf295cec84b9a` | [`bbbe4c4f68b2a336887321d5b696defea3adf6f6a90935925e4f0381a3fb0f70`](../harness/evidence/sets/gate-run-armv7-6de1193f-20261121-154133-shard-1.json) |
+| Earlier: MPEG-TS progressive playback, Linux AArch64 | `4ec296c5c0be3cc519864de8d8d1b1e1b91132ee` | [`0e2e9af49367f7788036fa6eee4155b65fc060cad5bbf9e1ad94e9bd98f409cf`](../harness/evidence/sets/gate-run-aarch64-4ec296c5-20261121-145820-shard-1.json) |
+| Earlier: MPEG-TS progressive playback, 32-bit ARMv7 | `4ec296c5c0be3cc519864de8d8d1b1e1b91132ee` | [`092a96ab91474982207b7db3adf02862aff0557b4bb1a98a0ed5a9a1bdd3f4d0`](../harness/evidence/sets/gate-run-armv7-4ec296c5-20261121-145957-shard-1.json) |
 | Packet framing, Linux AArch64 | `c2bffebc3d7e2d6a0443119e1cfbdeff6b4d89cb` | [`b0395c11d63e47794ed80fe28403a2ef6693bfe161f363fa16b05e2b8595ff50`](../harness/evidence/sets/gate-run-aarch64-c2bffebc-20261121-080236-shard-1.json) |
 | Packet framing, 32-bit ARMv7 | `c2bffebc3d7e2d6a0443119e1cfbdeff6b4d89cb` | [`8ffa541c814f6a70d3eb0a78c42977886652e1b5a9284b24a1ba5793525b2908`](../harness/evidence/sets/gate-run-armv7-c2bffebc-20261121-080056-shard-1.json) |
 | Earlier: Packet framing, Linux AArch64 | `5ee3eba8ad5563ee1ccccbfdd0e9a4c023133c65` | [`13656a6d64cd61a8bb2dd23dc35acbc48ee09e53a304f3ed03bd348a3a85517e`](../harness/evidence/sets/gate-run-aarch64-5ee3eba8-20261121-011442-shard-1.json) |
@@ -2161,6 +1111,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | MPEG-TS | 97/97 compat-view operations (`mpegts-pes`) | 0.86632 (97/97 pass) at `f1fabdc3` | heap ≤0.09018, total RSS ≤0.80430 (97/97 lower, kernel-bound) at `f1fabdc3` |
 | MPEG-TS access units | 179/179 transport compatibility folds (`mpegts-access-units`) at `c1ace6c8` | 0.9643 at `c1ace6c8` (179/179 pass, worst `au-dvb-eac3-32000`) | heap ≤0.1628, total RSS ≤0.8694 at `c1ace6c8` (179/179 lower) |
 | MPEG-TS DTS core | 6/6 authored packet folds in the [DTS core comparison](../harness/features/mpegts-dts-core/contract.json) and all 253 packets in the [FATE DTS transport](../harness/features/mpegts-dts-legacy/contract.json) | 0.55412 (7/7 pass) at `f1fabdc3` | heap ≤0.08498, total RSS ≤0.94704 (7/7 lower, kernel-bound) at `f1fabdc3` |
+| MPEG-TS DTS core discovery | 7/7 admission and refusal folds ([contract](../harness/features/mpegts-dts-discovery/contract.json)) | 0.316605 (7/7 pass) at `9f0fca33` | heap ≤0.112275, total RSS ≤0.847619 (7/7 lower, kernel-bound) at `9f0fca33` |
 | MPEG-TS free-format audio | 8/8 frame folds (`mpegts-free-audio`) | 0.90719 (8/8 pass) at `f1fabdc3` | heap ≤0.08004, total RSS ≤0.71760 (8/8 lower, kernel-bound) at `f1fabdc3` |
 | MPEG-TS previous picture | 4/4 landing, discard and packet folds (`mpegts-previous-picture`) | 0.50057 (4/4 pass) at `f1fabdc3` | heap ≤0.49031, total RSS ≤0.77382 (4/4 lower, kernel-bound) at `f1fabdc3` |
 | MPEG-TS previous audio | 4/4 landing, discard and packet folds (`mpegts-previous-audio`) | 0.29462 (4/4 pass) at `f1fabdc3` | heap ≤0.15269, total RSS ≤0.79411 (4/4 lower, kernel-bound) at `f1fabdc3` |
@@ -2178,7 +1129,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | MPEG-TS core-bearing XLL seek | 12/12 coded packet suffix folds in the [DTS seek comparison](../harness/features/mpegts-dts-seek/contract.json) | 0.324092 (12/12 pass) at `964b36cb` | heap ≤0.209783, total RSS ≤0.914034 (12/12 lower, kernel-bound) at `964b36cb` |
 | MPEG-TS M2TS physical restart | 2/2 repeated audio seek folds in the [audio seek comparison](../harness/features/mpegts-previous-audio/contract.json) | 0.843447 (2/2 pass) at `964b36cb` | heap ≤0.293190, total RSS ≤0.795987 (2/2 lower, kernel-bound) at `964b36cb` |
 | MPEG-TS ordered-entity epoch seek | 28/28 additional [picture folds](../harness/features/mpegts-previous-picture/contract.json), including equal-time landings across entities | 0.357042 (28/28 pass) at `964b36cb` | heap ≤0.038390, total RSS ≤0.666035 (28/28 lower, kernel-bound) at `964b36cb` |
-| MPEG-TS progressive playback | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 0.7550 (3/3 pass, worst `reordered-48000`) | heap ≤0.0154, total RSS ≤0.6667 (3/3 lower) |
+| MPEG-TS progressive playback | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 0.7312 at `6de1193f` (3/3 pass, worst `reordered-48000`) | heap ≤0.0154, total RSS ≤0.6647 (3/3 lower) at `6de1193f` |
 | Playback: MP4 forward | 46/46 packet folds (`mp4-forward`) | 0.9089 (51/51 pass, worst `progressive-ten-sequential-batches`) | heap ≤0.5920, total RSS ≤0.8879 (51/51 lower) |
 | Playback: MP4 range | 51/51 open and backward-seek comparisons (`mp4-range`) | 0.9772 (64/64 pass, worst `fragmented-before-sync`) | heap ≤0.7849, total RSS ≤0.8800 (64/64 lower) |
 | Playback: TS program | 35/35 packet folds (`ts-program`) | 0.7635 (35/35 pass, worst `entry-hevc-aac-44100-00`) | heap ≤0.1179, total RSS ≤0.8266 (35/35 lower) |
@@ -2201,38 +1152,6 @@ caption and teletext rows are timed and measured against `ffmpeg-subtitles-plain
 the subtitles reference built without the wrappers that flag target-dependent results, so
 no flagging code runs in the reference's timed span or memory window.
 
-At `3df7ae6d` the total RSS gate failed in three subtitle features, in the cases above the
-reference. The four `mpeg2-a53-limit-ts` captions were above it in all 120 of their pairs
-(1.0720 to 1.0822): the candidate started the operation with about 1,223 resident pages for
-the transport stream, against about 838 for the same video as an elementary stream, and grew
-by 8 to 22 pages; the reference started with about 1,157 and 1,090 and did not grow.
-Preparation read the transport stream's whole video stream (1.57 MB of PES payload) into
-memory before extracting its captions. It now extracts them as the packets are cut, as it
-does for the elementary stream: at `4dbbd545` the transport stream case starts the
-operation with 857 resident pages, against 1,207 before and 853 for the elementary stream,
-and at `4fc96a49` the four cases
-measure 0.7784 to 0.7882 and all eight `mpeg2-a53-limit` cases at most 0.7984. The text case
-`charset-cp950-nomapping-a240` (1.0045) and the PGS case `long-movie-mkv` (1.0051) are above
-it in 9 and 16 of their 30 pairs; their median peaks are within 16 pages of the reference's
-(534 against 550, and 1,680 against 1,677). Collected again alone, 30 pairs each on the same
-host from an empty page cache, they give 0.9752 (above in 3 pairs) and 1.0012 (above in 8);
-the host reclaimed no memory during either collection. At `4fc96a49`, collected after the
-closed captions on the third host, they give 0.9713 (above in 4 pairs) and 0.9908 (above in
-3). The causes are not established; the raw samples of `3df7ae6d` and `4fc96a49` hold all
-three collections. At `79e0ae13` both features are lower than the reference in total RSS in
-every case. At `a73350ca` the four `long-movie` PGS cases are above it on both targets:
-total RSS 1.1903 to 1.4305 on Linux AArch64 and 1.3049 to 1.5305 here, with heap at most
-0.9563 and no memory reclaimed on either host during the collections. The reference's
-figures were unchanged; the worker started the operation with about 3.8 MB more resident
-memory (10.0 to 10.4 MB against 6.2 to 6.7 MB at `79e0ae13` on Linux AArch64), one
-allocation more per packet. Every timed and measured run had begun to report the prepared
-packets' input digest, and the PGS worker worked it out from its `sub-input` view, which
-copies every packet payload out of the pool and was kept for the rest of the process: a
-second copy of the 3.77 MB input. The worker now folds the digest from the packets' clocks
-(`99f1027b`), its output unchanged, and starts the operation with 6.3 to 6.9 MB on Linux
-AArch64 and 5.7 to 6.3 MB here. All four cases are lower again on both targets: 0.7723 to
-0.9596 on Linux AArch64 and 0.8450 to 0.9926 here.
-
 The DVD decoder gives the numbers of a VobSub configuration and of the `palette` option the
 values observed in FFmpeg built for ARMv7: a colour list's numbers (the `palette` option and
 a `palette:` line) wrap modulo 2³², and one beyond 32 bits is white (`0xffffff`); a `size:`
@@ -2247,16 +1166,10 @@ and the cases `vobsub-idx-size-beyond-32-bits`, `vobsub-idx-size-negative-beyond
 and `vobsub-idx-delay-beyond-32-bits`; its fifth, `vobsub-idx-size-int-min`, both targets
 refuse. A decoder that refuses to open is a result both workers fold and compare.
 
-At `f4f1c7ad`, the ARMv7 packet-framing runtime bounds exceed the ceiling
-for `hevc-type17` (1.2422) and `hevc-irap_repeat` (1.2689). Their paired
-medians are 1.1090 and 1.1972. The slowest relative pairs took 4541 ns
-and 6638 ns per operation in Triergon versus medians of 3448 ns and
-5790 ns. The reference times in those pairs are close to its medians.
-The source of the variation is unresolved. The ARMv7 runtime bound for
-`hevc-update` fell from 1.2106 at `f40c8eb0` to 1.1359 at `f4f1c7ad`.
-
-Median ARMv7 time in ns per operation (Triergon / FFmpeg) on the same
-c6g.4xlarge class and image:
+Median ARMv7 packet-framing time in ns per operation (Triergon / FFmpeg) on a
+c6g.4xlarge from the gate image, for the three HEVC cases whose runtime bounds were above
+the ceiling at `f4f1c7ad`. The run at main `f71495ea` used 20 pairs for `hevc-type17` and
+`hevc-update` and 30 for `hevc-irap_repeat`; the later runs used 30 for each:
 
 | Case | Main `f71495ea` | `62e1ad85` | `f4f1c7ad` |
 |---|---:|---:|---:|
@@ -2264,251 +1177,16 @@ c6g.4xlarge class and image:
 | `hevc-irap_repeat` | 7364.49 / 7036.05 | 5902.78 / 4842.78 | 5789.83 / 4848.21 |
 | `hevc-update` | 6139.05 / 6228.57 | 5100.73 / 4440.64 | 5044.14 / 4477.17 |
 
-Triergon's medians fell in all three cases. The reference's fell by more
-after the timed adapter adopted the matched fold and reused empty packet
-shells. The library and filter calls are unchanged. The earlier reference
-run at `f71495ea` used 20 pairs for `hevc-type17` and `hevc-update` and
-30 pairs for `hevc-irap_repeat`. Both later runs used 30 pairs for each.
+The reference's medians fell by more than Triergon's after its timed adapter adopted the
+matched fold and reused empty packet shells; the library and filter calls are unchanged.
 
-Five of MP4 range's 51 cases also exceed the ceiling on ARMv7, with a worst
-bound of 1.2241. MP4 range is gated on
-Linux AArch64 only. The closest below it is MP4 forward 1.0811. Capture's worst
-bound on ARMv7 at `e5f6c971` is 1.0427. At `f8e1c4d9` Matroska's worst bound
-is 0.9708 and DVD's is 0.9752.
-Each feature's evidence set lists every case's bound.
-
-The AAC decoder takes 4.8 to 30.3% fewer user-mode instructions on this target at
-`4213d042` than at `e43f7a4f` (`perf stat` on CPU 1). LLVM emits no NEON float instruction
-for the gate target, for plain loops, `f32::algebraic_*` operations and explicit
-four-lane arrays alike, and 32-bit ARM has no post-incrementing float load, so the
-changes keep sums in registers, read float streams in blocks with immediate offsets, drop
-copies and per-band table lookups, and compute the SBR QMF analysis as a fold and two
-32-point DCT-IVs. Only that last change moves the output: SBR output changes at rounding
-level, and no aac lane vector's error against FFmpeg grows by more than 1.74 times
-(`al_sbr_cm_48_5.1`, 10% of its limit). Its gated AAC cases pass with room: `aac-lc-5.1`
-0.9635 and `aac-lc-stereo` 0.9158, against 1.1622 and 1.0065 at `a73350ca`, and AAC in MOV
-1.0062, against 1.1105. The three HE-AAC workloads stayed open at that revision, at 1.2875 to
-1.2933, from 1.6507 to 1.7985. FFmpeg's ARMv7 build runs SBR's QMF windowing, subband
-shuffles, HF generation, gain filtering and noise and its s16 conversion as NEON code, 19.6%
-of its cycles on `aac-he-stereo`; the decoder ran that work scalar, and the QMF synthesis
-alone took 21.7% of its cycles. On Linux AArch64 the same changes take 3.1 to 10.7% of the AAC
-workloads' instructions away. Evidence sets `aac-thumb2-speed-armv7` and
-`aac-thumb2-speed-aarch64` hold the counts of every commit, the profiles, the grades and
-the code-shape probes.
-
-The codec bounds are gated on this target. At `f9fd4030` and `906d0a36`, all 20 workloads of
-`workloads.json` and all 10 of `file-workloads.json` are within the ceiling. The three
-HE-AAC workloads reached it, from 1.2853 to 1.3037 at `c68c9667` to 1.0498 to 1.0731, when
-the SBR QMF banks' windowing and subband shuffles were written with `std::simd`
-(codec-aac's `simd` feature, which the gate build enables with the pinned nightly for the
-AAC decode path only). LLVM emits NEON code for those four-lane forms, where it emits none
-for the scalar loops, and the decoder takes 21 to 24% fewer user-mode instructions and 17
-to 19% fewer cycles on these workloads. Each lane does the scalar code's operations in the
-same order: the 39 AAC vectors and the timing workloads decode byte-identically to the
-scalar build on this target, and the workloads on Linux AArch64, where the same change
-takes 6 to 8% of the instructions away. A vector form of HF generation's patch loop,
-assembled lane by lane, was slower on both targets and stays scalar.
-
-At `81edf4c0` the three HE-AAC workloads measure 1.0032 (`aac-he-stereo`), 1.0163
-(`aac-hev2-stereo`) and 1.0182 (`aac-he-5.1`), from 1.0647, 1.0751 and 1.0510 at `906d0a36`.
-Each timing stopped after 20 pairs on the ceiling then in force, its upper bound already below
-the later [ceiling](quality.md#gates) of 1.05. A
-stage account at `2a6a07a7` named three items the reference runs as NEON code and the
-decoder ran scalar: the device path's s16 conversion (about 6% of the cycles of both stereo
-workloads, against 0.5% in FFmpeg's NEON conversion), the covariance sums of HF generation
-(about 3.5% of `aac-he-stereo`, three times the reference's, and summed again for every
-patch that shares a source band) and on HE-AAC v2 the Parametric Stereo
-hybrid filters (about 4.5%). The stereo pass-through of `triergon_session::mix` now converts
-from the samples' bits with integer operations, which LLVM vectorises for this target; each
-source band's predictor is computed once a frame; and with codec-aac's `simd` feature the
-covariances of four source bands, and the hybrid filters of four slots, are summed per
-vector, each lane in the scalar code's order. Against `2a6a07a7` the gate build takes 4.6%
-fewer user-mode instructions and 5.5% fewer cycles on `aac-he-stereo`, 7.3% and 5.6% on
-`aac-hev2-stereo` and 1.6% and 2.6% on `aac-he-5.1`; the other decoders' stereo workloads,
-which pass through the same conversion, take 2 to 9% fewer cycles. Output is
-unchanged: the workloads' digests, and every aac-lane vector decoded by the AAC decode
-example at `2a6a07a7` and `9d70b166`, are byte-identical on both targets. Linux AArch64
-keeps the floating-point conversion; there the HE-AAC workloads take 0.7 to 2.9% fewer
-cycles.
-
-The other decoders' multichannel workloads run as many instructions as at `2a6a07a7`, with
-cycles from 2.4% fewer (DTS) to 4% more (`ac3-4.0`, `eac3-7.1`, `vorbis-q3-5.1`): their code
-is unchanged, and where it lies in the codec worker, linked without a trained order, moved.
-On `vorbis-q3-5.1` the extra cycles are in the shared inverse MDCT. Their bounds at `81edf4c0`
-(`vorbis-q3-5.1` 0.9904, `eac3-7.1` 0.9622, `ac3-5.1-448` 0.9206) are those of `f9fd4030`
-(0.9877, 0.9607, 0.9186), against 0.9544, 0.9283 and 0.8943 at `906d0a36`. Evidence sets
-`aac-sbr-ps-simd-armv7` and `aac-sbr-ps-simd-aarch64` hold the stage account, the counts of
-every commit, the profiles, a quick timing round, the tests and the byte-for-byte check;
-`codec-worker-placement-armv7` holds the other decoders' counts and profiles.
-
-At `2d82a042` the three HE-AAC workloads measure 0.8951 (`aac-he-stereo`), 0.9276
-(`aac-hev2-stereo`) and 0.9015 (`aac-he-5.1`) on this target, from 1.0032, 1.0167 and 1.0194 at
-`546045db`. A profile of the gate build at `b78dab15` against the reference put 35 to 44% of
-the HE-AAC cycles in the DCT-IV that both the SBR QMF banks and the IMDCT compute through a
-complex FFT, all of it scalar code here, and 5.6 to 6.1% in `memset`, against 2.7 to 3.2% in
-FFmpeg. With codec-aac's `simd` feature the DCT-IV's pre-twiddle, radix-4 stages,
-post-twiddle and last radix-2 stage now run as four-lane vectors, each lane doing the
-scalar code's operations in its order; the bit-reversed gather into the first radix-4 stage
-stays scalar. The `memset` calls came from scratch the decoder zeroed and then wrote over:
-the QMF analysis buffer of every slot, the smoothed gains of every HF adjustment slot, the
-prediction coefficients, the covariance kernel's transposed band and the Parametric Stereo
-decorrelator's buffers. Against `b78dab15` the gate build takes 7.5 to 8.1% fewer cycles on
-the HE-AAC workloads from the vector forms and another 0.4 to 2.1% from the scratch, 12 to
-13% fewer on the AAC-LC workloads; on Linux AArch64 the HE-AAC workloads take 5.4 to 6.3%
-fewer cycles and the AAC-LC ones 1.8 to 2.4%. Output is unchanged: the workloads' digests,
-and the 39 aac-lane vectors decoded by the AAC decode example with and without `simd`, are
-byte-identical to `b78dab15` on both targets. The stable codec worker runs the same
-instructions as at `e9596487` on every other codec and file workload on both targets, and the
-playback workers are byte-identical. Evidence sets `aac-dct-simd-armv7` and
-`aac-dct-simd-aarch64` hold the counts, the profiles, the callers of `memset`, the tests and
-the byte-for-byte check, and `gate-run-TARGET-2d82a042-*` the gate runs.
-
-The nightly builds the video decoders slower on this target, so the rest of the codec
-worker stays on stable. At `7f32411b`, with the whole codec worker built by the nightly,
-the six video workloads measured 0.6298 to 1.1694 (`h264-high-1080p` 1.1694), against 0.6044
-to 1.1198 at `c68c9667`; at `f9fd4030`, with only `codec-aac-worker` on the nightly, they
-measure 0.5995 to 1.1344. On Linux AArch64, `h264-high-1080p` measured 0.9835 at
-`c68c9667`, 0.9696 at `7f32411b`, 0.9735 at `f9fd4030` and 0.9774 at `906d0a36`.
-
-`h264-high-1080p` measures 1.0397 at `906d0a36`, from 1.1344 at `f9fd4030`. At `256aa348` the
-decoder spent 7.5% of its cycles on this workload in the integer division routines
-(`__aeabi_uidiv` and its kin), which stand in for the divide instruction the ARMv7 baseline
-lacks: the slice loop, neighbour derivation, deblocking and the co-located lookup split
-macroblock addresses by the picture width, and the neighbour location took `% maxW`. Those
-splits now multiply by ceil(2^31 / width) and shift (`triergon_codec::Divisor`, exact for
-every address the parameter sets allow), and xW and yW take a mask. The decoder takes 4.5%
-fewer user-mode instructions and 8.6% fewer cycles on `h264-high-1080p` and
-`h264-main-1920x800`, and 8.0% fewer cycles on `h264-high-720p`; on Linux AArch64, which
-divides in hardware, instructions rise 0.03 to 0.11% and cycles fall 0.4 to 0.8%. Output is
-unchanged. The largest decoder item left is bi-prediction (`weight_bi`, 9.6% of cycles),
-whose cost is loads from the reference frames; the reference spends under 1.5% there.
-Evidence set `h264-division-7c534afb` holds the stage account, counts and profiles.
-
-`h264-high-1080p` measures 0.9935 (median 0.9889) at `fc65d9fc`, from 1.0311 at `546045db` and
-1.0087 at `2d82a042` with the same H.264 code.
-At `b78dab15` the workload took 9.910G user-mode instructions and 5.157G cycles, the
-reference 11.129G and 5.145G; the decoder's share, without the harness digest and the RGBA
-conversion, was about 3.7G cycles against the reference's 2.2G. The code generator
-vectorises loops over 16 byte lanes on this target and none over 8 or 4, so the averaging
-and weighting of bi-predicted blocks narrower than 16 samples and every chroma
-interpolation ran as scalar code; deblocking took 13% of the cycles, the reference 7%, and
-wrote back every filtered edge although 56% of luma edges and 77% of chroma edges changed
-no sample. Narrow bi-predicted blocks now combine 16 samples at a time over their rows laid
-end to end in scratch (on 32-bit ARM only: on Linux AArch64 the copies cost more than they
-save), chroma interpolation runs one loop over a block's gathered rows, deblocking filters
-both chroma planes of an edge in one 16-lane pass and writes back only changed edges, a
-table replaces the division of implicit weights and temporal direct prediction, and the
-same-size RGBA conversion clamps before its halving shift. Against main `6ed706b8`, the
-decoder takes 4.7% fewer instructions and 4.1% fewer cycles on `h264-high-1080p`, 4.6% and
-4.6% on `h264-main-1920x800`, and 0.9% and 1.1% on `h264-high-720p`, whose time the RGBA
-scaler dominates; on Linux AArch64, 2.2%, 2.4% and 0.8% fewer instructions and 0.4 to 0.9%
-fewer cycles. The HEVC and audio workloads run the same instructions on both targets, but
-for `hevc-main-1080p` on ARMv7 (0.7% fewer, the RGBA conversion). Output is unchanged.
-Reference-frame loads remain the largest decoder cost: the decoder refills L1 39M times on
-this workload, the reference 22M. Evidence set `h264-narrow-arm-fc65d9fc` holds the
-profiles, loop-shape probes, counts and tests.
-
-`h264-high-1080p` measures 0.9837 (median 0.9807) at `d1526aa0`. At main `41031255`, 10.4% of
-the workload's cycles went to the CABAC decision, whose 9-bit offset and look-ahead lived in
-a 64-bit register: on this target each 64-bit shift by a variable amount is 11 instructions
-and each comparison two. The arithmetic decoder now keeps them in a 32-bit word on 32-bit
-targets, refilled to capacity from the stream's bit position, and the deblocking filter takes
-an inter macroblock's uniform-motion summary when the macroblock decodes instead of a row
-later, when its motion has left the cache. Against `41031255` the decoder takes 3.2% fewer
-instructions and 2.8% fewer cycles on `h264-high-1080p`, 3.1% and 1.9% on
-`h264-main-1920x800`, and 3.2% and 2.1% on `hevc-main-1080p`, whose CABAC shares the engine;
-the audio workloads run the same instructions, and on Linux AArch64, which keeps the 64-bit
-register, the H.264 workloads take within 0.04% of main's instructions. Output is unchanged.
-Evidence set `h264-cabac32-d1526aa0` holds the profile, counts and tests.
-
-The MP4 forward case `progressive-ten-sequential-batches` (a front `moov` and ten
-`moof`/`mdat` pairs of three packets) measures 0.9013 (95% 0.8945 to 0.9100) at `419a8493`,
-from 1.0573 (1.0418 to 1.0671) at `1c64b775`. At `2a6a07a7` an operation took 565.6K
-user-mode instructions and 255.7K cycles, against the reference's 592.0K and 237.8K: fewer
-instructions at a lower rate. 29% of the cycles were in the C library, 11% in two `memcpy`
-calls of the player moving 576 of the 640 bytes of an engine step on 32-bit ARM: it took
-each engine's step out of its result with `?` on every poll, and most polls yield. The player
-now matches each step where the engine wrote it, and only an event moves. An operation
-takes 460.6K instructions and 214.1K cycles (−18.6% and −16.3%); the C library's share is
-20%. The remaining items above 4% of cycles are the 64-bit division routines in the
-exact time arithmetic each packet's clocks go through (7%), and `memcpy` in the
-progressive engine's merge (4%). Counted against `2a6a07a7`, the Matroska legacy AAC-LC and
-MPEG-TS progressive cases on both targets, and an audio clock and a raw Annex B case on
-ARMv7, keep their user-mode instructions within ±0.06%, and on ARMv7 every trace of both
-playback workers is byte-identical (289 cases).
-Evidence set `mp4-forward-step-in-place-419a8493` holds the stage account, counts,
-profiles and trace identities.
-
-The AC-3, E-AC-3, DTS and MPEG audio workloads reached the ceiling between `4213d042` and
-`c68c9667`. The changes were to code shape, not to the instruction set. The library calls
-for `floor`, `round` and integer division are gone: AC-3 decouples with integer coupling
-coordinates and rounds AHT values without `roundf`. Divisions by a run-time divisor go
-through `triergon_codec::divide`, which divides exactly in double precision on 32-bit ARM.
-DTS and MPEG audio Layer II split block and grouped codes with a reciprocal. Sums and
-reader state stay in registers, mirrored streams are loaded once, and loops run without
-index checks. The DTS, MPEG audio and AC-3 synthesis windows run in register-sized groups.
-Two changes are ARMv7 only, both bit-identical. AC-3's long transform windows each output
-in its last pass, which takes 23% fewer cycles here and would take 45% more on Linux
-AArch64, where the separate loops vectorise. The shared DCT-IV runs its post-twiddle from
-both ends. Two changes round differently, on both targets. AC-3 and E-AC-3 compute the
-inverse transform with radix-4 and radix-8 passes, and MPEG audio Layer III computes its
-36-point IMDCT through a 9-point complex DFT. Every other change leaves the output
-bit-identical.
-
-No error against FFmpeg moves on 80 pinned vectors (AC-3, E-AC-3, DTS, MPEG audio, Opus
-and Vorbis), or on the 25 regenerated Layer I and II vectors. On 27 of the 28 regenerated
-Layer III vectors the error moves at rounding level. RMS grows by at most 1.08 times on
-this target and 1.09 times on Linux AArch64. Maximum error grows by at most 1.22 and
-1.50 times. No Layer III vector ends above 8.0% of the RMS limit or 18.7% of the maximum
-limit on either target.
-
-At `4213d042` the worst of these ARMv7 bounds were `mp2-256-48k` 1.8358 and
-`dts-core-es-6.1` 1.8323. At `0ac17828`, before the AAC decoder's speed changes were
-merged, the highest were `vorbis-q3-5.1` 1.0503, `eac3-stereo-spx` 1.0273 and `eac3-7.1`
-1.0190, all within the ceiling.
-Evidence sets `audio-speed-0ac17828-TARGET` hold the per-vector errors before and after,
-the profiles and the notes, and `gate-run-TARGET-0ac17828-*` the gate runs at that
-revision.
-
-Before this work, at `4cbd1e86`, built as A32 with NEON
-(`armv7-unknown-linux-gnueabihf`, `-C target-feature=+neon`) and timed against the same
-reference, the three E-AC-3 workloads were within the ceiling (1.1231 to 1.1821). Their
-cause was the Thumb-2 encoding. The two AC-3 (1.2190 and 1.2657), three HE-AAC (1.4763 to
-1.5747), two DTS (1.6030 and 1.6343) and three MPEG audio workloads (1.5358 to 1.6114)
-stayed above it. Those decoders ran 1.6 to 2.3 times the reference's user-mode
-instructions. SBR and its QMF synthesis took 47% of HE-AAC's cycles, and the polyphase
-synthesis 61 to 72% of MPEG audio's. The library `floor` took 12% of AC-3's cycles, and the
-library integer division 7.6% of DTS's (evidence set `codec-armv7-causes`). Earlier, on a c6g.4xlarge pinned to CPU 1, in the same user
-space and against the same pinned reference, the AC-3, E-AC-3 and DTS workloads were
-timed at `ddb02a59` and the five AAC workloads at `0b3c2db5`. Ten of the fourteen audio
-workloads were above the ceiling: `dts-core-7.1-master` 2.0698, `dts-core-es-6.1` 2.0338,
-`aac-he-5.1` 1.7656, `aac-he-stereo` 1.7092, `aac-hev2-stereo` 1.6377, `ac3-5.1-448`
-1.3764, `ac3-2.0-192` 1.3716, `eac3-stereo-spx` 1.3684, `eac3-5.1-spx` 1.3292 and
-`eac3-7.1` 1.2933, while `aac-lc-5.1` 1.1423, `ac3-4.0` 1.0948, `eac3-5.1-1536` 0.9794
-and `aac-lc-stereo` 0.9761 were within it. The six video workloads, at `3df7ae6d`, were
-0.5945 to 1.1236. Before `ddb02a59` the instruction set moved audio and video in opposite
-directions. At `22ed8232`, built for
-`armv7-unknown-linux-gnueabihf` (A32 without NEON; a comparison build) and timed against
-the same FFmpeg reference, the codec worker's upper bounds are `h264-high-1080p` 1.5231,
-`aac-lc-stereo` 1.1610, `ac3-2.0-192` 1.5995,
-`eac3-stereo-spx` 1.4897 and `dts-core-es-6.1` 1.7571, against 1.1214, 1.7653, 2.0521,
-2.2204 and 2.0400 in the gate build at that commit: the video decoders gain from the gate
-target, the audio decoders lose. A32 with NEON (`-C target-feature=+neon`) gives 1.1035,
-1.0730, 1.5231, 1.3929 and 1.6803 on the same workloads, and Thumb-2 without NEON 1.5587,
-1.7915, 2.0801, 2.2523 and 1.9084: NEON brings the video gain and the Thumb-2 encoding the
-audio loss. No Rust target compiles A32 with NEON under default flags.
-
-Most of that audio loss was the downmix's conversion to s16. ARMv7 has no instruction
-for `f32::floor`, so the conversion called the `floorf` linked into the worker, which
-moves each sample from the VFP registers to the core registers and back and, as Thumb-2,
-mispredicts its branches: at `f3d4935b`, 8 decodes of `aac-lc-stereo` miss 7.9 M branches
-in the gate build and 0.83 M in the A32 with NEON build. `mix::to_s16` now converts toward
-zero, steps down where that rounded up and saturates in integers. It gives the floor's
-result for every one of the 2^32 `f32` values, and `cargo xtask codecs equivalence`
-records the same 574 decoder outputs as at `f3d4935b`. On the same host, the gate build
-at `ddb02a59` against `f3d4935b` (instruction and cycle counts with `cargo xtask count`,
-runtime as the upper bound over 30 pairs); built as A32 with NEON, `ddb02a59` likewise
-runs 2.5 to 18.5% fewer instructions than `f3d4935b` on every workload:
+On ARMv7, which has no instruction for `f32::floor`, the downmix's conversion to s16
+called the `floorf` linked into the worker (evidence set `codec-armv7-causes`).
+`mix::to_s16` converts toward zero, steps down where that rounded up and saturates in
+integers. It gives the floor's result for every one of the 2^32 `f32` values, and
+`cargo xtask codecs equivalence` records the same 574 decoder outputs as at `f3d4935b`.
+The gate build at `ddb02a59` against `f3d4935b` on one host (instruction and cycle counts
+with `cargo xtask count`, runtime as the upper bound over 30 pairs):
 
 | Workload | Instructions | Cycles | Runtime, `f3d4935b` | Runtime, `ddb02a59` |
 |---|---:|---:|---:|---:|
@@ -2524,20 +1202,9 @@ runs 2.5 to 18.5% fewer instructions than `f3d4935b` on every workload:
 | `dts-core-es-6.1` | −2.89% | −6.05% | 2.2072 | 2.0338 |
 | `dts-core-7.1-master` | −3.20% | −7.86% | 2.2418 | 2.0698 |
 
-200 decodes of `aac-lc-stereo` take 4.35 s in the gate build, against 7.57 s at
-`f3d4935b`, and 3.91 s in the A32 with NEON build, against 4.79 s, all with the same
-digest. Recorded with `perf` (user-mode cycles and instructions), `floorf` and
-`Downmix::mix` took 4,555 M and 2,077 M cycles in the gate build at `f3d4935b`;
-`Downmix::mix` now takes 852 M, against 719 M in the A32 with NEON build. The gate
-build takes 8.54 G cycles in all, 11% more than the A32 with NEON build's 7.67 G, against
-14.89 G and 9.50 G before; the rest of the difference is spread over the decoder's
-functions. The raw samples hold the recordings and the per-symbol reports.
-
-The five AAC workloads, HE-AAC v1 and v2 among them, were measured again at `0b3c2db5`,
-which merges `b89e5844` into the change, against `b89e5844` on one host. The 577 decoder
-outputs, which now include the HE-AAC workloads' mixes, are byte-identical. Every audio
-workload runs 2.2 to 20.9% fewer instructions in the gate build, and 1.8 to 18.5% fewer
-built as A32 with NEON. HE-AAC gains less than AAC-LC because SBR is most of its work:
+At `0b3c2db5`, which merges `b89e5844` into the change, against `b89e5844` on one host,
+the 577 decoder outputs, the HE-AAC workloads' mixes among them, are byte-identical.
+HE-AAC gains less than AAC-LC because SBR is most of its work:
 
 | Workload | Instructions | Cycles | Runtime, `b89e5844` | Runtime, `0b3c2db5` |
 |---|---:|---:|---:|---:|
@@ -2546,11 +1213,6 @@ built as A32 with NEON. HE-AAC gains less than AAC-LC because SBR is most of its
 | `aac-he-stereo` | −6.10% | −18.96% | 2.1114 | 1.7092 |
 | `aac-he-5.1` | −2.17% | −6.90% | 1.8979 | 1.7656 |
 | `aac-hev2-stereo` | −6.74% | −20.36% | 2.0549 | 1.6377 |
-
-Recorded with `perf`, 50 decodes of `aac-he-stereo` in the gate build take 13.59 s
-against 16.65 s at `b89e5844`, with the same digest. There `floorf` and `Downmix::mix`
-took 4,620 M and 2,175 M of 32.65 G cycles; `Downmix::mix` now takes 692 M of 26.57 G,
-and `Sbr::process` with the QMF synthesis takes 47%.
 
 Capture conversion must stay within one of FFmpeg's on every sample. At capture widths
 of at least 16 that are multiples of 4, FFmpeg's ARMv7 build averages each 2×2 block's
@@ -2575,74 +1237,6 @@ orientations, where it exercises the block path.
 [`capture-native-widths-armv7`](../harness/evidence/sets/capture-native-widths-armv7.json)
 holds these checks at `a34b98d0`.
 
-Compared with `f8e1c4d9`, the filtered conversion changes the capture output
-folds on all 15 Linux AArch64 cases. All 15 ARMv7 output folds and all
-reference folds on both targets match their earlier values.
-
-At `a34b98d0`, the 15 capture cases passed conversion, encoding, mux, runtime,
-peak heap and kernel-bound total RSS on each c6g.4xlarge target. The worst
-runtime bounds are 1.0519 on Linux AArch64 and 1.0536 on 32-bit ARMv7.
-
-Earlier, at `001d40b6`, all 15 cases per target passed parity, runtime, peak
-heap and kernel-bound total RSS. The runtime upper bounds were within the [ceiling](quality.md#gates) then in force.
-
-At `e5f6c971`, all 15 cases per c6g.4xlarge target pass conversion, encoding,
-mux, runtime, peak heap and kernel-bound total RSS. The input
-hashes and output folds match `a34b98d0`. The ARMv7 workloads are 480 or 960
-pixels wide and use the block converter.
-
-The Linux AArch64 evidence combines shards 1, 4 and 5 of run
-`20261118-172954` with both shards of run `20261118-185150`. A lost SSH
-connection left the original shards 2 and 3 without archives. The second
-run measured their seven cases at the same revision. Run `20261118-185012`
-covered all 15 ARMv7 cases.
-
-In that comparison, the sole bound above the [ceiling](quality.md#gates) then in force was AArch64 `c04-motion-960` at 1.0595 after the
-validated 20-pair early stop. Its bound was 1.0519 with 30 pairs at `a34b98d0`
-and 1.0385 at `001d40b6`. Both recent revisions use filtered chroma.
-On one AArch64 host, `cargo xtask count` reports 0.78% fewer user-mode
-instructions and 1.20% fewer user-mode cycles at `e5f6c971` than at `a34b98d0`.
-The input and worker hashes match their gate measurements. The cause of the
-difference between the gate runs remains unresolved.
-
-At `c30b9c80`, all 15 capture cases per c6g.4xlarge target pass conversion,
-encoding, mux, paired runtime, peak heap and kernel-bound total peak RSS.
-The encoded output folds match `e5f6c971` on all cases. Reusing source rows
-reduces motion search work. The 32-bit ARM input layout removes one transform
-transpose and preserves both rounding passes.
-
-The runtime upper bound for AArch64 `c04-motion-960` is
-0.9730. The bound for ARMv7 `c14-motion-960-rate255`
-is 0.9838. The largest bounds among the other cases
-are 0.9595 for `c13-motion-960-6m` on AArch64 and 0.9525 for `c13-motion-960-6m` on ARMv7.
-
-Capture's worst bound here was 1.1669 at `a73350ca` and 1.1865 at `576f088f`. Profiled in user-mode cycles against
-FFmpeg on the gate host, the encoder's motion search reduced each 16-lane sum of absolute
-differences with 16 lane extracts and spills where it was inlined, built half-sample rows
-byte by byte, ran the inverse DCT over all 64 coefficients although 76 to 95% of blocks
-hold at most four, and cleared the coarse search's row of differences with a library
-`memset` per row. The sums of absolute differences are now out-of-line vector reductions,
-half-sample rows are formed whole, the inverse DCT sums the basis rows of only the
-coefficients a block holds, with the same rounding points, and the coarse row is a
-fixed-size array. `c14-motion-960-rate255` went from 1.175 to 1.069 of FFmpeg's user-mode
-cycles and `c13-motion-960-6m` from 1.178 to 1.065, with all 15 stream digests unchanged.
-At `e5f6c971`, the worst ARMv7 runtime bound is 1.0427
-(`c14-motion-960-rate255`).
-The remaining gap is spread over the encoder's DCT, quantisation and search,
-which FFmpeg's ARMv7 build runs in ARMv6 and NEON routines (by their symbols
-in its profile).
-
-At `a73350ca` 16 `subtitle-dvd` cases were above the [ceiling](quality.md#gates) then in force here (`vob-split` worst, 1.0869),
-while the feature's median of case medians was 0.1918: they are the DVD program streams
-with many full-size subpictures, whose time is the run-length decode; most other cases
-are small. The worker ran FFmpeg's user-mode instruction count on
-them but about ten times its branch misses (10.3 M against 0.9 M): it expanded a picture's
-top and bottom field lines interleaved, so the branch between short and long runs
-alternated between two lines' patterns, and its bit reader refilled a 64-bit cache on a
-data-dependent branch. It now decodes one line at a time and reads each code from the bit
-position. At `f8e1c4d9` those 16 cases are at most 0.8184 and the feature's worst bound
-is 0.9752 (`fate-dvd-still-frame-1`), with all 233 DVD traces unchanged.
-
 `raster-sweep` fails `outlines-71` and `outlines-83`: libass silently draws nothing
 when its composite allocation fails; the crate returns `Allocation`. Both cases draw
 glyph and border bitmaps of 1 to 2 GB each, so their composite does not fit a 32-bit
@@ -2653,65 +1247,16 @@ compared there and must pass on every other target.
 Its heaviest case, `bitmaps-24`, takes about 50 s on each side, within
 `raster-sweep`'s 120 s `timeout_seconds`.
 
-The total RSS gate passes on ARMv7 in every container and playback row. Which of a
-worker's code is resident is set by where the functions an operation runs lie among the
-64 KiB windows the kernel faults in around each access: an MP4 range operation runs
-about 250 KB of the playback worker's code, which module order spreads over most of its
-windows. The media, playback, Matroska playback and transport workers link with `lld`
-in their trained orders ([quality](quality.md#measuring-performance)), which keep the
-functions the training corpus runs together. Linked by the toolchain's default linker
-instead, at `e21f800e` (`2a6a07a7` with every trained order removed) on the same images,
-whose ordered results are those of `1c64b775` with the same workers, MP4 forward's total
-RSS bound rises from 0.9893 (51/51 lower) to 1.1158 (0/51), MP4 range's from 0.9233
-(64/64) to 1.0920 (0/64), Matroska demux's from 0.9045 (12/12) to 1.0209 (10/12), Matroska
-zlib's from 0.9450 (10/10) to 1.0110 (8/10) and Matroska legacy AAC's from 0.9555 (4/4) to
-1.0172 (0/4); on Linux AArch64 packet framing's rises from 1.0290 (134/135) to 1.0469
-(0/135), and every other item stays lower. The median case of an item holds 88 to 672 KiB
-more on ARMv7, and 92 to 608 KiB more on Linux AArch64, without its order.
-
-Making the workers smaller does not close this. The functions the training corpus runs lie
-in every 64 KiB window of each ordered worker's code (11 of the media worker's 11 on
-ARMv7, 22 of the playback worker's 23), and packed they fill 6 and 16. Built with
-`opt-level = "s"` or `"z"` and linked without their orders, the ordered workers' images
-are 12 to 23% smaller, and the median training operation of each worker and target
-recovers 21 to 64% of the peak resident memory its order saves, some none. At `2b196e9c`,
-whose 256-bit time arithmetic is out of line, the ARMv7 playback worker's code is 2.1%
-smaller and its unordered MP4 cases hold a median of 104 to 118 KiB less; linked without
-the orders at `d18904f9`, MP4 forward (1.0581, 0/51 lower), MP4 range (1.0548, 1/64),
-Matroska demux (10/12) and legacy AAC (0/4) still fail on ARMv7, and packet framing
-(1.0493, 0/135) on Linux AArch64.
-
-At `79e0ae13` packet framing's total RSS is lower than the reference's in all 125 cases
-(worst 0.9972). At `4a932ef9` it was lower in 73, with a worst bound of
-1.010086455331412 (`bad-packet-good-update`) and a median of the 125 bounds of 0.9971.
-Both workers' resident pages move in 64 KiB steps, the kernel's fault-around window,
-depending on where libc is loaded. In 40 runs of each worker on
-`bad-packet-good-update`, sorted by libc's load address modulo 64 KiB, the framing
-worker holds 15 to 16 more pages of libc than the reference at the same address, and 31
-to 32 more at four of the sixteen: before `main`, the Rust runtime's main-thread
-stack-guard lookup reads `/proc/self/maps` through glibc's `pthread_getattr_np` and
-`sscanf`, which brings in libc's printf and scanf code, and the reference never runs
-that code. The worker's own binary is 15 pages smaller (53 resident pages against 68),
-so the two totals overlap, and a case falls below the reference when most of the
-reference's 30 runs land on an address that costs it an extra window. Since `5ee3eba8` the
-workers enter through C's `main`, which leaves that lookup out, and every case is below
-the reference.
-
-The collections at `3df7ae6d` were the first ARMv7 collections with the page-cache eviction. At `22ed8232`, without
-it, how much of each executable was resident at the start of the operation varied between
-runs: the playback worker started at a median of about 2.3 MiB, up to 2.8 MiB, where it then
-started at about 1.8 MiB within 1.73 to 1.88 MiB, and the Matroska reference started at about
-2.0 MiB, where it then started at about 1.7 MiB. MP4 forward, TS program, raw Annex B and HLS
-were therefore lower than before, and Matroska higher (8 of 116 cases below the
-reference, where 110 had been).
-
-At `3df7ae6d` the TS program and ISO BMFF memory was collected a second time, on the same
-host from an empty page cache. In the first collection the kernel bound recorded, in one run each of two
-TS program cases and five ISO BMFF outputs, an update of the measured process's resident
-counters by another task, which makes the observation invalid. That host's kernel had
-reclaimed about 7.8 million pages through `kswapd` by then; it reclaimed none during the
-second collection. The ARMv7 table of that time gave the second collection; both are in the
-raw samples.
+Which of a worker's code is resident is set by where the functions an operation runs lie
+among the 64 KiB windows the kernel faults in around each access. The media, playback,
+Matroska playback and transport workers link with `lld` in their trained orders
+([quality](quality.md#measuring-performance)), which keep the functions the training
+corpus runs together. Linked by the toolchain's default linker instead, at `e21f800e`
+(`2a6a07a7` with every trained order removed), MP4 forward's total RSS bound rises from
+0.9893 (51/51 lower) to 1.1158 (0/51), MP4 range's from 0.9233 (64/64) to 1.0920 (0/64),
+Matroska demux's from 0.9045 (12/12) to 1.0209 (10/12), Matroska zlib's from 0.9450
+(10/10) to 1.0110 (8/10) and Matroska legacy AAC's from 0.9555 (4/4) to 1.0172 (0/4) on
+ARMv7; on Linux AArch64 packet framing's rises from 1.0290 (134/135) to 1.0469 (0/135).
 
 The [measured revisions](#measured-revisions) table names the revision and raw samples
 behind each ARMv7 row.

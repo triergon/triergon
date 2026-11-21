@@ -3,8 +3,8 @@
 Twelve synthetic TS188 inputs for the `mpegts-pes` contract (`harness/features/mpegts-pes/`).
 The contract's other inputs are the authored streams under
 [`crates/mpegts/tests/data/`](../../../crates/mpegts/tests/data/manifest.json). Like
-those, these were constructed byte by byte from ITU-T H.222.0: no encoder, upstream media or other implementation is involved, and the
-payloads are opaque markers rather than decodable media.
+those, these were constructed byte by byte from ITU-T H.222.0, with no encoder, upstream
+media or other implementation; the payloads are opaque markers, not decodable media.
 
 | Inputs | Construction |
 |---|---|
@@ -13,14 +13,14 @@ payloads are opaque markers rather than decodable media.
 | `pat-pointer-then-clean-pusi.ts` | `psi-pointer-overrun.ts` (a PAT whose pointer field overruns its payload) followed by `ts188-basic.ts` with the PAT continuity counter advanced |
 | `pmt-pointer-then-clean-pusi.ts` | `ts188-basic.ts` with an overrunning-pointer section inserted on the PMT PID before its PMT, whose continuity counter is advanced |
 
-`corpus.json` pins each file by SHA-256.
+The contract's `corpus.json` pins each file by SHA-256.
 
-
-The authored `dts-core-mono.dts` input contains 12 canonical 512-byte frames
-from a synthetic sine wave. The generated audio carries the repository's
-MIT or Apache-2.0 terms. The DTS transport controls rewrap these bytes without
-decoding. Its SHA-256 is
-`a1db20abc4bce08a504108de2998337f4d906eda3373acdc3abab39fcaaf1330`.
+`dts-core-mono.dts` holds 12 canonical 512-byte DTS core frames of a synthetic sine
+wave, under the repository's MIT or Apache-2.0 terms; the DTS transport controls rewrap
+them without decoding (SHA-256
+`a1db20abc4bce08a504108de2998337f4d906eda3373acdc3abab39fcaaf1330`).
+`free-format-mono.mp3` is the MPEG-1 Layer III stream the `mpegts-free-audio` inputs
+rewrap (`xtask/src/transport_fixtures/matched.rs` pins it).
 
 ```sh
 ffmpeg -f lavfi -i 'sine=frequency=523:sample_rate=48000:duration=0.128' \

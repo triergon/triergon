@@ -1453,15 +1453,21 @@ impl DemuxObserver {
             return Err(error);
         }
         let result = self.poll_inner(work, cancel);
-        if let Err(error) = result.as_ref()
-            && !matches!(
-                error,
-                Error::Backpressure { .. } | Error::Allocation | Error::Cancelled
-            )
-        {
-            self.fault = Some(*error);
+        if let Err(error) = &result {
+            self.keep_fault(*error);
         }
         result
+    }
+
+    /// Keeps a failure that ends the observer, so that every later poll reports it.
+    #[cold]
+    fn keep_fault(&mut self, error: Error) {
+        if !matches!(
+            error,
+            Error::Backpressure { .. } | Error::Allocation | Error::Cancelled
+        ) {
+            self.fault = Some(error);
+        }
     }
 
     /// Prepay allocation/move work across small polls, then reserve before any
@@ -1770,6 +1776,13 @@ impl DemuxObserver {
         if self.header_used == 0 && self.complete_timed_header(work, cancel)? {
             return Ok(true);
         }
+        self.poll_staged_header(work, cancel)
+    }
+
+    /// Reads a header byte range at a time, for the headers one carrier does not
+    /// hold whole or that the whole-header path refuses. Kept apart from that path.
+    #[inline(never)]
+    fn poll_staged_header(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if self.header_used == self.header_target {
             if !work.try_charge(1) {
                 return Ok(false);
