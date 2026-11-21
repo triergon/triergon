@@ -50,6 +50,33 @@ impl<E: std::fmt::Debug> From<E> for Refusal {
     }
 }
 
+// The worker diagnostic names are part of its trace format.
+struct VideoRefusal(String);
+
+impl From<triergon_codec_h264::DecodeError> for VideoRefusal {
+    fn from(error: triergon_codec_h264::DecodeError) -> Self {
+        use triergon_codec_h264::DecodeError;
+
+        Self(match error {
+            DecodeError::Invalid(detail) => format!("InvalidData({detail:?})"),
+            DecodeError::Policy(detail) => format!("ResourceLimit({detail:?})"),
+            _ => format!("{error:?}"),
+        })
+    }
+}
+
+impl From<triergon_codec_hevc::DecodeError> for VideoRefusal {
+    fn from(error: triergon_codec_hevc::DecodeError) -> Self {
+        use triergon_codec_hevc::DecodeError;
+
+        Self(match error {
+            DecodeError::Invalid(detail) => format!("InvalidData({detail:?})"),
+            DecodeError::Policy(detail) => format!("ResourceLimit({detail:?})"),
+            _ => format!("{error:?}"),
+        })
+    }
+}
+
 #[derive(Default)]
 struct Output {
     frames: u64,
@@ -123,7 +150,7 @@ fn access_units<'a>(data: &'a [u8], hevc: bool, mut each: impl FnMut(&'a [u8])) 
 }
 
 fn video(codec: VideoCodec, data: &[u8], out: &mut Output) {
-    let mut decoder: Box<dyn VideoDecoder<Error = Refusal>> = match codec {
+    let mut decoder: Box<dyn VideoDecoder<Error = VideoRefusal>> = match codec {
         VideoCodec::H264 => triergon_codec_h264::Decoder::new().boxed(),
         VideoCodec::Hevc => triergon_codec_hevc::Decoder::new().boxed(),
     };
@@ -464,5 +491,36 @@ impl DecodeMode {
             "raw" => Self::Raw,
             _ => return None,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::VideoRefusal;
+    use triergon_codec_h264::DecodeError as H264;
+    use triergon_codec_hevc::DecodeError as Hevc;
+
+    #[test]
+    fn video_refusals_use_the_trace_error_names() {
+        for (error, expected) in [
+            (
+                VideoRefusal::from(H264::Invalid("ref_idx beyond reference list")),
+                r#"InvalidData("ref_idx beyond reference list")"#,
+            ),
+            (
+                VideoRefusal::from(Hevc::Invalid("bitstream overrun")),
+                r#"InvalidData("bitstream overrun")"#,
+            ),
+            (
+                VideoRefusal::from(H264::Policy("too many slices")),
+                r#"ResourceLimit("too many slices")"#,
+            ),
+            (
+                VideoRefusal::from(Hevc::Policy("picture size")),
+                r#"ResourceLimit("picture size")"#,
+            ),
+        ] {
+            assert_eq!(error.0, expected);
+        }
     }
 }

@@ -51,10 +51,10 @@ impl From<DecodeError> for triergon_codec::Error {
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DecodeError::Unsupported(s) => write!(f, "unsupported: {s}"),
-            DecodeError::Invalid(s) => write!(f, "invalid data: {s}"),
-            DecodeError::Policy(s) => write!(f, "resource limit: {s}"),
-            DecodeError::MissingParameterSet(s) => write!(f, "missing parameter set: {s}"),
+            DecodeError::Unsupported(s) => write!(f, "unsupported HEVC feature: {s}"),
+            DecodeError::Invalid(s) => write!(f, "invalid HEVC data: {s}"),
+            DecodeError::Policy(s) => write!(f, "HEVC resource limit: {s}"),
+            DecodeError::MissingParameterSet(s) => write!(f, "missing HEVC parameter set: {s}"),
             DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
         }
     }
@@ -63,3 +63,32 @@ impl fmt::Display for DecodeError {
 impl std::error::Error for DecodeError {}
 
 pub(crate) type Result<T> = core::result::Result<T, DecodeError>;
+
+#[cfg(test)]
+mod tests {
+    use super::DecodeError;
+
+    #[test]
+    fn display_identifies_the_codec_and_error_class() {
+        for (error, expected) in [
+            (
+                DecodeError::Unsupported("unequal luma/chroma bit depth"),
+                "unsupported HEVC feature: unequal luma/chroma bit depth",
+            ),
+            (
+                DecodeError::Invalid("bitstream overrun"),
+                "invalid HEVC data: bitstream overrun",
+            ),
+            (
+                DecodeError::Policy("picture size"),
+                "HEVC resource limit: picture size",
+            ),
+            (
+                DecodeError::MissingParameterSet("SPS"),
+                "missing HEVC parameter set: SPS",
+            ),
+        ] {
+            assert_eq!(error.to_string(), expected);
+        }
+    }
+}
