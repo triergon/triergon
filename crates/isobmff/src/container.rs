@@ -11,7 +11,7 @@
 //! Track metadata describes the first sample entry. [`Packet::sample`] names the
 //! entry of each sample and [`Track::descriptions`] keeps them all, so a track
 //! that changes entry is visible there. Movie boxes the neutral view has no field
-//! for, such as colour, `udta` chapters and metadata, stay readable as bounded
+//! for, such as `udta` chapters and metadata, stay readable as bounded
 //! bytes through [`Reader::movie_box`] and [`SampleDescription::raw`].
 use crate::encoded_stream::ObjectTypeScan;
 use crate::fragment::FragmentCursorPosition;
@@ -25,8 +25,9 @@ use crate::{
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{
-    CodecId, ContainerReader, Event as Neutral, MediaKind, PacketInfo, RandomAccess, ReaderStep,
-    SeekMethod, SeekPolicy, SeekReceipt, SeekRequest, TrackId, TrackInfo,
+    CodecId, ColourDescription, ColourRange, ContainerReader, Event as Neutral, MediaKind, Origin,
+    PacketInfo, RandomAccess, ReaderStep, SeekMethod, SeekPolicy, SeekReceipt, SeekRequest,
+    Sourced, TrackId, TrackInfo,
 };
 use triergon_core::{
     Backpressure, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow,
@@ -203,6 +204,7 @@ pub struct Track {
     language: Option<[u8; 3]>,
     object_type: Option<u8>,
     configuration: Option<Configuration>,
+    colour: Option<EntryColour>,
     start: SampleCursorPosition,
     regular: Option<SampleCursorPosition>,
     fragment: usize,
@@ -313,6 +315,9 @@ impl TrackInfo for Track {
             .as_ref()
             .and_then(|code| std::str::from_utf8(code).ok())
     }
+    fn colour(&self) -> Option<ColourDescription> {
+        self.colour.map(EntryColour::description)
+    }
 }
 
 /// Reader events other than packets and seeks.
@@ -329,7 +334,11 @@ pub enum ReaderEvent {
 #[derive(Debug)]
 enum EntryScan {
     ObjectType(ObjectTypeScan),
-    Record(BoxChildren, [u8; 4]),
+    Children {
+        children: BoxChildren,
+        record: Option<[u8; 4]>,
+        colour: bool,
+    },
 }
 
 fn missing(reason: &'static str) -> Error {
@@ -519,6 +528,7 @@ impl Reader {
                 language: packed_language(source.header().raw_mdhd.payload())?,
                 object_type: None,
                 configuration: None,
+                colour: None,
                 start,
                 regular: Some(start),
                 fragment: 0,
@@ -788,9 +798,11 @@ fn entry_scan(
         return (scan.map(EntryScan::ObjectType), Configuration::Entry);
     }
     let codec = codec_id(&header.handler, &entry.format, None);
-    let Some(record) = configuration_box(codec) else {
+    let record = configuration_box(codec);
+    let colour = header.handler == *b"vide" && (record.is_some() || codec == CodecId::RawVideo);
+    if record.is_none() && !colour {
         return (None, Configuration::Entry);
-    };
+    }
     let child_limits = Limits {
         max_boxes: limits.configuration.max_child_boxes,
         ..limits.open.format
@@ -802,12 +814,17 @@ fn entry_scan(
         }
         _ => entry.extensions(EntryLayout::Visual, child_limits),
     };
-    (
-        children
-            .ok()
-            .map(|children| EntryScan::Record(children, record)),
-        Configuration::Absent,
-    )
+    let configuration = if record.is_some() {
+        Configuration::Absent
+    } else {
+        Configuration::Entry
+    };
+    let scan = children.ok().map(|children| EntryScan::Children {
+        children,
+        record,
+        colour,
+    });
+    (scan, configuration)
 }
 
 /// Advance the scan. `true` means the work is spent. A sample entry that cannot
@@ -833,20 +850,114 @@ fn step_entry_scan(
             }
             *active = None;
         }
-        Some(EntryScan::Record(children, record)) => match children.poll(work) {
+        Some(EntryScan::Children {
+            children,
+            record,
+            colour,
+        }) => match children.poll(work) {
             Ok(BoxStep::Yield) => return Ok(true),
-            Ok(BoxStep::Box(raw)) if raw.header().kind == *record => {
-                let start = usize::from(raw.header().header_size);
-                let bytes = raw.bytes().slice(start..raw.bytes().len())?;
-                track.configuration = Some(Configuration::Record(bytes));
-                *active = None;
+            Ok(BoxStep::Box(raw)) => {
+                let header = raw.header();
+                if *record == Some(header.kind) {
+                    let start = usize::from(header.header_size);
+                    let bytes = raw.bytes().slice(start..raw.bytes().len())?;
+                    track.configuration = Some(Configuration::Record(bytes));
+                    *record = None;
+                } else if *colour
+                    && header.kind == *b"colr"
+                    && let Some(description) = parse_colour(raw.payload())
+                {
+                    track.colour = Some(description);
+                    *colour = false;
+                }
+                if record.is_none() && !*colour {
+                    *active = None;
+                }
             }
-            Ok(BoxStep::Box(_)) => {}
             Ok(BoxStep::End) | Err(_) => *active = None,
         },
         None => {}
     }
     Ok(false)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct EntryColour {
+    primaries: u16,
+    transfer: u16,
+    matrix: u16,
+    range: ColourRange,
+}
+
+impl EntryColour {
+    fn description(self) -> ColourDescription {
+        let range_origin = if self.range == ColourRange::Unspecified {
+            Origin::Absent
+        } else {
+            Origin::Container
+        };
+        ColourDescription {
+            primaries: Sourced::new(u64::from(self.primaries), Origin::Container),
+            transfer: Sourced::new(u64::from(self.transfer), Origin::Container),
+            matrix: Sourced::new(u64::from(self.matrix), Origin::Container),
+            range: Sourced::new(self.range, range_origin),
+            chroma_siting: None,
+            mastering: None,
+            content_light: None,
+        }
+    }
+}
+
+// ISO/IEC 14496-12:2015 section 12.1.5 and Apple's colour parameter atom:
+// https://developer.apple.com/documentation/quicktime-file-format/color_parameter_atom
+fn parse_colour(b: &[u8]) -> Option<EntryColour> {
+    let range = match b.get(..4)? {
+        b"nclc" => ColourRange::Unspecified,
+        b"nclx" => match b.get(10)? {
+            0 => ColourRange::Limited,
+            0x80 => ColourRange::Full,
+            _ => return None,
+        },
+        _ => return None,
+    };
+    Some(EntryColour {
+        primaries: fields::u16_at(b, 4).ok()?,
+        transfer: fields::u16_at(b, 6).ok()?,
+        matrix: fields::u16_at(b, 8).ok()?,
+        range,
+    })
+}
+
+#[cfg(test)]
+mod colour_tests {
+    use super::*;
+
+    #[test]
+    fn colour_payload_bounds_and_unknown_codes() {
+        let nclx = [b'n', b'c', b'l', b'x', 0xff, 0xff, 0, 2, 0, 0, 0];
+        for end in 0..nclx.len() {
+            assert!(parse_colour(&nclx[..end]).is_none());
+        }
+        let parsed = parse_colour(&nclx).unwrap();
+        assert_eq!(parsed.primaries, 65535);
+        assert_eq!(parsed.range, ColourRange::Limited);
+        let mut bad = nclx;
+        bad[10] = 1;
+        assert!(parse_colour(&bad).is_none());
+        bad[..4].copy_from_slice(b"prof");
+        assert!(parse_colour(&bad).is_none());
+        let mut nclc = nclx;
+        nclc[..4].copy_from_slice(b"nclc");
+        assert!(parse_colour(&nclc[..9]).is_none());
+        assert_eq!(
+            parse_colour(&nclc[..10])
+                .unwrap()
+                .description()
+                .range
+                .origin,
+            Origin::Absent
+        );
+    }
 }
 
 impl ContainerReader for Reader {

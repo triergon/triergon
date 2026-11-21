@@ -183,9 +183,10 @@ Limits of the reader:
   `Track::edits`. `compat::mov` gives FFmpeg's edited packets.
 - `TrackInfo` describes the first sample entry; `Packet::sample` names each
   sample's entry and `Track::descriptions` keeps them all.
-- Colour, chapters and other metadata have no typed field (`colour`,
-  `default_track` and `forced` are `None`); read them through `Track::descriptions`
-  and `Reader::movie_box`.
+- For known visual entries, `colour` reads the first valid `nclx` or `nclc`
+  colour box in the first sample entry. It preserves the numeric codes and
+  reports an absent range for `nclc`. The raw descriptions retain the boxes.
+  Chapters and other metadata remain available through `Reader::movie_box`.
 - External data references and media outside an `mdat` are refused; only a `url `
   entry flagged self-contained counts as this file. An empty `traf` fails the open.
 - A fragment without `tfdt` has `None` times and cannot be a seek landing. Times

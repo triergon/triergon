@@ -100,6 +100,8 @@ pub enum Origin {
     Bitstream,
     /// Absent from the source; the specification's default applies.
     SpecificationDefault,
+    /// The source did not state this field and no specification default is applied.
+    Absent,
 }
 
 /// A value with its provenance.
