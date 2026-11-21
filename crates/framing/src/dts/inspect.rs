@@ -1,16 +1,13 @@
 //! Canonical DTS header source inspection from ETSI TS 102 114
 //! V1.6.1 clauses 3.4/5.3/5.4.2. This reports source bits and validation issues;
 //! publication is not bitstream acceptance, framing, decoder support or parity.
-#![forbid(unsafe_code)]
-
 use super::DtsSourceIdentity;
+use super::core_frame::{BITRATES, CHANNELS, CORE_SYNC, EXTENSION_SYNC, core_rate};
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::bits_at;
 use triergon_core::{Budget, Bytes, Error, Result, SourceLocation, Step, Time, WorkBudget};
 
-pub(super) const CORE_SYNC: u32 = 0x7ffe8001;
-const EXTENSION_SYNC: u32 = 0x64582025;
 const FIELD_COUNT: usize = 27;
 
 /// A field of the core frame header (ETSI TS 102 114 V1.6.1 clause 5.3,
@@ -696,7 +693,6 @@ pub(super) fn validate_header(
             _ => None,
         }
     });
-    const CHANNELS: [u8; 16] = [1, 2, 2, 2, 2, 3, 3, 4, 4, 5, 6, 6, 6, 7, 8, 8];
     let views = DtsInspectionViews {
         declared_frame_bytes: frame_size.map(|value| value + 1),
         core_rate_hz: rate,
@@ -712,28 +708,8 @@ pub(super) fn validate_header(
     Ok((DtsInspectionIssues(issues), views))
 }
 
-fn core_rate(code: u32) -> Option<u32> {
-    match code {
-        1 => Some(8000),
-        2 => Some(16000),
-        3 => Some(32000),
-        6 => Some(11025),
-        7 => Some(22050),
-        8 => Some(44100),
-        11 => Some(12000),
-        12 => Some(24000),
-        13 => Some(48000),
-        _ => None,
-    }
-}
-
 fn bitrate(code: u32) -> Option<u32> {
-    const RATES: [u32; 25] = [
-        32000, 56000, 64000, 96000, 112000, 128000, 192000, 224000, 256000, 320000, 384000, 448000,
-        512000, 576000, 640000, 768000, 960000, 1024000, 1152000, 1280000, 1344000, 1408000,
-        1411200, 1472000, 1536000,
-    ];
     usize::try_from(code)
         .ok()
-        .and_then(|index| RATES.get(index).copied())
+        .and_then(|index| BITRATES.get(index).copied())
 }

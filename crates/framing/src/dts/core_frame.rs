@@ -9,9 +9,35 @@ use triergon_core::{
     SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, Time, WorkBudget,
 };
 
-const CORE_SYNC: u32 = 0x7ffe8001;
-const EXTENSION_SYNC: u32 = 0x64582025;
+/// `SYNC` of a core frame.
+pub(super) const CORE_SYNC: u32 = 0x7ffe8001;
+/// The sync word of an extension substream.
+pub(super) const EXTENSION_SYNC: u32 = 0x64582025;
+/// Bit rate in bits per second of the `RATE` codes 0 to 24.
+pub(super) const BITRATES: [u32; 25] = [
+    32000, 56000, 64000, 96000, 112000, 128000, 192000, 224000, 256000, 320000, 384000, 448000,
+    512000, 576000, 640000, 768000, 960000, 1024000, 1152000, 1280000, 1344000, 1408000, 1411200,
+    1472000, 1536000,
+];
+/// Full-bandwidth channels of the `AMODE` codes 0 to 15.
+pub(super) const CHANNELS: [u8; 16] = [1, 2, 2, 2, 2, 3, 3, 4, 4, 5, 6, 6, 6, 7, 8, 8];
 const MAXIMUM_COPY: usize = 4096;
+
+/// Core sampling frequency in Hz of an `SFREQ` code; `None` for a code without one.
+pub(super) const fn core_rate(code: u32) -> Option<u32> {
+    match code {
+        1 => Some(8000),
+        2 => Some(16000),
+        3 => Some(32000),
+        6 => Some(11025),
+        7 => Some(22050),
+        8 => Some(44100),
+        11 => Some(12000),
+        12 => Some(24000),
+        13 => Some(48000),
+        _ => None,
+    }
+}
 
 /// The header of a normal DTS core frame (ETSI TS 102 114 V1.6.1 clause 5.3,
 /// Table 5-1): every field as coded, in bitstream order, then the values derived
@@ -188,17 +214,8 @@ pub fn probe_core_header(input: &[u8]) -> Result<DtsCoreHeader> {
     let sum_surround = bits.byte(1)?;
     let dialog_word = bits.byte(4)?;
 
-    let core_rate_hz: u32 = match sfreq {
-        1 => 8000,
-        2 => 16000,
-        3 => 32000,
-        6 => 11025,
-        7 => 22050,
-        8 => 44100,
-        11 => 12000,
-        12 => 24000,
-        13 => 48000,
-        _ => return Err(Error::Invalid("DTS core sample-rate code")),
+    let Some(core_rate_hz) = core_rate(u32::from(sfreq)) else {
+        return Err(Error::Invalid("DTS core sample-rate code"));
     };
     if fsize < 95 || nblks < 5 || fixed != 0 {
         return Err(Error::Invalid("DTS frame/block size or fixed bit"));
@@ -206,11 +223,6 @@ pub fn probe_core_header(input: &[u8]) -> Result<DtsCoreHeader> {
     if lfe == 3 || !matches!(pcm_resolution, 0 | 1 | 2 | 3 | 5 | 6) {
         return Err(Error::Invalid("DTS LFE or PCM-resolution code"));
     }
-    const BITRATES: [u32; 25] = [
-        32000, 56000, 64000, 96000, 112000, 128000, 192000, 224000, 256000, 320000, 384000, 448000,
-        512000, 576000, 640000, 768000, 960000, 1024000, 1152000, 1280000, 1344000, 1408000,
-        1411200, 1472000, 1536000,
-    ];
     let nominal_bitrate = BITRATES.get(usize::from(rate)).copied();
     if nominal_bitrate.is_none() && rate != 29 {
         return Err(Error::Invalid("DTS nominal-bitrate code"));
@@ -227,7 +239,6 @@ pub fn probe_core_header(input: &[u8]) -> Result<DtsCoreHeader> {
     if extension != 0 && !matches!(extension_id, 0 | 2 | 6) {
         return Err(Error::Unsupported("reserved DTS internal-extension code"));
     }
-    const CHANNELS: [u8; 16] = [1, 2, 2, 2, 2, 3, 3, 4, 4, 5, 6, 6, 6, 7, 8, 8];
     let full_bandwidth_channels = CHANNELS.get(usize::from(amode)).copied();
     let frame_bytes = usize::from(fsize).checked_add(1).ok_or(Error::Overflow)?;
     let coding_window_samples = u32::from(nblks)

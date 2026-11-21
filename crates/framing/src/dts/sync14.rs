@@ -1,6 +1,7 @@
 //! Normal core frames of a 14-bit DTS stream whose frames fill whole 14-bit words,
 //! found from one sync to the next. Experimental, and not a reader for 14-bit DTS in
 //! general. ETSI TS 102 114 V1.2.1 §5.3 and V1.6.1 §5.3–5.4.2.
+use crate::dts::core_frame::CORE_SYNC;
 use crate::dts::reader::{ReaderInput, limit, retryable, source_error};
 use crate::dts::{
     Dts14BitPayload, Dts14BitUnpacker, DtsCoreHeader, DtsPackingLimits, DtsSourceIdentity,
@@ -752,7 +753,7 @@ fn normal_sync(source: &[u8; 6], order: DtsWordOrder) -> bool {
     let prefix = (u64::from(word(source, 0, order) & 0x3fff) << 28)
         | (u64::from(word(source, 2, order) & 0x3fff) << 14)
         | u64::from(word(source, 4, order) & 0x3fff);
-    prefix >> 4 == ((0x7ffe8001_u64 << 6) | 0x3f)
+    prefix >> 4 == ((u64::from(CORE_SYNC) << 6) | 0x3f)
 }
 
 pub(crate) fn header_payload(source: &[u8; 18], order: DtsWordOrder) -> Result<[u8; 15]> {

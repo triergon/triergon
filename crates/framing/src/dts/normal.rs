@@ -1,6 +1,7 @@
 //! Normal core frames of a DTS stream in any word packing, ETSI TS 102 114 §5.3 and
 //! §5.4.2. A frame is the span from one normal sync to the next; how its length
 //! relates to `FSIZE` is reported, and neither shows that the coded audio is valid.
+use crate::dts::core_frame::CORE_SYNC;
 use crate::dts::reader::{ReaderInput, limit, retryable, source_error};
 use crate::dts::{
     DtsCoreField, DtsPackedHeader, DtsPackedLimits, DtsPackedPayload, DtsPackedPayloadJob,
@@ -668,7 +669,7 @@ impl DtsNormalSourceReader {
                 self.packing.bit(&self.prefix[..self.prefix_len], bit)? << (7 - bit % 8);
         }
         let header = inspect_header_bits(&stack, bits.min(120))?;
-        if header.value(DtsCoreField::Sync) != Some(0x7ffe8001) {
+        if header.value(DtsCoreField::Sync) != Some(CORE_SYNC) {
             return Err(if bits < 32 {
                 Error::Truncated
             } else {

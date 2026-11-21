@@ -1,5 +1,6 @@
 //! Original word-payload storage from ETSI TS102114 §3.4/5.3.
 //! Every source bit survives; byte-alignment zeros are labelled non-source bits.
+use crate::dts::core_frame::CORE_SYNC;
 use crate::dts::reader::limit;
 use crate::dts::{DtsPackedBitLocation, DtsSourceIdentity};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -98,10 +99,10 @@ impl DtsPacking {
             for bit in 0..bits {
                 value = (value << 1) | u32::from(packing.bit(prefix, bit)?);
             }
-            if bits == 32 && value == 0x7ffe8001 {
+            if bits == 32 && value == CORE_SYNC {
                 return Ok(packing);
             }
-            if bits < 32 && value == (0x7ffe8001_u32 >> (32 - bits)) {
+            if bits < 32 && value == (CORE_SYNC >> (32 - bits)) {
                 return Err(Error::Truncated);
             }
         }
@@ -115,7 +116,7 @@ impl DtsPacking {
         for bit in 0..38 {
             value = (value << 1) | u64::from(self.bit(prefix, bit)?);
         }
-        Ok(value == ((0x7ffe8001_u64 << 6) | 63))
+        Ok(value == ((u64::from(CORE_SYNC) << 6) | 63))
     }
 }
 

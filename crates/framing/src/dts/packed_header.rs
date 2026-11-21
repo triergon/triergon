@@ -1,5 +1,6 @@
 //! Original exact-bit header facts; output alignment zeros are never source bits.
-use crate::dts::inspect::{CORE_SYNC, required_header_bits, validate_header};
+use crate::dts::core_frame::CORE_SYNC;
+use crate::dts::inspect::{required_header_bits, validate_header};
 use crate::dts::{
     DtsCoreField as F, DtsInspectionIssues, DtsInspectionSourceStatus, DtsInspectionViews,
     FieldObservation,
