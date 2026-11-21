@@ -1,6 +1,8 @@
-//! Separate, pin-bound regular encoded edit admission. Source samples, edits,
-//! decoder configuration and clocks remain unchanged. No decoder/AU claim.
-//! Admission scans real metadata once before any occurrence is published.
+//! Edit-list plans for encoded tracks, as FFmpeg's MOV demuxer applies one rate-one
+//! media edit, optionally after a leading empty edit. [`EncodedEditJob`] scans the
+//! track's metadata and samples once and returns an [`EncodedEditPlan`], with which the
+//! packet cursor shifts packet clocks, marks discarded packets and reports skip-samples
+//! side data. Source samples, edits, configuration and clocks are not changed.
 use crate::{
     Access, CursorStatus, Next, Sample,
     boxes::BoxView,
@@ -29,10 +31,14 @@ pub(crate) mod fragment_aac;
 // ETSI TS 102 366 Annex F.2: an AC-3 or E-AC-3 ISO media sample covers six blocks.
 const DOLBY_SAMPLE_TICKS: u32 = 1536;
 
+/// Opt-in token for encoded edit plans, taken by [`EncodedEditJob::new`] and
+/// [`PacketCursor::new_encoded_regular`](super::packets::PacketCursor::new_encoded_regular).
 #[derive(Clone, Copy, Debug)]
 pub struct EncodedEditProfile;
+/// Bounds of an encoded edit scan; exceeding one is `Error::Limit`.
 #[derive(Clone, Copy, Debug)]
 pub struct EncodedEditLimits {
+    /// Samples in the track, and `sbgp` runs in each of its recovery groups.
     pub max_samples: u64,
 }
 impl Default for EncodedEditLimits {
@@ -42,12 +48,18 @@ impl Default for EncodedEditLimits {
         }
     }
 }
+/// The track an [`EncodedEditPlan`] is built for.
 #[derive(Debug)]
 pub struct EncodedEditContext<'a> {
+    /// The track's sample table.
     pub table: &'a SampleTable,
+    /// The track's `elst` edit list.
     pub edits: &'a EditList,
+    /// The admitted stream of the table's first description.
     pub stream: &'a EncodedStream,
+    /// The `mdhd` timescale as a time base; it must equal the stream's time base.
     pub media_base: TimeBase,
+    /// The `mvhd` timescale as a time base, in which the edit durations are stored.
     pub movie_base: TimeBase,
 }
 #[derive(Clone, Copy, Debug)]
@@ -89,6 +101,10 @@ impl OpusTiming {
     }
 }
 
+/// How FFmpeg's MOV demuxer applies an encoded track's edit: the media edit, the source
+/// tick at packet time zero, the end of the edit and the samples it keeps. A packet
+/// cursor takes it for the table and edit list it was built from
+/// ([`PacketCursor::new_encoded_regular`](super::packets::PacketCursor::new_encoded_regular)).
 #[derive(Clone, Debug)]
 pub struct EncodedEditPlan {
     source_table: BoxView,
@@ -115,44 +131,65 @@ pub struct EncodedEditPlan {
     recovery_observation: Option<crate::compat::mov::encoded_recovery_context::RecoveryObservation>,
 }
 impl EncodedEditPlan {
+    /// The sample groups as the context view read them, for a plan from
+    /// [`EncodedEditJob::new_with_recovery_contexts`] or
+    /// [`EncodedEditJob::new_range_playback`]; `None` otherwise.
     pub fn recovery_observation(
         &self,
     ) -> Option<&crate::compat::mov::encoded_recovery_context::RecoveryObservation> {
         self.recovery_observation.as_ref()
     }
 
+    /// The checked `roll` and `prol` groups, for a plan from
+    /// [`EncodedEditJob::new_with_recovery_groups`]; `None` otherwise.
     pub fn recovery_facts(&self) -> Option<&crate::compat::mov::encoded_recovery::RecoveryFacts> {
         self.recovery_facts.as_ref()
     }
+    /// Whether packets take their disposable flag from the table's `sdtp` bytes: for a
+    /// table with an `sdtp` box under the dependency, recovery and context views.
     pub fn has_dependency_view(&self) -> bool {
         self.dependency_table
     }
+    /// The `stbl` box of the planned track.
     pub fn source_table(&self) -> &BoxView {
         &self.source_table
     }
+    /// The `elst` box.
     pub fn source_edit(&self) -> &BoxView {
         &self.source_edit
     }
+    /// The stream's configuration box, as [`EncodedStream::configuration_box`] gives it.
     pub fn source_configuration(&self) -> &BoxView {
         &self.source_config
     }
+    /// The media edit applied, as stored.
     pub fn source_entry(&self) -> EditEntry {
         self.entry
     }
+    /// 0-based index of that edit in the `elst` box: 1 after a leading empty edit, else 0.
     pub fn edit_ordinal(&self) -> u32 {
         self.edit_ordinal
     }
     pub(crate) fn seek_offset(&self) -> i64 {
         self.video_seek_offset
     }
+    /// The source tick that becomes packet time zero, in ticks of the media timescale:
+    /// packet DTS and PTS are the sample's source DTS and CTS minus it. It is the edit's
+    /// media time for audio and, for video, the first presentation time at or after it
+    /// (or that of a sync sample that spans the whole edit), lowered by the duration of
+    /// a leading empty edit, so it can be negative.
     pub fn anchor_ticks(&self) -> i128 {
         self.anchor
     }
+    /// The exclusive end of the edit on the source timeline, in ticks of the media
+    /// timescale: where its presentation starts (the media time for audio, the first
+    /// presentation time at or after it for video) plus its duration.
     pub fn selected_end_ticks(&self) -> i128 {
         self.end
     }
-    /// End of the regular Opus presentation window on the edited timeline.
-    /// The final source duration can shorten the last coded packet.
+    /// End of the Opus presentation on the edited timeline: the earlier of the edit's
+    /// end and the last sample's end, less the anchor. The last source duration can
+    /// shorten the last coded packet. `Error::Unsupported` for another codec's plan.
     pub fn opus_presentation_end(&self) -> Result<Time> {
         if !matches!(self.timing, EditTiming::Opus) {
             return Err(Error::Unsupported("Opus presentation needs an Opus edit"));
@@ -308,10 +345,12 @@ impl EncodedEditPlan {
         };
         Ok(Some((packet, sequence)))
     }
-    /// Demux skip-samples side data for a sample from this plan's source track.
-    /// The first two little-endian words give leading and trailing sample counts.
-    /// DTS counts use the sample-entry clock. The MOV Opus projection reports
-    /// leading trim in media ticks and trailing trim in 48 kHz samples.
+    /// The skip-samples side data FFmpeg's MOV demuxer attaches to the packet of
+    /// `source`, a sample of the planned track; `None` for video, past the edit's end and
+    /// when nothing is trimmed. The first two little-endian 32-bit words count the
+    /// samples to skip at the start and at the end; the last two bytes are zero. DTS
+    /// counts use the sample-entry clock; Opus gives the leading count in media ticks and
+    /// the trailing count in 48 kHz samples. `Error::Unsupported` for an unknown DTS.
     pub fn skip_samples(&self, source: &Sample) -> Result<Option<[u8; 10]>> {
         let frame = match self.timing {
             EditTiming::Video => return Ok(None),
@@ -389,6 +428,10 @@ fn skip_side_data(start: u32, end: u32) -> Option<[u8; 10]> {
     Some(bytes)
 }
 
+/// Plans an encoded track's edit as FFmpeg's MOV demuxer applies it: scans the track's
+/// sample groups, configuration and samples once and returns an [`EncodedEditPlan`].
+/// The constructor chooses the view; poll the job with the input cursor the sample
+/// table was read from.
 #[allow(missing_debug_implementations)] // Holds a framing parser that has no `Debug`.
 pub struct EncodedEditJob<'a> {
     context: EncodedEditContext<'a>,
@@ -447,6 +490,10 @@ struct LeadingVideoEdit {
 }
 
 impl<'a> EncodedEditJob<'a> {
+    /// Plans one rate-one media edit with a nonnegative media time for a track with one
+    /// description of AVC, HEVC or AAC LC. `Error::Unsupported` for another edit list,
+    /// codec, clock or sample layout; `Error::ForeignPool` when the context is not in
+    /// `input`'s pool.
     pub fn new(
         context: EncodedEditContext<'a>,
         input: &InputCursor,
@@ -456,6 +503,10 @@ impl<'a> EncodedEditJob<'a> {
         context.stream.kind().require_regular_codec()?;
         Self::new_description_bound(context, input, limits, 1, false, false)
     }
+    /// Like [`new`](Self::new), for a track with several descriptions; `configs` holds
+    /// one admitted stream per `stsd` entry, in order, and is checked as
+    /// [`EncodedInitial::new`](crate::compat::mov::encoded::EncodedInitial::new) checks
+    /// it. An audio track must have one description.
     pub fn new_with_configs(
         context: EncodedEditContext<'a>,
         configs: &[EncodedStream],
@@ -471,8 +522,10 @@ impl<'a> EncodedEditJob<'a> {
         let count = u32::try_from(configs.len()).map_err(|_| Error::Overflow)?;
         Self::new_description_bound(context, input, limits, count, false, false)
     }
-    /// Separate source-preserving SDTP/public-disposable observation. Effective
-    /// recovery memberships and unproven group namespaces remain unsupported.
+    /// Like [`new_with_configs`](Self::new_with_configs), and when the table has an
+    /// `sdtp` box, marks a packet disposable when no other sample depends on it, as
+    /// FFmpeg's MOV demuxer does. Its `roll` and `prol` groups must then be absent or
+    /// empty; other groups and the reserved `sdtp` value are `Error::Unsupported`.
     pub fn new_with_dependency_table(
         context: EncodedEditContext<'a>,
         configs: &[EncodedStream],
@@ -492,8 +545,11 @@ impl<'a> EncodedEditJob<'a> {
         let dependency_table = context.table.has_dependency_table();
         Self::new_description_bound(context, input, limits, count, dependency_table, false)
     }
-    /// Bounded regular open/index receiver observation. All actual roll/prol
-    /// source records are validated and retained; this is not decoder preroll.
+    /// Like [`new_with_dependency_table`](Self::new_with_dependency_table), but accepts
+    /// `roll` and `prol` groups and the reserved `sdtp` value. The groups are checked and
+    /// kept in [`EncodedEditPlan::recovery_facts`] but not applied, as FFmpeg's MOV
+    /// demuxer does not apply them; a fault in them or a group of another type fails the
+    /// job.
     pub fn new_with_recovery_groups(
         context: EncodedEditContext<'a>,
         configs: &[EncodedStream],
@@ -519,6 +575,10 @@ impl<'a> EncodedEditJob<'a> {
         job.recovery_walk = Some(recovery);
         Ok(job)
     }
+    /// Like [`new_with_recovery_groups`](Self::new_with_recovery_groups), but reads the
+    /// sample groups as the context view does: a fault in them is kept in
+    /// [`EncodedEditPlan::recovery_observation`] instead of failing the job. `sync`
+    /// groups and `rap ` mappings are `Error::Unsupported`.
     pub fn new_with_recovery_contexts(
         context: EncodedEditContext<'a>,
         configs: &[EncodedStream],
@@ -554,11 +614,14 @@ impl<'a> EncodedEditJob<'a> {
         out.recovery_contexts = Some(recovery);
         Ok(out)
     }
-    /// Range playback admits leading encoder-delay edits for AC-3, E-AC-3
-    /// and DTS. AVC and DTS also support a leading empty edit before the media edit.
-    /// AAC uses the sample durations in `stts` and the coded frame length for trim.
-    /// Opus uses the edit list for priming and keeps each source duration.
-    /// A regular video edit can begin on the presentation tick of a non-sync sample at decode origin.
+    /// Plans the edit for range playback of a stream from
+    /// `EncodedStreamJob::new_range_playback`, reading sample groups as
+    /// [`new_with_recovery_contexts`](Self::new_with_recovery_contexts) does. Range
+    /// playback admits leading encoder-delay edits for AC-3, E-AC-3 and DTS. AVC and DTS
+    /// also support a leading empty edit before the media edit. AAC uses the sample
+    /// durations in `stts` and the coded frame length for trim. Opus uses the edit list
+    /// for priming and keeps each source duration. A video edit can begin on the
+    /// presentation tick of a non-sync sample at decode origin.
     pub fn new_range_playback(
         context: EncodedEditContext<'a>,
         configs: &[EncodedStream],
@@ -821,6 +884,9 @@ impl<'a> EncodedEditJob<'a> {
         input.read_into(&mut [], work, cancel)?;
         Ok(())
     }
+    /// Scans the track within `work`; `Ready` when the plan can be taken.
+    /// `Error::Unsupported` for a track outside the view's profile. Every later call
+    /// returns the same error.
     pub fn poll(
         &mut self,
         input: &mut InputCursor,
@@ -1328,6 +1394,8 @@ impl<'a> EncodedEditJob<'a> {
             }
         }
     }
+    /// Takes the plan once [`poll`](Self::poll) returned `Ready`; `Error::Invalid`
+    /// before that. Later polls return `End`.
     pub fn take(
         &mut self,
         input: &mut InputCursor,

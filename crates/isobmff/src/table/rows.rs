@@ -1,8 +1,11 @@
-//! Wire tables retain compact source rows; never expand a run into per-sample storage.
-//! Adobe F4V 10.1 §§2.7.6, 2.8. Unsupported current-ISO layouts stay explicit.
-//! Signed ctts: published ISO 14496-12:2008/Amd1:2009 §§8.6.1.3.1-.3.
-//! Experimental stz2: MPEG m76694 table9 Original and author SDL M2902.
-//! Selected widths only; unused odd-count nibble is retained, never validated.
+//! Sample-table boxes read as rows over their raw bytes: the rows of `stts`, `ctts`, `stsc`,
+//! `stss` and `stps`, the sizes of `stsz` and `stz2`, and the offsets of `stco` and `co64`.
+//! A run is never expanded into per-sample storage. Layouts outside these specifications,
+//! and `stz2` field widths other than 4, 8 and 16, are unsupported; the unused low nibble
+//! of an odd-length 4-bit table is kept and not checked.
+//!
+//! Specification: Adobe F4V 10.1 §§2.7.6, 2.8; ISO/IEC 14496-12:2008/Amd1:2009
+//! §§8.6.1.3.1–.3 (signed `ctts`); MPEG m76694 Table 9 and SDL M2902 (draft `stz2`).
 use crate::{Limits, boxes::BoxView, fields, policy};
 use triergon_core::{Error, Result};
 

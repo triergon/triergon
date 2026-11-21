@@ -1,4 +1,8 @@
-//! Resolve a regular Opus sample's declared recovery on the source clock.
+//! Where a regular Opus track's decoder starts after a seek. [`OpusRecoveryLanding`]
+//! names the sample at the landing and the earlier sample its `roll` group points back
+//! to, which must give at least 80 ms of preroll unless it is the track's first sample.
+//!
+//! Specification: Opus in ISO BMFF §4.3.6.2.
 
 use crate::{
     BuildStatus, Next, Sample,
@@ -8,15 +12,21 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, Reservation, Result, Time, TimeBase, WorkBudget};
 
-/// Decoder start for a regular Opus track selected during a movie seek.
+/// Where the decoder of a regular Opus track starts after a seek, from the track's
+/// `roll` group, as the `with_opus_recovery` option of
+/// [`GlobalSeekJob`](crate::compat::mov::seek::GlobalSeekJob) and
+/// [`RangeSeekJob`](crate::compat::mov::seek::RangeSeekJob) reports it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpusRecoveryLanding {
+    /// `track_ID` of the Opus track.
     pub track_id: u32,
-    /// One-based source ordinal of the audio sample at the video landing.
+    /// 1-based source ordinal of the audio sample at the video landing.
     pub sync_sample: u64,
-    /// One-based source ordinal at which the decoder must start.
+    /// 1-based source ordinal at which the decoder must start; at most `sync_sample`,
+    /// and 1 when recovery reaches back to the track's start.
     pub first_sample: u64,
-    /// Source-clock time available to warm up the decoder before the sync sample.
+    /// Decode time from `first_sample` to `sync_sample` on the track's media clock:
+    /// at least 80 ms unless `first_sample` is 1.
     pub preroll: Time,
 }
 

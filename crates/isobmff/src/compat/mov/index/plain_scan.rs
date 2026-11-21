@@ -1,17 +1,9 @@
-//! A backward seek over a track whose index entries are its samples, read from
-//! its tables.
-//!
-//! A track with no edit list, partial sync or dependency samples, or a track of
-//! fragments alone, has one index entry per sample, in sample order. An entry's
-//! timestamp is the sample's decode time, with a regular track's composition
-//! shift added or a fragment edit's offset taken away, and it is a key where the
-//! sample is a sync sample, or the first sample under an explicitly empty sync
-//! table. [`PlainScan`] walks the tables for exactly these facts, without building
-//! an occurrence, and makes the choices [`SeekJob`](super::SeekJob) makes from the
-//! entries. Wherever an entry would fail one of the index's or the seek's checks,
-//! or would need a rule the scan does not follow (a fragment sample without a
-//! decode time, a discarded sample, a run that continues another without a key),
-//! it gives up, and the seek builds the entries one by one instead.
+//! A backward seek read from the tables of a track whose index entries are its
+//! samples, one each in order: a regular track without edits, partial sync or
+//! dependency samples, one under a single media edit, or fragments alone. An entry's
+//! timestamp is the decode time shifted as the index shifts it, and a sync sample is
+//! a key. [`PlainScan`] makes [`SeekJob`](super::SeekJob)'s choice from these facts;
+//! where an entry needs another rule or fails a check, the seek builds every entry.
 use crate::compat::mov::cursor::{PlainSource, PlainStart, PreviousClock, PreviousSample};
 use crate::compat::mov::edit_list::EmitStart;
 use crate::fragment::RunSkip;

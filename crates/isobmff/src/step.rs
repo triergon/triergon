@@ -1,4 +1,6 @@
-//! The results of polling a work-bounded walk, builder or cursor.
+//! The values the crate's polls return: [`Next`] for walks that hand out each item,
+//! [`BuildStatus`] for builders that are finished separately, and [`CursorStatus`] for
+//! cursors whose items are taken separately.
 
 /// One step of a walk over parsed boxes, table rows or descriptors: the next
 /// item, a pause because the work budget is spent, or the end of the walk.

@@ -1,5 +1,9 @@
-//! Pin-bound startup clock view over validated source fragments.
-//! Unsigned tfdt and exact i128 source endpoints never become demux fields.
+//! The fragment start clock during FFmpeg's open.
+//!
+//! [`FragmentClockJob`] folds one fragment's sample durations onto FFmpeg's signed 64-bit
+//! clock from its `tfdt` and reports where that clock overflows, with FFmpeg's return code.
+//! [`check_signed_decode_runs`] refuses a file whose decode run ends past the signed clock.
+//! The unsigned `tfdt` and the exact source end are kept beside the signed values.
 use crate::{
     BuildStatus, Next, Sample,
     boxes::BoxView,
@@ -9,23 +13,35 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, InputCursor, InputToken, Result, SourceId, WorkBudget};
 
-/// Explicit admission to reference observations, not an ISO clock rule.
+/// Selects FFmpeg's signed fragment clock; pass it to [`FragmentClockJob::new`] or
+/// [`check_signed_decode_runs`]. It is not an ISO clock rule.
 #[derive(Clone, Copy, Debug)]
 pub struct FragmentClockProfile;
+/// One fragment's start and end on FFmpeg's signed clock, beside the source values.
 #[derive(Debug)]
 pub struct FragmentClockResult {
+    /// The fragment's `traf` box.
     pub raw_traf: BoxView,
+    /// The fragment's `tfdt` box.
     pub raw_tfdt: BoxView,
+    /// The input source the job was bound to.
     pub source: SourceId,
+    /// The input token the job was bound to.
     pub token: InputToken,
+    /// `baseMediaDecodeTime` of the `tfdt`, in ticks of the media timescale.
     pub source_start: u64,
+    /// Exact decode end of the fragment's samples, in ticks of the media timescale.
     pub source_end: i128,
+    /// The `tfdt` start as FFmpeg's signed field holds it: its 64 bits read as signed.
     pub demux_start: i64,
+    /// `demux_start` plus every sample duration, or `None` when that sum overflows `i64`.
     pub demux_end: Option<i64>,
     pub(crate) rejected_source_ordinal: Option<u64>,
 }
 impl FragmentClockResult {
-    /// None admits only this clock domain, never the rest of demux open.
+    /// FFmpeg's open return code: `Some(-1094995529)` (`AVERROR_INVALIDDATA`) when the
+    /// signed clock overflows, `None` otherwise. `None` says nothing about the rest of the
+    /// open.
     pub fn demux_open_result(&self) -> Option<i32> {
         self.rejected_source_ordinal.map(|_| -1_094_995_529)
     }
@@ -52,9 +68,11 @@ pub fn check_signed_decode_runs(
     }
     Ok(())
 }
-/// Source cursor syntax work plus one work unit for each demux duration fold.
-/// One pending source sample allows Work1 progress without repeating parsing.
-/// No payload read, source seek, copied workspace or demux confirmation is invented.
+/// Folds one fragment's sample durations onto FFmpeg's signed clock.
+///
+/// Each sample costs one work unit beyond the fragment cursor's own work. The job reads no
+/// payload and never moves `input`; it checks that `input` stays the source, token and
+/// position it started with.
 #[derive(Debug)]
 pub struct FragmentClockJob<'a> {
     index: &'a FragmentIndex,
@@ -72,6 +90,10 @@ pub struct FragmentClockJob<'a> {
     finished: bool,
 }
 impl<'a> FragmentClockJob<'a> {
+    /// Starts the job for `index`, bound to `input`'s current source, token and position.
+    /// Fails with `Error::ForeignPool` when the fragment is not in `input`'s pool,
+    /// `Error::Unsupported` when it has no `tfdt` or no known decode end, and
+    /// `Error::Limit` when it has more than `maximum` samples.
     pub fn new(
         index: &'a FragmentIndex,
         input: &InputCursor,
@@ -145,6 +167,8 @@ impl<'a> FragmentClockJob<'a> {
         self.failed = Some(error);
         error
     }
+    /// Folds further sample durations. Fails when `input` is no longer the source, token
+    /// and position the job started with.
     pub fn poll(
         &mut self,
         input: &mut InputCursor,
@@ -226,6 +250,8 @@ impl<'a> FragmentClockJob<'a> {
             }
         }
     }
+    /// Takes the result after [`poll`](Self::poll) returned `Ready`, without checking
+    /// `input`; `Error::Invalid` before then or when called again.
     pub fn take_result(&mut self) -> Result<FragmentClockResult> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -237,7 +263,8 @@ impl<'a> FragmentClockJob<'a> {
         self.finished = true;
         Ok(result)
     }
-    /// Recheck the live source transaction at the consumer publication boundary.
+    /// Takes the result as [`take_result`](Self::take_result) does, after checking `input`
+    /// again.
     pub fn try_finish(
         &mut self,
         input: &mut InputCursor,

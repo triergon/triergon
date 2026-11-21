@@ -1,6 +1,10 @@
-//! Exact source movie/edit point mapping and recovery-aware source range plans.
-//! Apple QTFF point conversion/CTS and original compact indexes; no demux
-//! occurrence projection, display-duration inference or packet sorting.
+//! Seek plans by movie time. [`MovieEditLocator`] maps a movie time through a track's
+//! edit list to a media time, [`SourceCompositionLookup`] finds the sample presented
+//! then, and [`MovieSourceSeekPlanner`] plans a seek to it with the preroll the sync
+//! sample's recovery group states. Times are exact; samples are not repeated, reordered
+//! or given display durations as a demuxer would.
+//!
+//! Specification: Apple QuickTime File Format (edit lists and composition times).
 use crate::{
     BuildStatus, Next, Sample,
     interleave::{SourceTrack, TrackSampleCursor},
@@ -16,35 +20,66 @@ use std::{
 };
 use triergon_core::{Error, Result, Rounding, Time, TimeBase, WorkBudget};
 
+/// The time bases a movie-time seek converts between.
 #[derive(Clone, Copy, Debug)]
 pub struct MovieSeekClocks {
+    /// The movie timescale (`mvhd`), in which edit durations count.
     pub movie_base: TimeBase,
+    /// The track's media timescale (`mdhd`), in which edit media times and sample
+    /// times count.
     pub media_base: TimeBase,
-    /// Caller-established identity-timeline end, not inferred CTS/display
-    /// coverage or an interpretation of a raw unknown-duration sentinel.
+    /// End of the timeline of a track without an edit list, as the caller establishes
+    /// it; must not be negative. Movie times at or after it are outside, and `None`
+    /// leaves the timeline open. It is not derived from sample times or a stated
+    /// duration.
     pub media_duration: Option<Time>,
 }
+/// A movie time that falls on media: the edit it falls in and the media time it maps
+/// to.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MovieSourcePoint {
+    /// The movie time asked for.
     pub requested_movie_time: Time,
+    /// 1-based `elst` row of the edit the time falls in; `None` without an edit list.
     pub edit_ordinal: Option<u32>,
+    /// That edit; `None` without an edit list.
     pub edit_entry: Option<EditEntry>,
+    /// Movie time at which that edit starts; zero without an edit list.
     pub movie_start: Time,
+    /// Movie time at which that edit ends; without an edit list,
+    /// [`media_duration`](MovieSeekClocks::media_duration).
     pub movie_end: Option<Time>,
+    /// The media time the movie time maps to at rate one: the edit's `media_time`
+    /// plus the offset into the edit, or the movie time itself without an edit list.
     pub source_time: Time,
 }
+/// A movie time that falls in an empty edit (`media_time` −1), where the track
+/// presents nothing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MovieEmptyEdit {
+    /// The movie time asked for.
     pub requested_movie_time: Time,
+    /// 1-based `elst` row of the empty edit.
     pub edit_ordinal: u32,
+    /// The empty edit.
     pub entry: EditEntry,
+    /// The movie times the empty edit covers.
     pub movie_range: Range<Time>,
 }
+/// Where a movie time falls on one track's timeline.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MoviePoint {
+    /// In an edit that presents media, or on the media timeline of a track without an
+    /// edit list.
     Media(MovieSourcePoint),
+    /// In an empty edit.
     Empty(MovieEmptyEdit),
-    Outside { requested_movie_time: Time },
+    /// Before zero, after the last edit, or at or after
+    /// [`media_duration`](MovieSeekClocks::media_duration) without an edit list.
+    Outside {
+        /// The movie time asked for.
+        requested_movie_time: Time,
+    },
 }
 fn count_limit(value: u64, maximum: u64) -> Result<()> {
     if value > maximum {
@@ -56,6 +91,8 @@ fn count_limit(value: u64, maximum: u64) -> Result<()> {
     Ok(())
 }
 
+/// Finds where a movie time falls on one track's timeline, walking its edit list one
+/// edit per work unit.
 #[derive(Debug)]
 pub struct MovieEditLocator<'a> {
     edits: Option<&'a EditList>,
@@ -67,6 +104,10 @@ pub struct MovieEditLocator<'a> {
     failed: Option<Error>,
 }
 impl<'a> MovieEditLocator<'a> {
+    /// A locator for the movie time `requested`; without `edits` the movie time is the
+    /// media time. Fails with `Error::Limit` for more edits than `max_edits` and
+    /// `Error::Invalid` for a negative
+    /// [`media_duration`](MovieSeekClocks::media_duration).
     pub fn new(
         edits: Option<&'a EditList>,
         clocks: MovieSeekClocks,
@@ -90,6 +131,9 @@ impl<'a> MovieEditLocator<'a> {
             failed: None,
         })
     }
+    /// Advances the walk. Fails with `Error::Unsupported` for an edit list with no
+    /// entries, a zero-duration edit at or before the time, or a rate other than one on the
+    /// edit it falls in. An error is kept and returned by every later poll.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -189,6 +233,8 @@ impl<'a> MovieEditLocator<'a> {
             }
         }
     }
+    /// The point, once [`poll`](Self::poll) has returned `Ready`; `Error::Invalid`
+    /// before that, or the error a poll returned.
     pub fn finish(mut self) -> Result<MoviePoint> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -199,19 +245,31 @@ impl<'a> MovieEditLocator<'a> {
     }
 }
 
+/// The sample a media time selects: the one presented latest at or before it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CompositionTarget {
+    /// The selected sample.
     Target(Sample),
+    /// Every sample is presented after the time, or the track has no samples.
     BeforeFirst,
+    /// A sample's presentation time is unknown, as in a fragment without `tfdt`, so no
+    /// sample can be selected.
     UnknownSourceTime {
+        /// 1-based ordinal of the first sample with an unknown presentation time.
         ordinal: u64,
     },
+    /// Two samples share the latest presentation time at or before the time.
     Ambiguous {
+        /// 1-based ordinal of the first sample with that presentation time.
         first_ordinal: u64,
+        /// 1-based ordinal of the next sample with that presentation time.
         second_ordinal: u64,
+        /// Their presentation time, on the media timeline.
         source_time: Time,
     },
 }
+/// Finds the sample of a track presented latest at or before a media time, scanning
+/// every sample in ordinal order.
 #[derive(Debug)]
 pub struct SourceCompositionLookup<'a> {
     cursor: TrackSampleCursor<'a>,
@@ -232,6 +290,10 @@ pub struct SourceCompositionLookup<'a> {
     failed: Option<Error>,
 }
 impl<'a> SourceCompositionLookup<'a> {
+    /// A lookup for the media time `requested` on `source`, whose samples count in
+    /// `media_base`. Fails with `Error::Invalid` for a sample table whose timing runs
+    /// do not cover its samples exactly; polling fails with `Error::Limit` past
+    /// `max_samples` scanned samples.
     pub fn new(
         source: SourceTrack<'a>,
         requested: Time,
@@ -258,6 +320,8 @@ impl<'a> SourceCompositionLookup<'a> {
             failed: None,
         })
     }
+    /// Advances the scan. Fails with `Error::Invalid` when sample ordinals do not
+    /// increase from 1; an error is kept and returned by every later poll.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -336,6 +400,9 @@ impl<'a> SourceCompositionLookup<'a> {
             }
         }
     }
+    /// The selection, once [`poll`](Self::poll) has returned `Ready`; `Error::Invalid`
+    /// before that, or the error a poll returned. An unknown presentation time takes
+    /// precedence over any selected sample.
     pub fn finish(mut self) -> Result<CompositionTarget> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -365,6 +432,9 @@ impl<'a> SourceCompositionLookup<'a> {
     }
 }
 
+/// Bounds on the work of a [`MovieSourceSeekPlanner`]; exceeding one fails with
+/// `Error::Limit`. The defaults allow 4096 edits, 1,000,000 scanned samples and 4096
+/// recovery scopes, with the default [`SourceSeekLimits`] and [`RecoveryLimits`].
 #[derive(Clone, Copy, Debug)]
 pub struct MovieSeekLimits {
     pub(crate) max_edits: u32,
@@ -384,37 +454,67 @@ impl Default for MovieSeekLimits {
         }
     }
 }
+/// The track a [`MovieSourceSeekPlanner`] seeks on, with its edits, clocks and
+/// recovery groups.
 #[derive(Clone, Copy, Debug)]
 pub struct MovieSourceSeekContext<'a> {
+    /// The track's sample table and fragments.
     pub source: SourceTrack<'a>,
+    /// The track's edit list; `None` when it has none.
     pub edits: Option<&'a EditList>,
+    /// The movie and media time bases.
     pub clocks: MovieSeekClocks,
+    /// Absolute byte ranges of the file's media, in which every planned sample must
+    /// lie.
     pub media_extents: &'a [Range<u64>],
+    /// The recovery group, `roll` or `prol`, whose distance sets the preroll.
     pub recovery_kind: RecoveryKind,
+    /// The scopes of the track's recovery groups: the sample table and each fragment.
+    /// Scopes of another kind are skipped.
     pub recovery_scopes: &'a [RecoveryScope<'a>],
 }
+/// How a movie-time seek ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MovieSeekStatus {
+    /// A plan was made.
     Planned,
+    /// The time falls in an empty edit.
     EmptyEdit {
+        /// 1-based `elst` row of the empty edit.
         edit_ordinal: u32,
     },
+    /// The time is outside the track's timeline.
     OutsideTimeline,
+    /// Every sample is presented after the media time the movie time maps to.
     BeforeFirstSample,
+    /// A sample's presentation time is unknown, so no sample can be selected.
     UnknownSourceTime {
+        /// 1-based ordinal of the first sample with an unknown presentation time.
         ordinal: u64,
     },
+    /// Two samples share the latest presentation time at or before the media time.
     AmbiguousComposition {
+        /// 1-based ordinal of the first sample with that presentation time.
         first_ordinal: u64,
+        /// 1-based ordinal of the next sample with that presentation time.
         second_ordinal: u64,
     },
 }
+/// The outcome of a movie-time seek.
 #[derive(Debug)]
 pub struct MovieSeekResult<'a> {
+    /// How the seek ended.
     pub status: MovieSeekStatus,
+    /// The media point the movie time maps to; `None` for an empty edit or a time
+    /// outside the timeline.
     pub point: Option<MovieSourcePoint>,
+    /// The empty edit, when the status is [`EmptyEdit`](MovieSeekStatus::EmptyEdit).
     pub gap: Option<MovieEmptyEdit>,
+    /// The recovery group entry at the sync sample, which set the preroll; present
+    /// when the status is [`Planned`](MovieSeekStatus::Planned).
     pub recovery: Option<RecoverySelection>,
+    /// The seek plan, present when the status is
+    /// [`Planned`](MovieSeekStatus::Planned).
     pub plan: Option<SourceSeekPlan<'a>>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -428,9 +528,11 @@ enum Phase {
     Ready,
 }
 
-/// Composes existing jobs without another sample/index array. The initial
-/// source plan identifies the sync sample; recovery then informs the final plan.
-/// A zero requirement reuses the validated initial plan without a second pass.
+/// Plans a seek to a movie time on one track. It maps the time through the edit list,
+/// finds the sample presented then, plans a seek to it, and reads the recovery group
+/// entry of the sync sample it lands on. A distance of zero, or no entry, keeps that
+/// plan; otherwise the plan is made again with as many preroll samples as the distance
+/// states.
 #[derive(Debug)]
 pub struct MovieSourceSeekPlanner<'a> {
     context: MovieSourceSeekContext<'a>,
@@ -452,6 +554,9 @@ pub struct MovieSourceSeekPlanner<'a> {
     failed: Option<Error>,
 }
 impl<'a> MovieSourceSeekPlanner<'a> {
+    /// A planner for the movie time `requested`. Fails with `Error::Invalid` for a
+    /// sample table whose timing runs do not cover its samples exactly, `Error::Limit`
+    /// for more recovery scopes than `limits` allow, and as [`MovieEditLocator::new`].
     pub fn new(
         context: MovieSourceSeekContext<'a>,
         requested: Time,
@@ -486,6 +591,10 @@ impl<'a> MovieSourceSeekPlanner<'a> {
             failed: None,
         })
     }
+    /// Advances the plan. Fails as the jobs it runs do, with `Error::Unsupported` when
+    /// the sync sample lies outside every scope of the recovery kind or its distance is
+    /// positive, and with `Error::Invalid` when two such scopes hold it. An error is
+    /// kept and returned by every later poll.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -704,6 +813,8 @@ impl<'a> MovieSourceSeekPlanner<'a> {
             }
         }
     }
+    /// The result, once [`poll`](Self::poll) has returned `Ready`; `Error::Invalid`
+    /// before that, or the error a poll returned.
     pub fn finish(mut self) -> Result<MovieSeekResult<'a>> {
         if let Some(error) = self.failed {
             return Err(error);

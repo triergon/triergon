@@ -1,4 +1,7 @@
-//! Sparse restart states for tracks that passed the demux range scan.
+//! Seeks from restart points recorded while a packet cursor checks its tracks. The
+//! cursor keeps a copy of a track's packet state every 8192 packets, and at a few
+//! nearer points for short tracks and fragment starts; `RangeSeekJob` replays from
+//! the nearest one instead of from the first packet.
 use super::{PacketCursor, Phase, Slot, count};
 use crate::{
     BuildStatus, CursorStatus,
@@ -194,8 +197,11 @@ impl<'a> Checkpoints<'a> {
 }
 
 impl<'a> PacketCursor<'a> {
-    /// Collect optional seek restarts as the complete range is checked.
-    /// The cursor must be exhausted and rewound before using the restarts.
+    /// Records restart points for [`prepare_checked_range_seek`](Self::prepare_checked_range_seek)
+    /// while the cursor checks its tracks; poll it to its end and rewind it before
+    /// using them. Does nothing unless the cursor is a fresh complete-source one.
+    /// Recording stops and drops every point at a packet a restart cannot cover,
+    /// such as a decode time that does not increase, or when storage runs out.
     pub fn enable_range_seek_checkpoints(&mut self) {
         if matches!(self.phase, Phase::Media) && self.complete_source && !self.front_source {
             self.recording_seek_checkpoints = true;
@@ -217,7 +223,8 @@ impl<'a> PacketCursor<'a> {
         }
     }
 
-    /// Release optional seek state without moving the active packet cursor.
+    /// Releases the restart points without moving the cursor; `true` when there
+    /// were any.
     pub fn discard_seek_checkpoints(&mut self) -> bool {
         self.recording_seek_checkpoints = false;
         self.seek_checkpoints.take().is_some()
@@ -236,7 +243,11 @@ impl<'a> PacketCursor<'a> {
         }
     }
 
-    /// Plan a seek using source-bound restarts if they cover this request.
+    /// A seek of track `video` to decode time `timestamp`, in ticks of its demux
+    /// time base, from the recorded restart points. `None` when there are none,
+    /// recording has not finished, a track has none, or this cursor's limits pass
+    /// `limits`. `Error::Unsupported` for `i64::MIN`, the demuxer's null value;
+    /// `Error::Invalid` when `video` is not one of the tracks.
     pub fn prepare_checked_range_seek(
         &self,
         video: u32,
@@ -428,7 +439,11 @@ impl<'a> TrackSeek<'a> {
     }
 }
 
-/// Source-bound seek over the sparse track restarts from range open.
+/// A backward seek over the restart points a [`PacketCursor`] recorded. It lands the
+/// reference track on its last key packet at or before the target, then each other
+/// track on its last key packet at or before the landing's decode time in that
+/// track's time base, replaying each from its nearest restart point rather than its
+/// first packet. It finishes with a cursor that continues from the landings.
 #[derive(Debug)]
 pub struct RangeSeekJob<'a> {
     index: Arc<Checkpoints<'a>>,
@@ -451,7 +466,8 @@ pub struct RangeSeekJob<'a> {
 
 impl<'a> RangeSeekJob<'a> {
     /// Use a secondary regular Opus track's source roll groups for decoder
-    /// recovery. Select this before polling the seek.
+    /// recovery. Select this before polling the seek. `Error::Invalid` for the
+    /// reference track or a missing one; `Error::Unsupported` without an Opus edit.
     pub fn with_opus_recovery(mut self, track_id: u32) -> Result<Self> {
         if self.scan.is_some()
             || self.landing.is_some()
@@ -479,6 +495,8 @@ impl<'a> RangeSeekJob<'a> {
         Ok(self)
     }
 
+    /// Advances the seek; failures are sticky. `Error::Unsupported` when the
+    /// reference track's landing is not a key packet.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -659,6 +677,10 @@ impl<'a> RangeSeekJob<'a> {
         Ok(())
     }
 
+    /// A packet cursor that continues every track from its landing, and the
+    /// reference track's landing. `Error::Invalid` before the seek is ready;
+    /// `Error::Limit` when the packets before the landings pass
+    /// [`SeekLimits::max_replayed_occurrences`].
     pub fn finish(self) -> Result<(PacketCursor<'a>, SeekLanding)> {
         if let Some(error) = self.failed {
             return Err(error);

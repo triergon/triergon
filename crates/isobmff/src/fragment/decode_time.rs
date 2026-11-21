@@ -1,8 +1,11 @@
-//! ETSI TS 126 244 V18.0.0 (2024-05), §13.5. Source media decode time,
-//! before edits. This supplies the tfdt field basis without claiming full ISO.
+//! The track fragment decode time box `tfdt`.
+//!
+//! Specification: ETSI TS 126 244 V18.0.0 (2024-05) §13.5.
 use crate::{boxes::BoxView, fields};
 use triergon_core::{Error, Result};
 
+/// A `tfdt` box: the decode time of a fragment's first sample in ticks of the media
+/// timescale, before any edit.
 #[derive(Clone, Debug)]
 pub struct FragmentDecodeTime {
     raw: BoxView,
@@ -10,6 +13,8 @@ pub struct FragmentDecodeTime {
     ticks: u64,
 }
 impl FragmentDecodeTime {
+    /// Reads a version 0 (32-bit) or 1 (64-bit) `tfdt`. `Error::Invalid` for another box
+    /// type or trailing bytes, `Error::Unsupported` for a later version or nonzero flags.
     pub fn parse(raw: BoxView) -> Result<Self> {
         if raw.header().kind != *b"tfdt" {
             return Err(Error::Invalid("not tfdt"));
@@ -31,12 +36,15 @@ impl FragmentDecodeTime {
             ticks,
         })
     }
+    /// The box version: 0 or 1.
     pub fn version(&self) -> u8 {
         self.version
     }
+    /// The decode time in ticks of the media timescale.
     pub fn ticks(&self) -> u64 {
         self.ticks
     }
+    /// The `tfdt` box as read.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }

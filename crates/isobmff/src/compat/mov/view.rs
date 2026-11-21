@@ -1,5 +1,7 @@
-//! Explicit reference-MOV observation projection. Never changes source sample facts.
-//! This is not the edit occurrence selector, a standards rule, or a parity waiver.
+//! Single packets and stream entries as FFmpeg's MOV demuxer reports them:
+//! `PacketView` is one packet, `PacketProjector` projects one source sample to it, and
+//! `StreamView` is a track as the demuxer lists it. Which samples become packets, and
+//! how often, is the packet and edit cursors' work. Source samples are never changed.
 use crate::{
     Access, Sample,
     compat::mov::clocks::{ClockField, MediaClock},
@@ -10,49 +12,81 @@ use crate::{
 use std::ops::Range;
 use triergon_core::{Bytes, Error, Result, Rounding, Time, TimeBase};
 
+/// An edit-list entry placed on the movie timeline.
 #[derive(Clone, Copy, Debug)]
 pub struct ProjectedEdit {
+    /// The `elst` entry.
     pub entry: EditEntry,
+    /// The presentation time at which the edit starts: the sum of the durations of
+    /// the entries before it.
     pub movie_start: Time,
+    /// The `mvhd` time base in which `entry.segment_duration` counts.
     pub movie_base: TimeBase,
 }
 
+/// Projects one source sample, on its own, to the packet FFmpeg's MOV demuxer
+/// reports for it.
 #[derive(Clone, Copy, Debug)]
 pub struct PacketProjector {
     media_base: TimeBase,
     sync_entries: Option<u32>,
 }
+/// A packet as FFmpeg's MOV demuxer reports it, naming the source sample it carries.
+/// Times and the duration count ticks of the track's demux time base
+/// ([`MediaClock::demux_base`](crate::compat::mov::clock::MediaClock::demux_base)).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PacketView {
+    /// 1-based ordinal of the source sample.
     pub source_ordinal: u64,
+    /// 1-based index of the sample's entry in `stsd`.
     pub source_description: u32,
+    /// Absolute file offsets of the sample's bytes.
     pub source_range: Range<u64>,
+    /// Presentation time; `None` where the field holds the demuxer's null value.
     pub pts: Option<i64>,
+    /// Decode time; `None` where the field holds the demuxer's null value.
     pub dts: Option<i64>,
+    /// The stored presentation time with its exact value.
     pub pts_field: ClockField,
+    /// The stored decode time with its exact value.
     pub dts_field: ClockField,
+    /// Duration: the sample's decode delta unless an edit or index rule replaces it.
     pub duration: i64,
+    /// Packet flags as FFmpeg reports them: 1 key, 4 discard, 16 disposable.
     pub flags: u32,
 }
 
-/// Explicit narrow demux catalogue projection for authored raw-video and tx3g
-/// carriers. Raw source headers/descriptions stay authoritative and retained.
+/// A track as FFmpeg's MOV demuxer lists it as a stream, for raw video (`raw `) and
+/// `tx3g` text; [`PcmStream`](crate::compat::mov::pcm::PcmStream) builds one for
+/// QuickTime PCM. The source header and descriptions are kept unchanged.
 #[derive(Clone, Debug)]
 pub struct StreamView {
+    /// `track_ID` of the `tkhd` box.
     pub track_id: u32,
+    /// FFmpeg's codec name: `rawvideo`, `mov_text`, `pcm_u8` or `pcm_s16be`.
     pub codec: &'static str,
+    /// FFmpeg's media type number: 0 video, 1 audio, 3 subtitle.
     pub media_type: u8,
+    /// The stream time base; equal to `clock.demux_base`.
     pub time_base: TimeBase,
+    /// The stream clock and why it is what it is.
     pub clock: MediaClock,
+    /// Codec private data: a `tx3g` entry's bytes after its sample entry fields;
+    /// empty for raw video and PCM.
     pub extradata: Bytes,
+    /// ISO 639-2/T language code from `mdhd`, three lowercase letters.
     pub language: [u8; 3],
+    /// Handler name from `hdlr`, ASCII, without its terminating NUL.
     pub handler_name: Bytes,
+    /// Vendor code of a raw-video or PCM entry, always zero. `None` for text, and
+    /// for raw video under another major brand or with an empty sample table.
     pub vendor_id: Option<[u8; 4]>,
 }
 impl StreamView {
-    /// Reference operation with explicit source major-brand context. Paired public
-    /// observations retain the zero vendor tag only for QuickTime-major regular
-    /// video, independently of compatible-brand declarations. No entry changes.
+    /// The stream of a track from its first description, given whether the file
+    /// has fragments and its `ftyp` major brand. Raw video keeps its vendor code
+    /// only under the `qt  ` major brand, whatever the compatible brands, and is
+    /// `Error::Unsupported` without a major brand.
     pub fn for_source(
         header: &TrackHeader,
         table: &SampleTable,
@@ -62,6 +96,9 @@ impl StreamView {
         Self::for_sample_table(header, table, has_fragments)?.with_major_brand(major_brand)
     }
 
+    /// [`for_source`](Self::for_source) for a raw-video track whose `mdhd` timescale
+    /// is zero, with the 1/1 s clock. `Error::Unsupported` unless the track has a
+    /// `vide` handler, one `raw ` description, a zero timescale and samples.
     pub fn for_zero_scale_source(
         header: &TrackHeader,
         table: &SampleTable,
@@ -96,10 +133,10 @@ impl StreamView {
         }
         Ok(self)
     }
-    /// Source-operation context is required for demux tag presence. The reference
-    /// no-stream-info operation omits the raw-video vendor tag for an empty regular
-    /// table initialized by fragments. The raw source entry remains untouched.
-    /// Audio catalogue projection is still unsupported; no video rule is applied.
+    /// The stream of a track from its first description. A raw-video track with an
+    /// empty sample table has no vendor code when the file has fragments and is
+    /// `Error::Unsupported` otherwise; `Error::Invalid` for a table without a
+    /// description. Audio other than PCM is not listed.
     pub fn for_sample_table(
         header: &TrackHeader,
         table: &SampleTable,
@@ -120,11 +157,16 @@ impl StreamView {
         }
         Ok(view)
     }
-    /// Description-only projection for the regular sample profile. Whole source
-    /// operations use `for_sample_table` to retain initialization context.
+    /// The stream for description `entry` alone, in the track's media time base.
+    /// [`for_sample_table`](Self::for_sample_table) also handles an empty table.
     pub fn new(header: &TrackHeader, entry: &SampleDescription) -> Result<Self> {
         Self::with_projection_base(header, entry, header.time_base()?)
     }
+    /// The stream for description `entry` with `demux_base` as its time base.
+    /// `Error::Unsupported` for another codec or handler, a nonzero raw-video
+    /// vendor, a QuickTime language code, or a handler name that is not
+    /// NUL-terminated ASCII in the ISO `hdlr` layout; `Error::Limit` for a name
+    /// field over 256 bytes.
     pub fn with_projection_base(
         header: &TrackHeader,
         entry: &SampleDescription,
@@ -236,19 +278,30 @@ enum Clock {
 }
 
 impl PacketProjector {
+    /// A projector for a track with media time base `media_base` and
+    /// `sync_entries` entries in `stss` (`None` without `stss`). With an empty
+    /// `stss`, the first sample is a key packet, as the demuxer marks it.
     pub fn new(media_base: TimeBase, sync_entries: Option<u32>) -> Self {
         Self {
             media_base,
             sync_entries,
         }
     }
-    /// Point/flag projection for an independently selected source occurrence.
-    /// The caller must not obtain occurrence selection from expected demux output.
-    /// This stateless method has no whole-ctts context; the complete regular
-    /// compatibility operation uses PacketCursor's bounded wire-run scan.
+    /// The packet for `source`, mapped through `edit` at rate one when given, and
+    /// marked discard where its presentation time lies outside the edit. It sees
+    /// no other sample, so it applies no composition shift; a
+    /// [`PacketCursor`](crate::compat::mov::packets::PacketCursor) does that for a
+    /// whole track. `Error::Unsupported` for unknown clocks, partial sync,
+    /// dependency or unknown access flags, and under an edit for a composition
+    /// offset, an empty `stss` or a time the edit does not map; `Error::Invalid`
+    /// for an empty edit.
     pub fn project(&self, source: &Sample, edit: Option<ProjectedEdit>) -> Result<PacketView> {
         self.project_inner(source, Clock::Source(edit))
     }
+    /// [`project`](Self::project) through `edit` as the demuxer maps it: the
+    /// sample's times move by the edit's movie start less `decode_start`, the decode
+    /// time from which the edit's packets start. `Error::Unsupported` for an edit
+    /// whose rate is not one.
     pub fn project_demux_edit(
         &self,
         source: &Sample,
@@ -394,8 +447,10 @@ impl PacketProjector {
     }
 }
 impl PacketView {
-    /// Observed demux occurrence-index duration rule. The next DTS must come
-    /// from the source-derived occurrence plan, never from expected demux output.
+    /// Sets the duration to the distance from this packet's decode time to
+    /// `following`, the next packet's, as the demuxer's index does. Keeps it when
+    /// either time is null or `following` is earlier; `Error::Overflow` when the
+    /// distance does not fit `i64`.
     pub fn with_following_dts(mut self, following: Option<i64>) -> Result<Self> {
         if let (Some(current), Some(next)) = (self.dts, following) {
             if next < current {

@@ -1,7 +1,13 @@
-//! Compact source roll/prol descriptions, runs and explicitly scoped defaults.
-//! Apple QTFF signed16 values; MPEG m76694 Original binary grammar; ISO FDAM3
-//! same-fragment namespace; named MPEG2026 draft profile for version2 defaults.
-//! No codec delay, demux-clock, cross-fragment cache or decoder recovery claim.
+//! The `roll` and `prol` recovery groups: sample group descriptions (`sgpd`,
+//! [`RecoveryDescriptions`]) holding signed roll distances, and sample-to-group mappings
+//! (`sbgp`, [`RecoveryMappings`]) assigning them to runs of samples. [`RecoveryLookup`]
+//! finds the entry that applies to one sample of a [`RecoveryScope`], the sample table
+//! or one fragment. A distance is what the file states, not a codec delay or proof of
+//! decoder recovery.
+//!
+//! Specification: Apple QuickTime File Format (signed 16-bit distance); MPEG m76694;
+//! ISO/IEC 14496-12 FDAM3 draft (fragment-local description indexes); MPEG 2026 draft
+//! (version 2 default indexes).
 use crate::{BuildStatus, boxes::BoxView, fields};
 use std::{
     ops::Range,
@@ -9,9 +15,13 @@ use std::{
 };
 use triergon_core::{Error, Result, WorkBudget};
 
+/// The grouping type of a recovery group.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RecoveryKind {
+    /// `roll`: roll recovery, whose distance counts the samples to decode for a member
+    /// sample to decode correctly.
     Roll,
+    /// `prol`: audio pre-roll, with the same distance field.
     Prol,
 }
 impl RecoveryKind {
@@ -23,14 +33,22 @@ impl RecoveryKind {
         }
     }
 }
+/// Which `sgpd` versions [`RecoveryDescriptions::parse`] accepts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RecoverySyntax {
+    /// Versions 0 and 1, which state no default index; version 2 fails with
+    /// `Error::Unsupported`.
     Versions0And1,
+    /// Versions 0 to 2, reading version 2's default description index as the MPEG
+    /// 2026 draft text lays it out. The draft is treated as experimental.
     Mpeg2026Draft,
 }
+/// Bounds on recovery groups; exceeding one fails with `Error::Limit`.
 #[derive(Clone, Copy, Debug)]
 pub struct RecoveryLimits {
+    /// Most entries in an `sgpd` box; 65,535 by default.
     pub max_descriptions: u32,
+    /// Most runs in an `sbgp` box; 1,000,000 by default.
     pub max_runs: u32,
 }
 impl Default for RecoveryLimits {
@@ -50,14 +68,24 @@ fn limit(value: u32, maximum: u32) -> Result<()> {
     }
     Ok(())
 }
+/// One recovery description entry: a signed distance.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RecoveryDescription {
+    /// 1-based index of the entry in its `sgpd` box.
     pub index: u32,
+    /// `roll_distance`, in samples: negative for the samples before a member sample
+    /// that must be decoded first, positive for the samples after it that must be
+    /// decoded before output is correct.
     pub distance: i16,
+    /// The same 16 bits, unsigned, as stored.
     pub raw_bits: u16,
+    /// Absolute byte range of the 2-byte field in the file.
     pub source_range: Range<u64>,
 }
 
+/// A parsed recovery sample group description box (`sgpd` of grouping type `roll` or
+/// `prol`), kept as the original box; entries are read one at a time through
+/// [`locate`](Self::locate).
 #[derive(Clone, Debug)]
 pub struct RecoveryDescriptions {
     raw: BoxView,
@@ -69,6 +97,11 @@ pub struct RecoveryDescriptions {
     records: usize,
 }
 impl RecoveryDescriptions {
+    /// Parses an `sgpd` box. Fails with `Error::Unsupported` for nonzero flags, a
+    /// version `syntax` does not accept or a grouping type other than `roll` and
+    /// `prol`, `Error::Invalid` for another box or trailing bytes, `Error::Truncated`
+    /// when the entries do not fit, and `Error::Limit` for more entries than
+    /// `limits.max_descriptions`.
     pub fn parse(raw: BoxView, syntax: RecoverySyntax, limits: RecoveryLimits) -> Result<Self> {
         if raw.header().kind != *b"sgpd" {
             return Err(Error::Invalid("not sgpd"));
@@ -132,29 +165,38 @@ impl RecoveryDescriptions {
             records,
         })
     }
+    /// The whole `sgpd` box.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
+    /// The grouping type.
     pub fn kind(&self) -> RecoveryKind {
         self.kind
     }
+    /// Box version: 0, 1 or 2.
     pub fn version(&self) -> u8 {
         self.version
     }
+    /// `default_length`: bytes per entry, or 0 when each entry states its own length;
+    /// 2 for version 0, which has no such field.
     pub fn fixed_entry_length(&self) -> u32 {
         self.length
     }
+    /// Number of entries.
     pub fn entry_count(&self) -> u32 {
         self.count
     }
+    /// Version 2's `default_sample_description_index`, the entry for samples no
+    /// mapping assigns, 0 for none; `None` for versions 0 and 1.
     pub fn default_index(&self) -> Option<u32> {
         self.default
     }
+    /// Offset in the box payload, in bytes, of the first entry.
     pub fn validation_start(&self) -> usize {
         self.records
     }
-    // A private continuation for the original lookup parser. Its caller stores
-    // only an end already returned by a validated two-byte source record.
+    // Continues a walk at entry `index`, `offset` bytes into the payload. The
+    // caller passes only an end that a lookup of the entry before returned.
     pub(crate) fn validation_at(
         &self,
         index: u32,
@@ -176,6 +218,8 @@ impl RecoveryDescriptions {
             failed: None,
         })
     }
+    /// A lookup of the 1-based entry `index`; `Error::Invalid` when it is 0 or above
+    /// [`entry_count`](Self::entry_count).
     pub fn locate(&self, index: u32) -> Result<RecoveryDescriptionLookup<'_>> {
         if index == 0 || index > self.count {
             return Err(Error::Invalid("recovery description index"));
@@ -197,6 +241,8 @@ impl RecoveryDescriptions {
     }
 }
 
+/// Reads one entry of a [`RecoveryDescriptions`], one entry per work unit; where
+/// entries state their own lengths it walks from the first entry.
 #[derive(Debug)]
 pub struct RecoveryDescriptionLookup<'a> {
     descriptions: &'a RecoveryDescriptions,
@@ -207,6 +253,10 @@ pub struct RecoveryDescriptionLookup<'a> {
     failed: Option<Error>,
 }
 impl RecoveryDescriptionLookup<'_> {
+    /// Advances the lookup. Fails with `Error::Truncated` for an entry shorter than 2
+    /// bytes or cut off, `Error::Unsupported` when the entry sought is longer than 2
+    /// bytes, and `Error::Invalid` for bytes after the last entry. An error is kept and
+    /// returned by every later poll.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -272,6 +322,8 @@ impl RecoveryDescriptionLookup<'_> {
             }
         }
     }
+    /// The entry, once [`poll`](Self::poll) has returned `Ready`; `Error::Invalid`
+    /// before that, or the error a poll returned.
     pub fn finish(mut self) -> Result<RecoveryDescription> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -282,6 +334,9 @@ impl RecoveryDescriptionLookup<'_> {
     }
 }
 
+/// A parsed recovery sample-to-group box (`sbgp` of grouping type `roll` or `prol`),
+/// kept as the original box: runs of samples, each with the index of the description
+/// that applies to them.
 #[derive(Clone, Debug)]
 pub struct RecoveryMappings {
     raw: BoxView,
@@ -291,6 +346,10 @@ pub struct RecoveryMappings {
     records: usize,
 }
 impl RecoveryMappings {
+    /// Parses an `sbgp` box. Fails with `Error::Unsupported` for a version above 1,
+    /// nonzero flags or a grouping type other than `roll` and `prol`, `Error::Invalid`
+    /// for another box or runs that do not fill the box exactly, and `Error::Limit`
+    /// for more runs than `limits.max_runs`.
     pub fn parse(raw: BoxView, limits: RecoveryLimits) -> Result<Self> {
         if raw.header().kind != *b"sbgp" {
             return Err(Error::Invalid("not sbgp"));
@@ -319,18 +378,26 @@ impl RecoveryMappings {
             records,
         })
     }
+    /// The whole `sbgp` box.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
+    /// The grouping type.
     pub fn kind(&self) -> RecoveryKind {
         self.kind
     }
+    /// Number of runs.
     pub fn run_count(&self) -> u32 {
         self.count
     }
+    /// Version 1's `grouping_type_parameter`; `None` for version 0.
     pub fn grouping_parameter(&self) -> Option<u32> {
         self.parameter
     }
+    /// The 0-based run `row` as stored: its `sample_count` and its
+    /// `group_description_index`, where 0 means no group, 1 to 0xFFFF name an entry of
+    /// the track's `sgpd`, and 0x10000 + n names entry n of the fragment's own `sgpd`.
+    /// `Error::Invalid` when `row` is not below [`run_count`](Self::run_count).
     pub fn run(&self, row: u32) -> Result<(u32, u32)> {
         if row >= self.count {
             return Err(Error::Invalid("recovery run index"));
@@ -350,27 +417,48 @@ impl RecoveryMappings {
     }
 }
 
+/// Which `sgpd` box a selected description comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RecoveryDefinitionOrigin {
+    /// The track's own, in its sample table.
     Track,
+    /// The fragment's own, in its `traf`; the value is the scope's
+    /// [`fragment_ordinal`](RecoveryScope::fragment_ordinal).
     Fragment(u64),
 }
+/// Where the description index for a sample comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RecoveryMappingOrigin {
+    /// The `sbgp` run holding the sample.
     Explicit,
+    /// Nowhere: the scope has no mapping and no default applies.
     Absent,
+    /// The default index of the track's `sgpd`, outside fragments.
     TrackDefault,
+    /// The default index of the fragment's own `sgpd`.
     FragmentDefault,
+    /// The default index of the track's `sgpd`, in a fragment without an `sgpd` of its
+    /// own.
     InheritedTrackDefault,
 }
+/// Samples of a track whose recovery groups share one set of boxes: those of the
+/// sample table, or those of one fragment.
 #[derive(Clone, Copy, Debug)]
 pub struct RecoveryScope<'a> {
+    /// The grouping type the scope's boxes must have.
     pub kind: RecoveryKind,
+    /// 1-based ordinal of the scope's first sample in the track; never zero.
     pub first_ordinal: u64,
+    /// Number of samples in the scope.
     pub sample_count: u64,
+    /// For a fragment, its number as the caller counts it, reported back in
+    /// [`RecoveryDefinitionOrigin::Fragment`]; `None` for the sample table.
     pub fragment_ordinal: Option<u64>,
+    /// The track's `sgpd` of this kind, from its sample table.
     pub track_descriptions: Option<&'a RecoveryDescriptions>,
+    /// The fragment's own `sgpd` of this kind, from its `traf`; fragment scopes only.
     pub local_descriptions: Option<&'a RecoveryDescriptions>,
+    /// The scope's `sbgp` of this kind, whose runs must cover all its samples.
     pub mappings: Option<&'a RecoveryMappings>,
 }
 impl RecoveryScope<'_> {
@@ -422,15 +510,24 @@ impl RecoveryScope<'_> {
     }
 }
 
+/// The recovery group entry that applies to one sample.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RecoverySelection {
+    /// The grouping type.
     pub kind: RecoveryKind,
+    /// `group_description_index` of the `sbgp` run holding the sample, as stored;
+    /// `None` when the scope has no mapping.
     pub raw_mapping_index: Option<u32>,
+    /// Where the description index comes from.
     pub mapping_origin: RecoveryMappingOrigin,
+    /// Which `sgpd` the description comes from; `None` without a description.
     pub definition_origin: Option<RecoveryDefinitionOrigin>,
+    /// The entry that applies; `None` when the sample is in no group.
     pub description: Option<RecoveryDescription>,
 }
 impl RecoverySelection {
+    /// Samples to decode before this one: the magnitude of a zero or negative distance,
+    /// or 0 without a description. `Error::Unsupported` for a positive distance.
     pub fn preceding_samples(&self) -> Result<u16> {
         match self.description.as_ref().map(|entry| entry.distance) {
             Some(distance) if distance > 0 => Err(Error::Unsupported(
@@ -526,6 +623,8 @@ enum Phase {
     Description,
     Ready,
 }
+/// Finds the recovery group entry for one sample of a [`RecoveryScope`]: it reads the
+/// scope's `sbgp` runs, one per work unit, then the entry they or a default index name.
 #[derive(Debug)]
 pub struct RecoveryLookup<'a> {
     scope: RecoveryScope<'a>,
@@ -539,6 +638,12 @@ pub struct RecoveryLookup<'a> {
     failed: Option<Error>,
 }
 impl<'a> RecoveryLookup<'a> {
+    /// A lookup for the 1-based track sample `ordinal`. Fails with `Error::Invalid`
+    /// when the sample is outside the scope, the scope's first ordinal is zero, its
+    /// boxes have another grouping type, fragment descriptions are given outside a
+    /// fragment or the track's entries or default index are out of range; with
+    /// `Error::Unsupported` for a nonzero grouping parameter; and with `Error::Limit`
+    /// past `limits`.
     pub fn new(scope: RecoveryScope<'a>, ordinal: u64, limits: RecoveryLimits) -> Result<Self> {
         scope.validate(limits)?;
         if ordinal < scope.first_ordinal || ordinal >= scope.end()? {
@@ -562,6 +667,11 @@ impl<'a> RecoveryLookup<'a> {
             failed: None,
         })
     }
+    /// Advances the lookup. Fails with `Error::Unsupported` when the runs cover fewer
+    /// samples than the scope or the default index that applies is ambiguous,
+    /// `Error::Invalid` when they cover more or name a missing entry, and as
+    /// [`RecoveryDescriptionLookup::poll`]. An error is kept and returned by every
+    /// later poll.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -669,6 +779,8 @@ impl<'a> RecoveryLookup<'a> {
             }
         }
     }
+    /// The selection, once [`poll`](Self::poll) has returned `Ready`; `Error::Invalid`
+    /// before that, or the error a poll returned.
     pub fn finish(mut self) -> Result<RecoverySelection> {
         if let Some(error) = self.failed {
             return Err(error);

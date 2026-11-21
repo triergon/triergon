@@ -1,18 +1,24 @@
-//! Reference demux signed/null field representation, never a source clock type.
+//! The clocks of FFmpeg's MOV demuxer: a packet time as the demuxer's signed 64-bit
+//! field holds it beside its exact value, a track's stream clock and the clock that
+//! orders packets across tracks. They are projections of the source ticks, which
+//! they never replace.
 use triergon_core::{Error, Result, Rounding, TickScale, Time, TimeBase};
 
-/// A usable timebase from the source declaration, when available.
+/// The time base a track's `mdhd` timescale declares, or none for a zero timescale.
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct SourceTimeBase(Option<TimeBase>);
 
 impl SourceTimeBase {
+    /// No usable time base: the declared timescale is zero.
     pub const UNAVAILABLE: Self = Self(None);
 
+    /// The declared time base, `None` for a zero timescale.
     pub const fn get(self) -> Option<TimeBase> {
         self.0
     }
 
+    /// The declared time base; `Error::Invalid` for a zero timescale.
     pub fn require(self) -> Result<TimeBase> {
         self.0.ok_or(Error::Invalid("zero media/movie timescale"))
     }
@@ -33,23 +39,32 @@ impl std::fmt::Debug for SourceTimeBase {
     }
 }
 
-/// Observation provenance for the separately exposed demux stream clock.
+/// Why a track's stream clock is what it is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MediaClockCause {
+    /// The stream clock is the declared media time base.
     SourceScale,
+    /// The `mdhd` timescale is zero; the stream clock is 1/1 s.
     ObservedZeroScaleWord,
-    /// Only this observed all-ones word is supported. Other out-of-range
-    /// denominators remain refused; no general fallback timebase is guessed.
+    /// The `mdhd` timescale is `0xFFFF_FFFF`; the stream clock is 1/1 s. Other
+    /// timescales above `i32::MAX` are refused rather than given a substitute.
     ObservedAllOnesScaleWord,
 }
 
+/// A track's stream clock as FFmpeg's MOV demuxer reports it, beside the time base
+/// the track declares.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MediaClock {
+    /// The time base of the `mdhd` timescale; unavailable for a zero timescale.
     pub source_base: SourceTimeBase,
+    /// The stream time base in which the demuxer stamps the track's packets.
     pub demux_base: TimeBase,
+    /// Why `demux_base` is what it is.
     pub cause: MediaClockCause,
 }
 impl MediaClock {
+    /// The 1/1 s clock of a track whose `mdhd` timescale is zero, under the run
+    /// recovery profile.
     pub fn for_zero_scale(_profile: crate::table::recovery::RunRecoveryProfile) -> Result<Self> {
         Ok(Self {
             source_base: SourceTimeBase::UNAVAILABLE,
@@ -57,6 +72,8 @@ impl MediaClock {
             cause: MediaClockCause::ObservedZeroScaleWord,
         })
     }
+    /// The clock of a track with media time base `source_base`.
+    /// `Error::Unsupported` for a timescale above `i32::MAX` other than `0xFFFF_FFFF`.
     pub fn from_source(source_base: TimeBase) -> Result<Self> {
         if source_base.numerator() == 1 && source_base.denominator() == u64::from(u32::MAX) {
             return Ok(Self {
@@ -78,20 +95,31 @@ impl MediaClock {
     }
 }
 
-/// Demux scheduling state is independent of source-knownness and API fields.
-/// Unorderable heads retain the incumbent in the reference catalogue-order fold.
+/// The clock by which a packet cursor places a track's next packet among the other
+/// tracks', as FFmpeg's MOV demuxer does. A packet whose clock cannot be compared
+/// never displaces the earlier candidate; see
+/// [`seekable_head_precedes`](crate::compat::mov::clock::seekable_head_precedes).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SchedulingClock {
+    /// The cursor has one track, so packets are not ordered across tracks.
     SingleTrack,
-    /// Explicit from-start nonseekable operation selects by actual byte address.
+    /// A forward-only input read from its start: packets are ordered by this
+    /// absolute file offset of their bytes.
     NonseekableSourcePosition(u64),
+    /// The decode time in microseconds, rounded to nearest with ties away from zero.
     ExactMicroseconds(i64),
+    /// The decode time is the demuxer's null value (`i64::MIN`).
     ApiSentinel,
+    /// The decode time in microseconds does not fit `i64`.
     RescaleOverflow {
+        /// The rounded microseconds, `None` when they do not fit `i128` either.
         exact_microseconds: Option<i128>,
     },
 }
 impl SchedulingClock {
+    /// The clock of a packet whose decode time is `field`, in ticks of `base`.
+    /// `Error::Unsupported` when the rounded microseconds equal `i64::MIN`, the
+    /// demuxer's null value.
     pub fn from_demux_clock(field: ClockField, base: TimeBase) -> Result<Self> {
         Self::from_clock(field, base, None)
     }
@@ -297,18 +325,20 @@ fn scheduling_matches_exact_time() {
     }
 }
 
-/// A demux API field has a raw representation even when its API value is null.
-/// `exact_ticks` is the format-demux projection input (which can be
-/// derived); source Sample/Time knownness and origin provenance remain separate.
-/// Supported by demux boundary observations, including wide-tfdt cases. Not
-/// ISO source semantics or a generic wrap rule.
+/// A packet time as FFmpeg's MOV demuxer stores it in a signed 64-bit field,
+/// beside the exact value it was computed from. A value outside the field's range
+/// wraps, as it does in the demuxer, for example after a wide `tfdt`. Whether the
+/// source time is known is a separate fact, kept on the source sample.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ClockField {
+    /// The exact time in ticks of the track's demux time base, before it is stored.
     pub exact_ticks: i128,
+    /// The stored bits: `exact_ticks` modulo 2^64.
     pub demux_bits: u64,
 }
 
 impl ClockField {
+    /// The field for exact time `ticks`, wrapped to 64 bits.
     pub fn from_exact_ticks(ticks: i128) -> Result<Self> {
         let bits = ticks.rem_euclid(1i128 << 64);
         Ok(Self {
@@ -316,10 +346,12 @@ impl ClockField {
             demux_bits: u64::try_from(bits).map_err(|_| Error::Overflow)?,
         })
     }
+    /// The stored bits read as a two's-complement `i64`, the value the field holds.
     pub fn signed_ticks(self) -> i64 {
         i64::from_be_bytes(self.demux_bits.to_be_bytes())
     }
-    /// This null is an API sentinel, not an absent source timestamp.
+    /// The field's value, `None` when it is `i64::MIN`, which the demuxer reports as
+    /// no timestamp. That null is a stored value, not an unknown source time.
     pub fn api_ticks(self) -> Option<i64> {
         let value = self.signed_ticks();
         (value != i64::MIN).then_some(value)

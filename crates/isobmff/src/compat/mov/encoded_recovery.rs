@@ -1,6 +1,8 @@
-//! Retained source roll/prol facts and a separately selected reference open/index view.
-//! Source prerequisites are not decoder claims. reference does not apply these group
-//! kinds in this operation; no source distance, mapping, clock or key is erased.
+//! The `roll` and `prol` sample groups and the `sdtp` bytes of an encoded track as the
+//! recovery view reads them. FFmpeg's MOV demuxer does not apply these groups when it
+//! opens and indexes a track, so they are checked and kept but not applied. A group is
+//! a source fact, not a promise of decoder recovery; no roll distance, mapping, clock or
+//! key flag is changed.
 use crate::{
     BuildStatus, Limits, Next,
     boxes::BoxChildren,
@@ -15,21 +17,35 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
+/// Opt-in token for the recovery view: the checked `roll` and `prol` groups of
+/// `EncodedEditJob::new_with_recovery_groups` and the `sdtp` reading of
+/// [`DependencyObservation`].
 #[derive(Clone, Copy, Debug)]
 pub struct EncodedRecoveryProfile;
+/// The `sample_is_depended_on` field of an `sdtp` byte as the recovery view reads it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DependencyCause {
+    /// 0: unknown.
     SourceUnspecified,
+    /// 1: other samples depend on this one.
     SourceReferenced,
+    /// 2: no other sample depends on this one; the packet is marked disposable.
     SourceUnreferenced,
+    /// 3: reserved. The demuxer does not apply it, and the packet is not marked
+    /// disposable.
     SourceReservedNotAppliedByReceiver,
 }
+/// One `sdtp` byte as the recovery view reads it. Unlike the metadata view, which
+/// refuses the reserved value, it reads all four values.
 #[derive(Clone, Copy, Debug)]
 pub struct DependencyObservation {
+    /// The byte and its decoded field.
     pub source: DependencyView,
+    /// How the recovery view reads the field.
     pub cause: DependencyCause,
 }
 impl DependencyObservation {
+    /// Reads one `sdtp` byte.
     pub fn from_source(raw: u8, _profile: EncodedRecoveryProfile) -> Self {
         let cause = match raw & 0x0c {
             0 => DependencyCause::SourceUnspecified,
@@ -42,16 +58,21 @@ impl DependencyObservation {
             cause,
         }
     }
+    /// Whether FFmpeg's MOV demuxer marks the packet disposable: only for
+    /// [`DependencyCause::SourceUnreferenced`].
     pub fn demux_disposable_hint(self) -> bool {
         self.cause == DependencyCause::SourceUnreferenced
     }
 }
+/// One grouping type's `sgpd` descriptions and `sbgp` mappings in a sample table;
+/// either can be absent.
 #[derive(Clone, Debug, Default)]
 pub struct RecoveryGroup {
     descriptions: Option<RecoveryDescriptions>,
     mappings: Option<RecoveryMappings>,
 }
 impl RecoveryGroup {
+    /// The parsed `sgpd` box; `None` when the table has none of this type.
     pub fn descriptions(&self) -> Option<&RecoveryDescriptions> {
         self.descriptions.as_ref()
     }
@@ -59,23 +80,31 @@ impl RecoveryGroup {
         self.mappings.as_ref()
     }
 }
+/// Why FFmpeg's MOV demuxer does not use a track's recovery groups, for trace
+/// comparison.
 #[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RecoveryReceiverCause {
+    /// The demuxer's open and index apply no `roll` or `prol` group.
     RollProlNotAppliedByOpenIndex,
 }
+/// The checked `roll` and `prol` groups of a sample table, which FFmpeg's MOV demuxer
+/// does not apply when it opens and indexes the track.
 #[derive(Clone, Debug)]
 pub struct RecoveryFacts {
     groups: [RecoveryGroup; 2],
     samples: u64,
 }
 impl RecoveryFacts {
+    /// The group of `kind`; empty when the table has no box of that type.
     pub fn group(&self, kind: RecoveryKind) -> &RecoveryGroup {
         &self.groups[match kind {
             RecoveryKind::Roll => 0,
             RecoveryKind::Prol => 1,
         }]
     }
+    /// The group of `kind` as a [`RecoveryScope`] over every sample of the table, from
+    /// ordinal 1.
     pub fn source_scope(&self, kind: RecoveryKind) -> RecoveryScope<'_> {
         let group = self.group(kind);
         RecoveryScope {
@@ -88,6 +117,7 @@ impl RecoveryFacts {
             mappings: group.mappings(),
         }
     }
+    /// Why the demuxer does not apply the groups, for trace comparison.
     #[cfg(feature = "reference-trace")]
     pub fn receiver_cause(&self) -> RecoveryReceiverCause {
         RecoveryReceiverCause::RollProlNotAppliedByOpenIndex

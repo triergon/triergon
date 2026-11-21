@@ -1,11 +1,10 @@
-//! Seek plans over the source indexes.
+//! Seek plans over a track's sample tables and fragments, without reading media.
 //!
-//! [`SourceSeekPlanner`] lands on a track's preceding sync sample with the preroll the
-//! caller asks for. [`MovieEditLocator`] maps a movie time through the edit list to a
-//! media point, [`SourceCompositionLookup`] finds the sample presented at a media time,
-//! and [`MovieSourceSeekPlanner`] combines both with the `roll` recovery groups into a
-//! plan for a movie time. Plans state container facts only: a sync sample is not proof
-//! of decoder recovery.
+//! [`SourceSeekPlanner`] lands on the sync sample at or before a target sample with the
+//! preroll the caller asks for. [`MovieEditLocator`] maps a movie time through the edit
+//! list, [`SourceCompositionLookup`] finds the sample presented at a media time, and
+//! [`MovieSourceSeekPlanner`] combines both with the recovery groups into a plan for a
+//! movie time. A sync sample is what the container states, not proof of decoder recovery.
 
 mod movie;
 mod opus;

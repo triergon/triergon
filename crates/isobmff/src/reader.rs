@@ -1,18 +1,9 @@
-//! The source view through the neutral container model.
-//!
-//! [`Reader`] walks the root boxes first, so it needs a seekable source: `moov`
-//! and every `moof` are retained, every `mdat` extent is recorded, and packets
-//! follow once the tracks are indexed. Packets are sample wire facts in ascending
-//! byte order across tracks and decode order within a track. Edit lists are not
-//! applied: times are the media clock of the track, and the list stays on
-//! [`Track::edits`]. A fragment without `tfdt` has unknown times, which stay
-//! `None`.
-//!
-//! Track metadata describes the first sample entry. [`Packet::sample`] names the
-//! entry of each sample and [`Track::descriptions`] keeps them all, so a track
-//! that changes entry is visible there. Movie boxes the neutral view has no field
-//! for, such as colour, `udta` chapters and metadata, stay readable as bounded
-//! bytes through [`Reader::movie_box`] and [`SampleDescription::raw`].
+//! [`Reader`], the source view through the neutral container model. It needs a seekable
+//! source: it walks the root boxes, indexes every track, then delivers samples in ascending
+//! byte order across tracks and decode order within each. Times are media ticks without
+//! edits, which stay on [`Track::edits`]; a fragment without `tfdt` has unknown times.
+//! Boxes the neutral model has no field for stay readable through [`Reader::movie_box`]
+//! and [`SampleDescription::raw`].
 use crate::config::ObjectTypeScan;
 use crate::fragment::FragmentCursorPosition;
 use crate::open::{Movie, MovieOpen, MovieTrack, OpenLimits, OpenStep};
@@ -213,9 +204,11 @@ pub struct Track {
     head: Option<Sample>,
 }
 impl Track {
+    /// The track's `tkhd`, `mdhd` and `hdlr` facts.
     pub fn header(&self) -> &TrackHeader {
         self.source.header()
     }
+    /// The regular sample table, which holds no samples in a purely fragmented track.
     pub fn table(&self) -> &SampleTable {
         self.source.table()
     }
@@ -435,7 +428,7 @@ impl Reader {
     fn movie_open(&self) -> bool {
         matches!(self.phase, Phase::Packets | Phase::Seek | Phase::Ended)
     }
-    /// The first `ftyp` major brand.
+    /// The `ftyp` major brand; that of the last `ftyp` where the source has several.
     pub fn major_brand(&self) -> Option<[u8; 4]> {
         self.movie.as_ref().and_then(Movie::major_brand)
     }
@@ -447,6 +440,7 @@ impl Reader {
             .iter()
             .find(|raw| raw.header().kind == *b"moov")
     }
+    /// The `mvhd` facts, once the root boxes have been walked.
     pub fn movie_header(&self) -> Option<&MovieHeader> {
         self.movie.as_ref().map(Movie::header)
     }

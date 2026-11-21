@@ -1,4 +1,6 @@
-//! Buffered cursor arithmetic for the reference transport models.
+//! Buffer arithmetic shared by the transport models: where FFmpeg's reader holds its
+//! 32768-byte buffer in the source as read callbacks of a bounded size fill it, and where a
+//! refill can start when the reader returns to the sample entry.
 use crate::{
     reference_trace::mov::raw_video_transport::EntryRevisit, table::recovery::DescriptionContext,
 };

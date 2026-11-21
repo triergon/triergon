@@ -1,4 +1,9 @@
-//! Adobe F4V 10.1 §1.3 / Apple QTFF atom bounds. UUID syntax stays opaque (G01).
+//! Box framing. [`BoxHeader`] reads one box header, [`BoxView`] holds one complete box in
+//! memory and walks its children with [`BoxChildren`], and [`BoxReader`] walks the root
+//! boxes of a source through the caller's input cursor. A `uuid` box is framed like any
+//! other; its extended type stays at the start of its payload.
+//!
+//! Specification: Adobe F4V 10.1 §1.3; Apple QuickTime File Format (atoms).
 use crate::{Limits, Next, fields, policy};
 use std::ops::Range;
 use triergon_core::{Bytes, Error, Result, WorkBudget};
@@ -6,22 +11,33 @@ use triergon_core::{Bytes, Error, Result, WorkBudget};
 mod reader;
 pub use reader::{BoxEvent, BoxReader, MediaDataPolicy};
 
+/// The header of one box: its type, where it starts and how long it is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BoxHeader {
+    /// The four-character box type.
     pub kind: [u8; 4],
+    /// Absolute file offset of the box's first byte.
     pub start: u64,
+    /// Total size in bytes, header included; `None` for a size-zero box whose end is not
+    /// known yet.
     pub size: Option<u64>,
+    /// Header length in bytes: 8, or 16 with a 64-bit size.
     pub header_size: u8,
 }
+/// The result of [`BoxHeader::parse`] on a prefix that may be too short.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HeaderRead {
+    /// The prefix must hold at least this many bytes (8 or 16).
     Need(usize),
+    /// The header is complete.
     Ready(BoxHeader),
 }
 
 impl BoxHeader {
-    /// Only inspects a bounded prefix. Unknown final length stays unknown. A zero
-    /// size is admitted only for a top-level terminal mdat in this selected seam.
+    /// Reads the header at absolute offset `start` from `prefix`, the bytes from there on.
+    /// `parent_end` is the end of the enclosing box or source, if known; a box crossing it
+    /// is `Error::Truncated`. A size-zero box runs to `parent_end` and is accepted only as
+    /// a `top_level` `mdat`; elsewhere it is `Error::Unsupported`.
     pub fn parse(
         prefix: &[u8],
         start: u64,
@@ -80,11 +96,14 @@ impl BoxHeader {
             header_size,
         }))
     }
+    /// Absolute end offset, exclusive; `None` while the size is unknown.
     pub fn end(&self) -> Result<Option<u64>> {
         self.size
             .map(|size| self.start.checked_add(size).ok_or(Error::Overflow))
             .transpose()
     }
+    /// Absolute byte range of the payload after the header; `Error::Unsupported` while
+    /// the end is unknown.
     pub fn payload_range(&self) -> Result<Range<u64>> {
         let start = self
             .start
@@ -97,14 +116,16 @@ impl BoxHeader {
     }
 }
 
-/// An immutable, core-charged, complete bounded metadata box. Large mdat headers
-/// use BoxHeader directly; this type never buffers a file or fetches a range.
+/// One complete box held in memory charged to the shared budget, with its parsed header.
+/// Media data is never held this way: an `mdat` is known only by its [`BoxHeader`].
 #[derive(Clone, Debug)]
 pub struct BoxView {
     bytes: Bytes,
     header: BoxHeader,
 }
 impl BoxView {
+    /// The box stored in `bytes`, which starts at absolute offset `start`; fails unless
+    /// `bytes` hold exactly one complete box.
     pub fn new(bytes: Bytes, start: u64) -> Result<Self> {
         let end = start
             .checked_add(u64::try_from(bytes.len()).map_err(|_| Error::Overflow)?)
@@ -121,15 +142,21 @@ impl BoxView {
         }
         Ok(Self { bytes, header })
     }
+    /// The whole box, header included.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// The parsed header.
     pub fn header(&self) -> &BoxHeader {
         &self.header
     }
+    /// The bytes after the header.
     pub fn payload(&self) -> &[u8] {
         &self.bytes[usize::from(self.header.header_size)..]
     }
+    /// Walks the child boxes that follow the header and `skip` more bytes (the fixed
+    /// fields of a full box or sample entry), up to `limits.max_boxes` of them.
+    /// `Error::Truncated` when `skip` passes the end of the box.
     pub fn children(&self, skip: usize, limits: Limits) -> Result<BoxChildren> {
         let position = usize::from(self.header.header_size)
             .checked_add(skip)
@@ -146,6 +173,8 @@ impl BoxView {
     }
 }
 
+/// A walk over the child boxes of one [`BoxView`], from [`BoxView::children`]. Each
+/// child is a [`BoxView`] sharing the parent's storage.
 #[derive(Debug)]
 pub struct BoxChildren {
     parent: BoxView,
@@ -154,7 +183,9 @@ pub struct BoxChildren {
     limits: Limits,
 }
 impl BoxChildren {
-    /// One unit bounds one header/slice operation. Position changes only on success.
+    /// The next child, for one work unit. `Error::Limit` past `max_boxes` children and
+    /// `Error::Truncated` for a child crossing the parent's end; a failed poll leaves the
+    /// walk where it was.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<BoxView>> {
         if self.position == self.parent.bytes.len() {
             return Ok(Next::End);

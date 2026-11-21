@@ -70,13 +70,23 @@ fn validate_quicktime_data_handler(raw: &BoxView) -> Result<()> {
     }
     Ok(())
 }
+/// Bounds of one [`MovieOpen`]; memory is bounded separately, by the input cursor's
+/// budget.
 #[derive(Clone, Copy, Debug)]
 pub struct OpenLimits {
+    /// Largest root box read into memory (`ftyp`, `moov`, `moof`), in bytes; default
+    /// 16 MiB.
     pub metadata_bytes: usize,
+    /// Most root boxes in the source; default 4096.
     pub roots: usize,
+    /// Most tracks, and most `trex` boxes; 1 to 64, default 64.
     pub tracks: usize,
+    /// Deepest nesting of container boxes walked in `moov`, which counts as 1; 1 to 32,
+    /// default 12.
     pub depth: usize,
+    /// Most `moof` boxes; default 4096.
     pub fragments: usize,
+    /// Count limits for every box, table and description walk.
     pub format: Limits,
 }
 impl Default for OpenLimits {
@@ -303,11 +313,16 @@ impl Walk {
         Ok(())
     }
 }
+/// How much of the source an open read; see [`Movie::read_scope`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MetadataReadScope {
+    /// Every root box, to the end of the source.
     CompleteEntity,
+    /// The movie came first and the open stopped at this first `mdat` header; later root
+    /// boxes, fragments included, were not read.
     FrontMetadataBeforeMdat(BoxHeader),
 }
+/// One opened track: its headers, checked sample table, edit list and fragment indexes.
 #[derive(Debug)]
 pub struct MovieTrack {
     pub(crate) header: TrackHeader,
@@ -392,6 +407,8 @@ impl PendingMedia {
     }
 }
 
+/// An opened movie: its tracks, the `mdat` extents and the retained root boxes; from
+/// [`MovieOpen::finish`].
 #[derive(Debug)]
 pub struct Movie {
     pub(crate) read_scope: MetadataReadScope,
@@ -410,30 +427,40 @@ pub struct Movie {
     pub(crate) pool: Budget,
 }
 impl Movie {
+    /// The `ftyp` major brand, if the source has an `ftyp`; that of the last one where it
+    /// has several.
     pub fn major_brand(&self) -> Option<[u8; 4]> {
         self.major_brand
     }
+    /// How much of the source the open read.
     pub fn read_scope(&self) -> MetadataReadScope {
         self.read_scope
     }
+    /// The size-zero `mdat` the open stopped at, after a movie that came first.
     pub fn terminal_mdat(&self) -> Option<TerminalMdat> {
         self.terminal_mdat
     }
+    /// The tracks, in `moov` order.
     pub fn tracks(&self) -> &[MovieTrack] {
         self.tracks.as_slice()
     }
+    /// The root boxes read into memory (`ftyp`, `moov`, `moof`), in file order.
     pub fn raw_roots(&self) -> &[BoxView] {
         self.raw_roots.as_slice()
     }
+    /// The movie header.
     pub fn header(&self) -> &MovieHeader {
         &self.movie
     }
+    /// The source the movie was read from.
     pub fn source(&self) -> triergon_core::SourceId {
         self.source
     }
+    /// The input generation the open read in.
     pub fn generation(&self) -> u64 {
         self.generation
     }
+    /// The source length in bytes, if the source stated one.
     pub fn source_length(&self) -> Option<u64> {
         self.source_length
     }
@@ -445,6 +472,7 @@ impl Movie {
     pub fn media(&self) -> &[Range<u64>] {
         self.media.as_slice()
     }
+    /// The fragment defaults of the `trex` boxes in `mvex`.
     pub fn trex(&self) -> &[Trex] {
         self.trex.as_slice()
     }
@@ -460,18 +488,24 @@ impl Movie {
     }
 }
 impl MovieTrack {
+    /// The track's edit list, if it has an `elst`.
     pub fn edits(&self) -> Option<&EditList> {
         self.edits.as_ref()
     }
+    /// The track's `tkhd`, `mdhd` and `hdlr` facts.
     pub fn header(&self) -> &TrackHeader {
         &self.header
     }
+    /// The regular sample table.
     pub fn table(&self) -> &SampleTable {
         &self.table
     }
+    /// The track's fragment indexes, in file order.
     pub fn fragments(&self) -> &[FragmentIndex] {
         self.fragments.as_slice()
     }
+    /// The track's `dref` box as read; every sample entry refers to a self-contained
+    /// entry in it.
     pub fn raw_dref(&self) -> &BoxView {
         &self.raw_dref
     }
@@ -483,7 +517,9 @@ impl MovieTrack {
 /// What one [`MovieOpen::advance`] did.
 #[derive(Debug)]
 pub enum OpenStep {
+    /// Call `advance` again, with a new work budget if this one is spent.
     Yield,
+    /// Answer this request through the input cursor, then call `advance` again.
     NeedInput(InputRequest),
     /// A root box was passed or retained.
     Root(BoxHeader),
@@ -535,6 +571,8 @@ pub struct MovieOpen {
     ready: bool,
 }
 impl MovieOpen {
+    /// An opener reading every root box from the cursor's position; `Error::Invalid` for
+    /// limits outside the ranges [`OpenLimits`] states.
     pub fn new(input: &InputCursor, limits: OpenLimits) -> Result<Self> {
         Self::new_inner(input, limits, false, false)
     }
@@ -1125,7 +1163,8 @@ impl MovieOpen {
         }
         Ok(OpenStep::Yield)
     }
-    /// The opened movie. Later calls fail: its parts have moved out.
+    /// The opened movie; `Error::Invalid` before [`OpenStep::Ready`]. It takes the
+    /// opener's parts, so a second call fails too.
     pub fn finish(&mut self, input: &InputCursor) -> Result<Movie> {
         if !self.ready {
             return Err(Error::Invalid("movie not ready"));

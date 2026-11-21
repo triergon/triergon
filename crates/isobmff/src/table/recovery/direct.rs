@@ -1,7 +1,9 @@
-//! Independently observed, explicitly selected malformed MOV projection.
-//! No canonical source table/configuration/clock is repaired. The initial-zero
-//! description rule is bounded to a single catalogue entry and an immediate
-//! valid second chunk row. Raw declarations and demux read coordinates differ.
+//! Direct recovery: a sample table whose first chunk row has description index zero, or
+//! whose first chunk starts past the physical end of the file, read as FFmpeg's MOV demuxer
+//! reads it. The zero is accepted only in the first row of a table with one sample
+//! description, followed by a row that starts at chunk 2 with index 1. The source tables
+//! stay as stated; where FFmpeg lays chunks out differently, each packet reports its own
+//! byte range beside the declared sample.
 use super::*;
 use crate::{
     CursorStatus,
@@ -17,6 +19,8 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+/// Opt-in token for direct recovery, passed to [`RunRecoveryBuilder::new_direct`] and the
+/// direct cursors of [`RunRecoveryTable`].
 #[derive(Clone, Copy, Debug)]
 pub struct DirectRecoveryProfile;
 impl DirectRecoveryProfile {
@@ -25,46 +29,76 @@ impl DirectRecoveryProfile {
     /// inputs; this is not an ISO rule or a universal AVIO algorithm claim.
     pub(crate) const OBSERVED_FORWARD_READ_CAPACITY: u64 = 32768;
 }
+/// The zero description index in the first `stsc` row that direct recovery accepts, and how
+/// FFmpeg reads the first chunk instead.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InitialDescriptionDiagnostic {
+    /// Absolute file offset of the row's `sample_description_index` field.
     pub field_start: u64,
+    /// Absolute file offset just past that 4-byte field.
     pub field_end: u64,
+    /// The stated index; always 0.
     pub raw_description: u32,
+    /// `samples_per_chunk` of the first row, which FFmpeg does not use.
     pub declared_first_chunk_samples: u32,
+    /// `samples_per_chunk` of the second row, which FFmpeg uses for the first chunk.
     pub observed_first_chunk_samples: u32,
+    /// 1-based sample description FFmpeg uses for the samples; always 1.
     pub demux_catalogue_entry: u32,
     pub(crate) strict_error: Error,
 }
+/// What the caller knows about the source for direct recovery.
 #[derive(Clone, Copy, Debug)]
 pub struct DirectContext {
+    /// Length of the source file in bytes.
     pub physical_length: u64,
 }
+/// How a direct-recovery packet relates to the declared sample it is paired with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DirectAssociation {
-    /// Raw source declaration corresponds to the demux coordinate; it may
-    /// still contain an invalid clock/extent diagnosed independently.
+    /// The packet reads the declared sample's own byte range. Its clock or extent may still
+    /// be invalid; the occurrence's `range_error` reports the extent.
     DeclarationCoordinate,
-    /// Only the raw size/time row ordinal corresponds. This never associates
-    /// the source frame/configuration/range with the derived demux read range.
+    /// The packet shares only its ordinal, and so its size and clock rows, with the declared
+    /// sample; its byte range comes from FFmpeg's chunk layout and is not that sample's.
     RawSizeAndClockOrdinalOnly,
 }
+/// Whether a direct-recovery packet's bytes can be read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DirectRead {
+    /// The packet is empty or starts before the physical end of the file.
     Available,
+    /// The packet starts at or past the physical end, within 32,768 bytes of the media
+    /// extent's start, where FFmpeg reads forward to the end of the file and reports end of
+    /// file.
     ObservedForwardEof,
+    /// The packet starts further past the media extent's start, where FFmpeg would have to
+    /// seek past the end; this view does not model the outcome.
     UnreviewedSeekRefusal,
 }
+/// One packet of a [`DirectPacketCursor`]: the declared sample and the packet FFmpeg
+/// reports in its place.
 #[derive(Clone, Debug)]
 pub struct DirectOccurrence {
+    /// The sample as the table declares it; its access is unknown when the sync table was
+    /// rejected.
     pub declaration: Sample,
+    /// The packet FFmpeg reports.
     pub demux: PacketView,
     pub(crate) source_timescale: u32,
+    /// How `demux` relates to `declaration`.
     pub association: DirectAssociation,
     pub(crate) raw_chunk_description: u32,
+    /// Why the packet's byte range leaves the media extent, if it does.
     pub range_error: Option<Error>,
+    /// Whether the packet's bytes can be read.
     pub read: DirectRead,
 }
 impl RunRecoveryBuilder {
+    /// Starts direct recovery of `raw`: run recovery that also accepts a zero
+    /// `sample_description_index` in the first `stsc` row, when the table has one sample
+    /// description and the second row starts at chunk 2 with index 1. The table then
+    /// reports an [`InitialDescriptionDiagnostic`]. Fails as [`new`](Self::new) does.
     pub fn new_direct(
         raw: BoxView,
         budget: Budget,
@@ -77,9 +111,18 @@ impl RunRecoveryBuilder {
     }
 }
 impl RunRecoveryTable {
+    /// The zero description index direct recovery accepted in the first `stsc` row, if any.
     pub fn initial_description_diagnostic(&self) -> Option<InitialDescriptionDiagnostic> {
         self.initial_description
     }
+    /// Walks the packets FFmpeg reports for this track. A table without an initial
+    /// description diagnostic whose first chunk starts before `context`'s physical end reads
+    /// as [`packet_cursor`](Self::packet_cursor) does, every packet available. Otherwise the
+    /// cursor follows FFmpeg's chunk layout and needs one media extent reaching the physical
+    /// end, one sample description and at most two `ctts` rows (`Error::Unsupported`
+    /// otherwise), and `limits` that admit a track, an extent and every sample
+    /// (`Error::Limit`). Fails with `Error::ForeignPool` when the table is not charged to
+    /// `pool`.
     pub fn direct_packet_cursor<'a>(
         &'a self,
         pool: &Budget,
@@ -135,6 +178,8 @@ impl RunRecoveryTable {
             latch: Latched::default(),
         })
     }
+    /// Builds FFmpeg's index of this track, one entry per packet, choosing the layout as
+    /// [`direct_packet_cursor`](Self::direct_packet_cursor) does.
     pub fn direct_index_cursor<'a>(
         &'a self,
         pool: &Budget,
@@ -350,6 +395,8 @@ impl DirectCursor<'_> {
         Ok(Some(row))
     }
 }
+/// FFmpeg's packets for a [`RunRecoveryTable`] under direct recovery, from
+/// [`RunRecoveryTable::direct_packet_cursor`].
 #[derive(Debug)]
 pub struct DirectPacketCursor<'a> {
     // Exactly one engine is initialized by these sealed constructors. Keep
@@ -368,6 +415,8 @@ impl<'a> From<RecoveryPacketCursor<'a>> for DirectPacketCursor<'a> {
     }
 }
 impl DirectPacketCursor<'_> {
+    /// Advances to the next packet; take it with [`take_occurrence`](Self::take_occurrence).
+    /// A failure, cancellation included, is sticky.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         let result = match self.latch.early(cancel) {
             Some(early) => early,
@@ -415,15 +464,23 @@ impl DirectPacketCursor<'_> {
             None => Ok(CursorStatus::End),
         }
     }
+    /// Takes the ready packet; fails with the sticky failure, or with `Error::Invalid` when
+    /// no packet is ready.
     pub fn take_occurrence(&mut self) -> Result<DirectOccurrence> {
         self.latch.take("no ready v2 observation")
     }
 }
+/// One entry of FFmpeg's index under direct recovery, with the declared sample it stands
+/// for.
 #[derive(Clone, Debug)]
 pub struct DirectIndexEntry {
+    /// The index entry FFmpeg reports.
     pub entry: NativeIndexEntry,
+    /// The sample as the table declares it.
     pub declaration: Sample,
+    /// How the entry's packet relates to `declaration`.
     pub association: DirectAssociation,
+    /// Why the packet's byte range leaves the media extent, if it does.
     pub range_error: Option<Error>,
 }
 // One engine is chosen per index; keep it inline rather than allocate it.
@@ -433,6 +490,8 @@ enum IndexEngine<'a> {
     Legacy(RecoveryIndexCursor<'a>),
     Direct(DirectPacketCursor<'a>),
 }
+/// FFmpeg's index of a [`RunRecoveryTable`] under direct recovery, from
+/// [`RunRecoveryTable::direct_index_cursor`].
 #[derive(Debug)]
 pub struct DirectIndexCursor<'a> {
     engine: IndexEngine<'a>,
@@ -453,6 +512,8 @@ impl<'a> From<RecoveryIndexCursor<'a>> for DirectIndexCursor<'a> {
     }
 }
 impl DirectIndexCursor<'_> {
+    /// Advances to the next entry; take it with [`take_entry`](Self::take_entry). A failure,
+    /// cancellation included, is sticky.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         let result = match self.latch.early(cancel) {
             Some(early) => early,
@@ -516,6 +577,8 @@ impl DirectIndexCursor<'_> {
             },
         }
     }
+    /// Takes the ready entry; fails with the sticky failure, or with `Error::Invalid` when no
+    /// entry is ready.
     pub fn take_entry(&mut self) -> Result<DirectIndexEntry> {
         self.latch.take("no ready v2 index")
     }

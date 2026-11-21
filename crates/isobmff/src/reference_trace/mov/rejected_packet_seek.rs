@@ -1,10 +1,11 @@
-//! Explicit reference first-packet failure, distinct from a source-parser error.
+//! The failure of a first packet read past the physical end of the source.
 //!
-//! The admitted passive observations establish one operation transition: when
-//! EVERY supported open window requires an absolute packet seek beyond the
-//! physical source, the wrapper rejects that seek and the MOV read reports
-//! invalid-data. This models that transition, not an observed demux I/O state.
-//! A physical length or read quantum by itself establishes no such transition.
+//! When, in every possible open buffer state of a
+//! [`RootWalkTransportModel`](crate::reference_trace::mov::transport::RootWalkTransportModel),
+//! reaching a track's first packet needs an absolute seek past the physical end, the seek is
+//! rejected and FFmpeg's MOV read fails with invalid data. [`InitialOperationJob`] detects
+//! that case and keeps the source's own error beside it. Neither the physical length nor
+//! the read size alone decides it.
 use crate::{
     BuildStatus, CursorStatus,
     boxes::BoxView,
@@ -24,12 +25,12 @@ use std::{
 };
 use triergon_core::{Budget, Error, InputCursor, InputToken, Result, SourceId, WorkBudget};
 
-/// Opt-in to the operation/error contract; no default source view is changed.
+/// Selects FFmpeg's first-read failure; pass it to [`InitialOperationJob::new`].
 #[derive(Clone, Copy, Debug)]
 pub struct RejectedPacketSeekProfile;
 
-/// A demux-operation projection with the exact source failure kept separately.
-/// No source sample, clock, configuration or range is repaired by this value.
+/// A first packet read that FFmpeg fails, with the source's own error kept beside it. No
+/// source sample, clock, configuration or range is repaired.
 #[derive(Clone, Debug)]
 pub struct RejectedPacketSeek {
     source_table: BoxView,
@@ -40,58 +41,74 @@ pub struct RejectedPacketSeek {
     physical_length: u64,
 }
 impl RejectedPacketSeek {
+    /// The track's `stbl` box.
     pub fn source_table(&self) -> &BoxView {
         &self.source_table
     }
+    /// The track's `mdhd` box.
     pub fn source_mdhd(&self) -> &BoxView {
         &self.source_mdhd
     }
+    /// The track's first description event, whose packet FFmpeg fails to read.
     pub fn source_event(&self) -> &DescriptionEvent {
         &self.event
     }
+    /// The `Error::Invalid` the input cursor returns when asked for the packet's start.
     pub fn source_error(&self) -> Error {
         self.source_error
     }
+    /// The model's buffer states when open returns.
     pub fn modeled_open_state(&self) -> ModeledOpenState {
         self.open
     }
+    /// Length of the source in bytes.
     pub fn physical_length(&self) -> u64 {
         self.physical_length
     }
-    /// Literal MOV read result established by the reference observations. This is
-    /// not the core Error value or the range callback's return code.
+    /// FFmpeg's read return code, `-1094995529` (`AVERROR_INVALIDDATA`). It is neither the
+    /// core error nor the read callback's return value.
     pub fn demux_read_result(&self) -> i32 {
         -1_094_995_529
     }
+    /// Packets FFmpeg delivers before the failure: always 0.
     pub fn demux_packets_delivered(&self) -> u64 {
         0
     }
+    /// Whether FFmpeg publishes its stream catalogue: always `false`.
     pub fn demux_catalogue_published(&self) -> bool {
         false
     }
+    /// Whether FFmpeg reports end of file: always `false`, since the read fails instead.
     pub fn demux_confirmed_eof(&self) -> bool {
         false
     }
 }
 
+/// The result of an [`InitialOperationJob`]: a rejected first read, or none.
 #[derive(Debug)]
 pub struct InitialOperation {
     rejected: Option<RejectedPacketSeek>,
 }
 impl InitialOperation {
-    /// None means this job made no demux failure claim. The caller must run
-    /// another established operation or retain its explicit refusal.
+    /// The rejected first read, or `None` when FFmpeg's read does not fail this way; the
+    /// caller then runs another operation or keeps its own refusal.
     pub fn rejected_seek(&self) -> Option<&RejectedPacketSeek> {
         self.rejected.as_ref()
     }
+    /// Takes the rejected first read, or `None` as for
+    /// [`rejected_seek`](Self::rejected_seek).
     pub fn into_rejected_seek(self) -> Option<RejectedPacketSeek> {
         self.rejected
     }
 }
 
-/// A bounded first-event probe followed by a real fallible core range request.
-/// The cursor is built internally from immutable table/header/model storage; no
-/// caller-supplied event or expected/demux output can choose the disposition.
+/// Decides whether FFmpeg fails the read of a track's first packet.
+///
+/// The job reads the first event of the track's root-walk packet cursor. When its packet
+/// starts past the physical end and more than 32768 bytes past the buffer end in every
+/// possible state, the job asks the input for that offset, which must fail, and reports a
+/// [`RejectedPacketSeek`]. The job builds its own cursor, so a caller cannot choose the
+/// outcome.
 pub struct InitialOperationJob<'a> {
     cursor: Option<DescriptionPacketCursor<'a>>,
     table: &'a DescriptionRecoveryTable,
@@ -119,6 +136,11 @@ impl std::fmt::Debug for InitialOperationJob<'_> {
     }
 }
 impl<'a> InitialOperationJob<'a> {
+    /// Starts the job for the track of `table` and `header`, with `media` the file's `mdat`
+    /// payload ranges and `input` the source. Fails with `Error::ForeignPool` when the
+    /// track's boxes are not in `input`'s pool, and with `Error::Unsupported` unless `input`
+    /// is random-access with the model's physical length and `table` and `media` are those
+    /// the model was built from.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         table: &'a DescriptionRecoveryTable,
@@ -204,6 +226,10 @@ impl<'a> InitialOperationJob<'a> {
         }
         Ok(())
     }
+    /// Reads the first event and, where FFmpeg's read fails, asks `input` for the packet's
+    /// start. Fails with `Error::Limit` for a first packet larger than `maximum_packet`
+    /// bytes, and when `input` is no longer the source, token and position the job started
+    /// with.
     pub fn poll(
         &mut self,
         input: &mut InputCursor,
@@ -334,6 +360,8 @@ impl<'a> InitialOperationJob<'a> {
         });
         Ok(BuildStatus::Ready)
     }
+    /// Takes the result after [`poll`](Self::poll) returned `Ready`, checking `input`
+    /// again. Fails with `Error::Invalid` before then or when called again.
     pub fn try_finish(
         &mut self,
         input: &mut InputCursor,

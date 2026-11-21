@@ -1,8 +1,11 @@
-//! Legacy fragment syntax/default precedence from Adobe F4V 10.1 §§2.9, 2.12.
-//! tfdt: ETSI TS 126 244 V18.0.0 §13.5. The moof-base bit uses acquired ISO
-//! 14496-12:2008/FDAmd2 addition to §8.8.7.1, with the published ETSI profile's
-//! named flag semantics. Selected signed trun v1 uses FDAM3 replacement8.8.8.2
-//! and MPEG m76694 table9 Original, experimentally. Final clauses/brands stay open.
+//! Track fragments. [`Trex`] holds a track's fragment defaults, [`FragmentBuilder`] indexes
+//! one `traf` into a [`FragmentIndex`] without reading media, and [`FragmentCursor`],
+//! [`OwnedFragmentCursor`] and [`FragmentLocator`] read its samples back. Signed `trun`
+//! version 1 composition offsets follow draft text and are read experimentally.
+//!
+//! Specification: Adobe F4V 10.1 §§2.9, 2.12; ETSI TS 126 244 V18.0.0 §13.5 (`tfdt`);
+//! ISO/IEC 14496-12:2008/FDAmd2 §8.8.7.1 (moof-relative base); FDAM3 §8.8.8.2 and MPEG
+//! m76694 Table 9 (signed `trun`).
 use crate::{
     Access, BuildStatus, Limits, Next, Sample,
     boxes::{BoxChildren, BoxView},
@@ -14,15 +17,23 @@ use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 mod decode_time;
 pub use decode_time::FragmentDecodeTime;
 
+/// A track's fragment defaults, from its `trex` box in `mvex`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Trex {
+    /// `track_ID` the defaults apply to; never zero.
     pub track_id: u32,
+    /// Default 1-based sample description index.
     pub description_index: u32,
+    /// Default sample duration in ticks of the media timescale.
     pub duration: u32,
+    /// Default sample size in bytes.
     pub size: u32,
+    /// Default `sample_flags` word.
     pub flags: u32,
 }
 impl Trex {
+    /// Reads a `trex` box. `Error::Invalid` for another box type, a zero track ID or
+    /// trailing bytes; `Error::Unsupported` for nonzero version or flags.
     pub fn parse(raw: &BoxView) -> Result<Self> {
         if raw.header().kind != *b"trex" {
             return Err(Error::Invalid("not trex"));
@@ -44,20 +55,31 @@ impl Trex {
     }
 }
 
+/// Where the data of a `traf` starts when it states neither a base data offset nor the
+/// moof-relative flag.
 #[derive(Clone, Copy, Debug)]
 pub enum ImplicitBase {
+    /// The first `traf` of its `moof`: at the `moof`'s first byte.
     FirstTraf,
-    /// Caller has established the preceding traf's data endpoint in this moof.
+    /// A later `traf`: at this absolute offset, the end of the preceding `traf`'s data in
+    /// the same `moof` ([`FragmentIndex::implicit_data_end`]).
     PreviousTraf(u64),
 }
+/// The place of a `traf` in its file and track, for [`FragmentBuilder`].
 #[derive(Clone, Copy, Debug)]
 pub struct FragmentContext {
+    /// Absolute file offset of the enclosing `moof`'s first byte.
     pub moof_start: u64,
+    /// Where the data starts if the `traf` does not say.
     pub implicit_base: ImplicitBase,
-    /// Independently established origin if tfdt is absent. When tfdt is present,
-    /// a supplied value must agree. Absence never silently implies time zero.
+    /// Decode time of the first sample in media ticks, if the caller knows it, for a
+    /// `traf` without `tfdt`. With `tfdt` present a supplied value must match it; without
+    /// either, sample times are unknown, not zero.
     pub decode_origin: Option<i128>,
+    /// 1-based track ordinal of the fragment's first sample; never zero.
     pub first_ordinal: u64,
+    /// Number of entries in the track's `stsd`, which the fragment's description index
+    /// must not exceed.
     pub description_count: u32,
 }
 
@@ -258,6 +280,8 @@ struct IndexedRun {
     duration: u64,
 }
 
+/// One `traf` indexed by run, from [`FragmentBuilder`]: its defaults, and where each run's
+/// data starts and its decode time. Nothing is stored per sample.
 #[derive(Debug)]
 pub struct FragmentIndex {
     raw: BoxView,
@@ -271,7 +295,7 @@ pub struct FragmentIndex {
     decode_end: Option<i128>,
 }
 impl FragmentIndex {
-    /// Format-local source syntax provenance; no demux distance semantics.
+    /// The `trun` flags of 0-based run `run`.
     pub(crate) fn run_flags(&self, run: usize) -> Result<u32> {
         self.runs
             .as_slice()
@@ -279,31 +303,37 @@ impl FragmentIndex {
             .map(|r| r.wire.fields)
             .ok_or(Error::Invalid("fragment source run absent"))
     }
+    /// The `traf` box as read.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
+    /// The `tfdt` box, if the `traf` has one.
     pub fn decode_time(&self) -> Option<&FragmentDecodeTime> {
         self.decode_time.as_ref()
     }
+    /// Number of samples across all runs.
     pub fn sample_count(&self) -> u64 {
         self.count
     }
-    /// Original container sample ordinal, not a clock or request generation.
+    /// 1-based track ordinal of the first sample.
     pub fn first_ordinal(&self) -> u64 {
         self.first_ordinal
     }
+    /// `track_ID` from `tfhd`.
     pub fn track_id(&self) -> u32 {
         self.defaults.track_id
     }
+    /// 1-based sample description index all the fragment's samples use.
     pub fn description_index(&self) -> u32 {
         self.defaults.description_index
     }
+    /// Absolute file offset just past the data of the last run.
     pub fn data_end(&self) -> u64 {
         self.data_end
     }
-    /// The last source-order run endpoint is an unambiguous following-traf base
-    /// only in this nonempty, forward/nonoverlapping legacy run profile. Backward
-    /// explicit runs remain preserved but cannot silently establish this context.
+    /// [`data_end`](Self::data_end) as the implicit base of the next `traf` in the same
+    /// `moof`. `Error::Unsupported` when the fragment has no samples, an empty run, or a
+    /// run that starts before the previous one ends, since that end is then ambiguous.
     pub fn implicit_data_end(&self) -> Result<u64> {
         if !self.implicit_safe || self.count == 0 {
             return Err(Error::Unsupported(
@@ -312,9 +342,12 @@ impl FragmentIndex {
         }
         Ok(self.data_end)
     }
+    /// Decode time just after the last sample, in media ticks; `None` when the fragment's
+    /// times are unknown.
     pub fn decode_end(&self) -> Option<i128> {
         self.decode_end
     }
+    /// A cursor over the samples in run order.
     pub fn cursor(&self) -> FragmentCursor<'_> {
         FragmentCursor {
             index: self,
@@ -324,6 +357,8 @@ impl FragmentIndex {
             decode: None,
         }
     }
+    /// A locator for the sample with 1-based track `ordinal`; `Error::Invalid` outside
+    /// this fragment.
     pub fn locate(&self, ordinal: u64) -> Result<FragmentLocator<'_>> {
         let end = self
             .first_ordinal
@@ -355,6 +390,9 @@ enum Phase {
     Ready,
 }
 
+/// Indexes one `traf` into a [`FragmentIndex`] under a work budget, reading no media.
+/// Poll until [`BuildStatus::Ready`], then call [`finish`](Self::finish). A failure other
+/// than backpressure is kept for later polls.
 #[derive(Debug)]
 pub struct FragmentBuilder {
     raw: BoxView,
@@ -381,6 +419,9 @@ pub struct FragmentBuilder {
     failed: Option<Error>,
 }
 impl FragmentBuilder {
+    /// A builder for `raw`, a `traf` stored in `budget`, taking from `trex` the defaults
+    /// `tfhd` does not override. `Error::Invalid` for another box type, a box from another
+    /// budget pool or a zero first ordinal.
     pub fn new(
         raw: BoxView,
         trex: Trex,
@@ -425,8 +466,8 @@ impl FragmentBuilder {
             failed: None,
         })
     }
-    /// The reference MOV receiver rejects a zero-size sample in a fragment
-    /// reached during header opening. Source and packet-stage parsing retain it.
+    /// [`new`](Self::new), also refusing a zero-size sample, as FFmpeg's MOV demuxer
+    /// does in the fragments it reads while opening a file.
     pub(crate) fn new_header_open(
         raw: BoxView,
         trex: Trex,
@@ -438,9 +479,13 @@ impl FragmentBuilder {
         builder.reject_zero_size = true;
         Ok(builder)
     }
+    /// The `traf` box being indexed.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
+    /// One bounded step. `Error::Invalid` for structural faults such as a missing or
+    /// duplicate `tfhd`, a misplaced `tfdt` or a description index outside the track;
+    /// `Error::Unsupported` for unknown `tfhd`, `tfdt` or `trun` versions or flags.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -693,6 +738,8 @@ impl FragmentBuilder {
             }
         }
     }
+    /// The index; the error that stopped the build, or `Error::Invalid` before
+    /// [`BuildStatus::Ready`].
     pub fn finish(mut self) -> Result<FragmentIndex> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -787,6 +834,7 @@ impl FragmentIndex {
     }
 }
 
+/// Reads the samples of a [`FragmentIndex`] in run order; from [`FragmentIndex::cursor`].
 #[derive(Clone, Copy, Debug)]
 pub struct FragmentCursor<'a> {
     index: &'a FragmentIndex,
@@ -796,11 +844,11 @@ pub struct FragmentCursor<'a> {
     decode: Option<i128>,
 }
 impl FragmentCursor<'_> {
-    /// Source run ordinal for the most recently emitted fragment sample. The
-    /// storage reads this after Sample, before another poll can leave that run.
+    /// 0-based run of the sample the last poll returned, until the next poll.
     pub(crate) fn run_index(&self) -> usize {
         self.run
     }
+    /// The next sample, for one work unit per sample and per run passed.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         let Advance::Sample(next) = self.advance(work)? else {
             return Ok(Next::Yield);
@@ -945,6 +993,8 @@ pub(crate) struct SkippedRunSample {
     pub(crate) sync: bool,
 }
 
+/// Finds one sample of a [`FragmentIndex`] by ordinal without visiting the runs before
+/// its own; from [`FragmentIndex::locate`].
 #[derive(Debug)]
 pub struct FragmentLocator<'a> {
     index: &'a FragmentIndex,
@@ -981,6 +1031,7 @@ impl FragmentLocator<'_> {
     pub(crate) fn passed_sync(&self) -> Option<u64> {
         self.passed_sync
     }
+    /// The located sample once, then [`Next::End`]. A failure is kept for later polls.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -1102,8 +1153,8 @@ impl FragmentLocator<'_> {
     }
 }
 
-/// An owned iterator over one immutable fragment index. Reborrows the same source
-/// cursor on each poll; no self-reference, alternate parser or retained-state injection.
+/// A [`FragmentCursor`] that owns its index, so it can be kept without a borrow; from
+/// [`FragmentIndex::into_cursor`].
 #[derive(Debug)]
 pub struct OwnedFragmentCursor {
     index: FragmentIndex,
@@ -1113,6 +1164,7 @@ pub struct OwnedFragmentCursor {
     decode: Option<i128>,
 }
 impl FragmentIndex {
+    /// A cursor over the samples that takes the index with it.
     pub fn into_cursor(self) -> OwnedFragmentCursor {
         OwnedFragmentCursor {
             index: self,
@@ -1139,9 +1191,11 @@ impl OwnedFragmentCursor {
     pub(crate) fn remaining_in_delivered_run(&self) -> u32 {
         self.index.runs.as_slice()[self.run].wire.count - self.sample
     }
+    /// The index being read.
     pub fn index(&self) -> &FragmentIndex {
         &self.index
     }
+    /// The next sample, as [`FragmentCursor::poll`] reports it.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         let mut cursor = FragmentCursor {
             index: &self.index,

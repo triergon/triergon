@@ -1,3 +1,5 @@
+//! The leading trim of the first packet of a fragmented AAC track whose edit starts the
+//! media after time zero, as FFmpeg's MOV demuxer reports it in skip-samples side data.
 use crate::{
     compat::mov::cursor::fragment_media_start,
     config::{AudioDescription, AudioDescriptionStep, ConfigurationLimits},
@@ -15,9 +17,9 @@ enum Phase {
     Audio(AacAscParser),
 }
 
-/// Read the leading decoder trim for the first AAC packet of a
-/// fragmented track with an open-ended rate-one edit. The source sample and
-/// fragment decode times stay in the original media timebase.
+/// Reads the leading decoder trim of the first AAC packet of a fragmented track whose
+/// edit list is one open-ended (zero-duration) rate-one edit with a positive media
+/// time. Source sample and fragment decode times stay in the media timescale.
 #[allow(missing_debug_implementations)] // The AAC parser has no Debug implementation.
 pub struct FragmentAacTrimJob {
     phase: Phase,
@@ -28,7 +30,10 @@ pub struct FragmentAacTrimJob {
 }
 
 impl FragmentAacTrimJob {
-    /// Returns no job when the track has no leading AAC trim to project.
+    /// The job for the 0-based track `at` of `movie`, or `None` when it has no leading
+    /// AAC trim: it is not a sound track whose samples are all in fragments, or has no
+    /// edit list, a zero media time or no `mp4a` entry. `Error::Unsupported` for another
+    /// edit list or several descriptions; `Error::Invalid` when there is no track `at`.
     pub fn new(movie: &Movie, at: usize) -> Result<Option<Self>> {
         let track = movie
             .tracks()
@@ -83,8 +88,10 @@ impl FragmentAacTrimJob {
         }))
     }
 
-    /// Return the leading sample count, yielding with `None` until the
-    /// configuration is ready. A non-AAC description yields zero.
+    /// Reads the AAC configuration within `work`: `None` until it is read, then the
+    /// edit's media time in samples at the configuration's output rate, rounded to
+    /// nearest, or 0 for an `mp4a` entry that is not AAC. `Error::Invalid` when polled
+    /// again after the count.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<u32>> {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);

@@ -1,28 +1,54 @@
-//! ETSI TS 126 244 V18.0.0 §13.4: compact source segment-index references.
-//! SAP declarations and byte/time candidates do not establish decoder recovery.
+//! The segment index box (`sidx`): [`SegmentIndex`] and the references its cursor
+//! reads, each the byte range and presentation span of a subsegment or of a nested
+//! index. The stream access point fields are what the file states, not proof that
+//! decoding can start there.
+//!
+//! Specification: ETSI TS 126 244 V18.0.0 §13.4.
 use crate::{Limits, Next, boxes::BoxView, fields, policy};
 use std::ops::Range;
 use triergon_core::{Error, Result, Time, TimeBase, WorkBudget};
 
+/// One reference of a `sidx` box, with its byte range and times worked out from the
+/// references before it.
 #[derive(Clone, Debug)]
 pub struct SegmentReference {
+    /// 1-based position of the reference in the box.
     pub ordinal: u32,
+    /// `reference_type`: true when the reference points at another `sidx` box, false
+    /// when it points at media.
     pub references_index: bool,
+    /// Absolute byte range in the file: the first reference starts `first_offset` bytes
+    /// after the `sidx` box, each later one where the previous ends, and each spans its
+    /// 31-bit `referenced_size`.
     pub range: Range<u64>,
-    /// Movie composition timeline after edits, not a replacement source DTS.
+    /// Earliest presentation time of the referenced material: the box's
+    /// `earliest_presentation_time` plus the durations of the references before it,
+    /// on the presentation timeline after edits; not a decode time.
     pub earliest_presentation: Time,
+    /// `subsegment_duration`, in the index timescale.
     pub presentation_duration: Time,
+    /// `starts_with_SAP`: the file states that the referenced material starts with a
+    /// stream access point.
     pub starts_with_sap: bool,
-    /// Values 0..6 are documented; reserved 7 stays raw, never grants recovery.
+    /// `SAP_type`, 0 to 7: 1 to 6 name a stream access point type, 0 states no type and
+    /// 7 is reserved. Kept as stored.
     pub sap_type: u8,
+    /// `SAP_delta_time`, in ticks of the index timescale; 28 bits.
     pub sap_delta_ticks: u32,
+    /// The reference's first 32-bit word as stored: `reference_type` and
+    /// `referenced_size`.
     pub raw_size_word: u32,
+    /// The reference's third 32-bit word as stored: `starts_with_SAP`, `SAP_type` and
+    /// `SAP_delta_time`.
     pub raw_sap_word: u32,
 }
 
-/// Keeps the complete source box and a compact fixed-width table. Targets must
-/// still be resolved against the correct source and checked as moof/sidx boxes;
-/// hierarchical graphs require caller-owned depth/cycle and range budgets.
+/// A parsed segment index box (`sidx`), kept as the original box; its references are
+/// read one at a time by [`cursor`](Self::cursor).
+///
+/// The references are not checked against the file. A caller that follows one must
+/// check that it lands on a `moof` or `sidx` box, and must bound the depth of nested
+/// indexes and detect cycles itself.
 #[derive(Clone, Debug)]
 pub struct SegmentIndex {
     raw: BoxView,
@@ -36,6 +62,11 @@ pub struct SegmentIndex {
     count: u16,
 }
 impl SegmentIndex {
+    /// Parses a `sidx` box. Fails with `Error::Unsupported` for a version above 1 or
+    /// nonzero flags, `Error::Invalid` for another box, a zero `reference_ID` or
+    /// timescale, nonzero reserved bits, a size-zero box or references that do not fill
+    /// the box exactly, and `Error::Limit` for more references than
+    /// `limits.max_records`.
     pub fn parse(raw: BoxView, limits: Limits) -> Result<Self> {
         if raw.header().kind != *b"sidx" {
             return Err(Error::Invalid("not sidx"));
@@ -83,27 +114,38 @@ impl SegmentIndex {
             count,
         })
     }
+    /// The whole `sidx` box.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
+    /// Box version: 0 for 32-bit, 1 for 64-bit earliest time and first offset.
     pub fn version(&self) -> u8 {
         self.version
     }
+    /// `reference_ID`: the stream the index describes, usually a `track_ID`; never
+    /// zero.
     pub fn reference_id(&self) -> u32 {
         self.reference_id
     }
+    /// Ticks per second of the index's times; never zero.
     pub fn timescale(&self) -> u32 {
         self.timescale
     }
+    /// `earliest_presentation_time` of the first reference, in ticks of
+    /// [`timescale`](Self::timescale).
     pub fn earliest_presentation_ticks(&self) -> u64 {
         self.earliest
     }
+    /// `first_offset`: bytes from the end of the `sidx` box to the first referenced
+    /// byte.
     pub fn first_offset(&self) -> u64 {
         self.first_offset
     }
+    /// Number of references in the box.
     pub fn reference_count(&self) -> u16 {
         self.count
     }
+    /// A cursor over the references, in box order.
     pub fn cursor(&self) -> SegmentIndexCursor<'_> {
         SegmentIndexCursor {
             index: self,
@@ -114,6 +156,7 @@ impl SegmentIndex {
     }
 }
 
+/// The references of a [`SegmentIndex`], in box order.
 #[derive(Clone, Copy, Debug)]
 pub struct SegmentIndexCursor<'a> {
     index: &'a SegmentIndex,
@@ -122,8 +165,9 @@ pub struct SegmentIndexCursor<'a> {
     time: i128,
 }
 impl SegmentIndexCursor<'_> {
-    /// One reference per work unit. Arithmetic, source slices and time creation
-    /// all succeed before cursor state changes; repeated failures cannot skip rows.
+    /// Reads the next reference, charging one work unit. A reference whose byte range
+    /// or time overflows fails and leaves the cursor where it was, so a later poll
+    /// reports the same failure instead of skipping it.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<SegmentReference>> {
         if self.record == u32::from(self.index.count) {
             return Ok(Next::End);

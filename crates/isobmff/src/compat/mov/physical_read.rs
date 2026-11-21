@@ -1,15 +1,21 @@
-//! Explicit demux physical-byte reads. Source declarations are never repaired.
+//! Physical reads for description recovery: the bytes of a packet that lie before the
+//! physical end of the file, read as FFmpeg's MOV demuxer reads a packet the file ends
+//! inside. The source declarations stay as stated.
 use crate::table::recovery::{DescriptionEvent, DescriptionRead};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{
     BudgetVec, Bytes, Error, InputCursor, InputToken, Result, SourceId, Step, WorkBudget,
 };
 
+/// Opt-in token for physical reads, passed to [`PhysicalRead::from_event`],
+/// [`PhysicalReader::new`] and the physical cursors of
+/// [`DescriptionRecoveryTable`](crate::compat::mov::recovery::DescriptionRecoveryTable).
 #[derive(Clone, Copy, Debug)]
 pub struct PhysicalReadProfile;
 
-/// Physical availability is a source fact. The short-packet/terminal projection
-/// is the separately selected empirical reference operation, never an I/O confirmation.
+/// A plan to read the bytes of one [`DescriptionEvent`]'s packet that lie before the
+/// physical end of the file. Whether bytes exist is a fact about the file; treating the
+/// packet as short there is how FFmpeg reads it, not something the read confirms.
 #[derive(Clone, Debug)]
 pub struct PhysicalRead {
     origin_pool: triergon_core::Budget,
@@ -23,6 +29,12 @@ pub struct PhysicalRead {
     short_at_physical_end: bool,
 }
 impl PhysicalRead {
+    /// Plans the read of `event`'s packet from `input`, under the media extent
+    /// `declared_media`. Fails with `Error::Unsupported` when the input's length is unknown
+    /// or it lacks random access, when the packet is empty, when `declared_media` leaves the
+    /// source, or when the packet does not start before the physical end; with
+    /// `Error::Invalid` for an event without a packet; and with `Error::Limit` when the
+    /// packet's declared size exceeds `maximum_packet`.
     pub fn from_event(
         event: &DescriptionEvent,
         input: &InputCursor,
@@ -80,28 +92,37 @@ impl PhysicalRead {
             source_range_error: event.range_error,
         })
     }
+    /// The packet's byte range as FFmpeg requests it, in absolute file offsets.
     pub fn requested(&self) -> Range<u64> {
         self.requested.clone()
     }
+    /// The part of [`requested`](Self::requested) before the physical end; never empty.
     pub fn available(&self) -> Range<u64> {
         self.available.clone()
     }
+    /// The event's `range_error`: why the packet's byte range leaves the media extent, if
+    /// it does.
     pub fn source_range_error(&self) -> Option<Error> {
         self.source_range_error
     }
+    /// The media extent the plan was made for, in absolute file offsets.
     pub fn declared_media(&self) -> Range<u64> {
         self.declared_media.clone()
     }
+    /// Whether the file ends inside the packet, so that
+    /// [`available`](Self::available) is shorter than [`requested`](Self::requested).
     pub fn is_short_at_physical_end(&self) -> bool {
         self.short_at_physical_end
     }
+    /// Length of the source in bytes.
     pub fn physical_length(&self) -> u64 {
         self.physical_length
     }
-    /// The admitted contiguous-packet operation ends after a positive short
-    /// prefix followed by its immediately adjacent, physically absent request.
-    /// This is an empirical projection, not a demux cursor/EOF observation.
-    /// A noncontiguous chunk is not silently discarded or modeled as a seek.
+    /// Whether FFmpeg's reading ends with end of file at `next`, the event after this one:
+    /// true when this packet is short at the physical end and `next` is an
+    /// [`UnavailablePhysicalStart`](DescriptionRead::UnavailablePhysicalStart) packet of 1
+    /// byte to 16 MiB that starts exactly where this one ends. Any other `next`, such as a
+    /// later chunk inside the file, gives false; it is neither dropped nor treated as a seek.
     pub fn modeled_following_eof(
         &self,
         next: &DescriptionEvent,
@@ -127,18 +148,24 @@ impl PhysicalRead {
     }
 }
 
+/// The bytes a [`PhysicalReader`] read, with the event and plan they belong to.
 #[derive(Clone, Debug)]
 pub struct PhysicalPayload {
+    /// The description event the bytes belong to, unchanged.
     pub event: DescriptionEvent,
+    /// The plan the bytes were read under.
     pub plan: PhysicalRead,
+    /// The bytes of the plan's [`available`](PhysicalRead::available) range.
     pub payload: Bytes,
+    /// The source the bytes came from.
     pub source: SourceId,
+    /// The input token of the read.
     pub token: InputToken,
 }
 
-/// A core-bound demux byte transaction, never a replacement source Sample.
-/// The original event accompanies the retained output. Range, source, pool,
-/// generation and request identities are checked before every read/publication.
+/// Reads the available bytes of a [`PhysicalRead`] into one buffer charged to the input's
+/// budget, and returns them with the event rather than as a new sample. The pool, source,
+/// input generation and request are checked before every read and before the result.
 #[derive(Debug)]
 pub struct PhysicalReader {
     event: DescriptionEvent,
@@ -151,6 +178,11 @@ pub struct PhysicalReader {
     failed: Option<Error>,
 }
 impl PhysicalReader {
+    /// Reserves the buffer and requests the plan's first available byte. Fails with
+    /// `Error::ForeignPool`, `Error::SourceMismatch`, `Error::StaleGeneration` or
+    /// `Error::StaleRequest` when `input` is not the one the plan was made from, with
+    /// `Error::Unsupported` when `event` or the source no longer matches the plan, and with
+    /// `Error::Limit` when the requested size exceeds `maximum_packet`.
     pub fn new(
         input: &mut InputCursor,
         event: DescriptionEvent,
@@ -207,6 +239,9 @@ impl PhysicalReader {
             failed: None,
         })
     }
+    /// Reads toward the end of the available range. Fails with `Error::Truncated` when the
+    /// source ends first, and with `Error::Invalid` when the input moved outside the
+    /// reader. A failure other than backpressure is sticky and releases the buffer.
     pub fn poll(
         &mut self,
         input: &mut InputCursor,

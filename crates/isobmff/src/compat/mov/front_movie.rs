@@ -1,7 +1,8 @@
-//! Explicit front-source demux continuation, separate from ISO source clocks.
-//! Fragment heads are emitted only by an owned, checked metadata cursor. The
-//! track state originates in an exhausted from-start demux index, never a clock
-//! guessed from a file name, EOF position, caller token or reference packet.
+//! Fragments of a forward-only movie whose metadata comes first, read as FFmpeg's
+//! MOV demuxer reads them. `FrontTrack` carries one track's packet clock on from a
+//! packet cursor that has reached its end, and `FrontFragment` yields each later
+//! fragment's samples for it to project. The track state comes only from that
+//! cursor, never from a clock the caller supplies.
 use crate::{
     CursorStatus, Next, Sample,
     compat::mov::{
@@ -14,9 +15,9 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, TimeBase, WorkBudget};
 
-/// One independently owned fragment; the preliminary signed-CTO scan is resumable
-/// and visits only its declared samples. Source times and raw CTO stay literal.
-/// The immutable metadata backing remains charged by its original storage.
+/// One fragment of a forward-only movie. A first pass over its samples finds their
+/// least composition offset, read as signed 32-bit; a second yields each sample as
+/// a [`FrontSample`]. Source times and offsets stay as declared.
 #[derive(Debug)]
 pub struct FrontFragment {
     cursor: OwnedFragmentCursor,
@@ -24,8 +25,8 @@ pub struct FrontFragment {
     minimum: i64,
     ready: Result<Option<FrontSample>>,
 }
-/// A source occurrence issued by the checked front fragment job. Private demux
-/// context fields prevent callers from substituting a run or clock authority.
+/// A sample of a [`FrontFragment`] with the run and offset context
+/// [`FrontTrack::project`] needs, which only the fragment can supply.
 #[derive(Clone, Debug)]
 pub struct FrontSample {
     sample: Sample,
@@ -40,17 +41,23 @@ struct FragmentRunHead {
     index: u32,
     remaining: u32,
 }
-/// A demux boundary reported after a zero-sized sample. The Source reader can
-/// still have more declarations and bytes to consume.
+/// An empty sample, at which FFmpeg's packet reads on a forward-only input end.
+/// The source can still declare more samples and hold more bytes after it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FrontReadBoundary {
+    /// `track_ID` of the sample's track.
     pub track_id: u32,
+    /// 1-based ordinal of the empty sample.
     pub source_ordinal: u64,
+    /// Absolute file offset at which the empty sample is declared.
     pub source_offset: u64,
 }
 impl FrontSample {
-    /// A final zero sample in the admitted media extent can end the demux
-    /// packet sequence. The caller still owns all samples in later extents.
+    /// The boundary this sample sets when it is empty, given whether more samples
+    /// follow it in the same `mdat`; `None` for a nonempty sample. The caller
+    /// handles samples in later `mdat` boxes. `Error::Unsupported` for an empty
+    /// sample followed by others in the `mdat` unless it starts the fragment's
+    /// first run.
     pub fn read_boundary_in_media(
         &self,
         has_more_samples_in_media: bool,
@@ -65,8 +72,8 @@ impl FrontSample {
         }
         Ok(Some(boundary))
     }
-    /// A zero-size declaration and the source coordinate that caused it.
-    /// Demux output after this boundary needs a separate receiver policy.
+    /// The boundary this sample sets when it is empty, `None` otherwise. What the
+    /// demuxer reports after the boundary is left to the caller.
     pub fn zero_read_boundary(&self) -> Option<FrontReadBoundary> {
         self.sample.range.is_empty().then_some(FrontReadBoundary {
             track_id: self.track,
@@ -74,14 +81,17 @@ impl FrontSample {
             source_offset: self.sample.range.start,
         })
     }
+    /// Samples of this sample's `trun` that follow it.
     pub fn remaining_in_run(&self) -> u32 {
         self.run.remaining
     }
+    /// The source sample, unchanged.
     pub fn source(&self) -> &Sample {
         &self.sample
     }
 }
 impl FrontFragment {
+    /// Reads the samples of the fragment `index`.
     pub fn new(index: FragmentIndex) -> Self {
         Self {
             cursor: index.into_cursor(),
@@ -90,9 +100,13 @@ impl FrontFragment {
             ready: Ok(None),
         }
     }
+    /// The fragment's index.
     pub fn index(&self) -> &FragmentIndex {
         self.cursor.index()
     }
+    /// Advances to the next sample. During the first pass it returns `Yield` after
+    /// each sample and at the pass's end as well as when the budget is spent; poll
+    /// again. Failures are sticky.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         if let Err(error) = &self.ready {
             return Err(*error);
@@ -146,6 +160,7 @@ impl FrontFragment {
             }
         }
     }
+    /// Takes the ready sample; `Error::Invalid` when none is ready.
     pub fn take_sample(&mut self) -> Result<FrontSample> {
         match &mut self.ready {
             Ok(ready) => ready
@@ -156,9 +171,12 @@ impl FrontFragment {
     }
 }
 
-/// A bounded scalar snapshot of one validated initial track. Returned states are
-/// values: allocation refusal can keep the original state and retry the same
-/// source head without advancing a demux clock twice.
+/// One track's packet clock on a forward-only input, taken from a cursor that has
+/// reached its end with
+/// [`PacketCursor::front_track`](crate::compat::mov::packets::PacketCursor::front_track)
+/// and carried across later fragments. It is a plain value:
+/// [`project`](Self::project) returns the next state, so a caller that cannot store
+/// a packet keeps the old state and retries the same sample.
 #[derive(Clone, Copy, Debug)]
 pub struct FrontTrack {
     track: u32,
@@ -193,14 +211,17 @@ impl FrontTrack {
             discard_boundary: i64::MIN,
         }
     }
+    /// The 1-based ordinal the track's next sample must have.
     pub fn next_source_ordinal(&self) -> Result<u64> {
         self.previous
             .map_or(Some(1), |p| p.sample.checked_add(1))
             .ok_or(Error::Overflow)
     }
-    /// Pure, bounded projection of a metadata-issued head. The caller validates
-    /// the actual current MDAT declaration and reserves output capacity before
-    /// committing the returned state. This method does not read or infer EOF.
+    /// The packet for `head` and the track state after it. The caller checks that
+    /// the sample lies in the current `mdat` and can store the packet before it
+    /// keeps the new state; nothing is read. `Error::Invalid` for a sample of
+    /// another track; `Error::Unsupported` for a track with regular samples or a
+    /// sample out of ordinal order.
     pub fn project(&self, head: &FrontSample) -> Result<(Self, PacketOccurrence)> {
         if head.track != self.track {
             return Err(Error::Invalid("native continuation track mismatch"));

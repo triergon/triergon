@@ -1,5 +1,6 @@
-//! One indexed, self-contained source sample through the shared input contract.
-//! No I/O, demux clock inference, configuration epoch or second allocation pool.
+//! Sample payloads. [`SampleReader`] reads one sample's bytes through the caller's input
+//! cursor into a [`SourcePacket`], and [`TerminalMdat`] bounds samples in a final `mdat`
+//! whose length is not known.
 use crate::{
     Sample,
     boxes::BoxHeader,
@@ -11,22 +12,30 @@ use triergon_core::{
     BudgetVec, Bytes, Error, InputCursor, InputToken, Result, SourceId, Step, WorkBudget,
 };
 
+/// One sample and its payload, from [`SampleReader`].
 #[derive(Clone, Debug)]
 pub struct SourcePacket {
+    /// The sample the bytes belong to.
     pub sample: Sample,
+    /// Exactly the sample's byte range, charged to the shared budget; it may share the
+    /// storage of an input window.
     pub payload: Bytes,
+    /// The source it was read from.
     pub source: SourceId,
+    /// The input token of the read that produced it.
     pub token: InputToken,
 }
 
-/// A checked terminal, top-level size-zero MDAT declaration. This preserves an
-/// unknown physical endpoint; it is not a read/EOF confirmation or a finite range.
+/// A top-level size-zero `mdat`, which runs to the end of a source of unknown length.
+/// It bounds samples from below only; reading a sample finds whether its bytes exist.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TerminalMdat {
     header: BoxHeader,
     payload_start: u64,
 }
 impl TerminalMdat {
+    /// The `mdat` of `header`; `Error::Invalid` unless it is an `mdat` of unknown size with
+    /// an 8-byte header.
     pub fn new(header: BoxHeader) -> Result<Self> {
         if header.kind != *b"mdat" || header.size.is_some() || header.header_size != 8 {
             return Err(Error::Invalid(
@@ -39,17 +48,20 @@ impl TerminalMdat {
             payload_start,
         })
     }
+    /// The `mdat` header.
     pub fn header(self) -> BoxHeader {
         self.header
     }
     pub(crate) fn payload_start(self) -> u64 {
         self.payload_start
     }
-    /// Checks the source-declared lower bound. Actual sample bytes must still be
-    /// read, and only a source-bound completion can establish the final endpoint.
+    /// Checks that the sample starts at or after the payload start; `Error::Invalid`
+    /// otherwise. Only reading the sample shows that the source holds its bytes.
     pub fn require_sample(self, sample: &Sample) -> Result<()> {
         self.require_range(&sample.range)
     }
+    /// [`require_sample`](Self::require_sample) for a byte range; `Error::Invalid` also
+    /// for a reversed range.
     pub fn require_range(self, range: &Range<u64>) -> Result<()> {
         if range.start > range.end || range.start < self.payload_start {
             return Err(Error::Invalid("sample outside terminal MDAT declaration"));
@@ -58,9 +70,11 @@ impl TerminalMdat {
     }
 }
 
-/// A bounded range transaction. A freeze backpressure retry retains all
-/// completed bytes. The reserved constructors allocate before changing the
-/// input transaction.
+/// Reads one sample's payload through the caller's input cursor, continuing from the
+/// current window where it already holds the sample's start. The constructors check the
+/// sample and, except [`new_with_shared_window`](Self::new_with_shared_window), reserve
+/// its buffer before they move the cursor. Backpressure while finishing keeps the bytes
+/// read for a retry; any other failure is kept for later polls.
 #[derive(Debug)]
 pub struct SampleReader {
     sample: Sample,
@@ -87,6 +101,9 @@ enum ReadMode {
 }
 
 impl SampleReader {
+    /// A reader that copies `sample`, which must lie inside `media_extent`, the payload
+    /// extent of its `mdat`. `Error::Limit` above `maximum_packet` bytes, `Error::Invalid`
+    /// past the known source length.
     pub fn new(
         input: &mut InputCursor,
         sample: Sample,
@@ -109,8 +126,8 @@ impl SampleReader {
         sample.require_within(media_extent)?;
         Self::new_checked(input, sample, maximum_packet, ReadMode::SharedWindow)
     }
-    /// Reads the complete declared sample under an open terminal MDAT. No final
-    /// media/source length is fabricated; premature physical EOF stays Truncated.
+    /// A reader for a sample of a [`TerminalMdat`]. The source ending inside the sample
+    /// fails the read with `Error::Truncated`.
     pub fn new_terminal_mdat(
         input: &mut InputCursor,
         sample: Sample,
@@ -120,6 +137,10 @@ impl SampleReader {
         terminal.require_sample(&sample)?;
         Self::new_checked(input, sample, maximum_packet, ReadMode::Reserved)
     }
+    /// A reader for the FFmpeg-compatible recovery view, whose
+    /// [`poll_recovery`](Self::poll_recovery) returns what exists of a sample cut off by
+    /// the end of the source. The sample may end past the known source length if it
+    /// starts before it.
     pub fn new_recovery(
         input: &mut InputCursor,
         sample: Sample,
@@ -177,6 +198,9 @@ impl SampleReader {
             failed: None,
         })
     }
+    /// One bounded step towards the [`SourcePacket`]. `Error::Truncated` when the source
+    /// ends inside the sample; a stale-token error or `Error::Invalid` when something else
+    /// moved the cursor.
     pub fn poll(
         &mut self,
         input: &mut InputCursor,
@@ -194,8 +218,9 @@ impl SampleReader {
             });
         self.record(result)
     }
-    /// The same bounded read transaction with an explicit demux short result.
-    /// Only the matching physical End with a positive prefix permits recovery.
+    /// [`poll`](Self::poll), except that a source ending inside the sample after at least
+    /// one copied byte returns those bytes as [`RecoverySampleRead::Short`] instead of
+    /// failing, as FFmpeg's MOV demuxer returns the part of a sample that exists.
     pub fn poll_recovery(
         &mut self,
         input: &mut InputCursor,

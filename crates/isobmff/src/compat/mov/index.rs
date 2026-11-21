@@ -1,7 +1,8 @@
-//! Explicit reference-public-MOV index/backward-seek view, never source timing.
-//! Original Samples and clock/config/edit provenance travel with every entry.
-//! Compact streaming metadata passes; no per-sample array or payload cache.
-//! Regression guards were observed failing before implementation activation.
+//! The index and backward seek of FFmpeg's MOV demuxer. `IndexCursor` builds a
+//! track's index entries as the demuxer exposes them, `SeekJob` and `GlobalSeekJob`
+//! select an entry for one track or all of them, and their plans replay the packets
+//! from there. Every entry carries its source sample and packet; the walks keep no
+//! per-sample array and read no payload.
 use crate::compat::mov::cursor::{PlainPrepare, PlainStart, TrackProjection, TrackResume};
 use crate::{
     BuildStatus, CursorStatus,
@@ -23,9 +24,12 @@ use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, TimeBase, WorkBu
 
 mod plain_scan;
 
+/// Limits of an [`IndexCursor`]; passing one is `Error::Limit`.
 #[derive(Clone, Copy, Debug)]
 pub struct IndexLimits {
+    /// Limits of the packet cursor the index reads.
     pub packets: PacketLimits,
+    /// Entries the index may hold.
     pub max_entries: u64,
 }
 impl Default for IndexLimits {
@@ -36,19 +40,32 @@ impl Default for IndexLimits {
         }
     }
 }
+/// One entry of a track's index as FFmpeg's MOV demuxer exposes it, with the packet
+/// it was built from.
 #[derive(Clone, Debug)]
 pub struct IndexEntry {
-    /// Zero-based demux entry, distinct from one-based unique source ordinal.
+    /// 0-based position of the entry in the track's index; not the 1-based sample
+    /// ordinal.
     pub ordinal: u64,
+    /// `track_ID` of the entry's track.
     pub track_id: u32,
+    /// Absolute file offset of the packet's bytes.
     pub position: i64,
+    /// The packet's decode time as the demuxer's signed field holds it, in ticks of
+    /// the track's demux time base.
     pub timestamp: i64,
-    /// Reference public signed2-bit C field plus its exact low two bits. This is
-    /// distinct from positive AVPacket key/discard flags and original sample flags.
+    /// The flags as the demuxer's two-bit signed field reads them: 1 key, -2
+    /// discard, -1 key and discard, 0 neither. These differ from the packet flags
+    /// and from the source sample's flags.
     pub flags: i32,
+    /// The same two bits unsigned: bit 0 key, bit 1 discard.
     pub raw_flag_bits: u8,
+    /// Size of the packet's bytes; below 2^29.
     pub size: u32,
+    /// The demuxer's distance in entries from the last key entry; 0 at a key and at
+    /// the first entry of a fragment.
     pub min_distance: i32,
+    /// The packet the entry was built from.
     pub occurrence: PacketOccurrence,
 }
 fn bound(value: u64, maximum: u64) -> Result<()> {
@@ -123,8 +140,9 @@ struct EntryFields {
     min_distance: i32,
 }
 
-/// One demux table stream, keeping a single ready projection. A complete
-/// source is mandatory for the existing explicit absent-tfdt demux origin.
+/// Builds one track's index as FFmpeg's MOV demuxer does, an [`IndexEntry`] per
+/// packet in decode order, holding one entry at a time. It reads the track over the
+/// complete source, so a fragment-only track without `tfdt` starts at zero.
 #[derive(Debug)]
 pub struct IndexCursor<'a> {
     cursor: PacketCursor<'a>,
@@ -165,6 +183,9 @@ impl<'a> IndexCursor<'a> {
             && track.table.unused_sync_entries() != 0
     }
 
+    /// The index of `track`, whose samples lie in `media`, built as
+    /// [`PacketCursor::new_complete_source`] reads it. A regular track whose `stss`
+    /// lists samples past its end may start with a non-key entry.
     pub fn new_complete_source(
         pool: &Budget,
         track: DemuxTrack<'a>,
@@ -187,6 +208,8 @@ impl<'a> IndexCursor<'a> {
 
     /// Replay one track from a completed packet cursor using its checked sample
     /// extents and initial clock facts. The index has its own entry limit.
+    /// `Error::Invalid` unless the cursor has ended cleanly over a complete,
+    /// seekable source and holds the track without an encoded edit.
     pub fn replay_track(
         checked: &PacketCursor<'a>,
         track_id: u32,
@@ -200,6 +223,9 @@ impl<'a> IndexCursor<'a> {
             false,
         ))
     }
+    /// The index of a regular `track` whose edit follows its plan, as
+    /// [`PacketCursor::new_encoded_regular`] reads it; `plans` holds the one entry
+    /// for this track. An edited track may start with a non-key entry.
     pub fn new_encoded_regular(
         pool: &Budget,
         track: DemuxTrack<'a>,
@@ -226,6 +252,10 @@ impl<'a> IndexCursor<'a> {
     pub(crate) fn allow_recovery_initial_nonkey(&mut self) {
         self.allow_initial_nonkey = true;
     }
+    /// Advances to the next entry; failures are sticky. `Error::Unsupported` for an
+    /// entry the demuxer's index would hold in a form not reproduced here: packet
+    /// flags other than key, discard and disposable, a size of 2^29 bytes or more,
+    /// or a non-key entry whose distance would carry over from another run.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -387,6 +417,7 @@ impl<'a> IndexCursor<'a> {
             }
         }
     }
+    /// Takes the ready entry; `Error::Invalid` when none is ready.
     pub fn take_entry(&mut self) -> Result<IndexEntry> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -469,9 +500,14 @@ impl<'a> IndexCursor<'a> {
     }
 }
 
+/// Limits of a seek; passing one is `Error::Limit`.
 #[derive(Clone, Copy, Debug)]
 pub struct SeekLimits {
+    /// Limits of each track's index; `max_entries` also bounds the entries a global
+    /// seek reads across tracks.
     pub index: IndexLimits,
+    /// Packets a [`SeekCursor`] may produce, those replayed before the landing
+    /// included, and packets a range seek may skip before its landings.
     pub max_replayed_occurrences: u64,
 }
 impl Default for SeekLimits {
@@ -482,11 +518,17 @@ impl Default for SeekLimits {
         }
     }
 }
+/// Where a seek landed on its track.
 #[derive(Clone, Debug)]
 pub struct SeekLanding {
+    /// The requested timestamp, in ticks of the track's demux time base.
     pub requested_timestamp: i64,
+    /// The index entry the seek selected.
     pub selected: IndexEntry,
+    /// How many of the track's index entries the seek read.
     pub scanned_entries: u64,
+    /// `true` when no key entry lies at or before the target, so the seek took the
+    /// track's first entry.
     pub used_first_fallback: bool,
     /// Decoder preroll when the caller requests source Opus recovery.
     pub opus_recovery: Option<OpusRecoveryLanding>,
@@ -501,8 +543,10 @@ struct Context<'a> {
     encoded_edits: Option<EncodedEdits<'a>>,
 }
 type EncodedEdits<'a> = &'a [Option<crate::compat::mov::encoded_edits::EncodedEditPlan>];
-/// Demux signed ticks are a separately named API argument. No rounding,
-/// source-time wrap or conversion through SourceTime is performed here.
+/// A backward seek on one track as FFmpeg's MOV demuxer does it: reads the track's
+/// index and selects the last key entry whose timestamp is at or before the target,
+/// or the first key entry when there is none. The target is in ticks of the track's
+/// demux time base, as the demuxer's seek takes it, and is not rounded.
 #[derive(Debug)]
 pub struct SeekJob<'a> {
     context: Context<'a>,
@@ -539,14 +583,16 @@ enum Plain<'a> {
     /// The seek reads every entry.
     Off,
 }
+/// A finished one-track seek: its landing and what is needed to replay the track
+/// to it.
 #[derive(Debug)]
 pub struct SeekPlan<'a> {
     context: Context<'a>,
     landing: SeekLanding,
 }
-/// Resumes the real demux occurrence state by a bounded metadata replay from
-/// original tables. Skipped metadata causes no payload reads or caller output.
-/// This is a production cursor operation, not comparator filtering or PTS sort.
+/// Yields a track's packets from a seek's landing on. It replays the packets
+/// before the landing from the tables, so their clock state carries over, without
+/// yielding them or reading any payload.
 #[derive(Debug)]
 pub struct SeekCursor<'a> {
     cursor: PacketCursor<'a>,
@@ -559,6 +605,9 @@ pub struct SeekCursor<'a> {
     failed: Option<Error>,
 }
 impl<'a> SeekJob<'a> {
+    /// A seek of `track`, whose samples lie in `media`, to `timestamp`, reading
+    /// the track as [`IndexCursor::new_complete_source`] does. `Error::Unsupported`
+    /// for `i64::MIN`, the demuxer's null value.
     pub fn new_complete_source(
         pool: &Budget,
         track: DemuxTrack<'a>,
@@ -620,6 +669,9 @@ impl<'a> SeekJob<'a> {
             failed: None,
         })
     }
+    /// Advances the seek; failures are sticky. `Error::Unsupported` where the
+    /// demuxer's choice is not reproduced: a null index timestamp, index timestamps
+    /// out of order around the target, or no key entry to land on.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -804,6 +856,7 @@ impl<'a> SeekJob<'a> {
             }
         }
     }
+    /// The plan of a ready seek; `Error::Invalid` before it is ready.
     pub fn finish(mut self) -> Result<SeekPlan<'a>> {
         let (landing, _) = self.take_landing()?;
         Ok(SeekPlan {
@@ -842,9 +895,12 @@ impl<'a> SeekJob<'a> {
     }
 }
 impl<'a> SeekPlan<'a> {
+    /// Where the seek landed.
     pub fn landing(&self) -> &SeekLanding {
         &self.landing
     }
+    /// A cursor that replays the track from its start and yields its packets from
+    /// the landing on.
     pub fn cursor(&self) -> Result<SeekCursor<'a>> {
         let c = &self.context;
         let cursor = if let Some(plans) = c.encoded_edits {
@@ -878,6 +934,8 @@ impl<'a> SeekPlan<'a> {
     }
 }
 impl SeekCursor<'_> {
+    /// Advances to the next packet; failures are sticky. `Error::Invalid` when the
+    /// replay does not reach a packet equal to the selected entry's.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -945,6 +1003,7 @@ impl SeekCursor<'_> {
             }
         }
     }
+    /// Takes the ready packet; `Error::Invalid` when none is ready.
     pub fn take_occurrence(&mut self) -> Result<PacketOccurrence> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -955,9 +1014,11 @@ impl SeekCursor<'_> {
     }
 }
 
-/// Aligns every stream to the selected reference entry's demux clock, not the
-/// original request or its physical position. The rescaled profile converts
-/// that anchor to each other track's demux base, rounding ties away from zero.
+/// A backward seek on every track as FFmpeg's MOV demuxer does it: seeks the
+/// reference track as [`SeekJob`] does, then each other track to the selected
+/// entry's timestamp, not the requested one or the entry's file position. The
+/// rescaled constructors convert that timestamp to each track's demux time base,
+/// rounding to nearest with ties away from zero.
 #[derive(Debug)]
 pub struct GlobalSeekJob<'a> {
     pool: Budget,
@@ -983,6 +1044,8 @@ pub struct GlobalSeekJob<'a> {
     ready: bool,
     failed: Option<Error>,
 }
+/// A finished global seek: the reference track's landing and where each track
+/// resumes.
 #[derive(Debug)]
 pub struct GlobalSeekPlan<'a> {
     pool: Budget,
@@ -1007,6 +1070,10 @@ enum GlobalSeekMode<'a> {
     },
 }
 impl<'a> GlobalSeekJob<'a> {
+    /// A seek of all `tracks` to `timestamp` on the track with ID `track_id`.
+    /// `Error::Unsupported` when the tracks' demux time bases differ (see
+    /// [`new_complete_source_rescaled`](Self::new_complete_source_rescaled)) and
+    /// for `i64::MIN`; `Error::Invalid` for an absent or repeated track ID.
     pub fn new_complete_source(
         pool: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -1027,7 +1094,8 @@ impl<'a> GlobalSeekJob<'a> {
         )
     }
 
-    /// Admit unequal demux timebases using the reference MOV seek rescale.
+    /// [`new_complete_source`](Self::new_complete_source) for tracks whose demux
+    /// time bases may differ.
     pub fn new_complete_source_rescaled(
         pool: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -1048,8 +1116,10 @@ impl<'a> GlobalSeekJob<'a> {
         )
     }
 
-    /// Use the same encoded edit plans that produced the indexed packet
-    /// occurrences. The selected anchor is rescaled for each other track.
+    /// A rescaled seek to `reference`, a track ID and timestamp, over tracks whose
+    /// edits follow `plans`, one per track, as
+    /// [`PacketCursor::new_encoded_regular`] reads them. Each edited track aligns
+    /// the rescaled timestamp to its plan.
     pub fn new_encoded_regular_rescaled(
         pool: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -1069,8 +1139,9 @@ impl<'a> GlobalSeekJob<'a> {
         )
     }
 
-    /// Plan a rescaled seek for the same track ordinals selected for playback.
-    /// Edit plans are indexed by the complete source track order.
+    /// A rescaled seek of the tracks whose catalogue position passes `include`, as
+    /// [`PacketCursor::new_projected`] plays them. `plans`, when given, has one
+    /// entry per track in `tracks`, selected or not.
     pub fn new_projected(
         pool: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -1219,6 +1290,9 @@ impl<'a> GlobalSeekJob<'a> {
             .and_then(|plans| plans[at].as_ref())
             .ok_or(Error::Unsupported("Opus recovery needs an Opus edit"))
     }
+    /// Advances the seek, track by track; failures are sticky. Fails as
+    /// [`SeekJob::poll`] does for any track, and with `Error::Limit` when the
+    /// entries read across tracks pass the index limit.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -1338,6 +1412,7 @@ impl<'a> GlobalSeekJob<'a> {
             self.child = Some(child);
         }
     }
+    /// The plan of a ready seek; `Error::Invalid` before it is ready.
     pub fn finish(mut self) -> Result<GlobalSeekPlan<'a>> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -1374,12 +1449,16 @@ impl<'a> GlobalSeekJob<'a> {
     }
 }
 impl<'a> GlobalSeekPlan<'a> {
+    /// Where the reference track landed.
     pub fn landing(&self) -> &SeekLanding {
         &self.reference
     }
+    /// Where each yielded track resumes, in catalogue order.
     pub fn anchors(&self) -> &[ResumePoint] {
         self.anchors.as_slice()
     }
+    /// A packet cursor over the tracks that starts each at its anchor, from the
+    /// packet state its seek kept where it can and by replay otherwise.
     pub fn cursor(&self) -> Result<PacketCursor<'a>> {
         // Start where each track's seek left its packet state, as a replay from
         // the beginning would reach it.

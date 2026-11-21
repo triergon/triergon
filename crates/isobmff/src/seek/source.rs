@@ -1,8 +1,10 @@
-//! Bounded source-sample seek plans over the existing compact format indexes.
+//! Seek plans by sample ordinal. [`SourceSeekPlanner`] finds the container sync sample
+//! at or before a target sample in a track's sample table and fragments, steps back the
+//! number of preroll samples the caller asks for, and checks that every sample from
+//! there to the target lies in the caller's media extents. Edit lists and sample groups
+//! are not applied.
 //!
-//! Apple QTFF seeking/stss/chunk tables supply the addressing basis. Preroll is
-//! an explicit caller requirement in container samples, not inferred codec or
-//! sample-group semantics. Demux edit occurrences and clocks are separate.
+//! Specification: Apple QuickTime File Format (seeking, `stss` and chunk tables).
 use crate::{
     Access, BuildStatus, Next, Sample, fragment::FragmentLocator, interleave::SourceTrack,
     table::SampleLocator,
@@ -13,19 +15,30 @@ use std::{
 };
 use triergon_core::{Error, Result, WorkBudget};
 
+/// The sample a [`SourceSeekPlanner`] lands on and the preroll it adds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourceSeekRequest {
+    /// 1-based ordinal of the sample to land on; zero fails
+    /// [`SourceSeekPlanner::new`] with `Error::Invalid`.
     pub target_ordinal: u64,
-    /// Preceding container samples required before the selected sync sample.
-    /// No group inheritance, PCM count or decoder recovery is implied here.
+    /// Samples to decode before the sync sample, counted in container samples. The
+    /// planner takes as many as precede the sync sample and reports any shortfall; it
+    /// does not derive the count from sample groups or the codec.
     pub preroll_samples: u16,
 }
 
+/// Bounds on the work of a [`SourceSeekPlanner`]; exceeding one fails with
+/// `Error::Limit`.
 #[derive(Clone, Copy, Debug)]
 pub struct SourceSeekLimits {
+    /// Most fragment indexes the track may have; 4096 by default.
     pub max_fragments: usize,
+    /// Most media extents the caller may pass; 4096 by default.
     pub max_media_extents: usize,
+    /// Most samples probed while looking back for a sync sample; 1,000,000 by default.
     pub max_sync_scan_samples: u64,
+    /// Most samples from the decode start to the target, both included; 1,000,000 by
+    /// default.
     pub max_range_samples: u64,
 }
 impl Default for SourceSeekLimits {
@@ -39,16 +52,30 @@ impl Default for SourceSeekLimits {
     }
 }
 
+/// Where a seek lands on one track: the target, the sync sample before it and the
+/// first sample to decode, as the source states them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SourceSeekLanding {
+    /// `track_ID` of the track; never zero.
     pub track_id: u32,
+    /// The request's [`target_ordinal`](SourceSeekRequest::target_ordinal).
     pub requested_ordinal: u64,
+    /// The sample at the requested ordinal.
     pub target: Sample,
+    /// The latest container sync sample at or before the target.
     pub sync_sample: Sample,
+    /// The first sample to decode: the earliest preroll sample, or the sync sample
+    /// when no preroll is taken.
     pub decode_start: Sample,
+    /// The request's [`preroll_samples`](SourceSeekRequest::preroll_samples).
     pub requested_preroll_samples: u16,
+    /// Preroll samples taken: the requested count, or fewer where the track starts
+    /// closer to the sync sample.
     pub available_preroll_samples: u16,
+    /// Requested preroll samples the track cannot supply.
     pub missing_preroll_samples: u16,
+    /// Samples whose byte ranges were checked against the media extents: every sample
+    /// from the decode start to the target, both included.
     pub validated_samples: u64,
 }
 
@@ -170,8 +197,11 @@ enum Phase {
     Ready,
 }
 
-/// Validates every requested byte range before making a confirmation available.
-/// Only source declarations are used; no clock/flag/description is rewritten.
+/// Plans a seek to one sample of a track. It finds the latest container sync sample at
+/// or before the target, adds the requested preroll, and checks the byte range of
+/// every sample from the decode start to the target against the media extents before
+/// [`finish`](Self::finish) returns a plan. Samples are reported as the source states
+/// them.
 #[derive(Debug)]
 pub struct SourceSeekPlanner<'a> {
     source: SourceTrack<'a>,
@@ -197,6 +227,11 @@ pub struct SourceSeekPlanner<'a> {
     failed: Option<Error>,
 }
 impl<'a> SourceSeekPlanner<'a> {
+    /// A planner for `request` on `source`, whose samples must lie in
+    /// `media_extents`, absolute byte ranges of the file's media. Fails with
+    /// `Error::Invalid` for a zero target ordinal or a sample table whose timing runs
+    /// do not cover its samples exactly, and `Error::Limit` for more fragments or
+    /// extents than `limits` allow.
     pub fn new(
         source: SourceTrack<'a>,
         request: SourceSeekRequest,
@@ -238,6 +273,12 @@ impl<'a> SourceSeekPlanner<'a> {
             failed: None,
         })
     }
+    /// Advances the plan. Fails with `Error::Unsupported` when no container sync
+    /// sample precedes the target or a planned ordinal lies in a gap between
+    /// fragments, `Error::Invalid` for a reversed extent, fragments with overlapping
+    /// ordinals, a target past the indexed samples or a planned sample outside every
+    /// extent, and `Error::Limit` past `limits`. An error is kept and returned by every
+    /// later poll.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -476,6 +517,8 @@ impl<'a> SourceSeekPlanner<'a> {
             }
         }
     }
+    /// The plan, once [`poll`](Self::poll) has returned `Ready`; `Error::Invalid`
+    /// before that, or the error a poll returned.
     pub fn finish(mut self) -> Result<SourceSeekPlan<'a>> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -493,15 +536,19 @@ impl<'a> SourceSeekPlanner<'a> {
     }
 }
 
+/// A checked seek plan for one track: its landing and the samples to read, from the
+/// decode start through the target.
 #[derive(Debug)]
 pub struct SourceSeekPlan<'a> {
     source: SourceTrack<'a>,
     landing: SourceSeekLanding,
 }
 impl SourceSeekPlan<'_> {
+    /// Where the plan lands.
     pub fn landing(&self) -> &SourceSeekLanding {
         &self.landing
     }
+    /// A new cursor over the planned samples, starting at the decode start.
     pub fn cursor(&self) -> SourceSeekSamples<'_> {
         SourceSeekSamples {
             source: self.source,
@@ -514,8 +561,9 @@ impl SourceSeekPlan<'_> {
     }
 }
 
-/// A plan can create fresh cursors after exhaustion without mutating an input
-/// entity. Actual fresh/after-EOF range transactions still belong to core I/O.
+/// The samples of a [`SourceSeekPlan`], from its decode start through its target, in
+/// ordinal order. It reads only the indexes: reading the payloads, from a new input
+/// position, is the caller's job. A plan can make any number of these cursors.
 #[derive(Debug)]
 pub struct SourceSeekSamples<'a> {
     source: SourceTrack<'a>,
@@ -526,6 +574,9 @@ pub struct SourceSeekSamples<'a> {
     failed: Option<Error>,
 }
 impl SourceSeekSamples<'_> {
+    /// Returns the next planned sample. Fails with `Error::Invalid` if the indexes
+    /// return a different sample than planned; an error is kept and returned by every
+    /// later poll.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Next<Sample>> {
         if let Some(error) = self.failed {
             return Err(error);

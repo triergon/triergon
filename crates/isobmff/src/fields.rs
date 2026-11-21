@@ -1,4 +1,5 @@
-//! Checked fields inside an already bounded metadata box; no input/storage layer.
+//! Big-endian field reads at checked offsets inside a box payload in memory; a read past
+//! the end is `Error::Truncated`.
 use triergon_core::{Error, Result};
 
 pub(crate) fn slice(bytes: &[u8], at: usize, length: usize) -> Result<&[u8]> {

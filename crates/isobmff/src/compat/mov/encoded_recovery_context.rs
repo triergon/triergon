@@ -1,6 +1,8 @@
-//! A pin-bound regular open/index observer; never turns source faults into
-//! validated groups. It first proves all enclosing box envelopes and refuses
-//! grouping kinds that have demux key/config effects outside this operation.
+//! The sample groups of an encoded track as the context view reads them when FFmpeg's
+//! MOV demuxer opens and indexes the track. The `roll` and `prol` groups are checked but
+//! not applied, and a fault in them is kept beside the result instead of failing; a
+//! fault never becomes a validated group. `sync` groups and `rap ` mappings, which
+//! affect the demuxer's key frames, are refused.
 use crate::compat::mov::encoded_recovery::RecoveryWalk;
 use crate::{
     Limits, Next,
@@ -11,6 +13,8 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
+/// A track's sample groups as the context view read them: the checked `roll` and `prol`
+/// groups, or the first fault that stopped the check.
 #[derive(Clone, Debug)]
 pub struct RecoveryObservation {
     raw: BoxView,
@@ -19,12 +23,18 @@ pub struct RecoveryObservation {
     fault: Option<SourceProfileFault>,
 }
 impl RecoveryObservation {
+    /// The `stbl` box the groups were read from.
     pub fn raw_source_table(&self) -> &BoxView {
         &self.raw
     }
+    /// Number of `sgpd` and `sbgp` boxes in the table, of any grouping type; the
+    /// demuxer applies none of them.
     pub fn ignored_group_boxes(&self) -> u32 {
         self.groups
     }
+    /// The checked groups, or the fault that stopped the check: an `Error::Invalid`,
+    /// `Error::Unsupported` or `Error::Truncated` with its `sgpd` or `sbgp` box. A group
+    /// of a type other than `roll` or `prol` is such a fault.
     pub fn source_result(&self) -> std::result::Result<&RecoveryFacts, &SourceProfileFault> {
         match (&self.validated, &self.fault) {
             (Some(v), None) => Ok(v),

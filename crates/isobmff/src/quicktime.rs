@@ -1,6 +1,9 @@
-//! QuickTime version-0 sound source facts and bounded PCM sample carriage.
-//! Apple QTFF sound-description/sound-data contracts are the source basis.
-//! Demux catalogue, aggregation and presentation are separate projections.
+//! QuickTime version 0 sound descriptions and their PCM samples. [`SoundDescriptionV0`]
+//! reads a description's fields, [`PcmLayout`] names a supported PCM format, and
+//! [`PcmSampleReader`] reads one sample as whole PCM frames. FFmpeg's grouping of samples
+//! into packets is in [`compat::mov::pcm`](crate::compat::mov::pcm).
+//!
+//! Specification: Apple QuickTime File Format (sound sample descriptions, sound data).
 use crate::{
     Sample, fields,
     movie::{SampleDescription, TrackHeader},
@@ -12,8 +15,8 @@ use std::{
 };
 use triergon_core::{Budget, Error, InputCursor, InputToken, Result, SourceId, Step, WorkBudget};
 
-/// Literal source fields, including values outside the selected PCM layout.
-/// Version 1/2 is refused before reusing any version-0 field offsets.
+/// The fields of a version 0 QuickTime sound description as stored, whatever format they
+/// describe. Version 1 and 2 descriptions are refused.
 #[derive(Clone, Debug)]
 pub struct SoundDescriptionV0 {
     entry: SampleDescription,
@@ -25,11 +28,15 @@ pub struct SoundDescriptionV0 {
     packet_size: u16,
     sample_rate_16_16: u32,
 }
+/// A PCM sample format that [`PcmLayout`] supports.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PcmEncoding {
+    /// 8-bit unsigned samples, entry code `raw `.
     Unsigned8,
+    /// 16-bit signed big-endian samples, entry code `twos`.
     Signed16BigEndian,
 }
+/// A supported PCM layout; from [`SoundDescriptionV0::pcm_layout`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PcmLayout {
     encoding: PcmEncoding,
@@ -38,21 +45,26 @@ pub struct PcmLayout {
     sample_rate_16_16: u32,
 }
 impl PcmLayout {
+    /// The sample format.
     pub fn encoding(self) -> PcmEncoding {
         self.encoding
     }
+    /// Number of channels: 1 or 2.
     pub fn channels(self) -> u16 {
         self.channels
     }
     pub(crate) fn frame_bytes(self) -> usize {
         self.frame_bytes
     }
+    /// Sample rate in Hz as a 16.16 fixed-point value; never zero.
     pub fn sample_rate_16_16(self) -> u32 {
         self.sample_rate_16_16
     }
 }
 impl SoundDescriptionV0 {
-    /// The handler is required: `raw ` is also a visual entry coding name.
+    /// Reads `entry` of the track whose header is `header`. The handler must be `soun`,
+    /// since `raw ` is also a video entry code; `Error::Invalid` otherwise, and
+    /// `Error::Unsupported` for a version 1 or 2 description.
     pub fn parse(header: &TrackHeader, entry: &SampleDescription) -> Result<Self> {
         if header.handler != *b"soun"
             || fields::fourcc(header.raw_hdlr.payload(), 8)? != header.handler
@@ -83,27 +95,35 @@ impl SoundDescriptionV0 {
             sample_rate_16_16: fields::u32_at(body, 24)?,
         })
     }
+    /// The sample description it was read from.
     pub fn source(&self) -> &SampleDescription {
         &self.entry
     }
+    /// Revision level field.
     pub fn revision(&self) -> u16 {
         self.revision
     }
+    /// Vendor code.
     pub fn vendor(&self) -> [u8; 4] {
         self.vendor
     }
+    /// Number of channels, as stored.
     pub fn channels(&self) -> u16 {
         self.channels
     }
+    /// Bits per sample, as stored.
     pub fn sample_bits(&self) -> u16 {
         self.sample_bits
     }
+    /// Compression ID; 0 for uncompressed samples.
     pub fn compression_id(&self) -> i16 {
         self.compression_id
     }
+    /// Packet size field; 0 for uncompressed samples.
     pub fn packet_size(&self) -> u16 {
         self.packet_size
     }
+    /// Sample rate in Hz as a 16.16 fixed-point value, as stored.
     pub fn sample_rate_16_16(&self) -> u32 {
         self.sample_rate_16_16
     }
@@ -111,6 +131,9 @@ impl SoundDescriptionV0 {
     pub fn sample_rate_fraction(&self) -> (u32, u32) {
         (self.sample_rate_16_16, 65536)
     }
+    /// The PCM layout of an uncompressed mono or stereo entry of 8-bit `raw ` or 16-bit
+    /// `twos` samples. `Error::Unsupported` for anything else, `Error::Invalid` for a zero
+    /// sample rate.
     pub fn pcm_layout(&self) -> Result<PcmLayout> {
         if self.compression_id != 0 || self.packet_size != 0 {
             return Err(Error::Unsupported("QT v0 compressed/nonzero packet layout"));
@@ -137,8 +160,7 @@ impl SoundDescriptionV0 {
     }
 }
 
-/// Complete source sample and its layout; no demux packet aggregation, clock
-/// repair, sample deletion or decoded-audio operation is implied.
+/// One whole PCM sample with its description and layout; from [`PcmSampleReader`].
 #[derive(Debug)]
 pub struct PcmSourcePacket {
     packet: SourcePacket,
@@ -147,22 +169,26 @@ pub struct PcmSourcePacket {
     complete_frames: usize,
 }
 impl PcmSourcePacket {
+    /// The sample and its bytes.
     pub fn packet(&self) -> &SourcePacket {
         &self.packet
     }
+    /// The sound description.
     pub fn description(&self) -> &SoundDescriptionV0 {
         &self.description
     }
+    /// The PCM layout.
     pub fn layout(&self) -> PcmLayout {
         self.layout
     }
+    /// Number of PCM frames, one value per channel each, in the payload.
     pub fn complete_frames(&self) -> usize {
         self.complete_frames
     }
 }
 
-/// Reuses the shared fallible incremental source reader, including its bounded
-/// payload allocation, source/range binding, yields and retained-capacity storage.
+/// Reads one PCM sample of a [`SoundDescriptionV0`] track through [`SampleReader`]. A
+/// failure other than backpressure is kept for later polls.
 #[derive(Debug)]
 pub struct PcmSampleReader {
     inner: Option<SampleReader>,
@@ -175,6 +201,9 @@ pub struct PcmSampleReader {
     failed: Option<Error>,
 }
 impl PcmSampleReader {
+    /// A reader for `sample`, inside `media`, as [`SampleReader::new`] checks it.
+    /// `Error::Invalid` for a sample of another description or a size that is zero or not
+    /// whole frames; `Error::ForeignPool` for a description stored in another budget.
     pub fn new(
         input: &mut InputCursor,
         description: SoundDescriptionV0,
@@ -222,6 +251,8 @@ impl PcmSampleReader {
         self.failed = Some(error);
         error
     }
+    /// One bounded step towards the [`PcmSourcePacket`]; `Error::Cancelled` once `cancel`
+    /// is set.
     pub fn poll(
         &mut self,
         input: &mut InputCursor,

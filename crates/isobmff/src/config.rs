@@ -16,8 +16,12 @@ pub(crate) use dts::{check_dts_sample_entry, check_mp4a_dts, dts_entry_children,
 /// Limits for inspecting an encoded sample description and its configuration.
 #[derive(Clone, Copy, Debug)]
 pub struct ConfigurationLimits {
+    /// Largest configuration box payload (`esds`, `ddts`), in bytes; default 1 MiB.
     pub max_config_bytes: usize,
+    /// Most child boxes inspected in one sample entry, those inside `wave` included;
+    /// default 4096.
     pub max_child_boxes: u32,
+    /// Most descriptors walked in one `esds`; default 4096.
     pub max_descriptors: u32,
 }
 impl Default for ConfigurationLimits {
@@ -331,8 +335,8 @@ impl AudioDescription {
 }
 
 /// Extracts AudioSpecificConfig from an `mp4a` description independently
-/// of its sample table. Supports ISO sound entries and the selected
-/// QuickTime sound layout with a `wave` container.
+/// of its sample table. Supports version 0 sound entries and QuickTime version 1 and 2
+/// sound descriptions, with the `esds` inside a `wave` box where QuickTime puts it.
 #[derive(Debug)]
 pub struct AacConfigurationJob {
     walk: Option<EsdsDescriptionWalk>,
@@ -340,6 +344,8 @@ pub struct AacConfigurationJob {
 }
 
 impl AacConfigurationJob {
+    /// A job for `entry`; fails unless it is an `mp4a` description whose sound
+    /// description layout can be read.
     pub fn new(entry: &SampleDescription, limits: ConfigurationLimits) -> Result<Self> {
         if entry.format != entry.raw().header().kind {
             return Err(Error::Invalid(
@@ -582,7 +588,7 @@ impl EsdsDescriptionWalk {
     }
 }
 
-/// Check a selected sample description for DTS core playback. Direct DTS
+/// Checks whether a sample description signals DTS audio with a core. Direct DTS
 /// entries and DTS object types in `mp4a` are checked within the caller's
 /// box, configuration-byte and descriptor limits. Other formats and valid
 /// non-DTS object types return `None`. A positive result describes container
@@ -708,6 +714,8 @@ impl AacWaveFields {
 pub struct ObjectTypeScan(EsdsDescriptionWalk);
 
 impl ObjectTypeScan {
+    /// A scan of `entry`; fails unless it is an `mp4a` or `mp4s` description whose layout
+    /// can be read.
     pub fn new(entry: &SampleDescription, limits: ConfigurationLimits) -> Result<Self> {
         let profile = if entry.format == *b"mp4s" {
             EsdsProfile::SystemStream

@@ -1,6 +1,8 @@
-//! Explicit reference QuickTime v0 PCM catalogue and chunk-packet observation view.
-//! Original source descriptions, sample ranges and unit decode clocks survive.
-//! This is neither a replacement source Sample nor an audio decoder.
+//! QuickTime version 0 PCM as FFmpeg's MOV demuxer delivers it: the stream entry
+//! (`PcmStream`), the packets of up to 1024 samples of one chunk (`PcmCursor`,
+//! `PcmPacket`) and their bytes (`PcmReader`). Each packet keeps the source
+//! descriptions, sample ordinals, byte ranges and one-tick decode clocks it covers.
+//! Nothing here decodes audio.
 use crate::{
     Access, CursorStatus, Limits, Next, Sample,
     boxes::{BoxChildren, BoxView},
@@ -18,15 +20,21 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputToken, Result, SourceId, Step, WorkBudget,
 };
 
-/// Separate, explicit interpretation of reference packet observations.
+/// Token that selects FFmpeg's QuickTime PCM packets for [`PcmStream`] and
+/// [`PcmCursor`].
 #[derive(Clone, Copy, Debug)]
 pub struct PcmProfile;
 
+/// Limits of a [`PcmCursor`]; passing one is `Error::Limit`.
 #[derive(Clone, Copy, Debug)]
 pub struct PcmLimits {
+    /// Samples in the track's sample table.
     pub max_samples: u64,
+    /// Packets the cursor yields.
     pub max_packets: u64,
+    /// Bytes the demuxer reads for one packet.
     pub max_packet_bytes: usize,
+    /// Rows in `stsc` and in the chunk offset table.
     pub max_metadata_rows: u32,
 }
 impl Default for PcmLimits {
@@ -68,13 +76,19 @@ fn header_binding(header: &TrackHeader) -> Result<()> {
     Ok(())
 }
 
-/// Initial demux catalogue and source entry are independent retained facts.
+/// A QuickTime PCM track as FFmpeg's MOV demuxer lists it, beside the track's first
+/// sound description.
 #[derive(Clone, Debug)]
 pub struct PcmStream {
     demux: StreamView,
     initial: SoundDescriptionV0,
 }
 impl PcmStream {
+    /// The stream of a PCM track. `Error::Unsupported` outside a `qt  ` major-brand
+    /// file, for a first description with a nonzero revision or vendor or another
+    /// data reference, for a QuickTime language code and for a handler outside the
+    /// ISO `hdlr` layout; `Error::Invalid` when `header` differs from its raw boxes
+    /// or the table has no description.
     pub fn new(
         header: &TrackHeader,
         table: &SampleTable,
@@ -158,16 +172,21 @@ impl PcmStream {
             initial,
         })
     }
+    /// The stream: `pcm_u8` or `pcm_s16be`, audio, in the media time base, with no
+    /// codec private data and a zero vendor code.
     pub fn demux(&self) -> &StreamView {
         &self.demux
     }
+    /// The track's first sound description.
     pub fn initial(&self) -> &SoundDescriptionV0 {
         &self.initial
     }
 }
 
-/// One demux request with its complete source interval and both descriptions.
-/// A request may overlap another source chunk; its source interval never expands.
+/// One packet FFmpeg's MOV demuxer emits for QuickTime PCM: up to 1024 consecutive
+/// samples of one chunk. The demuxer reads it with the first description's frame
+/// size, so where a later description's frames differ, the bytes it reads can
+/// reach into another chunk; the source samples it covers are kept beside them.
 #[derive(Clone, Debug)]
 pub struct PcmPacket {
     initial: SoundDescriptionV0,
@@ -185,36 +204,50 @@ pub struct PcmPacket {
     generation: InputToken,
 }
 impl PcmPacket {
+    /// The sound description that `stsc` names for the packet's chunk.
     pub fn source_description(&self) -> &SoundDescriptionV0 {
         &self.description
     }
+    /// The track's first sound description, whose frame size sets the bytes read.
     pub fn initial_description(&self) -> &SoundDescriptionV0 {
         &self.initial
     }
+    /// The track's `stbl` box.
     pub fn source_table(&self) -> &BoxView {
         &self.raw_table
     }
+    /// 1-based ordinals of the source samples the packet covers, end exclusive.
     pub fn source_samples(&self) -> Range<u64> {
         self.samples.clone()
     }
+    /// Absolute file offsets of those samples' bytes.
     pub fn source_range(&self) -> &Range<u64> {
         &self.source_range
     }
+    /// Absolute file offsets of the bytes the demuxer reads for the packet: the
+    /// sample count times the first description's frame size, from the samples'
+    /// place in their chunk.
     pub fn demux_range(&self) -> &Range<u64> {
         &self.demux_range
     }
+    /// 0-based position of the packet in the track's packets.
     pub fn demux_ordinal(&self) -> u64 {
         self.ordinal
     }
+    /// Decode time in media ticks: the 0-based index of the first sample, each
+    /// sample lasting one tick.
     pub fn dts(&self) -> i64 {
         self.dts
     }
+    /// Presentation time, equal to [`dts`](Self::dts).
     pub fn pts(&self) -> i64 {
         self.dts
     }
+    /// Duration in media ticks: the number of samples.
     pub fn duration(&self) -> u32 {
         self.duration
     }
+    /// Packet flags as FFmpeg reports them: always 1, key.
     pub fn flags(&self) -> u32 {
         1
     }
@@ -254,10 +287,11 @@ struct Group {
     description: SoundDescriptionV0,
 }
 
-/// Source-table traversal and grouping are work bounded and allocate no index.
-/// Each original source sample is validated; packet requests use the initial
-/// demux frame layout independently. Legitimate payload range requests do not
-/// reset this metadata cursor; a source generation change always invalidates it.
+/// Groups a QuickTime PCM track's samples into the [`PcmPacket`]s FFmpeg's MOV
+/// demuxer emits, from the sample table, with no per-sample storage. Every source
+/// sample is checked. The cursor is bound to the input's pool, source and
+/// generation: payload reads in the same generation leave it usable, and a new
+/// generation fails it with `Error::StaleGeneration`.
 #[derive(Debug)]
 pub struct PcmCursor<'a> {
     header: &'a TrackHeader,
@@ -285,6 +319,11 @@ pub struct PcmCursor<'a> {
     ended: bool,
 }
 impl<'a> PcmCursor<'a> {
+    /// A cursor over `table`, whose samples must lie in the `media` extent
+    /// (absolute file offsets). `Error::ForeignPool` when the table or header boxes
+    /// are charged to another pool than `input`'s; `Error::Invalid` for an inverted
+    /// extent, a header that differs from its raw boxes or a table without a
+    /// description.
     pub fn new(
         header: &'a TrackHeader,
         table: &'a SampleTable,
@@ -357,6 +396,10 @@ impl<'a> PcmCursor<'a> {
         self.offsets = None;
         error
     }
+    /// Advances to the next packet. Failures are sticky. `Error::Unsupported` for
+    /// a composition or access table, for samples that are not consecutive one-tick
+    /// sync frames of their description's size, and for a packet read outside
+    /// `media`; `Error::Invalid` where the chunk tables and samples disagree.
     pub fn poll(
         &mut self,
         input: &mut InputCursor,
@@ -604,6 +647,7 @@ impl<'a> PcmCursor<'a> {
         });
         Ok(())
     }
+    /// Takes the ready packet; `Error::Invalid` when none is ready.
     pub fn take_packet(
         &mut self,
         input: &mut InputCursor,
@@ -622,6 +666,7 @@ impl<'a> PcmCursor<'a> {
     }
 }
 
+/// The bytes of one [`PcmPacket`], read by a [`PcmReader`].
 #[derive(Clone, Debug)]
 pub struct PcmPayload {
     plan: PcmPacket,
@@ -630,22 +675,27 @@ pub struct PcmPayload {
     token: InputToken,
 }
 impl PcmPayload {
+    /// The packet that was read.
     pub fn plan(&self) -> &PcmPacket {
         &self.plan
     }
+    /// The bytes of the packet's [`demux_range`](PcmPacket::demux_range).
     pub fn payload(&self) -> &Bytes {
         &self.payload
     }
+    /// The input source they were read from.
     pub fn source(&self) -> SourceId {
         self.source
     }
+    /// The input request they were read under.
     pub fn token(&self) -> &InputToken {
         &self.token
     }
 }
 
-/// Actual charged physical read; never constructs a replacement source sample.
-/// Refusals, cancellation, foreign pools and stale transactions stay core errors.
+/// Reads one [`PcmPacket`]'s bytes from a seekable input into a buffer charged to
+/// the input's pool. Cancellation, foreign pools and stale requests fail with the
+/// core errors.
 #[derive(Debug)]
 pub struct PcmReader {
     plan: PcmPacket,
@@ -657,6 +707,10 @@ pub struct PcmReader {
     failed: Option<Error>,
 }
 impl PcmReader {
+    /// Requests `plan`'s bytes from `input`. `Error::Limit` past `maximum_packet`
+    /// bytes; `Error::Unsupported` unless the input is seekable with a known length
+    /// that covers them; `Error::Invalid` for an empty read or one outside the
+    /// packet's media extent.
     pub fn new(input: &mut InputCursor, plan: PcmPacket, maximum_packet: usize) -> Result<Self> {
         plan.bind(input)?;
         let range = &plan.demux_range;
@@ -691,6 +745,8 @@ impl PcmReader {
             failed: None,
         })
     }
+    /// Advances the read; `Ready` with the payload. `Error::Truncated` when the
+    /// input ends first. Failures other than `Error::Backpressure` are sticky.
     pub fn poll(
         &mut self,
         input: &mut InputCursor,

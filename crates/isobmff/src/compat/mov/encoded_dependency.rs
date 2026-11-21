@@ -1,7 +1,7 @@
-//! The SDTP view does not imply decoder recovery. This bounded source walk
-//! admits only absent or explicitly unassociated roll/prol contexts. Existing
-//! typed recovery parsers validate their own source grammar; one real mapping
-//! row is inspected per work unit, with no sample array or inferred defaults.
+//! The `sdtp` dependency view's check of a sample table's groups: `roll` and `prol`
+//! groups must be absent or empty, with no descriptions and every sample mapped to no
+//! group, and other grouping types are refused. One mapping row is read per unit of
+//! work. An `sdtp` byte says nothing about decoder recovery.
 use crate::{
     Limits, Next,
     boxes::BoxChildren,

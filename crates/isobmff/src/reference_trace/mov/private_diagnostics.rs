@@ -1,6 +1,9 @@
-//! Source-owned causal diagnostics for the selected reference receiver. Process
-//! addresses are never invented. Reference read-demand spans borrow the REAL
-//! enclosing source table; short children never become validated codec boxes.
+//! FFmpeg's log lines for the child boxes of a raw-video sample entry.
+//!
+//! [`PrivateDiagnosticJob`] walks the children of a track's `raw ` entry and reports, in
+//! order, the messages FFmpeg logs for them and the open return code when a child fails
+//! the open. Where FFmpeg reads past a child's end, the reported bytes are a slice of the
+//! enclosing `stbl`; a short child is reported, never taken for a valid configuration box.
 use crate::{
     BuildStatus, Limits, Next,
     boxes::{BoxChildren, BoxView},
@@ -12,14 +15,28 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
+/// A message FFmpeg logs for a child box of a raw-video entry; `Display` writes its text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DiagnosticKind {
+    /// An `avcC`, `hvcC` or `av1C` child after configuration bytes longer than one byte
+    /// are installed; FFmpeg ignores it.
     IgnoredAdditionalConfiguration,
+    /// A `vpcC` child whose version, carried here, is not 1.
     UnsupportedVpVersion(u8),
+    /// A `vpcC` child shorter than 5 bytes; it fails the open.
     EmptyVpConfiguration,
+    /// A `ddts` child whose `ChannelLayout`, carried here, is above 255.
     UnsupportedDtsLayout(u16),
+    /// A `ddts` child whose sampling frequency, read as signed and carried here, is not
+    /// positive; it fails the open.
     InvalidDtsRate(i32),
-    AttemptedChildOverread { atom: [u8; 4], bytes: u64 },
+    /// FFmpeg's read of an `esds` or `ddts` child runs past the end of the child.
+    AttemptedChildOverread {
+        /// Code of the child: `esds` or `ddts`.
+        atom: [u8; 4],
+        /// Bytes read past the end of the child.
+        bytes: u64,
+    },
 }
 impl fmt::Display for DiagnosticKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -38,18 +55,30 @@ impl fmt::Display for DiagnosticKind {
         }
     }
 }
+/// One message FFmpeg logs while walking a raw-video entry, with the child box it is about.
 #[derive(Clone, Debug)]
 pub struct ReceiverDiagnostic {
+    /// Which message FFmpeg logs, with its values.
     pub kind: DiagnosticKind,
+    /// The child box the message is about, as it is in the source.
     pub raw: BoxView,
+    /// 1-based position of that child among the entry's child boxes.
     pub child_ordinal: u32,
+    /// For an `esds` or `ddts` child, the bytes of the enclosing `stbl` that FFmpeg reads,
+    /// from the child's payload start; they can extend past the child. `None` otherwise.
     pub inspected_parent_span: Option<Bytes>,
+    /// Whether the child is shorter than the bytes FFmpeg reads from it.
     pub source_child_truncated: bool,
 }
+/// The messages FFmpeg logs for the child boxes of a raw-video entry, and its open result.
 #[derive(Debug)]
 pub struct PrivateDiagnostics {
+    /// The `stbl` box holding the entry.
     pub source_table: BoxView,
+    /// The messages, in the order FFmpeg logs them.
     pub events: BudgetVec<ReceiverDiagnostic>,
+    /// FFmpeg's open return code when a child fails the open (`-1094995529`,
+    /// `AVERROR_INVALIDDATA`); `None` when none does. Later children are not inspected.
     pub demux_open_result: Option<i32>,
 }
 #[derive(Debug, Clone, Copy)]
@@ -199,6 +228,8 @@ impl EsdsDemand {
         }
     }
 }
+/// Walks the child boxes of a track's single raw-video entry and collects the messages
+/// FFmpeg logs for them.
 #[derive(Debug)]
 pub struct PrivateDiagnosticJob {
     pool: Budget,
@@ -216,6 +247,9 @@ pub struct PrivateDiagnosticJob {
     failed: Option<Error>,
 }
 impl PrivateDiagnosticJob {
+    /// Starts a walk over the children of `table`'s one entry. Fails with
+    /// `Error::ForeignPool` when the table's bytes do not belong to `pool`, and with
+    /// `Error::Unsupported` unless the table has exactly one description, of format `raw `.
     pub fn new(table: &SampleTable, pool: &Budget, limits: Limits) -> Result<Self> {
         if !table.raw().bytes().belongs_to(pool) {
             return Err(Error::ForeignPool);
@@ -254,6 +288,10 @@ impl PrivateDiagnosticJob {
             source_child_truncated: truncated,
         }
     }
+    /// Walks further children. Fails with `Error::Unsupported` for a child whose effect is
+    /// not modelled: a `dOps` shorter than 11 bytes, of nonzero version or after other
+    /// configuration, a `vpcC` of version 1, or an `esds` whose ES descriptor is followed
+    /// by a decoder configuration descriptor.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(e) = self.failed {
             return Err(e);
@@ -456,6 +494,9 @@ impl PrivateDiagnosticJob {
             }
         }
     }
+    /// Takes the result after [`poll`](Self::poll) returned `Ready`. Fails with
+    /// `Error::Invalid` before then or when called again, and with `Error::Cancelled` when
+    /// `cancel` is set.
     pub fn try_finish(&mut self, cancel: &AtomicBool) -> Result<PrivateDiagnostics> {
         if let Some(e) = self.failed {
             return Err(e);

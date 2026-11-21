@@ -1,5 +1,9 @@
-//! Explicit empirical reference description view. Raw source tables/configuration/clocks are
-//! never repaired. The cursor emits an event even for a missing demux entry.
+//! Description recovery: a sample table whose chunk rows state invalid description indexes,
+//! read as FFmpeg's MOV demuxer reads it. The source tables stay as stated. The cursors
+//! report an event for every declared sample, including those FFmpeg reports no packet
+//! for, and the physical cursors pair with
+//! [`PhysicalReader`](crate::compat::mov::recovery::PhysicalReader) to read a packet the
+//! file ends inside.
 use super::*;
 use crate::{
     CursorStatus,
@@ -10,30 +14,44 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+/// Opt-in token for description recovery, passed to [`DescriptionRecoveryBuilder::new`] and
+/// the description cursors of [`DescriptionRecoveryTable`].
 #[derive(Clone, Copy, Debug)]
 pub struct DescriptionRecoveryProfile;
 
-/// Caller facts only. custom_read_maximum is retained as configuration/provenance;
-/// no demux I/O outcome is inferred from it.
+/// What the caller knows about the source for description recovery.
 #[derive(Clone, Copy, Debug)]
 pub struct DescriptionContext {
+    /// Length of the source file in bytes.
     pub physical_length: u64,
+    /// Most bytes one call of the caller's read callback supplies. Only the comparison
+    /// transport models of `reference_trace` read it; the cursors here infer no read
+    /// outcome from it.
     pub custom_read_maximum: usize,
 }
+/// Whether a description-recovery packet's bytes can be read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DescriptionRead {
+    /// The packet starts before the physical end of the file.
     Available,
-    /// An explicitly selected, independently guarded reference transport model.
-    /// The source range remains invalid and no demux I/O confirmation is invented.
+    /// The first packet starts past the physical end, and the transport model given to the
+    /// cursor shows FFmpeg's read reaching end of file there. The packet's byte range stays
+    /// invalid.
     ModeledInitialEof,
+    /// The packet starts at or past the physical end; what FFmpeg's read does there is not
+    /// modelled.
     UnavailablePhysicalStart,
+    /// A packet read through run recovery whose read outcome this view does not model.
     UnreviewedContext,
+    /// The event has no packet, so nothing is read.
     NoPacketForAbsentCatalogue,
 }
 impl DescriptionContext {
-    /// Source physical availability only. It proves neither demux EOF nor any
-    /// demux seek/buffer/cursor state. Missing physical bytes stay an unknown
-    /// demux terminal transition until an independently reviewed policy exists.
+    /// Whether a packet starting at absolute offset `start` can be read:
+    /// [`Available`](DescriptionRead::Available) before the physical end,
+    /// [`UnavailablePhysicalStart`](DescriptionRead::UnavailablePhysicalStart) otherwise.
+    /// This is a fact about the file, not about FFmpeg's read. Fails with
+    /// `Error::Unsupported` unless `terminal_media` is a range ending at the physical end.
     pub fn read_disposition(
         self,
         start: u64,
@@ -52,50 +70,82 @@ impl DescriptionContext {
     }
 }
 
+/// How a description-recovery packet relates to the declared sample it is paired with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DescriptionAssociation {
-    /// Coordinates agree; invalid source configuration/clock is not validated.
+    /// The packet reads the declared sample's own byte range; its configuration and clock
+    /// are not checked.
     DeclarationCoordinate,
-    /// Only raw size/time ordinals correspond, not a canonical frame/config.
+    /// The packet shares only its ordinal, and so its size and clock rows, with the declared
+    /// sample; its byte range comes from FFmpeg's chunk layout and is not that sample's.
     RawSizeAndClockOrdinalOnly,
 }
+/// Whether FFmpeg reports a packet for a declared sample.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DescriptionEmission {
+    /// FFmpeg reports a packet.
     Packet,
+    /// The chunk's description index 2 names an entry the single-entry `stsd` lacks, so
+    /// FFmpeg reports no packet.
     SuppressedMissingCatalogueEntry,
 }
+/// An `stsc` row whose `sample_description_index` strict parsing rejects.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DescriptionRowDiagnostic {
     pub(crate) row: u32,
+    /// The stated index; never 1.
     pub raw_description: u32,
     pub(crate) declared_first_chunk: u32,
     pub(crate) declared_samples_per_chunk: u32,
+    /// Absolute file offset of the row's `sample_description_index` field.
     pub field_start: u64,
+    /// Absolute file offset just past that 4-byte field.
     pub field_end: u64,
     pub(crate) strict_error: Error,
 }
 
-/// All original source declarations are retained, including clock rows omitted
-/// by the demux catalogue. A suppressed event contains no demux packet.
+/// One declared sample of a [`DescriptionPacketCursor`], with the packet FFmpeg reports for
+/// it. Every declared sample has an event, including those FFmpeg reports no packet for.
 #[derive(Clone, Debug)]
 pub struct DescriptionEvent {
+    /// The sample as the table declares it; its access is unknown when the sync table was
+    /// rejected.
     pub declaration: Sample,
+    /// The packet FFmpeg reports; `None` when it reports none.
     pub packet: Option<PacketView>,
+    /// Whether FFmpeg reports a packet.
     pub emission: DescriptionEmission,
+    /// How `packet` relates to `declaration`.
     pub association: DescriptionAssociation,
+    /// `sample_description_index` of the `stsc` row the packet's chunk belongs to.
     pub raw_chunk_description: u32,
+    /// 1-based chunk number in FFmpeg's layout; `None` when the cursor reads the table
+    /// through run recovery.
     pub physical_chunk: Option<u32>,
+    /// 0-based `stsc` row whose `samples_per_chunk` FFmpeg uses for the chunk; `None` when
+    /// the cursor reads the table through run recovery.
     pub observed_count_row: Option<u32>,
+    /// The `mdhd` timescale; zero when the header was recovered with a zero timescale.
     pub source_timescale: u32,
+    /// The `Error::Invalid` strict parsing returns for the `stsc` rows, when the declared
+    /// or the chunk's description index is not 1.
     pub source_error: Option<Error>,
+    /// Why the packet's byte range leaves the media extent, if it does.
     pub range_error: Option<Error>,
+    /// Whether the packet's bytes can be read.
     pub read: DescriptionRead,
+    /// Packets since the last key packet as FFmpeg's index counts them, declared samples
+    /// without a packet included; 0 for a key packet and for the first declared sample.
     pub demux_index_distance: u64,
+    /// How FFmpeg's buffered reader reaches end of file for the first packet when it starts
+    /// past the physical end and the cursor was given a transport model; `None` otherwise.
     #[cfg(feature = "reference-trace")]
     pub modeled_transport_read:
         Option<crate::reference_trace::mov::raw_video_transport::ModeledInitialRead>,
 }
 
+/// Builds a [`DescriptionRecoveryTable`] from an `stbl` box whose `stsc` rows state invalid
+/// description indexes, as FFmpeg's MOV demuxer reads it. Run recovery applies as well.
 #[derive(Debug)]
 pub struct DescriptionRecoveryBuilder {
     inner: RunRecoveryBuilder,
@@ -107,6 +157,9 @@ pub struct DescriptionRecoveryBuilder {
     failed: Option<Error>,
 }
 impl DescriptionRecoveryBuilder {
+    /// Starts description recovery of `raw`, charging storage to `budget`. Fails with
+    /// `Error::ForeignPool` when `raw`'s bytes are not charged to `budget`, and with
+    /// `Error::Invalid` when it is not an `stbl` box.
     pub fn new(
         raw: BoxView,
         budget: Budget,
@@ -128,6 +181,11 @@ impl DescriptionRecoveryBuilder {
             failed: None,
         })
     }
+    /// Advances the build. The table must have one sample description, and each row's
+    /// description index must be 1 or 0; the first row may instead state 2 (an entry `stsd`
+    /// lacks) or `u32::MAX` when it is the only invalid row and the second row starts at
+    /// chunk 2. With any invalid row, `ctts` may have at most two rows. Anything else fails
+    /// with `Error::Unsupported`. A failure other than backpressure is sticky.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(e) = self.failed {
             return Err(e);
@@ -202,6 +260,8 @@ impl DescriptionRecoveryBuilder {
         self.ready = true;
         Ok(BuildStatus::Ready)
     }
+    /// Returns the table once [`poll`](Self::poll) has returned [`BuildStatus::Ready`];
+    /// fails with `Error::Invalid` before that, or with the failure `poll` returned.
     pub fn finish(self) -> Result<DescriptionRecoveryTable> {
         if let Some(e) = self.failed {
             return Err(e);
@@ -217,6 +277,8 @@ impl DescriptionRecoveryBuilder {
     }
 }
 
+/// A sample table read under description recovery: the raw tables, the rows strict parsing
+/// rejects, and cursors over the samples they declare.
 #[derive(Debug)]
 pub struct DescriptionRecoveryTable {
     base: RunRecoveryTable,
@@ -224,27 +286,37 @@ pub struct DescriptionRecoveryTable {
     special: Option<u32>,
 }
 impl DescriptionRecoveryTable {
+    /// The `stbl` box as stated.
     pub fn raw(&self) -> &BoxView {
         self.base.raw()
     }
+    /// The `stsd` sample descriptions; description recovery requires exactly one.
     pub fn descriptions(&self) -> &[SampleDescription] {
         self.base.descriptions()
     }
+    /// As [`RunRecoveryTable::coverage`].
     pub fn coverage(&self) -> &[Option<RunCoverage>; 2] {
         self.base.coverage()
     }
+    /// As [`RunRecoveryTable::sync_diagnostic`].
     pub fn sync_diagnostic(&self) -> Option<SyncDiagnostic> {
         self.base.sync_diagnostic()
     }
+    /// As [`RunRecoveryTable::source_prefix_cursor`]; samples keep their stated description
+    /// indexes.
     pub fn source_prefix_cursor(&self) -> RecoverySourceCursor<'_> {
         self.base.source_prefix_cursor()
     }
+    /// Number of rows in `stsc`.
     pub fn raw_description_row_count(&self) -> u32 {
         self.base.storage.stsc.count
     }
+    /// Number of `stsc` rows whose description index is not 1.
     pub fn invalid_description_count(&self) -> u32 {
         self.invalid
     }
+    /// The diagnostic for 0-based `stsc` row `row`; `None` when its description index is 1.
+    /// Fails with `Error::Invalid` when `row` is past the last row.
     pub fn description_diagnostic(&self, row: u32) -> Result<Option<DescriptionRowDiagnostic>> {
         let table = &self.base.storage;
         if row >= table.stsc.count {
@@ -272,6 +344,7 @@ impl DescriptionRecoveryTable {
             strict_error: Error::Invalid("stsc order/count/description"),
         }))
     }
+    /// As [`RunRecoveryTable::stream_view_for_recovery_header`].
     pub fn stream_view_for_recovery_header(
         &self,
         header: &crate::compat::mov::field_recovery::RecoveryTrackHeader,
@@ -279,6 +352,13 @@ impl DescriptionRecoveryTable {
     ) -> Result<crate::compat::mov::view::StreamView> {
         self.base.stream_view_for_recovery_header(header, brand)
     }
+    /// Walks an event for every declared sample. A table without invalid rows whose first
+    /// chunk starts before the physical end reads as [`RunRecoveryTable::packet_cursor`]
+    /// does. Otherwise the cursor follows FFmpeg's chunk layout and needs one media extent
+    /// ending at the physical end and at most two `ctts` rows (`Error::Unsupported`
+    /// otherwise), and `limits` that admit a track, an extent and every sample
+    /// (`Error::Limit`). Fails with `Error::ForeignPool` when the table is not charged to
+    /// `pool`.
     pub fn description_packet_cursor<'a>(
         &'a self,
         pool: &Budget,
@@ -376,8 +456,9 @@ impl DescriptionRecoveryTable {
             legacy_distance: 0,
         })
     }
-    /// A canonical first source request crosses the known physical end.
-    /// No demux observation or expected object participates in this predicate.
+    /// Whether the first sample's declared range starts before `length` and ends after it,
+    /// so that only a prefix of it exists in a file of `length` bytes. False for a table
+    /// with invalid rows or without samples.
     pub fn first_sample_physical_prefix(
         &self,
         length: u64,
@@ -393,7 +474,12 @@ impl DescriptionRecoveryTable {
             .ok_or(Error::Overflow)?;
         Ok(start < length && end > length)
     }
-    /// Explicit physical-byte operation. The plain description constructors are unchanged.
+    /// Walks an event for every declared sample in FFmpeg's chunk layout, for reading packet
+    /// bytes with [`PhysicalReader`](crate::compat::mov::recovery::PhysicalReader). A
+    /// packet is [`Available`](DescriptionRead::Available) when it starts before the
+    /// physical end. Needs one media extent inside the physical source and at most two
+    /// `ctts` rows (`Error::Unsupported` otherwise); fails with `Error::ForeignPool` when
+    /// the table is not charged to `pool`.
     pub fn physical_packet_cursor<'a>(
         &'a self,
         pool: &Budget,
@@ -423,6 +509,8 @@ impl DescriptionRecoveryTable {
             true,
         )
     }
+    /// FFmpeg's index over the events of
+    /// [`physical_packet_cursor`](Self::physical_packet_cursor).
     pub fn physical_index_cursor<'a>(
         &'a self,
         pool: &Budget,
@@ -436,6 +524,11 @@ impl DescriptionRecoveryTable {
             self.physical_packet_cursor(pool, header, media, limits.packets, context, profile)?;
         Ok(DescriptionIndexCursor::new(inner, limits.max_entries))
     }
+    /// [`physical_packet_cursor`](Self::physical_packet_cursor) in the context of a
+    /// root-walk transport model, for trace comparison: a first packet past the physical
+    /// end reports [`ModeledInitialEof`](DescriptionRead::ModeledInitialEof) where the model
+    /// shows FFmpeg's read reaching end of file. Fails when `model` was not built for this
+    /// table, `pool` and `media`.
     #[cfg(feature = "reference-trace")]
     pub fn root_walk_packet_cursor<'a>(
         &'a self,
@@ -461,6 +554,8 @@ impl DescriptionRecoveryTable {
         }
         Ok(cursor)
     }
+    /// FFmpeg's index over the events of
+    /// [`root_walk_packet_cursor`](Self::root_walk_packet_cursor), for trace comparison.
     #[cfg(feature = "reference-trace")]
     pub fn root_walk_index_cursor<'a>(
         &'a self,
@@ -475,6 +570,11 @@ impl DescriptionRecoveryTable {
             self.root_walk_packet_cursor(pool, header, media, limits.packets, model, profile)?;
         Ok(DescriptionIndexCursor::new(inner, limits.max_entries))
     }
+    /// [`description_packet_cursor`](Self::description_packet_cursor) in the context of a
+    /// raw-video transport model, for trace comparison: a first packet past the physical
+    /// end reports [`ModeledInitialEof`](DescriptionRead::ModeledInitialEof) where the model
+    /// shows FFmpeg's read reaching end of file. Fails when `model` was not built for this
+    /// table, `pool` and `media`.
     #[cfg(feature = "reference-trace")]
     pub fn description_packet_cursor_with_transport<'a>(
         &'a self,
@@ -494,6 +594,8 @@ impl DescriptionRecoveryTable {
         }
         Ok(cursor)
     }
+    /// As [`description_index_cursor`](Self::description_index_cursor), with the context of
+    /// a raw-video transport model, for trace comparison.
     #[cfg(feature = "reference-trace")]
     pub fn description_index_cursor_with_transport<'a>(
         &'a self,
@@ -514,6 +616,9 @@ impl DescriptionRecoveryTable {
         )?;
         Ok(DescriptionIndexCursor::new(inner, limits.max_entries))
     }
+    /// FFmpeg's index over the events of
+    /// [`description_packet_cursor`](Self::description_packet_cursor); a declared sample
+    /// without a packet takes no entry.
     pub fn description_index_cursor<'a>(
         &'a self,
         pool: &Budget,
@@ -692,6 +797,7 @@ impl Direct<'_> {
     }
 }
 
+/// The events of a [`DescriptionRecoveryTable`], one per declared sample in decode order.
 #[derive(Debug)]
 pub struct DescriptionPacketCursor<'a> {
     legacy: Option<DirectPacketCursor<'a>>,
@@ -701,6 +807,8 @@ pub struct DescriptionPacketCursor<'a> {
     legacy_distance: u64,
 }
 impl DescriptionPacketCursor<'_> {
+    /// Advances to the next event; take it with [`take_event`](Self::take_event). A
+    /// failure, cancellation included, is sticky.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         let result = match self.latch.early(cancel) {
             Some(early) => early,
@@ -708,6 +816,8 @@ impl DescriptionPacketCursor<'_> {
         };
         self.latch.settle(result)
     }
+    /// Takes the ready event; fails with the sticky failure, or with `Error::Invalid` when
+    /// no event is ready.
     pub fn take_event(&mut self) -> Result<DescriptionEvent> {
         self.latch.take("v3 no ready event")
     }
@@ -774,20 +884,33 @@ impl DescriptionPacketCursor<'_> {
     }
 }
 
+/// An entry of FFmpeg's index for a recovered track, as FFmpeg reports it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NativeIndexEntry {
+    /// 0-based position in the index.
     pub ordinal: u64,
+    /// Absolute file offset of the packet's first byte.
     pub position: i64,
+    /// The packet's decode time, in ticks of the track's packet time base.
     pub timestamp: i64,
+    /// 1 for a key packet, 0 otherwise.
     pub flags: i32,
+    /// Packet size in bytes; at most `0x1fff_ffff`.
     pub size: u32,
+    /// Packets since the last key packet; 0 at a key packet. Under description recovery
+    /// the count includes declared samples without a packet.
     pub min_distance: i32,
 }
+/// One event of a [`DescriptionIndexCursor`]: a declared sample and the index entry FFmpeg
+/// makes for its packet.
 #[derive(Clone, Debug)]
 pub struct DescriptionIndexEvent {
+    /// The packet cursor's event for the declared sample.
     pub source_event: DescriptionEvent,
+    /// The index entry for the packet; `None` when FFmpeg reports no packet.
     pub demux_entry: Option<NativeIndexEntry>,
 }
+/// FFmpeg's index of a [`DescriptionRecoveryTable`], one declared sample at a time.
 #[derive(Debug)]
 pub struct DescriptionIndexCursor<'a> {
     inner: DescriptionPacketCursor<'a>,
@@ -804,6 +927,8 @@ impl<'a> DescriptionIndexCursor<'a> {
             latch: Latched::default(),
         }
     }
+    /// Advances to the next event; take it with [`take_event`](Self::take_event). A
+    /// failure, cancellation included, is sticky.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         let result = match self.latch.early(cancel) {
             Some(early) => early,
@@ -811,6 +936,8 @@ impl<'a> DescriptionIndexCursor<'a> {
         };
         self.latch.settle(result)
     }
+    /// Takes the ready event; fails with the sticky failure, or with `Error::Invalid` when
+    /// no event is ready.
     pub fn take_event(&mut self) -> Result<DescriptionIndexEvent> {
         self.latch.take("v3 no ready index event")
     }

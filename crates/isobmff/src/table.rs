@@ -1,5 +1,7 @@
-//! Regular sample-table seam. Sequential O(samples + source runs); bounded seek
-//! locator works over source run/chunk tables without a per-sample index allocation.
+//! Regular sample tables. [`SampleTableBuilder`] checks a track's `stbl` into a
+//! [`SampleTable`] that keeps the tables as stored; [`SampleCursor`] reads every sample in
+//! order and [`SampleLocator`] finds one sample from the run and chunk tables without
+//! visiting the samples before it. Nothing is stored per sample.
 use crate::{
     Access, BuildStatus, Limits, Next, Sample,
     boxes::{BoxChildren, BoxView},
@@ -15,8 +17,11 @@ use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 pub(crate) mod recovery;
 pub(crate) mod rows;
 
+/// How [`SampleTableBuilder`] treats `stts` and `ctts` runs that count more samples than
+/// the sample size table has.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TimingRunPolicy {
+    /// The runs must count exactly the sample count; otherwise `Error::Invalid`.
     #[default]
     Strict,
     /// Use the timing prefix covered by the sample sizes. The final decode
@@ -24,8 +29,10 @@ pub enum TimingRunPolicy {
     BoundedPrefix,
 }
 
+/// How [`SampleTableBuilder`] treats an `stss` entry past the last sample.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SyncSamplePolicy {
+    /// Such an entry is `Error::Invalid`.
     #[default]
     Strict,
     /// Use the increasing prefix before the first entry past the last sample.
@@ -36,17 +43,24 @@ pub enum SyncSamplePolicy {
 /// Validation policies for regular sample tables. Both are strict by default.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SampleTablePolicy {
+    /// How timing runs must cover the samples.
     pub timing_runs: TimingRunPolicy,
+    /// How sync sample entries must lie within the samples.
     pub sync_samples: SyncSamplePolicy,
 }
 
-/// Declared timing occurrences beyond the number of samples with sizes.
+/// Samples counted by timing runs beyond those the sample size table has; zero unless
+/// [`TimingRunPolicy::BoundedPrefix`] accepted them.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TimingRunSurplus {
+    /// Surplus samples of the last `stts` run.
     pub decode_samples: u64,
+    /// Surplus samples of the `ctts` runs.
     pub composition_samples: u64,
 }
 
+/// A checked regular sample table. It keeps the `stbl` boxes as stored and reads samples
+/// from them on demand.
 #[derive(Debug)]
 pub struct SampleTable {
     raw: BoxView,
@@ -73,32 +87,35 @@ struct SamplePosition {
 }
 
 impl SampleTable {
+    /// The `stbl` box as read.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
+    /// The entries of `stsd`, in order.
     pub fn descriptions(&self) -> &[SampleDescription] {
         self.descriptions.as_slice()
     }
+    /// Number of samples, from `stsz` or `stz2`.
     pub fn sample_count(&self) -> u64 {
         u64::from(self.sizes.count)
     }
-    /// The raw table retains the original run counts.
+    /// The timing runs' surplus over the sample count; the stored runs keep their counts.
     pub fn timing_run_surplus(&self) -> TimingRunSurplus {
         self.timing_run_surplus
     }
-    /// Raw entry count. None is absent; Some(0) is explicitly present-empty.
+    /// Number of entries stored in `stss`, unused ones included; `None` without `stss`,
+    /// `Some(0)` for an empty one.
     pub fn sync_entry_count(&self) -> Option<u32> {
         self.sync
             .as_ref()
             .map(|table| table.count + self.unused_sync_entries)
     }
-    /// Number of raw entries at and after the first sync marker past the track.
+    /// Number of `stss` entries from the first one past the last sample on, which
+    /// [`SyncSamplePolicy::BoundedPrefix`] leaves unused; zero otherwise.
     pub fn unused_sync_entries(&self) -> u32 {
         self.unused_sync_entries
     }
-    /// Preserve presence separately from an explicitly encoded all-zero SDTP.
-    /// Internal observation profiles can select a source-backed branch without
-    /// rescanning tables or inferring presence from the first sample's value.
+    /// Whether the table has `sdtp`, even one whose bytes are all zero.
     pub(crate) fn has_dependency_table(&self) -> bool {
         self.dependency.is_some()
     }
@@ -111,14 +128,14 @@ impl SampleTable {
         self.ctts.is_some()
     }
 
-    /// Borrow compact validated wire runs for the separate demux observation
-    /// view. Their source version, raw bytes and per-sample meaning stay intact.
+    /// The checked `ctts` runs as stored, with their box version.
     pub(crate) fn composition_runs(&self) -> Option<&Words> {
         self.ctts.as_ref()
     }
     pub(crate) fn decode_runs(&self) -> &Words {
         &self.stts
     }
+    /// A cursor over every sample in decode order.
     pub fn cursor(&self) -> SampleCursor<'_> {
         SampleCursor {
             table: self,
@@ -143,6 +160,9 @@ impl SampleTable {
             chunks: ChunkCursor::default(),
         }
     }
+    /// The latest sync sample at or before 1-based `ordinal`, or `None` if `stss` lists
+    /// none that early; without `stss` every sample is one. `Error::Invalid` for an
+    /// ordinal outside the table.
     pub fn previous_sync(&self, ordinal: u64) -> Result<Option<u64>> {
         if ordinal == 0 || ordinal > self.sample_count() {
             return Err(Error::Invalid("sync query sample"));
@@ -152,6 +172,7 @@ impl SampleTable {
             None => Ok(Some(ordinal)),
         }
     }
+    /// A locator for the sample with 1-based `ordinal`; `Error::Invalid` outside the table.
     pub fn locate(&self, ordinal: u64) -> Result<SampleLocator<'_>> {
         if ordinal == 0 || ordinal > self.sample_count() {
             return Err(Error::Invalid("locate sample"));
@@ -287,8 +308,8 @@ fn single(slot: &mut Option<BoxView>, value: BoxView) -> Result<()> {
     *slot = Some(value);
     Ok(())
 }
-fn required(slot: &Option<BoxView>) -> Result<BoxView> {
-    slot.clone()
+fn required(slot: Option<&BoxView>) -> Result<BoxView> {
+    slot.cloned()
         .ok_or(Error::Invalid("missing mandatory sample table"))
 }
 
@@ -309,6 +330,9 @@ enum Check {
     Done,
 }
 
+/// Checks one `stbl` into a [`SampleTable`] under a work budget, one table row per work
+/// unit. Poll until [`BuildStatus::Ready`], then call [`finish`](Self::finish). A failure
+/// other than backpressure is kept for later polls.
 #[derive(Debug)]
 pub struct SampleTableBuilder {
     raw: BoxView,
@@ -343,6 +367,8 @@ impl SampleTableBuilder {
         self.legacy_dependency_flags = true;
     }
 
+    /// A builder with strict policies for `raw`, an `stbl` stored in `budget`; see
+    /// [`with_policy`](Self::with_policy).
     pub fn new(raw: BoxView, budget: Budget, limits: Limits) -> Result<Self> {
         Self::with_timing_policy(raw, budget, limits, TimingRunPolicy::Strict)
     }
@@ -366,6 +392,8 @@ impl SampleTableBuilder {
         )
     }
 
+    /// A builder with both policies chosen. `Error::Invalid` for another box type or a box
+    /// from another budget pool.
     pub fn with_policy(
         raw: BoxView,
         budget: Budget,
@@ -408,9 +436,12 @@ impl SampleTableBuilder {
             sync_diagnostic: None,
         })
     }
+    /// The `stbl` box being checked.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
+    /// One bounded step. `Error::Invalid` for missing, duplicate or inconsistent tables,
+    /// `Error::Unsupported` for unknown versions or flags, `Error::Limit` past the limits.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -454,7 +485,7 @@ impl SampleTableBuilder {
                                 ));
                             }
                         }
-                        let stsd = required(&self.parts.stsd)?;
+                        let stsd = required(self.parts.stsd.as_ref())?;
                         fields::full_zero(stsd.payload())?;
                         self.description_count = fields::u32_at(stsd.payload(), 4)?;
                         if self.description_count == 0 {
@@ -509,8 +540,10 @@ impl SampleTableBuilder {
                                 return Err(Error::Invalid("sample description count mismatch"));
                             }
                             // All constructors below only inspect fixed headers/checked row extents.
-                            let stts = Words::parse(required(&self.parts.stts)?, 8, self.limits)?;
-                            let stsc = Words::parse(required(&self.parts.stsc)?, 12, self.limits)?;
+                            let stts =
+                                Words::parse(required(self.parts.stts.as_ref())?, 8, self.limits)?;
+                            let stsc =
+                                Words::parse(required(self.parts.stsc.as_ref())?, 12, self.limits)?;
                             let sizes = Sizes::parse(
                                 self.parts
                                     .sizes
@@ -518,8 +551,10 @@ impl SampleTableBuilder {
                                     .or_else(|| self.parts.compact.clone())
                                     .ok_or(Error::Invalid("missing sample size table"))?,
                             )?;
-                            let offsets =
-                                Offsets::parse(required(&self.parts.offsets)?, self.limits)?;
+                            let offsets = Offsets::parse(
+                                required(self.parts.offsets.as_ref())?,
+                                self.limits,
+                            )?;
                             let ctts = self
                                 .parts
                                 .ctts
@@ -779,6 +814,8 @@ impl SampleTableBuilder {
         }
         Ok(())
     }
+    /// The table; the error that stopped the build, or `Error::Invalid` before
+    /// [`BuildStatus::Ready`].
     pub fn finish(mut self) -> Result<SampleTable> {
         if self.recover_sync {
             return Err(Error::Invalid(
@@ -812,8 +849,8 @@ impl SampleTableBuilder {
     }
 }
 
-/// One sample step checks at most one row in each validated sync table.
-/// It allocates nothing and commits cursor changes only after all checks succeed.
+/// Reads the samples of a [`SampleTable`] in decode order; from [`SampleTable::cursor`].
+/// It allocates nothing, and a failed poll leaves it where it was.
 #[derive(Clone, Copy, Debug)]
 pub struct SampleCursor<'a> {
     table: &'a SampleTable,
@@ -951,6 +988,7 @@ impl<'a> SampleCursor<'a> {
     pub(crate) fn ordinal(&self) -> u64 {
         self.ordinal
     }
+    /// The next sample, for one work unit.
     #[inline]
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         if self.ordinal == self.table.sample_count() {
@@ -1122,7 +1160,9 @@ enum LocatePhase {
     Emit,
 }
 
-/// Resumable O(time runs + chunk runs + variable sizes within one chunk).
+/// Finds one sample of a [`SampleTable`] by ordinal; from [`SampleTable::locate`]. It
+/// visits the time and chunk runs before the sample and, for variable sizes, the earlier
+/// samples of its chunk, one work unit each.
 #[derive(Debug)]
 pub struct SampleLocator<'a> {
     table: &'a SampleTable,
@@ -1141,6 +1181,7 @@ pub struct SampleLocator<'a> {
     done: bool,
 }
 impl SampleLocator<'_> {
+    /// The located sample once, then [`Next::End`].
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         if self.done {
             return Ok(Next::End);

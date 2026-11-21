@@ -1,5 +1,8 @@
-//! Admission of an encoded sample entry: its stream view, configuration and
-//! the metadata the demuxer reads from the movie.
+//! Admission of one encoded sample entry as FFmpeg's MOV demuxer reads it.
+//! [`EncodedStreamJob`] checks an AVC, HEVC, AV1, VP9, AAC, AC-3, E-AC-3, DTS or Opus
+//! entry and its configuration box and returns an [`EncodedStream`]: the stream the
+//! demuxer reports, beside the source entry, its configuration and the track metadata
+//! it was derived from.
 use crate::{
     CursorStatus, Limits, Next,
     boxes::{BoxChildren, BoxView},
@@ -17,19 +20,33 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, InputCursor, InputToken, Result, SourceId, WorkBudget};
 use triergon_framing::opus::{self, OpusHead};
 
+/// Opt-in token for [`EncodedStreamJob::new`]: admit the first description of a track
+/// in an ISO-branded file.
 #[derive(Clone, Copy, Debug)]
 pub struct EncodedStreamProfile;
 
+/// The codec of an admitted sample entry, by entry format and configuration box.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EncodedEntryKind {
+    /// H.264: an `avc1` or `avc3` entry with `avcC`.
     Avc,
+    /// H.265: an `hvc1` or `hev1` entry with `hvcC`; range playback also admits the
+    /// Dolby Vision `dvh1` and `dvhe` entries.
     Hevc,
+    /// AV1: an `av01` or `dav1` entry with `av1C`; range playback only.
     Av1,
+    /// VP9: a `vp09` entry with `vpcC`; range playback only.
     Vp9,
+    /// AAC: an `mp4a` entry whose `esds` holds an AAC LC, SBR or PS configuration.
     Aac,
+    /// AC-3: an `ac-3` entry with `dac3`.
     Ac3,
+    /// E-AC-3: an `ec-3` entry with `dec3`.
     Eac3,
+    /// DTS core: a `dtsc`, `dtsh` or `dtsl` entry, or an `mp4a` entry whose `esds` names
+    /// a DTS object type; range playback only.
     Dts,
+    /// Opus: an `Opus` entry with `dOps`; range playback only.
     Opus,
 }
 
@@ -45,6 +62,8 @@ impl EncodedEntryKind {
         Ok(())
     }
 }
+/// An admitted encoded sample entry: the stream FFmpeg's MOV demuxer reports for it,
+/// with the source entry, its configuration box and the track headers it was read from.
 #[derive(Clone, Debug)]
 pub struct EncodedStream {
     demux: StreamView,
@@ -58,30 +77,42 @@ pub struct EncodedStream {
     wave_source: Option<crate::compat::mov::encoded_contexts::WaveObservation>,
 }
 impl EncodedStream {
+    /// The `wave` box as [`EncodedStreamJob::new_description_with_contexts`] read it, with
+    /// the faults it read past; `None` for other views and for entries without `wave`.
     pub fn wave_source(&self) -> Option<&crate::compat::mov::encoded_contexts::WaveObservation> {
         self.wave_source.as_ref()
     }
 
+    /// The stream as FFmpeg's MOV demuxer reports it: codec, time base, extradata,
+    /// language and handler name.
     pub fn demux(&self) -> &StreamView {
         &self.demux
     }
+    /// The admitted `stsd` entry, unchanged.
     pub fn source_description(&self) -> &SampleDescription {
         &self.entry
     }
-    /// The source configuration box, or the original sample entry for the
-    /// selected QuickTime DTS description with in-band configuration.
+    /// The configuration box as stored, or the sample entry itself for a QuickTime
+    /// `dtsc` entry, which carries its configuration in band.
     pub fn configuration_box(&self) -> &BoxView {
         &self.configuration
     }
+    /// The `compressorname` of a visual entry, at most 31 ASCII bytes without its length
+    /// byte; `None` for audio entries and for an empty name.
     pub fn encoder_name(&self) -> Option<&Bytes> {
         self.encoder.as_ref()
     }
+    /// The codec; [`EncodedEntryKind::Dts`] also for an `mp4a` entry carrying DTS.
     pub fn kind(&self) -> EncodedEntryKind {
         self.kind
     }
+    /// The `mdhd` language, `hdlr` name and QuickTime sound fields the stream was derived
+    /// from; `None` for streams from [`EncodedStreamJob::new`] and
+    /// [`EncodedStreamJob::new_description`].
     pub fn receiver_source(&self) -> Option<&crate::compat::mov::encoded_metadata::EncodedSource> {
         self.receiver_source.as_ref()
     }
+    /// The track's `tkhd`, `mdhd` and `hdlr` boxes, in that order.
     pub fn raw_headers(&self) -> &[BoxView; 3] {
         &self.raw_headers
     }
@@ -110,8 +141,10 @@ impl DescriptionView {
     }
 }
 
-/// Metadata-only job over the original charged source storage. Source/request
-/// generations, work, cancellation and transport checks use the shared core.
+/// Reads one sample entry of a track and its configuration as FFmpeg's MOV demuxer
+/// admits them, and returns an [`EncodedStream`]. The constructor chooses which entries
+/// and metadata forms are admitted. The job reads only metadata already held; poll it
+/// with the input cursor the sample table was read from.
 #[derive(Debug)]
 pub struct EncodedStreamJob<'a> {
     header: &'a TrackHeader,
@@ -139,6 +172,11 @@ pub struct EncodedStreamJob<'a> {
     descriptors_left: u32,
 }
 impl<'a> EncodedStreamJob<'a> {
+    /// Admits the first description of a track whose file has an `isom`, `iso2`, `mp41`
+    /// or `mp42` major brand: AVC, HEVC, AAC, AC-3 or E-AC-3 with ISO language and
+    /// handler fields. `Error::Unsupported` for another brand, codec, handler or data
+    /// reference, or an empty table; `Error::ForeignPool` when the table or the headers
+    /// are not in `input`'s pool.
     pub fn new(
         header: &'a TrackHeader,
         table: &SampleTable,
@@ -159,6 +197,8 @@ impl<'a> EncodedStreamJob<'a> {
             DescriptionView::Regular,
         )
     }
+    /// Like [`new`](Self::new), for the 1-based `description` of a track with several.
+    /// `Error::Invalid` when the table has no such description.
     pub fn new_description(
         header: &'a TrackHeader,
         table: &SampleTable,
@@ -180,8 +220,11 @@ impl<'a> EncodedStreamJob<'a> {
             DescriptionView::Regular,
         )
     }
-    /// Admits the independently sourced QuickTime VBR AudioV1/wave layout
-    /// and separate legacy metadata presence rules. Existing profiles stay exact.
+    /// Like [`new_description`](Self::new_description), and also admits a `qt  ` major
+    /// brand with an AAC entry in a QuickTime sound description version 1 whose `esds`
+    /// is in a `wave` box, a zero `mdhd` language (read as `eng`) and the Pascal name of
+    /// a QuickTime `mhlr` handler. The stream carries the
+    /// [`EncodedSource`](crate::compat::mov::encoded::EncodedSource) it was read from.
     pub fn new_description_with_metadata(
         header: &'a TrackHeader,
         table: &SampleTable,
@@ -191,8 +234,11 @@ impl<'a> EncodedStreamJob<'a> {
     ) -> Result<Self> {
         Self::new_description_inner(header, table, input, selection, DescriptionView::Metadata)
     }
-    /// Named receiver context: source wave words/ordering and the old strict
-    /// profile's first fault remain owned; no valid-source result is fabricated.
+    /// Like [`new_description_with_metadata`](Self::new_description_with_metadata), but
+    /// reads a `wave` box as FFmpeg's MOV demuxer does: a duplicate or conflicting `frma`,
+    /// a duplicate `esds`, terminator data, a child after the terminator, an incomplete
+    /// context or a compression ID of 0 is counted in the stream's
+    /// [`wave_source`](EncodedStream::wave_source) instead of failing.
     pub fn new_description_with_contexts(
         header: &'a TrackHeader,
         table: &SampleTable,
@@ -202,8 +248,12 @@ impl<'a> EncodedStreamJob<'a> {
     ) -> Result<Self> {
         Self::new_description_inner(header, table, input, selection, DescriptionView::Contexts)
     }
-    /// Range playback requires unambiguous audio configuration and admits
-    /// AV1, VP9 and selected DTS core descriptions in addition to the reference codecs.
+    /// Admits the entries range playback reads: those of
+    /// [`new_description_with_metadata`](Self::new_description_with_metadata), Dolby
+    /// Vision HEVC, AV1, VP9, Opus and DTS core entries, video entries of `qt  ` files,
+    /// AAC in a QuickTime sound description version 2 and the unspecified QuickTime
+    /// language (`und`). An `mp4a` entry whose `esds` names a DTS object type is read as
+    /// DTS; an AAC `wave` box outside a QuickTime sound description is unsupported.
     pub fn new_range_playback(
         header: &'a TrackHeader,
         table: &SampleTable,
@@ -420,6 +470,9 @@ impl<'a> EncodedStreamJob<'a> {
         input.read_into(&mut [], work, cancel)?;
         Ok(())
     }
+    /// Reads the entry's child boxes and configuration within `work`; `Ready` when the
+    /// stream can be taken. `Error::Unsupported` or `Error::Invalid` for an entry the
+    /// view does not admit. Every later call returns the same error.
     pub fn poll(
         &mut self,
         input: &mut InputCursor,
@@ -771,7 +824,7 @@ impl<'a> EncodedStreamJob<'a> {
                 self.major,
             )?;
             let receiver_source = receiver_source.map(|mut source| {
-                source.sound = self.sound_source.clone();
+                source.sound.clone_from(&self.sound_source);
                 source.wave = self.wave_fields.as_ref().map(|w| w.raw.clone());
                 source
             });
@@ -802,6 +855,8 @@ impl<'a> EncodedStreamJob<'a> {
             return Ok(CursorStatus::Ready);
         }
     }
+    /// Takes the stream once [`poll`](Self::poll) returned `Ready`; `Error::Invalid`
+    /// before that. Later polls return `End`.
     pub fn take(&mut self, input: &mut InputCursor, cancel: &AtomicBool) -> Result<EncodedStream> {
         if let Some(e) = self.failed {
             return Err(e);

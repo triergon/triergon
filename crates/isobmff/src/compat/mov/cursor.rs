@@ -1,12 +1,10 @@
-//! Bounded all-stream occurrence iterator for the explicitly selected MOV view.
-//!
-//! Source grammar/clocks come from the independent source indexes. Selection,
-//! regular raw32 clock projection and fragment bit4 are separate observation
-//! rules, checked against demux captures, including signed-raw fragment CTO
-//! compensation and explicit complete-source/predecessor origin derivation.
-//! bit4 uses the previous run's tail, not a lifetime maximum, frozen while
-//! appending a run.
-//! No demux implementation code, expanded sample array, I/O or payload storage.
+//! The packet sequence of FFmpeg's MOV demuxer over all selected tracks.
+//! `PacketCursor` checks every sample's byte range, then yields each packet with its
+//! source sample, in the order the demuxer picks them across tracks. It reproduces
+//! the demuxer's composition shift of regular tracks, its signed reading of fragment
+//! composition offsets, its decode times for fragments without `tfdt`, and its
+//! discard flag on fragment packets that decode no later than the packet before
+//! their run. It reads no payload and keeps no per-sample array.
 use crate::{
     CursorStatus, Next, Sample,
     compat::mov::{
@@ -33,46 +31,64 @@ mod range_seek;
 use range_seek::Checkpoints;
 pub use range_seek::RangeSeekJob;
 
-/// Opt-in compatibility operation, not a source/presentation conformance rule.
-/// The original constructors use forced MOV, seekable input, no stream-info and
-/// NOPARSE|NOFILLIN (48). `new_front_source` explicitly adds the
-/// separately observed nonseekable, from-start profile; it does not change those
-/// default operations or establish a complete-entity/EOF Source fact.
+/// The FFmpeg configuration a packet cursor reproduces.
 #[derive(Clone, Copy, Debug)]
 pub enum DemuxProfile {
+    /// The `mov` demuxer forced on a seekable input with `-fflags +noparse+nofillin`
+    /// (flags value 48) and no stream-information probe.
+    /// [`PacketCursor::new_front_source`] reproduces the same demuxer reading a
+    /// nonseekable input from its start.
     NoParseNoFillin,
 }
 #[cfg(feature = "reference-trace")]
 impl DemuxProfile {
+    /// SHA-256 of the FFmpeg comparison worker whose traces this view reproduces.
     pub const WORKER_SHA256: &'static str =
         "d97ce08126efe876cf92dfaac3655073da87fd8c590793a7d37ffd9e1fbea2d2";
-    /// Same upstream revision, separately built Linux ARM64 observation worker.
+    /// SHA-256 of a comparison worker of the same FFmpeg revision built separately
+    /// for Linux AArch64.
     pub const LINUX_BOUNDARY_WORKER_SHA256: &'static str =
         "e8fcc2429e2086b5d0edf4929c098e0150c715ffa3faafc00e9b691e0128c14f";
 }
 
-/// Source association is established by the caller, independently of I/O request
-/// tokens and codec epochs. Supply these in actual movie catalogue order.
+/// One track's parsed tables, as input to a packet cursor or a seek. Give tracks in
+/// the order of their `trak` boxes in `moov`, the order in which the demuxer lists
+/// streams; the caller pairs each table with its own track's fragments and edits.
 #[derive(Clone, Copy, Debug)]
 pub struct DemuxTrack<'a> {
+    /// `track_ID` of the `tkhd` box; unique among the tracks given.
     pub track_id: u32,
+    /// The track's regular sample table; empty for a track of fragments alone.
     pub table: &'a SampleTable,
+    /// The track's fragments, in file order.
     pub fragments: &'a [FragmentIndex],
+    /// The time base of the `mdhd` timescale.
     pub media_base: TimeBase,
+    /// The edit list and the `mvhd` time base its segment durations count in;
+    /// `None` without `edts`.
     pub edits: Option<(&'a EditList, TimeBase)>,
 }
-/// Zero-based demux occurrence position, not a source sample ordinal or I/O token.
+/// Where a track's packets resume: at a 0-based position in the track's packet
+/// sequence, which is not a sample ordinal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ResumePoint {
+    /// `track_ID` of the track.
     pub track_id: u32,
+    /// 0-based position of the first packet to yield among the track's packets.
     pub occurrence: u64,
 }
+/// Limits of a packet cursor; passing one is `Error::Limit`.
 #[derive(Clone, Copy, Debug)]
 pub struct PacketLimits {
+    /// Tracks in one cursor; never more than 64, whatever the value.
     pub max_tracks: usize,
+    /// `mdat` extents the samples may lie in.
     pub max_media_extents: usize,
+    /// Samples across the tracks' regular tables, and sample extents checked.
     pub max_source_samples: u64,
+    /// Packets the cursor produces, counting those it skips to a resume point.
     pub max_occurrences: u64,
+    /// Limits of each edited track's [`EditCursor`](crate::compat::mov::edits::EditCursor).
     pub edit: EditLimits,
 }
 impl Default for PacketLimits {
@@ -86,44 +102,75 @@ impl Default for PacketLimits {
         }
     }
 }
+/// The edit that produced a packet.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EditIdentity {
+    /// 1-based position of the packet among the track's edited packets; the sample
+    /// ordinal under a fragment edit.
     pub sequence: u64,
+    /// 1-based index of the producing entry in the edit list.
     pub edit_ordinal: u32,
+    /// Where the packet's duration comes from.
     pub duration_basis: DurationBasis,
 }
-/// Provenance for a demux clock. Derived variants never fill source Sample time.
+/// Where a packet's decode time comes from. A derived time is never written back to
+/// the source [`Sample`](crate::Sample), whose times stay unknown.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClockOrigin {
+    /// The sample's own decode time, from the sample table or `tfdt`.
     SourceClock,
+    /// A fragment sample without `tfdt`: the previous sample's decode time plus its
+    /// duration.
     PredecessorEnd(PredecessorClock),
-    /// Only the explicit complete-source constructor establishes this origin.
+    /// Zero, for the first sample of a fragment-only track without `tfdt`, in a
+    /// cursor over the complete source
+    /// ([`PacketCursor::new_complete_source`] and the constructors built on it).
     CompleteMediaStart,
-    /// Explicit from-start front metadata establishes a demux origin, without
-    /// claiming that the entity has reached physical EOF or filling Source time.
+    /// Zero, for the first sample of a fragment-only track without `tfdt`, read
+    /// from the start of a forward-only input. It does not mean the input has
+    /// reached its end.
     FrontSourceMediaStart,
 }
+/// How a [`ClockOrigin::PredecessorEnd`] decode time was derived. Times are media
+/// ticks after any fragment edit offset.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PredecessorClock {
+    /// 1-based ordinal of the previous sample.
     pub predecessor_sample: u64,
+    /// The previous packet's decode time.
     pub predecessor_demux_dts_ticks: i128,
+    /// The previous sample's decode delta.
     pub predecessor_duration_ticks: u32,
+    /// Whether the previous sample's own source decode time is known.
     pub predecessor_source_dts_known: bool,
+    /// The derived decode time: the previous packet's plus its delta.
     pub derived_dts_ticks: i128,
 }
+/// One packet a cursor yields: the source sample beside the packet FFmpeg's MOV
+/// demuxer reports for it.
 #[derive(Clone, Debug)]
 pub struct PacketOccurrence {
+    /// `track_ID` of the packet's track.
     pub track_id: u32,
+    /// The source sample, unchanged.
     pub source: Sample,
+    /// The packet the demuxer reports.
     pub demux: PacketView,
+    /// The edit that produced the packet; `None` for an unedited track.
     pub edit: Option<EditIdentity>,
+    /// Where the packet's decode time comes from.
     pub clock_origin: ClockOrigin,
+    /// The track's stream clock.
     pub media_clock: MediaClock,
+    /// The clock that placed the packet among the other tracks'.
     pub scheduling_clock: SchedulingClock,
 }
 
-/// Whether this seekable MOV head replaces the incumbent during a
-/// left-to-right catalogue scan. Incomparable and tied heads keep the incumbent.
+/// Whether `contender` comes before `incumbent`, the best next packet so far in a
+/// scan of the tracks in catalogue order, as FFmpeg's MOV demuxer picks packets on
+/// a seekable input: by decode time when the two are more than one second apart,
+/// otherwise by file offset. Ties, and heads without an exact microsecond clock,
+/// keep the incumbent.
 pub fn seekable_head_precedes(contender: &PacketOccurrence, incumbent: &PacketOccurrence) -> bool {
     match (contender.scheduling_clock, incumbent.scheduling_clock) {
         (
@@ -595,12 +642,12 @@ impl TrackProjection {
     }
 }
 
-/// One charged slot/head per track (including the existing edit cursor's bounded
-/// lookahead), plus one pending validation sample. The ready occurrence stays in
-/// its track's slot until it is taken.
-/// Polling is cancellable/work-bounded, with sticky failures.
-/// Preflight validates *all* source sample extents before demux policy refusals.
-/// Backward source addresses remain legal: the consumer performs checked ranges.
+/// Yields the packets of the given tracks in the order FFmpeg's MOV demuxer emits
+/// them, each a [`PacketOccurrence`]. Before the first packet it checks that every
+/// sample of every track lies inside one `media` extent, so a range error is
+/// reported before any unsupported clock or edit. It holds one packet per track,
+/// charged to its budget, and its failures are sticky. Samples may lie at
+/// decreasing file offsets; the caller reads each by its checked range.
 #[derive(Debug)]
 pub struct PacketCursor<'a> {
     slots: BudgetVec<Slot<'a>>,
@@ -737,6 +784,11 @@ impl<'a> PacketCursor<'a> {
         self.slots.as_slice().first().map_or(0, Slot::seek_offset)
     }
 
+    /// A cursor over `tracks`, whose samples must lie in `media`: the absolute file
+    /// offsets of the `mdat` payloads, ascending and not overlapping. A fragment-only
+    /// track whose first sample has no decode time fails with `Error::Unsupported`
+    /// at that sample; see [`new_complete_source`](Self::new_complete_source).
+    /// `Error::Invalid` for a repeated track ID.
     pub fn new(
         budget: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -794,8 +846,9 @@ impl<'a> PacketCursor<'a> {
         Ok(cursor)
     }
 
-    /// Project initialization edits for tracks declared by the front movie's
-    /// fragment defaults, including tracks whose first fragment arrives later.
+    /// [`new_front_source`](Self::new_front_source) for a fragmented movie: each
+    /// track with a `trex` in `defaults` applies its initialization edit to its
+    /// fragments, including a track whose first fragment comes after other media.
     pub fn new_front_fragmented(
         budget: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -858,11 +911,11 @@ impl<'a> PacketCursor<'a> {
             micros: [None; SCALED_TRACKS],
         }
     }
-    /// The caller establishes one complete original media source and all its
-    /// preceding track samples. This enables the reference demux start-zero rule
-    /// for an unknown first fragment clock; source timestamps remain unknown.
-    /// Do not use for isolated/range fragments, missing prior segments or a
-    /// continuation whose earlier samples are absent. `new` keeps that refusal.
+    /// [`new`](Self::new) for tracks that hold every sample of the file from its
+    /// start. A fragment-only track whose first sample has no decode time then
+    /// starts at zero, as the demuxer does; the source sample's times stay unknown.
+    /// Do not use it for a range of fragments or a continuation without its earlier
+    /// samples.
     pub fn new_complete_source(
         budget: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -874,9 +927,11 @@ impl<'a> PacketCursor<'a> {
         cursor.complete_source = true;
         Ok(cursor)
     }
-    /// Explicit front-metadata, from-start nonseekable demux operation. A
-    /// terminal declaration remains open; it is never a fabricated finite range.
-    /// Only the source-bound playback opener should establish this context.
+    /// A cursor over a forward-only input read from its start, with the movie
+    /// metadata before the media: packets come in file order, and a fragment-only
+    /// track whose first sample has no decode time starts at zero. `terminal` is a
+    /// final size-zero `mdat` whose end is unknown; samples from its payload on are
+    /// checked against it. `Error::Invalid` when it overlaps the last of `media`.
     pub fn new_front_source(
         budget: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -908,8 +963,10 @@ impl<'a> PacketCursor<'a> {
         Ok(cursor)
     }
 
-    /// Project validated regular edits in ascending source order. All sample
-    /// declarations must belong to the media extent already found by the opener.
+    /// A forward-only cursor over regular tracks whose edits follow `plans`, one
+    /// per track (`None` for an unedited one), with every sample in the single
+    /// extent of `media`. `Error::Unsupported` for fragments, for more than one
+    /// extent, and at a packet that starts before the previous one ends.
     pub fn new_front_with_encoded_edits(
         budget: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -943,9 +1000,10 @@ impl<'a> PacketCursor<'a> {
         Ok(cursor)
     }
 
-    /// Project unedited regular declarations for a forward-only front movie.
-    /// An occurrence outside the first extent still needs actual later media
-    /// admission before it may carry a packet payload.
+    /// A forward-only cursor over unedited regular tracks, with `bounds` the first
+    /// `mdat`. Samples declared past it are not checked yet: read a packet's bytes
+    /// only once the `mdat` that holds them has been reached. `Error::Unsupported`
+    /// for edits or fragments.
     pub fn new_front_regular(
         budget: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -967,8 +1025,9 @@ impl<'a> PacketCursor<'a> {
         cursor.forward_regular = Some(bounds);
         Ok(cursor)
     }
-    /// Snapshot only an exhausted, checked front-source track. The private state
-    /// cannot be manufactured from a caller's expected clock or source token.
+    /// The clock state of the track at catalogue position `at`, to carry on over
+    /// later fragments. `Error::Invalid` unless this forward-only cursor has
+    /// reached its end without failure and with no packet left untaken.
     pub fn front_track(&self, at: usize) -> Result<crate::compat::mov::front_movie::FrontTrack> {
         if !self.front_source
             || !matches!(self.phase, Phase::End)
@@ -992,8 +1051,9 @@ impl<'a> PacketCursor<'a> {
             slot.fragment_edit,
         ))
     }
-    /// Explicit encoded edit admission; the default/demux-source constructors
-    /// keep their original policy and every raw source/edit field.
+    /// [`new_complete_source`](Self::new_complete_source) in which each edited
+    /// track follows its plan in `plans`, one per track (`None` for an unedited
+    /// one). `Error::Invalid` when a plan does not belong to its track.
     pub fn new_encoded_regular(
         budget: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -1039,6 +1099,10 @@ impl<'a> PacketCursor<'a> {
         }
         Ok(())
     }
+    /// The skip-samples side data of the ready packet, as
+    /// [`EncodedEditPlan::skip_samples`](crate::compat::mov::edits::EncodedEditPlan::skip_samples)
+    /// gives it; `None` for a track without an encoded edit. `Error::Invalid` when
+    /// no packet is ready.
     pub fn ready_encoded_skip(&self) -> Result<Option<[u8; 10]>> {
         let (slot, item) = self.ready_slot().ok_or(Error::Invalid(
             "encoded skip requires ready source occurrence",
@@ -1048,13 +1112,15 @@ impl<'a> PacketCursor<'a> {
             None => Ok(None),
         }
     }
+    /// How many samples' byte ranges the cursor has checked against `media`.
     pub fn validated_samples(&self) -> u64 {
         self.validated
     }
 
-    /// Validate every source extent and project only selected track ordinals.
-    /// Demux clocks and edits are required only for the selected tracks.
-    /// Supply any edit plans in source order.
+    /// A complete-source cursor that checks every track's sample ranges but yields
+    /// packets only for the tracks whose catalogue position passes `include`, which
+    /// alone need supported clocks and edits. `plans`, when given, has one entry per
+    /// track in `tracks`. `Error::Limit` past 64 tracks.
     pub fn new_projected(
         budget: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -1075,9 +1141,10 @@ impl<'a> PacketCursor<'a> {
         Ok(cursor)
     }
 
-    /// Check source ranges and packet projections before playback without
-    /// merging the track heads. Poll to End, then rewind for packet delivery.
-    /// Use a complete indexed source from its beginning.
+    /// Makes this fresh complete-source cursor check its sample ranges and project
+    /// every packet of each track in turn, without merging tracks, and then end.
+    /// Poll it to `End`, then [`rewind_at_end`](Self::rewind_at_end) for playback.
+    /// `Error::Invalid` unless the cursor is a fresh, unresumed complete-source one.
     pub fn check_projections_before_replay(&mut self) -> Result<()> {
         if !self.complete_source
             || self.front_source
@@ -1097,16 +1164,21 @@ impl<'a> PacketCursor<'a> {
         Ok(())
     }
 
-    /// During the complete projection check, collect the latest packet
-    /// presentation end. The maximum is independent of inter-track order.
-    /// Preserve merged order if seek restarts can reach a count or storage limit.
+    /// [`check_projections_before_replay`](Self::check_projections_before_replay)
+    /// that also finds the latest packet presentation end, read with
+    /// [`checked_duration_us`](Self::checked_duration_us); it does not depend on
+    /// the order across tracks. With seek checkpoints enabled, it walks the packets
+    /// in merged order instead where per-track checkpoints could pass their count
+    /// limit or the budget.
     pub fn check_duration_before_replay(&mut self) -> Result<()> {
         self.check_projections_before_replay()?;
         self.checked_duration_us = Some(0);
         Ok(())
     }
 
-    /// Return the checked presentation end in microseconds after the scan.
+    /// The latest packet presentation end (time plus duration) in microseconds,
+    /// rounded to nearest, once the duration check has ended without failure;
+    /// `None` before that or without the check.
     pub fn checked_duration_us(&self) -> Option<i64> {
         if matches!(self.phase, Phase::End) && self.failed.is_none() {
             self.checked_duration_us
@@ -1114,9 +1186,11 @@ impl<'a> PacketCursor<'a> {
             None
         }
     }
-    /// Reconstruct each track's real demux state up to its checked occurrence
-    /// position before the existing global selector begins delivery. Full source
-    /// extent validation still runs first; skipped metadata reads no payload.
+    /// [`new_complete_source`](Self::new_complete_source) that starts each track at
+    /// its [`ResumePoint`], one per track: the packets before it are projected for
+    /// their clock state but not yielded, and no payload is read. All sample ranges
+    /// are still checked first. `Error::Invalid` for a missing, repeated or unknown
+    /// track, and at a track's end before its resume point.
     pub fn new_complete_source_at(
         budget: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -1187,8 +1261,7 @@ impl<'a> PacketCursor<'a> {
             .ok_or(Error::Invalid("native source fragment absent"))?;
         Ok(Some((fragment, run, index.run_flags(run)?)))
     }
-    /// Inspect the current occurrence without consuming its place in the
-    /// demux schedule.
+    /// The ready packet, without taking it.
     pub fn occurrence(&self) -> Option<&PacketOccurrence> {
         self.ready_slot().map(|(_, occurrence)| occurrence)
     }
@@ -1427,8 +1500,10 @@ impl<'a> PacketCursor<'a> {
         Ok(cursor)
     }
 
-    /// Start a separate replay of these immutable complete-source tables.
-    /// Reuse the verified extents and initial clock facts with the same limits.
+    /// A new cursor over the same tracks from their first packets, reusing this
+    /// cursor's checked sample ranges, clock setup and limits, and its seek
+    /// checkpoints once recorded. `Error::Invalid` unless this complete-source
+    /// cursor passed its checks without failure.
     pub fn fork_checked_replay(&self) -> Result<Self> {
         if !self.complete_source
             || self.front_source
@@ -1495,7 +1570,9 @@ impl<'a> PacketCursor<'a> {
         Ok(replay)
     }
 
-    /// Choose initial per-track occurrence positions on a fresh checked replay.
+    /// Sets where each track of a fresh [`fork_checked_replay`](Self::fork_checked_replay)
+    /// or rewound cursor resumes, one [`ResumePoint`] per yielded track.
+    /// `Error::Invalid` once the replay has started.
     pub fn resume_checked_replay(mut self, starts: &[ResumePoint]) -> Result<Self> {
         if !matches!(self.phase, Phase::Initialize) || self.at != 0 {
             return Err(Error::Invalid(
@@ -1506,8 +1583,9 @@ impl<'a> PacketCursor<'a> {
         Ok(self)
     }
 
-    /// Replay the same checked sample tables from their beginning after End.
-    /// The extent and clock preflight still applies to these borrowed tables.
+    /// Restarts the cursor from the first packets after a clean end, keeping its
+    /// checked sample ranges and clock setup. It also ends a projection or duration
+    /// check and stops recording seek checkpoints. `Error::Invalid` before a clean end.
     pub fn rewind_at_end(&mut self) -> Result<()> {
         if !matches!(self.phase, Phase::End) || self.failed.is_some() {
             return Err(Error::Invalid("native occurrence rewind needs a clean end"));
@@ -1530,6 +1608,7 @@ impl<'a> PacketCursor<'a> {
         Ok(())
     }
 
+    /// Takes the ready packet; `Error::Invalid` when none is ready.
     pub fn take_occurrence(&mut self) -> Result<PacketOccurrence> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -1539,11 +1618,16 @@ impl<'a> PacketCursor<'a> {
             .and_then(|at| self.slots.as_mut_slice()[at].head.take())
             .ok_or(Error::Invalid("no ready native packet"))
     }
+    /// Advances to the next packet across the tracks. `Yield` can also follow a
+    /// sample that an encoded edit drops; poll again. `Error::Invalid` for a sample
+    /// outside `media` or out of order; `Error::Unsupported` where a clock, edit or
+    /// flag needs a rule of the demuxer that is not reproduced.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         self.poll_until::<false>(work, cancel)
     }
-    /// Runs the checks that precede the first occurrence: the sample extents,
-    /// the clocks and the edit setup. `Ready` once the cursor would fill.
+    /// Runs the checks that precede the first packet: the sample ranges, the
+    /// clocks and the edit setup. `Ready` once they have passed; the next
+    /// [`poll`](Self::poll) produces packets.
     pub fn prepare(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         self.poll_until::<true>(work, cancel)
     }

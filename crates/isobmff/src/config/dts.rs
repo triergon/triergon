@@ -1,4 +1,6 @@
-//! DTS container signalling for the explicitly selected core playback path.
+//! DTS signalling in sample entries: whether an entry carries a DTS core, read from a
+//! `dtsc`, `dtsh` or `dtsl` entry and its `ddts` box or from an `mp4a` object type, and
+//! the clock the entry declares.
 use crate::{
     Limits,
     boxes::{BoxChildren, BoxView},
@@ -22,6 +24,7 @@ impl DtsCoreDescription {
     }
 
     /// Media ticks per sample-entry tick and, when signalled, per access unit.
+    /// `Error::Unsupported` unless `base` is `1/n` and both are whole numbers of ticks.
     pub fn media_clock(self, base: TimeBase) -> Result<(u32, Option<u32>)> {
         let rate = u64::from(self.sample_entry_rate_hz);
         let scale = base.denominator();

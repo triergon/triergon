@@ -1,9 +1,11 @@
-//! Reference MOV compatibility occurrence view for the observed strict,
-//! nonreordered, positive-delta, rate-one regular sample profile.
+//! FFmpeg's MOV demuxer applying an edit list to a regular track. `EditCursor`
+//! emits each media edit's samples from the preceding sync sample on, up to a sync
+//! sample that reaches the edit's end, and so repeats, trims and shifts samples,
+//! for rate-one edits over samples with no composition offsets and positive decode
+//! deltas. The source table is never changed.
 //!
-//! Apple/Adobe establish edit point mapping, gaps and repetition. Demux key-end
-//! postroll and expanded-index terminal duration are separate observation rules.
-//! This cursor never changes the unique source index or injects expected packets.
+//! Specification: Apple QuickTime File Format and Adobe F4V (edit mapping, gaps and
+//! repetition).
 use crate::{
     Access, CursorStatus, Next, Sample,
     compat::mov::{
@@ -15,9 +17,13 @@ use crate::{
 };
 use triergon_core::{Error, Result, Rounding, Time, TimeBase, WorkBudget};
 
+/// Limits of an [`EditCursor`]; passing one is `Error::Limit`.
 #[derive(Clone, Copy, Debug)]
 pub struct EditLimits {
+    /// Packets the cursor may emit in all.
     pub max_occurrences: u64,
+    /// Sample reads the cursor may make in all, counting every pass over the table
+    /// and every decode delta read for a duration.
     pub max_scanned_samples: u64,
 }
 impl Default for EditLimits {
@@ -29,25 +35,38 @@ impl Default for EditLimits {
     }
 }
 
+/// Where an edited packet's duration comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DurationBasis {
+    /// The source decode delta, for the packet the demuxer repeats at a trailing
+    /// empty edit and for the packet before it.
     TerminalEmptyEndpointObservation,
-    /// Reference demux packet ordinal still consumes the original decode table.
+    /// The `stts` delta of the sample whose ordinal is the packet's position: the
+    /// demuxer takes the n-th packet's duration from the n-th decode delta, even
+    /// where edits repeat or skip samples.
     OriginalDecodeTableOrdinal,
-    /// A fragment clock offset keeps the duration declared by its run.
+    /// The decode delta its `trun` declares, for a fragment sample under an edit.
     FragmentDecodeDelta,
+    /// The distance to the next packet's decode time.
     FollowingOccurrenceDts,
+    /// The source decode delta, because the next packet decodes earlier.
     SourceDeltaAtBackwardJump,
+    /// The source decode delta of the last packet.
     SourceDeltaAtTerminal,
-    /// Provisional reference-output rule, not a source duration or standards rule.
+    /// The last packet of an edit list that repeats samples, cut to end at the
+    /// edits' total duration in media ticks, and zero when it starts at or after it.
     ExpandedTerminalEndObservation,
 }
 
+/// One packet an [`EditCursor`] emits.
 #[derive(Clone, Debug)]
 pub struct EditOccurrence {
+    /// 1-based position of the packet in the cursor's output.
     pub sequence: u64,
     pub(crate) edit_ordinal: u32,
+    /// The source sample the packet carries, unchanged; edits can repeat it.
     pub source: Sample,
+    /// The packet the demuxer reports.
     pub demux: PacketView,
     pub(crate) duration_basis: DurationBasis,
 }
@@ -60,9 +79,12 @@ enum Phase {
     Done,
 }
 
-/// Allocates no occurrence/sample array. Source scans and generated occurrences
-/// have separate cumulative limits; each poll obeys the shared work budget.
-/// The caller associates this table/edit list with the same source track.
+/// Applies one regular track's edit list as FFmpeg's MOV demuxer does, yielding an
+/// [`EditOccurrence`] per packet. Each media edit starts at the last sync sample at
+/// or before its media time and runs to the first sync sample whose end reaches the
+/// edit's end; packets outside the edit are marked discard. It reads the table in
+/// passes with no per-sample storage, within [`EditLimits`]. The caller pairs the
+/// table and edit list of one track.
 #[derive(Clone, Debug)]
 pub struct EditCursor<'a> {
     table: &'a SampleTable,
@@ -136,6 +158,9 @@ fn count_limit(value: u64, maximum: u64) -> Result<()> {
     Ok(())
 }
 impl<'a> EditCursor<'a> {
+    /// A cursor over `table` under `edits`, with the track's media time base and
+    /// the movie's `mvhd` time base. `Error::Unsupported` for an empty table, an
+    /// empty edit list or an empty `stss`.
     pub fn new(
         table: &'a SampleTable,
         edits: &'a EditList,
@@ -180,11 +205,17 @@ impl<'a> EditCursor<'a> {
             failed: None,
         })
     }
+    /// Takes the ready packet; `Error::Invalid` when none is ready.
     pub fn take_occurrence(&mut self) -> Result<EditOccurrence> {
         self.ready
             .take()
             .ok_or(Error::Invalid("no ready native occurrence"))
     }
+    /// Advances to the next packet. Failures are sticky. `Error::Unsupported` for
+    /// an edit whose rate is not one, a media edit with a negative start or zero
+    /// duration, one that starts outside the samples or after no sync sample, and
+    /// a sample with a composition offset, a zero delta, unknown or unequal clocks,
+    /// or partial sync, dependency or unknown access flags.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<CursorStatus> {
         if let Some(error) = self.failed {
             return Err(error);

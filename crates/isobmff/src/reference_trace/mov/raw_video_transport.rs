@@ -1,6 +1,11 @@
-//! Separately selected, source-derived model of the reference transport slice.
-//! This is an empirical demux view, never a source EOF/clock/range repair.
-//! Own model from passive public callback controls; no demux bodies consulted.
+//! A model of FFmpeg's buffered reader during the open of a small QuickTime raw-video file.
+//!
+//! [`RawVideoTransportBuilder`] walks the file's top-level boxes and movie metadata and works
+//! out the buffer states FFmpeg's reader can be in when open returns, for a read callback
+//! that returns at most
+//! [`custom_read_maximum`](crate::compat::mov::recovery::DescriptionContext::custom_read_maximum)
+//! bytes per call. The model reads no media and never repairs a source range, clock or end
+//! of file.
 use super::transport_window::{CAPACITY, Revisit, Window};
 use crate::{
     BuildStatus, Limits, Next,
@@ -18,38 +23,67 @@ const CONSUMPTION_BOUNDS: &str = "v3 modeled metadata consumption bounds";
 const DISCARD_BOUND: u64 = 32768; // Separately observed reference forward protocol bound.
 const CHILD_LIMIT: u32 = 16;
 
+/// Selects the raw-video transport model; pass it to [`RawVideoTransportBuilder::new`].
 #[derive(Clone, Copy, Debug)]
 pub struct RawVideoTransportProfile;
 
+/// How FFmpeg's reader returns to the start of the sample entry after reading the entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EntryRevisit {
+    /// The entry start is still in the buffer; the revisit reads nothing.
     Buffered,
+    /// The entry start lies at least the buffered length before the buffer; the reader
+    /// refills from the entry start.
     DirectCallback,
+    /// The entry start lies less than the buffered length before the buffer. The refill
+    /// can start anywhere from that length before the buffer to the entry start, and the
+    /// model keeps every such start.
     OneWindowCallbackSet,
 }
 
-/// Modeled state, not a claim that the source operation observed demux I/O.
+/// The buffer states FFmpeg's reader can be in when open returns. It is a model, not a
+/// record of FFmpeg's reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ModeledOpenState {
+    /// Least absolute file offset just past the buffered bytes, over the possible states.
     pub source_position_min: u64,
+    /// Greatest absolute file offset just past the buffered bytes, over the possible states.
     pub source_position_max: u64,
+    /// Absolute file offset of the next byte the reader returns; the same in every state.
     pub logical_position: u64,
+    /// Number of possible buffer states, from 1 to 64.
     pub possible_windows: u32,
+    /// How the reader returned to the start of the sample entry during open.
     pub entry_revisit: EntryRevisit,
 }
 
-/// A symbolic callback operation plan, not an observed confirmation. Positive reads
-/// discard source bytes without emitting a packet; the final positive-size
-/// source callback at its known end returns EOF under the original adapter.
+/// How FFmpeg's reader reaches end of file for a first packet that starts at or past the
+/// physical end of the source.
+///
+/// In every possible buffer state the reader skips forward by reading and discarding the
+/// rest of the source, through callback calls that each return bytes, and the next call,
+/// at the physical end, returns end of file. No packet bytes are produced.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ModeledInitialRead {
     pub(crate) possible_windows: u32,
+    /// Fewest callback calls returning bytes before the call that returns end of file, over
+    /// the possible buffer states.
     pub positive_callback_calls_min: u64,
+    /// Most callback calls returning bytes before the call that returns end of file, over
+    /// the possible buffer states.
     pub positive_callback_calls_max: u64,
+    /// Absolute file offset of the call that returns end of file: the physical length of
+    /// the source.
     pub terminal_callback_position: u64,
     pub(crate) terminal_callback_requested: u32,
 }
 
+/// The buffer states FFmpeg's reader can be in after opening a small QuickTime raw-video
+/// file, built by [`RawVideoTransportBuilder`].
+///
+/// Passed to [`DescriptionRecoveryTable::description_packet_cursor_with_transport`], it
+/// lets a recovered first packet past the physical end report the end of file FFmpeg
+/// reaches.
 #[derive(Debug)]
 pub struct RawVideoTransportModel {
     ftyp: BoxView,
@@ -69,17 +103,22 @@ impl RawVideoTransportModel {
             custom_read_maximum: self.custom_read_maximum,
         }
     }
+    /// The buffer states when open returns.
     pub fn modeled_open_state(&self) -> ModeledOpenState {
         self.open
     }
+    /// The `moov` box the model was built from.
     pub fn source_movie(&self) -> &BoxView {
         &self.movie
     }
+    /// The `ftyp` box the model was built from.
     pub fn source_file_type(&self) -> &BoxView {
         &self.ftyp
     }
-    /// Data/functional guard: the observed public window must be an exact
-    /// member of the conservative set, never a guessed selected alignment.
+    /// Whether a buffer state FFmpeg reports after open is exactly one of the possible
+    /// states. `source_position` is the absolute file offset just past the buffered bytes;
+    /// `ptr_offset` and `end_offset` are the offsets of the read position and of the buffer
+    /// end from the buffer start.
     pub fn includes_open_window(
         &self,
         source_position: u64,
@@ -100,12 +139,16 @@ impl RawVideoTransportModel {
         }
         false
     }
-    /// A positive first packet read beyond physical source can follow the
-    /// independently guarded forward-discard protocol. Source range invalidity
-    /// remains invalid; an unreviewed seek path is never converted into EOF.
+    /// Whether FFmpeg reaches end of file, rather than seeking, when it reads a first packet
+    /// at `range` (absolute file offsets): see [`initial_read_plan`](Self::initial_read_plan).
+    /// The source range stays invalid either way.
     pub fn models_initial_eof(&self, range: Range<u64>) -> bool {
         self.initial_read_plan(range).is_some()
     }
+    /// How FFmpeg's reader reaches end of file for a first packet at `range`, or `None`
+    /// where the model does not apply. It applies to a packet of 1 byte to 16 MiB that
+    /// starts at or past the physical end, at most 32768 bytes past the buffer end in every
+    /// possible state, so that FFmpeg skips to it by reading and discarding.
     pub fn initial_read_plan(&self, range: Range<u64>) -> Option<ModeledInitialRead> {
         let size = range.end.checked_sub(range.start)?;
         if size == 0 || size > 16 * 1024 * 1024 || range.start < self.physical_length {
@@ -237,8 +280,14 @@ fn visual_entry(raw: &BoxView) -> Result<()> {
     Ok(())
 }
 
-/// Constant-depth, bounded-header validation and at most64 charged window states.
-/// Every source byte stays in its original immutable, pool-owned metadata view.
+/// Builds a [`RawVideoTransportModel`] from a file's top-level box headers and movie
+/// metadata.
+///
+/// It accepts only a small QuickTime raw-video file: `ftyp`, `moov` and a final `mdat`,
+/// with `free` boxes between them, plain 8-byte box headers, and one video track whose
+/// boxes come in a fixed order and whose one entry is a 78-byte RGB24 `raw ` entry. Any
+/// other file is `Error::Unsupported`. Source boxes stay views of their original bytes,
+/// and the builder holds at most 64 buffer states.
 #[derive(Debug)]
 pub struct RawVideoTransportBuilder<'a> {
     ftyp: BoxView,
@@ -268,6 +317,11 @@ pub struct RawVideoTransportBuilder<'a> {
     windows: u32,
 }
 impl<'a> RawVideoTransportBuilder<'a> {
+    /// Starts a model of the file with these `ftyp` and `moov` boxes, `roots` its top-level
+    /// box headers in file order and `table` its track's recovered sample table. Fails with
+    /// `Error::ForeignPool` when a box's bytes do not belong to `pool`, and with
+    /// `Error::Unsupported` for a source longer than 32768 bytes, a `context` read size
+    /// other than 1, 2, 3, 4, 7, 64 or 65536 bytes, or a file outside the accepted set.
     pub fn new(
         ftyp: BoxView,
         movie: BoxView,
@@ -331,6 +385,8 @@ impl<'a> RawVideoTransportBuilder<'a> {
             windows: 0,
         })
     }
+    /// Checks further box headers and metadata boxes, then works out the buffer states.
+    /// Fails with `Error::Unsupported` where the file leaves the accepted set.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -521,6 +577,8 @@ impl<'a> RawVideoTransportBuilder<'a> {
             }
         }
     }
+    /// Returns the model after [`poll`](Self::poll) returned `Ready`; `Error::Invalid`
+    /// before then.
     pub fn finish(self) -> Result<RawVideoTransportModel> {
         if let Some(error) = self.failed {
             return Err(error);

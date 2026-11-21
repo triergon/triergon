@@ -1,5 +1,6 @@
-//! Top-level box framing over the parent's concrete InputCursor. No duplicate
-//! input windows, request tokens, generation, cancellation or allocator framework.
+//! [`BoxReader`], which walks the root boxes of a source through the caller's
+//! [`InputCursor`]: it announces each header, then reads the box into memory or skips it,
+//! as the caller chooses.
 use crate::boxes::{BoxHeader, BoxView, HeaderRead};
 use std::io::{Read, Seek};
 use std::sync::atomic::AtomicBool;
@@ -7,15 +8,23 @@ use triergon_core::{
     BudgetVec, Error, InputCursor, InputToken, Result, SourceId, Step, WorkBudget, blocking::Feed,
 };
 
+/// What a [`BoxReader`] poll reports.
 #[derive(Debug)]
 pub enum BoxEvent {
+    /// A root box header was read. Call [`BoxReader::read_metadata`] or
+    /// [`BoxReader::skip`] before polling again.
     Header(BoxHeader),
+    /// The box [`BoxReader::read_metadata`] asked for, complete.
     Metadata(BoxView),
+    /// The announced box was skipped. For a size-zero box that ran to the end of the
+    /// source, the header now states its size.
     Skipped(BoxHeader),
 }
 
+/// How a [`BoxReader`] treats an `mdat` that declares more bytes than the source holds.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum MediaDataPolicy {
+    /// `Error::Truncated`, as for any box past the known end of the source.
     #[default]
     Strict,
     /// Report a terminal media box's declared extent even if it crosses the
@@ -32,9 +41,10 @@ enum Phase {
     Skipped,
 }
 
-/// Syntax state bound to one concrete input transaction. Internal range skips
-/// update the core token but preserve generation. Create a new reader after a
-/// logical reset or continue_source; decoder/configuration epochs remain external.
+/// A resumable walk over the root boxes of one source, from the input cursor's position
+/// when it was built. It is bound to that cursor's input transaction, so a poll after
+/// anything else moved the cursor is `Error::Invalid`: build a new reader after a reset or
+/// a source continuation. A failure other than backpressure is kept for later polls.
 #[derive(Debug)]
 pub struct BoxReader {
     source: SourceId,
@@ -52,10 +62,13 @@ pub struct BoxReader {
     media_data_policy: MediaDataPolicy,
 }
 impl BoxReader {
+    /// A [`MediaDataPolicy::Strict`] reader that reads boxes of at most `metadata_limit`
+    /// bytes into memory; `Error::Invalid` for a limit below 8.
     pub fn new(input: &InputCursor, metadata_limit: usize) -> Result<Self> {
         Self::with_media_data_policy(input, metadata_limit, MediaDataPolicy::Strict)
     }
 
+    /// [`new`](Self::new) with a chosen [`MediaDataPolicy`].
     pub fn with_media_data_policy(
         input: &InputCursor,
         metadata_limit: usize,
@@ -80,10 +93,8 @@ impl BoxReader {
             media_data_policy,
         })
     }
-    /// Exposes a terminal MDAT declaration separately from the physical source
-    /// end. It never admits incomplete metadata or changes the Strict parser.
-    /// Callers must preserve declared/available bounds and stop before skip when
-    /// the terminal declaration exceeds known length; no range beyond EOF is made.
+    /// A [`MediaDataPolicy::PreserveTerminalDeclaration`] reader for the recovery view.
+    /// Metadata boxes must still be complete.
     pub(crate) fn new_recovery(
         input: &InputCursor,
         metadata_limit: usize,
@@ -95,11 +106,12 @@ impl BoxReader {
             MediaDataPolicy::PreserveTerminalDeclaration,
         )
     }
+    /// The source the reader is bound to.
     pub fn source(&self) -> SourceId {
         self.source
     }
-    /// The current announced MDAT's wire size is zero, even if parsing
-    /// resolved it to a finite extent using the known source length.
+    /// Whether the box just announced is an `mdat` whose stored size is zero, even when
+    /// its extent was worked out from the known source length.
     pub fn announced_open_mdat(&self) -> bool {
         self.phase == Phase::Announced && self.prefix[..8] == *b"\0\0\0\0mdat"
     }
@@ -121,6 +133,9 @@ impl BoxReader {
         self.header = None;
         self.phase = Phase::Header;
     }
+    /// Reads the announced box into memory; later polls read it and report
+    /// [`BoxEvent::Metadata`]. `Error::Unsupported` for an `mdat` or a box of unknown size,
+    /// `Error::Limit` above the reader's metadata limit.
     pub fn read_metadata(&mut self, input: &InputCursor) -> Result<()> {
         self.binding(input)?;
         if self.phase != Phase::Announced {
@@ -149,6 +164,9 @@ impl BoxReader {
         self.phase = Phase::Metadata { target: length };
         Ok(())
     }
+    /// Skips the announced box; the next poll reports [`BoxEvent::Skipped`]. With random
+    /// access the cursor requests the box's end at once, continuing from the current window
+    /// where the box ends inside it; otherwise the polls read through the box.
     pub fn skip(&mut self, input: &mut InputCursor) -> Result<()> {
         self.binding(input)?;
         if self.phase != Phase::Announced {
@@ -198,6 +216,9 @@ impl BoxReader {
             }
         }
     }
+    /// One bounded step towards the next [`BoxEvent`], or [`Step::End`] where the source
+    /// ends between boxes. `Error::Truncated` where it ends inside a box, `Error::Invalid`
+    /// after a header that was neither read nor skipped.
     #[inline(always)]
     pub fn poll(
         &mut self,

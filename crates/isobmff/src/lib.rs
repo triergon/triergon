@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
@@ -8,16 +9,11 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// Pending: `missing_docs`.
-// Pending: these rewrites change the generated code of measured hot paths and are
-// adopted with an A/B timing run.
+// Hot paths keep the forms they were measured with; these rewrites change their code.
 #![allow(
-    clippy::assigning_clones,
     clippy::checked_conversions,
     clippy::map_unwrap_or,
-    clippy::redundant_closure_for_method_calls,
-    clippy::ref_option,
-    clippy::unnested_or_patterns
+    clippy::redundant_closure_for_method_calls
 )]
 
 pub mod boxes;
@@ -47,11 +43,17 @@ pub use step::{BuildStatus, CursorStatus, Next};
 
 use triergon_core::{Error, Result};
 
-/// Format-policy counts; live capacity is exclusively owned/accounted by core.
+/// Count limits on what one parse may walk. Memory is bounded separately, by the shared
+/// [`Budget`](triergon_core::Budget); a count past its limit is [`Error::Limit`].
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
+    /// Most children one [`BoxChildren`](boxes::BoxChildren) walk visits, and most boxes
+    /// one movie walk visits; default 1,000,000.
     pub max_boxes: u32,
+    /// Most rows one table box (`stts`, `stsc`, `stco`, `elst`, `trun`, `sidx`, ...)
+    /// declares, and most `trun` boxes in one `traf`; default 1,000,000.
     pub max_records: u32,
+    /// Most entries in one `stsd`, and in one `dref` during open; default 256.
     pub max_descriptions: u32,
 }
 impl Default for Limits {

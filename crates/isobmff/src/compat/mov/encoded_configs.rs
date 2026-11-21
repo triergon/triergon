@@ -1,5 +1,8 @@
-//! Source-description transitions and track creation tags in a separately named
-//! reference receiver operation. No sample/configuration bytes are reconstructed.
+//! Encoded tracks with several sample descriptions, as FFmpeg's MOV demuxer reports
+//! them: [`EncodedInitial`] is the stream view with the first sample's extradata and
+//! [`EncodedConfigSequence`] gives the new extradata at each change of description.
+//! [`EncodedCreation`] reads the `mdhd` creation tag. No sample or configuration bytes
+//! are rebuilt.
 use crate::{
     Sample,
     boxes::BoxView,
@@ -11,8 +14,13 @@ use crate::{
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, InputCursor, InputToken, Result, SourceId, WorkBudget};
 
+/// Opt-in token for tracks with several descriptions: `EncodedStreamJob::new_description`,
+/// [`EncodedInitial`], [`EncodedConfigSequence`], `EncodedEditJob::new_with_configs` and
+/// [`EncodedCreation`].
 #[derive(Clone, Copy, Debug)]
 pub struct EncodedConfigProfile;
+/// The `mdhd` creation time and the `creation_time` tag FFmpeg's MOV demuxer derives
+/// from it, for creation times from 1970.
 #[derive(Clone, Debug)]
 pub struct EncodedCreation {
     raw: BoxView,
@@ -20,9 +28,9 @@ pub struct EncodedCreation {
     demux: Option<[u8; 27]>,
 }
 impl EncodedCreation {
-    /// Fixed bounded field action: at most14 year-search and12 month steps.
-    /// The raw media header remains owned; movie/track creation fields are not
-    /// substituted. Older ambiguous epochs stay explicitly unsupported.
+    /// Reads the creation time of `header`'s `mdhd` box; the `mvhd` and `tkhd` times are
+    /// not used. `Error::Unsupported` for nonzero flags, a version above 1, a time before
+    /// 1970 or a year past 9999.
     pub fn from_source(header: &TrackHeader, _profile: EncodedConfigProfile) -> Result<Self> {
         let raw = header.raw_mdhd.clone();
         let (version, flags) = fields::full(raw.payload())?;
@@ -45,12 +53,15 @@ impl EncodedCreation {
             demux,
         })
     }
+    /// The `mdhd` box.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
+    /// The creation time as stored, in seconds since 1904-01-01 UTC.
     pub fn source_seconds(&self) -> u64 {
         self.source_seconds
     }
+    /// The tag text, `YYYY-MM-DDTHH:MM:SS.000000Z` in UTC; `None` for a zero time.
     pub fn demux(&self) -> Option<&[u8; 27]> {
         self.demux.as_ref()
     }
@@ -181,6 +192,8 @@ pub(crate) fn validate_range_configs(
     }
     Ok(())
 }
+/// The stream view FFmpeg's MOV demuxer reports for a track with several descriptions:
+/// the metadata of the first `stsd` entry with the extradata of the first sample's.
 #[derive(Clone, Debug)]
 pub struct EncodedInitial {
     demux: StreamView,
@@ -189,8 +202,11 @@ pub struct EncodedInitial {
     metadata_description: BoxView,
 }
 impl EncodedInitial {
-    /// Supply the actual first validated source sample. Metadata/encoder remain
-    /// from STSD's first declared entry; extradata follows its first used entry.
+    /// Builds the view from `configs`, one admitted stream per `stsd` entry in order,
+    /// and the track's first sample. `Error::Invalid` when `configs` does not match the
+    /// table's descriptions or `first` is not sample 1; `Error::Unsupported` when the
+    /// descriptions differ in codec or time base, an audio track has several, or the
+    /// codec needs range playback; `Error::Limit` past 64 descriptions.
     pub fn new(
         table: &SampleTable,
         configs: &[EncodedStream],
@@ -221,24 +237,35 @@ impl EncodedInitial {
             metadata_description: configs[0].source_description().raw().clone(),
         })
     }
+    /// The stream view: the first entry's metadata and the first sample's extradata.
     pub fn demux(&self) -> &StreamView {
         &self.demux
     }
+    /// 1-based `stsd` index of the first sample's description.
     pub fn source_initial_description(&self) -> u32 {
         self.source_initial_description
     }
+    /// The configuration box of the first sample's description.
     pub fn initial_configuration(&self) -> &BoxView {
         &self.initial_config
     }
+    /// The first `stsd` entry, which supplies the metadata.
     pub fn metadata_description(&self) -> &BoxView {
         &self.metadata_description
     }
 }
+/// The result of [`EncodedConfigSequence::observe`].
 #[derive(Clone, Debug)]
 pub enum EncodedConfigStep {
+    /// The work budget is spent: call again with the same sample and a new budget.
     Yield,
+    /// The sample is consumed. `Some` is the extradata the demuxer switches to because
+    /// the sample's description differs from the previous sample's, even when the
+    /// bytes are equal.
     Ready(Option<Bytes>),
 }
+/// Follows a track's samples in order and reports where FFmpeg's MOV demuxer switches
+/// extradata because the sample description changes.
 #[derive(Debug)]
 pub struct EncodedConfigSequence<'a> {
     configs: &'a [EncodedStream],
@@ -251,6 +278,7 @@ pub struct EncodedConfigSequence<'a> {
     failed: Option<Error>,
 }
 impl<'a> EncodedConfigSequence<'a> {
+    /// Starts before the track's first sample; fails as [`EncodedInitial::new`] does.
     pub fn new(
         table: &SampleTable,
         configs: &'a [EncodedStream],
@@ -269,9 +297,10 @@ impl<'a> EncodedConfigSequence<'a> {
             failed: None,
         })
     }
-    /// One real source event at a time; work0 leaves it wholly unconsumed. The
-    /// owned result is the original charged config span, including equal-byte
-    /// transitions. No packet repeat, coalescing or post-serialization repair.
+    /// Takes the next sample, in ordinal order from 1; a zero work budget yields without
+    /// consuming it. The first sample reports `None`: its extradata is the initial one.
+    /// `Error::Invalid` for a sample out of order, past the table or naming a
+    /// description not in it. Every later call returns the same error.
     pub fn observe(
         &mut self,
         sample: &Sample,

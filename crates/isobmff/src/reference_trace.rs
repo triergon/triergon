@@ -109,7 +109,9 @@ pub mod mov {
     }
 
     pub mod encoded {
-        //! Labels of the encoded recovery view.
+        //! The cause that
+        //! [`receiver_cause`](crate::compat::mov::encoded::RecoveryFacts::receiver_cause)
+        //! reports for an encoded track's recovery groups.
         pub use crate::compat::mov::encoded_recovery::RecoveryReceiverCause;
     }
 }

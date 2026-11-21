@@ -1,22 +1,35 @@
-//! Historical primary Adobe F4V10.1 §§2.16.1-.2 syntax and MPEG m76694
-//! table9 Original corroboration. Compact source hints; no demux-clock or
-//! decoder-recovery claim, including for an empty tfra table.
+//! The track fragment random access box (`tfra`) and the movie fragment random access
+//! offset box (`mfro`) that locates the `mfra` box holding it at the end of a file. A
+//! `tfra` row names a random access sample by its time and by `moof`, `traf`, `trun`
+//! and sample number. The rows are what the file states and are not checked against
+//! the fragments; an empty table is not read as marking every sample a sync sample.
+//!
+//! Specification: Adobe F4V 10.1 §§2.16.1–2.16.2; MPEG m76694 Table 9.
 use crate::{Limits, Next, boxes::BoxView, fields, policy};
 use std::ops::Range;
 use triergon_core::{Error, Result, WorkBudget};
 
+/// One row of a `tfra` box, as stored.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FragmentRandomAccessEntry {
+    /// 1-based position of the row in the box.
     pub ordinal: u32,
+    /// `time` of the random access sample, in ticks of the track's media timescale.
     pub time_ticks: u64,
+    /// `moof_offset`: absolute file offset in bytes of the `moof` box holding the
+    /// sample.
     pub moof_offset: u64,
+    /// 1-based `traf` within that `moof`; never zero.
     pub traf_number: u32,
+    /// 1-based `trun` within that `traf`; never zero.
     pub trun_number: u32,
+    /// 1-based sample within that `trun`; never zero.
     pub sample_number: u32,
 }
 
-/// Retains the complete original box. Header/bounds validation is constant
-/// work; each fixed-width row is interpreted only when its cursor is polled.
+/// A parsed track fragment random access box (`tfra`), kept as the original box.
+/// Parsing checks the header and that the rows fill the box exactly; each row is read
+/// when [`cursor`](Self::cursor) reaches it.
 #[derive(Clone, Debug)]
 pub struct TrackFragmentRandomAccess {
     raw: BoxView,
@@ -27,6 +40,10 @@ pub struct TrackFragmentRandomAccess {
     stride: usize,
 }
 impl TrackFragmentRandomAccess {
+    /// Parses a `tfra` box. Fails with `Error::Unsupported` for a version above 1 or
+    /// nonzero flags, `Error::Invalid` for another box, a zero `track_ID`, nonzero
+    /// reserved bits or rows that do not fill the box exactly, and `Error::Limit` for
+    /// more rows than `limits.max_records`.
     pub fn parse(raw: BoxView, limits: Limits) -> Result<Self> {
         if raw.header().kind != *b"tfra" {
             return Err(Error::Invalid("not tfra"));
@@ -66,21 +83,27 @@ impl TrackFragmentRandomAccess {
             stride,
         })
     }
+    /// The whole `tfra` box.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
+    /// `track_ID` of the track the rows belong to; never zero.
     pub fn track_id(&self) -> u32 {
         self.track_id
     }
+    /// `number_of_entry`: the number of rows.
     pub fn entry_count(&self) -> u32 {
         self.count
     }
+    /// Box version: 0 for 32-bit, 1 for 64-bit time and `moof` offset.
     pub fn version(&self) -> u8 {
         self.version
     }
+    /// Byte widths, 1 to 4, of the `traf`, `trun` and sample numbers, in that order.
     pub fn number_widths(&self) -> [u8; 3] {
         self.widths
     }
+    /// A cursor over the rows, in box order.
     pub fn cursor(&self) -> FragmentRandomAccessCursor<'_> {
         FragmentRandomAccessCursor {
             index: self,
@@ -148,6 +171,7 @@ fn number(body: &[u8], at: usize, width: u8) -> Result<u32> {
     Ok(u32::from_be_bytes(padded))
 }
 
+/// The rows of a [`TrackFragmentRandomAccess`], in box order.
 #[derive(Debug)]
 pub struct FragmentRandomAccessCursor<'a> {
     index: &'a TrackFragmentRandomAccess,
@@ -155,8 +179,10 @@ pub struct FragmentRandomAccessCursor<'a> {
     failed: Option<Error>,
 }
 impl FragmentRandomAccessCursor<'_> {
-    /// One bounded row per unit. A bad record is sticky and cannot be skipped
-    /// on retry. No ordering, range-target or source-clock inference is made.
+    /// Reads the next row, charging one work unit. A row with a zero `traf`, `trun` or
+    /// sample number fails with `Error::Invalid`, and every later poll returns the same
+    /// error. Rows are returned as stored: their order, offsets and times are not
+    /// checked.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<FragmentRandomAccessEntry>> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -180,14 +206,22 @@ impl FragmentRandomAccessCursor<'_> {
     }
 }
 
-/// Tail lookup requires actual supplied `mfro` bytes and a known source end.
-/// It does not scan signatures, resolve tfra targets or issue range requests.
+/// A movie fragment random access offset box (`mfro`), the last box of a file, which
+/// states the size of the `mfra` box it ends.
+///
+/// Parsing needs the `mfro` box itself and the source length. Reading the `mfra` box
+/// at [`parent_range`](Self::parent_range) and its `tfra` boxes is the caller's job.
 #[derive(Clone, Debug)]
 pub struct MovieFragmentRandomAccessTail {
     raw: BoxView,
     parent: Range<u64>,
 }
 impl MovieFragmentRandomAccessTail {
+    /// Parses an `mfro` box that ends at `source_end`, the source length in bytes.
+    /// Fails with `Error::Unsupported` for a version above 1 or nonzero flags, and
+    /// `Error::Invalid` for another box, a box not ending at `source_end`, or a stated
+    /// `mfra` size smaller than this box plus an 8-byte header or larger than the
+    /// source.
     pub fn parse(raw: BoxView, source_end: u64) -> Result<Self> {
         if raw.header().kind != *b"mfro" {
             return Err(Error::Invalid("not mfro"));
@@ -214,12 +248,16 @@ impl MovieFragmentRandomAccessTail {
             parent: start..source_end,
         })
     }
+    /// The whole `mfro` box.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
+    /// Absolute byte range the stated `mfra` box occupies; it ends at the source end.
     pub fn parent_range(&self) -> Range<u64> {
         self.parent.clone()
     }
+    /// Checks that `parent` is the `mfra` box at [`parent_range`](Self::parent_range)
+    /// and ends with this `mfro` box, byte for byte; `Error::Invalid` otherwise.
     pub fn require_mfra(&self, parent: &BoxView) -> Result<()> {
         if parent.header().kind != *b"mfra"
             || parent.header().start != self.parent.start
@@ -237,8 +275,8 @@ impl MovieFragmentRandomAccessTail {
             .checked_sub(parent.header().start)
             .ok_or(Error::Overflow)?;
         let offset = usize::try_from(offset).map_err(|_| Error::Overflow)?;
-        // The complete tail is fixed16 or24 bytes in this bounded profile.
-        // Comparing it also refuses a same-address parent with different bytes.
+        // The tail is 16 bytes, or 24 with a 64-bit box size. Comparing it also
+        // refuses a parent at the same address with different bytes.
         let embedded = fields::slice(parent.bytes().as_ref(), offset, self.raw.bytes().len())?;
         if embedded != self.raw.bytes().as_ref() {
             return Err(Error::Invalid("mfro bytes differ from mfra tail"));

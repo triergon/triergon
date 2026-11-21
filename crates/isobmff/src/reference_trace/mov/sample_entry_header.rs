@@ -1,5 +1,9 @@
-//! Pin-bound demux header outcomes over immutable source sample entries.
-//! This is neither codec validation nor an ISO/QuickTime validity rule.
+//! Sample entry outcomes of FFmpeg's open.
+//!
+//! [`SampleEntryHeaderJob`] walks one sample entry's child boxes and reports whether FFmpeg's
+//! open rejects the entry, with its return code, and which configuration box it installs.
+//! [`RawVisualEntriesJob`] applies that to the raw entries of a video track. Neither
+//! validates a codec configuration or applies an ISO or QuickTime validity rule.
 use crate::{
     BuildStatus, Limits, Next,
     boxes::{BoxChildren, BoxView},
@@ -9,50 +13,74 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
-/// reference public MOV open observations, not a general demux profile.
+/// Selects FFmpeg's sample entry checks during open; pass it to
+/// [`SampleEntryHeaderJob::new`] or [`RawVisualEntriesJob::new`].
 #[derive(Clone, Copy, Debug)]
 pub struct SampleEntryHeaderProfile;
 
+/// Why FFmpeg's open rejects a sample entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HeaderCause {
-    OpusBodyLength { declared: usize },
-    OpusVersion { raw: u8 },
-    OpusConfigurationCollision { earlier: [u8; 4] },
-    DtsSampleRate { raw: u32 },
+    /// A `dOps` payload shorter than 11 bytes or longer than 2^30 bytes.
+    OpusBodyLength {
+        /// Payload length in bytes.
+        declared: usize,
+    },
+    /// A `dOps` version other than 0.
+    OpusVersion {
+        /// The version byte.
+        raw: u8,
+    },
+    /// A `dOps` after another configuration box was installed.
+    OpusConfigurationCollision {
+        /// Code of that box: `dOps`, `avcC`, `hvcC` or `av1C`.
+        earlier: [u8; 4],
+    },
+    /// A `ddts` of at least 20 payload bytes whose sampling frequency is 0 or above
+    /// `i32::MAX`.
+    DtsSampleRate {
+        /// The 32-bit sampling frequency field.
+        raw: u32,
+    },
 }
 
+/// The child box FFmpeg's open rejects a sample entry for.
 #[derive(Debug)]
 pub struct HeaderRejection {
+    /// The first rejected child box, as it is in the source.
     pub raw: BoxView,
+    /// Why FFmpeg rejects it.
     pub cause: HeaderCause,
 }
 
+/// FFmpeg's open outcome for one sample entry, with the entry itself.
 #[derive(Debug)]
 pub struct SampleEntryHeader {
     /// Complete source entry, including every opaque/private child and reserved bit.
     pub description: SampleDescription,
     pub(crate) rejection: Option<HeaderRejection>,
+    /// Number of child boxes walked; every child is walked, also after a rejection.
     pub inspected_children: u32,
-    /// Receiver-selected opaque storage in original child order. A nontrivial
-    /// configuration persists; all original ordered entry bytes stay retained.
+    /// The configuration box whose payload FFmpeg installs: the first `dOps`, or an `avcC`,
+    /// `hvcC` or `av1C`, which replaces an earlier box only when that box's payload is at
+    /// most one byte. A field-only body (a whole `fiel` box) installs nothing, nor does a
+    /// child after a rejection. `None` when no child installs a box.
     pub installed_configuration_source: Option<BoxView>,
 }
 impl SampleEntryHeader {
-    /// None means no failure established by this bounded domain. It does not
-    /// admit the rest of demux open or assert codec/configuration conformance.
+    /// FFmpeg's open return code for the entry: `Some(-1094995529)` (`AVERROR_INVALIDDATA`)
+    /// when it rejects a child, `None` otherwise. `None` says nothing about the rest of the
+    /// open or about the configuration's validity.
     pub fn demux_open_result(&self) -> Option<i32> {
         self.rejection.as_ref().map(|_| -1_094_995_529)
     }
 }
 
-/// Scans all source child headers before publishing a demux-domain outcome.
-/// Header/count/range errors remain source errors, even after a demux rejection.
-/// One child header unit plus one fixed-field interpretation unit; a pending
-/// child permits Work1 progress. No child vector, body copy or new storage is made.
+/// Walks one sample entry's child boxes and works out FFmpeg's open outcome for them.
 ///
-/// This job consumes an already owned metadata snapshot, not a live I/O cursor.
-/// It cannot seek, consume input, acknowledge failure or change a source token.
-/// Resetting an unrelated/live cursor cannot invalidate retained source bytes.
+/// Every child header is read before the outcome is ready, and a malformed child fails the
+/// job even after a rejection. The job reads the entry's retained bytes, never the input,
+/// so resetting an input cursor does not affect it. It copies and allocates nothing.
 #[derive(Debug)]
 pub struct SampleEntryHeaderJob {
     description: Option<SampleDescription>,
@@ -67,9 +95,10 @@ pub struct SampleEntryHeaderJob {
     failed: Option<Error>,
 }
 impl SampleEntryHeaderJob {
-    /// The caller supplies the sourced layout; unknown entries are never
-    /// silently assigned a visual/audio layout. Configuration state starts at
-    /// each description boundary, never at an I/O transaction/config epoch.
+    /// Starts a walk over `description`'s child boxes, which start where `layout` says,
+    /// with no configuration installed. Fails as
+    /// [`SampleDescription::extensions`](crate::movie::SampleDescription::extensions) does
+    /// for that layout.
     pub fn new(
         description: &SampleDescription,
         layout: EntryLayout,
@@ -101,6 +130,7 @@ impl SampleEntryHeaderJob {
         error
     }
 
+    /// Walks further child boxes; a malformed child fails the job.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -163,8 +193,8 @@ impl SampleEntryHeaderJob {
             // empty bodies. This is not the Opus grammar's minimum-size rule.
             return None;
         }
-        match raw.header().kind {
-            [b'd', b'O', b'p', b's'] => {
+        match &raw.header().kind {
+            b"dOps" => {
                 if !(11..=1 << 30).contains(&body.len()) {
                     return Some(HeaderCause::OpusBodyLength {
                         declared: body.len(),
@@ -179,7 +209,7 @@ impl SampleEntryHeaderJob {
                 self.installed = Some(*b"dOps");
                 self.installed_source = Some(raw.clone());
             }
-            [b'a', b'v', b'c', b'C'] | [b'h', b'v', b'c', b'C'] | [b'a', b'v', b'1', b'C'] => {
+            b"avcC" | b"hvcC" | b"av1C" => {
                 // These direct configuration handlers also dispatch a whole
                 // legacy field-only envelope. Such a body installs no codec
                 // bytes and must not overwrite an earlier genuine storage.
@@ -201,7 +231,7 @@ impl SampleEntryHeaderJob {
                     }
                 }
             }
-            [b'd', b'd', b't', b's'] if body.len() >= 20 => {
+            b"ddts" if body.len() >= 20 => {
                 let rate = u32::from_be_bytes([body[0], body[1], body[2], body[3]]);
                 if rate == 0 || rate > i32::MAX as u32 {
                     return Some(HeaderCause::DtsSampleRate { raw: rate });
@@ -214,8 +244,9 @@ impl SampleEntryHeaderJob {
         None
     }
 
-    /// Checks cancellation again at the publication boundary. A result keeps
-    /// its complete original storage charged after the job/caller aliases drop.
+    /// Takes the outcome after [`poll`](Self::poll) returned `Ready`. Fails with
+    /// `Error::Invalid` before then or when called again, and with `Error::Cancelled` when
+    /// `cancel` is set. The outcome keeps the entry's bytes charged to their pool.
     pub fn try_finish(&mut self, cancel: &AtomicBool) -> Result<SampleEntryHeader> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -257,6 +288,8 @@ pub struct RawVisualEntriesJob<'a> {
     failed: Option<Error>,
 }
 impl<'a> RawVisualEntriesJob<'a> {
+    /// Starts a check of `table`'s `raw ` entries longer than the 78 bytes of visual
+    /// fields. A track whose handler is not `vide` has none to check.
     pub fn new(
         header: &TrackHeader,
         table: &'a SampleTable,
@@ -276,6 +309,8 @@ impl<'a> RawVisualEntriesJob<'a> {
         }
     }
 
+    /// Checks further entries. Fails with `Error::Invalid` on the first entry FFmpeg's open
+    /// rejects.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);

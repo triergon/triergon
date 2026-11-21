@@ -1,7 +1,8 @@
-//! Segment and fragment indexes: `sidx`, `tfra` and `mfro`.
+//! Segment and fragment indexes: `sidx` ([`SegmentIndex`]), `tfra`
+//! ([`TrackFragmentRandomAccess`]) and `mfro` ([`MovieFragmentRandomAccessTail`]).
 //!
-//! Their entries are hints the file states about where segments and fragments start.
-//! Nothing here checks them against the media they point at.
+//! Their entries are hints the file states about where segments and random access
+//! samples are. Nothing here checks them against the media they point at.
 
 mod sidx;
 mod tfra;

@@ -1,5 +1,9 @@
-//! Explicit reference opaque-private catalogue view. Source raw-video codec identity
-//! never becomes Opus/AVC/HEVC from private bytes. No decoded-AU claim.
+//! The private configuration bytes FFmpeg publishes for a raw-video entry.
+//!
+//! [`PrivateConfigurationJob`] works out the bytes from the configuration box FFmpeg installs
+//! for the entry, and [`StreamView::for_source_private`] puts them on the track's stream view
+//! as `extradata`. The track keeps its raw-video codec whatever the bytes hold, and nothing
+//! is decoded.
 use crate::{
     BuildStatus, Limits,
     compat::mov::view::StreamView,
@@ -11,14 +15,22 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};
+/// Selects FFmpeg's private configuration for raw video; pass it to
+/// [`PrivateConfigurationJob::new`] or [`StreamView::for_source_private`].
 #[derive(Clone, Copy, Debug)]
 pub struct PrivateCatalogueProfile;
+/// Where the private bytes come from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PrivateConfigCause {
+    /// No bytes: no child installs a configuration box, or FFmpeg's open rejects the entry.
     Absent,
+    /// The payload of the installed `avcC`, `hvcC` or `av1C` box, unchanged.
     OpaqueDirectBody,
+    /// A 19-byte Opus identification header (`OpusHead`, RFC 7845) built from an 11-byte
+    /// `dOps` of channel mapping family 0.
     OpusIdentificationMappingZero,
 }
+/// The private bytes FFmpeg publishes for a raw-video entry, with the entry's open outcome.
 #[derive(Debug)]
 pub struct PrivateConfiguration {
     header: SampleEntryHeader,
@@ -26,19 +38,23 @@ pub struct PrivateConfiguration {
     cause: PrivateConfigCause,
 }
 impl PrivateConfiguration {
+    /// FFmpeg's open outcome for the entry, with the entry itself.
     pub fn source(&self) -> &SampleEntryHeader {
         &self.header
     }
+    /// The bytes FFmpeg publishes as the stream's `extradata`, or `None` for none.
     pub fn demux_bytes(&self) -> Option<&Bytes> {
         self.demux.as_ref()
     }
+    /// Where [`demux_bytes`](Self::demux_bytes) come from.
     pub fn cause(&self) -> PrivateConfigCause {
         self.cause
     }
 }
-/// This is an owned metadata operation like the header job. It neither reads a live cursor
-/// nor implies that reset invalidates retained source metadata. The caller must
-/// bind the result to the exact source description before publishing a stream.
+/// Works out the private bytes FFmpeg publishes for one `raw ` entry.
+///
+/// Like [`SampleEntryHeaderJob`], it reads the entry's retained bytes, never the input.
+/// Pass the result to [`StreamView::for_source_private`] with the same entry's track.
 #[derive(Debug)]
 pub struct PrivateConfigurationJob {
     pool: Budget,
@@ -50,6 +66,9 @@ pub struct PrivateConfigurationJob {
     finished: bool,
 }
 impl PrivateConfigurationJob {
+    /// Starts the job for `description`, allowing at most `maximum` private bytes. Fails
+    /// with `Error::ForeignPool` when the entry is not in `pool` and with
+    /// `Error::Unsupported` unless its format is `raw `.
     pub fn new(
         description: &SampleDescription,
         pool: &Budget,
@@ -87,6 +106,9 @@ impl PrivateConfigurationJob {
         self.failed = Some(error);
         error
     }
+    /// Walks the entry and builds the bytes. Fails with `Error::Limit` when they exceed
+    /// `maximum`, and with `Error::Unsupported` for a `dOps` other than an 11-byte record
+    /// of version 0, one or two channels and channel mapping family 0.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -183,6 +205,9 @@ impl PrivateConfigurationJob {
         });
         Ok(BuildStatus::Ready)
     }
+    /// Takes the result after [`poll`](Self::poll) returned `Ready`. Fails with
+    /// `Error::Invalid` before then or when called again, and with `Error::Cancelled` when
+    /// `cancel` is set.
     pub fn try_finish(&mut self, cancel: &AtomicBool) -> Result<PrivateConfiguration> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -199,8 +224,11 @@ impl PrivateConfigurationJob {
     }
 }
 impl StreamView {
-    /// Limited raw-visual private-control receiver. It preserves the actual
-    /// source codec and table, and constructs the stream before publication.
+    /// A regular raw-video track's stream view as [`for_source`](Self::for_source) builds
+    /// it, with `configuration`'s bytes as `extradata`; the codec and table stay those of the
+    /// source. Fails with `Error::Unsupported` unless the track is an unfragmented `vide`
+    /// track with one `raw ` entry, and with `Error::Invalid` when `configuration` belongs
+    /// to another entry or FFmpeg's open rejects the entry.
     pub fn for_source_private(
         header: &TrackHeader,
         table: &SampleTable,

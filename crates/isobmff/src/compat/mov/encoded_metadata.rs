@@ -1,5 +1,7 @@
-//! Source-owned legacy metadata and separately named reference receiver facts.
-//! No source creation word, handler bytes, language word or audio unit changes.
+//! Track metadata of an encoded stream as FFmpeg's MOV demuxer reads it: the `mdhd`
+//! creation time and language, the `hdlr` name, the fields of a QuickTime sound
+//! description version 1 and the `sdtp` dependency byte. Each value keeps the source
+//! box or word it was read from beside the demuxer's reading.
 use crate::{
     boxes::BoxView,
     fields,
@@ -7,22 +9,38 @@ use crate::{
 };
 use triergon_core::{Bytes, Error, Result};
 
+/// Opt-in token for the metadata view: the legacy QuickTime forms of
+/// `EncodedStreamJob::new_description_with_metadata`, the creation tag of
+/// [`EncodedCreationSource`] and the `sdtp` disposable flag of
+/// `EncodedEditJob::new_with_dependency_table`.
 #[derive(Clone, Copy, Debug)]
 pub struct EncodedMetadataProfile;
+/// Which description of a track to admit, under which major brand and limits.
 #[derive(Clone, Copy, Debug)]
 pub struct EncodedSelection {
+    /// The file's `ftyp` major brand; `None` is `Error::Unsupported`.
     pub major_brand: Option<[u8; 4]>,
+    /// 1-based index of the `stsd` entry.
     pub description: u32,
+    /// Bounds on the entry's child boxes, descriptors and configuration size.
     pub limits: crate::config::ConfigurationLimits,
 }
+/// How [`EncodedCreationSource`] read the `mdhd` creation time, or why it has no tag.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CreationCause {
+    /// The creation time is zero: no tag.
     SourceZero,
+    /// A version-0 time below 2,082,844,800, read as seconds since 1970 rather than 1904.
     VersionZeroUnixObservation,
+    /// Seconds since 1904-01-01 UTC, as specified.
     QuickTime1904Seconds,
+    /// A version-1 time above `i64::MAX`, which the demuxer reads as negative: no tag.
     VersionOneDemuxNegativeObservation,
+    /// The time since 1970 in microseconds does not fit in an `i64`: no tag.
     DemuxMicrosecondsUnrepresentable,
 }
+/// The `mdhd` creation time and the `creation_time` tag FFmpeg's MOV demuxer derives
+/// from it in the metadata view.
 #[derive(Clone, Debug)]
 pub struct EncodedCreationSource {
     raw: BoxView,
@@ -32,6 +50,8 @@ pub struct EncodedCreationSource {
     cause: CreationCause,
 }
 impl EncodedCreationSource {
+    /// Reads the creation time of `header`'s `mdhd` box. `Error::Unsupported` for
+    /// nonzero flags, a version above 1 or a year past 9999.
     pub fn from_source(header: &TrackHeader, _profile: EncodedMetadataProfile) -> Result<Self> {
         let raw = header.raw_mdhd.clone();
         if raw.header().kind != *b"mdhd" {
@@ -85,31 +105,41 @@ impl EncodedCreationSource {
             cause,
         })
     }
+    /// The `mdhd` box.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
+    /// The `mdhd` version: 0 for a 32-bit creation time, 1 for a 64-bit one.
     pub fn source_version(&self) -> u8 {
         self.source_version
     }
+    /// The creation time as stored, nominally in seconds since 1904-01-01 UTC.
     pub fn source_seconds(&self) -> u64 {
         self.source_seconds
     }
+    /// The tag text, `YYYY-MM-DDTHH:MM:SS.000000Z` in UTC; `None` when there is no tag.
     pub fn demux(&self) -> Option<&[u8; 27]> {
         self.demux.as_ref()
     }
+    /// How the tag was derived, or why there is none.
     pub fn cause(&self) -> CreationCause {
         self.cause
     }
 }
 
-/// Audio-v1 words retain their actual units. In particular samples-per-packet
-/// never replaces STTS, MDHD timescale, byte count or source sample boundaries.
+/// The four fields a QuickTime sound description version 1 adds, as stored. They
+/// describe the codec's packets and never replace the sample table's durations,
+/// timescale, sizes or sample boundaries.
 #[derive(Clone, Debug)]
 pub struct SoundV1Source {
     raw: BoxView,
+    /// Uncompressed frames per compressed packet (`samplesPerPacket`).
     pub samples_per_packet: u32,
+    /// Bytes per packet for a single channel (`bytesPerPacket`).
     pub bytes_per_packet: u32,
+    /// Bytes per frame across all channels (`bytesPerFrame`).
     pub bytes_per_frame: u32,
+    /// Bytes of one uncompressed sample (`bytesPerSample`).
     pub bytes_per_sample: u32,
 }
 impl SoundV1Source {
@@ -145,16 +175,25 @@ impl SoundV1Source {
     }
 }
 
+/// How the `mdhd` language word was read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LanguageCause {
+    /// Three packed ISO 639-2/T letters.
     IsoPacked,
+    /// Zero, the QuickTime code for English: reported as `eng`.
     QuickTimeEnglishZero,
+    /// `0x7fff`, QuickTime's unspecified language: reported as `und`. Range playback of
+    /// `qt  ` files only.
     QuickTimeUnspecified,
 }
+/// The `mdhd` language word and how FFmpeg's MOV demuxer reads it. The code it
+/// reports is the stream view's `language`.
 #[derive(Clone, Copy, Debug)]
 pub struct LanguageSource {
+    /// The word as stored: a pad bit and three 5-bit letters, or a QuickTime code.
     pub raw_word: u16,
     pub(crate) demux: [u8; 3],
+    /// How the word was read.
     pub cause: LanguageCause,
 }
 pub(crate) fn language(header: &TrackHeader, allow_unspecified: bool) -> Result<LanguageSource> {
@@ -200,10 +239,15 @@ pub(crate) fn language(header: &TrackHeader, allow_unspecified: bool) -> Result<
     })
 }
 
+/// The `hdlr` name as FFmpeg's MOV demuxer reads it.
 #[derive(Clone, Debug)]
 pub struct HandlerSource {
     raw: BoxView,
+    /// The name bytes, without the terminator or the Pascal length byte; `None` when
+    /// the name is empty.
     pub demux: Option<Bytes>,
+    /// Whether the name is a Pascal string, as in a QuickTime `mhlr` handler of a `qt  `
+    /// file, rather than NUL-terminated.
     pub source_pascal: bool,
 }
 pub(crate) fn handler(header: &TrackHeader, major: Option<[u8; 4]>) -> Result<HandlerSource> {
@@ -253,34 +297,48 @@ pub(crate) fn handler(header: &TrackHeader, major: Option<[u8; 4]>) -> Result<Ha
     })
 }
 impl HandlerSource {
+    /// The `hdlr` box.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
 }
 
-/// Only the explicitly selected metadata receiver uses these metadata-presence facts.
-/// The original source storage retain every byte, including unknown extension
-/// atoms, the Pascal length and the legacy language word.
+/// The track metadata an [`EncodedStream`](crate::compat::mov::encoded::EncodedStream)
+/// was derived from, for streams admitted by the metadata, context and range playback
+/// views. Each part keeps the source box or word it was read from.
 #[derive(Clone, Debug)]
 pub struct EncodedSource {
+    /// The `mdhd` language.
     pub language: LanguageSource,
+    /// The `hdlr` name.
     pub handler: HandlerSource,
+    /// The QuickTime sound description version 1 fields of an AAC entry; `None`
+    /// otherwise.
     pub sound: Option<SoundV1Source>,
+    /// The entry's `wave` box, when its configuration is read from one.
     pub wave: Option<BoxView>,
 }
 
-/// A packet hint in the separate reference view. Source dependency byte and STSS
-/// access remain distinct; this grants no decoder or random-access proof.
+/// The `sample_is_depended_on` field of an `sdtp` byte (bits 3 and 2). FFmpeg's MOV
+/// demuxer marks a packet disposable when it is `Unreferenced`; the field says nothing
+/// about sync samples or decoder recovery.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DependedOn {
+    /// 0: unknown.
     Unspecified,
+    /// 1: other samples depend on this one.
     Referenced,
+    /// 2: no other sample depends on this one.
     Unreferenced,
+    /// 3: reserved.
     Reserved,
 }
+/// One `sdtp` byte with its decoded `sample_is_depended_on` field.
 #[derive(Clone, Copy, Debug)]
 pub struct DependencyView {
+    /// The byte as stored.
     pub raw: u8,
+    /// Its `sample_is_depended_on` field.
     pub depended_on: DependedOn,
 }
 impl DependencyView {
@@ -293,9 +351,9 @@ impl DependencyView {
         };
         Self { raw, depended_on }
     }
-    /// Only the separate metadata edit-plan view uses this hint after checking its
-    /// source/group context. It does not reinterpret source leading/key facts.
-    /// Source reserved values remain refused by the metadata view and distinct in the recovery view.
+    /// Whether FFmpeg's MOV demuxer marks the packet disposable: only for `Unreferenced`.
+    /// The metadata view refuses the reserved value; the recovery view reads it through
+    /// `DependencyObservation`. Leading and sync facts are not used.
     pub(crate) fn demux_disposable_hint(self) -> bool {
         self.depended_on == DependedOn::Unreferenced
     }
