@@ -5,7 +5,7 @@ use std::path::Path;
 
 use crate::json::{self, Value};
 
-use super::{Item, Placement, R, Stage, Step, owned, xtask};
+use super::{Item, Placement, R, Stage, Step, lanes, owned, xtask};
 
 /// Relative scheduling costs for report features, in historical plan order.
 /// A newly registered report has a weight of one until it has a measured cost.
@@ -24,6 +24,11 @@ const REPORT_WEIGHTS: &[(&str, u32)] = &[
     ("matroska-colour", 3),
     ("matroska-cues-preroll", 1),
     ("matroska-demux", 1),
+    ("quicktime-pcm-samples", 1),
+    ("mov-pcm-packets", 1),
+    ("mov-run-recovery", 1),
+    ("isobmff-dts-signalling", 1),
+    ("mov-encoded-views", 1),
     ("matroska-header-removal", 1),
     ("matroska-segment-metadata", 5),
     ("matroska-zlib", 1),
@@ -38,6 +43,9 @@ const REPORT_WEIGHTS: &[(&str, u32)] = &[
     ("subtitle-dvd-host", 1),
     ("subtitle-cc", 10),
     ("subtitle-teletext", 5),
+    ("dts-core-frames", 1),
+    ("dts-packed-frames", 1),
+    ("dts-parser-trace", 1),
 ];
 
 /// How the gate covers every other registered feature (`harness/features/ID`):
@@ -45,17 +53,28 @@ const REPORT_WEIGHTS: &[(&str, u32)] = &[
 /// `gate plan` and `gate summary` fail on a registered feature that is neither here
 /// nor registered with the report runner.
 pub(super) const COVERED: &[(&str, Coverage)] = &[
+    ("dts-core-header", Coverage::Item("oracle-compare")),
+    ("dts-unpacking", Coverage::Item("oracle-compare")),
     (
         "isobmff-open-index",
         Coverage::Item("isobmff-bench, in parts"),
     ),
     ("isobmff-reader", Coverage::Item("codecs isobmff-reader")),
     ("isobmff-seek", Coverage::Item("isobmff-seek")),
+    (
+        "quicktime-sound-description",
+        Coverage::Item("oracle-compare"),
+    ),
+    ("isobmff-dts-entry-source", Coverage::Item("oracle-compare")),
     ("packet-framing", Coverage::Item("framing")),
     ("progressive-ts188", Coverage::Item("progressive")),
     ("font-outlines", Coverage::Item("fonts compare")),
     ("font-hinting-none", Coverage::Item("fonts compare")),
     ("font-hinting-default", Coverage::Item("fonts compare")),
+    ("mkv-codec-state", Coverage::Item("oracle-compare")),
+    ("mkv-metadata-oracle", Coverage::Item("oracle-compare")),
+    ("mkv-track-extensions-oracle", Coverage::Item("oracle-compare")),
+    ("font-store", Coverage::Item("oracle-compare")),
     ("shape-libass", Coverage::Item("shape compare")),
     ("shape-text", Coverage::Item("shape compare")),
     ("shape-bidi", Coverage::Item("shape compare")),
@@ -84,7 +103,7 @@ pub(super) const COVERED: &[(&str, Coverage)] = &[
     ),
     (
         "aac-access-units",
-        Coverage::Excluded("on demand: prepared and compared by codecs aac-access-units"),
+        Coverage::Item("codecs aac-access-units"),
     ),
 ];
 
@@ -268,9 +287,9 @@ const FORMATS_FFPROBE: &str = ".research/reference-formats/install/bin/ffprobe";
 /// The reader comparison's inputs and seek cases, and the lanes the gate compares.
 const READER_MANIFEST: &str = "harness/codecs/reader-manifest.json";
 const READER_SEEKS: &str = "harness/codecs/reader-seeks.json";
-const OGG_READER_LANES: &str = "reader-ogg,reader-ogg-seek";
-/// The correctness lanes of the audio decoders the `codecs-audio` item grades.
-const AUDIO_LANES: &str = "aac,ac3,eac3,dts";
+const MOV_MANIFEST: &str = "harness/codecs/aac/mov-manifest.json";
+const CORRECTNESS: &str = crate::codecs::derived::MANIFEST;
+const DECODE_REFERENCE: &str = "target/harness/ffmpeg-decode-worker";
 
 pub(super) fn step(
     name: impl Into<String>,
@@ -310,7 +329,7 @@ fn collections(name: &str, timing: Vec<String>, memory: Vec<String>) -> [Step; 2
 
 /// The codec workload lists. Each list's timing is one item and its memory is in parts,
 /// each part every Nth workload: a list's memory took up to 108 minutes in one piece.
-const WORKLOAD_LISTS: [WorkloadList; 2] = [
+const WORKLOAD_LISTS: [WorkloadList; 4] = [
     WorkloadList {
         name: "codec-workloads",
         workloads: "harness/codecs/workloads.json",
@@ -324,6 +343,20 @@ const WORKLOAD_LISTS: [WorkloadList; 2] = [
         aac: false,
         timing_weight: 4,
         part_weights: &[16, 29, 20],
+    },
+    WorkloadList {
+        name: "aac-default-workloads",
+        workloads: "harness/codecs/aac-default-workloads.json",
+        aac: false,
+        timing_weight: 5,
+        part_weights: &[12, 14],
+    },
+    WorkloadList {
+        name: "hevc-simd-workloads",
+        workloads: "harness/codecs/hevc-simd-workloads.json",
+        aac: false,
+        timing_weight: 6,
+        part_weights: &[10, 10, 40],
     },
 ];
 
@@ -356,6 +389,7 @@ pub(super) fn items(
         target,
         release,
         pairs: crate::harness::timing::GATE_PAIRS.to_string(),
+        lanes: lanes::planned(),
     };
     let mut items: Vec<Item> = reports
         .iter()
@@ -372,6 +406,9 @@ pub(super) fn items(
         plan.video_codecs(),
         plan.audio_codecs(),
         plan.ogg_readers(),
+        plan.file_codecs(),
+        plan.elementary_readers(),
+        plan.aac_access_units(),
     ]);
     for list in &WORKLOAD_LISTS {
         items.extend(plan.workloads(list));
@@ -396,6 +433,7 @@ struct Plan<'a> {
     release: &'a str,
     /// The report pairs of every collection.
     pairs: String,
+    lanes: Value,
 }
 
 impl Plan<'_> {
@@ -715,6 +753,101 @@ impl Plan<'_> {
         }
     }
 
+    fn codec_example(
+        &self,
+        bin: &str,
+        example: &str,
+        name: &str,
+        package: &str,
+        feature: Option<&str>,
+        nightly: bool,
+    ) -> Vec<String> {
+        let mut cargo = vec!["cargo".to_owned()];
+        if nightly {
+            cargo.push(format!("+{}", crate::NIGHTLY));
+        }
+        cargo.extend(owned(&[
+            "build",
+            "--release",
+            "--locked",
+            "-p",
+            package,
+            "--example",
+            example,
+        ]));
+        cargo.extend(self.cross_target());
+        let release = if nightly {
+            cargo.extend(owned(&["--target-dir", "target/nightly"]));
+            self.release.replacen("target/", "target/nightly/", 1)
+        } else {
+            self.release.to_owned()
+        };
+        if let Some(feature) = feature {
+            cargo.extend(owned(&["--features", feature]));
+        }
+        let mut command = owned(&[
+            "sh",
+            "-c",
+            r#"dir=$1 from=$2 to=$3; shift 3; mkdir -p -- "$dir" && "$@" && cp -- "$from" "$to""#,
+            "codec-example",
+            bin,
+            &format!("{release}/examples/{example}"),
+            &format!("{bin}/{name}"),
+        ]);
+        command.extend(cargo);
+        command
+    }
+
+    fn codec_grade(
+        &self,
+        name: &str,
+        manifest: &str,
+        grade_lanes: &str,
+        bin: &str,
+        options: &[&str],
+    ) -> Step {
+        let run = format!("{}/{name}.jsonl", self.out);
+        let mut command = xtask(&[
+            "codecs",
+            "grade",
+            "--manifest",
+            manifest,
+            "--lanes",
+            grade_lanes,
+            "--root",
+            ".",
+            "--bin",
+            bin,
+            "--ffmpeg",
+            &format!("{FFMPEG_BIN}/ffmpeg"),
+            "--ffprobe",
+            &format!("{FFMPEG_BIN}/ffprobe"),
+            "--codec-worker",
+            &self.codec_worker(),
+            "--reference",
+            DECODE_REFERENCE,
+            "--out",
+            &run,
+        ]);
+        command.extend(owned(options));
+        step(name, Stage::Timing, Placement::Free, command)
+    }
+
+    fn codec_summary(&self, name: &str, run: &str) -> Step {
+        step(
+            name,
+            Stage::Timing,
+            Placement::Free,
+            xtask(&[
+                "codecs",
+                "summarize",
+                &format!("{}/{run}.jsonl", self.out),
+                &format!("{}/{name}.json", self.out),
+                "--require-pass",
+            ]),
+        )
+    }
+
     /// The H.264 and HEVC decoders against FFmpeg's on the conformance vectors.
     fn video_codecs(&self) -> Item {
         let (out, release) = (self.out, self.release);
@@ -728,7 +861,7 @@ impl Plan<'_> {
              cp {release}/examples/decode_h264 {bin}/codec-h264-decode && \
              cp {release}/examples/decode_hevc {bin}/codec-hevc-decode"
         ));
-        let steps = vec![
+        let mut steps = vec![
             step("codec-bin", Stage::Timing, Placement::Free, build),
             step(
                 "codecs-manifest",
@@ -769,11 +902,54 @@ impl Plan<'_> {
                 ]),
             ),
         ];
+        let stable = lanes::item(&self.lanes, "codecs")
+            .filter(|lane| *lane != "hevc-simd")
+            .collect::<Vec<_>>()
+            .join(",");
+        steps.push(self.codec_grade(
+            "codecs-grade-workloads",
+            CORRECTNESS,
+            &stable,
+            &bin,
+            &["--only", &lanes::video_workloads()],
+        ));
+        steps.push(self.codec_summary("codecs-summary-workloads", "codecs-grade-workloads"));
+
+        let simd_bin = format!("{out}/codec-bin-simd");
+        steps.push(step(
+            "codec-bin-simd",
+            Stage::Timing,
+            Placement::Free,
+            self.codec_example(
+                &simd_bin,
+                "decode_hevc",
+                "codec-hevc-decode",
+                "triergon-codec-hevc",
+                Some("simd"),
+                true,
+            ),
+        ));
+        steps.push(self.codec_grade(
+            "codecs-grade-hevc-simd",
+            CORRECTNESS,
+            "hevc",
+            &simd_bin,
+            &[
+                "--codec-worker-for",
+                &format!("video-hevc={release}/codec-hevc-worker"),
+            ],
+        ));
+        steps.push(self.codec_summary("codecs-summary-hevc-simd", "codecs-grade-hevc-simd"));
         Item {
             name: "codecs".into(),
-            weight: 23,
+            weight: 33,
             steps,
-            preflight: owned(&["--codecs", "harness/codecs/workloads.json"]),
+            preflight: owned(&[
+                "--codecs",
+                "harness/codecs/workloads.json",
+                "--correctness",
+                &stable,
+            ]),
         }
     }
 
@@ -800,6 +976,11 @@ impl Plan<'_> {
              cp {release}/examples/decode_dts {audio_bin}/codec-dca-decode"
         ));
         let audio_run = format!("{out}/codecs-audio-grade.jsonl");
+        let audio = lanes::item(&self.lanes, "codecs-audio")
+            .filter(|lane| *lane != "aac-default")
+            .collect::<Vec<_>>()
+            .join(",");
+        let default_bin = format!("{out}/codec-audio-bin-default");
         Item {
             name: "codecs-audio".into(),
             weight: 1,
@@ -815,7 +996,7 @@ impl Plan<'_> {
                         "--manifest",
                         crate::codecs::derived::MANIFEST,
                         "--lanes",
-                        AUDIO_LANES,
+                        &audio,
                         "--root",
                         ".",
                         "--bin",
@@ -846,19 +1027,49 @@ impl Plan<'_> {
                         "--require-pass",
                     ]),
                 ),
+                step(
+                    "codec-audio-bin-default",
+                    Stage::Timing,
+                    Placement::Free,
+                    self.codec_example(
+                        &default_bin,
+                        "decode_aac",
+                        "codec-aac-decode",
+                        "triergon-codec-aac",
+                        None,
+                        false,
+                    ),
+                ),
+                self.codec_grade(
+                    "codecs-audio-grade-default",
+                    CORRECTNESS,
+                    "aac",
+                    &default_bin,
+                    &[],
+                ),
+                self.codec_summary("codecs-audio-summary-default", "codecs-audio-grade-default"),
             ],
-            preflight: owned(&["--correctness", AUDIO_LANES]),
+            preflight: owned(&["--correctness", &audio]),
         }
     }
 
     /// The Ogg reader's packets and seeks against ffprobe, in both views; the step fails
     /// on a case that neither passes nor differs only by its reviewed differences.
     fn ogg_readers(&self) -> Item {
+        self.reader_item("ogg-readers", 1)
+    }
+
+    fn elementary_readers(&self) -> Item {
+        self.reader_item("elementary-readers", 2)
+    }
+
+    fn reader_item(&self, name: &str, weight: u32) -> Item {
+        let selected = lanes::item(&self.lanes, name).collect::<Vec<_>>().join(",");
         Item {
-            name: "ogg-readers".into(),
-            weight: 1,
+            name: name.into(),
+            weight,
             steps: vec![step(
-                "ogg-readers",
+                name,
                 Stage::Timing,
                 Placement::Free,
                 xtask(&[
@@ -869,7 +1080,7 @@ impl Plan<'_> {
                     "--seeks",
                     READER_SEEKS,
                     "--only",
-                    OGG_READER_LANES,
+                    &selected,
                     "--root",
                     ".",
                     "--ffprobe",
@@ -877,10 +1088,112 @@ impl Plan<'_> {
                     "--codec-worker",
                     &self.codec_worker(),
                     "--out",
-                    &format!("{}/ogg-readers.jsonl", self.out),
+                    &format!("{}/{name}.jsonl", self.out),
                 ]),
             )],
-            preflight: owned(&["--readers", OGG_READER_LANES]),
+            preflight: owned(&["--readers", &selected]),
+        }
+    }
+
+    /// Audio decoders reached through the file reader and track configuration.
+    fn file_codecs(&self) -> Item {
+        let bin = format!("{}/codec-files-bin", self.out);
+        let (mov, files): (Vec<_>, Vec<_>) =
+            lanes::item(&self.lanes, "codecs-files").partition(|lane| *lane == "aac-mov");
+        let all = files
+            .iter()
+            .chain(&mov)
+            .copied()
+            .collect::<Vec<_>>()
+            .join(",");
+        Item {
+            name: "codecs-files".into(),
+            weight: 6,
+            steps: vec![
+                step(
+                    "codec-files-bin",
+                    Stage::Timing,
+                    Placement::Free,
+                    self.codec_example(
+                        &bin,
+                        "decode_audio",
+                        "audio-decode",
+                        "triergon-session",
+                        Some("codecs"),
+                        false,
+                    ),
+                ),
+                self.codec_grade(
+                    "codecs-files-grade",
+                    CORRECTNESS,
+                    &files.join(","),
+                    &bin,
+                    &[],
+                ),
+                self.codec_grade(
+                    "codecs-files-mov-grade",
+                    MOV_MANIFEST,
+                    &mov.join(","),
+                    &bin,
+                    &[],
+                ),
+                self.codec_summary("codecs-files-summary", "codecs-files-grade"),
+                self.codec_summary("codecs-files-mov-summary", "codecs-files-mov-grade"),
+            ],
+            preflight: owned(&["--correctness", &all]),
+        }
+    }
+
+    /// Prepare and grade configured AAC packets before collecting either bound.
+    fn aac_access_units(&self) -> Item {
+        let out = self.out;
+        let prepared = format!("{out}/aac-access-units");
+        let aac = format!("{}/codec-aac-worker", self.release);
+        let collect = |mode: &str, destination: &str| {
+            let mut args = xtask(&[
+                "codecs",
+                mode,
+                "--candidate",
+                &aac,
+                "--reference",
+                DECODE_REFERENCE,
+                "--workloads",
+                &format!("{prepared}/workloads.json"),
+                "--root",
+                &prepared,
+                "--out",
+                &format!("{out}/{destination}/aac-access-units"),
+                "--candidate-for",
+                &format!("audio-aac-access-units={aac}"),
+                "--candidate-for",
+                &format!("audio-aac-access-units-compat={aac}"),
+            ]);
+            if mode == "time" {
+                args.extend(owned(&[
+                    "--ledger",
+                    &format!("{out}/aac-access-units-ledger.jsonl"),
+                    "--label",
+                    self.target,
+                ]));
+            }
+            self.full(args)
+        };
+        let mut steps = vec![step(
+            "aac-access-units-parity",
+            Stage::Timing,
+            Placement::Free,
+            xtask(&["codecs", "aac-access-units", "--out", &prepared]),
+        )];
+        steps.extend(collections(
+            "aac-access-units",
+            collect("time", "benchmark"),
+            collect("memory", "memory"),
+        ));
+        Item {
+            name: "aac-access-units".into(),
+            weight: 5,
+            steps,
+            preflight: owned(&["--aac-access-units"]),
         }
     }
 
@@ -904,6 +1217,10 @@ impl Plan<'_> {
             ]);
             if list.aac {
                 args.extend(owned(&["--candidate-for", &self.aac_worker()]));
+            }
+            if name == "hevc-simd-workloads" {
+                let worker = format!("video-hevc={}/codec-hevc-worker", self.release);
+                args.extend(owned(&["--candidate-for", &worker]));
             }
             args.push("--out".to_owned());
             if mode == "time" {
