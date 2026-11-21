@@ -320,7 +320,7 @@
         "name": "ycbcr-palette",
         "entry_points": ["YcbcrMatrix", "ChannelRounding"],
         "degree": "step",
-        "needs": "pgs-palette-sweep and dvb-palette-sweep fold BT.601 and BT.709 nearest through the subtitle decoders; subtitle-dvd covers BT.601 half-down from MP4/DVD configuration. Confirm these paths by worker coverage and find a reference operation for the public BT.709 half-down combination."
+        "needs": "PGS and DVB folds cover Nearest with BT.601 and BT.709, and subtitle-dvd compares BT.601/HalfDown through MOV palette configuration. BT.709/HalfDown still needs a direct palette operation because no subtitle decoder or demuxer selects it."
       }
     ],
     "triergon-raster": [],
@@ -349,7 +349,7 @@
         "name": "libass-rotations",
         "entry_points": ["compat::libass::rotates", "compat::libass::GlyphRotations", "compat::libass::FaceRotations", "compat::libass::SizedMetrics::rotating"],
         "degree": "step",
-        "needs": "ass-render compares vertical glyph metrics through image placement, including both lookup orders of shared glyphs in vertical-first-lookup.ass. Confirm coverage of every public entry point and a first lookup through extents."
+        "needs": "ass-render compares character-first and advance-first rotation through image placement. A direct comparison is needed for GlyphRotations::get, len and is_empty and for an extent-first lookup, since rendering never queries the accessors or loads extents before the advance."
       }
     ],
     "triergon-subtitles": [
@@ -399,19 +399,13 @@
         "name": "pgs-segments",
         "entry_points": ["pgs::SegmentIter", "pgs::Composition", "pgs::Palette", "pgs::ObjectFragment", "pgs::Windows"],
         "degree": "step",
-        "needs": "a worker operation folding each segment's parsed fields against a reference view. The receiver folds decoded subtitles; Matroska discovery needs a PGS-capable operation folding the probe cutoff, since matroska-startup-seek requires video and folds only selected video packets."
+        "needs": "a worker operation comparing each parsed segment field. The matroska-startup-seek case startup-avc-pgs-early-canvas drives discovery through segment kind, raw length and composition width and height. The fold covers selected AVC packet timing, sizes and bytes, with no PGS fields or discovery cutoff."
       },
       {
         "name": "vobsub-index-lines",
         "entry_points": ["dvd::vobsub::Lines", "dvd::vobsub::Line"],
         "degree": "step",
         "needs": "a corpus of .idx files with a reference view of each line; compared only as the parse inside compat::dvd::VobSubIndex"
-      },
-      {
-        "name": "dvd-ifo-palette",
-        "entry_points": ["compat::dvd::ifo_palette"],
-        "degree": "step",
-        "needs": "subtitle-dvd folds IFO palettes and fallbacks against dvdsub. Confirm worker coverage of ifo_palette and settle the open sector-offset overflow result on both targets."
       },
       {
         "name": "carriage-reference-trace",
