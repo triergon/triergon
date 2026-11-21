@@ -282,56 +282,13 @@
         "needs": "a worker operation reading sidx, tfra and mfro boxes, compared with the reference's segment and fragment index entries"
       },
       {
-        "name": "mov-track-seek",
-        "entry_points": ["compat::mov::seek::SeekJob"],
-        "degree": "step",
-        "needs": "a worker operation seeking one track on its own against the reference; compared only as the per-track step of GlobalSeekJob (isobmff-seek)"
-      },
-      {
-        "name": "source-seek-planning",
-        "entry_points": ["seek::SourceSeekPlanner", "seek::SourceCompositionLookup"],
-        "degree": "step",
-        "needs": "a worker operation planning seeks to a sample ordinal with a caller's preroll and looking up composition times, against the reference; compared only inside MovieSourceSeekPlanner range plans (isobmff-seek)"
-      },
-      {
         "name": "mov-reference-trace",
         "entry_points": ["reference_trace::mov::receiver::ReceiverClock", "reference_trace::mov::diagnostics::PrivateDiagnosticJob", "reference_trace::mov::operation::InitialOperationJob", "reference_trace::mov::sample_entry::PrivateConfigurationJob", "reference_trace::mov::sample_entry::SampleEntryHeaderJob", "reference_trace::mov::transport::RootWalkTransportBuilder"],
         "degree": "recorded",
         "needs": "a worker operation that runs these comparison projections against the reference; tests check recorded reference output only"
       }
     ],
-    "triergon-matroska": [
-      {
-        "name": "block-addition-side-data",
-        "entry_points": ["compat::block_additions::packet_side_data", "compat::block_additions::PacketSideData", "compat::block_additions::hdr10_plus", "Hdr10Plus::parse_t35"],
-        "degree": "unit-tests",
-        "needs": "a worker operation folding each packet's HDR10+, LCEVC and opaque block additions against the reference's packet side data; matroska-colour compares static HDR metadata only"
-      },
-      {
-        "name": "track-extensions",
-        "entry_points": ["TrackExtensions", "TrackExtensionsJob", "MappingView", "MappingExtension", "Configuration::track_extensions_job"],
-        "degree": "unit-tests",
-        "needs": "a corpus with BlockAdditionMapping elements and the reference's stream side data for them"
-      },
-      {
-        "name": "codec-state",
-        "entry_points": ["CodecState", "Configuration::codec_state"],
-        "degree": "unit-tests",
-        "needs": "a corpus with CodecState elements and a reference view of the configuration each block is decoded with"
-      },
-      {
-        "name": "typed-attachments",
-        "entry_points": ["metadata::Attachment", "metadata::SharedDocument::attachments", "Reader::attachments"],
-        "degree": "unit-tests",
-        "needs": "the catalogue fold read through the typed attachment view instead of the element tree, against the reference's attachment streams"
-      },
-      {
-        "name": "metadata-view-fields",
-        "entry_points": ["metadata::Edition::is_default", "metadata::Edition::ordered", "metadata::Targets", "metadata::SimpleTag::language", "metadata::SimpleTag::binary", "metadata::SimpleTag::is_default", "metadata::Chapter::hidden", "metadata::ChapterDisplay::languages", "metadata::SegmentInfo::writing_app"],
-        "degree": "untested",
-        "needs": "the catalogue fold extended with these typed fields, against the reference's chapters, tags and format metadata"
-      }
-    ],
+    "triergon-matroska": [],
     "triergon-ogg": [
       {
         "name": "push-reader-windows",
