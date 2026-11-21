@@ -81,10 +81,7 @@ impl AacAdtsStreamReader {
                 }
             }
         }
-        let cursor = self
-            .cursor
-            .as_mut()
-            .ok_or(Error::Invalid("missing ADTS input cursor"))?;
+        let cursor = self.input.cursor()?;
         let end = if self.carrier {
             self.limits.maximum_frame_bytes.min(7)
         } else {
@@ -170,9 +167,8 @@ impl AacAdtsStreamReader {
             .checked_add(u64::try_from(frame_bytes).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
         if self
-            .cursor
-            .as_ref()
-            .ok_or(Error::Invalid("missing ADTS input cursor"))?
+            .input
+            .cursor()?
             .capabilities()
             .length
             .is_some_and(|n| end > n)
@@ -270,10 +266,7 @@ impl AacAdtsStreamReader {
             self.phase = Phase::Grow;
             return Ok(NEXT);
         }
-        let cursor = self
-            .cursor
-            .as_mut()
-            .ok_or(Error::Invalid("missing ADTS input cursor"))?;
+        let cursor = self.input.cursor()?;
         let buffer = self
             .buffer
             .as_mut()
@@ -363,10 +356,7 @@ impl AacAdtsStreamReader {
             }
         };
         let prefix = raw.slice(0..self.header_offset)?;
-        let cursor = self
-            .cursor
-            .as_ref()
-            .ok_or(Error::Invalid("missing ADTS input cursor"))?;
+        let cursor = self.input.cursor()?;
         let source = AacSource {
             source: cursor.source(),
             generation: cursor.generation(),
@@ -438,10 +428,7 @@ impl AacAdtsStreamReader {
             return Ok(YIELD);
         }
         self.check_minimum(Bytes::owner_overhead_bytes())?;
-        let cursor = self
-            .cursor
-            .as_ref()
-            .ok_or(Error::Invalid("missing ADTS input cursor"))?;
+        let cursor = self.input.cursor()?;
         let end = self
             .frame_start
             .checked_add(u64::try_from(self.frame_bytes).map_err(|_| Error::Overflow)?)
@@ -503,7 +490,7 @@ impl AacAdtsStreamReader {
     #[inline]
     fn end_of_input(&mut self) -> Result<Flow> {
         Ok(Flow::Break(Step::End(SourceLocation {
-            source: self.parked.source,
+            source: self.input.source(),
             offset: self.position(),
         })))
     }

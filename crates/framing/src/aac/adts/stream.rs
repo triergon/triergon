@@ -4,7 +4,7 @@ mod phases;
 
 use super::carrier::AacAdtsCarrier;
 use super::{AacAdtsFrame, AacAdtsHeader};
-use crate::retryable;
+use crate::{ReaderInput, retryable};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
@@ -53,8 +53,7 @@ enum Phase {
 /// Input is requested and answered as for an [`InputCursor`].
 pub struct AacAdtsStreamReader {
     pool: Budget,
-    cursor: Option<InputCursor>,
-    parked: InputRequest,
+    input: ReaderInput,
     capabilities: SourceCapabilities,
     limits: AacAdtsStreamLimits,
     phase: Phase,
@@ -64,11 +63,12 @@ pub struct AacAdtsStreamReader {
     frame_start: u64,
     frame_bytes: usize,
     header: Option<AacAdtsHeader>,
+    /// The frame being built, taken at each freeze: replacing a vector there instead
+    /// costs more instructions per frame.
     buffer: Option<BudgetVec<u8>>,
     growth_target: usize,
     growth_copy_credit: usize,
     completed: usize,
-    failure: Option<Error>,
     carrier: bool,
     header_offset: usize,
     eof_fragment: bool,
@@ -79,12 +79,12 @@ impl std::fmt::Debug for AacAdtsStreamReader {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("AacAdtsStreamReader")
-            .field("source", &self.parked.source)
+            .field("source", &self.input.source())
             .field("position", &self.position())
             .field("capabilities", &self.capabilities)
             .field("limits", &self.limits)
             .field("completed", &self.completed)
-            .field("failure", &self.failure)
+            .field("failure", &self.input.failure())
             .finish_non_exhaustive()
     }
 }
@@ -134,11 +134,9 @@ impl AacAdtsStreamReader {
             return Err(Error::Invalid("zero ADTS stream policy"));
         }
         let cursor = InputCursor::new(pool, source, capabilities, limits.maximum_input_window)?;
-        let parked = cursor.request();
         Ok(Self {
             pool: pool.clone(),
-            cursor: Some(cursor),
-            parked,
+            input: ReaderInput::Open(cursor),
             capabilities,
             limits,
             phase: Phase::Start,
@@ -152,7 +150,6 @@ impl AacAdtsStreamReader {
             growth_target: 0,
             growth_copy_credit: 0,
             completed: 0,
-            failure: None,
             carrier,
             header_offset: 0,
             eof_fragment: false,
@@ -169,9 +166,7 @@ impl AacAdtsStreamReader {
     /// The request for the bytes the reader needs next, at
     /// [`position`](Self::position). A reader that has failed keeps its last one.
     pub fn request(&self) -> InputRequest {
-        self.cursor
-            .as_ref()
-            .map_or_else(|| self.parked.clone(), InputCursor::request)
+        self.input.request()
     }
     /// The token an answer to the current request must carry.
     pub fn token(&self) -> InputToken {
@@ -184,17 +179,10 @@ impl AacAdtsStreamReader {
     }
     /// Source offset of the next byte the reader reads.
     pub fn position(&self) -> u64 {
-        self.cursor
-            .as_ref()
-            .map_or(self.parked.offset, InputCursor::position)
+        self.input.position()
     }
     fn cursor_mut(&mut self) -> Result<&mut InputCursor> {
-        if let Some(e) = self.failure {
-            return Err(e);
-        }
-        self.cursor
-            .as_mut()
-            .ok_or(Error::Invalid("missing ADTS input cursor"))
+        self.input.cursor()
     }
     /// Answers the current request with `window`, as
     /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
@@ -224,10 +212,9 @@ impl AacAdtsStreamReader {
     /// [`InputCursor::finish`](triergon_core::InputCursor::finish) does: a source that
     /// ends before its known length fails the reader with [`Error::Truncated`].
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
-        let result = self.cursor_mut()?.finish(source, token);
-        if let Some(c) = &self.cursor {
-            self.capabilities = c.capabilities();
-        }
+        let cursor = self.input.cursor()?;
+        let result = cursor.finish(source, token);
+        self.capabilities = cursor.capabilities();
         if matches!(result, Err(Error::Truncated)) {
             self.stop(Error::Truncated);
         }
@@ -267,15 +254,14 @@ impl AacAdtsStreamReader {
         }
         let mut next = InputCursor::new(
             &self.pool,
-            self.parked.source,
+            self.input.source(),
             self.capabilities,
             self.limits.maximum_input_window,
         )?;
         if offset != 0 {
             next.request_range(offset)?;
         }
-        self.parked = next.request();
-        self.cursor = Some(next);
+        self.input = ReaderInput::Open(next);
         self.phase = Phase::Start;
         self.used = 0;
         self.copied = 0;
@@ -286,7 +272,6 @@ impl AacAdtsStreamReader {
         self.growth_target = 0;
         self.growth_copy_credit = 0;
         self.completed = 0;
-        self.failure = None;
         self.header_offset = 0;
         self.eof_fragment = false;
         self.selected_error = None;
@@ -299,13 +284,12 @@ impl AacAdtsStreamReader {
     fn stop(&mut self, error: Error) {
         // Dropping the actual cursor releases a buffered input owner without
         // inventing a transport/cancel event to represent a syntax failure.
-        if let Some(c) = self.cursor.take() {
-            self.parked = c.request();
+        if let ReaderInput::Open(c) = &self.input {
             self.capabilities = c.capabilities();
         }
+        self.input.fail_with(error);
         self.buffer = None;
         self.header = None;
-        self.failure = Some(error);
     }
     /// Reads for as long as `work` lasts.
     ///
@@ -358,7 +342,7 @@ impl AacAdtsStreamReader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<StreamOutput>> {
-        if let Some(e) = self.failure {
+        if let Some(e) = self.input.failure() {
             return Err(e);
         }
         let result = self.advance(work, cancel);
@@ -404,11 +388,12 @@ impl AacAdtsStreamReader {
             })
     }
     fn minimum(&self, additional: usize) -> Result<usize> {
-        let source = self
-            .cursor
-            .as_ref()
-            .and_then(InputCursor::buffered_owner)
-            .map_or(0, Bytes::retained_storage_bytes);
+        let source = match &self.input {
+            ReaderInput::Open(cursor) => cursor
+                .buffered_owner()
+                .map_or(0, Bytes::retained_storage_bytes),
+            ReaderInput::Failed { .. } => 0,
+        };
         let capacity = self.buffer.as_ref().map_or(0, BudgetVec::capacity);
         Budget::control_storage_bytes()
             .checked_add(source)
