@@ -97,8 +97,7 @@ pub(crate) struct Tns {
 /// One decoded channel of a syntactic element for the current frame.
 #[derive(Debug)]
 pub(crate) struct ChannelData {
-    /// bitmask of codebooks used in this frame (debug statistics)
-    pub cb_mask: u32,
+    /// The frame carries pulse data (for the `inspect` statistics).
     pub pulse_used: bool,
     pub info: IcsInfo,
     pub global_gain: u8,
@@ -115,7 +114,6 @@ pub(crate) struct ChannelData {
 impl ChannelData {
     pub(crate) fn new() -> ChannelData {
         ChannelData {
-            cb_mask: 0,
             pulse_used: false,
             info: IcsInfo::default(),
             global_gain: 0,
@@ -293,12 +291,6 @@ pub(crate) fn parse_ics(
         }
     }
     ch.pulse_used = npulse > 0;
-    ch.cb_mask = 0;
-    for g in 0..ch.info.num_window_groups {
-        for sfb in 0..ch.info.max_sfb {
-            ch.cb_mask |= 1 << ch.band_type[g * MAX_SFB + sfb];
-        }
-    }
     decode_spectrum(br, ch, &pulse[..npulse], random)?;
     if br.overrun() {
         return Err(DecodeError::InvalidData("channel stream overrun"));
