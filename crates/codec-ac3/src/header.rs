@@ -240,10 +240,7 @@ pub(crate) fn peek_chanmap(frame: &[u8]) -> Option<u16> {
     b[..n].copy_from_slice(&frame[..n]);
     let mut r = BitReader::at(&b, 16);
     let strmtyp = r.read(2);
-    r.skip(3 + 11);
-    let fscod = r.read(2);
-    r.skip(2); // fscod2 or numblkscod
-    let _ = fscod;
+    r.skip(3 + 11 + 2 + 2); // substreamid, frmsiz, fscod, fscod2 or numblkscod
     let acmod = r.read(3);
     r.skip(1 + 5 + 5); // lfeon, bsid, dialnorm
     if r.bit() {

@@ -44,7 +44,7 @@ use triergon_codec::{AudioDecoder, Budget, Charged, DownmixLevels, Reservation};
 pub(crate) const PAD: usize = 16;
 /// Largest syncframe: 2048 16-bit words (E-AC-3 frmsiz) / 1920 words (AC-3 32 kHz 640 kbps).
 const MAX_FRAME_BYTES: usize = 4096;
-/// Maximum syncframes per access unit (independent + 8 dependents + other programs).
+/// Most syncframes the search for program 0's dependent substreams reads.
 const MAX_FRAMES_PER_AU: usize = 64;
 
 /// What to do with syncframes whose CRC does not check.
@@ -137,9 +137,35 @@ pub struct FrameInfo {
     pub downmix: Option<DownmixInfo>,
 }
 
+/// One syncframe of the program an access unit decodes.
+#[derive(Clone, Copy)]
 struct SyncframeRef {
     offset: usize,
     header: FrameHeader,
+}
+
+/// Independent substream 0 and the dependent substreams that extend it: at most one
+/// per substream id.
+const MAX_PROGRAM_FRAMES: usize = 9;
+
+/// The syncframes of program 0 in one access unit.
+struct Program {
+    frames: [SyncframeRef; MAX_PROGRAM_FRAMES],
+    len: usize,
+    /// Sample rate reported for the access unit (see [`Decoder::program`]).
+    sample_rate: u32,
+}
+
+impl Program {
+    fn frames(&self) -> &[SyncframeRef] {
+        &self.frames[..self.len]
+    }
+}
+
+/// Channel layout of a program and the plane each substream's coded channels write.
+struct ProgramLayout {
+    layout: ChannelLayout,
+    maps: [PlaneMap; MAX_PROGRAM_FRAMES],
 }
 
 /// AC-3 / E-AC-3 decoder.
@@ -151,8 +177,9 @@ pub struct Decoder {
     groups: Box<GroupTables>,
     rng: noise::Rng,
     indep: Box<Substream>,
-    /// Dependent substreams, created and charged when a stream first names them.
-    deps: Vec<Option<Dependent>>,
+    /// Dependent substreams by substream id, created and charged when a stream first
+    /// names them.
+    deps: [Option<Dependent>; 8],
     /// Pool of the stream-dependent storage.
     budget: Budget,
     /// Charge of the output frame the last access unit sized.
@@ -172,10 +199,20 @@ impl Default for Decoder {
     }
 }
 
+impl DecoderOptions {
+    /// Noise follows the reference decoder's seed-zero stream.
+    fn reference_noise(self) -> bool {
+        self.compat == Compat::Reference && self.noise == NoiseMode::Normal
+    }
+}
+
 impl Decoder {
     /// A decoder with the default options and a pool of the default limit.
     pub fn new() -> Self {
-        #[allow(clippy::expect_used)] // The default limit is far above a pool's own charge.
+        #[expect(
+            clippy::expect_used,
+            reason = "the default limit is far above a pool's own charge"
+        )]
         Self::with_limits(Limits::default()).expect("default storage budget")
     }
 
@@ -188,18 +225,14 @@ impl Decoder {
     /// A decoder charging the caller's pool.
     pub fn new_in(budget: &Budget) -> Self {
         let opts = DecoderOptions::default();
-        let mut deps = Vec::with_capacity(8);
-        deps.resize_with(8, || None);
         Decoder {
             opts,
             buf: vec![0u8; MAX_FRAME_BYTES + PAD].into_boxed_slice(),
             imdct: imdct::Imdct::new(),
             groups: Box::new(GroupTables::new()),
-            rng: noise::Rng::new(
-                opts.compat == Compat::Reference && opts.noise == NoiseMode::Normal,
-            ),
+            rng: noise::Rng::new(opts.reference_noise()),
             indep: Box::new(Substream::new()),
-            deps,
+            deps: [const { None }; 8],
             budget: budget.clone(),
             output_charge: Reservation::empty(budget),
             last_block: Box::new([[0.0; 256]; MAX_CHANNELS]),
@@ -215,8 +248,7 @@ impl Decoder {
     #[must_use]
     pub fn with_options(mut self, opts: DecoderOptions) -> Self {
         self.opts = opts;
-        self.rng =
-            noise::Rng::new(opts.compat == Compat::Reference && opts.noise == NoiseMode::Normal);
+        self.rng = noise::Rng::new(opts.reference_noise());
         self.quirk_armed = opts.compat == Compat::Reference;
         self
     }
@@ -264,248 +296,31 @@ impl Decoder {
     /// syncframe plus its dependent substreams (other independent programs are skipped).
     /// Appends the decoded samples to `out` (which must be empty or hold the same layout).
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<FrameInfo, DecodeError> {
-        let first = parse_header(au)?;
-        if first.stream_type == StreamType::Dependent || first.substream_id != 0 {
-            return Err(DecodeError::MissingIndependentSubstream);
-        }
-        // Enumerate syncframes of program 0.
-        let mut frames: [Option<SyncframeRef>; 9] = Default::default();
-        let mut nframes = 0usize;
-        let mut off = 0usize;
-        let mut in_program0 = true;
-        let mut seen = 0;
-        // Sample rate reported for the access unit (see the non-compatible dependent below).
-        let mut out_rate = first.sample_rate;
-        while off < au.len() && seen < MAX_FRAMES_PER_AU {
-            seen += 1;
-            let h = match parse_header(&au[off..]) {
-                Ok(h) => h,
-                Err(e) if off == 0 => return Err(e),
-                Err(_) => break,
-            };
-            if off > 0 {
-                if h.syntax == Syntax::Ac3 {
-                    break;
-                }
-                if h.stream_type != StreamType::Dependent {
-                    in_program0 = false;
-                }
-            }
-            if in_program0 && nframes < 9 {
-                if off > 0 && h.syntax != Syntax::Eac3 {
-                    break;
-                }
-                if off > 0
-                    && (h.num_blocks != first.num_blocks || h.sample_rate != first.sample_rate)
-                {
-                    if self.opts.compat != Compat::Reference {
-                        return Err(DecodeError::InvalidData(
-                            "dependent substream block count/rate mismatch",
-                        ));
-                    }
-                    // FFmpeg 9.0.2 drops a dependent whose rate or block count differs from the
-                    // independent substream ("non-compatible") and outputs the core alone, e.g.
-                    // a bsid 9 core (24 kHz) with a 48 kHz dependent. Behind a bsid 9/10 core
-                    // it then labels the output with the dependent's rate (an FFmpeg quirk,
-                    // black-box); behind any other core the core's rate is kept.
-                    if first.syntax == Syntax::Ac3 && first.bsid > 8 {
-                        out_rate = h.sample_rate;
-                    }
-                    off += h.frame_bytes;
-                    continue;
-                }
-                frames[nframes] = Some(SyncframeRef {
-                    offset: off,
-                    header: h,
-                });
-                nframes += 1;
-            }
-            off += h.frame_bytes;
-        }
-        // FFmpeg 9.0.2 refuses E-AC-3 reduced sample rates (fscod2) in any substream it would
-        // decode and outputs nothing for the access unit (black-box).
-        if self.opts.compat == Compat::Reference
-            && frames[..nframes]
-                .iter()
-                .flatten()
-                .any(|f| f.header.syntax == Syntax::Eac3 && f.header.fscod == 3)
-        {
-            return Err(DecodeError::Unsupported(Feature::Eac3ReducedSampleRate));
-        }
-        let first_ref = frames[0].as_ref().expect("first frame");
-        let truncated_first = first_ref.header.frame_bytes > au.len();
-
-        // Channel layout of the program.
-        let mut speakers = [Speaker::FrontCenter; MAX_CHANNELS];
-        let mut nsp = 0usize;
-        let mut maps: [PlaneMap; 9] = [[None; NCH]; 9];
-        let mut coded_speakers: [[Option<Speaker>; NCH]; 9] = [[None; NCH]; 9];
-        for (i, f) in frames.iter().enumerate().take(nframes) {
-            let f = f.as_ref().unwrap();
-            let h = &f.header;
-            if i > 0 && f.offset + h.frame_bytes > au.len() {
-                // A truncated dependent substream cannot be decoded.
-                return Err(DecodeError::Truncated {
-                    needed: f.offset + h.frame_bytes,
-                    available: au.len(),
-                });
-            }
-            let nf = substream::NFCHANS[h.acmod as usize];
-            let chanmap = if h.stream_type == StreamType::Dependent {
-                peek_chanmap(&au[f.offset..f.offset + h.frame_bytes])
-            } else {
-                None
-            };
-            let cs = &mut coded_speakers[i];
-            match chanmap {
-                Some(map) => {
-                    let mut list = [Speaker::FrontCenter; 20];
-                    let mut n = 0;
-                    let mut has_lfe = false;
-                    for bit in 0..16 {
-                        if map & (0x8000 >> bit) == 0 {
-                            continue;
-                        }
-                        let s: &[Speaker] = match bit {
-                            0 => &[Speaker::FrontLeft],
-                            1 => &[Speaker::FrontCenter],
-                            2 => &[Speaker::FrontRight],
-                            3 => &[Speaker::SideLeft],
-                            4 => &[Speaker::SideRight],
-                            5 => &[Speaker::FrontLeftOfCenter, Speaker::FrontRightOfCenter],
-                            6 => &[Speaker::BackLeft, Speaker::BackRight],
-                            7 => &[Speaker::BackCenter],
-                            8 => &[Speaker::TopCenter],
-                            9 => &[Speaker::SurroundDirectLeft, Speaker::SurroundDirectRight],
-                            10 => &[Speaker::WideLeft, Speaker::WideRight],
-                            11 => &[Speaker::TopFrontLeft, Speaker::TopFrontRight],
-                            12 => &[Speaker::TopFrontCenter],
-                            13 => &[Speaker::TopSideLeft, Speaker::TopSideRight],
-                            14 => &[Speaker::LowFrequency2],
-                            _ => {
-                                has_lfe = true;
-                                &[]
-                            }
-                        };
-                        for &sp in s {
-                            if n < list.len() {
-                                list[n] = sp;
-                                n += 1;
-                            }
-                        }
-                    }
-                    if n != nf || has_lfe != h.lfeon {
-                        return Err(DecodeError::InvalidData(
-                            "chanmap does not match acmod/lfeon",
-                        ));
-                    }
-                    for c in 0..nf {
-                        cs[c] = Some(list[c]);
-                    }
-                    if h.lfeon {
-                        cs[LFE] = Some(Speaker::LowFrequency);
-                    }
-                }
-                None => {
-                    for (c, &sp) in acmod_channels(h.acmod).iter().enumerate() {
-                        cs[c] = Some(sp);
-                    }
-                    if h.lfeon {
-                        cs[LFE] = Some(Speaker::LowFrequency);
-                    }
-                }
-            }
-            for sp in cs.iter().flatten() {
-                if !speakers[..nsp].contains(sp) {
-                    if nsp == MAX_CHANNELS {
-                        return Err(DecodeError::InvalidData("more than 16 channels"));
-                    }
-                    speakers[nsp] = *sp;
-                    nsp += 1;
-                }
-            }
-        }
-        // Native order; the speakers are unique by construction.
-        speakers[..nsp].sort_unstable();
-        let layout = ChannelLayout::new(speakers[..nsp].iter().copied()).expect("16 speakers");
+        let program = self.program(au)?;
+        let first = program.frames[0].header;
+        let ProgramLayout { layout, maps } = program_layout(au, program.frames())?;
         let dual_mono = first.acmod == 0;
-        // Planes: a speaker written by a later substream replaces the earlier one.
-        for i in 0..nframes {
-            for c in 0..NCH {
-                if let Some(sp) = coded_speakers[i][c] {
-                    maps[i][c] = layout.position(sp);
-                }
-            }
-        }
-        for i in 0..nframes {
-            for c in 0..NCH {
-                if let Some(p) = maps[i][c]
-                    && (i + 1..nframes).any(|j| maps[j].contains(&Some(p)))
-                {
-                    maps[i][c] = None;
-                }
-            }
-        }
-
-        // Output frame bookkeeping.
-        if out.samples_per_channel > 0 && (out.layout != layout || out.sample_rate != out_rate) {
+        let rate = program.sample_rate;
+        if out.samples_per_channel > 0 && (out.layout != layout || out.sample_rate != rate) {
             return Err(DecodeError::OutputLayoutMismatch);
         }
         let samples = first.samples();
         let base = out.samples_per_channel;
 
-        if truncated_first {
+        if first.frame_bytes > au.len() {
+            let truncated = DecodeError::Truncated {
+                needed: first.frame_bytes,
+                available: au.len(),
+            };
             if first.syntax == Syntax::Eac3 {
-                return Err(DecodeError::Truncated {
-                    needed: first.frame_bytes,
-                    available: au.len(),
-                });
+                return Err(truncated);
             }
-            // AC-3: repeat the last decoded block (FFmpeg-compatible concealment).
-            self.prepare_output(out, &layout, out_rate, base + samples)?;
-            let same = self.last_layout == Some((layout, dual_mono));
-            for p in 0..layout.channels() {
-                for blk in 0..first.num_blocks {
-                    let dst = &mut out.planes[p][base + blk * 256..base + blk * 256 + 256];
-                    if same {
-                        dst.copy_from_slice(&self.last_block[p]);
-                    } else {
-                        dst.fill(0.0);
-                    }
-                }
-            }
-            return Ok(FrameInfo {
-                syntax: first.syntax,
-                bsid: first.bsid,
-                acmod: first.acmod,
-                lfeon: first.lfeon,
-                dialnorm: 0,
-                sample_rate: out_rate,
-                samples,
-                layout,
-                dual_mono,
-                substreams: 0,
-                crc_ok: false,
-                concealed: Some(DecodeError::Truncated {
-                    needed: first.frame_bytes,
-                    available: au.len(),
-                }),
-                features: FrameFeatures::default(),
-                downmix_codes: self.indep.downmix,
-                // The header of the truncated frame is not decoded; repeat the last info.
-                downmix: if same {
-                    self.last_downmix
-                } else {
-                    downmix_info(false, first.acmod, &DownmixCodes::default())
-                },
-            });
+            return self.conceal_truncated(&first, layout, rate, truncated, out);
         }
 
-        // CRC checks.
         let mut crc_ok = true;
-        for f in frames.iter().take(nframes).flatten() {
-            let fb = &au[f.offset..f.offset + f.header.frame_bytes];
-            let (c1, c2) = check_crc(fb, &f.header);
+        for f in program.frames() {
+            let (c1, c2) = check_crc(&au[f.offset..f.offset + f.header.frame_bytes], &f.header);
             if !(c1 && c2) {
                 crc_ok = false;
                 if self.opts.crc == CrcPolicy::Reject {
@@ -517,7 +332,7 @@ impl Decoder {
             }
         }
 
-        self.prepare_output(out, &layout, out_rate, base + samples)?;
+        self.prepare_output(out, &layout, rate, base + samples)?;
         self.trace.frames.clear();
         let mut concealed = None;
         let mut info_dialnorm = 0;
@@ -525,8 +340,7 @@ impl Decoder {
         let mut downmix_codes = DownmixCodes::default();
         let mut downmix = None;
         let mut decoded = 0;
-        for i in 0..nframes {
-            let f = frames[i].as_ref().unwrap();
+        for (i, (f, &map)) in program.frames().iter().zip(&maps).enumerate() {
             let h = f.header;
             let fb = &au[f.offset..f.offset + h.frame_bytes];
             self.buf[..fb.len()].copy_from_slice(fb);
@@ -540,7 +354,7 @@ impl Decoder {
             let mut sink = BlockSink {
                 planes: &mut out.planes,
                 base,
-                map: maps[i],
+                map,
                 scratch: &mut self.scratch,
             };
             let ntrace = self.trace.frames.len();
@@ -574,23 +388,9 @@ impl Decoder {
                     return Err(e);
                 }
                 concealed.get_or_insert(e);
-                // Repeat the last good block for the failed and following blocks.
-                for c in 0..NCH {
-                    let Some(p) = maps[i][c] else { continue };
-                    for b in blk..h.num_blocks {
-                        let dst = base + b * 256;
-                        if b == 0 {
-                            let src = if self.last_layout == Some((layout, dual_mono)) {
-                                self.last_block[p]
-                            } else {
-                                [0.0; 256]
-                            };
-                            out.planes[p][dst..dst + 256].copy_from_slice(&src);
-                        } else {
-                            out.planes[p].copy_within(dst - 256..dst, dst);
-                        }
-                    }
-                }
+                let repeat_from =
+                    (self.last_layout == Some((layout, dual_mono))).then_some(&*self.last_block);
+                repeat_blocks(out, base, &map, blk..h.num_blocks, repeat_from);
             }
         }
         // Remember the last block for concealment.
@@ -606,7 +406,7 @@ impl Decoder {
             acmod: first.acmod,
             lfeon: first.lfeon,
             dialnorm: info_dialnorm,
-            sample_rate: out_rate,
+            sample_rate: rate,
             samples,
             layout,
             dual_mono,
@@ -617,6 +417,245 @@ impl Decoder {
             downmix_codes,
             downmix,
         })
+    }
+
+    /// The syncframes of program 0 that `au` starts with: independent substream 0 and
+    /// the dependent substreams that follow it, up to the next independent substream.
+    fn program(&self, au: &[u8]) -> Result<Program, DecodeError> {
+        let first = parse_header(au)?;
+        if first.stream_type == StreamType::Dependent || first.substream_id != 0 {
+            return Err(DecodeError::MissingIndependentSubstream);
+        }
+        let mut program = Program {
+            frames: [SyncframeRef {
+                offset: 0,
+                header: first,
+            }; MAX_PROGRAM_FRAMES],
+            len: 1,
+            sample_rate: first.sample_rate,
+        };
+        let mut off = first.frame_bytes;
+        let mut seen = 1;
+        while off < au.len() && seen < MAX_FRAMES_PER_AU && program.len < MAX_PROGRAM_FRAMES {
+            seen += 1;
+            let Ok(h) = parse_header(&au[off..]) else {
+                break;
+            };
+            if h.syntax == Syntax::Ac3 || h.stream_type != StreamType::Dependent {
+                break;
+            }
+            if h.num_blocks != first.num_blocks || h.sample_rate != first.sample_rate {
+                if self.opts.compat != Compat::Reference {
+                    return Err(DecodeError::InvalidData(
+                        "dependent substream block count/rate mismatch",
+                    ));
+                }
+                // FFmpeg 9.0.2 drops a dependent whose rate or block count differs from the
+                // independent substream ("non-compatible") and outputs the core alone, e.g.
+                // a bsid 9 core (24 kHz) with a 48 kHz dependent. Behind a bsid 9/10 core
+                // it then labels the output with the dependent's rate (an FFmpeg quirk,
+                // black-box); behind any other core the core's rate is kept.
+                if first.syntax == Syntax::Ac3 && first.bsid > 8 {
+                    program.sample_rate = h.sample_rate;
+                }
+            } else {
+                program.frames[program.len] = SyncframeRef {
+                    offset: off,
+                    header: h,
+                };
+                program.len += 1;
+            }
+            off += h.frame_bytes;
+        }
+        // FFmpeg 9.0.2 refuses E-AC-3 reduced sample rates (fscod2) in any substream it would
+        // decode and outputs nothing for the access unit (black-box).
+        if self.opts.compat == Compat::Reference
+            && program
+                .frames()
+                .iter()
+                .any(|f| f.header.syntax == Syntax::Eac3 && f.header.fscod == 3)
+        {
+            return Err(DecodeError::Unsupported(Feature::Eac3ReducedSampleRate));
+        }
+        Ok(program)
+    }
+
+    /// AC-3 frame cut short: six repeats of the last decoded block, or silence when the
+    /// layout changed (FFmpeg-compatible concealment).
+    fn conceal_truncated(
+        &mut self,
+        first: &FrameHeader,
+        layout: ChannelLayout,
+        rate: u32,
+        truncated: DecodeError,
+        out: &mut AudioFrame,
+    ) -> Result<FrameInfo, DecodeError> {
+        let dual_mono = first.acmod == 0;
+        let samples = first.samples();
+        let base = out.samples_per_channel;
+        self.prepare_output(out, &layout, rate, base + samples)?;
+        let same = self.last_layout == Some((layout, dual_mono));
+        for p in 0..layout.channels() {
+            for blk in 0..first.num_blocks {
+                let dst = &mut out.planes[p][base + blk * 256..base + blk * 256 + 256];
+                if same {
+                    dst.copy_from_slice(&self.last_block[p]);
+                } else {
+                    dst.fill(0.0);
+                }
+            }
+        }
+        Ok(FrameInfo {
+            syntax: first.syntax,
+            bsid: first.bsid,
+            acmod: first.acmod,
+            lfeon: first.lfeon,
+            dialnorm: 0,
+            sample_rate: rate,
+            samples,
+            layout,
+            dual_mono,
+            substreams: 0,
+            crc_ok: false,
+            concealed: Some(truncated),
+            features: FrameFeatures::default(),
+            downmix_codes: self.indep.downmix,
+            // The header of the truncated frame is not decoded; repeat the last info.
+            downmix: if same {
+                self.last_downmix
+            } else {
+                downmix_info(false, first.acmod, &DownmixCodes::default())
+            },
+        })
+    }
+}
+
+/// Speakers of the E-AC-3 custom channel map bits 0..=14 (Annex E Table E2.5), most
+/// significant bit first; bit 15 is the LFE.
+const CHANMAP_SPEAKERS: [&[Speaker]; 15] = [
+    &[Speaker::FrontLeft],
+    &[Speaker::FrontCenter],
+    &[Speaker::FrontRight],
+    &[Speaker::SideLeft],
+    &[Speaker::SideRight],
+    &[Speaker::FrontLeftOfCenter, Speaker::FrontRightOfCenter],
+    &[Speaker::BackLeft, Speaker::BackRight],
+    &[Speaker::BackCenter],
+    &[Speaker::TopCenter],
+    &[Speaker::SurroundDirectLeft, Speaker::SurroundDirectRight],
+    &[Speaker::WideLeft, Speaker::WideRight],
+    &[Speaker::TopFrontLeft, Speaker::TopFrontRight],
+    &[Speaker::TopFrontCenter],
+    &[Speaker::TopSideLeft, Speaker::TopSideRight],
+    &[Speaker::LowFrequency2],
+];
+
+/// Speaker of each coded channel of syncframe `f`: from a dependent substream's custom
+/// channel map, else from acmod.
+fn coded_speakers(au: &[u8], f: &SyncframeRef) -> Result<[Option<Speaker>; NCH], DecodeError> {
+    let h = &f.header;
+    let mut speakers = [None; NCH];
+    let chanmap = if h.stream_type == StreamType::Dependent {
+        peek_chanmap(&au[f.offset..f.offset + h.frame_bytes])
+    } else {
+        None
+    };
+    if let Some(map) = chanmap {
+        let nf = substream::NFCHANS[h.acmod as usize];
+        let mut n = 0;
+        for (bit, group) in CHANMAP_SPEAKERS.iter().enumerate() {
+            if map & (0x8000 >> bit) != 0 {
+                for &sp in *group {
+                    if n < nf {
+                        speakers[n] = Some(sp);
+                    }
+                    n += 1;
+                }
+            }
+        }
+        if n != nf || (map & 1 != 0) != h.lfeon {
+            return Err(DecodeError::InvalidData(
+                "chanmap does not match acmod/lfeon",
+            ));
+        }
+    } else {
+        for (c, &sp) in acmod_channels(h.acmod).iter().enumerate() {
+            speakers[c] = Some(sp);
+        }
+    }
+    if h.lfeon {
+        speakers[LFE] = Some(Speaker::LowFrequency);
+    }
+    Ok(speakers)
+}
+
+/// The output layout of a program in native order and the plane of every coded channel.
+/// A speaker written by a later substream replaces the earlier one.
+fn program_layout(au: &[u8], frames: &[SyncframeRef]) -> Result<ProgramLayout, DecodeError> {
+    let too_many = DecodeError::InvalidData("more than 16 channels");
+    let mut speakers = [Speaker::FrontCenter; MAX_CHANNELS];
+    let mut nsp = 0usize;
+    let mut coded = [[None; NCH]; MAX_PROGRAM_FRAMES];
+    for (i, f) in frames.iter().enumerate() {
+        if i > 0 && f.offset + f.header.frame_bytes > au.len() {
+            // A truncated dependent substream cannot be decoded.
+            return Err(DecodeError::Truncated {
+                needed: f.offset + f.header.frame_bytes,
+                available: au.len(),
+            });
+        }
+        coded[i] = coded_speakers(au, f)?;
+        for sp in coded[i].iter().flatten() {
+            if !speakers[..nsp].contains(sp) {
+                *speakers.get_mut(nsp).ok_or(too_many)? = *sp;
+                nsp += 1;
+            }
+        }
+    }
+    // Native order; the speakers are unique by construction.
+    speakers[..nsp].sort_unstable();
+    let layout = ChannelLayout::new(speakers[..nsp].iter().copied()).ok_or(too_many)?;
+    let mut maps: [PlaneMap; MAX_PROGRAM_FRAMES] = [[None; NCH]; MAX_PROGRAM_FRAMES];
+    for (map, coded) in maps.iter_mut().zip(&coded).take(frames.len()) {
+        for (plane, sp) in map.iter_mut().zip(coded) {
+            *plane = sp.and_then(|sp| layout.position(sp));
+        }
+    }
+    let n = frames.len();
+    for i in 0..n {
+        for c in 0..NCH {
+            if let Some(p) = maps[i][c]
+                && (i + 1..n).any(|j| maps[j].contains(&Some(p)))
+            {
+                maps[i][c] = None;
+            }
+        }
+    }
+    Ok(ProgramLayout { layout, maps })
+}
+
+/// Block repeat concealment (A/52 7.10) of `blocks` of the planes `map` routes to: block
+/// 0 repeats `last` (or is silent without it), later blocks repeat their predecessor.
+fn repeat_blocks(
+    out: &mut AudioFrame,
+    base: usize,
+    map: &PlaneMap,
+    blocks: core::ops::Range<usize>,
+    last: Option<&[[f32; 256]; MAX_CHANNELS]>,
+) {
+    for &p in map.iter().flatten() {
+        for b in blocks.clone() {
+            let dst = base + b * 256;
+            if b == 0 {
+                let block = &mut out.planes[p][dst..dst + 256];
+                match last {
+                    Some(last) => block.copy_from_slice(&last[p]),
+                    None => block.fill(0.0),
+                }
+            } else {
+                out.planes[p].copy_within(dst - 256..dst, dst);
+            }
+        }
     }
 }
 
