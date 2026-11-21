@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-armv7-a86ead25-20261121-192712-shard-1",
+ "path": "gate-run-armv7-a86ead25-20261121-192712-shard-1",
+ "retention": "retained",
+ "reason": "ATSC E-AC-3 grouping and retained transport comparisons on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/a86ead25a0e7be2259efb50e8c5f396678d73ecd-armv7-20261121-192712/shard-1/b3d2c5648248f1e1baff08c6dfef8fb9e8c0546346fd7bd799a3d08d1289a3fa.tar.zst",
+ "sha256": "b3d2c5648248f1e1baff08c6dfef8fb9e8c0546346fd7bd799a3d08d1289a3fa",
+ "bytes": 1692079,
+ "results": [
+  {
+   "path": "memory/mpegts-atsc-eac3-six-block/gate-result.json",
+   "command": "report --memory",
+   "key": "6d0278ef9ae6c24056d5fa0e16508341e497b3906b8ca952fc1474345bf9223f",
+   "status": 0,
+   "report_sha256": "1f5e47665f3317eedaf15c19dcecb2da10b5b674bb55c5239762302461a909e4",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-atsc-eac3-six-block/gate-result.json",
+   "command": "report --benchmark",
+   "key": "78c3783cb28444cba35015f944c28d246e7208c951e40f669388c7fd2fb0f2da",
+   "status": 0,
+   "report_sha256": "f9704e96ab3e33217a5a6d468228b603c64cfa5332f440e25c4a6323c63a5ed6",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mpegts-atsc-eac3-six-block/gate-result.json",
+   "command": "grade",
+   "key": "32c68a3c140885876731a15463c8c54b3d0dbf1e513d85a675c4a85910a6aa8f",
+   "status": 0,
+   "report_sha256": "b41e5419744f3850d5e433d35152b672af590d0d7da49b2a75a89df76b26865d"
+  }
+ ]
+}

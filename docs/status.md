@@ -66,6 +66,7 @@ reference links as under `static-toolchain-runtime-v1`.
 | MPEG-TS explicit epoch seek | Bounded seek within a selected source clock and configuration pair in one entity; original decoder setup, decode order and provenance survive replay; timestamp-only seeks still refuse epoch changes | 8/8 [picture seek](../harness/features/mpegts-previous-picture/contract.json) comparisons across both policies and TS188/M2TS192, with clock discontinuities and PMT changes | 0.50617 (8/8 pass) at `f1fabdc3` | heap ≤0.03251, total RSS ≤0.59533 (8/8 lower, kernel-bound) at `f1fabdc3` | other codec-change profiles |
 | MPEG-TS AVC to HEVC seek | TS188 playback preroll across a PMT configuration change on one PID | 12 pictures and 15,780 bytes through EOF in the [picture seek comparison](../harness/features/mpegts-previous-picture/corpus.json) | 0.468289 (1/1 pass) at `84d5a5ad` | heap ≤0.051068, total RSS ≤0.583581 (1/1 lower, kernel-bound) at `84d5a5ad` | M2TS and ordered-entity codec changes |
 | MPEG-TS ordered-entity epoch seek | Select an explicit clock and configuration pair across ordered source entities. Index by track, epoch pair and source plan. | 28/28 additional authored folds in the [picture comparison](../harness/features/mpegts-previous-picture/contract.json), including equal-time landings across entity boundaries | 0.515085 (28/28 pass) at `964b36cb` | heap ≤0.036489, total RSS ≤0.591278 (28/28 lower, kernel-bound) at `964b36cb` | additional source and codec-change profiles |
+| MPEG-TS ATSC E-AC-3 grouping | Assemble six audio blocks per access unit in a finite TS188 PES, with sequential dependent syncframes | 10/10 [packet folds](../harness/features/mpegts-atsc-eac3-six-block/corpus.json) | 0.607743 (10/10 pass) at `a86ead25` | heap ≤0.003479, total RSS ≤0.690107 (10/10 lower, kernel-bound) at `a86ead25` | other PES and dependent-stream layouts |
 | MPEG-TS program playback | Selected TS188 and M2TS192 programs with packet payloads and clock projection | 36/36 packet folds | 0.776010 (36/36 pass, worst `m2ts-entry-hevc-aac-44100-01-video`) at `5c2a2a5f` | heap ≤0.087973, total RSS ≤0.663876 (36/36 lower, kernel-bound) at `5c2a2a5f` | additional program and carriage profiles |
 | MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 0.9716 at `6de1193f` (3/3 pass, worst `reordered-48000`, median 0.9676) | heap ≤0.0155, total RSS ≤0.4472 (3/3 lower) at `6de1193f` | broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 0.7859 (71/71 pass, worst `dvb-hevc-eac3-32000`) | heap ≤0.0207, total RSS ≤0.6592 (71/71 lower) | other profiles |
@@ -99,11 +100,11 @@ under two delivery granularities. Probe metadata and full packet-fold parity
 remain open on both inputs.
 
 The [six-block ATSC E-AC-3 comparison](../harness/features/mpegts-atsc-eac3-six-block/contract.json)
-groups independent and dependent syncframes within each PES. The matched
-public parser comparison passes all ten authored packet folds. Ordinary
-parser grouping differs on all ten folds. Fold and proof retain byte-identity and
-source-header digest checks; timed and memory modes omit those extra passes.
-Native measurements remain open.
+matches all ten authored folds. The measured operation checks converter sync
+at the opening short primary. Diagnostic folds additionally verify parser byte
+identity and full supported BSI. Ordinary parser grouping differs on all ten
+folds. The grouped operation meets the runtime and memory requirements on both
+targets.
 
 The [TS program comparison](../harness/features/ts-program/contract.json)
 includes one complete forward-only M2TS192 AVC/AAC program. The 33 interleaved
@@ -327,6 +328,10 @@ runtime and total RSS:
 | MPEG-TS and framing regressions, part 2, Linux AArch64 | `6a43f20bbf94a52514caae4034f2a2cc09c74fdb` | [`636bdd78c4db2f6d07a239e4e690b2eb5ae36eb3c772686980d735d27e648cb5`](../harness/evidence/sets/gate-run-aarch64-6a43f20b-20261121-164146-shard-2.json) |
 | MPEG-TS picture seek comparisons, Linux AArch64 | `84d5a5ad6749e4d88a9312eac0cd5403ced7ba5f` | [`d36f6f2c45183ccd9a05dfb19be2e549142d6c7945783085c86fdab32d7e6229`](../harness/evidence/sets/gate-run-aarch64-84d5a5ad-20261121-180213-shard-1.json) |
 | MPEG-TS picture seek comparisons, 32-bit ARMv7 | `84d5a5ad6749e4d88a9312eac0cd5403ced7ba5f` | [`0c20e7b6aa91047f3d1e55be2d929271870e76a8d03b5c96c09b805247ba0646`](../harness/evidence/sets/gate-run-armv7-84d5a5ad-20261121-174939-shard-1.json) |
+| ATSC E-AC-3 grouping, Linux AArch64 | `a86ead25a0e7be2259efb50e8c5f396678d73ecd` | [`a47599f16b15164ee2121f69ffca427b5d1ac2fd1ce7834c8d9c1187bfb2a80e`](../harness/evidence/sets/gate-run-aarch64-a86ead25-20261121-192148-shard-1.json) |
+| Transport packet and seek comparisons, Linux AArch64 | `07b3f2a979edbd29be641b6473ff3b7d079fdeb4` | [`bfbc7934bb7a23dbfcbbb706eff526bff1fc5817adf254cd0d4cfa0a2e2118c7`](../harness/evidence/sets/gate-run-aarch64-07b3f2a9-20261121-184618-shard-1.json) |
+| ATSC E-AC-3 grouping, 32-bit ARMv7 | `a86ead25a0e7be2259efb50e8c5f396678d73ecd` | [`b3d2c5648248f1e1baff08c6dfef8fb9e8c0546346fd7bd799a3d08d1289a3fa`](../harness/evidence/sets/gate-run-armv7-a86ead25-20261121-192712-shard-1.json) |
+| Transport packet and seek comparisons, 32-bit ARMv7 | `07b3f2a979edbd29be641b6473ff3b7d079fdeb4` | [`88567f2447b9b495efe2f8fbf4a00f081511d40f2b5789adc0a5a5bb021c03b6`](../harness/evidence/sets/gate-run-armv7-07b3f2a9-20261121-184633-shard-1.json) |
 | MPEG-TS DTS core discovery, Linux AArch64 | `9f0fca339f1ed5c804b8078b92d6f5f4713d4cc2` | [`d17505cdcb5becfef3b22a9ba1829c1de2885e6a3bf8d127650c13a944b1d8df`](../harness/evidence/sets/gate-run-aarch64-9f0fca33-20261121-170345-shard-1.json) |
 | MPEG-TS and framing regressions, part 1, 32-bit ARMv7 | `6a43f20bbf94a52514caae4034f2a2cc09c74fdb` | [`23c224643e34ea086133420f1a858e2efb1954243ceaa46f0320bb9291e81ddc`](../harness/evidence/sets/gate-run-armv7-6a43f20b-20261121-164144-shard-1.json) |
 | MPEG-TS and framing regressions, part 2, 32-bit ARMv7 | `6a43f20bbf94a52514caae4034f2a2cc09c74fdb` | [`085bbd0af9ee7bd36a3249dc58fb07aae08a7c38acecab2860148209c54700c9`](../harness/evidence/sets/gate-run-armv7-6a43f20b-20261121-164144-shard-2.json) |
@@ -1152,6 +1157,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | MPEG-TS progressive playback | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 0.7312 at `6de1193f` (3/3 pass, worst `reordered-48000`) | heap ≤0.0154, total RSS ≤0.6647 (3/3 lower) at `6de1193f` |
 | Playback: MP4 forward | 46/46 packet folds (`mp4-forward`) | 0.9089 (51/51 pass, worst `progressive-ten-sequential-batches`) | heap ≤0.5920, total RSS ≤0.8879 (51/51 lower) |
 | Playback: MP4 range | 51/51 open and backward-seek comparisons (`mp4-range`) | 0.9772 (64/64 pass, worst `fragmented-before-sync`) | heap ≤0.7849, total RSS ≤0.8800 (64/64 lower) |
+| MPEG-TS ATSC E-AC-3 grouping | 10/10 [packet folds](../harness/features/mpegts-atsc-eac3-six-block/corpus.json) | 0.412350 (10/10 pass) at `a86ead25` | heap ≤0.003010, total RSS ≤0.857263 (10/10 lower, kernel-bound) at `a86ead25` |
 | Playback: TS program | 36/36 packet folds (`ts-program`) | 0.759665 (36/36 pass, worst `entry-hevc-aac-44100-00`) at `5c2a2a5f` | heap ≤0.117901, total RSS ≤0.852116 (36/36 lower, kernel-bound) at `5c2a2a5f` |
 | Playback: raw Annex B | 7/7 packet folds (`raw-annex-b`) | 0.5037 (7/7 pass, worst `hevc-aud1`) | heap ≤0.1265, total RSS ≤0.7430 (7/7 lower) |
 | Rasterising | `raster-glyphs` 12/12, `raster-outlines` 2/2 and `raster-bitmaps` 2/2 pass; `raster-sweep` 301/303 (below); the crate's tests pass | not measured | not measured |
