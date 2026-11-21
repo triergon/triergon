@@ -2,6 +2,7 @@
 use crate::reader::{Format, Reader};
 use crate::stream::{Limits, Packet, ReaderEvent};
 use std::io::{Read, Seek};
+use std::sync::atomic::AtomicBool;
 use triergon_core::blocking::{Blocking, seekable_capabilities};
 use triergon_core::container::{Event, SeekReceipt, SeekRequest};
 use triergon_core::{Budget, Error, Result, SourceId};
@@ -41,20 +42,29 @@ impl<F: Format, S: Read + Seek> BlockingReader<F, S> {
         self.driver.into_inner()
     }
 
-    /// The next event, `None` at the end of the stream.
-    pub fn next_event(&mut self) -> Result<Option<Event<Packet, ReaderEvent>>> {
-        self.driver.next_event()
+    /// The next event, `None` at the end of the stream. Fails with
+    /// [`Error::Cancelled`] once `cancel` is set.
+    pub fn next_event(
+        &mut self,
+        cancel: &AtomicBool,
+    ) -> Result<Option<Event<Packet, ReaderEvent>>> {
+        self.driver.next_event_or_cancel(cancel)
     }
 
-    /// The next packet, `None` at the end of the stream.
-    pub fn next_packet(&mut self) -> Result<Option<Packet>> {
-        self.driver.next_packet()
+    /// The next packet, passing other events by; `None` at the end of the stream.
+    pub fn next_packet(&mut self, cancel: &AtomicBool) -> Result<Option<Packet>> {
+        while let Some(event) = self.next_event(cancel)? {
+            if let Event::Packet(packet) = event {
+                return Ok(Some(packet));
+            }
+        }
+        Ok(None)
     }
 
     /// Read until the track is known.
-    fn open_track(&mut self) -> Result<()> {
+    fn open_track(&mut self, cancel: &AtomicBool) -> Result<()> {
         while self.reader().stream().is_none() {
-            if self.next_event()?.is_none() {
+            if self.next_event(cancel)?.is_none() {
                 return Err(Error::Invalid("no frame in the source"));
             }
         }
@@ -62,11 +72,11 @@ impl<F: Format, S: Read + Seek> BlockingReader<F, S> {
     }
 
     /// Seek and return the receipt; packets from the landing point follow.
-    pub fn seek(&mut self, request: SeekRequest) -> Result<SeekReceipt> {
-        self.open_track()?;
+    pub fn seek(&mut self, request: SeekRequest, cancel: &AtomicBool) -> Result<SeekReceipt> {
+        self.open_track(cancel)?;
         self.driver.seek(request)?;
         loop {
-            match self.next_event()? {
+            match self.next_event(cancel)? {
                 Some(Event::Seek(receipt)) => return Ok(receipt),
                 Some(_) => {}
                 None => return Err(Error::Invalid("seek target beyond the stream")),

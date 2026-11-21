@@ -7,6 +7,7 @@ is a `triergon_core::container::ContainerReader` with one track and does no I/O;
 
 ```rust
 use std::io::Cursor;
+use std::sync::atomic::AtomicBool;
 use triergon_core::container::{PacketInfo, TrackInfo};
 use triergon_elementary::{BlockingReader, Limits, MpegAudio};
 
@@ -15,8 +16,9 @@ let mut frame = vec![0xff, 0xfb, 0x90, 0x64];
 frame.resize(417, 0);
 let file = [frame.clone(), frame].concat();
 
+let cancel = AtomicBool::new(false);
 let mut reader = BlockingReader::<MpegAudio, _>::open(Cursor::new(file), Limits::default())?;
-let first = reader.next_packet()?.expect("a frame");
+let first = reader.next_packet(&cancel)?.expect("a frame");
 assert_eq!((first.pts(), first.duration()), (Some(0), Some(1152)));
 let track = reader.reader().stream().expect("the track");
 assert_eq!((track.codec_tag(), track.sample_rate()), (b"mp3".as_slice(), 44100));

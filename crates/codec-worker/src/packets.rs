@@ -270,6 +270,7 @@ fn ogg_packets(file: File, seek: Option<&Seek>, out: &mut impl Write) -> std::io
 }
 
 fn elementary_packets<F: Format>(file: File, out: &mut impl Write) -> std::io::Result<()> {
+    let cancel = AtomicBool::new(false);
     let mut reader = match elementary::BlockingReader::<F, _>::open(
         BufReader::new(file),
         elementary::Limits::default(),
@@ -278,7 +279,7 @@ fn elementary_packets<F: Format>(file: File, out: &mut impl Write) -> std::io::R
         Err(error) => return finish(out, &[], Err(error)),
     };
     let end = loop {
-        match reader.next_packet() {
+        match reader.next_packet(&cancel) {
             Ok(Some(packet)) => {
                 Row::of(&packet, 0, packet.offset(), packet.is_complete()).write(out)?;
             }

@@ -443,21 +443,25 @@ fn the_blocking_reader_reads_and_seeks() {
     let file: Vec<u8> = (0..60).flat_map(ac3_frame).collect();
     let mut reader =
         BlockingReader::<Ac3, _>::open(std::io::Cursor::new(file), Limits::default()).unwrap();
+    let cancel = AtomicBool::new(false);
     let mut count = 0;
-    while reader.next_packet().unwrap().is_some() {
+    while reader.next_packet(&cancel).unwrap().is_some() {
         count += 1;
     }
     assert_eq!(count, 60);
     let receipt = reader
-        .seek(SeekRequest {
-            track: triergon_elementary::TRACK,
-            target: Time::new(1, 2).unwrap(),
-            policy: SeekPolicy::PreviousRandomAccess,
-        })
+        .seek(
+            SeekRequest {
+                track: triergon_elementary::TRACK,
+                target: Time::new(1, 2).unwrap(),
+                policy: SeekPolicy::PreviousRandomAccess,
+            },
+            &cancel,
+        )
         .unwrap();
     // Sample 24000 is in frame 15 of 1536 samples.
     assert_eq!(receipt.landing, Time::new(15 * 1536, 48000).unwrap());
-    let next = reader.next_packet().unwrap().unwrap();
+    let next = reader.next_packet(&cancel).unwrap().unwrap();
     assert_eq!(
         triergon_core::container::PacketInfo::pts(&next),
         Some(15 * 1536)
