@@ -5,6 +5,7 @@ use super::{AccessUnit, MpegAudioFrame, Packet, PacketTracks, Reader, ReaderEven
 use crate::{SourceEpochs, TraceEvent, clock::SourceTimePolicy};
 use retained::{Retain, RetainedOutput};
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_bitstream::{BitCursor, BitSource};
 use triergon_core::container::{
     CodecId, Event, PacketInfo, ReaderStep, SeekMethod, SeekPolicy, SeekReceipt, SeekRequest,
     TrackId, TrackInfo,
@@ -13,7 +14,9 @@ use triergon_core::{
     Budget, BudgetVec, Charged, Error, InputRequest, Result, SourceCapabilities, SourceId, Step,
     Time, WorkBudget,
 };
-use triergon_framing::{MpegChannelMode, MpegLayer, MpegVersion, probe_dts_core_header};
+use triergon_framing::{
+    MpegChannelMode, MpegLayer, MpegVersion, indexed_aac_frequency, probe_dts_core_header,
+};
 
 /// A length-known, seekable part of the original contiguous transport stream.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -180,7 +183,12 @@ pub(super) struct SeekProbe {
 fn seekable_audio(codec: CodecId<'_>) -> bool {
     matches!(
         codec,
-        CodecId::Aac | CodecId::Ac3 | CodecId::Eac3 | CodecId::MpegAudio | CodecId::Dts
+        CodecId::Aac
+            | CodecId::AacLatm
+            | CodecId::Ac3
+            | CodecId::Eac3
+            | CodecId::MpegAudio
+            | CodecId::Dts
     )
 }
 
@@ -207,12 +215,52 @@ fn mpeg_audio_entry(frame: &MpegAudioFrame) -> Result<bool> {
     Ok(side[0] == 0 && (!mpeg1 || side[1] & 0x80 == 0))
 }
 
+// ISO/IEC 14496-3 §1.7.3: a LOAS AudioMuxElement can either carry its
+// StreamMuxConfig or refer to the previous one. A seek entry must carry its own
+// config. This profile has one AAC-LC program, layer and variable-size payload.
+fn latm_entry(multiplex: &[u8]) -> Option<()> {
+    let mut bits = BitCursor::new(multiplex);
+    // useSameStreamMux = 0, audioMuxVersion = 0, allStreamsSameTimeFraming = 1.
+    if bits.read(3).ok()? != 1 || bits.read(13).ok()? != 0 {
+        return None;
+    }
+    let asc = bits.read(16).ok()?;
+    if asc >> 11 != 2 || asc & 7 != 0 || !(1..=7).contains(&((asc >> 3) & 15)) {
+        return None;
+    }
+    indexed_aac_frequency(((asc >> 7) & 15) as u8)?;
+    if bits.read(3).ok()? != 0 {
+        return None;
+    }
+    bits.skip(8).ok()?; // LATM buffer fullness.
+    if bits.read(2).ok()? != 0 {
+        return None; // Other data and CRC-bearing configurations are outside this profile.
+    }
+    let mut payload = 0;
+    loop {
+        let length = bits.read(8).ok()? as usize;
+        payload += length;
+        if payload > bits.remaining() / 8 {
+            return None;
+        }
+        if length != 255 {
+            break;
+        }
+    }
+    bits.skip(payload * 8).ok()?;
+    (payload != 0 && bits.remaining() < 8).then_some(())
+}
+
 fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
     let clock = packet.clock();
     let time = clock.and_then(|clock| clock.pts.exact);
     let (offset, random_access) = match packet.access_unit() {
         AccessUnit::Video(unit) => (unit.range.start, unit.random_access),
         AccessUnit::Adts(frame) => (frame.source().offset, time.is_some()),
+        AccessUnit::Loas(frame) => (
+            frame.elementary_range().start,
+            time.is_some() && latm_entry(frame.multiplex_element()).is_some(),
+        ),
         // E-AC-3 access units begin with the independent syncframe and
         // include its associated dependent substreams (A/52 Annex E §2.3.1).
         AccessUnit::Ac3(frame) => (frame.facts().offset, time.is_some()),
@@ -379,7 +427,7 @@ impl Reader {
         }
     }
 
-    /// Seek a selected AVC, HEVC, ADTS AAC-LC, AC-3, E-AC-3, MPEG audio or DTS core
+    /// Seek a selected AVC, HEVC, AAC-LC in ADTS or LOAS, AC-3, E-AC-3, MPEG audio or DTS core
     /// track in one length-known, seekable entity. The reader lands on the last coded
     /// random-access picture or complete audio frame carrying the greatest
     /// resolved PTS at or before the target. It delivers original transport,

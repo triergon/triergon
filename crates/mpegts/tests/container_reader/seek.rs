@@ -738,3 +738,57 @@ fn indexed_seek_recognises_landing_after_a_transport_byte_run_change() {
         }
     }
 }
+
+#[test]
+fn latm_seek_requires_a_complete_in_band_configuration() {
+    // Version zero, one AAC-LC stereo layer at 48 kHz, frameLengthType zero.
+    let configured = [0x56, 0xe0, 8, 0x20, 0, 0x11, 0x90, 0x1f, 0xe0, 0x0f, 0];
+    let mut bad_length = configured;
+    bad_length[9] = 0x27;
+    // One payload using the previous StreamMuxConfig.
+    let dependent = [0x56, 0xe0, 3, 0x80, 0xf0, 0];
+    let mut ts = Transport::new();
+    ts.tables(&[(0x11, PID, &[])], 0);
+    ts.pes(PID, 0xc0, &configured, Some(90_000), None);
+    ts.pes(PID, 0xc0, &dependent, Some(91_920), None);
+    ts.pes(PID, 0xc0, &bad_length, Some(93_840), None);
+    ts.pes(PID, 0xc0, &configured, Some(95_760), None);
+    let pool = Budget::new(1 << 20).unwrap();
+    for (target, landing, expected) in [(94_000, 90_000, 4), (96_000, 95_760, 1)] {
+        let mut reader = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+        reader
+            .request_seek(SeekRequest {
+                track: TrackId(PID.into()),
+                target: clock(target),
+                policy: SeekPolicy::PlaybackPreroll,
+            })
+            .unwrap();
+        let mut announced = false;
+        let mut packets = 0;
+        while let Some(event) = next(&mut reader, &pool, &ts.bytes, 7, 5).unwrap() {
+            match event {
+                Event::Seek(result) => {
+                    assert!(!announced);
+                    assert_eq!(result.landing, clock(landing));
+                    assert_eq!(result.discard_until, clock(target));
+                    announced = true;
+                }
+                Event::Packet(packet) => {
+                    assert!(announced);
+                    assert_eq!(packet.track_info().codec(), CodecId::AacLatm);
+                    if packets == 0 {
+                        assert_eq!(packet.payload(), configured);
+                        assert_eq!(packet.pts(), Some(landing as i64));
+                    }
+                    if packets == 1 {
+                        assert_eq!(packet.payload(), dependent);
+                    }
+                    packets += 1;
+                }
+                Event::Other(_) => (),
+            }
+        }
+        assert!(announced);
+        assert_eq!(packets, expected);
+    }
+}

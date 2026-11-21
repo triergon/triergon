@@ -406,6 +406,86 @@ pub fn author_dts(root: &Path, args: &[String]) -> R<()> {
     manifest(root, FEATURE, cases)
 }
 
+fn loas_aac(payload: &[u8], configured: bool) -> R<Vec<u8>> {
+    let mut frame = vec![0x56, 0xe0, 0];
+    let mut position = 24;
+    let mut put = |value: u32, width: usize| {
+        for shift in (0..width).rev() {
+            if position % 8 == 0 {
+                frame.push(0);
+            }
+            let index = position / 8;
+            frame[index] |= ((value >> shift) as u8 & 1) << (7 - position % 8);
+            position += 1;
+        }
+    };
+    put(u32::from(!configured), 1);
+    if configured {
+        // audioMuxVersion 0, shared time framing, one frame, program and layer.
+        put(1 << 13, 15);
+        put(0x1188, 16); // AAC-LC mono, 48 kHz, 1,024 samples.
+        put(0, 3); // Variable payload length, one AAC layer.
+        put(255, 8); // Variable-rate buffer fullness.
+        put(0, 2); // No other data or header CRC.
+    }
+    for _ in 0..payload.len() / 255 {
+        put(255, 8);
+    }
+    put((payload.len() % 255) as u32, 8);
+    for &byte in payload {
+        put(u32::from(byte), 8);
+    }
+    let size = frame.len() - 3;
+    if size > 8191 {
+        return Err("fixture LOAS payload length".into());
+    }
+    frame[1] |= (size >> 8) as u8;
+    frame[2] = size as u8;
+    Ok(frame)
+}
+
+fn latm_seek_cases(root: &Path, feature: &str, reference: &Path, cases: &mut Vec<Value>) -> R<()> {
+    let aac = super::audio(root, false)?;
+    let raw = &aac.bytes[aac.header..aac.first];
+    let configured = loas_aac(raw, true)?;
+    let dependent = loas_aac(raw, false)?;
+    let latm = Codec {
+        name: "latm-aac-lc",
+        stream_type: 0x11,
+        ..aac
+    };
+    let mut ts = Transport::new();
+    ts.tables(&latm, &[])?;
+    for (frame, pts) in [
+        (&configured, 90_000),
+        (&dependent, 91_920),
+        (&dependent, 93_840),
+        (&configured, 95_760),
+    ] {
+        ts.pes(latm.stream_id, &part(frame, Some(pts), None))?;
+    }
+    let input = Input {
+        name: latm.name,
+        m2ts: false,
+        data: ts.finish(false),
+    };
+    let pid = PID.to_string();
+    for (id, target, policy) in [
+        ("latm-in-band-preroll", "94000", "preroll"),
+        ("latm-next-configuration", "96000", "previous"),
+    ] {
+        cases.push(input.record(
+            root,
+            feature,
+            id,
+            &[pid.as_str(), target, policy],
+            reference,
+            "ts-audio-seek-fold",
+        )?);
+    }
+    Ok(())
+}
+
 /// Rewrap pinned audio frames with independently authored PES timing.
 pub fn author_audio_seek(root: &Path, args: &[String]) -> R<()> {
     let [record, reference] = args else {
@@ -559,6 +639,7 @@ pub fn author_audio_seek(root: &Path, args: &[String]) -> R<()> {
             "ts-audio-seek-fold",
         )?);
     }
+    latm_seek_cases(root, FEATURE, Path::new(reference), &mut cases)?;
     manifest(root, FEATURE, cases)
 }
 

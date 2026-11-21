@@ -133,10 +133,13 @@ contain exactly one media program. `ContainerReader` supplies the normal
 input-window, work, cancellation, backpressure and reset protocol.
 
 `Reader::request_seek` scans one seekable, length-known entity for the previous
-coded AVC or HEVC random-access picture, or a timestamped ADTS AAC-LC, AC-3,
+coded AVC or HEVC random-access picture, or a timestamped AAC-LC in ADTS or
+LOAS, AC-3,
 E-AC-3, MPEG audio or DTS core access unit. Layer III requires an empty bit
 reservoir at the landing. DTS core requires a frame that needs no previous decoder
-history. Subsequent dependent frames are delivered as preroll. The landing is the
+history. LOAS requires a complete in-band LATM configuration with one AAC-LC
+payload and indexed sampling frequency. Subsequent dependent frames are
+delivered as preroll. The landing is the
 last eligible packet with the greatest presentation time at or before the target.
 Audio frames without a source PTS are delivered
 with their original timing when they follow a landing.

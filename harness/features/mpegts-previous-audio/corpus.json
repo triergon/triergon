@@ -353,6 +353,44 @@
         "bytes": 288,
         "digest": 5744551764839532241
       }
+    },
+    {
+      "id": "latm-in-band-preroll",
+      "profile": "latm-in-band-preroll",
+      "file": "harness/features/mpegts-previous-audio/inputs/latm-aac-lc.ts",
+      "sha256": "2c791fb2461ad0533c55fae8e91e8c44784ec1f8673b5e75bf0abc03e97521b1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "94000",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 782,
+        "digest": 10391062714438619022
+      }
+    },
+    {
+      "id": "latm-next-configuration",
+      "profile": "latm-next-configuration",
+      "file": "harness/features/mpegts-previous-audio/inputs/latm-aac-lc.ts",
+      "sha256": "2c791fb2461ad0533c55fae8e91e8c44784ec1f8673b5e75bf0abc03e97521b1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "96000",
+        "previous"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 198,
+        "digest": 10019071087705066079
+      }
     }
   ]
 }
