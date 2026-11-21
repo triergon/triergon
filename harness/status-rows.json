@@ -824,7 +824,63 @@
         "capture-c15-noise-480-bottomup"
       ]
     },
-    {"area": "Capture configurations", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "not yet measured"}
+    {"area": "Capture configurations", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "not yet measured"},
+    {
+      "area": "Bit readers",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "bit-readers"
+    },
+    {
+      "area": "RBSP and runs",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "rbsp-unescape"
+    },
+    {
+      "area": "Core budget accounting",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "core-budgets"
+    },
+    {
+      "area": "Inverse MDCT and DCT-IV",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "dsp-imdct"
+    },
+    {
+      "area": "Codec windows",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "dsp-windows"
+    },
+    {
+      "area": "Codec division",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "dsp-divide"
+    },
+    {
+      "area": "Opus final range",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "opus-final-range"
+    }
   ],
   "open_cells": [
     {
