@@ -9,7 +9,7 @@ use crate::retryable;
 use crate::transport::ContinuityOutcome;
 use crate::transport::{SCRAMBLED_PAYLOAD, TRANSPORT_ERROR_INDICATOR};
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Error, Result, SourceLocation, WorkBudget};
+use triergon_core::{Error, Result, SourceId, SourceLocation, WorkBudget};
 
 /// What happens next to the carrier in hand.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -150,14 +150,77 @@ impl TransportStream {
             .packet
             .as_ref()
             .ok_or(Error::Invalid("TS packet missing"))?;
-        let Some(payload) = packet.payload.as_ref() else {
+        if packet.payload.is_none() {
             self.stage = Stage::Release;
             return Ok(());
-        };
+        }
         let entity = packet.source_id.ok_or(Error::SourceMismatch)?;
-        let pid = packet.pid;
         let pusi = packet.payload_unit_start;
         let offset = packet.payload_source_offset;
+        let index = match self.route {
+            Route::Pes(index) => index,
+            Route::Pat | Route::Pmt => {
+                return self.feed_section::<FEED>(entity, pusi, offset, work);
+            }
+            Route::Clock | Route::Ignore => {
+                self.stage = Stage::Release;
+                return Ok(());
+            }
+        };
+        let payload = &mut self.packet.as_mut().expect("TS packet present").payload;
+        let assembler = self.routes.as_mut_slice()[index]
+            .assembler
+            .as_mut()
+            .ok_or(Error::Invalid("PES route missing"))?;
+        if !pusi
+            && self.feed_omissions.is_none()
+            && assembler.retain_body_carrier(
+                payload,
+                SourceLocation {
+                    source: entity,
+                    offset,
+                },
+                work,
+            )
+        {
+            self.stage = Stage::Release;
+            return Ok(());
+        }
+        let pushed = assembler.push(
+            payload.take().ok_or(Error::Invalid("TS payload missing"))?,
+            pusi,
+            entity,
+            offset,
+        );
+        match pushed {
+            Ok(()) => self.stage = Stage::Assemble,
+            Err(rejected) => {
+                *payload = Some(rejected.value);
+                return Err(rejected.error);
+            }
+        }
+        Ok(())
+    }
+
+    /// The payload stage on the PAT or PMT route: a repeat of the accepted table is
+    /// recorded without parsing it again; anything else goes to the section assembler.
+    #[inline(never)]
+    fn feed_section<const FEED: bool>(
+        &mut self,
+        entity: SourceId,
+        pusi: bool,
+        offset: u64,
+        work: &mut WorkBudget,
+    ) -> Result<()> {
+        let packet = self
+            .packet
+            .as_ref()
+            .ok_or(Error::Invalid("TS packet missing"))?;
+        let payload = packet
+            .payload
+            .as_ref()
+            .ok_or(Error::Invalid("TS payload missing"))?;
+        let pid = packet.pid;
         if pusi
             && work.remaining() >= payload.len() as u64
             && let [0, section_and_stuffing @ ..] = payload.as_ref()
@@ -190,65 +253,28 @@ impl TransportStream {
             return Ok(());
         }
         let payload = &mut self.packet.as_mut().expect("TS packet present").payload;
-        let pushed = match self.route {
-            Route::Pat => self.pat.assembler.push(
-                payload.take().ok_or(Error::Invalid("TS payload missing"))?,
-                pusi,
-                entity,
-                offset,
-            ),
-            Route::Pmt => self
+        let assembler = if self.route == Route::Pat {
+            &mut self.pat.assembler
+        } else {
+            &mut self
                 .pmt
                 .as_mut()
                 .ok_or(Error::Invalid("PMT route missing"))?
                 .assembler
-                .push(
-                    payload.take().ok_or(Error::Invalid("TS payload missing"))?,
-                    pusi,
-                    entity,
-                    offset,
-                ),
-            Route::Pes(index) => {
-                let assembler = self.routes.as_mut_slice()[index]
-                    .assembler
-                    .as_mut()
-                    .ok_or(Error::Invalid("PES route missing"))?;
-                if !pusi
-                    && self.feed_omissions.is_none()
-                    && assembler.retain_body_carrier(
-                        payload,
-                        SourceLocation {
-                            source: entity,
-                            offset,
-                        },
-                        work,
-                    )
-                {
-                    self.stage = Stage::Release;
-                    return Ok(());
-                }
-                assembler.push(
-                    payload.take().ok_or(Error::Invalid("TS payload missing"))?,
-                    pusi,
-                    entity,
-                    offset,
-                )
-            }
-            Route::Clock | Route::Ignore => {
-                self.stage = Stage::Release;
-                return Ok(());
-            }
         };
-        let pushed = pushed.map_err(|rejected| {
-            *payload = Some(rejected.value);
-            rejected.error
-        });
+        let pushed = assembler.push(
+            payload.take().ok_or(Error::Invalid("TS payload missing"))?,
+            pusi,
+            entity,
+            offset,
+        );
         match pushed {
             Ok(()) => self.stage = Stage::Assemble,
-            Err(error)
-                if matches!(self.route, Route::Pat | Route::Pmt)
-                    && error == Error::Invalid(POINTER_FIELD) =>
-            {
+            Err(rejected) => {
+                *payload = Some(rejected.value);
+                if rejected.error != Error::Invalid(POINTER_FIELD) {
+                    return Err(rejected.error);
+                }
                 // This wire-syntax fault is rejected by push before acceptance.
                 // Use the same explicit source-diagnostic recovery as poll faults;
                 // invariant/ownership/resource errors still propagate unchanged.
@@ -257,12 +283,11 @@ impl TransportStream {
                     kind: FaultKind::Psi,
                     pid: Some(pid),
                     location: self.location(),
-                    error,
+                    error: rejected.error,
                     rejected: None,
                 });
                 self.stage = Stage::Release;
             }
-            Err(error) => return Err(error),
         }
         Ok(())
     }
@@ -300,32 +325,7 @@ impl TransportStream {
         cancel: &AtomicBool,
     ) -> Result<Option<TraceEvent>> {
         let result = match self.route {
-            Route::Pat => self
-                .pat
-                .assembler
-                .poll(work, cancel)
-                .map(|step| match step {
-                    AssemblyStep::Output(section) => {
-                        self.section = Some(section);
-                        false
-                    }
-                    AssemblyStep::Yield => false,
-                    _ => true,
-                }),
-            Route::Pmt => self
-                .pmt
-                .as_mut()
-                .ok_or(Error::Invalid("PMT route missing"))?
-                .assembler
-                .poll(work, cancel)
-                .map(|step| match step {
-                    AssemblyStep::Output(section) => {
-                        self.section = Some(section);
-                        false
-                    }
-                    AssemblyStep::Yield => false,
-                    _ => true,
-                }),
+            Route::Pat | Route::Pmt => return self.drain_section(work, cancel),
             Route::Pes(index) => {
                 let assembler = self.routes.as_mut_slice()[index]
                     .assembler
@@ -352,6 +352,41 @@ impl TransportStream {
             }
             Route::Clock | Route::Ignore => Ok(true),
         };
+        match result {
+            Ok(true) => {
+                self.stage = Stage::Release;
+                Ok(None)
+            }
+            Ok(false) => Ok(None),
+            Err(error) if retryable(error) => Err(error),
+            Err(error) => Ok(Some(self.discard_faulted_route(error))),
+        }
+    }
+
+    /// The assemble stage on the PAT or PMT route.
+    #[inline(never)]
+    fn drain_section(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<TraceEvent>> {
+        let assembler = if self.route == Route::Pat {
+            &mut self.pat.assembler
+        } else {
+            &mut self
+                .pmt
+                .as_mut()
+                .ok_or(Error::Invalid("PMT route missing"))?
+                .assembler
+        };
+        let result = assembler.poll(work, cancel).map(|step| match step {
+            AssemblyStep::Output(section) => {
+                self.section = Some(section);
+                false
+            }
+            AssemblyStep::Yield => false,
+            _ => true,
+        });
         match result {
             Ok(true) => {
                 self.stage = Stage::Release;
