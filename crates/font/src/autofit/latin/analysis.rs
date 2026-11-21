@@ -1,6 +1,8 @@
 //! Finding a glyph's features for the latin writing system: segments along
 //! a dimension, the stems and serifs they form, the edges they group into
 //! and the blue zones those edges lie in.
+//!
+//! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
 use super::super::hints::{
     AxisHints, Dimension, Edge, GlyphHints, Segment, Width, direction, edge, point,
@@ -10,8 +12,8 @@ use crate::fixed::wrap32::{abs, div_fix, mul_fix, wrap};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 
-/// Where a segment ends while it is being found, and FreeType's copy of
-/// those values for the previous segment of the contour.
+/// Where a segment ends while it is being found; the walk keeps one for
+/// the previous segment of the contour too.
 #[derive(Clone, Copy, Debug)]
 struct Extent {
     min_pos: i64,
@@ -57,12 +59,12 @@ impl Extent {
     }
 }
 
-/// `af_latin_hints_compute_segments`: the runs of points along `dim` whose
-/// out direction is the dimension's major direction (or its opposite), in
-/// font units, with their positions across the run (`u`) and their extent
-/// along it (`v`); one-point contours give one-point segments. A glyph of
-/// more than 1000 segments gets none. Segment heights then grow by half the
-/// distance to the points just outside them, which helps tell serifs.
+/// The segments of `dim`: the runs of points whose out direction is the
+/// dimension's major direction (or its opposite), in font units, with their
+/// positions across the run (`u`) and their extent along it (`v`);
+/// one-point contours give one-point segments. A glyph of more than 1000
+/// segments gets none. Segment heights then grow by half the distance to
+/// the points just outside them, which helps tell serifs.
 pub(in super::super) fn compute_segments(
     hints: &mut GlyphHints,
     dim: Dimension,
@@ -252,9 +254,8 @@ pub(in super::super) fn compute_segments(
 }
 
 /// Merges segment `current`, which ends at `point`, with `previous`, which
-/// ended where it starts, as `af_latin_hints_compute_segments` does: with
-/// identical directions the two become one; otherwise the longer one stays,
-/// in `previous`'s place.
+/// ended where it starts: with identical directions the two become one;
+/// otherwise the longer one stays, in `previous`'s place.
 #[expect(clippy::too_many_arguments, reason = "the state of the segment walk")]
 fn merge_segments(
     segments: &mut [Segment],
@@ -304,12 +305,11 @@ fn merge_segments(
     }
 }
 
-/// `af_latin_hints_link_segments`: pairs each segment in the major
-/// direction with the facing segment of opposite direction to its right
-/// that scores best, by overlap along the axis and by distance against the
-/// widest standard width `widths` gives (or the plain distance without
-/// widths). A segment whose best partner prefers another becomes a serif of
-/// that other segment.
+/// Pairs each segment in the major direction with the facing segment of
+/// opposite direction to its right that scores best, by overlap along the
+/// axis and by distance against the widest standard width `widths` gives
+/// (or the plain distance without widths). A segment whose best partner
+/// prefers another becomes a serif of that other segment.
 pub(super) fn link_segments(
     hints: &mut GlyphHints,
     dim: Dimension,
@@ -378,14 +378,13 @@ pub(super) fn link_segments(
     Ok(())
 }
 
-/// `af_latin_hints_compute_edges`: groups the segments of `dim` into edges,
-/// sorted by position: a segment joins the first edge of its direction
-/// closer than the axis's edge threshold (at most 1/4 pixel), else starts
-/// one. Segments shorter than a pixel (horizontal edges only), wider than
-/// a pixel, or serifs shorter than 1.5 pixels are left out; one-point
-/// segments join an edge of any direction near them. Each edge then takes
-/// its links and serifs from its segments and is round where most of its
-/// segments are.
+/// Groups the segments of `dim` into edges, sorted by position: a segment
+/// joins the first edge of its direction closer than the axis's edge
+/// threshold (at most 1/4 pixel), else starts one. Segments shorter than a
+/// pixel (horizontal edges only), wider than a pixel, or serifs shorter
+/// than 1.5 pixels are left out; one-point segments join an edge of any
+/// direction near them. Each edge then takes its links and serifs from its
+/// segments and is round where most of its segments are.
 pub(super) fn compute_edges(
     hints: &mut GlyphHints,
     dim: Dimension,
@@ -453,13 +452,12 @@ pub(super) fn compute_edges(
     )
 }
 
-/// The second half of `af_latin_hints_compute_edges` and of
-/// `af_cjk_hints_compute_edges`, which agree: gives each segment its edge,
-/// then each edge the link and the serif its segments point to (the nearer
-/// where two do), marks the edges serifs point to, and makes each edge
-/// round where most of its segments are. A link or serif to a segment on
-/// no edge is passed over, which the CJK writing system, putting every
-/// segment on one, never needs.
+/// Finishes grouped edges, for the latin and CJK writing systems alike:
+/// gives each segment its edge, then each edge the link and the serif its
+/// segments point to (the nearer where two do), marks the edges serifs
+/// point to, and makes each edge round where most of its segments are. A
+/// link or serif to a segment on no edge is passed over, which the CJK
+/// writing system, putting every segment on one, never needs.
 pub(in super::super) fn edge_properties(
     segments: &mut [Segment],
     edges: &mut [Edge],
@@ -540,9 +538,8 @@ pub(in super::super) fn edge_properties(
     Ok(())
 }
 
-/// Starts an edge of segment `s` alone, kept in order (`af_axis_hints_new_edge`
-/// for the segment's position and direction), at the segment's position
-/// scaled by `scale`.
+/// Starts an edge of segment `s` alone, placed in order by the segment's
+/// position and direction, at the segment's position scaled by `scale`.
 pub(in super::super) fn start_edge(
     axis: &mut AxisHints,
     s: usize,
@@ -572,7 +569,7 @@ pub(in super::super) fn add_to_edge(segments: &mut [Segment], edge: &mut Edge, s
     edge.last = s;
 }
 
-/// `af_latin_hints_detect_features`: segments, their links and edges.
+/// Finds the features of `dim`: segments, their links and edges.
 pub(super) fn detect_features(
     hints: &mut GlyphHints,
     dim: Dimension,
@@ -586,11 +583,10 @@ pub(super) fn detect_features(
     compute_edges(hints, dim, latin, top_to_bottom, work)
 }
 
-/// `af_latin_hints_compute_blue_edges`: gives each horizontal edge the
-/// active blue zone edge nearest it within 1/40 em (at most half a pixel):
-/// the reference, or for a round edge beyond it the overshoot. Top zones
-/// take edges against the major direction, bottom zones edges along it, and
-/// neutral zones both.
+/// Gives each horizontal edge the active blue zone edge nearest it within
+/// 1/40 em (at most half a pixel): the reference, or for a round edge
+/// beyond it the overshoot. Top zones take edges against the major
+/// direction, bottom zones edges along it, and neutral zones both.
 pub(super) fn compute_blue_edges(
     hints: &mut GlyphHints,
     metrics: &Metrics,

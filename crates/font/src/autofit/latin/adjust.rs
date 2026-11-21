@@ -1,14 +1,15 @@
-//! The accent adjustments of the latin writing system (`afadjust.c` and
-//! the vertical adjustment code of `aflatin.c`): characters the adjustment
-//! database lists have their tildes stretched and aligned to the pixel
-//! grid, the blue zones of their base kept off their diacritics, and their
-//! diacritics kept a pixel away from the base after hinting.
+//! The accent adjustments of the latin writing system: characters the
+//! adjustment database lists have their tildes stretched and aligned to the
+//! pixel grid, the blue zones of their base kept off their diacritics, and
+//! their diacritics kept a pixel away from the base after hinting.
 //!
 //! The adjustments work on whole contours: the database assumes one
 //! enclosing contour for the base glyph and one for each diacritic. Their
-//! positions and heights are `FT_Pos` and wrap in 32 bits, as they do in
-//! FreeType on 32-bit ARMv7; so do the sentinels, `FT_LONG_MIN` and
-//! `FT_LONG_MAX`, that a contour of one or two points keeps as its extrema.
+//! positions and heights wrap in 32 bits, as they do in FreeType on 32-bit
+//! ARMv7, and a contour of one or two points keeps `i32::MAX` and
+//! `i32::MIN` as its lowest and highest points.
+//!
+//! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
 use super::super::hints::{Dimension, GlyphHints, edge, point};
 use super::super::tables::ADJUSTMENTS;
@@ -17,7 +18,7 @@ use crate::fixed::wrap32::{self, mul_fix, pix_round, wrap};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 
-/// The adjustment flags (`AF_ADJUST_*` and `AF_IGNORE_*`).
+/// The flags of an entry in the adjustment database.
 mod flag {
     /// Push the topmost contour up, clear of the rest.
     pub(super) const UP: u16 = 0x01;
@@ -42,9 +43,9 @@ mod flag {
     pub(super) const NO_HEIGHT_CHECK: u16 = 0x1000;
 }
 
-/// `af_adjustment_database_lookup`: the flags of `code`, by FreeType's
-/// binary search over the database in its order, which is not sorted
-/// throughout (so that a few code points are never found).
+/// The flags of `code`, by binary search over the database in FreeType's
+/// order, which is not sorted throughout (so that a few code points are
+/// never found).
 pub(in super::super) fn adjustment(code: u32) -> u16 {
     let (mut low, mut high) = (0, ADJUSTMENTS.len() - 1);
     while high >= low {
@@ -67,10 +68,10 @@ pub(in super::super) fn adjustment(code: u32) -> u16 {
     0
 }
 
-/// The vertical preparation of `af_latin_hints_apply`: tildes stretched
-/// and aligned, horizontal edges found, and blue zones kept off diacritics
-/// as `adjustment` asks. Returns the limit on a diacritic's height for the
-/// separation after hinting.
+/// Prepares the vertical hinting: tildes stretched and aligned, horizontal
+/// edges found, and blue zones kept off diacritics as `adjustment` asks.
+/// Returns the limit on a diacritic's height for the separation after
+/// hinting.
 pub(super) fn prepare(
     hints: &mut GlyphHints,
     metrics: &Metrics,
@@ -154,8 +155,8 @@ pub(super) fn prepare(
     Ok(accent_height_limit)
 }
 
-/// `af_latin_get_base_glyph_blues`: the first active top and bottom blue
-/// zones of capital (else small) letters.
+/// The first active top and bottom blue zones of capital (else small)
+/// letters.
 fn base_glyph_blues(metrics: &Metrics, capital: bool) -> (Option<Blue>, Option<Blue>) {
     let (top, bottom) = if capital {
         (blue::TOP, blue::BOTTOM)
@@ -170,8 +171,8 @@ fn base_glyph_blues(metrics: &Metrics, capital: bool) -> (Option<Blue>, Option<B
     (find(top), find(bottom))
 }
 
-/// `af_compute_vertical_extrema`: each contour's lowest and highest point;
-/// contours of one or two points keep `FT_LONG_MAX` and `FT_LONG_MIN`.
+/// Each contour's lowest and highest point; contours of one or two points
+/// keep `i32::MAX` and `i32::MIN`.
 fn compute_vertical_extrema(hints: &mut GlyphHints, work: &mut WorkBudget) -> Result<()> {
     let count = hints.contours.len();
     charge(work, hints.points.len() + count)?;
@@ -205,8 +206,7 @@ fn extrema(hints: &GlyphHints, c: usize) -> (i64, i64) {
     (hints.y_minima[c], hints.y_maxima[c])
 }
 
-/// `af_find_highest_contour`: the contour reaching highest, of two the
-/// shorter one.
+/// The contour reaching highest, of two the shorter one.
 fn highest_contour(hints: &GlyphHints) -> usize {
     let (mut best, mut best_min, mut best_max) = (0, wrap32::MAX, wrap32::MIN);
     for c in 0..hints.contours.len() {
@@ -218,9 +218,8 @@ fn highest_contour(hints: &GlyphHints) -> usize {
     best
 }
 
-/// `af_find_second_highest_contour`: of the contours reaching below the
-/// highest one's bottom, the one reaching highest; contour 0 for fewer than
-/// three contours.
+/// Of the contours reaching below the highest one's bottom, the one
+/// reaching highest; contour 0 for fewer than three contours.
 fn second_highest_contour(hints: &GlyphHints) -> usize {
     if hints.contours.len() < 3 {
         return 0;
@@ -237,8 +236,7 @@ fn second_highest_contour(hints: &GlyphHints) -> usize {
     best
 }
 
-/// `af_find_lowest_contour`: the contour reaching lowest, of two the
-/// shorter one.
+/// The contour reaching lowest, of two the shorter one.
 fn lowest_contour(hints: &GlyphHints) -> usize {
     let (mut best, mut best_min, mut best_max) = (0, wrap32::MAX, wrap32::MIN);
     for c in 0..hints.contours.len() {
@@ -250,8 +248,8 @@ fn lowest_contour(hints: &GlyphHints) -> usize {
     best
 }
 
-/// `af_find_second_lowest_contour`, the counterpart of
-/// [`second_highest_contour`].
+/// Of the contours reaching above the lowest one's top, the one reaching
+/// lowest; contour 0 for fewer than three contours.
 fn second_lowest_contour(hints: &GlyphHints) -> usize {
     if hints.contours.len() < 3 {
         return 0;
@@ -268,7 +266,7 @@ fn second_lowest_contour(hints: &GlyphHints) -> usize {
     best
 }
 
-/// `af_move_contour_vertically`.
+/// Moves every point of contour `c` up by `by`, wrapping in 32 bits.
 fn move_contour(hints: &mut GlyphHints, c: usize, by: i64) {
     let first = hints.contours[c];
     let points = hints.points.as_mut_slice();
@@ -282,7 +280,7 @@ fn move_contour(hints: &mut GlyphHints, c: usize, by: i64) {
     }
 }
 
-/// `af_move_contours_up`: moves every contour above `limit` by `delta`.
+/// Moves every contour above `limit` up by `delta`.
 fn move_contours_up(hints: &mut GlyphHints, limit: i64, delta: i64) {
     for c in 0..hints.contours.len() {
         let (min, max) = extrema(hints, c);
@@ -292,8 +290,7 @@ fn move_contours_up(hints: &mut GlyphHints, limit: i64, delta: i64) {
     }
 }
 
-/// `af_move_contours_down`: moves every contour below `limit` down by
-/// `delta`.
+/// Moves every contour below `limit` down by `delta`.
 fn move_contours_down(hints: &mut GlyphHints, limit: i64, delta: i64) {
     for c in 0..hints.contours.len() {
         let (min, max) = extrema(hints, c);
@@ -303,10 +300,9 @@ fn move_contours_down(hints: &mut GlyphHints, limit: i64, delta: i64) {
     }
 }
 
-/// `af_touch_top_contours` and `af_touch_bottom_contours`: marks the
-/// points of the contours at or above (below) `tilde`'s bottom so that
-/// hinting leaves them, as `af_touch_contour` does: kept out of segments,
-/// and the points on the curve touched vertically.
+/// Marks the points of the contours at or above (below) `tilde`'s bottom so
+/// that hinting leaves them: kept out of segments, and the points on the
+/// curve touched vertically.
 fn touch_contours(hints: &mut GlyphHints, tilde: usize, top: bool) {
     let limit = hints.y_minima[tilde];
     for c in 0..hints.contours.len() {
@@ -329,15 +325,14 @@ fn touch_contours(hints: &mut GlyphHints, tilde: usize, top: bool) {
     }
 }
 
-/// `af_latin_stretch_top_tilde` and `af_latin_stretch_bottom_tilde`:
-/// stretches the tilde contour so that its wiggle (the smallest distance of
+/// Stretches the tilde contour so that its wiggle (the smallest distance of
 /// a round on-curve extremum from the far side, at least an eighth of the
 /// height) spans more than a pixel, and protects it and the contours beyond
 /// it from hinting. Returns how much taller it got.
 ///
 /// As in FreeType, the scaling multiplies and divides in 32 bits, wrapping
 /// where it overflows, and a contour of one or two points measures from its
-/// `FT_LONG_MAX` minimum and `FT_LONG_MIN` maximum (a height of 1).
+/// `i32::MAX` minimum to its `i32::MIN` maximum (a height of 1).
 fn stretch_tilde(hints: &mut GlyphHints, tilde: usize, top: bool) -> i64 {
     let (min_y, max_y) = extrema(hints, tilde);
     if min_y == max_y {
@@ -399,7 +394,7 @@ fn stretch_tilde(hints: &mut GlyphHints, tilde: usize, top: bool) -> i64 {
     loop {
         p = points[p].next;
         // `height` is not zero: the extrema differ in 32 bits. ARMv7 divides
-        // `FT_LONG_MIN` by -1 to `FT_LONG_MIN`, as the wrap does.
+        // `i32::MIN` by -1 to `i32::MIN`, as the wrap does.
         let scaled = wrap(wrap(points[p].y - base) * target_height);
         points[p].y = wrap(scaled / height + base);
         if p == first {
@@ -409,9 +404,8 @@ fn stretch_tilde(hints: &mut GlyphHints, tilde: usize, top: bool) -> i64 {
     wrap(target_height - height)
 }
 
-/// `af_latin_align_top_tilde` and `af_latin_align_bottom_tilde`: moves the
-/// tilde contour so that its bottom (top) is on a pixel, or its centre for
-/// a tilde under three pixels tall. Returns the move.
+/// Moves the tilde contour so that its bottom (top) is on a pixel, or its
+/// centre for a tilde under three pixels tall. Returns the move.
 fn align_tilde(hints: &mut GlyphHints, tilde: usize, top: bool) -> i64 {
     let first = hints.contours[tilde];
     let points = hints.points.as_slice();
@@ -440,8 +434,8 @@ fn align_tilde(hints: &mut GlyphHints, tilde: usize, top: bool) -> i64 {
     delta
 }
 
-/// `af_check_contour_horizontal_overlap`: whether contour `c` overlaps the
-/// horizontal extent of the other contours of three or more points.
+/// Whether contour `c` overlaps the horizontal extent of the other contours
+/// of three or more points.
 fn overlaps_horizontally(hints: &GlyphHints, c: usize) -> bool {
     let points = hints.points.as_slice();
     let (mut own_min, mut own_max) = (wrap32::MAX, wrap32::MIN);
@@ -470,12 +464,11 @@ fn overlaps_horizontally(hints: &GlyphHints, c: usize) -> bool {
         || (own_max >= other_max && own_min <= other_min)
 }
 
-/// `af_glyph_hints_apply_vertical_separation_adjustments` after the
-/// vertical hinting: a diacritic above (below) its base that overlaps it
-/// horizontally and is no taller than `accent_height_limit` moves until a
-/// pixel separates it from the contours below (above), with every contour
-/// in its range or beyond it; a tilde whose bottom then lands on a pixel is
-/// re-centred.
+/// Separates diacritics from their base after the vertical hinting: a
+/// diacritic above (below) its base that overlaps it horizontally and is no
+/// taller than `accent_height_limit` moves until a pixel separates it from
+/// the contours below (above), with every contour in its range or beyond
+/// it; a tilde whose bottom then lands on a pixel is re-centred.
 pub(super) fn separate_vertically(
     hints: &mut GlyphHints,
     adjustment: u16,
@@ -643,11 +636,11 @@ mod tests {
     fn short_contours_keep_32_bit_sentinels() {
         let budget = Budget::new(1 << 20).unwrap();
         let min = i64::from(i32::MIN);
-        // A contour of two points, then a flat one on FT_LONG_MIN.
+        // A contour of two points, then a flat one on `i32::MIN`.
         let hints = hints(&budget, &[&[0, 10], &[min, min, min]]);
         assert_eq!(hints.y_minima.as_slice(), [i64::from(i32::MAX), min]);
         assert_eq!(hints.y_maxima.as_slice(), [min, min]);
-        // The flat contour ties with the initial FT_LONG_MIN maximum and is
+        // The flat contour ties with the initial `i32::MIN` maximum and is
         // not taken; the first contour stays the highest.
         assert_eq!(highest_contour(&hints), 0);
     }
@@ -655,9 +648,9 @@ mod tests {
     #[test]
     fn a_tilde_stretch_wraps_in_32_bits() {
         let budget = Budget::new(1 << 20).unwrap();
-        // A tilde of two points measures from FT_LONG_MAX to FT_LONG_MIN, a
+        // A tilde of two points measures from `i32::MAX` to `i32::MIN`, a
         // height of 1, and stretches to 64: each y becomes
-        // (y - FT_LONG_MAX) × 64 + FT_LONG_MAX, in 32 bits.
+        // (y - `i32::MAX`) × 64 + `i32::MAX`, in 32 bits.
         let mut hints = hints(&budget, &[&[0, 10]]);
         assert_eq!(stretch_tilde(&mut hints, 0, true), 63);
         let ys: Vec<i64> = hints.points.iter().map(|p| p.y).collect();

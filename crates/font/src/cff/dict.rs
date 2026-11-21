@@ -1,4 +1,5 @@
 //! CFF DICT data (Adobe Technical Note 5176, section 4; OpenType CFF2 DICTs).
+//! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
 use super::number::{Operand, number_length};
 use super::path::Fixed;
@@ -11,15 +12,14 @@ use triergon_core::{Error, Result, WorkBudget};
 pub(crate) const CFF_OPERANDS: usize = 48;
 pub(crate) const CFF2_OPERANDS: usize = 513;
 
-/// The DICT parser's stack as FreeType sizes it: Top and Font DICTs take
-/// `CFF_MAX_STACK_DEPTH` or `CFF2_DEFAULT_STACK` entries, operator included,
-/// and a Private DICT one more (`cffload.c`); a CFF2 Private DICT's is the
-/// Top DICT's `maxstack` plus one, which FreeType clamps to 513.
+/// The DICT parser's stack: Top and Font DICTs take 96 entries in CFF and
+/// 513 in CFF2, operator included, and a Private DICT one more; `maxstack`,
+/// which sizes a CFF2 Private DICT's, is held at 513.
 pub(crate) const CFF_TOP_STACK: usize = 96;
 pub(crate) const CFF_PRIVATE_STACK: usize = 97;
 pub(crate) const CFF2_TOP_STACK: usize = 513;
 pub(crate) const CFF2_PRIVATE_STACK: usize = CFF2_MAXSTACK + 1;
-/// `CFF2_MAX_STACK` and `CFF2_DEFAULT_STACK`, which bound `maxstack` both ways.
+/// The CFF2 stack limit of 513 operands, which bounds `maxstack` both ways.
 pub(crate) const CFF2_MAXSTACK: usize = 513;
 
 /// Which DICT a parse reads, for the operators FreeType knows in it.
@@ -61,9 +61,8 @@ pub(crate) mod op {
     pub(crate) const FD_ARRAY: u16 = 0x0c24;
     pub(crate) const FD_SELECT: u16 = 0x0c25;
 
-    /// The operands FreeType needs for `op` in a DICT of `kind`, by
-    /// `cfftoken.h` and the field readers of `cffparse.c`: `None` for an
-    /// operator it does not know there, which it skips.
+    /// The fewest operands `op` may have in a DICT of `kind`; `None` for an
+    /// operator that DICT does not know, which is skipped.
     pub(crate) const fn min_operands(version: Version, kind: Kind, op: u16) -> Option<usize> {
         match (version, kind) {
             (Version::Cff1, Kind::Top | Kind::Font) => match op {
@@ -217,20 +216,18 @@ impl<T: Copy + Default, const N: usize> Stack<T, N> {
     }
 }
 
-/// One DICT entry: an operator and its operands as FreeType's parser holds
-/// them.
+/// One DICT entry: an operator and the operands before it.
 pub(crate) struct Entry<'a, 'b> {
     pub(crate) operator: u16,
     pub(crate) operands: &'b [Operand<'a>],
 }
 
-/// Calls `apply` for each entry, as `cff_parser_run` reads a DICT: a number
-/// cut short at the end ends it, and operators without a meaning are
-/// skipped with their operands. `variations` holds the region scalars of
-/// each `vsindex` in a CFF2 Private DICT, the only DICT where `vsindex` and
-/// `blend` apply; `blend` replaces its operands with their blends in place,
-/// as `cff_blend_doBlend` does: each default in 16.16 plus its deltas times
-/// the 16.16 region scalars. `vsindex` reaches `apply` too.
+/// Calls `apply` for each entry of a DICT: a number cut short at the end
+/// ends it, and operators without a meaning are skipped with their operands.
+/// `variations` holds the region scalars of each `vsindex` in a CFF2 Private
+/// DICT, the only DICT where `vsindex` and `blend` apply; `blend` replaces
+/// its operands with their blends in place: each default in 16.16 plus its
+/// deltas times the 16.16 region scalars. `vsindex` reaches `apply` too.
 pub(crate) fn parse<'a, 's, const N: usize>(
     bytes: &'a [u8],
     work: &mut WorkBudget,
@@ -266,7 +263,7 @@ pub(crate) fn parse<'a, 's, const N: usize>(
                 if blended {
                     return Err(Error::Invalid("CFF2 vsindex after blend"));
                 }
-                // FreeType casts it to `FT_UInt` and checks it at `blend`.
+                // Read as unsigned, and checked only at a `blend`.
                 vsindex = first(stack.as_slice())?.unsigned();
                 apply(Entry {
                     operator,

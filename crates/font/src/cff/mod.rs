@@ -1,4 +1,5 @@
 //! CFF and CFF2 outlines in OpenType (Adobe Technical Note 5176; OpenType `CFF2`).
+//! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
 mod charstring;
 
@@ -57,8 +58,8 @@ struct Private {
     hints: HintDict,
 }
 
-/// A face's encoding as FreeType lists it (`cff_encoding_load`): the glyph
-/// of each code, for the Adobe charmap a name-keyed CFF face gets.
+/// A face's encoding (TN 5176 section 12): the glyph of each code, for the
+/// Adobe charmap a name-keyed CFF face gets.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Encoding {
     /// The Adobe encoding id: 0 Standard, 1 Expert, 2 Custom.
@@ -87,8 +88,7 @@ pub(crate) struct Cff {
     /// The charset: the SID of each glyph, or its CID in a CID-keyed font;
     /// empty for CFF2, which has none.
     sids: BudgetVec<u16>,
-    /// The lowest glyph of each SID of a name-keyed face, [`NO_GLYPH`] for
-    /// none (`cff_charset_compute_cids`).
+    /// The lowest glyph of each SID of a name-keyed face, [`NO_GLYPH`] for none.
     glyphs_by_sid: BudgetVec<u16>,
     /// The encoding of a name-keyed CFF face that maps a code.
     encoding: Option<Encoding>,
@@ -100,10 +100,10 @@ pub(crate) struct Cff {
     /// The face's units per em, from `head`, which bound the hinted scale.
     face_units_per_em: u16,
     /// Region scalars of each ItemVariationData at the default instance, in
-    /// 16.16, as `cff_blend_build_vector` computes them.
+    /// 16.16 ([`region_scalar`]).
     scalars: BudgetVec<Fixed>,
     variation_data: BudgetVec<(u32, u32)>,
-    /// The axes of the face's `fvar`, zero without one (FreeType's `lenNDV`).
+    /// The axes of the face's `fvar`, zero without one.
     fvar_axes: u16,
     /// The axes of the variation store's regions.
     store_axes: u16,
@@ -270,10 +270,10 @@ impl Cff {
         self.version
     }
 
-    /// Parses a DICT of `kind` as `cff_parser_run` does: entries FreeType
-    /// does not know in it are skipped, and one with fewer operands than
-    /// FreeType reads fails the parse. `weights` gives the region scalars a
-    /// CFF2 Private DICT's `blend` applies.
+    /// Parses a DICT of `kind`: entries [`op::min_operands`] does not know
+    /// in it are skipped, and one with fewer operands than it asks for fails
+    /// the parse. `weights` gives the region scalars a CFF2 Private DICT's
+    /// `blend` applies.
     fn dict<'a, 's>(
         &'s self,
         bytes: &'a [u8],
@@ -300,8 +300,8 @@ impl Cff {
         }
     }
 
-    /// The entries of the Top DICT, or of a Font DICT, which FreeType reads
-    /// as a Top DICT in CFF (`cff_subfont_load`).
+    /// The entries of the Top DICT, or of a Font DICT, which is read as a
+    /// Top DICT in CFF.
     fn font_dict_entries(&self, bytes: &[u8], kind: Kind, work: &mut WorkBudget) -> Result<Top> {
         let mut top = Top {
             charstring_type: 2,
@@ -319,7 +319,7 @@ impl Cff {
                 op::FD_ARRAY => top.fd_array = Some(first.unsigned()),
                 op::FD_SELECT => top.fd_select = Some(first.unsigned()),
                 op::VSTORE => top.vstore = Some(first.unsigned()),
-                // A registry of 0xFFFF marks no ROS (`cid_registry`).
+                // A registry of 0xFFFF marks no ROS.
                 op::ROS => top.ros = first.integer() as u32 != 0xffff,
                 op::SYNTHETIC_BASE => top.synthetic = true,
                 op::CHARSTRING_TYPE => top.charstring_type = first.integer(),
@@ -336,17 +336,15 @@ impl Cff {
         Ok(top)
     }
 
-    /// The Private DICT at `location` (size, offset), read as
-    /// `cff_load_private_dict` reads it: none, or one at offset or size zero,
-    /// leaves no local subroutines and zeros for the hinter's values; else the
-    /// DICT's entries over FreeType's defaults.
+    /// The Private DICT at `location` (size, offset): none, or one at offset
+    /// or size zero, leaves no local subroutines and zeros for the hinter's
+    /// values; else the DICT's entries over the defaults.
     ///
-    /// FreeType parses it when it opens the face without a design vector, so
-    /// that every `blend` weighs its deltas zero, and reads its local
-    /// subroutines and `vsindex` from that parse. Each glyph load of a face
-    /// with variations and `fvar` parses it again with the design vector, and
-    /// the hinter takes its values from that parse, unsanitised up to the
-    /// error should it fail (`cf2_font_setup` ignores the error).
+    /// A first parse weighs the deltas of every `blend` zero, and gives the
+    /// local subroutines and `vsindex`. In a face with variations and `fvar`
+    /// a second parse applies the region scalars of the default instance,
+    /// and the hinter takes its values from that one, uncorrected up to the
+    /// error should it fail.
     fn private_dict(
         &self,
         table: &[u8],
@@ -379,8 +377,8 @@ impl Cff {
     }
 
     /// One parse of a Private DICT's `bytes` with `weights` for its blends:
-    /// what it read, and how it ended. The hinter's values are corrected as
-    /// `cff_load_private_dict` corrects them only when the parse succeeds.
+    /// what it read, and how it ended. The hinter's values are corrected
+    /// ([`HintDict::sanitize`]) only when the parse succeeds.
     fn read_private<'s>(
         &'s self,
         bytes: &[u8],
@@ -408,7 +406,7 @@ impl Cff {
                 op::BLUE_SCALE => hints.blue_scale = operands[0].fixed(3),
                 op::BLUE_SHIFT => hints.blue_shift = operands[0].integer(),
                 op::BLUE_FUZZ => hints.blue_fuzz = operands[0].integer(),
-                // FreeType stores LanguageGroup in an int.
+                // LanguageGroup keeps its low 32 bits.
                 op::LANGUAGE_GROUP => hints.language_group = operands[0].integer() as i32,
                 _ => {}
             }
@@ -531,8 +529,7 @@ impl Cff {
         Ok(&self.scalars.as_slice()[first..first + len])
     }
 
-    /// The first glyph whose charset SID is `sid`, for `seac`
-    /// (`cff_lookup_glyph_by_stdcharcode`).
+    /// The first glyph whose charset SID is `sid`, for `seac` and encodings.
     pub(super) fn glyph_for_sid(&self, sid: u16) -> Option<u32> {
         let glyph = *self.glyphs_by_sid.get(usize::from(sid))?;
         (glyph != NO_GLYPH).then_some(u32::from(glyph))
@@ -550,11 +547,10 @@ impl Cff {
         Ok(())
     }
 
-    /// The glyph names in index order, as FreeType reads them for its
-    /// Unicode charmap (`cff_sid_to_glyph_name`): each glyph's charset SID as
-    /// a standard string below 391, else as an object of the string INDEX,
-    /// up to a NUL; `None` beyond the strings. A CID-keyed font's CIDs are
-    /// read as SIDs too. Empty for CFF2.
+    /// The glyph names in index order, for a Unicode charmap: each glyph's
+    /// charset SID as a standard string below 391, else as an object of the
+    /// string INDEX, up to a NUL; `None` beyond the strings. A CID-keyed
+    /// font's CIDs are read as SIDs too. Empty for CFF2.
     pub(crate) fn glyph_names<'a>(
         &'a self,
         data: &'a [u8],
@@ -581,8 +577,8 @@ impl Cff {
         self.encoding.as_ref()
     }
 
-    /// `cff_charset_load`: the SID of every glyph, from a charset table
-    /// (formats 0, 1 and 2) or a predefined one, which must cover the glyphs.
+    /// Reads the SID of every glyph from a charset table (formats 0, 1 and
+    /// 2) or a predefined one, which must cover the glyphs.
     fn read_charset(&mut self, table: &[u8], offset: usize, work: &mut WorkBudget) -> Result<()> {
         let count = usize::try_from(self.glyph_count).map_err(|_| Error::Overflow)?;
         charge(work, count)?;
@@ -631,10 +627,10 @@ impl Cff {
         Ok(())
     }
 
-    /// `cff_encoding_load`: the glyph of each code, from an encoding table
-    /// (formats 0 and 1, with supplements) or the Standard or Expert encoding
-    /// through the charset; `None` when no code has a glyph, where FreeType
-    /// lists no Adobe charmap.
+    /// Reads the glyph of each code from an encoding table (formats 0 and 1,
+    /// with supplements) or the Standard or Expert encoding through the
+    /// charset; `None` when no code has a glyph, where FreeType lists no
+    /// Adobe charmap.
     fn read_encoding(&self, table: &[u8], offset: usize) -> Result<Option<Encoding>> {
         let sids = self.sids.as_slice();
         let count = sids.len();
@@ -647,7 +643,7 @@ impl Cff {
                 } else {
                     &crate::postscript::EXPERT_ENCODING
                 };
-                // The lowest glyph of each SID (`cff_charset_compute_cids`).
+                // The lowest glyph of each SID.
                 let mut coded = 0;
                 for (code, &sid) in encoding.iter().enumerate() {
                     if sid == 0 {
@@ -775,13 +771,13 @@ impl Cff {
         Ok(())
     }
 
-    /// Loads `glyph` into `outline` as FreeType's default load leaves it in
-    /// the glyph slot (`FT_LOAD_DEFAULT`: Adobe's hinter, without stem
-    /// darkening), before any grid fitting of its metrics: the charstring is
-    /// hinted at cf2's scale, a 64th of the 16.16 `scale` rounded, into 26.6
-    /// pixels, which then go through its Font DICT's FontMatrix and are moved
-    /// by the matrix offset in font units, unscaled. A Font DICT with other
-    /// units per em adjusts the scale first, as [`Self::load`] does.
+    /// Loads `glyph` into `outline` hinted, as FreeType's default load leaves
+    /// it (Adobe's hinter, without stem darkening), before any grid fitting
+    /// of its metrics: the charstring is hinted at a 64th of the 16.16
+    /// `scale`, rounded, into 26.6 pixels, which then go through its Font
+    /// DICT's FontMatrix and are moved by the matrix offset in font units,
+    /// unscaled. A Font DICT with other units per em adjusts the scale first,
+    /// as [`Self::load`] does.
     ///
     /// The hinter refuses scales beyond 2000 pixels per em, which then load as
     /// [`Self::load`] loads them, as FreeType retries them unhinted; a scale
@@ -798,10 +794,10 @@ impl Cff {
     ) -> Result<()> {
         let table = self.table.bytes(data);
         let (matrix, adjusted) = self.placement(table, glyph, scale)?;
-        // `cf2_getScaleAndHintFlag`, in 32 bits.
+        // A 64th of the scale, rounded, in 32 bits.
         let hinted = |s: i64| (s as u32).wrapping_add(32).cast_signed() / 64;
         let (x, y) = (hinted(adjusted.x), hinted(adjusted.y));
-        // `cf2_checkTransform`.
+        // The hinter needs positive scales.
         if x <= 0 || y <= 0 {
             return Err(Error::Invalid("CFF hinting scale below 1/64"));
         }
@@ -901,19 +897,17 @@ fn private_location(operands: &[Operand<'_>]) -> Result<(usize, usize)> {
     Ok((size as usize, offset as usize))
 }
 
-/// `cff_blend_build_vector`'s factor for the region whose `axes` axes
-/// `axis` reads, at the default instance: zero without `fvar`, where FreeType
-/// has no design vector; else, at a coordinate of zero on every axis, one,
-/// scaled down by each axis that peaks away from zero with a range around
-/// it, and zero when such an axis's range excludes zero.
+/// The scalar of the region whose `axes` axes `axis` reads, at the default
+/// instance: zero without `fvar`; else, at a coordinate of zero on every
+/// axis, one, scaled down by each axis that peaks away from zero with a
+/// range around it, and zero when such an axis's range excludes zero.
 fn region_scalar(fvar_axes: u16, axes: u16, axis: &mut Reader<'_>) -> Result<Fixed> {
     if fvar_axes == 0 {
         return Ok(0);
     }
     let mut scalar: i64 = 0x10000;
     for _ in 0..axes {
-        // F2Dot14 coordinates; FreeType's 16.16 copies scale each ratio by
-        // four, which leaves `FT_MulDiv` unchanged.
+        // F2Dot14 coordinates, used as they are: only their ratios matter.
         let [start, peak, end] = [axis.i16()?, axis.i16()?, axis.i16()?].map(i64::from);
         if peak == 0 {
             continue;
@@ -1295,7 +1289,7 @@ mod tests {
         assert_eq!(points(&glyph, TWO, false), points(&glyph, TWO, true));
         // At 100000 the hinter scales by (100000 + 32) / 64 = 1563: 110 units
         // are 110 × 1563 = 171930 in 16.16, 167 in 26.6 after `>> 10`, where
-        // the unhinted FT_MulFix(110, 100000) rounds to 168.
+        // the unhinted 110 × 100000 / 65536 rounds to 168.
         assert_eq!(
             points(&glyph, 100_000, true),
             [(15, 30), (167, 30), (244, 106)]
@@ -1310,7 +1304,7 @@ mod tests {
     fn a_stem_pair_moves_its_nearer_edge_onto_a_pixel() {
         // hstem 100 50: edges at 100 × 2048 = 3.125 and 4.6875 pixels. The
         // initial map holds only the synthetic edge at zero, which places the
-        // stem where the scale does; `cf2_hintmap_adjustHints` moves the pair
+        // stem where the scale does; adjusting the map moves the pair
         // down by 0.125 (less than up by 0.3125) to 3 and 4.5625 pixels, 192
         // and 292 in 26.6, and points below follow at the nominal scale.
         let mut glyph = vec![N(100), N(50), Op(1)];

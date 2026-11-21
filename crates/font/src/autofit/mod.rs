@@ -1,24 +1,23 @@
-//! FreeType's auto-hinter (`autofit`) as `FT_LOAD_DEFAULT` runs it on the
-//! TrueType faces it hints, those without bytecode: the glyph is loaded in
-//! font units, assigned a style by its characters, hinted by the style's
-//! writing system at the size's scales, and its metrics fitted to the pixel
-//! grid (`af_loader_load_glyph`).
+//! The auto-hinter, as the default load runs it on TrueType faces without
+//! bytecode: the glyph is loaded in font units, assigned a style by its
+//! characters, hinted by the style's writing system at the size's scales,
+//! and its metrics fitted to the pixel grid. Translated from FreeType 2.15.0
+//! (see `docs/provenance.md`).
 //!
-//! FreeType is taken as the font reference builds it: without HarfBuzz, so
-//! only the face's Unicode charmap assigns styles, with the CJK and Indic
-//! writing systems, and for the normal render mode. The dummy, latin and
-//! CJK writing systems hint here. Glyphs of an Indic style get FreeType's
+//! It is FreeType's auto-hinter as built without HarfBuzz, so only the
+//! face's Unicode charmap assigns styles, with the CJK and Indic writing
+//! systems, and for the normal render mode. The dummy, latin and CJK
+//! writing systems hint here. Glyphs of an Indic style get FreeType's
 //! advances, which that writing system leaves unhinted, but not their
-//! outlines. Positions, distances and scales follow FreeType's `FT_Long`
-//! arithmetic on 32-bit ARMv7, wrapping in 32 bits (see [`long`]).
+//! outlines. Positions, distances and scales wrap in 32 bits, as FreeType's
+//! do on 32-bit ARMv7 (see [`crate::fixed::wrap32`]).
 //!
-//! The per-face state (`AF_FaceGlobalsRec`) is computed on the first load
-//! that needs it, as FreeType computes it, and kept: the style of each
-//! glyph, the reverse charmap of the adjustment database, and each latin
-//! or CJK style's metrics in font units, measured when a glyph of the style
-//! is first loaded. Metrics are scaled for each load, which costs a few
-//! dozen multiplications. The storage hinting a glyph needs is kept with the
-//! face too and reused by the next load.
+//! The per-face state is computed on the first load that needs it and kept:
+//! the style of each glyph, the reverse charmap of the adjustment database,
+//! and each latin or CJK style's metrics in font units, measured when a
+//! glyph of the style is first loaded. Metrics are scaled for each load,
+//! which costs a few dozen multiplications. The storage hinting a glyph
+//! needs is kept with the face too and reused by the next load.
 
 mod cjk;
 mod hints;
@@ -66,7 +65,7 @@ pub(crate) struct Autofit {
     scratch: Mutex<Option<Scratch>>,
 }
 
-/// `AF_FaceGlobalsRec`, as the default load needs it.
+/// What every load of a face shares: its glyphs' styles and their metrics.
 #[derive(Debug)]
 struct Globals {
     coverage: Coverage,
@@ -80,12 +79,11 @@ struct Globals {
     /// latin style without blue zones, which the dummy writing system then
     /// hints.
     metrics: BudgetVec<OnceLock<Option<Charged<Box<StyleMetrics>>>>>,
-    /// `FT_IS_FIXED_WIDTH`: `post.isFixedPitch`.
+    /// Whether `post.isFixedPitch` is set.
     fixed_pitch: bool,
 }
 
-/// A style's metrics in font units, as its writing system measures them
-/// (`AF_StyleMetricsRec` and the writing system's extension of it).
+/// A style's metrics in font units, as its writing system measures them.
 #[derive(Debug)]
 #[expect(clippy::large_enum_variant, reason = "kept boxed, one per style")]
 enum StyleMetrics {
@@ -102,15 +100,15 @@ enum Hinter {
     Latin(latin::Metrics),
     /// The style's metrics, scaled.
     Cjk(cjk::Metrics),
-    /// The Indic writing system, which hints with the CJK routines but is
-    /// not ported.
+    /// The Indic writing system, which this crate does not hint with: a
+    /// glyph of its styles that has points is `Unsupported`.
     Indic,
 }
 
 impl Hinter {
-    /// The 16.16 scales the writing system hints with: the scaler's, in the
-    /// 32 bits of an `FT_Fixed`, as the CJK metrics keep them, or the latin
-    /// metrics' with the vertical scale fitted to the x height.
+    /// The 16.16 scales the writing system hints with: the scaler's, wrapped
+    /// to 32 bits, as the CJK metrics keep them, or the latin metrics' with
+    /// the vertical scale fitted to the x height.
     fn scales(&self, scaler: Scaler) -> (i64, i64) {
         match self {
             Self::Latin(metrics) => (metrics.x_scale(), metrics.y_scale()),
@@ -119,10 +117,10 @@ impl Hinter {
         }
     }
 
-    /// The style metrics' `digits_have_same_width`: false for the dummy
-    /// writing system, whose metrics are zeroed, and here for the Indic one,
-    /// whose glyphs, as CJK ones, advance by the rounded scaled advance
-    /// whatever it says.
+    /// Whether the style's metrics found its digits to share one advance:
+    /// false for the dummy writing system, which has no metrics, and here
+    /// for the Indic one, whose glyphs, as CJK ones, advance by the rounded
+    /// scaled advance either way.
     fn digits_have_same_width(&self) -> bool {
         match self {
             Self::Latin(metrics) => metrics.digits_have_same_width(),
@@ -135,21 +133,21 @@ impl Hinter {
 /// The face, as the auto-hinter's metrics are measured on it.
 pub(super) struct Face<'f> {
     font: &'f Font,
-    /// The face's Unicode charmap, as `FT_Select_Charmap` selects it.
+    /// The face's Unicode charmap ([`Font::unicode_charmap`]).
     charmap: Option<Charmap<'f>>,
     /// Where scratch storage is charged.
     budget: &'f Budget,
 }
 
 impl Face<'_> {
-    /// `FT_Get_Char_Index` through the Unicode charmap.
+    /// The glyph the Unicode charmap maps `c` to, if any.
     fn glyph(&self, c: char) -> Option<GlyphId> {
         self.charmap?.glyph(u32::from(c))
     }
 
-    /// `FT_Load_Glyph` with `FT_LOAD_NO_SCALE` into `outline`: whether the
-    /// glyph loads. A glyph FreeType cannot load either is skipped by the
-    /// callers; this crate's limits and budgets fail the load.
+    /// Loads `glyph` in font units into `outline`: whether it loads. The
+    /// callers skip a glyph whose data is invalid, truncated or overflows;
+    /// this crate's limits and budgets fail the load.
     fn load_units(
         &self,
         glyph: GlyphId,
@@ -199,8 +197,8 @@ impl Autofit {
         }
     }
 
-    /// `af_face_globals_new`: the style coverage and the reverse charmap,
-    /// computed once.
+    /// The face's state, computed once: the style coverage and the reverse
+    /// charmap.
     fn globals(&self, font: &Font, work: &mut WorkBudget) -> Result<&Globals> {
         if let Some(globals) = self.globals.get() {
             return Ok(globals);
@@ -230,15 +228,13 @@ impl Autofit {
         Ok(self.globals.get_or_init(|| globals))
     }
 
-    /// The writing system that hints `glyph` at `scaler` for `scope`
-    /// (`af_face_globals_get_metrics` and the metrics' scaling), a latin or
-    /// CJK style's metrics measured on the face once. A glyph outside the
-    /// face is `Invalid`.
+    /// The writing system that hints `glyph` at `scaler` for `scope`, with a
+    /// latin or CJK style's metrics, measured on the face once, scaled to
+    /// the size. A glyph outside the face is `Invalid`.
     ///
     /// For the advance alone a CJK or Indic glyph takes the dummy writing
     /// system, without measuring its style: none of the three hints
-    /// advances (`AF_SCALER_FLAG_NO_ADVANCE`), and all three scale them by
-    /// the scaler's scales.
+    /// advances, and all three scale them by the scaler's scales.
     fn hinter(
         &self,
         globals: &Globals,
@@ -322,11 +318,10 @@ impl Autofit {
         result
     }
 
-    /// `af_loader_load_glyph` for `FT_LOAD_DEFAULT`: loads `glyph` into
-    /// `outline` hinted at `scaler`, moved by the hinted left phantom
-    /// point, and returns the glyph slot's metrics: the box of every point
-    /// fitted outwards to whole pixels, and the advances of
-    /// [`Self::advances`]. Hinted coordinates wrap in 32 bits.
+    /// The default load: loads `glyph` into `outline` hinted at `scaler`,
+    /// moved by the hinted left phantom point, and returns its metrics: the
+    /// box of every point fitted outwards to whole pixels, and the advances
+    /// of [`Self::advances`]. Hinted coordinates wrap in 32 bits.
     ///
     /// # Errors
     ///
@@ -347,7 +342,7 @@ impl Autofit {
             load.hint(&mut scratch.hints, units, outline, Scope::Outline, work)
         })?;
         if pp.0 != 0 {
-            // `FT_Outline_Translate`.
+            // The left phantom point moves to the origin.
             let dx = to_i32(pp.0);
             for p in outline.points_mut() {
                 p.point.x = p.point.x.wrapping_sub(dx);
@@ -360,8 +355,8 @@ impl Autofit {
         Ok(GlyphMetrics {
             advance: to_i32(horizontal),
             vertical_advance: to_i32(vertical),
-            // `FT_Load_Glyph` scales the linear advance after any load, as
-            // the unhinted loads do.
+            // The linear advance is unhinted: scaled by the size's scale, as
+            // after any load.
             linear_vertical_advance: linear_advance(units.vertical_units, scaler.y_scale),
             bearing_x: to_i32(left),
             bearing_y: to_i32(top),
@@ -407,9 +402,8 @@ impl Autofit {
 }
 
 impl GlyphLoad<'_> {
-    /// `FT_Load_Glyph` with `FT_LOAD_NO_SCALE`, as the auto-hinter loads the
-    /// glyph it hints: its outline in font units into `outline`, and its
-    /// advances.
+    /// Loads the glyph to hint: its outline in font units into `outline`,
+    /// and its advances in font units.
     fn load_units(&self, outline: &mut Outline, work: &mut WorkBudget) -> Result<Advances> {
         let units = self.font.load(self.glyph, Scale::UNITS, outline, work)?;
         Ok(Advances {
@@ -421,17 +415,15 @@ impl GlyphLoad<'_> {
 
     /// Hints the glyph loaded in font units into `outline` (for
     /// [`Scope::Outline`]) with `hints`, whose contents it replaces, and
-    /// returns the hinted phantom points' x: the part of
-    /// `af_loader_load_glyph` between loading and the metrics. `units` are
-    /// the glyph's advances in font units.
+    /// returns the hinted phantom points' x. `units` are the glyph's
+    /// advances in font units.
     ///
     /// The right phantom point starts at the scaled advance. A glyph
     /// without points keeps both as they are. Otherwise, for a latin glyph
     /// with two or more hinted vertical edges, the side bearings follow the
     /// outermost edges' moves, rounded, with a pixel more where rounding
     /// would eat a side bearing; else, as the dummy and CJK writing systems
-    /// leave advances unhinted (`AF_SCALER_FLAG_NO_ADVANCE`), both points
-    /// are rounded.
+    /// leave advances unhinted, both points are rounded.
     ///
     /// # Errors
     ///
@@ -460,7 +452,7 @@ impl GlyphLoad<'_> {
                 return Ok((0, pix_round(pp2x)));
             }
             Hinter::Dummy => {
-                // `af_dummy_hints_apply`: the points only scaled.
+                // The dummy writing system only scales the points.
                 if scope == Scope::Outline {
                     for p in outline.points_mut() {
                         p.point.x = to_i32(mul_fix(i64::from(p.point.x), x_scale));
@@ -511,13 +503,12 @@ impl GlyphLoad<'_> {
         Ok((pp1x, pp2x))
     }
 
-    /// The advances `af_loader_load_glyph` reports, rounded to whole
-    /// pixels, from the glyph's advances in font units `units` and its
-    /// hinted phantom points `pp`: for a fixed-pitch face, or a digit of a
-    /// style whose digits share one advance, the scaled advance; else the
-    /// distance between the phantom points, an advance of zero staying
-    /// zero; and the vertical advance scaled by the writing system's
-    /// vertical scale.
+    /// The advances of the hinted load, rounded to whole pixels, from the
+    /// glyph's advances in font units `units` and its hinted phantom points
+    /// `pp`: for a fixed-pitch face, or a digit of a style whose digits
+    /// share one advance, the scaled advance; else the distance between the
+    /// phantom points, an advance of zero staying zero; and the vertical
+    /// advance scaled by the writing system's vertical scale.
     fn advances(&self, units: Advances, (pp1x, pp2x): (i64, i64)) -> (i64, i64) {
         let (x_scale, y_scale) = self.hinter.scales(self.scaler);
         let digits_same = self.hinter.digits_have_same_width();

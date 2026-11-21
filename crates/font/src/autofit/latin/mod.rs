@@ -1,10 +1,12 @@
-//! The latin writing system (`aflatin.c`), which hints most scripts: the
-//! style's global metrics (standard stem widths, blue zones and whether the
-//! digits share one advance), measured on the face once and scaled for each
-//! size, and the hinting of one glyph with them in [`apply`]. The CJK
-//! writing system measures its stem widths and its digits as this one does
+//! The latin writing system, which hints most scripts: the style's global
+//! metrics (standard stem widths, blue zones and whether the digits share
+//! one advance), measured on the face once and scaled for each size, and
+//! the hinting of one glyph with them in [`apply`]. The CJK writing system
+//! measures its stem widths and its digits as this one does
 //! ([`Stems::measure`], [`digits_have_same_width`]) and finds segments and
 //! edge properties with [`compute_segments`] and [`edge_properties`].
+//!
+//! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
 mod adjust;
 mod analysis;
@@ -22,11 +24,10 @@ use crate::fixed::wrap32::{self, abs, mul_div, mul_fix, pix_round, wrap};
 use crate::outline::{Outline, OutlinePoint, PointKind};
 use triergon_core::{Result, WorkBudget};
 
-/// `AF_LATIN_MAX_WIDTHS` (and `AF_CJK_MAX_WIDTHS`): the standard widths kept
-/// per dimension.
+/// The standard widths kept per dimension.
 const MAX_WIDTHS: usize = 16;
 
-/// The properties of a blue string (`AF_BLUE_PROPERTY_LATIN_*`).
+/// The properties of a blue string.
 mod property {
     pub(super) const TOP: u8 = 1 << 0;
     pub(super) const SUB_TOP: u8 = 1 << 1;
@@ -37,7 +38,7 @@ mod property {
     pub(super) const SMALL_BOTTOM: u8 = 1 << 6;
 }
 
-/// The flags of a blue zone (`AF_LATIN_BLUE_*`).
+/// The flags of a blue zone.
 mod blue {
     /// Less than 3/4 pixel tall at the current size.
     pub(super) const ACTIVE: u8 = 1 << 0;
@@ -50,15 +51,13 @@ mod blue {
     pub(super) const BOTTOM_SMALL: u8 = 1 << 6;
 }
 
-/// `AF_LATIN_CONSTANT`: `value`, given for 2048 units per em, for the face's
-/// units per em.
+/// `value`, given for 2048 units per em, scaled to the face's units per em.
 pub(super) fn constant(units_per_em: u16, value: i64) -> i64 {
     value * i64::from(units_per_em) / 2048
 }
 
-/// The standard stem widths of one dimension, in font units, as
-/// `af_latin_metrics_init_widths` measures them and
-/// `af_cjk_metrics_init_widths`, its copy, does too.
+/// The standard stem widths of one dimension, in font units, which the
+/// latin and CJK writing systems measure alike.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Stems {
     pub(super) count: usize,
@@ -104,8 +103,7 @@ impl Stems {
             && face.load_units(glyph, outline, work)?
             && !outline.is_empty()
         {
-            // The analysis runs in font units: FreeType's hints keep their
-            // zero scale here.
+            // The analysis runs in font units; the hints' scales stay zero.
             let mut hints = GlyphHints::new(face.budget);
             hints.reload(outline, units_per_em, work)?;
             for dim in Dimension::BOTH {
@@ -141,9 +139,8 @@ impl Stems {
     }
 }
 
-/// `af_latin_metrics_check_digits` (and `af_cjk_metrics_check_digits`, its
-/// copy): whether the glyphs of the ASCII digits the face maps share one
-/// `hmtx` advance.
+/// Whether the glyphs of the ASCII digits the face maps share one `hmtx`
+/// advance.
 pub(super) fn digits_have_same_width(face: &Face<'_>) -> bool {
     let mut first: Option<u16> = None;
     for digit in '0'..='9' {
@@ -160,8 +157,8 @@ pub(super) fn digits_have_same_width(face: &Face<'_>) -> bool {
     true
 }
 
-/// A blue zone (`AF_LatinBlueRec`): its reference and overshoot positions,
-/// and the extent of the characters it was measured on.
+/// A blue zone: its reference and overshoot positions, and the extent of
+/// the characters it was measured on.
 #[derive(Clone, Copy, Debug, Default)]
 struct Blue {
     reference: Width,
@@ -171,8 +168,8 @@ struct Blue {
     flags: u8,
 }
 
-/// One dimension's metrics (`AF_LatinAxisRec`): standard widths, and for
-/// the vertical dimension the blue zones.
+/// One dimension's metrics: standard widths, and for the vertical dimension
+/// the blue zones.
 #[derive(Clone, Copy, Debug)]
 struct Axis {
     scale: i64,
@@ -211,9 +208,8 @@ impl Axis {
     }
 }
 
-/// The global metrics of a style of the latin writing system
-/// (`AF_LatinMetricsRec`), in font units as measured on the face, or scaled
-/// to a size by [`Self::scaled`].
+/// The global metrics of a style of the latin writing system, in font units
+/// as measured on the face, or scaled to a size by [`Self::scaled`].
 #[derive(Clone, Debug)]
 pub(crate) struct Metrics {
     style: usize,
@@ -223,9 +219,9 @@ pub(crate) struct Metrics {
 }
 
 impl Metrics {
-    /// `af_latin_metrics_init`: the style's metrics as measured on the
-    /// face, or `None` when none of its blue strings gives a zone; FreeType
-    /// then leaves the style's glyphs to the dummy writing system.
+    /// The style's metrics as measured on the face, or `None` when none of
+    /// its blue strings gives a zone, which leaves the style's glyphs to
+    /// the dummy writing system.
     ///
     /// Without a Unicode charmap nothing is measured, and the metrics stay
     /// empty.
@@ -244,7 +240,7 @@ impl Metrics {
             return Ok(Some(metrics));
         }
         let mut outline = Outline::new(face.budget);
-        // `af_latin_metrics_init_widths`.
+        // The standard widths of both dimensions.
         let stems = Stems::measure(face, style, &mut outline, work)?;
         for (axis, stems) in metrics.axis.iter_mut().zip(stems) {
             axis.stems = stems;
@@ -256,11 +252,10 @@ impl Metrics {
         Ok(Some(metrics))
     }
 
-    /// `af_latin_metrics_init_blues`: one blue zone per blue string of the
-    /// style that finds a glyph, its reference the median of the flat
-    /// extrema of its characters and its overshoot the median of the round
-    /// ones, then the zones' tops lowered where zones overlap. Whether any
-    /// zone was found.
+    /// Measures one blue zone per blue string of the style that finds a
+    /// glyph, its reference the median of the flat extrema of its characters
+    /// and its overshoot the median of the round ones, then lowers the
+    /// zones' tops where zones overlap. Returns whether any zone was found.
     fn init_blues(
         &mut self,
         face: &Face<'_>,
@@ -312,7 +307,7 @@ impl Metrics {
             if flat_count == 0 && round_count == 0 {
                 continue;
             }
-            // `af_sort_pos`; equal positions are indistinguishable.
+            // Equal positions are indistinguishable: an unstable sort does.
             rounds[..round_count].sort_unstable();
             flats[..flat_count].sort_unstable();
             let (mut reference, mut shoot) = match (flat_count, round_count) {
@@ -359,8 +354,8 @@ impl Metrics {
         if axis.blue_count == 0 {
             return Ok(false);
         }
-        // Sort the zones bottom to top (`af_latin_sort_blue`), then lower
-        // each top that reaches into the next zone.
+        // Sort the zones bottom to top, then lower each top that reaches into
+        // the next zone.
         let upward = |b: &Blue| b.flags & (blue::TOP | blue::SUB_TOP) != 0;
         let bottom = |b: &Blue| {
             if upward(b) {
@@ -371,8 +366,7 @@ impl Metrics {
         };
         let mut sorted: [usize; MAX_BLUES] = std::array::from_fn(|i| i);
         let sorted = &mut sorted[..axis.blue_count];
-        // FreeType's insertion sort moves a zone only past higher ones, so it
-        // is stable, as this sort is.
+        // A stable sort: zones with equal bottoms keep their order.
         sorted.sort_by_key(|&i| bottom(&axis.blues[i]));
         for i in 0..sorted.len() - 1 {
             let next = &axis.blues[sorted[i + 1]];
@@ -394,9 +388,8 @@ impl Metrics {
         Ok(true)
     }
 
-    /// `af_latin_metrics_scale`: the metrics at 16.16 scales `x_scale` and
-    /// `y_scale` (font units to 26.6 pixels), in the 32 bits of an
-    /// `FT_Fixed`.
+    /// The metrics at 16.16 scales `x_scale` and `y_scale` (font units to
+    /// 26.6 pixels), each wrapped to 32 bits.
     pub(super) fn scaled(&self, x_scale: i64, y_scale: i64) -> Self {
         let mut scaled = self.clone();
         scaled.scale_dim(Dimension::Horizontal, wrap(x_scale));
@@ -404,9 +397,9 @@ impl Metrics {
         scaled
     }
 
-    /// `af_latin_metrics_scale_dim`. The vertical scale is first adjusted
-    /// so that the x height blue zone's overshoot lands on a pixel, rounding
-    /// up from 40/64, unless that moves any extent by two pixels or more.
+    /// Scales one dimension. The vertical scale is first adjusted so that
+    /// the x height blue zone's overshoot lands on a pixel, rounding up
+    /// from 40/64, unless that moves any extent by two pixels or more.
     /// Widths and blue zones are scaled; a zone under 3/4 pixel tall is
     /// active, with its reference rounded and its overshoot at 0, 1/2 or 1
     /// pixel from it. A sub-top zone overlapping another active zone is
@@ -420,7 +413,6 @@ impl Metrics {
                 .find(|b| b.flags & blue::ADJUSTMENT != 0)
         {
             let scaled = mul_fix(x_height.shoot.org, scale);
-            // The `increase-x-height` property is off.
             let fitted = wrap((scaled + 40) & !63);
             if scaled != fitted {
                 let new_scale = mul_div(scale, fitted, scaled);
@@ -501,14 +493,13 @@ impl Metrics {
     }
 }
 
-/// The extremum one glyph gives a blue zone, part of
-/// `af_latin_metrics_init_blues`: the highest point (for a top or sub-top
-/// zone) or lowest of its contours of two or more points, and whether the
-/// segment around it is round. Every point also widens `ascender` and
-/// `descender`. `None` for a glyph FreeType skips: a degenerate one for a
-/// long zone, a round extremum for a neutral one, and an extremum on
-/// `FT_LONG_MIN` or `FT_LONG_MAX`, which FreeType starts its search from and
-/// takes for none found.
+/// The extremum one glyph gives a blue zone: the highest point (for a top
+/// or sub-top zone) or lowest of its contours of two or more points, and
+/// whether the segment around it is round. Every point also widens
+/// `ascender` and `descender`. `None` for a glyph that gives none: a
+/// degenerate one for a long zone, a round extremum for a neutral one, and
+/// an extremum on `i32::MIN` or `i32::MAX`, which FreeType takes for none
+/// found.
 fn extremum(
     points: &[OutlinePoint],
     ends: &[u32],
@@ -554,7 +545,7 @@ fn extremum(
         }
     }
     if best_point < 0 {
-        // FreeType then keeps its initial flat zero.
+        // Every contour is a single point: a flat extremum at zero.
         return Some((0, false));
     }
     let (contour_first, contour_last) = (best_first, best_last);

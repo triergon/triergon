@@ -1,7 +1,7 @@
 //! Grid-fitting a glyph with the CJK writing system, as FreeType's default
-//! load (`FT_LOAD_TARGET_NORMAL`) runs it: stems are adjusted to whole
-//! pixels, without snapping to standard widths and without the light,
-//! monochrome and LCD modes' variations.
+//! load runs it: stems are adjusted to whole pixels, without snapping to
+//! standard widths and without the light, monochrome and LCD modes'
+//! variations. Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
 use super::super::hints::{Dimension, Edge, GlyphHints, edge, point};
 use super::{Axis, Metrics, analysis};
@@ -9,8 +9,8 @@ use crate::fixed::wrap32::{abs, mul_div, wrap};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 
-/// `af_cjk_hints_apply` after `af_cjk_hints_init`: hints the glyph loaded
-/// into `hints` (scaled by the metrics' scales) with `metrics`, scaled.
+/// Hints the glyph loaded into `hints` (scaled by the metrics' scales)
+/// with `metrics`, scaled.
 ///
 /// In both dimensions edges are found and given their blue zones; then
 /// each dimension's edges are fitted, the points of their segments moved
@@ -34,15 +34,14 @@ pub(in super::super) fn apply(
     Ok(())
 }
 
-/// `af_cjk_compute_stem_width` for the default load, with stem adjustment
-/// and without snapping: the width of a stem, lightly quantized. Where the
-/// axis has standard widths, a stem within 40/64 pixel of the first one's
-/// scaled width (which the CJK metrics leave at zero) becomes 3/4 pixel;
-/// others under 54/64 pixel grow halfway to that, and others under three
-/// pixels keep their whole pixels and a fraction under 10/64 or from 22/64
-/// to 42/64, but a fraction up to 22/64 becomes 10/64 and one up to 54/64
-/// becomes 54/64. A width of `FT_LONG_MIN` stays negative when made
-/// positive, as FreeType's does.
+/// The width of a stem, lightly quantized and never snapped to a standard
+/// width. Where the axis has standard widths, a stem within 40/64 pixel of
+/// the first one's scaled width (which the CJK metrics leave at zero)
+/// becomes 3/4 pixel; others under 54/64 pixel grow halfway to that, and
+/// others under three pixels keep their whole pixels and a fraction under
+/// 10/64 or from 22/64 to 42/64, but a fraction up to 22/64 becomes 10/64
+/// and one up to 54/64 becomes 54/64. A width of -2^31 stays negative when
+/// made positive, wrapping in 32 bits.
 fn stem_width(axis: &Axis, width: i64) -> i64 {
     let mut dist = abs(width);
     if axis.stems.count > 0 && abs(dist) < 40 {
@@ -70,25 +69,23 @@ struct Fitter<'a> {
 }
 
 impl Fitter<'_> {
-    /// `af_cjk_align_linked_edge`: places edge `stem` at its fitted stem
-    /// width from edge `base`.
+    /// Places edge `stem` at its fitted stem width from edge `base`.
     fn align_linked(&mut self, base: usize, stem: usize) {
         let (base_edge, stem_edge) = (self.edges[base], self.edges[stem]);
         let fitted = stem_width(self.axis, wrap(stem_edge.opos - base_edge.opos));
         self.edges[stem].pos = wrap(base_edge.pos + fitted);
     }
 
-    /// `af_cjk_align_serif_edge`: moves edge `serif` as edge `base` moved.
+    /// Moves edge `serif` as edge `base` moved.
     fn align_serif(&mut self, base: usize, serif: usize) {
         let base = self.edges[base];
         let serif = &mut self.edges[serif];
         serif.pos = wrap(base.pos + (serif.opos - base.opos));
     }
 
-    /// `af_hint_normal_stem` for the default load: fits the stem between
-    /// edges `e` and `link` at its fitted width, centred on its original
-    /// centre moved by `anchor`, then shifts it as [`stem_shift`] says.
-    /// Returns the shift.
+    /// Fits the stem between edges `e` and `link` at its fitted width,
+    /// centred on its original centre moved by `anchor`, then shifts it as
+    /// [`stem_shift`] says. Returns the shift.
     fn normal_stem(&mut self, e: usize, link: usize, anchor: i64) -> i64 {
         let (edge1, edge2) = (self.edges[e], self.edges[link]);
         let cur_len = stem_width(self.axis, wrap(edge2.opos - edge1.opos));
@@ -108,16 +105,15 @@ impl Fitter<'_> {
     }
 }
 
-/// The shift `af_hint_normal_stem` gives a stem from `start` of length
-/// `len`, with the default load's threshold of a whole pixel (the light
-/// mode's smaller ones do not apply): none when an end is on the pixel
-/// grid. A stem of up to a pixel across a pixel boundary moves wholly to
-/// the side of it the stem covers more of (the upper one on a tie). A
+/// The shift [`Fitter::normal_stem`] gives a stem from `start` of length
+/// `len`, with a threshold of a whole pixel: none when an end is on the
+/// pixel grid. A stem of up to a pixel across a pixel boundary moves wholly
+/// to the side of it the stem covers more of (the upper one on a tie). A
 /// longer stem whose length's fraction is under half a pixel and reaches
 /// the start's distance up or the end's distance down stays; otherwise it
-/// takes the smaller of two moves, each the smaller of a move down and one
-/// up as FreeType pairs them, each putting one end on the grid, the first
-/// on a tie.
+/// takes the smaller of the moves measured from the start and from the end
+/// (the start's on a tie), each the smaller of a move down and one up (down
+/// on a tie) that puts one end on the grid.
 fn stem_shift(start: i64, len: i64) -> i64 {
     let threshold = 64;
     let end = wrap(start + len);
@@ -157,7 +153,7 @@ fn stem_shift(start: i64, len: i64) -> i64 {
     }
 }
 
-/// `af_cjk_hint_edges`: fits the edges of `dim`.
+/// Fits the edges of `dim`.
 ///
 /// Edges in blue zones go to the zones' fitted positions first, with the
 /// other edge of their stem at the stem's width. Then every stem is fitted
@@ -181,10 +177,10 @@ fn hint_edges(
         axis,
     };
     let done = |fitted: &Edge| fitted.flags & edge::DONE != 0;
-    // FreeType's anchor only says whether an edge was fitted yet.
+    // Whether an edge was fitted yet.
     let mut anchored = false;
     let mut delta = 0;
-    // Edges left to the serif and interpolation passes (FreeType's `FT_Int`).
+    // Edges left to the serif and interpolation passes.
     let mut skipped = 0_i32;
     let mut last_stem: Option<i64> = None;
 
@@ -232,7 +228,7 @@ fn hint_edges(
             }
         }
         if fit.edges[link].blue_edge.is_some() {
-            // FreeType does not expect this.
+            // The linked edge sits on a blue zone: this one follows it.
             fit.align_linked(link, e);
             fit.edges[e].flags |= edge::DONE;
             continue;
@@ -322,9 +318,9 @@ fn hint_edges(
     Ok(())
 }
 
-/// `af_cjk_align_edge_points` without snapping: moves the points of each
-/// segment of each edge by the edge's move and marks them touched. A point
-/// two segments share moves twice, as in FreeType.
+/// Moves the points of each segment of each edge by the edge's move and
+/// marks them touched. A point two segments share moves twice, as in
+/// FreeType.
 fn align_edge_points(hints: &mut GlyphHints, dim: Dimension, work: &mut WorkBudget) -> Result<()> {
     let axis = &hints.axis[dim.index()];
     let points = hints.points.as_mut_slice();
@@ -395,10 +391,10 @@ mod tests {
     #[test]
     fn a_width_of_ft_long_min_wraps_as_on_32_bit_arm() {
         let width = i64::from(i32::MIN);
-        // FT_ABS leaves FT_LONG_MIN negative: within 40 of zero.
+        // The absolute value of -2^31 wraps to -2^31: under 40.
         assert_eq!(stem_width(&axis(true), width), -48);
-        // Under 54: 54 - FT_LONG_MIN wraps to 54 - 2^31, half of which
-        // added to FT_LONG_MIN wraps to 2^30 + 27, then negated.
+        // Under 54: 54 + 2^31 wraps to 54 - 2^31, half of which added to
+        // -2^31 wraps to 2^30 + 27, then negated.
         assert_eq!(stem_width(&axis(false), width), -(1 << 30) - 27);
     }
 

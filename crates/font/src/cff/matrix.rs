@@ -1,9 +1,9 @@
-//! The FontMatrix as FreeType applies it: read into 16.16 values sharing one
-//! power of ten (`cff_parse_font_matrix`), normalised so that `yy` is one with
-//! the rest of the scale moved into units per em (`cff_face_init`), and
-//! concatenated with the Top DICT's for Font DICTs. Outlines are transformed
-//! in fixed point as FreeType does on 32-bit ARM, with 32-bit `FT_Long`
-//! products and sums, so results match it bit for bit.
+//! The FontMatrix of a Top or Font DICT: read into 16.16 values sharing one
+//! power of ten, normalised so that `yy` is one with the rest of the scale
+//! moved into units per em, and concatenated with the Top DICT's for Font
+//! DICTs. Outlines are transformed in fixed point with 32-bit products and
+//! sums, which gives FreeType's results on 32-bit ARM bit for bit.
+//! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
 use super::number::{Operand, POWER_TENS, fixed_dynamic};
 use crate::fixed::ONE;
@@ -59,8 +59,8 @@ impl FontMatrix {
         if !(-9..=0).contains(&max) || !(0..=9).contains(&(max - min)) {
             return Ok(Self::identity(1));
         }
-        // Rounded to the common power of ten, saturating at the 32-bit
-        // `FT_LONG_MIN` and `FT_LONG_MAX` of 32-bit ARM.
+        // Rounded to the common power of ten, saturating at the least and
+        // greatest 32-bit values.
         let [xx, yx, xy, yy, dx, dy] = values.map(|(value, scale)| {
             let divisor = POWER_TENS[usize::try_from(max - scale).unwrap_or(0)];
             let half = divisor >> 1;
@@ -89,10 +89,9 @@ impl FontMatrix {
         })
     }
 
-    /// `FT_Matrix_Check` as GCC builds it for 32-bit ARM: nonzero 32-bit
-    /// coefficients, shifted right so that the largest has 15 significant
-    /// bits (`FT_MSB(val) - 4 * sizeof(FT_ULong) + 2`), whose determinant is
-    /// not small next to the squared Frobenius norm, both in 32 bits.
+    /// Whether the matrix is far from singular: nonzero 32-bit coefficients,
+    /// shifted right until the largest has 15 significant bits, whose
+    /// determinant exceeds a 32nd of the squared Frobenius norm, in 32 bits.
     fn is_regular(&self) -> bool {
         let coefficients = [self.xx, self.xy, self.yx, self.yy];
         let any = coefficients.iter().fold(0, |any, v| any | v.unsigned_abs());
@@ -139,7 +138,7 @@ impl FontMatrix {
             1
         };
         let val = ONE * scaling;
-        // `ADD_LONG` of two `FT_MulDiv`s, in 32 bits.
+        // `a × b / val + c × d / val`, each term rounded, in 32 bits.
         let product =
             |a: i64, b: i64, c: i64, d: i64| wrap(mul_div(a, b, val) + mul_div(c, d, val));
         Self {
@@ -166,8 +165,8 @@ impl FontMatrix {
         self.is_linear_identity() && self.dx == 0 && self.dy == 0
     }
 
-    /// A point in font units through the normalised matrix and offset
-    /// (`FT_Outline_Transform`, then `FT_Outline_Translate`).
+    /// A point in font units through the normalised matrix, then moved by
+    /// its offset, in 32 bits.
     pub(super) const fn point(&self, (x, y): (i64, i64)) -> (i64, i64) {
         let (x, y) = if self.is_linear_identity() {
             (x, y)
@@ -275,19 +274,19 @@ mod tests {
     #[test]
     fn normalising_and_checking_follow_32_bit_arm() {
         // 0.03 0 0 0.03 30000 0: normalising divides the offset, 30000 at the
-        // shared power of ten, by 0.03 with FT_DivFix, whose result keeps its
+        // shared power of ten, by 0.03 in 16.16, and the quotient keeps its
         // low 32 bits: 1114157335, 17000 font units, not 1000040.
         let m = matrix([b"0.03", b"0", b"0", b"0.03", b"30000", b"0"]);
         assert_eq!((m.xx, m.yy, m.dx), (1966, 1966, 1_966_080_000));
         assert_eq!(m.normalized().dx, 17000);
         // At a divisor of 10^7, xx's 2147482993 is within half the divisor of
-        // FT_LONG_MAX, so FreeType saturates it to FT_LONG_MAX / 10^7, 214,
-        // rather than rounding it to 215.
+        // 2^31 - 1, so it saturates to (2^31 - 1) / 10^7, 214, rather than
+        // rounding to 215.
         let m = matrix([b"3.276799e7", b"0", b"0", b"3e7", b"1e4", b"0"]);
         assert_eq!(m.xx, 214);
         assert_ne!(m, FontMatrix::identity(1));
-        // FT_Matrix_Check shifts the coefficients to 15 significant bits
-        // first: this matrix passes it in 32 bits, though not in 64.
+        // `is_regular` shifts the coefficients to 15 significant bits first:
+        // this matrix passes it in 32 bits, though not in 64.
         let skewed = FontMatrix {
             xx: -6420,
             xy: -441_914,

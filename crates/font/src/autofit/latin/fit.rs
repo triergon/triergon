@@ -1,7 +1,9 @@
 //! Grid-fitting a glyph with the latin writing system, as FreeType's
-//! default load (`FT_LOAD_TARGET_NORMAL`) runs it: stems are adjusted to
-//! whole pixels, without snapping to standard widths and without the light,
-//! monochrome and LCD modes' variations.
+//! default load runs it: stems are adjusted to whole pixels, without
+//! snapping to standard widths and without the light, monochrome and LCD
+//! modes' variations.
+//!
+//! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
 use super::super::hints::{Dimension, Edge, GlyphHints, Point, Segment, edge};
 use super::super::style::NONBASE;
@@ -26,18 +28,17 @@ pub(in super::super) enum Scope {
 pub(in super::super) struct Glyph {
     /// Its entry in the style coverage, with its `NONBASE` bit.
     pub(in super::super) coverage: u16,
-    /// Its flags in the adjustment database (`AF_ADJUST_*`), through the
-    /// reverse charmap; zero for none.
+    /// Its flags in the adjustment database, through the reverse charmap;
+    /// zero for none.
     pub(in super::super) adjustment: u16,
-    /// The size's pixels per em (`x_ppem`).
+    /// The size's pixels per em.
     pub(in super::super) ppem: u16,
     /// Whether the face is italic, which turns horizontal hinting off.
     pub(in super::super) italic: bool,
 }
 
-/// `af_latin_hints_apply` after `af_latin_hints_init`: hints the glyph
-/// loaded into `hints` (scaled by the metrics' scales, `x_scale` and the x
-/// height adjusted `y_scale`) with `metrics`, scaled.
+/// Hints the glyph loaded into `hints` (scaled by the metrics' scales,
+/// `x_scale` and the x height adjusted `y_scale`) with `metrics`, scaled.
 ///
 /// Horizontally, unless the face is italic: vertical edges are found and
 /// fitted. Vertically: accents are first prepared as the adjustment
@@ -105,15 +106,14 @@ pub(in super::super) fn apply(
     Ok(())
 }
 
-/// `af_latin_compute_stem_width` for the default load, with stem
-/// adjustment and without snapping: the width of a stem from an edge with
-/// flags `base_flags` moved by `base_delta`, lightly quantized. Widths of
-/// extra light axes and of vertical serifs under three pixels stay;
-/// others grow to 1 pixel (round edges under 1.25 pixel) or 7/8, snap to
-/// the standard width within 5/8 pixel, keep small fractions under three
-/// pixels, and round above, less part of the base edge's move at under 30
-/// pixels per em. A width of `FT_LONG_MIN` stays negative when made
-/// positive, as FreeType's does.
+/// The width of a stem for the default load, with stem adjustment and
+/// without snapping: that of a stem from an edge with flags `base_flags`
+/// moved by `base_delta`, lightly quantized. Widths of extra light axes and
+/// of vertical serifs under three pixels stay; others grow to 1 pixel
+/// (round edges under 1.25 pixel) or 7/8, snap to the standard width within
+/// 5/8 pixel, keep small fractions under three pixels, and round above,
+/// less part of the base edge's move at under 30 pixels per em. A width of
+/// `i32::MIN` stays negative when made positive.
 fn stem_width(
     axis: &Axis,
     dim: Dimension,
@@ -183,8 +183,7 @@ struct Fitter<'a> {
 }
 
 impl Fitter<'_> {
-    /// `af_latin_align_linked_edge`: places edge `stem` at its fitted stem
-    /// width from edge `base`.
+    /// Places edge `stem` at its fitted stem width from edge `base`.
     fn align_linked(&mut self, base: usize, stem: usize) {
         let (base_edge, stem_edge) = (self.edges[base], self.edges[stem]);
         let dist = wrap(stem_edge.opos - base_edge.opos);
@@ -201,7 +200,7 @@ impl Fitter<'_> {
         self.edges[stem].pos = wrap(base_edge.pos + fitted);
     }
 
-    /// `af_latin_compute_stem_width` between two edges, from nowhere.
+    /// The fitted stem width between two edges, taking the first as unmoved.
     fn width(&self, from: usize, to: usize) -> i64 {
         let (a, b) = (self.edges[from], self.edges[to]);
         stem_width(
@@ -228,7 +227,7 @@ impl Fitter<'_> {
     }
 }
 
-/// `af_latin_hint_edges`: fits the edges of `dim`.
+/// Fits the edges of `dim` to the pixel grid.
 ///
 /// Horizontal edges in blue zones go to the zones' fitted positions first,
 /// with the other edge of their stem at the stem's width. Then every stem
@@ -447,7 +446,7 @@ fn hint_edges(
             }
             let opos = fit.edges[e].opos;
             if delta < 64 + 16 {
-                // `af_latin_align_serif_edge`: follow the serif's base.
+                // A serif within 1.25 pixels of its base follows it.
                 let base = fit.edges[fit.edges[e].serif.unwrap_or(e)];
                 fit.edges[e].pos = wrap(base.pos + (opos - base.opos));
             } else if let Some(a) = anchor {
@@ -526,8 +525,8 @@ mod tests {
 
     #[test]
     fn a_width_of_ft_long_min_stays_negative() {
-        // FT_ABS leaves FT_LONG_MIN negative, under the 7/8 pixel minimum,
-        // which then applies: -56, where 64-bit arithmetic keeps the width.
+        // Made positive in 32 bits the width stays negative, under the 7/8
+        // pixel minimum, which then applies: -56, where 64 bits keep the width.
         let width = i64::from(i32::MIN);
         let h = Dimension::Horizontal;
         assert_eq!(stem_width(&axis(None, false), h, 20, width, 0, 0, 0), -56);

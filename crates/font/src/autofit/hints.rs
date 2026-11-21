@@ -1,12 +1,12 @@
-//! The glyph analysis the auto-hinter's writing systems share
-//! (`afhints.c`): an outline's points with their directions and weak or
-//! strong roles, the segments and edges found along each dimension, and the
-//! alignment of points to hinted edges and between them.
+//! The glyph analysis the auto-hinter's writing systems share: an outline's
+//! points with their directions and weak or strong roles, the segments and
+//! edges found along each dimension, and the alignment of points to hinted
+//! edges and between them. Translated from FreeType 2.15.0 (see
+//! `docs/provenance.md`).
 //!
-//! Points, segments and edges refer to each other by index. Segment and edge
-//! fields FreeType keeps in 16 bits (`FT_Short`) are 16-bit here and wrap as
-//! they do there; positions, as `FT_Pos`, wrap in 32 bits (see
-//! [`long`](super::long)).
+//! Points, segments and edges refer to each other by index. Their font-unit
+//! coordinates and extents are kept in 16 bits and wrap there; scaled
+//! positions wrap in 32 bits (see [`crate::fixed::wrap32`]).
 
 use crate::Orientation;
 use crate::fixed::wrap32::{div_fix, mul_fix, to_i32, wrap};
@@ -14,7 +14,7 @@ use crate::outline::{Outline, PointKind};
 use crate::work::charge;
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 
-/// A dimension (`AF_Dimension`).
+/// A dimension to hint along.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Dimension {
     /// x coordinates: vertical segments and edges.
@@ -34,8 +34,8 @@ impl Dimension {
     }
 }
 
-/// Directions (`AF_Direction`), chosen so that two are opposite exactly
-/// when they sum to zero.
+/// Directions, chosen so that two are opposite exactly when they sum to
+/// zero.
 pub(super) mod direction {
     pub(in super::super) const NONE: i8 = 4;
     pub(in super::super) const RIGHT: i8 = 1;
@@ -44,7 +44,7 @@ pub(super) mod direction {
     pub(in super::super) const DOWN: i8 = -2;
 }
 
-/// Point flags (`AF_FLAG_*`).
+/// Point flags.
 pub(super) mod point {
     /// A quadratic control point.
     pub(in super::super) const CONIC: u16 = 1 << 0;
@@ -59,7 +59,7 @@ pub(super) mod point {
     pub(in super::super) const IGNORE: u16 = 1 << 6;
 }
 
-/// Edge and segment flags (`AF_EDGE_*`).
+/// Edge and segment flags.
 pub(super) mod edge {
     pub(in super::super) const ROUND: u8 = 1 << 0;
     pub(in super::super) const SERIF: u8 = 1 << 1;
@@ -70,8 +70,8 @@ pub(super) mod edge {
     pub(in super::super) const NO_BLUE: u8 = 1 << 4;
 }
 
-/// `af_direction_compute`: the direction of a vector, or none when its arms
-/// do not differ enough (by a factor of 14, about 4.1 degrees).
+/// The direction of a vector, or none when its arms do not differ enough
+/// (by a factor of 14, about 4.1 degrees).
 pub(super) fn direction_of(dx: i64, dy: i64) -> i8 {
     let (direction, long, short) = if dy >= dx {
         if dy >= -dx {
@@ -91,7 +91,7 @@ pub(super) fn direction_of(dx: i64, dy: i64) -> i8 {
     }
 }
 
-/// A width (`AF_WidthRec`): in font units, scaled, and fitted.
+/// A width: in font units, scaled, and fitted.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) struct Width {
     pub(super) org: i64,
@@ -99,9 +99,8 @@ pub(super) struct Width {
     pub(super) fit: i64,
 }
 
-/// `af_sort_and_quantize_widths`: sorts the first `count` widths and
-/// replaces each cluster no wider than `threshold` by one width; returns
-/// the new count.
+/// Sorts the first `count` widths and replaces each cluster no wider than
+/// `threshold` by one width; returns the new count.
 ///
 /// As in FreeType, a cluster's sum is divided by the index after it rather
 /// than by its size, and no widths at all leave one: the first entry, zero
@@ -114,8 +113,7 @@ pub(super) fn sort_and_quantize_widths(
     if count == 1 {
         return 1;
     }
-    // FreeType's insertion sort moves a width only past larger ones, so it
-    // is stable, as this sort is.
+    // Stable: equal widths keep their order.
     table[..count].sort_by_key(|w| w.org);
     let mut start = 0;
     let mut current = table[0].org;
@@ -148,7 +146,7 @@ pub(super) fn sort_and_quantize_widths(
     kept
 }
 
-/// An outline point under hinting (`AF_PointRec`).
+/// An outline point under hinting.
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct Point {
     pub(super) flags: u16,
@@ -173,8 +171,7 @@ pub(super) struct Point {
     pub(super) prev: usize,
 }
 
-/// A segment (`AF_SegmentRec`): consecutive points about aligned along a
-/// dimension.
+/// A segment: consecutive points about aligned along a dimension.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Segment {
     pub(super) flags: u8,
@@ -202,7 +199,7 @@ pub(super) struct Segment {
 }
 
 impl Segment {
-    /// A new segment, as FreeType clears one.
+    /// A new segment: unlinked, with the score a link has to beat.
     pub(super) const NEW: Self = Self {
         flags: 0,
         dir: 0,
@@ -222,7 +219,7 @@ impl Segment {
     };
 }
 
-/// An edge (`AF_EdgeRec`): segments at about the same position.
+/// An edge: segments at about the same position.
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct Edge {
     /// The position in font units.
@@ -243,7 +240,7 @@ pub(super) struct Edge {
     pub(super) last: usize,
 }
 
-/// The segments and edges of one dimension (`AF_AxisHintsRec`).
+/// The segments and edges of one dimension.
 #[derive(Debug)]
 pub(super) struct AxisHints {
     pub(super) segments: BudgetVec<Segment>,
@@ -263,9 +260,9 @@ impl AxisHints {
         }
     }
 
-    /// `af_axis_hints_new_edge`: room for a new edge at `fpos` in direction
-    /// `dir`, kept in order; returns its index. An edge in the minor
-    /// direction goes before edges at the same position in the major one.
+    /// Makes room for a new edge at `fpos` in direction `dir`, keeping the
+    /// edges in order; returns its index. An edge in the minor direction
+    /// goes before edges at the same position in the major one.
     pub(super) fn new_edge(&mut self, fpos: i16, dir: i8, top_to_bottom: bool) -> Result<usize> {
         let mut at = self.edges.len();
         self.edges.try_push(Edge::default()).map_err(|e| e.error)?;
@@ -287,7 +284,7 @@ impl AxisHints {
     }
 }
 
-/// The hints of one glyph (`AF_GlyphHintsRec`).
+/// The hints of one glyph.
 #[derive(Debug)]
 pub(super) struct GlyphHints {
     pub(super) x_scale: i64,
@@ -305,8 +302,7 @@ pub(super) struct GlyphHints {
 }
 
 impl GlyphHints {
-    /// `af_glyph_hints_init`: empty hints at a zero scale, their storage
-    /// charged to `budget`.
+    /// Empty hints at a zero scale, their storage charged to `budget`.
     pub(super) fn new(budget: &Budget) -> Self {
         Self {
             x_scale: 0,
@@ -321,9 +317,9 @@ impl GlyphHints {
         }
     }
 
-    /// `af_glyph_hints_reload`: loads the points of `outline`, in font
-    /// units, scaling them by the hints' scales, and finds each point's
-    /// directions and whether it is weak.
+    /// Loads the points of `outline`, in font units, scaling them by the
+    /// hints' scales, and finds each point's directions and whether it is
+    /// weak.
     ///
     /// Vectors shorter than a threshold of 20/2048 em (taxicab length) are
     /// accumulated with their neighbours, which become weak; so do points
@@ -518,8 +514,8 @@ impl GlyphHints {
         Ok(())
     }
 
-    /// `af_glyph_hints_save`: writes the hinted positions back to
-    /// `outline`, whose points the hints were loaded from.
+    /// Writes the hinted positions back to `outline`, whose points the hints
+    /// were loaded from.
     pub(super) fn save(&self, outline: &mut Outline) {
         for (target, point) in outline.points_mut().iter_mut().zip(self.points.as_slice()) {
             target.point.x = to_i32(point.x);
@@ -527,8 +523,8 @@ impl GlyphHints {
         }
     }
 
-    /// `af_glyph_hints_align_edge_points`: moves the points of each segment
-    /// on an edge to the edge's position and marks them touched.
+    /// Moves the points of each segment on an edge to the edge's position
+    /// and marks them touched.
     pub(super) fn align_edge_points(
         &mut self,
         dim: Dimension,
@@ -563,9 +559,9 @@ impl GlyphHints {
         Ok(())
     }
 
-    /// `af_glyph_hints_align_strong_points`, TrueType's `IP`: places each
-    /// strong point not yet touched between the edges around it, or beyond
-    /// the outermost ones by its original distance.
+    /// TrueType's `IP` for the strong points: places each one not yet
+    /// touched between the edges around it, or beyond the outermost ones by
+    /// its original distance.
     pub(super) fn align_strong_points(
         &mut self,
         dim: Dimension,
@@ -620,10 +616,9 @@ impl GlyphHints {
         Ok(())
     }
 
-    /// `af_glyph_hints_align_weak_points`, TrueType's `IUP`: interpolates
-    /// each run of untouched points between the touched points around it
-    /// in its contour, or shifts a contour with one touched point by that
-    /// point's move.
+    /// TrueType's `IUP`: interpolates each run of untouched points between
+    /// the touched points around it in its contour, or shifts a contour
+    /// with one touched point by that point's move.
     pub(super) fn align_weak_points(
         &mut self,
         dim: Dimension,
@@ -676,7 +671,7 @@ impl GlyphHints {
                         first_touched,
                     );
                 }
-                // FreeType tests against the glyph's first point, not the
+                // The test is against the glyph's first point, not the
                 // contour's; an empty range does nothing either way.
                 if first_touched > 0 {
                     interpolate(
@@ -729,8 +724,8 @@ fn enclosing(edges: &[Edge], u: i64) -> std::result::Result<usize, usize> {
     Err(min)
 }
 
-/// `af_iup_shift`: moves points `p1..=p2` but `reference` by the move of
-/// `reference` (`u` hinted, `v` original).
+/// Moves points `p1..=p2` but `reference` by the move of `reference` (`u`
+/// hinted, `v` original).
 fn shift(points: &mut [Point], p1: usize, p2: usize, reference: usize) {
     let delta = wrap(points[reference].u - points[reference].v);
     if delta == 0 {
@@ -743,9 +738,8 @@ fn shift(points: &mut [Point], p1: usize, p2: usize, reference: usize) {
     }
 }
 
-/// `af_iup_interp`: interpolates points `p1..=p2` between the references,
-/// or shifts them by the nearer reference's move outside the references'
-/// span.
+/// Interpolates points `p1..=p2` between the touched points `ref1` and
+/// `ref2`, or shifts them by the nearer one's move outside their span.
 fn interpolate(points: &mut [Point], p1: usize, p2: usize, ref1: usize, ref2: usize) {
     if p1 > p2 {
         return;
@@ -776,11 +770,11 @@ fn interpolate(points: &mut [Point], p1: usize, p2: usize, ref1: usize, ref2: us
     }
 }
 
-/// `ft_corner_is_flat`: whether the corner of an in and an out vector is
-/// nearly straight, by FreeType's approximate lengths: the two arms are
-/// less than 17/16 of the hypotenuse.
+/// Whether the corner of an in and an out vector is nearly straight, by
+/// approximate lengths: the two arms together are less than 17/16 of the
+/// hypotenuse.
 fn corner_is_flat(in_x: i64, in_y: i64, out_x: i64, out_y: i64) -> bool {
-    // `FT_HYPOT`: the longer arm plus 3/8 of the shorter.
+    // An approximate length: the longer component plus 3/8 of the shorter.
     let length = |x: i64, y: i64| {
         let (x, y) = (x.abs(), y.abs());
         if x > y {

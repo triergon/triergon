@@ -1,12 +1,11 @@
-//! The hinter of FreeType's CFF engine (`psaux/pshints.c`, `psaux/psblues.c`)
-//! as its default load runs it, without stem darkening: the stem hints and hint
-//! masks a charstring declares, the blue zones of its Private DICT at a size,
-//! and the hint maps that move horizontal stem edges onto pixel boundaries.
-//! Vertical stems only count towards the length of masks, as in FreeType.
+//! The CFF hinter, without stem darkening: the stem hints and hint masks a
+//! charstring declares (TN 5177 4.3), the blue zones of its Private DICT at a
+//! size, and the hint maps that move horizontal stem edges onto pixel
+//! boundaries. Vertical stems only count towards the length of masks.
+//! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 //!
-//! The arithmetic is cf2's: 16.16 values in 32 bits that wrap where FreeType's
-//! `ADD_INT32` and `SUB_INT32` wrap, with `FT_MulFix`, `FT_DivFix` and
-//! `FT_MulDiv` results narrowed to 32 bits as `CF2_Fixed` narrows them.
+//! The arithmetic is 16.16 in 32 bits: sums and differences wrap, and
+//! products, quotients and scaled ratios are narrowed to 32 bits.
 
 use super::path::Fixed;
 use crate::fixed::{div_fix, mul_div, mul_fix};
@@ -14,50 +13,50 @@ use crate::read::Reader;
 use crate::work::charge;
 use triergon_core::{Error, Result, WorkBudget};
 
-/// The stem hints a mask can select (`CF2_MAX_HINTS`).
+/// The stem hints a mask can select (TN 5177 Appendix B).
 const MAX_HINTS: usize = 96;
-/// Edges of a hint map (`CF2_MAX_HINT_EDGES`).
+/// Edges of a hint map: two for each stem hint.
 const MAX_EDGES: usize = 2 * MAX_HINTS;
-/// Zones of BlueValues and OtherBlues (`CF2_MAX_BLUES + CF2_MAX_OTHERBLUES`).
+/// Zones of BlueValues and OtherBlues: seven pairs and five.
 const MAX_ZONES: usize = 12;
 const ONE: Fixed = 0x1_0000;
-/// The least distance kept between hint edges (`CF2_MIN_COUNTER`, 0.5).
+/// The least distance kept between hint edges: half a pixel.
 const MIN_COUNTER: Fixed = 0x8000;
-/// The em box of ideographic fonts (`CF2_ICF_Bottom`, `CF2_ICF_Top`).
+/// The em box of ideographic fonts, bottom and top.
 const EM_BOX_BOTTOM: Fixed = -120 << 16;
 const EM_BOX_TOP: Fixed = 880 << 16;
 
-/// `FT_MulFix` narrowed to 32 bits.
+/// `a × b / 65536`, rounded half away from zero, narrowed to 32 bits.
 pub(super) fn mul(a: Fixed, b: Fixed) -> Fixed {
     mul_fix(i64::from(a), i64::from(b)) as Fixed
 }
 
-/// `FT_DivFix` narrowed to 32 bits.
+/// `a × 65536 / b`, rounded half away from zero, narrowed to 32 bits.
 fn div(a: Fixed, b: Fixed) -> Fixed {
     div_fix(i64::from(a), i64::from(b)) as Fixed
 }
 
-/// `cf2_fixedRound`: to the nearest whole number, halves up.
+/// To the nearest whole number, halves up.
 const fn round(x: Fixed) -> Fixed {
     (x.cast_unsigned().wrapping_add(0x8000) & 0xffff_0000).cast_signed()
 }
 
-/// `cf2_fixedFraction`.
+/// `x` less the whole number at or below it.
 const fn fraction(x: Fixed) -> Fixed {
     x.wrapping_sub((x.cast_unsigned() & 0xffff_0000).cast_signed())
 }
 
-/// `cf2_fixedAbs`, which leaves the most negative value as it is.
+/// The magnitude of `x`; the most negative value stays as it is.
 const fn abs(x: Fixed) -> Fixed {
     if x < 0 { x.wrapping_neg() } else { x }
 }
 
-/// `cf2_intToFixed` of a value FreeType keeps in a long.
+/// The integer `v` in 16.16, wrapping in 32 bits.
 const fn int_to_fixed(v: i64) -> Fixed {
     ((v as u32) << 16).cast_signed()
 }
 
-/// What a hint edge is (`CF2_GhostBottom` and the rest).
+/// The kinds and states of a hint edge.
 mod flag {
     pub(super) const GHOST_BOTTOM: u8 = 0x1;
     pub(super) const GHOST_TOP: u8 = 0x2;
@@ -67,9 +66,8 @@ mod flag {
     pub(super) const SYNTHETIC: u8 = 0x20;
 }
 
-/// A hint edge (`CF2_Hint`): a character space coordinate, its device space
-/// position and the scale from it to the next edge. No flags marks an edge
-/// that is absent.
+/// A hint edge: a character space coordinate, its device space position and
+/// the scale from it to the next edge. No flags marks an edge that is absent.
 #[derive(Clone, Copy, Debug, Default)]
 struct Edge {
     flags: u8,
@@ -81,14 +79,14 @@ struct Edge {
 }
 
 impl Edge {
-    /// `cf2_hint_init`: the bottom or top edge of horizontal stem `index`,
-    /// moved by the accent offset `origin`. A stem placed by an earlier hint
-    /// map keeps its place, locked.
+    /// The bottom or top edge of horizontal stem `index`, moved by the accent
+    /// offset `origin`. A stem placed by an earlier hint map keeps its place,
+    /// locked.
     fn new(stem: Stem, index: usize, origin: Fixed, scale: Fixed, bottom: bool) -> Self {
         use flag::{GHOST_BOTTOM, GHOST_TOP, PAIR_BOTTOM, PAIR_TOP};
         let width = stem.max.wrapping_sub(stem.min);
-        // Widths of -21 and -20 mark ghost edges; other negative widths are
-        // inverted pairs, which FreeType turns round.
+        // Widths of -21 and -20 mark ghost edges (TN 5177 4.3); other negative
+        // widths are inverted pairs, which are turned round.
         let (flags, cs) = match (width, bottom) {
             (-0x15_0000, true) => (GHOST_BOTTOM, stem.max),
             (-0x15_0000, false) | (-0x14_0000, true) => (0, 0),
@@ -159,8 +157,8 @@ impl Edge {
     }
 }
 
-/// A stem hint (`CF2_StemHint`): its edges in character space and, once a hint
-/// map has placed them, in device space.
+/// A stem hint: its edges in character space and, once a hint map has placed
+/// them, in device space.
 #[derive(Clone, Copy, Debug, Default)]
 struct Stem {
     min: Fixed,
@@ -170,7 +168,7 @@ struct Stem {
     used: bool,
 }
 
-/// A hint mask (`CF2_HintMask`): one bit per stem, horizontal stems first.
+/// A hint mask: one bit per stem, horizontal stems first.
 #[derive(Clone, Copy, Debug, Default)]
 struct Mask {
     bits: [u8; MAX_HINTS / 8],
@@ -181,7 +179,7 @@ struct Mask {
 }
 
 impl Mask {
-    /// `cf2_hintmask_setCounts`: more than 96 stems fail the glyph.
+    /// Sizes the mask for `count` stems; more than 96 fail the glyph.
     fn set_count(&mut self, count: usize) -> Result<()> {
         if count > MAX_HINTS {
             return Err(Error::Invalid("more than 96 stem hints"));
@@ -192,7 +190,7 @@ impl Mask {
         Ok(())
     }
 
-    /// `cf2_hintmask_read`: the mask bytes after a `hintmask` or `cntrmask`.
+    /// Reads the mask bytes after a `hintmask` or `cntrmask`.
     fn read(&mut self, r: &mut Reader<'_>, count: usize) -> Result<()> {
         self.set_count(count)?;
         for byte in &mut self.bits[..count.div_ceil(8)] {
@@ -201,7 +199,7 @@ impl Mask {
         Ok(())
     }
 
-    /// `cf2_hintmask_setAll`.
+    /// Selects all `count` stems.
     fn set_all(&mut self, count: usize) -> Result<()> {
         self.set_count(count)?;
         let bytes = &mut self.bits[..count.div_ceil(8)];
@@ -221,9 +219,8 @@ impl Mask {
     }
 }
 
-/// A delta-encoded Private DICT array as FreeType stores it: 16.16 running
-/// sums, written over the values of an earlier entry, and the count of the
-/// last entry.
+/// A delta-encoded Private DICT array: 16.16 running sums, written over the
+/// values of an earlier entry, and the count of the last entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Deltas<const N: usize> {
     values: [i64; N],
@@ -236,7 +233,7 @@ impl<const N: usize> Deltas<N> {
         count: 0,
     };
 
-    /// `cff_kind_delta_fixed`: the running sums of the first `N` deltas.
+    /// Stores the running sums of the first `N` deltas.
     pub(super) fn set(&mut self, deltas: impl Iterator<Item = i64>) {
         let mut sum = 0_i64;
         self.count = 0;
@@ -247,7 +244,7 @@ impl<const N: usize> Deltas<N> {
         }
     }
 
-    /// The pairs FreeType's zone loops read: from each even index, with the
+    /// The pairs the zones are built from: from each even index, with the
     /// value after an odd count's last (left from an earlier entry, or zero).
     fn pairs(&self) -> impl Iterator<Item = (Fixed, Fixed)> + '_ {
         // `N` is even, so an odd count leaves room for the value after it.
@@ -257,9 +254,8 @@ impl<const N: usize> Deltas<N> {
     }
 }
 
-/// The Private DICT values the hinter reads, as FreeType stores them
-/// (`CFF_PrivateRec`): the blue arrays in 16.16, BlueScale in 16.16 times
-/// 1000.
+/// The Private DICT values the hinter reads: the blue arrays in 16.16,
+/// BlueScale in 16.16 times 1000.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct HintDict {
     pub(super) blue_values: Deltas<14>,
@@ -273,7 +269,7 @@ pub(super) struct HintDict {
 }
 
 impl HintDict {
-    /// What FreeType keeps for a Font DICT without a Private DICT: zeros.
+    /// The values of a Font DICT without a Private DICT: zeros.
     pub(super) const ABSENT: Self = Self {
         blue_values: Deltas::EMPTY,
         other_blues: Deltas::EMPTY,
@@ -285,8 +281,8 @@ impl HintDict {
         language_group: 0,
     };
 
-    /// The defaults `cff_load_private_dict` parses over: BlueScale 0.039625
-    /// (`0.039625 * 0x10000 * 1000` in double), BlueShift 7, BlueFuzz 1.
+    /// The defaults a Private DICT's entries replace: BlueScale 0.039625
+    /// (39.625 in 16.16), BlueShift 7, BlueFuzz 1.
     pub(super) const DEFAULTS: Self = Self {
         blue_scale: 2_596_864,
         blue_shift: 7,
@@ -294,9 +290,8 @@ impl HintDict {
         ..Self::ABSENT
     };
 
-    /// What `cff_load_private_dict` corrects after parsing: an even number
-    /// of BlueValues, and the defaults for BlueShift and BlueFuzz outside 0 to
-    /// 1000.
+    /// Corrects the values of a parsed DICT: an even number of BlueValues,
+    /// and the defaults for BlueShift and BlueFuzz outside 0 to 1000.
     pub(super) fn sanitize(&mut self) {
         self.blue_values.count &= !1;
         if !(0..=1000).contains(&self.blue_shift) {
@@ -308,7 +303,7 @@ impl HintDict {
     }
 }
 
-/// A blue zone (`CF2_BlueRec`).
+/// A blue zone: a range of heights whose stem edges align to its flat edge.
 #[derive(Clone, Copy, Debug, Default)]
 struct Zone {
     bottom: Fixed,
@@ -319,7 +314,7 @@ struct Zone {
     is_bottom: bool,
 }
 
-/// The blue zones of a Private DICT at a scale (`CF2_Blues`).
+/// The blue zones of a Private DICT at a scale.
 #[derive(Clone, Debug)]
 pub(super) struct Blues {
     scale: Fixed,
@@ -334,7 +329,7 @@ pub(super) struct Blues {
 }
 
 impl Blues {
-    /// `cf2_blues_init` at the 16.16 vertical scale `scale`, without darkening.
+    /// The zones of `dict` at the 16.16 vertical `scale`, without darkening.
     pub(super) fn new(dict: &HintDict, scale: Fixed) -> Self {
         let mut blues = Self {
             scale,
@@ -434,7 +429,7 @@ impl Blues {
             }
         }
         // Below BlueScale, overshoot is suppressed and zones are boosted, by
-        // up to 0.6 of a pixel (`cf2_doubleToFixed(.6)`), kept below one half.
+        // up to 0.6 of a pixel (39322 in 16.16), kept below one half.
         let mut boost = 0;
         if scale < blue_scale {
             blues.suppress_overshoot = true;
@@ -455,10 +450,10 @@ impl Blues {
         blues
     }
 
-    /// `cf2_blues_capture`: whether a zone captures the bottom edge of
-    /// a stem, or its top edge, searched in one pass; a captured stem moves
-    /// onto the zone's flat edge (overshoot suppressed), at least a pixel past
-    /// it (BlueShift), or onto the nearest pixel, and both its edges lock.
+    /// Whether a zone captures the bottom edge of a stem, or its top edge,
+    /// searched in one pass; a captured stem moves onto the zone's flat edge
+    /// (overshoot suppressed), at least a pixel past it (BlueShift), or onto
+    /// the nearest pixel, and both its edges lock.
     fn capture(&self, bottom: &mut Edge, top: &mut Edge) -> bool {
         let fuzz = self.fuzz;
         let within = |zone: &Zone, cs: Fixed| {
@@ -502,8 +497,8 @@ impl Blues {
     }
 }
 
-/// A hint map (`CF2_HintMap`): edges sorted by character space coordinate,
-/// between which device space coordinates are interpolated.
+/// A hint map: edges sorted by character space coordinate, between which
+/// device space coordinates are interpolated.
 #[derive(Clone, Debug)]
 pub(super) struct HintMap {
     edges: [Edge; MAX_EDGES],
@@ -526,17 +521,16 @@ impl HintMap {
         }
     }
 
-    /// A copy of `other`, as FreeType copies a map by structure.
+    /// Copies `other`: its edges, their count and whether it is built.
     fn copy_from(&mut self, other: &Self) {
         self.edges[..other.count].copy_from_slice(&other.edges[..other.count]);
         self.count = other.count;
         self.valid = other.valid;
     }
 
-    /// `cf2_hintmap_map`: the device space coordinate of `cs`, uniformly
-    /// scaled by `scale` without edges. FreeType searches from its last hit;
-    /// the edges are sorted, so the edge it finds is this one, the highest at
-    /// or below `cs`, or below them all the first.
+    /// The device space coordinate of `cs`: uniformly scaled by `scale`
+    /// without edges, else placed from the highest edge at or below `cs` at
+    /// that edge's scale, or below them all from the first at `scale`.
     pub(super) fn map(&self, cs: Fixed, scale: Fixed) -> Fixed {
         let edges = &self.edges[..self.count];
         let Some(&lowest) = edges.first() else {
@@ -549,9 +543,9 @@ impl HintMap {
         mul(cs.wrapping_sub(edge.cs), scale).wrapping_add(edge.ds)
     }
 
-    /// `cf2_hintmap_insertHint`: inserts a stem's edges, either of which may be
-    /// absent, unless they overlap the map's in character space or, placed
-    /// through the `initial` map, in device space.
+    /// Inserts a stem's edges, either of which may be absent, unless they
+    /// overlap the map's in character space or, placed through the `initial`
+    /// map, in device space.
     fn insert(
         &mut self,
         bottom: Edge,
@@ -617,10 +611,10 @@ impl HintMap {
         Ok(())
     }
 
-    /// `cf2_hintmap_adjustHints`: moves each unlocked edge or pair the least
-    /// distance that puts one of its edges on a pixel boundary, keeping half a
-    /// pixel from its neighbours, bottom up; a second pass, top down, retries
-    /// the edges that could not move up. Scales are set by the first pass.
+    /// Moves each unlocked edge or pair the least distance that puts one of
+    /// its edges on a pixel boundary, keeping half a pixel from its
+    /// neighbours, bottom up; a second pass, top down, retries the edges that
+    /// could not move up. Scales are set by the first pass.
     fn adjust(&mut self, work: &mut WorkBudget) -> Result<()> {
         let count = self.count;
         charge(work, count)?;
@@ -679,8 +673,7 @@ impl HintMap {
     }
 }
 
-/// The horizontal stem hints (`hStemHintArray`): the first 96, since a mask
-/// over more fails.
+/// The horizontal stem hints: the first 96, since a mask over more fails.
 type Stems = [Stem; MAX_HINTS];
 
 /// The bottom and top edges of horizontal stem `i`.
@@ -698,14 +691,13 @@ fn edges(stems: &Stems, i: usize, origin: Fixed, scale: Fixed) -> (Edge, Edge) {
 struct Hinted<'b> {
     blues: &'b Blues,
     stems: Stems,
-    /// The edges blue zones capture from all stems, which place the others
-    /// (`initialHintMap`).
+    /// The edges blue zones capture from all stems, which place the others.
     initial: HintMap,
-    /// The map of the current mask (`hintMap`).
+    /// The map of the current mask.
     current: HintMap,
-    /// The map at the current subpath's first point (`firstHintMap`).
+    /// The map at the current subpath's first point.
     first: HintMap,
-    /// The map of a counter mask, which FreeType builds and discards.
+    /// The map of a counter mask, built only to place and lock its stems.
     counters: HintMap,
 }
 
@@ -718,12 +710,12 @@ enum Map {
 }
 
 impl Hinted<'_> {
-    /// `cf2_hintmap_build` placing the edges of the `horizontal` stems
-    /// `mask` selects into the `target` map: the em box's, then those
-    /// captured or placed by an earlier map, then the rest, adjusted. The
-    /// initial map holds the captured edges alone and one at zero below or
-    /// above them all; the others are placed through it, and record where
-    /// their stems went, so that later maps keep them there.
+    /// Places the edges of the `horizontal` stems `mask` selects into the
+    /// `target` map: the em box's, then those captured or placed by an
+    /// earlier map, then the rest, adjusted. The initial map holds the
+    /// captured edges alone and one at zero below or above them all; the
+    /// others are placed through it, and record where their stems went, so
+    /// that later maps keep them there.
     fn place(
         &mut self,
         target: Map,
@@ -799,17 +791,17 @@ impl Hinted<'_> {
     }
 }
 
-/// The hints of one charstring as FreeType's interpreter keeps them: the
-/// number of its stem hints and its hint mask, which decide how the
-/// charstring reads, and, hinting, the stems' edges and the hint maps of its
-/// glyph path. Unhinted, the hint maps hold no edges, so points scale
-/// uniformly; only whether the current one is built is kept.
+/// The hints of one charstring: the number of its stem hints and its hint
+/// mask, which decide how the charstring reads, and, hinting, the stems'
+/// edges and the hint maps of its glyph path. Unhinted, the hint maps hold no
+/// edges, so points scale uniformly; only whether the current one is built is
+/// kept.
 #[derive(Debug)]
 pub(super) struct Hints<'b> {
     horizontal: usize,
     vertical: usize,
     mask: Mask,
-    /// Whether the current hint map is built (`hintMap.isValid`).
+    /// Whether the current hint map is built.
     built: bool,
     /// The vertical offset of a `seac` accent, which moves its stems.
     origin: Fixed,
@@ -840,8 +832,8 @@ impl<'b> Hints<'b> {
         self.horizontal + self.vertical
     }
 
-    /// Whether the stems are fixed: FreeType ignores stem operators once a
-    /// hint mask is read or, at the first move, set.
+    /// Whether the stems are fixed: stem operators are ignored once a hint
+    /// mask is read or, at the first move, set.
     pub(super) const fn are_fixed(&self) -> bool {
         self.mask.valid
     }
@@ -865,8 +857,8 @@ impl<'b> Hints<'b> {
         self.built
     }
 
-    /// `cf2_doStems` without the width: the stems of an operator's operands,
-    /// past an odd first one, as running sums.
+    /// Declares the stems of an operator's operands, past an odd first one,
+    /// as running sums.
     pub(super) fn add_stems(&mut self, horizontal: bool, operands: &[Fixed]) {
         let mut position: Fixed = 0;
         for pair in operands[operands.len() % 2..].chunks_exact(2) {
@@ -896,8 +888,8 @@ impl<'b> Hints<'b> {
         self.mask.read(r, self.count())
     }
 
-    /// The mask after a `cntrmask`. Hinting, FreeType builds a hint map from
-    /// it and discards it, which places and locks the stems it selects.
+    /// The mask after a `cntrmask`. Hinting, a hint map is built from it and
+    /// discarded, which places and locks the stems it selects.
     pub(super) fn read_counter_mask(
         &mut self,
         r: &mut Reader<'_>,
@@ -907,8 +899,8 @@ impl<'b> Hints<'b> {
         mask.read(r, self.count())?;
         let (count, horizontal) = (self.count(), self.horizontal);
         if let Some(h) = &mut self.hinted {
-            // FreeType places counter hints, and an initial map built for
-            // them, without the accent offset.
+            // Counter hints, and an initial map built for them, are placed
+            // without the accent offset.
             h.build_initial(count, horizontal, 0, work)?;
             if horizontal > mask.count {
                 return Ok(());
@@ -918,9 +910,9 @@ impl<'b> Hints<'b> {
         Ok(())
     }
 
-    /// `cf2_hintmap_build` of the current hint map from the mask, all stems
-    /// when no mask was read. A mask over fewer stems than the horizontal
-    /// ones leaves the map without edges, and as built as it was.
+    /// Builds the current hint map from the mask, all stems when no mask was
+    /// read. A mask over fewer stems than the horizontal ones leaves the map
+    /// without edges, and as built as it was.
     pub(super) fn build_current(&mut self, work: &mut WorkBudget) -> Result<()> {
         let (count, horizontal, origin) = (self.count(), self.horizontal, self.origin);
         if let Some(h) = &mut self.hinted {

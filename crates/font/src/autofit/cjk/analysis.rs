@@ -1,6 +1,7 @@
-//! Finding a glyph's features for the CJK writing system: the latin
-//! writing system's segments, the stems and serifs they form, the edges
-//! they group into and the blue zones those edges lie in.
+//! Finding a glyph's features for the CJK writing system: the latin writing
+//! system's segments, the stems and serifs they form, the edges they group
+//! into and the blue zones those edges lie in. Translated from FreeType
+//! 2.15.0 (see `docs/provenance.md`).
 
 use super::super::hints::{Dimension, GlyphHints};
 use super::super::latin::{self, add_to_edge, edge_properties, start_edge};
@@ -9,12 +10,10 @@ use crate::fixed::wrap32::{abs, div_fix, mul_fix};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 
-/// `af_cjk_hints_detect_features`: segments, their links and edges.
+/// Finds the features of `dim`: segments, their links and edges.
 ///
-/// The segments are the latin writing system's
-/// (`af_cjk_hints_compute_segments`): FreeType's pass that then recomputes
-/// their roundness walks the segments counted before they were computed,
-/// none, and changes nothing.
+/// The segments are the latin writing system's, with the roundness it
+/// gives them, which FreeType leaves unchanged for CJK too.
 pub(super) fn detect_features(
     hints: &mut GlyphHints,
     dim: Dimension,
@@ -26,7 +25,7 @@ pub(super) fn detect_features(
     compute_edges(hints, dim, &metrics.axis[dim.index()], work)
 }
 
-/// `af_cjk_hints_link_segments`: pairs each segment in the major direction
+/// Links the segments of `dim`: pairs each segment in the major direction
 /// with a facing segment of opposite direction at or after its position
 /// that overlaps it by 8/2048 em or more: the nearest, unless a slightly
 /// farther one overlaps longer. Then, as strokes of Hanzi widen at their
@@ -149,12 +148,11 @@ fn link_segments(
     Ok(())
 }
 
-/// `af_cjk_hints_compute_edges`: groups every segment of `dim` into edges,
-/// sorted by position: a segment joins the nearest edge of its direction
-/// closer than the axis's edge threshold (at most 1/4 pixel) whose linked
-/// segments all lie that close to its own link, else starts one. Each edge
-/// then takes its links and serifs from its segments and is round where
-/// most of its segments are.
+/// Groups every segment of `dim` into edges, sorted by position: a segment
+/// joins the nearest edge of its direction closer than the axis's edge
+/// threshold (at most 1/4 pixel) whose linked segments all lie that close
+/// to its own link, else starts one. Each edge then takes its links and
+/// serifs from its segments and is round where most of its segments are.
 fn compute_edges(
     hints: &mut GlyphHints,
     dim: Dimension,
@@ -226,11 +224,10 @@ fn compute_edges(
     )
 }
 
-/// `af_cjk_hints_compute_blue_edges`: gives each edge of `dim` the active
-/// blue zone edge nearest it within 1/40 em (at most half a pixel): of
-/// each zone, whichever of its reference and overshoot is nearer. Top (and
-/// right) zones take edges against the major direction, bottom (and left)
-/// zones edges along it.
+/// Gives each edge of `dim` the active blue zone edge nearest it within
+/// 1/40 em (at most half a pixel): of each zone, whichever of its reference
+/// and overshoot is nearer. Top (and right) zones take edges against the
+/// major direction, bottom (and left) zones edges along it.
 pub(super) fn compute_blue_edges(
     hints: &mut GlyphHints,
     metrics: &Metrics,
