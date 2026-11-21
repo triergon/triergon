@@ -25,7 +25,16 @@ pub enum Kind {
 impl Kind {
     pub fn trace(name: &str) -> Result<Self, String> {
         [
+            "bit-readers",
+            "rbsp",
+            "windows",
+            "divide",
+            "core-budgets",
+            "opus-final-range",
             "views-smoke",
+            "pgs-segments",
+            "text-extraction",
+            "tx3g-config",
             "mkv-metadata",
             "mkv-track-extensions",
             "mkv-codec-state",
