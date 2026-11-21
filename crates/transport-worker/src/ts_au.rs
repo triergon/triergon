@@ -2,7 +2,7 @@
 //!
 //! The separate demux-clock policy places source PES anchors for comparison. It
 //! never changes the source packet's timestamps or supplies a clock to later AUs.
-use crate::runner::{Invocation, Refusal, Result, Totals, measure};
+use crate::runner::{Invocation, Refusal, Result, Totals, measure, measure_repeated};
 use crate::ts::{au_recovery, confirm_control_only_entity, fold_payload};
 use crate::ts_input::{self, FIRST_SOURCE, Request};
 use std::path::Path;
@@ -891,13 +891,18 @@ pub fn run(args: &[String]) -> Result<()> {
     let pool = Budget::new(256 * 1024 * 1024)?;
     let request =
         ts_input::parse_access_units(&pool, Path::new(invocation.path), invocation.arguments)?;
-    measure(&invocation, OPERATION, Some(&pool), || {
+    let run = || {
         operation(
             &pool,
             std::hint::black_box(&request),
             &AtomicBool::new(false),
         )
-    })
+    };
+    if request.probe_dts_core {
+        measure_repeated(&invocation, OPERATION, Some(&pool), run)
+    } else {
+        measure(&invocation, OPERATION, Some(&pool), run)
+    }
 }
 
 #[cfg(test)]

@@ -80,9 +80,9 @@ pub mod dts {
     //! are not inferred from private tag numbers.
     //! The explicit-selection comparison uses the same codec declaration with
     //! FFmpeg git revision `d32b387f` on the 9.0 branch. Ordinary discovery in
-    //! that transport-dts build identifies FATE `dts/dts.ts` as binary data,
-    //! not DTS: `harness/probe_ts_dts_discovery.py` reproduces the limitation.
-    //! Envelope identification has no automatic-discovery parity comparison.
+    //! that transport-dts build identifies FATE `dts/dts.ts` as binary data.
+    //! The `mpegts-dts-discovery` comparison validates automatic admission and
+    //! the complete packet fold against a public DTS parser and demuxer adapter.
 
     /// A caller-identified DTS core stream with empty program and elementary
     /// descriptor loops. The reader validates each frame and keeps the original

@@ -176,19 +176,22 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
     TsWork total = {0, 0, 0};
     const char *refusal = NULL;
     int eof = 0, rc = 0;
+    unsigned long runs = 0;
     const uint64_t start = bench ? now_ns() : 0;
     for (unsigned long i = 0; i < iterations; ++i) {
         TsWork work = {0, 0, 0};
         rc = source.count ? ts_entities_operation(&source, (int)program, access_units, &work)
             : probe_dts_core ? ts_dts_automatic_operation(bytes, (size_t)size, (int)program, &work)
             : ts_operation(bytes, (size_t)size, (int)program, access_units, unlabelled_dts_core, &work);
+        if (probe_dts_core && runs && eof != (rc == 1)) goto done;
+        ++runs;
         fold(&total.digest, work.digest);
         total.packets += work.packets;
         total.bytes += work.bytes;
         eof = rc == 1;
         if (!eof) {
             refusal = "demuxer stopped before EOF";
-            break;
+            if (!probe_dts_core) break;
         }
     }
     const uint64_t elapsed = bench ? now_ns() - start : 0;
@@ -197,7 +200,7 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
     printf("{\"schema\":1,\"operation\":\"%s\",\"iterations\":%lu,\"packets\":%" PRIu64
            ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 ",\"elapsed_ns\":%" PRIu64 ",\"eof\":%s",
            access_units ? TS_AU_OPERATION : TS_OPERATION,
-           iterations, total.packets, total.bytes, total.digest, elapsed, eof ? "true" : "false");
+           runs, total.packets, total.bytes, total.digest, elapsed, eof ? "true" : "false");
     if (refusal) {
         printf(",\"refusal\":");
         quote(refusal);
