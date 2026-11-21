@@ -5,6 +5,7 @@ use crate::compat::layout::Policy;
 use crate::error::{DecodeError, Feature, Result};
 use crate::filterbank::Filterbank;
 use crate::ics::*;
+use crate::inspect::FrameRecord;
 use crate::pce::{Pce, parse_pce};
 use crate::tables::SAMPLE_RATES;
 use crate::{ltp, pred, sbr};
@@ -193,21 +194,13 @@ pub(crate) struct Core {
     pub budget: Budget,
     /// Charge of the output frame the last access unit sized.
     output_charge: Reservation,
-    /// Development statistics of the last block: one line per decoded element (only
-    /// collected when `stats_enabled`).
-    #[cfg(feature = "inspect")]
-    pub stats: String,
-    #[cfg(feature = "inspect")]
-    pub stats_enabled: bool,
+    /// What the `inspect` feature records.
+    pub inspect: FrameRecord,
     /// Output samples (per channel) still to be dropped (FFmpeg skip_samples behaviour).
     pub skip_samples: usize,
     pub priming_policy: crate::compat::priming::Policy,
     /// Frames output since the last (re)configuration.
     pub frames_out: u64,
-    /// Development aid: bit ranges (relative to the payload) of SBR fill elements of the
-    /// last frame.
-    #[cfg(feature = "inspect")]
-    pub sbr_fil_ranges: Vec<(usize, usize)>,
 }
 
 impl Core {
@@ -231,14 +224,9 @@ impl Core {
             qmf: sbr::Modulation::new(),
             budget: budget.clone(),
             output_charge: Reservation::empty(budget),
-            #[cfg(feature = "inspect")]
-            stats: String::new(),
-            #[cfg(feature = "inspect")]
-            stats_enabled: false,
+            inspect: FrameRecord::new(),
             skip_samples: 0,
             priming_policy: crate::compat::priming::Policy::default(),
-            #[cfg(feature = "inspect")]
-            sbr_fil_ranges: Vec::new(),
             frames_out: 0,
         }
     }
@@ -645,7 +633,6 @@ impl Core {
                     last_elem = None;
                 }
                 ID_FIL => {
-                    #[cfg(feature = "inspect")]
                     let fil_start = br.position() - 3;
                     let mut count = br.read(4) as usize;
                     if count == 15 {
@@ -685,8 +672,7 @@ impl Core {
                             }
                         }
                         if let (EXT_SBR_DATA | EXT_SBR_DATA_CRC, Some(ei)) = (ext, last_elem) {
-                            #[cfg(feature = "inspect")]
-                            self.sbr_fil_ranges.push((fil_start, end));
+                            self.inspect.sbr_fill(fil_start, end);
                             let saved_end = br.end();
                             br.set_end(end);
                             let crc = ext == EXT_SBR_DATA_CRC;
@@ -863,66 +849,12 @@ impl Core {
         Ok(changed)
     }
 
-    #[cfg(feature = "inspect")]
-    fn record_stats(&mut self) {
-        self.stats.clear();
-        for e in self.elements.iter().filter(|_| self.stats_enabled) {
-            if !e.decoded {
-                continue;
-            }
-            for c in 0..2 {
-                if !e.ch_decoded[c] {
-                    continue;
-                }
-                let cd = &e.cd[c];
-                use std::fmt::Write;
-                let _ = write!(
-                    self.stats,
-                    "el{}/{} ch{} seq{} sh{} maxsfb{} grp{} cb{:#x} tns{} pulse{} pred{} ltp{}; ",
-                    e.kind,
-                    e.tag,
-                    c,
-                    cd.info.window_sequence,
-                    cd.info.window_shape,
-                    cd.info.max_sfb,
-                    cd.info.num_window_groups,
-                    cd.cb_mask,
-                    cd.tns.present as u8,
-                    cd.pulse_used as u8,
-                    cd.info.predictor_data_present as u8,
-                    cd.info.ltp[0].present as u8
-                );
-            }
-        }
-        for c in self.cce.iter().filter(|_| self.stats_enabled) {
-            use std::fmt::Write;
-            let _ = write!(
-                self.stats,
-                "cce{} dec{} ind{} dom{} seq{} g1={:.4} tns{} cb{:#x} maxsfb{} tgts{:?}; ",
-                c.tag,
-                c.decoded as u8,
-                c.ind_sw as u8,
-                c.domain as u8,
-                c.cd.info.window_sequence,
-                c.gains[1][0],
-                c.cd.tns.present as u8,
-                c.cd.cb_mask,
-                c.cd.info.max_sfb,
-                c.targets
-                    .iter()
-                    .map(|t| (t.is_cpe, t.tag, t.l, t.r))
-                    .collect::<Vec<_>>()
-            );
-        }
-    }
-
     fn finish_frame<const RAW: bool>(&mut self, frame: &mut AudioFrame) {
         let cfg = CoreCfg {
             aot: self.aot,
             sf_index: self.sf_index,
         };
-        #[cfg(feature = "inspect")]
-        self.record_stats();
+        self.inspect.block(&self.elements, &self.cce);
         crate::cce::process_cces(self);
         for ei in 0..self.elements.len() {
             let e: &mut ElementState = &mut self.elements[ei];

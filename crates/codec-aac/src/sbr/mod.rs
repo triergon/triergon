@@ -21,6 +21,7 @@ pub(crate) use qmf::Modulation;
 use crate::error::{DecodeError, Result};
 use crate::fft::Cpx;
 use crate::huffman::{Vlc, books};
+use crate::inspect::PsInput;
 use freq::FreqTables;
 use tables::NOISE;
 use triergon_bitstream::CachedBitReader;
@@ -292,10 +293,8 @@ pub(crate) struct Sbr {
     stereo: Option<ps::Stereo>,
     // scratch
     x: BudgetVec<[Cpx; 64]>,
-    /// Development aid: the 38 QMF slots handed to Parametric Stereo in the last frame
-    /// (re, im interleaved; empty when PS did not run).
-    #[cfg(feature = "inspect")]
-    pub(crate) ps_input: Vec<f32>,
+    /// The QMF slots handed to Parametric Stereo, as the `inspect` feature records them.
+    pub(crate) ps_input: PsInput,
 }
 
 impl Sbr {
@@ -315,8 +314,7 @@ impl Sbr {
             ps_seen: false,
             stereo: (!pair).then(|| ps::Stereo::new(budget)).transpose()?,
             x: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
-            #[cfg(feature = "inspect")]
-            ps_input: Vec::new(),
+            ps_input: PsInput::new(),
         })
     }
 
@@ -345,8 +343,7 @@ impl Sbr {
             ps_seen,
             stereo,
             x,
-            #[cfg(feature = "inspect")]
-                ps_input: _,
+            ps_input: _,
         } = self; // the core rate, and so fs, is the same for every element of a layout
         *hdr = Header::default();
         *have_header = false;
@@ -666,15 +663,7 @@ impl Sbr {
                         row[k] = ch.xl[k][i + T_HFADJ];
                     }
                 }
-                #[cfg(feature = "inspect")]
-                {
-                    self.ps_input.clear();
-                    for row in self.x.iter() {
-                        for v in row {
-                            self.ps_input.extend([v.re, v.im]);
-                        }
-                    }
-                }
+                self.ps_input.capture(&self.x);
                 // Parametric Stereo: the mono QMF matrix becomes the left and right matrices (ps.rs)
                 if self.ps_seen {
                     self.ps.apply(stereo, &mut self.x);

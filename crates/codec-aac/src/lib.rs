@@ -30,6 +30,7 @@ mod huffman;
 mod huffman_probed;
 mod huffman_tables;
 mod ics;
+mod inspect;
 mod ltp;
 mod pce;
 mod pred;
@@ -145,35 +146,6 @@ impl Decoder {
     /// Reset overlap, prediction, PNS and SBR/PS signal history after a discontinuity.
     pub fn reset(&mut self) {
         self.core.reset_history();
-    }
-
-    /// Development aid: payload bit ranges of the SBR fill elements of the last frame.
-    #[cfg(feature = "inspect")]
-    pub fn sbr_fill_ranges(&self) -> &[(usize, usize)] {
-        &self.core.sbr_fil_ranges
-    }
-
-    /// Development aid: collect [`Self::stats`] from now on (it formats text per frame).
-    #[cfg(feature = "inspect")]
-    pub fn enable_stats(&mut self) {
-        self.core.stats_enabled = true;
-    }
-
-    /// Development aid: the QMF slots the Parametric Stereo tool received in the last
-    /// frame, 38 rows of 64 bands, re and im interleaved (empty without PS).
-    #[cfg(feature = "inspect")]
-    pub fn ps_input(&self) -> &[f32] {
-        self.core
-            .elements
-            .iter()
-            .find_map(|e| e.sbr.as_ref().filter(|s| !s.ps_input.is_empty()))
-            .map_or(&[], |s| &s.ps_input)
-    }
-
-    /// Development statistics of the last decoded block (unstable format).
-    #[cfg(feature = "inspect")]
-    pub fn stats(&self) -> &str {
-        &self.core.stats
     }
 
     /// Current output sample rate (0 before the first frame).
@@ -342,8 +314,7 @@ fn decode_blocks<const RAW: bool>(
     per_block_crc: bool,
     out: &mut AudioFrame,
 ) -> Result<(), DecodeError> {
-    #[cfg(feature = "inspect")]
-    core.sbr_fil_ranges.clear();
+    core.inspect.start_access_unit();
     let mut br = CachedBitReader::new(payload);
     core.reserve_output::<RAW>(out, usize::from(blocks))?;
     for block in 0..blocks {
