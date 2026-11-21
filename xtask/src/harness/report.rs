@@ -127,10 +127,10 @@ fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
 fn entity_input_failure(
     corpus: &Path,
     case: &Value,
-    ordered_transport: bool,
+    prefix: Option<&str>,
 ) -> Result<Option<&'static str>, String> {
     let entities = case.get("entities");
-    if entities.is_none() && !ordered_transport {
+    if entities.is_none() && !matches!(prefix, Some("ts-" | "ts-au-")) {
         return Ok(None);
     }
     let args = case_arguments(case);
@@ -139,6 +139,19 @@ fn entity_input_failure(
     };
     let args = match args {
         [namespace, remaining @ ..] if namespace == "--dvb" || namespace == "--atsc" => remaining,
+        _ => args,
+    };
+    // This single-entity option declares a codec, so it has no companion input.
+    let args = match (prefix, args) {
+        (Some("ts-au-"), [option])
+            if option
+                .to_str()
+                .and_then(|option| option.strip_prefix("--dts-core="))
+                .and_then(|pid| pid.parse::<u16>().ok())
+                .is_some_and(|pid| (0x10..0x1fff).contains(&pid)) =>
+        {
+            &[]
+        }
         _ => args,
     };
     let Some(entities) = entities else {
@@ -231,7 +244,7 @@ fn additional_input_failure(
     case: &Value,
     prefix: Option<&str>,
 ) -> Result<Option<&'static str>, String> {
-    let failure = entity_input_failure(corpus, case, matches!(prefix, Some("ts-" | "ts-au-")))?;
+    let failure = entity_input_failure(corpus, case, prefix)?;
     if failure.is_some() {
         return Ok(failure);
     }
@@ -1612,27 +1625,30 @@ mod prefix_tests {
         let case = parse(&row).unwrap();
         let unpinned = parse(r#"{"arguments":["188","1","next.ts"]}"#).unwrap();
         assert_eq!(
-            entity_input_failure(&root, &unpinned, true).unwrap_err(),
+            entity_input_failure(&root, &unpinned, Some("ts-")).unwrap_err(),
             "worker entity argument has no input pin"
         );
         let mismatched =
             parse(&row.replace(r#"["188","1","next.ts"]"#, r#"["188","1","different.ts"]"#))
                 .unwrap();
         assert_eq!(
-            entity_input_failure(&root, &mismatched, true).unwrap_err(),
+            entity_input_failure(&root, &mismatched, Some("ts-")).unwrap_err(),
             "ordered entity does not match its worker argument"
         );
         assert_eq!(
-            entity_input_failure(&root, &case, true).unwrap(),
+            entity_input_failure(&root, &case, Some("ts-")).unwrap(),
             Some("missing-entity")
         );
         std::fs::write(root.join("next.ts"), b"other entity bytes").unwrap();
         assert_eq!(
-            entity_input_failure(&root, &case, true).unwrap(),
+            entity_input_failure(&root, &case, Some("ts-")).unwrap(),
             Some("entity-hash-mismatch")
         );
         std::fs::write(root.join("next.ts"), input).unwrap();
-        assert_eq!(entity_input_failure(&root, &case, true).unwrap(), None);
+        assert_eq!(
+            entity_input_failure(&root, &case, Some("ts-")).unwrap(),
+            None
+        );
         for namespace in ["--dvb", "--atsc"] {
             let with_namespace = parse(&row.replace(
                 r#"["188","1","next.ts"]"#,
@@ -1640,12 +1656,12 @@ mod prefix_tests {
             ))
             .unwrap();
             assert_eq!(
-                entity_input_failure(&root, &with_namespace, true).unwrap(),
+                entity_input_failure(&root, &with_namespace, Some("ts-")).unwrap(),
                 None
             );
         }
         let measured = measure_pinned(
-            || entity_input_failure(&root, &case, true),
+            || entity_input_failure(&root, &case, Some("ts-")),
             || {
                 std::fs::write(root.join("next.ts"), b"changed while measuring").unwrap();
                 Ok(Value::object([("status", Value::str("measured"))]))
@@ -1678,6 +1694,21 @@ mod prefix_tests {
         assert!(result.get("invalidated_measurement").is_some());
         std::fs::remove_file(root.join("next.ts")).unwrap();
         std::fs::remove_dir(root).unwrap();
+    }
+
+    #[test]
+    fn dts_identity_is_a_single_entity_access_unit_option() {
+        let root = Path::new(".");
+        let selected = parse(r#"{"arguments":["188","1","--dvb","--dts-core=256"]}"#).unwrap();
+        assert_eq!(
+            entity_input_failure(root, &selected, Some("ts-au-")).unwrap(),
+            None
+        );
+        assert!(entity_input_failure(root, &selected, Some("ts-")).is_err());
+        for options in [r#""next.ts","--dts-core=256""#, r#""--dts-core=8191""#] {
+            let case = parse(&format!(r#"{{"arguments":["188","1",{options}]}}"#)).unwrap();
+            assert!(entity_input_failure(root, &case, Some("ts-au-")).is_err());
+        }
     }
 
     #[test]
