@@ -151,7 +151,7 @@ tree; `triergon_pixel::letterbox` and `mix.rs` implement them and their unit tes
 pin them. The letterbox is checked against the reference chain in
 [triergon-pixel](../pixel/README.md#conformance); `tests/sessions.rs` covers
 timing, flush, stop, backpressure, failure, rate changes and downmix with
-scripted decoders. A host test in `triergon-playback` (`tests/continuation.rs`)
+scripted decoders. A host test in `triergon-bridge` (`tests/it/mp4_hevc_aac.rs`)
 reads an AVC/AAC MP4, feeds both sessions through the framing adapters, and
 checks output positions, seek-to-start replay and teardown. Codec conformance
 lives in the codec crates. Gates: [docs/quality.md](../../docs/quality.md).

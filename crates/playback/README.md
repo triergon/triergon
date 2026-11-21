@@ -50,6 +50,20 @@ assert!(packets > 0);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+Every format reaches a consumer through the neutral views of
+`triergon_core::container`. `Output::packet` (or `Event::packet`) shows a Matroska
+frame or an MP4 sample as a `Packet<'_>`, a borrow that implements `PacketInfo` on
+the source clock; `Packet::demux_times` gives the demux clock beside it. Transport
+stream PES are several payload spans, not one slice, and have no packet view: their
+access units come from [`triergon-hls`](../hls/README.md) or `triergon_mpegts::Reader`.
+`Engine::track_count` and `Engine::track` show the tracks known so far as `Track<'_>`,
+which implements `TrackInfo`: the Matroska reader's tracks, the MP4 plan's tracks, or
+the streams of the transport stream's active program map. An MP4 track's codec and
+configuration record come from its first sample entry, which
+`mp4::PreparedMp4::identify_tracks` reads on request; until then an `mp4a` entry
+names no codec and no record. [`triergon-bridge`](../bridge/README.md)'s
+`access::AccessUnits` frames such packets as a decoder's access units.
+
 Implement `Source` for real transports. `ByteSource` serves immutable local
 bytes. Use `probe::Probe` when the container is unknown; its `SelectedInput`
 replays the probed prefix and then continues reading. The probe accepts the MP4
@@ -110,13 +124,14 @@ video and audio tracks.
 
 | Area | Entry points |
 |---|---|
-| Source protocol | `Source`, `SourceReply`, `ByteSource`, `SourceOwner` |
+| Source protocol | `Source`, `SourceReply` (`provide_to` an input), `ByteSource`, `SourceOwner` |
+| Neutral views | `Packet` (`PacketInfo`, `demux_times`), `Track` (`TrackInfo`, `key`), `Engine::{track_count, track}`, `mp4::PreparedMp4::identify_tracks` |
 | Probe | `probe::Probe`: Matroska, MP4, TS188 and M2TS192 |
-| Matroska | `Engine::matroska` (an unstarted reader built with `Reader::new`, `Reader::new_with_payload_ownership`, `new_with_immutable_seek_index` or `compat::block_additions::new_reader`) |
-| MP4 / MOV | `mp4::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `Engine::mp4`, `Engine::mp4_progressive`, `compat::mov::{index, index_front, index_encoded_range, open_front, forward_encoded_edits}`, `Mp4RangeOpen` / `Mp4RangePlayer` |
+| Matroska | `Engine::matroska` (an unstarted reader built with `Reader::new`, `Reader::new_with_payload_ownership`, `new_with_immutable_seek_index` or `compat::block_additions::new_reader`), `Engine::matroska_reader`, `matroska::ReplayOutput` |
+| MP4 / MOV | `mp4::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `mp4::Mp4IndexJob`, `Engine::mp4`, `Engine::mp4_progressive`, `compat::mov::{index, index_front, index_encoded_range, open_front, forward_encoded_edits}`, `mp4::Mp4RangeOpen` / `Mp4RangePlayer` |
 | MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_demux_seek` / `apply_mp4_demux_seek`, progressive variants, `PreparedMp4::movie_seek` |
 | MP4 catalogue replacement | `mp4::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
-| TS / M2TS | `Engine::ts`, `Engine::ts_entities`; demux PES of selected PIDs or of a segment's own tracks: `compat::pes::{open, open_segment, open_private_audio}`, `compat::pes::startup::Startup` for bound M2TS startup |
+| TS / M2TS | `Engine::ts`, `Engine::ts_entities`; demux PES of selected PIDs (1 to 0x1ffe, at most 64) or of a segment's own tracks: `compat::pes::{open, open_segment, open_private_audio}`, `compat::pes::startup::Startup` for bound M2TS startup |
 | PES feed | `pes_feed`: the feed [`triergon-hls`](../hls/README.md) reads HLS segments and progressive TS188 input from |
 | Sink handoff | `pump::{Pump, Sink, CatalogueSink, Feed}` |
 
@@ -235,9 +250,9 @@ is imposed.
 - MPEG-TS: ITU-T H.222.0.
 - AVC/HEVC parameter sets: ITU-T H.264 §7.3 and Annex B, ITU-T H.265.
 
-Integration tests in `tests/` replay authored and FFmpeg-generated fixtures
-and compare packet order, bytes, flags, PTS, DTS and duration with pinned
-FFprobe records. `tests/native_terminal_matrix.rs` reads 39 terminal-media
+Integration tests in `tests/it/`, one module per behaviour, replay authored and
+FFmpeg-generated fixtures and compare packet order, bytes, flags, PTS, DTS and
+duration with pinned FFprobe records. `tests/it/native_terminal_matrix.rs` reads 39 terminal-media
 inputs through the native packet view in 13 source geometries: 12
 nonseekable (known and unknown length, read sizes 1, 7 and 4096, work quanta
 1 and 4096) for every input, and one seekable read of known length for each

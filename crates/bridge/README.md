@@ -9,7 +9,8 @@ subtitle receivers of `triergon-subtitles`. It does not decode media or render.
 |---|---|
 | Matroska feeds | `matroska::MatroskaFeedSetup` (AVC Annex B, AAC ADTS), `MatroskaHevcDolbySetup` (HEVC Annex B, AC-3/E-AC-3), `MatroskaDiscovery`, `MatroskaCompactDiscovery`, `MatroskaVideoSeekGate` |
 | Matroska clocks | feed methods `demux_avc_clock`, `demux_aac_clock_probe` (`MatroskaTrackFeed`), `demux_hevc_clock`, `demux_dolby_clock_probe` (`MatroskaHevcDolbyFeed`); the audio probes are `MatroskaClockProbe`s; `MatroskaBitmapClockProbe` |
-| Packet bridges | `aac::AacBridge`, `av1::Av1Bridge` (including MP4 `av01` and `dav1`); MP4 AVC and HEVC samples frame through `triergon_framing::nal::NalPacketSession` |
+| Access units | `access::AccessUnits` from any reader's `TrackInfo` and `PacketInfo`: AVC and HEVC as Annex B, AAC with an AudioSpecificConfig as ADTS, other codecs and tracks without a record as they are |
+| Packet bridges | `aac::AacBridge` (MP4 AAC as ADTS, bound to one plan's track and configuration revision), `av1::Av1Bridge` (including MP4 `av01` and `dav1`) |
 | Subtitles | `text::TextBridge`, `bitmap::{PgsBridge, DvdReceiver}`, `matroska::MatroskaBitmapTrack`, `mp4_dvd::{Mp4DvdSetup, Mp4DvdTrack}`, `ts::dvb::DvbTsBridge`, `ts::pgs::PgsTsTrack`, `ts::teletext::TeletextTsBridge`, `caption::CaptionBridge` |
 | Compatibility | `compat::matroska::legacy_aac_lc_initialization` |
 

@@ -11,6 +11,7 @@ parse playlists, retry transports, decode media or render.
 | Progressive TS188 | `progressive::TsProgressiveReader` (AVC + ADTS AAC) |
 | Access-unit readers | `avc::AvcTsReader`, `aac::HlsAac` |
 | Segment clocks | `clock::resolve_hls_aac_clocks`, `HlsAacClock` |
+| Packet views | `packet::UnitPacket` through `PacketInfo`, from `TsProgressiveReader::packet` and `HlsSegment::packet`: AVC units on the 90 kHz clock, AAC frames on the finest clock their PES times and sample duration count exactly in. An HEVC picture of a media segment is several slices and has no packet view; `contiguous_feed` copies it |
 
 ## Behaviour and limits
 

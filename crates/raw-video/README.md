@@ -24,7 +24,9 @@ The raw Annex B probe selects AVC or HEVC at the first slice after its
 parameter sets. It reads each NAL's first five bytes and skips the rest of the
 NAL body in word-sized steps, charging one work unit per byte either way.
 Raw Annex B carries no container clock: the feed's duration is the active SPS
-picture period, derived again whenever the configuration changes.
+picture period, derived again whenever the configuration changes. A feed packet's
+access unit aliases several NAL owners, so it has no single payload slice and no
+`PacketInfo` view; `RawAccessUnit::segments` reads it in order.
 
 ## Conformance
 
