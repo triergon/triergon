@@ -103,6 +103,5 @@ container readers under the [numeric rules](../../harness/codecs/numeric-rules.j
 Layer I and II compare with FFmpeg's float decoders. On the gate build 62/64 pass
 (Layer I 5/5, Layer II 20/20, Layer III 37/39). Open: `he_mode` changes channel mode
 mid-stream, which FFmpeg's CLI converts to the first frame's format; `he_free` is free
-format (bit rate index 0, each frame running to the next header): FFmpeg's demuxer finds no
-two consecutive frames and refuses the file, and this decoder refuses free-format frames. Runtime and memory against the [gates](../../docs/quality.md#gates):
-[status](../../docs/status.md).
+format, which FFmpeg's demuxer and this decoder both refuse. Runtime and memory against
+the [gates](../../docs/quality.md#gates): [status](../../docs/status.md).

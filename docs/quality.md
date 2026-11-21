@@ -165,9 +165,9 @@ resource limit becomes an explicit, reviewed rule for that case.
   (`harness/reference.c` and `harness/reference_raster.h`), which takes the
   same flags; there a read of an uninitialised variable fails the build
   (`-Wall -Werror -Werror=uninitialized`). libass's included sources are
-  compiled as system headers, without warnings. Runtime is not measured yet;
-  two rules hold when it is. Timing uses an unflagged build: the same source,
-  pins and configure flags without `-ftrivial-auto-var-init`, both recorded in
+  compiled as system headers, without warnings. The rasterising features'
+  runtime is not measured yet; two rules hold when it is. Timing uses an
+  unflagged build: the same source, pins and configure flags without `-ftrivial-auto-var-init`, both recorded in
   `build.json`, while parity keeps the flagged one. The flag changes the
   reference's instruction counts by under 0.5% on the required workloads, but
   its code layout makes small-glyph workloads 8% to 40% slower on Linux
@@ -177,7 +177,7 @@ resource limit becomes an explicit, reviewed rule for that case.
   equivalent reset inside it, whichever matches how a caller uses the
   library; caches that would make repeats unfairly cheap are disabled for
   timing, not reset inside the clock. The change that first times the
-  rasterising or rendering features makes `cargo xtask check-design` or the
+  rasterising features makes `cargo xtask check-design` or the
   timing code refuse a lane whose reference build is flagged. Its features run libass's outline, stroker,
   rasteriser, blur, composition and clipping stages on glyphs of the font
   corpus loaded as libass loads them with hinting off (FreeType in the
@@ -260,7 +260,7 @@ resource limit becomes an explicit, reviewed rule for that case.
   manifest` generate them from `harness/fonts/corpus.json`, the shaping texts,
   seeded random cases, the ASS fixtures and each feature's settings
   (`xtask/src/{fonts,shape,raster,ass}/manifest.rs`, registered in
-  `xtask/src/lanes.rs`), and take each case's expected work from
+  `xtask/src/generators.rs`), and take each case's expected work from
   `harness/features/<feature>/pins.json`. Pins are the reference's folds:
   re-record them with `cargo xtask fonts manifest --record`, `cargo xtask shape
   manifest --record`, `cargo xtask raster manifest --record` or `cargo xtask ass
@@ -385,7 +385,7 @@ compares canonical output. Workers speak one line protocol with `trace`, `bench`
 `memory` modes, framed by begin/end markers and a named digest.
 
 ```sh
-cargo xtask prepare-check   # build the FFmpeg reference, fixtures and workers
+cargo xtask prepare-check   # build the pinned references, fixtures and workers
 cargo xtask check           # format, test, clippy, rustdoc, release build, worker tests, design checks
 cargo xtask report --fate-cache .research/fate-samples
                             # correctness report against the reference
@@ -433,7 +433,7 @@ A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `matroska-audio-clocks` do with `playback-matroska-worker`
 and the `video` reference and `hls-segments` with `playback-worker` and the `formats` reference, the six bitmap, caption and teletext `subtitle-*` features with
 `subtitle-worker` and the `subtitles` reference, `subtitle-text` with `subtitle-worker`
-and the `formats` reference, the three font features with `font-worker` and FreeType, the six
+and the `formats` reference, the four font features with `font-worker` and FreeType, the seven
 shaping features with `shape-worker` and HarfBuzz and FriBidi, the five rasterising
 features with `raster-worker` and libass, and the four ASS parsing features,
 `ass-render` and `ass-render-host` with `ass-worker` and libass.
@@ -506,8 +506,8 @@ open cases are expected to be rejected by both builds, and the campaign keeps th
 manifest as `manifest.json` for replay. `cargo xtask codecs fuzz --lane L` builds it
 from a codec lane's FATE vectors instead: release and `checked` builds of `codec-worker`
 (release optimisation with overflow checks and debug assertions) decode each mutation
-whole. `cargo xtask check` runs one round on smoke cases of each required font,
-shaping, rasterising and ASS feature.
+whole. `cargo xtask check` runs one round on smoke cases of selected required font,
+shaping, rasterising and ASS features.
 
 On native AArch64 or 32-bit ARMv7 Linux, `cargo xtask memory-admission CANDIDATE REFERENCE`
 checks the worker libraries using the probe and observer in `target/harness`.
@@ -707,7 +707,8 @@ may override that count for diagnostic comparisons.
     workers' records disagree with the training manifest and the committed trained
     orders of the checking host's target.
 - A gate run builds with `cargo xtask build-workers --all-references`, which fails when
-  any profile reference's FFmpeg, FreeType, HarfBuzz or libass profile is not prepared.
+  any profile reference's FFmpeg, mpg123, FreeType, HarfBuzz or libass build is not
+  prepared.
   Without the flag, `build-workers` builds the references whose profiles are prepared
   and prints each one it skipped; `comparison_references` in `identity.json` lists
   exactly those it built.
@@ -769,8 +770,7 @@ may override that count for diagnostic comparisons.
   executable from the same, empty, page-cache state. Without it, a freshly written copy
   can stay cached in larger blocks, and the kernel then makes more of the executable
   resident on some runs than on others: 320 kB more of a subtitle worker's own mapping,
-  and so of the resident peak, on a c8g.xlarge. A failed eviction fails the run. Memory
-  results collected before this eviction may include that effect, on either side.
+  and so of the resident peak, on a c8g.xlarge. A failed eviction fails the run.
 - Before a timing pass, `cargo xtask count CANDIDATE REFERENCE ARGUMENT...` runs both
   workers on one workload under Linux `perf stat`, five runs each, and prints the least
   user-mode instructions, cycles and branch misses. It fails when instructions rise more
@@ -800,8 +800,9 @@ may override that count for diagnostic comparisons.
 ### Running the gates
 
 `cargo xtask gate` holds the full gate as one plan. Its items are the work for one
-measured thing: a feature's timing, memory and grade, a part of the ISO BMFF suite's
-measurements, the ISO BMFF seek, packet-framing and progressive TS suites, the video
+measured thing: a feature's timing, memory and grade, the external vector, a part of
+the ISO BMFF suite's measurements, the ISO BMFF seek, packet-framing and progressive TS
+suites, the ISO BMFF and Ogg readers' packets against `ffprobe`, the video
 codecs' parity (`codecs`), the audio codecs' correctness lanes (`codecs-audio`: AAC,
 AC-3, E-AC-3 and DTS, failing on any vector that fails and is not a listed open case),
 a codec workload list's timing, a part of its memory (`codecs memory --part
@@ -875,8 +876,9 @@ On one host, a shard's run is:
    `cargo xtask build-workers --all-references`, so that every profile reference is
    built, and `cargo xtask gate preflight`, which runs `cargo xtask preflight` with
    everything the shard measures (`--feature ID`, with `--corpus ID=DIR` and
-   `--manifest ID=FILE` as `report` takes them, `--isobmff`, `--isobmff-seek`, `--codecs` for each
-   workload list, `--correctness` for the codec correctness lanes, `--external-vector`, `--capture` for the capture cases), with the
+   `--manifest ID=FILE` as `report` takes them, `--isobmff`, `--isobmff-seek`,
+   `--isobmff-reader`, `--codecs` for each workload list, `--readers` for the Ogg
+   reader lanes, `--correctness` for the codec correctness lanes, `--external-vector`, `--capture` for the capture cases), with the
    [committed RSS module review](../harness/rss-bound/README.md#proof) of the tree's
    module source for the running kernel (`cargo xtask preflight` also takes
    `--reference NAME` for any other reference a run names by path, `--review FILE`
@@ -919,9 +921,10 @@ run can measure without one of its references. Prepare them first, in this order
 links the FreeType, FriBidi and HarfBuzz builds):
 
 ```sh
-for profile in matroska formats video subtitles decode capture capture-small; do
+for profile in matroska formats transport-dts video subtitles decode capture capture-small; do
     cargo xtask prepare-ffmpeg --jobs 8 --profile "$profile"
 done
+cargo xtask prepare-mpg123 --jobs 8
 cargo xtask fonts prepare --jobs 8
 cargo xtask shape prepare --jobs 8
 cargo xtask ass prepare --jobs 8      # the libass build, as raster prepare makes it
@@ -973,35 +976,19 @@ independent ratios, refuses sessions whose pairs are visibly not independent. Th
 to the unchanged error of the 30-pair bound and keeps the one-sided 5% false-pass
 guarantee of a 95% bound.
 
-The guarantee assumes independent pairs. In the archived 30-pair sessions
+The guarantee assumes independent pairs. The archived 30-pair sessions
 (`armv7-thumb2-3df7ae6d-linux-armv7` on ARMv7; `runners-gate-build-linux-arm64` and
-`mpegts-pes-gate-build-linux-arm64` on AArch64) the paired ratios behave as independent
-draws: against each session's own shuffled ratios, the share of sessions whose lag-1
-autocorrelation exceeds the shuffled 95th percentile is 4.5% to 5.3% of memory
-collections and 3.0% to 6.0% of timing sessions (5% for independent pairs), and the mean
-of pairs 1 to 10 against pairs 11 to 30 differs by −0.04 to +0.04 standard deviations on
-average, with 1.5% to 6.8% of sessions beyond either 5% tail of the shuffled shifts.
-Simulated with the true median exactly at the ceiling, the rule stops a session early
-with probability 0.007% for independent pairs, 0.025% at a lag-1 autocorrelation of 0.2,
-0.27% at 0.5, and 0.02% to 0.06% with the first ten pairs shifted favourably by 0.5 to 3
-standard deviations, where looks after 10 and 20 pairs would stop 2.7% to 99%.
-
-Replayed on those sessions and on `isobmff-armv7-runtime-regate-linux-arm64`, the rule
-stops 1,597 of 1,663 AArch64 and 2,980 of 3,037 ARMv7 timing sessions and 1,337 of 1,663
-AArch64 and 2,956 of 3,335 ARMv7 memory collections, and no session it stops failed at
-30 pairs (a collection refused as an invalid observation is refused either way).
-Drawing pairs from the ARMv7 timing sessions' own ratios rescaled to a median exactly at
-the ceiling, 0.006% of 128,000 simulated sessions stop early, and the share that passes,
-3.22%, is the 30-pair bound's; from the ARMv7 memory collections' total resident ratios
-at a median of 1, 0.003% of 60,000 stop early and 2.54% pass, as with 30 pairs. Against
-fresh 30-pair runs of `matroska-demux` and ISO BMFF on the same worker bytes, every
-session that stopped kept its verdict on both targets. Five ARMv7 `matroska-demux`
-memory cases, whose total resident bounds lie between 0.978 and 1.011, ran every pair on
-both sides and changed verdict between the two runs, as two 30-pair bounds that close to
-the ceiling can. ISO BMFF timing took 12.0 instead of 15.8 minutes on AArch64 and 14.8
-instead of 19.2 on ARMv7, and its memory 13.5 instead of 19.2 and 10.7 instead of 15.0.
-The replays, simulations and runs are evidence sets `gate-early-stop-two-blocks`,
-`gate-early-stop-runs-aarch64` and `gate-early-stop-runs-armv7`.
+`mpegts-pes-gate-build-linux-arm64` on AArch64) behave as independent draws: their lag-1
+autocorrelations and early-against-late shifts exceed their own shuffled ratios' 95th
+percentiles about as often as independence gives. Simulated with the true median
+exactly at the ceiling, the rule stops a session early with probability 0.007% for
+independent pairs and 0.27% at a lag-1 autocorrelation of 0.5. Replayed on those
+sessions and on `isobmff-armv7-runtime-regate-linux-arm64`, it stops most sessions and
+no session it stops failed at 30 pairs; against fresh 30-pair runs of `matroska-demux`
+and ISO BMFF on the same worker bytes, every session that stopped kept its verdict on
+both targets. The replays, simulations and runs are evidence sets
+`gate-early-stop-two-blocks`, `gate-early-stop-runs-aarch64` and
+`gate-early-stop-runs-armv7`.
 
 #### Memory in parallel
 
@@ -1021,49 +1008,29 @@ collects every case's memory in one collection from the records the timing run w
 refusing them if the sources, workers, cases or host differ; without `--stage` one run
 does both, its memory after all its timing. Collecting side by side, it gives each
 case its own copy of its generated input, checked against the hash its timing recorded
-and removed when the run ends, so cases of one input no longer share a file; on one CPU
-they read the input itself. Pinned to one CPU, collection runs exactly as before. The
+and removed when the run ends; on one CPU they read the input itself. The
 reference's memory is measured afresh in every pair, not reused from earlier runs: on a
 second host of the same class it gives the same heaps and resident peaks within their
 spread (evidence set `gate-reference-memory-cross-host`), but caching it would save a
 few minutes and give up the interleaving of both workers within each pair.
-Collected serially and in parallel under the kernel bound with 30 pairs at `a92f2d0a`
-(evidence set `gate-parallel-memory-matroska`), `matroska-demux` gives every case the
-same peak heap sample for sample on Linux AArch64 and on the ARMv7 gate target, moves
-no case's median total RSS by more than one page on AArch64 or ten pages on ARMv7,
-both inside the serial collection's own spread, and grades every case the same. With
-each slot pinned to its CPU, at `8607afdd` on AArch64 and `247e8560` on ARMv7 (evidence
-set `gate-parallel-memory-matroska-head`), the same comparison gives the same result:
-heaps identical, medians within one page on AArch64 and twelve on ARMv7, verdicts
-unchanged.
-ISO BMFF, collected serially and in parallel at `a92f2d0a` (evidence sets
-`gate-parallel-memory-isobmff-aarch64` and `gate-parallel-memory-isobmff-armv7`), gives
-all 956 cases the same peak heap sample for sample, moves no case's median resident peak
-by more than two pages on AArch64 or nineteen on ARMv7, inside the serial spread, and
-passes every case either way; the collection took 82 instead of 252 minutes on AArch64
-and 96 instead of 296 on ARMv7.
-Capture, collected at `4b43bf74` from one timing run's records serially on five cases and
-in parallel on all fifteen (evidence sets `gate-parallel-memory-capture-codecs-aarch64`
-and `gate-parallel-memory-capture-codecs-armv7`), gives those five cases the same peak
-heap sample for sample on both targets, keeps every resident median inside the serial
-spread, and grades them the same; the fifteen took 10 minutes on AArch64 and 11 on ARMv7,
-where the five took 31 serially. The gate collects a shard's capture memory steps the
-same way: the 15 capture items at `c82b4452`, each target on one host (evidence sets
-`gate-run-aarch64-c82b4452-20261118-143205-shard-1` and
-`gate-run-armv7-c82b4452-20261118-143302-shard-1`), against their serial steps at
-`f7b1d8eb` on the same worker bytes (`gate-run-aarch64-f7b1d8eb-20261118-104434-shard-1`
-to `-5` and `gate-run-armv7-f7b1d8eb-20261118-104533-shard-1` to `-5`), give every case
-the same 20 pairs, both workers' peak heap identical sample for sample, each total
-resident median inside the serial collection's range, moved by at most one page on
-AArch64 and 13.5 on ARMv7, and the same heap and total RSS verdicts; the memory pass took
-10.1 minutes on AArch64 and 11.6 on ARMv7, where the serial steps took 88.6 and 83.2. The codec workloads, collected in parallel at the same
-revision, grade every workload as the serial collection of the same worker bytes at
-`8154812e` does, with the reference's heap identical sample for sample. The candidate's
-heap is identical in 21 of 30 workloads on AArch64 and 25 of 30 on ARMv7, and 8 or 16
-bytes apart in the others, in every sample: the codec worker keeps its own path, which a
-slot's copy lengthens. Collected serially, those workloads give the serial collection's
-heaps when measured from the workers' own paths and the parallel collection's when
-measured from a slot's copies.
+Parallel and serial collections of the same worker bytes agree: `matroska-demux` at
+`a92f2d0a` (evidence set `gate-parallel-memory-matroska`) and with each slot pinned at
+`8607afdd` on AArch64 and `247e8560` on ARMv7 (`gate-parallel-memory-matroska-head`);
+ISO BMFF's 956 cases at `a92f2d0a` (`gate-parallel-memory-isobmff-aarch64` and
+`gate-parallel-memory-isobmff-armv7`); capture at `4b43bf74`
+(`gate-parallel-memory-capture-codecs-aarch64` and
+`gate-parallel-memory-capture-codecs-armv7`); and a shard's 15 batched capture items at
+`c82b4452` (`gate-run-aarch64-c82b4452-20261118-143205-shard-1` and
+`gate-run-armv7-c82b4452-20261118-143302-shard-1`) against their serial steps at
+`f7b1d8eb` (`gate-run-aarch64-f7b1d8eb-20261118-104434-shard-1` to `-5` and
+`gate-run-armv7-f7b1d8eb-20261118-104533-shard-1` to `-5`). Each gives the same peak heap
+sample for sample, resident medians inside the serial collection's spread (at most two
+pages apart on AArch64 and nineteen on ARMv7) and the same verdicts, in a fraction of the
+time: ISO BMFF took 82 instead of 252 minutes on AArch64 and 96 instead of 296 on ARMv7,
+the shard's capture memory 10.1 and 11.6 instead of 88.6 and 83.2. The codec workloads,
+collected in parallel at `c82b4452`, grade as the serial collection at `8154812e` does;
+the candidate's heap differs by 8 or 16 bytes in some workloads because a slot's copy
+lengthens the path the codec worker keeps.
 
 Each collection records the number of slots (`memory_slots`) and what the host's memory
 did over it (`host_memory`): `MemAvailable` at its start and end and the change of the
@@ -1147,35 +1114,20 @@ on its AArch64 kernel; later Graviton generations cannot.
 
 The results in [status](status.md#32-bit-armv7) come from the Ubuntu 24.04 armhf user
 space archived as evidence set `armv7-userland` (211 packages; the image holds no home
-directory, toolchain or build output). Unpack it on the host and enter it:
-
-```sh
-sha=f93de19128a5bc101c125a4a1f7c61f42062675186cfc86f627d220d1d079533
-aws s3 cp "$TRIERGON_EVIDENCE_ARCHIVE/evidence/armv7-userland/$sha.tar.gz" armv7-userland.tar.gz
-echo "$sha  armv7-userland.tar.gz" | sha256sum --check
-sudo mkdir -p /srv/armhf
-sudo tar -xpzf armv7-userland.tar.gz --numeric-owner -C /srv/armhf
-for d in proc sys dev dev/pts; do sudo mount --bind /$d /srv/armhf/$d; done
-sudo cp /etc/resolv.conf /srv/armhf/etc/resolv.conf
-sudo install -d -o 1000 -g 1000 /srv/armhf/home/ubuntu
-sudo chroot /srv/armhf setarch linux32 sudo -u ubuntu -H bash -l
-```
+directory, toolchain or build output). `tools/gate-host.sh setup armv7` fetches and
+hash-checks it, unpacks it at `/srv/armhf`, binds `/proc`, `/sys`, `/dev` and debugfs
+into it at every boot, and installs Rust with the gate target and the packages the
+`subtitles` reference's libzvbi build needs (`autoconf automake libtool autopoint
+gettext`); every command then runs inside it under `setarch linux32` as user `ubuntu`
+(uid 1000, passwordless `sudo`).
 
 The image was made with `debootstrap --arch=armhf --variant=buildd
 --components=main,universe noble` from `http://ports.ubuntu.com/ubuntu-ports`, with
 `noble-updates` and `noble-security` enabled, then `apt-get install build-essential
 pkg-config zlib1g-dev python3 python3-numpy make git zstd curl ca-certificates sudo jq
-time`. It has a user `ubuntu` (uid 1000, passwordless `sudo`); its home directory is not
-part of the image.
-A user space built the same way later can pick up newer packages; compare its
-`dpkg-query -W` list before treating its results as comparable. Inside, install rustup
-as on any host, add the gate target, and run every command under `setarch linux32`. Record the CPU, kernel
-and user-space package list with the results. The `subtitles` reference builds libzvbi
-from its source archive, which needs `apt-get install autoconf automake libtool autopoint
-gettext` in the user space first.
-
-`tools/gate-host.sh setup armv7` does all of this on a gate host, and mounts the user
-space at every boot.
+time`. A user space built the same way later can pick up newer packages; compare its
+`dpkg-query -W` list before treating its results as comparable. Record the CPU, kernel
+and user-space package list with the results.
 
 The kernel RSS bound works for a 32-bit process through the module's 32-bit ioctl
 entry point. The module belongs to the host's kernel, so build and load it on the host,
@@ -1249,13 +1201,10 @@ on, SSH is open to one address (`TRIERGON_SSH_CIDR`, a /32), and a timer on the 
 disk powers it off, and so terminates it, 72 hours after it boots. Both
 commands refuse to launch anything unless `TRIERGON_SSH_CIDR` is the workstation's
 current public address as a /32, which they read from `https://checkip.amazonaws.com`
-and print beside it; they never widen it. When a poll fails because the workstation's
-public address is no longer the one the session's security group admits, the run says so
-and waits, polling on, instead of giving up on hosts that are still working: open the
-group to the new address (one /32) within 30 minutes and it carries on; after that the
-shard fails and the session's teardown removes its host. It never changes the group
-itself. A group it cannot read is reported as a credential failure, and counts as a
-failed poll.
+and print beside it; they never widen it. If the workstation's address changes during a
+run, polls wait up to 30 minutes for the group to admit the new /32, which the run never
+changes itself, before the shard fails; a group it cannot read is reported as a
+credential failure.
 
 ## Robustness
 

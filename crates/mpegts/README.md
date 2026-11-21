@@ -53,8 +53,7 @@ event contexts, byte ranges and charged storage. Its payload may be damaged or
 scrambled: it is neither validated source PES nor a codec access unit.
 `DemuxClock::project_transport_fault` places the encoded PTS in the existing demux
 interval without creating a source clock anchor; encoded DTS remains absent.
-The policy allocates two charged one-entry descriptor tables and aliases the
-original payload. Cancellation and allocation pressure preserve pending input.
+Cancellation and allocation pressure preserve pending input.
 An unavoidable storage total above the pool limit returns `Limit`; storage held
 by external outputs or reservations can instead cause retryable `Backpressure`.
 
@@ -99,8 +98,7 @@ check through `confirm_terminal_finished`. Only then does `terminal_confirmation
 expose a `TransportTailConfirmation` and permit logical completion. The diagnostic
 and any rejected bytes stay available as charged storage. No empty output,
 additional carrier, malformed adaptation/PES, entity transition or I/O failure is
-promoted to success. These boundary checks add fixed state and no allocation,
-payload copy or descriptor table; a rejected carrier shares its existing charge.
+promoted to success.
 
 `compat::pes::MalformedInputCompletion` can report selected TS188 AVC carriers
 with reserved adaptation control, an adaptation overrun, an invalid PES start
@@ -121,8 +119,7 @@ operation and a fresh EOF check on the original cursor.
 The completion can account for an empty physical input at EOF and preserves
 the original PAT, PMT and PES scope. It requires contiguous input coverage and
 a healthy cursor. `required_work` bounds per-event admission. A short grant
-leaves the event available for retry. Fixed policy state and charged aliases
-reuse the parser's original bytes.
+leaves the event available for retry.
 
 ## Access units
 
@@ -174,8 +171,8 @@ Unordered times or exhausted index bounds fall back to scanning. Explicit epoch
 indexes replay from the start to reconstruct state. Timestamp-only requests never
 reuse an explicit-epoch index. Sources must remain stable between requests.
 Reader tests cover indexed epoch selection across TS188/M2TS192 entity plans,
-codec changes and exact packet suffix facts; these combinations have no matched
-reference or native runtime and memory qualification.
+codec changes and exact packet suffix facts; the codec-change combinations have no
+matched reference comparison.
 
 The epoch distinction follows [H.222.0 (08/2023)](https://www.itu.int/rec/T-REC-H.222.0-202308-S/en)
 §2.4.3.5 (a signalled PCR discontinuity starts a new system time base) and
@@ -186,20 +183,9 @@ The required [picture comparison](../../harness/features/mpegts-previous-picture
 covers 36 explicit-epoch AVC seeks against the pinned FFmpeg formats build:
 a clock change or same-codec PMT descriptor change, each in TS188 and M2TS192,
 with both seek policies, ordered entity splits and repeated indexed seeks.
-Equal-PTS controls put overlapping epochs in separate entities. Each picture has its own PES. Both workers scan the full
-stable input through EOF and replay every suffix packet, comparing the requested,
-landing and discard times, PTS, effective DTS, random-access flags and all bytes.
-The candidate selects the source epoch pair; the reference selects landing
-candidates by its public packet positions over the authored physical boundary.
-After building the workers, run:
-
-```sh
-CARGO_INCREMENTAL=0 cargo xtask report \
-  --contract harness/features/mpegts-previous-picture/contract.json \
-  --manifest harness/features/mpegts-previous-picture/corpus.json --corpus .
-```
-
-Native Linux parity, runtime and memory qualification remain separate checks.
+Equal-PTS controls put overlapping epochs in separate entities. Every suffix packet
+through EOF is compared: requested, landing and discard times, PTS, effective DTS,
+random-access flags and all bytes.
 
 DTS-HD seeking also supports a lossless XLL stream with no core, one extension
 substream at index zero, one presentation and one active speaker asset. An entry
@@ -225,18 +211,9 @@ construction 14 as a separate core plus XLL.
 Annex F.4.3 defines PES alignment and complete access-unit carriage;
 alignment alone does not establish decoder recovery.
 
-The next recovery proofs require all active assets of every selected presentation
-and extension substream to be independently available, with their navigation and
-core dependencies checked together. Inherited static metadata needs a verified
-setup origin included in preroll; PES alignment cannot supply it. Delays and
-smoothing need a bounded earlier decoding origin, while nonzero XLL sync offsets
-need a complete frame and checked alignment at the signalled offset. Speaker
-remapping and mixing need their full mapping and scaling dependencies checked.
-Legacy DRC and dialogue metadata are parsed within the asset descriptor; secondary
-decoding and Rev2 DRC remain unsupported. Authored construction-14 controls test
-packet suffixes and recovery metadata. The pinned transport reference has no DTS
-decoder, so these controls do not establish decoded-PCM parity. Native runtime,
-heap and kernel-bound RSS qualification for this seek profile is unmeasured.
+Legacy DRC and dialogue metadata are parsed within the asset descriptor. The pinned
+transport reference has no DTS decoder, so the authored construction-14 controls test
+packet suffixes and recovery metadata, not decoded-PCM parity.
 
 Use `Reader::request_seek_in_entities` for consecutive length-known, seekable
 parts of one logical transport stream. The ordered `SeekEntity` list supplies
@@ -345,7 +322,8 @@ The boundary semantics follow [RFC 8216 sections 3 and 4.3.2.3](https://www.rfc-
 
 The admitted carriages are AVC and HEVC Annex B, MPEG-1 and MPEG-2 audio,
 single-block ADTS AAC-LC, LATM in LOAS, AC-3 and E-AC-3 with explicitly
-declared DVB or ATSC signalling, DVB-signalled DTS core, and DVB subtitle segments.
+declared DVB or ATSC signalling, DVB-signalled DTS core and DTS-HD, caller-identified
+unlabelled DTS core, and DVB subtitle segments.
 
 For MPEG audio, PMT stream types `0x03` and `0x04` select Layer I, II and III
 frame parsing in audio PES packets (`0xc0`–`0xdf`). The reader can assemble a
@@ -664,7 +642,7 @@ file.
 | Continuity | `Continuity::observe` → `ContinuityOutcome` |
 | PSI | `SectionAssembler`, `psi::{PatReader, PmtReader, PatCollector}` |
 | Track classification | `psi::ElementaryStream` implements `triergon_core::container::TrackInfo` |
-| Descriptors | `psi::Descriptor::{registration, languages, avc_video, hevc_video, dvb_ac3, dvb_eac3, dvb_subtitling}` |
+| Descriptors | `psi::Descriptor::{registration, languages, avc_video, hevc_video, dvb_ac3, dvb_eac3, dvb_subtitling, dvb_dts_hd}` |
 | Stream codec | `psi::ElementaryStream::{codec, dvb_descriptor_codec}` → `triergon_core::CodecId` |
 | PES | `PesAssembler` → `Pes`, `PesHeader::{raw_pts_time, raw_dts_time}` |
 | Timestamps | `clock::source_timestamp` with `clock::SourceTimePolicy` |
@@ -684,16 +662,10 @@ admitted observer for the active map. The private types 0x81 and 0x87 indicate
 audio, and 0x90 indicates presentation graphics in this view. MPEG-1 video
 (0x01) keeps its source kind and is unknown in the selected PES view.
 
-The startup probe scores sync bytes in groups while charging each inspected
-byte. Complete TS188 and M2TS192 carriers use one validator for common
-payload and adaptation layouts, including PCR. M2TS prefixes stay opaque.
-Program playback keeps tight carrier storage so a packet cannot retain an
-entire input window. A complete buffered carrier can reserve its storage and
-shared header together. The PES observer checks that the payload is the exact
-span at its declared offset in that carrier. A ready PES continuation can
-retain just the payload view while playback delivers the full transport event.
-For a carrier that needs incremental assembly, the observer retains the
-charged bytes and the fields used for packet order and offsets.
+The startup probe charges each inspected byte; M2TS prefixes stay opaque. Program
+playback keeps tight carrier storage so a packet cannot retain an entire input
+window, and the PES observer checks that each payload is the exact span at its
+declared offset in its carrier.
 
 The sequential feed keeps program tables, clock transitions and diagnostics.
 `TransportStream::poll_feed` can deliver validated PES continuations directly
@@ -702,14 +674,8 @@ plain continuation's charged payload storage into `compat::pes::DemuxObserver`.
 `poll_feed_with_payload_runs` can offer several payload-only continuations
 on one PID from an already shared window. Each carrier keeps its source
 range and event ordinal. Runs reserve checked span capacity before advancing
-input; ordinary carrier polling handles PES completion.
-Feed dispatch reuses the selected PES route after checking its PID against the
-current program table. Other PIDs use the ordinary route lookup.
-Idle PSI jobs do not enter the table poller. Complete timestamp-only PES headers
-use the shared timestamp validator directly; other headers retain incremental
-validation. Both paths preserve work charges and cancellation boundaries.
-Runs record the complete final carrier for duplicate detection before transferring
-the shared backing storage. Every retained view keeps the full allocation charged.
+input; ordinary carrier polling handles PES completion. Every retained view keeps
+the full allocation charged.
 A fresh, inactive `DemuxObserver` can select `enable_compact_payloads` before input and then use
 `poll_compact_payload` (or its input-bound counterpart). `CompactDemuxPacket`
 retains one backing handle per admitted run on 64-bit targets; `CompactPayload::spans` and its
@@ -794,7 +760,7 @@ pipeline ([triergon-capture](../capture/README.md#conformance)).
 | Packets | TS188, M2TS192 (4-byte prefix kept opaque), adaptation field, PCR/OPCR, private data, extension bytes kept raw |
 | Continuity | per-PID counters, wrap, one duplicate packet (with the PCR exception), loss, signalled discontinuity |
 | PSI | pointer field, multi-section packets, CRC-32, PAT, PMT, program and ES descriptor loops |
-| Descriptors | registration, ISO 639 language, AVC, HEVC, DVB AC-3 (`0x6a`), E-AC-3 (`0x7a`), DVB subtitling (`0x59`), teletext (`0x56`) |
+| Descriptors | registration, ISO 639 language, AVC, HEVC, DVB AC-3 (`0x6a`), E-AC-3 (`0x7a`), DTS (`0x7b`), DTS-HD (extension `0x7f`/`0x0e`), DVB subtitling (`0x59`), teletext (`0x56`) |
 | PES | split headers, finite lengths, unbounded lengths on MPEG-1/2 video (0x01, 0x02), AVC (0x1b) and HEVC (0x24) streams, PTS/DTS with marker checks, optional fields |
 | FFmpeg-compatible carriage | AVC, HEVC, AAC ADTS, AAC LATM (`RegisteredCarriage`); AC-3/E-AC-3 by DVB tag or stream type `0x81`/`0x87` (`PrivateAudioCarriage`); single-service DVB subtitles; PES packets of any stream (`PesCutter`), including PGS (`0x90`), teletext and caption-carrying video |
 
@@ -839,12 +805,14 @@ pipeline ([triergon-capture](../capture/README.md#conformance)).
   flush a PES; only `end_of_source()` at logical end of media does.
 - **Descriptor namespace.** Private descriptor tags are interpreted as DVB
   only under `psi::DescriptorNamespace::Dvb`, supplied by the caller through
-  `new_with_namespace`. The default is `Unspecified`.
+  `new_with_namespace`. `DescriptorNamespace::Atsc` instead maps stream types
+  `0x81` and `0x87` to AC-3 and E-AC-3. The default is `Unspecified`.
 - **FFmpeg-compatible view.** Each observer is bound to one program, PID,
   stream type and stream ID (`DemuxScope`). Contexts outside the observed
   profile return `Error::Unsupported`.
 - **Not handled.** SI tables beyond PAT/PMT (their packets are still reported),
-  ATSC/Blu-ray signalling, descrambling, multi-program PES output.
+  ATSC signalling beyond the AC-3 and E-AC-3 stream types, Blu-ray signalling,
+  descrambling, multi-program PES output.
 
 ## Conformance
 
@@ -859,23 +827,14 @@ Specification basis:
 Verification:
 
 - The [DTS seek comparison](../../harness/features/mpegts-dts-seek/contract.json)
-  contains two DTS core history cases and 24 authored XLL cases. Twelve XLL cases
-  use an extension alone and twelve carry an independently recoverable core.
-  The cases cover short extension headers in TS188 and long extension headers in M2TS192, both
-  seek policies at 90,000 and 91,920 source ticks, explicit and missing source DTS,
-  and an indexed backward seek after draining to EOF. Each suffix includes every
-  payload byte and its source clocks. The fixture author is
-  `cargo xtask fixture transport-dts-seek --record REFERENCE`; it records folds
-  through the FFmpeg TS audio seek worker and reproduces the existing core cases.
-  FFmpeg identifies the DVB extension descriptor as data and preserves the aligned
-  full PES payload. These inputs contain only self-contained XLL entries with
-  checked recovery navigation; the independent reader tests cover refusals.
-  Synthetic bodies exercise framing and recovery metadata, not audio decoding.
-  Run `CARGO_INCREMENTAL=0 cargo xtask build-workers --only transport-worker`, then
-  `CARGO_INCREMENTAL=0 cargo xtask report --contract harness/features/mpegts-dts-seek/contract.json --manifest harness/features/mpegts-dts-seek/corpus.json --corpus . --output DIR`.
-  Adding `--benchmark --memory --require-slice-acceptance` applies the complete
-  per-case runtime, live-heap and total-RSS contract on each required native target.
-  [Native results](../../docs/status.md) include both XLL profiles on AArch64 and ARMv7.
+  contains two DTS core history cases and 24 authored XLL cases (twelve
+  extension-only, twelve with an independently recoverable core): short extension
+  headers in TS188 and long ones in M2TS192, both seek policies, explicit and missing
+  source DTS, and indexed backward seeks after EOF. Every suffix payload byte and
+  source clock is compared. `cargo xtask fixture transport-dts-seek --record REFERENCE`
+  authors the inputs. Synthetic bodies exercise framing and recovery metadata, not
+  audio decoding. [Native results](../../docs/status.md) include both XLL profiles on
+  AArch64 and ARMv7.
 - `CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test container_reader seek::dts_hd`
   checks DTS-HD seek metadata, full original packet and PES provenance, exact clocks,
   small input/work grants, TS188/M2TS192, previous/preroll landings, index reuse,
@@ -902,27 +861,11 @@ Verification:
 - The source view is compared field by field with an independent oracle over
   the corpus. The FFmpeg-compatible view is compared packet by packet
   (payload bytes, timestamps, flags, positions, stream-ID side data) with the
-  FFmpeg reference; nonmatching cases are kept as failures, not normalised.
-  `cargo xtask report` runs that comparison from
-  [`harness/features/mpegts-pes/`](../../harness/features/mpegts-pes/contract.json)
-  through `transport-worker`'s `ts-` modes, which use the public API only:
-  `TransportStream` selects the program, its first active PMT binds a
-  `compat::pes::DemuxObserver` to the one elementary stream, wrapped by
-  `TransportFaultRecovery`, and `DemuxClock` places the timestamps. A typed
-  program-policy or empty-observation refusal
-  with no emitted packets and one entity can complete through a bounded
-  control-only replay and a real `NoMediaConfirmation`. Other refusals remain
-  failures unless the separately reported malformed-input policy proves complete
-  original-cursor coverage and real EOF with `NoPacketsConfirmation`. That
-  proof runs on the original source operation. The control-only replay runs
-  inside the measured operation.
-  For an ordered sequence, each intermediate physical End is sealed before
-  the same cursor advances to its next request. Ordinary boundaries retain
-  PES assembly and the demux clock, including an initialization entity's
-  program map. A declared discontinuity requires drained PES assembly and
-  a new source map for the same elementary stream. Folded positions use the
-  sequence coordinate system. Source ranges and epochs remain physical
-  source facts.
+  FFmpeg reference ([`harness/features/mpegts-pes/`](../../harness/features/mpegts-pes/contract.json));
+  nonmatching cases are kept as failures, not normalised. The worker uses the public
+  API only: `TransportStream`, a `compat::pes::DemuxObserver` wrapped by
+  `TransportFaultRecovery`, and `DemuxClock`. A refusal completes only with a real
+  `NoMediaConfirmation` or `NoPacketsConfirmation`.
   The 272 recorded requests map to 97 PES compatibility-view operations.
   All 97 match the pinned FFmpeg formats worker on AArch64 Linux and macOS.
   In the full gate runs at `1c64b775`, all 97 pass the runtime ceiling on

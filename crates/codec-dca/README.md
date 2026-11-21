@@ -1,11 +1,10 @@
 # triergon-codec-dca
 
 DTS Coherent Acoustics core decoder (ETSI TS 102 114), including the XCh and X96
-extensions carried inside the core frame. It is a codec-layer crate whose only dependency
-is [triergon-codec](../codec/README.md) (`AudioDecoder`, `AudioFrame`, `Budget`,
-`ChannelLayout`, `Speaker`). It decodes one core frame at a time to planar `f32` in FFmpeg's native
-channel order. It does not decode DTS-HD extension substreams (XBR, XLL, LBR, or XXCh/X96
-in an extension substream); the caller strips those.
+extensions carried inside the core frame, on [triergon-codec](../codec/README.md) alone.
+It decodes one core frame at a time to planar `f32` in FFmpeg's native channel order.
+It does not decode DTS-HD extension substreams (XBR, XLL, LBR, or XXCh/X96 in an
+extension substream); the caller strips those.
 
 ## Usage
 

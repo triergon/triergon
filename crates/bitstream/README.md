@@ -95,7 +95,7 @@ assert_eq!(Engine::<true>::new(&[0xff, 0x80], 0).err(), Some(InvalidOffset));
 
 ## Checksums
 
-[`crc`] holds the three checksums the workspace uses. Each function continues from a
+[`crc`] holds the four checksums the workspace uses. Each function continues from a
 register value, so a message can arrive in pieces.
 
 ```rust

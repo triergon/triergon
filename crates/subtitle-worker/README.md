@@ -39,30 +39,24 @@ Preparation is outside the timed interval and the memory window: reading the fil
 through the Triergon container readers, selecting the stream, copying its packets
 in demux order, for captions extracting the caption data of every picture in
 output order (H.264 and HEVC in Matroska or MP4 with the parameter sets of the
-track's configuration before the first packet's), and creating the pool the decoder is charged to. The operation creates the decoder, decodes every prepared packet with
-one call each, drains it, folds every output subtitle (`src/sink.rs`) and frees
+track's configuration before the first packet's), and creating the pool the decoder is charged to. The operation creates the decoder, decodes every prepared packet in
+order (the PGS, DVB and DVD decoders in work slices of 65,536 units, resumed until
+the packet is done), drains it, folds every output subtitle (`src/sink.rs`) and frees
 everything.
 
 The fold, bench and memory modes run through
-[triergon-harness-runner](../harness-runner/README.md), which fails an operation that
-leaves storage charged to the pool, and print the harness protocol's one JSON line:
-`packets` counts output subtitles, `bytes` folded bytes and `digest` folds every
-subtitle's packet index, times, and per rectangle its geometry, flags, palette,
-pixels, text and ASS line. A decoder error, such as memory the pool refuses, ends
-the operation: the line counts what was folded before it and carries the error as
-its `refusal`, with the packet it stopped at as its `cause`. The fold, bench and
-memory modes also print `input_digest`, worked out outside the operation from the
-prepared packets as the reference works it out: their count, then per packet whether it has a PTS,
-the PTS and the duration, in order, folded word by word (d = 31d + w, wrapping); the
+[triergon-harness-runner](../harness-runner/README.md) and print the harness
+protocol's one JSON line: `packets` counts output subtitles, `bytes` folded bytes and
+`digest` folds every subtitle's packet index, times, and per rectangle its geometry,
+flags, palette, pixels, text and ASS line. A decoder error, such as memory the pool
+refuses, ends the operation with its `refusal` and the packet it stopped at as its
+`cause`. The line also carries `input_digest`, worked out outside the operation as
+the reference works it out: the packet count, then per packet whether it has a PTS,
+the PTS and the duration, folded word by word (d = 31d + w, wrapping); the
 `subtitle-cc` contract compares it, so the prepared packets' order and times must
-match the reference's exactly. PGS works it out from its prepared packets' clocks
-without the input mode's view, which copies every payload, so a timed or measured
-run holds its input once. The bench mode adds the
-elapsed time of the timed loop and the memory mode brackets one operation with the
-allocation-window markers. The
-trace mode prints the same values as lines, identical to the reference's trace, so a
-failing case can be diffed; the input mode prints the prepared packets. The features
-are `harness/features/subtitle-{pgs,dvb,dvd,cc,teletext}/`.
+match the reference's exactly. The trace mode prints the folded values as lines,
+identical to the reference's trace; the input mode prints the prepared packets. The
+features are `harness/features/subtitle-{pgs,dvb,dvd,cc,teletext}/`.
 
 ## Text subtitles
 
@@ -100,12 +94,10 @@ in work slices of any size. The corpus is `harness/features/subtitle-pgs-capsule
 
 ## Recording and verifying subtitle fixtures
 
-`cargo xtask subtitle-fixtures verify FEATURE REFERENCE` runs the independent
-FFmpeg worker on every authored case in order. It checks the complete manifest,
-including input SHA-256s, decoder arguments, packet counts, folded byte counts
-and digests. Each worker reads a snapshot of the hashed input and must report
-EOF. If the source SHA-256 differs when the worker returns, the command fails.
-Use `record` in place of `verify` to write the manifest after all folds succeed.
+`cargo xtask subtitle-fixtures verify FEATURE REFERENCE` runs the FFmpeg reference
+worker on every authored case and checks the complete manifest (input SHA-256s,
+decoder arguments, packet and byte counts, digests; every run must reach EOF);
+`record` writes the manifest after all folds succeed.
 
 | Feature | Reference in `target/harness/` | Operation | Input location |
 | --- | --- | --- | --- |
@@ -113,12 +105,8 @@ Use `record` in place of `verify` to write the manifest after all folds succeed.
 | `subtitle-pgs-capsules` | `ffmpeg-formats-worker` | `pgs-fold` | Repository PGS capsules |
 | `subtitle-dvb`, `subtitle-teletext` | `ffmpeg-subtitles-worker` | `sub-fold` | `.research/subtitle-corpus` |
 
-For `subtitle-text-host`, pass `--target TRIPLE` for the reference worker's
-target. Recording replaces that target's fold in each case and preserves the
-others when the input SHA-256 and decoder arguments match their recorded values.
-To change those inputs, record every target into a fresh manifest. The recorder
-uses an adjacent `.record-lock` file to serialize writes to the same manifest.
-The operating system releases the lock when the recorder exits.
-`--corpus DIR` selects the input root and `--manifest FILE` selects the
-manifest to check or write. The text capsule and broadcast stream authors
-continue to generate their input bytes and enumerate their cases in Python.
+`subtitle-text-host` takes `--target TRIPLE`, the reference worker's target;
+recording replaces that target's fold and keeps the others while the input SHA-256
+and decoder arguments match. `--corpus DIR` and `--manifest FILE` select the input
+root and the manifest. `harness/subtitle_corpus.py` and the generators in
+`harness/subtitles/` author the inputs and enumerate the cases.

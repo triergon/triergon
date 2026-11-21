@@ -62,18 +62,14 @@ the pre-skip or other container trims.
 
 ## Behaviour and limits
 
-- CELT shares a compile-time lookup across bands with the same pulse costs. Pulse
-  decoding accumulates vector energy as it writes each codeword.
-- De-emphasis is a one-pole recursion per channel. When every stream of a packet decodes
-  CELT frames alone (and no SILK samples are held back), it runs once the streams are
-  decoded, for up to eight output channels in one loop, so that their recursions
-  overlap; otherwise each stream de-emphasises its own frames. Both give the same
-  output. The output gain is applied after de-emphasis, once per packet.
-- The header's output gain is applied. Its pre-skip is not: the decoder reports it as
-  its start delay (`AudioDecoder::delay`), which a consumer discards together with the
-  container's trims (Ogg's granule positions, Matroska's CodecDelay and
-  DiscardPadding), as FFmpeg does unless asked not to; `triergon-session`'s
-  `TrackDecoder` does both.
+- When every stream of a packet decodes CELT frames alone (and no SILK samples are held
+  back), de-emphasis runs once all streams are decoded, for up to eight output channels
+  in one loop; otherwise each stream de-emphasises its own frames, with the same output.
+- The header's output gain is applied after de-emphasis, once per packet. Its pre-skip
+  is not: the decoder reports it as its start delay (`AudioDecoder::delay`), which a
+  consumer discards together with the container's trims (Ogg's granule positions,
+  Matroska's CodecDelay and DiscardPadding), as FFmpeg does unless asked not to;
+  `triergon-session`'s `TrackDecoder` does both.
 - Following FFmpeg 9.0.2:
   - SILK output passes through FFmpeg's resampler, which holds back the last 24
     samples of the first narrowband frame after a start and releases them before the
@@ -91,12 +87,10 @@ the pre-skip or other container trims.
 - No packet loss concealment or forward error correction: every access unit is a packet.
 - Malformed packets return `DecodeFailure` (an `Invalid` error inside); streams of one
   multistream packet with different durations are `Invalid`. A packet is checked whole
-  before any stream decodes: the framing of every stream's packet, the redundant frame
-  size of each hybrid frame, the durations, then the output frame's charge. The redundant
-  frame size follows the SILK layer, so checking reads the SILK symbols and redundancy
-  fields of every frame into a staging area, from which decoding synthesizes SILK and
-  continues with CELT; nothing is read twice. A refused packet leaves every stream as
-  it was, so the next packet decodes as if it had not been sent.
+  (every stream's framing, each hybrid frame's redundant frame size, the durations, then
+  the output frame's charge) before any stream decodes; the SILK symbols read while
+  checking are staged and not read twice. A refused packet leaves every stream as it
+  was, so the next packet decodes as if it had not been sent.
 - Memory charged to the decoder's budget: at construction the state of each stream
   (45 KiB: CELT history and energies, SILK state) with room to stage one packet of it
   (20 KiB), the buffers and inverse MDCT tables the streams share (140 KiB), and the

@@ -7,10 +7,6 @@ sits above `triergon-matroska`, `triergon-isobmff`, `triergon-mpegts`,
 `triergon-framing` and `triergon-subtitles`. It does not fetch over HTTP,
 parse playlists, retry transports, decode media or render.
 
-The MP4 range comparison includes two upstream samples, one with an initial
-non-sync AVC prefix and one with tracks shorter than the declared movie.
-It checks startup and backward seek through EOF for both.
-
 ## Usage
 
 ```rust
@@ -72,24 +68,14 @@ seek accounts for the composition lead. A short edit retains enough of the next
 decode interval to complete its displayed pictures. An empty edit does not
 produce a packet.
 QuickTime range playback reads AAC configuration from version 1 and version 2
-sound descriptions with `wave` extensions. The `avc-aac-quicktime-surround.mov`
-fixture contains synthetic AVC and six-channel, 48 kHz AAC. The range comparison
-also runs with the optional format and marker atoms replaced by free boxes.
-`avc-aac-quicktime-reordered.mov` adds 44.1 kHz AAC and AVC with B pictures.
-`avc-aac-quicktime-fragmented.mov` exercises open and seek with empty
-initialization sample tables and a version 1 sound description. It remuxes the
-synthetic `fragmented-avc-aac.mp4` fixture under the same MIT or Apache-2.0 license.
-`avc-aac-quicktime-7-1.mov` uses the same synthetic video pattern and distinct
-tones at 251, 379, 503, 71, 641, 769, 911 and 1031 Hz for the eight speakers.
-FFmpeg 9.0.2 encoded the fixture as 44.1 kHz AAC-LC with channel configuration
-12. The fixture is distributed under the repository's dual licence. The
-[range corpus](../../harness/features/mp4-range/corpus.json) records its SHA-256.
-
-`avc-aac-program.mov` uses an authored AVC pattern and seven independent tones
-in a 48 kHz AAC-LC program with a leading edit. The range corpus compares its
-original configuration and every selected packet on open and backward seek.
-The fixture uses the repository's dual licence. To regenerate it with FFmpeg
-9.0.2 and libx264:
+sound descriptions with `wave` extensions. The synthetic `avc-aac-quicktime-*.mov`
+fixtures cover six-channel 48 kHz AAC, 44.1 kHz AAC with AVC B pictures, a
+fragmented remux of `fragmented-avc-aac.mp4` with empty initialization sample
+tables, and 7.1 AAC-LC (channel configuration 12, one distinct tone per speaker,
+encoded by FFmpeg 9.0.2). `avc-aac-program.mov` carries a seven-tone 48 kHz AAC-LC
+program with a leading edit. All use the repository's dual licence; the
+[range corpus](../../harness/features/mp4-range/corpus.json) records their SHA-256s.
+To regenerate `avc-aac-program.mov` with FFmpeg 9.0.2 and libx264:
 
 ```sh
 signal='0.13*sin(2*PI*107*t)|0.13*sin(2*PI*211*t)|0.13*sin(2*PI*307*t)|0.13*sin(2*PI*53*t)|0.13*sin(2*PI*409*t)|0.13*sin(2*PI*509*t)|0.13*sin(2*PI*601*t)'
@@ -103,10 +89,8 @@ ffmpeg -nostdin -f lavfi -i 'testsrc2=s=96x64:r=25' \
 
 `Mp4RangeOpen::for_media` projects media tracks for playback and seek alignment.
 Data tracks such as RTP hints and timecode still have their sample extents checked.
-Supply any edit plans in source track order, with `None` for each data track.
-The `avc-aac-rtp-hints.mp4` test fixture contains a synthetic AVC test pattern,
-AAC sine audio and two RTP hint tracks, with the first hint track between the
-video and audio tracks.
+Supply any edit plans in source track order, with `None` for each data track
+(`avc-aac-rtp-hints.mp4` places an RTP hint track between video and audio).
 
 ## Supported
 
@@ -260,32 +244,20 @@ one AVC track and one ADTS AAC track. AVC starts on a timed IDR with an
 access-unit delimiter. AAC needs an initial PES timestamp, then advances
 by the exact ADTS duration when an anchor is absent. Source timestamps stay
 available alongside the playback clocks. Completed units can be delivered
-before the end of input. The AVC reader transfers its assembly buffer to each
-completed unit in progressive and HLS playback. It copies only the delimiter
-lookahead into the next buffer. A player that is done with a unit may hand it
-back with `TsProgressiveReader::reuse_unit` instead of dropping it. Hand back
-each unit when it would otherwise be dropped, and keep advancing as usual.
-When no other handle shares a video unit's storage and the reader has just
-published, that storage becomes the buffer for the next unit, provided its
-capacity is at most twice the last published unit: the slack amortised growth
-already allows, so reuse never holds much more memory than the units need.
-Handing units back is optional: dropping them gives the same units, clocks and
-work counts. The progressive and HLS readers hand each consumed PES's span and
-header lists back to the transport observer themselves, which keeps them under
-the same rule.
-A unit that is still shared, or that arrives once assembly has moved on, is
-simply dropped. Each advance can process several internal steps
-within the caller's work budget. A source that spends its remaining work before
-a reply is ready leaves the request pending for the next advance. Start a new
-reader to begin at another offset.
-Input requests prefer a TS188 boundary within the cursor's window limit. Short
-replies continue through the ordinary packet carry path.
+before the end of input, and each advance can run several internal steps within
+the caller's work budget; a source that spends the remaining work before replying
+leaves the request pending. Start a new reader to begin at another offset.
+Input requests prefer a TS188 boundary within the cursor's window limit.
+The AVC reader moves its assembly buffer into each completed unit (progressive and
+HLS playback). `TsProgressiveReader::reuse_unit` optionally hands a finished unit
+back: an unshared video unit whose capacity is at most twice the last published
+unit becomes the next assembly buffer; anything else is dropped. Units, clocks and
+work counts are the same either way.
 On 64-bit targets, progressive PES payloads retain one shared backing handle per
-admitted carrier run. The AVC and AAC cursors borrow each logical carrier range, preserving its
-validation, work and retirement boundaries. Independently retained AAC frames
-still keep the full backing allocation charged. Both framers also expose
-`push_compact` for explicit `CompactDemuxPacket` delivery alongside ordinary `push`.
-Both paths share track, configuration-epoch and source-clock admission checks.
+admitted carrier run, and the AVC and AAC cursors borrow each carrier range.
+Independently retained AAC frames keep the full backing allocation charged. Both
+framers also expose `push_compact` for `CompactDemuxPacket` delivery alongside
+`push`, with the same track, configuration-epoch and source-clock checks.
 
 **Subtitles.** The TS bridges bind to one PID of one active PMT and take its
 strict private-stream PES; a new generation, PMT epoch or clock epoch needs a
@@ -338,14 +310,10 @@ retire; `Submission::Blocked` returns the same envelope. Threading and
 platform decoder configuration are the sink's responsibility; no `Send` bound
 is imposed.
 
-`cargo xtask progressive` checks three comparable AVC/AAC TS188 packet folds and
-all five authored functional controls through the bounded sequential reader.
-All ten literal worker outcomes are required, including positive Rust output and
-the recorded reference refusal on the legal duplicate control. The
-[contract](../../harness/features/progressive-ts188/contract.json) preserves complete
-packet fields and payloads with two retained units per stream. `--benchmark --memory`
-uses the standard paired harness for the three original comparable cases only;
-native gate-build qualification remains pending.
+`cargo xtask progressive` compares three AVC/AAC TS188 packet folds and five
+authored functional controls through the bounded sequential reader against the
+[contract](../../harness/features/progressive-ts188/contract.json), which keeps
+complete packet fields and payloads with two retained units per stream.
 
 ## Conformance
 
@@ -386,9 +354,8 @@ the audio edit to media time zero and duration 16,459.
 `forward-aac-fractional-edit.mp4` sets the movie timescale to 1,000, its
 duration and the video edit's duration to 334, and the audio edit's media
 time and duration to 64 and 45. The audio edit rounds to an end one sample
-into the third packet. All three fixtures use the repository's dual license.
-The four fragmented fixtures also use the repository's dual license.
-`forward-fragment-aac-edit.mp4` and `forward-fragment-aac-late-track.mp4`
+into the third packet. These and the four fragmented fixtures below use the
+repository's dual licence. `forward-fragment-aac-edit.mp4` and `forward-fragment-aac-late-track.mp4`
 use an FFmpeg-generated AVC test pattern and mono AAC tone. Both carry an
 open-ended audio initialization edit. The latter starts with a video-only
 fragment. `forward-fragment-aac-short.mp4` truncates an authored AVC/AAC

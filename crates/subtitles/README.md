@@ -5,9 +5,10 @@ explicit charset conversion; bitmap decoding of DVB, PGS and DVD subpictures int
 indexed planes with their palettes; CEA-608 closed captions taken from MPEG-2,
 H.264 and HEVC video and decoded to timed text; and DVB teletext pages. It is a
 codec-layer crate that depends only on [`triergon-core`](../core) for budgets,
-`Bytes`, work accounting and exact time, on
-[`triergon-bitstream`](../bitstream) for RBSP reading, and on
-[`triergon-pixel`](../pixel) for the Y'CbCr → RGB of palette entries. It does not demux
+`Bytes`, work accounting and exact time, [`triergon-bitstream`](../bitstream) for
+RBSP reading, [`triergon-framing`](../framing) for H.264 and HEVC parameter sets
+and picture output, and [`triergon-pixel`](../pixel) for the Y'CbCr → RGB of
+palette entries. It does not demux
 containers (apart from the VobSub `.idx`/`.sub` pair and DVD program streams,
 which only carry subtitles), render glyphs, scale or composite bitmaps, or
 schedule presentation; those belong to the caller.
@@ -101,12 +102,12 @@ duration is kept in 32 bits; WebVTT blocks end at FFmpeg's line-break runs, a cu
 `-->` may be on a later line, a cue that does not read ends the document. Cues are
 sorted by start time, one that ends before it starts lasts until the next, and one
 whose start, duration and text repeat the cue before it is dropped.
-`Reader::new` uses the ARMv7 timestamp field width on all platforms. SubRip saturates
-signed fields to 32 bits. WebVTT bounds the magnitude to 32 unsigned bits before
-reading the field as a signed value. Call `Reader::with_timestamp_field_width`
-with `TimestampFieldWidth::Bits64` for the AArch64 Linux interpretation. It uses
-64-bit bounds before reading the low 32 bits as signed. In that mode a SubRip hour
-of 2³¹ reads as −2³¹ and a WebVTT seconds field of 2³² reads as zero. A UTF-16 SubRip
+`Reader::new` reads time fields as on ARMv7 on every platform: SubRip saturates
+signed fields to 32 bits, and WebVTT bounds the magnitude to 32 unsigned bits before
+reading the field as signed. `Reader::with_timestamp_field_width` with
+`TimestampFieldWidth::Bits64` reads them as on AArch64 Linux, with 64-bit bounds
+before the low 32 bits are read as signed, so a SubRip hour of 2³¹ reads as −2³¹
+and a WebVTT seconds field of 2³² as zero. A UTF-16 SubRip
 document is converted as FFmpeg converts it, the first byte of some
 characters after a line break included. A document in another charset is FFmpeg's
 `sub_charenc` case: each cue's text converts on its own with `charset::CharsetJob`
@@ -155,15 +156,7 @@ at a unit per source byte counted and per source and output byte encoded, as a
 byte-at-a-time conversion would charge; a step ends before a character the work
 budget does not cover in full.
 
-Standalone ASCII bytes decode directly in the multibyte profiles. Historical
-Shift-JIS decodes 0x5C as yen and 0x7E as overline.
-After a lead byte, the decoder validates the trail and looks up the pair.
-
-The three EUC-KR profiles share one two-byte lookup table.
-Both receiver profiles additionally map bytes 0x80–0x9F to the C1 controls.
-Only `ReceiverEucKrGlibc239` maps A2 E8 to U+327E.
-
-Mapping tables, sources and licences are listed in
+The multibyte profiles, their mapping tables, sources and licences are listed in
 [MULTIBYTE-CONTRACT.md](src/text/MULTIBYTE-CONTRACT.md). Undefined or unmapped
 bytes are errors; nothing is replaced with U+FFFD.
 
@@ -230,10 +223,9 @@ The text profile names, default limits and timing rules are in
 The implementation is original safe Rust. Tests use independently authored
 fixtures whose expected values were specified from the standards, not produced
 by this code: `tests/text-fixtures/` (with a separate Python oracle). Receivers
-are checked against recorded output of the
-pinned FFmpeg build, and case by case against the build itself through the
-subtitle runner (`crates/subtitle-worker`, `harness/features/subtitle-*`). Every operation is also exercised at several work quanta,
-under allocation pressure and with cancellation. Gates and the reference build
-are described in [docs/quality.md](../../docs/quality.md); current results are
-in [docs/status.md](../../docs/status.md). Every subtitle feature was measured at
-`f8e1c4d9` on Linux AArch64 and in the ARMv7 user space, and PGS again at `546045db`.
+are checked against recorded output of the pinned FFmpeg build, and case by case
+against the build itself through the subtitle runner (`crates/subtitle-worker`,
+`harness/features/subtitle-*`). Every operation is also exercised at several work
+quanta, under allocation pressure and with cancellation. Gates and the reference
+build are described in [docs/quality.md](../../docs/quality.md); results are in
+[docs/status.md](../../docs/status.md).

@@ -50,8 +50,8 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
 ## Behaviour and limits
 
 - `Picture` carries cropped `width`/`height`, three `Plane`s that share the decoder's
-  frame buffer (no copy; `row(y)`, `data()`, `raw()`), `pts`, `poc`, `sar`, `colour` and
-  `interlaced`. Each picture keeps the timestamp of the access unit that carried it
+  frame buffer (no copy; `row(y)`, `data()`, `raw()`), `bit_depth`, `pts`, `poc`, `sar`,
+  `colour` and `interlaced`. Each picture keeps the timestamp of the access unit that carried it
   through reordering.
 - Errors are typed: `Unsupported(&str)` names the feature, `InvalidData(&str)`,
   `ResourceLimit(&str)`, `Budget(StorageError)`. The decoder does not panic on
@@ -90,19 +90,17 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
 ## Performance
 
 - Macroblock addresses split into column and row by a multiplication and a shift
-  (`triergon_codec::Divisor`), so 32-bit ARM, whose baseline has no divide instruction,
-  calls no division routine per macroblock. Temporal direct prediction and implicit
-  weights take the reciprocal of the POC distance from a table.
-- On 32-bit ARM the code generator vectorises loops over 16 byte lanes and none over 8 or
-  4, so bi-prediction of a block narrower than 16 samples combines its two predictions in
-  scratch, 16 samples at a time over the rows laid end to end, and copies its own samples
-  out; other targets combine row by row in place. Chroma interpolation gathers a block's
-  rows end to end and runs one loop over all of its samples on every target.
-- Deblocking filters an edge's Cb and Cr lines together in one 16-lane pass, writes an
-  edge back only where a sample changed, and transposes vertical edges in u32 words on
-  32-bit targets (u64 elsewhere). An inter macroblock's uniform-motion summary, which the
-  edge strengths start from, is taken as the macroblock decodes, while its motion is in
-  cache.
+  (`triergon_codec::Divisor`), so 32-bit ARM calls no division routine per macroblock;
+  temporal direct prediction and implicit weights read POC-distance reciprocals from a
+  table.
+- On 32-bit ARM, where only 16-lane loops vectorise, bi-prediction of a block narrower
+  than 16 samples combines its two predictions in scratch over the rows laid end to end;
+  other targets combine row by row in place. Chroma interpolation runs one loop over a
+  block's rows laid end to end on every target.
+- Deblocking filters an edge's Cb and Cr lines together in one 16-lane pass, writes back
+  only changed samples, and transposes vertical edges in u32 words on 32-bit targets
+  (u64 elsewhere). The edge strengths start from an inter macroblock's uniform-motion
+  summary, taken as it decodes.
 - CABAC decodes in a 32-bit register on 32-bit targets (`triergon_bitstream::cabac`).
 - Gate timings against FFmpeg are in [docs/status.md](../../docs/status.md): at `fc65d9fc`
   the three H.264 workloads' paired 95% upper bounds are 0.76 to 0.99 on ARMv7 and 0.62 to

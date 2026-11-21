@@ -106,11 +106,11 @@ floors the target to nanoseconds and calls `seek_previous` for
 | Content encoding | Header stripping and zlib, per frame (scope 1), CodecPrivate (scope 2) or both; ordered chains of up to eight stages |
 | Colour | All 13 `Colour` integers and 10 `MasteringMetadata` floats (`colour::Colour`) |
 | Segment metadata | Info (title, apps, scale, IEEE duration, DateUTC), editions and nested chapters with displays, tags with nested SimpleTags and all target UIDs, attachments |
-| Seeking | SeekHead chains, Cues (incl. CueRelativePosition, CueBlockNumber), bounded fallback scan, all-track preroll |
+| Seeking | SeekHead chains, Cues (incl. CueRelativePosition, CueBlockNumber, CueCodecState), bounded fallback scan, all-track preroll |
 
 Refused with `Error::Unsupported`: encryption, bzip2/lzo compression, preset
 zlib dictionaries, ContentEncoding scope 4, `TrackTimestampScale` other than 1.0,
-CueCodecState, multiple EBML documents or Segments, EBMLReadVersion above 1,
+multiple EBML documents or Segments, EBMLReadVersion above 1,
 DocTypeReadVersion above 4, EBMLMaxIDLength above 4, EBMLMaxSizeLength above 8,
 and seeking on a non-video track.
 
@@ -192,18 +192,16 @@ modules reproduce FFmpeg's Matroska demuxer where a consumer needs its result, a
 each names the FFmpeg revision it reproduces. `compat::clock` gives FFmpeg's packet
 clock. `compat::seek::at_block_start` selects complete audio blocks by their start
 in the comparison clock during subtitle seek recovery. That integer clock gives
-zero recovery delay to an audio track with a positive rate below 1 Hz. A bounded search can
-land on the first verified keyframe for a nonnegative request that precedes
-it. The ordinary playback seek uses packet overlap
-and retains untimed laces so their timestamps can be derived
-from the audio. An overlapping lace with leading discard padding keeps all its
+zero recovery delay to an audio track with a positive rate below 1 Hz. The ordinary
+playback seek uses packet overlap and retains untimed laces so their timestamps can be
+derived from the audio. An overlapping lace with leading discard padding keeps all its
 frames so a decoder can apply the block-wide trim using their sample counts.
 `compat::block_additions` builds readers that admit WebM VP9's implicit
 ITU-T T.35 addition (BlockAddID 4 without a declared MaxBlockAdditionID), and
 projects block additions to the packet side data and HDR10+ events FFmpeg attaches
-to packets. The `reference-trace` feature exposes comparison projections.
-`Colour::trace_fields` returns the colour fields and `seek_initial_trim` reports
-when the block-start seek comparison reapplies initial audio padding.
+to packets. The `reference-trace` feature exposes comparison projections, such as
+`Colour::trace_fields` (above) and `seek_initial_trim`, which reports when the
+block-start seek comparison reapplies initial audio padding.
 
 **Segment metadata.** Each `metadata::SharedDocument` owns one source buffer
 plus a compact node arena; `Edition`, `Chapter`, `Tag`, `SimpleTag`,

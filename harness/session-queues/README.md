@@ -66,14 +66,12 @@ done
 "$runner" session-queues check "$scratch/baseline" "$scratch/candidate" "$scratch/work"
 ```
 
-The build command uses the shared gate compiler, worker target and linker flags.
-In an armhf user space it passes `--target thumbv7neon-unknown-linux-gnueabihf`
-and copies the linked example from the intermediates for that source revision
-and overlay. These intermediates live under the shared target directory.
-Each worker has an
-adjacent `.build.json` file recording its SHA-256, library revision, overlay
-hashes, target, compiler and build command. Keep each executable with its build identity.
-The comparison checks these identities and saves both records in `identity.json`.
+The build command uses the shared gate compiler, worker target
+(`thumbv7neon-unknown-linux-gnueabihf` in an armhf user space) and linker flags, and
+copies the linked example out of the shared target directory. Each worker gets an
+adjacent `.build.json` recording its SHA-256, library revision, overlay hashes, target,
+compiler and build command; keep it with the executable. The comparison checks both
+identities and saves them in `identity.json`.
 
 On an isolated native Linux AArch64 or ARMv7 host, use the ordinary pinned
 worker toolchain and CPU affinity. The memory run uses the prepared
@@ -92,6 +90,6 @@ output folds before collecting measurements. Time uses 30 randomized pairs for
 each complete cycle. Memory uses 10 pairs per case and endpoint with separate heap
 and RSS processes. Per architecture this schedules 300 timed worker invocations
 and 600 observed invocations before warmups, calibration and any harness retries.
-Keep unsuccessful observations with the successful rows. The ratios describe the
-two supplied workers. A measurement status records collection validity; the
-per-case bounds and allocation counts determine whether the change helps.
+Unsuccessful observations are kept with the successful rows. The ratios describe only
+the two supplied workers; the status records collection validity, and the per-case
+bounds and allocation counts show whether the change helps.

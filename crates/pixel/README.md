@@ -4,8 +4,9 @@ Picture types and the fixed pixel conversions shared by the capture, playback an
 subtitle sides: borrowed views of decoded pictures, a macroblock-aligned YUV 4:2:0
 picture, RGBA → YUV 4:2:0 with ITU-R BT.601 coefficients, a letterbox that converts a
 decoded 4:2:0 picture into a 1920×1080 RGBA canvas exactly as FFmpeg's scale/pad
-chain does, and the Y'CbCr → RGB of subtitle palette entries. It is the pixel layer below the codec crates and depends only on `std`.
-It does no general scaling, colour management or other canvas sizes.
+chain does, and the Y'CbCr → RGB of subtitle palette entries. It is the pixel layer
+below the codec crates and depends only on `std`. It does no general scaling, colour
+management or other canvas sizes.
 
 ## Usage
 
@@ -96,10 +97,9 @@ picture averages each pair of rows. The first chroma row of a 6-row picture
 uses weights 1755, 1756 and 585 divided by 4096. The other two rows use the
 usual four taps.
 
-Use `Converter::filtered` to use this filter at every width, as FFmpeg's AArch64
-build does. Input shorter than
-`width × height × 4` is `Error::InputLength`; longer input is ignored past that
-length. `convert` replicates the coded padding.
+`Converter::filtered` uses this filter at every width, as FFmpeg's AArch64 build does.
+Input shorter than `width × height × 4` is `Error::InputLength`; longer input is ignored
+past that length. `convert` replicates the coded padding.
 
 **Plane layout.** Visible sample (x, y) of a `Plane` is
 `data[offset + y * stride + x]`. Decoders should hand over the whole decoded plane

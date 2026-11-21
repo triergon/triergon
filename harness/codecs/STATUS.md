@@ -4,10 +4,9 @@ Inputs, rules and tools used to compare the codec crates (`crates/codec-aac`,
 `codec-ac3`, `codec-dca`, `codec-flac`, `codec-h264`, `codec-hevc`, `codec-mp3`,
 `codec-opus`, `codec-vorbis`), the session crate (`crates/session`) and the audio
 container readers (`crates/ogg`, `crates/elementary`) with FFmpeg 9.0.2. What each
-decoder supports and refuses is in its crate README. The comparison harness is the
-decode build of `harness/reference.c` and the decode profile's `ffmpeg` and `ffprobe`,
-driven by `cargo xtask codecs` (`manifest`, `grade`, `summarize`, `readers`, `time`,
-`memory`, `equivalence`; see `cargo xtask codecs --help`). Gate definitions:
+decoder supports and refuses is in its crate README. The reference is the decode build
+of `harness/reference.c` with the decode profile's `ffmpeg` and `ffprobe`, driven by
+`cargo xtask codecs` (`--help` lists its commands). Gate definitions:
 [docs/quality.md](../../docs/quality.md).
 
 | Path | Content |
@@ -174,17 +173,16 @@ cargo xtask codecs isobmff-reader --ffprobe .research/reference-formats/install/
 
 ## Timing and memory
 
-`cargo xtask codecs time` pairs the workers on the workloads (30 pairs, seed 280, retried on 281 and 282;
-a workload settled below the ceiling stops at 20, see
-[early stop](../../docs/quality.md#early-stop)).
+`cargo xtask codecs time` pairs the workers on the workloads (30 pairs, seed 280,
+retried on 281 and 282; [early stop](../../docs/quality.md#early-stop) applies).
 `cargo xtask codecs memory --candidate target/release/codec-worker --reference
 target/harness/ffmpeg-decode-worker --workloads harness/codecs/file-workloads.json
 --root . --out DIR` measures both workers' `OP-memory` runs under the shared observer
 of `target/harness` (30 pairs, seed 283). Each worker's work is checked first and must
 be equal; the gate is the paired 95% upper bounds of peak heap
 (`heap_ratio_upper_95`) and total resident peak RSS (`total_rss_ratio_upper_95`), both
-below 1.0, on native AArch64 Linux with the gate build. `DIR` keeps every raw
-observation per workload and `summary.json`.
+below 1.0, with the gate build on native Linux AArch64 or in the 32-bit ARMv7 user space.
+`DIR` keeps every raw observation per workload and `summary.json`.
 
 ## Dispositions cited by the correctness summaries
 

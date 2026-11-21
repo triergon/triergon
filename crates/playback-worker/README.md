@@ -26,15 +26,9 @@ playback-worker PREFIXmemory FILE ARGS
 playback-worker PREFIXtrace  FILE ARGS
 ```
 
-Every mode prints one JSON line with the packet and byte counts and the ordered fold
-of each operation's digest. `bench` runs the operation ITERATIONS times and adds the
-elapsed time of that loop, `memory` brackets one operation with the allocation-window
-markers, and `trace`, where a family has it, prints what the operation folds before
-the result. Reading the input, process start-up and the result line are outside the
-timed loop and the allocation window. An operation on a preloaded input fails when it
-leaves any of that input's pool charged. An operation that ends early stops the loop:
-the line then counts the operations that ran, says `"eof":false` and names the refusal
-and the input event it is attributed to.
+The modes and the result line are those of
+[triergon-harness-runner](../harness-runner/README.md); `trace`, where a family has
+it, prints what the operation folds before the result.
 
 | Prefix | ARGS | Operation | Contract |
 |---|---|---|---|

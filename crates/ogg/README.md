@@ -95,12 +95,12 @@ start (`SeekMethod::Restart`).
 ## Limits
 
 `Limits::default()`: packets of up to 16 MiB gathered across pages, 16 MiB of headers per
-track (cover art in a comment header), 64 logical streams per link, 1024 tracks, 128 KiB
-of skipped bytes in a row, 256 KiB per seek probe, 128 KiB end scan. Charged to the
-budget: gathered packets and split pages, track configurations, and the track, stream
-and link tables. The scratch lists of one page are fixed at its 255 lacing values. A
-limit violation is an error; a full pool is `Step::Backpressure`, and the step resumes
-once output is released.
+track (cover art in a comment header), 64 logical streams per link, 1024 tracks, and
+two maximum pages (`page::MAX_PAGE`, 65,307 bytes) of skipped bytes in a row, four per
+seek probe and two for the end scan, in a 64 MiB pool. Charged to the budget: gathered
+packets and split pages, track configurations, and the track, stream and link tables.
+The scratch lists of one page are fixed at its 255 lacing values. A limit violation is an
+error; a full pool is `Step::Backpressure`, and the step resumes once output is released.
 
 ## Comparison with FFmpeg
 

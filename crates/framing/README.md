@@ -1,7 +1,8 @@
 # triergon-framing
 
 Packet framing and codec-configuration parsing for the format layer: H.264/HEVC
-NAL units and records, AV1 OBUs, VP9 records, AAC, AC-3/E-AC-3 and DTS core.
+NAL units and records, AV1 OBUs, VP9 records, AAC, AC-3/E-AC-3, DTS core, MPEG audio
+headers, and FLAC, Opus and Vorbis configurations.
 Containers hand it record bytes and complete samples; it returns source-preserving
 views, decoder-ready Annex-B/ADTS/temporal-unit output and typed refusals. It
 depends on `triergon-core` and `triergon-bitstream`, does no I/O and does not decode
@@ -9,8 +10,8 @@ audio or video.
 
 ## Usage
 
-Every operation takes a core `Budget` pool, a `WorkBudget` and a cancel flag, and
-is driven by `step`. Record and packet jobs return `BuildStep::{Yield, Ready,
+Every record job, packet job and incremental reader takes a core `Budget` pool, a
+`WorkBudget` and a cancel flag, and is driven by `step`. Record and packet jobs return `BuildStep::{Yield, Ready,
 Complete}`; incremental readers return core `Step::{NeedInput, Yield, Ready, End}`
 and are fed with `provide` and closed with `finish` or `fail`.
 
@@ -98,16 +99,17 @@ assert_eq!(decoder_input, [
 | DTS core | `probe_dts_core_header`, `DtsCoreFrameReader`, `DtsHeaderInspector` | Normal core header (all fields, optional HCRC), FSIZE+1 frame acquisition |
 | DTS declared extents | `probe_dts_frame_extent`, `probe_dts_extension_substream_extent` | Bounded core and extension size fields at an established canonical sync, including the short and long extension prefixes |
 | DTS packings | `Dts14BitUnpacker`, `DtsPackedPayloadJob`, `Dts14SyncReader`, `Dts14CarrierReader`, `DtsNormalSourceReader` | 16-bit LE and 14-bit BE/LE word packings; experimental 14-bit stream acquisition |
+| MPEG audio | `MpegAudioHeader`, `mpeg_info_frame`, `mpeg_audio_crc_ok` | ISO/IEC 11172-3 and 13818-3 frame headers, including MPEG-2.5 rates; Xing, Info (with LAME tag) and VBRI information frames; frame CRC check |
+| FLAC | `flac_stream_info`, `flac_metadata_blocks`, `flac_configuration_from_dfla`, `flac_configuration_from_ogg`, `FlacFrameHeader` | STREAMINFO and metadata blocks; the `fLaC` configuration rebuilt from a `dfLa` payload or the first Ogg FLAC packet; frame headers with their CRC-8 |
+| Opus | `OpusHead`, `opus_packet_samples` | Identification header, also from a `dOps` payload; packet duration from the TOC |
+| Vorbis | `VorbisIdentification`, `VorbisModes`, `vorbis_packet_blocksize`, `xiph_split`, `xiph_join` | Identification header, setup-header modes and each audio packet's block size without decoding; Xiph lacing |
+| Audio configuration | `canonical_flac_configuration`, `canonical_opus_configuration`, `canonical_vorbis_configuration` | One canonical decoder configuration per codec, whichever container carried it |
 | DTS parser comparison | `reference_trace::dts::ParserOperation` (`reference-trace` feature) | Raw 14-bit source frames alongside the packets, clock and byte positions of FFmpeg's `dca` parser |
 
-With the DTS packet corpus in `TRIERGON_DTS_CORPUS` and the pinned `ffmpeg`
-and `ffprobe` on `PATH`, run
-`cargo test -p triergon-framing --test dts_packet_corpus -- --ignored`.
-The comparison uses the second audio stream of `dts.mp4`, `dts.mkv` and
-`dts.mov`, plus the FATE DTS-HD MA sample and its three remuxes in `fate-dts/`.
-It compares the 27 fields between inspectors. For every input packet, the
-reference filter supplies the expected core size and bytes. The [DTS measurement results](../../docs/status.md#dts-core-header-inspection)
-cover the seven inputs and the native instruction counts for header inspection.
+With the DTS packet corpus in `TRIERGON_DTS_CORPUS` and the pinned `ffmpeg` and
+`ffprobe` on `PATH`, `cargo test -p triergon-framing --test dts_packet_corpus -- --ignored`
+compares the 27 fields between inspectors and each packet's core size and bytes with
+the reference filter ([results](../../docs/status.md#dts-core-header-inspection)).
 
 ## Behaviour and limits
 
@@ -143,16 +145,11 @@ writers use the validated parameter-set ranges from these records.
 one unit always progresses and zero units consume nothing. Copies are at most
 4096 bytes between cancel checks. Allocation pressure returns retryable
 `Backpressure` at the exact checkpoint; no partial output is published.
-Stateful packet jobs keep up to seven segment descriptors inline, enough for an
-access unit with in-band parameter sets and several slices, and charge heap
-segment storage for more to the caller's pool; they share the original payload
-for passthrough packets. A packet or configuration
-output is sized before it is written and charged once, with the shared owner it
-is published in; one of at most 4096 bytes that the remaining work covers is
-copied in one pass, charged as its NAL-by-NAL copy is. A `NalPacketSession`
-frames packets, configuration records and outputs of at most 4 GiB − 1 bytes
-(`NalPacketLimits::MAXIMUM_SPAN`), whatever its limits allow; its segment
-descriptors are 16 bytes.
+Stateful packet jobs keep up to seven segment descriptors inline and charge more
+to the caller's pool; passthrough packets share the original payload. Outputs are
+sized and charged once before they are written. A `NalPacketSession` frames
+packets, records and outputs of at most 4 GiB − 1 bytes
+(`NalPacketLimits::MAXIMUM_SPAN`), whatever its limits allow.
 
 **Codec-specific limits.**
 
@@ -217,6 +214,8 @@ Implemented from these specifications:
 | VP9 | VP Codec ISO Media File Format Binding v1.0 |
 | AC-3 / E-AC-3 | ATSC A/52:2018 §§5.3–5.4, Table 5.18, Annex E Tables E1.2, E1.5, E1.6 and §E2.3; ETSI TS 102 366 V1.4.1 Annex F.4/F.6 (dac3/dec3) |
 | DTS | ETSI TS 102 114 V1.6.1 §§3.4, 5.3, 5.4.2, Tables 5-1 to 5-20; V1.2.1 §5.3 (14-bit packing) |
+| MPEG audio | ISO/IEC 11172-3 §2.4.2.3, §2.4.3.1; ISO/IEC 13818-3 |
+| FLAC, Opus, Vorbis | RFC 9639; RFC 7845 §5.1 and RFC 6716 §§3.1–3.2; Vorbis I §§4.2–4.3 |
 
 Verification:
 
@@ -237,7 +236,7 @@ packet-framing scripts with the pinned FFmpeg bitstream-filter API. The
 complete packet fields and side data, malformed input, flush and drain actions,
 and retained packet access after close. Add `--benchmark --memory` to collect
 paired runtime and memory measurements through the shared harness; qualification
-requires the pinned gate build on native AArch64 Linux.
+requires the pinned gate build on native AArch64 Linux and 32-bit ARMv7.
 
 Set `TRIERGON_PACKET_EVENTS` to a private output directory when running
 `cargo test -p triergon-framing --features reference-trace --test packet_view`

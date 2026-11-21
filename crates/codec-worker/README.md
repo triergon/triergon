@@ -17,6 +17,7 @@ features or another compiler measures nothing else: the gate build builds it wit
 codec-worker KIND-CODEC-bench  FILE ITERATIONS
 codec-worker KIND-CODEC-memory FILE
 codec-worker KIND-CODEC-raw    FILE OUT
+codec-worker KIND-CODEC-fold   FILE
 codec-worker packets FORMAT FILE
 codec-worker packets mov FILE [TRACK_ID@MICROSECONDS]
 codec-worker seek ogg FILE TRACK SECONDS exact|preroll
@@ -24,30 +25,29 @@ codec-worker seek ogg FILE TRACK SECONDS exact|preroll
 
 `KIND-CODEC` is one of `video-h264`, `video-hevc`, `audio-ac3`, `audio-eac3`,
 `audio-aac`, `audio-aac-access-units`, `audio-aac-access-units-compat`, `audio-dts`, `audio-flac`, `audio-mp3`,
-`audio-vorbis` or `audio-opus`. The `simd` feature enables the HEVC decoder's nightly-only
-SIMD kernels, and `aac-simd` the AAC decoder's; output is identical.
+`audio-vorbis` or `audio-opus`. The nightly-only `simd` and `aac-simd` features enable
+the HEVC and AAC decoders' SIMD kernels; output is identical.
 
 Video is split into Annex B access units and audio into frames (AC-3/E-AC-3 by
 `access_unit_len`, AAC by the ADTS header, DTS by the core FSIZE) the same way the
 reference worker's parser does, so both decode the same units. This is measurement
-framing; playback frames access units through `triergon-framing`. Decode errors are
+framing; playback frames access units through `triergon-framing`. FLAC, MP3, Vorbis and
+Opus files are read sequentially through their container reader and the session's track
+decoder, as the reference reads them through its demuxer. Decode errors are
 printed to stderr and decoding continues.
 
 For configured AAC, `cargo xtask codecs aac-access-units --out DIR` extracts the
-original packets and AudioSpecificConfig with the pinned `ffprobe`. Each input
-starts with four little-endian 32-bit words for the sample rate, channel count,
-packet count and configuration length. The configuration precedes the packets,
-each with a little-endian 32-bit length and 64 zero padding bytes. Both workers
-cap the preloaded input at 64 MiB and require 1024 samples per plane per packet.
-The `raw` mode writes little-endian floats in frame and plane order and reports
-the ordered speaker IDs. The command compares every sample with the AAC
-accuracy bounds and checks the speaker order. The comparison's candidate is
-`codec-aac-worker`, as its contract names. Pass its `workloads.json` to
-`cargo xtask codecs time` and `cargo xtask codecs memory` with the same input
-directory, and that worker as `--candidate`. Both commands require the matching
-`parity.json`.
-`audio-aac-access-units` uses the specification mapping.
-`audio-aac-access-units-compat` uses the conventional surround mapping.
+original packets and AudioSpecificConfig with the pinned `ffprobe`, and compares
+every sample of the `raw` output (little-endian floats in frame and plane order,
+with the ordered speaker IDs) with the AAC accuracy bounds. Each input starts with
+four little-endian 32-bit words (sample rate, channel count, packet count,
+configuration length), then the configuration, then each packet with a
+little-endian 32-bit length and 64 zero padding bytes; it is capped at 64 MiB and
+every packet must give 1024 samples per plane. `audio-aac-access-units` uses the
+specification channel mapping, `audio-aac-access-units-compat` the conventional
+surround mapping. `cargo xtask codecs time` and `memory` measure an operation from
+`codec-aac-worker` given as `--candidate-for OPERATION=W`, and admit these
+workloads only with the matching `parity.json`.
 
 ## Outputs
 
@@ -60,6 +60,7 @@ pictures or audio frames.
 | `bench` | `{"schema":1, "iterations", "elapsed_ns", "packets", "bytes", "digest"}`; reading the file is outside the timed interval |
 | `memory` | `TRIERGON_BEGIN_V1` and `TRIERGON_END_V1` around one run, then `{"packets", "bytes"}`; the digest goes to stderr |
 | `raw` | writes the converted output to `OUT`, then `{"packets", "bytes", "digest"}` |
+| `fold` | `{"packets", "bytes", "digest"}` of one untimed run |
 
 `digest` is `triergon_harness_protocol::interleaved::InterleavedDigest` over the
 exact converted output: a fingerprint of equal output, not a cryptographic hash.

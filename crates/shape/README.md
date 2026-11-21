@@ -240,7 +240,7 @@ Paragraphs are limited to 2³² characters.
   conformance files and runs the `bidi_conformance` example on them: 770,241
   cases of classes in BidiTest.txt and 91,707 of characters in
   BidiCharacterTest.txt, all passing.
-- Six harness features (`harness/features/shape-*`) run through
+- Seven harness features (`harness/features/shape-*`) run through
   [`shape-worker`](../shape-worker/README.md) and the HarfBuzz 14.6.0 and FriBidi
   1.0.17 reference worker (`harness/reference_shape.h`, FriBidi as libass calls
   it), and require both to fold the same output:
@@ -263,11 +263,9 @@ Paragraphs are limited to 2³² characters.
     U+0308 on a contour-point anchor, Bitstream Vera `x` with U+0301 placed by
     fallback positioning).
   - `shape-text` and `shape-text-all`: the same cases, and every corpus face and
-    script (1,790 cases, 104,796 runs; 1,768 and 103,031 before Bitstream Vera
-    and the two mark samples joined them), with HarfBuzz's built-in font functions
-    at units per em against `OtMetrics`. They cover the font tables' layout
-    without FreeType, the CFF extents fallback mark positioning reads among
-    them.
+    script (1,790 cases, 104,796 runs), with HarfBuzz's built-in font functions at
+    units per em against `OtMetrics`: the font tables' layout without FreeType,
+    the CFF extents fallback mark positioning reads among them.
   - `shape-bidi`: 24 cases, authored and seeded random paragraphs and lines with
     each base direction, with and without bracket pairing; levels, visual order
     and paragraph directions.
@@ -283,16 +281,14 @@ Paragraphs are limited to 2³² characters.
   `shape-text-all` runs on demand (`cargo xtask shape compare --all`). The
   crate's acceptance rests on `shape-libass`, `shape-bidi`, `shape-simple` and
   `shape-unicode`; the units-per-em features, `shape-extents` among them, are
-  additional coverage. `check`
-  still runs and reports every open case.
-  The case rows are
-  generated (`cargo xtask shape manifest`) from the font corpus in
+  additional coverage. `check` still runs and reports every open case. The case
+  rows are generated (`cargo xtask shape manifest`) from the font corpus in
   `harness/fonts/corpus.json`, authored texts and seeded random strings, and each
   case's expected output is pinned from the reference in `pins.json`.
   `cargo xtask report` runs each feature on its own and with `--benchmark` and
   `--memory` measures runtime and memory against the reference; `shape-dump`,
-  `bidi-dump`, `simple-dump`, `unicode-dump` and `extents-dump` print the folded values as lines
-  in both workers, for diffing a failing case.
+  `bidi-dump`, `simple-dump`, `unicode-dump` and `extents-dump` print the folded
+  values as lines in both workers, for diffing a failing case.
 - `cargo xtask shape probe` assembles the CFF and CFF2 faces described under
   `harness/shape/probes` and requires both workers' `extents` operation, every
   glyph's extents through HarfBuzz's OpenType font functions, to match each

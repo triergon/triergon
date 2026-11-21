@@ -250,11 +250,8 @@ them when the scale is undefined. A `SizedFont` then gives:
   HarfBuzz callbacks make (`FT_LOAD_DEFAULT`), into an `Outline` and the full
   `GlyphMetrics`: the advances and the control box (`horiBearingX`,
   `horiBearingY`, `width`, `height`), fitted to the pixel grid by the default
-  load. A CFF, CFF2 or CID-keyed glyph is hinted there as FreeType's CFF driver
-  hints it with Adobe's hinter (`cf2`, without stem darkening): its stems and
-  hint masks, counter masks and blue zones at the hinted scale, then the
-  FontMatrix and its offset; above 2000 pixels per em it loads unhinted, as
-  FreeType retries it. A glyph of a TrueType face without bytecode (no `fpgm`,
+  load. A CFF, CFF2 or CID-keyed glyph is hinted there as described under
+  hinted CFF outlines above. A glyph of a TrueType face without bytecode (no `fpgm`,
   a `prep` of at most 7 bytes) goes through FreeType's auto-hinter, as below.
   Other TrueType glyphs go through the TrueType interpreter, as below.
 - The TrueType interpreter (`bytecode`) runs a face's programs as FreeType
@@ -308,10 +305,7 @@ them when the scale is undefined. A `SizedFont` then gives:
   points interpolated. Their advance stays the scaled one, rounded, and their
   outline is not moved by it. Glyphs of the Indic styles have that advance
   and, without points, their empty outlines, but outlines with points are
-  `Unsupported`. The style of every glyph and each style's metrics are
-  computed on the first load that needs them and kept with the face, charged
-  to its budget, as is the storage one load hints in, which the next reuses
-  and which stays charged at the largest glyph's size.
+  `Unsupported`.
 - `synthesize`: libass's synthetic styles, decided by `Font::synthesis` from the
   requested weight and slant against `OS/2.fsSelection` bits 0 and 5 and
   `Font::weight`: the oblique shear (0x2d24 for CFF faces, 0x5700 for others, as
@@ -449,7 +443,8 @@ Private DICT per CFF FDArray entry, variation region scalars and kern subtable
 records. A face FreeType auto-hints also keeps, once a default load needs
 them, the auto-hinter's style of each glyph, its reverse charmap of accented
 characters and each latin or CJK style's metrics, charged to that budget, as is the
-scratch storage of an auto-hinted load. A face with TrueType programs makes, on
+scratch storage of an auto-hinted load, which the next reuses and which stays charged
+at the largest glyph's size. A face with TrueType programs makes, on
 its first hinted load, the interpreter's function and instruction definitions,
 which it keeps, and for the size it last loaded hinted at its control values,
 storage, twilight zone, stack and the zone one glyph is hinted in, which the next
@@ -515,14 +510,14 @@ composites, 32 nested calls of TrueType functions, which end the program) are
 
   `cargo xtask check` requires `font-outlines`, `font-hinting-none` and
   `font-hinting-default` (`cargo xtask fonts compare`); `font-hinting-modes` runs
-  on demand (`cargo xtask fonts compare --all`) and is not gated yet. The
-  required features list their open cases, which `check` still runs and reports. The case rows are
+  on demand (`cargo xtask fonts compare --all`) and is not gated. `check` still
+  runs and reports the open cases the required features list. The case rows are
   generated (`cargo xtask fonts manifest`) and each case's expected work is pinned
   from FreeType's output in `pins.json`. `cargo xtask report` runs each feature on
   its own and with `--benchmark` and `--memory` measures runtime and memory
   against FreeType. `font-dump` and `font-sized-dump` print the folded values as
   lines in both workers, for diffing a failing case.
-- The corpus includes five fonts the crate's test support writes
+- The corpus includes six fonts the crate's test support writes
   (`examples/authored-fonts.rs`): `seac`, the arithmetic, logic and storage operators,
   the flex forms, counter masks, subroutines nested twelve deep, curve operators with
   operand counts the format does not allow, a skewing FontMatrix with an offset,

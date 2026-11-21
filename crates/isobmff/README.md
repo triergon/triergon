@@ -25,20 +25,10 @@ The crate exposes two views of the same file:
   `+noparse+nofillin` (`DemuxProfile::NoParseNoFillin`), for a consumer that
   chooses FFmpeg's result. It is a separate projection and never rewrites source
   facts. The `compat::mov` documentation names the FFmpeg revision it reproduces.
-  Encoded AVC playback preserves a leading empty edit before its rate-one video
-  edit, with both packet clocks shifted by the start delay. Playback starts decode
-  at the retained sync sample, keeps the decode tail needed for a short edit,
-  and accounts for composition lead when seeking. If a cut is contained within
-  one sync sample and starts after that sample's presentation time, the
-  compatible view retains the packet marked for discard. An edited endpoint
-  at or beyond the signed clock limit produces no video packets.
 
 Values that only make sense when comparing traces with FFmpeg, such as its return
 codes, log lines and models of its input layer, are compiled only with the
 non-default `reference-trace` feature, under `reference_trace::mov`.
-Its raw-video and root-walk transport models retain every possible buffer
-alignment when revisiting a sample entry. The root-walk model also reports
-bounds on absolute seeks when skipping source boxes.
 
 After packet traversal reaches the end, `replay_track` can build an index for a
 selected track using the sample extents and clock facts already checked during
@@ -50,36 +40,22 @@ All parsers are polled. Each `poll` takes a `WorkBudget` (and usually a cancel
 flag) and returns `Yield`, a result, or `Step::NeedInput` for the shared
 `InputCursor` to satisfy.
 
-`SampleReader::new_with_shared_window` can return a view of a complete sample
-in an existing shared input window. The view retains the window's budget charge.
-Random access can reuse bytes already supplied in the same generation:
-`SampleReader::new` copies a sample from the current window where it holds the
-sample's start, and `BoxReader::skip` continues from it where the skipped box ends
-inside it. Samples split across windows use a bounded packet buffer.
-Complete indexed sources can check all packet projections and find the latest
-presentation end by track before rewinding for merged playback. Rewinding
-reuses the existing edit cursors.
-Optional seek restarts are allocated after the required cursors.
-Short regular tracks can keep extra seek restart points in the existing
-checkpoint allocation.
-Complete fragment-only tracks can also retain a restart for backward seek
-when their projected decode times increase. Non-sync run starts can retain
-restarts at fragment boundaries. A small number of additional restarts at
-short intervals and fragment boundaries reduce replay work for nearby seeks.
+`SampleReader::new_with_shared_window` can return a view of a complete sample in an
+existing shared input window; the view retains the window's budget charge. Within one
+input generation, `SampleReader::new` copies a sample from the current window where it
+holds the sample's start, and `BoxReader::skip` continues from it; samples split across
+windows use a bounded packet buffer.
 
-Packet cursors check sample extents a chunk or a fragment run at a time, and
-check samples one at a time only where a span leaves an extent, so that the first
-failing sample reports the error. The compatibility seek (`SeekJob`,
-`GlobalSeekJob`) reads the index of a track whose entries are its samples, each
-once, from its tables: a regular track with no edit list, or under one media
-edit after at most an empty edit, and a track of fragments alone. It steps through
-the samples without building their packets, builds only the entry it selects, and
-gives way to building every entry wherever an entry needs a rule the table walk
-does not follow or fails a check, which then reports that failure. A global seek
-starts each track's packets from the state its own seek reached at the selected
-entry instead of replaying the track from its first sample. Source seek plans
-continue a fragment run's lookup from one sample to the next and step over the
-samples before a target without building them.
+Packet cursors check sample extents a chunk or a fragment run at a time, and sample by
+sample only where a span leaves an extent, so the first failing sample reports the
+error. The compatibility seek (`SeekJob`, `GlobalSeekJob`) reads the index of a track
+whose entries are its samples (a regular track with no edit list or one media edit
+after at most an empty edit, or a track of fragments alone) from its tables, builds
+only the entry it selects, and falls back to building every entry where an entry needs
+a rule the table walk does not follow. A global seek starts each track from the state
+its own seek reached instead of replaying it from its first sample. Optional seek
+restarts at short intervals and fragment boundaries reduce replay work for nearby
+seeks.
 
 ```rust
 use std::sync::atomic::AtomicBool;
@@ -278,21 +254,11 @@ under its documented policy (4 reads by two kinds):
   the reader on the one before. FFmpeg resumes the other tracks at their last sample at
   or before the landing decode time, the reader at the first at or after the landing.
 
-`examples/isobmff_consumer_worker.rs` drives the FFmpeg-compatible operations for
-comparison runs and needs the `reference-trace` feature. When it retains no packets
-it reads each payload as a view of the input window, and copies it otherwise. At a
-seek or a range plan it resets its input to the landing's byte position, as the
-playback engine does when it begins a seek: the reads that follow start in a new
-input generation, with no window kept from before. Within one generation, each
-sample read continues from the current window where it holds the sample's start.
-
-The comparison worker's `--recover-regular-tables` profile uses the bounded
-regular recovery cursors for a single local, unedited track. Use it alone
-for open and index comparisons. It projects
-a zero media timescale and an invalid initial sample description for comparison.
-For an initial offset past the source, it checks whether the bounded read
-model establishes EOF. The source trace keeps the original fields and
-strict validation.
+`examples/isobmff_consumer_worker.rs` (needs `reference-trace`) drives the
+FFmpeg-compatible operations for comparison runs. At a seek or range plan it resets
+its input to the landing's byte position, as the playback engine does. Its
+`--recover-regular-tables` profile, for open and index comparisons only, uses the
+bounded regular recovery cursors for a single local, unedited track.
 
 `AacConfigurationJob` reads AudioSpecificConfig from one `mp4a` sample
 description, including QuickTime version 1 and version 2 sound descriptions
@@ -348,17 +314,12 @@ view, `sdtp` may carry flag 1 with version 0 and exactly one byte per sample.
   `FragmentContext::decode_origin` has unknown DTS/CTS, not zero.
   `CompositionOffset` keeps version, raw bits and the signed reading separate;
   an absent offset differs from an explicit zero.
-- **Comparison decode runs.** For an explicit `tfdt` at or below `i64::MAX`,
-  `reference_trace::mov::fragment_clock::check_signed_decode_runs` requires the
-  accumulated decode end to be at most `i64::MAX`. The MOV comparison worker applies
-  it to open and index operations. Source indexes retain the unsigned origin and
-  exact end. Higher starts stay on `compat::mov::clock::ClockField`.
-- **Comparison sample entries.**
-  `reference_trace::mov::sample_entry::RawVisualEntriesJob` checks configuration
-  boxes in raw visual entries. The MOV comparison worker runs it for every track
-  before publishing streams, for open, index and seek. A nonempty Opus configuration
-  shorter than 11 payload bytes fails the operation. Source inspection retains the
-  original entry and its child boxes.
+- **Comparison checks.** With `reference-trace`, the MOV comparison worker applies
+  `reference_trace::mov::fragment_clock::check_signed_decode_runs` (an explicit
+  `tfdt` at or below `i64::MAX` must accumulate to a decode end at most `i64::MAX`)
+  and `reference_trace::mov::sample_entry::RawVisualEntriesJob` (configuration boxes
+  of raw visual entries; a nonempty Opus configuration under 11 payload bytes fails).
+  Source indexes and inspection keep the original values.
 - **Surplus timing entries.** `SampleTableBuilder::with_timing_policy`
   accepts `TimingRunPolicy::BoundedPrefix` for the QuickTime-compatible
   interpretation of overlong timing runs. The last decode run may cross
@@ -382,7 +343,9 @@ view, `sdtp` may carry flag 1 with version 0 and exactly one byte per sample.
   physical cursor only.
 - **Edits.** Source edit lists are parsed and mapped at rate one only.
   Non-unit rates and dwell edits are refused. The source view never repeats
-  or shifts packets; the FFmpeg-compatible view does.
+  or shifts packets; the FFmpeg-compatible view does. There, encoded AVC keeps a
+  leading empty edit as a start delay on both packet clocks, and an edited endpoint
+  at or beyond the signed clock limit produces no video packets.
   A front-metadata cursor can project checked encoded edits for regular tracks
   within one finite media extent. The forward playback index checks the
   projected byte order before delivering any packet.
@@ -455,33 +418,14 @@ Verification:
   flags, bytes) with the pinned FFmpeg reference. Comparisons never sort or
   normalise either side.
 
-With the `formats` reference prepared, `cargo xtask build-workers` registers the
-comparison workers. Run `cargo xtask isobmff-bench` for all 1,020 open and index
-parity checks, covering 972 output labels and 48 explicit refusals. Add
-`--benchmark --memory` to measure the complete selection, or
-`--benchmark --memory --subset52` for the separate 52-operation selection.
-Both retain all 1,020 parity checks. The complete selection measures 956 physical
-operations with 16 explicit aliases. Run these commands with `CARGO_INCREMENTAL=0`
-and keep the RSS kernel module unloaded while timing.
-
-Use `--benchmark --memory --require-acceptance` for a combined native AArch64 Linux
-run, with `TRIERGON_RSS_KERNEL_BOUND` unset or `0`. Each case completes timing
-before memory on the same recorded worker pair. The conservative RSS observer
-must pass the strict memory gates. Final report assembly streams one case's raw
-observations at a time and keeps the individual JSON files and hashes alongside it.
-Runtime and memory verdicts use the shared harness acceptance evaluator and its
-current policy. Each collection also writes a compact `collection.json` that
-references hash-checked samples. Join separate timing and memory collections with:
-
-```sh
-cargo xtask grade TIMING/collection.json MEMORY/collection.json \
-    --contract harness/features/isobmff-open-index/contract.json \
-    --manifest harness/features/isobmff-open-index/corpus.json --output DIR
-```
-
-The grader checks the complete corpus, exact outputs for each role, refusal
-diagnostics and alias operations. It reads one case's raw observations at a time;
-the 52-operation selection cannot qualify the complete feature.
+With the `formats` reference prepared and the workers built (`cargo xtask
+build-workers`), `cargo xtask isobmff-bench` runs all 1,020 open and index parity
+checks: 972 output labels and 48 explicit refusals. `--benchmark --memory` measures
+the complete selection (956 physical operations and 16 explicit aliases), and
+`--subset52` a separate 52-operation selection that cannot qualify the feature;
+both keep every parity check. `--require-acceptance` applies the gates, and `cargo
+xtask grade` joins separate timing and memory `collection.json` files against
+[harness/features/isobmff-open-index](../../harness/features/isobmff-open-index).
 
 `cargo xtask isobmff-seek` compares 476 seek and range-plan cases
 ([contract](../../harness/features/isobmff-seek/contract.json)) over eight authored
@@ -504,14 +448,7 @@ for a seek mode given `--range-plan`.
 
 Gate results (c6g.4xlarge, `f8661cb0`): every case matches, and all 472 timed cases
 pass runtime and memory on both targets (worst upper bound 0.9136 on Linux AArch64 and
-0.9546 on 32-bit ARMv7, peak heap at most 0.9032 of the reference's). Seeks read
-plain and single-edit regular tracks and fragment-only tracks from their sample tables,
-build only the occurrence they land on, start each track of a global seek where its own
-seek stopped, and check sample byte ranges a chunk or a fragment run at a time. A
-global seek keeps the seek of the track at hand boxed, and a track seek refreshes the
-packet state it keeps at its best entry in place, so a seek never moves its several
-kilobytes of state whole; the box scan checks its input once per event, not once per
-byte of a one-byte window.
+0.9546 on 32-bit ARMv7, peak heap at most 0.9032 of the reference's).
 
 Not compared yet: the compatibility seek refuses a global seek across tracks with
 unequal clocks, overlapping or null index clocks and regular table recovery as

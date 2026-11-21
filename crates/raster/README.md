@@ -80,7 +80,8 @@ border it has and draws only the others, held through a handle of its own
 and `Raster::compose` hold them by. The steps are public too: `Run::place`
 quantises and places the glyph without drawing it, giving the `BitmapTransform`
 its fill and border are drawn under; `Raster::stroke_border` strokes the border,
-returning it in storage of exactly its size, and `Raster::draw` draws each, the opaque box from `Shape::unit_box`; and
+returning it in storage of exactly its size, `Raster::draw` draws each and
+`Raster::draw_box` the opaque box, from `Shape::unit_box`; and
 `Run::add` adds what was drawn to the run. A bitmap is then keyed by its shape
 and its transform, a stroked border by its glyph and its `BorderStroke`, and a
 composite by `Effects::key` and its glyphs' bitmaps and places, as libass keys
@@ -179,11 +180,9 @@ features `raster-glyphs`, `raster-outlines`, `raster-bitmaps` and
 [raster-worker](../raster-worker/README.md) with the pinned libass build on
 its C engine exactly: outline points and segments, bitmap positions, sizes and every pixel,
 glyph and run positions, and clip parts; see [docs/status.md](../../docs/status.md).
-Runtime and memory are not measured yet. When they are, the reference is timed
-from a build of the same libass without its zeroed locals, whose code layout
-alone slows small glyphs by up to 40%, and its timed region holds only the work
-the candidate's does, without libass's per-run cache reset; see the libass pin
-in [docs/quality.md](../../docs/quality.md#reference-and-corpus).
+Runtime and memory are not measured; the libass pin in
+[docs/quality.md](../../docs/quality.md#reference-and-corpus) sets how the reference
+is to be timed.
 
 ## Licence
 

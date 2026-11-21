@@ -50,14 +50,13 @@ PTS are distinct.
 
 `reference_trace::carriage::Session` (with the `reference-trace` feature)
 publishes an immutable `Snapshot` per input, a sample `Input` or a whole
-`DocumentInput` (`Source`), with the FFmpeg-compatible packet view (`Snapshot::reader_view()` returns `ReaderView::Reference`): millisecond
-document timing
-that keeps zero or negative intervals, and the reference's UTF-16 SubRip
+`DocumentInput` (`Source`), as FFmpeg's demuxers present it: millisecond document
+timing that keeps zero or negative intervals, and the reference's UTF-16 SubRip
 line-entry byte behaviour. `recover_pending` returns inputs after cancellation
 or a resource failure.
 
 ## Default limits
 
 `Limits::default()`: input 4 MiB; configuration and BlockAddition 1 MiB each;
-labels 256 bytes; 4096 modifiers per
-sample; decoded output 4 MiB per cue. Limits are caller policy, not syntax.
+labels 256 bytes; 4096 modifiers per sample; decoded output 4 MiB per cue.
+Limits are caller policy, not syntax.

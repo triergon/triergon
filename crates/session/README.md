@@ -17,7 +17,7 @@ use triergon_session::{
 };
 
 // With the `codecs` feature the decoders come from `video_decoder(VideoCodec::H264)` and
-// `audio_decoder(AudioCodec::Aac)`; `StreamSelection::load` starts both sessions with them.
+// `audio_decoder(AudioCodec::Aac, &[])`; `StreamSelection::load` starts both sessions with them.
 fn play(
     video_decoder: Box<dyn VideoDecoder>,
     audio_decoder: Option<Box<dyn AudioDecoder>>,
@@ -46,7 +46,7 @@ the canonical configuration of FLAC, Opus and Vorbis (see `audio_configuration`)
 ignores it for the others. Without it, implement `VideoDecoder`
 and `AudioDecoder` (re-exported from triergon-codec) yourself; the tests use
 scripted decoders. The `simd` feature forwards to the HEVC decoder's nightly-only
-SIMD kernels.
+SIMD kernels, and `aac-simd` to the [AAC decoder's](../codec-aac/README.md#features).
 
 For ADTS packets carrying an explicit container priming edit, use
 `compat::aac::adts_decoder(PrimingPolicy::Container)` and apply the edit to
@@ -125,10 +125,11 @@ input).
 
 ## Conformance
 
-The letterbox and downmix rules are native observations of FFmpeg 9.0.2,
-recorded as `RGBA-CONTRACT.json` and `DOWNMIX-CONTRACT.json` in the research
-tree; `triergon_pixel::letterbox` and `mix.rs` implement them and their unit tests
-pin them. The letterbox is checked against the reference chain in
+The letterbox and downmix rules are native observations of FFmpeg 9.0.2, recorded in
+[rgba-contract.json](../../harness/codecs/rgba-contract.json) and
+[downmix-contract.json](../../harness/codecs/downmix-contract.json);
+`triergon_pixel::letterbox` and `mix.rs` implement them and their unit tests pin them.
+The letterbox is checked against the reference chain in
 [triergon-pixel](../pixel/README.md#conformance); `tests/sessions.rs` covers
 timing, flush, stop, backpressure, failure, rate changes and downmix with
 scripted decoders. A host test in `triergon-playback` (`tests/continuation.rs`)

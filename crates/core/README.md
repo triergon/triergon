@@ -3,8 +3,9 @@
 Shared vocabulary for every Triergon format and codec crate: exact rational
 time, capacity-accounted byte storage, a poll-based input cursor, resumable
 steps, per-step work budgets, one error type and the format-neutral container
-model. It is the bottom layer of the workspace and depends only on `std`. It
-performs no I/O, owns no threads and implements no format: packet boundaries,
+model. It is the bottom layer of the workspace and depends only on `std`. Apart
+from the `blocking` adapter, which reads a caller's `std::io` source, it performs
+no I/O; it owns no threads and implements no format: packet boundaries,
 codec configuration and clock epochs belong to the format crates built on it.
 
 ## Usage
@@ -56,11 +57,12 @@ assert_eq!(base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?, 203
 
 | Area | Items |
 |---|---|
-| Time | `Time` (reduced `i128`/`u128` seconds), `TimeBase` (reduced positive `u64` ratio), `Rounding` |
-| Storage | `Budget`, `Reservation`, `Charged<T>`, `Bytes`, `BytesWriter`, `BudgetVec<T>`, `BudgetVecIntoIter`, `OwnedInputBytes`, `ByteStorageAddress`, `nonzero_prefix_len` |
+| Time | `Time` (reduced `i128`/`u128` seconds), `TimeBase` (reduced positive `u64` ratio), `TickScale`, `Rounding`, `round_ties_even_i32` |
+| Storage | `Budget`, `Reservation`, `Charged<T>`, `Bytes`, `BytesWriter`, `BudgetVec<T>`, `BudgetVecIntoIter`, `BytesView`, `OwnedInputBytes`, `ByteStorageAddress`, `nonzero_prefix_len` |
 | Input | `InputCursor`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure` |
 | Source signatures | Module `signature` exposes the EBML and Ogg markers, the opening box type and the three sync bytes for each transport packet spacing. Each caller chooses its accepted boxes and how to resolve ambiguous transport. |
 | Steps | `Step<T, B>`, `Backpressure` |
+| Blocking I/O | module `blocking`: `Blocking` drives a `ContainerReader` from a `std::io::Read` (and `Seek`) source, `Feed` supplies an `InputCursor`, `seekable_capabilities` |
 | Work | `WorkBudget` |
 | Container model | module `container`: `ContainerReader`, `ReaderStep`, `Event`, `PacketInfo`, `TrackInfo`, `TrackId`, `MediaKind`, `CodecId`, `RandomAccess`, `Trim`, seek and colour types |
 | Errors | `Error`, `Result`, `FreezeError`, `PushError<T>`, `TransferError` |
@@ -198,8 +200,9 @@ numeric, and a conflict between container and bitstream colour is reported as tw
 descriptions, never resolved. Readers are concrete types used through generics or
 one closed enum; there is no registry and no dynamic dispatch on the packet path
 (`Track` may be `dyn TrackInfo` for a closed enum). Implementations:
-`triergon_matroska::typed::Reader`, `triergon_isobmff::Reader` and the facade's
-`triergon::AnyReader`. The
+`triergon_matroska::typed::Reader`, `triergon_isobmff::Reader`,
+`triergon_mpegts::Reader`, `triergon_ogg::Reader`, `triergon_elementary::Reader` and
+the facade's `triergon::AnyReader`. The
 semantic contract is described in
 [docs/architecture.md](../../docs/architecture.md#container-contract).
 
@@ -215,11 +218,8 @@ specification. Verification:
   every output row from `examples/time-oracle.rs` with independent Python
   `fractions.Fraction` and integer expectations. Each of the debug and release
   builds runs 34,502 time and 15,024 wide-arithmetic cases plus 1,280 time and
-  429 wide edge cases. The check verifies the input and expected-file SHA-256s.
-  `--toolchain NAME` selects the compiler and `--target TRIPLE` selects a
-  locally executable target. Each run under `.research/core-time-check/runs/`
-  retains the source snapshot, probes, outputs and a report with compiler and
-  Cargo artifact identities. Use `--output DIR` to choose the report directory.
+  429 wide edge cases, and verifies the input and expected-file SHA-256s
+  (`--help` lists the toolchain, target, profile and output options).
 - Two `compile_fail` doctests on `OwnedInputBytes` prove produced storage
   cannot be turned back into caller input.
 - Container-model unit tests check exact packet time without fabricated values and

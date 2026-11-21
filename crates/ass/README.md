@@ -275,8 +275,7 @@ typographic descender and advancing by their linear vertical advance, and are
 shaped with the default-load vertical advance of every glyph libass's glyph
 metrics cache keeps rotated: a glyph's first lookup through a character from
 U+02F1 decides, for the renderer's life and for each requested font (family,
-weight, slant), face and size, as libass keys that cache. Not rendered: libass's simple shaping
-level, its hinting modes, selective style overrides and track features.
+weight, slant), face and size, as libass keys that cache.
 
 **Caches.** `Settings::cache` holds the cache limits (`CacheLimits`): its
 default is libass's (10,000 outlines, 128 MiB of glyph bitmaps, 64 MiB of
@@ -486,11 +485,11 @@ with any specification of the format.
 
 ## Not here
 
-libass's simple shaping level and hinting modes,
-its selective style override (`ass_set_selective_style_override`; with libass's
-default settings it changes nothing), track features (`ass_track_set_feature`),
-`ass_step_sub`, `ass_configure_prune` (a player calls
-`prune_events`), reading files and charset conversion.
+libass's simple shaping level and hinting modes, its selective style override
+(`ass_set_selective_style_override`; with libass's default settings it changes
+nothing), track features (`ass_track_set_feature`), `ass_step_sub`,
+`ass_configure_prune` (a player calls `prune_events`), reading files and charset
+conversion.
 
 ## Licence
 

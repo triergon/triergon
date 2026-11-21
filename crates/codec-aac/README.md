@@ -32,28 +32,21 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
 
 `examples/decode_aac.rs IN.aac OUT.f32` writes interleaved f32le and prints a JSON summary.
 
-`RawLcDecoder::new_in` accepts the indexed core rate and fixed channel configuration
-from a checked AudioSpecificConfig. Its `decode` consumes one complete raw data block
-of at most 64 KiB and produces 1024 samples per channel. The supported fixed configurations are 1–7,
-11, 12 and 14. Their audible elements follow Table 1.19, including the distinct
-7.1 Front, Back and Top layouts. Raw packets that carry SBR or require 960-sample
-blocks are outside this decoder's scope.
-[ISO/IEC 14496-3:2009/Amd.4, Table 1.19](https://standards.iteh.ai/catalog/standards/iso/c0071f4c-5db7-4cf4-a32e-6b75c874d46d/iso-iec-14496-3-2009-amd-4-2013)
-
-`RawLcDecoder::with_program_config_in` takes the byte-aligned Program Configuration
-Element from an AudioSpecificConfig with channel configuration zero. It supports
-up to eight channels with distinct speaker positions and matches coded
-elements by type and tag. The AudioSpecificConfig program remains in effect
-when a packet contains its own PCE.
-Height information is applied when its extension is complete and its CRC-8 is valid.
-An ambiguous mapping returns `Feature::RawProgramLayout`.
-[ISO/IEC 14496-3:2001/Cor.2:2004, 4.5.1](https://standards.iteh.ai/catalog/standards/iso/09c0e8dc-4b21-438e-a1f1-665e44bfb859/iso-iec-14496-3-2001-cor-2-2004)
-
-`RawLcDecoder::with_layout_in` accepts
-`compat::layout::Policy::ConventionalSurround` for the default FFmpeg speaker
-mapping. This uses a back pair in configurations 5, 6, 11 and 14 and interprets
-configuration 7 as 7.1 Back. The raw decoder synthesizes directly into the
-caller's reserved PCM planes and reuses them on the next access unit.
+`RawLcDecoder` decodes one complete raw data block of at most 64 KiB to 1024 samples
+per channel, configured from a checked AudioSpecificConfig. `new_in` takes the indexed
+core rate and fixed channel configuration 1–7, 11, 12 or 14, whose audible elements
+follow Table 1.19, including the distinct 7.1 Front, Back and Top layouts
+([ISO/IEC 14496-3:2009/Amd.4](https://standards.iteh.ai/catalog/standards/iso/c0071f4c-5db7-4cf4-a32e-6b75c874d46d/iso-iec-14496-3-2009-amd-4-2013)).
+`with_layout_in` with `compat::layout::Policy::ConventionalSurround` gives FFmpeg's
+default mapping instead: a back pair in configurations 5, 6, 11 and 14, and
+configuration 7 as 7.1 Back. `with_program_config_in` takes the byte-aligned PCE of
+channel configuration zero: up to eight channels with distinct speaker positions, coded
+elements matched by type and tag, height information applied when its extension is
+complete and its CRC-8 valid, and `Feature::RawProgramLayout` for an ambiguous mapping
+([ISO/IEC 14496-3:2001/Cor.2:2004, 4.5.1](https://standards.iteh.ai/catalog/standards/iso/09c0e8dc-4b21-438e-a1f1-665e44bfb859/iso-iec-14496-3-2001-cor-2-2004)).
+That program stays in effect when a packet carries its own PCE. The configuration must
+use 1024-sample frames; a packet carrying SBR is refused (`Feature::RawSbr`). The raw
+decoder synthesizes directly into the caller's reserved planes and reuses them.
 
 ## Features
 
@@ -62,12 +55,11 @@ caller's reserved PCM planes and reuses them on the next access unit.
 | `simd` | off | `std::simd` forms of the DCT-IV passes after the input gather (pre-twiddle, radix-4 stages, post-twiddle and the last radix-2 stage fused with it, four points at a time), which serve the SBR QMF banks and the IMDCT; of the SBR QMF analysis and synthesis windowing and shuffles; of the covariance sums of HF generation (four source bands at a time); and of the Parametric Stereo hybrid filters (four slots at a time). Requires a nightly toolchain (`portable_simd`); `cargo xtask check-simd` uses the pinned one. |
 
 Without `simd` the crate builds on stable and uses the scalar code. Each vector lane
-performs the scalar code's operations in the same order, so output is identical where the
-vector unit follows IEEE 754 (AArch64); ARMv7 NEON flushes subnormal values to zero. On
-32-bit ARM (`thumbv7neon`) LLVM emits no NEON float code from the scalar loops, so there
-only these forms run on NEON. The gate build builds the AAC decode path
-(`codec-aac-worker` and the AAC decode example) with the pinned nightly and this feature,
-on both targets; every other worker stays on stable.
+performs the scalar operations in the same order, so output is identical where the vector
+unit follows IEEE 754 (AArch64); ARMv7 NEON flushes subnormals to zero. LLVM emits no NEON
+float code from the scalar loops on `thumbv7neon`, so the gate build builds the AAC
+decode path (`codec-aac-worker` and the AAC decode example) with the pinned nightly and
+this feature on both targets; every other worker stays on stable.
 
 ## Supported
 
@@ -80,7 +72,7 @@ on both targets; every other worker stays on stable.
 | SBR | Implicit signalling; output at twice the core rate from the first SBR frame; all grid classes, coupled and balanced envelopes, up to 6 patches, limiter, sinusoids |
 | PS | Implicit signalling (mono stream becomes stereo); 20- and 34-band hybrid, IID/ICC/IPD/OPD, switching between 20 and 34 bands |
 | Rates | Sampling-frequency indices 0–12 |
-| Layouts | ADTS configurations 1–7 and PCE layouts up to 48 channels; raw fixed configurations 1–7, 11, 12 and 14, and out-of-band PCE layouts with up to eight distinct speaker positions |
+| Layouts | ADTS configurations 1–7 and PCE layouts up to 93 channels; raw fixed configurations 1–7, 11, 12 and 14, and out-of-band PCE layouts with up to eight distinct speaker positions |
 
 ## Behaviour and limits
 
@@ -91,22 +83,16 @@ on both targets; every other worker stays on stable.
   `Unsupported(Feature)`, `InvalidData(&str)` naming the syntax element,
   `ResourceLimit(&str)`, `Truncated`, `Budget(StorageError)`.
 - Storage that depends on the stream is charged to the decoder's budget before it is
-  allocated. What the ADTS header configures, the elements of a fixed channel
-  configuration and the output frame for the configured layout, is charged before an
-  access unit's first raw data block. In-band reconfiguration is charged when it appears:
-  a PCE, a CPE in a mono stream, the start of SBR or PS and a coupling channel build their
-  whole state, and the larger frame they need, before they apply. A refused charge is
-  `DecodeError::Budget`: the access unit is dropped and nothing of the reconfiguration is
-  applied, so the next access unit decodes as if the refused one had not arrived. That
-  holds when the refusal comes before the access unit advanced other history; an earlier
-  raw data block of the same ADTS frame, or an element with Main prediction before the
-  refusal, stays decoded. `Decoder::with_limits(Limits { live_storage_bytes })` sets the
-  pool, `Decoder::new_in` charges a caller's `Budget`. An element is a kind and a 4-bit
-  tag, so a layout switch, which reuses the elements both layouts have, holds at most 48
-  (16 each of SCE, CPE and LFE). The 32 MiB default holds that many at 318 KiB each, the
-  largest element with SBR and Main prediction (a single channel element holds PS's stereo
-  synthesis instead of a second analysed SBR channel), 16 coupling channels of 53 KiB and
-  93 planes of four SBR raw data blocks (2.9 MiB): 18.6 MiB in all.
+  allocated. In-band reconfiguration (a PCE, a CPE in a mono stream, the start of SBR or
+  PS, a coupling channel) builds its whole state, and the larger frame it needs, first.
+  A refused charge is `DecodeError::Budget`: the access unit is dropped and nothing of
+  the reconfiguration applies, so the next one decodes as if it had not arrived, except
+  for an earlier raw data block of the same ADTS frame or a Main-prediction element
+  decoded before the refusal. `Decoder::with_limits(Limits { live_storage_bytes })` sets
+  the pool, `Decoder::new_in` charges a caller's `Budget`. A layout switch holds at most
+  48 elements (16 tags each of SCE, CPE and LFE); the 32 MiB default holds that many at
+  318 KiB each (the largest, with SBR and Main prediction), 16 coupling channels of
+  53 KiB and 93 planes of four SBR raw data blocks (2.9 MiB): 18.6 MiB in all.
 - Refused: SSR (`Feature::SsrGainControl`) and reserved sampling-frequency indices 13–15.
   ER, LD, ELD, USAC and 960-sample frames cannot be carried in ADTS; LATM/LOAS is not
   accepted.
