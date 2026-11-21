@@ -1,5 +1,5 @@
 //! Format-specific <=192-byte carry, not an I/O cursor/token framework.
-use crate::carrier::{PlainCarrier, PlainContinuation, TS188_BYTES};
+use crate::transport::carrier::{PlainCarrier, PlainContinuation, TS188_BYTES};
 use crate::{
     AssemblyStep, PacketFormat, RejectedTransport, TransportInspection, TransportInspector,
     TransportPacket,

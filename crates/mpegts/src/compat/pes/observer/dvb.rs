@@ -2,7 +2,7 @@
 //! parsing or source namespace inference. The demux packet keeps the complete
 //! PES data field, including identifier/stream ID/tail bytes and opaque faults.
 use super::{DemuxObserver, DemuxScope};
-use crate::demux_clock::DemuxProfile;
+use crate::compat::pes::clock::DemuxProfile;
 use crate::psi::{DescriptorNamespace, Descriptors};
 use crate::{ParseLimits, checked_pid, limit};
 use triergon_core::{Budget, Error, Result};

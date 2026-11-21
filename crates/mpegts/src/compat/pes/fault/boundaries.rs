@@ -2,8 +2,8 @@
 // H.222.0 (08/2023) 2.4.3.5: DI signals a source clock discontinuity;
 // the strict source Timeline, rather than compatibility timestamps, binds it.
 use super::{SourceContext, TransportFaultRecovery};
-use crate::demux_pes::{DemuxBoundary, DemuxPacket};
-use crate::media_entity::TraceOrigin;
+use crate::compat::pes::observer::{DemuxBoundary, DemuxPacket};
+use crate::stream::entity::TraceOrigin;
 use crate::{
     FaultKind, MediaEntityEnd, ObservedTrace, PacketFormat, TraceEvent, TraceFault, TransportPacket,
 };

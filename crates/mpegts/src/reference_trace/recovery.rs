@@ -1,11 +1,21 @@
+//! The demuxer's packets from rejected carriers.
+//!
+//! [`RecoveryObserver`] wraps a
+//! [`DemuxObserver`] and also assembles the
+//! packets FFmpeg emits for carriers the source view rejects
+//! ([`RecoveredPacket`], [`DiagnosticPacket`]). It follows one selected program
+//! through PAT and PMT changes ([`PatSelection`], [`PmtBindingJob`]).
+//!
+//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+//!
 //! Opt-in real rejected-carrier observation. No validated source packet/header
 //! is forged. OPCR and explicit selected-AVC diagnostic policies are separate.
-use crate::demux_clock::DemuxProfile;
-use crate::demux_pes::{
+use crate::compat::pes::clock::DemuxProfile;
+use crate::compat::pes::fault::TransportFaultJob;
+use crate::compat::pes::observer::{
     DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, PrivateAudioCarriage,
     PrivateAudioDescriptors, RegisteredCarriage, SourceContext,
 };
-use crate::demux_transport::TransportFaultJob;
 use crate::{
     AssemblyStep, PacketFormat, ParseLimits, RejectedTransport, SourceEpochs, SourceRange,
     TransportPacket,
@@ -15,6 +25,7 @@ use triergon_core::{Budget, BudgetVec, Bytes, Error, Refused, Result, SourceLoca
 
 mod lifecycle;
 mod selected;
+pub use crate::compat::pes::clock::{DiagnosticTimeView, EncodedTimeView};
 pub use lifecycle::{PatRoute, PatSelection, PmtBinding, PmtBindingJob};
 pub use selected::{DiagnosticCarrier, DiagnosticHeader, DiagnosticPacket, SelectedFault};
 
@@ -174,7 +185,7 @@ impl RecoveryObserver {
         profile: DemuxProfile,
         scope: DemuxScope,
         namespace: crate::psi::DescriptorNamespace,
-        descriptors: super::demux_pes::DvbSubtitlesDescriptors<'_>,
+        descriptors: crate::compat::pes::observer::DvbSubtitlesDescriptors<'_>,
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
@@ -201,7 +212,7 @@ impl RecoveryObserver {
 
     pub fn bind_input(
         &mut self,
-        context: &crate::demux_input::InputContext,
+        context: &crate::compat::input::InputContext,
         input: &triergon_core::InputCursor,
     ) -> Result<()> {
         if self.pending.is_some() || self.last.is_some() {

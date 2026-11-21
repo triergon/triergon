@@ -1243,7 +1243,6 @@ pub(crate) fn parse_header(budget: &Budget, bytes: &[u8]) -> Result<PesHeader> {
 }
 
 #[cfg(test)]
-#[path = "pes/adts_span_budget.rs"]
 mod adts_span_budget;
 
 #[cfg(test)]

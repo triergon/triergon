@@ -9,23 +9,9 @@
 )]
 // Pending: `missing_docs`, `clippy::expect_used`.
 
-pub mod carrier;
 pub mod clock;
 pub mod compat;
-mod continuity;
-#[cfg(feature = "reference-trace")]
-mod demux_catalogue;
-mod demux_clock;
-mod demux_input;
-mod demux_pes;
-#[cfg(feature = "reference-trace")]
-mod demux_recovery;
-mod demux_stream;
-mod demux_transport;
-mod framer;
-mod media_entity;
 pub mod mux;
-mod packet_completion;
 pub mod pes;
 pub mod psi;
 mod reader;
@@ -34,11 +20,6 @@ pub mod reference_trace;
 mod stream;
 mod transport;
 
-pub use carrier::TransportObservation;
-pub use carrier::{RejectedTransport, TransportInspection, TransportInspector};
-pub use continuity::{Continuity, ContinuityOutcome};
-pub use framer::{FrameState, FrameStep, NullCarrierRun, TransportFramer};
-pub use media_entity::{MediaEntityEnd, ObservedTrace};
 pub use pes::{Pes, PesAssembler, PesHeader, PesSpan};
 pub use psi::SectionAssembler;
 pub use reader::{
@@ -47,10 +28,16 @@ pub use reader::{
     MpegAudioFrame, Packet, PacketClock, PayloadSource, Reader, ReaderEvent, ReaderLimits,
     SeekEntity, SourceEvent, Track, UnframedAudio,
 };
+pub use stream::entity::{MediaEntityEnd, ObservedTrace};
 pub use stream::{
     CarrierObservation, CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem,
     FeedPayloadRun, TraceEvent, TraceFault, TransportStream,
 };
+pub use transport::carrier::{
+    RejectedTransport, TransportInspection, TransportInspector, TransportObservation,
+};
+pub use transport::continuity::{Continuity, ContinuityOutcome};
+pub use transport::framer::{FrameState, FrameStep, NullCarrierRun, TransportFramer};
 pub use transport::{Adaptation, PacketFormat, Pcr, TransportPacket, parse_transport};
 
 use triergon_core::{BudgetVec, Error, Result, SourceId};

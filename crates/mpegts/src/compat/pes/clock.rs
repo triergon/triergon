@@ -141,7 +141,7 @@ impl DemuxClock {
     /// timestamp or anchor is created, including for forbidden timing flags.
     pub fn project_pes_fault(
         &mut self,
-        packet: &crate::demux_transport::PesFaultPacket,
+        packet: &crate::compat::pes::fault::PesFaultPacket,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<DiagnosticTimeView>> {
@@ -166,7 +166,7 @@ impl DemuxClock {
     /// This creates no source timestamp or clock anchor.
     pub fn project_transport_fault(
         &mut self,
-        packet: &crate::demux_transport::TransportFaultPacket,
+        packet: &crate::compat::pes::fault::TransportFaultPacket,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<EncodedTimeView>> {
@@ -192,7 +192,7 @@ impl DemuxClock {
     pub fn project_encoded_header(
         &mut self,
         pid: u16,
-        header: &crate::demux_recovery::EncodedHeader,
+        header: &crate::reference_trace::recovery::EncodedHeader,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<EncodedTimeView>> {
@@ -357,7 +357,7 @@ impl DemuxClock {
     pub fn project_diagnostic_header(
         &mut self,
         pid: u16,
-        header: &crate::demux_recovery::DiagnosticHeader,
+        header: &crate::reference_trace::recovery::DiagnosticHeader,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<DiagnosticTimeView>> {

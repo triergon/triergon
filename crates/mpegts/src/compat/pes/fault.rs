@@ -2,7 +2,9 @@
 //!
 //! H.222.0 (08/2023) 2.4.3.3: TEI denotes an uncorrectable error; scrambling
 //! does not establish clear payload. Neither flag is cleared or repaired here.
-use crate::demux_pes::{DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, SourceContext};
+use crate::compat::pes::observer::{
+    DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, SourceContext,
+};
 use crate::{AssemblyStep, FaultKind, SourceEpochs, SourceRange, TraceFault, TransportPacket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Bytes, Error, Refused, Result, SourceLocation, WorkBudget};

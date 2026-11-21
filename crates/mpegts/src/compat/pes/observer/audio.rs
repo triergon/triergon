@@ -1,7 +1,7 @@
 //! The demuxer's private-audio interpretation, not source namespace
 //! inference, audio-frame parsing, ATSC service conformance or decoder config.
 use super::{DemuxObserver, DemuxScope};
-use crate::demux_clock::DemuxProfile;
+use crate::compat::pes::clock::DemuxProfile;
 use crate::psi::Descriptors;
 use crate::{ParseLimits, checked_pid, limit};
 use triergon_core::{Budget, Error, Result};

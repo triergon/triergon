@@ -1,3 +1,13 @@
+//! The demuxer's programs and streams.
+//!
+//! [`Catalogue`] projects strict PAT and PMT events onto FFmpeg's program and
+//! stream order, its absent-PCR value and language tags.
+//! [`PsiCompatibilityPolicies`] adds the tables the demuxer accepts and the
+//! source view does not, and [`PsiCompatibilityEvidence`] records each one with
+//! its source status.
+//!
+//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+//!
 //! Bounded demux catalogue view of actual strict PAT/PMT events.
 //!
 //! H.222.0 2.4.4/2.6 remain the source grammar. The separate flags48
@@ -138,7 +148,9 @@ impl Catalogue {
             0x0f => Ok(CatalogueCodec::AacAdts),
             0x11 => Ok(CatalogueCodec::AacLatm),
             6 | 0x81 | 0x87 => {
-                use crate::demux_pes::{PrivateAudioCarriage as C, PrivateAudioDescriptors};
+                use crate::compat::pes::observer::{
+                    PrivateAudioCarriage as C, PrivateAudioDescriptors,
+                };
                 let observed = C::from_observed_pmt(
                     kind,
                     PrivateAudioDescriptors {
@@ -635,7 +647,7 @@ mod tests {
     use crate::TransportStream;
     use triergon_core::{InputWindow, SourceCapabilities, Step};
     fn fixture(budget: &Budget) -> (PatTable, MediaEntityEnd, InputCursor) {
-        let data = include_bytes!("../tests/data/ts188-basic.ts");
+        let data = include_bytes!("../../tests/data/ts188-basic.ts");
         let mut input = InputCursor::new(
             budget,
             SourceId(1),

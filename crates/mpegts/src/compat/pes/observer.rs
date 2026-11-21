@@ -3,10 +3,12 @@
 //! Independently authored from H.222.0 source syntax and recorded public-API
 //! observations. Assembly consumes real input
 //! boundaries; no complete source/demux output is split, repeated or repaired.
-use crate::carrier::{PLAIN_PAYLOAD_BYTES, PlainContinuation, TS_PAYLOAD_START, TS188_BYTES};
-use crate::demux_clock::DemuxProfile;
+use crate::compat::pes::clock::DemuxProfile;
 use crate::pes::{HEADER_MAX, parse_header, parse_timed_header};
 use crate::psi::ElementaryStream;
+use crate::transport::carrier::{
+    PLAIN_PAYLOAD_BYTES, PlainContinuation, TS_PAYLOAD_START, TS188_BYTES,
+};
 use crate::{
     AssemblyStep, ParseLimits, PesHeader, SourceEpochs, SourceRange, TransportPacket, checked_pid,
     commit_range, limit, prepare_range,
@@ -24,12 +26,10 @@ const DEFAULT_PACKET_CAP: usize = 204_800;
 
 mod audio;
 mod compact;
-mod cutter;
 mod dvb;
 mod pes_list;
 pub use audio::{PrivateAudioCarriage, PrivateAudioDescriptors};
 pub use compact::{CompactPayload, DemuxSpanView, DemuxSpanViews, PayloadCursor};
-pub use cutter::{CutPes, PesCutter, pcr_bounded_pts};
 pub use dvb::DvbSubtitlesDescriptors;
 pub(crate) use pes_list::ListGrowth;
 use pes_list::PesList;
@@ -358,7 +358,7 @@ pub struct DemuxObserver {
     scope: DemuxScope,
     // No source storage or auxiliary queue; only selects a bounded demux view.
     private_audio: Option<PrivateAudioCarriage>,
-    demux_input: Option<crate::demux_input::InputBinding>,
+    demux_input: Option<crate::compat::input::InputBinding>,
     payload_format: PayloadFormat,
     budget: Budget,
     limits: ParseLimits,
@@ -524,7 +524,7 @@ impl DemuxObserver {
     /// epochs are separate; every bound push/poll must supply the actual cursor.
     pub fn bind_input(
         &mut self,
-        context: &crate::demux_input::InputContext,
+        context: &crate::compat::input::InputContext,
         input: &triergon_core::InputCursor,
     ) -> Result<()> {
         context.validate_cursor(input)?;
@@ -2190,7 +2190,7 @@ mod tests {
             profile: DemuxProfile,
             scope: DemuxScope,
             private_audio: Option<PrivateAudioCarriage>,
-            demux_input: Option<crate::demux_input::InputBinding>,
+            demux_input: Option<crate::compat::input::InputBinding>,
             dvb_subtitles: bool,
             budget: Budget,
             limits: ParseLimits,

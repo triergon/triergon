@@ -1,3 +1,13 @@
+//! The demuxer's start position.
+//!
+//! FFmpeg's demuxer reports packet positions against the carrier grid it finds at
+//! the start of the input. [`InputBootstrap`] inspects the initial window for that
+//! grid without consuming input. The [`InputContext`] it produces binds a
+//! [`DemuxObserver`](super::pes::DemuxObserver) to the same positions through
+//! [`bind_input`](super::pes::DemuxObserver::bind_input).
+//!
+//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+//!
 //! The demuxer's input startup. This is not transport validation or the
 //! normative source position. No reference source was consulted.
 use crate::PacketFormat;
@@ -6,17 +16,20 @@ use triergon_core::{
     Bytes, Error, InputCursor, InputToken, InputWindow, Result, SourceId, WorkBudget,
 };
 
-/// Explicit result of the observed default-callback, finite aligned operation.
-/// Other delivery, mixed stride, damaged sync and ambiguous grids are unproven.
-#[cfg_attr(
-    not(feature = "reference-trace"),
-    allow(unreachable_pub, reason = "exported only with reference-trace")
-)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PositionBasis {
-    SyncStart,
-    CarrierStart,
+pub(crate) mod basis {
+    /// Explicit result of the observed default-callback, finite aligned operation.
+    /// Other delivery, mixed stride, damaged sync and ambiguous grids are unproven.
+    #[cfg_attr(
+        not(feature = "reference-trace"),
+        allow(unreachable_pub, reason = "exported only with reference-trace")
+    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum PositionBasis {
+        SyncStart,
+        CarrierStart,
+    }
 }
+use basis::PositionBasis;
 
 #[derive(Clone, Copy, Debug)]
 enum Extent {

@@ -2,7 +2,7 @@
 
 use super::{DemuxSpan, SourceContext};
 use crate::SourceRange;
-use crate::carrier::{PLAIN_PAYLOAD_BYTES, TS_PAYLOAD_START, TS188_BYTES};
+use crate::transport::carrier::{PLAIN_PAYLOAD_BYTES, TS_PAYLOAD_START, TS188_BYTES};
 use std::ops::Range;
 use triergon_core::{Budget, BudgetVec, BudgetVecIntoIter, BytesView};
 

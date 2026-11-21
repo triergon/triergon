@@ -87,7 +87,7 @@ impl PlainCarrier {
                     return None;
                 }
                 let pcr = if has_pcr {
-                    Some(crate::transport::pcr(&data[6..12]).ok()?)
+                    Some(crate::transport::packet::pcr(&data[6..12]).ok()?)
                 } else {
                     None
                 };
@@ -568,7 +568,7 @@ impl TransportInspector {
                         if self.fields.flags & 0x10 != 0 {
                             let next =
                                 Self::field_end(self.position, self.fields.adaptation_end, 6)?;
-                            match crate::transport::pcr_with_policy(
+                            match crate::transport::packet::pcr_with_policy(
                                 &data[self.position..next],
                                 self.pcr_policy,
                             ) {
@@ -599,7 +599,7 @@ impl TransportInspector {
                             let next =
                                 Self::field_end(self.position, self.fields.adaptation_end, 6)?;
                             self.fields.opcr =
-                                Some(crate::transport::pcr(&data[self.position..next])?);
+                                Some(crate::transport::packet::pcr(&data[self.position..next])?);
                             self.position = next;
                         }
                         self.phase = Phase::Splice;

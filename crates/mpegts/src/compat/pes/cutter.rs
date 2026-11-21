@@ -5,7 +5,7 @@
 //! header is read as far as its timestamps; marker bits and the remaining
 //! optional fields are not checked. Continuity counters are not checked either:
 //! a repeated or missing transport packet changes the data as it arrives.
-use super::DemuxBoundary;
+use super::observer::DemuxBoundary;
 use crate::pes::HEADER_MAX;
 use crate::{ParseLimits, TransportPacket, checked_pid, limit};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};

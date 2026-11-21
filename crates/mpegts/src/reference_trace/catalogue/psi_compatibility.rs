@@ -1,7 +1,7 @@
 //! Explicit flags48 PSI compatibility. No Source PatTable, active ProgramMap
 //! event, source diagnostic or epoch is synthesized by this optional operation.
 use super::*;
-use crate::demux_pes::{DemuxObserver, SourceContext};
+use crate::compat::pes::observer::{DemuxObserver, SourceContext};
 use crate::psi::{
     Descriptors, PatReader, PmtReader, Section, SectionAssembler, SectionHeader, TableStep,
 };
@@ -1440,9 +1440,9 @@ mod guards {
     use super::*;
     use crate::{SourceEpochs, TransportStream};
     use triergon_core::{InputWindow, SourceCapabilities, Step};
-    const BAD_DESC: &[u8] = include_bytes!("../../tests/data/pmt-descriptor-overrun.ts");
-    const BAD_NUMBER: &[u8] = include_bytes!("../../tests/data/pmt-multi-section-forbidden.ts");
-    const PARTIAL_PAT: &[u8] = include_bytes!("../../tests/data/pat-incomplete-version.ts");
+    const BAD_DESC: &[u8] = include_bytes!("../../../tests/data/pmt-descriptor-overrun.ts");
+    const BAD_NUMBER: &[u8] = include_bytes!("../../../tests/data/pmt-multi-section-forbidden.ts");
+    const PARTIAL_PAT: &[u8] = include_bytes!("../../../tests/data/pat-incomplete-version.ts");
     struct Item {
         event: TraceEvent,
         context: SourceContext,

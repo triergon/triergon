@@ -2,7 +2,7 @@
 //! The completion accounts for every carrier and the original cursor's EOF,
 //! including empty physical input.
 use super::{SourceContext, TransportFaultRecovery};
-use crate::demux_pes::DemuxScope;
+use crate::compat::pes::observer::DemuxScope;
 use crate::psi::DescriptorNamespace;
 use crate::{
     FaultKind, MediaEntityEnd, ObservedTrace, PacketFormat, ParseLimits, TraceEvent, TraceFault,

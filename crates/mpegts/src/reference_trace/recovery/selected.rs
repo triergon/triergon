@@ -101,8 +101,8 @@ impl DiagnosticPacket {
         self.spans.as_slice().iter().map(AsRef::as_ref)
     }
 }
-impl From<crate::demux_transport::TransportFaultPacket> for DiagnosticPacket {
-    fn from(packet: crate::demux_transport::TransportFaultPacket) -> Self {
+impl From<crate::compat::pes::fault::TransportFaultPacket> for DiagnosticPacket {
+    fn from(packet: crate::compat::pes::fault::TransportFaultPacket) -> Self {
         let header = DiagnosticHeader {
             bytes: packet.encoded_header.backing_bytes().clone(),
             pts: Some(packet.encoded_header.encoded_pts_raw33()),
@@ -120,10 +120,12 @@ impl From<crate::demux_transport::TransportFaultPacket> for DiagnosticPacket {
             duration90_raw: packet.duration90_raw,
             stream_id: packet.stream_id,
             selected_fault: match packet.kind {
-                crate::demux_transport::TransportFaultKind::TransportError => {
+                crate::compat::pes::fault::TransportFaultKind::TransportError => {
                     SelectedFault::TransportError
                 }
-                crate::demux_transport::TransportFaultKind::Scrambling => SelectedFault::Scrambling,
+                crate::compat::pes::fault::TransportFaultKind::Scrambling => {
+                    SelectedFault::Scrambling
+                }
             },
             source_fault: packet.source_fault,
             carrier: DiagnosticCarrier::Transport(packet.carrier),

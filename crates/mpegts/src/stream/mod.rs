@@ -1,20 +1,21 @@
 //! Composed selected-program TS -> PSI -> PES source operation. No codec AU work.
+pub(crate) mod entity;
 mod storage;
 
 pub(crate) use storage::{StorageItem, TransportStorageCursor};
 
-use crate::carrier::{
-    PLAIN_PAYLOAD_BYTES, PlainContinuation, TS188_BYTES, TransportObservation,
-    payload_only_continuation,
-};
 use crate::compat::adts::UnboundedPes;
 use crate::compat::pes::{DemuxObserver, ReadyContinuation, SourceContext};
-use crate::framer::FramedCarrier;
-use crate::media_entity::{ObservedTrace, TraceOrigin};
 use crate::psi::{
     DescriptorNamespace, PatCollector, PatReader, PatTable, PmtReader, ProgramMap, Section,
     TableStep,
 };
+use crate::stream::entity::{ObservedTrace, TraceOrigin};
+use crate::transport::carrier::{
+    PLAIN_PAYLOAD_BYTES, PlainContinuation, TS188_BYTES, TransportObservation,
+    payload_only_continuation,
+};
+use crate::transport::framer::FramedCarrier;
 use crate::{
     AssemblyStep, Continuity, ContinuityOutcome, NullCarrierRun, PacketFormat, ParseLimits, Pes,
     PesAssembler, SectionAssembler, SourceEpochs, TransportFramer, TransportPacket,

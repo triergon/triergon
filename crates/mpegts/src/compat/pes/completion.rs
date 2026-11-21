@@ -4,9 +4,9 @@
 //! from PES payload. No validated PES scope, source table, timestamp or clock
 //! can be constructed from this operation's confirmation. Non-control payload needs
 //! the existing real-scope observer; it can never select an empty fallback.
-use crate::demux_pes::SourceContext;
-use crate::media_entity::{ObservedTrace, TraceOrigin};
+use crate::compat::pes::observer::SourceContext;
 use crate::psi::{PatReader, PatSection, Section, SectionAssembler, TableStep};
+use crate::stream::entity::{ObservedTrace, TraceOrigin};
 use crate::{
     AssemblyStep, CompactTraceEvent, FaultKind, MediaEntityEnd, NullCarrierRun, PacketFormat,
     ParseLimits, TraceEvent, TraceFault, TransportInspection, TransportInspector, TransportPacket,

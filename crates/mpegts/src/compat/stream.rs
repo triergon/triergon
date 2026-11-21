@@ -1,3 +1,17 @@
+//! The demuxer's streams.
+//!
+//! [`ProgramReader`] reads the PAT and PMT sections the demuxer accepts and
+//! reports each [`Program`] with its elementary streams. [`codec`] is the
+//! codec the demuxer opens for a PMT entry, [`is_video`] whether it opens a
+//! video stream, and [`configuration`] the decoder configuration it derives
+//! from the entry's DVB subtitling or teletext descriptor. The standard
+//! readings are [`TransportStream`] and [`ElementaryStream::codec`].
+//!
+//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+//!
+//! [`TransportStream`]: crate::TransportStream
+//! [`ElementaryStream::codec`]: crate::psi::ElementaryStream::codec
+//!
 //! The demuxer's programs and streams: the PAT and PMT sections it accepts,
 //! and its reading of a PMT entry (codec, video, decoder configuration).
 use crate::psi::{Descriptor, ElementaryStream, PES_PRIVATE_DATA, Section, SectionAssembler};
