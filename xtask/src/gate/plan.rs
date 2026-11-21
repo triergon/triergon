@@ -881,51 +881,15 @@ impl Plan<'_> {
              cp {release}/examples/decode_h264 {bin}/codec-h264-decode && \
              cp {release}/examples/decode_hevc {bin}/codec-hevc-decode"
         ));
-        let mut steps = vec![
-            step("codec-bin", Stage::Timing, Placement::Free, build),
-            step(
-                "codecs-manifest",
-                Stage::Timing,
-                Placement::Free,
-                xtask(&[
-                    "codecs",
-                    "manifest",
-                    "--out",
-                    &format!("{out}/codecs-fate-manifest.json"),
-                    "h264=.research/fate-samples/h264-conformance",
-                    "hevc=.research/fate-samples/hevc-conformance",
-                ]),
-            ),
-            step(
-                "codecs-grade",
-                Stage::Timing,
-                Placement::Free,
-                xtask(&[
-                    "codecs",
-                    "grade",
-                    "--manifest",
-                    &format!("{out}/codecs-fate-manifest.json"),
-                    "--root",
-                    ".",
-                    "--bin",
-                    &bin,
-                    "--ffmpeg",
-                    &format!("{FFMPEG_BIN}/ffmpeg"),
-                    "--ffprobe",
-                    &format!("{FFMPEG_BIN}/ffprobe"),
-                    "--codec-worker",
-                    &self.codec_worker(),
-                    "--reference",
-                    "target/harness/ffmpeg-decode-worker",
-                    "--out",
-                    &format!("{out}/codecs-grade.jsonl"),
-                ]),
-            ),
-        ];
         let stable = lanes::item(&self.lanes, "codecs")
             .filter(|lane| *lane != "hevc-simd")
             .collect::<Vec<_>>()
             .join(",");
+        let mut steps = vec![
+            step("codec-bin", Stage::Timing, Placement::Free, build),
+            self.codec_grade("codecs-grade", CORRECTNESS, &stable, &bin, &[]),
+            self.codec_summary("codecs-summary", "codecs-grade"),
+        ];
         steps.push(self.codec_grade(
             "codecs-grade-workloads",
             CORRECTNESS,
