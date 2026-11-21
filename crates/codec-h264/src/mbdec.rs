@@ -75,6 +75,52 @@ impl MbData {
     }
 }
 
+/// Map mb_type in a slice of type `st` to kind and partition predictions (Tables 7-11, 7-13
+/// and 7-14). Returns whether a P macroblock is P_8x8ref0.
+#[inline(never)] // The mapping is the same in both entropy modes: one copy.
+fn set_type(mb: &mut MbData, st: SliceType, mb_type: u32) -> Result<bool, SliceError> {
+    match st {
+        SliceType::I => set_intra_type(mb, mb_type)?,
+        SliceType::SI => return Err(SliceError::Unsupported("SI slices")),
+        SliceType::P | SliceType::SP => match mb_type {
+            0 => {
+                mb.kind = Kind::P16x16;
+                mb.part_pred[0] = PRED_L0;
+            }
+            1 => {
+                mb.kind = Kind::P16x8;
+                mb.part_pred = [PRED_L0, PRED_L0, 0, 0];
+            }
+            2 => {
+                mb.kind = Kind::P8x16;
+                mb.part_pred = [PRED_L0, PRED_L0, 0, 0];
+            }
+            3 | 4 => {
+                mb.kind = Kind::P8x8;
+                mb.part_pred = [PRED_L0; 4];
+            }
+            5..=30 => set_intra_type(mb, mb_type - 5)?,
+            _ => return Err(inval("P mb_type")),
+        },
+        SliceType::B => match mb_type {
+            0 => mb.kind = Kind::BDirect,
+            1..=21 => {
+                let (shape, p0, p1) = B_MB_TYPES[mb_type as usize];
+                mb.kind = match shape {
+                    0 => Kind::B16x16,
+                    1 => Kind::B16x8,
+                    _ => Kind::B8x16,
+                };
+                mb.part_pred = [p0, p1, 0, 0];
+            }
+            22 => mb.kind = Kind::B8x8,
+            23..=48 => set_intra_type(mb, mb_type - 23)?,
+            _ => return Err(inval("B mb_type")),
+        },
+    }
+    Ok(matches!(st, SliceType::P | SliceType::SP) && mb_type == 4)
+}
+
 /// Map I-slice mb_type (0..=25) to kind / Intra16x16 parameters.
 fn set_intra_type(mb: &mut MbData, t: u32) -> Result<(), SliceError> {
     match t {
@@ -532,47 +578,7 @@ impl SliceDecoder<'_> {
         mb.modes = [2; 16];
         mb.rem = [None; 16];
         let mb_type = e.mb_type(self)?;
-        // Map mb_type into kinds.
-        match st {
-            SliceType::I => set_intra_type(&mut self.mb, mb_type)?,
-            SliceType::SI => return Err(SliceError::Unsupported("SI slices")),
-            SliceType::P | SliceType::SP => match mb_type {
-                0 => {
-                    self.mb.kind = Kind::P16x16;
-                    self.mb.part_pred[0] = PRED_L0;
-                }
-                1 => {
-                    self.mb.kind = Kind::P16x8;
-                    self.mb.part_pred = [PRED_L0, PRED_L0, 0, 0];
-                }
-                2 => {
-                    self.mb.kind = Kind::P8x16;
-                    self.mb.part_pred = [PRED_L0, PRED_L0, 0, 0];
-                }
-                3 | 4 => {
-                    self.mb.kind = Kind::P8x8;
-                    self.mb.part_pred = [PRED_L0; 4];
-                }
-                5..=30 => set_intra_type(&mut self.mb, mb_type - 5)?,
-                _ => return Err(inval("P mb_type")),
-            },
-            SliceType::B => match mb_type {
-                0 => self.mb.kind = Kind::BDirect,
-                1..=21 => {
-                    let (shape, p0, p1) = B_MB_TYPES[mb_type as usize];
-                    self.mb.kind = match shape {
-                        0 => Kind::B16x16,
-                        1 => Kind::B16x8,
-                        _ => Kind::B8x16,
-                    };
-                    self.mb.part_pred = [p0, p1, 0, 0];
-                }
-                22 => self.mb.kind = Kind::B8x8,
-                23..=48 => set_intra_type(&mut self.mb, mb_type - 23)?,
-                _ => return Err(inval("B mb_type")),
-            },
-        }
-        let p8x8ref0 = matches!(st, SliceType::P | SliceType::SP) && mb_type == 4;
+        let p8x8ref0 = set_type(&mut self.mb, st, mb_type)?;
         if self.mb.kind == Kind::IPcm {
             return self.decode_pcm(e);
         }
@@ -1174,11 +1180,19 @@ impl SliceDecoder<'_> {
     // ------------------------------------------------------------------ I_PCM
 
     fn decode_pcm<E: Entropy>(&mut self, e: &mut E) -> Result<(), SliceError> {
-        let g = self.geom_of(self.cur);
-        self.geom = g;
         let mut samples = [0u8; 384];
         let n = if self.s.chroma { 384 } else { 256 };
         e.pcm_samples(self, &mut samples[..n])?;
+        self.store_pcm(&samples);
+        Ok(())
+    }
+
+    /// Write the samples of an I_PCM macroblock (luma, then Cb at 256 and Cr at 320) and its
+    /// bookkeeping.
+    #[inline(never)] // The same in both entropy modes, and rare: one copy, out of the layer.
+    fn store_pcm(&mut self, samples: &[u8; 384]) {
+        let g = self.geom_of(self.cur);
+        self.geom = g;
         let buf = &mut self.pic.buf;
         for y in 0..16 {
             let o = g.off_y + y * g.stride_y;
@@ -1206,7 +1220,6 @@ impl SliceDecoder<'_> {
         info.nzmask = 0xFFFF;
         info.chroma_mode = 0;
         self.mark_intra_motion();
-        Ok(())
     }
 
     pub(crate) fn qpc_for(&self, qp: i32, comp: usize) -> i32 {
