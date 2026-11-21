@@ -757,5 +757,7 @@ impl Parser<'_> {
     }
 }
 
+// Worker crates include this file by path; a path relative to it resolves from each.
 #[cfg(test)]
+#[path = "json/tests.rs"]
 mod tests;
