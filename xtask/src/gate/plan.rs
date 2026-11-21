@@ -58,6 +58,8 @@ pub(super) const COVERED: &[(&str, Coverage)] = &[
     ("tx3g-config-oracle", Coverage::Item("oracle-compare")),
     ("tx3g-semantics", Coverage::Item("oracle-compare")),
     ("dts-core-header", Coverage::Item("oracle-compare")),
+    ("av1-obu-wire", Coverage::Item("oracle-compare")),
+    ("aac-adts-header", Coverage::Item("oracle-compare")),
     ("dts-unpacking", Coverage::Item("oracle-compare")),
     (
         "isobmff-open-index",
@@ -425,6 +427,9 @@ pub(super) fn items(
         plan.codec_dsp(),
         plan.aac_access_units(),
     ]);
+    if let Some(session) = plan.session_codecs() {
+        items.push(session);
+    }
     for list in &WORKLOAD_LISTS {
         items.extend(plan.workloads(list));
     }
@@ -991,12 +996,15 @@ impl Plan<'_> {
              cp {release}/examples/decode_dts {audio_bin}/codec-dca-decode"
         ));
         let audio_run = format!("{out}/codecs-audio-grade.jsonl");
-        let audio = lanes::item(&self.lanes, "codecs-audio")
+        let (variants, standard): (Vec<_>, Vec<_>) = lanes::item(&self.lanes, "codecs-audio")
+            .partition(|lane| crate::codecs::correctness::variant_manifest(lane).is_some());
+        let audio = standard
+            .into_iter()
             .filter(|lane| *lane != "aac-default")
             .collect::<Vec<_>>()
             .join(",");
         let default_bin = format!("{out}/codec-audio-bin-default");
-        Item {
+        let mut item = Item {
             name: "codecs-audio".into(),
             weight: 1,
             steps: vec![
@@ -1065,7 +1073,38 @@ impl Plan<'_> {
                 self.codec_summary("codecs-audio-summary-default", "codecs-audio-grade-default"),
             ],
             preflight: owned(&["--correctness", &audio]),
+        };
+        if !variants.is_empty() {
+            let variants = variants.join(",");
+            item.preflight.extend(owned(&["--correctness", &variants]));
+            item.steps.extend([
+                step(
+                    "codec-strip-dither-bin",
+                    Stage::Timing,
+                    Placement::Free,
+                    self.codec_example(
+                        &audio_bin,
+                        "strip_dither",
+                        "strip_dither",
+                        "triergon-codec-ac3",
+                        Some("reference-trace"),
+                        false,
+                    ),
+                ),
+                self.codec_grade(
+                    "codecs-audio-variants-grade",
+                    CORRECTNESS,
+                    &variants,
+                    &audio_bin,
+                    &[],
+                ),
+                self.codec_summary(
+                    "codecs-audio-variants-summary",
+                    "codecs-audio-variants-grade",
+                ),
+            ]);
         }
+        item
     }
 
     /// The Ogg reader's packets and seeks against ffprobe, in both views; the step fails
@@ -1210,6 +1249,69 @@ impl Plan<'_> {
             steps,
             preflight: owned(&["--aac-access-units"]),
         }
+    }
+
+    /// Grade the session API and reset behaviour, using the same decoded outputs.
+    fn session_codecs(&self) -> Option<Item> {
+        let selected = lanes::item(&self.lanes, "codecs-sessions")
+            .collect::<Vec<_>>()
+            .join(",");
+        if selected.is_empty() {
+            return None;
+        }
+        let bin = format!("{}/codec-session-bin", self.out);
+        Some(Item {
+            name: "codecs-sessions".into(),
+            weight: 20,
+            preflight: owned(&[
+                "--correctness",
+                &selected,
+                "--codecs",
+                "harness/codecs/session-workloads.json",
+            ]),
+            steps: vec![
+                step(
+                    "codec-session-bin",
+                    Stage::Timing,
+                    Placement::Free,
+                    self.codec_example(
+                        &bin,
+                        "session_decode",
+                        "session_decode",
+                        "triergon-session",
+                        Some("codecs"),
+                        false,
+                    ),
+                ),
+                step(
+                    "codec-track-reset-bin",
+                    Stage::Timing,
+                    Placement::Free,
+                    self.codec_example(
+                        &bin,
+                        "decode_audio",
+                        "audio-decode",
+                        "triergon-session",
+                        Some("codecs"),
+                        false,
+                    ),
+                ),
+                step(
+                    "codec-session-reference-bin",
+                    Stage::Timing,
+                    Placement::Free,
+                    owned(&[
+                        "sh",
+                        "-c",
+                        r#"set -e; export PKG_CONFIG_LIBDIR="$PWD/.research/reference-decode/install/lib/pkgconfig"; "${CC:-cc}" -O2 -Wall -Wextra -Werror harness/reference_session.c $(pkg-config --static --cflags --libs libavformat libavcodec libavfilter libavutil libswscale libswresample) -o "$1""#,
+                        "build-session-reference",
+                        &format!("{bin}/reference-session"),
+                    ]),
+                ),
+                self.codec_grade("codecs-session-grade", CORRECTNESS, &selected, &bin, &[]),
+                self.codec_summary("codecs-session-summary", "codecs-session-grade"),
+            ],
+        })
     }
 
     /// A workload list's timing item, then its memory parts.
