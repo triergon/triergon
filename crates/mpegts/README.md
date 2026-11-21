@@ -643,7 +643,7 @@ file.
 | PES | `PesAssembler` → `Pes`, `PesHeader::{raw_pts_time, raw_dts_time}` |
 | Timestamps | `clock::source_timestamp` with `clock::SourceTimePolicy` |
 | FFmpeg-compatible PES | `compat::pes::DemuxObserver::{new_registered, new_private_audio, new_hls_private_audio, new_dvb_subtitles}`; `compat::pes::PesCutter` → `CutPes` for one PID of any stream type |
-| FFmpeg-compatible streams | `compat::stream::{ProgramReader, codec, configuration, is_video}`: programs, stream codecs (adds 0x81, 0x87, 0x90 and DVB tags outside a DVB namespace) and subtitle configuration |
+| FFmpeg-compatible streams | `compat::stream::{ProgramReader, PositionalStreamIds, codec, configuration, is_video}`: programs with PMT and PCR PIDs, stream codecs (adds 0x81, 0x87, 0x90 and DVB tags outside a DVB namespace) and subtitle configuration; `poll_with_work` cooperatively assembles sections |
 | FFmpeg-compatible clock | `compat::pes::DemuxClock::{project_header, place}`, `compat::pes::pcr_bounded_pts` (teletext PTS) |
 | FFmpeg-compatible start position | `compat::input::InputBootstrap` |
 
@@ -913,3 +913,27 @@ LCEVC/VVC features. Its observation tool reuses the transport packet runner and
 records reference discovery metadata without claiming probe parity. Unsupported
 stream types 0x33 and 0x36 retain their native tags and descriptors as unknown
 tracks; this does not provide VVC framing or LCEVC enhancement support.
+
+`compat::stream::ProgramReader` reports each accepted PMT's program number,
+PMT PID, PCR PID and current elementary streams. `poll_with_work` permits
+cancellation and yields during section assembly; table interpretation is atomic
+within `ParseLimits`. The original `pmtchange.ts` control covers program 4's
+five streams through replacement, including audio languages and AC-3/MPEG-2
+classification. The opt-in `compat::stream::PositionalStreamIds` operation
+returns separate `{ id, pid }` mappings: it keeps IDs 4677–4681 while the
+replacement PMT and packet routing retain wire PIDs 4691–4695. It accepts a
+fixed program/PMT route and stream count, with unchanged PID order or wholly
+new PIDs. It refuses elementary stream identifier descriptors (`0x52`),
+duplicate PIDs, partial overlap, insertion and removal. Language and codec are
+not matching keys; descriptor bytes and source metadata remain unchanged.
+State and returned mappings use the caller's budget; stream and descriptor
+limits bound atomic interpretation. Failure leaves the prior mapping intact.
+
+Nine authored black-box cascades cover complete replacements, ordering, type
+changes, removal/reappearance, insertion, partial overlap, language swaps and
+stream identifier swaps. Their cumulative prefixes compare merge disabled and
+enabled, with parser framing disabled to observe marker PES assignments.
+They establish positional identity only within the operation's stated scope.
+SCTE-35 remains unknown type 0x86 rather than the probe's named codec
+with tag zero. Full probe metadata and native performance for this control
+are not established.

@@ -224,6 +224,127 @@ fn original_pmt_replacement_retains_tracks_clocks_and_faults() {
     assert_eq!(facts, read(&bytes, None, 187, 128));
 }
 
+// Projection of the ordinary probe's programs[0] and its streams, not a packet
+// fold. Reference d32b387f2b0a484599d4587d651891f0c63c4238, ffprobe SHA-256
+// d9d0840413169e2ec50eb1a2e3c9bebf3aa5a15ab97217ac987ca9a901b33896:
+// -v error -bitexact -of json -merge_pmt_versions 1 -show_programs
+// -show_streams -i pmtchange.ts
+// Original stdout SHA-256:
+// 9e76e1d93d554fb236a74dc97a741c527f5996cc6f960499d15d42ddb28950bb.
+#[test]
+#[ignore = "requires hash-pinned original mpegts/pmtchange.ts in the FATE cache"]
+fn original_compat_program_discovery_and_probe_identity_difference() {
+    use triergon_mpegts::compat::stream::{PositionalStreamIds, ProgramReader, codec};
+    use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, parse_transport};
+
+    let bytes = original(
+        "pmtchange.ts",
+        "5185db2052de1174629acdf13382eb42449ebfa7ef2b09a822d9867ed8c80860",
+    );
+    let discover = |grant| {
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut reader = ProgramReader::new(pool.clone(), ParseLimits::default()).unwrap();
+        let mut identities =
+            PositionalStreamIds::new(pool.clone(), ParseLimits::default()).unwrap();
+        let cancel = AtomicBool::new(false);
+        let mut found = Vec::new();
+        assert!(bytes.chunks_exact(188).remainder().is_empty());
+        for (index, raw) in bytes.chunks_exact(188).enumerate() {
+            let packet = parse_transport(
+                Bytes::copy_from_slice(&pool, raw).unwrap(),
+                PacketFormat::Ts188,
+                index as u64 * 188,
+            )
+            .unwrap();
+            reader.push(&packet).unwrap();
+            let mut drained = false;
+            for _ in 0..4096 {
+                match reader
+                    .poll_with_work(&mut WorkBudget::new(grant), &cancel)
+                    .unwrap()
+                {
+                    AssemblyStep::Output(program) => {
+                        let assigned = identities.apply(&program).unwrap();
+                        for (index, identity) in assigned.as_slice().iter().enumerate() {
+                            assert_eq!(usize::from(identity.id), 4677 + index);
+                            assert_eq!(identity.pid, program.streams.as_slice()[index].pid);
+                        }
+                        let mut rows = vec![format!(
+                            "program {} pmt {} pcr {}",
+                            program.number,
+                            program.pmt_pid,
+                            program.pcr_pid.unwrap()
+                        )];
+                        for stream in program.streams.as_slice() {
+                            let language = stream
+                                .descriptors()
+                                .map(Result::unwrap)
+                                .find(|descriptor| descriptor.tag == 10)
+                                .map_or("-", |descriptor| {
+                                    std::str::from_utf8(&descriptor.data[..3]).unwrap()
+                                });
+                            rows.push(format!(
+                                "{} {} {:?} {}",
+                                stream.pid,
+                                stream.stream_type,
+                                codec(stream),
+                                language
+                            ));
+                        }
+                        found.push(rows);
+                    }
+                    AssemblyStep::Yield => {}
+                    AssemblyStep::NeedPayload => {
+                        drained = true;
+                        break;
+                    }
+                    AssemblyStep::Finished => panic!("unexpected terminal assembler"),
+                }
+            }
+            assert!(drained, "discovery must finish within bounded packet work");
+        }
+        found
+    };
+    let found = discover(4096);
+    assert_eq!(found, discover(1));
+    assert_eq!(found.len(), 2);
+    let reference: Vec<_> = include_str!("data/pmt-merge-probe.txt").lines().collect();
+    assert_eq!(found[1][0], reference[0]);
+    for (map, first_pid, pcr) in [(&found[0], 4677, 4680), (&found[1], 4691, 4694)] {
+        assert_eq!(map[0], format!("program 4 pmt 73 pcr {pcr}"));
+        assert_eq!(map.len(), reference.len());
+        for (index, (kind, codec, language)) in [
+            (129, "Some(Ac3)", "eng"),
+            (129, "Some(Ac3)", "spa"),
+            (129, "Some(Ac3)", "por"),
+            (2, "Some(Mpeg2Video)", "-"),
+            (134, "None", "-"),
+        ]
+        .iter()
+        .enumerate()
+        {
+            assert_eq!(
+                map[index + 1],
+                format!("{} {kind} {codec} {language}", first_pid + index)
+            );
+        }
+    }
+    // Keep source and compatibility identities separate: the probe retains the first
+    // stream IDs through replacement and identifies SCTE-35 with codec tag 0;
+    // the PMT reader exposes current wire PIDs and unknown stream type 0x86.
+    // The opt-in positional operation above retains IDs without rewriting them.
+    assert_eq!(
+        reference[1..],
+        [
+            "4677 129 Ac3 eng",
+            "4678 129 Ac3 spa",
+            "4679 129 Ac3 por",
+            "4680 2 Mpeg2Video -",
+            "4681 0 scte_35 -",
+        ]
+    );
+}
+
 #[test]
 #[ignore = "requires hash-pinned original mpegts/loewe.ts in the FATE cache"]
 fn original_unaligned_program_reports_faults_at_aligned_offsets() {

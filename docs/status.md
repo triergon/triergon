@@ -108,6 +108,25 @@ on `pmtchange.ts` and transport faults on the unaligned `loewe.ts` sync grid
 under two delivery granularities. Probe metadata and full packet-fold parity
 remain open on both inputs.
 
+An original `pmtchange.ts` control also exercises
+`compat::stream::ProgramReader` with one-unit and larger work grants. It reports
+program 4 on PMT PID 73 twice, with PCR PIDs 4680 then 4694 and five streams
+per PMT. AC-3/MPEG-2 classification and the three audio languages agree with
+the pinned probe's corresponding fields. This is partial discovery coverage:
+the opt-in `compat::stream::PositionalStreamIds` operation retains the probe's
+stream IDs 4677–4681 separately from replacement wire PIDs 4691–4695. Nine
+hash-pinned authored cascades (24 cumulative inputs, merge off/on) establish
+ordinal reuse with marker PES assignments and parser framing disabled. The
+operation accepts a fixed program/PMT route and stream count, unchanged PID
+order or complete replacement, and no elementary stream identifier (`0x52`)
+descriptors. Partial PID overlap, insertion/removal, duplicate PIDs and stream
+identifier matching are refused. Language and codec do not select identities.
+Source PMTs, descriptors, PIDs and existing packet traces remain unchanged.
+The probe identifies SCTE-35 with codec tag zero while the reader retains
+unknown wire type 0x86. Full metadata, broader identity matching and original
+packet parity remain open. Native runtime/heap/RSS gates for these operations
+have not been measured.
+
 ## Subtitle text comparisons
 
 At `f13dcaf3`, a partial gate run of `subtitle-text` per target passed parity,

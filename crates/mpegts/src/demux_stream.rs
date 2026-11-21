@@ -10,9 +10,120 @@ use triergon_core::{Budget, BudgetVec, Error, Result, SourceId, WorkBudget};
 #[derive(Debug)]
 pub struct Program {
     pub number: u16,
+    /// The PAT route on which this PMT was received.
+    pub pmt_pid: u16,
     /// `None` when the PMT names PID 0x1fff (no PCR).
     pub pcr_pid: Option<u16>,
     pub streams: BudgetVec<ElementaryStream>,
+}
+
+/// A stable compatibility identity and its current source PID.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StreamIdentity {
+    /// The PID at the first accepted PMT position.
+    pub id: u16,
+    /// The PID in the current source PMT. Packet routing still uses this PID.
+    pub pid: u16,
+}
+
+/// Opt-in positional stream identities for complete PMT PID replacements.
+///
+/// Observed with FFmpeg's `merge_pmt_versions=1` at the revision named in
+/// [`crate::compat::stream`]. `identity_black_box_cascades` in
+/// `tests/demux_streams.rs` establishes ordinal reuse without elementary stream
+/// identifier descriptors. Language and codec are not matching keys.
+///
+/// This operation accepts one fixed program/PMT route and stream count. PIDs
+/// must remain in the same order or be wholly replaced. Elementary descriptor
+/// 0x52, duplicate PIDs, partial overlap, removal and insertion are refused.
+/// No descriptor matching or source metadata rewriting is performed. Recreate
+/// the operation to begin a new identity scope after a refused transition.
+/// State and each returned mapping are budgeted and bounded by `ParseLimits`.
+#[derive(Debug)]
+pub struct PositionalStreamIds {
+    budget: Budget,
+    limits: ParseLimits,
+    route: Option<(u16, u16)>,
+    current: BudgetVec<StreamIdentity>,
+}
+
+impl PositionalStreamIds {
+    pub fn new(budget: Budget, limits: ParseLimits) -> Result<Self> {
+        Ok(Self {
+            current: BudgetVec::new(&budget),
+            budget,
+            limits: limits.validate()?,
+            route: None,
+        })
+    }
+
+    /// Returns identities in source PMT order without modifying `program`.
+    /// Failure leaves the last accepted mapping unchanged. A fixed PID bitmap
+    /// makes validation linear in the number of streams and descriptor bytes.
+    pub fn apply(&mut self, program: &Program) -> Result<BudgetVec<StreamIdentity>> {
+        let streams = program.streams.as_slice();
+        if streams.len() > self.limits.streams {
+            return Err(limit(streams.len(), self.limits.streams));
+        }
+        let route = (program.number, program.pmt_pid);
+        if self.route.is_some_and(|last| last != route)
+            || (self.route.is_some() && streams.len() != self.current.len())
+        {
+            return Err(Error::Unsupported("positional PMT identity scope changed"));
+        }
+        let mut seen = [0_u64; 128];
+        for stream in streams {
+            let word = seen
+                .get_mut(usize::from(stream.pid) / 64)
+                .ok_or(Error::Invalid(
+                    "positional PMT PID outside the 13-bit range",
+                ))?;
+            let bit = 1_u64 << (stream.pid % 64);
+            if *word & bit != 0 {
+                return Err(Error::Invalid("duplicate positional PMT PID"));
+            }
+            *word |= bit;
+            if stream.descriptor_bytes.len() > self.limits.section_bytes {
+                return Err(limit(
+                    stream.descriptor_bytes.len(),
+                    self.limits.section_bytes,
+                ));
+            }
+            for (count, descriptor) in stream.descriptors().enumerate() {
+                if count == self.limits.descriptors {
+                    return Err(limit(count + 1, self.limits.descriptors));
+                }
+                if descriptor?.tag == 0x52 {
+                    return Err(Error::Unsupported("elementary stream identifier matching"));
+                }
+            }
+        }
+        if self.route.is_some() {
+            let unchanged = streams
+                .iter()
+                .zip(self.current.as_slice())
+                .all(|(stream, previous)| stream.pid == previous.pid);
+            if !unchanged
+                && self.current.as_slice().iter().any(|previous| {
+                    seen[usize::from(previous.pid) / 64] & (1_u64 << (previous.pid % 64)) != 0
+                })
+            {
+                return Err(Error::Unsupported("partial positional PMT PID replacement"));
+            }
+        }
+        let mut next = BudgetVec::new(&self.budget);
+        next.try_extend_with(streams.len(), |index| {
+            let pid = streams[index].pid;
+            StreamIdentity {
+                id: self.current.as_slice().get(index).map_or(pid, |old| old.id),
+                pid,
+            }
+        })?;
+        let output = next.try_clone()?;
+        self.current = next;
+        self.route = Some(route);
+        Ok(output)
+    }
 }
 
 /// Reads the PAT and the PMTs it names from a program's transport packets, as
@@ -103,9 +214,24 @@ impl ProgramReader {
     /// The next PMT the last push completed.
     pub fn poll(&mut self) -> Result<Option<Program>> {
         let cancel = AtomicBool::new(false);
+        match self.poll_with_work(&mut WorkBudget::new(u64::MAX), &cancel)? {
+            AssemblyStep::Output(program) => Ok(Some(program)),
+            AssemblyStep::NeedPayload | AssemblyStep::Finished => Ok(None),
+            AssemblyStep::Yield => unreachable!("unlimited section work"),
+        }
+    }
+
+    /// Cooperatively assembles the next PMT. Resume after `Yield` before pushing
+    /// another packet. Table interpretation is atomic and bounded by
+    /// [`ParseLimits`]; section assembly charges the caller's work budget.
+    pub fn poll_with_work(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<AssemblyStep<Program>> {
         while let Some(route) = self.active {
             let assembler = self.assembler(route);
-            match assembler.poll(&mut WorkBudget::new(u64::MAX), &cancel) {
+            match assembler.poll(work, cancel) {
                 Ok(AssemblyStep::Output(section)) => {
                     let accepted = section.crc_remainder() == Some(0)
                         && section.bytes().as_ref().get(5).is_some_and(|b| b & 1 != 0);
@@ -119,11 +245,11 @@ impl ProgramReader {
                         }
                         Route::Pmt(index) => self.read_pmt(index, &section)?,
                     };
-                    if program.is_some() {
-                        return Ok(program);
+                    if let Some(program) = program {
+                        return Ok(AssemblyStep::Output(program));
                     }
                 }
-                Ok(AssemblyStep::Yield) => {}
+                Ok(AssemblyStep::Yield) => return Ok(AssemblyStep::Yield),
                 Ok(AssemblyStep::NeedPayload | AssemblyStep::Finished) => self.active = None,
                 Err(Error::Invalid(_) | Error::Truncated) => {
                     assembler.discard();
@@ -132,7 +258,7 @@ impl ProgramReader {
                 Err(error) => return Err(error),
             }
         }
-        Ok(None)
+        Ok(AssemblyStep::NeedPayload)
     }
 
     fn assembler(&mut self, route: Route) -> &mut SectionAssembler {
@@ -221,6 +347,7 @@ impl ProgramReader {
         }
         Ok(Some(Program {
             number: route.program,
+            pmt_pid: route.pid,
             pcr_pid: (pcr_pid != 0x1fff).then_some(pcr_pid),
             streams,
         }))
