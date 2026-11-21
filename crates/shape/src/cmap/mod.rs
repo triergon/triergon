@@ -12,10 +12,11 @@
 #[rustfmt::skip] // Laid out by the generator.
 mod tables;
 
-use crate::ot::data::{Data, bsearch};
+use crate::ot::data::Data;
 use std::cmp::Ordering;
 use tables::{ARABIC_PUA_U8, ARABIC_PUA_U16, MACROMAN};
 use triergon_font::GlyphId;
+use triergon_font::read::bsearch;
 
 /// A sanitized `cmap` table.
 #[derive(Clone, Copy, Debug)]

@@ -3,9 +3,10 @@
 //! order, each kerning value split between the two glyphs.
 
 use super::apply::{Apply, Next, Values};
-use super::data::{Data, bsearch};
+use super::data::Data;
 use super::layout::LookupFlags;
 use triergon_core::{Error, Result};
+use triergon_font::read::bsearch;
 
 /// The OpenType (Microsoft) `kern` table.
 #[derive(Clone, Copy, Debug, Default)]

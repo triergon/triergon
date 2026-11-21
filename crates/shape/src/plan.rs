@@ -10,6 +10,7 @@ use crate::shapers::{Pause, Shaper};
 use crate::tag::{Direction, Script, Tag};
 use crate::work;
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
+use triergon_font::read::bsearch;
 
 /// A feature the caller sets for the whole item, such as `kern=0`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -390,8 +391,7 @@ impl Plan {
     fn feature(&self, tag: &[u8; 4]) -> Option<&FeatureMap> {
         let tag = Tag::new(tag);
         let features = self.features.as_slice();
-        crate::ot::data::bsearch(features.len(), |i| features[i].tag.cmp(&tag))
-            .map(|i| &features[i])
+        bsearch(features.len(), |i| features[i].tag.cmp(&tag)).map(|i| &features[i])
     }
 
     /// Whether feature `tag` has a mask but no lookups in the font.

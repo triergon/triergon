@@ -3,12 +3,13 @@
 
 use super::apply::{Apply, Values};
 use super::context;
-use super::data::{Data, bsearch};
+use super::data::Data;
 use super::layout::{LookupFlags, LookupType, class, coverage};
 use crate::buffer::{Attachment, Buffer, Info, Pos, Position};
 use crate::metrics::Scaled;
 use crate::tag::Direction;
 use triergon_core::Result;
+use triergon_font::read::bsearch;
 
 /// Applies one subtable of type `kind` at the current glyph.
 pub(crate) fn apply<'a>(ctx: &mut Apply<'a, '_>, kind: LookupType, data: Data<'a>) -> Result<bool> {

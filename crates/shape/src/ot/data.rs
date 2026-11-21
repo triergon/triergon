@@ -91,29 +91,9 @@ impl Data<'_> {
     }
 }
 
-/// HarfBuzz's binary search over `count` records: the index whose record
-/// `compare` finds equal, if the probes meet one. Unsorted data gives the same
-/// answer as in HarfBuzz because the probes are the same.
-pub(crate) fn bsearch(
-    count: usize,
-    compare: impl Fn(usize) -> std::cmp::Ordering,
-) -> Option<usize> {
-    use std::cmp::Ordering;
-    let (mut min, mut max) = (0_isize, count as isize - 1);
-    while min <= max {
-        let mid = ((min as usize + max as usize) / 2) as isize;
-        match compare(mid as usize) {
-            Ordering::Greater => max = mid - 1,
-            Ordering::Less => min = mid + 1,
-            Ordering::Equal => return Some(mid as usize),
-        }
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{Data, bsearch};
+    use super::Data;
 
     #[test]
     fn reads_past_the_end_are_zero() {
@@ -128,13 +108,5 @@ mod tests {
         assert_eq!(Data(&[0, 9]).count(0, 2, 0), 9, "empty records always fit");
         assert_eq!(Data(&[0, 9, 1, 2]).headless_count(0, 2, 2), 2);
         assert_eq!(Data(&[0, 0, 1, 2]).headless_count(0, 2, 2), 0);
-    }
-
-    #[test]
-    fn binary_search_probes_like_harfbuzz() {
-        let keys = [1, 3, 5, 7];
-        assert_eq!(bsearch(4, |i| keys[i].cmp(&5)), Some(2));
-        assert_eq!(bsearch(4, |i| keys[i].cmp(&4)), None);
-        assert_eq!(bsearch(0, |_| unreachable!()), None);
     }
 }
