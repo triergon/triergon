@@ -107,9 +107,9 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   tests whether the slice is CAVLC or CABAC. What does not depend on the mode is compiled
   once: the mb_type tables, I_PCM storage and reconstruction.
 - CABAC decodes in a 32-bit register on 32-bit targets (`triergon_bitstream::cabac`).
-- Gate timings against FFmpeg are in [docs/status.md](../../docs/status.md): at `fc65d9fc`
-  the three H.264 workloads' paired 95% upper bounds are 0.76 to 0.99 on ARMv7 and 0.62 to
-  0.97 on Linux AArch64.
+- The Codecs rows report gate timings against FFmpeg on
+  [Linux AArch64](../../docs/status.md#linux-aarch64) and
+  [32-bit ARMv7](../../docs/status.md#32-bit-armv7).
 
 ## Conformance
 

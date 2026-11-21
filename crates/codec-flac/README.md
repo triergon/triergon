@@ -89,11 +89,16 @@ channel counts that change between frames.
 ## Conformance
 
 - Specification: RFC 9639.
-- Vectors (outside git): the IETF CELLAR decoder testbench
-  (`subset`, `uncommon`, `faulty`; CC0) and streams `harness/codecs/flac/flac_vectors.py generate` makes
-  with FFmpeg's encoder and the reference `flac` encoder over bit depths 4 to 32, 1 to 8
-  channels, sample rates 1 Hz to 768 kHz, block sizes 16 to 65535, every compression level,
-  LPC type, stereo mode, partition order and prediction order 1 to 32.
+- The external vectors come from the IETF CELLAR decoder testbench (`subset`,
+  `uncommon`, `faulty`, licensed CC0) and from
+  [`flac_vectors.py`](../../harness/codecs/flac/flac_vectors.py). Run
+  `python3 harness/codecs/flac/flac_vectors.py FFMPEG FLAC .research/flac-generated`
+  with the FFmpeg executable from the decode profile and the reference `flac` 1.4.3
+  executable to reproduce the pinned inputs. The script generates deterministic WAV
+  signals in a temporary directory and encodes them to FLAC across bit depths, channel
+  counts, sample rates, block sizes and encoder options. The
+  [`codec-vector-inputs` evidence set](../../harness/evidence/sets/codec-vector-inputs.json)
+  includes both groups of vectors.
 - `cargo test -p triergon-codec-flac` runs predictor, layout and hand-built frame tests
   (every subframe type and stereo mode, the refusals, truncation at every byte, every bit
   flipped, a too-small budget) and, when the vectors are present, checks the integer

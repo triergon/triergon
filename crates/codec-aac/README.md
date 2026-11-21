@@ -177,8 +177,15 @@ on both targets; every other worker stays on stable.
   `aac-sce-in-stereo` comparison checks both float planes and the stereo
   output.
 - SBR/PS vectors are also checked against the conformance `.s16` references (≤ 1 LSB).
-- `cargo test -p triergon-codec-aac` runs synthetic ADTS and raw AAC-LC tests. `tests/fate_vectors.rs`
-  runs the FATE vectors when `.research/fate-samples/aac/` is present (set
-  `AAC_REF_DIR` for the float comparison) and skips otherwise.
+- `cargo test -p triergon-codec-aac` runs synthetic ADTS and raw AAC-LC tests. The FATE
+  suite reads source vectors from `.research/fate-samples/aac/` and reads paired `.adts`
+  streams and `.f32` reference outputs from the directory named by `AAC_REF_DIR`.
+  [Gate hosts](../../docs/quality.md#gate-hosts) unpack the
+  [`codec-vector-inputs` evidence set](../../harness/evidence/sets/codec-vector-inputs.json)
+  at the repository root, and `cargo xtask gate` sets `AAC_REF_DIR` to
+  `.research/aac-references/` for its test step. To run the full suite locally, unpack
+  the same set at the repository root and run
+  `AAC_REF_DIR="$PWD/.research/aac-references" cargo test -p triergon-codec-aac`.
+  Direct test runs report skips for absent external inputs.
 - Comparison and probe tools: [harness/codecs/aac/tools](../../harness/codecs/aac/tools).
   Project-wide gates: [docs/quality.md](../../docs/quality.md).
