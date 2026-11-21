@@ -375,16 +375,8 @@ impl OwnedInputBytes {
     }
     /// The vector as it was adopted, its charge returned to the pool. Fails,
     /// returning this handle unchanged, while any `Bytes` made from it lives.
-    pub fn try_into_vec(mut self) -> std::result::Result<Vec<u8>, Self> {
-        if self.bytes.range.start != 0
-            || self.bytes.range.end != self.bytes.storage.data.len()
-            || Arc::get_mut(&mut self.bytes.storage).is_none()
-        {
-            return Err(self);
-        }
-        let Self {
-            bytes: Bytes { storage, range },
-        } = self;
+    pub fn try_into_vec(self) -> std::result::Result<Vec<u8>, Self> {
+        let Bytes { storage, range } = self.bytes;
         match Arc::try_unwrap(storage) {
             Ok(Storage { data, charge }) => {
                 drop(charge);
