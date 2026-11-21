@@ -143,6 +143,7 @@ pub struct OutputScope<Pool = Budget> {
 
 impl OutputScope {
     /// Whether `output` belongs to this scope.
+    #[inline]
     pub fn matches(&self, output: &Output) -> bool {
         self.source == output.source
             && self.session == output.session
@@ -167,6 +168,7 @@ pub struct Output {
 }
 impl Output {
     /// The output without its event-sized storage, when it holds a Matroska event.
+    #[inline]
     pub fn into_matroska_replay(self) -> Option<MatroskaReplayOutput> {
         let Event::Matroska(event) = self.event else {
             return None;
@@ -186,10 +188,12 @@ impl Output {
     }
 
     /// The source the output came from.
+    #[inline]
     pub fn source_id(&self) -> triergon_core::SourceId {
         self.source
     }
     /// Whether the output's storage is charged to `pool`.
+    #[inline]
     pub fn belongs_to(&self, pool: &Budget) -> bool {
         self.pool().same_pool(pool)
     }
@@ -222,6 +226,7 @@ impl Output {
     }
 
     /// The playback state this output belongs to.
+    #[inline]
     pub fn scope(&self) -> OutputScope {
         OutputScope {
             source: self.source,
@@ -232,6 +237,7 @@ impl Output {
         }
     }
     /// The event.
+    #[inline]
     pub fn event(&self) -> &Event {
         &self.event
     }
@@ -241,18 +247,22 @@ impl Output {
         self.event.packet()
     }
     /// How to deliver the event.
+    #[inline]
     pub fn delivery(&self) -> Delivery {
         self.delivery
     }
     /// The delivery epoch; each seek and selection change starts a new one.
+    #[inline]
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
     /// The input generation the output was read in.
+    #[inline]
     pub fn generation(&self) -> u64 {
         self.generation
     }
     /// Takes the event.
+    #[inline]
     pub fn into_event(self) -> Event {
         self.event
     }
@@ -616,6 +626,7 @@ impl<S: Source> Player<S> {
     }
     /// Hands a consumed PES's lists back to the observer of `pid`, so that it
     /// allocates nothing for its next PES. Does nothing for other engines.
+    #[inline]
     pub fn reuse_pes_lists(&mut self, pid: u16, lists: crate::engine::ts::feed::SpentLists) {
         if let Some(engine) = self.engine.as_mut() {
             engine.reuse_pes_lists(pid, lists);

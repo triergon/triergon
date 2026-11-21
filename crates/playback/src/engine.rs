@@ -57,6 +57,7 @@ pub enum Engine {
 impl Engine {
     /// Hands a consumed PES's lists back to the observer of `pid`, when this
     /// is a transport stream engine.
+    #[inline]
     pub(crate) fn reuse_pes_lists(&mut self, pid: u16, lists: ts::feed::SpentLists) {
         if let Self::Ts(engine) = self {
             engine.reuse_pes_lists(pid, lists);
