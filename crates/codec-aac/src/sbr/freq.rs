@@ -70,6 +70,15 @@ fn nint(x: f64) -> i64 {
     (x + 0.5).floor() as i64
 }
 
+/// Append to `master` the borders that `widths` step through from its last border.
+fn push_widths(master: &mut Vec<usize>, widths: &[i64]) {
+    let mut border = master.last().map_or(0, |&b| b as i64);
+    for &d in widths {
+        border += d;
+        master.push(border as usize);
+    }
+}
+
 /// Band borders between `start` and `stop` with `n` geometrically spaced bands, as
 /// integer widths sorted ascending (4.6.18.3.2.1 vDk computation).
 fn geometric_dk(start: usize, stop: usize, n: usize) -> Vec<i64> {
@@ -161,10 +170,7 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
             k2_diff += incr;
         }
         master.push(k0);
-        for d in vdk {
-            let last = *master.last().unwrap() as i64;
-            master.push((last + d) as usize);
-        }
+        push_widths(&mut master, &vdk);
     } else {
         let bands = [12.0f64, 10.0, 8.0][h.freq_scale as usize - 1];
         let warp = if h.alter_scale { 1.3 } else { 1.0 };
@@ -179,10 +185,7 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
             return Err(DecodeError::InvalidData("SBR master band width"));
         }
         master.push(k0);
-        for d in &dk0 {
-            let last = *master.last().unwrap() as i64;
-            master.push((last + d) as usize);
-        }
+        push_widths(&mut master, &dk0);
         if two_regions {
             let n1 = 2 * nint(bands * (k2 as f64 / k1 as f64).ln() / (2.0 * 2f64.ln() * warp));
             if n1 > 0 {
@@ -197,10 +200,7 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
                 if dk1.iter().any(|&d| d <= 0) {
                     return Err(DecodeError::InvalidData("SBR master band width"));
                 }
-                for d in &dk1 {
-                    let last = *master.last().unwrap() as i64;
-                    master.push((last + d) as usize);
-                }
+                push_widths(&mut master, &dk1);
             }
         }
     }
@@ -281,7 +281,7 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
             break;
         }
     }
-    if patch_num.len() > 1 && *patch_num.last().unwrap() < 3 {
+    if patch_num.len() > 1 && patch_num.last().is_some_and(|&n| n < 3) {
         patch_num.pop();
         patch_start.pop();
     }
@@ -324,9 +324,10 @@ pub(crate) fn limiter_table(
     }
     let lim_bands = [1.2f64, 2.0, 3.0][limiter_bands as usize - 1];
     let mut borders = vec![kx];
+    let mut border = kx;
     for &n in patch_num {
-        let l = *borders.last().unwrap();
-        borders.push(l + n);
+        border += n;
+        borders.push(border);
     }
     let mut t: Vec<usize> = low.to_vec();
     t.extend_from_slice(&borders[1..borders.len() - 1]);

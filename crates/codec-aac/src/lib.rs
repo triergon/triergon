@@ -2,12 +2,13 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(feature = "simd", feature(portable_simd))]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr
 )]
-// Pending: `missing_docs`, `clippy::unwrap_used`, `clippy::expect_used`.
+// Pending: `clippy::unwrap_used`, `clippy::expect_used`.
 // Pending: these rewrites change the generated code of measured hot paths and are
 // adopted with an A/B timing run.
 #![allow(

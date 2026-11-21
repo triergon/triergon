@@ -24,6 +24,7 @@ pub enum Feature {
     SampleRateIndex(u8),
 }
 
+/// Why the decoder refused an access unit or a configuration.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
     /// The input uses a feature outside the implemented set (named).

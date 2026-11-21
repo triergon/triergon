@@ -314,8 +314,7 @@ impl Core {
         if channel_config != 0 {
             self.pce = None;
         }
-        self.rebuild_layout();
-        Ok(())
+        self.rebuild_layout()
     }
 
     /// Set up the out-of-band program of a raw AAC-LC stream.
@@ -363,7 +362,7 @@ impl Core {
         let mut core = Self::new(budget);
         core.sf_index = usize::from(frequency_index);
         core.slots = slots;
-        core.rebuild_layout();
+        core.rebuild_layout()?;
         if core.layout.mask() == 0 {
             return Err(DecodeError::Unsupported(Feature::RawProgramLayout));
         }
@@ -426,12 +425,17 @@ impl Core {
         Ok(())
     }
 
-    pub(crate) fn rebuild_layout(&mut self) {
-        (self.layout, self.plane_of) = self.layout_of(&self.slots, self.unordered);
+    fn rebuild_layout(&mut self) -> Result<()> {
+        (self.layout, self.plane_of) = self.layout_of(&self.slots, self.unordered)?;
+        Ok(())
     }
 
     /// The layout of `slots` and the plane of each slot's channels.
-    fn layout_of(&self, slots: &[Slot], unordered: bool) -> (ChannelLayout, Vec<[usize; 2]>) {
+    fn layout_of(
+        &self,
+        slots: &[Slot],
+        unordered: bool,
+    ) -> Result<(ChannelLayout, Vec<[usize; 2]>)> {
         // Expand slots to planes; PS doubles the single mono slot.
         let mut entries: Vec<(Speaker, usize, usize)> = Vec::new();
         for (i, s) in slots.iter().enumerate() {
@@ -454,8 +458,9 @@ impl Core {
             plane_of[e.1][e.2] = p;
         }
         // A PCE yields one slot per listed element: at most CAPACITY planes.
-        let layout = ChannelLayout::new(entries.iter().map(|e| e.0)).expect("PCE channel bound");
-        (layout, plane_of)
+        let layout = ChannelLayout::new(entries.iter().map(|e| e.0))
+            .ok_or(DecodeError::Unsupported(Feature::TooManyChannels))?;
+        Ok((layout, plane_of))
     }
 
     /// Apply an in-band layout of `slots`: its elements and the room it needs in `out` are
@@ -467,28 +472,27 @@ impl Core {
         out: &mut AudioFrame,
         blocks: usize,
     ) -> Result<()> {
-        let (layout, plane_of) = self.layout_of(&slots, unordered);
+        let (layout, plane_of) = self.layout_of(&slots, unordered)?;
         self.make_room(out, layout.channels(), self.frame_len(), blocks)?;
         // Both layouts together hold at most 48 identities (16 tags of each kind), so the
         // switch never holds more element state than that.
-        let mut added = self.build_elements(self.aot, &slots, self.sbr_active, &self.elements)?;
-        let mut old = core::mem::take(&mut self.elements);
-        for s in &slots {
-            let has = |e: &Charged<Box<ElementState>>| e.kind == s.kind && e.tag == s.tag;
-            if self.elements.iter().any(has) {
-                continue;
+        let added = self.build_elements(self.aot, &slots, self.sbr_active, &self.elements)?;
+        // The elements both layouts have, renewed, and the new ones, in the order of their
+        // first slot.
+        let first_slot = |e: &Charged<Box<ElementState>>| {
+            slots
+                .iter()
+                .position(|s| s.kind == e.kind && s.tag == e.tag)
+        };
+        self.elements.retain_mut(|e| {
+            let kept = first_slot(e).is_some();
+            if kept {
+                e.renew();
             }
-            let e = match old.iter().position(has) {
-                Some(i) => {
-                    let mut e = old.swap_remove(i);
-                    e.renew();
-                    e
-                }
-                None => added.remove(added.iter().position(has).expect("built above")),
-            };
-            self.elements.push(e);
-        }
-        drop(old);
+            kept
+        });
+        self.elements.extend(added);
+        self.elements.sort_by_key(first_slot);
         self.cce.clear();
         self.slots = slots;
         self.unordered = unordered;
@@ -845,13 +849,15 @@ impl Core {
             self.make_room(out, channels, self.frame_len(), blocks)?;
         }
         let e: &mut ElementState = &mut self.elements[ei];
-        e.sbr
-            .as_mut()
-            .expect("every element runs SBR")
-            .parse(br, crc, bits, is_cpe)?;
+        // Every element has its SBR state once SBR runs.
+        let sbr = match e.sbr {
+            Some(ref mut sbr) => sbr,
+            None => e.sbr.insert(new_sbr(&self.budget, self.sf_index, e.kind)?),
+        };
+        sbr.parse(br, crc, bits, is_cpe)?;
         if to_stereo {
             self.ps_active = true;
-            self.rebuild_layout();
+            self.rebuild_layout()?;
             changed = true;
         }
         Ok(changed)

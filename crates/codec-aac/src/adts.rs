@@ -2,17 +2,23 @@
 
 use crate::error::{DecodeError, Result};
 
+/// The fixed and variable header of one ADTS frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AdtsHeader {
     /// 0 = MPEG-4, 1 = MPEG-2.
     pub id: u8,
+    /// No CRC follows the header (and, with several raw data blocks, none follows each
+    /// block).
     pub protection_absent: bool,
     /// profile_ObjectType (audio object type - 1): 0 Main, 1 LC, 2 SSR, 3 LTP.
     pub profile: u8,
+    /// sampling_frequency_index, 0 to 15 (13 to 15 are reserved).
     pub sf_index: u8,
+    /// channel_configuration, 0 to 7; 0 means a PCE in the payload gives the layout.
     pub channel_config: u8,
     /// Total frame length in bytes, header included.
     pub frame_length: usize,
+    /// adts_buffer_fullness, 0x7ff for a variable-rate stream.
     pub buffer_fullness: u16,
     /// number_of_raw_data_blocks_in_frame + 1.
     pub raw_data_blocks: u8,
@@ -24,7 +30,11 @@ impl AdtsHeader {
         if self.protection_absent { 7 } else { 9 }
     }
 
-    /// Parse the 7-byte fixed+variable header at the start of `b`.
+    /// Parse the 7-byte fixed and variable header at the start of `b`.
+    ///
+    /// # Errors
+    /// `Truncated` when `b` is shorter than 7 bytes; `InvalidData` for a wrong syncword
+    /// or layer, or a frame length shorter than the header.
     pub fn parse(b: &[u8]) -> Result<AdtsHeader> {
         if b.len() < 7 {
             return Err(DecodeError::Truncated);
@@ -54,8 +64,10 @@ impl AdtsHeader {
     }
 }
 
-/// Find the next plausible ADTS frame in `data` starting at `from`: returns (offset, header).
-/// Used by the example splitter; checks that the following frame (if any) also syncs.
+/// The next plausible ADTS frame in `data` at or after `from`, as its offset and header:
+/// a valid header with a defined sampling frequency index that is followed by another
+/// syncword, an ID3 or `TAG` tag, or the end of `data`. A final frame that runs past the
+/// end of `data` is returned too, so that its decoder reports it as truncated.
 pub fn find_frame(data: &[u8], from: usize) -> Option<(usize, AdtsHeader)> {
     let mut i = from;
     while i + 7 <= data.len() {
