@@ -19,7 +19,7 @@ fn integer_rescale_agrees_with_canonical_time_at_ties_and_extremes() {
         for to in bases {
             for ticks in [i64::MIN, -90_001, -3, -1, 0, 1, 3, 90_001, i64::MAX] {
                 let time = Time::from_ticks(i128::from(ticks), from).unwrap();
-                for rounding in UNIT53_ROUNDINGS {
+                for rounding in ROUNDINGS {
                     assert_eq!(
                         from.rescale(ticks, to, rounding),
                         time.to_i64_ticks(to, rounding),
@@ -174,7 +174,7 @@ fn a_movie_media_and_codec_clock_can_require_more_than_u64_denominator() {
     assert_eq!(sum.checked_sub(c).unwrap(), a.checked_add(b).unwrap());
 }
 
-const UNIT53_ROUNDINGS: [Rounding; 5] = [
+const ROUNDINGS: [Rounding; 5] = [
     Rounding::TowardZero,
     Rounding::AwayFromZero,
     Rounding::Floor,
@@ -183,7 +183,7 @@ const UNIT53_ROUNDINGS: [Rounding; 5] = [
 ];
 
 #[test]
-fn unit_conversion_53_exact_clocks_include_above_u64_and_both_signed_limits() {
+fn tick_conversion_exact_clocks_include_above_u64_and_both_signed_limits() {
     // Expected integer values authored independently with Python Fraction.
     let cases: &[(i128, u128, u64, i128)] = &[
         (0, 1, 1, 0),
@@ -236,7 +236,7 @@ fn unit_conversion_53_exact_clocks_include_above_u64_and_both_signed_limits() {
     for &(n, d, scale, expected) in cases {
         let time = Time::new(n, d).unwrap();
         let base = TimeBase::new(1, scale).unwrap();
-        for mode in UNIT53_ROUNDINGS {
+        for mode in ROUNDINGS {
             assert_eq!(
                 time.to_ticks(base, mode),
                 Ok(expected),
@@ -247,7 +247,7 @@ fn unit_conversion_53_exact_clocks_include_above_u64_and_both_signed_limits() {
 }
 
 #[test]
-fn unit_conversion_53_overflows_keep_public_signed_and_wide_product_bounds() {
+fn tick_conversion_overflows_keep_public_signed_and_wide_product_bounds() {
     let cases: &[(i128, u128, u64)] = &[
         (170141183460469231731687303715884105727, 1, 2),
         (-170141183460469231731687303715884105728, 1, 2),
@@ -267,7 +267,7 @@ fn unit_conversion_53_overflows_keep_public_signed_and_wide_product_bounds() {
     for &(n, d, scale) in cases {
         let time = Time::new(n, d).unwrap();
         let base = TimeBase::new(1, scale).unwrap();
-        for mode in UNIT53_ROUNDINGS {
+        for mode in ROUNDINGS {
             assert_eq!(
                 time.to_ticks(base, mode),
                 Err(Error::Overflow),
@@ -278,7 +278,7 @@ fn unit_conversion_53_overflows_keep_public_signed_and_wide_product_bounds() {
 }
 
 #[test]
-fn unit_conversion_53_nonunit_nonexact_and_wide_denominator_keep_all_roundings() {
+fn tick_conversion_nonunit_nonexact_and_wide_denominator_keep_all_roundings() {
     let cases: &[(i128, u128, u64, u64, [i128; 5])] = &[
         (1, 3, 1, 2, [0, 1, 0, 1, 1]),
         (-1, 3, 1, 2, [0, -1, -1, 0, -1]),
@@ -359,7 +359,7 @@ fn unit_conversion_53_nonunit_nonexact_and_wide_denominator_keep_all_roundings()
     for &(n, d, base_n, base_d, expected) in cases {
         let time = Time::new(n, d).unwrap();
         let base = TimeBase::new(base_n, base_d).unwrap();
-        for (mode, value) in UNIT53_ROUNDINGS.into_iter().zip(expected) {
+        for (mode, value) in ROUNDINGS.into_iter().zip(expected) {
             assert_eq!(
                 time.to_ticks(base, mode),
                 Ok(value),
@@ -370,7 +370,7 @@ fn unit_conversion_53_nonunit_nonexact_and_wide_denominator_keep_all_roundings()
 }
 
 #[test]
-fn wide_gcd_54_can_reenter_u64_after_one_or_more_euclidean_steps() {
+fn wide_gcd_can_reenter_u64_after_one_or_more_euclidean_steps() {
     // Independent Python Fraction reduction; no expected values from this gcd.
     let cases: &[(i128, u128, i128, u128)] = &[
         (
@@ -408,7 +408,7 @@ fn wide_gcd_54_can_reenter_u64_after_one_or_more_euclidean_steps() {
 }
 
 #[test]
-fn wide_gcd_54_keeps_wide_gcd_when_remainder_is_zero() {
+fn wide_gcd_keeps_wide_gcd_when_remainder_is_zero() {
     let cases: &[(i128, u128, i128, u128)] = &[
         (
             1329227995784915872903807060280344576,
@@ -429,6 +429,68 @@ fn wide_gcd_54_keeps_wide_gcd_when_remainder_is_zero() {
         assert_eq!(
             (value.numerator(), value.denominator()),
             (expected_n, expected_d)
+        );
+    }
+}
+
+// With M = 2^64 - 1 and P = M * (M + 1) = 2^128 - 2^64:
+// 1/M + 1/(M+1) = (2M + 1)/P and 1/M - 1/(M+1) = 1/P.
+#[test]
+fn adjacent_full_width_clock_denominators_keep_exact_signed_sums() {
+    let m = u128::from(u64::MAX);
+    let above = 1_u128 << 64;
+    let product = 340_282_366_920_938_463_444_927_863_358_058_659_840_u128;
+    let sum = 36_893_488_147_419_103_231_i128;
+    for (an, ad, bn, bd, add, sub) in [
+        (1, m, 1, m, (2, m), (0, 1)),
+        (1, m, 1, above, (sum, product), (1, product)),
+        (1, above, 1, m, (sum, product), (-1, product)),
+        (-1, m, -1, above, (-sum, product), (-1, product)),
+    ] {
+        let a = Time::new(an, ad).unwrap();
+        let b = Time::new(bn, bd).unwrap();
+        let actual_add = a.checked_add(b).unwrap();
+        let actual_sub = a.checked_sub(b).unwrap();
+        assert_eq!((actual_add.numerator(), actual_add.denominator()), add);
+        assert_eq!((actual_sub.numerator(), actual_sub.denominator()), sub);
+    }
+}
+
+#[test]
+fn checked_tick_width_preserves_cancellation_widening_and_signed_bounds() {
+    let narrow = i128::from(u64::MAX);
+    let wide = 1_i128 << 64;
+    let cases = [
+        (0, u64::MAX, 1, 0, 1),
+        (narrow, 1, u64::MAX, 1, 1),
+        (-narrow, 1, u64::MAX, -1, 1),
+        (1_i128 << 63, 2, 1, wide, 1),
+        (wide, 1, 1, wide, 1),
+        (-wide, 1, 1, -wide, 1),
+        (wide, 1, u64::MAX, wide, u128::from(u64::MAX)),
+        (-wide, 1, u64::MAX, -wide, u128::from(u64::MAX)),
+        (i128::MIN, 1, 1_u64 << 63, -wide, 1),
+        (i128::MIN, 1, 1, i128::MIN, 1),
+        (i128::MAX, 1, 1, i128::MAX, 1),
+    ];
+    for (ticks, numerator, denominator, expected_numerator, expected_denominator) in cases {
+        let actual =
+            Time::from_ticks(ticks, TimeBase::new(numerator, denominator).unwrap()).unwrap();
+        assert_eq!(
+            actual.numerator(),
+            expected_numerator,
+            "ticks={ticks} base={numerator}/{denominator}"
+        );
+        assert_eq!(
+            actual.denominator(),
+            expected_denominator,
+            "ticks={ticks} base={numerator}/{denominator}"
+        );
+    }
+    for (ticks, numerator) in [(narrow, u64::MAX), (-narrow, u64::MAX), (i128::MIN, 2)] {
+        assert_eq!(
+            Time::from_ticks(ticks, TimeBase::new(numerator, 1).unwrap()),
+            Err(Error::Overflow)
         );
     }
 }

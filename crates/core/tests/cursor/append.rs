@@ -1,26 +1,9 @@
+use crate::support::{SOURCE, cursor, provide_inline as inline};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure,
-    SourceId, Step, WorkBudget,
+    Budget, BudgetVec, Bytes, Error, InputWindow, SourceFailure, Step, WorkBudget,
 };
-fn cursor(pool: &Budget, length: Option<u64>, ranges: bool) -> InputCursor {
-    InputCursor::new(
-        pool,
-        SourceId(40),
-        SourceCapabilities {
-            length,
-            random_access: ranges,
-        },
-        64,
-    )
-    .unwrap()
-}
-fn inline(input: &mut InputCursor, bytes: &[u8]) {
-    let request = input.request();
-    input
-        .provide_inline(request.source, request.token, request.offset, bytes)
-        .unwrap();
-}
+
 #[test]
 fn reserved_append_consumes_inline_with_no_free_pool_or_temporary_owner() {
     let pool = Budget::new(4096).unwrap();
@@ -266,7 +249,7 @@ fn empty_wait_work_and_explicit_eof_follow_read_into_order() {
         Step::Ready(3)
     ));
     assert!(
-        matches!(input.read_append(&mut output, 1, &mut WorkBudget::new(0), &AtomicBool::new(false)).unwrap(), Step::End(at) if at.offset == 3 && at.source == SourceId(40))
+        matches!(input.read_append(&mut output, 1, &mut WorkBudget::new(0), &AtomicBool::new(false)).unwrap(), Step::End(at) if at.offset == 3 && at.source == SOURCE)
     );
     assert_eq!(output.as_slice(), b"preabc");
 }

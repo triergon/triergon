@@ -1,31 +1,9 @@
+use crate::support::{SOURCE, copied_window as window, cursor};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
-    Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure, SourceId,
-    Step, WorkBudget,
+    Budget, Bytes, Error, InputWindow, SourceCapabilities, SourceFailure, SourceId, Step,
+    WorkBudget,
 };
-
-fn cursor(pool: &Budget, length: Option<u64>, random_access: bool) -> InputCursor {
-    InputCursor::new(
-        pool,
-        SourceId(7),
-        SourceCapabilities {
-            length,
-            random_access,
-        },
-        64,
-    )
-    .unwrap()
-}
-fn window(cursor: &InputCursor, bytes: &[u8]) -> InputWindow {
-    let request = cursor.request();
-    InputWindow::new(
-        request.source,
-        request.token,
-        request.offset,
-        Bytes::copy_from_slice(cursor.budget(), bytes).unwrap(),
-    )
-    .unwrap()
-}
 
 #[test]
 fn starvation_empty_input_work_yield_and_explicit_entity_end_are_distinct() {
@@ -58,7 +36,7 @@ fn starvation_empty_input_work_yield_and_explicit_entity_end_are_distinct() {
         Step::Ready(2)
     ));
     assert_eq!(&out[..2], b"ab");
-    input.finish(SourceId(7), input.token()).unwrap();
+    input.finish(SOURCE, input.token()).unwrap();
     assert!(matches!(
         input.read_into(&mut out, &mut work, &cancel).unwrap(),
         Step::Ready(2)
@@ -124,7 +102,7 @@ fn source_offsets_above_four_gib_are_not_lengths_or_usize_indices() {
     let bytes = Bytes::copy_from_slice(&pool, b"xx").unwrap();
     let input = cursor(&pool, None, true);
     assert!(matches!(
-        InputWindow::new(SourceId(7), input.token(), u64::MAX, bytes),
+        InputWindow::new(SOURCE, input.token(), u64::MAX, bytes),
         Err(Error::Overflow)
     ));
 }
@@ -140,7 +118,7 @@ fn old_ranges_errors_and_source_reuse_cannot_poison_a_new_request() {
     assert!(input.provide(&stale).is_err());
     assert!(
         input
-            .fail(SourceId(7), stale.token.clone(), SourceFailure::Transport)
+            .fail(SOURCE, stale.token.clone(), SourceFailure::Transport)
             .is_err()
     );
     input.provide(&window(&input, b"new")).unwrap();
@@ -162,7 +140,7 @@ fn failure_is_sticky_even_at_known_end_and_cancellation_needs_explicit_recovery(
     let pool = Budget::new(8192).unwrap();
     let mut input = cursor(&pool, Some(0), true);
     input
-        .fail(SourceId(7), input.token(), SourceFailure::Transport)
+        .fail(SOURCE, input.token(), SourceFailure::Transport)
         .unwrap();
     assert_eq!(
         input
@@ -184,7 +162,7 @@ fn failure_is_sticky_even_at_known_end_and_cancellation_needs_explicit_recovery(
         Error::Cancelled
     );
     input.reset(0).unwrap();
-    input.finish(SourceId(7), input.token()).unwrap();
+    input.finish(SOURCE, input.token()).unwrap();
     assert!(matches!(
         input
             .read_into(&mut [0], &mut WorkBudget::new(1), &AtomicBool::new(false))
@@ -236,10 +214,7 @@ fn invalid_windows_and_truncation_are_checked_before_committing() {
     assert_eq!(input.position(), 0);
     input.provide(&window(&input, b"a")).unwrap();
     assert!(input.provide(&window(&input, b"b")).is_err());
-    assert_eq!(
-        input.finish(SourceId(7), input.token()),
-        Err(Error::Truncated)
-    );
+    assert_eq!(input.finish(SOURCE, input.token()), Err(Error::Truncated));
     assert_eq!(
         input
             .read_into(&mut [0], &mut WorkBudget::new(1), &AtomicBool::new(false))
@@ -255,7 +230,7 @@ fn completing_one_resource_is_not_completion_of_a_transport_or_playlist() {
     let mut input = cursor(&pool, Some(1), false);
     let old = input.token();
     input.provide(&window(&input, b"a")).unwrap();
-    input.finish(SourceId(7), input.token()).unwrap();
+    input.finish(SOURCE, input.token()).unwrap();
     assert!(
         input
             .continue_source(
@@ -296,7 +271,7 @@ fn tokens_identify_the_pool_and_new_parser_instance_not_just_a_small_counter() {
     let other_pool = Budget::new(8192).unwrap();
     let other = cursor(&other_pool, None, true);
     let bogus = InputWindow::new(
-        SourceId(7),
+        SOURCE,
         other.token(),
         0,
         Bytes::copy_from_slice(&pool, b"x").unwrap(),

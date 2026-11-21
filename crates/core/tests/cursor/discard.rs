@@ -1,36 +1,6 @@
-//! Original cursor contracts: no destination, owner, allocation or inferred EOF.
+use crate::support::{SOURCE, cursor, provide_inline as inline, provide_owned as owned};
 use std::sync::atomic::AtomicBool;
-use triergon_core::{
-    Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure, SourceId,
-    Step, WorkBudget,
-};
-
-fn cursor(pool: &Budget, length: Option<u64>, ranges: bool) -> InputCursor {
-    InputCursor::new(
-        pool,
-        SourceId(1801),
-        SourceCapabilities {
-            length,
-            random_access: ranges,
-        },
-        64,
-    )
-    .unwrap()
-}
-fn inline(input: &mut InputCursor, bytes: &[u8]) {
-    let request = input.request();
-    input
-        .provide_inline(request.source, request.token, request.offset, bytes)
-        .unwrap();
-}
-fn owned(input: &mut InputCursor, bytes: Bytes) {
-    let request = input.request();
-    input
-        .provide_owned(
-            InputWindow::new(request.source, request.token, request.offset, bytes).unwrap(),
-        )
-        .unwrap();
-}
+use triergon_core::{Budget, Bytes, Error, SourceFailure, Step, WorkBudget};
 
 #[test]
 fn inline_discard_needs_no_free_pool_or_temporary_owner() {
@@ -58,7 +28,7 @@ fn inline_discard_needs_no_free_pool_or_temporary_owner() {
             assert_eq!(pool.used(), held);
         }
         assert!(
-            matches!(input.read_discard(1, &mut WorkBudget::new(0), &AtomicBool::new(false)).unwrap(), Step::End(at) if at.source == SourceId(1801) && at.offset == 3)
+            matches!(input.read_discard(1, &mut WorkBudget::new(0), &AtomicBool::new(false)).unwrap(), Step::End(at) if at.source == SOURCE && at.offset == 3)
         );
         drop(blocker);
     }
@@ -265,11 +235,7 @@ fn cancellation_drops_only_cursor_owner_and_reset_rejects_old_request() {
     );
     let request = input.reset(0).unwrap();
     assert_ne!(request.token.generation(), token.generation());
-    assert!(
-        input
-            .provide_inline(SourceId(1801), token, 0, b"x")
-            .is_err()
-    );
+    assert!(input.provide_inline(SOURCE, token, 0, b"x").is_err());
     assert!(
         matches!(input.read_discard(1, &mut work, &AtomicBool::new(false)).unwrap(), Step::NeedInput(next) if next.token == request.token)
     );

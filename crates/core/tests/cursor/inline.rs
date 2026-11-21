@@ -1,28 +1,9 @@
+use crate::support::{SOURCE, cursor, cursor_with_window, provide_inline as provide};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure, SourceId,
     Step, WorkBudget,
 };
-
-fn cursor(pool: &Budget, length: Option<u64>, random_access: bool) -> InputCursor {
-    InputCursor::new(
-        pool,
-        SourceId(7),
-        SourceCapabilities {
-            length,
-            random_access,
-        },
-        64,
-    )
-    .unwrap()
-}
-
-fn provide(input: &mut InputCursor, bytes: &[u8]) {
-    let request = input.request();
-    input
-        .provide_inline(request.source, request.token, request.offset, bytes)
-        .unwrap();
-}
 
 fn read(input: &mut InputCursor, output: &mut [u8], units: u64) -> usize {
     let mut work = WorkBudget::new(units);
@@ -60,7 +41,7 @@ fn inline_headers_copy_caller_bytes_and_preserve_work_and_entity_end() {
         Step::Yield
     ));
     assert_eq!(input.position(), 0);
-    input.finish(SourceId(7), input.token()).unwrap();
+    input.finish(SOURCE, input.token()).unwrap();
     assert_eq!(read(&mut input, &mut output, 1), 1);
     assert_eq!(output[0], 10);
     assert_eq!(read(&mut input, &mut output, 2), 2);
@@ -68,7 +49,7 @@ fn inline_headers_copy_caller_bytes_and_preserve_work_and_entity_end() {
     assert_eq!(read(&mut input, &mut output, 8), 1);
     assert_eq!(output[0], 13);
     assert!(
-        matches!(input.read_into(&mut output, &mut WorkBudget::new(8), &AtomicBool::new(false)).unwrap(), Step::End(at) if at.source == SourceId(7) && at.offset == 4)
+        matches!(input.read_into(&mut output, &mut WorkBudget::new(8), &AtomicBool::new(false)).unwrap(), Step::End(at) if at.source == SOURCE && at.offset == 4)
     );
     assert_eq!(pool.used(), base);
 }
@@ -123,16 +104,7 @@ fn invalid_inline_responses_cannot_replace_requested_input() {
 #[test]
 fn inline_policy_and_known_length_rejections_are_nonmutating() {
     let pool = Budget::new(1024).unwrap();
-    let mut narrow = InputCursor::new(
-        &pool,
-        SourceId(7),
-        SourceCapabilities {
-            length: None,
-            random_access: false,
-        },
-        2,
-    )
-    .unwrap();
+    let mut narrow = cursor_with_window(&pool, None, false, 2);
     let request = narrow.request();
     assert_eq!(
         narrow
@@ -204,7 +176,7 @@ fn empty_availability_does_not_mean_eof_and_transport_failure_stays_sticky() {
     ));
     provide(&mut input, b"data");
     input
-        .fail(SourceId(7), input.token(), SourceFailure::Transport)
+        .fail(SOURCE, input.token(), SourceFailure::Transport)
         .unwrap();
     assert_eq!(
         input
@@ -221,7 +193,7 @@ fn empty_availability_does_not_mean_eof_and_transport_failure_stays_sticky() {
     assert!(input.retained_window().is_none());
     assert_eq!(pool.used(), base);
     input.reset(0).unwrap();
-    input.finish(SourceId(7), input.token()).unwrap();
+    input.finish(SOURCE, input.token()).unwrap();
     assert!(matches!(
         input
             .read_into(&mut [0], &mut WorkBudget::new(1), &AtomicBool::new(false))
@@ -236,7 +208,7 @@ fn cancellation_and_short_declared_entities_discard_inline_data_until_reset() {
     let mut input = cursor(&pool, Some(3), false);
     provide(&mut input, b"ab");
     assert_eq!(
-        input.finish(SourceId(7), input.token()).unwrap_err(),
+        input.finish(SOURCE, input.token()).unwrap_err(),
         Error::Truncated
     );
     assert_eq!(
@@ -329,7 +301,7 @@ fn span_promotion_retries_pressure_and_retains_the_whole_original_owner() {
     );
     let retained = pool.used();
     assert_eq!(retained, base + owner.retained_storage_bytes());
-    input.finish(SourceId(7), input.token()).unwrap();
+    input.finish(SOURCE, input.token()).unwrap();
     let tail = match input
         .read_span(64, &mut WorkBudget::new(5), &AtomicBool::new(false))
         .unwrap()
@@ -428,7 +400,7 @@ fn inline_bytes_use_relative_indices_at_large_and_maximum_source_offsets() {
     assert_eq!(read(&mut input, &mut out, 1), 1);
     assert_eq!(out[0], b'z');
     assert_eq!(input.position(), u64::MAX);
-    input.finish(SourceId(7), input.token()).unwrap();
+    input.finish(SOURCE, input.token()).unwrap();
     assert!(
         matches!(input.read_into(&mut out, &mut WorkBudget::new(1), &AtomicBool::new(false)).unwrap(), Step::End(at) if at.offset == u64::MAX)
     );

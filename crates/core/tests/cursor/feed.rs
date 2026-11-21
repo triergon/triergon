@@ -1,19 +1,11 @@
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::sync::atomic::AtomicBool;
 use triergon_core::blocking::Feed;
-use triergon_core::{Budget, Error, InputCursor, SourceCapabilities, SourceId, Step, WorkBudget};
+use triergon_core::{Budget, Error, InputCursor, Step, WorkBudget};
 
+/// A cursor on a seekable source of `length` bytes.
 fn cursor(pool: &Budget, length: u64, window: usize) -> InputCursor {
-    InputCursor::new(
-        pool,
-        SourceId(3),
-        SourceCapabilities {
-            length: Some(length),
-            random_access: true,
-        },
-        window,
-    )
-    .unwrap()
+    crate::support::cursor_with_window(pool, Some(length), true, window)
 }
 
 /// Reads the whole source through `feed`, one window per request.

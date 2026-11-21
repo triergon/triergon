@@ -1,4 +1,3 @@
-//! Only original caller input can leave its pool, after all produced views drop.
 use triergon_core::{Budget, Bytes, OwnedInputBytes};
 
 fn input() -> Vec<u8> {

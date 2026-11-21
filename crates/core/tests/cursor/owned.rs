@@ -1,33 +1,13 @@
+use crate::support::{SOURCE, cursor, window as response};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{
-    Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure, SourceId,
-    Step, WorkBudget,
-};
-
-fn cursor(pool: &Budget, length: Option<u64>) -> InputCursor {
-    InputCursor::new(
-        pool,
-        SourceId(1),
-        SourceCapabilities {
-            length,
-            random_access: true,
-        },
-        64,
-    )
-    .unwrap()
-}
-
-fn response(input: &InputCursor, bytes: Bytes) -> InputWindow {
-    let request = input.request();
-    InputWindow::new(request.source, request.token, request.offset, bytes).unwrap()
-}
+use triergon_core::{Budget, Bytes, Error, InputWindow, SourceFailure, Step, WorkBudget};
 
 #[test]
 fn owned_spans_keep_hidden_backing_and_work_bounds_until_the_last_output_drops() {
     let pool = Budget::new(4096).unwrap();
     let original = Bytes::copy_from_slice(&pool, b"_abcdef_").unwrap();
     let charged = original.retained_storage_bytes();
-    let mut input = cursor(&pool, Some(6));
+    let mut input = cursor(&pool, Some(6), true);
     input
         .provide_owned(response(&input, original.slice(1..7).unwrap()))
         .unwrap();
@@ -62,7 +42,7 @@ fn owned_spans_keep_hidden_backing_and_work_bounds_until_the_last_output_drops()
             .unwrap(),
         Step::NeedInput(_)
     ));
-    input.finish(SourceId(1), input.token()).unwrap();
+    input.finish(SOURCE, input.token()).unwrap();
     assert!(
         matches!(input.read_span(1, &mut WorkBudget::new(1), &cancel).unwrap(), Step::End(at) if at.offset == 6)
     );
@@ -77,10 +57,10 @@ fn owned_spans_keep_hidden_backing_and_work_bounds_until_the_last_output_drops()
 fn owned_response_rejection_preserves_cursor_and_distinguishes_stale_and_foreign_tokens() {
     let pool = Budget::new(4096).unwrap();
     let other = Budget::new(4096).unwrap();
-    let mut input = cursor(&pool, None);
-    let foreign = cursor(&other, None);
+    let mut input = cursor(&pool, None, true);
+    let foreign = cursor(&other, None, true);
     let bytes = Bytes::copy_from_slice(&pool, b"abc").unwrap();
-    let bad = InputWindow::new(SourceId(1), foreign.token(), 0, bytes.clone()).unwrap();
+    let bad = InputWindow::new(SOURCE, foreign.token(), 0, bytes.clone()).unwrap();
     assert_eq!(input.provide_owned(bad), Err(Error::ForeignPool));
     let stale = response(&input, bytes.clone());
     input.reset(0).unwrap();
@@ -102,7 +82,7 @@ fn owned_response_rejection_preserves_cursor_and_distinguishes_stale_and_foreign
 #[test]
 fn owned_empty_response_is_starvation_and_cancellation_and_transport_stay_sticky() {
     let pool = Budget::new(4096).unwrap();
-    let mut input = cursor(&pool, None);
+    let mut input = cursor(&pool, None, true);
     let cancel = AtomicBool::new(false);
     input
         .provide_owned(response(
@@ -137,7 +117,7 @@ fn owned_empty_response_is_starvation_and_cancellation_and_transport_stay_sticky
     );
     input.reset(0).unwrap();
     input
-        .fail(SourceId(1), input.token(), SourceFailure::Transport)
+        .fail(SOURCE, input.token(), SourceFailure::Transport)
         .unwrap();
     assert!(matches!(
         input.read_span(1, &mut WorkBudget::new(1), &cancel),
