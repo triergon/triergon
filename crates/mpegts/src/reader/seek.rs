@@ -313,12 +313,25 @@ fn packet_probe(packet: Packet) -> Result<Probing> {
         AccessUnit::Dts(frame) => {
             let header = probe_dts_core_header(frame.bytes().as_ref())?;
             if header.frame_bytes != frame.bytes().len() {
-                return Err(Error::Unsupported("MPEG-TS DTS-HD seek"));
+                let descriptor = packet.track_info().stream().dvb_dts_hd()?;
+                if !descriptor.is_some_and(|descriptor| {
+                    descriptor.extensions[0].is_some_and(|extension| {
+                        extension
+                            .assets()
+                            .next()
+                            .is_some_and(|asset| asset.construction == 14)
+                    })
+                }) {
+                    return Err(Error::Unsupported("MPEG-TS DTS-HD seek"));
+                }
+                xll_header = dts_hd::entry(&packet)?;
             }
             // DTS TS 102 114 §5.4.2, HFLAG signals prior predictor history.
             (
                 frame.elementary_range().start,
-                time.is_some() && header.history == 0,
+                time.is_some()
+                    && header.history == 0
+                    && (header.frame_bytes == frame.bytes().len() || xll_header.is_some()),
             )
         }
         AccessUnit::DtsExtension(frame) => {

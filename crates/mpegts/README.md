@@ -200,16 +200,33 @@ zero initial decoding delay and no smoothing buffer. The common-header checksum
 is checked cooperatively before the seek result is issued. Missing static setup
 or sync, nonzero delay and nonzero sync offset do not establish an entry. Other
 asset layouts, mixing, speaker remapping, secondary decoding and Rev2 DRC are
-unsupported for seeking. Core-bearing DTS-HD remains unsupported even when the
-core predictor-history flag is clear. The same scan bound, index, original packet
+unsupported for seeking. Construction 14 additionally supports a separate canonical
+core without internal extensions, with a clear predictor-history flag and DWORD-aligned
+extension start. The extension must satisfy the same XLL recovery checks and explicitly
+map its backward-compatible core to extension zero and asset zero. Core history alone
+does not establish recovery. The same scan bound, index, original packet
 suffix and preroll discard time apply.
 
 The recovery requirements follow [ETSI TS 102 114 V1.6.1](https://www.etsi.org/deliver/etsi_ts/102100_102199/102114/01.06.01_60/ts_102114v010601p.pdf),
 Tables 7-2 and 7-5–7-7 and §7.5.3.4. XLL predictor history is confined to a frame
 (§8.5.2.1 and §8.5.4); the common header and checksum are specified in §8.3.1 and
-Annex B. Annex G.3.1 and Table E-2 identify construction 17 as XLL without a core.
+Annex B. Annex G.3.1 and Table E-2 identify construction 17 as XLL without a core and
+construction 14 as a separate core plus XLL.
 Annex F.4.3 defines PES alignment and complete access-unit carriage;
 alignment alone does not establish decoder recovery.
+
+The next recovery proofs require all active assets of every selected presentation
+and extension substream to be independently available, with their navigation and
+core dependencies checked together. Inherited static metadata needs a verified
+setup origin included in preroll; PES alignment cannot supply it. Delays and
+smoothing need a bounded earlier decoding origin, while nonzero XLL sync offsets
+need a complete frame and checked alignment at the signalled offset. Speaker
+remapping and mixing need their full mapping and scaling dependencies checked.
+Legacy DRC and dialogue metadata are parsed within the asset descriptor; secondary
+decoding and Rev2 DRC remain unsupported. Authored construction-14 controls test
+packet suffixes and recovery metadata. The pinned transport reference has no DTS
+decoder, so these controls do not establish decoded-PCM parity. Native runtime,
+heap and kernel-bound RSS qualification for this seek profile is unmeasured.
 
 Use `Reader::request_seek_in_entities` for consecutive length-known, seekable
 parts of one logical transport stream. The ordered `SeekEntity` list supplies

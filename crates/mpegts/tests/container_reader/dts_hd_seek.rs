@@ -342,6 +342,22 @@ fn tracked_xll_inputs_preserve_both_landings_policies_and_indexed_suffixes() {
             PacketFormat::M2ts192,
             432,
         ),
+        (
+            include_bytes!(
+                "../../../../harness/features/mpegts-dts-seek/inputs/dts-core-xll-short.ts"
+            )
+            .as_slice(),
+            PacketFormat::Ts188,
+            940,
+        ),
+        (
+            include_bytes!(
+                "../../../../harness/features/mpegts-dts-seek/inputs/dts-core-xll-long.m2ts"
+            )
+            .as_slice(),
+            PacketFormat::M2ts192,
+            944,
+        ),
     ] {
         let pool = Budget::new(32 << 20).unwrap();
         let mut reader = new_reader(&pool, bytes, format, true);
@@ -352,7 +368,11 @@ fn tracked_xll_inputs_preserve_both_landings_policies_and_indexed_suffixes() {
             assert_eq!(packet.pts(), Some(pts));
             assert_eq!(packet.dts(), (index % 2 == 0).then_some(pts - 120));
             assert_eq!(packet.payload().len(), frame_bytes);
-            assert!(matches!(packet.access_unit(), AccessUnit::DtsExtension(_)));
+            if frame_bytes > 512 {
+                assert!(matches!(packet.access_unit(), AccessUnit::Dts(_)));
+            } else {
+                assert!(matches!(packet.access_unit(), AccessUnit::DtsExtension(_)));
+            }
             let TraceEvent::Pes(pes) = packet.sources()[0].pes.event() else {
                 panic!("expected source PES");
             };
@@ -584,6 +604,93 @@ fn xll_refuses_unsupported_asset_navigation_and_invalid_common_headers() {
 }
 
 #[test]
+fn core_and_xll_require_independent_history_and_navigation() {
+    let descriptor = &[
+        0x7f, 14, 0x0e, 0xc0, 5, 1, 0x60, 0x08, 0, 0, 5, 2, 0x64, 0x74, 0, 0,
+    ];
+    let frames: Vec<Vec<u8>> = (0..4)
+        .map(|index| {
+            let mut core = include_bytes!("../../../../harness/fixtures/mpegts/dts-core-mono.dts")
+                [..512]
+                .to_vec();
+            set(&mut core, 87, 1, u32::from(index == 1));
+            set(&mut core, 83, 1, 0); // No internal extension.
+            let mut extension = frame(index != 2, 0, 0, index);
+            set(&mut extension, 202, 1, 1); // External backward-compatible core.
+            set(&mut extension, 203, 5, 0); // Default core mapping.
+            crc(&mut extension, 5, 28);
+            [core, extension].concat()
+        })
+        .collect();
+    let inputs: Vec<_> = frames
+        .iter()
+        .enumerate()
+        .map(|(i, bytes)| (bytes.as_slice(), Some(90_000 + i as u64 * 960), None))
+        .collect();
+    let ts = transport_with_descriptor(&inputs, descriptor);
+    let pool = Budget::new(32 << 20).unwrap();
+    let mut reader = new_reader(&pool, &ts.bytes, PacketFormat::Ts188, true);
+    let (_, sequential) = drain(&mut reader, &pool, &ts.bytes, 7, 1).unwrap();
+    reader.close();
+    drop(reader);
+    let mut reader = new_reader(&pool, &ts.bytes, PacketFormat::Ts188, true);
+    for (target, start) in [(92_000, 0), (94_000, 3)] {
+        reader
+            .request_seek(SeekRequest {
+                track: TrackId(PID.into()),
+                target: clock(target),
+                policy: SeekPolicy::PreviousRandomAccess,
+            })
+            .unwrap();
+        let (result, packets) = drain(&mut reader, &pool, &ts.bytes, 7, 1).unwrap();
+        assert_eq!(result.unwrap().landing, clock(90_000 + start as u64 * 960));
+        same_packets(&packets, &sequential[start..]);
+    }
+}
+
+#[test]
+fn core_xll_checks_mapping_and_crc_at_the_original_packet_offset() {
+    let descriptor = &[
+        0x7f, 14, 0x0e, 0xc0, 5, 1, 0x60, 0x08, 0, 0, 5, 2, 0x64, 0x74, 0, 0,
+    ];
+    for mapping in [0, 1, 8] {
+        let mut core =
+            include_bytes!("../../../../harness/fixtures/mpegts/dts-core-mono.dts")[..512].to_vec();
+        set(&mut core, 87, 1, 0);
+        let mut extension = frame(true, 0, 0, 0);
+        set(&mut extension, 202, 1, 1);
+        set(&mut extension, 203, 5, mapping);
+        crc(&mut extension, 5, 28);
+        if mapping == 0 {
+            extension[38] ^= 1; // XLL CRC, not extension-header CRC.
+        }
+        core.extend(extension);
+        let ts = transport_with_descriptor(&[(&core, Some(90_000), None)], descriptor);
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut reader = new_reader(&pool, &ts.bytes, PacketFormat::Ts188, true);
+        reader
+            .request_seek(SeekRequest {
+                track: TrackId(PID.into()),
+                target: clock(90_000),
+                policy: SeekPolicy::PreviousRandomAccess,
+            })
+            .unwrap();
+        let error = drain(&mut reader, &pool, &ts.bytes, 7, 1).unwrap_err();
+        assert_eq!(
+            error,
+            if mapping == 0 {
+                Error::Invalid("DTS-HD seek XLL header CRC")
+            } else {
+                Error::Unsupported("MPEG-TS DTS-HD seek recovery layout")
+            }
+        );
+        reader.close();
+        drop(reader);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
+}
+
+#[test]
 fn core_history_alone_cannot_establish_dts_hd_recovery() {
     let mut core =
         include_bytes!("../../../../harness/fixtures/mpegts/dts-core-mono.dts")[..512].to_vec();
@@ -615,7 +722,7 @@ fn core_history_alone_cannot_establish_dts_hd_recovery() {
         .unwrap();
     assert!(matches!(
         drain(&mut reader, &pool, &ts.bytes, 7, 1),
-        Err(Error::Unsupported("MPEG-TS DTS-HD seek"))
+        Err(Error::Unsupported("MPEG-TS DTS-HD seek recovery layout"))
     ));
 }
 
