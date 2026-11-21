@@ -761,99 +761,102 @@ impl<'a> EncodedStreamJob<'a> {
             if !work.try_charge(1) {
                 return Ok(CursorStatus::Yield);
             }
-            let cfg = match self.configuration.as_ref() {
-                Some(cfg) => cfg,
-                None if self.kind == EncodedEntryKind::Dts => self.entry.raw(),
-                None => return Err(Error::Invalid("encoded config missing at publication")),
-            };
-            let dts = match self.kind {
-                EncodedEntryKind::Dts => Some(check_dts_sample_entry(
-                    &self.entry,
-                    self.configuration.as_ref(),
-                )?),
-                EncodedEntryKind::Aac if self.view == DescriptionView::RangePlayback => {
-                    match self.esds.as_ref().and_then(|esds| esds.object_type) {
-                        Some(oti) if dts_object_type(oti)? => {
-                            self.kind = EncodedEntryKind::Dts;
-                            Some(check_mp4a_dts(&self.entry)?)
-                        }
-                        _ => None,
-                    }
-                }
-                _ => None,
-            };
-            if let Some(dts) = dts {
-                dts.media_clock(self.header.time_base()?)?;
-            }
-            let extradata = match self.kind {
-                EncodedEntryKind::Aac => self
-                    .esds
-                    .as_ref()
-                    .and_then(|x| x.dsi.as_ref().map(|(_, bytes)| bytes.clone()))
-                    .ok_or(Error::Unsupported(
-                        "encoded AAC decoder-specific config absent",
-                    ))?,
-                EncodedEntryKind::Avc | EncodedEntryKind::Hevc | EncodedEntryKind::Av1 => cfg
-                    .bytes()
-                    .slice(usize::from(cfg.header().header_size)..cfg.bytes().len())?,
-                EncodedEntryKind::Opus => opus_configuration(&self.pool, &self.entry, cfg)?,
-                EncodedEntryKind::Ac3
-                | EncodedEntryKind::Eac3
-                | EncodedEntryKind::Vp9
-                | EncodedEntryKind::Dts => {
-                    cfg.bytes().slice(cfg.bytes().len()..cfg.bytes().len())?
-                }
-            };
-            if self.kind == EncodedEntryKind::Aac {
-                let first = *extradata
-                    .as_ref()
-                    .first()
-                    .ok_or(Error::Unsupported("encoded empty AAC configuration"))?;
-                if !matches!(first >> 3, 2 | 5 | 29) {
-                    return Err(Error::Unsupported(
-                        "encoded unselected MPEG-4 Audio object type",
-                    ));
-                }
-            }
-            let (mut demux, encoder, receiver_source) = metadata(
-                self.header,
-                &self.entry,
-                self.kind,
-                extradata,
-                self.view,
-                self.major,
-            )?;
-            let receiver_source = receiver_source.map(|mut source| {
-                source.sound.clone_from(&self.sound_source);
-                source.wave = self.wave_fields.as_ref().map(|w| w.raw.clone());
-                source
-            });
-            if self.view != DescriptionView::Regular && self.major == Some(*b"qt  ") {
-                let vendor = fields::fourcc(self.entry.raw().payload(), 12)?;
-                if self.requires_wave && vendor != [0; 4] {
-                    return Err(Error::Unsupported(
-                        "encoded QuickTime nonzero vendor profile",
-                    ));
-                }
-                demux.vendor_id = Some(vendor);
-            }
-            self.result = Some(EncodedStream {
-                demux,
-                entry: self.entry.clone(),
-                configuration: cfg.clone(),
-                dts,
-                encoder,
-                kind: self.kind,
-                receiver_source,
-                wave_source: self.wave_source.take(),
-                raw_headers: [
-                    self.header.raw_tkhd.clone(),
-                    self.header.raw_mdhd.clone(),
-                    self.header.raw_hdlr.clone(),
-                ],
-            });
+            self.result = Some(self.build_stream()?);
             return Ok(CursorStatus::Ready);
         }
+    }
+    /// The stream of a completed walk.
+    fn build_stream(&mut self) -> Result<EncodedStream> {
+        let cfg = match self.configuration.as_ref() {
+            Some(cfg) => cfg,
+            None if self.kind == EncodedEntryKind::Dts => self.entry.raw(),
+            None => return Err(Error::Invalid("encoded config missing at publication")),
+        };
+        let dts = match self.kind {
+            EncodedEntryKind::Dts => Some(check_dts_sample_entry(
+                &self.entry,
+                self.configuration.as_ref(),
+            )?),
+            EncodedEntryKind::Aac if self.view == DescriptionView::RangePlayback => {
+                match self.esds.as_ref().and_then(|esds| esds.object_type) {
+                    Some(oti) if dts_object_type(oti)? => {
+                        self.kind = EncodedEntryKind::Dts;
+                        Some(check_mp4a_dts(&self.entry)?)
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        };
+        if let Some(dts) = dts {
+            dts.media_clock(self.header.time_base()?)?;
+        }
+        let extradata = match self.kind {
+            EncodedEntryKind::Aac => self
+                .esds
+                .as_ref()
+                .and_then(|x| x.dsi.as_ref().map(|(_, bytes)| bytes.clone()))
+                .ok_or(Error::Unsupported(
+                    "encoded AAC decoder-specific config absent",
+                ))?,
+            EncodedEntryKind::Avc | EncodedEntryKind::Hevc | EncodedEntryKind::Av1 => {
+                cfg.bytes()
+                    .slice(usize::from(cfg.header().header_size)..cfg.bytes().len())?
+            }
+            EncodedEntryKind::Opus => opus_configuration(&self.pool, &self.entry, cfg)?,
+            EncodedEntryKind::Ac3
+            | EncodedEntryKind::Eac3
+            | EncodedEntryKind::Vp9
+            | EncodedEntryKind::Dts => cfg.bytes().slice(cfg.bytes().len()..cfg.bytes().len())?,
+        };
+        if self.kind == EncodedEntryKind::Aac {
+            let first = *extradata
+                .as_ref()
+                .first()
+                .ok_or(Error::Unsupported("encoded empty AAC configuration"))?;
+            if !matches!(first >> 3, 2 | 5 | 29) {
+                return Err(Error::Unsupported(
+                    "encoded unselected MPEG-4 Audio object type",
+                ));
+            }
+        }
+        let (mut demux, encoder, receiver_source) = metadata(
+            self.header,
+            &self.entry,
+            self.kind,
+            extradata,
+            self.view,
+            self.major,
+        )?;
+        let receiver_source = receiver_source.map(|mut source| {
+            source.sound.clone_from(&self.sound_source);
+            source.wave = self.wave_fields.as_ref().map(|w| w.raw.clone());
+            source
+        });
+        if self.view != DescriptionView::Regular && self.major == Some(*b"qt  ") {
+            let vendor = fields::fourcc(self.entry.raw().payload(), 12)?;
+            if self.requires_wave && vendor != [0; 4] {
+                return Err(Error::Unsupported(
+                    "encoded QuickTime nonzero vendor profile",
+                ));
+            }
+            demux.vendor_id = Some(vendor);
+        }
+        Ok(EncodedStream {
+            demux,
+            entry: self.entry.clone(),
+            configuration: cfg.clone(),
+            dts,
+            encoder,
+            kind: self.kind,
+            receiver_source,
+            wave_source: self.wave_source.take(),
+            raw_headers: [
+                self.header.raw_tkhd.clone(),
+                self.header.raw_mdhd.clone(),
+                self.header.raw_hdlr.clone(),
+            ],
+        })
     }
     /// Takes the stream once [`poll`](Self::poll) returned `Ready`; `Error::Invalid`
     /// before that. Later polls return `End`.
