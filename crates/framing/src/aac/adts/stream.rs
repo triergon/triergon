@@ -51,29 +51,31 @@ enum Phase {
 /// CRC and payload whole, in an immutable pool allocation of its own.
 ///
 /// Input is requested and answered as for an [`InputCursor`].
+// Fields in the order the compiler chose for them, held by `repr(C)`.
+#[repr(C)]
 pub struct AacAdtsStreamReader {
-    pool: Budget,
-    input: ReaderInput,
     capabilities: SourceCapabilities,
+    input: ReaderInput,
+    /// The frame being built, taken at each freeze: replacing a vector there instead
+    /// costs more instructions per frame.
+    buffer: Option<BudgetVec<u8>>,
+    header: Option<AacAdtsHeader>,
+    selected_error: Option<Error>,
+    pool: Budget,
     limits: AacAdtsStreamLimits,
-    phase: Phase,
-    prefix: [u8; 7],
     used: usize,
     copied: usize,
     frame_start: u64,
     frame_bytes: usize,
-    header: Option<AacAdtsHeader>,
-    /// The frame being built, taken at each freeze: replacing a vector there instead
-    /// costs more instructions per frame.
-    buffer: Option<BudgetVec<u8>>,
     growth_target: usize,
     growth_copy_credit: usize,
     completed: usize,
-    carrier: bool,
     header_offset: usize,
+    carrier: bool,
     eof_fragment: bool,
-    selected_error: Option<Error>,
     split_prefix: bool,
+    phase: Phase,
+    prefix: [u8; 7],
 }
 impl std::fmt::Debug for AacAdtsStreamReader {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
