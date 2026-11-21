@@ -5,7 +5,8 @@
 
 use std::collections::BTreeSet;
 use triergon_core::{Budget, Bytes};
-use triergon_font::{CharstringOperator, Font, Limits, OperatorSet, Outline};
+use triergon_font::reference_trace::OperatorSet;
+use triergon_font::{Font, Limits, Outline};
 
 fn main() {
     let budget = Budget::new(1 << 31).expect("budget");
@@ -26,14 +27,8 @@ fn main() {
             }
         }
     }
-    let names = |covered: bool| -> Vec<&str> {
-        CharstringOperator::ALL
-            .into_iter()
-            .filter(|&op| operators.contains(op) == covered)
-            .map(CharstringOperator::name)
-            .collect()
-    };
-    println!("operators exercised: {}", names(true).join(" "));
-    println!("operators not exercised: {}", names(false).join(" "));
+    let names = |set: OperatorSet| set.names().collect::<Vec<_>>().join(" ");
+    println!("operators exercised: {}", names(operators));
+    println!("operators not exercised: {}", names(operators.complement()));
     println!("cmap formats: {formats:?}");
 }

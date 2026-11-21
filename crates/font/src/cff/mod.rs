@@ -3,7 +3,9 @@
 
 mod charstring;
 
-pub use charstring::{CharstringBounds, CharstringOperator, OperatorSet};
+pub use charstring::CharstringBounds;
+#[cfg(feature = "reference-trace")]
+pub use charstring::OperatorSet;
 mod dict;
 mod hint;
 mod index;
@@ -703,6 +705,7 @@ impl Cff {
     }
 
     /// The operators `glyph`'s program executes; `outline` is scratch storage.
+    #[cfg(feature = "reference-trace")]
     pub(crate) fn operators(
         &self,
         data: &[u8],

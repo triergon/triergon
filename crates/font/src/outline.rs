@@ -7,11 +7,14 @@ use triergon_core::{Budget, BudgetVec, Error, Result};
 /// pixels (1/64 pixel) from [`SizedFont`](crate::SizedFont).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Point {
+    /// Rightwards.
     pub x: i32,
+    /// Upwards.
     pub y: i32,
 }
 
 impl Point {
+    /// The point at `(x, y)`.
     pub const fn new(x: i32, y: i32) -> Self {
         Self { x, y }
     }
@@ -39,7 +42,9 @@ pub enum PointKind {
 /// One point of an outline.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OutlinePoint {
+    /// Where it is.
     pub point: Point,
+    /// Whether it is on the curve or controls it.
     pub kind: PointKind,
 }
 
@@ -48,8 +53,11 @@ pub struct OutlinePoint {
 pub enum Segment {
     /// Starts a contour.
     MoveTo(Point),
+    /// A line to the point.
     LineTo(Point),
+    /// A quadratic curve by a control point to an end point.
     QuadTo(Point, Point),
+    /// A cubic curve by two control points to an end point.
     CubicTo(Point, Point, Point),
     /// Ends the contour with a line back to its start, if it is not there already.
     Close,
@@ -74,6 +82,7 @@ pub struct Outline {
 }
 
 impl Outline {
+    /// An empty outline whose storage is charged to `budget`.
     pub fn new(budget: &Budget) -> Self {
         Self {
             points: BudgetVec::new(budget),
@@ -83,6 +92,7 @@ impl Outline {
         }
     }
 
+    /// Every point, contour after contour.
     pub fn points(&self) -> &[OutlinePoint] {
         self.points.as_slice()
     }
@@ -112,10 +122,12 @@ impl Outline {
         self.contours().flat_map(contour_segments)
     }
 
+    /// Whether the outline has no points.
     pub fn is_empty(&self) -> bool {
         self.points.is_empty()
     }
 
+    /// Removes every point and contour, keeping the storage.
     pub fn clear(&mut self) {
         self.points.clear();
         self.ends.clear();

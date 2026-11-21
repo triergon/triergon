@@ -1,17 +1,25 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr,
-    clippy::unwrap_used
+    clippy::unwrap_used,
+    clippy::expect_used
 )]
-// Pending: `missing_docs`, `clippy::expect_used`.
 
 pub mod compat;
 pub mod fixed;
 pub mod read;
+
+/// What only a comparison of this crate with a reference build needs: which
+/// charstring operators the glyphs of a corpus execute.
+#[cfg(feature = "reference-trace")]
+pub mod reference_trace {
+    pub use crate::cff::OperatorSet;
+}
 
 mod autofit;
 mod bytecode;
@@ -29,7 +37,7 @@ mod store;
 mod synthesis;
 mod work;
 
-pub use cff::{CharstringBounds, CharstringOperator, OperatorSet};
+pub use cff::CharstringBounds;
 pub use cmap::{
     CharEncoding, Charmap, CharmapKind, CmapFormat, Mappings, Variant, VariationSequences,
 };
@@ -553,9 +561,11 @@ impl Font {
         self.names.records(self.data.as_ref())
     }
 
-    /// The preferred record for `name_id`, as [`Self::family_name`] reports
-    /// one: a Windows Unicode or Symbol record, US English before others,
-    /// else a Macintosh Roman English one, else a Unicode-platform one.
+    /// The preferred record for `name_id`: the last English Windows record
+    /// (Unicode or Symbol encoding), else the first Windows one, unless a
+    /// Macintosh record exists and the Windows one is not English; then the
+    /// last English (or Roman) Macintosh record; then the last
+    /// Unicode-platform record.
     pub fn preferred_name(&self, name_id: NameId) -> Option<NameRecord<'_>> {
         self.names.preferred(self.data.as_ref(), name_id)
     }
@@ -865,16 +875,21 @@ impl Font {
     }
 
     /// The charstring operators `glyph`'s program executes, with its subroutines
-    /// and `seac` components; empty for TrueType outlines. Corpus tools use it to
-    /// show which operators a comparison exercises.
+    /// and `seac` components; empty for TrueType outlines. It shows which
+    /// operators the glyphs of a corpus exercise.
+    ///
+    /// # Errors
+    ///
+    /// Those of [`Self::outline_into`], which it runs into `scratch`.
+    #[cfg(feature = "reference-trace")]
     pub fn charstring_operators(
         &self,
         glyph: GlyphId,
         scratch: &mut Outline,
-    ) -> Result<OperatorSet> {
+    ) -> Result<reference_trace::OperatorSet> {
         self.check(glyph)?;
         match &self.outlines {
-            Outlines::Glyf(_) => Ok(OperatorSet::default()),
+            Outlines::Glyf(_) => Ok(reference_trace::OperatorSet::default()),
             Outlines::Cff(cff) => {
                 let mut work = WorkBudget::new(self.limits.work);
                 cff.operators(self.data.as_ref(), glyph, scratch, &self.limits, &mut work)
@@ -903,13 +918,6 @@ impl Font {
                 Ok(bounds.map_or(ControlBox::Empty, ControlBox::Charstring))
             }
         }
-    }
-
-    /// Loads `glyph` into a new outline charged to `budget`.
-    pub fn outline(&self, glyph: GlyphId, budget: &Budget) -> Result<(Outline, GlyphMetrics)> {
-        let mut outline = Outline::new(budget);
-        let metrics = self.outline_into(glyph, &mut outline)?;
-        Ok((outline, metrics))
     }
 
     fn glyf_context(&self) -> glyf::Context<'_> {

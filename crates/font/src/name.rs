@@ -7,33 +7,56 @@ use triergon_core::Result;
 /// A naming-table record's name identifier (OpenType `name`, "Name IDs").
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NameId {
+    /// 0: the copyright notice.
     Copyright,
+    /// 1: the family name.
     Family,
+    /// 2: the subfamily (style) name.
     Subfamily,
+    /// 3: the unique font identifier.
     UniqueId,
+    /// 4: the full name.
     FullName,
+    /// 5: the version string.
     Version,
+    /// 6: the PostScript name.
     PostScript,
+    /// 7: the trademark.
     Trademark,
+    /// 8: the manufacturer.
     Manufacturer,
+    /// 9: the designer.
     Designer,
+    /// 10: the description.
     Description,
+    /// 11: the vendor's URL.
     VendorUrl,
+    /// 12: the designer's URL.
     DesignerUrl,
+    /// 13: the licence description.
     License,
+    /// 14: the licence URL.
     LicenseUrl,
+    /// 16: the typographic family name.
     TypographicFamily,
+    /// 17: the typographic subfamily name.
     TypographicSubfamily,
+    /// 18: the compatible full name (Macintosh).
     CompatibleFull,
+    /// 19: the sample text.
     SampleText,
+    /// 20: the PostScript CID findfont name.
     PostScriptCid,
+    /// 21: the WWS family name.
     WwsFamily,
+    /// 22: the WWS subfamily name.
     WwsSubfamily,
     /// Any other identifier, including font-specific ones from 256.
     Other(u16),
 }
 
 impl NameId {
+    /// The identifier a record stores as `id`.
     pub const fn from_id(id: u16) -> Self {
         match id {
             0 => Self::Copyright,
@@ -95,16 +118,22 @@ impl NameId {
 /// The platform of a naming-table or `cmap` encoding record.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Platform {
+    /// 0: Unicode.
     Unicode,
+    /// 1: Macintosh.
     Macintosh,
-    /// ISO (deprecated); its records are UTF-16BE like Unicode-platform ones.
+    /// 2: ISO (deprecated); its records are UTF-16BE like Unicode-platform ones.
     Iso,
+    /// 3: Windows.
     Windows,
+    /// 4: custom.
     Custom,
+    /// Any other platform number.
     Other(u16),
 }
 
 impl Platform {
+    /// The platform a record stores as `id`.
     pub const fn from_id(id: u16) -> Self {
         match id {
             0 => Self::Unicode,
@@ -116,6 +145,7 @@ impl Platform {
         }
     }
 
+    /// The platform number a record stores.
     pub const fn id(self) -> u16 {
         match self {
             Self::Unicode => 0,
@@ -144,7 +174,7 @@ impl Names {
     pub(crate) fn new(data: &[u8], offset: usize, len: usize) -> Result<Self> {
         let table = slice(data, offset, len)?;
         let mut r = Reader::new(table);
-        // FreeType reads any version as format 0, records first.
+        // Any version reads as format 0, records first.
         r.u16()?;
         let count = r.u16()?;
         let storage = usize::from(r.u16()?);
@@ -163,8 +193,8 @@ impl Names {
     }
 
     /// Record `index`, or `None` past the end or when its string is empty or lies
-    /// outside the string storage: FreeType skips such records, and so do
-    /// [`crate::Font::names`] and the face's name selection.
+    /// outside the string storage: [`crate::Font::names`] and the face's name
+    /// selection skip such records.
     pub(crate) fn record(self, data: &[u8], index: u16) -> Option<NameRecord<'_>> {
         if index >= self.count {
             return None;
@@ -191,7 +221,7 @@ impl Names {
         (0..self.count).filter_map(move |i| self.record(data, i))
     }
 
-    /// The record FreeType reports for `name_id`: the last English Windows record,
+    /// The preferred record for `name_id`: the last English Windows record,
     /// else the first Windows one, unless a Macintosh record exists and the Windows
     /// one is not English; then the last English (or Roman) Macintosh record; then
     /// the last Unicode-platform record.
@@ -233,10 +263,13 @@ impl Names {
 /// One naming-table record.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NameRecord<'a> {
+    /// The platform the encoding and language numbers belong to.
     pub platform: Platform,
     /// The platform-specific encoding number; [`NameRecord::encoding`] reads it.
     pub encoding_id: u16,
+    /// The platform-specific language number.
     pub language: Language,
+    /// What the string names.
     pub name_id: NameId,
     /// The encoded string.
     pub bytes: &'a [u8],
@@ -288,8 +321,8 @@ impl<'a> NameRecord<'a> {
         }
     }
 
-    /// The raw code units: 16-bit units for UTF-16BE platforms, bytes otherwise, as
-    /// FreeType reads them when it forms ASCII names.
+    /// The raw code units: 16-bit units for UTF-16BE platforms, bytes
+    /// otherwise.
     pub fn code_units(&self) -> impl Iterator<Item = u16> + 'a {
         let width = if self.is_utf16() { 2 } else { 1 };
         self.bytes.chunks_exact(width).map(move |unit| match unit {

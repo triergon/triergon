@@ -5,8 +5,8 @@ use triergon_core::{Budget, Bytes, Error, WorkBudget};
 use triergon_font::compat::libass::{self, FaceInfo, Request, select};
 use triergon_font::{
     Bounds, Built, CharEncoding, CharmapKind, CharstringBounds, CmapFormat, ControlBox, Font,
-    GlyphId, Limits, Load, Orientation, Outline, OutlineFormat, Platform, Point, PointKind,
-    Segment, SizedFont, Store, StoreKey, Style,
+    GlyphId, GlyphMetrics, Limits, Load, Orientation, Outline, OutlineFormat, Platform, Point,
+    PointKind, Segment, SizedFont, Store, StoreKey, Style,
 };
 
 fn parse(data: &[u8]) -> Font {
@@ -14,9 +14,16 @@ fn parse(data: &[u8]) -> Font {
     Font::new(bytes, 0, &budget, Limits::default()).unwrap()
 }
 
+/// `glyph` loaded into a new outline charged to `budget`.
+fn load(font: &Font, glyph: u16, budget: &Budget) -> Result<(Outline, GlyphMetrics), Error> {
+    let mut outline = Outline::new(budget);
+    let metrics = font.outline_into(GlyphId(glyph), &mut outline)?;
+    Ok((outline, metrics))
+}
+
 fn points(font: &Font, glyph: u16) -> (Vec<(i32, i32, PointKind)>, Vec<u32>, i32) {
     let budget = Budget::new(1 << 20).unwrap();
-    let (outline, metrics) = font.outline(GlyphId(glyph), &budget).unwrap();
+    let (outline, metrics) = load(font, glyph, &budget).unwrap();
     let points = outline
         .points()
         .iter()
@@ -92,7 +99,7 @@ fn truetype_outlines_shift_to_the_side_bearing_and_compose() {
     assert_eq!(composite[5], (50, 100, PointKind::Quadratic));
     assert_eq!((ends, advance), (vec![4, 7], 300));
     let budget = Budget::new(1 << 20).unwrap();
-    let (outline, _) = font.outline(GlyphId(2), &budget).unwrap();
+    let (outline, _) = load(&font, 2, &budget).unwrap();
     let segments: Vec<_> = outline.segments().collect();
     let p = Point::new;
     assert_eq!(
@@ -103,7 +110,7 @@ fn truetype_outlines_shift_to_the_side_bearing_and_compose() {
             Segment::Close
         ]
     );
-    assert!(font.outline(GlyphId(0), &budget).unwrap().0.is_empty());
+    assert!(load(&font, 0, &budget).unwrap().0.is_empty());
 }
 
 #[test]
@@ -346,10 +353,7 @@ fn control_boxes_come_from_glyf_headers_and_unrounded_charstrings() {
         ..Limits::default()
     };
     let cff = Font::new(data, 0, &budget, few).unwrap();
-    assert!(matches!(
-        cff.outline(GlyphId(2), &budget),
-        Err(Error::Policy(_))
-    ));
+    assert!(matches!(load(&cff, 2, &budget), Err(Error::Policy(_))));
     assert_eq!(
         cff.control_box(GlyphId(2), &mut work()),
         Ok(ControlBox::Charstring(curve))
@@ -452,7 +456,7 @@ fn limits_and_budgets_bound_outlines() {
     };
     let font = Font::new(bytes.clone(), 0, &budget, tight).unwrap();
     assert_eq!(
-        font.outline(GlyphId(3), &budget).unwrap_err(),
+        load(&font, 3, &budget).unwrap_err(),
         Error::Policy("outline points")
     );
     let shallow = Limits {
@@ -461,7 +465,7 @@ fn limits_and_budgets_bound_outlines() {
     };
     let font = Font::new(bytes.clone(), 0, &budget, shallow).unwrap();
     assert_eq!(
-        font.outline(GlyphId(3), &budget).unwrap_err(),
+        load(&font, 3, &budget).unwrap_err(),
         Error::Policy("glyph nesting depth")
     );
     let idle = Limits {
@@ -472,7 +476,7 @@ fn limits_and_budgets_bound_outlines() {
     assert!(Font::new(bytes, 0, &budget, idle).is_err());
     let small = Budget::new(Budget::control_storage_bytes() + 16).unwrap();
     assert!(matches!(
-        font.outline(GlyphId(1), &small).unwrap_err(),
+        load(&font, 1, &small).unwrap_err(),
         Error::Limit { .. }
     ));
 }

@@ -84,112 +84,63 @@ const fn truth(b: bool) -> Fixed {
 /// A charstring operator (TN 5177 Appendix A; CFF2 adds `vsindex` and `blend`
 /// and drops `return` and `endchar`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum CharstringOperator {
-    /// `hstem`: declares horizontal stem hints.
+pub(crate) enum CharstringOperator {
     HStem,
-    /// `vstem`: declares vertical stem hints.
     VStem,
-    /// `hstemhm`: declares horizontal stem hints in a charstring with hint masks.
     HStemHm,
-    /// `vstemhm`: declares vertical stem hints in a charstring with hint masks.
     VStemHm,
-    /// `hintmask`: selects the stem hints in force by the mask after it.
     HintMask,
-    /// `cntrmask`: names the stems whose counters to control by the mask after it.
     CntrMask,
-    /// `rmoveto`: starts a subpath at a relative point.
     RMoveTo,
-    /// `hmoveto`: starts a subpath after a horizontal move.
     HMoveTo,
-    /// `vmoveto`: starts a subpath after a vertical move.
     VMoveTo,
-    /// `rlineto`: lines to each relative point.
     RLineTo,
-    /// `hlineto`: alternating horizontal and vertical lines, horizontal first.
     HLineTo,
-    /// `vlineto`: alternating vertical and horizontal lines, vertical first.
     VLineTo,
-    /// `rrcurveto`: Bézier curves, each given by three relative points.
     RRCurveTo,
-    /// `rcurveline`: curves as `rrcurveto` draws them, then a line.
     RCurveLine,
-    /// `rlinecurve`: lines as `rlineto` draws them, then a curve.
     RLineCurve,
-    /// `vvcurveto`: curves that start and end vertical.
     VVCurveTo,
-    /// `hhcurveto`: curves that start and end horizontal.
     HHCurveTo,
-    /// `vhcurveto`: curves that start vertical and end horizontal, then alternate.
     VHCurveTo,
-    /// `hvcurveto`: curves that start horizontal and end vertical, then alternate.
     HVCurveTo,
-    /// `callsubr`: calls a local subroutine.
     CallSubr,
-    /// `callgsubr`: calls a global subroutine.
     CallGSubr,
-    /// `return`: returns from a subroutine.
     Return,
-    /// `endchar`: ends the charstring.
     EndChar,
-    /// `vsindex`: selects the variation data a CFF2 `blend` uses.
     VsIndex,
-    /// `blend`: replaces CFF2 default values and their deltas with blended values.
     Blend,
-    /// `flex`: two curves that render as a line when shallower than the flex depth.
     Flex,
-    /// `hflex`: a flex that starts, joins and ends with horizontal tangents.
     HFlex,
-    /// `flex1`: a flex that ends at its starting x or y coordinate.
     Flex1,
-    /// `hflex1`: a flex that joins horizontal and ends at its starting height.
     HFlex1,
-    /// `dotsection`: deprecated, does nothing.
     DotSection,
-    /// `and`: one if both of two numbers are nonzero, else zero.
     And,
-    /// `or`: one if either of two numbers is nonzero, else zero.
     Or,
-    /// `not`: one for zero, zero for any other number.
     Not,
-    /// `abs`: the absolute value of a number.
     Abs,
-    /// `add`: the sum of two numbers.
     Add,
-    /// `sub`: the difference of two numbers.
     Sub,
-    /// `div`: the quotient of two numbers.
     Div,
-    /// `neg`: the negative of a number.
     Neg,
-    /// `eq`: one if two numbers are equal, else zero.
     Eq,
-    /// `drop`: removes the top number.
     Drop,
-    /// `put`: stores a number in the transient array.
     Put,
-    /// `get`: fetches a number from the transient array.
     Get,
-    /// `ifelse`: chooses between two numbers by comparing two others.
     IfElse,
-    /// `random`: a pseudo-random number above zero and at most one.
     Random,
-    /// `mul`: the product of two numbers.
     Mul,
-    /// `sqrt`: the square root of a number.
     Sqrt,
-    /// `dup`: duplicates the top number.
     Dup,
-    /// `exch`: exchanges the top two numbers.
     Exch,
-    /// `index`: copies a number from further down the stack to the top.
     Index,
-    /// `roll`: rotates the top numbers of the stack.
     Roll,
 }
 
+#[cfg(feature = "reference-trace")]
 impl CharstringOperator {
-    /// Every operator, in [`Self::name`] order of the specification's tables.
-    pub const ALL: [Self; 50] = [
+    /// Every operator, in the order of the specification's tables.
+    const ALL: [Self; 50] = [
         Self::HStem,
         Self::VStem,
         Self::HStemHm,
@@ -243,7 +194,7 @@ impl CharstringOperator {
     ];
 
     /// The operator's name in TN 5177.
-    pub const fn name(self) -> &'static str {
+    const fn name(self) -> &'static str {
         match self {
             Self::HStem => "hstem",
             Self::VStem => "vstem",
@@ -301,7 +252,9 @@ impl CharstringOperator {
     const fn bit(self) -> u64 {
         1 << self as u8
     }
+}
 
+impl CharstringOperator {
     /// The one-byte operator `byte`, or `None` for numbers, the escape byte and
     /// reserved values.
     const fn one_byte(byte: u8, version: Version) -> Option<Self> {
@@ -369,27 +322,33 @@ impl CharstringOperator {
     }
 }
 
-/// A set of charstring operators, such as those one glyph's program uses.
+/// A set of charstring operators, such as those one glyph's program executes
+/// ([`Font::charstring_operators`](crate::Font::charstring_operators)).
+#[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct OperatorSet(u64);
 
+#[cfg(feature = "reference-trace")]
 impl OperatorSet {
-    /// Whether `op` is in the set.
-    pub const fn contains(self, op: CharstringOperator) -> bool {
-        self.0 & op.bit() != 0
-    }
-
     /// The operators of either set.
     #[must_use]
     pub const fn union(self, other: Self) -> Self {
         Self(self.0 | other.0)
     }
 
-    /// The set's operators, in the order of [`CharstringOperator::ALL`].
-    pub fn iter(self) -> impl Iterator<Item = CharstringOperator> {
+    /// The Type 2 and CFF2 operators outside the set.
+    #[must_use]
+    pub const fn complement(self) -> Self {
+        Self(!self.0 & ((1 << CharstringOperator::ALL.len()) - 1))
+    }
+
+    /// The names of the set's operators as TN 5177 and the CFF2 chapter spell
+    /// them, in the order of their tables.
+    pub fn names(self) -> impl Iterator<Item = &'static str> {
         CharstringOperator::ALL
             .into_iter()
-            .filter(move |&op| self.contains(op))
+            .filter(move |op| self.0 & op.bit() != 0)
+            .map(CharstringOperator::name)
     }
 }
 
@@ -412,6 +371,7 @@ pub(super) trait Observe {
 
 impl Observe for () {}
 
+#[cfg(feature = "reference-trace")]
 impl Observe for OperatorSet {
     fn operator(&mut self, op: CharstringOperator) {
         self.0 |= op.bit();
@@ -419,8 +379,8 @@ impl Observe for OperatorSet {
 }
 
 /// The box of every point a glyph's program draws, control points included, in
-/// 16.16 charstring coordinates before any FontMatrix: the bounds HarfBuzz
-/// takes CFF glyph extents from. A subpath's start counts once it draws.
+/// 16.16 charstring coordinates before any FontMatrix. A subpath's start
+/// counts once it draws.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CharstringBounds {
     /// The least x coordinate of any point.
@@ -518,6 +478,7 @@ pub(super) fn outline(
 
 /// The operators `glyph`'s program executes, including subroutines and `seac`
 /// components, into an outline that is then discarded.
+#[cfg(feature = "reference-trace")]
 pub(super) fn operators(
     cff: &Cff,
     table: &[u8],

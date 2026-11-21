@@ -114,17 +114,29 @@ pub(crate) fn glyph_count(data: &[u8]) -> Result<u16> {
 /// The `OS/2` fields a face exposes. Fields a table version lacks are zero.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Os2 {
+    /// The table version.
     pub version: u16,
+    /// `usWeightClass`: 1 to 1000, 400 regular and 700 bold.
     pub weight_class: u16,
+    /// `usWidthClass`: 1 (ultra-condensed) to 9 (ultra-expanded).
     pub width_class: u16,
+    /// `fsType`: the embedding licensing bits.
     pub fs_type: u16,
+    /// `yStrikeoutSize`: the strikeout's thickness in font units.
     pub strikeout_size: i16,
+    /// `yStrikeoutPosition`: the strikeout's top above the baseline.
     pub strikeout_position: i16,
+    /// `fsSelection`.
     pub selection: FsSelection,
+    /// `sTypoAscender`.
     pub typo_ascender: i16,
+    /// `sTypoDescender`, negative below the baseline.
     pub typo_descender: i16,
+    /// `sTypoLineGap`.
     pub typo_line_gap: i16,
+    /// `usWinAscent`.
     pub win_ascent: u16,
+    /// `usWinDescent`, positive below the baseline.
     pub win_descent: u16,
 }
 
