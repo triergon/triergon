@@ -1,4 +1,5 @@
-//! Separately named carrier output; a raw unit is never an audio certificate.
+//! An ADTS stream read as contiguous units that keep the bytes outside complete
+//! frames. A unit is source bytes with a diagnostic; it does not vouch for audio.
 use super::{AacAdtsFrame, AacAdtsHeader, AacAdtsStreamLimits, AacAdtsStreamReader};
 use crate::aac::AacSource;
 use std::sync::atomic::AtomicBool;
@@ -7,13 +8,33 @@ use triergon_core::{
     SourceFailure, SourceId, Step, WorkBudget,
 };
 
+/// What ends a unit of an [`AacAdtsCarrierReader`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AacAdtsCarrierBoundary {
-    DeclaredEnvelope { header_offset: usize },
+    /// The `aac_frame_length` of a header with `layer` 0 in the unit.
+    DeclaredEnvelope {
+        /// Bytes of the unit before that header: 0 when the unit starts with it,
+        /// more when it was found by scanning and the bytes before it are kept in
+        /// the same unit.
+        header_offset: usize,
+    },
+    /// The end of the source, reported with `finish`: the unit is what was left,
+    /// short of a complete header or frame, or without any header.
     ExplicitEofFragment,
+    /// A header found by scanning: the unit is the bytes before it. Only a reader
+    /// made by [`AacAdtsCarrierReader::for_parser_packets`] ends units this way.
     FollowingEnvelope,
+    /// The `aac_frame_length` of the header the unit starts with, whose `layer` is
+    /// not 0. Only a reader made by [`AacAdtsCarrierReader::for_parser_packets`]
+    /// ends units this way.
     ParserLengthCandidate,
 }
+/// One unit of an ADTS stream read by [`AacAdtsCarrierReader`]: a frame, or bytes
+/// that are not a complete frame, with what ends the unit and why it is not a
+/// frame.
+///
+/// The units of a stream are contiguous: together they hold every byte read, in
+/// order, each unit in an allocation of its own.
 #[derive(Clone, Debug)]
 pub struct AacAdtsCarrier {
     pub(crate) raw: Bytes,
@@ -24,8 +45,15 @@ pub struct AacAdtsCarrier {
     pub(crate) inspection_end: u64,
 }
 impl AacAdtsCarrier {
-    /// Convert an aligned, complete, selected AAC-LC envelope without copying
-    /// the coded bytes. Other carrier observations retain their original facts.
+    /// The unit as an [`AacAdtsFrame`] that shares its bytes, when it is a complete
+    /// AAC LC frame of one raw data block that starts with its header: the boundary
+    /// is `DeclaredEnvelope { header_offset: 0 }`, there is no
+    /// [`selected_error`](Self::selected_error) and the unit is as long as the
+    /// header declares.
+    ///
+    /// # Errors
+    ///
+    /// Any other unit is returned as it was.
     pub fn into_selected_frame(self) -> std::result::Result<AacAdtsFrame, Self> {
         let Some(header) = self.header else {
             return Err(self);
@@ -39,47 +67,90 @@ impl AacAdtsCarrier {
         AacAdtsFrame::from_envelope(self.raw.clone(), self.source, header).map_err(|_| self)
     }
 
+    /// The unit's bytes.
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
+    /// Where the unit starts in its source.
     pub const fn source(&self) -> AacSource {
         self.source
     }
+    /// The header the unit's extent comes from: the one that declares its frame
+    /// length, or, for a unit the end of the source cut short, the one of the
+    /// unfinished frame. `None` when the unit has none: bytes before a following
+    /// header, or a remainder at the end of the source in which no header was found.
     pub const fn header(&self) -> Option<AacAdtsHeader> {
         self.header
     }
+    /// What ends the unit.
     pub const fn boundary(&self) -> AacAdtsCarrierBoundary {
         self.boundary
     }
-    /// End of bytes actually inspected by this reader. Recovery may inspect a
-    /// following header beyond the opaque prefix it publishes.
+    /// Source offset just past the last byte the reader had read when it produced
+    /// the unit. It is the unit's end, except for a unit that a following header
+    /// ends: the seven bytes of that header were read to find the boundary.
     pub const fn inspection_end(&self) -> u64 {
         self.inspection_end
     }
-    /// Encountered selected-source diagnostic at this stream position, including
-    /// real recovery lookahead through inspection_end. It does not certify the
-    /// returned raw unit as a complete frame or erase an existing Strict error.
+    /// Why the bytes at this position are not a complete AAC LC frame of one raw
+    /// data block, judged on everything read up to
+    /// [`inspection_end`](Self::inspection_end): [`Error::Truncated`] when the source
+    /// ended first, [`Error::Invalid`] for a header or frame length that breaks the
+    /// syntax or for bytes without a header, [`Error::Unsupported`] for another
+    /// profile or several raw data blocks. `None` only for a unit that
+    /// [`into_selected_frame`](Self::into_selected_frame) converts.
+    ///
+    /// The diagnostic stands beside the unit's bytes: carrying them neither makes
+    /// them a frame nor removes the error [`AacAdtsStreamReader`] reports for the
+    /// same bytes.
     pub const fn selected_error(&self) -> Option<Error> {
         self.selected_error
     }
 }
 
+/// Bounds of an [`AacAdtsCarrierReader`]. None may be zero.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AacAdtsCarrierLimits {
+    /// Most bytes one unit may hold. A unit that its header declares longer, or
+    /// more bytes than this with neither a header nor the end of the source, is
+    /// [`Error::Limit`].
     pub maximum_packet_bytes: usize,
+    /// Most units the reader produces between resets; a further one is
+    /// [`Error::Limit`].
     pub maximum_packets: usize,
+    /// Most bytes one input window may carry.
     pub maximum_input_window: usize,
 }
 
+/// Reads an ADTS stream as contiguous [`AacAdtsCarrier`] units, from input of any
+/// chunking, without failing on bytes that are not frames.
+///
+/// A unit that starts with a plausible header (syncword `0xfff`, layer 0, a
+/// sampling frequency index that names a frequency, a frame length of at least 7)
+/// extends as far as that header declares, whatever its profile and block count.
+/// From anything else the reader scans byte by byte for such a header. Bytes that
+/// the end of the source leaves over form a last unit. Nothing is decoded and no
+/// CRC is verified; each unit says why it is not a frame.
+///
+/// Input is requested and answered as for an
+/// [`InputCursor`](triergon_core::InputCursor).
+#[derive(Debug)]
 pub struct AacAdtsCarrierReader {
     pub(crate) inner: AacAdtsStreamReader,
 }
 impl AacAdtsCarrierReader {
-    /// Native-parser packet view. Leading bytes are emitted separately when a
-    /// complete following parser candidate establishes their physical extent.
-    /// The default carrier view instead retains that prefix in one source span.
-    /// This compatibility policy may recognize nonzero layer bits, retaining
-    /// an explicit invalid-source diagnostic rather than validating the syntax.
+    /// A reader of `source` whose units follow the packets of FFmpeg's AAC parser.
+    /// Bytes before a header found by scanning become a unit of their own
+    /// ([`AacAdtsCarrierBoundary::FollowingEnvelope`]) once the seven bytes of
+    /// that header are read; a reader made by [`new`](Self::new) keeps them in one
+    /// unit with the header's frame. A header whose `layer` is not 0 also
+    /// delimits a unit ([`AacAdtsCarrierBoundary::ParserLengthCandidate`]): the
+    /// unit keeps [`Error::Invalid`] as its diagnostic, and its syntax is not
+    /// validated.
+    ///
+    /// # Errors
+    ///
+    /// When a limit is zero.
     pub fn for_parser_packets(
         pool: &Budget,
         source: SourceId,
@@ -99,6 +170,14 @@ impl AacAdtsCarrierReader {
             )?,
         })
     }
+    /// A reader of `source` from offset zero, with windows charged to `pool`. Bytes
+    /// before a header found by scanning stay in one unit with that header's frame
+    /// ([`AacAdtsCarrierBoundary::DeclaredEnvelope`] with a nonzero
+    /// `header_offset`).
+    ///
+    /// # Errors
+    ///
+    /// When a limit is zero.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -124,24 +203,49 @@ impl AacAdtsCarrierReader {
         self.inner.input_wait_buffer_capacity()
     }
 
+    /// The request for the bytes the reader needs next, at
+    /// [`position`](Self::position).
     pub fn request(&self) -> InputRequest {
         self.inner.request()
     }
+    /// The token an answer to the current request must carry.
     pub fn token(&self) -> InputToken {
         self.inner.token()
     }
+    /// Source offset of the next byte the reader reads.
     pub fn position(&self) -> u64 {
         self.inner.position()
     }
+    /// Units produced since the reader was made or last reset.
     pub fn completed_packets(&self) -> usize {
         self.inner.completed_frames()
     }
+    /// Answers the current request with `window`, whose bytes the reader shares
+    /// until it has copied them into a unit.
+    ///
+    /// # Errors
+    ///
+    /// When the window is refused as by
+    /// [`InputCursor::provide`](triergon_core::InputCursor::provide), which changes
+    /// nothing, or the reader has failed.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.inner.provide(window)
     }
+    /// [`provide`](Self::provide) for a window the caller gives away.
+    ///
+    /// # Errors
+    ///
+    /// As [`provide`](Self::provide); a refused window is dropped.
     pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
         self.inner.provide_owned(window)
     }
+    /// [`provide`](Self::provide) for at most
+    /// [`InputCursor::INLINE_CAPACITY`](triergon_core::InputCursor::INLINE_CAPACITY)
+    /// bytes, copied into the reader without an allocation.
+    ///
+    /// # Errors
+    ///
+    /// As [`provide`](Self::provide), and when `bytes` is longer than that.
     pub fn provide_inline(
         &mut self,
         source: SourceId,
@@ -151,9 +255,26 @@ impl AacAdtsCarrierReader {
     ) -> Result<()> {
         self.inner.provide_inline(source, token, offset, bytes)
     }
+    /// Answers the current request with the end of the source, which lies after
+    /// the bytes already provided.
+    ///
+    /// # Errors
+    ///
+    /// When the source ends before its known length: the reader fails for good with
+    /// [`Error::Truncated`] and produces no unit from the bytes left. A token or
+    /// source other than the current one, or a reader that has failed, changes
+    /// nothing.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.inner.finish(source, token)
     }
+    /// Answers the current request with a failure. Buffered bytes and an unfinished
+    /// unit are dropped, and every later step returns [`Error::Transport`] or
+    /// [`Error::Cancelled`].
+    ///
+    /// # Errors
+    ///
+    /// When the token or source is not the current one or the reader has failed
+    /// already; nothing changes.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -162,9 +283,34 @@ impl AacAdtsCarrierReader {
     ) -> Result<()> {
         self.inner.fail(source, token, failure)
     }
+    /// Starts reading the same source again at `offset`, under another token
+    /// generation, and returns the request for the first bytes. Buffered bytes, an
+    /// unfinished unit, the end of the source, a failure and the unit count are
+    /// cleared together; a source length learned from [`finish`](Self::finish) is
+    /// kept.
+    ///
+    /// # Errors
+    ///
+    /// When `offset` is not zero and the source has no random access, or `offset`
+    /// lies past the known length. The reader stays as it was.
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
         self.inner.reset(offset)
     }
+    /// Reads for as long as `work` lasts.
+    ///
+    /// [`Step::Ready`] carries the next unit. [`Step::NeedInput`] carries the request
+    /// to answer with [`provide`](Self::provide), [`finish`](Self::finish) or
+    /// [`fail`](Self::fail). [`Step::Yield`] asks for another call with more work.
+    /// [`Step::End`] reports the end of the source once every byte has been
+    /// produced in a unit.
+    ///
+    /// # Errors
+    ///
+    /// When a unit exceeds `maximum_packet_bytes` or the units exceed
+    /// `maximum_packets`, when `cancel` is set, or when the source failed or ended
+    /// before its known length. The reader then returns the same error from every
+    /// later call until [`reset`](Self::reset). [`Error::Backpressure`] and
+    /// [`Error::Allocation`] keep its state, to be stepped again.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

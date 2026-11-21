@@ -1,4 +1,5 @@
-//! Selected aligned ADTS stream envelopes; source lifecycle is the shared core.
+//! Consecutive ADTS frames read from a stream. Requests, windows, the end of the
+//! source and its failures are those of the core `InputCursor`.
 mod phases;
 
 use super::carrier::AacAdtsCarrier;
@@ -9,10 +10,16 @@ use triergon_core::{
     SourceCapabilities, SourceFailure, SourceId, Step, WorkBudget,
 };
 
+/// Bounds of an [`AacAdtsStreamReader`]. None may be zero.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AacAdtsStreamLimits {
+    /// Most bytes one frame may hold, header included; a header that declares more
+    /// is [`Error::Limit`].
     pub maximum_frame_bytes: usize,
+    /// Most frames the reader returns between resets; a further one is
+    /// [`Error::Limit`].
     pub maximum_frames: usize,
+    /// Most bytes one input window may carry.
     pub maximum_input_window: usize,
 }
 
@@ -31,10 +38,18 @@ enum Phase {
     End,
 }
 
-/// Strict aligned, selected single-block ADTS envelopes. No recovery scan,
-/// encoded-audio validation, CRC verification or clock/config epoch is inferred.
-/// Input generation is the real shared-cursor epoch; every output keeps its
-/// physical source offset, full header/CRC/payload and charged immutable owner.
+/// Reads a stream of consecutive ADTS frames, each one AAC LC raw data block, from
+/// input of any chunking.
+///
+/// The stream must be aligned: the first frame starts at the first byte read and
+/// each further one where the last ended. A header that does not begin such a frame
+/// is an error; there is no scan for the next syncword. The payload is not
+/// validated, the CRC is not verified, and neither timing nor a change of
+/// configuration is derived. Each frame keeps its source offset, the
+/// [`generation`](Self::generation) of the input it was read from, and its header,
+/// CRC and payload whole, in an immutable pool allocation of its own.
+///
+/// Input is requested and answered as for an [`InputCursor`].
 pub struct AacAdtsStreamReader {
     pool: Budget,
     cursor: Option<InputCursor>,
@@ -59,11 +74,29 @@ pub struct AacAdtsStreamReader {
     selected_error: Option<Error>,
     split_prefix: bool,
 }
+impl std::fmt::Debug for AacAdtsStreamReader {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("AacAdtsStreamReader")
+            .field("source", &self.parked.source)
+            .field("position", &self.position())
+            .field("capabilities", &self.capabilities)
+            .field("limits", &self.limits)
+            .field("completed", &self.completed)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
 enum StreamOutput {
     Selected(AacAdtsFrame),
     Carrier(AacAdtsCarrier),
 }
 impl AacAdtsStreamReader {
+    /// A reader of `source` from offset zero, with windows charged to `pool`.
+    ///
+    /// # Errors
+    ///
+    /// When a limit is zero.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -135,17 +168,23 @@ impl AacAdtsStreamReader {
         self.buffer.as_ref().map_or(0, BudgetVec::capacity)
     }
 
+    /// The request for the bytes the reader needs next, at
+    /// [`position`](Self::position). A reader that has failed keeps its last one.
     pub fn request(&self) -> InputRequest {
         self.cursor
             .as_ref()
             .map_or_else(|| self.parked.clone(), InputCursor::request)
     }
+    /// The token an answer to the current request must carry.
     pub fn token(&self) -> InputToken {
         self.request().token
     }
+    /// [`InputToken::generation`] of the current token; it changes with every
+    /// [`reset`](Self::reset).
     pub fn generation(&self) -> u64 {
         self.token().generation()
     }
+    /// Source offset of the next byte the reader reads.
     pub fn position(&self) -> u64 {
         self.cursor
             .as_ref()
@@ -159,12 +198,30 @@ impl AacAdtsStreamReader {
             .as_mut()
             .ok_or(Error::Invalid("missing ADTS input cursor"))
     }
+    /// Answers the current request with `window`, whose bytes the reader shares
+    /// until it has copied them into a frame.
+    ///
+    /// # Errors
+    ///
+    /// When the window is refused as by [`InputCursor::provide`], which changes
+    /// nothing, or the reader has failed.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.cursor_mut()?.provide(window)
     }
+    /// [`provide`](Self::provide) for a window the caller gives away.
+    ///
+    /// # Errors
+    ///
+    /// As [`provide`](Self::provide); a refused window is dropped.
     pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
         self.cursor_mut()?.provide_owned(window)
     }
+    /// [`provide`](Self::provide) for at most [`InputCursor::INLINE_CAPACITY`] bytes,
+    /// copied into the reader without an allocation.
+    ///
+    /// # Errors
+    ///
+    /// As [`provide`](Self::provide), and when `bytes` is longer than that.
     pub fn provide_inline(
         &mut self,
         source: SourceId,
@@ -175,6 +232,14 @@ impl AacAdtsStreamReader {
         self.cursor_mut()?
             .provide_inline(source, token, offset, bytes)
     }
+    /// Answers the current request with the end of the source, which lies after
+    /// the bytes already provided.
+    ///
+    /// # Errors
+    ///
+    /// When the source ends before its known length: the reader fails for good with
+    /// [`Error::Truncated`]. A token or source other than the current one, or a
+    /// reader that has failed, changes nothing.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         let result = self.cursor_mut()?.finish(source, token);
         if let Some(c) = &self.cursor {
@@ -185,6 +250,14 @@ impl AacAdtsStreamReader {
         }
         result
     }
+    /// Answers the current request with a failure. Buffered bytes and an unfinished
+    /// frame are dropped, and every later step returns [`Error::Transport`] or
+    /// [`Error::Cancelled`].
+    ///
+    /// # Errors
+    ///
+    /// When the token or source is not the current one or the reader has failed
+    /// already; nothing changes.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -198,9 +271,16 @@ impl AacAdtsStreamReader {
         });
         Ok(())
     }
-    /// An explicit read epoch for the same physical source. Invalid resets do
-    /// not change state. Source length learned from real finish is retained;
-    /// buffered syntax/EOF/failure and frame count are reset together.
+    /// Starts reading the same source again at `offset`, under another token
+    /// generation, and returns the request for the first bytes. Buffered bytes, an
+    /// unfinished frame, the end of the source, a failure and the frame count are
+    /// cleared together; a source length learned from [`finish`](Self::finish) is
+    /// kept.
+    ///
+    /// # Errors
+    ///
+    /// When `offset` is not zero and the source has no random access, or `offset`
+    /// lies past the known length. The reader stays as it was.
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
         if !self.capabilities.random_access && offset != 0 {
             return Err(Error::Unsupported("random-access input"));
@@ -235,6 +315,7 @@ impl AacAdtsStreamReader {
         self.selected_error = None;
         Ok(self.request())
     }
+    /// Frames returned since the reader was made or last reset.
     pub fn completed_frames(&self) -> usize {
         self.completed
     }
@@ -249,6 +330,24 @@ impl AacAdtsStreamReader {
         self.header = None;
         self.failure = Some(error);
     }
+    /// Reads for as long as `work` lasts.
+    ///
+    /// [`Step::Ready`] carries the next frame. [`Step::NeedInput`] carries the
+    /// request to answer with [`provide`](Self::provide), [`finish`](Self::finish)
+    /// or [`fail`](Self::fail). [`Step::Yield`] asks for another call with more
+    /// work. [`Step::End`] reports the end of the source at a frame boundary.
+    ///
+    /// # Errors
+    ///
+    /// When the source ends inside a frame, or a frame passes its known length;
+    /// when the syncword is not `0xfff`, the layer is not 0, the sampling frequency
+    /// index names no frequency or the frame length is shorter than the header and
+    /// CRC; when the profile is not AAC LC or the frame holds several raw data
+    /// blocks; when a frame exceeds `maximum_frame_bytes` or the frames exceed
+    /// `maximum_frames`; when `cancel` is set or the source failed. The reader then
+    /// returns the same error from every later call until [`reset`](Self::reset).
+    /// [`Error::Backpressure`] and [`Error::Allocation`] keep its state, to be
+    /// stepped again.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

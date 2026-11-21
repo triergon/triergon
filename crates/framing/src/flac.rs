@@ -17,11 +17,15 @@ pub const VORBIS_COMMENT: u8 = 4;
 /// The STREAMINFO metadata block (RFC 9639 section 8.2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FlacStreamInfo {
+    /// Smallest block of the stream, in inter-channel samples.
     pub min_block_size: u16,
+    /// Largest block of the stream, in inter-channel samples.
     pub max_block_size: u16,
     /// Bytes; 0 when unknown.
     pub min_frame_size: u32,
+    /// Largest frame of the stream in bytes; 0 when unknown.
     pub max_frame_size: u32,
+    /// Sample rate in Hz, a 20-bit field.
     pub sample_rate: u32,
     /// 1 to 8.
     pub channels: u8,
@@ -29,6 +33,7 @@ pub struct FlacStreamInfo {
     pub bits_per_sample: u8,
     /// Inter-channel samples in the stream; 0 when unknown.
     pub total_samples: u64,
+    /// MD5 of the unencoded audio; all zero when unknown.
     pub md5: [u8; 16],
 }
 
@@ -37,6 +42,11 @@ impl FlacStreamInfo {
     pub const BYTES: usize = 34;
 
     /// Parse a STREAMINFO block body.
+    ///
+    /// # Errors
+    ///
+    /// When `body` is shorter than [`Self::BYTES`], codes fewer than 4 bits per
+    /// sample, or has a minimum block size above its maximum.
     pub fn parse(body: &[u8]) -> Result<FlacStreamInfo> {
         let b = body.get(..Self::BYTES).ok_or(Error::Truncated)?;
         let be24 = |at: usize| u32::from_be_bytes([0, b[at], b[at + 1], b[at + 2]]);
@@ -69,13 +79,21 @@ impl FlacStreamInfo {
 /// One metadata block of a configuration.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FlacMetadataBlock<'a> {
+    /// Block type, 0 to 127, such as [`STREAMINFO`] and [`VORBIS_COMMENT`].
     pub kind: u8,
+    /// The last-block flag: no metadata block follows this one.
     pub last: bool,
+    /// The block's data, without its four-byte header.
     pub body: &'a [u8],
 }
 
 /// The metadata blocks after an `fLaC` marker, in order, ending at the block marked last
 /// or at the end of `bytes`.
+///
+/// # Errors
+///
+/// When `bytes` does not start with the marker. The iterator yields one error and
+/// then ends when `bytes` stops inside a block header or body.
 pub fn metadata_blocks(
     bytes: &[u8],
 ) -> Result<impl Iterator<Item = Result<FlacMetadataBlock<'_>>>> {
@@ -108,6 +126,12 @@ pub fn metadata_blocks(
 }
 
 /// The STREAMINFO of a canonical configuration: its first metadata block.
+///
+/// # Errors
+///
+/// When `configuration` does not start with the `fLaC` marker, or its first metadata
+/// block is missing, incomplete, not STREAMINFO or one [`FlacStreamInfo::parse`]
+/// refuses.
 pub fn stream_info(configuration: &[u8]) -> Result<FlacStreamInfo> {
     let first = metadata_blocks(configuration)?
         .next()
@@ -209,10 +233,13 @@ impl FlacChannelAssignment {
 /// A frame header (RFC 9639 section 9.1) with its CRC-8 checked.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FlacFrameHeader {
+    /// The blocking strategy, which says what `number` counts.
     pub blocking: FlacBlocking,
+    /// Inter-channel samples in the frame, 1 to 65536.
     pub block_size: u32,
     /// `None` when the header defers to STREAMINFO.
     pub sample_rate: Option<u32>,
+    /// How the frame codes its channels, and how many.
     pub channels: FlacChannelAssignment,
     /// `None` when the header defers to STREAMINFO.
     pub bits_per_sample: Option<u8>,

@@ -15,7 +15,11 @@ use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudge
 /// Widths 1..=4 describe generic big-endian fields, not ISO width eligibility.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeclaredConfigNal {
+    /// Byte range in the record of the NAL unit's big-endian length field: 1 to
+    /// 4 bytes, inside its array and after the array's preceding NAL unit.
     pub length_field: Range<usize>,
+    /// Byte range in the record of the NAL unit. It starts where `length_field`
+    /// ends, ends inside its array, and is as long as the field's value says.
     pub payload: Range<usize>,
 }
 
@@ -23,17 +27,29 @@ pub struct DeclaredConfigNal {
 /// and the fixed NAL headers are verified against the source bytes.
 #[derive(Clone, Debug)]
 pub struct DeclaredConfigArray<'a> {
+    /// Byte range in the record of the whole array. Arrays are declared in
+    /// ascending order and do not overlap.
     pub raw_range: Range<usize>,
+    /// The `nal_unit_type` the array declares for its NAL units: at most 31 for
+    /// H.264 and 63 for H.265.
     pub nal_unit_type: u8,
+    /// The array's declared completeness, such as `array_completeness` of an
+    /// HEVC record; `None` when nothing is declared. It is kept unchecked.
     pub completeness: Option<bool>,
+    /// The array's NAL units in record order.
     pub nals: &'a [DeclaredConfigNal],
 }
 
+/// Bounds of a [`DeclaredConfigParser`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DeclaredConfigLimits {
+    /// The most bytes the record may hold. Must not be zero.
     pub maximum_record_bytes: usize,
+    /// The most arrays that may be declared.
     pub maximum_arrays: usize,
+    /// The most NAL units that may be declared over all arrays.
     pub maximum_nals: usize,
+    /// The most bytes one NAL unit may hold. Must not be zero.
     pub maximum_nal_bytes: usize,
 }
 
@@ -48,24 +64,31 @@ pub struct DeclaredConfigNalView {
 }
 
 impl DeclaredConfigNalView {
+    /// The NAL unit's bytes, a span of the record.
     pub fn source_bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// The bytes of the NAL unit's length field, a span of the record.
     pub fn length_field_bytes(&self) -> &Bytes {
         &self.length_bytes
     }
+    /// Byte range of the NAL unit in the record.
     pub fn source_range(&self) -> Range<usize> {
         self.range.clone()
     }
+    /// The fixed header read from the NAL unit.
     pub const fn header(&self) -> NalHeader {
         self.header
     }
-    /// Reports a declaration disagreement without changing or filtering bytes.
+    /// Whether the header's `nal_unit_type` differs from the type its array
+    /// declares. The disagreement is reported without changing or filtering
+    /// bytes.
     pub const fn array_type_mismatch(&self) -> bool {
         self.mismatch
     }
 }
 
+/// One declared array of a [`DeclaredConfiguration`].
 #[derive(Clone, Debug)]
 pub struct DeclaredConfigArrayView {
     bytes: Bytes,
@@ -76,25 +99,31 @@ pub struct DeclaredConfigArrayView {
 }
 
 impl DeclaredConfigArrayView {
+    /// The array's bytes, a span of the record.
     pub fn source_bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// Byte range of the array in the record.
     pub fn source_range(&self) -> Range<usize> {
         self.range.clone()
     }
+    /// Indices of the array's NAL units in [`DeclaredConfiguration::nals`].
     pub fn nal_indices(&self) -> Range<usize> {
         self.nal_indices.clone()
     }
+    /// The `nal_unit_type` the array declares for its NAL units.
     pub const fn declared_nal_unit_type(&self) -> u8 {
         self.declared_type
     }
+    /// The array's declared completeness; `None` when nothing was declared.
     pub const fn declared_completeness(&self) -> Option<bool> {
         self.declared_completeness
     }
 }
 
 /// Owns all output descriptors and source storage; no declaration borrow escapes.
-/// SourceId and sample width are caller declarations, not inferred wire facts.
+/// `SourceId` and sample width are caller declarations, not inferred wire facts.
+#[derive(Debug)]
 pub struct DeclaredConfiguration {
     source: SourceId,
     codec: Codec,
@@ -105,24 +134,33 @@ pub struct DeclaredConfiguration {
 }
 
 impl DeclaredConfiguration {
+    /// The source the caller named for the record.
     pub const fn source_id(&self) -> SourceId {
         self.source
     }
+    /// The coding standard the caller declared.
     pub const fn codec(&self) -> Codec {
         self.codec
     }
+    /// The whole record as it was given.
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
+    /// Width of the length field before each NAL unit of a media sample, as the
+    /// caller declared it.
     pub const fn sample_length_size(&self) -> LengthSize {
         self.sample_width
     }
+    /// Always [`ConfigInspection::DeclaredOpaque`]: the record's own syntax is
+    /// not parsed.
     pub const fn inspection(&self) -> ConfigInspection {
         ConfigInspection::DeclaredOpaque
     }
+    /// The declared arrays in record order.
     pub fn arrays(&self) -> &[DeclaredConfigArrayView] {
         self.arrays.as_slice()
     }
+    /// The NAL units of all arrays in record order.
     pub fn nals(&self) -> &[DeclaredConfigNalView] {
         self.nals.as_slice()
     }
@@ -171,7 +209,32 @@ pub struct DeclaredConfigParser<'a> {
     failure: Option<Error>,
 }
 
+impl std::fmt::Debug for DeclaredConfigParser<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("DeclaredConfigParser")
+            .field("source", &self.source)
+            .field("codec", &self.codec)
+            .field("sample_width", &self.sample_width)
+            .field("limits", &self.limits)
+            .field("declared_arrays", &self.declarations.len())
+            .field("checked_arrays", &self.arrays.len())
+            .field("checked_nals", &self.nals.len())
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
 impl<'a> DeclaredConfigParser<'a> {
+    /// A parser for the record `raw`, charged to `pool`, with the layout that
+    /// `arrays` declares. `source` and `sample_width` are kept as declared.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ForeignPool`] when `raw` is charged to another pool;
+    /// [`Error::Invalid`] when it is empty or a byte limit is zero;
+    /// [`Error::Limit`] when the record exceeds `maximum_record_bytes` or the
+    /// arrays `maximum_arrays`.
     pub fn new(
         pool: &Budget,
         codec: Codec,
@@ -213,6 +276,19 @@ impl<'a> DeclaredConfigParser<'a> {
         })
     }
 
+    /// Checks the declared layout against the record and builds its views.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] for a range that is out of order or leaves its array
+    /// or the record, a length field that is not 1 to 4 bytes directly before
+    /// its NAL unit or whose value is not the unit's length, an array type
+    /// above the codec's largest `nal_unit_type` and a refused NAL header;
+    /// [`Error::Truncated`] for a NAL unit shorter than its header;
+    /// [`Error::Limit`] past `maximum_nals` or `maximum_nal_bytes`;
+    /// [`Error::Cancelled`] when `cancel` is set. [`Error::Backpressure`] and
+    /// [`Error::Allocation`] are retryable: the parser keeps its progress. Every
+    /// other error is final and returned again by each later call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

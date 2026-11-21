@@ -1,5 +1,6 @@
-//! Original normal-frame source acquisition, ETSI TS102114 §5.3/5.4.2.
-//! A measured sync span and FSIZE arithmetic are evidence, not audio validity.
+//! Normal core frames of a DTS stream in any word packing, ETSI TS 102 114 §5.3 and
+//! §5.4.2. A frame is the span from one normal sync to the next; how its length
+//! relates to `FSIZE` is reported, and neither shows that the coded audio is valid.
 use crate::dts::packed::limit;
 use crate::dts::{
     DtsCoreField, DtsPackedHeader, DtsPackedLimits, DtsPackedPayload, DtsPackedPayloadJob,
@@ -11,70 +12,120 @@ use triergon_core::{
     SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, WorkBudget,
 };
 
+/// Limits of a [`DtsNormalSourceReader`]. None may be zero.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsNormalLimits {
+    /// The most source bytes one frame may span, from its sync to the next. The
+    /// reader reserves this many for every frame, and a returned frame keeps them
+    /// charged to the pool while it is held.
     pub maximum_source_frame_bytes: usize,
+    /// The most bytes one frame's payload may take once its bits are packed into
+    /// bytes ([`DtsNormalSourceFrame::storage_bytes`]).
     pub maximum_storage_bytes: usize,
+    /// The most frames read since construction or the last reset.
     pub maximum_frames: usize,
+    /// The most bytes one input window may hold.
     pub maximum_input_window: usize,
 }
 
+/// What ended a frame of a [`DtsNormalSourceReader`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DtsNormalBoundary {
-    /// A following normal38 sync on the same source unit grid was observed.
-    /// This alone does not prove that a coded-audio payload cannot contain it.
-    FollowingNormalSync { offset: u64 },
-    /// Completion is explicit, including completion of an artificial view.
+    /// The next normal sync (`SYNC`, `FTYPE` 1, `SHORT` 31) on the same source unit
+    /// grid starts where this frame ends. Coded audio can hold the same 38 bits, so
+    /// the sync alone does not prove that a frame starts there.
+    FollowingNormalSync {
+        /// Source offset of the following sync, in bytes.
+        offset: u64,
+    },
+    /// The source ended, as [`DtsNormalSourceReader::finish`] declared. A caller may
+    /// declare the end of a part of a stream as well as of a whole one.
     ExplicitSourceEnd,
 }
 
-/// Two independently named arithmetic equalities, never a chosen FSIZE domain.
+/// How the measured length of a frame relates to its `FSIZE`. `FSIZE` + 1 counts the
+/// bytes of a frame; in a packed stream that can be read as a count of source bytes
+/// or of payload bytes. Each reading is tested on its own and neither is preferred.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DtsExtentRelation {
+    /// Both readings hold.
     Both,
+    /// The frame's payload holds `FSIZE` + 1 bytes and less than one further source
+    /// unit of payload bits.
     PayloadWordCount,
+    /// The frame spans exactly `FSIZE` + 1 source bytes.
     PhysicalByteCount,
+    /// Neither reading holds.
     Neither,
 }
 
-/// Actual source bits after FSIZE+1 payload bytes, only when their number is
-/// less than one source unit's payload width. Their validity/meaning is open.
+/// The payload bits a frame carries after its `FSIZE` + 1 payload bytes. There are
+/// fewer of them than one source unit carries. Whether they are valid, and what they
+/// mean, is not established.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsCarrierTail {
+    /// Index of the first tail bit in the frame's payload: `8 * (FSIZE + 1)`.
     pub start_bit: usize,
+    /// Number of tail bits, less than [`DtsPacking::word_payload_bits`]; 0 when the
+    /// payload ends with its byte `FSIZE`.
     pub bit_count: u8,
+    /// The tail bits in stream order, the last of them in bit 0.
     pub value: u16,
 }
 
+/// What a [`DtsNormalSourceReader`] measured for one frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsNormalFacts {
+    /// Source, cursor generation and byte offset of the frame's first byte.
     pub identity: DtsSourceIdentity,
+    /// The packing the frame is stored in.
     pub packing: DtsPacking,
+    /// Length of the frame in source bytes.
     pub source_bytes: usize,
+    /// Number of payload bits the frame carries: 8, 16 or 14 for each source unit.
     pub source_payload_bits: usize,
+    /// Length in bytes of the payload packed into bytes: `source_payload_bits` / 8,
+    /// rounded up.
     pub storage_bytes: usize,
+    /// What ended the frame.
     pub boundary: DtsNormalBoundary,
+    /// Number of normal syncs inside the frame that did not end it, because fewer
+    /// than `FSIZE` + 1 source bytes preceded them.
     pub skipped_short_syncs: usize,
+    /// How the frame's length relates to `FSIZE`.
     pub extent_relation: DtsExtentRelation,
+    /// The payload bits after `FSIZE` + 1 bytes. `None` unless the payload reading of
+    /// `FSIZE` holds ([`DtsExtentRelation::Both`] or
+    /// [`DtsExtentRelation::PayloadWordCount`]).
     pub carrier_tail: Option<DtsCarrierTail>,
+    /// The header fields, read from at most the first 120 payload bits of the
+    /// frame's first 18 source bytes.
     pub header: DtsPackedHeader,
 }
 
+/// One frame of a [`DtsNormalSourceReader`]: its source bytes, its payload and what
+/// the reader measured. It owns its bytes and outlives the reader.
 #[derive(Clone, Debug)]
 pub struct DtsNormalSourceFrame {
     payload: DtsPackedPayload,
     facts: DtsNormalFacts,
 }
 impl DtsNormalSourceFrame {
+    /// The frame's payload, which also maps each payload bit to its source byte.
     pub fn payload(&self) -> &DtsPackedPayload {
         &self.payload
     }
+    /// The frame as the source stores it.
     pub fn source_bytes(&self) -> &Bytes {
         self.payload.source_bytes()
     }
+    /// The frame's payload bits packed into bytes, the first bit in the high bit of
+    /// byte 0 and the last byte padded with zero bits. For
+    /// [`DtsPacking::CanonicalBe`] these are the source bytes.
     pub fn storage_bytes(&self) -> &Bytes {
         self.payload.storage_bytes()
     }
+    /// What the reader measured for the frame.
     pub const fn facts(&self) -> DtsNormalFacts {
         self.facts
     }
@@ -94,14 +145,26 @@ enum Phase {
     Publish,
 }
 
-/// Four normal source packings with independently measured, variable intervals.
-/// Packing is a source storage fact, not a caller-selected FSIZE interpretation.
-/// Source units are bytes for CanonicalBe and complete words for other packings.
-/// A normal sync before the minimum of the two named size equalities is retained
-/// as an interior candidate. Later candidates delimit source records even if
-/// neither equality holds; that unresolved relation stays in the output.
-/// Termination/HD, arbitrary resynchronization and coded-body validation remain
-/// unsupported. In particular a published source record is not a parity verdict.
+/// Reads the normal core frames of a DTS stream stored in any of the four
+/// [`DtsPacking`]s, each frame with its own measured length.
+///
+/// The stream must start with a normal sync: `SYNC`, `FTYPE` 1 and `SHORT` 31. A
+/// frame ends at the next normal sync on the source unit grid, or at the end of the
+/// source. Source units are bytes for [`DtsPacking::CanonicalBe`] and whole two-byte
+/// words for the other packings. A normal sync that follows fewer than `FSIZE` + 1
+/// source bytes, the smaller of the two extents `FSIZE` can describe, is kept as
+/// frame content and counted in [`DtsNormalFacts::skipped_short_syncs`]. A later one
+/// ends the frame even when neither extent matches the frame's length;
+/// [`DtsNormalFacts::extent_relation`] reports that relation as it is.
+///
+/// The packing states how the source stores the stream; it does not select a reading
+/// of `FSIZE`. Termination frames and extension substreams are not supported, no sync
+/// is searched for after input that is not a frame, and the coded audio is not
+/// checked: a returned frame is a measured span of the source, not a judgement on
+/// its content.
+///
+/// Call [`step`](Self::step) and answer each [`Step::NeedInput`] with
+/// [`provide`](Self::provide), [`finish`](Self::finish) or [`fail`](Self::fail).
 pub struct DtsNormalSourceReader {
     pool: Budget,
     cursor: Option<InputCursor>,
@@ -129,7 +192,26 @@ pub struct DtsNormalSourceReader {
     failure: Option<Error>,
 }
 
+impl std::fmt::Debug for DtsNormalSourceReader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DtsNormalSourceReader")
+            .field("packing", &self.packing)
+            .field("limits", &self.limits)
+            .field("position", &self.position())
+            .field("generation", &self.generation())
+            .field("completed", &self.completed)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
 impl DtsNormalSourceReader {
+    /// A reader at offset zero of `source`, whose stream is stored in `packing`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] when a limit is zero, and [`Error::Limit`] when a frame of
+    /// `maximum_source_frame_bytes` cannot fit `pool`.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -180,26 +262,48 @@ impl DtsNormalSourceReader {
             failure: None,
         })
     }
+    /// The request for the bytes at [`position`](Self::position). A failed reader
+    /// returns the request it had open when it failed.
     pub fn request(&self) -> InputRequest {
         self.cursor
             .as_ref()
             .map_or_else(|| self.last_request.clone(), InputCursor::request)
     }
+    /// Source offset of the next byte the reader takes from its input. After a frame
+    /// that ended at a following sync it is six bytes past the frame's end: the
+    /// reader has read that sync.
     pub fn position(&self) -> u64 {
         self.cursor
             .as_ref()
             .map_or(self.last_request.offset, InputCursor::position)
     }
+    /// Generation of the reader's input cursor, which every frame carries in its
+    /// identity. [`reset`](Self::reset) starts a new one.
     pub fn generation(&self) -> u64 {
         self.cursor.as_ref().map_or(
             self.last_request.token.generation(),
             InputCursor::generation,
         )
     }
+    /// Answers the current request with `window`.
+    ///
+    /// # Errors
+    ///
+    /// The cursor's refusal of a window that does not answer the request (see
+    /// [`InputCursor::provide`]), which leaves the reader as it was. A failed reader
+    /// returns its earlier error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.healthy()?;
         self.cursor_mut()?.provide(window)
     }
+    /// Answers the current request with the end of the source, which also ends the
+    /// frame being read.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Truncated`], from then on, when the source ends before its known
+    /// length. A token or source that does not match the request is refused and
+    /// leaves the reader as it was. A failed reader returns its earlier error.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
         let result = self.cursor_mut()?.finish(source, token);
@@ -208,6 +312,14 @@ impl DtsNormalSourceReader {
         }
         result
     }
+    /// Answers the current request with a source failure. The reader drops the frame
+    /// it was reading and from then on returns [`Error::Transport`] or
+    /// [`Error::Cancelled`]; the bytes read so far never become a frame.
+    ///
+    /// # Errors
+    ///
+    /// A token or source that does not match the request is refused and leaves the
+    /// reader as it was. A failed reader returns its earlier error.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -222,6 +334,17 @@ impl DtsNormalSourceReader {
         });
         Ok(())
     }
+    /// Restarts at source offset `offset`, where a frame must start, and returns the
+    /// request for the bytes there. The frame being read is dropped, the frame count
+    /// starts again and the cursor takes a new generation, so answers to earlier
+    /// requests are refused. Frames already returned stay as they are.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Unsupported`] when `offset` is not a multiple of the packing's source
+    /// unit, or the cursor's refusal of an offset it cannot serve (see
+    /// [`InputCursor::reset`]). A failed reader returns its earlier error and cannot
+    /// be reset.
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
         self.healthy()?;
         if !offset.is_multiple_of(self.packing.source_unit_bytes() as u64) {
@@ -262,6 +385,20 @@ impl DtsNormalSourceReader {
         self.clear_builders();
         self.failure = Some(error);
     }
+    /// Reads on, as far as `work` allows. [`Step::Ready`] carries the next frame,
+    /// [`Step::NeedInput`] the request to answer before the next call, and
+    /// [`Step::End`] the end of the source once the last frame is returned;
+    /// [`Step::Yield`] means the work is spent.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Backpressure`] and [`Error::Allocation`] leave the reader as it was:
+    /// free pool storage and call again. Every other error is kept and returned by
+    /// all later calls: [`Error::Cancelled`] when `cancel` is set, [`Error::Invalid`]
+    /// when the stream does not start with `SYNC`, [`Error::Unsupported`] when it
+    /// starts with a termination frame (`FTYPE` 0) or a `SHORT` other than 31,
+    /// [`Error::Truncated`] when the source ends inside a header or a source word,
+    /// and [`Error::Limit`] when a frame or the number of frames exceeds its limit.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

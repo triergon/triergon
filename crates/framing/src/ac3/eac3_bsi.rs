@@ -15,9 +15,11 @@ pub struct Eac3BitRange {
 }
 
 impl Eac3BitRange {
+    /// The first bit of the range, counted from the first bit of the syncword.
     pub const fn start_bit(self) -> usize {
         self.start
     }
+    /// The length of the range in bits.
     pub const fn bit_count(self) -> usize {
         self.bits
     }
@@ -32,12 +34,19 @@ pub struct Eac3BitSpan {
 }
 
 impl Eac3BitSpan {
+    /// The frame the span lies in.
     pub fn frame(&self) -> &Ac3Frame {
         &self.frame
     }
+    /// The span's bits within [`frame`](Self::frame).
     pub const fn range(&self) -> Eac3BitRange {
         self.range
     }
+    /// Bit `index` of the span; 0 is its first bit.
+    ///
+    /// # Errors
+    ///
+    /// When `index` is not below the span's bit count.
     pub fn bit(&self, index: usize) -> Result<bool> {
         if index >= self.range.bits {
             return Err(Error::Invalid("E-AC-3 bit span index"));
@@ -47,6 +56,10 @@ impl Eac3BitSpan {
     }
     /// Source bytes covering the span. The first/last bytes can also contain
     /// adjacent fields; range() retains the exact bit boundary.
+    ///
+    /// # Errors
+    ///
+    /// Never: a span lies inside its frame.
     pub fn covering_bytes(&self) -> Result<Bytes> {
         let end = self
             .range
@@ -63,14 +76,21 @@ impl Eac3BitSpan {
 /// retained without interpreting the opaque auxiliary/audio payload or its CRC.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Eac3Trailer {
+    /// `auxdatae`: whether the frame carries auxiliary data.
     pub auxiliary_data_present: bool,
+    /// `auxdatal`, 14 bits: the length of the auxiliary data in bits. `None` when
+    /// `auxdatae` is 0.
     pub auxiliary_length_code: Option<u16>,
+    /// `encinfo`, the bit before `crc2`.
     pub encoder_info: bool,
+    /// `crc2`, the last 16 bits of the frame, as coded; it is not checked.
     pub crc2_word: u16,
 }
 
+/// Caller limits of an [`Eac3BsiParser`]. Each must be nonzero.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Eac3BsiLimits {
+    /// The longest frame accepted, in bytes.
     pub maximum_frame_bytes: usize,
     /// BSI bits after the sixteen-bit syncword, including the fixed BSI prefix.
     pub maximum_bsi_bits: usize,
@@ -80,31 +100,64 @@ pub struct Eac3BsiLimits {
 /// selected context; an explicitly coded zero remains Some(0)/Some(false).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Eac3BsiFacts {
+    /// Bit position just past the last field of the bit stream information,
+    /// counted from the first bit of the syncword.
     pub end_bit: usize,
+    /// Bit position where the fields of the frame's header end and the fields
+    /// below begin: the header's [`probe_bits`].
+    ///
+    /// [`probe_bits`]: crate::ac3::Ac3FrameHeader::probe_bits
     pub prefix_end_bit: usize,
+    /// Range of the mixing metadata, from `mixmdate` through its last field.
+    /// `None` when `mixmdate` is 0.
     pub mixing_metadata: Option<Eac3BitRange>,
+    /// `mixdef`: 0, 1 or 2. `None` unless an independent frame (`strmtyp` 0)
+    /// carries mixing metadata.
     pub mixing_definition: Option<u8>,
+    /// Range of the informational metadata, from `infomdate` through its last
+    /// field. `None` when `infomdate` is 0.
     pub informational_metadata: Option<Eac3BitRange>,
+    /// `bsmod`, 3 bits; coded with the informational metadata.
     pub bitstream_mode: Option<u8>,
+    /// `copyrightb`; coded with the informational metadata.
     pub copyright: Option<bool>,
+    /// `origbs`; coded with the informational metadata.
     pub original: Option<bool>,
+    /// `dsurmod`, 2 bits; coded with the informational metadata of a frame whose
+    /// `acmod` is 2.
     pub surround_mode: Option<u8>,
+    /// `dheadphonmod`, 2 bits; coded with the informational metadata of a frame
+    /// whose `acmod` is 2.
     pub headphone_mode: Option<u8>,
+    /// `dsurexmod`, 2 bits; coded with the informational metadata of a frame whose
+    /// `acmod` is 6 or 7.
     pub surround_ex_mode: Option<u8>,
     /// Packed mixlevel(5), roomtyp(2), adconvtyp(1), without normalization.
     pub production: Option<u8>,
+    /// `mixlevel2`, `roomtyp2` and `adconvtyp2` of a dual-mono frame (`acmod` 0),
+    /// packed as `production` is.
     pub second_production: Option<u8>,
+    /// `sourcefscod`; coded with the informational metadata unless `fscod` is 3.
     pub source_fscod: Option<bool>,
+    /// `convsync`; coded in an independent frame (`strmtyp` 0) of fewer than six
+    /// audio blocks.
     pub converter_sync: Option<bool>,
     /// None for the six-block Type-2 inferred block ID; distinct from Some(true).
     pub block_id: Option<bool>,
+    /// `blkid` of a frame converted from AC-3 (`strmtyp` 2), whether coded or
+    /// implied by six audio blocks, which give `Some(true)`. `None` for the other
+    /// stream types.
     pub effective_block_id: Option<bool>,
+    /// `frmsizecod`, 6 bits; coded when `effective_block_id` is `Some(true)`.
     pub converted_frame_size_code: Option<u8>,
     /// Payload bits only, excluding addbsie and addbsil. May be byte-unaligned.
     pub additional_bsi: Option<Eac3BitRange>,
+    /// The fields that end the frame.
     pub trailer: Eac3Trailer,
 }
 
+/// An E-AC-3 frame with the bit stream information an [`Eac3BsiParser`] read
+/// from it.
 #[derive(Clone, Debug)]
 pub struct Eac3Bsi {
     frame: Ac3Frame,
@@ -112,12 +165,20 @@ pub struct Eac3Bsi {
 }
 
 impl Eac3Bsi {
+    /// The frame the information was read from.
     pub fn frame(&self) -> &Ac3Frame {
         &self.frame
     }
+    /// The values and bit ranges read.
     pub const fn facts(&self) -> Eac3BsiFacts {
         self.facts
     }
+    /// An owned view of `range`, which shares the frame's bytes.
+    ///
+    /// # Errors
+    ///
+    /// When `range` starts inside the syncword or ends after
+    /// [`Eac3BsiFacts::end_bit`].
     pub fn bit_span(&self, range: Eac3BitRange) -> Result<Eac3BitSpan> {
         let end = range.start.checked_add(range.bits).ok_or(Error::Overflow)?;
         if range.start < 16 || end > self.facts.end_bit {
@@ -231,7 +292,28 @@ pub struct Eac3BsiParser {
     failure: Option<Error>,
 }
 
+impl std::fmt::Debug for Eac3BsiParser {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Eac3BsiParser")
+            .field("limits", &self.limits)
+            .field("position_bits", &self.position)
+            .field("complete", &self.complete)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
 impl Eac3BsiParser {
+    /// A parser of `frame` that starts reading where the frame's header ends.
+    ///
+    /// # Errors
+    ///
+    /// When a limit is zero; when `frame` is not charged to `pool`, is longer than
+    /// `maximum_frame_bytes`, is an AC-3 frame, has the reserved `strmtyp` 3 or
+    /// does not hold exactly the bytes its header declares; and when the header
+    /// fields alone exceed `maximum_bsi_bits` or reach the auxiliary data and CRC
+    /// fields that end the frame.
     pub fn new(pool: &Budget, frame: Ac3Frame, limits: Eac3BsiLimits) -> Result<Self> {
         if limits.maximum_frame_bytes == 0 || limits.maximum_bsi_bits == 0 {
             return Err(Error::Invalid("zero E-AC-3 BSI policy"));
@@ -338,6 +420,8 @@ impl Eac3BsiParser {
         })
     }
 
+    /// Bit position of the next field to read, counted from the first bit of the
+    /// syncword.
     pub fn position_bits(&self) -> usize {
         self.position
     }
@@ -402,6 +486,15 @@ impl Eac3BsiParser {
         }
     }
 
+    /// Advances by at most the work left in `work`, where each bit read costs one
+    /// unit, and returns the frame with its bit stream information once that is
+    /// read.
+    ///
+    /// # Errors
+    ///
+    /// When the fields reach the auxiliary data and CRC fields that end the frame
+    /// or exceed `maximum_bsi_bits`, `mixdef` is 3, or `cancel` is set. Every later
+    /// call returns the same error.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

@@ -5,14 +5,20 @@ use crate::{BuildStep, hevc::HvcConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
+/// The NAL units of an `hvcC` record as one Annex B buffer, with the record they
+/// were written from.
+#[derive(Debug)]
 pub struct HvcAnnexBOutput {
     bytes: Bytes,
     configuration: HvcConfiguration,
 }
 impl HvcAnnexBOutput {
+    /// Every NAL unit of the record in record order, each after a four-byte start
+    /// code. Empty for a record without NAL units.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// The record the bytes were written from, as it was given to the writer.
     pub fn configuration(&self) -> &HvcConfiguration {
         &self.configuration
     }
@@ -25,6 +31,9 @@ enum Phase {
     Freeze,
     Complete,
 }
+/// Writes every NAL unit of an `hvcC` record as Annex B, in record order and
+/// whatever type its array declares: each after a four-byte start code, into one
+/// buffer charged to the pool.
 pub struct HvcAnnexBWriter {
     pool: Budget,
     input: Option<HvcConfiguration>,
@@ -36,7 +45,24 @@ pub struct HvcAnnexBWriter {
     phase: Phase,
     failure: Option<Error>,
 }
+impl std::fmt::Debug for HvcAnnexBWriter {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("HvcAnnexBWriter")
+            .field("maximum", &self.maximum)
+            .field("total", &self.total)
+            .field("index", &self.index)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
 impl HvcAnnexBWriter {
+    /// Starts writing the NAL units of `input` into a buffer of at most
+    /// `maximum_output_bytes` bytes charged to `pool`.
+    ///
+    /// # Errors
+    ///
+    /// When the record belongs to another pool.
     pub fn new(
         pool: &Budget,
         input: HvcConfiguration,
@@ -57,6 +83,17 @@ impl HvcAnnexBWriter {
             failure: None,
         })
     }
+    /// Advances by at most the units in `work` and returns the output once, as
+    /// [`BuildStep`] describes. Sizing the output costs one unit for each NAL unit
+    /// and writing it one for each byte.
+    ///
+    /// # Errors
+    ///
+    /// When `cancel` is set, the output would exceed `maximum_output_bytes`, or the
+    /// pool's limit is below the record and the output together. Every later call
+    /// returns the same error. A pool that lacks the room only until other storage
+    /// is released is `Backpressure` or `Allocation` instead, and the call can be
+    /// repeated.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

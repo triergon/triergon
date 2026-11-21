@@ -1,6 +1,6 @@
 //! The packet job state machine: separate preparation and emission scratch, driven by
-//! [`NalPacketJob::advance_into`]. Each method is one step of the original
-//! loop; `Step::Continue` re-enters the loop and `Step::Break` returns.
+//! [`NalPacketJob::advance_into`]. Each method is one step of its loop;
+//! `Step::Continue` re-enters the loop and `Step::Break` returns.
 use super::{
     AvcState, ConfigurationRef, EmissionPhase, Injection, NalPacket, NalPacketJob, NalPacketOutput,
     NalPacketProgress, NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketInput,

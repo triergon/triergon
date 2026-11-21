@@ -13,40 +13,71 @@ pub(super) const CORE_SYNC: u32 = 0x7ffe8001;
 const EXTENSION_SYNC: u32 = 0x64582025;
 const FIELD_COUNT: usize = 27;
 
-/// Order is the primary bitstream-header syntax, including conditional HCRC.
+/// A field of the core frame header (ETSI TS 102 114 V1.6.1 clause 5.3,
+/// Table 5-1). The variants are in bitstream order, including the conditional
+/// `HCRC`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum DtsCoreField {
+    /// `SYNC`, 32 bits: the sync word, `0x7FFE8001` for a core frame.
     Sync,
+    /// `FTYPE`, 1 bit: 1 for a normal frame, 0 for a termination frame.
     Normal,
+    /// `SHORT`, 5 bits: the deficit sample count, 31 in a normal frame.
     Short,
+    /// `CPF`, 1 bit: whether the header carries `HCRC`.
     CrcPresent,
+    /// `NBLKS`, 7 bits: the number of 32-sample blocks per channel, minus one.
     BlockCount,
+    /// `FSIZE`, 14 bits: the frame size in bytes, minus one.
     FrameSize,
+    /// `AMODE`, 6 bits: the audio channel arrangement code.
     AudioMode,
+    /// `SFREQ`, 4 bits: the core sampling frequency code.
     SampleRate,
+    /// `RATE`, 5 bits: the transmission bit rate code.
     Rate,
+    /// `FixedBit`, 1 bit: reserved, 0.
     Fixed,
+    /// `DYNF`, 1 bit: the embedded dynamic range flag.
     Dynamic,
+    /// `TIMEF`, 1 bit: the embedded time stamp flag.
     Timestamp,
+    /// `AUXF`, 1 bit: the auxiliary data flag.
     Auxiliary,
+    /// `HDCD`, 1 bit: the HDCD source flag.
     Hdcd,
+    /// `EXT_AUDIO_ID`, 3 bits: the extension audio descriptor.
     ExtensionId,
+    /// `EXT_AUDIO`, 1 bit: whether the frame carries an extension.
     Extension,
+    /// `ASPF`, 1 bit: the audio sync word insertion flag.
     AudioSync,
+    /// `LFF`, 2 bits: the low frequency effects flag.
     Lfe,
+    /// `HFLAG`, 1 bit: the predictor history flag.
     History,
+    /// `HCRC`, 16 bits: the header CRC word, in the header only when `CPF` is 1.
     Hcrc,
+    /// `FILTS`, 1 bit: the multirate interpolator switch.
     Filter,
+    /// `VERNUM`, 4 bits: the encoder software revision.
     Version,
+    /// `CHIST`, 2 bits: the copy history.
     CopyHistory,
+    /// `PCMR`, 3 bits: the source PCM resolution code.
     PcmResolution,
+    /// `SUMF`, 1 bit: the front sum/difference flag.
     SumFront,
+    /// `SUMS`, 1 bit: the surround sum/difference flag.
     SumSurround,
+    /// `DIALNORM`, 4 bits: the dialog normalization for `VERNUM` 6 and 7,
+    /// unspecified for other versions.
     DialogWord,
 }
 
 impl DtsCoreField {
+    /// Every field, in bitstream order.
     pub const ALL: [Self; FIELD_COUNT] = [
         Self::Sync,
         Self::Normal,
@@ -77,6 +108,7 @@ impl DtsCoreField {
         Self::DialogWord,
     ];
 
+    /// Width of the field in bits, 1 to 32.
     pub const fn width(self) -> u8 {
         const WIDTHS: [u8; FIELD_COUNT] = [
             32, 1, 5, 1, 7, 14, 6, 4, 5, 1, 1, 1, 1, 1, 3, 1, 1, 2, 1, 16, 1, 4, 2, 3, 1, 1, 4,
@@ -85,23 +117,39 @@ impl DtsCoreField {
     }
 }
 
-/// A partial prefix integer has exactly `observed_bits` bits. It has not been
-/// shifted/zero-filled to the declared width. `value()` is None until complete.
+/// What the source holds of one header field. When the source ends inside a
+/// field, the partial prefix integer has exactly `observed_bits` bits. It has
+/// not been shifted/zero-filled to the declared width. `value()` is `None` until
+/// the field is complete.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FieldObservation {
+    /// No bit of the field was read: the source ends before it, or a
+    /// [`DtsHeaderInspector`] stopped at a sync word that is not the core sync
+    /// word.
     NotReached,
-    /// HCRC is absent once source CPF=0 is observed, even on an earlier truncation.
-    /// Unknown CPF remains NotReached; no missing value is filled with zero.
+    /// The field is not in this header: `HCRC` when `CPF` is 0, also when the
+    /// source ends before the place `HCRC` would have. While `CPF` is unknown
+    /// `HCRC` is `NotReached`; no missing value is filled with zero.
     NotInSyntax,
+    /// At least one bit of the field was read.
     Bits {
+        /// Offset of the field's first bit from the start of the inspected bytes,
+        /// in bits.
         offset: u16,
+        /// Width of the complete field in bits, 1 to 32.
         width: u8,
+        /// How many of the field's bits the source holds: `width` for a complete
+        /// field, 1 to `width - 1` when the source ends inside it.
         observed_bits: u8,
+        /// The observed bits as an unsigned integer, the first bit most
+        /// significant: the field's value when it is complete.
         prefix: u32,
     },
 }
 
 impl FieldObservation {
+    /// The value of a complete field; `None` when it is partial, not reached or
+    /// not in the header.
     pub const fn value(self) -> Option<u32> {
         match self {
             Self::Bits {
@@ -114,6 +162,9 @@ impl FieldObservation {
         }
     }
 
+    /// The bits read for the field, as bit offsets from the start of the
+    /// inspected bytes: `offset..offset + observed_bits`. `None` when no bit was
+    /// read.
     pub fn bit_range(self) -> Option<Range<u16>> {
         match self {
             Self::Bits {
@@ -126,33 +177,55 @@ impl FieldObservation {
     }
 }
 
-/// Issues describe independently observed source constraints. None is silently
-/// relaxed to reproduce native permissiveness. No decoder-ready flag is exposed.
+/// The constraints of the specification that an inspected header breaks, as a
+/// set of the flags below. Each flag is set from the complete fields it names,
+/// independently of the others. None is relaxed to match a more permissive
+/// decoder. An empty set does not say that a decoder can use the frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsInspectionIssues(u32);
 
 impl DtsInspectionIssues {
+    /// The source ends before the last header field is complete. Not set when
+    /// the sync word is complete and is not the core sync word.
     pub const TRUNCATED: u32 = 1;
+    /// The first 32 bits are not the core sync word `0x7FFE8001`.
     pub const NONCANONICAL_SYNC: u32 = 1 << 1;
+    /// The reserved bit after `RATE` is 1.
     pub const FIXED_BIT: u32 = 1 << 2;
+    /// `FSIZE` is below 95.
     pub const FRAME_SIZE: u32 = 1 << 3;
+    /// `NBLKS` is below 5, or a normal frame has an `NBLKS` other than 7, 15,
+    /// 31, 63 and 127.
     pub const BLOCK_COUNT: u32 = 1 << 4;
+    /// `SFREQ` is a code without a sampling frequency.
     pub const SAMPLE_RATE_CODE: u32 = 1 << 5;
+    /// `RATE` is neither a nominal bit rate, 0 to 24, nor 29, the open rate.
     pub const BITRATE_CODE: u32 = 1 << 6;
+    /// `LFF` is 3.
     pub const LFE_CODE: u32 = 1 << 7;
+    /// `PCMR` is 4 or 7.
     pub const PCM_RESOLUTION: u32 = 1 << 8;
+    /// A normal frame has a `SHORT` other than 31.
     pub const NORMAL_SHORT: u32 = 1 << 9;
+    /// `FTYPE` is 0: a termination frame.
     pub const TERMINATION: u32 = 1 << 10;
+    /// `VERNUM` is above 7.
     pub const FUTURE_VERSION: u32 = 1 << 11;
+    /// `EXT_AUDIO` is 1 with an `EXT_AUDIO_ID` other than 0, 2 and 6.
     pub const UNSUPPORTED_EXTENSION: u32 = 1 << 12;
+    /// The first 32 bits are the extension substream sync word `0x64582025`.
+    /// Set together with [`NONCANONICAL_SYNC`](Self::NONCANONICAL_SYNC).
     pub const EXTENSION_SUBSTREAM: u32 = 1 << 13;
 
+    /// The set as a mask of the flags above.
     pub const fn bits(self) -> u32 {
         self.0
     }
+    /// Whether no flag is set.
     pub const fn is_empty(self) -> bool {
         self.0 == 0
     }
+    /// Whether every flag in the mask `flags` is set.
     pub const fn contains(self, flags: u32) -> bool {
         self.0 & flags == flags
     }
@@ -186,36 +259,65 @@ impl DtsInspectionIssues {
     }
 }
 
-/// Separately named current-syntax views. Unknown or incomplete fields remain
-/// None. Even a present view is not complete-carriage/coded-audio validation.
+/// The values an inspected header's complete fields stand for. Each is `None`
+/// while a field it needs is unknown or incomplete, or holds a code without a
+/// value. Even a present value does not validate the rest of the frame or its
+/// coded audio.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsInspectionViews {
-    /// Arithmetic view of coded FSIZE+1, including invalid undersized codes.
+    /// `FSIZE + 1`, the declared frame size in bytes: 1 to 16384, computed also
+    /// for the invalid sizes below 96.
     pub declared_frame_bytes: Option<u32>,
+    /// Core sampling frequency in Hz, for an `SFREQ` code that has one: 8000,
+    /// 11025, 12000, 16000, 22050, 24000, 32000, 44100 or 48000.
     pub core_rate_hz: Option<u32>,
     /// Core samples per channel from a complete NBLKS in 5..=127, before any
     /// termination adjustment. Normal-frame restrictions apply to `normal_window`.
     pub coded_window_samples: Option<u32>,
+    /// Number of full-bandwidth channels, 1 to 8, for `AMODE` 0 to 15; `None`
+    /// for the arrangement codes above 15. The LFE channel is not counted.
     pub full_bandwidth_channels: Option<u8>,
+    /// Bit rate in bits per second for `RATE` 0 to 24, 32000 to 1536000; `None`
+    /// for every other code.
     pub nominal_bitrate: Option<u32>,
+    /// Whether `RATE` is 29, the open bit rate; `None` while `RATE` is
+    /// incomplete.
     pub open_bitrate: Option<bool>,
-    /// Only normal current-version headers with normal SHORT/NBLKS and a known
-    /// rate have this view. No termination or future-version time is invented.
+    /// Duration of a normal frame, `coded_window_samples / core_rate_hz`
+    /// seconds: present only for `FTYPE` 1, `SHORT` 31, `NBLKS` 7, 15, 31, 63 or
+    /// 127, an `SFREQ` code with a frequency and `VERNUM` 0 to 7. No time is
+    /// made up for a termination frame or a later version.
     pub normal_window: Option<Time>,
-    /// Defined here only for versions6/7, not unspecified placeholder words.
+    /// Dialog normalization gain in dB: `-(16 + DIALNORM)` for `VERNUM` 6 and
+    /// `-DIALNORM` for `VERNUM` 7. `None` for the other versions, whose
+    /// `DIALNORM` bits are unspecified.
     pub dialog_gain_db: Option<i8>,
 }
 
-/// Classification under the existing canonical normal-header source contract.
-/// NormalHeader certifies neither full carriage nor audio/decoder validity.
+/// The class of an inspected header, the first of these that applies: an
+/// extension substream sync word (`Unsupported`), another sync word than the
+/// core one (`Invalid`), a header the source ends inside (`Truncated`), a field
+/// the specification rules out (`Invalid`), a termination frame, later version
+/// or reserved extension (`Unsupported`), and otherwise `NormalHeader`.
+/// `NormalHeader` validates neither the rest of the frame nor its audio, and
+/// does not say that a decoder accepts it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DtsInspectionSourceStatus {
+    /// A complete header of a normal core frame without any issue.
     NormalHeader,
+    /// The source ends before the header is complete.
     Truncated,
+    /// The sync word is neither the core nor the extension substream sync word,
+    /// or a field holds a value the specification rules out.
     Invalid,
+    /// An extension substream, a termination frame, `VERNUM` above 7 or a
+    /// reserved extension code.
     Unsupported,
 }
 
+/// The result of a [`DtsHeaderInspector`]: what the record holds of every header
+/// field, the constraints the header breaks, the values its fields stand for,
+/// and the record itself.
 #[derive(Clone, Debug)]
 pub struct DtsInspection {
     raw: Bytes,
@@ -227,28 +329,39 @@ pub struct DtsInspection {
 }
 
 impl DtsInspection {
+    /// The whole record exactly as it was given, including any bytes after the
+    /// header.
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
+    /// Where the record came from, as the caller stated it.
     pub const fn identity(&self) -> DtsSourceIdentity {
         self.identity
     }
+    /// What the record holds of `field`.
     pub const fn field(&self, field: DtsCoreField) -> FieldObservation {
         self.fields[field as usize]
     }
+    /// The constraints the header breaks.
     pub const fn issues(&self) -> DtsInspectionIssues {
         self.issues
     }
+    /// The values the complete fields stand for.
     pub const fn views(&self) -> DtsInspectionViews {
         self.views
     }
+    /// Length of the header in bits, sync word included: 104, or 120 with
+    /// `HCRC`. `None` unless the core sync word and `CPF` are both complete.
     pub const fn required_header_bits(&self) -> Option<u16> {
         self.required_bits
     }
+    /// Whether the record begins with the core sync word and holds every header
+    /// field completely.
     pub fn syntax_complete(&self) -> bool {
         self.field(DtsCoreField::Sync).value() == Some(CORE_SYNC)
             && self.field(DtsCoreField::DialogWord).value().is_some()
     }
+    /// The header's class, derived from [`issues`](Self::issues).
     pub const fn source_status(&self) -> DtsInspectionSourceStatus {
         self.issues.source_status()
     }
@@ -262,11 +375,17 @@ enum Phase {
     Complete,
 }
 
-/// Inspects at most120 bits of a bounded complete source prefix/record. Every
-/// source byte is retained unchanged, including any tail beyond the header.
-/// All metadata has fixed inline size. Steps allocate/copy no dynamic storage;
-/// full-pool pressure therefore needs no retry allocation to publish a report.
-/// Zero work does nothing, work1 progresses, and cancellation is sticky.
+/// Reads the core header fields of one record the caller owns, bit by bit, and
+/// reports each field with its source bits and every constraint the header
+/// breaks, where [`probe_core_header`](crate::dts::probe_core_header) refuses
+/// the header at the first one. It inspects at most 120 bits. The result keeps
+/// every byte of the record as it is, including any after the header.
+///
+/// One bit costs one unit of work, and so do an absent `HCRC`, the validation
+/// and the result. A step without work does nothing; one unit always makes
+/// progress. The inspector allocates and copies nothing, so a full pool never
+/// delays the result. An error, cancellation included, is returned again by
+/// every later step.
 pub struct DtsHeaderInspector {
     raw: Option<Bytes>,
     identity: DtsSourceIdentity,
@@ -282,7 +401,28 @@ pub struct DtsHeaderInspector {
     failure: Option<Error>,
 }
 
+impl std::fmt::Debug for DtsHeaderInspector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DtsHeaderInspector")
+            .field("identity", &self.identity)
+            .field("position", &self.position)
+            .field("source_bits", &self.source_bits)
+            .field("issues", &self.issues)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
 impl DtsHeaderInspector {
+    /// An inspector of `source`, a record that begins where a frame's sync word
+    /// is expected and that `identity` locates. `source` must be charged to
+    /// `pool`. Bytes after the header are not read.
+    ///
+    /// # Errors
+    ///
+    /// `ForeignPool` when `source` is charged to another pool. `Invalid` when
+    /// `maximum_record_bytes` is zero, `Limit` when the record is longer than
+    /// that. `Overflow` when the record ends beyond offset `u64::MAX`.
     pub fn new(
         pool: &Budget,
         identity: DtsSourceIdentity,
@@ -327,7 +467,12 @@ impl DtsHeaderInspector {
 
     /// Advances the inspection. `Ready` occurs once, then `End` at the record's
     /// end: the end of the owned record, not an observed end of the transport.
-    /// An owned record never requests input.
+    /// `Yield` means the work is spent. An owned record never requests input.
+    ///
+    /// # Errors
+    ///
+    /// `Cancelled` when `cancel` is set. A header that breaks the specification
+    /// is not an error: it is reported in the result.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

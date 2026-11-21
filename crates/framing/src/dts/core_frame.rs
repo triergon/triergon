@@ -12,47 +12,100 @@ const CORE_SYNC: u32 = 0x7ffe8001;
 const EXTENSION_SYNC: u32 = 0x64582025;
 const MAXIMUM_COPY: usize = 4096;
 
-/// Raw source codes plus separately retained checked views of a selected header.
+/// The header of a normal DTS core frame (ETSI TS 102 114 V1.6.1 clause 5.3,
+/// Table 5-1): every field as coded, in bitstream order, then the values derived
+/// from them. The ranges given are those [`probe_core_header`] returns.
 /// `hcrc` distinguishes physical absence from a coded zero. `None` for channel
-/// count, nominal bitrate or dialog gain does not manufacture a coded default.
+/// count, nominal bitrate or dialog gain means the code defines no value; no
+/// default is substituted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsCoreHeader {
+    /// `FTYPE`, the frame type: 1, a normal frame.
     pub normal: u8,
+    /// `SHORT`, the deficit sample count: 31 in a normal frame.
     pub short: u8,
+    /// `CPF`: 1 when the header carries `HCRC`, otherwise 0.
     pub cpf: u8,
+    /// `NBLKS`, the number of 32-sample blocks per channel minus one: 7, 15, 31,
+    /// 63 or 127.
     pub nblks: u8,
+    /// `FSIZE`, the frame size in bytes minus one: 95 to 16383.
     pub fsize: u16,
+    /// `AMODE`, the audio channel arrangement code: 0 to 63. Codes 0 to 15 have
+    /// a channel count; see `full_bandwidth_channels`.
     pub amode: u8,
+    /// `SFREQ`, the core sampling frequency code: 1, 2, 3, 6, 7, 8, 11, 12 or 13.
     pub sfreq: u8,
+    /// `RATE`, the transmission bit rate code: 0 to 24 for a nominal rate, or 29
+    /// for an open rate.
     pub rate: u8,
+    /// `FixedBit`, the reserved bit after `RATE`: 0.
     pub fixed: u8,
+    /// `DYNF`, the embedded dynamic range flag: 0 or 1.
     pub dynamic: u8,
+    /// `TIMEF`, the embedded time stamp flag: 0 or 1.
     pub timestamp: u8,
+    /// `AUXF`, the auxiliary data flag: 0 or 1.
     pub auxiliary: u8,
+    /// `HDCD`, the HDCD source flag: 0 or 1.
     pub hdcd: u8,
+    /// `EXT_AUDIO_ID`, the extension audio descriptor: 0 to 7. With `extension`
+    /// set it is 0, 2 or 6.
     pub extension_id: u8,
+    /// `EXT_AUDIO`: 1 when the frame carries the extension `extension_id` names,
+    /// otherwise 0.
     pub extension: u8,
+    /// `ASPF`, the audio sync word insertion flag: 0 or 1.
     pub audio_sync: u8,
+    /// `LFF`, the low frequency effects flag: 0 without an LFE channel, 1 or 2
+    /// with one.
     pub lfe: u8,
+    /// `HFLAG`, the predictor history flag: 0 or 1.
     pub history: u8,
+    /// `HCRC`, the header CRC word as coded; `None` when `cpf` is 0. It is not
+    /// verified.
     pub hcrc: Option<u16>,
+    /// `FILTS`, the multirate interpolator switch: 0 or 1.
     pub filter: u8,
+    /// `VERNUM`, the encoder software revision: 0 to 7.
     pub version: u8,
+    /// `CHIST`, the copy history: 0 to 3.
     pub copy_history: u8,
+    /// `PCMR`, the source PCM resolution code: 0, 1, 2, 3, 5 or 6.
     pub pcm_resolution: u8,
+    /// `SUMF`, the front sum/difference flag: 0 or 1.
     pub sum_front: u8,
+    /// `SUMS`, the surround sum/difference flag: 0 or 1.
     pub sum_surround: u8,
+    /// `DIALNORM`, the last four header bits as coded: 0 to 15. They are a dialog
+    /// normalization only for `version` 6 and 7; see `dialog_gain_db`.
     pub dialog_word: u8,
+    /// Length of the header in bits, sync word included: 104, or 120 with `HCRC`.
     pub header_bits: u16,
+    /// Size of the whole frame in bytes, sync word included: `FSIZE + 1`, 96 to
+    /// 16384.
     pub frame_bytes: usize,
+    /// Core sampling frequency in Hz, from `SFREQ`: 8000, 11025, 12000, 16000,
+    /// 22050, 24000, 32000, 44100 or 48000.
     pub core_rate_hz: u32,
+    /// Samples per channel the frame codes at `core_rate_hz`:
+    /// `32 * (NBLKS + 1)`, which is 256, 512, 1024, 2048 or 4096.
     pub coding_window_samples: u32,
+    /// Number of full-bandwidth channels, 1 to 8, for `AMODE` 0 to 15; `None`
+    /// for the arrangement codes above 15. The LFE channel is not counted.
     pub full_bandwidth_channels: Option<u8>,
+    /// Bit rate in bits per second for `RATE` 0 to 24, 32000 to 1536000; `None`
+    /// for an open rate.
     pub nominal_bitrate: Option<u32>,
+    /// Whether `RATE` is 29, the open bit rate.
     pub open_bitrate: bool,
+    /// Dialog normalization gain in dB: `-(16 + DIALNORM)` for `VERNUM` 6,
+    /// `-DIALNORM` for `VERNUM` 7, `None` for every other version.
     pub dialog_gain_db: Option<i8>,
-    /// Exact normal-frame core coding-window duration, not container PTS/DTS,
-    /// an inferred extended output rate or a termination presentation duration.
+    /// Duration of the frame's core coding window, exactly
+    /// `coding_window_samples / core_rate_hz` seconds. It is not a container
+    /// PTS/DTS, does not use the higher output rate of an extension, and is not
+    /// the presentation duration of a termination frame.
     pub window: Time,
 }
 
@@ -83,9 +136,22 @@ impl HeaderBits<'_> {
     }
 }
 
-/// Allocation-free bounded prefix probe. At most fifteen source bytes and
-/// 120 bits are inspected, regardless of the size of the caller's slice.
-/// Success does not certify a complete body, coded audio or decoder readiness.
+/// Reads the header of a normal core frame from the start of `input`, which
+/// begins at the sync word `0x7FFE8001` in canonical big-endian byte order.
+/// The probe allocates nothing and inspects at most fifteen bytes (120 bits),
+/// regardless of the size of the caller's slice. Success does not certify a
+/// complete body, coded audio or decoder readiness.
+///
+/// # Errors
+///
+/// `Truncated` when `input` ends before the header does: 13 bytes, or 15 with
+/// `HCRC`. `Invalid` when `input` begins with neither the core nor the extension
+/// substream sync word, and for a field the specification rules out: an `SFREQ`
+/// or `RATE` code without a value, `FSIZE` below 95, `NBLKS` below 5, a set
+/// reserved bit, `LFF` 3, `PCMR` 4 or 7, a `SHORT` other than 31 or an `NBLKS`
+/// other than 7, 15, 31, 63 and 127. `Unsupported` for the extension substream
+/// sync word `0x64582025`, a termination frame, `VERNUM` above 7, and
+/// `EXT_AUDIO` set with an `EXT_AUDIO_ID` other than 0, 2 and 6.
 pub fn probe_core_header(input: &[u8]) -> Result<DtsCoreHeader> {
     check_sync(input)?;
     if input.len() < 11 {
@@ -213,22 +279,35 @@ pub fn probe_core_header(input: &[u8]) -> Result<DtsCoreHeader> {
     })
 }
 
+/// The bounds a [`DtsCoreFrameReader`] enforces. None may be zero.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsCoreFrameLimits {
+    /// Largest frame accepted, in bytes (`FSIZE + 1`).
     pub maximum_frame_bytes: usize,
+    /// Most frames the reader returns. Input that continues after that many
+    /// is refused.
     pub maximum_frames: usize,
+    /// Most bytes one input window may carry.
     pub maximum_input_window: usize,
 }
 
+/// Where a [`DtsCoreFrame`] lies in its source, and what its header says.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsCoreFrameFacts {
+    /// The source the frame was read from.
     pub source: SourceId,
+    /// The generation of the reader's input when the frame was returned; see
+    /// [`DtsCoreFrameReader::generation`].
     pub generation: u64,
+    /// Offset of the frame's sync word in the source, in bytes.
     pub offset: u64,
+    /// The header read from the frame's first bytes.
     pub header: DtsCoreHeader,
 }
 
-/// Owned complete declared envelope. There is no public unchecked constructor.
+/// One complete core frame: an owned copy of the `FSIZE + 1` bytes its header
+/// declares, exactly as the source has them, with its header. Only a
+/// [`DtsCoreFrameReader`] creates one.
 #[derive(Clone, Debug)]
 pub struct DtsCoreFrame {
     bytes: Bytes,
@@ -236,9 +315,12 @@ pub struct DtsCoreFrame {
 }
 
 impl DtsCoreFrame {
+    /// The frame's bytes from the sync word on: `facts().header.frame_bytes` of
+    /// them.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// The frame's place in its source and its header.
     pub const fn facts(&self) -> DtsCoreFrameFacts {
         self.facts
     }
@@ -258,10 +340,19 @@ enum Phase {
     Publish,
 }
 
-/// Complete declared-frame acquisition, without implicit resynchronization or
-/// payload editing. Input visits and all dynamic-buffer copies are separately
-/// work-bounded; allocation/probe/freeze/publication each cost one fixed unit.
-/// Packing conversions, termination and HD-asset extraction remain unsupported.
+/// Reads the core frames of an aligned stream: canonical big-endian normal
+/// frames back to back, the first at offset zero. Each frame is returned
+/// complete: the `FSIZE + 1` bytes its header declares, copied byte for byte.
+/// The reader never searches for a sync word: bytes that are not a frame header
+/// where one is due are an error. It does not convert word packings, and refuses
+/// termination frames and extension substreams.
+///
+/// Reading input and copying into the frame are each charged one unit of work per
+/// byte; the sync check, reading `CPF`, the header probe, the allocation,
+/// completing the frame and returning it cost one unit each. An error from
+/// [`step`](Self::step) ends the reader, and every later call returns it again,
+/// except `Backpressure` and `Allocation`, after which `step` may be called
+/// again.
 #[derive(Debug)]
 pub struct DtsCoreFrameReader {
     cursor: Option<InputCursor>,
@@ -284,6 +375,12 @@ pub struct DtsCoreFrameReader {
 }
 
 impl DtsCoreFrameReader {
+    /// A reader at offset zero of `source`. Input windows must be charged to
+    /// `pool`, and the frames are charged to it.
+    ///
+    /// # Errors
+    ///
+    /// `Invalid` when a limit is zero.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -318,26 +415,52 @@ impl DtsCoreFrameReader {
             failure: None,
         })
     }
+    /// [`InputToken::generation`] of the token the reader's requests carry.
+    /// After an error, that of the last request.
     pub fn generation(&self) -> u64 {
         self.cursor.as_ref().map_or(
             self.last_request.token.generation(),
             InputCursor::generation,
         )
     }
+    /// Offset in the source of the next byte the reader consumes. After an
+    /// error, the offset of the last request.
     pub fn position(&self) -> u64 {
         self.cursor
             .as_ref()
             .map_or(self.last_request.offset, InputCursor::position)
     }
+    /// The request for the bytes at [`position`](Self::position), to be answered
+    /// with [`provide`](Self::provide), [`finish`](Self::finish) or
+    /// [`fail`](Self::fail). After an error, the last request made.
     pub fn request(&self) -> InputRequest {
         self.cursor
             .as_ref()
             .map_or_else(|| self.last_request.clone(), InputCursor::request)
     }
+    /// Answers the current request with `window`, whose bytes the reader shares.
+    /// An empty window means "none yet", never the end of the source.
+    ///
+    /// # Errors
+    ///
+    /// The error that ended the reader, if any. Otherwise a window is refused,
+    /// leaving the reader as it was, when it carries another token or source
+    /// than the request, is charged to another pool, exceeds
+    /// `maximum_input_window`, does not start at `position`, or arrives while
+    /// earlier bytes are unread or after the end of the source.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.healthy()?;
         self.cursor_mut()?.provide(window)
     }
+    /// Answers the current request with the end of the source, which lies after
+    /// the bytes already provided. [`step`](Self::step) then returns `End` once
+    /// it has read them, or `Truncated` when they end inside a frame.
+    ///
+    /// # Errors
+    ///
+    /// The error that ended the reader, if any; a token or source other than
+    /// the request's; and `Truncated`, which ends the reader, when the source
+    /// ends before the length its capabilities declared.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
         let result = self.cursor_mut()?.finish(source, token);
@@ -346,6 +469,14 @@ impl DtsCoreFrameReader {
         }
         result
     }
+    /// Answers the current request with a failure of the source. This ends the
+    /// reader: every later call returns `Transport` or `Cancelled`, as `failure`
+    /// says. Frames returned earlier stay valid.
+    ///
+    /// # Errors
+    ///
+    /// The error that ended the reader, if any, and a token or source other
+    /// than the request's.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -380,6 +511,19 @@ impl DtsCoreFrameReader {
         self.header = None;
     }
 
+    /// Advances the reader by at most the work left in `work`. `Ready` carries
+    /// the next complete frame. `NeedInput` carries the request to answer before
+    /// the next call, `Yield` means the work is spent, and `End` that the source
+    /// ended on a frame boundary, at the location given.
+    ///
+    /// # Errors
+    ///
+    /// `Cancelled` when `cancel` is set. `Truncated` when the source ends inside
+    /// a frame. A header [`probe_core_header`] refuses, with its error. `Limit`
+    /// when a frame exceeds `maximum_frame_bytes` or what the pool can hold, and
+    /// when input continues after `maximum_frames` frames. `Backpressure` or
+    /// `Allocation` when the frame's storage cannot be allocated: after these
+    /// two, and only these, `step` may be called again.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

@@ -1,5 +1,6 @@
-//! Experimental exact-word normal DTS14 envelopes, discovered from source syncs.
-//! ETSI TS102114 V1.2.1 §5.3 / V1.6.1 §5.3–5.4.2; not universal DTS framing.
+//! Normal core frames of a 14-bit DTS stream whose frames fill whole 14-bit words,
+//! found from one sync to the next. Experimental, and not a reader for 14-bit DTS in
+//! general. ETSI TS 102 114 V1.2.1 §5.3 and V1.6.1 §5.3–5.4.2.
 use crate::dts::{
     Dts14BitPayload, Dts14BitUnpacker, DtsCoreHeader, DtsPackingLimits, DtsSourceIdentity,
     DtsWordOrder, probe_core_header,
@@ -10,34 +11,59 @@ use triergon_core::{
     SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, WorkBudget,
 };
 
+/// Limits of a [`Dts14SyncReader`]. None may be zero.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Dts14SyncLimits {
+    /// The most source bytes one frame may span. The reader reserves this many for
+    /// every frame, and a returned frame keeps them charged to the pool while it is
+    /// held.
     pub maximum_physical_frame_bytes: usize,
+    /// The most bytes one unpacked frame may hold: its `FSIZE` + 1.
     pub maximum_canonical_frame_bytes: usize,
+    /// The most frames read since construction or the last reset.
     pub maximum_frames: usize,
+    /// The most bytes one input window may hold.
     pub maximum_input_window: usize,
 }
 
+/// What ended a frame of a [`Dts14SyncReader`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dts14BoundaryEvidence {
-    /// Following normal38-bit sync was read, but is not in this frame's bytes.
-    FollowingNormalSync { physical_offset: u64 },
-    /// Explicit completion of the supplied entity, possibly an artificial view.
+    /// The next normal sync (`SYNC`, `FTYPE` 1, `SHORT` 31) starts where this frame
+    /// ends. The reader has read it; its bytes are not part of this frame.
+    FollowingNormalSync {
+        /// Source offset of the following sync, in bytes.
+        physical_offset: u64,
+    },
+    /// The source ended, as [`Dts14SyncReader::finish`] declared. A caller may
+    /// declare the end of a part of a stream as well as of a whole one.
     ExplicitSourceEnd,
 }
 
+/// What a [`Dts14SyncReader`] measured for one frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Dts14SyncFacts {
+    /// Source, cursor generation and byte offset of the frame's first byte.
     pub identity: DtsSourceIdentity,
+    /// Byte order of the source's 16-bit words.
     pub word_order: DtsWordOrder,
+    /// Length of the frame in source bytes: two for each 14-bit word.
     pub physical_bytes: usize,
+    /// Length of the unpacked frame in bytes, equal to `FSIZE` + 1.
     pub payload_bytes: usize,
+    /// What ended the frame.
     pub boundary: Dts14BoundaryEvidence,
+    /// Number of normal syncs inside the frame. They did not end it because the
+    /// words before them did not hold `FSIZE` + 1 bytes.
     pub skipped_interior_syncs: usize,
+    /// The frame's header, read from its first 18 source bytes.
     pub header: DtsCoreHeader,
 }
 
-/// Complete source span, not a coded-audio/CRC or complete-module certificate.
+/// One frame of a [`Dts14SyncReader`]: its source bytes, the unpacked frame and what
+/// the reader measured. It owns its bytes and outlives the reader. The frame is a
+/// complete span of the source with a checked header and length; its coded audio
+/// and checksums are not checked, and nothing says a decoder accepts it.
 #[derive(Clone, Debug)]
 pub struct Dts14SyncFrame {
     payload: Dts14BitPayload,
@@ -45,15 +71,20 @@ pub struct Dts14SyncFrame {
 }
 
 impl Dts14SyncFrame {
+    /// The frame as the source stores it: 16-bit words carrying 14 bits each.
     pub fn physical_bytes(&self) -> &Bytes {
         self.payload.source_bytes()
     }
+    /// The unpacked frame: `FSIZE` + 1 bytes that start with the 32-bit `SYNC`.
     pub fn canonical_bytes(&self) -> &Bytes {
         self.payload.canonical_bytes()
     }
+    /// The unpacked payload together with its source words: the two bits each word
+    /// leaves unused and the source byte of every payload bit.
     pub fn payload(&self) -> &Dts14BitPayload {
         &self.payload
     }
+    /// What the reader measured for the frame.
     pub const fn facts(&self) -> Dts14SyncFacts {
         self.facts
     }
@@ -74,9 +105,26 @@ enum Phase {
     Publish,
 }
 
-/// Bounded source-sync discovery with no FSIZE-derived physical read target.
-/// Exact-word geometry is deliberately narrower than a general DTS14 stream.
-/// A healthy reset clears synchronization and advances the core generation.
+/// Reads the normal core frames of a 14-bit DTS stream: 16-bit words in a given byte
+/// order, each carrying 14 bits of the frame in its low bits.
+///
+/// The stream must start with a frame. A frame ends at the next normal sync (`SYNC`,
+/// `FTYPE` 1, `SHORT` 31) found where the words read so far hold exactly `FSIZE` + 1
+/// bytes, or at the end of the source. `FSIZE` is only compared with the length
+/// found; the reader never reads a number of bytes derived from it. A normal sync
+/// anywhere else is frame content, counted in
+/// [`Dts14SyncFacts::skipped_interior_syncs`].
+///
+/// Only frames of a multiple of seven bytes are read: they fill whole words, eight
+/// source bytes for every seven. Any other frame is [`Error::Unsupported`], which
+/// makes this narrower than 14-bit DTS in general. A reader from [`new`](Self::new)
+/// also requires every frame to span as many source bytes as the first; one from
+/// [`per_frame`](Self::per_frame) lets each frame have its own length.
+///
+/// Call [`step`](Self::step) and answer each [`Step::NeedInput`] with
+/// [`provide`](Self::provide), [`finish`](Self::finish) or [`fail`](Self::fail).
+/// [`reset`](Self::reset) on a reader that has not failed forgets the stream read so
+/// far and starts a new cursor generation.
 pub struct Dts14SyncReader {
     pool: Budget,
     cursor: Option<InputCursor>,
@@ -107,7 +155,30 @@ pub struct Dts14SyncReader {
     failure: Option<Error>,
 }
 
+impl std::fmt::Debug for Dts14SyncReader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Dts14SyncReader")
+            .field("order", &self.order)
+            .field("limits", &self.limits)
+            .field("require_fixed_interval", &self.require_fixed_interval)
+            .field("position", &self.position())
+            .field("generation", &self.generation())
+            .field("completed", &self.completed)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
 impl Dts14SyncReader {
+    /// A reader at offset zero of `source`, whose words are in `order` and whose
+    /// frames all span the same number of source bytes. A frame of another length
+    /// than the first since construction or the last reset is
+    /// [`Error::Unsupported`].
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] when a limit is zero, and [`Error::Limit`] when a frame of
+    /// `maximum_physical_frame_bytes` cannot fit `pool`.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -161,22 +232,32 @@ impl Dts14SyncReader {
         })
     }
 
+    /// Generation of the reader's input cursor, which every frame carries in its
+    /// identity. [`reset`](Self::reset) starts a new one.
     pub fn generation(&self) -> u64 {
         self.cursor.as_ref().map_or(
             self.last_request.token.generation(),
             InputCursor::generation,
         )
     }
+    /// Source offset of the next byte the reader takes from its input. After a frame
+    /// that ended at a following sync it is six bytes past the frame's end: the
+    /// reader has read that sync.
     pub fn position(&self) -> u64 {
         self.cursor
             .as_ref()
             .map_or(self.last_request.offset, InputCursor::position)
     }
-    /// Normal frames at a per-frame cadence (ETSI TS 102 114 V1.6.1 5.3). Each frame
-    /// ends at a following normal sync or the explicit end of the entity, and its
-    /// low14 payload matches the declared byte count exactly. Geometry and every
-    /// source bit are validated independently for each record; non-byte-aligned tails
-    /// and unresolved FSIZE domains are `Unsupported`.
+    /// A reader like one from [`new`](Self::new), except that each frame has its own
+    /// length (ETSI TS 102 114 V1.6.1 5.3). Each frame ends at a following normal
+    /// sync or at the declared end of the source, and its 14-bit payload holds
+    /// exactly `FSIZE` + 1 bytes. The length and every source bit of a frame are
+    /// checked for that frame alone; a payload that does not end on a byte boundary
+    /// or does not hold `FSIZE` + 1 bytes is [`Error::Unsupported`].
+    ///
+    /// # Errors
+    ///
+    /// As [`new`](Self::new).
     pub fn per_frame(
         pool: &Budget,
         source: SourceId,
@@ -189,15 +270,32 @@ impl Dts14SyncReader {
         Ok(reader)
     }
 
+    /// The request for the bytes at [`position`](Self::position). A failed reader
+    /// returns the request it had open when it failed.
     pub fn request(&self) -> InputRequest {
         self.cursor
             .as_ref()
             .map_or_else(|| self.last_request.clone(), InputCursor::request)
     }
+    /// Answers the current request with `window`.
+    ///
+    /// # Errors
+    ///
+    /// The cursor's refusal of a window that does not answer the request (see
+    /// [`InputCursor::provide`]), which leaves the reader as it was. A failed reader
+    /// returns its earlier error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.healthy()?;
         self.cursor_mut()?.provide(window)
     }
+    /// Answers the current request with the end of the source, which also ends the
+    /// frame being read.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Truncated`], from then on, when the source ends before its known
+    /// length. A token or source that does not match the request is refused and
+    /// leaves the reader as it was. A failed reader returns its earlier error.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
         let result = self.cursor_mut()?.finish(source, token);
@@ -206,6 +304,14 @@ impl Dts14SyncReader {
         }
         result
     }
+    /// Answers the current request with a source failure. The reader drops the frame
+    /// it was reading and from then on returns [`Error::Transport`] or
+    /// [`Error::Cancelled`]; the bytes read so far never become a frame.
+    ///
+    /// # Errors
+    ///
+    /// A token or source that does not match the request is refused and leaves the
+    /// reader as it was. A failed reader returns its earlier error.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -220,6 +326,17 @@ impl Dts14SyncReader {
         });
         Ok(())
     }
+    /// Restarts at source offset `offset`, where a frame must start, and returns the
+    /// request for the bytes there. The frame being read is dropped, the frame count
+    /// starts again, a reader from [`new`](Self::new) takes its frame length from the
+    /// next frame, and the cursor takes a new generation, so answers to earlier
+    /// requests are refused. Frames already returned stay as they are.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Unsupported`] when `offset` is odd, or the cursor's refusal of an
+    /// offset it cannot serve (see [`InputCursor::reset`]). A failed reader returns
+    /// its earlier error and cannot be reset.
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
         self.healthy()?;
         if !offset.is_multiple_of(2) {
@@ -266,6 +383,22 @@ impl Dts14SyncReader {
         self.failure = Some(error);
     }
 
+    /// Reads on, as far as `work` allows. [`Step::Ready`] carries the next frame,
+    /// [`Step::NeedInput`] the request to answer before the next call, and
+    /// [`Step::End`] the end of the source once the last frame is returned;
+    /// [`Step::Yield`] means the work is spent.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Backpressure`] and [`Error::Allocation`] leave the reader as it was:
+    /// free pool storage and call again. Every other error is kept and returned by
+    /// all later calls: [`Error::Cancelled`] when `cancel` is set, the refusal of a
+    /// frame's header by [`probe_core_header`], [`Error::Unsupported`] for a frame
+    /// that is not a multiple of seven bytes, that does not hold `FSIZE` + 1 bytes
+    /// when the source ends, or whose length a reader from [`new`](Self::new) does
+    /// not accept, [`Error::Truncated`] when the source ends inside a header or a
+    /// word, and [`Error::Limit`] when a frame or the number of frames exceeds its
+    /// limit.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

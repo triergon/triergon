@@ -20,23 +20,32 @@ pub enum MpegVersion {
 /// The coding layer a header names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MpegLayer {
+    /// Layer I: 384 samples per frame, in slots of four bytes.
     I,
+    /// Layer II: 1152 samples per frame.
     II,
+    /// Layer III: 1152 samples per frame in MPEG-1, 576 in MPEG-2 and 2.5.
     III,
 }
 
 /// Channel mode of a frame header.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MpegChannelMode {
+    /// Two channels of one programme.
     Stereo,
+    /// Stereo that may share information between the channels, as
+    /// `mode_extension` says.
     JointStereo,
+    /// Two independent channels.
     DualChannel,
+    /// One channel.
     Mono,
 }
 
 /// De-emphasis a frame header asks for. It does not change decoding.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MpegEmphasis {
+    /// No de-emphasis.
     None,
     /// 50/15 microseconds.
     FiftyFifteen,
@@ -50,18 +59,31 @@ pub enum MpegEmphasis {
 /// A decoded MPEG audio frame header.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MpegAudioHeader {
+    /// The MPEG audio version, which scales the sample rate and selects the
+    /// bit rate table.
     pub version: MpegVersion,
+    /// The coding layer.
     pub layer: MpegLayer,
     /// A 16-bit CRC follows the header.
     pub crc: bool,
     /// Kilobits per second; 0 for a free-format frame.
     pub bitrate_kbps: u16,
+    /// Sampling frequency in Hz: 44100, 48000 or 32000 in MPEG-1, half of
+    /// those in MPEG-2 and a quarter in MPEG-2.5.
     pub sample_rate: u32,
+    /// `padding_bit`: the frame is one slot longer, four bytes in Layer I and
+    /// one byte in the others.
     pub padding: bool,
+    /// `mode`.
     pub channel_mode: MpegChannelMode,
+    /// `mode_extension`, 0 to 3, as coded; it has a meaning in joint stereo
+    /// only.
     pub mode_extension: u8,
+    /// `copyright`.
     pub copyright: bool,
+    /// The original bit: set for an original, clear for a copy.
     pub original: bool,
+    /// `emphasis`.
     pub emphasis: MpegEmphasis,
 }
 
@@ -229,6 +251,7 @@ pub enum MpegInfoKind {
 /// The stream description of a Xing, Info or VBRI frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MpegInfoFrame {
+    /// The tag the frame carries.
     pub kind: MpegInfoKind,
     /// Audio frames in the stream, not counting this one.
     pub frames: Option<u32>,
@@ -236,6 +259,9 @@ pub struct MpegInfoFrame {
     pub bytes: Option<u32>,
     /// The 100-entry seek table of a Xing or Info frame.
     pub toc: Option<[u8; 100]>,
+    /// The LAME extension of a Xing or Info frame; `None` when the frame ends
+    /// before it or its encoder string holds anything but printable ASCII and
+    /// zero bytes, and for VBRI.
     pub lame: Option<LameTag>,
 }
 
@@ -321,6 +347,10 @@ pub fn info_frame(frame: &[u8], header: &MpegAudioHeader) -> Option<MpegInfoFram
 
 /// Check the CRC of a frame whose header says it carries one (ISO/IEC 11172-3 2.4.3.1):
 /// the CRC covers the last two header bytes and the first `protected` bytes after it.
+///
+/// # Errors
+///
+/// When `frame` is shorter than the header, the CRC and `protected` bytes.
 pub fn crc_ok(frame: &[u8], protected: usize) -> Result<bool> {
     let stored = frame.get(4..6).ok_or(Error::Truncated)?;
     let body = frame.get(6..6 + protected).ok_or(Error::Truncated)?;

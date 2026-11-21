@@ -1,52 +1,74 @@
-//! VP9 VPCodecConfigurationRecord facts from WebM's authoritative v1.0 binding.
-//! The FullBox envelope is supplied explicitly by the container owner; this
-//! module does not guess whether record bytes include box headers or v0 syntax.
+//! The VP9 `VPCodecConfigurationRecord` of WebM's authoritative v1.0 binding
+//! (the `vpcC` box). The caller supplies the `FullBox` version and flags
+//! explicitly, as [`Vp9ConfigContext`]; this module does not guess whether
+//! record bytes include box headers or v0 syntax.
 use crate::{BuildStep, record_input};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, InputCursor, Result, SourceId, Step, WorkBudget};
 
+/// The `FullBox` header of the `vpcC` box a record comes from, as the caller
+/// read it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Vp9ConfigContext {
+    /// The box `version`; the parser accepts only 1.
     pub version: u8,
+    /// The box `flags`, 24 bits. The binding has them zero; another value is
+    /// kept and reported as a syntax issue.
     pub flags: u32,
 }
 
+/// Bounds on a `vpcC` record. Each must be non-zero.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Vp9ConfigLimits {
+    /// The most bytes of the whole record.
     pub maximum_record_bytes: usize,
+    /// The most bytes of the record the parser takes at once.
     pub maximum_input_window: usize,
 }
 
+/// The eight fixed bytes of a `VPCodecConfigurationRecord`, each field as
+/// coded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Vp9ConfigFields {
     raw: [u8; 8],
 }
 
 impl Vp9ConfigFields {
+    /// `profile`; VP9 has profiles 0 to 3.
     pub const fn profile(self) -> u8 {
         self.raw[0]
     }
+    /// `level`: ten times the level number, such as 41 for level 4.1.
     pub const fn level(self) -> u8 {
         self.raw[1]
     }
+    /// `bitDepth`: bits per sample; VP9 has 8, 10 and 12.
     pub const fn bit_depth(self) -> u8 {
         self.raw[2] >> 4
     }
+    /// `chromaSubsampling`, 0 to 7: 0 and 1 are 4:2:0 (vertically sited and
+    /// colocated with luma), 2 is 4:2:2, 3 is 4:4:4, the rest are reserved.
     pub const fn chroma_subsampling(self) -> u8 {
         (self.raw[2] >> 1) & 7
     }
+    /// `videoFullRangeFlag`: full range rather than legal range.
     pub const fn video_full_range(self) -> bool {
         self.raw[2] & 1 != 0
     }
+    /// `colourPrimaries`, a code point of ISO/IEC 23001-8.
     pub const fn colour_primaries(self) -> u8 {
         self.raw[3]
     }
+    /// `transferCharacteristics`, a code point of ISO/IEC 23001-8.
     pub const fn transfer_characteristics(self) -> u8 {
         self.raw[4]
     }
+    /// `matrixCoefficients`, a code point of ISO/IEC 23001-8; 0 is RGB.
     pub const fn matrix_coefficients(self) -> u8 {
         self.raw[5]
     }
+    /// `codecInitializationDataSize`: bytes of initialization data after the
+    /// fixed fields. The binding has it zero for VP9.
     pub const fn initialization_size(self) -> u16 {
         u16::from_be_bytes([self.raw[6], self.raw[7]])
     }
@@ -59,14 +81,18 @@ impl Vp9ConfigFields {
 pub struct Vp9ConfigSyntaxIssues(u8);
 
 impl Vp9ConfigSyntaxIssues {
+    /// The issue bits listed on the type; 0 when none was found.
     pub const fn bits(self) -> u8 {
         self.0
     }
+    /// True when none of the listed issues was found.
     pub const fn is_empty(self) -> bool {
         self.0 == 0
     }
 }
 
+/// A parsed `vpcC` record with the `FullBox` header it came with, sharing the
+/// record's bytes.
 #[derive(Clone, Debug)]
 pub struct Vp9Configuration {
     raw: Bytes,
@@ -77,24 +103,38 @@ pub struct Vp9Configuration {
 }
 
 impl Vp9Configuration {
+    /// The whole record as it was given to the parser.
     pub fn raw_record(&self) -> &Bytes {
         &self.raw
     }
+    /// The `FullBox` header the parser was given.
     pub const fn context(&self) -> Vp9ConfigContext {
         self.context
     }
+    /// The eight fixed bytes before `codecInitializationData`.
     pub const fn fields(&self) -> Vp9ConfigFields {
         self.fields
     }
+    /// The source the record was given to the parser as.
     pub const fn source(&self) -> SourceId {
         self.source
     }
+    /// The input generation the record was read under.
     pub const fn generation(&self) -> u64 {
         self.generation
     }
+    /// `codecInitializationData` as coded: the record after its eight fixed
+    /// bytes, sharing its allocation. Empty in a record that follows the
+    /// binding.
+    ///
+    /// # Errors
+    ///
+    /// None for a record a parser returned, which holds its eight fixed bytes.
     pub fn initialization_bytes(&self) -> Result<Bytes> {
         self.raw.slice(8..self.raw.len())
     }
+    /// The departures from the binding found in the `FullBox` flags and the
+    /// fixed fields.
     pub fn syntax_issues(&self) -> Vp9ConfigSyntaxIssues {
         let fields = self.fields;
         Vp9ConfigSyntaxIssues(
@@ -111,8 +151,9 @@ impl Vp9Configuration {
 
 /// Reads exactly the eight-byte fixed record prefix with bounded work, checks
 /// its declared initialization length, and retains the opaque initialization.
-/// Nonempty VP9 initialization violates the binding; it is reported as a source
+/// Nonempty VP9 initialization violates the binding; it is reported as a syntax
 /// issue rather than silently removed. No source-sized copy/allocation occurs.
+#[derive(Debug)]
 pub struct Vp9ConfigParser {
     source: Option<Bytes>,
     cursor: Option<InputCursor>,
@@ -126,6 +167,16 @@ pub struct Vp9ConfigParser {
 }
 
 impl Vp9ConfigParser {
+    /// A parser for `record`, the payload of a `vpcC` box after its `FullBox`
+    /// header, which `context` carries. `source` names the record in the
+    /// configuration.
+    ///
+    /// # Errors
+    ///
+    /// When a limit is zero; the record is charged to another pool than
+    /// `pool`, is longer than `maximum_record_bytes` or is shorter than its
+    /// eight fixed bytes; the box version is not 1; or the flags exceed 24
+    /// bits.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -161,6 +212,14 @@ impl Vp9ConfigParser {
         self.cursor = None;
     }
 
+    /// Reads the fixed fields, one work unit per byte and one for the length
+    /// check, and returns the configuration.
+    ///
+    /// # Errors
+    ///
+    /// Cancellation, or a record shorter or longer than its eight fixed bytes
+    /// and the `codecInitializationDataSize` they declare. Each is final: every
+    /// later call returns the same error.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

@@ -5,16 +5,26 @@ use crate::{BuildStep, ac3::frame::BIT_RATES_KBPS, record_input};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, InputCursor, Result, SourceId, Step, WorkBudget};
 
+/// Which record a payload holds. The payload does not say: the caller knows it from
+/// the type of the box.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ac3ConfigKind {
+    /// The payload of an AC3SpecificBox (`dac3`), ETSI TS 102 366 Annex F.4: three
+    /// bytes.
     Dac3,
+    /// The payload of an EC3SpecificBox (`dec3`), ETSI TS 102 366 Annex F.6.
     Dec3,
 }
 
+/// Caller limits of an [`Ac3ConfigParser`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Ac3ConfigLimits {
+    /// The longest record accepted, in bytes; not zero.
     pub maximum_record_bytes: usize,
+    /// The most independent substreams a `dec3` record may declare
+    /// (`num_ind_sub + 1`): 1 to 8.
     pub maximum_independent_substreams: u8,
+    /// The most bytes of the record the parser takes in at a time; not zero.
     pub maximum_input_window: usize,
 }
 
@@ -24,14 +34,18 @@ pub struct Ac3ConfigLimits {
 pub struct Ac3ConfigIssues(u8);
 
 impl Ac3ConfigIssues {
+    /// The issue bits listed on the type; 0 when there is none.
     pub const fn bits(self) -> u8 {
         self.0
     }
+    /// Whether no issue was found.
     pub const fn is_empty(self) -> bool {
         self.0 == 0
     }
 }
 
+/// The 24 bits of a `dac3` record. Every field reads as coded, reserved values
+/// included.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Dac3Fields {
     raw: [u8; 3],
@@ -41,27 +55,38 @@ impl Dac3Fields {
     const fn word(self) -> u32 {
         u32::from_be_bytes([0, self.raw[0], self.raw[1], self.raw[2]])
     }
+    /// `fscod`, the sample rate code: 0 for 48 kHz, 1 for 44.1 kHz, 2 for 32 kHz,
+    /// 3 reserved.
     pub const fn fscod(self) -> u8 {
         (self.word() >> 22) as u8
     }
+    /// `bsid`, 5 bits; AC-3 uses 0 to 8.
     pub const fn bsid(self) -> u8 {
         ((self.word() >> 17) & 31) as u8
     }
+    /// `bsmod`, the bit stream mode: 3 bits.
     pub const fn bsmod(self) -> u8 {
         ((self.word() >> 14) & 7) as u8
     }
+    /// `acmod`, the audio coding mode: 3 bits.
     pub const fn acmod(self) -> u8 {
         ((self.word() >> 11) & 7) as u8
     }
+    /// `lfeon`: whether the stream codes a low-frequency effects channel.
     pub const fn lfe_on(self) -> bool {
         self.word() & 1024 != 0
     }
+    /// `bit_rate_code`, 5 bits: the index of the nominal bit rate, from 0 for
+    /// 32 kbit/s to 18 for 640 kbit/s; 19 to 31 are reserved.
     pub const fn bit_rate_code(self) -> u8 {
         ((self.word() >> 5) & 31) as u8
     }
+    /// The five reserved bits that end the record; 0 in a conforming record.
     pub const fn reserved_bits(self) -> u8 {
         (self.word() & 31) as u8
     }
+    /// The sample rate that `fscod` names, in Hz. `None` for the reserved code and
+    /// for a `bsid` above 8.
     pub fn sample_rate_hz(self) -> Option<u32> {
         if self.bsid() > 8 {
             return None;
@@ -70,6 +95,8 @@ impl Dac3Fields {
             .get(usize::from(self.fscod()))
             .copied()
     }
+    /// The nominal bit rate that `bit_rate_code` names, in bits per second: 32000
+    /// to 640000. `None` for a reserved code and for a `bsid` above 8.
     pub fn nominal_bit_rate_bps(self) -> Option<u32> {
         if self.bsid() > 8 {
             return None;
@@ -78,6 +105,8 @@ impl Dac3Fields {
             .get(usize::from(self.bit_rate_code()))
             .map(|value| u32::from(*value) * 1000)
     }
+    /// The reserved and unsupported values among the fields, as
+    /// [`Ac3ConfigIssues`] bits.
     pub fn syntax_issues(self) -> Ac3ConfigIssues {
         Ac3ConfigIssues(
             u8::from(self.reserved_bits() != 0)
@@ -88,6 +117,7 @@ impl Dac3Fields {
     }
 }
 
+/// A `dac3` record: its bytes as supplied and the fields they code.
 #[derive(Clone, Debug)]
 pub struct Dac3Configuration {
     raw: Bytes,
@@ -97,20 +127,28 @@ pub struct Dac3Configuration {
 }
 
 impl Dac3Configuration {
+    /// The record's three bytes, sharing the allocation the parser was given.
     pub fn raw_record(&self) -> &Bytes {
         &self.raw
     }
+    /// The record's fields, as coded.
     pub const fn fields(&self) -> Dac3Fields {
         self.fields
     }
+    /// The source the parser was created for.
     pub const fn source(&self) -> SourceId {
         self.source
     }
+    /// The generation of the parser that read the record: a number its pool gives
+    /// to no other parser or reader.
     pub const fn generation(&self) -> u64 {
         self.generation
     }
 }
 
+/// One independent substream entry of a `dec3` record: three bytes, or four when
+/// it declares dependent substreams. Every field reads as coded, reserved values
+/// included.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Dec3Substream {
     raw: [u8; 4],
@@ -124,30 +162,40 @@ impl Dec3Substream {
         width: 3,
         offset: 0,
     };
+    /// The entry's bytes: three, or four when `num_dep_sub` is not 0.
     pub fn raw_bytes(&self) -> &[u8] {
         &self.raw[..usize::from(self.width)]
     }
+    /// `fscod`, the sample rate code: 0 for 48 kHz, 1 for 44.1 kHz, 2 for 32 kHz,
+    /// 3 reserved.
     pub const fn fscod(self) -> u8 {
         self.raw[0] >> 6
     }
+    /// `bsid`, 5 bits; E-AC-3 uses 11 to 16.
     pub const fn bsid(self) -> u8 {
         (self.raw[0] >> 1) & 31
     }
+    /// The reserved bit after `bsid`; 0 in a conforming record.
     pub const fn reserved_one_bit(self) -> u8 {
         self.raw[0] & 1
     }
+    /// `asvc`: whether the substream is an associated service.
     pub const fn asvc(self) -> bool {
         self.raw[1] & 128 != 0
     }
+    /// `bsmod`, the bit stream mode: 3 bits.
     pub const fn bsmod(self) -> u8 {
         (self.raw[1] >> 4) & 7
     }
+    /// `acmod`, the audio coding mode: 3 bits.
     pub const fn acmod(self) -> u8 {
         (self.raw[1] >> 1) & 7
     }
+    /// `lfeon`: whether the substream codes a low-frequency effects channel.
     pub const fn lfe_on(self) -> bool {
         self.raw[1] & 1 != 0
     }
+    /// The three reserved bits before `num_dep_sub`; 0 in a conforming record.
     pub const fn reserved_three_bits(self) -> u8 {
         self.raw[2] >> 5
     }
@@ -156,6 +204,8 @@ impl Dec3Substream {
     pub const fn num_dependent(self) -> u8 {
         (self.raw[2] >> 1) & 15
     }
+    /// `chan_loc`, 9 bits: the channel locations of the dependent substreams.
+    /// `None` when `num_dep_sub` is 0.
     pub const fn channel_location(self) -> Option<u16> {
         if self.num_dependent() == 0 {
             None
@@ -163,6 +213,8 @@ impl Dec3Substream {
             Some(((self.raw[2] & 1) as u16) << 8 | self.raw[3] as u16)
         }
     }
+    /// The reserved bit that takes the place of `chan_loc` when `num_dep_sub` is
+    /// 0; `None` otherwise.
     pub const fn no_dependent_reserved_bit(self) -> Option<u8> {
         if self.num_dependent() == 0 {
             Some(self.raw[2] & 1)
@@ -180,6 +232,8 @@ impl Dec3Substream {
             .get(usize::from(self.fscod()))
             .copied()
     }
+    /// The reserved and unsupported values among the fields, as
+    /// [`Ac3ConfigIssues`] bits.
     pub fn syntax_issues(self) -> Ac3ConfigIssues {
         Ac3ConfigIssues(
             u8::from(
@@ -194,6 +248,8 @@ impl Dec3Substream {
     }
 }
 
+/// A `dec3` record: its bytes as supplied, `data_rate` and one entry for each
+/// independent substream.
 #[derive(Clone, Debug)]
 pub struct Dec3Configuration {
     raw: Bytes,
@@ -206,24 +262,43 @@ pub struct Dec3Configuration {
 }
 
 impl Dec3Configuration {
+    /// The whole record, sharing the allocation the parser was given.
     pub fn raw_record(&self) -> &Bytes {
         &self.raw
     }
+    /// `data_rate`, 13 bits: the data rate of the stream in kbit/s, as coded.
     pub const fn data_rate_kbps(&self) -> u16 {
         self.data_rate
     }
+    /// The independent substream entries in record order: `num_ind_sub + 1` of
+    /// them, 1 to 8.
     pub fn substreams(&self) -> &[Dec3Substream] {
         &self.entries[..usize::from(self.count)]
     }
+    /// The source the parser was created for.
     pub const fn source(&self) -> SourceId {
         self.source
     }
+    /// The generation of the parser that read the record: a number its pool gives
+    /// to no other parser or reader.
     pub const fn generation(&self) -> u64 {
         self.generation
     }
+    /// The bytes after the last entry, uninterpreted and sharing the record's
+    /// allocation; empty when the record ends with its entries.
+    ///
+    /// # Errors
+    ///
+    /// Never: the range lies inside the record.
     pub fn trailing_reserved_bytes(&self) -> Result<Bytes> {
         self.raw.slice(self.tail_offset..self.raw.len())
     }
+    /// The bytes of entry `index` of [`substreams`](Self::substreams), sharing the
+    /// record's allocation.
+    ///
+    /// # Errors
+    ///
+    /// When `index` is not below the number of entries.
     pub fn substream_bytes(&self, index: usize) -> Result<Bytes> {
         let entry = self
             .substreams()
@@ -237,6 +312,7 @@ impl Dec3Configuration {
                     .ok_or(Error::Overflow)?,
         )
     }
+    /// The issues of all entries together, as [`Ac3ConfigIssues`] bits.
     pub fn syntax_issues(&self) -> Ac3ConfigIssues {
         Ac3ConfigIssues(
             self.substreams()
@@ -246,19 +322,24 @@ impl Dec3Configuration {
     }
 }
 
+/// The record an [`Ac3ConfigParser`] read.
 #[derive(Clone, Debug)]
 pub enum Ac3Configuration {
+    /// A `dac3` record.
     Dac3(Dac3Configuration),
+    /// A `dec3` record.
     Dec3(Dec3Configuration),
 }
 
 impl Ac3Configuration {
+    /// The whole record, sharing the allocation the parser was given.
     pub fn raw_record(&self) -> &Bytes {
         match self {
             Self::Dac3(value) => value.raw_record(),
             Self::Dec3(value) => value.raw_record(),
         }
     }
+    /// The source the parser was created for.
     pub fn source(&self) -> SourceId {
         match self {
             Self::Dac3(value) => value.source(),
@@ -297,7 +378,29 @@ pub struct Ac3ConfigParser {
     failure: Option<Error>,
 }
 
+impl std::fmt::Debug for Ac3ConfigParser {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Ac3ConfigParser")
+            .field("source", &self.identity)
+            .field("generation", &self.generation)
+            .field("limits", &self.limits)
+            .field("complete", &self.complete)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
 impl Ac3ConfigParser {
+    /// A parser of `record`, the complete payload of the box that `kind` names.
+    /// `source` only labels the result.
+    ///
+    /// # Errors
+    ///
+    /// When `maximum_independent_substreams` is not 1 to 8 or another limit is
+    /// zero; when `record` is not charged to `pool`, is longer than
+    /// `maximum_record_bytes`, or is shorter than three bytes (`dac3`) or two
+    /// (`dec3`).
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -344,6 +447,14 @@ impl Ac3ConfigParser {
         self.source = None;
         self.cursor = None;
     }
+    /// Advances by at most the work left in `work`, and returns the record once
+    /// it is read.
+    ///
+    /// # Errors
+    ///
+    /// When a `dac3` record is longer than three bytes, a `dec3` record declares
+    /// more independent substreams than the limit or ends inside an entry, or
+    /// `cancel` is set. Every later call returns the same error.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

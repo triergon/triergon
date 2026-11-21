@@ -34,8 +34,12 @@ use crate::{
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};
 
-/// A malformed nonempty version-one AVC update header. Only a completed
-/// short-header failure in the explicit update parser can create this rejection.
+/// An AVC configuration update that the filter rejects together with its packet:
+/// a record of `configurationVersion` 1 that is shorter than seven bytes and so
+/// ends before its PPS count. Only a parser made with
+/// [`ReceiverAvcConfigParser::new_update`] creates it, after it failed with
+/// [`Error::Truncated`].
+#[derive(Debug)]
 pub struct ReceiverAvcUpdateRejection {
     raw: Bytes,
     source: AvcConfigSource,
@@ -43,31 +47,53 @@ pub struct ReceiverAvcUpdateRejection {
     strict_source_refusal: Option<Error>,
 }
 impl ReceiverAvcUpdateRejection {
+    /// The update record as it was given.
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
+    /// Where the caller says the record came from.
     pub fn source(&self) -> AvcConfigSource {
         self.source
     }
+    /// The parser's error: [`Error::Truncated`].
     pub fn source_error(&self) -> Error {
         self.error
     }
-    /// The ordinary source parser may refuse width three before this observed
-    /// record walk reaches its later physical error. Preserve both facts.
+    /// The error with which [`AvcConfigParser`] refuses the record before it
+    /// reaches the truncation: [`Error::Invalid`] for a three-byte NAL length in
+    /// a record of six bytes. `None` when it stops at the truncation too.
     pub fn strict_source_refusal(&self) -> Option<Error> {
         self.strict_source_refusal
     }
-    /// Observed public receive result; this is not an executed native call.
-    /// Comparison-only.
+    /// FFmpeg's return code for the packet that carries this update:
+    /// `AVERROR_INVALIDDATA`. It is a constant for comparison, compiled with the
+    /// `reference-trace` feature; FFmpeg is not called.
     #[cfg(feature = "reference-trace")]
     pub fn native_receive_result(&self) -> i32 {
         -1_094_995_529
     }
 }
 
+/// An AVC configuration record as FFmpeg's `h264_mp4toannexb` filter accepts it.
+///
+/// Its SPS and PPS arrays are complete. Unlike an [`AvcConfiguration`], it may
+/// declare a three-byte NAL length, and a record whose `AVCProfileIndication`
+/// is 100, 110, 122 or 144 may end inside its four-byte extension header, or
+/// directly after one that declares SPS extension entries.
+/// [`strict_source_refusal`](Self::strict_source_refusal) tells such a record
+/// from one that [`AvcConfigParser`] accepts.
 pub struct ReceiverAvcConfiguration {
     inner: AvcConfiguration,
     refusal: NalConfigurationRefusal,
+}
+impl std::fmt::Debug for ReceiverAvcConfiguration {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ReceiverAvcConfiguration")
+            .field("record", &self.inner)
+            .field("strict_source_refusal", &self.strict_source_refusal())
+            .finish_non_exhaustive()
+    }
 }
 impl ReceiverAvcConfiguration {
     fn from_record(inner: AvcConfiguration) -> Self {
@@ -96,49 +122,72 @@ impl ReceiverAvcConfiguration {
     pub(crate) const fn refusal(&self) -> NalConfigurationRefusal {
         self.refusal
     }
+    /// The record's arrays in order: SPS, PPS and, when the record holds a
+    /// complete extension header, SPS extension.
     pub fn arrays(
         &self,
     ) -> impl ExactSizeIterator<Item = AvcConfigArray<'_>> + DoubleEndedIterator + '_ {
         self.inner.arrays()
     }
+    /// The array at `index`; `None` past the last.
     pub fn array(&self, index: usize) -> Option<AvcConfigArray<'_>> {
         self.inner.array(index)
     }
+    /// The record's bytes after its last array. The zero to three bytes of an
+    /// extension header that is cut short are among them.
     pub fn trailing_bytes(&self) -> &[u8] {
         self.inner.trailing_bytes()
     }
+    /// The NAL unit at `index`, counted over all arrays in record order; `None`
+    /// past the last.
     pub fn nal(&self, index: usize) -> Option<AvcConfigNal<'_>> {
         self.inner.nal(index)
     }
+    /// NAL units in all arrays together.
     pub fn nal_count(&self) -> usize {
         self.inner.nal_count()
     }
+    /// Arrays in the record: 2, or 3 with a complete extension header.
     pub fn array_count(&self) -> usize {
         self.inner.array_count()
     }
 
+    /// The whole record as it was given.
     pub fn source_bytes(&self) -> &Bytes {
         self.inner.source_bytes()
     }
+    /// Where the caller says the record came from.
     pub fn source(&self) -> AvcConfigSource {
         self.inner.source()
     }
+    /// The record's fixed fields.
     pub fn fields(&self) -> AvcConfigFields {
         self.inner.fields()
     }
+    /// Width of the length field before each NAL unit of a sample,
+    /// `lengthSizeMinusOne + 1`: 1 to 4 bytes, three among them.
     pub fn observed_length_size(&self) -> LengthSize {
         self.inner.sample_length_size()
     }
+    /// The NAL units of all arrays in record order.
     pub fn nals(
         &self,
     ) -> impl ExactSizeIterator<Item = AvcConfigNal<'_>> + DoubleEndedIterator + '_ {
         self.inner.nals()
     }
+    /// The error with which [`AvcConfigParser`] refuses this record:
+    /// [`Error::Invalid`] for a three-byte NAL length, otherwise
+    /// [`Error::Truncated`] for an extension that is cut short. `None` when it
+    /// accepts the record.
     pub fn strict_source_refusal(&self) -> Option<Error> {
         self.refusal.error()
     }
 }
 
+/// An HEVC configuration record as FFmpeg's `hevc_mp4toannexb` filter accepts
+/// it: what an [`HvcConfiguration`] holds, and also a record that declares a
+/// three-byte NAL length.
+#[derive(Debug)]
 pub struct ReceiverHevcConfiguration {
     inner: HvcConfiguration,
 }
@@ -146,50 +195,70 @@ impl ReceiverHevcConfiguration {
     pub(crate) fn record(&self) -> &HvcConfiguration {
         &self.inner
     }
+    /// The array at `index`; `None` past the last.
     pub fn array(&self, index: usize) -> Option<HvcConfigArray<'_>> {
         self.inner.array(index)
     }
+    /// The record's bytes after its last array.
     pub fn opaque_suffix(&self) -> &[u8] {
         self.inner.opaque_suffix()
     }
+    /// The bit set of [`HvcConfiguration::syntax_issues`]; bit 5 marks the
+    /// three-byte NAL length.
     pub fn syntax_issues(&self) -> u32 {
         self.inner.syntax_issues()
     }
+    /// The NAL unit at `index`, counted over all arrays in record order; `None`
+    /// past the last.
     pub fn nal(&self, index: usize) -> Option<HvcConfigNal<'_>> {
         self.inner.nal(index)
     }
+    /// NAL units in all arrays together.
     pub fn nal_count(&self) -> usize {
         self.inner.nal_count()
     }
+    /// Arrays in the record, `numOfArrays`.
     pub fn array_count(&self) -> usize {
         self.inner.array_count()
     }
 
+    /// The whole record as it was given.
     pub fn source_bytes(&self) -> &Bytes {
         self.inner.source_bytes()
     }
+    /// The fields of the record's 23-byte fixed part.
     pub fn fields(&self) -> HvcConfigFields {
         self.inner.fields()
     }
+    /// Width of the length field before each NAL unit of a sample,
+    /// `lengthSizeMinusOne + 1`: 1 to 4 bytes, three among them.
     pub fn observed_length_size(&self) -> LengthSize {
         self.inner.length_size()
     }
+    /// The record's arrays in order, whatever NAL unit type each declares.
     pub fn arrays(
         &self,
     ) -> impl ExactSizeIterator<Item = HvcConfigArray<'_>> + DoubleEndedIterator + '_ {
         self.inner.arrays()
     }
+    /// The NAL units of all arrays in record order.
     pub fn nals(
         &self,
     ) -> impl ExactSizeIterator<Item = HvcConfigNal<'_>> + DoubleEndedIterator + '_ {
         self.inner.nals()
     }
+    /// [`Error::Unsupported`], with which [`HvcConfigParser`] refuses a
+    /// three-byte NAL length; `None` for a record it accepts.
     pub fn strict_source_refusal(&self) -> Option<Error> {
         (self.fields().length_size_minus_one() == 2)
             .then_some(Error::Unsupported("hvcC three-byte sample length"))
     }
 }
 
+/// Parses an AVC configuration record with the acceptance of FFmpeg's
+/// `h264_mp4toannexb` filter: a session's initial configuration
+/// ([`new`](Self::new)) or the `new_extradata` side data of a packet
+/// ([`new_update`](Self::new_update)).
 pub struct ReceiverAvcConfigParser {
     inner: AvcConfigParser,
     raw: Bytes,
@@ -197,7 +266,25 @@ pub struct ReceiverAvcConfigParser {
     update_role: bool,
     rejection_taken: bool,
 }
+impl std::fmt::Debug for ReceiverAvcConfigParser {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ReceiverAvcConfigParser")
+            .field("parser", &self.inner)
+            .field("update", &self.update_role)
+            .field("strict_source_refusal", &self.strict_source_refusal())
+            .finish_non_exhaustive()
+    }
+}
 impl ReceiverAvcConfigParser {
+    /// A parser for `raw`, the record of a session's initial configuration (the
+    /// payload of an `avcC` box), charged to `pool`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] when a byte limit is zero; [`Error::ForeignPool`] when
+    /// `raw` is charged to another pool; [`Error::Limit`] when it exceeds
+    /// `maximum_record_bytes`; [`Error::Truncated`] when it is empty.
     pub fn new(
         pool: &Budget,
         source: AvcConfigSource,
@@ -230,8 +317,15 @@ impl ReceiverAvcConfigParser {
             rejection_taken: false,
         })
     }
-    /// Explicit nonempty packet-side-data operation, not initial configuration.
-    /// Present empty side data remains the existing forwarded-empty policy.
+    /// A parser for `raw`, the nonempty `new_extradata` side data of a packet,
+    /// which replaces the session's configuration. Side data that is present
+    /// and empty is no update: the session forwards it and takes no record.
+    /// Only a parser made here reports
+    /// [`take_update_rejection`](Self::take_update_rejection).
+    ///
+    /// # Errors
+    ///
+    /// As [`new`](Self::new).
     pub fn new_update(
         pool: &Budget,
         source: AvcConfigSource,
@@ -240,14 +334,30 @@ impl ReceiverAvcConfigParser {
     ) -> Result<Self> {
         Self::with_role(pool, source, raw, limits, true)
     }
+    /// The record as it was given.
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
-    /// The strict refusal established so far, including extension truncation
-    /// once the receiver publishes a record.
+    /// The error with which [`AvcConfigParser`] refuses the record, as far as
+    /// it is established: a three-byte NAL length from construction on, an
+    /// extension that is cut short once the record is published.
     pub fn strict_source_refusal(&self) -> Option<Error> {
         self.refusal.error()
     }
+    /// Parses the record. One work unit reads at most the six fixed bytes, or
+    /// the length and header of one NAL unit.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Unsupported`] for a `configurationVersion` other than 1;
+    /// [`Error::Truncated`] for a record that ends inside its fixed bytes, its
+    /// SPS and PPS arrays or an SPS extension entry; [`Error::Invalid`] for a
+    /// NAL length of zero and a refused NAL header; [`Error::Limit`] past
+    /// `maximum_nals` or `maximum_nal_bytes`; [`Error::Cancelled`] when `cancel`
+    /// is set.
+    /// [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the
+    /// parser keeps its progress. Every other error is final and returned again
+    /// by each later call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -266,6 +376,11 @@ impl ReceiverAvcConfigParser {
     /// Publishes into an empty caller-provided slot. Occupied slots are rejected
     /// before any state, work or retained storage changes, including update rejections.
     /// Yield, completion and errors leave an initially empty slot empty.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] for an occupied slot, after which the parser can be
+    /// stepped again; otherwise as [`step`](Self::step).
     pub fn step_into(
         &mut self,
         work: &mut WorkBudget,
@@ -278,6 +393,10 @@ impl ReceiverAvcConfigParser {
             record
         })
     }
+    /// After an update parser failed with [`Error::Truncated`] on a record of
+    /// `configurationVersion` 1 that is shorter than seven bytes: the record
+    /// and the error, once. `None` for a parser made with [`new`](Self::new),
+    /// for every other failure, before a failure and on later calls.
     pub fn take_update_rejection(&mut self) -> Option<ReceiverAvcUpdateRejection> {
         // A complete AVC record requires the six-byte prefix and a PPS count.
         // No native result is inferred for other strict syntax/version errors,
@@ -299,10 +418,22 @@ impl ReceiverAvcConfigParser {
     }
 }
 
+/// Parses an HEVC configuration record with the acceptance of FFmpeg's
+/// `hevc_mp4toannexb` filter: as [`HvcConfigParser`] does, and also with a
+/// three-byte NAL length.
+#[derive(Debug)]
 pub struct ReceiverHevcConfigParser {
     inner: HvcConfigParser,
 }
 impl ReceiverHevcConfigParser {
+    /// A parser for `raw`, the record of a session's configuration (the payload
+    /// of an `hvcC` box), charged to `pool`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] when a byte limit is zero; [`Error::ForeignPool`] when
+    /// `raw` is charged to another pool; [`Error::Limit`] when it exceeds
+    /// `maximum_record_bytes`; [`Error::Truncated`] when it is empty.
     pub fn new(
         pool: &Budget,
         source: HvcConfigSource,
@@ -313,6 +444,19 @@ impl ReceiverHevcConfigParser {
             inner: HvcConfigParser::new_observed_width(pool, source, raw, limits)?,
         })
     }
+    /// Parses the record. One work unit reads at most the 23 fixed bytes, one
+    /// array header, or the length and header of one NAL unit.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Unsupported`] for a `configurationVersion` other than 1;
+    /// [`Error::Truncated`] for a record that ends inside its fixed bytes, an
+    /// array header or a NAL unit; [`Error::Invalid`] for a NAL length of zero
+    /// and a refused NAL header; [`Error::Limit`] past `maximum_arrays`,
+    /// `maximum_nals` or `maximum_nal_bytes`; [`Error::Cancelled`] when `cancel`
+    /// is set. [`Error::Backpressure`] and [`Error::Allocation`] are retryable:
+    /// the parser keeps its progress. Every other error is final and returned
+    /// again by each later call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -331,6 +475,11 @@ impl ReceiverHevcConfigParser {
     /// Publishes into an empty caller-provided slot. Occupied slots are rejected
     /// before any state, work or retained storage changes. Yield, completion and errors
     /// leave an initially empty slot empty.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] for an occupied slot, after which the parser can be
+    /// stepped again; otherwise as [`step`](Self::step).
     pub fn step_into(
         &mut self,
         work: &mut WorkBudget,

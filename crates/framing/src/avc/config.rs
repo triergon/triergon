@@ -1,6 +1,6 @@
-//! ISO/IEC14496-15:2010 / incorporated2006 FRExt record grammar.
-//! The private source manifest pins the primary clauses. NAL bodies, sample-entry
-//! rules and record/SPS consistency are not decoded or certified here.
+//! The `avcC` record grammar of ISO/IEC 14496-15:2010 with the 2006 FRExt
+//! amendment. NAL bodies, sample-entry rules and record/SPS consistency are not
+//! decoded or certified here.
 use crate::inline_storage::InlineStorage;
 use crate::{
     BuildStep, ConfigProgress,
@@ -10,28 +10,46 @@ use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Result, SourceId, WorkBudget};
 
+/// Where an `avcC` record comes from. The parser copies it to the record and its
+/// views and does not interpret it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AvcConfigSource {
+    /// The source the record was read from.
     pub source: SourceId,
     /// Caller-supplied configuration epoch, never inferred from NAL contents.
     pub generation: u64,
+    /// Offset of the record's first byte in the source, in bytes. The record must
+    /// end at or before `u64::MAX`.
     pub offset: u64,
 }
 
+/// The bounds of one `avcC` parse.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AvcConfigLimits {
+    /// Largest record accepted, in bytes; above 0.
     pub maximum_record_bytes: usize,
+    /// Most NAL units in the record, over all its arrays.
     pub maximum_nals: usize,
+    /// Largest NAL unit accepted, in bytes; above 0.
     pub maximum_nal_bytes: usize,
 }
 
+/// Which of an `avcC` record's NAL unit arrays.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AvcConfigArrayKind {
+    /// `sequenceParameterSetNALUnit`: the sequence parameter sets.
     Sequence,
+    /// `pictureParameterSetNALUnit`: the picture parameter sets.
     Picture,
+    /// `sequenceParameterSetExtNALUnit`: the sequence parameter set extensions that
+    /// end a record with the high-profile fields.
     SequenceExtension,
 }
 
+/// The fixed fields of an `avcC` record as stored, reserved bits included: its
+/// first six bytes and, when the record has the high-profile extension, the four
+/// bytes that open it. [`AvcConfigParser`] reads the extension exactly when
+/// `AVCProfileIndication` is 100, 110, 122 or 144.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AvcConfigFields {
     prefix: [u8; 6],
@@ -39,45 +57,68 @@ pub struct AvcConfigFields {
 }
 
 impl AvcConfigFields {
+    /// The first six bytes of the record, through the byte that holds
+    /// `numOfSequenceParameterSets`.
     pub const fn raw_prefix(self) -> [u8; 6] {
         self.prefix
     }
+    /// `configurationVersion`; 1 in every parsed record.
     pub const fn version(self) -> u8 {
         self.prefix[0]
     }
+    /// `AVCProfileIndication`: the stream's `profile_idc`.
     pub const fn profile_indication(self) -> u8 {
         self.prefix[1]
     }
+    /// `profile_compatibility`: the byte between `profile_idc` and `level_idc` of a
+    /// sequence parameter set, with its `constraint_set` flags.
     pub const fn profile_compatibility(self) -> u8 {
         self.prefix[2]
     }
+    /// `AVCLevelIndication`: the stream's `level_idc`.
     pub const fn level_indication(self) -> u8 {
         self.prefix[3]
     }
+    /// `lengthSizeMinusOne`, 0 to 3: one less than the bytes in the length field
+    /// before each NAL unit of a sample.
     pub const fn length_size_minus_one(self) -> u8 {
         self.prefix[4] & 3
     }
+    /// The six reserved bits before `lengthSizeMinusOne`; 63 when all are set, as the
+    /// record format requires.
     pub const fn length_reserved(self) -> u8 {
         self.prefix[4] >> 2
     }
+    /// The three reserved bits before `numOfSequenceParameterSets`; 7 when all are
+    /// set, as the record format requires.
     pub const fn sequence_count_reserved(self) -> u8 {
         self.prefix[5] >> 5
     }
-    /// Physical extension bytes, including all reserved fields and count.
+    /// Physical extension bytes, including all reserved fields and count. `None`
+    /// when the record has no extension.
     pub const fn raw_extension(self) -> Option<[u8; 4]> {
         self.extension
     }
+    /// `chroma_format`, 0 to 3; `None` when the record has no extension.
     pub fn chroma_format(self) -> Option<u8> {
         self.extension.map(|v| v[0] & 3)
     }
+    /// `bit_depth_luma_minus8` as stored, 0 to 7; `None` when the record has no
+    /// extension.
     pub fn bit_depth_luma_minus8(self) -> Option<u8> {
         self.extension.map(|v| v[1] & 7)
     }
+    /// `bit_depth_chroma_minus8` as stored, 0 to 7; `None` when the record has no
+    /// extension.
     pub fn bit_depth_chroma_minus8(self) -> Option<u8> {
         self.extension.map(|v| v[2] & 7)
     }
-    /// Local syntax/field issues, not full decoder validity. Bits0/1: prefix
-    /// reserved; bits2/3/4: extension reserved; bits5/6: depth outside0..=4.
+    /// Local syntax and field issues as a bit set, not full decoder validity. Bits 0
+    /// and 1: a reserved bit before `lengthSizeMinusOne` and before
+    /// `numOfSequenceParameterSets` is clear. Bits 2, 3 and 4: a reserved bit of the
+    /// extension is clear, before `chroma_format`, `bit_depth_luma_minus8` and
+    /// `bit_depth_chroma_minus8`. Bits 5 and 6: `bit_depth_luma_minus8` and
+    /// `bit_depth_chroma_minus8` are outside `0..=4`.
     pub fn syntax_issues(self) -> u8 {
         let mut issues = u8::from(self.length_reserved() != 63)
             | (u8::from(self.sequence_count_reserved() != 7) << 1);
@@ -289,6 +330,9 @@ enum Phase {
     Complete,
 }
 
+/// Parses an `avcC` record (`AVCDecoderConfigurationRecord`) into an
+/// [`AvcConfiguration`].
+///
 /// Input is one already externally framed, same-pool immutable record (without
 /// box header). The first walk validates the record before reserving descriptor
 /// storage. Small records reuse the validated facts if the fill fits in one step.
@@ -314,7 +358,27 @@ pub struct AvcConfigParser {
     receiver: bool,
 }
 
+impl std::fmt::Debug for AvcConfigParser {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("AvcConfigParser")
+            .field("source", &self.source)
+            .field("limits", &self.limits)
+            .field("fields", &self.fields)
+            .field("total", &self.total)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
 impl AvcConfigParser {
+    /// Starts the parse of `raw`, one complete record charged to `pool`.
+    ///
+    /// # Errors
+    ///
+    /// When `maximum_record_bytes` or `maximum_nal_bytes` is zero, `raw` belongs to
+    /// another pool, is empty or is longer than `maximum_record_bytes`, or the
+    /// record's end offset in the source overflows `u64`.
     pub fn new(
         pool: &Budget,
         source: AvcConfigSource,
@@ -365,6 +429,18 @@ impl AvcConfigParser {
         Ok(parser)
     }
 
+    /// Advances by at most the units in `work` and returns the record once, as
+    /// [`BuildStep`] describes.
+    ///
+    /// # Errors
+    ///
+    /// When `cancel` is set; when `configurationVersion` is not 1 or the sample
+    /// length field is three bytes; when the record ends inside a field or a NAL
+    /// unit, or before the extension that `AVCProfileIndication` 100, 110, 122 or
+    /// 144 requires; when a NAL unit is empty or has `forbidden_zero_bit` set; when
+    /// a limit is exceeded. Every later call returns the same error. A pool that
+    /// lacks room for the record's descriptors until other storage is released is
+    /// `Backpressure` or `Allocation` instead, and the call can be repeated.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -383,6 +459,10 @@ impl AvcConfigParser {
     /// Publishes into an empty caller-provided slot without returning the record.
     /// An occupied slot is rejected before any state, work or retained storage changes.
     /// Yield, completion and errors leave an initially empty slot empty.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::step`]; also when `ready` is occupied.
     pub fn step_into(
         &mut self,
         work: &mut WorkBudget,
@@ -666,21 +746,29 @@ pub struct AvcConfiguration {
     nals: AvcNalStorage,
 }
 impl AvcConfiguration {
+    /// The whole record as it was given to the parser, trailing bytes included.
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
+    /// The origin given to the parser.
     pub const fn source(&self) -> AvcConfigSource {
         self.source
     }
+    /// The record's fixed fields.
     pub const fn fields(&self) -> AvcConfigFields {
         self.fields
     }
+    /// Width of the length field before each NAL unit of a sample:
+    /// `lengthSizeMinusOne + 1` bytes.
     pub const fn sample_length_size(&self) -> LengthSize {
         self.width
     }
+    /// Offset in the record, in bytes, of the end of its last array. What follows
+    /// is [`Self::trailing_bytes`].
     pub const fn understood_end(&self) -> usize {
         self.arrays[self.array_count() - 1].range.end as usize
     }
+    /// Number of NAL units in the record, over all its arrays.
     pub fn nal_count(&self) -> usize {
         self.nals.len()
     }
@@ -698,6 +786,8 @@ impl AvcConfiguration {
         // start-code bytes. The extension array is never emitted here.
         picture.range.end as usize - 7 + 2 * count
     }
+    /// Number of arrays: 2, or 3 when the record has the extension with its
+    /// sequence parameter set extensions.
     pub const fn array_count(&self) -> usize {
         if self.fields.extension.is_some() {
             3
@@ -705,6 +795,8 @@ impl AvcConfiguration {
             2
         }
     }
+    /// NAL unit `index` in record order, counted across the arrays; `None` from
+    /// [`Self::nal_count`] on.
     pub fn nal(&self, index: usize) -> Option<AvcConfigNal<'_>> {
         self.nals
             .as_slice()
@@ -715,6 +807,8 @@ impl AvcConfiguration {
                 descriptor,
             })
     }
+    /// Every NAL unit in record order: the sequence parameter sets, the picture
+    /// parameter sets, then any sequence parameter set extensions.
     pub fn nals(
         &self,
     ) -> impl ExactSizeIterator<Item = AvcConfigNal<'_>> + DoubleEndedIterator + '_ {
@@ -727,6 +821,7 @@ impl AvcConfiguration {
                 descriptor,
             })
     }
+    /// Array `index` in record order; `None` from [`Self::array_count`] on.
     pub fn array(&self, index: usize) -> Option<AvcConfigArray<'_>> {
         self.arrays[..self.array_count()]
             .get(index)
@@ -736,6 +831,8 @@ impl AvcConfiguration {
                 descriptor,
             })
     }
+    /// The arrays in record order: sequence, picture, then the extension's when
+    /// the record has it.
     pub fn arrays(
         &self,
     ) -> impl ExactSizeIterator<Item = AvcConfigArray<'_>> + DoubleEndedIterator + '_ {
@@ -747,9 +844,17 @@ impl AvcConfiguration {
                 descriptor,
             })
     }
+    /// The bytes of the record after its last array, which the parser does not
+    /// interpret; empty when the record ends there.
     pub fn trailing_bytes(&self) -> &[u8] {
         &self.raw[self.understood_end()..]
     }
+    /// [`Self::trailing_bytes`] as an owner that shares the record's allocation and
+    /// keeps all of it charged.
+    ///
+    /// # Errors
+    ///
+    /// Only for a range outside the record, which a parsed record rules out.
     pub fn retain_trailing_bytes(&self) -> Result<Bytes> {
         self.raw.slice(self.understood_end()..self.raw.len())
     }
@@ -762,6 +867,10 @@ impl AvcConfiguration {
             .ok_or(Error::Overflow)
     }
     /// Heap descriptor capacity only; arrays and up to four NALs are inline.
+    ///
+    /// # Errors
+    ///
+    /// When the size in bytes overflows `usize`.
     pub fn descriptor_storage_bytes(&self) -> Result<usize> {
         self.nals
             .heap_capacity()
@@ -769,6 +878,10 @@ impl AvcConfiguration {
             .ok_or(Error::Overflow)
     }
     /// Full hidden raw backing plus actual descriptor heap capacities.
+    ///
+    /// # Errors
+    ///
+    /// When the sum in bytes overflows `usize`.
     pub fn retained_storage_bytes(&self) -> Result<usize> {
         self.descriptor_storage_bytes()?
             .checked_add(self.raw.retained_storage_bytes())
@@ -776,10 +889,12 @@ impl AvcConfiguration {
     }
 }
 
+/// One NAL unit of an `avcC` record, borrowed from its [`AvcConfiguration`].
+///
 /// A NAL borrow cannot escape its configuration; retaining it is explicit.
 ///
 /// ```compile_fail,E0505
-/// use triergon_framing::AvcConfiguration;
+/// use triergon_framing::avc::AvcConfiguration;
 /// fn escape(view: AvcConfiguration) {
 ///     let leaf = view.nal(0).unwrap();
 ///     drop(view);
@@ -790,7 +905,7 @@ impl AvcConfiguration {
 /// Borrowed bytes carry the configuration's lifetime, not the NAL borrow's:
 ///
 /// ```compile_fail,E0505
-/// use triergon_framing::AvcConfiguration;
+/// use triergon_framing::avc::AvcConfiguration;
 /// fn escape(view: AvcConfiguration) -> usize {
 ///     let bytes = view.nal(0).unwrap().length_field_bytes();
 ///     drop(view);
@@ -804,30 +919,39 @@ pub struct AvcConfigNal<'a> {
     descriptor: &'a AvcNalDescriptor,
 }
 impl<'a> AvcConfigNal<'a> {
+    /// The NAL unit, header byte included, without its length field.
     pub fn source_bytes(&self) -> &'a [u8] {
         &self.raw[self.descriptor.payload()]
     }
+    /// The two-byte big-endian length field stored before the NAL unit.
     pub fn length_field_bytes(&self) -> &'a [u8] {
         &self.raw[self.descriptor.length_field()]
     }
+    /// Where [`Self::source_bytes`] lies in the record, in bytes from its start.
     pub fn source_range(&self) -> Range<usize> {
         self.descriptor.payload()
     }
+    /// The origin of the record.
     pub const fn source(&self) -> AvcConfigSource {
         self.source
     }
+    /// The array that holds the NAL unit.
     pub const fn array_kind(&self) -> AvcConfigArrayKind {
         self.descriptor.kind
     }
+    /// The NAL unit's header: its `nal_ref_idc` and `nal_unit_type`, which the
+    /// array it is in does not constrain.
     pub const fn header(&self) -> NalHeader {
         self.descriptor.header
     }
 }
 
+/// One NAL unit array of an `avcC` record, borrowed from its [`AvcConfiguration`].
+///
 /// An array borrow is tied to the configuration in the same way.
 ///
 /// ```compile_fail,E0505
-/// use triergon_framing::AvcConfiguration;
+/// use triergon_framing::avc::AvcConfiguration;
 /// fn escape(view: AvcConfiguration) -> usize {
 ///     let array = view.array(0).unwrap();
 ///     drop(view);
@@ -841,21 +965,30 @@ pub struct AvcConfigArray<'a> {
     descriptor: &'a ArrayDescriptor,
 }
 impl<'a> AvcConfigArray<'a> {
+    /// The array as stored: its count byte, then each NAL unit after its length
+    /// field. The extension's array starts three bytes earlier, with the chroma
+    /// format and bit depth bytes.
     pub fn source_bytes(&self) -> &'a [u8] {
         &self.raw[self.descriptor.source_range()]
     }
+    /// The origin of the record.
     pub const fn source(&self) -> AvcConfigSource {
         self.source
     }
+    /// Which array this is.
     pub const fn kind(&self) -> AvcConfigArrayKind {
         self.descriptor.kind
     }
+    /// Where [`Self::source_bytes`] lies in the record, in bytes from its start.
     pub fn source_range(&self) -> Range<usize> {
         self.descriptor.source_range()
     }
+    /// The indices of the array's NAL units for [`AvcConfiguration::nal`].
     pub fn nal_indices(&self) -> Range<usize> {
         self.descriptor.nal_indices()
     }
+    /// Offset in the record of the byte that holds the array's NAL unit count. For
+    /// the sequence parameter sets its low five bits are the count.
     pub const fn count_offset(&self) -> usize {
         self.descriptor.count_offset()
     }

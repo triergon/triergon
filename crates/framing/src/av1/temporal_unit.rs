@@ -17,13 +17,21 @@ const METADATA: u8 = 5;
 const DELIMITER: &[u8] = &[0x12, 0];
 
 /// Checked, reusable view of the configuration needed at random access.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Av1TemporalUnitConfig<'a> {
     obus: &'a [Av1Obu],
     length: usize,
 }
 
 impl<'a> Av1TemporalUnitConfig<'a> {
+    /// The OBUs of `configuration` that a temporal unit takes at random access:
+    /// its Sequence Header and metadata OBUs, or none when the record does not
+    /// start with a Sequence Header OBU.
+    ///
+    /// # Errors
+    ///
+    /// When the record's fixed fields have a syntax issue, or one of those OBUs
+    /// has a must-be-zero header bit set.
     pub fn new(configuration: &'a Av1Configuration) -> Result<Self> {
         if !configuration.fields().syntax_issues().is_empty() {
             return Err(Error::Invalid("AV1 configuration record flags"));
@@ -57,10 +65,15 @@ fn receiver_configuration(obu: &Av1Obu) -> bool {
     matches!(obu.facts().header.obu_type(), SEQUENCE_HEADER | METADATA)
 }
 
+/// Bounds on one sample and the temporal unit made of it. Each must be
+/// non-zero.
 #[derive(Clone, Copy, Debug)]
 pub struct Av1TemporalUnitLimits {
+    /// The most bytes of the container sample.
     pub maximum_sample_bytes: usize,
+    /// The most bytes of the temporal unit: the sample and what is inserted.
     pub maximum_output_bytes: usize,
+    /// The most OBUs in the sample.
     pub maximum_obus: usize,
 }
 
@@ -107,15 +120,34 @@ pub struct Av1TemporalUnit<'a> {
     length: usize,
 }
 
+impl std::fmt::Debug for Av1TemporalUnit<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Av1TemporalUnit")
+            .field("source_bytes", &self.source.len())
+            .field("byte_len", &self.length)
+            .field("delimiter_inserted", &(self.delimiter_end == 0))
+            .field("configuration_inserted", &self.configuration.is_some())
+            .field("size_field_written", &self.repaired.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
 impl Av1TemporalUnit<'_> {
+    /// The container sample the unit was made of, as it was given.
     pub fn source(&self) -> &[u8] {
         self.source
     }
 
+    /// Bytes of the temporal unit: the lengths of [`segments`](Self::segments)
+    /// added up.
     pub const fn byte_len(&self) -> usize {
         self.length
     }
 
+    /// The temporal unit as consecutive byte spans, none of them empty: the
+    /// temporal delimiter (the sample's own, or `12 00` when it has none), the
+    /// configuration OBUs when they are inserted, then the sample's other OBUs,
+    /// the last with a size field written when it was coded without one.
     pub fn segments(&self) -> impl Iterator<Item = &[u8]> {
         let (delimiter, body) = self.source.split_at(self.delimiter_end);
         let delimiter = if delimiter.is_empty() {
@@ -157,7 +189,26 @@ pub struct Av1TemporalUnitJob<'a> {
     failure: Option<Error>,
 }
 
+impl std::fmt::Debug for Av1TemporalUnitJob<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Av1TemporalUnitJob")
+            .field("limits", &self.limits)
+            .field("offset", &self.offset)
+            .field("obus", &self.obus)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
 impl<'a> Av1TemporalUnitJob<'a> {
+    /// A job over `source`, one complete container sample holding one temporal
+    /// unit. The OBUs of `configuration` are inserted when `random_access` is
+    /// set and the sample has no Sequence Header OBU of its own.
+    ///
+    /// # Errors
+    ///
+    /// When a limit is zero, or the sample is empty or longer than
+    /// `maximum_sample_bytes`.
     pub fn new(
         source: &'a [u8],
         configuration: Option<Av1TemporalUnitConfig<'a>>,
@@ -187,6 +238,18 @@ impl<'a> Av1TemporalUnitJob<'a> {
         })
     }
 
+    /// Passes over the sample's OBUs, one work unit each, and returns the
+    /// temporal unit once the last is reached.
+    ///
+    /// # Errors
+    ///
+    /// Cancellation; an OBU header with a must-be-zero bit set; a size field
+    /// that is malformed or reaches past the end of the sample; a temporal
+    /// delimiter that is not the first OBU, has a payload or an extension, or
+    /// lacks its size field; a sample that holds a temporal delimiter and
+    /// nothing else; more OBUs than `maximum_obus`; a temporal unit longer than
+    /// `maximum_output_bytes`. Each is final: every later call returns the same
+    /// error.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

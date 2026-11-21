@@ -7,6 +7,7 @@ use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 /// is its last three bytes.
 pub(crate) const START_CODE: [u8; 4] = [0, 0, 0, 1];
 
+/// One NAL unit behind a four-byte start code, as [`AnnexBWriter`] writes it.
 #[derive(Clone, Debug)]
 pub struct AnnexBOutput {
     bytes: Bytes,
@@ -14,9 +15,11 @@ pub struct AnnexBOutput {
 }
 
 impl AnnexBOutput {
+    /// `00 00 00 01` followed by the NAL unit's bytes.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// Where the NAL unit lay in its source and how it was framed there.
     pub const fn source_facts(&self) -> NalFacts {
         self.source_facts
     }
@@ -24,8 +27,9 @@ impl AnnexBOutput {
 
 /// Emits exactly 00 00 00 01 followed by the original NAL bytes. No parameter
 /// sets, access-unit delimiters, emulation-prevention bytes or padding are added
-/// inside the NAL. A four-byte prefix includes the Annex-B zero_byte so callers
+/// inside the NAL. A four-byte prefix includes the Annex-B `zero_byte` so callers
 /// need not guess whether this NAL starts an access unit.
+#[derive(Debug)]
 pub struct AnnexBWriter {
     pool: Budget,
     input: Option<NalUnit>,
@@ -39,6 +43,14 @@ pub struct AnnexBWriter {
 }
 
 impl AnnexBWriter {
+    /// A writer for `input`, whose bytes are charged to `pool`; the output is
+    /// charged to it too.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ForeignPool`] when `input` is charged to another pool;
+    /// [`Error::Limit`] when the NAL unit and its start code exceed
+    /// `maximum_output_bytes`.
     pub fn new(pool: &Budget, input: NalUnit, maximum_output_bytes: usize) -> Result<Self> {
         if !input.bytes().belongs_to(pool) {
             return Err(Error::ForeignPool);
@@ -65,6 +77,12 @@ impl AnnexBWriter {
 
     /// Charges one unit per output byte copied and one per reserve/freeze
     /// attempt. A failed freeze retains the completed builder for retry.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Cancelled`] when `cancel` is set. [`Error::Backpressure`] and
+    /// [`Error::Allocation`] are retryable: the writer keeps its progress. Every
+    /// other error is final and returned again by each later call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

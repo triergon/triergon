@@ -9,12 +9,20 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
 /// Holds one bounded record. A random-access feed uses its SPS and PPS arrays.
+#[derive(Debug)]
 pub struct AvcAnnexBConfig {
     record: AvcConfiguration,
     parameter_bytes: usize,
 }
 
 impl AvcAnnexBConfig {
+    /// Prepares `record` for [`AvcAnnexBJob`]: samples have NAL length fields of the
+    /// width it declares, and an IDR access unit starts with its SPS and PPS NAL
+    /// units.
+    ///
+    /// # Errors
+    ///
+    /// When the Annex B size of those parameter sets overflows `usize`.
     pub fn new(record: AvcConfiguration) -> Result<Self> {
         let mut parameter_bytes = 0usize;
         for nal in record.nals().filter(parameter_set) {
@@ -26,6 +34,7 @@ impl AvcAnnexBConfig {
         })
     }
 
+    /// The record given to [`Self::new`].
     pub fn record(&self) -> &AvcConfiguration {
         &self.record
     }
@@ -45,15 +54,22 @@ fn add_nal_bytes(bytes: usize, nal_bytes: usize) -> Result<usize> {
         .ok_or(Error::Overflow)
 }
 
+/// The bounds of one sample's conversion to an Annex B access unit. Each must be
+/// above 0.
 #[derive(Clone, Copy, Debug)]
 pub struct AvcAnnexBLimits {
+    /// Largest sample accepted, in bytes.
     pub maximum_packet_bytes: usize,
+    /// Largest access unit produced, in bytes, counting its start codes and the
+    /// parameter sets put before a random access point.
     pub maximum_output_bytes: usize,
+    /// Most NAL units in one sample.
     pub maximum_nals: usize,
 }
 
 /// A complete feed view. Parameter sets precede an IDR access unit and every
 /// NAL keeps its original bytes. The container's key flag is a separate fact.
+#[derive(Debug)]
 pub struct AvcAnnexBAccessUnit<'a> {
     config: &'a AvcAnnexBConfig,
     sample: &'a [u8],
@@ -62,14 +78,20 @@ pub struct AvcAnnexBAccessUnit<'a> {
 }
 
 impl AvcAnnexBAccessUnit<'_> {
+    /// Whether the sample holds a NAL unit of type 5, a slice of an IDR picture.
     pub const fn is_idr(&self) -> bool {
         self.idr
     }
 
+    /// Total length of [`Self::segments`] in bytes.
     pub const fn byte_len(&self) -> usize {
         self.bytes
     }
 
+    /// The access unit as Annex B, in pieces to write one after another: a
+    /// four-byte start code and then a NAL unit, for the record's SPS and PPS NAL
+    /// units when [`Self::is_idr`] and then for each NAL unit of the sample.
+    ///
     /// All bounds were checked before publication. Iterating reparses only the
     /// short length fields, with no descriptor allocation or payload copy.
     #[inline]
@@ -83,6 +105,7 @@ impl AvcAnnexBAccessUnit<'_> {
         }
     }
 
+    /// The configuration the job was created with.
     pub fn configuration(&self) -> &AvcAnnexBConfig {
         self.config
     }
@@ -141,6 +164,9 @@ impl<'a> Iterator for AnnexBSegments<'a> {
     }
 }
 
+/// Converts one complete length-prefixed sample to an [`AvcAnnexBAccessUnit`]. It
+/// checks every length field and NAL header of the sample and copies nothing.
+#[derive(Debug)]
 pub struct AvcAnnexBJob<'a> {
     config: &'a AvcAnnexBConfig,
     sample: &'a [u8],
@@ -153,6 +179,13 @@ pub struct AvcAnnexBJob<'a> {
 }
 
 impl<'a> AvcAnnexBJob<'a> {
+    /// Starts the conversion of `sample`, whose NAL units each follow a length field
+    /// of the width the record of `config` declares.
+    ///
+    /// # Errors
+    ///
+    /// When a limit is zero, or the sample is empty or longer than
+    /// `limits.maximum_packet_bytes`.
     pub fn new(
         config: &'a AvcAnnexBConfig,
         sample: &'a [u8],
@@ -180,8 +213,17 @@ impl<'a> AvcAnnexBJob<'a> {
         })
     }
 
+    /// Advances by at most the units in `work` and returns the access unit once, as
+    /// [`BuildStep`] describes.
+    ///
     /// One work unit covers one checked length field and fixed NAL header.
     /// A malformed tail never publishes a partially converted access unit.
+    ///
+    /// # Errors
+    ///
+    /// When `cancel` is set, a length field or NAL unit runs past the end of the
+    /// sample, a NAL unit is empty or has `forbidden_zero_bit` set, or a limit is
+    /// exceeded. Every later call returns the same error.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

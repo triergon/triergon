@@ -1,6 +1,6 @@
 //! The ADTS stream state machine: one method per [`Phase`], driven by
-//! [`AacAdtsStreamReader::advance`]. Each method is one step of the original
-//! loop; `Flow::Continue` re-enters the loop and `Flow::Break` returns.
+//! [`AacAdtsStreamReader::advance`]. Each method is one pass of that loop;
+//! `Flow::Continue` re-enters the loop and `Flow::Break` returns.
 use super::{AacAdtsStreamReader, Phase, StreamOutput};
 use crate::aac::AacSource;
 use crate::aac::adts::carrier::{AacAdtsCarrier, AacAdtsCarrierBoundary};

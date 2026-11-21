@@ -14,10 +14,15 @@ use triergon_core::{BudgetVec, Error, Result};
 /// The fields of a Vorbis identification header (Vorbis I section 4.2.2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VorbisIdentification {
+    /// `audio_channels`, at least 1.
     pub channels: u8,
+    /// `audio_sample_rate` in Hz, at least 1.
     pub sample_rate: u32,
+    /// `bitrate_maximum`, a hint in bits per second; unset when 0 or negative.
     pub bitrate_maximum: i32,
+    /// `bitrate_nominal`, a hint in bits per second; unset when 0 or negative.
     pub bitrate_nominal: i32,
+    /// `bitrate_minimum`, a hint in bits per second; unset when 0 or negative.
     pub bitrate_minimum: i32,
     /// Short and long block sizes, powers of two from 64 to 8192.
     pub blocksize: [u16; 2],
@@ -25,6 +30,12 @@ pub struct VorbisIdentification {
 
 impl VorbisIdentification {
     /// Parse an identification header packet.
+    ///
+    /// # Errors
+    ///
+    /// When the packet is shorter than 30 bytes or is not an identification header, its
+    /// `vorbis_version` is not 0, a channel count, sample rate or block size is out of
+    /// range, the short block is longer than the long one, or the framing bit is clear.
     pub fn parse(packet: &[u8]) -> Result<VorbisIdentification> {
         if packet.len() < 30 {
             return Err(Error::Truncated);
@@ -82,6 +93,7 @@ pub struct VorbisModes {
 /// The block an audio packet codes (Vorbis I section 4.3.1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VorbisBlock {
+    /// The block has the long block size, as the block flag of its mode says.
     pub long: bool,
     /// For a long block, whether the previous window is long, as its window flag states;
     /// `None` for a short block, whose window does not say.
@@ -104,6 +116,11 @@ impl VorbisBlock {
 
 impl VorbisModes {
     /// The modes of a setup header packet.
+    ///
+    /// # Errors
+    ///
+    /// When `setup` is not a setup header, or does not end in a run of well-formed modes
+    /// that the count before it agrees with.
     pub fn from_setup(setup: &[u8]) -> Result<VorbisModes> {
         if header_type(setup) != Some(5) {
             return Err(Error::Invalid("Vorbis setup header"));
@@ -163,6 +180,11 @@ impl VorbisModes {
 
     /// The block an audio packet codes: its mode number follows the packet type bit,
     /// and a long block's window flags follow the mode number.
+    ///
+    /// # Errors
+    ///
+    /// When the packet is empty, is a header packet, names a mode the setup header does
+    /// not have, or ends before the window flags of a long block.
     pub fn block(&self, packet: &[u8]) -> Result<VorbisBlock> {
         let first = *packet.first().ok_or(Error::Truncated)?;
         if first & 1 != 0 {
@@ -189,6 +211,10 @@ impl VorbisModes {
 
 /// The block size an audio packet codes, from the identification header's block sizes
 /// and the setup header's modes.
+///
+/// # Errors
+///
+/// As [`VorbisModes::block`].
 pub fn packet_blocksize(modes: &VorbisModes, blocksize: [u16; 2], packet: &[u8]) -> Result<u16> {
     Ok(modes.block(packet)?.size(blocksize))
 }
@@ -204,7 +230,12 @@ pub fn header_type(packet: &[u8]) -> Option<u8> {
 
 /// Split Xiph-laced packets (Matroska CodecPrivate for `A_VORBIS`): a byte holding the
 /// packet count minus one, the size of each packet but the last as runs of 255 ending in
-/// a smaller byte, then the packets.
+/// a smaller byte, then the packets. `out` receives the range of each packet in `bytes`,
+/// the last one reaching to the end.
+///
+/// # Errors
+///
+/// When `bytes` is empty or ends inside the sizes, or the sizes pass its end.
 pub fn xiph_split(bytes: &[u8], out: &mut Vec<core::ops::Range<usize>>) -> Result<()> {
     out.clear();
     let count = usize::from(*bytes.first().ok_or(Error::Truncated)?) + 1;
@@ -233,6 +264,11 @@ pub fn xiph_split(bytes: &[u8], out: &mut Vec<core::ops::Range<usize>>) -> Resul
 }
 
 /// Join packets with Xiph lacing, the inverse of [`xiph_split`]. At most 256 packets.
+/// The laced bytes are appended to `out`.
+///
+/// # Errors
+///
+/// When `packets` is empty or holds more than 256 packets; `out` is then untouched.
 pub fn xiph_join(packets: &[&[u8]], out: &mut Vec<u8>) -> Result<()> {
     let Some((last, rest)) = packets.split_last() else {
         return Err(Error::Invalid("no packets to lace"));
@@ -259,13 +295,21 @@ pub fn xiph_join(packets: &[&[u8]], out: &mut Vec<u8>) -> Result<()> {
 /// The three Vorbis header packets of a canonical configuration.
 #[derive(Clone, Copy, Debug)]
 pub struct VorbisHeaders<'a> {
+    /// The identification header packet (type 1).
     pub identification: &'a [u8],
+    /// The comment header packet (type 3).
     pub comment: &'a [u8],
+    /// The setup header packet (type 5).
     pub setup: &'a [u8],
 }
 
 impl<'a> VorbisHeaders<'a> {
     /// The headers of a Xiph-laced configuration, each checked for its type byte.
+    ///
+    /// # Errors
+    ///
+    /// When the lacing is malformed, does not hold three packets, or a packet does not
+    /// start with the type byte and `vorbis` of its place.
     pub fn from_laced(bytes: &'a [u8]) -> Result<VorbisHeaders<'a>> {
         let mut ranges = Vec::with_capacity(3);
         xiph_split(bytes, &mut ranges)?;

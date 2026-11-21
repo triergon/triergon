@@ -55,7 +55,11 @@ pub use sync14::{
 /// through to their output unchanged; it is not checked against a transport.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsSourceIdentity {
+    /// The source the record was read from.
     pub source: SourceId,
+    /// The generation of the input the record was read from, as
+    /// [`triergon_core::InputToken::generation`] gives it.
     pub generation: u64,
+    /// Offset of the record's first byte in `source`, in bytes.
     pub offset: u64,
 }

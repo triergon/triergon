@@ -1,4 +1,6 @@
-//! Bounded initialization-extradata view of the same pinned packet receiver.
+//! The configuration of a packet session as Annex B extradata, as the FFmpeg
+//! bitstream filters named on [`crate::compat::nal`] publish it when they are
+//! initialised, in a bounded output.
 use crate::nal::packet::{
     NalConfigurationRefusal, copy_annex_b_segment, copy_annex_b_whole, freeze_annex_b_output,
     start_annex_b_output,
@@ -7,46 +9,85 @@ use crate::{BuildStep, avc::AvcConfigArrayKind, nal::NalPacketConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
+/// A session configuration as Annex B extradata, written by
+/// [`NalPacketConfigWriter`].
 pub struct NalPacketConfigOutput {
     bytes: Bytes,
     source: Bytes,
     source_refusal: NalConfigurationRefusal,
 }
+impl std::fmt::Debug for NalPacketConfigOutput {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("NalPacketConfigOutput")
+            .field("output_bytes", &self.bytes.len())
+            .field("source_bytes", &self.source.len())
+            .field("strict_source_refusal", &self.strict_source_refusal())
+            .finish_non_exhaustive()
+    }
+}
 impl NalPacketConfigOutput {
+    /// The Annex B extradata: every SPS and PPS of an AVC record, or every NAL
+    /// unit of an HEVC record, in record order and each behind `00 00 00 01`.
+    /// For a passthrough configuration, its bytes as they are.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// The configuration's source bytes: the record the output was written
+    /// from, or the passthrough bytes.
     pub fn source_bytes(&self) -> &Bytes {
         &self.source
     }
+    /// The error with which the strict record parser refuses the record, when
+    /// it was accepted through [`crate::compat::nal`]; `None` for a record that
+    /// parser accepts.
     pub fn strict_source_refusal(&self) -> Option<Error> {
         self.source_refusal.error()
     }
 }
 
-/// Original initialization bytes and source error for an observed unsupported
-/// HEVC decoder-array declaration. No produced configuration is fabricated.
+/// The record and error of an HEVC configuration that declares an array of a
+/// NAL unit type the filter does not write: any type but 32 to 34, 39 and 40.
+/// No output exists for it.
 pub struct NalPacketConfigRejection {
     source: Bytes,
     error: Error,
     declared_array_type: u8,
     source_refusal: NalConfigurationRefusal,
 }
+impl std::fmt::Debug for NalPacketConfigRejection {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("NalPacketConfigRejection")
+            .field("source_bytes", &self.source.len())
+            .field("source_error", &self.error)
+            .field("declared_array_type", &self.declared_array_type)
+            .field("strict_source_refusal", &self.strict_source_refusal())
+            .finish_non_exhaustive()
+    }
+}
 impl NalPacketConfigRejection {
+    /// The whole record as it was given.
     pub fn source_bytes(&self) -> &Bytes {
         &self.source
     }
+    /// The error [`NalPacketConfigWriter::step`] returned for the array.
     pub fn source_error(&self) -> Error {
         self.error
     }
+    /// The NAL unit type the first such array declares, 0 to 63.
     pub fn declared_array_type(&self) -> u8 {
         self.declared_array_type
     }
+    /// The error with which the strict record parser refuses the record, when
+    /// it was accepted through [`crate::compat::nal`]; `None` for a record that
+    /// parser accepts.
     pub fn strict_source_refusal(&self) -> Option<Error> {
         self.source_refusal.error()
     }
-    /// The reference filter's `AVERROR_INVALIDDATA`, not an executed native call.
-    /// Comparison-only.
+    /// FFmpeg's return code for initialising `hevc_mp4toannexb` with this
+    /// record: `AVERROR_INVALIDDATA`. It is a constant for comparison, compiled
+    /// with the `reference-trace` feature; FFmpeg is not called.
     #[cfg(feature = "reference-trace")]
     pub fn native_initialize_result(&self) -> i32 {
         -1_094_995_529
@@ -68,6 +109,9 @@ enum Phase {
     Complete,
 }
 
+/// Writes the configuration of a [`NalPacketSession`](crate::nal::NalPacketSession)
+/// as Annex B extradata, as FFmpeg's `h264_mp4toannexb` and `hevc_mp4toannexb`
+/// bitstream filters publish it when they are initialised.
 pub struct NalPacketConfigWriter<'a> {
     config: &'a NalPacketConfiguration,
     length_prefixed: bool,
@@ -82,7 +126,25 @@ pub struct NalPacketConfigWriter<'a> {
     rejected_array: Option<u8>,
     rejection_taken: bool,
 }
+impl std::fmt::Debug for NalPacketConfigWriter<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("NalPacketConfigWriter")
+            .field("codec", &self.config.codec())
+            .field("source_bytes", &self.config.bytes().len())
+            .field("maximum_output_bytes", &self.maximum)
+            .field("failure", &self.failure)
+            .field("rejected_array_type", &self.rejected_array)
+            .finish_non_exhaustive()
+    }
+}
 impl<'a> NalPacketConfigWriter<'a> {
+    /// A writer for `configuration`, whose bytes are charged to `pool`; the
+    /// output is charged to it too and holds at most `maximum_output_bytes`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ForeignPool`] when `configuration` is charged to another pool.
     pub fn new(
         pool: &Budget,
         configuration: &'a NalPacketConfiguration,
@@ -125,6 +187,9 @@ impl<'a> NalPacketConfigWriter<'a> {
             (index == 0).then_some((true, config.bytes().as_ref(), 0))
         }
     }
+    /// After [`step`](Self::step) refused an HEVC record for the type of one of
+    /// its arrays: the record and the error, once. `None` for every other
+    /// failure, before a failure and on later calls.
     pub fn take_receiver_rejection(&mut self) -> Option<NalPacketConfigRejection> {
         if self.rejection_taken {
             return None;
@@ -139,6 +204,19 @@ impl<'a> NalPacketConfigWriter<'a> {
             source_refusal: self.config.refusal(),
         })
     }
+    /// Sizes the extradata, then copies it. Work is charged per array checked,
+    /// NAL unit sized and byte copied.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Unsupported`] for an HEVC record that declares an array of a
+    /// NAL unit type other than 32 to 34, 39 and 40, which
+    /// [`take_receiver_rejection`](Self::take_receiver_rejection) then reports;
+    /// [`Error::Limit`] when the extradata exceeds `maximum_output_bytes` or the
+    /// pool's limit; [`Error::Cancelled`] when `cancel` is set.
+    /// [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the
+    /// writer keeps its progress. Every other error is final and returned again
+    /// by each later call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

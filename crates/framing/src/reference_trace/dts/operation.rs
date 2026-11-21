@@ -1,10 +1,12 @@
-//! Complete source acquisition alongside the separately named carrier/parser view.
+//! The complete source frames of a raw 14-bit DTS entity side by side with the
+//! packets of the reference parser.
 //!
-//! The two real input cursors have distinct tokens and generations. Callers answer
-//! both from the same declared entity; no Source frame boundaries are supplied to
-//! the parser view. These are two operations, with both costs exposed, rather than
-//! a replacement of the original Strict/native comparison or automatic DTS probing.
-//! The reference revision is recorded once, on [`crate::reference_trace::dts`].
+//! The two readers have input cursors of their own, with distinct tokens and
+//! generations. The caller answers both from the same entity, and the packet reader
+//! is told nothing about the boundaries of the source frames. Both readers run in
+//! full and both are charged for. The operation does not compare their results and
+//! does not detect DTS or its word order. The reference revision is named once, on
+//! [`crate::reference_trace::dts`].
 use crate::dts::{
     Dts14CarrierLimits, Dts14CarrierPacket, Dts14CarrierReader, Dts14CarrierSyntax, Dts14SyncFrame,
     Dts14SyncLimits, Dts14SyncReader, DtsCoreHeader, DtsSourceIdentity, DtsWordOrder,
@@ -18,19 +20,28 @@ use triergon_core::{
     SourceFailure, SourceId, SourceLocation, Step, WorkBudget,
 };
 
+/// One of the two readers of a [`ParserOperation`]. Each has an input cursor of its
+/// own, so a request and its answer name the reader they belong to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ParserOperationLane {
+    /// The source-frame reader, a [`Dts14SyncReader::per_frame`].
     Source,
+    /// The parser-packet reader, a [`Dts14CarrierReader`].
     ParserProjection,
 }
 
+/// Limits of a [`ParserOperation`], one set for each reader.
 #[derive(Clone, Copy, Debug)]
 pub struct ParserOperationLimits {
+    /// Limits of the source-frame reader.
     pub source: Dts14SyncLimits,
+    /// Limits of the parser-packet reader.
     pub parser: Dts14CarrierLimits,
 }
 
-/// Actual cursor identities. A generation is never rewritten to make views agree.
+/// The cursors of a [`ParserOperation`]: its source and the generation of each
+/// reader's cursor. The two generations differ, and each is reported as its cursor
+/// has it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ParserOperationContext {
     source: SourceId,
@@ -39,28 +50,47 @@ pub struct ParserOperationContext {
     fresh_zero_origin: bool,
 }
 impl ParserOperationContext {
+    /// Cursor generation of the source-frame reader, which every source frame
+    /// carries in its identity.
     pub fn source_generation(&self) -> u64 {
         self.source_generation
     }
+    /// Cursor generation of the parser-packet reader, which every parser packet
+    /// carries in its identity.
     pub fn parser_generation(&self) -> u64 {
         self.parser_generation
     }
 }
 
-/// Public-parser clock projection, separately retained from Source time.
-/// The reference parser inspects an 18-byte physical prefix, latches the first
-/// accepted core rate, and rounds subsequent coding windows in that clock.
-/// It does not publish the source channel layout or nominal header bitrate.
+/// The duration, sample rate and profile the reference parser reports with one
+/// packet. This is the parser's clock, kept apart from the duration of a source
+/// frame ([`DtsCoreHeader::window`]). The parser reads the core header in a packet's
+/// first 18 bytes, keeps the sample rate of the first header it accepts, and rounds
+/// every later coding window to that rate. It reports neither the channel layout nor
+/// the nominal bit rate of the header.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ParserClock {
+    /// The packet's duration in samples at `codec_sample_rate`: the header's coding
+    /// window rescaled from the header's own sample rate and rounded to the nearest
+    /// sample. 0 for [`ParserClockDisposition::OpaqueOrShort`].
     pub duration: i64,
+    /// Core sample rate of the first accepted header, in Hz; 0 before one is
+    /// accepted.
     pub codec_sample_rate: u32,
+    /// The parser's profile number: -99 before a header is accepted, 20 from then
+    /// on.
     pub profile: i32,
+    /// Whether the packet's own header gave these values.
     pub disposition: ParserClockDisposition,
 }
+/// Whether a packet's header contributed to its [`ParserClock`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ParserClockDisposition {
+    /// The packet is opaque or shorter than 18 bytes. No header is read: the
+    /// duration is 0 and the rate and profile are those of the packets before.
     OpaqueOrShort,
+    /// The packet's first 18 bytes hold a normal core header without `EXT_AUDIO`,
+    /// and the duration comes from it.
     SelectedCorePrefix,
 }
 #[derive(Clone, Copy)]
@@ -149,6 +179,7 @@ impl ClockState {
     }
 }
 
+/// One packet of the parser-packet reader together with the parser's clock for it.
 #[derive(Clone, Debug)]
 pub struct ParserPacket {
     packet: Dts14CarrierPacket,
@@ -180,24 +211,30 @@ impl ParserPacket {
             clock,
         })
     }
+    /// The packet as the source stores it.
     pub fn source_bytes(&self) -> &Bytes {
         self.packet.source_bytes()
     }
+    /// The source offsets the packet covers, in bytes; the end is exclusive.
     pub fn physical_range(&self) -> Range<u64> {
         self.range.clone()
     }
+    /// Source, parser-cursor generation and byte offset of the packet's first byte.
     pub fn identity(&self) -> DtsSourceIdentity {
         self.packet.identity
     }
+    /// The cursors of the operation that read the packet.
     pub fn context(&self) -> ParserOperationContext {
         self.context
     }
+    /// The packet as the packet reader returned it.
     pub fn packet(&self) -> &Dts14CarrierPacket {
         &self.packet
     }
-    /// Complete-packet Source header only when exact geometry and the existing
-    /// strict probe both succeed. Prefix facts alone do not certify a packet;
-    /// no associated Source frame fills an opaque or refused packet header.
+    /// The packet's core header, when the whole packet is one exact normal frame
+    /// ([`Dts14CarrierSyntax::ExactNormal`]). `None` for an opaque or refused packet:
+    /// a header readable in the first bytes of such a packet is not reported here,
+    /// and the header of a source frame is never put in its place.
     pub fn source_header(&self) -> Option<DtsCoreHeader> {
         if let Dts14CarrierSyntax::ExactNormal(header) = self.packet.syntax {
             Some(header)
@@ -205,50 +242,93 @@ impl ParserPacket {
             None
         }
     }
-    /// This modeled public state is never a source coding-window duration.
+    /// The parser's clock for the packet. It is not the duration of a source
+    /// frame's coding window.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Unsupported`] where the parser's clock is not modelled: the header
+    /// in the packet's first 18 bytes is refused or sets `EXT_AUDIO`, the packet
+    /// holds the extension substream sync `64 58 20 25` at the byte offset
+    /// `FSIZE` + 1 rounded up to a multiple of four, or an earlier packet of the
+    /// operation had one of these.
     pub fn clock(&self) -> Result<ParserClock> {
         self.clock
     }
 }
 
+/// How one reader of a [`ParserOperation`] stopped.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ParserOperationTerminal {
+    /// The source ended here, after the reader's last frame or packet.
     End(SourceLocation),
-    Refused { error: Error, at: SourceLocation },
+    /// The reader stopped with an error.
+    Refused {
+        /// The reader's error.
+        error: Error,
+        /// Where in the source the reader had read to.
+        at: SourceLocation,
+    },
 }
 
+/// One result of a [`ParserOperation`], taken with [`ParserOperation::take_event`].
 #[derive(Clone, Debug)]
 pub enum ParserOperationEvent {
+    /// The next frame of the source-frame reader.
     SourceFrame(Dts14SyncFrame),
+    /// The next packet of the parser-packet reader, with the parser's clock.
     ParserPacket(ParserPacket),
-    /// A genuine terminal source/parser error remains a required outcome.
+    /// A reader stopped with an error, which is a result like any other: the other
+    /// reader continues, and [`ParserOperationStep::End`] reports the error again.
     ViewRefusal {
+        /// The reader that stopped.
         lane: ParserOperationLane,
+        /// Its error.
         error: Error,
+        /// The input request it had open.
         request: InputRequest,
     },
 }
 
+/// The outcome of [`ParserOperation::step`].
 #[derive(Debug)]
 pub enum ParserOperationStep {
-    /// A complete inline payload is available through `take_event`.
+    /// An event is ready and complete: take it with
+    /// [`ParserOperation::take_event`].
     Event,
+    /// A reader needs input: answer `request` through the operation, naming the
+    /// same `lane`.
     NeedInput {
+        /// The reader that asks.
         lane: ParserOperationLane,
+        /// The bytes it asks for.
         request: InputRequest,
     },
+    /// The work budget is spent: call again with a new one.
     Yield,
-    /// Completeness of both views, not native/module acceptance.
+    /// Both readers have stopped. This says how each one ended; it does not say
+    /// that the reference or a decoder accepts the stream.
     End {
+        /// How the source-frame reader stopped.
         source: ParserOperationTerminal,
+        /// How the parser-packet reader stopped.
         parser: ParserOperationTerminal,
     },
 }
 
-/// Bounded orchestration of the existing full Source and carrier readers.
-/// No queue, hidden frame reassembly, cached native result or new dependency.
-/// A fatal cancellation/transport failure drops both private owners immediately;
-/// caller-held events continue owning their complete source/canonical storage.
+/// Runs a [`Dts14SyncReader::per_frame`] and a [`Dts14CarrierReader`] over the same
+/// raw 14-bit DTS entity, in turns, and returns the source frames of the first and
+/// the parser packets of the second as events.
+///
+/// The two readers are run as they are and stay unconnected: nothing is queued
+/// between them, no packet is assembled from source frames, and no recorded
+/// reference output is used. At most one event is held at a time. A cancellation
+/// or a source failure drops both readers at once; events the caller has taken
+/// keep their source and unpacked bytes.
+///
+/// [`step`](Self::step) names the reader a request belongs to. Answer it with
+/// [`provide`](Self::provide), [`finish`](Self::finish) or [`fail`](Self::fail) for
+/// that lane, and give both readers the same bytes.
 pub struct ParserOperation {
     source: Option<Dts14SyncReader>,
     parser: Option<Dts14CarrierReader>,
@@ -266,7 +346,25 @@ pub struct ParserOperation {
 const _: () = assert!(size_of::<ParserOperation>() <= 4096);
 const _: () = assert!(size_of::<ParserOperationStep>() <= 256);
 
+impl std::fmt::Debug for ParserOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ParserOperation")
+            .field("context", &self.context)
+            .field("turn", &self.turn)
+            .field("source_end", &self.source_end)
+            .field("parser_end", &self.parser_end)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
 impl ParserOperation {
+    /// An operation at offset zero of `source`, whose 16-bit words are in `order`.
+    ///
+    /// # Errors
+    ///
+    /// Those of [`Dts14SyncReader::per_frame`] and [`Dts14CarrierReader::new`] for
+    /// their limits.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -297,11 +395,18 @@ impl ParserOperation {
             failure: None,
         })
     }
+    /// The source and the cursor generations of the two readers.
     pub fn context(&self) -> ParserOperationContext {
         self.context
     }
-    /// Moves the complete owned event out once. Repeated polls leave this slot
-    /// unchanged until taken; no new read, owner or work is hidden by a poll.
+    /// Takes the event that [`ParserOperationStep::Event`] announced, once. Until
+    /// then every [`step`](Self::step) returns `Event` again and reads nothing,
+    /// allocates nothing and charges no work.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] when no event is ready. A failed operation returns its
+    /// earlier error.
     pub fn take_event(&mut self) -> Result<ParserOperationEvent> {
         self.healthy()?;
         self.ready_event
@@ -325,6 +430,12 @@ impl ParserOperation {
         self.ready_event = None;
         self.failure = Some(error);
     }
+    /// The input request of one reader.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] when that reader has stopped. A failed operation returns
+    /// its earlier error.
     pub fn request(&self, lane: ParserOperationLane) -> Result<InputRequest> {
         self.healthy()?;
         match lane {
@@ -338,6 +449,12 @@ impl ParserOperation {
         }
         .ok_or(Error::Invalid("DTS operation view is terminal"))
     }
+    /// Answers the current request of one reader with `window`.
+    ///
+    /// # Errors
+    ///
+    /// As [`request`](Self::request), or the reader's refusal of a window that does
+    /// not answer its request, which leaves the operation as it was.
     pub fn provide(&mut self, lane: ParserOperationLane, window: &InputWindow) -> Result<()> {
         self.request(lane)?;
         match lane {
@@ -353,6 +470,15 @@ impl ParserOperation {
                 .provide(window),
         }
     }
+    /// Answers the current request of one reader with the end of the source. Each
+    /// reader is told separately.
+    ///
+    /// # Errors
+    ///
+    /// As [`request`](Self::request), or the reader's refusal of a token or source
+    /// that does not match its request, which leaves the operation as it was.
+    /// [`Error::Truncated`] when the source ends before its known length; that
+    /// reader then stops with a [`ParserOperationEvent::ViewRefusal`].
     pub fn finish(
         &mut self,
         lane: ParserOperationLane,
@@ -373,6 +499,15 @@ impl ParserOperation {
                 .finish(source, token),
         }
     }
+    /// Answers the current request of one reader with a source failure, which fails
+    /// the whole operation: both readers and an event not yet taken are dropped, and
+    /// every later call returns [`Error::Transport`] or [`Error::Cancelled`]. The
+    /// other reader's bytes never become a last frame or packet.
+    ///
+    /// # Errors
+    ///
+    /// As [`request`](Self::request), or the reader's refusal of a token or source
+    /// that does not match its request, which leaves the operation as it was.
     pub fn fail(
         &mut self,
         lane: ParserOperationLane,
@@ -432,6 +567,18 @@ impl ParserOperation {
             request,
         })
     }
+    /// Advances the two readers in turns, as far as `work` allows. Besides the
+    /// readers' own work, one unit is charged for each turn and 128 for the clock of
+    /// each parser packet.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Backpressure`] and [`Error::Allocation`] leave the operation as it
+    /// was: free pool storage and call again. [`Error::Cancelled`] when `cancel` is
+    /// set, and [`Error::Invalid`] when the two readers end at different source
+    /// locations, fail the operation for good. Any other error of a reader is not
+    /// returned: it stops that reader and arrives as a
+    /// [`ParserOperationEvent::ViewRefusal`].
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -561,8 +708,9 @@ impl ParserOperation {
     }
 }
 
-/// Byte-validated physical containment. It never copies Source facts into a
-/// native header or mistakes an opaque packet for one Source frame.
+/// A source frame and the parser packet that contains it, established by comparing
+/// their bytes. It relates the two by position only: the packet's header stays what
+/// the packet reader found, and an opaque packet is not taken for one source frame.
 #[derive(Clone, Debug)]
 pub struct FactAssociation {
     source_frame: Dts14SyncFrame,
@@ -571,22 +719,29 @@ pub struct FactAssociation {
     packet_range: Range<u64>,
 }
 impl FactAssociation {
+    /// The source frame.
     pub fn source_frame(&self) -> &Dts14SyncFrame {
         &self.source_frame
     }
+    /// The parser packet that contains the frame.
     pub fn parser_packet(&self) -> &ParserPacket {
         &self.parser_packet
     }
+    /// The source offsets of the frame, in bytes; the end is exclusive.
     pub fn source_range(&self) -> Range<u64> {
         self.source_range.clone()
     }
+    /// The source offsets of the packet, in bytes; the end is exclusive.
     pub fn packet_range(&self) -> Range<u64> {
         self.packet_range.clone()
     }
 }
 
-/// One source frame may be contained in a coarser parser packet. Work charges
-/// each original byte comparison; output retains both complete backing owners.
+/// Checks that a parser packet contains a source frame: that the frame's source
+/// range lies within the packet's and that the packet holds the frame's bytes
+/// there. A packet may span more than one source frame. One work unit is charged
+/// for each byte compared, and the result keeps the bytes of both.
+#[derive(Debug)]
 pub struct FactAssociationJob {
     source: Option<Dts14SyncFrame>,
     packet: Option<ParserPacket>,
@@ -598,6 +753,15 @@ pub struct FactAssociationJob {
     taken: bool,
 }
 impl FactAssociationJob {
+    /// A job for a source frame and a parser packet of the operation that `context`
+    /// describes.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ForeignPool`] when the bytes of either are not charged to `pool`,
+    /// [`Error::SourceMismatch`] when either comes from another source, and
+    /// [`Error::Invalid`] when either carries a cursor generation other than the
+    /// context's or the frame's source range is not within the packet's.
     pub fn new(
         pool: &Budget,
         context: ParserOperationContext,
@@ -644,6 +808,16 @@ impl FactAssociationJob {
         self.packet = None;
         self.failed = Some(error);
     }
+    /// Compares the frame's bytes with the packet's, as far as `work` allows.
+    /// [`Step::Ready`] carries the association, once; [`Step::Yield`] means the work
+    /// is spent. The job reads no input and returns neither [`Step::NeedInput`] nor
+    /// [`Step::End`].
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] when a byte differs or the association has been returned
+    /// already, and [`Error::Cancelled`] when `cancel` is set. A difference and a
+    /// cancellation are kept and returned by all later calls.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

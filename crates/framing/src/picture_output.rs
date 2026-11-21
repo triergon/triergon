@@ -74,10 +74,22 @@ use triergon_core::{Budget, BudgetVec, Error, Result};
 pub enum Leave<'a, P> {
     /// Output by the bumping process: cropped and output, and marked as not
     /// needed for output. It stays stored while it is used for reference.
-    Output { poc: i32, picture: &'a P },
+    Output {
+        /// PicOrderCnt( ) of the picture.
+        poc: i32,
+        /// Its payload, lent for the call.
+        picture: &'a P,
+    },
     /// Its buffer is emptied. `output` says whether it was output before;
     /// a picture removed while still needed for output is discarded.
-    Removed { poc: i32, picture: P, output: bool },
+    Removed {
+        /// PicOrderCnt( ) of the picture.
+        poc: i32,
+        /// Its payload, given back.
+        picture: P,
+        /// Whether the bumping process output it before.
+        output: bool,
+    },
 }
 
 /// A stored picture, named for as long as it is stored.
@@ -87,16 +99,21 @@ pub struct PictureId(u32);
 /// How a field or frame is marked for reference (H.264 8.2.5, H.265 8.3.2).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Marking {
+    /// Unused for reference.
     #[default]
     Unused,
+    /// Used for short-term reference.
     ShortTerm,
+    /// Used for long-term reference.
     LongTerm,
 }
 
 /// A field of a frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Parity {
+    /// The top field.
     Top,
+    /// The bottom field.
     Bottom,
 }
 
@@ -140,6 +157,7 @@ impl<P> Stored<P> {
 pub struct Entry<'a, P>(&'a mut Stored<P>);
 
 impl<P> Entry<'_, P> {
+    /// The name the picture has while it is stored.
     #[must_use]
     pub fn id(&self) -> PictureId {
         self.0.id
@@ -151,6 +169,8 @@ impl<P> Entry<'_, P> {
         self.0.poc
     }
 
+    /// The marking of `field`. A frame is stored with both fields marked
+    /// alike, a field picture with the field it lacks unused.
     #[must_use]
     pub fn marking(&self, field: Parity) -> Marking {
         self.0.marking[field.index()]
@@ -176,11 +196,15 @@ impl<P> Entry<'_, P> {
         self.0.waiting
     }
 
+    /// Output by the bumping process already; it stays stored while it is used
+    /// for reference or held.
     #[must_use]
     pub fn was_output(&self) -> bool {
         self.0.output
     }
 
+    /// Kept out of bumping ([`NewPicture::hold`]) until
+    /// [`release`](Self::release) or its second field.
     #[must_use]
     pub fn is_held(&self) -> bool {
         self.0.held
@@ -192,11 +216,13 @@ impl<P> Entry<'_, P> {
         self.0.held = false;
     }
 
+    /// The payload stored with the picture.
     #[must_use]
     pub fn picture(&self) -> &P {
         &self.0.picture
     }
 
+    /// The payload stored with the picture, for the caller to change.
     pub fn picture_mut(&mut self) -> &mut P {
         &mut self.0.picture
     }
@@ -230,6 +256,7 @@ impl<P> Entry<'_, P> {
 pub struct View<'a, P>(&'a Stored<P>);
 
 impl<'a, P> View<'a, P> {
+    /// The name the picture has while it is stored.
     #[must_use]
     pub fn id(&self) -> PictureId {
         self.0.id
@@ -241,6 +268,8 @@ impl<'a, P> View<'a, P> {
         self.0.poc
     }
 
+    /// The marking of `field`. A frame is stored with both fields marked
+    /// alike, a field picture with the field it lacks unused.
     #[must_use]
     pub fn marking(&self, field: Parity) -> Marking {
         self.0.marking[field.index()]
@@ -278,7 +307,9 @@ pub struct NewPicture {
 /// A picture the buffer did not take, given back.
 #[derive(Debug)]
 pub struct Refused<P> {
+    /// The pool's refusal of the memory for one more picture.
     pub error: Error,
+    /// The payload of the picture that was not stored.
     pub picture: P,
 }
 
@@ -288,6 +319,7 @@ pub enum StoreError<P> {
     /// Every frame buffer holds a picture used for reference and none waits
     /// for output: the stream overflows the buffer.
     Full(P),
+    /// The pool refused the memory for one more picture.
     Refused(Refused<P>),
 }
 
@@ -349,6 +381,7 @@ pub struct HevcPicture {
 /// What C.4.4 needs of the current H.264 picture.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct AvcPicture {
+    /// An IDR picture.
     pub idr: bool,
     /// The picture has `memory_management_control_operation` equal to 5.
     pub mmco5: bool,
@@ -358,6 +391,7 @@ pub struct AvcPicture {
 }
 
 impl<P> DecodedPictures<P> {
+    /// An empty buffer whose storage is charged to `pool`.
     #[must_use]
     pub fn new(pool: &Budget) -> Self {
         Self {
@@ -372,6 +406,7 @@ impl<P> DecodedPictures<P> {
         self.stored.len()
     }
 
+    /// True when no picture is stored.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.stored.is_empty()

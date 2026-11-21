@@ -1,12 +1,17 @@
 use triergon_core::{Error, Result};
 
+/// The coding standard of a NAL unit stream, which fixes its header layout.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Codec {
+    /// H.264 (AVC): a one-byte NAL unit header.
     Avc,
+    /// H.265 (HEVC): a two-byte NAL unit header.
     Hevc,
 }
 
 impl Codec {
+    /// Bytes of the fixed NAL unit header: 1 for H.264, 2 for H.265. A NAL unit
+    /// is at least this long.
     pub const fn minimum_header_bytes(self) -> usize {
         match self {
             Self::Avc => 1,
@@ -19,13 +24,20 @@ impl Codec {
 /// retained, without claiming that the corresponding coding tool is supported.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NalHeader {
+    /// The one-byte header of H.264 7.3.1.
     Avc {
+        /// `nal_ref_idc`, 0 to 3.
         nal_ref_idc: u8,
+        /// `nal_unit_type`, 0 to 31 (Table 7-1).
         nal_unit_type: u8,
     },
+    /// The two-byte header of H.265 7.3.1.2.
     Hevc {
+        /// `nal_unit_type`, 0 to 63 (Table 7-1).
         nal_unit_type: u8,
+        /// `nuh_layer_id`, 0 to 63; zero is the base layer.
         layer_id: u8,
+        /// `nuh_temporal_id_plus1`, 1 to 7.
         temporal_id_plus_one: u8,
     },
 }
@@ -52,6 +64,12 @@ impl NalHeaderError {
 impl NalHeader {
     /// H.264 (08/2024) 7.3.1 and H.265 (07/2024) 7.3.1.2. Extended AVC
     /// headers, RBSP syntax and type-specific constraints are outside this call.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Truncated`] when `nal` is shorter than the header;
+    /// [`Error::Invalid`] when `forbidden_zero_bit` is set or an H.265
+    /// `nuh_temporal_id_plus1` is zero.
     pub fn parse(codec: Codec, nal: &[u8]) -> Result<Self> {
         Self::parse_compact(codec, nal).map_err(NalHeaderError::error)
     }
@@ -84,6 +102,7 @@ impl NalHeader {
         }
     }
 
+    /// The standard whose header layout this is.
     pub const fn codec(self) -> Codec {
         match self {
             Self::Avc { .. } => Codec::Avc,
@@ -91,12 +110,16 @@ impl NalHeader {
         }
     }
 
+    /// `nal_unit_type` of either standard: 0 to 31 for H.264, 0 to 63 for H.265.
+    /// The values are named in [`avc`](crate::avc) and [`hevc`](crate::hevc).
     pub const fn nal_unit_type(self) -> u8 {
         match self {
             Self::Avc { nal_unit_type, .. } | Self::Hevc { nal_unit_type, .. } => nal_unit_type,
         }
     }
 
+    /// The parameter set `nal_unit_type` names: H.264 types 7 and 8, H.265 types
+    /// 32 to 34; `None` for every other type.
     /// This is a type classification, not a parse of parameter-set contents.
     pub const fn parameter_set_kind(self) -> Option<ParameterSetKind> {
         match self {
@@ -120,11 +143,17 @@ impl NalHeader {
     }
 }
 
+/// The parameter sets a configuration carries, by `nal_unit_type`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ParameterSetKind {
+    /// H.264 sequence parameter set, type 7.
     AvcSps,
+    /// H.264 picture parameter set, type 8.
     AvcPps,
+    /// H.265 video parameter set, type 32.
     HevcVps,
+    /// H.265 sequence parameter set, type 33.
     HevcSps,
+    /// H.265 picture parameter set, type 34.
     HevcPps,
 }

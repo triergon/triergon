@@ -13,6 +13,11 @@ use triergon_core::{
 pub struct LengthSize(u8);
 
 impl LengthSize {
+    /// A length field of `bytes` bytes.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] unless `bytes` is 1 to 4.
     pub fn new(bytes: u8) -> Result<Self> {
         if !(1..=4).contains(&bytes) {
             return Err(Error::Invalid("NAL length width must be 1 through 4"));
@@ -20,22 +25,36 @@ impl LengthSize {
         Ok(Self(bytes))
     }
 
+    /// The width in bytes, 1 to 4.
     pub const fn bytes(self) -> u8 {
         self.0
     }
 }
 
+/// How the NAL units of a stream or sample are delimited.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Framing {
+    /// Each NAL unit follows a big-endian length field of this width, as in the
+    /// samples of ISO/IEC 14496-15.
     LengthPrefixed(LengthSize),
+    /// Each NAL unit follows a `00 00 01` or `00 00 00 01` start code (H.264
+    /// and H.265 Annex B).
     AnnexB,
 }
 
+/// Bounds of a [`NalReader`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ReaderLimits {
+    /// The most bytes one NAL unit may hold. A [`NalReader`] reserves this much
+    /// for each Annex B unit. Must not be zero.
     pub maximum_nal_bytes: usize,
+    /// The most zero bytes accepted before a start code, beyond the code's own,
+    /// and at the end of an Annex B source. Not used with length prefixes.
     pub maximum_padding_bytes: usize,
+    /// The most NAL units read from the source. Must not be zero.
     pub maximum_nal_units: usize,
+    /// The most bytes one input window may carry: [`InputRequest::maximum`] is
+    /// never above it. Must not be zero.
     pub maximum_input_window: usize,
 }
 
@@ -54,18 +73,28 @@ impl ReaderLimits {
     }
 }
 
-/// Exact observed source framing, before any output adaptation. Annex-B
-/// `prefix_offset` includes the optional zero_byte, but excludes leading padding.
+/// The exact framing of a NAL unit in its source, before any output adaptation. Annex-B
+/// `prefix_offset` includes the optional `zero_byte`, but excludes leading padding.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NalFraming {
+    /// A length field before the NAL unit.
     LengthPrefixed {
+        /// Source offset of the length field's first byte.
         prefix_offset: u64,
+        /// Width of the length field.
         length_size: LengthSize,
+        /// The field's value: the NAL unit's length in bytes, never zero.
         declared_length: u32,
     },
+    /// A start code before the NAL unit.
     AnnexB {
+        /// Source offset of the start code's first byte.
         prefix_offset: u64,
+        /// Length of the start code in bytes: 3, or 4 with its `zero_byte`.
         start_code_bytes: u8,
+        /// Zero bytes before the start code of the first NAL unit read. Zero
+        /// for every later unit: the zeros before its start code are the
+        /// `trailing_zero_bytes` of the unit before it.
         leading_zero_bytes: usize,
     },
 }
@@ -88,16 +117,28 @@ impl NalFraming {
     }
 }
 
+/// Where a NAL unit lies in its source, how it is framed there and what its
+/// fixed header says.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NalFacts {
+    /// The source the NAL unit was read from.
     pub source: SourceId,
+    /// The length field or start code before the NAL unit.
     pub framing: NalFraming,
+    /// Source offset of the NAL unit's first byte, directly after its length
+    /// field or start code.
     pub payload_offset: u64,
+    /// Length of the NAL unit in bytes, its header included.
     pub payload_length: usize,
+    /// Zero bytes between the end of the NAL unit and the next start code or
+    /// the end of the source (`trailing_zero_8bits`). Always zero with length
+    /// prefixes.
     pub trailing_zero_bytes: usize,
+    /// The NAL unit's fixed header.
     pub header: NalHeader,
 }
 
+/// One complete NAL unit and where it lay in its source.
 #[derive(Clone, Debug)]
 pub struct NalUnit {
     bytes: Bytes,
@@ -105,10 +146,13 @@ pub struct NalUnit {
 }
 
 impl NalUnit {
+    /// The NAL unit from its header on, without length field, start code or
+    /// zero padding.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
 
+    /// Where the NAL unit lay in its source and what its header says.
     pub const fn facts(&self) -> NalFacts {
         self.facts
     }
@@ -151,6 +195,7 @@ enum Phase {
 /// Length-prefixed NALs reserve their declared length once. Annex-B NALs reserve
 /// `maximum_nal_bytes` once because their length is not known in advance. This
 /// deliberate tradeoff prevents hidden vector-growth copies. Output clones retain that capacity.
+#[derive(Debug)]
 pub struct NalReader {
     cursor: InputCursor,
     codec: Codec,
@@ -175,6 +220,13 @@ pub struct NalReader {
 }
 
 impl NalReader {
+    /// A reader at offset zero of `source`. Its input windows and NAL units are
+    /// charged to `pool`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] when a limit other than `maximum_padding_bytes` is
+    /// zero.
     pub fn new(
         pool: &Budget,
         codec: Codec,
@@ -251,12 +303,16 @@ impl NalReader {
         Ok(())
     }
 
+    /// The request for the bytes the reader takes next, as
+    /// [`step`](Self::step) returns it with `NeedInput`.
     pub fn request(&self) -> InputRequest {
         self.cursor.request()
     }
+    /// The token an answer to the current request must carry.
     pub fn token(&self) -> InputToken {
         self.cursor.token()
     }
+    /// Source offset of the next byte the reader takes from its input.
     pub fn position(&self) -> u64 {
         self.cursor.position()
     }
@@ -266,6 +322,7 @@ impl NalReader {
         self.end_after_nal
     }
 
+    /// The source being read.
     pub fn source(&self) -> SourceId {
         self.cursor.source()
     }
@@ -276,12 +333,20 @@ impl NalReader {
         Ok(self.buffer.as_ref().map_or(0, BudgetVec::capacity))
     }
 
+    /// The pool input windows and NAL units are charged to.
     pub fn budget(&self) -> &Budget {
         self.cursor.budget()
     }
 
-    /// Rejected caller responses do not change parser state. A short or empty
-    /// window is starvation; only `finish` establishes source completion.
+    /// Answers the current request with `window`, whose bytes the reader
+    /// shares. Rejected caller responses do not change parser state. A short or
+    /// empty window is starvation; only `finish` establishes source completion.
+    ///
+    /// # Errors
+    ///
+    /// A window that does not answer the current request is refused: another
+    /// token, source, pool or offset, or more bytes than the request allows.
+    /// After a final error of [`step`](Self::step), that error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -289,6 +354,11 @@ impl NalReader {
         self.cursor.provide(window)
     }
 
+    /// [`provide`](Self::provide) for a window the caller gives away.
+    ///
+    /// # Errors
+    ///
+    /// As [`provide`](Self::provide); a refused window is dropped.
     pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -340,6 +410,14 @@ impl NalReader {
         }
     }
 
+    /// Answers the current request with the end of the source, which lies after
+    /// the bytes already provided.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Truncated`], here and from every later call, when the source
+    /// ends before its declared length. A `source` or `token` other than the
+    /// current one is refused and changes nothing.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -351,6 +429,14 @@ impl NalReader {
         result
     }
 
+    /// Answers the current request with a failure of the source. Every later
+    /// call returns [`Error::Transport`] or [`Error::Cancelled`], as `failure`
+    /// says.
+    ///
+    /// # Errors
+    ///
+    /// A `source` or `token` other than the current one is refused and changes
+    /// nothing.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -382,11 +468,28 @@ impl NalReader {
         self.next = None;
     }
 
+    /// Reads towards the next NAL unit. `Ready` carries one complete unit;
+    /// `NeedInput` carries the request to answer with
+    /// [`provide`](Self::provide), [`finish`](Self::finish) or
+    /// [`fail`](Self::fail); `End` follows the last unit of a finished source.
+    ///
     /// Work units charge each input-byte visit (including its constant-size
     /// classification/copy), each deferred Annex-B payload-byte append, and
     /// each reserve/freeze attempt. No growth copies occur after reserve.
     /// Backpressure/allocation errors are retryable with the same parser;
     /// all content, transport and cancellation failures are sticky.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] for a length field of zero, anything but zero bytes
+    /// before the first start code, a nonzero byte after `00 00 00`, an Annex B
+    /// unit of no bytes and a refused NAL header; [`Error::Truncated`] when the
+    /// source ends inside a length field, a length-prefixed unit or the zeros
+    /// before a first start code, when a length field declares more bytes than
+    /// a source of known length has left, and for a unit shorter than its
+    /// header; [`Error::Limit`] past `maximum_nal_bytes`,
+    /// `maximum_padding_bytes` or `maximum_nal_units`; [`Error::Cancelled`] when
+    /// `cancel` is set.
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<NalUnit>> {
         if let Some(error) = self.failure {
             return Err(error);

@@ -13,7 +13,9 @@ pub const SAMPLE_RATE: u32 = 48_000;
 /// The fields of an Opus identification header.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct OpusHead {
+    /// Version of the header, 0 to 15; 1 for a header read from a `dOps` box.
     pub version: u8,
+    /// Output channels, 1 to 255; 1 or 2 with mapping family 0.
     pub channels: u8,
     /// Samples at 48 kHz to discard from the start of the decoded stream.
     pub pre_skip: u16,
@@ -21,8 +23,12 @@ pub struct OpusHead {
     pub input_sample_rate: u32,
     /// Output gain in Q7.8 dB.
     pub output_gain: i16,
+    /// Channel mapping family: 0 for mono or stereo in one stream, 1 for the
+    /// Vorbis channel order, 255 for channels without a defined meaning.
     pub mapping_family: u8,
+    /// Opus streams in each packet, at least 1; 1 with mapping family 0.
     pub streams: u8,
+    /// How many of the streams are coupled (stereo), at most `streams`.
     pub coupled_streams: u8,
     mapping: [u8; 255],
 }
@@ -49,6 +55,12 @@ impl OpusHead {
 
     /// Parse an `OpusHead` packet (RFC 7845 section 5.1). Bytes after the mapping table
     /// are ignored, as the specification requires of a version 0 header.
+    ///
+    /// # Errors
+    ///
+    /// When the magic is missing, the packet ends before a field or the mapping table,
+    /// the version is above 15, the channel count is 0 or, in family 0, above 2, or the
+    /// stream counts or a mapping index are out of range.
     pub fn parse(bytes: &[u8]) -> Result<OpusHead> {
         if !bytes.starts_with(b"OpusHead") {
             return Err(Error::Invalid("Opus identification header magic"));
@@ -75,6 +87,10 @@ impl OpusHead {
 
     /// Parse the payload of an ISO BMFF `dOps` box (Opus in ISO BMFF, section 4.3.2):
     /// the same fields, big-endian, without the magic.
+    ///
+    /// # Errors
+    ///
+    /// When the box version is not 0, and as [`parse`](Self::parse) for the fields.
     pub fn from_dops(bytes: &[u8]) -> Result<OpusHead> {
         let field = |range: core::ops::Range<usize>| bytes.get(range).ok_or(Error::Truncated);
         let version = field(0..1)?[0];
@@ -206,6 +222,11 @@ pub fn frame_samples(toc: u8) -> u32 {
 }
 
 /// Frames in a packet from its TOC and frame-count byte (RFC 6716 section 3.2).
+///
+/// # Errors
+///
+/// When the packet is empty, or is a code 3 packet without its frame-count byte or
+/// with a count of 0.
 pub fn packet_frames(packet: &[u8]) -> Result<u32> {
     let toc = *packet.first().ok_or(Error::Truncated)?;
     Ok(match toc & 3 {
@@ -223,6 +244,10 @@ pub fn packet_frames(packet: &[u8]) -> Result<u32> {
 
 /// Duration of a packet at 48 kHz. A packet longer than 120 ms is invalid (RFC 6716
 /// section 3.2.5).
+///
+/// # Errors
+///
+/// As [`packet_frames`], and when the frames add up to more than 5760 samples.
 pub fn packet_samples(packet: &[u8]) -> Result<u32> {
     let frames = packet_frames(packet)?;
     let samples = frames * frame_samples(packet[0]);

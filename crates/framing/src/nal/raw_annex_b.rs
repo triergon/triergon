@@ -18,11 +18,21 @@ const ZEROS: [u8; 256] = [0; 256];
 const START_3: &[u8] = &[0, 0, 1];
 const START_4: &[u8] = &[0, 0, 0, 1];
 
+/// Bounds of a [`RawAnnexBReader`].
+///
+/// The default allows NAL units of 4 MiB, 4096 padding bytes, 32 million NAL
+/// units in the stream, input windows of 64 KiB, and access units of 8 MiB and
+/// 1024 NAL units.
 #[derive(Clone, Copy, Debug)]
 pub struct RawAnnexBLimits {
+    /// Bounds of each NAL unit, of zero padding, of the stream's NAL unit count
+    /// and of input windows. This reader grows a unit's buffer as its bytes
+    /// arrive; it does not reserve `maximum_nal_bytes`.
     pub nal: ReaderLimits,
-    /// Exact original extent, including start codes and padding.
+    /// The most source bytes one access unit may span, start codes and padding
+    /// included. Must not be zero.
     pub maximum_access_unit_bytes: usize,
+    /// The most NAL units one access unit may hold. Must not be zero.
     pub maximum_access_unit_nals: usize,
 }
 
@@ -41,11 +51,17 @@ impl Default for RawAnnexBLimits {
     }
 }
 
-/// Original source facts and a scatter view over the immutable NAL owners.
+/// One access unit of an Annex B elementary stream: where it lies in the source,
+/// what it holds, and its NAL units, each with the buffer it was read into.
 #[derive(Debug)]
 pub struct RawAccessUnit {
+    /// The source the access unit was read from.
     pub source: SourceId,
+    /// The coding standard of the stream.
     pub codec: Codec,
+    /// The source byte range of the access unit: from the zero padding or start
+    /// code before its first NAL unit to the end of its last unit's trailing
+    /// zeros.
     pub range: Range<u64>,
     /// At least one primary AVC slice or recognized base-layer HEVC slice.
     pub has_vcl: bool,
@@ -55,11 +71,14 @@ pub struct RawAccessUnit {
 }
 
 impl RawAccessUnit {
+    /// The access unit's NAL units in source order, parameter sets, SEI and
+    /// delimiters included.
     pub fn nals(&self) -> &[NalUnit] {
         self.nals.as_slice()
     }
 
-    /// All source bytes, including the original zero padding and prefix widths.
+    /// The bytes of [`range`](Self::range) in order, as slices: all source
+    /// bytes, including the original zero padding and prefix widths.
     pub fn segments(&self) -> impl Iterator<Item = &[u8]> {
         self.nals().iter().flat_map(|nal| {
             let facts = nal.facts();
@@ -146,6 +165,22 @@ struct PendingNal {
     role: Option<Role>,
 }
 
+/// Groups the NAL units of an Annex B elementary stream into access units. It
+/// adds no timestamps.
+///
+/// Once an access unit holds a slice, it ends before the next NAL unit that
+/// begins another one. For H.264 that is a unit of type 6 to 9 or 14 to 18
+/// (7.4.1.2.3) and the first slice of another primary coded picture (7.4.1.2.4),
+/// told apart with the parameter sets the stream carries. For H.265 it is a
+/// base-layer unit for which [`hevc::begins_access_unit`] holds and a
+/// base-layer slice with `first_slice_segment_in_pic_flag` set (7.4.2.4.4); a
+/// unit of only its two header bytes that ends the stream begins nothing, as in
+/// FFmpeg's parser. Every byte of the source belongs to one access unit, zero
+/// padding included.
+///
+/// The reader is driven like a [`NalReader`]: [`step`](Self::step) asks for
+/// input, and [`provide`](Self::provide), [`finish`](Self::finish) or
+/// [`fail`](Self::fail) answers.
 pub struct RawAnnexBReader {
     nal: NalReader,
     codec: Codec,
@@ -161,8 +196,29 @@ pub struct RawAnnexBReader {
     failure: Option<Error>,
 }
 
+impl std::fmt::Debug for RawAnnexBReader {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RawAnnexBReader")
+            .field("codec", &self.codec)
+            .field("limits", &self.limits)
+            .field("position", &self.nal.position())
+            .field("published_bytes", &self.unit_start)
+            .field("pending_nals", &self.unit.len())
+            .field("end", &self.end)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
 impl RawAnnexBReader {
+    /// A reader at offset zero of `source`, charged to `pool`.
     /// The caller provides the codec from a trusted route or separate probe.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] when a limit other than `maximum_padding_bytes` is
+    /// zero.
     pub fn new(
         pool: &Budget,
         codec: Codec,
@@ -189,11 +245,25 @@ impl RawAnnexBReader {
         })
     }
 
+    /// Answers the current request with `window`, whose bytes the reader
+    /// shares. An empty window is no answer yet; only
+    /// [`finish`](Self::finish) ends the source.
+    ///
+    /// # Errors
+    ///
+    /// A window that does not answer the current request is refused and changes
+    /// nothing: another token, source, pool or offset, or more bytes than the
+    /// request allows. After a final error of [`step`](Self::step), that error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.healthy()?;
         self.nal.provide(window)
     }
 
+    /// [`provide`](Self::provide) for a window the caller gives away.
+    ///
+    /// # Errors
+    ///
+    /// As [`provide`](Self::provide); a refused window is dropped.
     pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
         self.healthy()?;
         self.nal.provide_owned(window)
@@ -219,6 +289,17 @@ impl RawAnnexBReader {
     /// Consume a borrowed slice that fits wholly inside the current NAL
     /// payload. If the reader needs to inspect a possible boundary, the caller
     /// can provide the same slice as a regular input window.
+    ///
+    /// `Ok(true)` when `bytes` was taken as the answer to `request`. `Ok(false)`,
+    /// with no byte taken, when the reader is not in the middle of a NAL unit,
+    /// when `bytes` is not 32 to 4096 bytes long, ends in a zero byte or holds
+    /// two zero bytes in a row, and when the work left or the unit's buffer
+    /// cannot take it.
+    ///
+    /// # Errors
+    ///
+    /// A `request` other than the current one is refused, as by
+    /// [`provide`](Self::provide); [`Error::Cancelled`] when `cancel` is set.
     pub fn append_payload(
         &mut self,
         request: &InputRequest,
@@ -233,6 +314,14 @@ impl RawAnnexBReader {
         self.nal.append_annex_payload(request, bytes, work, cancel)
     }
 
+    /// Answers the current request with the end of the source, which lies after
+    /// the bytes already provided.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Truncated`], here and from every later call, when the source
+    /// ends before its declared length. A `source` or `token` other than the
+    /// current one is refused and changes nothing.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
         let result = self.nal.finish(source, token);
@@ -242,6 +331,14 @@ impl RawAnnexBReader {
         result
     }
 
+    /// Answers the current request with a failure of the source. Every later
+    /// call returns [`Error::Transport`] or [`Error::Cancelled`], as `failure`
+    /// says.
+    ///
+    /// # Errors
+    ///
+    /// A `source` or `token` other than the current one is refused and changes
+    /// nothing.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -257,6 +354,25 @@ impl RawAnnexBReader {
         Ok(())
     }
 
+    /// Reads towards the next access unit. `Ready` carries one; `NeedInput`
+    /// carries the request to answer; `End` follows the last access unit of a
+    /// finished source. Work is charged per source byte and per NAL unit.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Unsupported`] for H.264 slice data partitioning, redundant
+    /// coded pictures, NAL unit types 13 to 16 and 19 to 21, and an SPS
+    /// `profile_idc` other than 44, 66, 77, 88, 100, 110, 122 and 244;
+    /// [`Error::Invalid`] for an H.264 slice whose parameter sets the stream
+    /// has not carried; the error of [`read_sps`](crate::avc::read_sps),
+    /// [`read_pps`](crate::avc::read_pps) or
+    /// [`read_slice_header`](crate::avc::read_slice_header) for an H.264
+    /// parameter set or slice header it refuses (emulation prevention is read
+    /// strictly); [`Error::Truncated`] for an H.265 slice of only its header;
+    /// [`Error::Limit`] past an access-unit limit; the errors of
+    /// [`NalReader::step`] for the framing. [`Error::Backpressure`] and
+    /// [`Error::Allocation`] are retryable: the reader keeps its progress. Every
+    /// other error is final and returned again by each later call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -419,14 +535,18 @@ impl RawAnnexBReader {
         Ok((capacity, self.unit.as_slice()))
     }
 
+    /// The request for the bytes the reader takes next, as
+    /// [`step`](Self::step) returns it with `NeedInput`.
     pub fn request(&self) -> InputRequest {
         self.nal.request()
     }
 
+    /// The coding standard given at construction.
     pub const fn codec(&self) -> Codec {
         self.codec
     }
 
+    /// The pool input windows, NAL units and access units are charged to.
     pub fn budget(&self) -> &Budget {
         self.nal.budget()
     }

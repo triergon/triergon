@@ -4,14 +4,21 @@ use crate::dts::{DtsPackedBitLocation, DtsSourceIdentity};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
 
+/// How the bits of a DTS stream are stored in its bytes (ETSI TS 102 114
+/// §3.4/5.3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DtsPacking {
+    /// The bitstream as specified: bytes in order, most significant bit first.
     CanonicalBe,
+    /// 16-bit words stored low byte first: the canonical bytes swapped in pairs.
     Words16Le,
+    /// 14 payload bits in the low bits of each 16-bit word, high byte first.
     Words14Be,
+    /// 14 payload bits in the low bits of each 16-bit word, low byte first.
     Words14Le,
 }
 impl DtsPacking {
+    /// Size of one storage unit in bytes: 1 for canonical bytes, 2 for words.
     pub const fn source_unit_bytes(self) -> usize {
         if matches!(self, Self::CanonicalBe) {
             1
@@ -19,6 +26,8 @@ impl DtsPacking {
             2
         }
     }
+    /// Payload bits one storage unit carries: 8 for a canonical byte, 16 or 14
+    /// for a word.
     pub const fn word_payload_bits(self) -> usize {
         match self {
             Self::CanonicalBe => 8,
@@ -26,6 +35,12 @@ impl DtsPacking {
             Self::Words14Be | Self::Words14Le => 14,
         }
     }
+    /// Number of payload bits in `source_bytes` bytes stored this way.
+    ///
+    /// # Errors
+    ///
+    /// `Truncated` when `source_bytes` is not a whole number of storage units,
+    /// `Overflow` when the count does not fit `usize`.
     pub fn payload_bits(self, source_bytes: usize) -> Result<usize> {
         if !source_bytes.is_multiple_of(self.source_unit_bytes()) {
             return Err(Error::Truncated);
@@ -50,7 +65,16 @@ impl DtsPacking {
         };
         Ok(((value >> (width - 1 - position % width)) & 1) as u8)
     }
-    /// Allocation-free fixed probe. High unused word bits remain in source.
+    /// The packing in which `prefix` begins with the core sync word
+    /// `0x7FFE8001`. The probe allocates nothing and reads at most four bytes,
+    /// six for the 14-bit packings. The two unused high bits of a 14-bit word are
+    /// not examined and stay in the source.
+    ///
+    /// # Errors
+    ///
+    /// `Truncated` when `prefix` has fewer than four bytes, or matches the start
+    /// of a 14-bit sync word and ends before its sixth byte. `Invalid` when it
+    /// begins with the sync word in no packing.
     pub fn detect(prefix: &[u8]) -> Result<Self> {
         if prefix.len() < 4 {
             return Err(Error::Truncated);
@@ -94,12 +118,20 @@ impl DtsPacking {
     }
 }
 
+/// The bounds a [`DtsPackedPayloadJob`] enforces.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsPackedLimits {
+    /// Largest record accepted, in bytes.
     pub maximum_source_bytes: usize,
+    /// Largest unpacked payload accepted, in bytes: its bits rounded up to
+    /// whole bytes.
     pub maximum_storage_bytes: usize,
 }
 
+/// The payload bits of one record, unpacked into bytes in bitstream order, with
+/// the record as it was stored. Every source bit is kept. When the payload is
+/// not a whole number of bytes, the last storage byte ends in zero bits that are
+/// not source bits; `valid_bits()` counts the bits that are.
 #[derive(Clone, Debug)]
 pub struct DtsPackedPayload {
     raw: Bytes,
@@ -109,24 +141,40 @@ pub struct DtsPackedPayload {
     valid_bits: usize,
 }
 impl DtsPackedPayload {
+    /// The record exactly as it was given, in its packing.
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
+    /// The payload in bitstream order, most significant bit first:
+    /// `valid_bits()` rounded up to whole bytes. For
+    /// [`DtsPacking::CanonicalBe`] these are the source bytes themselves,
+    /// shared.
     pub fn storage_bytes(&self) -> &Bytes {
         &self.storage
     }
+    /// Where the record came from, as the caller stated it.
     pub const fn identity(&self) -> DtsSourceIdentity {
         self.identity
     }
+    /// The packing the record was read in.
     pub const fn packing(&self) -> DtsPacking {
         self.packing
     }
+    /// Number of payload bits in `storage_bytes()`, counted from its first bit.
     pub const fn valid_bits(&self) -> usize {
         self.valid_bits
     }
+    /// Number of zero bits after the payload in the last storage byte: 0, 2, 4
+    /// or 6. They are not source bits.
     pub fn alignment_zero_bits(&self) -> u8 {
         ((8 - self.valid_bits % 8) % 8) as u8
     }
+    /// Where payload bit `position`, counted from zero in bitstream order, lies
+    /// in the source.
+    ///
+    /// # Errors
+    ///
+    /// `Invalid` when `position` is not below `valid_bits()`.
     pub fn source_bit(&self, position: usize) -> Result<DtsPackedBitLocation> {
         if position >= self.valid_bits {
             return Err(Error::Invalid("DTS non-source alignment bit"));
@@ -160,12 +208,25 @@ impl DtsPackedPayload {
             msb0_bit: msb0,
         })
     }
+    /// Payload bit `position`, counted from zero in bitstream order: 0 or 1.
+    ///
+    /// # Errors
+    ///
+    /// `Invalid` when `position` is not below `valid_bits()`.
     pub fn bit(&self, position: usize) -> Result<u8> {
         if position >= self.valid_bits {
             return Err(Error::Invalid("DTS non-source alignment bit"));
         }
         Ok((self.storage.as_ref()[position / 8] >> (7 - position % 8)) & 1)
     }
+    /// The two bits above the payload in source word `index`, counted from
+    /// zero, for the 14-bit packings: 0 to 3. `None` for
+    /// [`DtsPacking::Words16Le`], whose words are all payload.
+    ///
+    /// # Errors
+    ///
+    /// `Invalid` for [`DtsPacking::CanonicalBe`], which has no words, and when
+    /// the record has no word `index`.
     pub fn unused_word_high_bits(&self, index: usize) -> Result<Option<u8>> {
         if matches!(self.packing, DtsPacking::CanonicalBe) {
             return Err(Error::Invalid("canonical byte stream has no storage words"));
@@ -197,6 +258,16 @@ enum Phase {
     Publish,
     Complete,
 }
+/// Unpacks one complete record the caller owns, stored in a known
+/// [`DtsPacking`], into a [`DtsPackedPayload`], step by step. A canonical record
+/// is returned as it is, sharing its bytes. A record of words is unpacked bit by
+/// bit into storage allocated once, at its final size, before the first bit is
+/// written.
+///
+/// Every payload bit and every storage byte costs one unit of work; allocating,
+/// completing and returning the storage cost a few more. After `Backpressure`
+/// or `Allocation` the job keeps its record and progress and may be stepped
+/// again; any other error is returned again by every later step.
 pub struct DtsPackedPayloadJob {
     pool: Budget,
     raw: Option<Bytes>,
@@ -213,7 +284,29 @@ pub struct DtsPackedPayloadJob {
     failure: Option<Error>,
     end: SourceLocation,
 }
+impl std::fmt::Debug for DtsPackedPayloadJob {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DtsPackedPayloadJob")
+            .field("identity", &self.identity)
+            .field("packing", &self.packing)
+            .field("valid_bits", &self.valid_bits)
+            .field("position", &self.position)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
 impl DtsPackedPayloadJob {
+    /// A job for `raw`, a record of whole storage units of `packing` that
+    /// `identity` locates. `raw` must be charged to `pool`, and the unpacked
+    /// storage is charged to it.
+    ///
+    /// # Errors
+    ///
+    /// `ForeignPool` when `raw` is charged to another pool. `Truncated` when a
+    /// record of words has an odd number of bytes. `Limit` when the record or
+    /// its unpacked storage exceeds `limits`, and, for a record of words, when
+    /// the pool's limit cannot hold the record and the storage together.
+    /// `Overflow` when the record ends beyond offset `u64::MAX`.
     pub fn new(
         pool: &Budget,
         identity: DtsSourceIdentity,
@@ -266,6 +359,16 @@ impl DtsPackedPayloadJob {
             end,
         })
     }
+    /// Advances the job by at most the work left in `work`. `Ready` carries the
+    /// payload, once; every later step returns `End` with the location of the
+    /// record's end in its source. `Yield` means the work is spent. An owned
+    /// record never requests input.
+    ///
+    /// # Errors
+    ///
+    /// `Cancelled` when `cancel` is set. `Backpressure` or `Allocation` when the
+    /// storage cannot be allocated: after these two, and only these, `step` may
+    /// be called again.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

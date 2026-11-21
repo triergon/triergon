@@ -7,32 +7,46 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};
 
+/// The first array of an `hvcC` record that a decoder configuration does not
+/// carry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HvcDecoderConfigRefusal {
+    /// Index of the array in the record.
     pub array_index: usize,
+    /// The `NAL_unit_type` the array declares: none of 32 to 34, 39 and 40.
     pub declared_nal_type: u8,
 }
 
+/// What [`HvcDecoderConfigWriter`] makes of a record.
+#[derive(Debug)]
 pub enum HvcDecoderConfigOutput {
+    /// Every array declares a VPS, SPS, PPS or SEI type: the record's NAL units as
+    /// Annex B.
     Converted(HvcAnnexBOutput),
+    /// An array declares another type; no bytes are written.
     Refused {
+        /// The record as it was given to the writer.
         configuration: HvcConfiguration,
+        /// The first such array.
         reason: HvcDecoderConfigRefusal,
     },
 }
 impl HvcDecoderConfigOutput {
+    /// The Annex B bytes of a converted record; the `hvcC` bytes of a refused one.
     pub fn bytes(&self) -> &Bytes {
         match self {
             Self::Converted(o) => o.bytes(),
             Self::Refused { configuration, .. } => configuration.source_bytes(),
         }
     }
+    /// The record given to the writer, converted or refused.
     pub fn configuration(&self) -> &HvcConfiguration {
         match self {
             Self::Converted(o) => o.configuration(),
             Self::Refused { configuration, .. } => configuration,
         }
     }
+    /// The array that refused the record; `None` when it was converted.
     pub const fn refusal(&self) -> Option<HvcDecoderConfigRefusal> {
         match self {
             Self::Converted(_) => None,
@@ -41,8 +55,12 @@ impl HvcDecoderConfigOutput {
     }
 }
 
-/// Selected decoder-configuration conversion. Generic all-NAL conversion is
-/// still HvcAnnexBWriter. A refusal retains the exact complete configuration.
+/// Writes the NAL units of an `hvcC` record as Annex B when every array declares
+/// a type a decoder configuration carries: VPS, SPS, PPS, prefix SEI or suffix
+/// SEI (32 to 34, 39, 40). It refuses any other record, and the refusal retains
+/// the exact complete configuration. [`HvcAnnexBWriter`] converts the NAL units
+/// of every record, whatever its arrays declare.
+#[derive(Debug)]
 pub struct HvcDecoderConfigWriter {
     pool: Budget,
     input: Option<HvcConfiguration>,
@@ -53,6 +71,12 @@ pub struct HvcDecoderConfigWriter {
     failure: Option<Error>,
 }
 impl HvcDecoderConfigWriter {
+    /// Starts the conversion of `input` into a buffer of at most `maximum` bytes
+    /// charged to `pool`.
+    ///
+    /// # Errors
+    ///
+    /// When the record belongs to another pool.
     pub fn new(pool: &Budget, input: HvcConfiguration, maximum: usize) -> Result<Self> {
         if !input.source_bytes().belongs_to(pool) {
             return Err(Error::ForeignPool);
@@ -67,6 +91,13 @@ impl HvcDecoderConfigWriter {
             failure: None,
         })
     }
+    /// Advances by at most the units in `work` and returns the output once, as
+    /// [`BuildStep`] describes. A refusal is an output, not an error. Checking an
+    /// array costs one unit; the rest is the work of [`HvcAnnexBWriter::step`].
+    ///
+    /// # Errors
+    ///
+    /// As [`HvcAnnexBWriter::step`].
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

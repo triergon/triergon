@@ -1,7 +1,10 @@
-//! Explicit conventional-carrier packet view; the Strict DTS14 frame API is unchanged.
-//! Low14 unpacking follows ETSI TS102114 5.3. Carrier recognition is deliberately
-//! narrower than low14 sync recognition. An unrecognized carrier stays opaque;
-//! no canonical syntax, audio validity or source boundary is invented for it.
+//! Packets of a 14-bit DTS stream, cut at the byte pattern of its sync words. This
+//! is a reader of its own beside the frame reader for 14-bit streams. The 14-bit
+//! unpacking follows ETSI TS 102 114 5.3. A packet starts only at the 16-bit words
+//! `1FFF E800 07Fx`, the two unused high bits of each word included; that is
+//! narrower than the frame reader's sync, which accepts any value in those bits. A
+//! packet that does not start with the pattern stays opaque: it gets no header, no
+//! unpacked payload, no claim about its audio, and no end but the end of the source.
 use crate::dts::{
     Dts14BitPayload, Dts14BitUnpacker, DtsCoreHeader, DtsPackingLimits, DtsSourceIdentity,
     DtsWordOrder, probe_core_header,
@@ -12,49 +15,86 @@ use triergon_core::{
     SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, WorkBudget,
 };
 
+/// Limits of a [`Dts14CarrierReader`]. None may be zero.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Dts14CarrierLimits {
+    /// The most source bytes one packet may hold.
     pub maximum_packet_bytes: usize,
+    /// The most packets read since construction or the last reset.
     pub maximum_packets: usize,
+    /// The most bytes one input window may hold.
     pub maximum_input_window: usize,
 }
+/// What ended a packet of a [`Dts14CarrierReader`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dts14CarrierBoundary {
-    FollowingCarrierSync { offset: u64 },
+    /// The next sync pattern starts where this packet ends.
+    FollowingCarrierSync {
+        /// Source offset of the following sync pattern, in bytes.
+        offset: u64,
+    },
+    /// The source ended, as [`Dts14CarrierReader::finish`] declared.
     ExplicitSourceEnd,
 }
+/// What a packet of a [`Dts14CarrierReader`] holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dts14CarrierSyntax {
-    /// The physical carrier signature is absent. All original bytes survive.
+    /// The packet does not start with the sync pattern. It keeps all of its source
+    /// bytes and is not unpacked.
     OpaqueCarrier,
-    /// Exact-word geometry and the existing strict header parser succeeded.
+    /// The packet unpacks to exactly one normal core frame: its 14-bit payload ends
+    /// on a byte boundary, [`probe_core_header`] accepts its header, and it holds
+    /// `FSIZE` + 1 bytes. Carries that header.
     ExactNormal(DtsCoreHeader),
-    /// Carrier bytes exist, but the independently checked syntax is unsupported.
+    /// The packet starts with the sync pattern but is not one exact normal frame.
+    /// Carries the reason: [`Error::Truncated`] for an odd number of source bytes,
+    /// the header's refusal by [`probe_core_header`], or [`Error::Unsupported`] for
+    /// a payload that does not end on a byte boundary or does not hold `FSIZE` + 1
+    /// bytes.
     Refused(Error),
 }
-/// Actual accepted input-window and reader progress, not a packet boundary.
+/// Where the reader's input stood when it returned a packet: the last window it
+/// accepted and how far it had read. These describe the input, not the packet's
+/// boundaries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Dts14CarrierProvision {
+    /// Source offset of the first byte of the last window accepted; the reader's
+    /// starting offset before any window.
     pub last_window_start: u64,
+    /// Source offset after the last byte of that window.
     pub last_window_end: u64,
+    /// Source offset after the last byte the reader had read: six bytes past a
+    /// packet that ended at a following sync pattern, the packet's end at the end
+    /// of the source.
     pub consumed_through: u64,
 }
+/// One packet of a [`Dts14CarrierReader`]. It owns its bytes and outlives the
+/// reader.
 #[derive(Clone, Debug)]
 pub struct Dts14CarrierPacket {
     raw: Bytes,
     payload: Option<Dts14BitPayload>,
+    /// Source, cursor generation and byte offset of the packet's first byte.
     pub identity: DtsSourceIdentity,
+    /// What ended the packet.
     pub boundary: Dts14CarrierBoundary,
+    /// What the packet holds.
     pub syntax: Dts14CarrierSyntax,
+    /// Where the reader's input stood when it returned the packet.
     pub provision: Dts14CarrierProvision,
 }
 impl Dts14CarrierPacket {
+    /// The packet as the source stores it.
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
+    /// The packet's unpacked 14-bit payload. `None` for an opaque packet and for
+    /// one with an odd number of source bytes.
     pub fn payload(&self) -> Option<&Dts14BitPayload> {
         self.payload.as_ref()
     }
+    /// The whole bytes of the unpacked payload; `None` when
+    /// [`payload`](Self::payload) is.
     pub fn canonical_bytes(&self) -> Option<&Bytes> {
         self.payload.as_ref().map(Dts14BitPayload::canonical_bytes)
     }
@@ -72,10 +112,27 @@ enum Phase {
     Unpack,
     Publish,
 }
-/// Bounded stream packet acquisition for the conventional 14-bit carrier.
-/// An explicit EOF flushes an opaque packet; a transport failure never does.
-/// Every publication owns its bytes independently of producer/input lifetime.
-/// This separately named API does not change source syntax or Strict framing.
+/// Cuts a 14-bit DTS stream into packets at its sync pattern: the 16-bit words
+/// `1FFF E800 07Fx` in a given byte order.
+///
+/// A packet that starts with the pattern ends at the next pattern found where its
+/// frame ends, or at the end of the source. The frame's length is `FSIZE` + 1 bytes
+/// from the header in the packet's first 18 source bytes, eight source bytes for
+/// every seven; a pattern before that point is packet content. A stream that does
+/// not start with the pattern is one opaque packet that runs to the end of the
+/// source. [`Dts14CarrierPacket::syntax`] says whether a packet unpacks to one exact
+/// normal core frame.
+///
+/// Bytes read so far become a packet only when [`finish`](Self::finish) declares the
+/// end of the source, never after [`fail`](Self::fail). Every packet owns its bytes,
+/// whatever becomes of the reader or of the input windows. Complete frames of the
+/// same stream come from [`Dts14SyncReader`](crate::dts::Dts14SyncReader); the two
+/// readers are independent. With the `reference-trace` feature,
+/// `reference_trace::dts` pairs these packets with the clock and byte positions of
+/// FFmpeg's `dca` parser.
+///
+/// Call [`step`](Self::step) and answer each [`Step::NeedInput`] with
+/// [`provide`](Self::provide), [`finish`](Self::finish) or [`fail`](Self::fail).
 pub struct Dts14CarrierReader {
     pool: Budget,
     cursor: Option<InputCursor>,
@@ -104,7 +161,26 @@ pub struct Dts14CarrierReader {
     packets: usize,
     failure: Option<Error>,
 }
+impl std::fmt::Debug for Dts14CarrierReader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Dts14CarrierReader")
+            .field("order", &self.order)
+            .field("limits", &self.limits)
+            .field("position", &self.position())
+            .field("generation", &self.generation())
+            .field("packets", &self.packets)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
 impl Dts14CarrierReader {
+    /// A reader at offset zero of `source`, whose 16-bit words are in `order`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] when a limit is zero, and [`Error::Limit`] when the first
+    /// 128 bytes of a packet, or `maximum_packet_bytes` if that is less, cannot fit
+    /// `pool`.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -161,22 +237,36 @@ impl Dts14CarrierReader {
             failure: None,
         })
     }
+    /// The request for the bytes at [`position`](Self::position). A failed reader
+    /// returns the request it had open when it failed.
     pub fn request(&self) -> InputRequest {
         self.cursor
             .as_ref()
             .map_or_else(|| self.last_request.clone(), InputCursor::request)
     }
+    /// Source offset of the next byte the reader takes from its input. After a
+    /// packet that ended at a following sync pattern it is six bytes past the
+    /// packet's end: the reader has read that pattern.
     pub fn position(&self) -> u64 {
         self.cursor
             .as_ref()
             .map_or(self.last_request.offset, InputCursor::position)
     }
+    /// Generation of the reader's input cursor, which every packet carries in its
+    /// identity. [`reset`](Self::reset) starts a new one.
     pub fn generation(&self) -> u64 {
         self.request().token.generation()
     }
     fn healthy(&self) -> Result<()> {
         self.failure.map_or(Ok(()), Err)
     }
+    /// Answers the current request with `window`.
+    ///
+    /// # Errors
+    ///
+    /// The cursor's refusal of a window that does not answer the request (see
+    /// [`InputCursor::provide`]), which leaves the reader as it was. A failed reader
+    /// returns its earlier error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.healthy()?;
         self.cursor_mut()?.provide(window)?;
@@ -187,6 +277,14 @@ impl Dts14CarrierReader {
             .ok_or(Error::Overflow)?;
         Ok(())
     }
+    /// Answers the current request with the end of the source, which also ends the
+    /// packet being read.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Truncated`], from then on, when the source ends before its known
+    /// length. A token or source that does not match the request is refused and
+    /// leaves the reader as it was. A failed reader returns its earlier error.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
         let r = self.cursor_mut()?.finish(source, token);
@@ -195,6 +293,14 @@ impl Dts14CarrierReader {
         }
         r
     }
+    /// Answers the current request with a source failure. The reader drops the
+    /// packet it was reading and from then on returns [`Error::Transport`] or
+    /// [`Error::Cancelled`]; the bytes read so far never become a packet.
+    ///
+    /// # Errors
+    ///
+    /// A token or source that does not match the request is refused and leaves the
+    /// reader as it was. A failed reader returns its earlier error.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -209,6 +315,16 @@ impl Dts14CarrierReader {
         });
         Ok(())
     }
+    /// Restarts at source offset `offset`, where a packet then starts, and returns
+    /// the request for the bytes there. The packet being read is dropped, the packet
+    /// count starts again and the cursor takes a new generation, so answers to
+    /// earlier requests are refused. Packets already returned stay as they are.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Unsupported`] when `offset` is odd, or the cursor's refusal of an
+    /// offset it cannot serve (see [`InputCursor::reset`]). A failed reader returns
+    /// its earlier error and cannot be reset.
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
         self.healthy()?;
         if !offset.is_multiple_of(2) {
@@ -244,6 +360,20 @@ impl Dts14CarrierReader {
         self.failure = Some(e);
         self.clear();
     }
+    /// Reads on, as far as `work` allows. [`Step::Ready`] carries the next packet,
+    /// [`Step::NeedInput`] the request to answer before the next call, and
+    /// [`Step::End`] the end of the source once the last packet is returned;
+    /// [`Step::Yield`] means the work is spent.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Backpressure`] and [`Error::Allocation`] leave the reader as it was:
+    /// free pool storage and call again. Every other error is kept and returned by
+    /// all later calls: [`Error::Cancelled`] when `cancel` is set,
+    /// [`Error::Unsupported`] for a sync pattern that follows opaque bytes, that
+    /// follows a packet whose header gives no length of whole words, or that first
+    /// comes after the frame's end, and [`Error::Limit`] when a packet, the number
+    /// of packets or the pool's size is exceeded.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

@@ -17,50 +17,84 @@ const WORDS_44100_EVEN: [u16; 19] = [
 ];
 const MAX_PREFIX: usize = 12;
 
+/// The syntax a syncframe follows, selected by its `bsid`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ac3Family {
+    /// AC-3, `bsid` 0 to 8: ATSC A/52:2018 clauses 5.3 and 5.4.
     Ac3,
+    /// E-AC-3, `bsid` 11 to 16: ATSC A/52:2018 Annex E.
     Eac3,
 }
 
+/// The families an [`Ac3FrameReader`] accepts. A frame of another family fails
+/// the reader.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ac3StreamSelection {
+    /// AC-3 and E-AC-3 frames, in any order.
     Any,
+    /// AC-3 frames only.
     Ac3Only,
+    /// E-AC-3 frames only.
     Eac3Only,
 }
 
+/// The second programme's fields in a dual-mono E-AC-3 frame (`acmod` 0), as coded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Eac3DualMono {
+    /// `dialnorm2`, 5 bits; 0 is reserved.
     pub dialnorm: u8,
+    /// `compr2`, 8 bits; `None` when `compr2e` is 0.
     pub compression: Option<u8>,
 }
 
+/// The header fields that differ between the two families, as coded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ac3FrameDetails {
+    /// The fields of an AC-3 `syncinfo` and the start of its `bsi`.
     Ac3 {
+        /// `fscod`, the sample rate code: 0 for 48 kHz, 1 for 44.1 kHz, 2 for
+        /// 32 kHz.
         fscod: u8,
+        /// `frmsizecod`, the frame size code of Table 5.18: 0 to 37.
         frmsizecod: u8,
+        /// `bsmod`, the bit stream mode: 3 bits.
         bsmod: u8,
+        /// `crc1` as coded; it is not checked.
         crc1: u16,
+        /// `cmixlev`, 2 bits; `None` unless `acmod` is 3, 5 or 7.
         center_mix: Option<u8>,
+        /// `surmixlev`, 2 bits; `None` unless `acmod` is 4 or above.
         surround_mix: Option<u8>,
+        /// `dsurmod`, 2 bits; `None` unless `acmod` is 2.
         surround_mode: Option<u8>,
+        /// `dialnorm`, 5 bits; 0 is reserved.
         dialnorm: u8,
+        /// `compr`, 8 bits; `None` when `compre` is 0.
         compression: Option<u8>,
     },
+    /// The fields at the start of an E-AC-3 `bsi` (Annex E Table E1.2).
     Eac3 {
+        /// `strmtyp`: 0 independent, 1 dependent, 2 independent and converted
+        /// from AC-3, 3 reserved.
         stream_type: u8,
+        /// `substreamid`: 0 to 7.
         substream_id: u8,
+        /// `frmsiz`, 11 bits: the frame holds `frmsiz + 1` 16-bit words.
         frame_size_code: u16,
+        /// `fscod`, the sample rate code: 0 for 48 kHz, 1 for 44.1 kHz, 2 for
+        /// 32 kHz, 3 for the halved rate that `fscod2` names.
         fscod: u8,
         /// fscod2 when fscod == 3; otherwise the physically present numblkscod.
         rate_or_blocks_code: u8,
+        /// `dialnorm`, 5 bits; 0 is reserved.
         dialnorm: u8,
+        /// `compr`, 8 bits; `None` when `compre` is 0.
         compression: Option<u8>,
+        /// `dialnorm2` and `compr2`; `None` unless `acmod` is 0.
         dual_mono: Option<Eac3DualMono>,
         /// None outside dependent streams; Some(false) retains explicit absence.
         channel_map_present: Option<bool>,
+        /// `chanmap`, 16 bits, as coded; `None` unless `chanmape` is 1.
         channel_map: Option<u16>,
     },
 }
@@ -71,29 +105,46 @@ pub enum Ac3FrameDetails {
 pub struct Ac3HeaderIssues(u8);
 
 impl Ac3HeaderIssues {
+    /// The issue bits listed on the type; 0 when there is none.
     pub const fn bits(self) -> u8 {
         self.0
     }
+    /// Whether no issue was found.
     pub const fn is_empty(self) -> bool {
         self.0 == 0
     }
 }
 
+/// The start of a syncframe as [`probe_header`] reads it: what both families
+/// state, and each family's own fields in `details`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Ac3FrameHeader {
+    /// The syntax the frame follows.
     pub family: Ac3Family,
+    /// Length of the whole syncframe in bytes, from the syncword through the
+    /// final CRC word: 128 to 3840 for AC-3 (Table 5.18), 6 to 4096 for E-AC-3.
     pub frame_bytes: usize,
+    /// Sample rate in Hz: 48000, 44100 or 32000, or half of one of these for an
+    /// E-AC-3 frame whose `fscod` is 3.
     pub sample_rate_hz: u32,
+    /// Audio blocks in the frame, each of 256 samples per channel: 6 for AC-3;
+    /// 1, 2, 3 or 6 for E-AC-3.
     pub blocks: u8,
+    /// `bsid`: 0 to 8 for AC-3, 11 to 16 for E-AC-3.
     pub bsid: u8,
+    /// `acmod`, the audio coding mode: 0 to 7.
     pub acmod: u8,
+    /// `lfeon`: whether the frame codes a low-frequency effects channel.
     pub lfe_on: bool,
     /// Exact bit boundary of the selected probe prefix, not the full BSI end.
     pub probe_bits: u8,
+    /// The fields particular to the family.
     pub details: Ac3FrameDetails,
 }
 
 impl Ac3FrameHeader {
+    /// `fscod2` of an E-AC-3 frame whose `fscod` is 3: 0 for 24 kHz, 1 for
+    /// 22.05 kHz, 2 for 16 kHz. `None` for every other frame.
     pub const fn eac3_fscod2(self) -> Option<u8> {
         match self.details {
             Ac3FrameDetails::Eac3 {
@@ -104,6 +155,9 @@ impl Ac3FrameHeader {
             _ => None,
         }
     }
+    /// `numblkscod` of an E-AC-3 frame whose `fscod` is not 3: 0, 1, 2 and 3 for
+    /// one, two, three and six audio blocks. `None` for AC-3, and for an `fscod`
+    /// of 3, where the frame has six blocks and codes `fscod2` in its place.
     pub const fn eac3_numblkscod(self) -> Option<u8> {
         match self.details {
             Ac3FrameDetails::Eac3 {
@@ -114,11 +168,16 @@ impl Ac3FrameHeader {
             _ => None,
         }
     }
+    /// Samples per channel coded in the frame: 256 for each audio block.
     pub fn coded_samples(self) -> u16 {
         u16::from(self.blocks) * 256
     }
     /// Coded sample span only. A dependent frame is not additional programme
     /// time and must not be added to its independent stream's presentation span.
+    ///
+    /// # Errors
+    ///
+    /// When `sample_rate_hz` is zero, which no header from [`probe_header`] has.
     pub fn sample_span(self) -> Result<Time> {
         Time::new(
             i128::from(self.coded_samples()),
@@ -127,6 +186,11 @@ impl Ac3FrameHeader {
     }
     /// Exact unreduced (bits * samples/second, samples) rate ratio. At 44.1 kHz
     /// this need not equal the AC-3 nominal bit-rate code's integral rate.
+    ///
+    /// # Errors
+    ///
+    /// When `blocks` is zero or the first term exceeds `u64`; neither holds for a
+    /// header from [`probe_header`].
     pub fn bit_rate_ratio(self) -> Result<(u64, u16)> {
         let numerator = u64::try_from(self.frame_bytes)
             .map_err(|_| Error::Overflow)?
@@ -139,6 +203,9 @@ impl Ac3FrameHeader {
         }
         Ok((numerator, denominator))
     }
+    /// The nominal bit rate that an AC-3 frame's `frmsizecod` names (Table 5.18),
+    /// in bits per second: 32000 to 640000. `None` for E-AC-3, which codes no
+    /// nominal rate, and for a reserved code.
     pub fn nominal_bit_rate_bps(self) -> Option<u32> {
         match self.details {
             Ac3FrameDetails::Ac3 { frmsizecod, .. } => BIT_RATES_KBPS
@@ -153,6 +220,8 @@ impl Ac3FrameHeader {
             .get(usize::from(self.acmod))
             .copied()
     }
+    /// The reserved values among the fields read, as [`Ac3HeaderIssues`] bits. The
+    /// fields themselves stay as coded.
     pub fn syntax_issues(self) -> Ac3HeaderIssues {
         match self.details {
             Ac3FrameDetails::Ac3 {
@@ -314,6 +383,14 @@ fn prefix_bits_match_a_scalar_read_at_each_alignment() {
 /// Reads at most twelve bytes / ninety selected bits. Extra supplied bytes are
 /// not scanned. Truncated means the bounded prefix needs more bytes; unsupported
 /// BSIDs and byte order are not guessed. CRCs/audio payload remain unchecked.
+///
+/// # Errors
+///
+/// When `prefix` ends before the fields it codes: two bytes show the syncword, six
+/// the frame length, and twelve always suffice. When it does not start with
+/// `0B 77`; for `bsid` 9, 10 or above 16; for a reserved `fscod`, `frmsizecod` or
+/// `fscod2`; and when the declared frame is too short to hold the fields ahead of
+/// its last sixteen bits.
 pub fn probe_header(prefix: &[u8]) -> Result<Ac3FrameHeader> {
     let prefix = &prefix[..prefix.len().min(MAX_PREFIX)];
     probe_with_layout(prefix, layout(prefix)?)
@@ -426,21 +503,33 @@ fn probe_with_layout(prefix: &[u8], info: Layout) -> Result<Ac3FrameHeader> {
     })
 }
 
+/// Caller limits of an [`Ac3FrameReader`]. Each must be nonzero.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Ac3FrameLimits {
+    /// The longest frame accepted, in bytes. A header that declares more fails the
+    /// reader before it reserves storage for the frame.
     pub maximum_frame_bytes: usize,
+    /// The number of frames the reader returns; the start of one more fails it.
     pub maximum_frames: usize,
+    /// The most bytes one input window may hold.
     pub maximum_input_window: usize,
 }
 
+/// Where a frame lies in its source, and its header.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Ac3FrameFacts {
+    /// The source the frame was read from.
     pub source: SourceId,
+    /// [`InputToken::generation`] of the reader that returned the frame.
     pub generation: u64,
+    /// Byte offset in the source of the frame's syncword.
     pub offset: u64,
+    /// The frame's header, as [`probe_header`] returns it for the frame's bytes.
     pub header: Ac3FrameHeader,
 }
 
+/// One complete syncframe: a copy of its bytes, charged to the reader's pool, and
+/// its [`Ac3FrameFacts`]. Its CRC words and audio blocks are not checked.
 #[derive(Clone, Debug)]
 pub struct Ac3Frame {
     bytes: Bytes,
@@ -448,12 +537,16 @@ pub struct Ac3Frame {
 }
 
 impl Ac3Frame {
+    /// The whole syncframe, from the syncword through the final CRC word:
+    /// `facts().header.frame_bytes` bytes.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// The frame's bytes without its facts.
     pub fn into_bytes(self) -> Bytes {
         self.bytes
     }
+    /// The frame's place in its source and its header.
     pub const fn facts(&self) -> Ac3FrameFacts {
         self.facts
     }
@@ -499,7 +592,27 @@ pub struct Ac3FrameReader {
     failure: Option<Error>,
 }
 
+impl std::fmt::Debug for Ac3FrameReader {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Ac3FrameReader")
+            .field("source", &self.cursor.source())
+            .field("position", &self.cursor.position())
+            .field("selection", &self.selection)
+            .field("limits", &self.limits)
+            .field("completed", &self.completed)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
 impl Ac3FrameReader {
+    /// A reader at offset zero of `source`. Input windows must be charged to
+    /// `pool`, and so are the frames it returns.
+    ///
+    /// # Errors
+    ///
+    /// When a limit is zero.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -537,24 +650,44 @@ impl Ac3FrameReader {
         self.buffer.as_ref().map_or(0, BudgetVec::capacity)
     }
 
+    /// The request for the bytes the reader needs next, which start at
+    /// [`position`](Self::position).
     pub fn request(&self) -> InputRequest {
         self.cursor.request()
     }
+    /// The token an answer must carry at this point.
     pub fn token(&self) -> InputToken {
         self.cursor.token()
     }
+    /// [`InputToken::generation`] of the reader's tokens; each frame records it in
+    /// [`Ac3FrameFacts::generation`].
     pub fn generation(&self) -> u64 {
         self.cursor.generation()
     }
+    /// Offset in the source of the next byte the reader takes.
     pub fn position(&self) -> u64 {
         self.cursor.position()
     }
+    /// Answers the current request with `window`. An empty window means "none
+    /// yet", never the end of the source.
+    ///
+    /// # Errors
+    ///
+    /// The reader's earlier failure, if it has one. A window that does not answer
+    /// the current request (another token, source, pool or offset, or more bytes
+    /// than the request allows) is refused and leaves the reader as it was.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
         }
         self.cursor.provide(window)
     }
+    /// [`provide`](Self::provide) for a window the caller gives away. A refused
+    /// window is dropped.
+    ///
+    /// # Errors
+    ///
+    /// As [`provide`](Self::provide).
     pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -567,6 +700,14 @@ impl Ac3FrameReader {
     /// The first segment must include the header prefix and the segments must
     /// total exactly one frame. A declined response leaves the input position
     /// unchanged and can be supplied through the ordinary streaming interface.
+    ///
+    /// `request` is the one [`step`](Self::step) returned at a frame boundary and
+    /// `length` the total length of `parts`, in bytes. `Ok(None)` declines.
+    ///
+    /// # Errors
+    ///
+    /// The reader's earlier failure; `cancel`, which fails the reader; and a pool
+    /// without room for the frame, which leaves the reader as it was.
     pub fn read_frame_parts<'a>(
         &mut self,
         request: &InputRequest,
@@ -656,6 +797,15 @@ impl Ac3FrameReader {
         }))
     }
 
+    /// Answers the current request with the end of the source. Once the bytes
+    /// already provided are read, [`step`](Self::step) returns [`Step::End`] at a
+    /// frame boundary and fails inside a frame.
+    ///
+    /// # Errors
+    ///
+    /// The reader's earlier failure; a token or source other than the current one,
+    /// which leaves the reader as it was; and an end that is not the known length
+    /// of the source, which fails the reader.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -666,6 +816,13 @@ impl Ac3FrameReader {
         }
         result
     }
+    /// Answers the current request with a failure. Bytes not yet read are dropped
+    /// and every later call returns the failure's error.
+    ///
+    /// # Errors
+    ///
+    /// The reader's earlier failure, or a token or source other than the current
+    /// one, which leaves the reader as it was.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -693,6 +850,21 @@ impl Ac3FrameReader {
         self.failure = Some(error);
         self.buffer = None;
     }
+    /// Advances by at most the work left in `work`.
+    ///
+    /// [`Step::Ready`] carries the next complete frame. [`Step::NeedInput`] is
+    /// answered with [`provide`](Self::provide), [`finish`](Self::finish) or
+    /// [`fail`](Self::fail). [`Step::Yield`] means `work` is spent. [`Step::End`]
+    /// means the source ended at a frame boundary.
+    ///
+    /// # Errors
+    ///
+    /// When the bytes at a frame boundary are not a header [`probe_header`]
+    /// accepts, the frame's family is not the selected one, a frame is longer than
+    /// `maximum_frame_bytes` or passes the known length of the source, the frames
+    /// outnumber `maximum_frames`, the source ends inside a frame, or `cancel` is
+    /// set. Every later call returns the same error. A pool without room for the
+    /// frame leaves the reader where it was: release output and call again.
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<Ac3Frame>> {
         if let Some(error) = self.failure {
             return Err(error);

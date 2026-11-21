@@ -14,6 +14,8 @@ pub struct AnnexBUnits<'a> {
 }
 
 impl<'a> AnnexBUnits<'a> {
+    /// An iterator over the units of `data`, from its first `00 00 01` on. It
+    /// yields nothing when `data` holds no start code.
     #[must_use]
     pub fn new(data: &'a [u8]) -> Self {
         let at = start_code(data, 0).map_or(data.len(), |s| s + 3);

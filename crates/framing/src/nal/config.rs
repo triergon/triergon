@@ -8,28 +8,41 @@ use triergon_core::{
     WorkBudget,
 };
 
+/// How the source bytes of a [`Configuration`] are encoded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConfigEncoding {
+    /// Parameter sets behind Annex B start codes.
     AnnexBParameterSets,
+    /// An `AVCDecoderConfigurationRecord` of ISO/IEC 14496-15: the payload of an
+    /// `avcC` box.
     AvcDecoderConfigurationRecord,
+    /// An `HEVCDecoderConfigurationRecord` of ISO/IEC 14496-15: the payload of an
+    /// `hvcC` box.
     HevcDecoderConfigurationRecord,
 }
 
+/// How much of a configuration's source bytes was checked.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConfigInspection {
     /// Record bytes and externally declared sample framing only. No record
-    /// syntax, lengthSizeMinusOne, arrays, profile, completeness or validity is
-    /// inferred. ISO/IEC 14496-15 record parsing is a named first-slice gap.
+    /// syntax, `lengthSizeMinusOne`, arrays, profile, completeness or validity is
+    /// inferred: the ISO/IEC 14496-15 record is not parsed.
     DeclaredOpaque,
     /// Annex-B boundaries and fixed NAL headers checked. Parameter-set contents
     /// and completeness/consistency are not parsed or certified.
     AnnexBFramed,
 }
 
+/// Bounds of a [`Configuration`] and of the reader that frames an Annex B one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ConfigLimits {
+    /// The most source bytes a configuration may hold. Must not be zero.
     pub maximum_source_bytes: usize,
+    /// The most parameter sets kept. [`AnnexBConfigParser`] reserves their
+    /// descriptors at its first step. Must not be zero.
     pub maximum_parameter_sets: usize,
+    /// Bounds of the [`NalReader`] that frames an Annex B configuration; they
+    /// are validated for a declared record too.
     pub reader: ReaderLimits,
 }
 
@@ -60,6 +73,7 @@ impl ConfigLimits {
     }
 }
 
+/// One parameter set of an Annex B [`Configuration`].
 #[derive(Clone, Debug)]
 pub struct ParameterSet {
     kind: ParameterSetKind,
@@ -67,9 +81,12 @@ pub struct ParameterSet {
 }
 
 impl ParameterSet {
+    /// The parameter set its `nal_unit_type` names.
     pub const fn kind(&self) -> ParameterSetKind {
         self.kind
     }
+    /// The NAL unit, a span of the configuration's source bytes, with its
+    /// offsets and start code there.
     pub fn unit(&self) -> &NalUnit {
         &self.unit
     }
@@ -78,6 +95,7 @@ impl ParameterSet {
 /// Preserves the complete source configuration, its declared encoding and the
 /// independently declared framing of media samples. Parameter-set order and
 /// duplicates are preserved. This is not a decoder-ready/complete-set claim.
+#[derive(Debug)]
 pub struct Configuration {
     codec: Codec,
     encoding: ConfigEncoding,
@@ -91,6 +109,13 @@ impl Configuration {
     /// Holds an unparsed ISO record without guessing sample framing. The caller
     /// must supply the framing fact from a separately validated source. A wrong
     /// or conflicting declaration cannot be detected by this opaque constructor.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] when `source` is empty, a limit that must not be zero
+    /// is, or `encoding` is not the record of `codec`; [`Error::ForeignPool`]
+    /// when `source` is charged to another pool; [`Error::Limit`] when it exceeds
+    /// `maximum_source_bytes`.
     pub fn declared_record(
         pool: &Budget,
         codec: Codec,
@@ -117,21 +142,30 @@ impl Configuration {
         })
     }
 
+    /// The coding standard the caller declared.
     pub const fn codec(&self) -> Codec {
         self.codec
     }
+    /// How [`source_bytes`](Self::source_bytes) is encoded.
     pub const fn encoding(&self) -> ConfigEncoding {
         self.encoding
     }
+    /// How much of the source bytes was checked.
     pub const fn inspection(&self) -> ConfigInspection {
         self.inspection
     }
+    /// The whole configuration as it was given, start codes and padding
+    /// included.
     pub fn source_bytes(&self) -> &Bytes {
         &self.source
     }
+    /// The framing of the media samples this configuration belongs to, as the
+    /// caller declared it.
     pub const fn sample_framing(&self) -> Framing {
         self.sample_framing
     }
+    /// The parameter sets in source order, duplicates included. Empty for a
+    /// declared record.
     pub fn parameter_sets(&self) -> &[ParameterSet] {
         self.parameters.as_slice()
     }
@@ -141,6 +175,7 @@ impl Configuration {
 /// The entire original source remains available even when normalization drops
 /// start codes/padding from the extracted NAL views. Feeding the private reader
 /// uses source slices, without private I/O or a second input copy.
+#[derive(Debug)]
 pub struct AnnexBConfigParser {
     pool: Budget,
     source: Option<Bytes>,
@@ -156,6 +191,15 @@ pub struct AnnexBConfigParser {
 }
 
 impl AnnexBConfigParser {
+    /// A parser for `source`, the whole configuration, charged to `pool`.
+    /// `source_id` names it in each parameter set's facts, and `sample_framing`
+    /// is kept as declared.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] when `source` is empty or a limit that must not be
+    /// zero is; [`Error::ForeignPool`] when `source` is charged to another pool;
+    /// [`Error::Limit`] when it exceeds `maximum_source_bytes`.
     pub fn new(
         pool: &Budget,
         codec: Codec,
@@ -200,6 +244,18 @@ impl AnnexBConfigParser {
         self.parameters = BudgetVec::new(&self.pool);
     }
 
+    /// Frames the source's NAL units and keeps each as a parameter set. Work is
+    /// charged per source byte and per parameter set.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Unsupported`] for a NAL unit that is not a parameter set of the
+    /// codec; [`Error::Invalid`] for a source that holds no parameter set;
+    /// [`Error::Limit`] past `maximum_parameter_sets`; the errors of
+    /// [`NalReader::step`] for the Annex B framing; [`Error::Cancelled`] when
+    /// `cancel` is set. [`Error::Backpressure`] and [`Error::Allocation`] are
+    /// retryable: the parser keeps its progress. Every other error is final and
+    /// returned again by each later call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

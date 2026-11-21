@@ -7,6 +7,10 @@ use crate::dts::{
 use triergon_bitstream::bits_at;
 use triergon_core::{Error, Result};
 
+/// The core header fields found in the first payload bits of a frame, as
+/// [`inspect_header_bits`] reads them: what is present of each field, the
+/// constraints the header breaks and the values its fields stand for. It keeps a
+/// copy of the header bits, at most 120, and nothing else of the frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsPackedHeader {
     prefix: HeaderPrefix,
@@ -58,27 +62,48 @@ impl DtsPackedHeader {
     pub fn field(&self, field: F) -> FieldObservation {
         self.prefix.field(field)
     }
+    /// The value of `field` when all of its bits are present; `None` when it is
+    /// partial, not reached or not in the header.
     pub fn value(&self, field: F) -> Option<u32> {
         self.field(field).value()
     }
+    /// The constraints the header breaks, as a mask of the
+    /// [`DtsInspectionIssues`] flags.
     pub const fn issues(&self) -> u32 {
         self.issues.bits()
     }
+    /// The values the complete fields stand for.
     pub const fn views(&self) -> DtsInspectionViews {
         self.views
     }
+    /// Length of the header in bits, sync word included: 104, or 120 with
+    /// `HCRC`. `None` unless the core sync word and `CPF` are both complete.
     pub const fn required_header_bits(&self) -> Option<u16> {
         self.required
     }
+    /// Whether the bits begin with the core sync word and hold every header
+    /// field completely.
     pub fn syntax_complete(&self) -> bool {
         self.value(F::Sync) == Some(CORE_SYNC) && self.value(F::DialogWord).is_some()
     }
+    /// The header's class, derived from [`issues`](Self::issues).
     pub fn source_status(&self) -> DtsInspectionSourceStatus {
         self.issues.source_status()
     }
 }
 
-/// Inspect up to 120 source bits, keeping only the header prefix and its derived views.
+/// Inspects the core header in the first `valid_bits` bits of `storage`, most
+/// significant bit first, as [`DtsPackedPayload::storage_bytes`] holds a frame
+/// unpacked from any packing. Bits of `storage` after `valid_bits` are ignored.
+/// At most 120 bits are read, and only the header prefix and the values derived
+/// from it are kept. A header that breaks the specification, or that the bits
+/// end inside, is reported in the result.
+///
+/// [`DtsPackedPayload::storage_bytes`]: crate::dts::DtsPackedPayload::storage_bytes
+///
+/// # Errors
+///
+/// `Invalid` when `valid_bits` exceeds the bits `storage` holds.
 pub fn inspect_header_bits(storage: &[u8], valid_bits: usize) -> Result<DtsPackedHeader> {
     if valid_bits > storage.len().checked_mul(8).ok_or(Error::Overflow)? {
         return Err(Error::Invalid("DTS valid bit extent"));

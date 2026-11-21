@@ -31,9 +31,15 @@ pub use prefix::{
     read_sps_timing,
 };
 
+/// Coded slice of a non-IDR picture.
 pub const SLICE: u8 = 1;
+/// Coded slice of an IDR picture.
 pub const IDR: u8 = 5;
+/// Supplemental enhancement information.
 pub const SEI: u8 = 6;
+/// Sequence parameter set.
 pub const SPS: u8 = 7;
+/// Picture parameter set.
 pub const PPS: u8 = 8;
+/// Access unit delimiter.
 pub const AUD: u8 = 9;

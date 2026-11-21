@@ -1,5 +1,6 @@
-//! Complete-packet, source-preserving projection of the reference public BSFs
-//! named on [`crate::compat::nal`].
+//! Complete length-prefixed samples framed as Annex B packets, as the FFmpeg
+//! bitstream filters named on [`crate::compat::nal`] frame them, with every
+//! output byte traceable to its source.
 //! NAL bodies stay opaque; this does not establish access-unit/decoder validity.
 mod phases;
 use phases::AvcBufferingLookahead;
@@ -138,46 +139,80 @@ pub(crate) fn freeze_annex_b_output(
     }
 }
 
-/// Literal caller fields. A numeric value here is not a known-source-clock proof.
+/// The scalar fields of an FFmpeg `AVPacket`: the default metadata of a
+/// [`NalPacket`]. A session reads none of them and carries them to its output as
+/// given, so a value here says nothing about the clock it was taken from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NalPacketFields {
+    /// Presentation timestamp (`pts`), in the caller's time base.
     pub pts: i64,
+    /// Decoding timestamp (`dts`), in the caller's time base.
     pub dts: i64,
+    /// Duration (`duration`), in the caller's time base.
     pub duration: i64,
+    /// Byte position of the packet in its stream (`pos`).
     pub position: i64,
+    /// The packet's flag bits (`flags`).
     pub flags: u32,
+    /// Index of the packet's stream (`stream_index`).
     pub stream_index: i32,
 }
 
+/// One container sample given to a [`NalPacketSession`], with the caller's
+/// metadata `M`.
 #[derive(Clone, Debug)]
 pub struct NalPacket<M = NalPacketFields> {
+    /// The complete sample: NAL units, each after a length field of the
+    /// configuration's width, or any bytes for a passthrough session. Charged
+    /// to the pool of the session's configuration.
     pub bytes: Bytes,
+    /// Where the sample starts in its source. Its offset plus the sample's
+    /// length must fit `u64`.
     pub location: SourceLocation,
-    /// Caller source generation; independent of the receiver configuration epoch.
+    /// The caller's generation of the source, carried to the output as given. It
+    /// is independent of [`NalPacketSession::receiver_epoch`].
     pub generation: u64,
-    /// Opaque caller metadata is moved intact, including exact/unknown clocks.
-    /// The default is only the literal native-observation scalar structure.
+    /// The caller's metadata, carried to the output as given, timestamps known or
+    /// unknown alike. [`NalPacketFields`] is the default type.
     pub fields: M,
-    /// Exact input side-data bytes, including a present empty value.
+    /// The packet's new-extradata side data (`AV_PKT_DATA_NEW_EXTRADATA`),
+    /// exactly as received: `None` when the packet has none, `Some` of no bytes
+    /// when it is present and empty.
     pub new_extradata: Option<Bytes>,
 }
 
+/// The configuration a [`NalPacketSession`] frames its packets with.
+#[derive(Debug)]
 pub enum NalPacketConfiguration {
+    /// An AVC configuration record that [`AvcConfigParser`](crate::avc::AvcConfigParser)
+    /// accepts.
     Avc(AvcConfiguration),
+    /// An HEVC configuration record that [`HvcConfigParser`](crate::hevc::HvcConfigParser)
+    /// accepts.
     Hevc(HvcConfiguration),
-    /// Receiver acceptance ([`crate::compat::nal`]); any strict ISO refusal remains attached.
+    /// An AVC record as FFmpeg's filter accepts it ([`crate::compat::nal`]). The
+    /// error with which the strict parser refuses it stays readable.
     ReceiverAvc(crate::compat::nal::ReceiverAvcConfiguration),
+    /// An HEVC record as FFmpeg's filter accepts it ([`crate::compat::nal`]).
+    /// The error with which the strict parser refuses it stays readable.
     ReceiverHevc(crate::compat::nal::ReceiverHevcConfiguration),
-    /// Explicit native passthrough mode. This is not Annex-B validation.
+    /// No record: every packet is published as it is and shares its bytes with
+    /// the output. Neither `raw` nor a packet is checked to be Annex B.
     Passthrough {
+        /// The coding standard of the stream.
         codec: Codec,
+        /// The configuration bytes, kept as given and reported with every
+        /// output.
         raw: Bytes,
     },
 }
 impl NalPacketConfiguration {
+    /// The configuration's source bytes: the whole record, or the passthrough
+    /// bytes.
     pub fn bytes(&self) -> &Bytes {
         self.record().bytes()
     }
+    /// The coding standard of the stream.
     pub fn codec(&self) -> Codec {
         match self {
             Self::Avc(_) | Self::ReceiverAvc(_) => Codec::Avc,
@@ -185,6 +220,9 @@ impl NalPacketConfiguration {
             Self::Passthrough { codec, .. } => *codec,
         }
     }
+    /// The error with which the strict record parser refuses this record, when
+    /// it was accepted through [`crate::compat::nal`]; `None` for a record that
+    /// parser accepts and for passthrough.
     pub fn strict_source_refusal(&self) -> Option<Error> {
         self.refusal().error()
     }
@@ -206,7 +244,9 @@ impl NalPacketConfiguration {
             Self::Passthrough { raw, .. } => ConfigurationRef::Passthrough(raw),
         }
     }
-    /// Literal source identity, independently of a record-validity conclusion.
+    /// Where the caller says the record came from, and its generation there, as
+    /// they were given to the record's parser. `None` for passthrough. It says
+    /// nothing about the record's validity.
     pub fn source_identity(&self) -> Option<(SourceLocation, u64)> {
         self.record().source_identity()
     }
@@ -392,9 +432,15 @@ impl<'a> ConfigNal<'a> {
 /// whatever these limits allow.
 #[derive(Clone, Copy, Debug)]
 pub struct NalPacketLimits {
+    /// The most bytes one input packet may hold.
     pub maximum_packet_bytes: usize,
+    /// The most bytes one output may hold, start codes and inserted parameter
+    /// sets included.
     pub maximum_output_bytes: usize,
+    /// The most NAL units one input packet may hold. Must not be zero.
     pub maximum_nals: usize,
+    /// The most segments one output may hold: the packet's NAL units and the
+    /// parameter sets inserted before them. Must not be zero.
     pub maximum_segments: usize,
 }
 impl NalPacketLimits {
@@ -440,10 +486,30 @@ impl Default for AvcState {
     }
 }
 
-/// Source and native configuration lifetimes are separate. Failed/cancelled
-/// jobs never publish partial packets or commit partial in-band state. A valid
-/// AVC side-data update survives a later physical payload error, as an explicit
-/// receiver fact; cancellation/resource refusal does not adopt that update.
+/// Frames the length-prefixed samples of one AVC or HEVC stream as Annex B
+/// packets, as FFmpeg's `h264_mp4toannexb` and `hevc_mp4toannexb` bitstream
+/// filters do.
+///
+/// Every NAL unit of a packet gets a start code: `00 00 00 01` for an HEVC NAL
+/// unit, an AVC parameter set and the first NAL unit of an output, `00 00 01`
+/// for every other AVC NAL unit. The configuration's parameter sets are inserted
+/// where the filters insert them. For AVC they go before the first slice of an
+/// IDR picture, and the SPS before an in-band PPS, unless parameter sets the
+/// stream carries in band already precede it; the session tracks those from
+/// packet to packet. For HEVC the whole record goes before the first parameter
+/// set or IRAP NAL unit of each packet that holds an IRAP NAL unit. The
+/// nonempty `new_extradata` of an AVC packet replaces the configuration;
+/// [`receiver_epoch`](Self::receiver_epoch) counts these updates and is
+/// independent of the generations the caller gives its sources.
+///
+/// One packet is framed at a time, by the [`NalPacketJob`] that
+/// [`packet`](Self::packet) or [`receiver_packet`](Self::receiver_packet)
+/// returns. A job that fails or is cancelled publishes no partial packet and
+/// leaves the in-band tracking as it was. An AVC update that the job has
+/// verified is adopted even when the packet's payload is then refused as
+/// invalid or truncated, as the filter adopts it; cancellation, limits and
+/// backpressure do not adopt it.
+///
 /// The session holds a packet's update and segment descriptors while its job
 /// runs. An update that is not adopted, and descriptor storage, are released
 /// when the job publishes or fails, or, for a job dropped before it finishes,
@@ -465,7 +531,30 @@ pub struct NalPacketSession {
     // The packet's segment descriptors, moved into its output on publication.
     segments: PacketSegmentStorage,
 }
+impl std::fmt::Debug for NalPacketSession {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("NalPacketSession")
+            .field("codec", &self.codec)
+            .field("length_width", &self.length_width)
+            .field("limits", &self.limits)
+            .field("configuration_bytes", &self.configuration.bytes().len())
+            .field("receiver_epoch", &self.receiver_epoch)
+            .field("drained", &self.drained)
+            .finish_non_exhaustive()
+    }
+}
 impl NalPacketSession {
+    /// A session for `configuration`, whose bytes are charged to `pool`; packets
+    /// and outputs are charged to it too. Byte limits above
+    /// [`NalPacketLimits::MAXIMUM_SPAN`] are lowered to it.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ForeignPool`] when `configuration` is charged to another pool;
+    /// [`Error::Invalid`] when `maximum_nals` or `maximum_segments` is zero;
+    /// [`Error::Limit`] when the configuration exceeds
+    /// [`NalPacketLimits::MAXIMUM_SPAN`].
     pub fn new(
         pool: &Budget,
         configuration: NalPacketConfiguration,
@@ -506,6 +595,8 @@ impl NalPacketSession {
             segments: empty_packet_segments(),
         })
     }
+    /// The configuration in effect: the one given at construction, or the last
+    /// AVC update adopted.
     pub fn configuration(&self) -> &NalPacketConfiguration {
         &self.configuration
     }
@@ -518,22 +609,46 @@ impl NalPacketSession {
         // selected from the parsed update when the packet began.
         self.length_width = length_width;
     }
+    /// The number of AVC configuration updates adopted so far; zero until the
+    /// first.
     pub fn receiver_epoch(&self) -> u64 {
         self.receiver_epoch
     }
-    /// No pending queue exists: the exclusive job borrow must end first.
+    /// Marks the end of the stream: every later packet is refused until
+    /// [`flush`](Self::flush). The session queues no output, so nothing is left
+    /// to collect; a job borrows the session exclusively and has ended before
+    /// this can be called.
     pub fn drain(&mut self) {
         self.drained = true;
     }
-    /// Keeps the current configuration/epoch, clears in-band injection state.
+    /// Restarts the stream: clears the tracking of in-band parameter sets,
+    /// releases an update that was not adopted and accepts packets again after
+    /// [`drain`](Self::drain). The configuration and
+    /// [`receiver_epoch`](Self::receiver_epoch) stay.
     pub fn flush(&mut self) {
         self.avc = AvcState::default();
         self.drained = false;
         self.pending_update = None;
     }
-    /// A nonempty AVC side-data record is parsed by the existing cooperative
-    /// AvcConfigParser before this call. Exact raw equality is then work-bounded
-    /// inside the job. HEVC retains but does not adopt the side-data record.
+    /// Begins framing `source` and returns its job, which borrows the session
+    /// until it is dropped.
+    ///
+    /// An AVC packet whose `new_extradata` is not empty replaces the
+    /// configuration: `avc_update` is the record that
+    /// [`AvcConfigParser`](crate::avc::AvcConfigParser) parsed from those bytes,
+    /// and `None` for every other packet. The job compares the record's bytes
+    /// with the side data, work-bounded, before it adopts the record. An HEVC
+    /// session keeps side data on the packet and never adopts it.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] after [`drain`](Self::drain), and when `avc_update`
+    /// is given without nonempty AVC side data or is missing for it;
+    /// [`Error::ForeignPool`] when the packet, its side data or the update is
+    /// charged to another pool than the configuration; [`Error::Limit`] past
+    /// `maximum_packet_bytes`, and for an update above
+    /// [`NalPacketLimits::MAXIMUM_SPAN`]; [`Error::Overflow`] when the packet's
+    /// end offset does not fit `u64`. The session stays as it was.
     pub fn packet<M>(
         &mut self,
         source: NalPacket<M>,
@@ -541,10 +656,20 @@ impl NalPacketSession {
     ) -> Result<NalPacketJob<'_, M>> {
         self.begin_packet(source, avc_update.map(AvcUpdate::Source), false)
     }
-    /// Frames a packet with the receiver's acceptance ([`crate::compat::nal`]):
-    /// a NAL header the strict path refuses is framed and its refusal recorded.
-    /// The source record error stays in the receiver configuration and in every
-    /// output/rejection.
+    /// [`packet`](Self::packet) with the filter's acceptance
+    /// ([`crate::compat::nal`]): a NAL unit whose header `packet` refuses is
+    /// framed, and the first such refusal is kept on the output or rejection.
+    /// An AVC IDR NAL unit of one byte is framed too. Before an AVC
+    /// buffering-period SEI that no in-band parameter set precedes, the SPS and
+    /// PPS are inserted: those the rest of the packet carries before its next
+    /// slice, else the configuration's. An update is a
+    /// [`ReceiverAvcConfiguration`](crate::compat::nal::ReceiverAvcConfiguration);
+    /// the error with which the strict parser refuses a record stays on the
+    /// configuration and on every output and rejection.
+    ///
+    /// # Errors
+    ///
+    /// As [`packet`](Self::packet).
     pub fn receiver_packet<M>(
         &mut self,
         source: NalPacket<M>,
@@ -645,24 +770,39 @@ impl NalPacketSession {
     }
 }
 
+/// Where the bytes of a [`NalPacketSegment`] come from.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NalPacketOrigin {
+    /// A NAL unit of the input packet.
     Packet {
+        /// Its byte range in the packet, without its length field. The whole
+        /// packet for a passthrough output.
         source_range: Range<usize>,
     },
+    /// A parameter set inserted from the configuration record.
     Configuration {
+        /// Its index among the record's NAL units, as
+        /// [`AvcConfiguration::nal`] and [`HvcConfiguration::nal`] count them.
         nal_index: usize,
+        /// Its byte range in the record, without its length field.
         source_range: Range<usize>,
     },
 }
-/// Small progress result for publication into an empty caller-owned slot.
+/// Progress of [`NalPacketJob::step_into`], which publishes into a
+/// caller-provided slot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NalPacketProgress {
+    /// The work budget is spent and the slot stays empty; call again with more.
     Yield,
+    /// The output was placed in the slot.
     Ready,
+    /// The output was already published; the slot stays empty.
     Complete,
 }
 
+/// One NAL unit of a [`NalPacketOutput`]: the source range it is copied from
+/// and where it lies in the output.
+///
 /// An immutable source range. Its backing bytes are owned by the output,
 /// rather than independently cloned into each descriptor.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -727,6 +867,8 @@ impl NalPacketSegment {
     fn passthrough(length: usize) -> Self {
         Self::packet(0..length, 0, 0)
     }
+    /// Whether the NAL unit comes from the packet or from the configuration
+    /// record, and its byte range there.
     pub fn origin(&self) -> NalPacketOrigin {
         if self.is_configuration() {
             NalPacketOrigin::Configuration {
@@ -739,9 +881,13 @@ impl NalPacketSegment {
             }
         }
     }
+    /// Length of the start code written before the NAL unit: 3 or 4 bytes, and
+    /// 0 for a passthrough output.
     pub fn prefix_bytes(&self) -> u8 {
         (self.nal_and_prefix >> 24) as u8 & !Self::CONFIGURATION_SOURCE
     }
+    /// Offset of the segment's start code in the output's bytes; the NAL unit
+    /// follows it.
     pub fn output_offset(&self) -> usize {
         self.output_offset as usize
     }
@@ -785,11 +931,12 @@ fn empty_packet_segments() -> PacketSegmentStorage {
     PacketSegmentStorage::new(|_| NalPacketSegment::packet(0..0, 0, 0))
 }
 
-/// Complete output. Payload, source, side data and raw effective configuration
-/// remain owned and charged after producer teardown. Borrowed segment bytes
-/// cannot outlive that output:
+/// One framed packet. It owns its Annex B bytes, the input packet with its side
+/// data, and the source bytes of the configuration it was framed with; all stay
+/// charged for as long as the output lives, also after its job and session are
+/// dropped. Borrowed segment bytes cannot outlive that output:
 /// ```compile_fail
-/// use triergon_framing::NalPacketOutput;
+/// use triergon_framing::nal::NalPacketOutput;
 /// fn invalid(output: NalPacketOutput) -> &'static [u8] {
 ///     output.segment_bytes(0).unwrap()
 /// }
@@ -809,21 +956,44 @@ pub struct NalPacketOutput<M = NalPacketFields> {
     receiver_epoch: u64,
     forward_new_extradata: bool,
 }
+impl<M> std::fmt::Debug for NalPacketOutput<M> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("NalPacketOutput")
+            .field("location", &self.source.location)
+            .field("source_bytes", &self.source.bytes.len())
+            .field("output_bytes", &self.bytes.len())
+            .field("segments", &self.segments.as_slice())
+            .field("receiver_epoch", &self.receiver_epoch)
+            .field("forward_new_extradata", &self.forward_new_extradata)
+            .field(
+                "configuration_source_refusal",
+                &self.configuration_source_refusal(),
+            )
+            .field("packet_source_refusal", &self.packet_source_refusal())
+            .finish_non_exhaustive()
+    }
+}
 
-/// A physical complete-packet rejection observed at the reference receive
-/// boundary. Resource, cancellation and strict fixed-header refusals are not
-/// codec errors and do not map to one of these kinds.
+/// Why the filter rejects a packet as invalid data. Limits, backpressure,
+/// cancellation and the NAL header refusals of [`NalPacketSession::packet`] are
+/// errors of this implementation, not of the filter, and have no kind.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NalPacketReceiverErrorKind {
+    /// The packet ends inside a NAL length field.
     IncompleteLengthPrefix,
+    /// A length field declares more bytes than the packet has left.
     IncompleteNalPayload,
+    /// An AVC packet of no bytes.
     EmptyAvcPacket,
+    /// An HEVC NAL length field of zero.
     EmptyHevcNal,
 }
 
-/// A separately typed receiver view of a real failed packet operation. The
-/// original source error, bytes, caller metadata and receiver configuration
-/// remain available; this does not certify the source as valid.
+/// A packet that the filter rejects as invalid data, taken from its failed job
+/// with [`NalPacketJob::take_receiver_rejection`]. It holds the input packet
+/// with its metadata, the job's error and the session's configuration. Holding
+/// them does not make the packet or the configuration valid.
 pub struct NalPacketRejection<M = NalPacketFields> {
     kind: NalPacketReceiverErrorKind,
     error: Error,
@@ -834,69 +1004,123 @@ pub struct NalPacketRejection<M = NalPacketFields> {
     packet_source_refusal: Option<NalHeaderError>,
     receiver_epoch: u64,
 }
+impl<M> std::fmt::Debug for NalPacketRejection<M> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("NalPacketRejection")
+            .field("kind", &self.kind)
+            .field("source_error", &self.error)
+            .field("location", &self.source.location)
+            .field("source_bytes", &self.source.bytes.len())
+            .field("receiver_epoch", &self.receiver_epoch)
+            .field(
+                "configuration_source_refusal",
+                &self.configuration_source_refusal(),
+            )
+            .field("packet_source_refusal", &self.packet_source_refusal())
+            .finish_non_exhaustive()
+    }
+}
 impl<M> NalPacketRejection<M> {
+    /// Why the filter rejects the packet.
     pub fn kind(&self) -> NalPacketReceiverErrorKind {
         self.kind
     }
+    /// The error the job returned: [`Error::Truncated`] for the incomplete
+    /// kinds, [`Error::Invalid`] for the empty ones.
     pub fn source_error(&self) -> Error {
         self.error
     }
-    /// The reference filter's `AVERROR_INVALIDDATA`, not an executed native call.
-    /// Comparison-only.
+    /// FFmpeg's return code for this packet: `AVERROR_INVALIDDATA`. It is a
+    /// constant for comparison, compiled with the `reference-trace` feature;
+    /// FFmpeg is not called.
     #[cfg(feature = "reference-trace")]
     pub fn native_receive_result(&self) -> i32 {
         -1_094_995_529
     }
+    /// The input packet, with its metadata and side data as given.
     pub fn source(&self) -> &NalPacket<M> {
         &self.source
     }
+    /// The source bytes of the session's configuration after the failure: the
+    /// packet's AVC update when the job had verified it.
     pub fn configuration_bytes(&self) -> &Bytes {
         &self.configuration
     }
+    /// Where the caller says that configuration's record came from, and its
+    /// generation there; `None` for passthrough.
     pub fn configuration_source_identity(&self) -> Option<(SourceLocation, u64)> {
         self.configuration_identity
     }
+    /// The error with which the strict record parser refuses that
+    /// configuration; `None` when it accepts the record.
     pub fn configuration_source_refusal(&self) -> Option<Error> {
         self.configuration_source_refusal.error()
     }
+    /// The first NAL header refusal that
+    /// [`NalPacketSession::receiver_packet`] framed past before the failure:
+    /// the error [`NalPacketSession::packet`] returns for this packet. `None`
+    /// when it accepts every header up to the failure.
     pub fn packet_source_refusal(&self) -> Option<Error> {
         self.packet_source_refusal.map(NalHeaderError::error)
     }
+    /// The session's [`receiver_epoch`](NalPacketSession::receiver_epoch) after
+    /// the failure; it counts the packet's update when the job had verified it.
     pub fn receiver_epoch(&self) -> u64 {
         self.receiver_epoch
     }
 }
 impl<M> NalPacketOutput<M> {
+    /// The Annex B packet: the start code and NAL unit of each segment, in
+    /// order. A passthrough output shares the input packet's bytes.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// The input packet, with its metadata and side data as given.
     pub fn source(&self) -> &NalPacket<M> {
         &self.source
     }
+    /// The source bytes of the configuration the packet was framed with: the
+    /// packet's own AVC update when it carried one.
     pub fn configuration_bytes(&self) -> &Bytes {
         &self.configuration
     }
+    /// Where the caller says that configuration's record came from, and its
+    /// generation there; `None` for passthrough.
     pub fn configuration_source_identity(&self) -> Option<(SourceLocation, u64)> {
         self.has_configuration_identity
             .then_some(self.configuration_identity)
     }
+    /// The output's NAL units in order, each with the source range it is copied
+    /// from.
     pub fn segments(&self) -> &[NalPacketSegment] {
         self.segments.as_slice()
     }
+    /// The error with which the strict record parser refuses that
+    /// configuration; `None` when it accepts the record.
     pub fn configuration_source_refusal(&self) -> Option<Error> {
         self.configuration_source_refusal.error()
     }
+    /// The first NAL header refusal that
+    /// [`NalPacketSession::receiver_packet`] framed past: the error
+    /// [`NalPacketSession::packet`] returns for this packet. `None` when it
+    /// accepts every header.
     pub fn packet_source_refusal(&self) -> Option<Error> {
         self.packet_source_refusal.map(NalHeaderError::error)
     }
+    /// The session's [`receiver_epoch`](NalPacketSession::receiver_epoch) with
+    /// this packet, whose own update is counted.
     pub fn receiver_epoch(&self) -> u64 {
         self.receiver_epoch
     }
+    /// Whether the filter leaves the packet's `new_extradata` side data on the
+    /// packet it outputs: always for HEVC; for AVC only when it is present and
+    /// empty, since a nonempty record is consumed as the configuration update.
     pub fn forward_new_extradata(&self) -> bool {
         self.forward_new_extradata
     }
     /// Borrow a segment payload through the output's retained packet/configuration
-    /// owner. No Bytes clone or allocation occurs.
+    /// owner. No Bytes clone or allocation occurs. `None` past the last segment.
     pub fn segment_bytes(&self, index: usize) -> Option<&[u8]> {
         let part = self.segments.as_slice().get(index)?;
         part.backing(&self.source.bytes, &self.configuration)
@@ -905,6 +1129,10 @@ impl<M> NalPacketOutput<M> {
     }
     /// One segment's payload as its own handle on the retained packet or
     /// configuration owner. No bytes are copied.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] past the last segment.
     pub fn retain_segment_bytes(&self, index: usize) -> Result<Bytes> {
         let part = self
             .segments
@@ -1020,10 +1248,26 @@ enum PacketPhase {
 }
 
 /// One cooperative packet framing job over the session it borrows.
+///
+/// [`step`](Self::step) or [`step_into`](Self::step_into) advances it until it
+/// publishes its one [`NalPacketOutput`].
 pub struct NalPacketJob<'a, M = NalPacketFields> {
     source: Option<NalPacket<M>>,
     state: PacketState<'a>,
     phase: PacketPhase,
+}
+impl<M> std::fmt::Debug for NalPacketJob<'_, M> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let source = self.source.as_ref();
+        formatter
+            .debug_struct("NalPacketJob")
+            .field("codec", &self.state.codec)
+            .field("location", &source.map(|packet| packet.location))
+            .field("source_bytes", &source.map(|packet| packet.bytes.len()))
+            .field("copying", &matches!(self.phase, PacketPhase::Emit(_)))
+            .field("failure", &self.state.failure)
+            .finish_non_exhaustive()
+    }
 }
 
 // While planning, the source stays borrowed and every retained buffer uses
@@ -1201,11 +1445,15 @@ impl PacketPlan {
 }
 
 impl<M> NalPacketJob<'_, M> {
+    /// The input packet, until it moves into the output or into a rejection;
+    /// `None` after that.
     pub fn source(&self) -> Option<&NalPacket<M>> {
         self.source.as_ref()
     }
-    /// Move the original failed source into an observed receiver-error view.
-    /// The source error remains sticky after the one-time move.
+    /// After the job failed on a packet that the filter rejects as invalid data
+    /// ([`NalPacketReceiverErrorKind`]): the packet and the failure, handed out
+    /// once. `None` for every other failure, before a failure and on later
+    /// calls. The job keeps returning its error.
     pub fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
         let state = &self.state;
         let kind = state.receiver_failure?;
@@ -1223,6 +1471,10 @@ impl<M> NalPacketJob<'_, M> {
         })
     }
     /// The same state engine as `step_into`, returning the output directly.
+    ///
+    /// # Errors
+    ///
+    /// As [`step_into`](Self::step_into), without the occupied slot.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -1240,6 +1492,23 @@ impl<M> NalPacketJob<'_, M> {
     /// Publish a complete output directly into an empty caller-owned slot.
     /// Occupied slots are rejected before any job, work or owner change and do
     /// not poison the job. Yield, completion and errors leave the slot empty.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Invalid`] for an occupied slot. For the packet:
+    /// [`Error::Truncated`] when it ends inside a length field or a NAL unit;
+    /// [`Error::Invalid`] for an empty AVC packet, an HEVC NAL length of zero
+    /// and update side data that differs from its parsed record;
+    /// [`Error::Unsupported`] for an HEVC record that declares an array of a
+    /// NAL unit type other than 32 to 34, 39 and 40; [`Error::Limit`] past a
+    /// limit of the session or of the pool; [`Error::Cancelled`] when `cancel`
+    /// is set. A job of [`NalPacketSession::packet`] also fails with the error
+    /// of [`NalHeader::parse`](crate::nal::NalHeader::parse) for a NAL header it
+    /// refuses, and with [`Error::Truncated`] for an AVC IDR NAL unit of one
+    /// byte.
+    /// [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the job
+    /// keeps its progress. Every other error is final and returned again by
+    /// each later call.
     #[inline(never)]
     pub fn step_into(
         &mut self,

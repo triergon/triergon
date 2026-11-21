@@ -29,12 +29,23 @@ pub enum AvcReading {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AvcPocSyntax {
     /// Type 0 with `pic_order_cnt_lsb` of `bits` bits.
-    Lsb { bits: u8 },
+    Lsb {
+        /// `log2_max_pic_order_cnt_lsb_minus4 + 4`, 4 to 16.
+        bits: u8,
+    },
     /// Type 1; the cycle's `offset_for_ref_frame` values go to the caller.
     Cycle {
+        /// `delta_pic_order_always_zero_flag`: slice headers carry no
+        /// `delta_pic_order_cnt`.
         always_zero: bool,
+        /// `offset_for_non_ref_pic`, added to the order count of a non-reference
+        /// picture.
         offset_for_non_ref_pic: i32,
+        /// `offset_for_top_to_bottom_field`, from a frame's top field to its bottom
+        /// field.
         offset_for_top_to_bottom_field: i32,
+        /// `num_ref_frames_in_pic_order_cnt_cycle`, 0 to 255: the number of
+        /// `offset_for_ref_frame` values.
         len: u8,
     },
     /// Type 2.
@@ -46,26 +57,39 @@ pub enum AvcPocSyntax {
 pub struct AvcVui {
     /// `num_units_in_tick` and `time_scale`, both above 0.
     pub timing: Option<(u32, u32)>,
+    /// `max_num_reorder_frames` as coded; `None` when the VUI states no bitstream
+    /// restriction.
     pub max_num_reorder_frames: Option<u32>,
+    /// `max_dec_frame_buffering` as coded, in frame buffers; `None` when the VUI
+    /// states no bitstream restriction.
     pub max_dec_frame_buffering: Option<u32>,
 }
 
 /// The fields of a sequence parameter set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AvcSps {
+    /// `seq_parameter_set_id`, 0 to 31.
     pub id: u8,
+    /// `profile_idc`: the profile the sequence conforms to.
     pub profile_idc: u8,
+    /// `constraint_set3_flag`, which with `level_idc` 11 means level 1b in the
+    /// Baseline, Main and Extended profiles.
     pub constraint_set3: bool,
+    /// `level_idc`: ten times the level number, and 11 or 9 for level 1b.
     pub level_idc: u8,
     /// ChromaArrayType: `chroma_format_idc`, or 0 with separate colour planes.
     pub chroma_array_type: u8,
+    /// `separate_colour_plane_flag`; `false` when it is absent.
     pub separate_colour_plane: bool,
     /// `log2_max_frame_num_minus4 + 4`.
     pub frame_num_bits: u8,
+    /// The picture order count type and its fields.
     pub poc: AvcPocSyntax,
+    /// `max_num_ref_frames` as coded.
     pub max_num_ref_frames: u32,
     /// `gaps_in_frame_num_value_allowed_flag`.
     pub gaps_in_frame_num_allowed: bool,
+    /// `frame_mbs_only_flag`: every picture is a frame, none a field.
     pub frame_mbs_only: bool,
     /// PicWidthInMbs * FrameHeightInMbs.
     pub frame_mbs: u32,
@@ -76,13 +100,21 @@ pub struct AvcSps {
 /// The fields of a picture parameter set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AvcPps {
+    /// `pic_parameter_set_id`, 0 to 255.
     pub id: u8,
+    /// `seq_parameter_set_id` of the SPS the PPS refers to, 0 to 31.
     pub sps_id: u8,
+    /// `bottom_field_pic_order_in_frame_present_flag`: a frame's slice headers carry
+    /// the order count delta of its bottom field.
     pub bottom_field_pic_order_in_frame_present: bool,
     /// `num_ref_idx_l0_default_active_minus1 + 1` and the same for list 1.
     pub num_ref_idx_default: [u32; 2],
+    /// `weighted_pred_flag`: P and SP slice headers carry a prediction weight table.
     pub weighted_pred: bool,
+    /// `weighted_bipred_idc` as coded, 0 to 3; with 1, B slice headers carry a
+    /// prediction weight table.
     pub weighted_bipred_idc: u8,
+    /// `redundant_pic_cnt_present_flag`: slice headers carry `redundant_pic_cnt`.
     pub redundant_pic_cnt_present: bool,
 }
 
@@ -100,18 +132,27 @@ pub enum AvcSliceDepth {
 pub struct AvcSliceHeader {
     /// `slice_type % 5`: 0 P, 1 B, 2 I, 3 SP, 4 SI.
     pub slice_type: u8,
+    /// `pic_parameter_set_id`, 0 to 255.
     pub pps_id: u8,
+    /// `frame_num`, of [`AvcSps::frame_num_bits`] bits.
     pub frame_num: u16,
     /// `bottom_field_flag` of a field picture.
     pub bottom_field: Option<bool>,
+    /// `idr_pic_id` of an IDR picture, `None` for any other.
     pub idr_pic_id: Option<u16>,
+    /// `pic_order_cnt_lsb`; 0 when the order count type is not 0.
     pub pic_order_cnt_lsb: u32,
+    /// `delta_pic_order_cnt_bottom`; 0 when it is absent.
     pub delta_pic_order_cnt_bottom: i32,
+    /// `delta_pic_order_cnt[ 0 ]` and `[ 1 ]`; 0 where absent.
     pub delta_pic_order_cnt: [i32; 2],
+    /// `redundant_pic_cnt`, 0 to 127; 0 when it is absent.
     pub redundant_pic_cnt: u32,
     /// Read with [`AvcSliceDepth::Marking`]: `memory_management_control_operation`
     /// 5 is present, and `no_output_of_prior_pics_flag` of an IDR picture.
     pub mmco5: bool,
+    /// `no_output_of_prior_pics_flag` of an IDR picture, read with
+    /// [`AvcSliceDepth::Marking`]; `false` otherwise.
     pub no_output_of_prior_pics: bool,
 }
 

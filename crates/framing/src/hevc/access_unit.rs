@@ -14,12 +14,22 @@ use triergon_core::{Error, Result, WorkBudget};
 pub type HevcAnnexBLimits = AvcAnnexBLimits;
 
 /// Holds the hvcC record and its declaration-order VPS/SPS/PPS extent.
+#[derive(Debug)]
 pub struct HevcAnnexBConfig {
     record: HvcConfiguration,
     parameter_bytes: usize,
 }
 
 impl HevcAnnexBConfig {
+    /// Prepares `record` for [`HevcAnnexBJob`]: samples have NAL length fields of
+    /// the width it declares, and a random access unit starts with the NAL units of
+    /// its VPS, SPS and PPS arrays.
+    ///
+    /// # Errors
+    ///
+    /// When a NAL unit's type and the type its array declares differ and either is
+    /// a VPS, SPS or PPS, or the Annex B size of the parameter sets overflows
+    /// `usize`.
     pub fn new(record: HvcConfiguration) -> Result<Self> {
         let mut parameter_bytes = 0;
         for nal in record.nals() {
@@ -34,10 +44,18 @@ impl HevcAnnexBConfig {
         })
     }
 
+    /// The record given to [`Self::new`].
     pub fn record(&self) -> &HvcConfiguration {
         &self.record
     }
 
+    /// Starts the conversion of `sample`, whose NAL units each follow a length field
+    /// of the width the record declares.
+    ///
+    /// # Errors
+    ///
+    /// When a limit is zero, or the sample is empty or longer than
+    /// `limits.maximum_packet_bytes`.
     pub fn job<'a>(
         &'a self,
         sample: &'a [u8],
@@ -72,6 +90,7 @@ fn is_parameter_set(nal: &HvcConfigNal<'_>) -> bool {
 
 /// Borrows a fully checked access unit and its configuration. The HEVC IRAP
 /// indication is a NAL type fact, independent of the container key flag.
+#[derive(Debug)]
 pub struct HevcAnnexBAccessUnit<'a> {
     config: &'a HevcAnnexBConfig,
     sample: &'a [u8],
@@ -80,14 +99,21 @@ pub struct HevcAnnexBAccessUnit<'a> {
 }
 
 impl HevcAnnexBAccessUnit<'_> {
+    /// Whether the sample holds a NAL unit of an IRAP type, 16 to 23.
     pub const fn is_random_access(&self) -> bool {
         self.random_access
     }
 
+    /// Total length of [`Self::segments`] in bytes.
     pub const fn byte_len(&self) -> usize {
         self.bytes
     }
 
+    /// The access unit as Annex B, in pieces to write one after another: a
+    /// four-byte start code and then a NAL unit, for the NAL units of the record's
+    /// VPS, SPS and PPS arrays when [`Self::is_random_access`] and then for each NAL
+    /// unit of the sample.
+    ///
     /// Length fields are re-read from the checked sample. Each segment is a
     /// static prefix or a borrowed NAL, in original declaration/sample order.
     pub fn segments(&self) -> impl Iterator<Item = &[u8]> {
@@ -107,6 +133,7 @@ impl HevcAnnexBAccessUnit<'_> {
             .flat_map(|nal| [START_CODE.as_slice(), nal])
     }
 
+    /// The configuration the job was created from.
     pub fn configuration(&self) -> &HevcAnnexBConfig {
         self.config
     }
@@ -123,6 +150,10 @@ impl HevcAnnexBAccessUnit<'_> {
     }
 }
 
+/// Converts one complete length-prefixed sample to a [`HevcAnnexBAccessUnit`]. It
+/// checks every length field and NAL header of the sample and copies nothing.
+/// [`HevcAnnexBConfig::job`] creates it.
+#[derive(Debug)]
 pub struct HevcAnnexBJob<'a> {
     config: &'a HevcAnnexBConfig,
     sample: &'a [u8],
@@ -135,8 +166,18 @@ pub struct HevcAnnexBJob<'a> {
 }
 
 impl<'a> HevcAnnexBJob<'a> {
+    /// Advances by at most the units in `work` and returns the access unit once, as
+    /// [`BuildStep`] describes.
+    ///
     /// One work unit covers the length field and fixed HEVC header. Even after
     /// finding IRAP, the complete sample must validate before publication.
+    ///
+    /// # Errors
+    ///
+    /// When `cancel` is set, a length field or NAL unit runs past the end of the
+    /// sample, a NAL unit is shorter than its two-byte header or has
+    /// `forbidden_zero_bit` set or `nuh_temporal_id_plus1` zero, or a limit is
+    /// exceeded. Every later call returns the same error.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

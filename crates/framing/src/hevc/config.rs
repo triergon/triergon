@@ -10,39 +10,59 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 use triergon_core::{Budget, Bytes, Error, Result, SourceId, WorkBudget};
+/// Where an `hvcC` record comes from. The parser copies it to the record and its
+/// views and does not interpret it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HvcConfigSource {
+    /// The source the record was read from.
     pub source: SourceId,
+    /// Caller-supplied configuration epoch, never inferred from NAL contents.
     pub generation: u64,
+    /// Offset of the record's first byte in the source, in bytes. The record must
+    /// end at or before `u64::MAX`.
     pub offset: u64,
 }
+/// The bounds of one `hvcC` parse.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HvcConfigLimits {
+    /// Largest record accepted, in bytes; above 0.
     pub maximum_record_bytes: usize,
+    /// Most arrays the record may declare (`numOfArrays`).
     pub maximum_arrays: usize,
+    /// Most NAL units the record may declare, over all its arrays.
     pub maximum_nals: usize,
+    /// Largest NAL unit accepted, in bytes; above 0.
     pub maximum_nal_bytes: usize,
 }
+/// The 23 fixed bytes that start an `hvcC` record
+/// (`HEVCDecoderConfigurationRecord`), as stored. Reserved bits stay readable and
+/// no field is checked against the parameter sets.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HvcConfigFields {
     prefix: [u8; 23],
 }
 impl HvcConfigFields {
+    /// The 23 bytes, through `numOfArrays`.
     pub const fn raw_prefix(self) -> [u8; 23] {
         self.prefix
     }
+    /// `configurationVersion`; 1 in every record of [`HvcConfigParser`].
     pub const fn version(self) -> u8 {
         self.prefix[0]
     }
+    /// `general_profile_space`, 0 to 3.
     pub const fn profile_space(self) -> u8 {
         self.prefix[1] >> 6
     }
+    /// `general_tier_flag`: the High tier when set, the Main tier otherwise.
     pub const fn tier_flag(self) -> bool {
         self.prefix[1] & 32 != 0
     }
+    /// `general_profile_idc`, 0 to 31.
     pub const fn profile_idc(self) -> u8 {
         self.prefix[1] & 31
     }
+    /// `general_profile_compatibility_flags`: flag `j` is bit `31 - j`.
     pub const fn profile_compatibility_flags(self) -> u32 {
         u32::from_be_bytes([
             self.prefix[2],
@@ -51,6 +71,8 @@ impl HvcConfigFields {
             self.prefix[5],
         ])
     }
+    /// `general_constraint_indicator_flags`: its 48 bits in the low 48 bits, the
+    /// first flag (`general_progressive_source_flag`) in bit 47.
     pub const fn constraint_indicator_flags(self) -> u64 {
         u64::from_be_bytes([
             0,
@@ -63,43 +85,63 @@ impl HvcConfigFields {
             self.prefix[11],
         ])
     }
+    /// `general_level_idc`: 30 times the level number.
     pub const fn level_idc(self) -> u8 {
         self.prefix[12]
     }
+    /// `min_spatial_segmentation_idc`, 0 to 4095.
     pub const fn min_spatial_segmentation_idc(self) -> u16 {
         u16::from_be_bytes([self.prefix[13] & 15, self.prefix[14]])
     }
+    /// `parallelismType`, 0 to 3: 1 slices, 2 tiles, 3 wavefronts, 0 mixed or
+    /// unknown.
     pub const fn parallelism_type(self) -> u8 {
         self.prefix[15] & 3
     }
+    /// `chroma_format_idc`, 0 to 3.
     pub const fn chroma_format_idc(self) -> u8 {
         self.prefix[16] & 3
     }
+    /// `bit_depth_luma_minus8` as stored, 0 to 7.
     pub const fn bit_depth_luma_minus8(self) -> u8 {
         self.prefix[17] & 7
     }
+    /// `bit_depth_chroma_minus8` as stored, 0 to 7.
     pub const fn bit_depth_chroma_minus8(self) -> u8 {
         self.prefix[18] & 7
     }
+    /// `avgFrameRate` in frames per 256 seconds; 0 when unspecified.
     pub const fn average_frame_rate(self) -> u16 {
         u16::from_be_bytes([self.prefix[19], self.prefix[20]])
     }
+    /// `constantFrameRate`, 0 to 3: 1 a constant frame rate, 2 a constant rate in
+    /// each temporal layer, 0 not stated.
     pub const fn constant_frame_rate(self) -> u8 {
         self.prefix[21] >> 6
     }
+    /// `numTemporalLayers`, 0 to 7; 0 when the record does not say whether the
+    /// stream is temporally scalable.
     pub const fn num_temporal_layers(self) -> u8 {
         (self.prefix[21] >> 3) & 7
     }
+    /// `temporalIdNested`: every SPS of the stream has
+    /// `sps_temporal_id_nesting_flag` set.
     pub const fn temporal_id_nested(self) -> bool {
         self.prefix[21] & 4 != 0
     }
+    /// `lengthSizeMinusOne`, 0 to 3: one less than the bytes in the length field
+    /// before each NAL unit of a sample.
     pub const fn length_size_minus_one(self) -> u8 {
         self.prefix[21] & 3
     }
+    /// `numOfArrays`: the number of NAL unit arrays after the fixed bytes.
     pub const fn array_count(self) -> u8 {
         self.prefix[22]
     }
-    /// Bits0..4 flag actual reserved-prefix patterns; bit5 flags width3.
+    /// Local syntax issues as a bit set. Bits 0 to 4: a reserved bit is clear before
+    /// `min_spatial_segmentation_idc`, `parallelismType`, `chroma_format_idc`,
+    /// `bit_depth_luma_minus8` and `bit_depth_chroma_minus8`. Bit 5:
+    /// `lengthSizeMinusOne` is 2, a three-byte length.
     pub fn syntax_issues(self) -> u32 {
         u32::from(self.prefix[13] >> 4 != 15)
             | u32::from(self.prefix[15] >> 2 != 63) << 1
@@ -109,6 +151,12 @@ impl HvcConfigFields {
             | u32::from(self.length_size_minus_one() == 2) << 5
     }
 }
+/// The fixed fields of the `hvcC` record that starts `raw`, with no check of its
+/// version, its fields or what follows them.
+///
+/// # Errors
+///
+/// When `raw` is shorter than the 23 fixed bytes.
 pub fn inspect_config_prefix(raw: &[u8]) -> Result<HvcConfigFields> {
     Ok(HvcConfigFields {
         prefix: raw
@@ -234,6 +282,9 @@ const INLINE_DESCRIPTORS: usize = 4;
 
 type DescriptorStorage<T> = InlineStorage<T, INLINE_DESCRIPTORS>;
 
+/// Parses an `hvcC` record (`HEVCDecoderConfigurationRecord`) into an
+/// [`HvcConfiguration`].
+///
 /// One externally framed, immutable, same-pool hvcC record without a box header.
 /// A resumable grammar walk validates the record and fills descriptors when both
 /// tables fit inline. A second walk fills the tables when either needs charged
@@ -259,7 +310,27 @@ pub struct HvcConfigParser {
     observed_width_three: bool,
 }
 
+impl std::fmt::Debug for HvcConfigParser {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("HvcConfigParser")
+            .field("source", &self.source)
+            .field("limits", &self.limits)
+            .field("fields", &self.fields)
+            .field("total", &self.total)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
 impl HvcConfigParser {
+    /// Starts the parse of `raw`, one complete record charged to `pool`.
+    ///
+    /// # Errors
+    ///
+    /// When `maximum_record_bytes` or `maximum_nal_bytes` is zero, `raw` belongs to
+    /// another pool, is empty or is longer than `maximum_record_bytes`, or the
+    /// record's end offset in the source overflows `u64`.
     pub fn new(
         pool: &Budget,
         source: HvcConfigSource,
@@ -319,6 +390,19 @@ impl HvcConfigParser {
         Ok(parser)
     }
 
+    /// Advances by at most the units in `work` and returns the record once, as
+    /// [`BuildStep`] describes.
+    ///
+    /// # Errors
+    ///
+    /// When `cancel` is set; when `configurationVersion` is not 1 or the sample
+    /// length field is three bytes; when the record ends inside its fixed bytes, an
+    /// array header, a length field or a NAL unit; when a NAL unit is empty,
+    /// shorter than its two-byte header, or has `forbidden_zero_bit` set or
+    /// `nuh_temporal_id_plus1` zero; when a limit is exceeded, the pool's own by
+    /// the record with its descriptors included. Every later call returns the same
+    /// error. A pool that lacks the room only until other storage is released is
+    /// `Backpressure` or `Allocation` instead, and the call can be repeated.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -337,6 +421,10 @@ impl HvcConfigParser {
     /// Publishes into an empty caller-provided slot without returning the record.
     /// An occupied slot is rejected before any state, work or retained storage changes.
     /// Yield, completion and errors leave an initially empty slot empty.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::step`]; also when `ready` is occupied.
     pub fn step_into(
         &mut self,
         work: &mut WorkBudget,
@@ -689,18 +777,25 @@ pub struct HvcConfiguration {
     first_unsupported_array: Option<(u8, u8)>,
 }
 impl HvcConfiguration {
+    /// The whole record as it was given to the parser, any suffix included.
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
+    /// The origin given to the parser.
     pub const fn source(&self) -> HvcConfigSource {
         self.source
     }
+    /// The record's fixed fields.
     pub const fn fields(&self) -> HvcConfigFields {
         self.fields
     }
+    /// Width of the length field before each NAL unit of a sample:
+    /// `lengthSizeMinusOne + 1` bytes.
     pub const fn length_size(&self) -> LengthSize {
         self.width
     }
+    /// Offset in the record, in bytes, of the end of its last array, or 23 when it
+    /// has none. What follows is [`Self::opaque_suffix`].
     pub const fn understood_end(&self) -> usize {
         self.understood_end
     }
@@ -708,9 +803,11 @@ impl HvcConfiguration {
     pub(crate) const fn first_unsupported_array(&self) -> Option<(u8, u8)> {
         self.first_unsupported_array
     }
+    /// Number of NAL units in the record, over all its arrays.
     pub fn nal_count(&self) -> usize {
         self.nals.len()
     }
+    /// Number of arrays in the record (`numOfArrays`).
     pub fn array_count(&self) -> usize {
         self.arrays.len()
     }
@@ -722,6 +819,8 @@ impl HvcConfiguration {
             .checked_sub(23 + 3 * self.array_count())?
             .checked_add(2 * self.nal_count())
     }
+    /// NAL unit `index` in record order, counted across the arrays; `None` from
+    /// [`Self::nal_count`] on.
     pub fn nal(&self, index: usize) -> Option<HvcConfigNal<'_>> {
         self.nals
             .as_slice()
@@ -732,6 +831,7 @@ impl HvcConfiguration {
                 descriptor,
             })
     }
+    /// Every NAL unit in record order, whatever type its array declares.
     pub fn nals(
         &self,
     ) -> impl ExactSizeIterator<Item = HvcConfigNal<'_>> + DoubleEndedIterator + '_ {
@@ -744,6 +844,7 @@ impl HvcConfiguration {
                 descriptor,
             })
     }
+    /// Array `index` in record order; `None` from [`Self::array_count`] on.
     pub fn array(&self, index: usize) -> Option<HvcConfigArray<'_>> {
         self.arrays
             .as_slice()
@@ -754,6 +855,7 @@ impl HvcConfiguration {
                 descriptor,
             })
     }
+    /// The arrays in record order, empty, repeated and unknown ones included.
     pub fn arrays(
         &self,
     ) -> impl ExactSizeIterator<Item = HvcConfigArray<'_>> + DoubleEndedIterator + '_ {
@@ -766,9 +868,17 @@ impl HvcConfiguration {
                 descriptor,
             })
     }
+    /// The bytes of the record after its last array, which the parser does not
+    /// interpret; empty when the record ends there.
     pub fn opaque_suffix(&self) -> &[u8] {
         &self.raw[self.understood_end..]
     }
+    /// [`Self::opaque_suffix`] as an owner that shares the record's allocation and
+    /// keeps all of it charged.
+    ///
+    /// # Errors
+    ///
+    /// Only for a range outside the record, which a parsed record rules out.
     pub fn retain_opaque_suffix(&self) -> Result<Bytes> {
         self.raw.slice(self.understood_end..self.raw.len())
     }
@@ -787,6 +897,10 @@ impl HvcConfiguration {
             .ok_or(Error::Overflow)
     }
     /// Heap descriptor capacity only; up to four entries per table are inline.
+    ///
+    /// # Errors
+    ///
+    /// When the size in bytes overflows `usize`.
     pub fn descriptor_storage_bytes(&self) -> Result<usize> {
         self.arrays
             .heap_capacity()
@@ -799,11 +913,20 @@ impl HvcConfiguration {
             })
             .ok_or(Error::Overflow)
     }
+    /// Bytes the record keeps charged: the whole allocation behind
+    /// [`Self::source_bytes`] and [`Self::descriptor_storage_bytes`].
+    ///
+    /// # Errors
+    ///
+    /// When the sum overflows `usize`.
     pub fn retained_storage_bytes(&self) -> Result<usize> {
         self.descriptor_storage_bytes()?
             .checked_add(self.raw.retained_storage_bytes())
             .ok_or(Error::Overflow)
     }
+    /// [`HvcConfigFields::syntax_issues`] of the fixed fields, with bit 6 when an
+    /// array has its reserved bit set and bit 7 when a NAL unit's type differs
+    /// from the type its array declares.
     pub fn syntax_issues(&self) -> u32 {
         self.fields().syntax_issues()
             | u32::from(self.arrays().any(|a| a.reserved_bit())) << 6
@@ -811,10 +934,12 @@ impl HvcConfiguration {
     }
 }
 
+/// One NAL unit of an `hvcC` record, borrowed from its [`HvcConfiguration`].
+///
 /// A borrowed hvcC leaf is tied to its configuration's lifetime.
 ///
 /// ```compile_fail,E0505
-/// use triergon_framing::HvcConfiguration;
+/// use triergon_framing::hevc::HvcConfiguration;
 /// fn escape(view: HvcConfiguration) {
 ///     let leaf = view.nal(0).unwrap();
 ///     drop(view);
@@ -823,7 +948,7 @@ impl HvcConfiguration {
 /// ```
 ///
 /// ```compile_fail,E0505
-/// use triergon_framing::HvcConfiguration;
+/// use triergon_framing::hevc::HvcConfiguration;
 /// fn escape(view: HvcConfiguration) -> usize {
 ///     let suffix = view.opaque_suffix();
 ///     drop(view);
@@ -837,32 +962,47 @@ pub struct HvcConfigNal<'a> {
     descriptor: &'a HvcNalDescriptor,
 }
 impl<'a> HvcConfigNal<'a> {
+    /// The NAL unit, its two header bytes included, without its length field.
     pub fn source_bytes(&self) -> &'a [u8] {
         &self.raw[self.descriptor.payload_range()]
     }
+    /// The two-byte big-endian length field stored before the NAL unit.
     pub fn length_field_bytes(&self) -> &'a [u8] {
         &self.raw[self.descriptor.length_offset()..self.descriptor.payload_start]
     }
+    /// Where [`Self::source_bytes`] lies in the record, in bytes from its start.
     pub fn source_range(&self) -> Range<usize> {
         self.descriptor.payload_range()
     }
+    /// The origin of the record.
     pub const fn source(&self) -> HvcConfigSource {
         self.source
     }
+    /// The NAL unit's own header: its `nal_unit_type`, `nuh_layer_id` and
+    /// `nuh_temporal_id_plus1`.
     pub const fn header(&self) -> NalHeader {
         self.descriptor.header
     }
+    /// Index of the array that holds the NAL unit, for
+    /// [`HvcConfiguration::array`].
     pub const fn array_index(&self) -> usize {
         self.descriptor.array as usize
     }
+    /// The `NAL_unit_type` its array declares, 0 to 63.
     pub const fn declared_nal_type(&self) -> u8 {
         self.descriptor.declared_type
     }
+    /// Whether the `nal_unit_type` of [`Self::header`] is
+    /// [`Self::declared_nal_type`].
     pub fn type_matches_declaration(&self) -> bool {
         self.header().nal_unit_type() == self.descriptor.declared_type
     }
 
     /// Require matching array and header types when either names a VPS, SPS or PPS.
+    ///
+    /// # Errors
+    ///
+    /// When the two types differ and either is 32, 33 or 34.
     pub fn check_parameter_set_declaration(&self) -> Result<()> {
         if ((32..=34).contains(&self.declared_nal_type())
             || self.header().parameter_set_kind().is_some())
@@ -874,8 +1014,11 @@ impl<'a> HvcConfigNal<'a> {
     }
 }
 
+/// One NAL unit array of an `hvcC` record, borrowed from its
+/// [`HvcConfiguration`].
+///
 /// ```compile_fail,E0505
-/// use triergon_framing::HvcConfiguration;
+/// use triergon_framing::hevc::HvcConfiguration;
 /// fn escape(view: HvcConfiguration) -> usize {
 ///     let header = view.array(0).unwrap().source_header_bytes();
 ///     drop(view);
@@ -889,27 +1032,39 @@ pub struct HvcConfigArray<'a> {
     descriptor: &'a HvcArrayDescriptor,
 }
 impl<'a> HvcConfigArray<'a> {
+    /// The array as stored: its three header bytes, then each NAL unit after its
+    /// length field.
     pub fn source_bytes(&self) -> &'a [u8] {
         &self.raw[self.descriptor.range.clone()]
     }
+    /// The three header bytes: `array_completeness`, a reserved bit and
+    /// `NAL_unit_type` in the first, the big-endian `numNalus` in the other two.
     pub fn source_header_bytes(&self) -> &'a [u8] {
         &self.raw[self.descriptor.range.start..self.descriptor.range.start + 3]
     }
+    /// The origin of the record.
     pub const fn source(&self) -> HvcConfigSource {
         self.source
     }
+    /// `array_completeness`: the record holds every NAL unit of this type and the
+    /// samples hold none.
     pub fn completeness(&self) -> bool {
         self.source_header_bytes()[0] & 128 != 0
     }
+    /// Whether the reserved bit after `array_completeness` is set; a conforming
+    /// record has it clear.
     pub fn reserved_bit(&self) -> bool {
         self.source_header_bytes()[0] & 64 != 0
     }
+    /// `NAL_unit_type`, 0 to 63: the type the array declares for its NAL units.
     pub fn declared_nal_type(&self) -> u8 {
         self.source_header_bytes()[0] & 63
     }
+    /// Where [`Self::source_bytes`] lies in the record, in bytes from its start.
     pub fn source_range(&self) -> Range<usize> {
         self.descriptor.range.clone()
     }
+    /// The indices of the array's NAL units for [`HvcConfiguration::nal`].
     pub fn nal_indices(&self) -> Range<usize> {
         self.descriptor.nal_indices()
     }

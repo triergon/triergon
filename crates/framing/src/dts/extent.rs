@@ -12,7 +12,11 @@ use crate::dts::{DtsCoreHeader, probe_core_header};
 /// Policies checked before the declared extents can be used for buffering.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsFrameExtentLimits {
+    /// Largest header accepted, in bytes: a core header rounded up to whole bytes
+    /// (13 or 15), or the declared header size of an extension substream. Must
+    /// not be zero.
     pub maximum_header_bytes: usize,
+    /// Largest declared frame accepted, in bytes. Must not be zero.
     pub maximum_frame_bytes: usize,
 }
 
@@ -38,22 +42,34 @@ impl DtsFrameExtentLimits {
 /// A successful probe does not mean these bytes have arrived or are valid.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsExtensionSubstreamExtent {
+    /// `UserDefinedBits`, the eight bits after the sync word, as coded.
     pub user_defined: u8,
+    /// `nExtSSIndex`, the extension substream index: 0 to 3.
     pub substream_index: u8,
+    /// `bHeaderSizeType`: `true` when the header size is coded in 12 bits and
+    /// the frame size in 20, `false` for 8 and 16.
     pub long_sizes: bool,
+    /// `nuExtSSHeaderSize`, the declared header size in bytes: at least 11, or 12
+    /// with long sizes, and at most 256, or 4096 with long sizes.
     pub header_bytes: usize,
+    /// `nuExtSSFsize`, the declared size of the whole extension substream frame
+    /// in bytes: more than `header_bytes` and at most 65536, or 1048576 with long
+    /// sizes.
     pub frame_bytes: usize,
 }
 
-/// Declared extent of a selected normal core or an extension substream frame.
-/// The core variant uses the existing core header validation unchanged.
+/// Declared extent of a normal core frame or an extension substream frame. A
+/// core frame is validated as [`probe_core_header`] validates it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DtsFrameExtent {
+    /// A core frame, with its header.
     Core(DtsCoreHeader),
+    /// An extension substream frame, with its size fields.
     Extension(DtsExtensionSubstreamExtent),
 }
 
 impl DtsFrameExtent {
+    /// Declared size of the whole frame in bytes, sync word included.
     pub const fn frame_bytes(self) -> usize {
         match self {
             Self::Core(header) => header.frame_bytes,
@@ -67,6 +83,14 @@ impl DtsFrameExtent {
 /// most fifteen bytes. `Truncated` means an incomplete prefix, not an incomplete
 /// frame body; the caller must separately acquire the returned declared extent.
 /// Word-swapped and 14-bit carriers are outside this API.
+///
+/// # Errors
+///
+/// `Truncated` when `input` ends inside the prefix. `Invalid` when it begins with
+/// neither the core nor the extension substream sync word, and when a limit is
+/// zero. `Limit` when the header or the frame is larger than `limits` allow.
+/// Otherwise whatever [`probe_core_header`] or
+/// [`probe_extension_substream_extent`] refuses the prefix with.
 pub fn probe_frame_extent(input: &[u8], limits: DtsFrameExtentLimits) -> Result<DtsFrameExtent> {
     match input.get(..4).ok_or(Error::Truncated)? {
         [0x7f, 0xfe, 0x80, 0x01] => {
@@ -90,6 +114,13 @@ pub fn probe_frame_extent(input: &[u8], limits: DtsFrameExtentLimits) -> Result<
 ///
 /// Rejects a header that overlaps its size prefix/CRC or leaves no asset data
 /// in the frame. This is an extent sanity check, not full header validation.
+///
+/// # Errors
+///
+/// `Truncated` when `input` ends inside the size prefix. `Invalid` when it does
+/// not begin with the extension substream sync word `0x64582025`, when the
+/// declared sizes cannot hold a header and data after it, and when a limit is
+/// zero. `Limit` when the header or the frame is larger than `limits` allow.
 pub fn probe_extension_substream_extent(
     input: &[u8],
     limits: DtsFrameExtentLimits,

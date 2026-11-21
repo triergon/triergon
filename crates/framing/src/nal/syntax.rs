@@ -52,6 +52,10 @@ pub(crate) fn skip_avc_scaling_matrix(
 
 /// Passes over the VUI fields before its timing (H.264 E.1.1, H.265 E.2.1) and
 /// returns `timing_info_present_flag` (`vui_timing_info_present_flag`).
+///
+/// # Errors
+///
+/// The error of `bits` when it ends, or refuses a field, before that flag.
 pub fn skip_vui_to_timing(bits: &mut impl BitSource, codec: Codec) -> Result<bool, BitError> {
     if bits.flag()? && bits.read(8)? == 255 {
         bits.read(32)?; // sar_width, sar_height
@@ -82,7 +86,13 @@ pub fn skip_vui_to_timing(bits: &mut impl BitSource, codec: Codec) -> Result<boo
 
 /// Passes over `profile_tier_level(1, max_sub_layers_minus1)` (H.265 7.3.3) and
 /// returns its `reserved_zero_2bits`, which FFmpeg skips and a strict reader
-/// requires to be zero.
+/// requires to be zero: all `2 * (8 - max_sub_layers_minus1)` bits as one value,
+/// and zero when `max_sub_layers_minus1` is zero and none are coded. A
+/// `max_sub_layers_minus1` above 7 is read as 7.
+///
+/// # Errors
+///
+/// The error of `bits` when it ends, or refuses a field, inside the structure.
 pub fn skip_hevc_profile_tier_level(
     bits: &mut impl BitSource,
     max_sub_layers_minus1: u8,

@@ -5,9 +5,12 @@ use crate::dts::DtsSourceIdentity;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
 
+/// Byte order of the 16-bit words that carry 14-bit DTS.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DtsWordOrder {
+    /// The first byte of a word is its high byte.
     BigEndian,
+    /// The first byte of a word is its low byte.
     LittleEndian,
 }
 
@@ -20,25 +23,36 @@ impl DtsWordOrder {
     }
 }
 
+/// The bounds a [`Dts14BitUnpacker`] enforces.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsPackingLimits {
+    /// Largest record accepted, in bytes.
     pub maximum_source_bytes: usize,
+    /// Largest canonical output accepted, in bytes: 14 bits per source word,
+    /// rounded down to whole bytes.
     pub maximum_output_bytes: usize,
 }
 
-/// Exact physical source bit for a logical payload bit; offset is an original
-/// byte offset and msb0_bit is0..7. This is not a canonical-byte source offset.
+/// The place in the packed source of one payload bit. `offset` is a byte offset
+/// in the source as it was stored, not in the unpacked canonical bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsPackedBitLocation {
+    /// The source the record was read from.
     pub source: triergon_core::SourceId,
+    /// The generation of the input the record was read from.
     pub generation: u64,
+    /// Offset in the source of the byte that holds the bit.
     pub offset: u64,
+    /// Position of the bit in that byte: 0 for the most significant bit to 7 for
+    /// the least.
     pub msb0_bit: u8,
 }
 
-/// Complete word-record payload, not a complete DTS frame. Canonical storage
-/// contains full bytes only. The0..6 residual bits are right-aligned separately;
-/// no payload bit is discarded and no partial byte is filled with invented bits.
+/// The payload of one record of 14-bit words: the low 14 bits of every word,
+/// joined most significant bit first. The record is not necessarily a complete
+/// DTS frame. The canonical bytes are whole bytes only; the 0 to 6 payload bits
+/// left over are kept apart, right-aligned, so no payload bit is discarded and
+/// no partial byte is filled with invented bits.
 #[derive(Clone, Debug)]
 pub struct Dts14BitPayload {
     source: Bytes,
@@ -51,27 +65,43 @@ pub struct Dts14BitPayload {
 }
 
 impl Dts14BitPayload {
+    /// The packed record exactly as it was given.
     pub fn source_bytes(&self) -> &Bytes {
         &self.source
     }
+    /// The whole bytes of the payload in bitstream order: `payload_bits() / 8`
+    /// of them.
     pub fn canonical_bytes(&self) -> &Bytes {
         &self.canonical
     }
+    /// Where the record came from, as the caller stated it.
     pub const fn identity(&self) -> DtsSourceIdentity {
         self.identity
     }
+    /// The byte order the record's words were read in.
     pub const fn word_order(&self) -> DtsWordOrder {
         self.order
     }
+    /// Number of payload bits: 14 for every source word.
     pub const fn payload_bits(&self) -> usize {
         self.payload_bits
     }
+    /// Number of payload bits after the last whole byte: `payload_bits() % 8`,
+    /// which is 0, 2, 4 or 6.
     pub const fn residual_bits(&self) -> u8 {
         self.residual_bits
     }
+    /// The last `residual_bits()` payload bits, right-aligned; 0 when there are
+    /// none.
     pub const fn residual_value(&self) -> u8 {
         self.residual_value
     }
+    /// The two bits above the payload in source word `word`, counted from zero:
+    /// 0 to 3.
+    ///
+    /// # Errors
+    ///
+    /// `Invalid` when the record has no word `word`.
     pub fn unused_high_bits(&self, word: usize) -> Result<u8> {
         let at = word.checked_mul(2).ok_or(Error::Overflow)?;
         let end = at.checked_add(2).ok_or(Error::Overflow)?;
@@ -82,6 +112,12 @@ impl Dts14BitPayload {
             .ok_or(Error::Invalid("DTS packed word index"))?;
         u8::try_from(self.order.word([pair[0], pair[1]]) >> 14).map_err(|_| Error::Overflow)
     }
+    /// Where payload bit `bit`, counted from zero in bitstream order, lies in
+    /// the packed source.
+    ///
+    /// # Errors
+    ///
+    /// `Invalid` when `bit` is not below `payload_bits()`.
     pub fn payload_bit_source(&self, bit: usize) -> Result<DtsPackedBitLocation> {
         if bit >= self.payload_bits {
             return Err(Error::Invalid("DTS packed payload bit index"));
@@ -119,12 +155,18 @@ enum Phase {
     Complete,
 }
 
-/// An owned complete word record, processed incrementally by work. This is a
-/// low14-bit transport adapter, not sync/frame discovery. Both word orders use
-/// the same primary bit rule. Odd final physical bytes are explicitly truncated.
-/// The output reserves its full capacity while empty; payload bits are charged
-/// individually, with separately charged publication/freeze actions. No step
-/// copies a dynamic prefix and no allocation failure loses its source or state.
+/// Unpacks one complete record of 14-bit DTS words that the caller owns
+/// (ETSI TS 102 114 V1.2.1 §5.3) into canonical bytes, step by step. Every
+/// 16-bit word gives its low 14 bits, most significant first, in either byte
+/// order. The unpacker does not look for a sync word or a frame boundary. A
+/// record with an odd number of bytes is refused as truncated.
+///
+/// The output is allocated once, at its final size, before the first bit is
+/// written. Every payload bit and every output byte costs one unit of work;
+/// allocating, completing and returning the output cost a few more. After
+/// `Backpressure` or `Allocation` the unpacker keeps its record and progress
+/// and may be stepped again; any other error is returned again by every later
+/// step.
 pub struct Dts14BitUnpacker {
     pool: Budget,
     source: Option<Bytes>,
@@ -142,7 +184,29 @@ pub struct Dts14BitUnpacker {
     failure: Option<Error>,
 }
 
+impl std::fmt::Debug for Dts14BitUnpacker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Dts14BitUnpacker")
+            .field("identity", &self.identity)
+            .field("order", &self.order)
+            .field("payload_bits", &self.payload_bits)
+            .field("position", &self.position)
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
 impl Dts14BitUnpacker {
+    /// An unpacker of `source`, a record of whole 16-bit words in byte order
+    /// `order` that `identity` locates. `source` must be charged to `pool`, and
+    /// the output is charged to it.
+    ///
+    /// # Errors
+    ///
+    /// `ForeignPool` when `source` is charged to another pool. `Truncated` for
+    /// an odd number of bytes. `Limit` when the record or its output exceeds
+    /// `limits`, and when the pool's limit cannot hold the record and the output
+    /// together. `Overflow` when the record ends beyond offset `u64::MAX`.
     pub fn new(
         pool: &Budget,
         identity: DtsSourceIdentity,
@@ -194,6 +258,16 @@ impl Dts14BitUnpacker {
         })
     }
 
+    /// Advances the unpacking by at most the work left in `work`. `Ready`
+    /// carries the payload, once; every later step returns `End` with the
+    /// location of the record's end in its source. `Yield` means the work is
+    /// spent. An owned record never requests input.
+    ///
+    /// # Errors
+    ///
+    /// `Cancelled` when `cancel` is set. `Backpressure` or `Allocation` when the
+    /// output cannot be allocated: after these two, and only these, `step` may
+    /// be called again.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
