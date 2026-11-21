@@ -82,9 +82,10 @@ pub struct Build {
     links: &'static [&'static str],
 }
 
-pub const BUILDS: [Build; 12] = [
+pub const BUILDS: [Build; 13] = [
     ffmpeg("ffmpeg-matroska", ".research/reference"),
     ffmpeg("ffmpeg-formats", ".research/reference-formats"),
+    ffmpeg("ffmpeg-framing-views", ".research/reference-framing-views"),
     ffmpeg("ffmpeg-transport-dts", ".research/reference-transport-dts"),
     ffmpeg("ffmpeg-video", ".research/reference-video"),
     ffmpeg("ffmpeg-subtitles", ".research/reference-subtitles"),

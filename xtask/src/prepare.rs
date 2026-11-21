@@ -29,6 +29,8 @@ pub enum Profile {
     Matroska,
     /// An isolated MOV/TS/subtitle reference; the Matroska build is untouched.
     Formats,
+    /// Public bitstream filters, parsers and codec configuration views.
+    FramingViews,
     /// The Matroska reference plus the H.264 and HEVC decoders, which stream
     /// discovery uses to learn the B-picture delay; the Matroska build is untouched.
     Video,
@@ -61,6 +63,7 @@ impl Profile {
         match self {
             Profile::Matroska => ".research/reference",
             Profile::Formats => ".research/reference-formats",
+            Profile::FramingViews => ".research/reference-framing-views",
             Profile::TransportDts => ".research/reference-transport-dts",
             Profile::Video => ".research/reference-video",
             Profile::Subtitles => ".research/reference-subtitles",
@@ -74,6 +77,7 @@ impl Profile {
         match self {
             Profile::Matroska
             | Profile::Formats
+            | Profile::FramingViews
             | Profile::Video
             | Profile::Subtitles
             | Profile::TransportDts => Source::Revision,
@@ -85,6 +89,7 @@ impl Profile {
         [
             Profile::Matroska,
             Profile::Formats,
+            Profile::FramingViews,
             Profile::TransportDts,
             Profile::Video,
             Profile::Subtitles,
@@ -100,6 +105,7 @@ impl Profile {
         match self {
             Profile::Matroska => "matroska",
             Profile::Formats => "formats",
+            Profile::FramingViews => "framing-views",
             Profile::TransportDts => "transport-dts",
             Profile::Video => "video",
             Profile::Subtitles => "subtitles",
@@ -166,6 +172,7 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
         Profile::Decode => return release(&DECODE_ARGS),
         Profile::Matroska
         | Profile::Formats
+        | Profile::FramingViews
         | Profile::Video
         | Profile::Subtitles
         | Profile::TransportDts => {}
@@ -191,6 +198,25 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
     .iter()
     .map(ToString::to_string)
     .collect();
+    if profile == Profile::FramingViews {
+        for flag in &mut argv {
+            *flag = match flag.as_str() {
+                "--enable-demuxer=matroska" => {
+                    "--enable-demuxer=mov,aac,eac3,dts,h264,hevc,ivf,obu"
+                }
+                "--enable-muxer=framecrc" => {
+                    "--enable-muxer=framecrc,null,obu,dts,md5,ivf,mp4,hevc"
+                }
+                "--enable-decoder=pcm_s16le" => "--enable-decoder=pcm_s16le,aac,eac3,dca",
+                "--enable-parser=h264,hevc,aac,ac3,vorbis" => {
+                    "--enable-parser=h264,hevc,aac,ac3,av1,vp9,dca"
+                }
+                other => other,
+            }
+            .to_owned();
+        }
+        argv.push("--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,extract_extradata,filter_units,trace_headers,aac_adtstoasc,dca_core".into());
+    }
     if profile == Profile::Formats {
         for flag in &mut argv {
             *flag = match flag.as_str() {
