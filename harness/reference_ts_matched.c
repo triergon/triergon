@@ -1,6 +1,7 @@
 /* Selected transport access units through public demuxer and framer APIs. */
 #include <errno.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -86,6 +87,26 @@ static void fold_clock(TsWork *out, int64_t pts, int64_t dts)
     fold(&out->digest, (uint64_t)dts);
 }
 
+#ifdef TRIERGON_REFERENCE_AUDIO_SEEK
+/* Layer III entries need their main data to start in this frame (RFC 5219). */
+static int audio_entry(const TsReader *reader, const AVPacket *packet)
+{
+    enum AVCodecID codec = reader->format->streams[packet->stream_index]->codecpar->codec_id;
+    if (codec == AV_CODEC_ID_DTS)
+        /* TS 102 114 §5.4.2: HFLAG is the last bit of byte 11. */
+        return packet->size >= 11 && !(packet->data[10] & 1);
+    if (codec != AV_CODEC_ID_MP3 || packet->size < 4 || (packet->data[1] & 6) != 2)
+        return 1;
+    const unsigned char *bytes = packet->data;
+    int mpeg1 = ((bytes[1] >> 3) & 3) == 3;
+    int stereo = (bytes[3] >> 6) != 3;
+    int size = mpeg1 ? (stereo ? 32 : 17) : (stereo ? 17 : 9);
+    int offset = (bytes[1] & 1) ? 4 : 6;
+    return packet->size >= offset + size
+        && bytes[offset] == 0 && (!mpeg1 || !(bytes[offset+1] & 0x80));
+}
+#endif
+
 #ifndef TRIERGON_REFERENCE_MPG123
 static int match(TsReader *reader, int64_t target, int preroll, TsWork *out)
 {
@@ -99,7 +120,7 @@ static int match(TsReader *reader, int64_t target, int preroll, TsWork *out)
 #ifdef TRIERGON_REFERENCE_AUDIO_SEEK
         if (p->size <= 0)
             return AVERROR_INVALIDDATA;
-        if (p->pts != AV_NOPTS_VALUE) {
+        if (p->pts != AV_NOPTS_VALUE && audio_entry(reader, p)) {
 #else
         if (p->flags & AV_PKT_FLAG_KEY) {
             if (p->pts == AV_NOPTS_VALUE)
@@ -125,7 +146,7 @@ static int match(TsReader *reader, int64_t target, int preroll, TsWork *out)
             continue;
         const AVPacket *p = reader->packet;
 #ifdef TRIERGON_REFERENCE_AUDIO_SEEK
-        if (ordinal == chosen && p->pts != landing)
+        if (ordinal == chosen && (p->pts != landing || !audio_entry(reader, p)))
             return AVERROR_INVALIDDATA;
 #else
         int key = !!(p->flags & AV_PKT_FLAG_KEY);
@@ -407,8 +428,9 @@ int main(int argc, char **argv)
     const int start = bench ? 4 : 3;
     long long iterations = 1, program, pid, target = 0;
     int option = 0, track = start + 2;
+    long long split = 0;
 #ifdef TRIERGON_REFERENCE_AUDIO_SEEK
-    if (argc == start + 6 && (!strcmp(argv[track], "--dvb") || !strcmp(argv[track], "--atsc")))
+    if (argc >= start + 6 && (!strcmp(argv[track], "--dvb") || !strcmp(argv[track], "--atsc")))
         ++track;
 #endif
 #ifdef TRIERGON_REFERENCE_MPG123
@@ -416,8 +438,22 @@ int main(int argc, char **argv)
     if (!option && argc != start + 3)
         return 2;
 #else
-    if (argc != track + 3 || !number(argv[track+1], INT64_MIN, INT64_MAX, &target))
+    const int extended = argc == track + 4;
+    int repeat = 0;
+    long long repeat_target = 0;
+    if ((!extended && argc != track + 3) || !number(argv[track+1], INT64_MIN, INT64_MAX, &target))
         return 2;
+    if (extended) {
+        const char *extra = argv[track+3];
+        if (!strncmp(extra, "split=", 6)) {
+            if (!number(extra + 6, 1, LLONG_MAX, &split))
+                return 2;
+        } else {
+            repeat = 1;
+            if (!number(extra, INT64_MIN, INT64_MAX, &repeat_target))
+                return 2;
+        }
+    }
     option = !strcmp(argv[track+2], "preroll");
     if (!option && strcmp(argv[track+2], "previous"))
         return 2;
@@ -431,7 +467,7 @@ int main(int argc, char **argv)
     if (!file)
         return 2;
     long length = fseek(file, 0, SEEK_END) ? -1 : ftell(file);
-    if (length < 1 || length > 64 * 1024 * 1024 || fseek(file, 0, SEEK_SET)) {
+    if (length <= split || length > 64 * 1024 * 1024 || fseek(file, 0, SEEK_SET)) {
         fclose(file);
         return 2;
     }
@@ -460,6 +496,12 @@ int main(int argc, char **argv)
         TsWork work = {0};
         rc = match(&reader, (int64_t)target, option, &work);
         reader_close(&reader);
+#ifndef TRIERGON_REFERENCE_MPG123
+        if (!rc && repeat) {
+            rc = match(&reader, (int64_t)repeat_target, option, &work);
+            reader_close(&reader);
+        }
+#endif
         runs++;
         fold(&totals.digest, work.digest);
         totals.packets += work.packets;

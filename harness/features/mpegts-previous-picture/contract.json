@@ -11,13 +11,19 @@
     "Start with one preloaded, seekable TS188 or M2TS192 entity, its program and AVC or HEVC PID, the target in 90 kHz ticks and the previous-picture or playback-preroll policy.",
     "Choose the last coded random-access picture with maximal presentation time at or before the requested time. The FFmpeg reference scans the parser-enabled demuxer with NOFILLIN, reopens it, and replays to the selected picture. It makes no stream discovery or decoder calls.",
     "Both workers fold the requested, landing and discard times, followed by every selected video packet through EOF. Each contributes presentation time, effective decode time (presentation time if DTS is absent), random-access flag and all bytes. The source reader does not fill in an absent DTS.",
-    "Controls include a seek to the first picture, between access points, and preroll near the end of a longer stream. Both the scan and replay run within the measured operation."
+    "Controls include a seek to the first picture, between access points, and preroll near the end of a longer stream. Both the scan and replay run within the measured operation.",
+    "Repeated cases start from a fresh reader, build an index during the first seek, deliver both packet suffixes through EOF, and require an indexed second seek. The reference scans and replays independently for each target.",
+    "Split cases seek across two consecutive entities cut at a carrier boundary inside a PES. The reference sees the same preloaded bytes as one logical stream and folds the same landing and complete suffix."
   ],
   "required_profiles": [
     "avc-earliest-picture",
     "avc-between-keyframes",
     "hevc-m2ts-preroll",
-    "avc-late-preroll"
+    "avc-late-preroll",
+    "avc-repeated-preroll",
+    "hevc-m2ts-repeated-preroll",
+    "avc-split-pes",
+    "hevc-m2ts-split-pes"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",

@@ -37,6 +37,7 @@ pub use avc_picture::{
 mod config;
 mod declared_config;
 mod dts_core;
+mod dts_extent;
 mod dts_inspect;
 mod dts_packing;
 mod dts_source;
@@ -99,6 +100,10 @@ pub use declared_config::{
 pub use dts_core::{
     DtsCoreFrame, DtsCoreFrameFacts, DtsCoreFrameLimits, DtsCoreFrameReader, DtsCoreHeader,
     probe_dts_core_header,
+};
+pub use dts_extent::{
+    DtsExtensionSubstreamExtent, DtsFrameExtent, DtsFrameExtentLimits,
+    probe_dts_extension_substream_extent, probe_dts_frame_extent,
 };
 pub use dts_inspect::{
     DtsCoreField, DtsHeaderInspector, DtsInspection, DtsInspectionIdentity, DtsInspectionIssues,

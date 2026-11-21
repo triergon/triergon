@@ -2,6 +2,7 @@
 mod classification;
 mod codec;
 mod descriptors;
+mod dts_hd;
 pub(crate) mod dvb;
 mod pat_table;
 mod section;
@@ -10,6 +11,7 @@ mod tables;
 
 pub(crate) use codec::PES_PRIVATE_DATA;
 pub use descriptors::{Descriptor, Descriptors};
+pub use dts_hd::{DvbDtsHd, DvbDtsHdAsset, DvbDtsHdSubstream};
 pub use dvb::{
     CodecIdentification, DescriptorNamespace, DvbNamespaceEvidence, DvbSubtitling,
     DvbSubtitlingService, DvbSubtitlingServices, DvbSubtitlingSignalling,

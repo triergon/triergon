@@ -133,18 +133,37 @@ contain exactly one media program. `ContainerReader` supplies the normal
 input-window, work, cancellation, backpressure and reset protocol.
 
 `Reader::request_seek` scans one seekable, length-known entity for the previous
-coded AVC or HEVC random-access picture, or a timestamped ADTS AAC-LC or AC-3
-frame. The landing is the last eligible packet with the greatest presentation
-time at or before the target. Audio frames without a source PTS are delivered
+coded AVC or HEVC random-access picture, or a timestamped ADTS AAC-LC, AC-3,
+E-AC-3, MPEG audio or DTS core access unit. Layer III requires an empty bit
+reservoir at the landing. DTS core requires a frame that needs no previous decoder
+history. Subsequent dependent frames are delivered as preroll. The landing is the
+last eligible packet with the greatest presentation time at or before the target.
+Audio frames without a source PTS are delivered
 with their original timing when they follow a landing.
 `ReaderLimits::maximum_seek_scan_bytes` limits the scan to 64 MiB by default.
 Packets retain their original bytes, clocks and source ranges. The reader retains
 a bounded single-track suffix when possible and otherwise replays the entity.
 An `Event::Seek` precedes the landing packet and carries the requested
 discard time for `PlaybackPreroll`. The caller supplies decoder setup.
-The reader refuses seeks across selected-track source epochs, ambiguous clock
-wraps, and continued entities. A coded random-access picture must have resolved
-timing.
+The reader refuses seeks across selected-track source epochs and ambiguous clock
+wraps. A coded random-access picture must have resolved timing.
+
+Use `Reader::request_seek_in_entities` for consecutive length-known, seekable
+parts of one logical transport stream. The ordered `SeekEntity` list supplies
+source IDs and lengths, and the scan bound applies to their combined size. Feed
+input by the requested source ID and finish the final entity. It is also safe to
+finish an intermediate entity as soon as all its bytes are supplied. The reader
+advances those boundaries during scan, replay and delivery, preserving in-flight
+PES and access units. The ordinary single-entity method requires a single source.
+
+Call `Reader::request_seek_and_index` to collect a bounded timestamp index
+during the first scan. Later seeks to the same track can use the index to select
+a landing with no separate scan. The index stores only landing points. Replay
+reads the entity prefix to reconstruct transport state and packet provenance,
+then streams the selected suffix. The index preserves the last
+packet on tied timestamps. It falls back to scanning when anchors are out of
+order or the entry or storage limit is reached. The source must remain stable.
+Reset, close and entity continuation discard the index.
 
 Use `Reader::new_with_packet_tracks` when the caller has already chosen the
 elementary PIDs. Only those PIDs allocate access-unit framers and produce
@@ -213,6 +232,16 @@ and [A/52 Annex G §3.3](https://www.atsc.org/wp-content/uploads/2021/04/A52-201
 Existing framers delimit the complete source bytes before decoder-feed conversion.
 MPEG-1/2 video, other subtitle carriages and ambiguous private streams currently emit
 `ReaderEvent::Unsupported`. Their original PMTs and PES remain available as source events.
+For DVB DTS-HD signalling, `psi::Descriptor::dvb_dts_hd` reads Annex G.3
+substream and asset information from the original descriptor bytes.
+`ElementaryStream::dvb_dts_hd` looks up the descriptor on a DVB private-data
+track and rejects conflicting DTS core and DTS-HD descriptors. The access-unit
+reader can frame one core-bearing DTS-HD unit per aligned finite PES. It
+checks the signalled extension substream order, extents and header CRC and
+leaves the asset payloads intact. `DtsAudioFrame::core_bytes` exposes the core
+prefix, and `bytes` exposes the complete unit. The original PES supplies its
+clock. Extension-only carriage remains outside this path.
+
 For DVB AC-3, an elementary `AC-3` registration can corroborate descriptor `0x6a`.
 
 The DVB E-AC-3 carriage requires PMT stream type `0x06`, an elementary
