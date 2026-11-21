@@ -62,11 +62,11 @@ fn regular_movie_with_backward_chunk_preserves_decode_order_or_refuses_physical_
             .iter()
             .map(|(id, table)| SourceTrack::new(*id, Some(table), &[]).unwrap())
             .collect();
-        let media = [1151..1268];
+        let media = 1151..1268;
         let mut cursor = PhysicalSampleCursor::new_with_media_extents(
             &budget,
             &tracks,
-            &media,
+            std::slice::from_ref(&media),
             PhysicalInterleaveLimits::default(),
         )
         .unwrap();
