@@ -183,6 +183,43 @@ fn charset_unknown_labels_and_undefined_bytes_remain_explicit_errors() {
         assert!(job.take_output(&AtomicBool::new(false)).is_err());
     }
 }
+/// A single-byte charset charges the same at every budget: a unit per source
+/// byte counted, one to allocate, one per source and output byte encoded, and
+/// one to freeze; an undefined byte fails once its unit is charged.
+#[test]
+fn single_byte_charsets_charge_the_same_at_every_budget() {
+    let raw = b"A\x80\x88z\xcf\xf0\x20\x96";
+    let text = "AЂ€zПр –";
+    let c = AtomicBool::new(false);
+    for q in (1..=12).chain([4096]) {
+        let pool = Budget::new(4096).unwrap();
+        let bytes = Bytes::copy_from_slice(&pool, raw).unwrap();
+        let mut job =
+            CharsetJob::new(&bytes, None, Charset::Windows1251, &pool, Limits::default()).unwrap();
+        let mut spent = 0;
+        loop {
+            let mut work = WorkBudget::new(q);
+            let status = job.poll(&mut work, &c).unwrap();
+            spent += work.spent();
+            if status == CharsetStatus::Ready {
+                break;
+            }
+        }
+        assert_eq!(job.take_output(&c).unwrap().utf8.as_ref(), text.as_bytes());
+        assert_eq!(
+            spent,
+            2 * raw.len() as u64 + text.len() as u64 + 2,
+            "budget {q}"
+        );
+    }
+    let pool = Budget::new(4096).unwrap();
+    let bytes = Bytes::copy_from_slice(&pool, b"AB\x98C").unwrap();
+    let mut job =
+        CharsetJob::new(&bytes, None, Charset::Windows1251, &pool, Limits::default()).unwrap();
+    let mut work = WorkBudget::new(4096);
+    assert!(job.poll(&mut work, &c).is_err());
+    assert_eq!(work.spent(), 3);
+}
 #[test]
 fn charset_zero_work_and_cancellation_are_resumable() {
     let pool = Budget::new(4096).unwrap();

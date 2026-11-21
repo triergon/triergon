@@ -8,14 +8,6 @@ __init_cpu_features
 __init_cpu_features_constructor
 std::sys::args::unix::imp::ARGV_INIT_ARRAY::init_wrapper
 main
-__aarch64_cas8_relax
-std::sys::pal::unix::stack_overflow::imp::make_handler
-std::sys::pal::unix::stack_overflow::thread_info::set_current_info
-__aarch64_cas4_acq
-__aarch64_cas8_acq
-__aarch64_swp4_rel
-std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-media_worker::main
 core::str::converts::from_utf8
 <std::sys::fs::unix::File>::open_c
 alloc::io::read::default_read_to_end::small_probe_read::<core::io::util::Take<std::fs::File>>
@@ -24,9 +16,12 @@ alloc::io::read::default_read_to_end::small_probe_read::<core::io::util::Take<st
 <media_worker::View>::of
 media_worker::memory
 <std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>
-OUTLINED_FUNCTION_22
+OUTLINED_FUNCTION_31
 <std::sys::sync::once::futex::Once>::call
+__aarch64_cas4_acq
 <std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0}
+__aarch64_swp4_rel
+__aarch64_cas8_relax
 <std::io::stdio::StdoutLock as core::io::write::Write>::write_all
 <std::sys::stdio::unix::Stdout as core::io::write::Write>::write_all
 <alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutRaw>>::flush_buf
@@ -124,6 +119,7 @@ core::ptr::drop_glue::<core::option::Option<triergon_matroska::storage::SharedBy
 <triergon_matroska::typed::reader::projection::LegacyProjection as triergon_matroska::typed::reader::projection::PacketProjection>::take_simple
 triergon_matroska::packet_clock::packet_timing
 media_worker::trims
+<triergon_matroska::storage::SharedText>::as_str
 <triergon_matroska::typed::reader::Reader>::start_group_batch
 <triergon_matroska::matroska::typed::side_data::GroupJob>::new
 <triergon_matroska::matroska::typed::packet::PacketBatchJob>::step_ready
@@ -160,6 +156,7 @@ core::ptr::drop_glue::<core::option::Option<triergon_matroska::typed::reader::re
 core::ptr::drop_glue::<core::option::Option<triergon_matroska::typed::reader::seeking::ScanState>>
 core::ptr::drop_glue::<core::option::Option<triergon_matroska::matroska::typed::usage::Pressure>>
 core::ptr::drop_glue::<core::option::Option<alloc::boxed::Box<triergon_matroska::typed::reader::seek_index::ImmutableSeekIndex>>>
+__aarch64_cas8_acq
 <alloc::sync::Arc<triergon_core::budget::Inner>>::drop_slow
 <std::io::stdio::StdoutLock as core::io::write::Write>::write_fmt
 core::fmt::write
@@ -168,11 +165,9 @@ core::fmt::write
 <core::fmt::Formatter>::pad_integral
 <core::fmt::Formatter>::pad_integral::write_prefix
 core::ptr::drop_glue::<std::io::stdio::StderrLock>
-<std::sync::once::Once>::call_once::<std::rt::cleanup::{closure#0}>::{closure#0}
 release_registered_frames
 btree_destroy
 __aarch64_swp8_acq_rel
-<triergon_matroska::storage::SharedText>::as_str
 <triergon_matroska::colour::Colour>::trace_fields
 <media_worker::catalogue::CatalogueView>::new::<core::io::cursor::Cursor<triergon_core::bytes::OwnedInputBytes>>
 <alloc::raw_vec::RawVec<media_worker::catalogue::ChapterView>>::grow_one
@@ -190,7 +185,6 @@ core::slice::sort::shared::smallsort::insertion_sort_shift_left::<usize, <[usize
 core::ptr::drop_glue::<media_worker::catalogue::CatalogueView>
 media_worker::seek_target
 <triergon_matroska::typed::reader::blocking::BlockingReader<core::io::cursor::Cursor<triergon_core::bytes::OwnedInputBytes>>>::seek
-<triergon_matroska::typed::reader::Reader>::begin_seek
 <triergon_core::input::InputCursor>::reset
 <triergon_matroska::typed::reader::Reader>::step_projected_with_source::<triergon_matroska::typed::reader::projection::TypedProjection>
 <triergon_matroska::typed::reader::Reader>::step_resolver
@@ -201,8 +195,10 @@ core::ptr::drop_glue::<triergon_matroska::matroska::typed::copy_vec::CopyVec<tri
 <triergon_matroska::typed::reader::Reader>::start_seek_plan
 core::ptr::drop_glue::<triergon_matroska::typed::reader::resolving::Resolver>
 <triergon_matroska::typed::reader::Reader>::step_seeking
-<triergon_core::time::Time>::combine
+<triergon_matroska::matroska::typed::seek::RecoveryAudio>::delay_ns
 <triergon_core::time::Time>::to_ticks
+<triergon_core::time::Time>::new
+<triergon_core::time::Time>::combine
 <triergon_core::time::Time>::to_nanoseconds
 <triergon_matroska::incremental::ElementReader>::begin_internal_cluster_range
 <triergon_core::input::InputCursor>::request_range
@@ -213,6 +209,8 @@ core::ptr::drop_glue::<triergon_matroska::typed::reader::resolving::Resolver>
 core::ptr::drop_glue::<triergon_matroska::matroska::typed::packet::TypedPacket>
 <triergon_matroska::matroska::typed::seek_validate::ValidatedCue as core::clone::Clone>::clone
 <triergon_matroska::typed::reader::Reader>::finish_seek
+__divti3
+compiler_builtins::int::specialized_div_rem::u128_div_rem
 core::ptr::drop_glue::<core::option::Option<triergon_matroska::typed::reader::seeking::ScanBoundary>>
 <triergon_matroska::matroska::typed::packet::FrameParameters>::scan_fields
 <triergon_matroska::typed::reader::seeking::ScanSimple>::context_matches
@@ -228,6 +226,7 @@ core::ptr::drop_glue::<triergon_matroska::typed::reader::seeking::ScanState>
 <triergon_matroska::matroska::typed::epoch::EpochRestoreJob>::after_group
 <triergon_matroska::matroska::typed::epoch::RestoredEpoch as core::clone::Clone>::clone
 core::ptr::drop_glue::<triergon_matroska::typed::reader::seeking::ScanBoundary>
+triergon_matroska::matroska::typed::packet::keep_recovery_packet
 <triergon_matroska::incremental::ElementReader>::admit_typed_leaf
 core::ptr::drop_glue::<triergon_matroska::incremental::ParseStep>
 <triergon_matroska::incremental::ElementReader>::owned_plain_prefix

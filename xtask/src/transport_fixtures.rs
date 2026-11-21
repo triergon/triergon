@@ -259,7 +259,7 @@ impl Transport {
 
     fn tables_for(&mut self, streams: &[(&Codec, u16, &[u8])]) -> R<()> {
         for (codec, _, descriptors) in streams {
-            if codec.dvb
+            if codec.name == "dvb-ac3"
                 && (descriptors.len() < 3
                     || descriptors[0] != 0x6a
                     || usize::from(descriptors[1]) + 2 != descriptors.len())

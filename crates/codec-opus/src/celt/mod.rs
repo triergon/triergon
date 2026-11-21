@@ -74,6 +74,14 @@ impl Workspace {
     }
 }
 
+/// Whether a frame comes out de-emphasised, or before its de-emphasis, which
+/// [`deemphasise_channels`] applies to every channel of a packet together.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Emphasis {
+    Apply,
+    Defer,
+}
+
 /// What a CELT frame codes, from the Opus TOC and mode.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct FrameLayout {
@@ -137,13 +145,15 @@ impl CeltDecoder {
     }
 
     /// Decode one frame from `rc` (which a hybrid frame shares with SILK) into
-    /// `out[channel][..120 << lm]` for each output channel.
+    /// `out[channel][..120 << lm]` for each output channel, de-emphasised unless
+    /// `emphasis` defers it.
     pub(crate) fn decode(
         &mut self,
         rc: &mut RangeDecoder<'_>,
         layout: FrameLayout,
         work: &mut Workspace,
         out: [&mut [f32]; 2],
+        emphasis: Emphasis,
     ) {
         let FrameLayout {
             lm,
@@ -233,7 +243,8 @@ impl CeltDecoder {
             }
         }
         self.denormalise(layout, header.silence, work);
-        self.synthesize(layout, blocks, header.pitch.unwrap_or_default(), work, out);
+        let pitch = header.pitch.unwrap_or_default();
+        self.synthesize(layout, blocks, pitch, work, out, emphasis);
         self.update_history(layout, header.transient);
         self.seed = rc.range();
     }
@@ -308,8 +319,9 @@ impl CeltDecoder {
         }
     }
 
-    /// Inverse transform, post-filter and de-emphasis of `work.spectrum` into `out`;
-    /// `pitch` is this frame's post-filter, which fades in after the first short block.
+    /// Inverse transform, post-filter and de-emphasis (unless deferred) of `work.spectrum`
+    /// into `out`; `pitch` is this frame's post-filter, which fades in after the first
+    /// short block.
     fn synthesize(
         &mut self,
         layout: FrameLayout,
@@ -317,6 +329,7 @@ impl CeltDecoder {
         pitch: Pitch,
         work: &mut Workspace,
         out: [&mut [f32]; 2],
+        emphasis: Emphasis,
     ) {
         let lm = layout.lm;
         let n = 120 << lm;
@@ -346,7 +359,14 @@ impl CeltDecoder {
                 );
             }
         }
-        self.deemphasise(frame, out);
+        match emphasis {
+            Emphasis::Apply => self.deemphasise(frame, out),
+            Emphasis::Defer => {
+                for (out, history) in out.into_iter().zip(&self.history).take(self.channels) {
+                    out.copy_from_slice(&history[frame..]);
+                }
+            }
+        }
         self.pitch_old = if lm != 0 { pitch } else { self.pitch };
         self.pitch = pitch;
     }
@@ -377,6 +397,12 @@ impl CeltDecoder {
         }
     }
 
+    /// The de-emphasis filter memory of each output channel, which a frame decoded with
+    /// [`Emphasis::Defer`] leaves for [`deemphasise_channels`] to continue.
+    pub(crate) fn deemphasis_memory(&mut self) -> &mut [f32] {
+        &mut self.deemphasis[..self.channels]
+    }
+
     /// Keep the energies for the next frame's prediction and anti-collapse; bands
     /// outside the coded ones restart from silence.
     fn update_history(&mut self, layout: FrameLayout, transient: bool) {
@@ -400,6 +426,44 @@ impl CeltDecoder {
             }
         }
     }
+}
+
+/// The de-emphasis of [`CeltDecoder::deemphasise`] for channels whose frames were decoded
+/// with [`Emphasis::Defer`]: each `samples[c]` in place, from and back into `memory[c]`.
+/// Up to eight channels run in one loop, each with its own recursion, so that the
+/// recursions overlap instead of following one another.
+pub(crate) fn deemphasise_channels(memory: &mut [f32], samples: &mut [&mut [f32]]) {
+    for (memory, samples) in memory.chunks_mut(8).zip(samples.chunks_mut(8)) {
+        match memory.len() {
+            1 => deemphasise_lanes::<1>(memory, samples),
+            2 => deemphasise_lanes::<2>(memory, samples),
+            3 => deemphasise_lanes::<3>(memory, samples),
+            4 => deemphasise_lanes::<4>(memory, samples),
+            5 => deemphasise_lanes::<5>(memory, samples),
+            6 => deemphasise_lanes::<6>(memory, samples),
+            7 => deemphasise_lanes::<7>(memory, samples),
+            _ => deemphasise_lanes::<8>(memory, samples),
+        }
+    }
+}
+
+/// [`deemphasise_channels`] for `N` channels, over the samples all of them have.
+fn deemphasise_lanes<const N: usize>(memory: &mut [f32], samples: &mut [&mut [f32]]) {
+    let len = samples.iter().map(|s| s.len()).min().unwrap_or(0);
+    let mut lanes: [&mut [f32]; N] = core::array::from_fn(|_| <&mut [f32]>::default());
+    for (lane, s) in lanes.iter_mut().zip(samples.iter_mut()) {
+        *lane = &mut s[..len];
+    }
+    let mut m = [0f32; N];
+    m.copy_from_slice(&memory[..N]);
+    for i in 0..len {
+        for (lane, m) in lanes.iter_mut().zip(&mut m) {
+            let t = lane[i] + *m;
+            *m = DEEMPHASIS * t;
+            lane[i] = t;
+        }
+    }
+    memory[..N].copy_from_slice(&m);
 }
 
 /// The frame header flags (RFC 6716 Table 56).

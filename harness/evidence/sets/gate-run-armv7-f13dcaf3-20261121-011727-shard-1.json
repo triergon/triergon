@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-armv7-f13dcaf3-20261121-011727-shard-1",
+ "path": "gate-run-armv7-f13dcaf3-20261121-011727-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run of subtitle text on 32-bit ARMv7 with single-byte charsets converted in runs and mov_text event prefixes staged in 64 bytes: timing, memory and grades of all 367 cases.",
+ "key": "evidence/gate-runs/f13dcaf328757770f863a8500670b836e6ffe83e-armv7-20261121-011727/shard-1/4f99a8ce4c41ce6efa35900a938c7423fd6f5e246008094c4f522e65d3239dca.tar.zst",
+ "sha256": "4f99a8ce4c41ce6efa35900a938c7423fd6f5e246008094c4f522e65d3239dca",
+ "bytes": 35459240,
+ "results": [
+  {
+   "path": "memory/subtitle-text/gate-result.json",
+   "command": "report --memory",
+   "key": "0bb6bcc87b63726153ca8d8790ea4a9e3aa799ef110c122b049879fda0923163",
+   "status": 0,
+   "report_sha256": "a957763d3442f76ae9d329b7224119e0f3e7c121ffe30445da85ee21c13befae",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text/gate-result.json",
+   "command": "report --benchmark",
+   "key": "f79ef9c31c51cf621b11d1582c18bfe3a73597a894b515dd13ed93e1bd587175",
+   "status": 0,
+   "report_sha256": "7b366feff217657add9e8a693442ae5b82ec80573db5ad9b7a339aeb13237ce8",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-text/gate-result.json",
+   "command": "grade",
+   "key": "8f78c11e69cc1a9e4a731e86da4d1e25a6606640b1550164a474b71d4127dffd",
+   "status": 0,
+   "report_sha256": "41fe4d584f368519e9ee8eb8bb4a067105f2364ff835f8591cb1e232611f65f3"
+  }
+ ]
+}
