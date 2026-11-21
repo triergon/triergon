@@ -6,6 +6,8 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use crate::json::{self, Value};
@@ -143,6 +145,40 @@ pub fn run_in(
     cwd: Option<&Path>,
     timeout: Duration,
 ) -> Result<Option<Finished>, String> {
+    run_limited(argv, env, cwd, timeout, None)
+}
+
+/// Run with at most `limit` bytes retained from each output pipe. An overflow
+/// is an error, never a truncated successful observation.
+pub fn run_bounded(
+    argv: &[OsString],
+    timeout: Duration,
+    limit: usize,
+) -> Result<Option<Finished>, String> {
+    let output_limit = limit.checked_add(1).ok_or("invalid worker output limit")?;
+    run_limited(argv, &[], None, timeout, Some(output_limit))
+}
+
+fn read_pipe(mut pipe: impl Read, limit: Option<(usize, Arc<AtomicBool>)>) -> Vec<u8> {
+    let mut buffer = Vec::new();
+    if let Some((detection_limit, overflow)) = limit {
+        let _ = pipe.take(detection_limit as u64).read_to_end(&mut buffer);
+        if buffer.len() == detection_limit {
+            overflow.store(true, Ordering::Release);
+        }
+    } else {
+        let _ = pipe.read_to_end(&mut buffer);
+    }
+    buffer
+}
+
+fn run_limited(
+    argv: &[OsString],
+    env: &[(String, Option<String>)],
+    cwd: Option<&Path>,
+    timeout: Duration,
+    output_limit: Option<usize>,
+) -> Result<Option<Finished>, String> {
     let started = Instant::now();
     let mut command = Command::new(&argv[0]);
     if let Some(cwd) = cwd {
@@ -162,22 +198,22 @@ pub fn run_in(
     let mut child = command
         .spawn()
         .map_err(|e| format!("{}: {e}", argv[0].to_string_lossy()))?;
-    let mut stdout = child.stdout.take().expect("piped stdout");
-    let mut stderr = child.stderr.take().expect("piped stderr");
-    let out = std::thread::spawn(move || {
-        let mut buffer = Vec::new();
-        let _ = stdout.read_to_end(&mut buffer);
-        buffer
-    });
-    let err = std::thread::spawn(move || {
-        let mut buffer = Vec::new();
-        let _ = stderr.read_to_end(&mut buffer);
-        buffer
-    });
+    let stdout = child.stdout.take().expect("piped stdout");
+    let stderr = child.stderr.take().expect("piped stderr");
+    let limit = output_limit.map(|limit| (limit, Arc::new(AtomicBool::new(false))));
+    let stdout_limit = limit.clone();
+    let stderr_limit = limit.clone();
+    let out = std::thread::spawn(move || read_pipe(stdout, stdout_limit));
+    let err = std::thread::spawn(move || read_pipe(stderr, stderr_limit));
+    let overflowed = || {
+        limit
+            .as_ref()
+            .is_some_and(|(_, flag)| flag.load(Ordering::Acquire))
+    };
     let status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break Some(status),
-            Ok(None) if started.elapsed() >= timeout => {
+            Ok(None) if overflowed() || started.elapsed() >= timeout => {
                 let _ = child.kill();
                 let _ = child.wait();
                 break None;
@@ -190,6 +226,9 @@ pub fn run_in(
         out.join().unwrap_or_default(),
         err.join().unwrap_or_default(),
     );
+    if overflowed() {
+        return Err("worker output exceeded observation limit".into());
+    }
     Ok(status.map(|status| Finished {
         code: status.code().map_or_else(|| -signal(&status), i64::from),
         stdout,
@@ -462,6 +501,24 @@ mod timeout_tests {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bounded_observations_never_accept_truncated_output() {
+        let result = run_bounded(&sh("printf abcd; printf efgh >&2"), DEFAULT_TIMEOUT, 4)
+            .unwrap()
+            .unwrap();
+        assert_eq!(result.stdout, b"abcd");
+        assert_eq!(result.stderr, b"efgh");
+        assert!(run_bounded(&sh("printf abcde"), DEFAULT_TIMEOUT, 4).is_err());
+        assert!(run_bounded(&sh("printf abcde >&2"), DEFAULT_TIMEOUT, 4).is_err());
+        let continued = sh("trap '' PIPE; printf abcde; while :; do :; done");
+        assert_eq!(
+            run_bounded(&continued, Duration::from_secs(1), 4)
+                .err()
+                .as_deref(),
+            Some("worker output exceeded observation limit")
+        );
+    }
 
     fn sh(script: &str) -> Vec<OsString> {
         vec!["sh".into(), "-c".into(), script.into()]

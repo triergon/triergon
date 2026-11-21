@@ -2,7 +2,7 @@
 //!
 //! The separate demux-clock policy places source PES anchors for comparison. It
 //! never changes the source packet's timestamps or supplies a clock to later AUs.
-use crate::runner::{Invocation, Refusal, Result, Totals, measure};
+use crate::runner::{Invocation, Refusal, Result, Totals, measure, measure_repeated};
 use crate::ts::{au_recovery, confirm_control_only_entity, fold_payload};
 use crate::ts_input::{self, FIRST_SOURCE, Request};
 use std::path::Path;
@@ -480,6 +480,7 @@ fn operation<const TRACE: bool>(
         program: Some(request.program),
         descriptor_namespace: request.namespace,
         unlabelled_dts_core: request.unlabelled_dts_core,
+        probe_unlabelled_dts_core: request.probe_dts_core,
         pcr_policy: request.pcr_policy,
         audio_eof_policy: AudioEofPolicy::ReportIncomplete,
         unframed_audio_policy: UnframedAudioPolicy::ReportAtEof,
@@ -752,6 +753,20 @@ fn operation<const TRACE: bool>(
                 if let Some(original) = deferred_continuity {
                     return Ok(original);
                 }
+                if request.probe_dts_core
+                    && let ReaderEvent::Unsupported { track, error } = &event
+                {
+                    return Ok(refused(
+                        totals,
+                        &format_args!(
+                            "DTS discovery refused program {} PID {} configuration {} ({error})",
+                            track.program(),
+                            track.stream().pid,
+                            track.configuration_epoch(),
+                        ),
+                        at,
+                    ));
+                }
                 let recovery = match &event {
                     ReaderEvent::Interrupted { cause, .. }
                         if single_entity
@@ -910,7 +925,7 @@ pub fn run(args: &[String]) -> Result<()> {
     let invocation = Invocation::parse(
         args,
         if eac3 { EAC3_PREFIX } else { PREFIX },
-        " SIZE PROGRAM [--dvb|--atsc] [[--discontinuity] ENTITY]... [--dts-core=PID] [--ignore-pcr-reserved-bits]",
+        " SIZE PROGRAM [--dvb|--atsc] [[--discontinuity] ENTITY]... [--dts-core=PID|--probe-dts-core] [--ignore-pcr-reserved-bits]",
         2..=usize::MAX,
         true,
     )?;
@@ -935,13 +950,18 @@ pub fn run(args: &[String]) -> Result<()> {
     } else {
         OPERATION
     };
-    measure(&invocation, name, Some(&pool), || {
+    let run = || {
         operation(
             &pool,
             std::hint::black_box(&request),
             &AtomicBool::new(false),
         )
-    })
+    };
+    if request.probe_dts_core {
+        measure_repeated(&invocation, OPERATION, Some(&pool), run)
+    } else {
+        measure(&invocation, name, Some(&pool), run)
+    }
 }
 
 #[cfg(test)]
@@ -968,6 +988,7 @@ mod tests {
             program: 1,
             namespace: DescriptorNamespace::Unspecified,
             unlabelled_dts_core: None,
+            probe_dts_core: false,
             pcr_policy: triergon_mpegts::compat::pes::PcrPolicy::Strict,
             following: BudgetVec::new(&pool),
         };
@@ -975,6 +996,51 @@ mod tests {
         let totals = operation::<false>(&pool, &request, &AtomicBool::new(false)).unwrap();
         assert_eq!(pool.used(), baseline);
         totals
+    }
+
+    #[test]
+    fn repeated_dts_discovery_reports_the_same_source_refusal() {
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut input = include_bytes!(
+            "../../../harness/features/mpegts-dts-core/inputs/dts-core-unlabelled-private-data.ts"
+        )
+        .to_vec();
+        let sync = input
+            .windows(4)
+            .position(|window| window == [0x7f, 0xfe, 0x80, 0x01])
+            .expect("first source DTS sync");
+        input[sync] = 0;
+        let request = Request {
+            input: Bytes::copy_from_slice(&pool, &input).unwrap(),
+            format: PacketFormat::Ts188,
+            program: 7,
+            namespace: DescriptorNamespace::Unspecified,
+            unlabelled_dts_core: None,
+            probe_dts_core: true,
+            pcr_policy: triergon_mpegts::compat::pes::PcrPolicy::IgnoreReservedBits,
+            following: BudgetVec::new(&pool),
+        };
+        let retained = pool.used();
+        let mut first = None;
+        for _ in 0..50 {
+            let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
+            assert_eq!((totals.packets, totals.bytes, totals.digest), (0, 0, 0));
+            let refusal = totals.refusal.expect("malformed DTS remains unsupported");
+            assert!(
+                refusal
+                    .reason
+                    .starts_with("DTS discovery refused program 7 PID 256 configuration "),
+                "{refusal:?}"
+            );
+            assert!(
+                refusal
+                    .reason
+                    .contains("MPEG-TS private PES does not prove DTS core")
+            );
+            let facts = (refusal.reason, refusal.cause);
+            assert_eq!(first.get_or_insert_with(|| facts.clone()), &facts);
+            assert_eq!(pool.used(), retained);
+        }
     }
 
     #[test]
