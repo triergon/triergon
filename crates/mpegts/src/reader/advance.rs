@@ -2,7 +2,8 @@
 use super::lane::{Lane, LaneStep, PesRun, StorageScan};
 use super::model::{ClockContext, Shared};
 use super::{
-    AccessUnit, EntityTransition, Packet, Reader, ReaderEvent, SourceEvent, Track, Transport, seek,
+    AccessUnit, EntityTransition, Packet, Reader, ReaderEvent, SourceEvent, Stream, Track,
+    Transport, seek,
 };
 use crate::clock::ClockKey;
 use crate::compat::adts;
@@ -308,7 +309,11 @@ impl Reader {
             if let super::Ending::Finished(at) = self.ending {
                 return Ok(Step::End(at));
             }
-            let Transport::Open { input, stream } = &mut self.transport else {
+            let Transport::Reading {
+                input,
+                stream: Stream::Open(stream),
+            } = &mut self.transport
+            else {
                 return Err(Error::Invalid("MPEG-TS reader closed"));
             };
             let mut observed = false;
@@ -962,7 +967,11 @@ impl Reader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Flow> {
-        let Transport::Open { input, stream } = &mut self.transport else {
+        let Transport::Reading {
+            input,
+            stream: Stream::Open(stream),
+        } = &mut self.transport
+        else {
             return Err(Error::Invalid("MPEG-TS reader closed"));
         };
         if let super::Ending::Continues(next) = self.ending {
@@ -1013,7 +1022,11 @@ impl Reader {
                 return Ok(Step::Yield);
             }
             let limit = crate::limit(scan.bytes(), self.pool.limit());
-            let Transport::Open { stream, .. } = &mut self.transport else {
+            let Transport::Reading {
+                stream: Stream::Open(stream),
+                ..
+            } = &mut self.transport
+            else {
                 return Err(error);
             };
             return Ok(Step::Ready(stream.refuse_blocked_pes_growth(limit)));

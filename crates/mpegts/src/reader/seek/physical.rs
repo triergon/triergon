@@ -501,7 +501,10 @@ impl Direct {
                     }
                     let checkpoint = &self.index.checkpoints.as_slice()[self.checkpoint];
                     let pid = self.index.map.map().streams.as_slice()[0].pid;
-                    let crate::reader::Transport::Open { stream, .. } = &mut reader.transport
+                    let crate::reader::Transport::Reading {
+                        stream: crate::reader::Stream::Open(stream),
+                        ..
+                    } = &mut reader.transport
                     else {
                         return Err(Error::SourceMismatch);
                     };

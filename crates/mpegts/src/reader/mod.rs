@@ -64,15 +64,31 @@ enum PacketTracks {
     reason = "the open transport is the common case and stays inline"
 )]
 enum Transport {
-    /// Transport packets are being read.
-    Open {
-        input: InputCursor,
-        stream: TransportStream,
-    },
-    /// The transport finished and released its storage; lane fragments remain.
-    Released { input: InputCursor },
+    /// `input` is being read; `stream` is open until the transport finishes.
+    Reading { input: InputCursor, stream: Stream },
     /// Closed or failed: every call reports this error.
     Stopped(Error),
+}
+
+/// The transport stream of a reader that is reading.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "the open transport is the common case and stays inline"
+)]
+enum Stream {
+    /// Transport packets are being read.
+    Open(TransportStream),
+    /// The transport finished and released its storage; lane fragments remain.
+    Released,
+}
+
+impl Stream {
+    fn open(&self) -> Option<&TransportStream> {
+        match self {
+            Self::Open(stream) => Some(stream),
+            Self::Released => None,
+        }
+    }
 }
 
 /// Incremental TS188/M2TS192 reader delivering complete source AUs, separately
@@ -162,7 +178,10 @@ impl Reader {
             window: input_window,
             limits,
             packet_tracks: PacketTracks::All,
-            transport: Transport::Open { input, stream },
+            transport: Transport::Reading {
+                input,
+                stream: Stream::Open(stream),
+            },
             lanes: BudgetVec::new(pool),
             tracks: BudgetVec::new(pool),
             staged_tracks: BudgetVec::new(pool),
@@ -244,43 +263,37 @@ impl Reader {
 
     pub(crate) fn continuity_source(&self) -> Option<(&InputCursor, Option<&TransportStream>)> {
         match &self.transport {
-            Transport::Open { input, stream } => Some((input, Some(stream))),
-            Transport::Released { input } => Some((input, None)),
+            Transport::Reading { input, stream } => Some((input, stream.open())),
             Transport::Stopped(_) => None,
         }
     }
 
     fn input(&self) -> Result<&InputCursor> {
         match &self.transport {
-            Transport::Open { input, .. } | Transport::Released { input } => Ok(input),
+            Transport::Reading { input, .. } => Ok(input),
             Transport::Stopped(error) => Err(*error),
         }
     }
 
     fn input_mut(&mut self) -> Result<&mut InputCursor> {
         match &mut self.transport {
-            Transport::Open { input, .. } | Transport::Released { input } => Ok(input),
+            Transport::Reading { input, .. } => Ok(input),
             Transport::Stopped(error) => Err(*error),
         }
     }
 
     fn stream(&self) -> Option<&TransportStream> {
         match &self.transport {
-            Transport::Open { stream, .. } => Some(stream),
-            Transport::Released { .. } | Transport::Stopped(_) => None,
+            Transport::Reading { stream, .. } => stream.open(),
+            Transport::Stopped(_) => None,
         }
     }
 
     /// Drops the finished transport's storage and keeps the input.
     fn release_transport(&mut self) {
-        let placeholder = Transport::Stopped(Error::Closed);
-        self.transport = match std::mem::replace(&mut self.transport, placeholder) {
-            Transport::Open { input, stream } => {
-                drop(stream);
-                Transport::Released { input }
-            }
-            other => other,
-        };
+        if let Transport::Reading { stream, .. } = &mut self.transport {
+            *stream = Stream::Released;
+        }
     }
     /// The tracks of the selected program announced so far.
     pub fn tracks(&self) -> &[Track] {
@@ -434,7 +447,7 @@ impl Reader {
     fn healthy(&self) -> Result<()> {
         match self.transport {
             Transport::Stopped(error) => Err(error),
-            Transport::Open { .. } | Transport::Released { .. } => Ok(()),
+            Transport::Reading { .. } => Ok(()),
         }
     }
     fn stop(&mut self, error: Error) {
