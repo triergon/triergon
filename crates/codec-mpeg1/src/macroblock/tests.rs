@@ -4,15 +4,19 @@
 use super::*;
 use crate::EncoderConfig;
 
-fn encoder() -> Encoder {
-    Encoder::new(EncoderConfig {
-        geometry: Geometry::new(16, 16).unwrap(),
+/// The capture rate rule at 1 Mbit/s for pictures of `geometry`.
+fn config(geometry: Geometry) -> EncoderConfig {
+    EncoderConfig {
+        geometry,
         bit_rate: 1_000_000,
         max_rate: 1_400_000,
         vbv_bits: 142_857,
         gop: 30,
-    })
-    .unwrap()
+    }
+}
+
+fn encoder() -> Encoder {
+    Encoder::new(config(Geometry::new(16, 16).unwrap())).unwrap()
 }
 
 fn code(
@@ -172,13 +176,7 @@ fn a_macroblock_under_the_vbv_guard_codes_no_coefficients() {
 #[test]
 fn skips_reused_for_a_repeated_picture_match_the_computed_path() {
     let geometry = Geometry::new(64, 48).unwrap();
-    let cfg = EncoderConfig {
-        geometry,
-        bit_rate: 1_000_000,
-        max_rate: 1_400_000,
-        vbv_bits: 142_857,
-        gop: 30,
-    };
+    let cfg = config(geometry);
     // A gradient with a little texture: the first P pictures refine it, then
     // its residual quantises to zero and the macroblocks are skipped.
     let mut input = Picture::new(geometry);
