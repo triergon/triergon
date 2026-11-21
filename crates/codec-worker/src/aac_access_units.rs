@@ -13,10 +13,10 @@ const PADDING: usize = 64;
 const SAMPLES: usize = 1024;
 const MAX_PACKET: usize = 64 << 10;
 const MAX_INPUT: u64 = 64 << 20;
-pub const OPERATION: &str = "audio-aac-access-units";
-pub const COMPAT_OPERATION: &str = "audio-aac-access-units-compat";
+pub(crate) const OPERATION: &str = "audio-aac-access-units";
+pub(crate) const COMPAT_OPERATION: &str = "audio-aac-access-units-compat";
 
-pub fn load(path: &str) -> Result<Vec<u8>, String> {
+pub(crate) fn load(path: &str) -> Result<Vec<u8>, String> {
     let mut file = File::open(path).map_err(|error| error.to_string())?;
     let metadata = file.metadata().map_err(|error| error.to_string())?;
     if !metadata.is_file() || !(16..=MAX_INPUT).contains(&metadata.len()) {
@@ -41,7 +41,7 @@ fn read_u32(data: &mut &[u8]) -> Result<u32, String> {
     Ok(u32::from_le_bytes(*word))
 }
 
-pub fn decode(mut data: &[u8], layout: Policy, out: &mut Output) -> Result<(), String> {
+pub(crate) fn decode(mut data: &[u8], layout: Policy, out: &mut Output) -> Result<(), String> {
     let rate = read_u32(&mut data)?;
     let channels = read_u32(&mut data)? as usize;
     let packets = read_u32(&mut data)?;

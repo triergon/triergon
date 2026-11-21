@@ -18,10 +18,10 @@
 
 use std::io::Write;
 use std::process::ExitCode;
-use std::time::Instant;
 
 use triergon_capture::pixel::{Orientation, PictureView, Plane};
 use triergon_capture::{Session, SessionConfig, Sink};
+use triergon_harness_runner::{BenchLine, Boundary, Timer, failed};
 
 struct HashSink {
     hash: u64,
@@ -49,8 +49,7 @@ impl Sink for HashSink {
 }
 
 fn fail(what: &str) -> ExitCode {
-    eprintln!("capture-worker: {what}");
-    ExitCode::from(2)
+    failed(Some("capture-worker"), 2, what)
 }
 
 fn open_session(cfg: &SessionConfig) -> triergon_capture::Result<Session> {
@@ -110,10 +109,35 @@ fn write_per_frame(
     std::fs::write(path, out).map_err(|_| "output")
 }
 
+#[derive(PartialEq, Eq)]
+enum Operation {
+    Convert,
+    Recon,
+    Pipeline,
+    Bench,
+    Memory,
+}
+
+impl Operation {
+    fn parse(name: &str, count: usize) -> Option<Self> {
+        Some(match (name, count) {
+            ("convert", 8) => Self::Convert,
+            ("recon", 9) => Self::Recon,
+            ("pipeline", 9) => Self::Pipeline,
+            ("bench", 9) => Self::Bench,
+            ("memory", 8) => Self::Memory,
+            _ => return None,
+        })
+    }
+}
+
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> ExitCode {
     let mut args: Vec<String> = std::env::args().collect();
-    if args.len() == 9 && args[1] == "bench" {
+    let operation = args
+        .get(1)
+        .and_then(|name| Operation::parse(name, args.len()));
+    if operation == Some(Operation::Bench) {
         // The timing command line, input and iterations first, in the order of
         // the other modes: <w> <h> <flip> <frames> <bitrate> <in.rgba> <iterations>.
         args[2..].rotate_left(2);
@@ -137,8 +161,11 @@ fn worker_main() -> ExitCode {
         let data = std::fs::read(path).ok()?;
         (data.len() >= frame_bytes * count).then_some(data)
     };
-    match args[1].as_str() {
-        "convert" if args.len() == 8 => {
+    let Some(operation) = operation else {
+        return fail("usage");
+    };
+    match operation {
+        Operation::Convert => {
             let Some(rgba) = load(&args[6]) else {
                 return fail("input");
             };
@@ -151,7 +178,7 @@ fn worker_main() -> ExitCode {
                 return fail(step);
             }
         }
-        "recon" if args.len() == 9 => {
+        Operation::Recon => {
             // Encoder-side reconstruction of every frame, for drift checks
             // against an independent decode of the same stream.
             let (Some(bitrate), Some(rgba)) = (parse(6), load(&args[7])) else {
@@ -166,7 +193,7 @@ fn worker_main() -> ExitCode {
                 return fail(step);
             }
         }
-        "pipeline" if args.len() == 9 => {
+        Operation::Pipeline => {
             let (Some(bitrate), Some(rgba)) = (parse(6), load(&args[7])) else {
                 return fail("input");
             };
@@ -188,7 +215,7 @@ fn worker_main() -> ExitCode {
                 underflow
             );
         }
-        "bench" if args.len() == 9 => {
+        Operation::Bench => {
             // `iterations` sessions, each from a fresh session and sink, timed
             // together. Every session must produce the same stream; the counts
             // are totals over the sessions, the digest that of the stream.
@@ -199,7 +226,7 @@ fn worker_main() -> ExitCode {
             };
             let cfg = SessionConfig::with_rate_rule(w, h, bitrate);
             let mut stream = None;
-            let start = Instant::now();
+            let start = Timer::start(true);
             for _ in 0..iterations {
                 let mut sink = HashSink::new();
                 if let Err(e) = session(&cfg, orientation, &rgba, count, &mut sink) {
@@ -211,34 +238,33 @@ fn worker_main() -> ExitCode {
             }
             let elapsed = start.elapsed().as_nanos();
             let (bytes, digest) = stream.unwrap_or_default();
+            let iterations = u64::from(iterations);
             println!(
-                "{{\"iterations\":{iterations},\"elapsed_ns\":{elapsed},\"packets\":{},\"bytes\":{},\"digest\":{digest}}}",
-                count as u64 * u64::from(iterations),
-                bytes * u64::from(iterations)
+                "{}",
+                BenchLine {
+                    schema: false,
+                    iterations,
+                    elapsed_ns: elapsed,
+                    packets: count as u64 * iterations,
+                    bytes: bytes * iterations,
+                    digest,
+                }
             );
         }
-        "memory" if args.len() == 8 => {
+        Operation::Memory => {
             let (Some(bitrate), Some(rgba)) = (parse(6), load(&args[7])) else {
                 return fail("input");
             };
             let cfg = SessionConfig::with_rate_rule(w, h, bitrate);
             let mut sink = HashSink::new();
             let mut stdout = std::io::stdout();
-            if stdout
-                .write_all(b"TRIERGON_BEGIN_V1\n")
-                .and_then(|()| stdout.flush())
-                .is_err()
-            {
+            if Boundary::Begin.mark(&mut stdout).is_err() {
                 return fail("marker");
             }
             if let Err(e) = session(&cfg, orientation, &rgba, count, &mut sink) {
                 return fail(&e);
             }
-            if stdout
-                .write_all(b"TRIERGON_END_V1\n")
-                .and_then(|()| stdout.flush())
-                .is_err()
-            {
+            if Boundary::End.mark(&mut stdout).is_err() {
                 return fail("marker");
             }
             let line = format!(
@@ -249,7 +275,6 @@ fn worker_main() -> ExitCode {
                 return fail("result");
             }
         }
-        _ => return fail("usage"),
     }
     ExitCode::SUCCESS
 }

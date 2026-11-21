@@ -9,12 +9,12 @@ use std::{
     io::{self, Cursor, Read},
     process::ExitCode,
     sync::atomic::AtomicBool,
-    time::Instant,
 };
 use triergon_harness_protocol::{
     digest::{fold, fold_bytes},
     hex, quoted,
 };
+use triergon_harness_runner::{BenchLine, Boundary, Timer, command};
 use triergon_matroska::compat::seek::at_block_start;
 use triergon_matroska::reference_trace::seek_initial_trim;
 use triergon_matroska::timing::ExactTime;
@@ -424,11 +424,7 @@ fn run(
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> ExitCode {
-    if let Err(e) = entry() {
-        eprintln!("{e}");
-        return ExitCode::FAILURE;
-    }
-    ExitCode::SUCCESS
+    command(None, 1, entry)
 }
 
 /// C's entry point, the one exception to the worker's `deny(unsafe_code)`
@@ -485,41 +481,84 @@ impl View {
     }
 }
 
-fn entry() -> Outcome {
-    let a: Vec<_> = std::env::args().collect();
-    let mode = a.get(1).ok_or(
+enum Source {
+    Catalogue,
+    Metadata,
+    Trace,
+    ShortTrace,
+}
+
+enum Operation {
+    Source(Source),
+    Baseline,
+    SeekTrace,
+    PlaybackSeekTrace,
+    Inflate,
+    Seek,
+    Trace(View),
+    TraceShort(View),
+    Bench(View),
+    SeekBench,
+    Memory(View),
+    SeekMemory,
+    MemoryBaseline,
+}
+
+impl Operation {
+    fn parse(mode: &str) -> Result<Self, Error> {
+        Ok(match mode {
+            "catalogue-source" => Self::Source(Source::Catalogue),
+            "metadata-source" => Self::Source(Source::Metadata),
+            "trace-source" => Self::Source(Source::Trace),
+            "trace-source-short" => Self::Source(Source::ShortTrace),
+            "baseline" => Self::Baseline,
+            "seek-trace" => Self::SeekTrace,
+            "playback-seek-trace" => Self::PlaybackSeekTrace,
+            "inflate" => Self::Inflate,
+            "seek" => Self::Seek,
+            "seek-bench" => Self::SeekBench,
+            "seek-memory" => Self::SeekMemory,
+            "memory-baseline" => Self::MemoryBaseline,
+            other => match View::of(other) {
+                (view, "trace") => Self::Trace(view),
+                (view, "trace-short") => Self::TraceShort(view),
+                (view, "bench") => Self::Bench(view),
+                (view, "memory") => Self::Memory(view),
+                _ => return Err("unknown operation".into()),
+            },
+        })
+    }
+}
+
+fn entry(args: &[String]) -> Outcome {
+    let (mode, args) = args.split_first().ok_or(
         "usage: media-worker trace|trace-short|seek|bench|baseline FILE [iterations/chunk/ns]",
     )?;
-    let file = std::fs::File::open(a.get(2).ok_or("missing input")?)?;
+    let (path, words) = args.split_first().ok_or("missing input")?;
+    let file = std::fs::File::open(path)?;
     let mut data = Vec::new();
     file.take(64 * 1024 * 1024 + 1).read_to_end(&mut data)?;
     if data.len() > 64 * 1024 * 1024 {
         return Err("input limit: 64 MiB".into());
     }
-    let words = &a[3..];
-    match mode.as_str() {
-        "catalogue-source" | "metadata-source" | "trace-source" | "trace-source-short" => {
-            source(mode, data, words)
-        }
-        "baseline" => {
+    match Operation::parse(mode)? {
+        Operation::Source(mode) => source(mode, data, words),
+        Operation::Baseline => {
             std::hint::black_box(&data);
             println!("{{\"input_bytes\":{}}}", data.len());
             Ok(())
         }
-        "seek-trace" => seek_trace(data, words, false),
-        "playback-seek-trace" => seek_trace(data, words, true),
-        "inflate" => inflate(&data, words),
-        "seek" => seek(data, words),
-        "seek-bench" => bench(data, words, true, View::PLAIN),
-        "seek-memory" => memory(data, words, Some(true), View::PLAIN),
-        "memory-baseline" => memory(data, words, None, View::PLAIN),
-        other => match View::of(other) {
-            (view, "trace") => traced(data, None, view),
-            (view, "trace-short") => traced(data, Some(words), view),
-            (view, "bench") => bench(data, words, false, view),
-            (view, "memory") => memory(data, words, Some(false), view),
-            _ => Err("unknown operation".into()),
-        },
+        Operation::SeekTrace => seek_trace(data, words, false),
+        Operation::PlaybackSeekTrace => seek_trace(data, words, true),
+        Operation::Inflate => inflate(&data, words),
+        Operation::Seek => seek(data, words),
+        Operation::Trace(view) => traced(data, None, view),
+        Operation::TraceShort(view) => traced(data, Some(words), view),
+        Operation::Bench(view) => bench(data, words, false, view),
+        Operation::SeekBench => bench(data, words, true, View::PLAIN),
+        Operation::Memory(view) => memory(data, words, Some(false), view),
+        Operation::SeekMemory => memory(data, words, Some(true), View::PLAIN),
+        Operation::MemoryBaseline => memory(data, words, None, View::PLAIN),
     }
 }
 
@@ -543,12 +582,12 @@ fn traced(data: Vec<u8>, short: Option<&[String]>, view: View) -> Outcome {
 /// The source-frame views: `trace-source FILE`, `trace-source-short FILE CHUNK`,
 /// `catalogue-source FILE` and `metadata-source FILE`.
 #[inline(never)]
-fn source(mode: &str, data: Vec<u8>, words: &[String]) -> Outcome {
+fn source(mode: Source, data: Vec<u8>, words: &[String]) -> Outcome {
     match mode {
-        "catalogue-source" => catalogue::source(open_owned(data, Limits::default())?),
-        "metadata-source" => trace_colour_source(open_owned(data, Limits::default())?),
-        "trace-source-short" => trace_source(open_shared(short(&data, words)?, Limits::default())?),
-        _ => trace_source(open_owned(data, Limits::default())?),
+        Source::Catalogue => catalogue::source(open_owned(data, Limits::default())?),
+        Source::Metadata => trace_colour_source(open_owned(data, Limits::default())?),
+        Source::ShortTrace => trace_source(open_shared(short(&data, words)?, Limits::default())?),
+        Source::Trace => trace_source(open_owned(data, Limits::default())?),
     }
 }
 
@@ -576,7 +615,7 @@ fn bench(mut data: Vec<u8>, words: &[String], seek: bool, view: View) -> Outcome
     if n == 0 || n > 1_000_000 {
         return Err("invalid iteration count".into());
     }
-    let start = Instant::now();
+    let start = Timer::start(true);
     let seek = if seek {
         Some(seek_target(words, 1)?)
     } else {
@@ -584,9 +623,8 @@ fn bench(mut data: Vec<u8>, words: &[String], seek: bool, view: View) -> Outcome
     };
     let (packets, bytes, digest) = run(&mut data, n, seek, view)?;
     let ns = start.elapsed().as_nanos();
-    println!(
-        "{{\"schema\":1,\"iterations\":{n},\"elapsed_ns\":{ns},\"packets\":{packets},\"bytes\":{bytes},\"digest\":{digest}}}"
-    );
+    let line = BenchLine::with_schema(u64::from(n), ns, (packets, bytes, digest));
+    println!("{line}");
     Ok(())
 }
 
@@ -597,8 +635,7 @@ fn bench(mut data: Vec<u8>, words: &[String], seek: bool, view: View) -> Outcome
 fn memory(mut data: Vec<u8>, words: &[String], seek: Option<bool>, view: View) -> Outcome {
     use std::io::Write;
     let mut output = io::stdout().lock();
-    output.write_all(b"TRIERGON_BEGIN_V1\n")?;
-    output.flush()?;
+    Boundary::Begin.mark(&mut output)?;
     let result = match seek {
         None => (0, 0, 0),
         Some(seek) => {
@@ -610,8 +647,7 @@ fn memory(mut data: Vec<u8>, words: &[String], seek: Option<bool>, view: View) -
             run(&mut data, 1, seek, view)?
         }
     };
-    output.write_all(b"TRIERGON_END_V1\n")?;
-    output.flush()?;
+    Boundary::End.mark(&mut output)?;
     writeln!(
         output,
         "{{\"packets\":{},\"bytes\":{},\"digest\":{}}}",

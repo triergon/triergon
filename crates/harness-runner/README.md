@@ -1,16 +1,16 @@
 # triergon-harness-runner
 
-The command line and measured loop the Rust harness workers (`playback-worker`,
-`subtitle-worker`) share. A worker mode is `{prefix}fold FILE ARGS`,
-`{prefix}bench FILE ITERATIONS ARGS`, `{prefix}memory FILE ARGS` and, where the worker
-traces, `{prefix}trace FILE ARGS`. [`Invocation`] parses it, and [`measure`] runs the
-operation as often as it asks and prints the result line the reference worker
-(`harness/reference.c`) prints for the same mode; [`measure_with`] adds named values
-the worker works out outside the operation, such as a digest of its prepared input.
-Input preparation, process start-up
-and the result line stay outside the timed loop and the allocation window; an
-operation that leaves storage charged to the preloaded input's pool fails the run.
-It is tooling, not part of the library.
+Shared command-line and reporting code for the Rust harness workers. A worker
+mode is `{prefix}fold FILE ARGS`, `{prefix}bench FILE ITERATIONS ARGS`,
+`{prefix}memory FILE ARGS` or, where the worker prints records,
+`{prefix}trace FILE ARGS`. [`Invocation`] parses the command line.
+
+[`measure`] repeats the operation, checks that each completed run releases
+its budget charges, and prints the work totals or the operation's refusal.
+[`measure_with`] appends named values computed during input preparation.
+Workers that own their measured loop use [`Timer`] and [`Boundary`] at the
+edges of the work they measure, then print their work with [`write_summary`]
+or [`BenchLine`]. [`command`] reports a worker's diagnostic and exit status.
 
 ## Usage
 

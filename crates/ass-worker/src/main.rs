@@ -16,21 +16,16 @@ use perform::{Result, Walker, parse, record_script, run_stream};
 use record::{Dump, Kind, Sink, Work};
 use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
-use std::time::Instant;
 use triergon_ass::{Options, Script};
 use triergon_core::Budget;
+use triergon_harness_runner::{
+    Boundary, Invocation, Mode as RunMode, Timer, Totals, write_summary,
+};
 
 const MAX_INPUT: u64 = 64 << 20;
 const USAGE: &str = "usage: ass-worker ass-fold FILE MODE | ass-bench FILE ITERATIONS MODE
        | ass-memory FILE MODE | ass-dump FILE MODE
   MODE: script | chunks, either followed by events";
-
-enum Action {
-    Fold,
-    Bench(u64),
-    Memory,
-    Dump,
-}
 
 /// What one operation does with the fixture.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -43,16 +38,11 @@ enum Mode {
     Events { stream: bool },
 }
 
-fn parse_args(args: &[String]) -> Result<(Action, &str, Mode)> {
+fn parse_args(args: &[String]) -> Result<(Invocation<'_>, Mode)> {
     let (action, rest) = args.split_first().ok_or(USAGE)?;
-    let (action, path, rest) = match (action.as_str(), rest) {
-        ("ass-bench", [path, count, rest @ ..]) => (Action::Bench(count.parse()?), path, rest),
-        ("ass-fold", [path, rest @ ..]) => (Action::Fold, path, rest),
-        ("ass-memory", [path, rest @ ..]) => (Action::Memory, path, rest),
-        ("ass-dump", [path, rest @ ..]) => (Action::Dump, path, rest),
-        _ => return Err(USAGE.into()),
-    };
-    let rest: Vec<&str> = rest.iter().map(String::as_str).collect();
+    let action = action.strip_prefix("ass-").ok_or(USAGE)?;
+    let invocation = Invocation::parse_mode(action, rest, Some("dump"), || USAGE)?;
+    let rest: Vec<&str> = invocation.arguments.iter().map(String::as_str).collect();
     let mode = match rest[..] {
         ["script"] => Mode::Script,
         ["chunks"] => Mode::Chunks,
@@ -60,7 +50,7 @@ fn parse_args(args: &[String]) -> Result<(Action, &str, Mode)> {
         ["chunks", "events"] => Mode::Events { stream: true },
         _ => return Err(USAGE.into()),
     };
-    Ok((action, path, mode))
+    Ok((invocation, mode))
 }
 
 /// One operation.
@@ -99,14 +89,14 @@ fn run(args: &[String]) -> Result<()> {
     {
         return render::run(args);
     }
-    let (action, path, mode) = parse_args(args)?;
-    let iterations = match action {
-        Action::Bench(count) => count,
-        _ => 1,
-    };
-    if !(1..=1_000_000).contains(&iterations) {
-        return Err(USAGE.into());
-    }
+    let (invocation, mode) = parse_args(args)?;
+    invocation.check_iterations(|| USAGE)?;
+    let Invocation {
+        mode: action,
+        path,
+        iterations,
+        ..
+    } = invocation;
     if std::fs::metadata(path)?.len() > MAX_INPUT {
         return Err("input exceeds the size bound".into());
     }
@@ -134,7 +124,7 @@ fn run(args: &[String]) -> Result<()> {
     };
     let retained = budget.used();
     let mut out = io::stdout().lock();
-    if let Action::Dump = action {
+    if action == RunMode::Trace {
         let mut dump = Dump(BufWriter::new(out));
         operation(
             &mut dump,
@@ -147,11 +137,11 @@ fn run(args: &[String]) -> Result<()> {
         )?;
         return Ok(dump.0.flush()?);
     }
-    let memory = matches!(action, Action::Memory);
+    let memory = action == RunMode::Memory;
     if memory {
-        record::mark(&mut out, record::WINDOW_BEGIN)?;
+        Boundary::Begin.mark(&mut out)?;
     }
-    let start = matches!(action, Action::Bench(_)).then(Instant::now);
+    let start = Timer::start(action == RunMode::Bench);
     let mut total = Work::default();
     for _ in 0..iterations {
         let mut work = Work::default();
@@ -169,23 +159,27 @@ fn run(args: &[String]) -> Result<()> {
             return Err("ass operation retained charged storage".into());
         }
     }
-    let elapsed = start.map_or(0, |begin| begin.elapsed().as_nanos());
+    let elapsed = start.elapsed().as_nanos();
     if memory {
-        record::mark(&mut out, record::WINDOW_END)?;
+        Boundary::End.mark(&mut out)?;
     }
-    Ok(total.print(&mut out, "ass-parse", iterations, elapsed)?)
+    Ok(write_summary(
+        &mut out,
+        "ass-parse",
+        iterations,
+        elapsed,
+        &Totals {
+            packets: total.packets,
+            bytes: total.bytes,
+            digest: total.digest,
+            refusal: None,
+        },
+    )?)
 }
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    match run(&args) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("ass-worker: {error}");
-            ExitCode::FAILURE
-        }
-    }
+    triergon_harness_runner::command(Some("ass-worker"), 1, run)
 }
 
 /// C's entry point, the one exception to the worker's `deny(unsafe_code)`

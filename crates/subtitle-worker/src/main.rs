@@ -217,18 +217,10 @@ fn input_digest(clocks: impl ExactSizeIterator<Item = (Option<i64>, Option<i64>)
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> ExitCode {
-    let words: Vec<String> = std::env::args().skip(1).collect();
-    let result = match words.first() {
-        Some(mode) if mode.starts_with(text::PREFIX) => text::run(&words),
-        _ => run(&words),
-    };
-    match result {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("subtitle-worker: {error}");
-            ExitCode::from(2)
-        }
-    }
+    triergon_harness_runner::command(Some("subtitle-worker"), 2, |words| match words.first() {
+        Some(mode) if mode.starts_with(text::PREFIX) => text::run(words),
+        _ => run(words),
+    })
 }
 
 /// C's entry point, the one exception to the worker's `deny(unsafe_code)`

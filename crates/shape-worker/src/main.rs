@@ -13,10 +13,12 @@ use std::error::Error;
 use std::io::{self, BufWriter, Write};
 use std::ops::Range;
 use std::process::ExitCode;
-use std::time::Instant;
 use triergon_core::{Budget, Bytes, WorkBudget};
 use triergon_font::compat::libass;
 use triergon_font::{Font, Limits};
+use triergon_harness_runner::{
+    Boundary, Invocation, Mode as RunMode, Timer, Totals, write_summary,
+};
 use triergon_shape::bidi::{self, BaseDirection, BidiClass, Bracket, Level, Resolver};
 use triergon_shape::compat::libass::SizedMetrics;
 use triergon_shape::{
@@ -458,23 +460,11 @@ fn read(file: &Bytes, budget: &Budget, operation: &Operation, sink: &mut impl Si
 
 // --------------------------------------------------------------------- main
 
-enum Action {
-    Fold,
-    Bench(u64),
-    Memory,
-    Dump,
-}
-
-fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
+fn parse(args: &[String]) -> Result<(Invocation<'_>, Operation)> {
     let (mode, rest) = args.split_first().ok_or(USAGE)?;
     let (operation, action) = mode.rsplit_once('-').ok_or(USAGE)?;
-    let (action, path, arguments) = match (action, rest) {
-        ("bench", [path, count, rest @ ..]) => (Action::Bench(count.parse()?), path, rest),
-        ("fold", [path, rest @ ..]) => (Action::Fold, path, rest),
-        ("memory", [path, rest @ ..]) => (Action::Memory, path, rest),
-        ("dump", [path, rest @ ..]) => (Action::Dump, path, rest),
-        _ => return Err(USAGE.into()),
-    };
+    let invocation = Invocation::parse_mode(action, rest, Some("dump"), || USAGE)?;
+    let arguments = invocation.arguments;
     let operation = match (operation, arguments) {
         ("shape", arguments) => Operation::Shape(shape_settings(Functions::OpenType, arguments)?),
         ("shape-libass", [size, arguments @ ..]) => {
@@ -492,7 +482,7 @@ fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
         ("extents", []) => Operation::Extents,
         _ => return Err(USAGE.into()),
     };
-    Ok((action, operation, path))
+    Ok((invocation, operation))
 }
 
 /// `DIRECTION SCRIPT LANGUAGE FEATURES TEXT...`.
@@ -520,14 +510,14 @@ fn shape_settings(functions: Functions, arguments: &[String]) -> Result<Settings
 }
 
 fn run(args: &[String]) -> Result<()> {
-    let (action, operation, path) = parse(args)?;
-    let iterations = match action {
-        Action::Bench(count) => count,
-        _ => 1,
-    };
-    if !(1..=1_000_000).contains(&iterations) {
-        return Err(USAGE.into());
-    }
+    let (invocation, operation) = parse(args)?;
+    invocation.check_iterations(|| USAGE)?;
+    let Invocation {
+        mode: action,
+        path,
+        iterations,
+        ..
+    } = invocation;
     let size = std::fs::metadata(path)?.len();
     if size > MAX_INPUT {
         return Err("input exceeds the size bound".into());
@@ -536,17 +526,16 @@ fn run(args: &[String]) -> Result<()> {
     let file = Bytes::try_from_vec(&budget, std::fs::read(path)?).map_err(|e| e.error)?;
     let retained = budget.used();
     let mut out = io::stdout().lock();
-    if let Action::Dump = action {
+    if action == RunMode::Trace {
         let mut dump = Dump(BufWriter::new(out));
         read(&file, &budget, &operation, &mut dump)?;
         return Ok(dump.0.flush()?);
     }
-    let memory = matches!(action, Action::Memory);
+    let memory = action == RunMode::Memory;
     if memory {
-        out.write_all(b"TRIERGON_BEGIN_V1\n")?;
-        out.flush()?;
+        Boundary::Begin.mark(&mut out)?;
     }
-    let start = matches!(action, Action::Bench(_)).then(Instant::now);
+    let start = Timer::start(action == RunMode::Bench);
     let mut total = Work::default();
     for _ in 0..iterations {
         let mut work = Work::default();
@@ -556,32 +545,27 @@ fn run(args: &[String]) -> Result<()> {
             return Err("shaping operation retained charged storage".into());
         }
     }
-    let elapsed = start.map_or(0, |begin| begin.elapsed().as_nanos());
+    let elapsed = start.elapsed().as_nanos();
     if memory {
-        out.write_all(b"TRIERGON_END_V1\n")?;
-        out.flush()?;
+        Boundary::End.mark(&mut out)?;
     }
-    writeln!(
-        out,
-        "{{\"schema\":1,\"operation\":\"{}\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
+    Ok(write_summary(
+        &mut out,
         operation.name(),
-        total.packets,
-        total.bytes,
-        total.digest,
-    )?;
-    Ok(out.flush()?)
+        iterations,
+        elapsed,
+        &Totals {
+            packets: total.packets,
+            bytes: total.bytes,
+            digest: total.digest,
+            refusal: None,
+        },
+    )?)
 }
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    match run(&args) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("shape-worker: {error}");
-            ExitCode::FAILURE
-        }
-    }
+    triergon_harness_runner::command(Some("shape-worker"), 1, run)
 }
 
 /// C's entry point, the one exception to the worker's `deny(unsafe_code)`

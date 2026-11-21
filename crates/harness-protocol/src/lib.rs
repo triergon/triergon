@@ -6,13 +6,14 @@
     unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr,
-    clippy::unwrap_used
+    clippy::unwrap_used,
+    clippy::expect_used
 )]
-// Pending: `clippy::expect_used`.
 
 pub mod digest;
 pub mod interleaved;
 pub mod md5;
+pub mod test_report;
 
 use std::{fmt::Write as _, io};
 
@@ -76,7 +77,9 @@ pub fn push_quoted(out: &mut String, value: &str) {
             '\n' => out.push_str("\\n"),
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
-            c if c < ' ' => write!(out, "\\u{:04x}", u32::from(c)).expect("String write"),
+            c if c < ' ' => {
+                let _ = write!(out, "\\u{:04x}", u32::from(c));
+            }
             c => out.push(c),
         }
     }

@@ -158,7 +158,7 @@ pub(super) fn finish(
 }
 
 /// A seek of `ogg_packets`: the track index, the target and the policy.
-pub struct Seek {
+pub(crate) struct Seek {
     track: usize,
     target: Time,
     policy: SeekPolicy,
@@ -166,7 +166,7 @@ pub struct Seek {
 
 impl Seek {
     /// `TRACK SECONDS POLICY` as `seek` takes them.
-    pub fn parse(track: &str, seconds: &str, policy: &str) -> Result<Seek, String> {
+    pub(crate) fn parse(track: &str, seconds: &str, policy: &str) -> Result<Seek, String> {
         let track = track.parse().map_err(|_| format!("track {track}"))?;
         let (whole, fraction) = seconds.split_once('.').unwrap_or((seconds, ""));
         let digits = format!("{whole}{fraction}");
@@ -302,7 +302,7 @@ fn elementary_packets<F: Format>(file: File, out: &mut impl Write) -> std::io::R
 /// Print the packets of `path` read as `format`, after the seek `seek` names (only
 /// `mov` seeks this way; Ogg seeks through [`seek`]); `Err` for an unknown format, an
 /// unreadable file or a bad seek.
-pub fn run(format: &str, path: &str, seek: Option<&str>) -> Result<(), String> {
+pub(crate) fn run(format: &str, path: &str, seek: Option<&str>) -> Result<(), String> {
     if let Some(seek) = seek
         && format != "mov"
     {
@@ -329,7 +329,7 @@ pub fn run(format: &str, path: &str, seek: Option<&str>) -> Result<(), String> {
 
 /// Print the receipt of `seek` in the Ogg file `path` and every event after it;
 /// `Err` for another format or an unreadable file.
-pub fn seek(format: &str, path: &str, seek: &Seek) -> Result<(), String> {
+pub(crate) fn seek(format: &str, path: &str, seek: &Seek) -> Result<(), String> {
     if format != "ogg" {
         return Err(format!("seek: no seeking reader for {format}"));
     }

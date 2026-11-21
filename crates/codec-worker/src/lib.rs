@@ -1,40 +1,40 @@
-//! Decoder measurement workers for the harness: the same operations as
-//! the decode build of `harness/reference.c`, through the decoders the session uses.
-//! `codec-worker` serves every operation; `codec-aac-worker` serves the AAC decode
-//! operations alone, so that a build of the AAC decoder with other features or another
-//! compiler measures nothing else.
-//!
-//! usage: `codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE |
-//! KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE [SEEK] |
-//! seek ogg FILE TRACK SECONDS POLICY`, KIND-CODEC
-//! one of video-h264, video-hevc, audio-ac3, audio-eac3, audio-aac, audio-dts, audio-flac,
-//! audio-mp3, audio-vorbis, audio-opus, audio-aac-access-units. Bench prints {iterations,
-//! elapsed_ns, packets, bytes, digest} where
-//! packets counts output pictures/audio blocks and the digest
-//! ([`triergon_harness_protocol::interleaved`]) covers the exact converted output (RGBA or
-//! interleaved stereo s16le). Configured AAC instead folds every native f32 plane.
-//! File loading and process start are outside the timed
-//! interval.
-//!
-//! The elementary-stream splitting below mirrors the reference worker's own parser
-//! (the decode build of `harness/reference.c`) so both decode the same
-//! units. It is measurement framing, not product framing:
-//! playback frames access units through `triergon-framing`. FLAC, MPEG audio, Vorbis
-//! and Opus lanes read their file format as a player does, through `AnyReader` and the
-//! session's track decoder, as the reference reads them through its demuxer.
-//! `packets` prints what a container reader emits per packet.
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
+#![warn(
+    missing_docs,
+    missing_debug_implementations,
+    unreachable_pub,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::unwrap_used,
+    clippy::expect_used
+)]
+#![expect(
+    clippy::expect_used,
+    reason = "the decoder worker preserves panic diagnostics on legacy argument and I/O failures"
+)]
+#![expect(
+    clippy::print_stdout,
+    reason = "the decoder worker speaks the harness protocol on stdout"
+)]
+#![expect(
+    clippy::print_stderr,
+    reason = "decoder refusals and the memory-mode digest are reported on stderr"
+)]
+
+// The elementary-stream splitting follows the harness parser so both decode the
+// same units. Consumers frame access units with triergon-framing.
 mod aac_access_units;
 mod isobmff_packets;
 mod packets;
 
 use std::io::Write;
-use std::time::Instant;
 use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_sequential};
 use triergon_codec::{
     AudioCodec, AudioDecoder, AudioFrame, DownmixLevels, VideoCodec, VideoDecoder,
 };
 use triergon_harness_protocol::interleaved::InterleavedDigest;
+use triergon_harness_runner::{BenchLine, Boundary, Timer};
 use triergon_pixel::letterbox::{Canvas, Scaler};
 use triergon_session::TrackDecoder;
 use triergon_session::mix::Downmix;
@@ -376,32 +376,32 @@ pub fn main(name: &str, operations: Operations) {
         std::fs::read(input).expect("input")
     };
     let mut out = Output::default();
-    match kind {
-        "bench" => {
+    match DecodeMode::parse(kind) {
+        Some(DecodeMode::Bench) => {
             let iterations: u32 = args
                 .get(3)
                 .expect("iterations")
                 .parse()
                 .expect("iterations");
-            let start = Instant::now();
+            let start = Timer::start(true);
             for _ in 0..iterations {
                 run(op, &data, &mut out);
             }
             let elapsed = start.elapsed().as_nanos();
-            println!(
-                "{{\"schema\":1,\"iterations\":{iterations},\"elapsed_ns\":{elapsed},\"packets\":{},\"bytes\":{},\"digest\":{}}}",
-                out.frames,
-                out.bytes,
-                out.digest.finish()
+            let line = BenchLine::with_schema(
+                u64::from(iterations),
+                elapsed,
+                (out.frames, out.bytes, out.digest.finish()),
             );
+            println!("{line}");
         }
-        "memory" => {
+        Some(DecodeMode::Memory) => {
             // Same observer protocol as the container workers: one whole operation between markers.
             let mut stdout = std::io::stdout().lock();
-            stdout.write_all(b"TRIERGON_BEGIN_V1\n").expect("stdout");
+            stdout.write_all(Boundary::Begin.line()).expect("stdout");
             stdout.flush().expect("stdout");
             run(op, &data, &mut out);
-            stdout.write_all(b"TRIERGON_END_V1\n").expect("stdout");
+            stdout.write_all(Boundary::End.line()).expect("stdout");
             stdout.flush().expect("stdout");
             // Equal memory work is equal units and bytes; the digest goes to stderr
             // because audio may differ within the graded 1 LSB.
@@ -413,7 +413,7 @@ pub fn main(name: &str, operations: Operations) {
             .expect("stdout");
             eprintln!("{{\"digest\":{}}}", out.digest.finish());
         }
-        "fold" => {
+        Some(DecodeMode::Fold) => {
             // One decode and its output identity, without timing: what a fuzz campaign
             // compares between builds.
             run(op, &data, &mut out);
@@ -424,7 +424,7 @@ pub fn main(name: &str, operations: Operations) {
                 out.digest.finish()
             );
         }
-        "raw" => {
+        Some(DecodeMode::Raw) => {
             out.raw = Some(std::io::BufWriter::new(
                 std::fs::File::create(args.get(3).expect("output")).expect("raw output"),
             ));
@@ -441,9 +441,28 @@ pub fn main(name: &str, operations: Operations) {
             }
             println!("}}");
         }
-        _ => {
+        None => {
             eprintln!("unknown mode {kind}");
             std::process::exit(2);
         }
+    }
+}
+
+enum DecodeMode {
+    Bench,
+    Memory,
+    Fold,
+    Raw,
+}
+
+impl DecodeMode {
+    fn parse(kind: &str) -> Option<Self> {
+        Some(match kind {
+            "bench" => Self::Bench,
+            "memory" => Self::Memory,
+            "fold" => Self::Fold,
+            "raw" => Self::Raw,
+            _ => return None,
+        })
     }
 }

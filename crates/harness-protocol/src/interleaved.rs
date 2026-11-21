@@ -17,6 +17,10 @@ pub struct InterleavedDigest {
 }
 
 impl InterleavedDigest {
+    #[expect(
+        clippy::expect_used,
+        reason = "chunks_exact supplies eight bytes per word"
+    )]
     fn block(accumulators: &mut [u64; 8], block: &[u8]) {
         for (accumulator, word) in accumulators.iter_mut().zip(block.chunks_exact(8)) {
             *accumulator = (*accumulator ^ u64::from_le_bytes(word.try_into().expect("8 bytes")))
