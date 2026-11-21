@@ -2,14 +2,12 @@
 
 The decoder vocabulary shared by the codec crates: the `VideoDecoder` and
 `AudioDecoder` traits, decoded audio as `AudioFrame` with a `ChannelLayout` of
-`Speaker`s, stream downmix metadata, the codec selectors, the Kaiser-Bessel-derived
-window the AAC and AC-3 filterbanks share, the inverse MDCT the Vorbis and Opus
-decoders share, and integer division by a run-time divisor without a library call on
-32-bit ARM. It sits in the codec layer below the nine decoders and depends only on
-[triergon-core](../core/README.md), whose storage types it re-exports for the
-decoders' budgets, and [triergon-pixel](../pixel/README.md), whose picture views (`PictureView`, `Plane`,
-`Colour`) it re-exports. It contains no decoder; sessions and workers drive the
-decoders only through these traits.
+`Speaker`s, stream downmix metadata, the codec selectors, and the windows, inverse MDCT
+and run-time integer division several decoders share. It depends only on
+[triergon-core](../core/README.md), whose storage types it re-exports for the decoders'
+budgets, and [triergon-pixel](../pixel/README.md), whose picture views (`PictureView`,
+`Plane`, `Colour`) it re-exports. It contains no decoder; sessions and workers drive the
+nine decoders only through these traits.
 
 ## Usage
 
@@ -50,12 +48,13 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 | `AudioFrame` | `sample_rate`, `layout`, `samples_per_channel`, `planes`: planar `f32`, full scale 1.0; `sample_format` (`SampleFormat::Float`, `S16`, `S32`): the decoder's native format, for mixing as FFmpeg mixes it |
 | `ChannelLayout` | speaker of each plane in plane order; `new`, `unspecified(n)` (no positions), `default_for(n)` (FFmpeg's default), `speakers`, `channels`, `position`, `mask`, `name` (FFmpeg's layout name), `EMPTY`, `CAPACITY` |
 | `layout::{vorbis_order, flac_order, native_order}` | the Vorbis/Opus and FLAC coded channel orders, and the plane each coded channel goes to |
-| `mdct::Imdct` | inverse MDCT and DCT-IV for any `N` with `N / 4` a product of 2, 3 and 5: an iterative mixed-radix FFT over split real and imaginary planes; `table_bytes` charges a budget first |
+| `mdct::Imdct` | inverse MDCT and DCT-IV for any `N` with `N / 4` a product of 2, 3 and 5: an iterative mixed-radix FFT over split real and imaginary planes; `new` charges its tables to a budget |
 | `Speaker` | loudspeaker position; `name()` gives FFmpeg's short name, `mask()` its `AV_CH_*` bit |
 | `DownmixLevels` | `center`, `surround`, `lfe` gains and `SurroundEncoding` (`None`, `Dolby`, `ProLogicII`) |
 | `DecodeFailure` | the refusing codec error's `Debug` text; `from_error` builds one |
 | `AudioFrame::try_resize` | sizes the planes, charging the frame's capacity to a decoder's `Reservation` first |
 | `kbd_window` | rising half of a Kaiser-Bessel-derived window of any length and alpha |
+| `vorbis_window` | rising slope of the power-complementary window Vorbis and CELT overlap by |
 | `divide`, `divide_u32` | `a / b` rounded towards zero for `b > 0`; on 32-bit ARM, whose baseline has no divide instruction, an exact double division instead of the library routine |
 | `Divisor` | quotient and remainder by one divisor fixed at run time, as a multiplication and a shift, exact while dividend times divisor stays below 2^31 |
 
@@ -101,9 +100,6 @@ then keeps the element order of the PCE, and so does the AAC decoder.
 - **Errors.** A refused access unit is a `DecodeFailure`; the decoder stays usable.
   Typed errors are available from each codec crate's own `decode`/`send`.
 
-## Conformance
-
 Speaker ids and names follow FFmpeg's channel layout API (`AV_CHAN_*`, `AV_CH_*`).
-The channel order is verified through the codec crates, whose output planes are
-compared with FFmpeg channel by channel; unit tests pin layout equality, masks and
-capacity. Gates: [docs/quality.md](../../docs/quality.md).
+Verification: [harness/codecs](../../harness/codecs/STATUS.md); results in
+[docs/status.md](../../docs/status.md).

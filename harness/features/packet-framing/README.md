@@ -14,10 +14,9 @@ outside this output projection. `eof: true` means the complete script was consum
 `inputs.json` holds the original script bytes as hexadecimal. `corpus.json` pins
 each input and its recorded public-API observation. `observations.json` retains
 those observations verbatim; the serial oracle derives both independent byte
-polynomials from them. A word is eight little-endian bytes. Each iteration folds
-both whole-operation digest words, including iterations with zero output packets.
-Both workers fold eight-byte groups with the same polynomial recurrence and
-process any trailing bytes individually.
+polynomials from them. Each iteration folds both whole-operation digest words, even
+with zero output packets; both workers fold eight-byte little-endian words with the
+same polynomial recurrence and any trailing bytes individually.
 
 `avc-profile-extension-inputs.json` adds the five fixed-header lengths, a
 nonempty configuration update and an extension header declaring an absent entry.
@@ -26,8 +25,9 @@ and across a flush, plus a header-only IDR. `cargo xtask framing manifest --reco
 records packet counts and whole-operation folds from the built FFmpeg worker.
 Use `--replace` to intentionally update existing input hashes or folds.
 
-The xtask entry point generates all inputs and delegates reports, paired timing,
-memory collection, isolation and gate-build checks to the shared harness. There
+`cargo xtask framing` (`--help` for options) generates all inputs and delegates
+reports, paired timing, memory collection, isolation and gate-build checks to the
+shared harness; `cargo xtask framing fixtures` writes the hash-checked inputs. There
 is no case filter. A baseline comparison cannot be an acceptance run. Workers
 preload identical padded, immutable input templates before timing and memory
 markers, and retain every output until after close. The Rust worker enables the
@@ -35,6 +35,5 @@ framing crate's `reference-trace` feature for comparison-only error codes.
 
 `provenance.json` binds the original 125 inputs and observations to their archive
 and source hashes. The two AVC input files and `corpus.json` pin the ten
-additional scripts and their observed folds. The historical measurements used
-compiler overrides. Qualification requires the pinned stable build and all 135
-cases on native Linux AArch64 and on 32-bit ARMv7.
+additional scripts and their observed folds. Qualification requires the pinned stable
+build and all 135 cases on native Linux AArch64 and on 32-bit ARMv7.
