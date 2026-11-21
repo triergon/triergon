@@ -746,6 +746,17 @@ pub fn feed_parity(
     Ok(result)
 }
 
+pub(super) fn pins_zero_output_refusal(expected: &Value) -> bool {
+    expected.get("eof") == Some(&Value::Bool(false))
+        && ["packets", "bytes", "digest"]
+            .iter()
+            .all(|key| expected.get(key) == Some(&Value::int(0)))
+}
+
+pub(super) fn reports_zero_output_refusal(output: &Value) -> bool {
+    pins_zero_output_refusal(output) && output.get("refusal").and_then(Value::as_str).is_some()
+}
+
 fn feed_result(
     left: &Value,
     right: &Value,
@@ -760,16 +771,11 @@ fn feed_result(
     let refusal = expected.get("eof") == Some(&Value::Bool(false));
     let complete = |outcome: &Value| {
         ok(outcome)
-            && data(outcome).get("eof") == Some(&Value::Bool(!refusal))
-            && (!refusal
-                || (data(outcome)
-                    .get("refusal")
-                    .and_then(Value::as_str)
-                    .is_some()
-                    && ["packets", "bytes", "digest"].iter().all(|key| {
-                        data(outcome).get(key) == Some(&Value::int(0))
-                            && expected.get(key) == Some(&Value::int(0))
-                    })))
+            && if refusal {
+                pins_zero_output_refusal(expected) && reports_zero_output_refusal(data(outcome))
+            } else {
+                data(outcome).get("eof") == Some(&Value::Bool(true))
+            }
     };
     let (candidate, reference) = (work(left), work(right));
     let (reference_flag, pinned_flag) = (flagged(data(right)), flagged(expected));
