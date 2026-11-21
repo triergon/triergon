@@ -50,9 +50,6 @@ impl core::fmt::Debug for OpusHead {
 }
 
 impl OpusHead {
-    /// Size of an `OpusHead` with channel mapping family 0.
-    pub const FAMILY_ZERO_BYTES: usize = 19;
-
     /// Parse an `OpusHead` packet (RFC 7845 section 5.1). Bytes after the mapping table
     /// are ignored, as the specification requires of a version 0 header.
     ///
@@ -199,17 +196,10 @@ impl OpusHead {
         out[21..21 + mapping.len()].copy_from_slice(mapping);
         21 + mapping.len()
     }
-
-    /// The header as an `OpusHead` packet appended to `out`.
-    pub fn to_bytes(&self, out: &mut Vec<u8>) {
-        let mut packet = [0; Self::MAX_BYTES];
-        let len = self.write(&mut packet);
-        out.extend_from_slice(&packet[..len]);
-    }
 }
 
 /// Samples per frame at 48 kHz for a TOC byte's configuration (RFC 6716 Table 2).
-pub fn frame_samples(toc: u8) -> u32 {
+fn frame_samples(toc: u8) -> u32 {
     let config = toc >> 3;
     match config {
         // SILK-only: 10, 20, 40, 60 ms.
@@ -221,13 +211,10 @@ pub fn frame_samples(toc: u8) -> u32 {
     }
 }
 
-/// Frames in a packet from its TOC and frame-count byte (RFC 6716 section 3.2).
-///
-/// # Errors
-///
-/// When the packet is empty, or is a code 3 packet without its frame-count byte or
-/// with a count of 0.
-pub fn packet_frames(packet: &[u8]) -> Result<u32> {
+/// Frames in a packet from its TOC and frame-count byte (RFC 6716 section 3.2). Fails
+/// when the packet is empty, or is a code 3 packet without its frame-count byte or with
+/// a count of 0.
+fn packet_frames(packet: &[u8]) -> Result<u32> {
     let toc = *packet.first().ok_or(Error::Truncated)?;
     Ok(match toc & 3 {
         0 => 1,
@@ -247,7 +234,8 @@ pub fn packet_frames(packet: &[u8]) -> Result<u32> {
 ///
 /// # Errors
 ///
-/// As [`packet_frames`], and when the frames add up to more than 5760 samples.
+/// When the packet is empty, is a code 3 packet without its frame-count byte or with a
+/// count of 0, or its frames add up to more than 5760 samples.
 pub fn packet_samples(packet: &[u8]) -> Result<u32> {
     let frames = packet_frames(packet)?;
     let samples = frames * frame_samples(packet[0]);
@@ -289,9 +277,9 @@ mod tests {
         );
         assert_eq!((parsed.streams, parsed.coupled_streams), (1, 1));
         assert_eq!(parsed.mapping(), &[0, 1]);
-        let mut out = Vec::new();
-        parsed.to_bytes(&mut out);
-        assert_eq!(out, head);
+        let mut out = [0; OpusHead::MAX_BYTES];
+        let len = parsed.write(&mut out);
+        assert_eq!(out[..len], head);
 
         head[9] = 6;
         head[18] = 1;

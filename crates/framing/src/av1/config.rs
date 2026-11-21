@@ -181,15 +181,6 @@ impl Av1Configuration {
     pub const fn generation(&self) -> u64 {
         self.generation
     }
-    /// `configOBUs` as coded: the record after its four fixed bytes, sharing
-    /// its allocation.
-    ///
-    /// # Errors
-    ///
-    /// None for a record a parser returned, which holds its four fixed bytes.
-    pub fn config_obu_bytes(&self) -> Result<Bytes> {
-        self.raw.slice(4..self.raw.len())
-    }
 }
 
 /// Accepts the codec record only, without the surrounding av1C box size/type.

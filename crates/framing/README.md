@@ -109,9 +109,9 @@ assert_eq!(decoder_input, [
 | `dts`: packings | `Dts14BitUnpacker`, `DtsPackedPayloadJob`, `Dts14SyncReader`, `Dts14CarrierReader`, `DtsNormalSourceReader` | 16-bit LE and 14-bit BE/LE word packings; experimental 14-bit stream acquisition |
 | `reference_trace::dts` | `ParserOperation` (`reference-trace` feature) | Raw 14-bit source frames alongside the packets, clock and byte positions of FFmpeg's `dca` parser |
 | `flac` | `stream_info`, `metadata_blocks`, `FlacStreamInfo`, `FlacFrameHeader`, `canonical_configuration` | STREAMINFO and the metadata blocks of a stream header, frame headers with their CRC-8 (RFC 9639); the canonical configuration (`fLaC` and metadata blocks) of a native header, an ISO BMFF `dfLa` payload or the first Ogg FLAC packet |
-| `opus` | `OpusHead`, `packet_samples`, `packet_frames`, `frame_samples`, `SAMPLE_RATE`, `canonical_configuration` | The identification header of RFC 7845 and its `dOps` form; packet durations from the TOC (RFC 6716); the canonical configuration (an `OpusHead` packet) |
-| `vorbis` | `VorbisHeaders`, `VorbisIdentification`, `VorbisModes`, `header_type`, `packet_blocksize`, `xiph_split`, `xiph_join`, `canonical_configuration` | The three header packets and their Xiph lacing; mode block sizes from the setup header, so a container derives packet durations without decoding |
-| `mpeg_audio` | `MpegAudioHeader`, `info_frame`, `MpegInfoFrame`, `LameTag`, `crc_ok` | The 32-bit frame header of ISO/IEC 11172-3 and 13818-3 with the MPEG-2.5 rates; Xing, Info and VBRI frames with the LAME tag; the frame CRC |
+| `opus` | `OpusHead`, `packet_samples`, `SAMPLE_RATE`, `canonical_configuration` | The identification header of RFC 7845 and its `dOps` form; packet durations from the TOC (RFC 6716); the canonical configuration (an `OpusHead` packet) |
+| `vorbis` | `VorbisHeaders`, `VorbisIdentification`, `VorbisModes`, `header_type`, `canonical_configuration` | The three header packets and their Xiph lacing; mode block sizes from the setup header, so a container derives packet durations without decoding |
+| `mpeg_audio` | `MpegAudioHeader`, `info_frame`, `MpegInfoFrame`, `LameTag` | The 32-bit frame header of ISO/IEC 11172-3 and 13818-3 with the MPEG-2.5 rates; Xing, Info and VBRI frames with the LAME tag |
 
 With the DTS packet corpus in `TRIERGON_DTS_CORPUS` and the pinned `ffmpeg`
 and `ffprobe` on `PATH`, run

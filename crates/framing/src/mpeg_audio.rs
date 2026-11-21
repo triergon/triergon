@@ -4,7 +4,6 @@
 //! ISO/IEC 13818-3 low sampling frequency extension, including the unofficial MPEG-2.5
 //! rates. [`info_frame`] reads a Xing or Info frame (with its LAME tag) or a VBRI
 //! frame: a valid frame whose payload describes the stream instead of carrying audio.
-use triergon_core::{Error, Result};
 
 /// The MPEG audio version a header names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -343,20 +342,6 @@ pub fn info_frame(frame: &[u8], header: &MpegAudioHeader) -> Option<MpegInfoFram
         });
     }
     None
-}
-
-/// Check the CRC of a frame whose header says it carries one (ISO/IEC 11172-3 2.4.3.1):
-/// the CRC covers the last two header bytes and the first `protected` bytes after it.
-///
-/// # Errors
-///
-/// When `frame` is shorter than the header, the CRC and `protected` bytes.
-pub fn crc_ok(frame: &[u8], protected: usize) -> Result<bool> {
-    let stored = frame.get(4..6).ok_or(Error::Truncated)?;
-    let body = frame.get(6..6 + protected).ok_or(Error::Truncated)?;
-    let crc = triergon_bitstream::crc::crc16_a52(0xffff, &frame[2..4]);
-    let crc = triergon_bitstream::crc::crc16_a52(crc, body);
-    Ok(crc == u16::from_be_bytes([stored[0], stored[1]]))
 }
 
 #[cfg(test)]

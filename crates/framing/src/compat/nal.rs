@@ -25,10 +25,7 @@ use crate::{
         AvcConfigArray, AvcConfigFields, AvcConfigLimits, AvcConfigNal, AvcConfigParser,
         AvcConfigSource, AvcConfiguration,
     },
-    hevc::{
-        HvcConfigArray, HvcConfigFields, HvcConfigLimits, HvcConfigNal, HvcConfigParser,
-        HvcConfigSource, HvcConfiguration,
-    },
+    hevc::{HvcConfigFields, HvcConfigLimits, HvcConfigParser, HvcConfigSource, HvcConfiguration},
     nal::LengthSize,
 };
 use std::sync::atomic::AtomicBool;
@@ -122,13 +119,6 @@ impl ReceiverAvcConfiguration {
     pub(crate) const fn refusal(&self) -> NalConfigurationRefusal {
         self.refusal
     }
-    /// The record's arrays in order: SPS, PPS and, when the record holds a
-    /// complete extension header, SPS extension.
-    pub fn arrays(
-        &self,
-    ) -> impl ExactSizeIterator<Item = AvcConfigArray<'_>> + DoubleEndedIterator + '_ {
-        self.inner.arrays()
-    }
     /// The array at `index`; `None` past the last.
     pub fn array(&self, index: usize) -> Option<AvcConfigArray<'_>> {
         self.inner.array(index)
@@ -138,18 +128,9 @@ impl ReceiverAvcConfiguration {
     pub fn trailing_bytes(&self) -> &[u8] {
         self.inner.trailing_bytes()
     }
-    /// The NAL unit at `index`, counted over all arrays in record order; `None`
-    /// past the last.
-    pub fn nal(&self, index: usize) -> Option<AvcConfigNal<'_>> {
-        self.inner.nal(index)
-    }
     /// NAL units in all arrays together.
     pub fn nal_count(&self) -> usize {
         self.inner.nal_count()
-    }
-    /// Arrays in the record: 2, or 3 with a complete extension header.
-    pub fn array_count(&self) -> usize {
-        self.inner.array_count()
     }
 
     /// The whole record as it was given.
@@ -195,10 +176,6 @@ impl ReceiverHevcConfiguration {
     pub(crate) fn record(&self) -> &HvcConfiguration {
         &self.inner
     }
-    /// The array at `index`; `None` past the last.
-    pub fn array(&self, index: usize) -> Option<HvcConfigArray<'_>> {
-        self.inner.array(index)
-    }
     /// The record's bytes after its last array.
     pub fn opaque_suffix(&self) -> &[u8] {
         self.inner.opaque_suffix()
@@ -208,18 +185,9 @@ impl ReceiverHevcConfiguration {
     pub fn syntax_issues(&self) -> u32 {
         self.inner.syntax_issues()
     }
-    /// The NAL unit at `index`, counted over all arrays in record order; `None`
-    /// past the last.
-    pub fn nal(&self, index: usize) -> Option<HvcConfigNal<'_>> {
-        self.inner.nal(index)
-    }
     /// NAL units in all arrays together.
     pub fn nal_count(&self) -> usize {
         self.inner.nal_count()
-    }
-    /// Arrays in the record, `numOfArrays`.
-    pub fn array_count(&self) -> usize {
-        self.inner.array_count()
     }
 
     /// The whole record as it was given.
@@ -234,18 +202,6 @@ impl ReceiverHevcConfiguration {
     /// `lengthSizeMinusOne + 1`: 1 to 4 bytes, three among them.
     pub fn observed_length_size(&self) -> LengthSize {
         self.inner.length_size()
-    }
-    /// The record's arrays in order, whatever NAL unit type each declares.
-    pub fn arrays(
-        &self,
-    ) -> impl ExactSizeIterator<Item = HvcConfigArray<'_>> + DoubleEndedIterator + '_ {
-        self.inner.arrays()
-    }
-    /// The NAL units of all arrays in record order.
-    pub fn nals(
-        &self,
-    ) -> impl ExactSizeIterator<Item = HvcConfigNal<'_>> + DoubleEndedIterator + '_ {
-        self.inner.nals()
     }
     /// [`Error::Unsupported`], with which [`HvcConfigParser`] refuses a
     /// three-byte NAL length; `None` for a record it accepts.
@@ -364,13 +320,8 @@ impl ReceiverAvcConfigParser {
         cancel: &AtomicBool,
     ) -> Result<BuildStep<ReceiverAvcConfiguration>> {
         let mut ready = None;
-        match self.step_into(work, cancel, &mut ready)? {
-            ConfigProgress::Ready => Ok(BuildStep::Ready(
-                ready.ok_or(Error::Invalid("missing published configuration"))?,
-            )),
-            ConfigProgress::Yield => Ok(BuildStep::Yield),
-            ConfigProgress::Complete => Ok(BuildStep::Complete),
-        }
+        self.step_into(work, cancel, &mut ready)?
+            .into_build_step(ready)
     }
 
     /// Publishes into an empty caller-provided slot. Occupied slots are rejected
@@ -463,13 +414,8 @@ impl ReceiverHevcConfigParser {
         cancel: &AtomicBool,
     ) -> Result<BuildStep<ReceiverHevcConfiguration>> {
         let mut ready = None;
-        match self.step_into(work, cancel, &mut ready)? {
-            ConfigProgress::Ready => Ok(BuildStep::Ready(
-                ready.ok_or(Error::Invalid("missing published configuration"))?,
-            )),
-            ConfigProgress::Yield => Ok(BuildStep::Yield),
-            ConfigProgress::Complete => Ok(BuildStep::Complete),
-        }
+        self.step_into(work, cancel, &mut ready)?
+            .into_build_step(ready)
     }
 
     /// Publishes into an empty caller-provided slot. Occupied slots are rejected

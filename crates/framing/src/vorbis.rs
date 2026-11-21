@@ -1,9 +1,9 @@
-//! Vorbis header packets and Xiph lacing.
+//! Vorbis header packets.
 //!
 //! A Vorbis stream starts with three header packets (Vorbis I section 4.2): the
 //! identification header ([`VorbisIdentification`]), the comment header and the setup
 //! header. Ogg carries them as its first three packets; Matroska and the canonical
-//! decoder configuration join them with Xiph lacing ([`xiph_split`], [`xiph_join`]).
+//! decoder configuration join them with Xiph lacing ([`VorbisHeaders::from_laced`]).
 //!
 //! [`VorbisModes`] recovers the block size of each mode from the setup header, and
 //! [`VorbisModes::block`] reads which block an audio packet codes, so a container can
@@ -209,16 +209,6 @@ impl VorbisModes {
     }
 }
 
-/// The block size an audio packet codes, from the identification header's block sizes
-/// and the setup header's modes.
-///
-/// # Errors
-///
-/// As [`VorbisModes::block`].
-pub fn packet_blocksize(modes: &VorbisModes, blocksize: [u16; 2], packet: &[u8]) -> Result<u16> {
-    Ok(modes.block(packet)?.size(blocksize))
-}
-
 /// The type byte a Vorbis header packet starts with: 1, 3 or 5 for identification,
 /// comment and setup.
 pub fn header_type(packet: &[u8]) -> Option<u8> {
@@ -228,15 +218,12 @@ pub fn header_type(packet: &[u8]) -> Option<u8> {
     }
 }
 
-/// Split Xiph-laced packets (Matroska CodecPrivate for `A_VORBIS`): a byte holding the
+/// Splits Xiph-laced packets (Matroska CodecPrivate for `A_VORBIS`): a byte holding the
 /// packet count minus one, the size of each packet but the last as runs of 255 ending in
 /// a smaller byte, then the packets. `out` receives the range of each packet in `bytes`,
-/// the last one reaching to the end.
-///
-/// # Errors
-///
-/// When `bytes` is empty or ends inside the sizes, or the sizes pass its end.
-pub fn xiph_split(bytes: &[u8], out: &mut Vec<core::ops::Range<usize>>) -> Result<()> {
+/// the last one reaching to the end. Fails when `bytes` is empty or ends inside the
+/// sizes, or the sizes pass its end.
+fn xiph_split(bytes: &[u8], out: &mut Vec<core::ops::Range<usize>>) -> Result<()> {
     out.clear();
     let count = usize::from(*bytes.first().ok_or(Error::Truncated)?) + 1;
     let mut at = 1;
@@ -260,35 +247,6 @@ pub fn xiph_split(bytes: &[u8], out: &mut Vec<core::ops::Range<usize>>) -> Resul
         at = end;
     }
     out.push(at..bytes.len());
-    Ok(())
-}
-
-/// Join packets with Xiph lacing, the inverse of [`xiph_split`]. At most 256 packets.
-/// The laced bytes are appended to `out`.
-///
-/// # Errors
-///
-/// When `packets` is empty or holds more than 256 packets; `out` is then untouched.
-pub fn xiph_join(packets: &[&[u8]], out: &mut Vec<u8>) -> Result<()> {
-    let Some((last, rest)) = packets.split_last() else {
-        return Err(Error::Invalid("no packets to lace"));
-    };
-    if packets.len() > 256 {
-        return Err(Error::Invalid("more than 256 laced packets"));
-    }
-    out.push((packets.len() - 1) as u8);
-    for packet in rest {
-        let mut size = packet.len();
-        while size >= 255 {
-            out.push(255);
-            size -= 255;
-        }
-        out.push(size as u8);
-    }
-    for packet in rest {
-        out.extend_from_slice(packet);
-    }
-    out.extend_from_slice(last);
     Ok(())
 }
 
@@ -347,13 +305,31 @@ pub fn canonical_configuration(configuration: &[u8], out: &mut BudgetVec<u8>) ->
 mod tests {
     use super::*;
 
+    /// Joins packets with Xiph lacing, the inverse of [`xiph_split`].
+    fn xiph_join(packets: &[&[u8]]) -> Vec<u8> {
+        let (last, rest) = packets.split_last().unwrap();
+        let mut out = vec![u8::try_from(rest.len()).unwrap()];
+        for packet in rest {
+            let mut size = packet.len();
+            while size >= 255 {
+                out.push(255);
+                size -= 255;
+            }
+            out.push(size as u8);
+        }
+        for packet in rest {
+            out.extend_from_slice(packet);
+        }
+        out.extend_from_slice(last);
+        out
+    }
+
     #[test]
     fn xiph_lacing_round_trips() {
         let a = vec![1u8; 30];
         let b = vec![3u8; 600];
         let c = vec![5u8; 7];
-        let mut laced = Vec::new();
-        xiph_join(&[&a, &b, &c], &mut laced).unwrap();
+        let laced = xiph_join(&[&a, &b, &c]);
         assert_eq!(&laced[..5], &[2, 30, 255, 255, 90]);
         let mut ranges = Vec::new();
         xiph_split(&laced, &mut ranges).unwrap();
@@ -404,7 +380,7 @@ mod tests {
             }
         );
         assert_eq!(block.samples_after(256, [256, 2048]), 576);
-        assert_eq!(packet_blocksize(&modes, [256, 2048], &[0]).unwrap(), 256);
+        assert_eq!(modes.block(&[0]).unwrap().size([256, 2048]), 256);
         assert!(modes.block(&[1]).is_err());
         assert!(modes.block(&[]).is_err());
 
