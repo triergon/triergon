@@ -6,8 +6,6 @@ mod bit_allocation;
 mod block;
 mod bsi;
 mod coupling;
-#[cfg(feature = "debug-dump")]
-mod debug_dump;
 mod exponents;
 mod mantissas;
 mod reconstruct;
@@ -441,8 +439,6 @@ impl Substream {
                 }
             }
             self.reconstruct(rng, noise);
-            #[cfg(feature = "debug-dump")]
-            self.debug_dump_block();
             if *quirk_armed && (1..self.nfchans).any(|ch| self.blksw[ch] != self.blksw[0]) {
                 *quirk_armed = false;
                 self.ffmpeg_first_mixed_transform_quirk();

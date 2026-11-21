@@ -11,9 +11,5 @@ publish.workspace = true
 triergon-bitstream = { path = "../bitstream" }
 triergon-codec = { path = "../codec" }
 
-[features]
-# Analysis aid for harness/codecs/ac3 scripts (per-block dumps); never needed in production.
-debug-dump = []
-
 [lints]
 workspace = true
