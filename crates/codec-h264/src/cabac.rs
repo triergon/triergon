@@ -12,7 +12,7 @@ pub(crate) struct Cabac<'a> {
     /// Payload bytes of the slice, for the overrun check.
     end: usize,
     /// Context states: (pStateIdx << 1) | valMPS.
-    pub ctx: [u8; NUM_CTX],
+    pub(crate) ctx: [u8; NUM_CTX],
 }
 
 #[inline(always)]
@@ -28,37 +28,37 @@ fn decide_nr(e: &mut Engine<'_>, ctx: &mut [u8; NUM_CTX], ctx_idx: usize) -> u32
 
 /// Context index offsets (Table 9-34).
 pub(crate) mod off {
-    pub const MB_TYPE_I: usize = 3;
-    pub const MB_SKIP_P: usize = 11;
-    pub const MB_TYPE_P: usize = 14;
-    pub const MB_TYPE_P_INTRA: usize = 17;
-    pub const SUB_MB_P: usize = 21;
-    pub const MB_SKIP_B: usize = 24;
-    pub const MB_TYPE_B: usize = 27;
-    pub const MB_TYPE_B_INTRA: usize = 32;
-    pub const SUB_MB_B: usize = 36;
-    pub const MVD_X: usize = 40;
-    pub const MVD_Y: usize = 47;
-    pub const REF_IDX: usize = 54;
-    pub const QP_DELTA: usize = 60;
-    pub const CHROMA_PRED: usize = 64;
-    pub const PREV_INTRA: usize = 68;
-    pub const REM_INTRA: usize = 69;
-    pub const FIELD: usize = 70;
-    pub const CBP_LUMA: usize = 73;
-    pub const CBP_CHROMA: usize = 77;
-    pub const CBF: usize = 85;
-    pub const SIG_FRAME: usize = 105;
-    pub const LAST_FRAME: usize = 166;
-    pub const ABS_LEVEL: usize = 227;
-    pub const SIG_FIELD: usize = 277;
-    pub const LAST_FIELD: usize = 338;
-    pub const T8X8: usize = 399;
-    pub const SIG8_FRAME: usize = 402;
-    pub const LAST8_FRAME: usize = 417;
-    pub const ABS8: usize = 426;
-    pub const SIG8_FIELD: usize = 436;
-    pub const LAST8_FIELD: usize = 451;
+    pub(crate) const MB_TYPE_I: usize = 3;
+    pub(crate) const MB_SKIP_P: usize = 11;
+    pub(crate) const MB_TYPE_P: usize = 14;
+    pub(crate) const MB_TYPE_P_INTRA: usize = 17;
+    pub(crate) const SUB_MB_P: usize = 21;
+    pub(crate) const MB_SKIP_B: usize = 24;
+    pub(crate) const MB_TYPE_B: usize = 27;
+    pub(crate) const MB_TYPE_B_INTRA: usize = 32;
+    pub(crate) const SUB_MB_B: usize = 36;
+    pub(crate) const MVD_X: usize = 40;
+    pub(crate) const MVD_Y: usize = 47;
+    pub(crate) const REF_IDX: usize = 54;
+    pub(crate) const QP_DELTA: usize = 60;
+    pub(crate) const CHROMA_PRED: usize = 64;
+    pub(crate) const PREV_INTRA: usize = 68;
+    pub(crate) const REM_INTRA: usize = 69;
+    pub(crate) const FIELD: usize = 70;
+    pub(crate) const CBP_LUMA: usize = 73;
+    pub(crate) const CBP_CHROMA: usize = 77;
+    pub(crate) const CBF: usize = 85;
+    pub(crate) const SIG_FRAME: usize = 105;
+    pub(crate) const LAST_FRAME: usize = 166;
+    pub(crate) const ABS_LEVEL: usize = 227;
+    pub(crate) const SIG_FIELD: usize = 277;
+    pub(crate) const LAST_FIELD: usize = 338;
+    pub(crate) const T8X8: usize = 399;
+    pub(crate) const SIG8_FRAME: usize = 402;
+    pub(crate) const LAST8_FRAME: usize = 417;
+    pub(crate) const ABS8: usize = 426;
+    pub(crate) const SIG8_FIELD: usize = 436;
+    pub(crate) const LAST8_FIELD: usize = 451;
 }
 
 /// ctxBlockCatOffset for coded_block_flag, significant/last and abs level (Table 9-40), cats 0..4.

@@ -7,8 +7,8 @@ pub(crate) const RBSP_PAD: usize = 16;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct NalHeader {
-    pub nal_ref_idc: u8,
-    pub nal_unit_type: u8,
+    pub(crate) nal_ref_idc: u8,
+    pub(crate) nal_unit_type: u8,
 }
 
 /// `None` for an empty unit or a set forbidden_zero_bit.

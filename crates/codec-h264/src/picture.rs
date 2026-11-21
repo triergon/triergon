@@ -37,13 +37,13 @@ pub(crate) fn array_mut<T, const N: usize>(s: &mut [T], at: usize) -> &mut [T; N
 /// their charge, so output pictures sharing the buffer keep it charged.
 #[derive(Debug)]
 pub(crate) struct FrameBuf {
-    pub y: BudgetVec<u8>,
-    pub cb: BudgetVec<u8>,
-    pub cr: BudgetVec<u8>,
-    pub width: usize,
-    pub height: usize,
-    pub cwidth: usize,
-    pub cheight: usize,
+    pub(crate) y: BudgetVec<u8>,
+    pub(crate) cb: BudgetVec<u8>,
+    pub(crate) cr: BudgetVec<u8>,
+    pub(crate) width: usize,
+    pub(crate) height: usize,
+    pub(crate) cwidth: usize,
+    pub(crate) cheight: usize,
 }
 
 impl FrameBuf {
@@ -93,15 +93,15 @@ impl FrameBuf {
 /// `mb * 4 + 8x8 index`.
 #[derive(Debug)]
 pub(crate) struct Motion {
-    pub mv: [BudgetVec<[i16; 2]>; 2],
+    pub(crate) mv: [BudgetVec<[i16; 2]>; 2],
     /// Only the corner 4x4 block of each 8x8 is kept (a stored reference of a frame-only
     /// stream with direct_8x8_inference_flag, whose co-located blocks are always corners).
-    pub corners: bool,
-    pub ref_idx: [BudgetVec<i8>; 2],
-    pub ref_id: [BudgetVec<i32>; 2],
+    pub(crate) corners: bool,
+    pub(crate) ref_idx: [BudgetVec<i8>; 2],
+    pub(crate) ref_id: [BudgetVec<i32>; 2],
     /// Per MB: bit 0 intra, bit 1 field macroblock.
-    pub mb_flags: BudgetVec<u8>,
-    pub mbs: usize,
+    pub(crate) mb_flags: BudgetVec<u8>,
+    pub(crate) mbs: usize,
 }
 
 pub(crate) const MBF_INTRA: u8 = 1;
@@ -200,9 +200,9 @@ pub(crate) enum Coding {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct OutputInfo {
-    pub crop: (u32, u32, u32, u32),
-    pub sar: (u32, u32),
-    pub colour: crate::ColourDescription,
+    pub(crate) crop: (u32, u32, u32, u32),
+    pub(crate) sar: (u32, u32),
+    pub(crate) colour: crate::ColourDescription,
 }
 
 /// The contents of a frame buffer of the decoded picture buffer: a frame, a complementary
@@ -212,23 +212,23 @@ pub(crate) struct OutputInfo {
 pub(crate) struct FrameStore {
     /// The frame buffer's number. A picture takes the free frame buffer with the lowest
     /// number, so buffers, and the samples they keep, are reused in a fixed order.
-    pub number: usize,
+    pub(crate) number: usize,
     /// Shared with output pictures; the decoder writes only into an unshared buffer. None
     /// before first use and while the store's picture is being decoded.
-    pub buf: Option<std::sync::Arc<FrameBuf>>,
+    pub(crate) buf: Option<std::sync::Arc<FrameBuf>>,
     /// Frame motion in `motion[0]`, or top / bottom field motion in `motion[0]` / `motion[1]`.
-    pub motion: [Motion; 2],
-    pub uid: u32,
+    pub(crate) motion: [Motion; 2],
+    pub(crate) uid: u32,
     /// Decoded fields: bit 0 top, bit 1 bottom (3 = frame or both fields).
-    pub fields: u8,
-    pub coding: Coding,
-    pub frame_num: u32,
-    pub long_term_frame_idx: u32,
-    pub poc: [i32; 2],
-    pub pts: Option<i64>,
-    pub non_existing: bool,
-    pub info: OutputInfo,
-    pub idr: bool,
+    pub(crate) fields: u8,
+    pub(crate) coding: Coding,
+    pub(crate) frame_num: u32,
+    pub(crate) long_term_frame_idx: u32,
+    pub(crate) poc: [i32; 2],
+    pub(crate) pts: Option<i64>,
+    pub(crate) non_existing: bool,
+    pub(crate) info: OutputInfo,
+    pub(crate) idr: bool,
 }
 
 impl FrameStore {
@@ -263,12 +263,12 @@ impl FrameStore {
 /// An entry of RefPicList0/1: a frame (parity 0) or a field (1 top, 2 bottom) of a DPB entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct RefPic {
-    pub idx: usize,
-    pub parity: u8,
-    pub poc: i32,
-    pub long: bool,
+    pub(crate) idx: usize,
+    pub(crate) parity: u8,
+    pub(crate) poc: i32,
+    pub(crate) long: bool,
     /// Identity used to compare reference pictures (uid << 2 | structure code).
-    pub id: i32,
+    pub(crate) id: i32,
 }
 
 pub(crate) fn ref_id(uid: u32, parity: u8) -> i32 {

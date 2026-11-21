@@ -10,11 +10,11 @@ use crate::picture::{array, array_mut};
 /// A view of one reference plane: a frame, or one field of a frame (stride doubled).
 #[derive(Clone, Copy)]
 pub(crate) struct PlaneRef<'a> {
-    pub data: &'a [u8],
-    pub base: usize,
-    pub stride: usize,
-    pub w: i32,
-    pub h: i32,
+    pub(crate) data: &'a [u8],
+    pub(crate) base: usize,
+    pub(crate) stride: usize,
+    pub(crate) w: i32,
+    pub(crate) h: i32,
 }
 
 impl<'a> PlaneRef<'a> {

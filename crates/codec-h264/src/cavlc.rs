@@ -82,11 +82,11 @@ impl Vlc {
 
 pub(crate) struct CavlcTables {
     /// coeff_token for nC ranges 0..2, 2..4, 4..8, >=8, -1 (chroma DC 4:2:0). Symbol = tc * 4 + t1.
-    pub coeff_token: [Vlc; 5],
-    pub total_zeros: [Vlc; 15],
-    pub total_zeros_dc: [Vlc; 3],
+    pub(crate) coeff_token: [Vlc; 5],
+    pub(crate) total_zeros: [Vlc; 15],
+    pub(crate) total_zeros_dc: [Vlc; 3],
     #[cfg_attr(not(test), allow(dead_code))]
-    pub run_before: [Vlc; 7],
+    pub(crate) run_before: [Vlc; 7],
 }
 
 fn cvt3(t: &[(u32, u8, u8)]) -> Vec<(u32, u8, u16)> {

@@ -73,26 +73,26 @@ pub(crate) const CBF_ALL: u32 = 0x07FF_FFFF;
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct MbInfo {
     /// Slice number + 1 within the picture; 0 = not (yet) decoded.
-    pub slice: u16,
-    pub kind: Kind,
-    pub field: bool,
-    pub t8x8: bool,
+    pub(crate) slice: u16,
+    pub(crate) kind: Kind,
+    pub(crate) field: bool,
+    pub(crate) t8x8: bool,
     /// coded_block_pattern (luma bits 0..3, chroma in bits 4..5). I_PCM stores 0x2F.
-    pub cbp: u8,
-    pub qp: i8,
-    pub qpc: [i8; 2],
-    pub chroma_mode: u8,
+    pub(crate) cbp: u8,
+    pub(crate) qp: i8,
+    pub(crate) qpc: [i8; 2],
+    pub(crate) chroma_mode: u8,
     /// Bit k set: 8x8 partition k is predicted in direct mode (B_Skip / B_Direct / B_Direct_8x8).
-    pub direct8: u8,
+    pub(crate) direct8: u8,
     /// Intra 4x4 / 8x8 prediction modes per raster 4x4 block (2 = DC for other MB kinds).
-    pub modes: [i8; 16],
+    pub(crate) modes: [i8; 16],
     /// TotalCoeff per 4x4 block: luma raster 0..15, Cb 16..19, Cr 20..23.
-    pub nz: [u8; 24],
-    pub cbf: u32,
+    pub(crate) nz: [u8; 24],
+    pub(crate) cbf: u32,
     /// |mvd| per raster 4x4 block, [list][blk][comp], saturated at 127.
-    pub mvd: [[[u8; 2]; 16]; 2],
+    pub(crate) mvd: [[[u8; 2]; 16]; 2],
     /// Non-zero transform coefficient flags per luma 4x4 (for deblocking bS = 2).
-    pub nzmask: u16,
+    pub(crate) nzmask: u16,
 }
 
 impl Default for MbInfo {
@@ -119,7 +119,7 @@ impl Default for MbInfo {
 /// Per-slice parameters needed after the slice is parsed (deblocking).
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct SliceDbk {
-    pub disable_idc: u32,
-    pub alpha_off: i32,
-    pub beta_off: i32,
+    pub(crate) disable_idc: u32,
+    pub(crate) alpha_off: i32,
+    pub(crate) beta_off: i32,
 }

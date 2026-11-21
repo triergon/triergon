@@ -195,12 +195,12 @@ pub(crate) fn chroma_dc_dequant(c: &mut [i32; 4], qp: i32, ls00: i32) {
 /// Neighbour samples for a 4x4 / 8x8 block: `top[0..n*2]` = p[x,-1], `left[0..n]` = p[-1,y],
 /// `tl` = p[-1,-1], with availability flags. Top-right substitution is done by the caller.
 pub(crate) struct Edge<const N: usize, const N2: usize> {
-    pub top: [u8; N2],
-    pub left: [u8; N],
-    pub tl: u8,
-    pub has_top: bool,
-    pub has_left: bool,
-    pub has_tl: bool,
+    pub(crate) top: [u8; N2],
+    pub(crate) left: [u8; N],
+    pub(crate) tl: u8,
+    pub(crate) has_top: bool,
+    pub(crate) has_left: bool,
+    pub(crate) has_tl: bool,
 }
 
 #[inline(always)]

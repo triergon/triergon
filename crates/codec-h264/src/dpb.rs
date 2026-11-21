@@ -71,13 +71,13 @@ impl Stored for Entry<'_, FrameStore> {
 /// POC decoding state carried between pictures.
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct PocState {
-    pub prev_poc_msb: i32,
-    pub prev_poc_lsb: i32,
-    pub prev_frame_num_offset: i32,
-    pub prev_frame_num: u32,
-    pub prev_ref_frame_num: u32,
+    pub(crate) prev_poc_msb: i32,
+    pub(crate) prev_poc_lsb: i32,
+    pub(crate) prev_frame_num_offset: i32,
+    pub(crate) prev_frame_num: u32,
+    pub(crate) prev_ref_frame_num: u32,
     /// The previous picture in decoding order had mmco5.
-    pub prev_mmco5: bool,
+    pub(crate) prev_mmco5: bool,
 }
 
 /// Compute TopFieldOrderCnt / BottomFieldOrderCnt for the current picture (8.2.1).
@@ -174,10 +174,10 @@ pub(crate) fn compute_poc(sps: &Sps, sh: &SliceHeader, st: &PocState) -> ([i32; 
 
 /// Picture number helpers for the current picture.
 pub(crate) struct PicNums {
-    pub frame_num: u32,
-    pub max_frame_num: u32,
+    pub(crate) frame_num: u32,
+    pub(crate) max_frame_num: u32,
     /// 0 frame, 1 top, 2 bottom.
-    pub structure: u8,
+    pub(crate) structure: u8,
 }
 
 impl PicNums {
@@ -543,9 +543,9 @@ pub(crate) fn sliding_window(
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct NewMarking {
     /// The frame's, or the field's, marking.
-    pub marking: Marking,
+    pub(crate) marking: Marking,
     /// LongTermFrameIdx, once one is assigned.
-    pub long_term_frame_idx: Option<u32>,
+    pub(crate) long_term_frame_idx: Option<u32>,
 }
 
 /// The current picture's place in marking: not stored yet, or the second field of the

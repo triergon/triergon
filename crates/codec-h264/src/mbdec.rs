@@ -16,32 +16,32 @@ fn inval(s: &'static str) -> SliceError {
 
 /// Parsed macroblock syntax (scratch, reused).
 pub(crate) struct MbData {
-    pub kind: Kind,
-    pub i16_mode: u8,
-    pub cbp: u8,
-    pub t8x8: bool,
-    pub chroma_mode: u8,
-    pub modes: [i8; 16],
+    pub(crate) kind: Kind,
+    pub(crate) i16_mode: u8,
+    pub(crate) cbp: u8,
+    pub(crate) t8x8: bool,
+    pub(crate) chroma_mode: u8,
+    pub(crate) modes: [i8; 16],
     /// prev_intra_pred_mode_flag / rem per block (None = predicted).
-    pub rem: [Option<u8>; 16],
-    pub sub: [u8; 4],
+    pub(crate) rem: [Option<u8>; 16],
+    pub(crate) sub: [u8; 4],
     /// Prediction kind per partition (16x16: [0]; 16x8/8x16: [0..2]; 8x8: per 8x8, 0 = direct).
-    pub part_pred: [u8; 4],
-    pub ref_idx: [[i8; 4]; 2],
+    pub(crate) part_pred: [u8; 4],
+    pub(crate) ref_idx: [[i8; 4]; 2],
     /// mvd per partition slot: [list][8x8 index * 4 + sub partition].
-    pub mvd: [[[i32; 2]; 16]; 2],
+    pub(crate) mvd: [[[i32; 2]; 16]; 2],
     /// Transform coefficient levels: luma 4x4 block r (raster) at r*16 (raster in block) or 8x8
     /// block k at k*64; Cb 4x4 k at 256 + k*16, Cr at 320 + k*16.
-    pub coef: [i32; 384],
+    pub(crate) coef: [i32; 384],
     /// Luma DC (raster of 4x4 blocks), Cb DC 16..20, Cr DC 20..24.
-    pub dc: [i32; 24],
+    pub(crate) dc: [i32; 24],
     /// Bits: luma 4x4 raster with coefficients (0..15), chroma AC 16..23.
-    pub blk: u32,
+    pub(crate) blk: u32,
     /// Luma 8x8 blocks with coefficients (transform 8x8).
-    pub b8: u8,
-    pub total: [u8; 24],
-    pub cbf: u32,
-    pub qp_delta: i32,
+    pub(crate) b8: u8,
+    pub(crate) total: [u8; 24],
+    pub(crate) cbf: u32,
+    pub(crate) qp_delta: i32,
 }
 
 /// te(v) (clause 9.1): ue(v) for a range above 1, otherwise the inverted single bit.

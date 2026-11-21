@@ -24,35 +24,35 @@ pub(crate) type WeightTable = [[[(i32, i32); 3]; 32]; 2];
 
 /// Immutable per-slice decoding parameters.
 pub(crate) struct SliceCtx {
-    pub sh: SliceHeader,
-    pub slice_num: u16,
-    pub cabac: bool,
-    pub constrained_intra: bool,
-    pub t8x8_mode: bool,
-    pub chroma: bool,
-    pub chroma_qp_off: [i32; 2],
+    pub(crate) sh: SliceHeader,
+    pub(crate) slice_num: u16,
+    pub(crate) cabac: bool,
+    pub(crate) constrained_intra: bool,
+    pub(crate) t8x8_mode: bool,
+    pub(crate) chroma: bool,
+    pub(crate) chroma_qp_off: [i32; 2],
     /// LevelScale4x4: [iYCbCr + 3 * inter][qP % 6][raster].
-    pub ls4: Box<[[[i32; 16]; 6]; 6]>,
+    pub(crate) ls4: Box<[[[i32; 16]; 6]; 6]>,
     /// LevelScale8x8: [inter][qP % 6][raster].
-    pub ls8: Box<[[[i32; 64]; 6]; 2]>,
-    pub ref_list: [Vec<RefPic>; 2],
-    pub direct_8x8_inference: bool,
-    pub wp: Wp,
+    pub(crate) ls8: Box<[[[i32; 64]; 6]; 2]>,
+    pub(crate) ref_list: [Vec<RefPic>; 2],
+    pub(crate) direct_8x8_inference: bool,
+    pub(crate) wp: Wp,
     /// Explicit weights: [list][refIdxWP] = (luma w, o), (cb w, o), (cr w, o).
-    pub weights: Box<WeightTable>,
-    pub log_wd: [u32; 2],
+    pub(crate) weights: Box<WeightTable>,
+    pub(crate) log_wd: [u32; 2],
     /// Colocated picture motion for temporal/spatial direct: see `ColPic`.
-    pub col: Option<ColInfo>,
+    pub(crate) col: Option<ColInfo>,
 }
 
 /// Information about RefPicList1[0] for direct prediction.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ColInfo {
     /// Position in the decoded picture buffer of the frame store holding RefPicList1[0].
-    pub idx: usize,
+    pub(crate) idx: usize,
     /// Parity of RefPicList1[0] (0 frame, 1 top, 2 bottom).
-    pub parity: u8,
-    pub short_term: bool,
+    pub(crate) parity: u8,
+    pub(crate) short_term: bool,
 }
 
 /// The picture being decoded.
@@ -60,21 +60,21 @@ pub(crate) struct ColInfo {
 pub(crate) struct CurPic {
     /// Position in the decoded picture buffer of the current frame's first field, while
     /// its second field is decoded into the same frame buffer.
-    pub first_field: Option<usize>,
-    pub buf: FrameBuf,
-    pub motion: Motion,
-    pub mbs: BudgetVec<MbInfo>,
+    pub(crate) first_field: Option<usize>,
+    pub(crate) buf: FrameBuf,
+    pub(crate) motion: Motion,
+    pub(crate) mbs: BudgetVec<MbInfo>,
     /// Width in MBs and height in MBs of this picture (field: half the frame height).
-    pub w: MbWidth,
-    pub h: usize,
+    pub(crate) w: MbWidth,
+    pub(crate) h: usize,
     /// 0 frame, 1 top field, 2 bottom field.
-    pub structure: u8,
-    pub mbaff: bool,
-    pub poc: [i32; 2],
-    pub slices: BudgetVec<SliceDbk>,
-    pub decoded_mbs: usize,
-    pub chroma: bool,
-    pub dbk: crate::deblock::Progress,
+    pub(crate) structure: u8,
+    pub(crate) mbaff: bool,
+    pub(crate) poc: [i32; 2],
+    pub(crate) slices: BudgetVec<SliceDbk>,
+    pub(crate) decoded_mbs: usize,
+    pub(crate) chroma: bool,
+    pub(crate) dbk: crate::deblock::Progress,
 }
 
 impl CurPic {
@@ -91,9 +91,9 @@ impl CurPic {
 #[derive(Clone, Copy)]
 pub(crate) struct Refs<'a> {
     /// The stored frame stores, by position in the decoded picture buffer.
-    pub dpb: &'a [&'a FrameStore],
+    pub(crate) dpb: &'a [&'a FrameStore],
     /// Stands in for the samples of a store that has none; callers check first.
-    pub no_samples: &'a FrameBuf,
+    pub(crate) no_samples: &'a FrameBuf,
 }
 
 impl<'a> Refs<'a> {
@@ -106,52 +106,52 @@ impl<'a> Refs<'a> {
 /// Geometry of a macroblock in the current picture's planes.
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct MbGeom {
-    pub mbx: usize,
+    pub(crate) mbx: usize,
     /// Luma y of the MB's first row in its own (field or frame) coordinates.
-    pub y_pic: usize,
-    pub off_y: usize,
-    pub stride_y: usize,
-    pub off_c: usize,
-    pub stride_c: usize,
+    pub(crate) y_pic: usize,
+    pub(crate) off_y: usize,
+    pub(crate) stride_y: usize,
+    pub(crate) off_c: usize,
+    pub(crate) stride_c: usize,
     /// The MB samples belong to a field (field picture or MBAFF field MB): parity 1 top 2 bottom.
-    pub field_parity: u8,
+    pub(crate) field_parity: u8,
 }
 
 /// Neighbouring macroblock addresses (6.4.9 / 6.4.10) of the current MB; None = unavailable.
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct NbAddr {
-    pub a: Option<usize>,
-    pub b: Option<usize>,
-    pub c: Option<usize>,
-    pub d: Option<usize>,
+    pub(crate) a: Option<usize>,
+    pub(crate) b: Option<usize>,
+    pub(crate) c: Option<usize>,
+    pub(crate) d: Option<usize>,
 }
 
 pub(crate) struct SliceDecoder<'a> {
-    pub s: &'a SliceCtx,
-    pub pic: &'a mut CurPic,
-    pub refs: Refs<'a>,
-    pub vlc: &'static CavlcTables,
-    pub br: BitReader<'a>,
-    pub cur: usize,
-    pub nb: NbAddr,
-    pub geom: MbGeom,
-    pub qp: i32,
-    pub prev_qp_delta_nz: bool,
-    pub mb: crate::mbdec::MbData,
+    pub(crate) s: &'a SliceCtx,
+    pub(crate) pic: &'a mut CurPic,
+    pub(crate) refs: Refs<'a>,
+    pub(crate) vlc: &'static CavlcTables,
+    pub(crate) br: BitReader<'a>,
+    pub(crate) cur: usize,
+    pub(crate) nb: NbAddr,
+    pub(crate) geom: MbGeom,
+    pub(crate) qp: i32,
+    pub(crate) prev_qp_delta_nz: bool,
+    pub(crate) mb: crate::mbdec::MbData,
     /// MBAFF: field flag decoded ahead for a skipped top MB (CAVLC) or for the pair (CABAC).
-    pub pending_field: Option<bool>,
-    pub last_mb_in_slice: usize,
+    pub(crate) pending_field: Option<bool>,
+    pub(crate) last_mb_in_slice: usize,
     /// Spatial direct (refIdx, mvp, directZero) of the current MB.
-    pub spatial_cache: Option<([i32; 2], [[i32; 2]; 2], bool)>,
+    pub(crate) spatial_cache: Option<([i32; 2], [[i32; 2]; 2], bool)>,
     /// Whole-MB motion (refIdx and vector per list, refIdx -1 = list unused) when the MB is
     /// predicted as one 16x16 block, recorded while deriving it for motion compensation.
-    pub mb_motion: Option<([i32; 2], [[i32; 2]; 2])>,
+    pub(crate) mb_motion: Option<([i32; 2], [[i32; 2]; 2])>,
     /// Some reference is the first field of the current frame (second-field decoding).
-    pub self_ref_possible: bool,
+    pub(crate) self_ref_possible: bool,
     /// Second-list prediction scratch for motion compensation.
-    pub mc_tmp: crate::inter::McTmp,
+    pub(crate) mc_tmp: crate::inter::McTmp,
     /// Prediction of the current macroblock when it may read its own picture.
-    pub mb_out: &'a mut crate::inter::MbSamples,
+    pub(crate) mb_out: &'a mut crate::inter::MbSamples,
 }
 
 impl<'a> SliceDecoder<'a> {

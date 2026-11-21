@@ -11,63 +11,63 @@ fn inval(what: &'static str) -> DecodeError {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Vui {
-    pub sar: (u32, u32),
-    pub video_full_range: bool,
-    pub colour_description_present: bool,
-    pub colour_primaries: u8,
-    pub transfer_characteristics: u8,
-    pub matrix_coefficients: u8,
-    pub timing: Option<(u32, u32, bool)>,
-    pub bitstream_restriction: bool,
-    pub max_num_reorder_frames: u32,
-    pub max_dec_frame_buffering: u32,
-    pub pic_struct_present: bool,
-    pub nal_hrd: bool,
-    pub vcl_hrd: bool,
-    pub cpb_removal_delay_len: u8,
-    pub dpb_output_delay_len: u8,
-    pub time_offset_len: u8,
+pub(crate) struct Vui {
+    pub(crate) sar: (u32, u32),
+    pub(crate) video_full_range: bool,
+    pub(crate) colour_description_present: bool,
+    pub(crate) colour_primaries: u8,
+    pub(crate) transfer_characteristics: u8,
+    pub(crate) matrix_coefficients: u8,
+    pub(crate) timing: Option<(u32, u32, bool)>,
+    pub(crate) bitstream_restriction: bool,
+    pub(crate) max_num_reorder_frames: u32,
+    pub(crate) max_dec_frame_buffering: u32,
+    pub(crate) pic_struct_present: bool,
+    pub(crate) nal_hrd: bool,
+    pub(crate) vcl_hrd: bool,
+    pub(crate) cpb_removal_delay_len: u8,
+    pub(crate) dpb_output_delay_len: u8,
+    pub(crate) time_offset_len: u8,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Sps {
-    pub profile_idc: u8,
-    pub constraint_flags: u8,
-    pub level_idc: u8,
-    pub id: u32,
-    pub chroma_format_idc: u32,
-    pub separate_colour_plane: bool,
-    pub bit_depth_luma: u32,
-    pub bit_depth_chroma: u32,
-    pub qpprime_y_zero_transform_bypass: bool,
-    pub seq_scaling_matrix_present: bool,
+pub(crate) struct Sps {
+    pub(crate) profile_idc: u8,
+    pub(crate) constraint_flags: u8,
+    pub(crate) level_idc: u8,
+    pub(crate) id: u32,
+    pub(crate) chroma_format_idc: u32,
+    pub(crate) separate_colour_plane: bool,
+    pub(crate) bit_depth_luma: u32,
+    pub(crate) bit_depth_chroma: u32,
+    pub(crate) qpprime_y_zero_transform_bypass: bool,
+    pub(crate) seq_scaling_matrix_present: bool,
     /// Scaling lists in zig-zag (scan) order: 6 4x4 and 6 8x8 (only 2 used for 4:2:0).
-    pub scaling4: [[u8; 16]; 6],
-    pub scaling8: [[u8; 64]; 6],
-    pub log2_max_frame_num: u32,
-    pub poc_type: u32,
-    pub log2_max_poc_lsb: u32,
-    pub delta_pic_order_always_zero: bool,
-    pub offset_for_non_ref_pic: i32,
-    pub offset_for_top_to_bottom_field: i32,
-    pub offset_for_ref_frame: Vec<i32>,
-    pub max_num_ref_frames: u32,
-    pub gaps_in_frame_num_allowed: bool,
-    pub pic_width_in_mbs: u32,
-    pub pic_height_in_map_units: u32,
-    pub frame_mbs_only: bool,
-    pub mb_adaptive_frame_field: bool,
-    pub direct_8x8_inference: bool,
-    pub crop: [u32; 4], // left, right, top, bottom in frame_crop_*_offset units
-    pub vui: Option<Vui>,
+    pub(crate) scaling4: [[u8; 16]; 6],
+    pub(crate) scaling8: [[u8; 64]; 6],
+    pub(crate) log2_max_frame_num: u32,
+    pub(crate) poc_type: u32,
+    pub(crate) log2_max_poc_lsb: u32,
+    pub(crate) delta_pic_order_always_zero: bool,
+    pub(crate) offset_for_non_ref_pic: i32,
+    pub(crate) offset_for_top_to_bottom_field: i32,
+    pub(crate) offset_for_ref_frame: Vec<i32>,
+    pub(crate) max_num_ref_frames: u32,
+    pub(crate) gaps_in_frame_num_allowed: bool,
+    pub(crate) pic_width_in_mbs: u32,
+    pub(crate) pic_height_in_map_units: u32,
+    pub(crate) frame_mbs_only: bool,
+    pub(crate) mb_adaptive_frame_field: bool,
+    pub(crate) direct_8x8_inference: bool,
+    pub(crate) crop: [u32; 4], // left, right, top, bottom in frame_crop_*_offset units
+    pub(crate) vui: Option<Vui>,
 }
 
 impl Sps {
-    pub fn frame_height_in_mbs(&self) -> u32 {
+    pub(crate) fn frame_height_in_mbs(&self) -> u32 {
         (2 - self.frame_mbs_only as u32).wrapping_mul(self.pic_height_in_map_units)
     }
-    pub fn chroma_array_type(&self) -> u32 {
+    pub(crate) fn chroma_array_type(&self) -> u32 {
         if self.separate_colour_plane {
             0
         } else {
@@ -75,7 +75,7 @@ impl Sps {
         }
     }
     /// Cropped output rectangle (x, y, w, h) in luma samples, equations 7-19 .. 7-22.
-    pub fn crop_rect(&self) -> (u32, u32, u32, u32) {
+    pub(crate) fn crop_rect(&self) -> (u32, u32, u32, u32) {
         let (sub_w, sub_h) = match self.chroma_array_type() {
             0 => (1, 1),
             1 => (2, 2),
@@ -95,32 +95,32 @@ impl Sps {
         }
         (x0, y0, x1 - x0, y1 - y0)
     }
-    pub fn max_frame_num(&self) -> u32 {
+    pub(crate) fn max_frame_num(&self) -> u32 {
         1 << self.log2_max_frame_num
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Pps {
-    pub id: u32,
-    pub sps_id: u32,
-    pub entropy_coding_mode: bool,
-    pub bottom_field_pic_order_in_frame_present: bool,
-    pub num_slice_groups: u32,
-    pub num_ref_idx_default: [u32; 2],
-    pub weighted_pred: bool,
-    pub weighted_bipred_idc: u32,
-    pub pic_init_qp: i32,
-    pub pic_init_qs: i32,
-    pub chroma_qp_index_offset: i32,
-    pub second_chroma_qp_index_offset: i32,
-    pub deblocking_filter_control_present: bool,
-    pub constrained_intra_pred: bool,
-    pub redundant_pic_cnt_present: bool,
-    pub transform_8x8_mode: bool,
-    pub pic_scaling_matrix_present: bool,
-    pub scaling4: [[u8; 16]; 6],
-    pub scaling8: [[u8; 64]; 6],
+pub(crate) struct Pps {
+    pub(crate) id: u32,
+    pub(crate) sps_id: u32,
+    pub(crate) entropy_coding_mode: bool,
+    pub(crate) bottom_field_pic_order_in_frame_present: bool,
+    pub(crate) num_slice_groups: u32,
+    pub(crate) num_ref_idx_default: [u32; 2],
+    pub(crate) weighted_pred: bool,
+    pub(crate) weighted_bipred_idc: u32,
+    pub(crate) pic_init_qp: i32,
+    pub(crate) pic_init_qs: i32,
+    pub(crate) chroma_qp_index_offset: i32,
+    pub(crate) second_chroma_qp_index_offset: i32,
+    pub(crate) deblocking_filter_control_present: bool,
+    pub(crate) constrained_intra_pred: bool,
+    pub(crate) redundant_pic_cnt_present: bool,
+    pub(crate) transform_8x8_mode: bool,
+    pub(crate) pic_scaling_matrix_present: bool,
+    pub(crate) scaling4: [[u8; 16]; 6],
+    pub(crate) scaling8: [[u8; 64]; 6],
 }
 
 /// Sequence-level 4x4 and 8x8 lists used by fall-back rule B.
