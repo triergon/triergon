@@ -1,7 +1,8 @@
 # triergon-framing
 
 Packet framing and codec-configuration parsing for the format layer: H.264/HEVC
-NAL units and records, AV1 OBUs, VP9 records, AAC, AC-3/E-AC-3 and DTS core.
+NAL units and records, fixed VVC NAL headers, AV1 OBUs, VP9 records, AAC,
+AC-3/E-AC-3 and DTS core.
 Containers hand it record bytes and complete samples; it returns source-preserving
 views, decoder-ready Annex-B/ADTS/temporal-unit output and typed refusals. It
 depends on `triergon-core` and `triergon-bitstream`, does no I/O and does not decode
@@ -9,7 +10,7 @@ audio or video.
 
 ## Usage
 
-Every operation takes a core `Budget` pool, a `WorkBudget` and a cancel flag, and
+Incremental operations take a core `Budget` pool, a `WorkBudget` and a cancel flag, and
 is driven by `step`. Record and packet jobs return `BuildStep::{Yield, Ready,
 Complete}`; incremental readers return core `Step::{NeedInput, Yield, Ready, End}`
 and are fed with `provide` and closed with `finish` or `fail`.
@@ -80,6 +81,7 @@ assert_eq!(decoder_input, [
 |---|---|---|
 | NAL streams | `NalReader`, `Framing::{AnnexB, LengthPrefixed}`, `LengthSize` | Incremental AVC/HEVC NAL extraction from any chunking; 1–4 byte big-endian lengths or Annex-B start codes; fixed NAL header facts |
 | NAL units in memory | `AnnexBUnits`, `start_code`, `split_length_prefixed`; `NalHeader::parse`; `avc`, `hevc` | An access unit's or stream's NAL units without their start codes or length prefixes; validated fixed headers; H.264 and H.265 type values and the HEVC type classes (slice, access-unit start, IRAP, IDR, BLA, RASL, RADL) |
+| VVC inspection in memory | `VvcNalHeader::inspect`, `VvcAnnexBUnits`, `VvcNal` | Two-byte header facts, including invalid and reserved values; borrowed Annex B NAL bytes from a complete buffer with an explicit maximum byte count; no allocation, RBSP parsing, AU detection or decoding |
 | Parameter-set walks | `skip_avc_scaling_matrix`, `skip_vui_to_timing`, `skip_hevc_profile_tier_level` | Pass over an SPS's H.264 scaling matrix, VUI fields before the timing, or H.265 profile-tier-level, over any `BitSource`, so each caller keeps its own emulation-prevention strictness and errors |
 | H.264 headers | `read_avc_sps`, `read_avc_pps`, `read_avc_slice_header`, `avc_slice_pps_id`; `AvcSps`, `AvcVui`, `AvcPocSyntax`, `AvcPps`, `AvcSliceHeader`, `AvcSliceDepth`, `AvcReading` | The SPS, PPS and slice header fields that picture order and output need (order count syntax, `frame_num` and `gaps_in_frame_num_value_allowed_flag`, fields, VUI timing and bitstream restriction, `no_output_of_prior_pics_flag`, `memory_management_control_operation` 5); `00 00 00` to `00 00 02` inside an RBSP refused or read as data |
 | Picture output | `picture_output::{DecodedPictures, Entry, View, NewPicture, Leave, Marking, Parity, PictureId, HevcLimits, HevcPicture, AvcPicture, StoreError, Refused, LateOutput}`, `picture_output::order::{AvcOrder, HevcOrder, AfterMmco5, AfterGap}`, `picture_output::levels::{max_dpb_mbs, max_dpb_frames}` | The decoded picture buffer of H.264 Annex C.4 (gap frames C.4.2, C.4.4, C.4.5, field pairs, bumping C.4.5.3) and H.265 Annex C.5.2 (C.5.2.2–C.5.2.4), generic over the stored picture, driven by marking, removal, storage and flush events, each stored picture readable by position and markable by field, and plain storage and bumping for a caller with its own output conditions; the output of the H.264 and HEVC decoders and of caption extraction; picture order counts of H.264 8.2.1 (types 0, 1, 2, `memory_management_control_operation` 5, `frame_num` gaps) and H.265 8.3.1; MaxDpbMbs and MaxDpbFrames of Table A-1; FFmpeg's observed departures as separate steps and options |
@@ -210,6 +212,8 @@ Implemented from these specifications:
 |---|---|
 | H.264 NAL / Annex B / AU | ITU-T H.264 (08/2024) §7.3.1, §7.4.1 Table 7-1, §§7.3.2.1.1, 7.3.2.2, 7.3.3, 7.4.1.2.3–4, Annex B |
 | HEVC NAL / Annex B / AU | ITU-T H.265 (07/2024) §7.3.1.2, §7.4.2 Table 7-1, §7.4.2.4.4, Annex B |
+| VVC fixed header | [ITU-T H.266 (09/2023)](https://www.itu.int/rec/T-REC-H.266-202309-S/en) §§7.3.1.2, 7.4.2.2 |
+| VVC byte stream extraction | [ITU-T H.266 (04/2022)](https://www.itu.int/rec/T-REC-H.266-202204-S/en) Annex B §§B.2.1–B.2.2 |
 | Picture output | ITU-T H.264 (08/2024) §8.2.1, §8.2.5.3–4, §A.3.1 Table A-1, Annex C.4.4–C.4.5; ITU-T H.265 (07/2024) §8.1.3, §8.3.1–8.3.2, Annex C.5.2 |
 | avcC | ISO/IEC 14496-15:2010 with the 2006 FRExt amendment |
 | hvcC, AAC ASC/ADTS | ISO/IEC 14496-15 and 14496-3 record layouts, from licensed interoperability references |
@@ -220,6 +224,20 @@ Implemented from these specifications:
 
 Verification:
 
+- `tests/vvc.rs` compares `VvcNalHeader::inspect` with an independent MSB-first
+  field reader for all 65,536 two-byte patterns, including forbidden bits, zero
+  temporal identifiers and reserved layers. `VvcAnnexBUnits` is compared with
+  literal expected NAL bytes for three- and four-byte prefixes, trailing zeros,
+  emulation prevention, short headers, empty units and exact byte limits.
+  These are specification controls, not an FFmpeg parser or decoder comparison.
+  The extractor reuses `AnnexBUnits`; it does not validate the mandatory
+  `zero_byte`, leading bytes, EBSP contents or type-specific constraints.
+  Its final buffer boundary ends the last NAL by caller contract. PES payloads
+  need not end there: [H.222.0 (08/2023)](https://www.itu.int/rec/T-REC-H.222.0-202308-S/en)
+  §2.4.3.7 associates VVC PTS/DTS with
+  the first AU commencing in a PES, without establishing AU or NAL extents.
+  The existing opaque VVC PES controls include a zero temporal identifier;
+  successful carriage is not evidence of conforming VVC pictures.
 - `fixtures/*.tsv` are bit-authored corpora with expected values from an
   independent whole-buffer oracle. Tests replay each case at many chunk sizes and
   work grants, plus negative, limit, cancellation, backpressure and ownership cases.
