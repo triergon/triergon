@@ -524,7 +524,7 @@ mod tests {
     }
 
     #[test]
-    fn a_width_of_ft_long_min_stays_negative() {
+    fn the_smallest_32_bit_width_stays_negative() {
         // Made positive in 32 bits the width stays negative, under the 7/8
         // pixel minimum, which then applies: -56, where 64 bits keep the width.
         let width = i64::from(i32::MIN);

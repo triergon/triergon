@@ -389,7 +389,7 @@ mod tests {
     }
 
     #[test]
-    fn a_width_of_ft_long_min_wraps_as_on_32_bit_arm() {
+    fn the_smallest_32_bit_width_wraps_as_on_32_bit_arm() {
         let width = i64::from(i32::MIN);
         // The absolute value of -2^31 wraps to -2^31: under 40.
         assert_eq!(stem_width(&axis(true), width), -48);

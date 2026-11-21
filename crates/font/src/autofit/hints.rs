@@ -834,7 +834,7 @@ mod tests {
     }
 
     #[test]
-    fn interpolation_wraps_as_ft_pos_does() {
+    fn interpolation_wraps_in_32_bits() {
         let mut points = [HintPoint::default(); 3];
         (points[0].u, points[0].v) = (-100, -100);
         (points[1].u, points[1].v) = (i64::from(i32::MAX), 0);
