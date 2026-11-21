@@ -789,6 +789,21 @@ pipeline ([triergon-capture](../capture/README.md#conformance)).
 
 ## Supported
 
+`Descriptor::lcevc_video` and `Descriptor::lcevc_linkage` expose bounded source
+fields from MPEG extension descriptors (`0x3f`, extension IDs `0x17`/`0x18`).
+They check exact lengths, linkage counts and video reserved bits; linkage tags
+borrow the original bytes and retain order and duplicates. These opt-in views
+do not change `validate_selected_syntax` or PMT admission. Unknown descriptors
+remain opaque. Base/enhancement association, codec admission, enhancement framing
+and decoding remain unsupported. H.222.0 (08/2023) Table 2-34 assigns LCEVC
+stream type `0x36`; `0x33` is VVC.
+
+The syntax follows [H.222.0 (08/2023)](https://www.itu.int/rec/T-REC-H.222.0-202308-S/en)
+Table 2-45, §§2.6.90–91 (Tables 2-109–110) and §§2.6.137–140
+(Tables 2-142–143); §2.1.131 defines the default reserved-one bits.
+Profile and HDR fields retain encoded values without asserting codec conformance.
+Five authored tests in `tests/lcevc.rs` check these source views.
+
 | Area | Coverage |
 | --- | --- |
 | Packets | TS188, M2TS192 (4-byte prefix kept opaque), adaptation field, PCR/OPCR, private data, extension bytes kept raw |

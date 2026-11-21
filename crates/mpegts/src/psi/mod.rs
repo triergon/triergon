@@ -4,6 +4,7 @@ mod codec;
 mod descriptors;
 mod dts_hd;
 pub(crate) mod dvb;
+mod lcevc;
 mod pat_table;
 mod section;
 mod signalling;
@@ -16,6 +17,7 @@ pub use dvb::{
     CodecIdentification, DescriptorNamespace, DvbNamespaceEvidence, DvbSubtitling,
     DvbSubtitlingService, DvbSubtitlingServices, DvbSubtitlingSignalling,
 };
+pub use lcevc::{LcevcLinkage, LcevcVideo};
 pub use pat_table::{PatCollector, PatSourceRange, PatTable};
 pub use section::{PsiCrc32, Section, SectionAssembler};
 pub use signalling::{
