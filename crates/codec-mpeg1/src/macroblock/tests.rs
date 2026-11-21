@@ -1,5 +1,8 @@
-//! Guards over the real encoder path.
+//! Inter macroblocks against the complete transform and quantisation, and skips
+//! reused for a repeated picture against the computed path.
+
 use super::*;
+use crate::EncoderConfig;
 
 fn encoder() -> Encoder {
     Encoder::new(EncoderConfig {
@@ -62,20 +65,17 @@ fn code(
 }
 
 #[test]
-fn q2_low_sad_impulse_must_not_erase_nonzero_quantized_coefficients() {
+fn a_small_dc_residual_at_the_finest_quantiser_keeps_its_level() {
     let mut e = encoder();
     let mut r = [0; 64];
     r[0] = 20;
     let (actual, expected, _) = code(&mut e, 2, &r, 0, false);
     assert!(expected.iter().any(|v| *v != 0));
-    assert_eq!(
-        actual, expected,
-        "SAD20 < old24, yet complete fixed transform is not empty"
-    );
+    assert_eq!(actual, expected);
 }
 
 #[test]
-fn sparse_residuals_of_both_signs_and_all_quantizers_match_complete_transform() {
+fn sparse_residuals_of_both_signs_match_the_complete_transform() {
     let mut e = encoder();
     for (q, amount, pair) in [
         (2, 20, false),
@@ -100,7 +100,7 @@ fn sparse_residuals_of_both_signs_and_all_quantizers_match_complete_transform() 
 }
 
 #[test]
-fn every_impulse_position_at_pixel_extremes_matches_complete_quantization() {
+fn every_impulse_position_at_sample_extremes_matches_the_complete_transform() {
     let mut e = encoder();
     for q in [2, 7, 16, 31] {
         for magnitude in [1, 20, 50, 160, 255] {
@@ -121,7 +121,7 @@ fn every_impulse_position_at_pixel_extremes_matches_complete_quantization() {
 }
 
 #[test]
-fn provably_small_residuals_remain_empty_with_the_same_actual_syntax() {
+fn residuals_proven_to_quantise_to_zero_code_as_an_empty_block() {
     let mut e = encoder();
     for q in 2..=31 {
         let (empty, complete, empty_bits) = code(&mut e, q, &[0; 64], 128, false);
@@ -140,7 +140,7 @@ fn provably_small_residuals_remain_empty_with_the_same_actual_syntax() {
 }
 
 #[test]
-fn checkerboards_and_dense_signed_residuals_match_all64_quantized_levels() {
+fn checkerboards_and_dense_residuals_match_the_complete_transform() {
     let mut e = encoder();
     for q in 2..=31 {
         for seed in 0..8 {
@@ -158,30 +158,7 @@ fn checkerboards_and_dense_signed_residuals_match_all64_quantized_levels() {
 }
 
 #[test]
-fn fixed_transform_magnitude_is_bounded_by_ceil_sad_over_four() {
-    for seed in 0..256 {
-        let input = std::array::from_fn(|i| {
-            if seed < 64 {
-                if i == seed { 255 } else { 0 }
-            } else if seed < 128 {
-                if i == seed - 64 { -255 } else { 0 }
-            } else {
-                ((i * 137 + seed * 293) % 511) as i32 - 255
-            }
-        });
-        let bound = input
-            .iter()
-            .map(|v| v.unsigned_abs())
-            .sum::<u32>()
-            .div_ceil(4);
-        let mut coefficients = input;
-        dct::fdct_raster(&mut coefficients);
-        assert!(coefficients.iter().all(|v| v.unsigned_abs() <= bound));
-    }
-}
-
-#[test]
-fn explicit_existing_vbv_tight_policy_remains_separate_from_zero_proof() {
+fn a_macroblock_under_the_vbv_guard_codes_no_coefficients() {
     let mut e = encoder();
     let mut residual = [0; 64];
     residual[0] = 20;
@@ -190,29 +167,6 @@ fn explicit_existing_vbv_tight_policy_remains_separate_from_zero_proof() {
     assert!(tight.iter().all(|v| *v == 0));
     let (ordinary, _, _) = code(&mut e, 2, &residual, 128, false);
     assert_eq!(ordinary, expected);
-}
-
-#[test]
-fn geometry_rejection_keeps_owned_output_and_subsequent_gop_state_unchanged() {
-    let mut e = encoder();
-    let wrong = Picture::new(Geometry::new(32, 16).unwrap());
-    let mut output = vec![9, 8, 7];
-    assert!(matches!(
-        e.encode(&wrong, &mut output),
-        Err(Error::PictureGeometry { .. })
-    ));
-    assert_eq!(output, [9, 8, 7]);
-    assert_eq!(e.index, 0);
-    assert_eq!(e.gop_start, 0);
-    let input = Picture::new(e.cfg.geometry);
-    let first = e.encode(&input, &mut output).unwrap();
-    assert!(first.key);
-    assert_eq!(first.index, 0);
-    assert_eq!(first.bits, output.len() * 8);
-    let next = e.encode(&input, &mut output).unwrap();
-    assert!(!next.key);
-    assert_eq!(next.index, 1);
-    assert_eq!(next.bits, output.len() * 8);
 }
 
 #[test]

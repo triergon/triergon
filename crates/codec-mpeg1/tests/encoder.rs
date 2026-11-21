@@ -27,7 +27,12 @@ fn mismatched_picture_returns_owner_unchanged_before_encoder_mutation() {
     ));
     assert_eq!(out, [1, 2, 3]);
     let p = Picture::new(Geometry::new(16, 16).unwrap());
-    assert_eq!(e.encode(&p, &mut out).unwrap().index, 0);
+    let first = e.encode(&p, &mut out).unwrap();
+    assert!(first.key && first.index == 0);
+    assert_eq!(first.bits, out.len() * 8);
+    let next = e.encode(&p, &mut out).unwrap();
+    assert!(!next.key && next.index == 1);
+    assert_eq!(next.bits, out.len() * 8);
 }
 #[test]
 fn a_budget_too_small_for_the_pictures_is_a_typed_error() {

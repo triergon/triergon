@@ -2,11 +2,7 @@
 //! reconstruction (ISO/IEC 11172-2 §2.4.4.1–2.4.4.2: dequantisation,
 //! oddification mismatch control and saturation to [-2048, 2047]).
 
-use super::bits::BitWriter;
-use super::tables::{
-    COEFFICIENTS, DC_SIZE_CHROMA, DC_SIZE_LUMA, DCT_ESCAPE, END_OF_BLOCK, INTRA_MATRIX, SCAN_BIT,
-    ZIGZAG,
-};
+use crate::tables::{COEFFICIENTS, DCT_ESCAPE, INTRA_MATRIX, SCAN_BIT, ZIGZAG};
 
 const SHIFT: u32 = 20;
 
@@ -142,7 +138,7 @@ fn refine_intra_same_bits(
 /// Raster bit mask of the non-zero entries, built as two 32-bit halves (one
 /// compare, select and OR-reduction per half, all in vector lanes).
 #[inline]
-fn nonzero(levels: &[i32; 64]) -> u64 {
+pub(crate) fn nonzero(levels: &[i32; 64]) -> u64 {
     let half = |levels: &[i32]| {
         levels
             .iter()
@@ -202,112 +198,11 @@ pub(crate) fn dequant_inter(levels: &[i32; 64], mask: u64, scale: u32, out: &mut
     }
 }
 
-/// dct_dc_size and differential bits for an intra DC difference.
-#[inline]
-pub(crate) fn write_dc(w: &mut BitWriter, diff: i32, luma: bool) {
-    let size = 32 - diff.unsigned_abs().leading_zeros();
-    let (code, len) = if luma {
-        DC_SIZE_LUMA[size as usize]
-    } else {
-        DC_SIZE_CHROMA[size as usize]
-    };
-    w.put(code, len);
-    if size > 0 {
-        let bits = if diff > 0 {
-            diff
-        } else {
-            diff + (1 << size) - 1
-        };
-        w.put(bits as u32, size);
-    }
-}
-
-/// Write the run/level pairs of the levels selected by the raster `mask` in
-/// zig-zag order, followed by end_of_block. Intra blocks start after DC;
-/// non-intra blocks code a leading run-0 level-±1 with dct_coeff_first `1s`.
-#[inline]
-pub(crate) fn write_coefficients(w: &mut BitWriter, levels: &[i32; 64], mask: u64, intra: bool) {
-    let mut scan = 0u64;
-    for p in bits(mask) {
-        scan |= SCAN_BIT[p];
-    }
-    let mut next = usize::from(intra);
-    let mut first = !intra;
-    for k in bits(scan) {
-        let run = k - next;
-        next = k + 1;
-        let level = levels[ZIGZAG[k]];
-        let sign = (level < 0) as u32;
-        let magnitude = level.unsigned_abs();
-        if first && run == 0 && magnitude == 1 {
-            w.put(0b10 | sign, 2);
-        } else if let Some((code, len)) = COEFFICIENTS.lookup(run, magnitude) {
-            w.put(code | sign, len);
-        } else {
-            w.put(DCT_ESCAPE.0, DCT_ESCAPE.1);
-            w.put(run as u32, 6);
-            if magnitude < 128 {
-                w.put((level & 0xFF) as u32, 8);
-            } else if level > 0 {
-                w.put(level as u32, 16);
-            } else {
-                w.put(0x8000 | (level + 256) as u32, 16);
-            }
-        }
-        first = false;
-    }
-    w.put(END_OF_BLOCK.0, END_OF_BLOCK.1);
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn dc_differentials() {
-        let mut w = BitWriter::default();
-        write_dc(&mut w, 0, true); // 100
-        write_dc(&mut w, -1, true); // 00 0
-        write_dc(&mut w, 3, false); // 10 11
-        write_dc(&mut w, -255, true); // 1111110 00000000
-        let mut out = Vec::new();
-        w.take_into(&mut out).unwrap();
-        let bits: String = out.iter().map(|b| format!("{b:08b}")).collect();
-        assert!(bits.starts_with("100000101111111100000000"));
-    }
-
-    #[test]
-    fn non_intra_first_coefficient_short_form() {
-        let mut levels = [0; 64];
-        levels[0] = -1;
-        levels[1] = 1;
-        let mut w = BitWriter::default();
-        write_coefficients(&mut w, &levels, nonzero(&levels), false);
-        let mut out = Vec::new();
-        w.take_into(&mut out).unwrap();
-        // 11 (first, -1) 110 (next run0 +1 = 11s) 10 (EOB)
-        assert_eq!(format!("{:08b}", out[0]), "11110100");
-    }
-
-    #[test]
-    fn escape_levels() {
-        let mut levels = [0; 64];
-        levels[ZIGZAG[1]] = -200;
-        levels[ZIGZAG[2]] = 130;
-        let mut w = BitWriter::default();
-        write_coefficients(&mut w, &levels, nonzero(&levels), true);
-        let mut out = Vec::new();
-        w.take_into(&mut out).unwrap();
-        let bits: String = out.iter().map(|b| format!("{b:08b}")).collect();
-        let want = "000001".to_owned()
-            + "000000"
-            + &format!("{:016b}", 0x8000 | 0x38)
-            + "000001"
-            + "000000"
-            + &format!("{:016b}", 130)
-            + "10";
-        assert!(bits.starts_with(&want));
-    }
+    use crate::bits::BitWriter;
+    use crate::syntax::write_coefficients;
 
     #[test]
     fn reconstruction_is_odd_and_saturated() {

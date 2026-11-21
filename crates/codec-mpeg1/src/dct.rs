@@ -404,6 +404,29 @@ mod tests {
     }
 
     #[test]
+    fn coefficients_are_bounded_by_a_quarter_of_the_residual_magnitude() {
+        for seed in 0..256 {
+            let input = std::array::from_fn(|i| {
+                if seed < 64 {
+                    if i == seed { 255 } else { 0 }
+                } else if seed < 128 {
+                    if i == seed - 64 { -255 } else { 0 }
+                } else {
+                    ((i * 137 + seed * 293) % 511) as i32 - 255
+                }
+            });
+            let bound = input
+                .iter()
+                .map(|v| v.unsigned_abs())
+                .sum::<u32>()
+                .div_ceil(4);
+            let mut coefficients = input;
+            fdct_raster(&mut coefficients);
+            assert!(coefficients.iter().all(|v| v.unsigned_abs() <= bound));
+        }
+    }
+
+    #[test]
     fn constant_block_dc() {
         let mut b = [128; 64];
         fdct_raster(&mut b);
