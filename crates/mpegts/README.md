@@ -326,8 +326,9 @@ PES across yields and allocates no payload storage. Source PMT, PES and clock
 facts stay unchanged. A failed initial probe remains unsupported; subsequent PES
 cannot rescue it. Map, clock and byte-run changes require fresh evidence.
 `unlabelled_dts_core` still permits explicit selection with split initial frames.
-The initial unsupported-track observation precedes probe admission; admitted
-packets and `Reader::tracks()` expose the separately inferred codec.
+For an eligible route, the first PES is published before a failed probe reports
+an unsupported track. On successful admission, packets and `Reader::tracks()`
+expose the separately inferred codec.
 
 This envelope check does not certify decoded audio. The existing DVB DTS
 classifier remains available under a declared DVB namespace. ATSC has no DTS

@@ -473,6 +473,7 @@ fn automatic_core_probe_requires_two_envelopes_and_keeps_source_facts() {
                     assert!(source_pes);
                     assert_eq!(packet.payload(), &BYTES[count * FRAME..(count + 1) * FRAME]);
                     assert_eq!(packet.track_info().codec(), CodecId::Dts);
+                    assert_eq!(drive.reader.tracks()[0].codec(), CodecId::Dts);
                     assert!(packet.track_info().stream().codec().is_none());
                     assert!(packet.track_info().stream().descriptor_bytes.is_empty());
                     assert_eq!(packet.track_info().codec_tag(), &[0x06]);

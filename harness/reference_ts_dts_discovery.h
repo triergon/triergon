@@ -8,16 +8,16 @@
 #define TS_DTS_FRAME_MAX 16384
 #define TS_DTS_PROBE_MAX (2 * TS_DTS_FRAME_MAX)
 
-/* Complete current single-section PMTs in TS188. Scan all PMTs so a changed
- * route is refused rather than silently treated as the initial route forever.
- * Bind the result to AVProgram below; a caller never supplies the ES PID. */
-static int ts_dts_route(const uint8_t *bytes, size_t size, int program, int *pmt)
+/* Check the selected initial PMT before examining its first PES. Once
+ * admission succeeds, resume the scan to reject later changes of route. */
+static int ts_dts_route(const uint8_t *bytes, size_t size, int program, int pmt,
+    size_t *next, int expected)
 {
-    int found = -1;
     if (size % 188) return -1;
-    for (size_t offset = 0; offset < size; offset += 188) {
+    for (size_t offset = *next; offset < size; offset += 188) {
         const uint8_t *ts = bytes + offset;
         if (ts[0] != 0x47) return -1;
+        if (((ts[1] & 31) << 8 | ts[2]) != pmt) continue;
         if (!(ts[1] & 0x40) || !(ts[3] & 0x10)) continue;
         size_t at = ts[3] & 0x20 ? 5u + ts[4] : 4u;
         if (at >= 188) continue;
@@ -46,12 +46,14 @@ static int ts_dts_route(const uint8_t *bytes, size_t size, int program, int *pmt
             }
             i += 5 + descriptors;
         }
-        int map_pid = ((ts[1] & 31) << 8) | ts[2];
-        if (count != 1 || (found >= 0 && (found != pid || *pmt != map_pid))) return -1;
-        *pmt = map_pid;
-        found = pid;
+        if (count != 1) return -1;
+        if (expected < 0) {
+            *next = offset + 188;
+            return pid;
+        }
+        if (expected != pid) return -1;
     }
-    return found;
+    return expected;
 }
 
 /* A fresh streaming parser sees a whole envelope and its copied lookahead.
@@ -131,8 +133,6 @@ done:
 static int ts_dts_discover(const uint8_t *bytes, size_t size, int program)
 {
     int pmt = -1, result = -1;
-    int pid = ts_dts_route(bytes, size, program, &pmt);
-    if (pid < 0) return -1;
     TsInput input = {bytes, size, 0};
     AVFormatContext *format = avformat_alloc_context();
     uint8_t *buffer = av_malloc(TS_AVIO_BYTES);
@@ -144,10 +144,15 @@ static int ts_dts_discover(const uint8_t *bytes, size_t size, int program)
     format->pb = io;
     format->flags |= AVFMT_FLAG_CUSTOM_IO | AVFMT_FLAG_NOFILLIN | AVFMT_FLAG_NOPARSE;
     if (avformat_open_input(&format, NULL, av_find_input_format("mpegts"), NULL) < 0) goto done;
-    unsigned bound = 0;
-    for (unsigned i = 0; i < format->nb_programs; ++i)
-        if (format->programs[i]->program_num == program && format->programs[i]->pmt_pid == pmt) ++bound;
-    if (bound != 1) goto done;
+    for (unsigned i = 0; i < format->nb_programs; ++i) {
+        if (format->programs[i]->program_num != program) continue;
+        if (pmt >= 0) goto done;
+        pmt = format->programs[i]->pmt_pid;
+    }
+    if (pmt < 0) goto done;
+    size_t next = 0;
+    int pid = ts_dts_route(bytes, size, program, pmt, &next, -1);
+    if (pid < 0) goto done;
     while (av_read_frame(format, packet) >= 0) {
         AVStream *stream = format->streams[packet->stream_index];
         if (stream->id != pid || !ts_in_program(format, packet->stream_index, program)) {
@@ -159,7 +164,8 @@ static int ts_dts_discover(const uint8_t *bytes, size_t size, int program)
         size_t at = ts[3] & 0x20 ? 5u + ts[4] : 4u;
         if (ts[0] != 0x47 || !(ts[1] & 0x40) || at + 4 > 188
             || memcmp(ts + at, "\0\0\1\xbd", 4)) break;
-        if (stream->codecpar->codec_id == AV_CODEC_ID_BIN_DATA && ts_dts_admit(packet)) result = pid;
+        if (stream->codecpar->codec_id == AV_CODEC_ID_BIN_DATA && ts_dts_admit(packet)
+            && ts_dts_route(bytes, size, program, pmt, &next, pid) == pid) result = pid;
         break;
     }
 done:

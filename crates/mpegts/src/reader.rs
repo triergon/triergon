@@ -1113,14 +1113,19 @@ impl Reader {
                 match lane.push(&mut source, key, work) {
                     Ok(true) => {
                         self.active = Some(index);
-                        if probing {
-                            if let Some(error) = lane.unsupported {
+                        if self.limits.probe_unlabelled_dts_core {
+                            if probing && let Some(error) = lane.unsupported {
                                 return Ok(Step::Ready(Event::Other(ReaderEvent::Unsupported {
                                     track: lane.track.clone(),
                                     error,
                                 })));
                             }
-                            self.tracks.as_mut_slice()[index] = lane.track.clone();
+                            // The probe can prove the framing before PES admission
+                            // yields. Publish the inferred track when admission commits.
+                            let published = &mut self.tracks.as_mut_slice()[index];
+                            if published.unlabelled_dts_core != lane.track.unlabelled_dts_core {
+                                *published = lane.track.clone();
+                            }
                         }
                     }
                     retry => {

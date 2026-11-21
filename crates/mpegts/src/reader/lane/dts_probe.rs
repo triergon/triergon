@@ -28,7 +28,6 @@ pub(super) struct Probe {
     frames: usize,
     span: usize,
     offset: usize,
-    inspected: usize,
     format: Option<(u8, u8, u8)>,
     result: Option<bool>,
 }
@@ -43,27 +42,32 @@ impl Probe {
             return self.result;
         }
         loop {
-            if !work.try_charge(1) {
-                return None;
-            }
-            if self.inspected == 32768 {
-                self.result = Some(false);
-                return self.result;
-            }
             let Some(span) = pes.spans().get(self.span) else {
+                if !work.try_charge(1) {
+                    return None;
+                }
                 self.result = Some(false);
                 return self.result;
             };
             let bytes: &[u8] = span.as_ref();
-            let Some(&byte) = bytes.get(self.offset) else {
+            let bytes = &bytes[self.offset..];
+            if bytes.is_empty() {
+                if !work.try_charge(1) {
+                    return None;
+                }
                 self.span += 1;
                 self.offset = 0;
                 continue;
-            };
-            self.offset += 1;
-            self.inspected += 1;
+            }
             if self.remaining != 0 {
-                self.remaining -= 1;
+                // The span already proves the extent. Charge its bytes without
+                // loading the body, which is opaque to the envelope check.
+                let count = work.take(self.remaining.min(bytes.len()) as u64) as usize;
+                if count == 0 {
+                    return None;
+                }
+                self.offset += count;
+                self.remaining -= count;
                 if self.remaining == 0 {
                     self.frames += 1;
                     self.used = 0;
@@ -74,8 +78,13 @@ impl Probe {
                 }
                 continue;
             }
-            self.header[self.used] = byte;
-            self.used += 1;
+            let count = work.take((self.header.len() - self.used).min(bytes.len()) as u64) as usize;
+            if count == 0 {
+                return None;
+            }
+            self.header[self.used..self.used + count].copy_from_slice(&bytes[..count]);
+            self.offset += count;
+            self.used += count;
             if self.used == self.header.len() {
                 let Ok(header) = probe_dts_core_header(&self.header) else {
                     self.result = Some(false);
