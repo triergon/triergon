@@ -92,6 +92,12 @@ static void fold_clock(TsWork *out, int64_t pts, int64_t dts)
 static int audio_entry(const TsReader *reader, const AVPacket *packet)
 {
     enum AVCodecID codec = reader->format->streams[packet->stream_index]->codecpar->codec_id;
+    if (codec == AV_CODEC_ID_AAC_LATM)
+        /* The fixture uses full LOAS packets, with in-band initialisation. */
+        return packet->size >= 4 && packet->data[0] == 0x56
+            && (packet->data[1] & 0xe0) == 0xe0
+            && packet->size == 3 + ((packet->data[1] & 31) << 8) + packet->data[2]
+            && !(packet->data[3] & 0x80);
     if (codec == AV_CODEC_ID_DTS)
         /* TS 102 114 §5.4.2: HFLAG is the last bit of byte 11. */
         return packet->size >= 11 && !(packet->data[10] & 1);

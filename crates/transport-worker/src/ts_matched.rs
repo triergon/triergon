@@ -166,6 +166,7 @@ fn drain(
                         );
                     }
                     AccessUnit::Adts(_)
+                    | AccessUnit::Loas(_)
                     | AccessUnit::Ac3(_)
                     | AccessUnit::MpegAudio(_)
                     | AccessUnit::Dts(_)
