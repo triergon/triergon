@@ -473,7 +473,7 @@ struct Walk {
 
 #[expect(
     clippy::large_enum_variant,
-    reason = "one walk per parser; boxing it would allocate outside the pool"
+    reason = "one read per parser; boxing it would allocate outside the pool"
 )]
 enum State {
     Reading(Walk),
