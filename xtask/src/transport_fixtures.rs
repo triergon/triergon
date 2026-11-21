@@ -8,8 +8,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::checks::read_json;
-use crate::corpus::{Paths, authored, write_json};
+use crate::corpus::{Paths, authored};
 use crate::harness::worker;
 use crate::json::{self, Value};
 use crate::sha256;
@@ -112,7 +111,7 @@ fn checked_input(root: &Path, record: &Value) -> R<String> {
 
 /// Bind every entity consumed by the reference, including non-primary files.
 pub fn entity_inputs(root: &Path) -> R<Vec<String>> {
-    let manifest = read_json(&root.join(ORIGINAL))?;
+    let manifest = json::read(&root.join(ORIGINAL))?;
     cases(&manifest)?
         .iter()
         .flat_map(entities)
@@ -168,7 +167,7 @@ fn original_inputs(mut manifest: Value) -> R<Value> {
 }
 
 fn original(root: &Path) -> R<Vec<Case>> {
-    let manifest = original_inputs(read_json(&root.join(ORIGINAL))?)?;
+    let manifest = original_inputs(json::read(&root.join(ORIGINAL))?)?;
     let rows = cases(&manifest)?;
     let requests: usize = rows
         .iter()
@@ -1265,7 +1264,7 @@ fn reference(root: &Path, input: &Path, row: &Value, recording: Recording<'_>) -
     argv.extend(crate::harness::report::case_arguments(row));
     let Some(done) = worker::run_in(&argv, &[], Some(root), worker::DEFAULT_TIMEOUT)? else {
         let timeout = Value::object([("status", Value::str("timeout"))]);
-        write_json(&recording.directory.join(format!("{id}.json")), &timeout)?;
+        json::write(&recording.directory.join(format!("{id}.json")), &timeout)?;
         return Ok(timeout);
     };
     save_reference_result(id, recording.directory, &argv, &done)
@@ -1305,7 +1304,7 @@ fn save_reference_result(
         ("stderr_sha256", Value::str(sha256::hex(&done.stderr))),
         ("observation", observation.clone()),
     ]);
-    write_json(&directory.join(format!("{id}.json")), &raw)?;
+    json::write(&directory.join(format!("{id}.json")), &raw)?;
     if done.code == 0
         && observation
             .get("data")
@@ -1367,7 +1366,7 @@ fn produce(paths: &Paths, recording: Option<Recording<'_>>) -> R<String> {
     let mut authored = all_cases(&paths.root)?;
     let pinned_path = paths.root.join("harness").join(FEATURE).join("corpus.json");
     let previous = if recording.is_none() || pinned_path.is_file() {
-        Some(read_json(&pinned_path)?)
+        Some(json::read(&pinned_path)?)
     } else {
         None
     };
@@ -1517,7 +1516,7 @@ fn produce(paths: &Paths, recording: Option<Recording<'_>>) -> R<String> {
     }
     let contract = contract(&authored)?;
     if recording.is_none()
-        && read_json(
+        && json::read(
             &paths
                 .root
                 .join("harness")
@@ -1532,7 +1531,7 @@ fn produce(paths: &Paths, recording: Option<Recording<'_>>) -> R<String> {
     paths.manifest(&format!("{FEATURE}/corpus.json"), &manifest)?;
     paths.manifest(&format!("{FEATURE}/contract.json"), &contract)?;
     if let Some(recording) = recording {
-        write_json(
+        json::write(
             &recording.directory.join("INDEX.json"),
             &Value::object([
                 ("complete", Value::Bool(true)),
@@ -1634,7 +1633,7 @@ pub fn main(root: &Path, args: &[String]) -> R<()> {
         .transpose()?;
     let reference = reference
         .map(|worker| -> R<_> {
-            let identity = read_json(&root.join("target/harness/identity.json"))?;
+            let identity = json::read(&root.join("target/harness/identity.json"))?;
             if let Some(error) = crate::harness::provenance::source_identity_error(root, &identity)
             {
                 return Err(error);

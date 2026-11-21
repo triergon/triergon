@@ -10,7 +10,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use crate::harness::{manifest, provenance};
 use crate::json::{self, Value};
 use crate::worker_tests::items;
-use crate::{corpus, process, python, sha256};
+use crate::{process, python, sha256};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 const USAGE: &str = "cargo xtask core-time [--output DIR] [--profiles debug release] [--toolchain NAME] [--target TRIPLE]";
@@ -525,7 +525,7 @@ fn run(root: &Path, args: &[String]) -> Result<()> {
         ),
     ]);
     let report_path = out.join("report.json");
-    corpus::write_json(&report_path, &report)?;
+    json::write(&report_path, &report)?;
     let latest = out.join("latest.tmp");
     fs::copy(report_path, &latest)?;
     fs::rename(latest, destination.join("report.json"))?;

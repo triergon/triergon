@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use crate::json::Value;
+use crate::json::{self, Value};
 
 const FILE: &str = "harness/policy.json";
 
@@ -75,7 +75,7 @@ fn section(
     name: &'static str,
 ) -> Result<impl Fn(&str) -> Result<f64, String>, String> {
     let path = root.join(FILE);
-    let policy = crate::checks::read_json(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let policy = json::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok(move |key: &str| {
         policy
             .get(name)

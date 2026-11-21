@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::sha256;
 
 use super::plan::{ISOBMFF_GRADE_TARGET, ISOBMFF_PARTS, capture_cases, items, report_features};
@@ -50,7 +50,7 @@ pub(super) fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i3
     let mut records_by_shard = Vec::new();
     let mut identities: Vec<(String, String)> = Vec::new();
     for directory in directories {
-        let shard = crate::checks::read_json(&directory.join(SHARD))
+        let shard = json::read(&directory.join(SHARD))
             .map_err(|e| format!("{}: {e}", directory.join(SHARD).display()))?;
         let mut records = Vec::new();
         if let Ok(entries) = fs::read_dir(directory.join("steps")) {
@@ -59,7 +59,7 @@ pub(super) fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i3
                 let name = entry.file_name();
                 let name = name.to_string_lossy();
                 if !name.starts_with('.') && name.ends_with(".json") {
-                    records.push(crate::checks::read_json(&entry.path())?);
+                    records.push(json::read(&entry.path())?);
                 }
             }
         }
@@ -254,7 +254,7 @@ pub(super) fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i3
         failed.len(),
         open.len()
     );
-    crate::corpus::write_json(
+    json::write(
         file,
         &Value::object([
             ("schema", Value::str("gate-summary-v1")),

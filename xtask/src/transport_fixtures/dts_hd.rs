@@ -1,7 +1,6 @@
 //! Specification-authored DTS-HD headers and finite aligned PES controls.
 use super::{Codec, Part, R, Transport, cases, part};
-use crate::checks::read_json;
-use crate::corpus::{Paths, write_json};
+use crate::corpus::Paths;
 use crate::json::{self, Value};
 use crate::sha256;
 use std::fs;
@@ -323,7 +322,7 @@ fn generate_feature(
 ) -> R<()> {
     let file = format!("features/{feature}/corpus.json");
     let previous = if reference.is_none() {
-        Some(read_json(&paths.root.join("harness").join(&file))?)
+        Some(json::read(&paths.root.join("harness").join(&file))?)
     } else {
         None
     };
@@ -423,7 +422,7 @@ fn generate_feature(
     {
         return Err("DTS-HD authored inputs differ from the pinned manifest".into());
     }
-    write_json(&paths.out.join("harness").join(file), &manifest)?;
+    json::write(&paths.out.join("harness").join(file), &manifest)?;
     Ok(())
 }
 

@@ -145,8 +145,7 @@ pub fn finish(
     let Some(compare) = compare else {
         return Ok(0);
     };
-    let before =
-        crate::checks::read_json(compare).map_err(|e| format!("{}: {e}", compare.display()))?;
+    let before = json::read(compare).map_err(|e| format!("{}: {e}", compare.display()))?;
     let empty = Value::Object(Vec::new());
     let before = before.get("outputs").unwrap_or(&empty);
     let after = record.get("outputs").unwrap_or(&empty);
@@ -248,7 +247,7 @@ pub fn run(
             }
         }
     }
-    let workloads = crate::checks::read_json(&root.join("harness/codecs/workloads.json"))?;
+    let workloads = json::read(&root.join("harness/codecs/workloads.json"))?;
     for workload in workloads
         .get("workloads")
         .and_then(Value::as_array)

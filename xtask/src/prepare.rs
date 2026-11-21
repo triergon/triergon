@@ -294,7 +294,7 @@ pub fn prepare(
     let prefix = cache.join("install");
     let argv = configure_argv(&prefix, profile);
     let record = cache.join("configure-argv.json");
-    let recorded = crate::checks::read_json(&record).ok();
+    let recorded = json::read(&record).ok();
     let wanted = Value::strings(argv.iter().cloned());
     let configuration = Value::object([
         ("arguments", wanted.clone()),
@@ -403,7 +403,7 @@ pub fn prepare(
         ));
     }
     let path = cache.join("build.json");
-    crate::corpus::write_json(&path, &Value::object(manifest))?;
+    json::write(&path, &Value::object(manifest))?;
     Ok(path.display().to_string())
 }
 
@@ -621,12 +621,12 @@ pub fn configure(
 ) -> Result<Value, String> {
     let wanted = Value::strings(argv.iter().cloned());
     let configured = source.join(marker).exists();
-    if !configured || crate::checks::read_json(record).ok().as_ref() != Some(&wanted) {
+    if !configured || json::read(record).ok().as_ref() != Some(&wanted) {
         if configured {
             run(Command::new("make").arg("distclean").current_dir(source))?;
         }
         run(Command::new(&argv[0]).args(&argv[1..]).current_dir(source))?;
-        crate::corpus::write_json(record, &wanted)?;
+        json::write(record, &wanted)?;
     }
     Ok(wanted)
 }
@@ -705,7 +705,7 @@ fn release_manifest(
         ),
     ]);
     let path = cache.join("build.json");
-    crate::corpus::write_json(&path, &manifest)?;
+    json::write(&path, &manifest)?;
     Ok(path.display().to_string())
 }
 

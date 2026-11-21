@@ -16,8 +16,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use super::{gate_build, linux, validation};
-use crate::checks::read_json;
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask preflight [--feature ID]... [--corpus ID=DIR]...
@@ -165,7 +164,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     }
     let options = Options::parse(root, args)?;
     let mut checks = Checks::default();
-    let identity = read_json(&root.join("target/harness/identity.json"));
+    let identity = json::read(&root.join("target/harness/identity.json"));
     checks.check(
         "build identity",
         identity
@@ -355,7 +354,7 @@ fn workers(root: &Path, identity: &Value) -> R<String> {
 /// Every case of a feature names references the identity holds and has every
 /// input it reads with its pinned hash.
 fn feature(root: &Path, identity: &Value, id: &str, options: &Options) -> R<String> {
-    let contract = read_json(&root.join("harness/features").join(id).join("contract.json"))?;
+    let contract = json::read(&root.join("harness/features").join(id).join("contract.json"))?;
     let manifest_path = options.manifest(root, id);
     let (manifest, _) = super::manifest::read(root, &manifest_path)?;
     let corpus = options.corpus(root, id, &manifest);
@@ -412,7 +411,7 @@ fn workloads(list: &Value) -> Vec<(&str, Option<(&str, &str)>)> {
 
 /// Every workload's input exists with its pinned hash.
 fn codec_inputs(root: &Path, workloads: &Path) -> R<String> {
-    let list = read_json(workloads)?;
+    let list = json::read(workloads)?;
     let entries = self::workloads(&list);
     let mut problems = Vec::new();
     for (id, input) in &entries {
@@ -471,7 +470,7 @@ fn correctness_files(root: &Path, lanes: &[String]) -> R<Vec<(PathBuf, Option<St
 /// vectors fails.
 fn lane_files(root: &Path, manifest: &str, lanes: &[&str]) -> R<Vec<(PathBuf, Option<String>)>> {
     let mut files = vec![(root.join(manifest), None)];
-    let listed = read_json(&root.join(manifest))?;
+    let listed = json::read(&root.join(manifest))?;
     let vectors = listed
         .get("vectors")
         .and_then(Value::as_array)
@@ -521,7 +520,7 @@ const VECTOR_CONTRACT: &str = "harness/features/matroska-segment-metadata/contra
 
 /// The mandatory external vectors: each path in the sample cache with its pin.
 fn external_vectors(root: &Path) -> R<Vec<(PathBuf, String)>> {
-    let contract = read_json(&root.join(VECTOR_CONTRACT))?;
+    let contract = json::read(&root.join(VECTOR_CONTRACT))?;
     let specs = contract
         .get("required_additional_vectors")
         .and_then(Value::as_array)
@@ -619,7 +618,7 @@ pub fn inputs(root: &Path, args: &[String], manifest: &dyn Fn(&Path) -> R<Value>
     }
     for list in &options.codecs {
         add(list.clone(), None);
-        for (id, input) in workloads(&read_json(list)?) {
+        for (id, input) in workloads(&json::read(list)?) {
             let (path, pin) =
                 input.ok_or_else(|| format!("{}: {id}: no path or hash", list.display()))?;
             add(root.join(path), Some(pin));
@@ -653,7 +652,7 @@ const CAPTURE_GENERATOR: &str = "harness/capture/generate_inputs.py";
 
 /// The capture cases exist, and the Python that generates their inputs has numpy.
 fn capture_inputs(root: &Path, cases: &Path) -> R<String> {
-    let listed = read_json(cases)?;
+    let listed = json::read(cases)?;
     let count = listed
         .get("cases")
         .and_then(Value::as_array)
@@ -696,7 +695,7 @@ fn module_review(root: &Path, review: &Path) -> R<String> {
             review.display()
         ));
     }
-    let document = read_json(review)?;
+    let document = json::read(review)?;
     let source = linux::file_sha(&root.join("harness/rss-bound/triergon_rss_bound.c"))?;
     let text = |key: &str| document.get(key).and_then(Value::as_str);
     if text("module_source_sha256") != Some(source.as_str()) {
@@ -726,7 +725,7 @@ fn module_absent() -> R<String> {
 
 /// Kernel-bound memory needs the module loaded under a current proof.
 fn kernel_proof(root: &Path) -> R<String> {
-    let identity = read_json(&root.join("target/harness/identity.json"))?;
+    let identity = json::read(&root.join("target/harness/identity.json"))?;
     let instrumentation = validation::field(&identity, "instrumentation")?;
     let profile = linux::load_kernel_profile(
         root,
@@ -795,7 +794,7 @@ mod tests {
         let source = linux::file_sha(&root.join("harness/rss-bound/triergon_rss_bound.c")).unwrap();
         let reviews = std::fs::read_dir(root.join("harness/rss-bound/reviews")).unwrap();
         let reviewed = reviews.flatten().any(|entry| {
-            let review = read_json(&entry.path()).unwrap();
+            let review = json::read(&entry.path()).unwrap();
             entry
                 .file_name()
                 .to_string_lossy()

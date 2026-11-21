@@ -7,7 +7,7 @@ use std::fmt;
 use std::path::Path;
 
 use super::policy::Policy;
-use crate::json::Value;
+use crate::json::{self, Value};
 
 /// A bound the gate grades each case on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -217,7 +217,7 @@ pub fn verdict(
 /// command whose collections have no grade to join them: reads its `report.json`,
 /// prints the lines and returns whether the step fails.
 pub fn collection_verdict(root: &Path, options: &super::report::Options) -> Result<bool, String> {
-    let read = crate::checks::read_json;
+    let read = json::read;
     let report = read(&options.output.join("report.json"))?;
     let contract = read(&options.contract)?;
     let (manifest, _) = super::manifest::read(root, &options.manifest)?;

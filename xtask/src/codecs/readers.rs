@@ -347,11 +347,8 @@ impl Rules {
     pub fn load(root: &Path) -> Result<Rules, String> {
         let rules = root.join(RULES);
         let differences = root.join(DIFFERENCES);
-        Rules::parse(
-            &crate::checks::read_json(&rules)?,
-            &crate::checks::read_json(&differences)?,
-        )
-        .map_err(|e| format!("{} / {}: {e}", rules.display(), differences.display()))
+        Rules::parse(&json::read(&rules)?, &json::read(&differences)?)
+            .map_err(|e| format!("{} / {}: {e}", rules.display(), differences.display()))
     }
 
     fn parse(document: &Value, differences: &Value) -> Result<Rules, String> {
@@ -540,8 +537,7 @@ fn decimal(text: &str) -> bool {
 impl SeekCase {
     /// The cases of a seek manifest.
     pub fn load(path: &Path) -> Result<Vec<SeekCase>, String> {
-        SeekCase::parse(&crate::checks::read_json(path)?)
-            .map_err(|e| format!("{}: {e}", path.display()))
+        SeekCase::parse(&json::read(path)?).map_err(|e| format!("{}: {e}", path.display()))
     }
 
     fn parse(document: &Value) -> Result<Vec<SeekCase>, String> {
@@ -1864,7 +1860,7 @@ fn view_status(row: &Value, view: &str) -> Option<String> {
 /// JSON row per input to `--out` and printing one line each, then the status counts
 /// per lane and view; the unexplained differences go to `OUT.differences.json`.
 pub fn run(options: &Options) -> Result<(), String> {
-    let manifest = crate::checks::read_json(&options.manifest)?;
+    let manifest = json::read(&options.manifest)?;
     let vectors = manifest
         .get("vectors")
         .and_then(Value::as_array)

@@ -1,6 +1,6 @@
 //! Pinned static mpg123 for the free-format transport comparison.
 use crate::fetch::Network;
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::prepare::{PinnedRelease, unpack_release, verify_release_tree};
 use crate::process::{output, run};
 use std::path::Path;
@@ -84,7 +84,7 @@ pub fn prepare(root: &Path, args: &[String]) -> Result<(), String> {
                 Value::object([("install/lib/libmpg123.a", Value::str(hash))]),
             ),
         ]);
-        crate::corpus::write_json(&cache.join("build.json"), &identity)?;
+        json::write(&cache.join("build.json"), &identity)?;
         Ok("Prepared static mpg123".into())
     })?;
     println!("{result}");

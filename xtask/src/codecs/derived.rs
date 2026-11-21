@@ -9,7 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::{fetch, sha256};
 
 /// How each derived stream is made.
@@ -39,11 +39,11 @@ pub struct Stream {
 /// Every derived stream, joined with its manifest vector. Each recipe names a
 /// vector below [`DIRECTORY`], and each such vector has exactly one recipe.
 pub fn streams(root: &Path) -> Result<Vec<Stream>, String> {
-    let recipes = crate::checks::read_json(&root.join(RECIPES))?;
+    let recipes = json::read(&root.join(RECIPES))?;
     if recipes.get("schema").and_then(Value::as_str) != Some(SCHEMA) {
         return Err(format!("{RECIPES}: not {SCHEMA}"));
     }
-    let manifest = crate::checks::read_json(&root.join(MANIFEST))?;
+    let manifest = json::read(&root.join(MANIFEST))?;
     let vectors = manifest
         .get("vectors")
         .and_then(Value::as_array)

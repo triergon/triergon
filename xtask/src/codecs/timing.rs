@@ -116,7 +116,7 @@ fn iterations(workload: &Value) -> Result<u32, String> {
 }
 
 pub fn run(options: &Options) -> Result<(), String> {
-    let manifest = crate::checks::read_json(&options.workloads)
+    let manifest = json::read(&options.workloads)
         .map_err(|e| format!("{}: {e}", options.workloads.display()))?;
     let workloads = manifest
         .get("workloads")

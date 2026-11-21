@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Instant;
 
-use crate::json::Value;
+use crate::json::{self, Value};
 
 use super::plan::CAPTURE_QUALIFY;
 use super::{Item, Placement, R, SHARD, Stage, Step, git, owned, parse_part, shard_items, status};
@@ -77,7 +77,7 @@ pub(super) fn run(
     let log = output.join("run.log");
     let revision = git(root, &["rev-parse", "HEAD"])?;
     let changes = git(root, &["status", "--short", "--untracked-files=no"])?;
-    crate::corpus::write_json(
+    json::write(
         &output.join(SHARD),
         &Value::object([
             ("index", Value::int(shard.0 as i64 + 1)),
@@ -307,7 +307,7 @@ pub(super) fn run_batch(
     let mut failed = 0;
     for ((item, step), result) in steps.iter().zip(results) {
         let status = result
-            .and_then(|result| crate::checks::read_json(&result).ok())
+            .and_then(|result| json::read(&result).ok())
             .and_then(|result| result.get("status").and_then(Value::as_f64))
             .map_or(1, |status| status as i32);
         if record_step(output, log, item, step, cpus, &ran, status)? != 0 {
@@ -422,7 +422,7 @@ pub(super) fn record_step(
         ("status", Value::int(i64::from(code))),
         ("outcome", Value::strings(outcome)),
     ]);
-    crate::corpus::write_json(
+    json::write(
         &output.join("steps").join(format!("{}.json", step.name)),
         &Value::object(fields),
     )?;
@@ -512,8 +512,7 @@ pub(super) fn unmeasured_cases(step: &Step) -> Vec<String> {
     let check = || {
         let contents =
             fs::read_to_string(output.join(filename)).map_err(|e| format!("no report: {e}"))?;
-        let report =
-            crate::json::parse_observations(&contents).map_err(|e| format!("{filename}: {e}"))?;
+        let report = json::parse_observations(&contents).map_err(|e| format!("{filename}: {e}"))?;
         unmeasured_in(step, &report, key, measured)
     };
     check().unwrap_or_else(|error| vec![error])

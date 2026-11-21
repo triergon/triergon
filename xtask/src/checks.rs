@@ -89,7 +89,7 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
         rel.extension().is_some_and(|e| e == "json")
     }) {
         let rel = path.strip_prefix(root).expect("walked under root");
-        match read_json(&path) {
+        match json::read(&path) {
             Ok(document) => data.push((rel.display().to_string(), document)),
             Err(error) => errors.push(format!("{}: {error}", rel.display())),
         }
@@ -139,7 +139,7 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
 fn open_bounds_error(contract_path: &Path, contract: &Value) -> Option<String> {
     contract.get("open_bounds")?;
     let corpus = contract_path.with_file_name("corpus.json");
-    let manifest = match read_json(&corpus) {
+    let manifest = match json::read(&corpus) {
         Ok(manifest) => manifest,
         Err(error) => {
             return Some(format!(
@@ -166,7 +166,7 @@ fn contract_fields(root: &Path) -> Vec<String> {
                 .expect("walked under root")
                 .display()
                 .to_string();
-            let errors = match read_json(&path) {
+            let errors = match json::read(&path) {
                 Ok(contract) => [
                     crate::harness::worker::contract_timeout(&contract)
                         .and(crate::harness::worker::contract_parity_timeout(&contract))
@@ -204,7 +204,7 @@ fn policy_values(root: &Path) -> Vec<String> {
         }
         Err(error) => errors.push(error),
     }
-    let policy = read_json(&root.join("harness/policy.json")).unwrap_or(Value::Null);
+    let policy = json::read(&root.join("harness/policy.json")).unwrap_or(Value::Null);
     let pairs = policy
         .get("runtime")
         .and_then(|runtime| runtime.get("minimum_pairs"))
@@ -602,11 +602,6 @@ fn git(root: &Path, args: &[&str]) -> Result<String, String> {
     }
     let text = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
     Ok(text.trim_end().to_owned())
-}
-
-pub fn read_json(path: &Path) -> Result<Value, String> {
-    let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    json::parse(&text).map_err(|e| e.to_string())
 }
 
 /// The workspace has only owned packages, no build scripts, and no unsafe code.

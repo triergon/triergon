@@ -37,17 +37,9 @@ impl Paths {
 
     pub(crate) fn manifest(&self, name: &str, value: &Value) -> Result<PathBuf, String> {
         let path = self.out.join("harness").join(name);
-        write_json(&path, value)?;
+        json::write(&path, value)?;
         Ok(path)
     }
-}
-
-pub fn write_json(path: &Path, value: &Value) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
-    }
-    fs::write(path, json::to_python(value, Some(2)) + "\n")
-        .map_err(|e| format!("{}: {e}", path.display()))
 }
 
 fn write(path: &Path, data: &[u8]) -> Result<(), String> {
@@ -796,7 +788,7 @@ fn mp4_range_expected((packets, bytes, digest): (u32, u32, u64)) -> Value {
 }
 
 fn mp4_range_fate_cases(root: &Path) -> Result<Vec<Value>, String> {
-    let registry = crate::checks::read_json(&root.join("harness/fate/samples.json"))?;
+    let registry = json::read(&root.join("harness/fate/samples.json"))?;
     let samples = registry
         .get("samples")
         .and_then(Value::as_array)
@@ -963,8 +955,8 @@ pub struct Source {
 
 impl Source {
     pub fn load(root: &Path) -> Result<Self, String> {
-        let trace = crate::checks::read_json(&root.join(SOURCE_TRACE))
-            .map_err(|e| format!("{SOURCE_TRACE}: {e}"))?;
+        let trace =
+            json::read(&root.join(SOURCE_TRACE)).map_err(|e| format!("{SOURCE_TRACE}: {e}"))?;
         let data = trace
             .get("data")
             .cloned()
@@ -1103,7 +1095,7 @@ pub fn structural(profile: &str) -> Vec<u8> {
 fn base(paths: &Paths) -> Result<String, String> {
     let output = paths.fixtures("fixtures")?;
     let seeds = paths.root.join("harness/fixtures/encoded");
-    let canonical = crate::checks::read_json(&seeds.join("manifest.json"))?;
+    let canonical = json::read(&seeds.join("manifest.json"))?;
     let mut cases = Vec::new();
     for case in canonical
         .get("cases")

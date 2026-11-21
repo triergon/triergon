@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::fetch::{Source, Transport};
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::prepare::{PinnedRelease, configure, unpack_release, verify_release_tree};
 use crate::process::{output, run};
 use crate::sha256;
@@ -95,7 +95,7 @@ fn compile_harfbuzz(cache: &Path, harfbuzz: &Path) -> Result<PathBuf, String> {
             ("object_sha256", Value::str(object)),
         ])
     };
-    let recorded = crate::checks::read_json(&record).ok();
+    let recorded = json::read(&record).ok();
     if let Ok(data) = fs::read(&object)
         && recorded == Some(compiled(&sha256::hex(&data)))
     {
@@ -108,7 +108,7 @@ fn compile_harfbuzz(cache: &Path, harfbuzz: &Path) -> Result<PathBuf, String> {
         .arg("-o")
         .arg(&object))?;
     let data = fs::read(&object).map_err(|e| format!("{}: {e}", object.display()))?;
-    crate::corpus::write_json(&record, &compiled(&sha256::hex(&data)))?;
+    json::write(&record, &compiled(&sha256::hex(&data)))?;
     Ok(object)
 }
 
@@ -200,7 +200,7 @@ pub fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, S
         ),
     ]);
     let path = cache.join("build.json");
-    crate::corpus::write_json(&path, &manifest)?;
+    json::write(&path, &manifest)?;
     Ok(path)
 }
 

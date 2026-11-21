@@ -11,7 +11,7 @@ fn prefix_traces_require_the_reference_and_secondary_input_pins() {
     let input = crate::sha256::hex(b"first");
     let secondary = crate::sha256::hex(b"original");
     let identity = |pin: &str| {
-        crate::json::parse(&format!(
+        json::parse(&format!(
                 r#"{{"comparison_references":{{"reference":{{"path":"reference","sha256":"{pin}"}}}}}}"#,
             ))
             .unwrap()
@@ -30,7 +30,7 @@ fn prefix_traces_require_the_reference_and_secondary_input_pins() {
             "companion-hash-mismatch",
         ),
     ] {
-        let case = crate::json::parse(&format!(
+        let case = json::parse(&format!(
             r#"{{"id":"case","file":"first","sha256":"{input}",{inputs}}}"#,
         ))
         .unwrap();
@@ -159,7 +159,7 @@ fn setup(with_workers: bool) -> PathBuf {
 }
 
 fn receipt(root: &Path, label: &str) -> Value {
-    read_json(&root.join(format!(".research/reference/fate-{label}.json"))).unwrap()
+    json::read(&root.join(format!(".research/reference/fate-{label}.json"))).unwrap()
 }
 
 #[test]

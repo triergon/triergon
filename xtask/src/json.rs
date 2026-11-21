@@ -433,6 +433,22 @@ impl fmt::Display for Error {
     }
 }
 
+/// The JSON document in the file at `path`.
+pub fn read(path: &std::path::Path) -> Result<Value, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    parse(&text).map_err(|e| e.to_string())
+}
+
+/// Writes `value` to `path` indented by two spaces as Python's `json.dump` does, with a
+/// final newline, creating the directory it is in.
+pub fn write(path: &std::path::Path, value: &Value) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+    }
+    std::fs::write(path, to_python(value, Some(2)) + "\n")
+        .map_err(|e| format!("{}: {e}", path.display()))
+}
+
 /// Parse one JSON document; surrounding whitespace is allowed, trailing data is not.
 pub fn parse(text: &str) -> Result<Value, Error> {
     parse_with(text, ParseMode::Python)

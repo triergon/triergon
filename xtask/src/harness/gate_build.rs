@@ -11,8 +11,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::checks::read_json;
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::{sha256, toml};
 
 /// The compiler release `rust-toolchain.toml` pins.
@@ -549,7 +548,7 @@ pub fn pair_refusals(root: &Path, candidate: &Path, reference: &Path) -> Vec<Str
 /// [`pair_refusals`] for a measurement whose workloads are split among `candidates`:
 /// each must be a worker of the recorded build.
 pub fn workers_refusals(root: &Path, candidates: &[&Path], reference: &Path) -> Vec<String> {
-    let identity = match read_json(&root.join("target/harness/identity.json")) {
+    let identity = match json::read(&root.join("target/harness/identity.json")) {
         Ok(identity) => identity,
         Err(error) => return vec![format!("no build identity: {error}")],
     };

@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::sha256;
 
 use super::plan::{capture_cases, items, report_features};
@@ -91,7 +91,7 @@ impl Tree {
     fn manifest(&self, path: &Path) -> R<Value> {
         let relative = self.relative(path)?;
         if self.committed.contains(&relative) {
-            return crate::checks::read_json(path);
+            return json::read(path);
         }
         generated_manifest(&self.root, path)
             .unwrap_or_else(|| Err(format!("{relative}: no committed or generated manifest")))

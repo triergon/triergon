@@ -212,7 +212,7 @@ fn a_memory_run_measures_the_cases_of_a_reused_timing_run() {
     ]);
     let index = root.join(crate::evidence::SETS).join("earlier-run.json");
     fs::create_dir_all(index.parent().unwrap()).unwrap();
-    crate::corpus::write_json(&index, &set).unwrap();
+    json::write(&index, &set).unwrap();
 
     // This run reuses the timing step: its records are restored, nothing is timed.
     let timing = root.join(".research/gate/new/capture-c01-timing");

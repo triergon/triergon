@@ -216,7 +216,7 @@ fn contract_paths_cannot_escape_the_cache() {
 #[test]
 fn spec_catalog_matches_the_manifest() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-    let manifest = crate::checks::read_json(&root.join("specs/sources.json")).unwrap();
+    let manifest = json::read(&root.join("specs/sources.json")).unwrap();
     let mut ids: Vec<_> = manifest
         .get("sources")
         .and_then(Value::as_array)

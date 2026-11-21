@@ -398,8 +398,7 @@ pub fn items<'v>(value: &'v Value, key: &str) -> Result<&'v [Value], String> {
 
 /// The `cases` of a feature corpus manifest.
 pub fn corpus_cases(root: &Path, feature: &str) -> Result<Vec<Value>, String> {
-    let manifest =
-        crate::checks::read_json(&root.join(format!("harness/features/{feature}/corpus.json")))?;
+    let manifest = json::read(&root.join(format!("harness/features/{feature}/corpus.json")))?;
     Ok(items(&manifest, "cases")?.to_vec())
 }
 

@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::harness::features::{Gate, gate};
 use crate::harness::manifest::canonical;
-use crate::json::Value;
+use crate::json::{self, Value};
 
 type R<T> = Result<T, String>;
 
@@ -105,7 +105,7 @@ fn contract_path(root: &Path, id: &str) -> PathBuf {
 /// The contract of feature `id`.
 fn contract(root: &Path, id: &str) -> R<Value> {
     let path = contract_path(root, id);
-    crate::checks::read_json(&path).map_err(|e| format!("{}: {e}", path.display()))
+    json::read(&path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 fn required_gate(root: &Path, id: &str) -> R<Gate> {
@@ -122,8 +122,7 @@ fn reference_name<'a>(document: &'a Value, feature: &str) -> R<&'a str> {
 /// The pins of `id`: case id to expected work.
 fn pins(root: &Path, id: &str) -> R<Vec<(String, Value)>> {
     let path = pins_path(root, id);
-    let document =
-        crate::checks::read_json(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let document = json::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     let contract = contract(root, id)?;
     if document.get("reference").and_then(Value::as_str) != Some(reference_name(&contract, id)?) {
         return Err(format!(
@@ -359,7 +358,7 @@ impl Generator {
     /// per target gets this host's entries, if the host's target is one of its
     /// `required_targets`, and keeps the other targets'.
     pub fn record(&self, root: &Path) -> R<()> {
-        let identity = crate::checks::read_json(&root.join("target/harness/identity.json"))?;
+        let identity = json::read(&root.join("target/harness/identity.json"))?;
         self.record_with(
             root,
             &crate::harness::report::gate_target()?,
@@ -459,7 +458,7 @@ impl Generator {
                 by_target.sort_by(|a, b| a.0.cmp(&b.0));
                 pinned.push((id.to_owned(), Value::Object(by_target)));
             }
-            crate::corpus::write_json(
+            json::write(
                 &pins_path(root, feature),
                 &self.pin_file(reference, &contract, pinned),
             )?;
@@ -485,7 +484,7 @@ impl Generator {
                 .get("cases")
                 .and_then(Value::as_array)
                 .map_or(0, <[_]>::len);
-            crate::corpus::write_json(&path, &manifest)?;
+            json::write(&path, &manifest)?;
             println!("{}: {cases} cases", path.display());
         }
         Ok(())
@@ -617,8 +616,8 @@ fn fold(worker: &Path, mode: &str, directory: &Path, row: &Value) -> R<Value> {
     if !output.status.success() {
         return Err(format!("{id}: the reference failed: {}", output.status));
     }
-    let data = crate::json::parse(&String::from_utf8_lossy(&output.stdout))
-        .map_err(|e| format!("{id}: {e}"))?;
+    let data =
+        json::parse(&String::from_utf8_lossy(&output.stdout)).map_err(|e| format!("{id}: {e}"))?;
     let mut pin: Vec<(&str, Value)> = ["packets", "bytes", "digest"]
         .map(|key| (key, data.get(key).cloned().unwrap_or(Value::Null)))
         .into();

@@ -2,7 +2,6 @@
 mod xll;
 
 use super::{Codec, PID, PROGRAM, Part, R, Transport, part, source};
-use crate::corpus::write_json;
 use crate::json::{self, Value};
 use crate::sha256;
 use std::fs;
@@ -402,7 +401,7 @@ fn silence(header: [u8; 4], length: usize) -> Vec<u8> {
 }
 
 fn manifest(root: &Path, feature: &str, cases: Vec<Value>) -> R<()> {
-    write_json(
+    json::write(
         &root.join(format!("harness/features/{feature}/corpus.json")),
         &Value::object([
             ("schema", Value::int(1)),

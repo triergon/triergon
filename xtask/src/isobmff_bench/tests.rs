@@ -504,7 +504,7 @@ fn streamed_report_retains_raw_samples_aliases_and_proof_fields() {
         ),
     ]);
     final_report(&out, &base, &rows, &summary).unwrap();
-    let report = read_json(&out.join("report.json")).unwrap();
+    let report = json::read(&out.join("report.json")).unwrap();
     assert_eq!(report.get("schema"), Some(&Value::int(1)));
     assert!(
         report
@@ -582,7 +582,7 @@ fn streamed_report_keeps_the_complete_ordered_membership() {
         &summary,
     )
     .unwrap();
-    let report = read_json(&out.join("report.json")).unwrap();
+    let report = json::read(&out.join("report.json")).unwrap();
     assert!(
         report
             .get("cases")

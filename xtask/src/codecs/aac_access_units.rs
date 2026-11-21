@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::{checks, corpus, harness, json, prepare, process, python, sha256};
+use crate::{harness, json, prepare, process, python, sha256};
 use json::Value;
 
 use super::correctness::{Rules, channel_stats};
@@ -53,11 +53,11 @@ struct Comparison {
 impl Comparison {
     fn load(root: &Path, paths: Option<(&Path, &Path)>) -> Result<Self, String> {
         let contract_path = root.join(FEATURE).join("contract.json");
-        let contract = checks::read_json(&contract_path)?;
+        let contract = json::read(&contract_path)?;
         if string(&contract, "operation")? != OPERATION {
             return Err("invalid AAC worker operation".into());
         }
-        let identity = checks::read_json(&root.join("target/harness/identity.json"))?;
+        let identity = json::read(&root.join("target/harness/identity.json"))?;
         let candidate_name = string(&contract, "candidate")?;
         let candidate_record = identity
             .get("additional_candidates")
@@ -152,7 +152,7 @@ pub(super) fn measurement_parity(
     }) {
         return Ok(None);
     }
-    if *manifest != checks::read_json(&root.join(FEATURE).join("corpus.json"))? {
+    if *manifest != json::read(&root.join(FEATURE).join("corpus.json"))? {
         return Err("AAC measurement requires the complete pinned workload set".into());
     }
     let comparison = Comparison::load(root, Some((candidates.of(OPERATION), reference)))?;
@@ -320,9 +320,9 @@ fn vectors(manifest: &Value) -> Result<&[Value], String> {
 }
 
 pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
-    let quicktime = checks::read_json(&root.join("harness/codecs/aac/mov-manifest.json"))?;
+    let quicktime = json::read(&root.join("harness/codecs/aac/mov-manifest.json"))?;
     let feature = root.join(FEATURE);
-    let authored = checks::read_json(&feature.join("sources.json"))?;
+    let authored = json::read(&feature.join("sources.json"))?;
     let sources = vectors(&quicktime)?
         .iter()
         .map(|source| (source, OPERATION))
@@ -468,22 +468,22 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
         return Err("AAC comparison tools or rules changed during parity".into());
     }
     let pinned = root.join(FEATURE).join("corpus.json");
-    if !record && checks::read_json(&pinned)? != workloads {
+    if !record && json::read(&pinned)? != workloads {
         return Err("AAC access-unit workload differs from its pins".into());
     }
     let workload_path = out.join("workloads.json");
-    corpus::write_json(&workload_path, &workloads)?;
+    json::write(&workload_path, &workloads)?;
     let parity = Value::object([
         ("comparison", comparison.binding),
         ("workloads_sha256", Value::str(file_sha(&workload_path)?)),
         ("cases", Value::Array(results)),
     ]);
-    corpus::write_json(&out.join(PARITY_FILE), &parity)?;
+    json::write(&out.join(PARITY_FILE), &parity)?;
     if !accepted {
         return Err("AAC speaker order or PCM differs from the reference".into());
     }
     if record {
-        corpus::write_json(&pinned, &workloads)?;
+        json::write(&pinned, &workloads)?;
     }
     Ok(())
 }

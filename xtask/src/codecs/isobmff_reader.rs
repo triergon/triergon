@@ -86,7 +86,7 @@ pub fn verify_inputs(root: &Path) -> Result<String, String> {
 
 /// The cases of `corpus.json`, checked against the counts the contract states.
 pub fn corpus(root: &Path) -> Result<Vec<Case>, String> {
-    let manifest = crate::checks::read_json(&root.join(FEATURE).join("corpus.json"))?;
+    let manifest = json::read(&root.join(FEATURE).join("corpus.json"))?;
     if manifest.get("schema").and_then(Value::as_str) != Some(CORPUS_SCHEMA) {
         return Err(format!(
             "{FEATURE}/corpus.json: schema is not {CORPUS_SCHEMA}"
@@ -123,7 +123,7 @@ pub fn corpus(root: &Path) -> Result<Vec<Case>, String> {
             seek,
         });
     }
-    let contract = crate::checks::read_json(&root.join(FEATURE).join("contract.json"))?;
+    let contract = json::read(&root.join(FEATURE).join("contract.json"))?;
     let stated = |key: &str| {
         contract
             .get("counts")
@@ -298,11 +298,8 @@ impl Rules {
     pub fn load(root: &Path) -> Result<Rules, String> {
         let rules = root.join(FEATURE).join("rules.json");
         let differences = root.join(FEATURE).join("differences.json");
-        Rules::parse(
-            &crate::checks::read_json(&rules)?,
-            &crate::checks::read_json(&differences)?,
-        )
-        .map_err(|e| format!("{} / {}: {e}", rules.display(), differences.display()))
+        Rules::parse(&json::read(&rules)?, &json::read(&differences)?)
+            .map_err(|e| format!("{} / {}: {e}", rules.display(), differences.display()))
     }
 
     fn parse(document: &Value, differences: &Value) -> Result<Rules, String> {

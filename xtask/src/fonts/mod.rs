@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::fetch::{self, Transport};
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::prepare::{configure, verify_release_tree};
 use crate::process::{output, run};
 use crate::sha256;
@@ -195,7 +195,7 @@ fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, Strin
         ),
     ]);
     let path = cache.join("build.json");
-    crate::corpus::write_json(&path, &manifest)?;
+    json::write(&path, &manifest)?;
     Ok(path)
 }
 
@@ -217,8 +217,7 @@ pub(crate) fn serves(source: &Value, lane: &str) -> bool {
 }
 
 pub(crate) fn corpus(root: &Path) -> Result<Vec<(Value, Vec<CorpusFile>)>, String> {
-    let manifest =
-        crate::checks::read_json(&root.join(CORPUS)).map_err(|e| format!("{CORPUS}: {e}"))?;
+    let manifest = json::read(&root.join(CORPUS)).map_err(|e| format!("{CORPUS}: {e}"))?;
     let sources = manifest
         .get("sources")
         .and_then(Value::as_array)

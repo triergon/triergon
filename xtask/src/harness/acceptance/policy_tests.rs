@@ -12,7 +12,7 @@ struct Fixture {
 impl Fixture {
     fn new() -> Self {
         let repository = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let policy = crate::checks::read_json(&repository.join("harness/policy.json")).unwrap();
+        let policy = crate::json::read(&repository.join("harness/policy.json")).unwrap();
         let gate = Runtime::load(repository).unwrap();
         let pairs = int(policy.get("runtime").unwrap().get("minimum_pairs")).unwrap();
         let reference_ns = 1_000_000;

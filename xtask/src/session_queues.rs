@@ -2,8 +2,8 @@
 mod build;
 
 use crate::harness::{comparison, memory, report, timing, worker};
-use crate::json::Value;
-use crate::{checks, corpus, json, sha256};
+use crate::json::{self, Value};
+use crate::sha256;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -80,7 +80,7 @@ fn check(
             let expected = case
                 .get(if stage == "full" { "starved" } else { stage })
                 .ok_or("missing expected output extent")?;
-            corpus::write_json(
+            json::write(
                 &output.join(format!("{id}-{stage}-work.json")),
                 &Value::object([("baseline", base.clone()), ("candidate", candidate.clone())]),
             )?;
@@ -149,8 +149,8 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
         ("target", Value::str(report::gate_target()?)),
         ("mode", Value::str(mode)),
     ]);
-    corpus::write_json(&output.join("identity.json"), &identity)?;
-    let manifest = checks::read_json(&manifest)?;
+    json::write(&output.join("identity.json"), &identity)?;
+    let manifest = json::read(&manifest)?;
     let cases = manifest
         .as_array()
         .filter(|c| !c.is_empty())
@@ -235,7 +235,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             _ => continue,
         };
         let name = format!("{}-{}-{mode}", row.id, row.stage);
-        corpus::write_json(&output.join(format!("{name}.json")), &result)?;
+        json::write(&output.join(format!("{name}.json")), &result)?;
         if !ok {
             failed.push(name);
         }

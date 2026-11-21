@@ -20,8 +20,6 @@ use super::reuse;
 use super::timing::{Operation, Pairs, Work, benchmark};
 use super::validation::{self, selected_operation};
 use super::worker;
-use crate::checks::read_json;
-use crate::corpus::write_json;
 use crate::json::{self, Value};
 use crate::sha256;
 
@@ -332,7 +330,7 @@ pub fn fate_coverage(
         .and_then(Value::as_array)
         .unwrap_or_default();
     let reference = root.join(".research/reference");
-    let build = read_json(&reference.join("build.json")).ok();
+    let build = json::read(&reference.join("build.json")).ok();
     let enabled: Vec<String> = fs::read_to_string(reference.join("fate-list.txt"))
         .map(|t| t.split_whitespace().map(str::to_owned).collect())
         .unwrap_or_default();
@@ -343,7 +341,7 @@ pub fn fate_coverage(
         for path in paths {
             let name = path.file_name().unwrap_or_default().to_string_lossy();
             if name.starts_with("fate-") && name.ends_with(".json") {
-                let receipt = read_json(&path)?;
+                let receipt = json::read(&path)?;
                 if let Some(case) = s(&receipt, "case") {
                     receipts.retain(|(k, _)| k != case);
                     receipts.push((case.to_owned(), receipt));
@@ -421,7 +419,7 @@ const REVIEWED_INPUTS: [&str; 2] = ["harness/fonts/corpus.json", "harness/fate/s
 fn reviewed_inputs(root: &Path) -> Result<Vec<Value>, String> {
     REVIEWED_INPUTS
         .iter()
-        .map(|path| read_json(&root.join(path)).map_err(|e| format!("{path}: {e}")))
+        .map(|path| json::read(&root.join(path)).map_err(|e| format!("{path}: {e}")))
         .collect()
 }
 
@@ -569,7 +567,7 @@ impl PrefixFeature {
         manifest: &Path,
         corpus: Option<&Path>,
     ) -> Result<Self, String> {
-        let document = read_json(contract)?;
+        let document = json::read(contract)?;
         let text = |key: &str| {
             s(&document, key)
                 .map(str::to_owned)
@@ -637,7 +635,7 @@ impl PrefixFeature {
 
     /// The built candidate and reference, checked against the build identity.
     pub fn workers(&self, root: &Path) -> Result<(PathBuf, PathBuf), String> {
-        let identity = read_json(&root.join("target/harness/identity.json"))?;
+        let identity = json::read(&root.join("target/harness/identity.json"))?;
         let candidate = validation::candidate_worker(root, &identity, &self.candidate)?;
         Ok((candidate, self.reference_worker(root, &identity)?))
     }
@@ -761,7 +759,7 @@ pub(crate) fn case_files(corpus: &Path, case: &Value) -> Result<Vec<PathBuf>, St
 
 fn save_checkpoint(path: &Path, value: &Value) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
-    write_json(&temporary, value)?;
+    json::write(&temporary, value)?;
     fs::rename(&temporary, path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
@@ -949,8 +947,8 @@ pub(crate) fn gate_key(
         (false, true) => "report --memory",
         (true, true) => "report --benchmark --memory",
     };
-    let identity = read_json(&root.join("target/harness/identity.json"))?;
-    let contract = read_json(&options.contract)?;
+    let identity = json::read(&root.join("target/harness/identity.json"))?;
+    let contract = json::read(&options.contract)?;
     let (manifest, _) = super::manifest::read(root, &options.manifest)?;
     let (media, native) = validation::current_workers(root, &identity)?;
     let candidate = match s(&contract, "candidate").unwrap_or("media-worker") {
@@ -1031,7 +1029,7 @@ pub(crate) fn collect(
     {
         return Err("a baseline comparison is not an acceptance run".into());
     }
-    let identity = read_json(&root.join("target/harness/identity.json"))?;
+    let identity = json::read(&root.join("target/harness/identity.json"))?;
     let pinned = gate_build::pinned_release(root)?;
     println!("{}", gate_build::describe(&identity, &pinned));
     let refusals = gate_build::identity_refusals(root, &identity, &pinned);
@@ -1039,7 +1037,7 @@ pub(crate) fn collect(
         return Err(format!("not the gate build: {}", refusals.join("; ")));
     }
     let (candidate, native) = validation::current_workers(root, &identity)?;
-    let contract = read_json(&options.contract)?;
+    let contract = json::read(&options.contract)?;
     let work_fields = super::comparison::work_fields(&contract)?;
     let timeout = worker::contract_timeout(&contract)?;
     let parity_timeout = worker::contract_parity_timeout(&contract)?;
@@ -1066,7 +1064,7 @@ pub(crate) fn collect(
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();
     for path in &options.additional_reports {
-        let receipt = read_json(path)?;
+        let receipt = json::read(path)?;
         let fresh = receipt
             .get("identity")
             .is_some_and(|i| super::diff::equal(i, &identity))
@@ -1084,8 +1082,8 @@ pub(crate) fn collect(
     let target = gate_target()?;
     let coverage = fate_coverage(
         root,
-        &read_json(&root.join("harness/fate/index.json"))?,
-        &read_json(&root.join("harness/fate/map.json"))?,
+        &json::read(&root.join("harness/fate/index.json"))?,
+        &json::read(&root.join("harness/fate/map.json"))?,
         options.fate_cache.as_deref(),
     )?;
     let mut base = vec![
@@ -1610,10 +1608,10 @@ pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
 #[cfg(test)]
 mod prefix_tests {
     use super::{
-        PrefixFeature, entity_input_failure, measure_pinned, open_cases, ratchet, read_json,
-        recorded_corpus, reviewed_inputs, rights_reviewed, s,
+        PrefixFeature, entity_input_failure, measure_pinned, open_cases, ratchet, recorded_corpus,
+        reviewed_inputs, rights_reviewed, s,
     };
-    use crate::json::{Value, parse};
+    use crate::json::{self, Value, parse};
     use std::collections::BTreeMap;
     use std::path::Path;
 
@@ -1796,7 +1794,7 @@ mod prefix_tests {
         let reviewed = reviewed_inputs(root).unwrap();
         for feature in ["pgs", "dvb", "dvd", "cc", "teletext"] {
             let path = root.join(format!("harness/features/subtitle-{feature}/corpus.json"));
-            let manifest = read_json(&path).unwrap();
+            let manifest = json::read(&path).unwrap();
             for case in manifest.get("cases").and_then(Value::as_array).unwrap() {
                 assert!(
                     rights_reviewed(&reviewed, case),
@@ -1853,7 +1851,7 @@ mod prefix_tests {
     #[test]
     fn dvd_palette_options_use_the_selected_corpus_and_keep_absence() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let manifest = read_json(&root.join("harness/features/subtitle-dvd/corpus.json")).unwrap();
+        let manifest = json::read(&root.join("harness/features/subtitle-dvd/corpus.json")).unwrap();
         let cases = manifest.get("cases").and_then(Value::as_array).unwrap();
         let case = |id| cases.iter().find(|case| s(case, "id") == Some(id)).unwrap();
         let scratch = crate::walk::scratch("dvd-ifo");
@@ -2264,7 +2262,7 @@ mod tests {
         ]);
         publish_measurements(&output.0, header, &[Value::int(1)], |case| Ok(case.clone())).unwrap();
         for name in ["collection.json", "report.json"] {
-            let report = read_json(&output.0.join(name)).unwrap();
+            let report = json::read(&output.0.join(name)).unwrap();
             assert_eq!(
                 report
                     .get("summary")

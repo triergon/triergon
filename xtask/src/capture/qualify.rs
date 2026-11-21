@@ -388,7 +388,7 @@ impl MeasuredCase {
         let id = python::str(case.get("id").unwrap_or(&Value::Null));
         let path = timing.join(&id).join(TIMING_RECORD);
         let Value::Object(record) =
-            crate::checks::read_json(&path).map_err(|e| format!("{}: {e}", path.display()))?
+            json::read(&path).map_err(|e| format!("{}: {e}", path.display()))?
         else {
             return Err(format!("{}: not a timing record", path.display()));
         };
@@ -883,8 +883,7 @@ fn prepare(root: &Path, a: &Options) -> Result<Prepared, String> {
     for dir in [&a.out, &a.inputs] {
         fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
-    let cases =
-        crate::checks::read_json(&a.cases).map_err(|e| format!("{}: {e}", a.cases.display()))?;
+    let cases = json::read(&a.cases).map_err(|e| format!("{}: {e}", a.cases.display()))?;
     let mut cases: Vec<Value> = cases
         .get("cases")
         .and_then(Value::as_array)
@@ -1025,8 +1024,7 @@ fn timed_cases(
     cases: &[Value],
 ) -> Result<Vec<MeasuredCase>, String> {
     let recorded = timing.join("identity.json");
-    let recorded =
-        crate::checks::read_json(&recorded).map_err(|e| format!("{}: {e}", recorded.display()))?;
+    let recorded = json::read(&recorded).map_err(|e| format!("{}: {e}", recorded.display()))?;
     let reused = crate::harness::reuse::was_reused(timing);
     if !crate::harness::diff::equal(
         &comparable(&recorded, reused),
@@ -1090,8 +1088,7 @@ fn failing_bounds(summary: &[Value]) -> Vec<String> {
 /// host's worker target: their conversion is compared and reported, and fails.
 fn open_cases(root: &Path, ids: &[&str]) -> Result<Vec<String>, String> {
     let path = root.join("harness/capture/contract.json");
-    let contract =
-        crate::checks::read_json(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let contract = json::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     listed_open(&contract, gate_build::worker_target()?, ids)
 }
 

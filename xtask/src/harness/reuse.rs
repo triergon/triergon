@@ -334,12 +334,12 @@ pub fn record(output: &Path, key: &Key, status: i32, reused: Option<Value>) -> R
         ("components", key.components.clone()),
     ]);
     fs::create_dir_all(output).map_err(|e| format!("{}: {e}", output.display()))?;
-    crate::corpus::write_json(&output.join(RESULT), &result)
+    json::write(&output.join(RESULT), &result)
 }
 
 /// The gate result recorded in `directory`.
 pub fn read(directory: &Path) -> R<Value> {
-    crate::checks::read_json(&directory.join(RESULT))
+    json::read(&directory.join(RESULT))
 }
 
 /// Whether `directory` holds a reused result rather than a measurement.
@@ -360,7 +360,7 @@ pub fn checked(directory: &Path, status: i32) -> R<()> {
     fields.retain(|(key, _)| key != "status" && key != "cases_checked");
     fields.push(("status".into(), Value::int(status)));
     fields.push(("cases_checked".into(), Value::Bool(true)));
-    crate::corpus::write_json(&directory.join(RESULT), &Value::Object(fields))
+    json::write(&directory.join(RESULT), &Value::Object(fields))
 }
 
 /// Whether the reused result in `directory` is one whose cases a gate run checked.
@@ -618,7 +618,7 @@ mod tests {
         ]);
         let file = root.join(crate::evidence::SETS).join("run.json");
         fs::create_dir_all(file.parent().unwrap()).unwrap();
-        crate::corpus::write_json(&file, &set).unwrap();
+        json::write(&file, &set).unwrap();
     }
 
     #[test]
@@ -679,7 +679,7 @@ mod tests {
         ]);
         let index = root.join(crate::evidence::SETS).join("gone.json");
         fs::create_dir_all(index.parent().unwrap()).unwrap();
-        crate::corpus::write_json(&index, &set).unwrap();
+        json::write(&index, &set).unwrap();
         let output = root.join("timing");
         let measured = std::cell::Cell::new(false);
         let status = restoring_step(&root, &output, &key, false, || {

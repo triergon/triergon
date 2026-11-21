@@ -117,7 +117,7 @@ pub fn sources(root: &Path, path: &Path) -> Vec<PathBuf> {
         .and_then(Path::file_name)
         .and_then(|n| n.to_str())
         .unwrap_or_default();
-    let contract = crate::checks::read_json(&path.with_file_name("contract.json")).ok();
+    let contract = json::read(&path.with_file_name("contract.json")).ok();
     match contract.as_ref().and_then(crate::generators::for_contract) {
         Some(generator) => generator
             .inputs(root, id)
@@ -137,7 +137,7 @@ pub(crate) fn generated(root: &Path, path: &Path) -> Option<Result<Value, String
         return None;
     }
     let id = path.parent().and_then(Path::file_name)?.to_str()?;
-    let document = match crate::checks::read_json(&path.with_file_name("contract.json")) {
+    let document = match json::read(&path.with_file_name("contract.json")) {
         Ok(document) => document,
         Err(error) => return Some(Err(error)),
     };

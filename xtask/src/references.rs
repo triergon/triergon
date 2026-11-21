@@ -223,7 +223,7 @@ impl Build {
     fn holds(&self, root: &Path, key: &Key) -> bool {
         let dir = self.path(root);
         dir.join("build.json").is_file()
-            && crate::checks::read_json(&dir.join(RECORD))
+            && json::read(&dir.join(RECORD))
                 .is_ok_and(|record| record.get("key").and_then(Value::as_str) == Some(&key.sha256))
     }
 
@@ -272,7 +272,7 @@ impl Build {
             ("installed_sha256", Value::str(installed_digest(&dir)?)),
             ("components", key.components),
         ]);
-        crate::corpus::write_json(&dir.join(RECORD), &record)?;
+        json::write(&dir.join(RECORD), &record)?;
         Ok(made)
     }
 
@@ -299,14 +299,12 @@ impl Build {
 
     /// The SHA-256 of the installed tree its record names, read again from disk.
     fn recorded_install(dir: &Path) -> Option<String> {
-        crate::checks::read_json(&dir.join(RECORD))
-            .ok()
-            .and_then(|record| {
-                record
-                    .get("installed_sha256")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned)
-            })
+        json::read(&dir.join(RECORD)).ok().and_then(|record| {
+            record
+                .get("installed_sha256")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        })
     }
 
     /// Replaces the build's directory with the contents of `pack`, which must
@@ -337,7 +335,7 @@ impl Build {
             let _ = fs::remove_dir_all(&staged);
             return Err(format!("{}: cannot unpack", pack.display()));
         }
-        let recorded = crate::checks::read_json(&staged.join(RECORD))
+        let recorded = json::read(&staged.join(RECORD))
             .ok()
             .and_then(|record| record.get("key").and_then(Value::as_str).map(str::to_owned));
         if recorded.as_deref() != Some(&key.sha256) {

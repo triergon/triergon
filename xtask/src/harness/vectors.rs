@@ -18,9 +18,7 @@ use super::report::{
     PrefixFeature, case_arguments, expected_for, gate_target, resolved_case_arguments,
 };
 use super::timing::{Operation, Pairs, Work, benchmark};
-use crate::checks::read_json;
-use crate::corpus::write_json;
-use crate::json::Value;
+use crate::json::{self, Value};
 
 type R<T> = Result<T, String>;
 
@@ -42,12 +40,12 @@ fn same(a: Option<&Value>, b: Option<&Value>) -> bool {
 
 fn save(path: &Path, value: &Value) -> R<()> {
     let temporary = path.with_extension("tmp");
-    write_json(&temporary, value)?;
+    json::write(&temporary, value)?;
     fs::rename(&temporary, path).map_err(|e| e.to_string())
 }
 
 fn workers(root: &Path) -> R<(PathBuf, PathBuf, Value)> {
-    let identity = read_json(&root.join("target/harness/identity.json"))?;
+    let identity = json::read(&root.join("target/harness/identity.json"))?;
     let (candidate, reference) = (
         root.join(gate_build::release_dir()?).join("media-worker"),
         root.join("target/harness/ffmpeg-worker"),
@@ -116,7 +114,7 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
 
 fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
     let contract_path = root.join(CONTRACT);
-    let contract = read_json(&contract_path)?;
+    let contract = json::read(&contract_path)?;
     let contract_sha = sha(&contract_path)?;
     let timeout = super::worker::contract_timeout(&contract)?;
     let spec = contract
@@ -361,7 +359,7 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
         return Err("Demux comparison requires both candidate and reference workers; run cargo xtask build-workers first".into());
     }
     let cache = root.join(".research/reference");
-    let build = read_json(&cache.join("build.json"))?;
+    let build = json::read(&cache.join("build.json"))?;
     let enabled = fs::read_to_string(cache.join("fate-list.txt")).map_err(|e| e.to_string())?;
     if !demux_only && !enabled.split_whitespace().any(|c| c == case) {
         return Err("Required configured FATE case disabled; rebuild the reference".into());
@@ -381,7 +379,7 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
     let sample_sha = sha(&path)?;
     let receipt_path = cache.join(format!("fate-{label}.json"));
     if receipt_path.exists()
-        && s(&read_json(&receipt_path)?, "sample_sha256") != Some(sample_sha.as_str())
+        && s(&json::read(&receipt_path)?, "sample_sha256") != Some(sample_sha.as_str())
     {
         return Err("FATE input changed since previous run".into());
     }
@@ -434,7 +432,7 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
     ];
     let mut demux_status = None;
     if candidate.exists() && reference.exists() {
-        let identity = read_json(&root.join("target/harness/identity.json"))?;
+        let identity = json::read(&root.join("target/harness/identity.json"))?;
         let fresh = || -> R<bool> {
             let binaries = Value::object([
                 ("candidate", Value::str(sha(&candidate)?)),
@@ -468,7 +466,7 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
         }
         demux_status = Some(status);
     }
-    write_json(&receipt_path, &Value::object(receipt))?;
+    json::write(&receipt_path, &Value::object(receipt))?;
     println!("{reference_status} {}", receipt_path.display());
     Ok(if code != 0 {
         code as i32
@@ -496,7 +494,7 @@ pub fn trace_identities(
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     let features = PrefixFeature::registered(root, &name, corpora)?;
-    let identity = read_json(&root.join("target/harness/identity.json"))?;
+    let identity = json::read(&root.join("target/harness/identity.json"))?;
     let native = root.join("target/harness/ffmpeg-worker");
     let scratch = std::env::temp_dir().join(format!("triergon-traces-{}", std::process::id()));
     let started = std::time::Instant::now();
@@ -535,8 +533,7 @@ pub fn trace_identities(
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    fs::write(output, crate::json::to_python(&record, Some(1)) + "\n")
-        .map_err(|e| e.to_string())?;
+    fs::write(output, json::to_python(&record, Some(1)) + "\n").map_err(|e| e.to_string())?;
     let passed = verdicts
         .iter()
         .filter(|(_, v)| v.as_str() == Some("pass"))
@@ -547,7 +544,7 @@ pub fn trace_identities(
         calls.len()
     );
     if let Some(compare) = compare {
-        let before = read_json(compare)?;
+        let before = json::read(compare)?;
         let earlier = before
             .get("calls")
             .and_then(Value::as_array)
@@ -565,7 +562,7 @@ pub fn trace_identities(
             let shown: Vec<String> = changed
                 .iter()
                 .take(10)
-                .map(|a| crate::json::to_python(a, None))
+                .map(|a| json::to_python(a, None))
                 .collect();
             println!("NOT EQUIVALENT [{}]", shown.join(", "));
             return Ok(1);
@@ -620,10 +617,10 @@ fn matroska_traces(
         ),
     ];
     for (manifest, contract_path, corpus) in SLICES {
-        let contract = read_json(&root.join(contract_path))?;
+        let contract = json::read(&root.join(contract_path))?;
         let id = s(&contract, "id").unwrap_or_default().to_owned();
         let timeout = super::worker::contract_timeout(&contract)?;
-        for case in read_json(&root.join(manifest))?
+        for case in json::read(&root.join(manifest))?
             .get("cases")
             .and_then(Value::as_array)
             .unwrap_or_default()
@@ -664,7 +661,7 @@ fn matroska_traces(
         }
     }
     let contract =
-        read_json(&root.join("harness/features/matroska-segment-metadata/contract.json"))?;
+        json::read(&root.join("harness/features/matroska-segment-metadata/contract.json"))?;
     let hdr = contract
         .get("required_additional_vectors")
         .and_then(Value::as_array)

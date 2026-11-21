@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::harness::report::{self, Options, PrefixFeature};
-use crate::{checks, corpus, json, sha256};
+use crate::{json, sha256};
 use json::Value;
 
 #[path = "../../harness/features/packet-framing/fixtures.rs"]
@@ -91,7 +91,7 @@ fn record_additional(root: &Path, replace: bool) -> Result<(), String> {
         &options.manifest,
         Some(&options.corpus),
     )?;
-    let identity = checks::read_json(&root.join("target/harness/identity.json"))?;
+    let identity = json::read(&root.join("target/harness/identity.json"))?;
     let reference = feature.reference_worker(root, &identity)?;
     fs::create_dir_all(&options.corpus).map_err(|e| e.to_string())?;
     let mut cases = feature.cases;
@@ -158,7 +158,7 @@ fn record_additional(root: &Path, replace: bool) -> Result<(), String> {
     }
     cases.truncate(fixtures::ORIGINAL_CASE_COUNT);
     cases.extend(additional);
-    let mut manifest = checks::read_json(&options.manifest)?;
+    let mut manifest = json::read(&options.manifest)?;
     let Value::Object(entries) = &mut manifest else {
         return Err("packet framing manifest must be an object".into());
     };
@@ -168,7 +168,7 @@ fn record_additional(root: &Path, replace: bool) -> Result<(), String> {
         .ok_or("cases missing")?;
     *rows = Value::Array(cases);
     let temporary = options.manifest.with_extension("json.part");
-    corpus::write_json(&temporary, &manifest)?;
+    json::write(&temporary, &manifest)?;
     fs::rename(&temporary, &options.manifest).map_err(|e| e.to_string())
 }
 

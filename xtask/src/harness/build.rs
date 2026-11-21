@@ -9,9 +9,7 @@ use std::process::Command;
 use super::gate_build;
 use super::linux;
 use super::provenance::{cargo_metadata, selected_graph, shared_inputs};
-use crate::checks::read_json;
-use crate::corpus::write_json;
-use crate::json::Value;
+use crate::json::{self, Value};
 
 type R<T> = Result<T, String>;
 
@@ -1171,7 +1169,7 @@ fn build_selected(
             continue;
         }
         if let Some(prepared) = reference.prepared {
-            prepared(&read_json(&build)?)?;
+            prepared(&json::read(&build)?)?;
         }
         let pkgconfig = std::env::join_paths(
             profiles().map(|profile| root.join(profile).join("install/lib/pkgconfig")),
@@ -1303,7 +1301,7 @@ fn build_selected(
             let profile = Value::object([
                 ("proof_path", Value::str(&proof_path)),
                 ("proof_sha256", Value::str(sha(&proof_file)?)),
-                ("proof", read_json(&proof_file)?),
+                ("proof", json::read(&proof_file)?),
             ]);
             let (observer_sha, probe_sha) = (
                 instrumentation[0].1.as_str().map(str::to_owned),
@@ -1340,7 +1338,7 @@ fn build_selected(
         }
     };
     let worker_identity = |path: &Path| -> R<Value> {
-        crate::json::parse(&output(
+        json::parse(&output(
             &path.display().to_string(),
             &["identity", "-"],
             &[],
@@ -1354,7 +1352,7 @@ fn build_selected(
     let graph = selected_graph(root, &metadata, "media-worker", &shared_inputs(root)?)?;
     let candidates = candidate_records(root, &additional)?;
     let pinned_build = if pinned.exists() {
-        Some(read_json(&pinned)?)
+        Some(json::read(&pinned)?)
     } else {
         None
     };
@@ -1428,7 +1426,7 @@ fn build_selected(
                     "source_sha256",
                     Value::str(sha(&root.join(reference.source))?),
                 ),
-                ("reference_build", read_json(build)?),
+                ("reference_build", json::read(build)?),
                 (
                     "linked_builds",
                     Value::Object(
@@ -1437,7 +1435,7 @@ fn build_selected(
                             .iter()
                             .map(|profile| {
                                 let build = root.join(profile).join("build.json");
-                                Ok(((*profile).to_owned(), read_json(&build)?))
+                                Ok(((*profile).to_owned(), json::read(&build)?))
                             })
                             .collect::<R<_>>()?,
                     ),
@@ -1489,7 +1487,7 @@ fn build_selected(
         ("compiler_command", strings(&command)),
         (
             "comparison_rules",
-            read_json(&root.join("harness/comparison-rules.json"))?,
+            json::read(&root.join("harness/comparison-rules.json"))?,
         ),
         (
             "comparison_references",
@@ -1636,13 +1634,13 @@ fn build_selected(
     }
     identity.extend(gate_build::current(root)?);
     let path = out.join("identity.json");
-    write_json(&path, &Value::Object(identity))?;
+    json::write(&path, &Value::Object(identity))?;
     if linux {
         let observations = Value::object([
             ("identity_sha256", Value::str(sha(&path)?)),
             ("raw_loader_observations", Value::Object(libraries)),
         ]);
-        write_json(&out.join("linux-loader-observations.json"), &observations)?;
+        json::write(&out.join("linux-loader-observations.json"), &observations)?;
     }
     Ok(path)
 }

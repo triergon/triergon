@@ -3,7 +3,8 @@
 use std::fs;
 use std::path::Path;
 
-use crate::{checks, corpus, json::Value, prepare, process};
+use crate::json::{self, Value};
+use crate::{prepare, process};
 
 use super::correctness::file_sha;
 
@@ -38,7 +39,7 @@ const PROGRAMS: &[(&str, u32, u8, &str)] = &[
 
 pub(super) fn run(root: &Path, out: &Path) -> Result<(), String> {
     let reference = root.join(".research/reference-decode");
-    let build = checks::read_json(&reference.join("build.json"))?;
+    let build = json::read(&reference.join("build.json"))?;
     let ffmpeg = reference.join("install/bin/ffmpeg");
     let hash = file_sha(&ffmpeg)?;
     if build.get("profile").and_then(Value::as_str) != Some("decode")
@@ -122,5 +123,5 @@ pub(super) fn run(root: &Path, out: &Path) -> Result<(), String> {
         ("license", Value::str("MIT OR Apache-2.0")),
         ("vectors", Value::Array(vectors)),
     ]);
-    corpus::write_json(&out.join("sources.json"), &manifest)
+    json::write(&out.join("sources.json"), &manifest)
 }

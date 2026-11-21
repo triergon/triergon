@@ -383,7 +383,7 @@ fn a_pair_outside_the_recorded_build_cannot_gate() {
             entry("ffmpeg-worker", digest("reference")),
         ));
     }
-    crate::corpus::write_json(&tree.join("target/harness/identity.json"), &identity).unwrap();
+    json::write(&tree.join("target/harness/identity.json"), &identity).unwrap();
     assert!(pair_refusals(&tree, &worker, &reference).is_empty());
     assert_eq!(pair_refusals(&tree, &other, &reference).len(), 1);
     assert_eq!(pair_refusals(&tree, &worker, &other).len(), 1);

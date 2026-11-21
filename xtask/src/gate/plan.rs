@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use crate::json::Value;
+use crate::json::{self, Value};
 
 use super::{Item, Placement, R, Stage, Step, owned, xtask};
 
@@ -1012,7 +1012,7 @@ impl Plan<'_> {
 
 /// The capture case ids, in the order of `harness/capture/cases.json`.
 pub(super) fn capture_cases(root: &Path) -> R<Vec<String>> {
-    let cases = crate::checks::read_json(&root.join(CAPTURE_CASES))?;
+    let cases = json::read(&root.join(CAPTURE_CASES))?;
     Ok(cases
         .get("cases")
         .and_then(Value::as_array)

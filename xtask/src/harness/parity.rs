@@ -10,7 +10,7 @@ use std::time::Duration;
 use super::diff::differences;
 use super::oracle::{self, Kind};
 use super::worker::{self, arg, data, ok, status};
-use crate::json::Value;
+use crate::json::{self, Value};
 
 /// The workers and files of one parity run.
 pub struct Run<'a> {
@@ -45,7 +45,7 @@ impl Run<'_> {
     }
 
     fn write(&self, name: &str, value: &Value) -> Result<(), String> {
-        crate::corpus::write_json(&self.raw.join(format!("{name}.json")), value)
+        json::write(&self.raw.join(format!("{name}.json")), value)
     }
 
     fn oracle(&self, kind: Kind) -> Result<Result<Value, String>, String> {
@@ -103,7 +103,7 @@ pub(super) fn review_native_difference(
     rule: &Value,
 ) -> (Value, Value, Value) {
     let delta = differences(storage, native);
-    let actual = crate::sha256::hex(crate::json::canonical(native).as_bytes());
+    let actual = crate::sha256::hex(json::canonical(native).as_bytes());
     let expected = rule
         .get("raw_native_output_sha256")
         .and_then(Value::as_str)
@@ -658,7 +658,7 @@ pub fn seek_parity(
         25_000_000_000,
     ];
     let mut result = parity(run, sequential_required, comparison, content, "")?;
-    let source = crate::checks::read_json(&run.raw.join("reference.json"))?;
+    let source = json::read(&run.raw.join("reference.json"))?;
     let mut rows = Vec::new();
     for target in TARGETS_NS {
         for after_eof in [false, true] {
@@ -828,11 +828,9 @@ mod feed_tests {
     fn all_framing_expectations_use_both_digests() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         let contract =
-            crate::checks::read_json(&root.join("harness/features/packet-framing/contract.json"))
-                .unwrap();
+            json::read(&root.join("harness/features/packet-framing/contract.json")).unwrap();
         let manifest =
-            crate::checks::read_json(&root.join("harness/features/packet-framing/corpus.json"))
-                .unwrap();
+            json::read(&root.join("harness/features/packet-framing/corpus.json")).unwrap();
         let fields = super::super::comparison::work_fields(&contract).unwrap();
         let rows = manifest.get("cases").and_then(Value::as_array).unwrap();
         assert_eq!(rows.len(), 135);

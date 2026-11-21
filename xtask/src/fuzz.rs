@@ -690,7 +690,7 @@ pub fn feature_manifest(root: &Path, feature: &Feature) -> R<(Value, usize)> {
     // A listed open case is one the candidate fails today: its builds reject it.
     // One open on some targets only (`targets`) is a difference from those
     // targets' reference, which the candidate completes.
-    let open: Vec<String> = crate::checks::read_json(&feature.contract)?
+    let open: Vec<String> = json::read(&feature.contract)?
         .get("open_cases")
         .and_then(Value::as_array)
         .unwrap_or_default()
@@ -768,13 +768,13 @@ pub fn feature_manifest(root: &Path, feature: &Feature) -> R<(Value, usize)> {
 /// `manifest.json`, which replays it.
 pub fn feature_campaign(root: &Path, feature: &Feature, args: &Campaign) -> R<i32> {
     let (manifest, largest) = feature_manifest(root, feature)?;
-    let contract = crate::checks::read_json(&feature.contract)?;
+    let contract = json::read(&feature.contract)?;
     let declared = contract
         .get("timeout_seconds")
         .map(|_| crate::harness::worker::contract_timeout(&contract))
         .transpose()?;
     let path = std::env::temp_dir().join(format!("triergon-campaign-{}.json", std::process::id()));
-    crate::corpus::write_json(&path, &manifest)?;
+    json::write(&path, &manifest)?;
     let campaign = Campaign {
         manifest: path.clone(),
         output: args.output.clone(),
@@ -807,7 +807,7 @@ fn sha(path: &Path) -> R<String> {
 
 fn write(path: &Path, value: &Value) -> R<()> {
     let temporary = path.with_extension("tmp");
-    crate::corpus::write_json(&temporary, value)?;
+    json::write(&temporary, value)?;
     fs::rename(&temporary, path).map_err(|e| e.to_string())
 }
 

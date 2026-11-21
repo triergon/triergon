@@ -232,7 +232,7 @@ struct Encoded {
 
 pub fn run(a: &Options) -> Result<(), String> {
     let case = if Path::new(&a.case).exists() {
-        crate::checks::read_json(Path::new(&a.case))?
+        json::read(Path::new(&a.case))?
     } else {
         python::loads(&a.case).ok_or("--case is neither a file nor JSON")?
     };
@@ -698,8 +698,7 @@ mod tests {
     #[test]
     fn rate_factors_follow_the_contract() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let contract =
-            crate::checks::read_json(&root.join("harness/capture/contract.json")).unwrap();
+        let contract = json::read(&root.join("harness/capture/contract.json")).unwrap();
         let recorded: Vec<f64> = contract
             .get("comparison_rules")
             .and_then(|r| r.get("encoder_rate_factors"))

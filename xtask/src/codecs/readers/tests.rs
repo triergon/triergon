@@ -311,7 +311,7 @@ fn the_repository_rules_load() {
     assert_eq!(rules.format("flac").unwrap().media, ["audio"]);
     let seeks = SeekCase::load(&root.join(SEEKS)).unwrap();
     assert_eq!(seeks.len(), SEEK_CASES);
-    let manifest = crate::checks::read_json(&root.join(MANIFEST)).unwrap();
+    let manifest = json::read(&root.join(MANIFEST)).unwrap();
     let vectors = manifest.get("vectors").and_then(Value::as_array).unwrap();
     let ogg_vectors = vectors
         .iter()

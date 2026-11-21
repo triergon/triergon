@@ -431,9 +431,7 @@ mod tests {
         let inventory = output(python).unwrap();
         let inventory = json::parse_strict(&inventory).unwrap();
         let rows = inventory.as_array().unwrap();
-        let pins =
-            crate::checks::read_json(&root.join("harness/features/subtitle-dvb/corpus.json"))
-                .unwrap();
+        let pins = json::read(&root.join("harness/features/subtitle-dvb/corpus.json")).unwrap();
         assert_eq!(rows.len(), cases(&pins).unwrap().len());
         for (row, pin) in rows.iter().zip(cases(&pins).unwrap()) {
             for field in ["id", "profile", "file", "source", "rights", "arguments"] {

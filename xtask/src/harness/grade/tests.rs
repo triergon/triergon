@@ -111,7 +111,7 @@ fn ordinary_contracts_do_not_require_functional_control_reports() {
         if !contract.is_file() {
             continue;
         }
-        let contract = read_json(&contract).unwrap();
+        let contract = json::read(&contract).unwrap();
         if contract.get("functional_controls").is_some() {
             continue;
         }
@@ -132,8 +132,8 @@ fn ordinary_contracts_do_not_require_functional_control_reports() {
 fn progressive_grading_requires_functional_proof_before_numeric_gates() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let feature = root.join("harness/features/progressive-ts188");
-    let contract = read_json(&feature.join("contract.json")).unwrap();
-    let manifest = read_json(&feature.join("corpus.json")).unwrap();
+    let contract = json::read(&feature.join("contract.json")).unwrap();
+    let manifest = json::read(&feature.join("corpus.json")).unwrap();
     let error = control_proofs(
         root,
         &contract,
@@ -607,7 +607,7 @@ fn every_feature_manifest_keeps_all_cases_including_nonrequired_profiles() {
         }
     }
     let contract =
-        read_json(&root.join("harness/features/matroska-segment-metadata/contract.json")).unwrap();
+        json::read(&root.join("harness/features/matroska-segment-metadata/contract.json")).unwrap();
     assert_eq!(
         matroska
             + array(&contract, "required_additional_vectors")
@@ -621,7 +621,7 @@ fn every_feature_manifest_keeps_all_cases_including_nonrequired_profiles() {
 fn aliases_require_registered_identical_operations_and_separate_traces() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let manifest =
-        read_json(&root.join("harness/features/isobmff-open-index/corpus.json")).unwrap();
+        json::read(&root.join("harness/features/isobmff-open-index/corpus.json")).unwrap();
     let cases = array(&manifest, "cases").unwrap();
     let expected = [cases[56].clone(), cases[248].clone()];
     let mut actual: Vec<_> = expected
@@ -910,7 +910,7 @@ fn failed_memory_without_pair_count_is_written_and_cannot_pass() {
         [Ok(joined.clone())].into_iter(),
     )
     .unwrap();
-    let written = read_json(&output.join("report.json")).unwrap();
+    let written = json::read(&output.join("report.json")).unwrap();
     require_same(
         field(&written, "cases").unwrap(),
         &Value::Array(vec![joined]),

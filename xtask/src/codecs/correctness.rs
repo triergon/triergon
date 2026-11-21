@@ -234,7 +234,7 @@ pub struct Rules {
 impl Rules {
     pub fn load(root: &Path) -> Result<Rules, String> {
         let path = root.join("harness/codecs/numeric-rules.json");
-        let rules = crate::checks::read_json(&path)?;
+        let rules = json::read(&path)?;
         let number = |section: &str, key: &str| {
             rules
                 .get(section)
@@ -784,7 +784,7 @@ fn open_cases<'a>(manifest: &'a Value, vectors: &[Value]) -> Result<Vec<&'a str>
 /// A row of a vector the manifest lists in `open_cases` carries `"open_case": true`.
 /// A named lane without vectors fails.
 pub fn grade(a: &Grade) -> Result<(), String> {
-    let manifest = crate::checks::read_json(&a.manifest)?;
+    let manifest = json::read(&a.manifest)?;
     let vectors = manifest
         .get("vectors")
         .and_then(Value::as_array)

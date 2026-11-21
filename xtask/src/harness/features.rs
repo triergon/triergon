@@ -3,8 +3,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::checks::read_json;
-use crate::json::Value;
+use crate::json::{self, Value};
 
 /// When a feature runs: its contract's `gate`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -85,7 +84,7 @@ pub(crate) fn discover(root: &Path) -> Result<Vec<Contract>, String> {
             .into_string()
             .map_err(|_| format!("{}: invalid feature directory name", entry.path().display()))?;
         let path = entry.path().join("contract.json");
-        let document = read_json(&path)?;
+        let document = json::read(&path)?;
         if document.get("id").and_then(Value::as_str) != Some(id.as_str()) {
             return Err(format!("{}: expected feature id {id}", path.display()));
         }

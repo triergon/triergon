@@ -14,7 +14,7 @@ fn root() -> &'static std::path::Path {
 }
 
 fn load(path: &str) -> Value {
-    crate::checks::read_json(&root().join(path)).unwrap()
+    crate::json::read(&root().join(path)).unwrap()
 }
 
 fn v(text: &str) -> Value {

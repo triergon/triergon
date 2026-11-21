@@ -17,7 +17,7 @@ fn private_reference_archive_does_not_replace_the_result_used_for_pins() {
         };
     let result = save_reference_result("sample", &out, &["worker".into()], &done).unwrap();
     assert_eq!(expected(&result).get("packets"), Some(&Value::int(2)));
-    let raw = read_json(&out.join("sample.json")).unwrap();
+    let raw = json::read(&out.join("sample.json")).unwrap();
     assert_eq!(raw.get("observation"), Some(&result));
     assert!(result.get("argv").is_none());
     assert_eq!(fs::read(out.join("sample.stdout")).unwrap(), done.stdout);
@@ -27,7 +27,7 @@ fn private_reference_archive_does_not_replace_the_result_used_for_pins() {
 
 #[test]
 fn original_inputs_arguments_and_all272_request_associations_are_unchanged() {
-    let original = read_json(&root().join(ORIGINAL)).unwrap();
+    let original = json::read(&root().join(ORIGINAL)).unwrap();
     let generated = all_cases(root()).unwrap();
     assert_eq!(generated.len(), 179);
     for (old, new) in cases(&original).unwrap().iter().zip(&generated) {
@@ -56,7 +56,7 @@ fn original_inputs_arguments_and_all272_request_associations_are_unchanged() {
 
 #[test]
 fn single_input_pins_stay_identical_when_sequence_reference_outputs_change() {
-    let manifest = read_json(&root().join(format!("harness/{FEATURE}/corpus.json"))).unwrap();
+    let manifest = json::read(&root().join(format!("harness/{FEATURE}/corpus.json"))).unwrap();
     let rows = cases(&manifest).unwrap();
     let mut prior = rows[..141].to_vec();
     let mut sequences = 0;
@@ -276,7 +276,7 @@ fn prefix_loading_uses_the_shared_report_and_keeps_all_required_profiles() {
     assert_eq!(au.candidate, "transport-worker");
     assert_eq!(au.reference, "ffmpeg-formats-native");
     assert_eq!(au.cases.len(), 179);
-    let contract = read_json(&au.contract).unwrap();
+    let contract = json::read(&au.contract).unwrap();
     assert_eq!(
         contract.get("required_profiles"),
         Some(&Value::strings(
@@ -298,7 +298,7 @@ fn prefix_loading_uses_the_shared_report_and_keeps_all_required_profiles() {
 
 #[test]
 fn reference_pins_prove_multiple_aus_per_pes_and_keep_raw_logs_private() {
-    let manifest = read_json(&root().join(format!("harness/{FEATURE}/corpus.json"))).unwrap();
+    let manifest = json::read(&root().join(format!("harness/{FEATURE}/corpus.json"))).unwrap();
     let rows = cases(&manifest).unwrap();
     for codec in ["avc", "hevc", "adts-aac-lc", "dvb-ac3"] {
         for (suffix, count) in [
@@ -443,7 +443,7 @@ fn raw_recording_requires_a_fresh_directory_outside_the_repository() {
 
 #[test]
 fn pes_input_pin_separates_reference_folds_from_source_associations() {
-    let manifest = read_json(&root().join(ORIGINAL)).unwrap();
+    let manifest = json::read(&root().join(ORIGINAL)).unwrap();
     let mutate = |key, value| {
         let mut modified = manifest.clone();
         let Value::Object(fields) = &mut modified else {
@@ -491,7 +491,7 @@ fn regenerating_the_au_corpus_preserves_every_pin_and_file_hash() {
             fs::read(out.join(&file)).unwrap()
         );
     }
-    let manifest = read_json(&out.join(format!("harness/{FEATURE}/corpus.json"))).unwrap();
+    let manifest = json::read(&out.join(format!("harness/{FEATURE}/corpus.json"))).unwrap();
     for case in &cases(&manifest).unwrap()[97..] {
         let file = Path::new(text(case, "file").unwrap());
         let base = if file.starts_with(".research") {

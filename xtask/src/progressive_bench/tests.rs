@@ -62,7 +62,7 @@ fn change(value: &mut Value, path: &[&str], replacement: Value) {
 // Functional-proof metadata only: these fixtures have no timing, memory,
 // observer or native gate evidence. Raw traces are checked separately.
 fn proof_fixture(identity: Value) -> (Value, Value, Value) {
-    let controls = read_json(&root().join(FEATURE).join("controls.json")).unwrap();
+    let controls = json::read(&root().join(FEATURE).join("controls.json")).unwrap();
     let reference = comparison::reference_named(&identity, "ffmpeg-formats-native").unwrap();
     let binding = proof_binding(root(), &identity, &reference).unwrap();
     let cases = rows(&controls)
@@ -327,8 +327,8 @@ fn missing_or_rehashed_proof_is_rejected() {
             ("sha256", Value::str("f".repeat(64))),
         ]),
     )]);
-    let contract = read_json(&selected.contract).unwrap();
-    let manifest = read_json(&selected.manifest).unwrap();
+    let contract = json::read(&selected.contract).unwrap();
+    let manifest = json::read(&selected.manifest).unwrap();
     assert!(
         validate_report_controls(
             root(),
@@ -379,7 +379,7 @@ fn rerun_preserves_existing_reports_and_controls() {
 fn original_three_timing_cases_and_five_functional_controls_keep_the_gates() {
     let options = options(root(), &[]).unwrap();
     validate(root(), &options).unwrap();
-    let contract = read_json(&options.contract).unwrap();
+    let contract = json::read(&options.contract).unwrap();
     for field in [
         "runtime_ratio_max",
         "runtime_optimization_ratio_target",
@@ -397,7 +397,7 @@ fn original_three_timing_cases_and_five_functional_controls_keep_the_gates() {
         contract.get("required_profiles"),
         Some(&Value::strings(TIMED))
     );
-    let controls = read_json(&root().join(FEATURE).join("controls.json")).unwrap();
+    let controls = json::read(&root().join(FEATURE).join("controls.json")).unwrap();
     assert_eq!(rows(&controls).unwrap().len(), 5);
     let refusal = rows(&controls).unwrap()[4]
         .get("outcomes")
@@ -542,7 +542,7 @@ fn an_incomplete_control_precheck_cannot_start_measurement() {
 }
 
 fn refusal() -> (Value, worker::Finished) {
-    let manifest = read_json(&root().join(FEATURE).join("controls.json")).unwrap();
+    let manifest = json::read(&root().join(FEATURE).join("controls.json")).unwrap();
     let case = rows(&manifest).unwrap()[4].clone();
     // The real partial trace is checked through the public worker in the CLI.
     let finished = worker::Finished {
@@ -585,7 +585,7 @@ fn refusal_requires_its_exit_partial_trace_and_specific_diagnostics() {
 
 #[test]
 fn successful_literal_trace_also_requires_the_complete_normative_footer() {
-    let manifest = read_json(&root().join(FEATURE).join("controls.json")).unwrap();
+    let manifest = json::read(&root().join(FEATURE).join("controls.json")).unwrap();
     let case = &rows(&manifest).unwrap()[0];
     let footer = Value::object([
         ("schema", Value::int(1)),

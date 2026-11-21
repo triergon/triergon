@@ -19,7 +19,7 @@ use std::time::Duration;
 use crate::codecs::correctness::file_sha;
 use crate::codecs::equivalence::{Job, cargo_build, finish, run_jobs, take_output};
 use crate::harness::worker;
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::process::TempDir;
 use crate::pyrandom::PyRandom;
 use crate::{python, sha256};
@@ -120,7 +120,7 @@ pub fn run(
             .join(crate::harness::gate_build::release_dir()?)
             .join("capture-worker"),
     );
-    let cases = crate::checks::read_json(&root.join("harness/capture/cases.json"))?;
+    let cases = json::read(&root.join("harness/capture/cases.json"))?;
     let scratch = TempDir::new(None)?;
     let mut record: Vec<(String, Value)> = Vec::new();
     for (index, case) in cases

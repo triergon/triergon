@@ -160,7 +160,7 @@ pub fn run_limit(manifest: &Value, target: &str) -> Result<Duration, String> {
 
 pub fn run(options: &Options) -> Result<(), String> {
     let ceilings = policy::Memory::load(&options.repository)?;
-    let manifest = crate::checks::read_json(&options.workloads)
+    let manifest = json::read(&options.workloads)
         .map_err(|e| format!("{}: {e}", options.workloads.display()))?;
     let limit = run_limit(&manifest, &crate::harness::report::gate_target()?)?;
     let workloads = manifest

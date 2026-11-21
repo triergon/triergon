@@ -17,7 +17,7 @@ pub mod timing;
 
 use std::path::{Path, PathBuf};
 
-use crate::json::Value;
+use crate::json::{self, Value};
 
 pub(crate) const INITIALIZED_AAC_REFERENCE: &str = "ffmpeg-aac-initialized-pcm";
 
@@ -102,7 +102,7 @@ impl Gate<'_> {
         full: bool,
         run: impl FnOnce() -> Result<(), String>,
     ) -> Result<i32, String> {
-        let list = crate::checks::read_json(self.workloads)?;
+        let list = json::read(self.workloads)?;
         let mut inputs = vec![self.workloads.to_path_buf()];
         for workload in list
             .get("workloads")

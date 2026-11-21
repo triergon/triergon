@@ -763,7 +763,7 @@ fn compare(root: &Path, args: &[String]) -> Task {
         "catalogue" => catalogue_parity(&run, sequential, None, content)?,
         other => return Err(format!("unknown operation {other}")),
     };
-    corpus::write_json(&run.raw.join("result.json"), &result)?;
+    json::write(&run.raw.join("result.json"), &result)?;
     println!(
         "{}",
         result
@@ -797,7 +797,7 @@ fn fate_inventory(args: &[String]) -> Task {
             &std::fs::read(&list).map_err(|e| format!("{}: {e}", list.display()))?,
         )?;
     }
-    corpus::write_json(&output, &report)?;
+    json::write(&output, &report)?;
     let count = report
         .get("cases")
         .and_then(json::Value::as_array)
@@ -1184,7 +1184,7 @@ fn check_features(root: &Path) -> Task {
         ));
     }
     let passed = contracts.iter().all(|contract| {
-        checks::read_json(&output.join(&contract.id).join("report.json"))
+        json::read(&output.join(&contract.id).join("report.json"))
             .ok()
             .and_then(|report| {
                 report

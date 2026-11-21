@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::sha256;
 
 use super::check::{Source, Tree, kept_files};
@@ -268,9 +268,8 @@ done
     let joined = fs::read_to_string(output.join("logs/batch.log")).unwrap();
     assert_eq!(joined.matches("capture qualify").count(), 1, "{joined}");
     assert_eq!(joined.matches(" --and ").count(), 2, "{joined}");
-    let record = |case: &str| {
-        crate::checks::read_json(&output.join(format!("steps/memory-{case}.json"))).unwrap()
-    };
+    let record =
+        |case: &str| json::read(&output.join(format!("steps/memory-{case}.json"))).unwrap();
     for (case, status) in [("passes", 0.0), ("fails", 3.0), ("silent", 1.0)] {
         let record = record(case);
         assert_eq!(record.get("status").and_then(Value::as_f64), Some(status));
@@ -486,8 +485,7 @@ fn features_with_committed_inputs_are_preflighted_against_them() {
             // A manifest can locate its inputs without a corpus override.
             // Check the paths and pins the generated preflight actually uses.
             let inputs =
-                crate::harness::preflight::inputs(root, &feature_args, &crate::checks::read_json)
-                    .unwrap();
+                crate::harness::preflight::inputs(root, &feature_args, &json::read).unwrap();
             let mut pinned = inputs
                 .iter()
                 .filter_map(|input| Some((&input.path, input.sha256.as_deref()?)))
@@ -573,7 +571,7 @@ fn timed_step(args: &[&str]) -> Step {
 }
 
 fn parsed(raw: &str) -> Value {
-    crate::json::parse_observations(raw).unwrap()
+    json::parse_observations(raw).unwrap()
 }
 
 fn external_receipt() -> Value {
@@ -727,7 +725,7 @@ fn isobmff_step_checks_the_registered_partial_collection() {
             ("part", part.map_or(Value::Null, Value::str)),
             ("selection", indices(&selected)),
         ]);
-        crate::corpus::write_json(&output.join(filename), &report).unwrap();
+        json::write(&output.join(filename), &report).unwrap();
         assert!(unmeasured_cases(&step).is_empty(), "{cmd}");
         let check = |r: &Value| unmeasured_in(&step, r, "timing", "measured");
         for (k, v) in [
@@ -792,8 +790,7 @@ fn a_reused_measurement_passes_only_with_the_verdict_a_gate_run_recorded() {
     let mut row = external_receipt().get("case").unwrap().clone();
     let id = row.get("id").unwrap().as_str().unwrap().to_owned();
     crate::isobmff_bench::field(&mut row, "timing", parsed(r#"{"status":"warmup-failed"}"#));
-    crate::corpus::write_json(&output.join("report.json"), &Value::object([("case", row)]))
-        .unwrap();
+    json::write(&output.join("report.json"), &Value::object([("case", row)])).unwrap();
     reuse::record(&output, &key, 0, None).unwrap();
     assert_eq!(checked_result(&timed), Some(output.clone()));
     assert_eq!(unmeasured_cases(&timed), [id]);

@@ -4,7 +4,6 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::checks::read_json;
 use crate::harness::report::{self, Options};
 use crate::harness::{build, comparison, diff, provenance, reuse, worker};
 use crate::json::{self, Value};
@@ -92,9 +91,9 @@ fn digest(path: &Path) -> Result<String, String> {
 }
 
 fn validate(root: &Path, options: &Options) -> Result<(), String> {
-    let contract = read_json(&options.contract)?;
-    let manifest = read_json(&options.manifest)?;
-    let controls = read_json(&root.join(FEATURE).join("controls.json"))?;
+    let contract = json::read(&options.contract)?;
+    let manifest = json::read(&options.manifest)?;
+    let controls = json::read(&root.join(FEATURE).join("controls.json"))?;
     let timed = rows(&manifest)?;
     let controls = rows(&controls)?;
     if timed.len() != TIMED.len()
@@ -155,7 +154,7 @@ fn validate(root: &Path, options: &Options) -> Result<(), String> {
             }
         }
     }
-    let provenance = read_json(&root.join(FEATURE).join("provenance.json"))?;
+    let provenance = json::read(&root.join(FEATURE).join("provenance.json"))?;
     for (field, file) in [
         ("controls_sha256", "controls.json"),
         ("timing_corpus_sha256", "corpus.json"),
@@ -232,7 +231,7 @@ struct Context {
 fn context(root: &Path, selected: &Options) -> Result<Context, String> {
     validate(root, selected)?;
     let identity_path = root.join("target/harness/identity.json");
-    let identity = read_json(&identity_path)?;
+    let identity = json::read(&identity_path)?;
     let (candidate, reference, reference_record) = bound_workers(root, &identity)?;
     let binding = proof_binding(root, &identity, &reference_record)?;
     Ok(Context {
@@ -440,12 +439,12 @@ pub(crate) fn validate_report_controls(
     validate(root, &selected)?;
     require_same(
         Some(contract),
-        &read_json(&selected.contract)?,
+        &json::read(&selected.contract)?,
         "registered contract",
     )?;
     require_same(
         Some(manifest),
-        &read_json(&selected.manifest)?,
+        &json::read(&selected.manifest)?,
         "registered manifest",
     )?;
     let attachment = report
@@ -473,7 +472,7 @@ pub(crate) fn validate_report_controls(
             key,
         )?;
     }
-    let controls = read_json(&root.join(FEATURE).join("controls.json"))?;
+    let controls = json::read(&root.join(FEATURE).join("controls.json"))?;
     let recorded = recorded_cases(&proof, &controls, &binding)?;
     check_artifacts(root, &path, recorded, &controls)?;
     bound_workers(root, identity)?;
@@ -563,7 +562,7 @@ fn check_controls(root: &Path, selected: &Options) -> Result<Option<Value>, Stri
     let output = selected.output.join("controls");
     report::create_output(&output)?;
     let before = context(root, selected)?;
-    let manifest = read_json(&root.join(FEATURE).join("controls.json"))?;
+    let manifest = json::read(&root.join(FEATURE).join("controls.json"))?;
     let mut results = Vec::new();
     let mut passed = true;
     for case in rows(&manifest)? {

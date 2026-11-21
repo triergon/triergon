@@ -1,8 +1,8 @@
 //! Bind a supplied session worker to the library checkout and the target Cargo built.
 use super::sha;
 use crate::harness::{build, gate_build};
-use crate::json::Value;
-use crate::{checks, corpus, json, process, sha256};
+use crate::json::{self, Value};
+use crate::{process, sha256};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -130,11 +130,11 @@ pub(super) fn stage(root: &Path, tree: &Path, dest: &Path) -> Result<(), String>
         ("build", build),
         ("argv", Value::strings(argv)),
     ]);
-    corpus::write_json(&identity_path(dest), &identity)
+    json::write(&identity_path(dest), &identity)
 }
 
 pub(super) fn verify(root: &Path, worker: &Path) -> Result<Value, String> {
-    let identity = checks::read_json(&identity_path(worker))?;
+    let identity = json::read(&identity_path(worker))?;
     if identity.get("sha256").and_then(Value::as_str) != Some(&sha(worker)?)
         || identity.get("target").and_then(Value::as_str) != Some(gate_build::worker_target()?)
         || identity.get("overlay") != Some(&overlay(root)?)

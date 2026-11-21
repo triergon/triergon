@@ -1819,7 +1819,7 @@ pub fn kernel_profile_current(
             || pin_sha("probe_binary") != probe_sha
             || pin_sha("module_api") != pin_sha("observer_api")
             || file_sha(&proof_path).ok().as_deref() != s(profile, "proof_sha256")
-            || !crate::checks::read_json(&proof_path).is_ok_and(|p| equal(&p, proof))
+            || !json::read(&proof_path).is_ok_and(|p| equal(&p, proof))
         {
             return Some(false);
         }
@@ -1831,7 +1831,7 @@ pub fn kernel_profile_current(
 }
 
 pub fn load_kernel_profile(root: &Path, observer_sha: &str, probe_sha: &str) -> R<Value> {
-    let identity = crate::checks::read_json(&root.join("target/harness/identity.json"))?;
+    let identity = json::read(&root.join("target/harness/identity.json"))?;
     let pin = identity
         .get("instrumentation")
         .and_then(|i| i.get("rss_kernel_bound"))
@@ -1843,7 +1843,7 @@ pub fn load_kernel_profile(root: &Path, observer_sha: &str, probe_sha: &str) -> 
             "proof_sha256",
             pin.get("proof_sha256").cloned().unwrap_or(Value::Null),
         ),
-        ("proof", crate::checks::read_json(&root.join(path))?),
+        ("proof", json::read(&root.join(path))?),
     ]);
     if !kernel_profile_current(root, &profile, Some(observer_sha), Some(probe_sha)) {
         return Err(

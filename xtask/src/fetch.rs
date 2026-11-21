@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::sha256;
 
 /// Network access, replaceable in tests.
@@ -319,7 +319,7 @@ pub fn specs(root: &Path, record: bool, net: &dyn Transport) -> Result<String, S
     let expected = if record {
         Value::Null
     } else {
-        crate::checks::read_json(&manifest)?
+        json::read(&manifest)?
     };
     let pinned = |id: &str| {
         expected
@@ -382,7 +382,7 @@ pub fn specs(root: &Path, record: bool, net: &dyn Transport) -> Result<String, S
             ("recorded", Value::str(today())),
             ("sources", Value::Array(rows)),
         ]);
-        crate::corpus::write_json(&manifest, &document)?;
+        json::write(&manifest, &document)?;
     }
     Ok(format!("Verified {count} specification snapshots"))
 }
@@ -477,7 +477,7 @@ fn fetch_pins(
 
 /// The mandatory external vectors, in the sample cache.
 fn required_pins(root: &Path) -> Result<Vec<Pin>, String> {
-    let contract = crate::checks::read_json(&root.join(VECTOR_CONTRACT))?;
+    let contract = json::read(&root.join(VECTOR_CONTRACT))?;
     let mut pins = Vec::new();
     for vector in contract
         .get("required_additional_vectors")
@@ -508,7 +508,7 @@ fn fate_corpus_pins(root: &Path) -> Result<Vec<Pin>, String> {
         if contract.document.get("fetch_fate_cases") != Some(&Value::Bool(true)) {
             continue;
         }
-        let manifest = crate::checks::read_json(&contract.manifest())?;
+        let manifest = json::read(&contract.manifest())?;
         let directory = manifest
             .get("directory")
             .and_then(Value::as_str)

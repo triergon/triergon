@@ -13,7 +13,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::checks::read_json;
 use crate::codecs::correctness::file_sha;
 use crate::harness::diff::equal;
 use crate::harness::policy::{Memory, Runtime};
@@ -127,7 +126,7 @@ fn document(root: &Path, name: &str, expected: &str) -> R<Value> {
     if actual != expected {
         return Err(format!("{path}: contract or membership changed"));
     }
-    read_json(&root.join(path))
+    json::read(&root.join(path))
 }
 
 #[derive(Clone)]
@@ -894,7 +893,7 @@ pub(crate) struct Build {
 
 impl Build {
     pub(crate) fn load(root: &Path) -> R<Self> {
-        let identity = read_json(&root.join("target/harness/identity.json"))?;
+        let identity = json::read(&root.join("target/harness/identity.json"))?;
         let candidate_record = identity
             .get("additional_candidates")
             .and_then(|v| v.get(CANDIDATE))
@@ -1274,7 +1273,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let options = Options::parse(&root, args)?;
     let suite = Suite::load(&root)?;
-    let policy = read_json(&root.join("harness/policy.json"))?;
+    let policy = json::read(&root.join("harness/policy.json"))?;
     let build = Build::load(&root)?;
     if let Some(parent) = options.output.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;

@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::archive::{TarFiles, TarReader};
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::sha256;
 
 /// The index's own fields: its schema, where keys lie, and how identifiers were
@@ -52,7 +52,7 @@ pub fn set(root: &Path, name: &str) -> Result<Value, String> {
     if !root.join(&path).is_file() {
         return Err(format!("{name} is not in the evidence index ({path})"));
     }
-    let set = crate::checks::read_json(&root.join(&path)).map_err(|e| format!("{path}: {e}"))?;
+    let set = json::read(&root.join(&path)).map_err(|e| format!("{path}: {e}"))?;
     if s(&set, "name") != Some(name) {
         return Err(format!("{path} does not hold set {name}"));
     }
@@ -487,7 +487,7 @@ pub fn entry(name: &str, archive: &Path, key: Option<&str>) -> Result<(String, S
         entry.push(("results", Value::Array(results)));
     }
     let entry = Value::object(entry);
-    Ok((key, crate::json::to_python(&entry, Some(1))))
+    Ok((key, json::to_python(&entry, Some(1))))
 }
 
 /// The fresh gate results a packed set holds ([`crate::harness::reuse`]), which a
@@ -537,14 +537,14 @@ pub fn promote(root: &Path, name: &str) -> Result<String, String> {
     let relative = set_path(name)?;
     let path = root.join(&relative);
     let text = fs::read_to_string(&path).map_err(|e| format!("{relative}: {e}"))?;
-    let mut set = crate::json::parse_strict(&text).map_err(|e| format!("{relative}: {e}"))?;
-    if crate::json::to_python(&set, Some(1)) + "\n" != text {
+    let mut set = json::parse_strict(&text).map_err(|e| format!("{relative}: {e}"))?;
+    if json::to_python(&set, Some(1)) + "\n" != text {
         return Err(format!("{relative} is not in its canonical layout"));
     }
     let (from, to) = promote_set(&mut set, name)?;
     let location = archive_location()?;
     aws_cp(&format!("{location}/{from}"), &format!("{location}/{to}"))?;
-    fs::write(&path, crate::json::to_python(&set, Some(1)) + "\n")
+    fs::write(&path, json::to_python(&set, Some(1)) + "\n")
         .map_err(|e| format!("{relative}: {e}"))?;
     Ok(format!("{name}: {from} -> {to}"))
 }
@@ -1105,7 +1105,7 @@ mod tests {
             ]);
             let file = root.join(SETS).join("shard.json");
             fs::create_dir_all(file.parent().unwrap()).unwrap();
-            crate::corpus::write_json(&file, &set).unwrap();
+            json::write(&file, &set).unwrap();
         };
         index("retained");
         let into = root.join("restored");
@@ -1208,7 +1208,7 @@ mod tests {
 
     #[test]
     fn promotion_moves_an_expiring_set_under_evidence() {
-        let parse = |text| crate::json::parse_strict(text).unwrap();
+        let parse = |text| json::parse_strict(text).unwrap();
         let mut a =
             parse(r#"{"name": "a", "retention": "90 days", "key": "qualification/a/0.tar.gz"}"#);
         assert_eq!(
@@ -1264,12 +1264,12 @@ mod tests {
             .parent()
             .unwrap()
             .to_path_buf();
-        let Ok(index) = crate::checks::read_json(&root.join(INDEX)) else {
+        let Ok(index) = json::read(&root.join(INDEX)) else {
             return;
         };
         let canonical = |path: &str, value: &Value| {
             assert_eq!(
-                crate::json::to_python(value, Some(1)) + "\n",
+                json::to_python(value, Some(1)) + "\n",
                 fs::read_to_string(root.join(path)).unwrap(),
                 "{path} must stay in its canonical layout, which `evidence promote` rewrites"
             );

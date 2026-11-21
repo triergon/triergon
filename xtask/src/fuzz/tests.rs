@@ -330,8 +330,7 @@ fn a_campaign_keeps_raw_streams_and_flags_input_tampering() {
         };
         (
             campaign(&root, &args).unwrap(),
-            crate::checks::read_json(&root.join(".research").join(name).join("report.json"))
-                .unwrap(),
+            json::read(&root.join(".research").join(name).join("report.json")).unwrap(),
         )
     };
     let (code, report) = run("agree", &reference);
@@ -425,8 +424,7 @@ fn seed_arguments_fill_the_arguments_slot_and_hangs_time_out() {
         b"{\"a\": \"x y\"}"
     );
     let observed =
-        crate::checks::read_json(&root.join(".research/arguments/case-000001/observation.json"))
-            .unwrap();
+        json::read(&root.join(".research/arguments/case-000001/observation.json")).unwrap();
     let status = |role: &str| {
         observed
             .get("operations")

@@ -7,7 +7,7 @@ fn args(values: &[&str]) -> Vec<String> {
 #[test]
 fn only_an_uninstrumented_build_of_the_same_libraries_measures_for_a_reference() {
     let contract = |reference: &str, measurement: &str| {
-        crate::json::parse(&format!(
+        json::parse(&format!(
             r#"{{"reference":"{reference}","measurement_reference":"{measurement}"}}"#
         ))
         .unwrap()
@@ -24,7 +24,7 @@ fn only_an_uninstrumented_build_of_the_same_libraries_measures_for_a_reference()
     assert!(error("libass-native", "libass-player-native").is_some());
     assert!(error("libass-ass-native", "freetype-native").is_some());
     assert!(error("libass-ass-native", "unbuilt").is_some());
-    let plain = crate::json::parse(r#"{"reference":"libass-ass-native"}"#).unwrap();
+    let plain = json::parse(r#"{"reference":"libass-ass-native"}"#).unwrap();
     assert_eq!(measurement_reference_error(&plain), None);
 }
 

@@ -15,7 +15,6 @@ use super::validation::{
     self, array, external_contract, field, hash, members, put, require_same, selected_operation,
     text,
 };
-use crate::checks::read_json;
 use crate::json::{self, Value};
 use crate::sha256;
 
@@ -844,7 +843,7 @@ fn join_case(
 fn current_workers(root: &Path, identity: &Value, contract: &Value) -> R<()> {
     require_same(
         identity,
-        &read_json(&root.join("target/harness/identity.json"))?,
+        &json::read(&root.join("target/harness/identity.json"))?,
         "current memory build identity",
     )?;
     validation::current_workers(root, identity)?;
