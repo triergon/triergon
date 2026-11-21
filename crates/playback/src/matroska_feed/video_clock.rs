@@ -3,7 +3,7 @@ use super::{
     Association, FeedCodec, MatroskaFeedPacket, MatroskaFeedPayload, MatroskaPacketTiming,
     MatroskaTrackFeed,
 };
-use crate::{Result, raw_video::hevc_syntax as hevc};
+use crate::{Result, raw_video::hevc_startup as hevc};
 use triergon_core::Error;
 use triergon_framing::{
     avc::{self, AvcAnnexBConfig},

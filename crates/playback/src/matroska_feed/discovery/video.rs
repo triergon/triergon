@@ -1,12 +1,14 @@
 //! Packet-clock readiness for startup with one active AVC or HEVC chain.
 use super::super::video_clock::{avc_chain, picture_nal};
-use crate::{Output, Result, raw_video::hevc_syntax as hevc};
+use crate::{Output, Result, raw_video::hevc_startup as hevc};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, WorkBudget};
 use triergon_framing::{
     BuildStep,
     avc::{AvcConfigLimits, AvcConfigParser, AvcConfigSource},
-    hevc::{HvcConfigLimits, HvcConfigParser, HvcConfigSource, HvcConfiguration},
+    hevc::{
+        HvcConfigLimits, HvcConfigParser, HvcConfigSource, HvcConfiguration, check_parameter_sets,
+    },
     nal::{Codec, LengthSize},
 };
 use triergon_matroska::{Track, TypedPacket as Packet};
@@ -288,7 +290,7 @@ impl Sample {
             let [Some(vps), Some(sps), Some(pps)] = payloads else {
                 return false;
             };
-            self.hevc_repeats_checked = hevc::check_parameter_sets(vps, sps, pps).is_ok();
+            self.hevc_repeats_checked = check_parameter_sets(vps, sps, pps).is_ok();
         }
         self.hevc_repeats_checked
     }

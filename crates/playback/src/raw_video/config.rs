@@ -1,5 +1,5 @@
 //! Active decoder configuration for raw Annex B AVC and base-layer HEVC.
-pub(crate) mod hevc;
+pub(super) mod hevc;
 
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId};
 pub use triergon_framing::avc::AvcVuiTiming;

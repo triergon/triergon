@@ -8,6 +8,7 @@ pub mod io;
 mod mp4_native_replay;
 pub mod mp4_open;
 pub mod mp4_plan;
+pub mod pes_feed;
 mod player;
 mod sample_sort;
 pub use engines::{
@@ -16,10 +17,10 @@ pub use engines::{
     TsNativePrivateAudioSelection, TsNativeSelection, TsNativeTrackSelection,
 };
 pub use player::{
-    ClockChoice, Delivery, Mp4NativeSeekCommand, Mp4NativeSeekJob, Mp4NativeSeekRequest,
-    Mp4RangeOpen, Mp4RangePlayer, Mp4RangeSeek, Mp4RangeSeekJob, Mp4SyncSeekCommand,
-    Mp4SyncSeekJob, Mp4SyncSeekRequest, Output, Player, PlayerPolicy, Progress, SeekIntent,
-    Selection, State, TrackKey, TrackKind,
+    ClockChoice, Delivery, MatroskaReplayOutput, Mp4NativeSeekCommand, Mp4NativeSeekJob,
+    Mp4NativeSeekRequest, Mp4RangeOpen, Mp4RangePlayer, Mp4RangeSeek, Mp4RangeSeekJob,
+    Mp4SyncSeekCommand, Mp4SyncSeekJob, Mp4SyncSeekRequest, Output, OutputScope, Player,
+    PlayerPolicy, Progress, SeekIntent, Selection, State, TrackKey, TrackKind,
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Format {

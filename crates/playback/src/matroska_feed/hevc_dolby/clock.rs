@@ -3,10 +3,13 @@ use super::{FeedCodec, MatroskaHevcDolbyFeed, MatroskaHevcDolbyPacket, MatroskaH
 use crate::{
     Result,
     matroska_feed::{Association, MatroskaPacketTiming, video_clock::DecodeClock},
-    raw_video::hevc_syntax as hevc,
+    raw_video::hevc_startup as hevc,
 };
 use triergon_core::Error;
-use triergon_framing::{hevc::HevcAnnexBConfig, nal::Codec};
+use triergon_framing::{
+    hevc::{HevcAnnexBConfig, check_parameter_sets, read_sps_timing, read_vps_timing},
+    nal::Codec,
+};
 
 /// One timing projection for an ordered HEVC feed from a random-access
 /// picture. Observe each packet once, in the original decode order.
@@ -28,9 +31,9 @@ impl MatroskaHevcDolbyFeed {
             return Ok(None);
         };
         let chain = hevc::startup_chain(config.record().nals().map(|nal| nal.source_bytes()))?;
-        let period = match hevc::read_vps_timing(chain.vps)? {
+        let period = match read_vps_timing(chain.vps)? {
             Some(period) => Some(period),
-            None => hevc::read_sps_timing(chain.sps)?
+            None => read_sps_timing(chain.sps)?
                 .map(|timing| (timing.num_units_in_tick, timing.time_scale)),
         };
         Ok(Some(MatroskaHevcClock {
@@ -72,7 +75,7 @@ impl MatroskaHevcClock<'_> {
                 }
                 if !self.repeat_prefixes_validated {
                     let [vps, sps, pps] = self.parameter_sets;
-                    hevc::check_parameter_sets(vps, sps, pps)?;
+                    check_parameter_sets(vps, sps, pps)?;
                     self.repeat_prefixes_validated = true;
                 }
                 Ok(true)

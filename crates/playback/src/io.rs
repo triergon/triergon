@@ -28,7 +28,8 @@ impl<S: Source> SourceOwner<S> {
             aborted: false,
         }
     }
-    pub(crate) fn map<T: Source>(mut self, map: impl FnOnce(S) -> T) -> Result<SourceOwner<T>> {
+    /// The same ownership over `map(source)`; `Closed` after an abort.
+    pub fn map<T: Source>(mut self, map: impl FnOnce(S) -> T) -> Result<SourceOwner<T>> {
         if self.aborted {
             return Err(Error::Closed);
         }
@@ -277,9 +278,11 @@ impl<S: Source> Probe<S> {
         })
     }
 }
-pub(crate) const CONTAINER_SIGNATURE_BYTES: usize = M2ts192.prefix_len();
+/// Prefix bytes [`detect_container`] needs for a conclusive answer.
+pub const CONTAINER_SIGNATURE_BYTES: usize = M2ts192.prefix_len();
 
-pub(crate) fn detect_container(prefix: &[u8]) -> Result<Option<Format>> {
+/// The container format a prefix starts with; `None` when it matches none.
+pub fn detect_container(prefix: &[u8]) -> Result<Option<Format>> {
     if signature::ebml(prefix) {
         return Ok(Some(Format::Matroska));
     }

@@ -3,11 +3,10 @@
 
 use super::Sps;
 use triergon_core::{Error, Result};
-pub(crate) use triergon_framing::hevc::{
-    check_parameter_sets, read_pps_ids, read_slice_prefix, read_sps_timing, read_vps_id,
-    read_vps_timing,
+pub(super) use triergon_framing::hevc::{
+    read_pps_ids, read_slice_prefix, read_sps_timing, read_vps_id,
 };
-use triergon_framing::hevc::{read_sps_prefix, read_sps_reorder};
+use triergon_framing::hevc::{check_parameter_sets, read_sps_prefix, read_sps_reorder};
 use triergon_framing::nal::{Codec, NalHeader};
 
 pub(super) fn sps(payload: &[u8]) -> Result<(u8, Sps)> {
@@ -23,15 +22,25 @@ pub(super) fn sps(payload: &[u8]) -> Result<(u8, Sps)> {
     ))
 }
 
-pub(crate) struct StartupChain<'a> {
+/// One active single-layer VPS, SPS and PPS, as NAL payloads after their headers.
+#[derive(Debug)]
+pub struct StartupChain<'a> {
+    /// The VPS payload.
     pub vps: &'a [u8],
+    /// The SPS payload.
     pub sps: &'a [u8],
+    /// The PPS payload.
     pub pps: &'a [u8],
+    /// The PPS ID.
     pub pps_id: u8,
+    /// The SPS's highest-sublayer reorder depth.
     pub reorder: u8,
 }
 
-pub(crate) fn startup_chain<'a>(nals: impl Iterator<Item = &'a [u8]>) -> Result<StartupChain<'a>> {
+/// The chain of a configuration record's parameter-set NALs: one distinct set
+/// of each type (exact repeats allowed, SEI skipped), at most 16 NALs of at
+/// most 4,096 bytes; `Unsupported` otherwise.
+pub fn startup_chain<'a>(nals: impl Iterator<Item = &'a [u8]>) -> Result<StartupChain<'a>> {
     let mut vps_set = None;
     let mut sps_set = None;
     let mut pps_set = None;
@@ -91,7 +100,7 @@ pub(crate) fn startup_chain<'a>(nals: impl Iterator<Item = &'a [u8]>) -> Result<
 }
 
 /// Identify the active chain's three supported parameter-set headers.
-pub(crate) fn parameter_set_payload(nal: &[u8]) -> Option<(usize, &[u8])> {
+pub fn parameter_set_payload(nal: &[u8]) -> Option<(usize, &[u8])> {
     let (header, payload) = nal.split_first_chunk::<2>()?;
     // The chain admits layer zero and temporal ID zero.
     let [kind @ (0x40 | 0x42 | 0x44), 1] = *header else {
@@ -100,16 +109,24 @@ pub(crate) fn parameter_set_payload(nal: &[u8]) -> Option<(usize, &[u8])> {
     Some((usize::from((kind - 0x40) >> 1), payload))
 }
 
-pub(crate) enum StartupNal {
+/// What a startup clock needs of one NAL of a sample.
+#[derive(Debug)]
+pub enum StartupNal {
+    /// A slice of a picture.
     Picture {
+        /// Whether it is the picture's first slice.
         first: bool,
+        /// Whether the picture is an IRAP picture.
         random_access: bool,
+        /// The slice's PPS ID.
         pps: u8,
     },
+    /// A parameter set, AUD, end of sequence or SEI NAL.
     Supplemental,
 }
 
-pub(crate) fn startup_nal(nal: &[u8], header: NalHeader) -> Result<StartupNal> {
+/// Classifies a base-layer NAL of a sample; `Unsupported` for other NALs.
+pub fn startup_nal(nal: &[u8], header: NalHeader) -> Result<StartupNal> {
     match header {
         NalHeader::Hevc {
             nal_unit_type: kind @ (0..=9 | 16..=21),

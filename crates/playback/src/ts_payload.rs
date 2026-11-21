@@ -9,30 +9,50 @@ use triergon_mpegts::{
     },
 };
 
-pub(crate) struct PesFacts<'a> {
+/// What a reader checks of a PES before it takes the payload, the same for
+/// owned and compact payloads.
+#[derive(Debug)]
+pub struct PesFacts<'a> {
+    /// Program number.
     pub program: u16,
+    /// Elementary stream PID.
     pub pid: u16,
+    /// The observer profile that cut the PES.
     pub profile: DemuxProfile,
+    /// Where the PES started in the source.
     pub source_origin: SourceLocation,
+    /// The source's clock and configuration epochs at the PES.
     pub source_epochs: SourceEpochs,
+    /// Demux packet flags.
     pub flags: u32,
+    /// PES `stream_id`.
     pub stream_id: u8,
+    /// How the payload is carried.
     pub payload_kind: DemuxPayloadKind,
+    /// The PES header as the source carries it.
     pub source_header: &'a PesHeader,
+    /// Whether the header's timestamps apply to this packet.
     pub time_header_applies: bool,
+    /// Payload length in bytes.
     pub payload_len: usize,
+    /// Whether the payload is empty.
     pub empty: bool,
+    /// Budget of the payload storage.
     pub payload_budget: &'a Budget,
+    /// Budget of the header range list.
     pub header_budget: &'a Budget,
 }
 
 impl PesFacts<'_> {
+    /// The header whose timestamps apply, if any.
     pub fn time_header(&self) -> Option<&PesHeader> {
         self.time_header_applies.then_some(self.source_header)
     }
 }
 
-pub(crate) trait PesInput {
+/// A completed PES as a reader takes it: owned spans or a compact payload.
+pub trait PesInput {
+    /// What the reader checks before taking the payload.
     fn facts(&self) -> PesFacts<'_>;
     /// The payload, and the header source ranges a reader does not read.
     fn into_parts(self) -> (CompactPayload, BudgetVec<SourceRange>);
@@ -41,8 +61,10 @@ pub(crate) trait PesInput {
 /// The lists of the PES a reader consumed last, kept until the reader's owner
 /// hands them back to the observer that emitted them.
 #[derive(Debug, Default)]
-pub(crate) struct SpentLists {
+pub struct SpentLists {
+    /// The payload span list.
     pub spans: Option<BudgetVec<DemuxSpan>>,
+    /// The header source range list.
     pub header: Option<BudgetVec<SourceRange>>,
 }
 

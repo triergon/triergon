@@ -108,13 +108,13 @@ impl<S: Source> Transport<S> {
         {
             // Recover the original cursor bound only on the oversize path.
             // Preserve its Limit-before-token-check ordering for all replies.
-            let hard_maximum = self.engine.input.request().maximum;
+            let hard_maximum = self.engine.input().request().maximum;
             let maximum = if window.bytes().len() > hard_maximum {
                 Some(hard_maximum)
             } else if window.source == request.source
                 && window.token == request.token
                 && window.offset == request.offset
-                && window.bytes().belongs_to(self.engine.input.budget())
+                && window.bytes().belongs_to(self.engine.input().budget())
             {
                 Some(request.maximum)
             } else {
@@ -425,7 +425,7 @@ impl<S: Source> TsProgressiveReader<S> {
             .as_ref()
             .ok_or(Error::Closed)?
             .engine
-            .input
+            .input()
             .budget();
         if config.track == tracks.video {
             self.video = Some(AvcTsReader::new_progressive(pool, config, self.limits.avc)?);

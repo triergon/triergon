@@ -93,7 +93,10 @@ pub enum Delivery {
     Present,
     UnknownTime,
 }
-pub(crate) struct OutputScope<Pool = Budget> {
+/// The source, pool, session, epoch and generation an output belongs to, kept
+/// to recognise later outputs of the same playback state.
+#[derive(Debug)]
+pub struct OutputScope<Pool = Budget> {
     source: triergon_core::SourceId,
     pool: Pool,
     session: u64,
@@ -102,7 +105,8 @@ pub(crate) struct OutputScope<Pool = Budget> {
 }
 
 impl OutputScope {
-    pub(crate) fn matches(&self, output: &Output) -> bool {
+    /// Whether `output` belongs to this scope.
+    pub fn matches(&self, output: &Output) -> bool {
         self.source == output.source
             && self.session == output.session
             && self.epoch == output.epoch
@@ -123,7 +127,8 @@ pub struct Output {
     bytes: usize,
 }
 impl Output {
-    pub(crate) fn into_matroska_replay(self) -> Option<MatroskaReplayOutput> {
+    /// The output without its event-sized storage, when it holds a Matroska event.
+    pub fn into_matroska_replay(self) -> Option<MatroskaReplayOutput> {
         let RawEvent::Matroska(event) = self.event else {
             return None;
         };
@@ -170,7 +175,8 @@ impl Output {
         }
     }
 
-    pub(crate) fn scope(&self) -> OutputScope {
+    /// The playback state this output belongs to.
+    pub fn scope(&self) -> OutputScope {
         OutputScope {
             source: self.source,
             pool: self.pool().clone(),
@@ -195,16 +201,21 @@ impl Output {
         self.event
     }
 }
-pub(crate) struct MatroskaReplayOutput {
+/// A retained Matroska output, which a caller can deliver later in order.
+#[derive(Debug)]
+pub struct MatroskaReplayOutput {
     // Packet configurations already retain the pool. Other events carry the
     // same explicit budget handle as their original output.
     scope: OutputScope<Option<Budget>>,
+    /// The Matroska event.
     pub event: triergon_matroska::Event,
-    pub(crate) delivery: Delivery,
+    /// How the output was to be delivered.
+    pub delivery: Delivery,
     bytes: usize,
 }
 
 impl MatroskaReplayOutput {
+    /// The output again, for delivery.
     pub fn into_output(self) -> Output {
         Output {
             source: self.scope.source,
@@ -492,7 +503,8 @@ impl<S: Source> Player<S> {
     pub fn budget(&self) -> &Budget {
         &self.pool
     }
-    pub(crate) fn source_mut(&mut self) -> Option<&mut S> {
+    /// The caller's source, while the player still owns it.
+    pub fn source_mut(&mut self) -> Option<&mut S> {
         self.source.as_mut().and_then(SourceOwner::source_mut)
     }
     pub fn seek_intent(&self) -> Option<SeekIntent> {
@@ -507,8 +519,12 @@ impl<S: Source> Player<S> {
     pub fn engine(&self) -> Option<&Engine> {
         self.engine.as_ref()
     }
-    pub(crate) fn engine_mut(&mut self) -> Option<&mut Engine> {
-        self.engine.as_mut()
+    /// Hands a consumed PES's lists back to the observer of `pid`, so that it
+    /// allocates nothing for its next PES. Does nothing for other engines.
+    pub fn reuse_pes_lists(&mut self, pid: u16, lists: crate::ts_payload::SpentLists) {
+        if let Some(engine) = self.engine.as_mut() {
+            engine.reuse_pes_lists(pid, lists);
+        }
     }
     pub fn pending_request(&self) -> Option<&InputRequest> {
         self.request.as_ref()

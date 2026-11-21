@@ -303,7 +303,7 @@ enum SegmentDiscovery {
 pub struct TsEngine {
     native_context: Option<ts::compat::input::InputContext>,
     native_prefix_failed: bool,
-    pub(crate) input: InputCursor,
+    input: InputCursor,
     stream: TransportStream,
     format: ts::PacketFormat,
     program: u16,
@@ -330,38 +330,57 @@ pub struct TsEngine {
     boundary: Option<ts::stream::MediaEntityEnd>,
 }
 
+/// A completed PES of a feed, with its payload as the observer delivers it.
 #[derive(Debug)]
-pub(crate) enum NativePacket {
+pub enum NativePacket {
+    /// Payload spans of the shared input windows.
     Owned(DemuxPacket),
+    /// One compact payload per carrier run.
     Compact(CompactDemuxPacket),
 }
 
+/// One step of a PES feed.
 #[derive(Debug)]
 #[allow(
     clippy::large_enum_variant,
     reason = "return original transport events without a heap allocation"
 )]
-pub(crate) enum TsPayloadStep {
+pub enum TsPayloadStep {
+    /// A source table, clock or fault event the feed delivers whole.
     Event(TsEvent),
+    /// The carriage a track was admitted with under the active PMT.
     Configuration(TsNativeConfiguration),
+    /// A track stopped: its carriage or one of its packets was refused.
     Refusal {
+        /// The refused track.
         track: TrackKey,
+        /// Why it was refused.
         error: Error,
+        /// Ordinal of the source event the refusal is attributed to.
         source_event_ordinal: u64,
     },
+    /// A completed PES with its demux clock.
     Packet {
+        /// The PES.
         packet: NativePacket,
+        /// Its timestamps on the demux clock.
         clock: DemuxTimeView,
     },
+    /// The current entity ended.
     EntityEnd(ts::stream::MediaEntityEnd),
+    /// The feed needs this input before it can continue.
     NeedInput(InputRequest),
+    /// The work budget ran out or the feed returns to its caller.
     Yield,
+    /// The source ended and every track drained.
     End,
+    /// An entity ended; the caller continues with the next one.
     AwaitEntity,
 }
 
 impl TsPayloadStep {
-    pub(crate) fn payload_bytes(&self) -> Option<usize> {
+    /// Payload bytes the step retains; `None` for steps without an event.
+    pub fn payload_bytes(&self) -> Option<usize> {
         Some(match self {
             Self::Packet { packet, .. } => match packet {
                 NativePacket::Owned(packet) => packet.payload_len,
@@ -1669,11 +1688,10 @@ impl TsEngine {
         Ok(engine)
     }
 
-    pub(crate) fn progressive(
-        input: InputCursor,
-        limits: ts::ParseLimits,
-        compact: bool,
-    ) -> Result<Self> {
+    /// A progressive PES feed of a single-program TS188 source: AVC and AAC
+    /// tracks found in its PMT, delivered as owned or, with `compact`, compact
+    /// payloads. Poll it with [`Self::poll_progressive_payload`].
+    pub fn progressive(input: InputCursor, limits: ts::ParseLimits, compact: bool) -> Result<Self> {
         Self::native_segment(
             input,
             limits,
@@ -1687,11 +1705,19 @@ impl TsEngine {
         )
     }
 
-    pub(crate) fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
+    /// The input cursor the feed reads.
+    #[inline]
+    pub fn input(&self) -> &InputCursor {
+        &self.input
+    }
+
+    /// Hands a source reply to the input; true when it was accepted.
+    pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
         provide(&mut self.input, reply)
     }
 
-    pub(crate) fn poll_progressive_payload(
+    /// The next step of a feed made by [`Self::progressive`].
+    pub fn poll_progressive_payload(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -1705,12 +1731,13 @@ impl TsEngine {
         self.poll::<TsPayloadStep>(work, cancel)
     }
 
-    pub(crate) fn take_suppressed_events(&mut self) -> u64 {
+    /// Source events the feed consumed without delivering since the last call.
+    pub fn take_suppressed_events(&mut self) -> u64 {
         std::mem::take(&mut self.suppressed_events)
     }
 
     /// Hands a consumed PES's lists back to the observer of `pid` for its next PES.
-    pub(crate) fn reuse_pes_lists(&mut self, pid: u16, lists: crate::ts_payload::SpentLists) {
+    pub fn reuse_pes_lists(&mut self, pid: u16, lists: crate::ts_payload::SpentLists) {
         let Some(index) = self.native_tracks.index(pid) else {
             return;
         };

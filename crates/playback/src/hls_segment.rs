@@ -1,8 +1,8 @@
 //! Complete, bounded playback feed for one independent TS188 media segment.
 
 use crate::{
-    ClockChoice, Engine, Error, Player, PlayerPolicy, Progress, RawEvent, Result, Selection,
-    Source, SourceReply, State, TrackKey,
+    ClockChoice, Error, Player, PlayerPolicy, Progress, RawEvent, Result, Selection, Source,
+    SourceReply, State, TrackKey,
     hls_aac::{HlsAac, HlsAacFrame},
     hls_avc::{AvcRaster, AvcTsAccessUnit, AvcTsLimits, AvcTsReader},
     hls_clock::{
@@ -338,7 +338,7 @@ where
             check_extent(length, 0, limits.maximum_source_bytes)?;
         }
         let pool = input.budget().clone();
-        let engine = Engine::ts_hls_segment(
+        let engine = crate::pes_feed::open_segment_feed(
             input,
             limits.transport,
             matches!(tracks, TrackSelection::Media(_)),
@@ -561,9 +561,8 @@ where
     ) {
         if let (Some(player), Some(TrackKey::Ts { pid, .. })) =
             (self.player.as_mut(), self.map.and_then(track))
-            && let Some(engine) = player.engine_mut()
         {
-            engine.reuse_pes_lists(pid, lists);
+            player.reuse_pes_lists(pid, lists);
         }
     }
 
@@ -1000,7 +999,8 @@ mod tests {
         )
         .unwrap();
         let bytes = Bytes::copy_from_slice(&pool, fixture).unwrap();
-        let engine = Engine::ts_hls_segment(cursor, ParseLimits::default(), false).unwrap();
+        let engine =
+            crate::pes_feed::open_segment_feed(cursor, ParseLimits::default(), false).unwrap();
         let mut player = Player::new(
             engine,
             SourceOwner::new(ByteSource::new(source, bytes, 4096).unwrap()),

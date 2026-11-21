@@ -12,7 +12,12 @@ use triergon_framing::nal::{RawAccessUnit, RawAnnexBReader};
 mod config;
 mod feed;
 mod probe;
-pub(crate) use config::hevc as hevc_syntax;
+/// The HEVC parameter-set chain a feed starts from.
+pub mod hevc_startup {
+    pub use super::config::hevc::{
+        StartupChain, StartupNal, parameter_set_payload, startup_chain, startup_nal,
+    };
+}
 pub use config::{AvcVuiTiming, HevcVuiTiming, RawVideoConfigTracker, RawVideoConfiguration};
 pub use feed::{RawFeedClock, RawVideoFeed, RawVideoFeedPacket};
 pub use probe::{
