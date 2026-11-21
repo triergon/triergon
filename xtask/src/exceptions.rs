@@ -4,7 +4,7 @@
 //! feature leaves the gate plan, when a list whose name starts with `open_` (a
 //! contract's `open_cases` and `open_bounds`, a workload list's `open_workloads`, a
 //! vector manifest's `open_cases`, the status page's `open_cells`) gains an entry, or
-//! when a crate's list of public features no contract compares
+//! when a crate's list of public features no gated comparison compares directly
 //! ([`NOT_COMPARED`]) grows. `harness/gate-exceptions.json` records how many of each
 //! the repository holds, and `cargo xtask check-design` counts them again: a change
 //! that loosens anything changes that file too.
@@ -18,12 +18,27 @@ use crate::json::Value;
 /// The record, relative to the repository root.
 pub const FILE: &str = "harness/gate-exceptions.json";
 
-/// The public features each library crate's README describes that no feature
-/// contract compares with its reference, relative to the repository root: by crate
-/// name, each feature's short stable `name`, the public items it is reached through
-/// (`entry_points`) and what a comparison would need (`needs`). A crate listed with
-/// none was reviewed and has none.
+/// The public features of each library crate that no gated comparison compares
+/// directly with its reference, relative to the repository root: by crate name, each
+/// feature's short stable `name`, the public items it is reached through
+/// (`entry_points`), how near it comes to a direct comparison (`degree`, one of
+/// [`DEGREES`]) and what a comparison would need (`needs`). A crate listed with none
+/// was reviewed and has none.
 pub const NOT_COMPARED: &str = "harness/not-compared.json";
+
+/// The degrees of [`NOT_COMPARED`], nearest a direct comparison first: compared only
+/// as a step inside a larger compared operation; checked against reference output
+/// recorded once in fixtures that no worker re-runs; compared with the reference by
+/// an opt-in test or a command the gate does not run; unit tests only; no tests; no
+/// reference implements it.
+pub const DEGREES: [&str; 6] = [
+    "step",
+    "recorded",
+    "outside-gate",
+    "unit-tests",
+    "untested",
+    "no-reference",
+];
 
 /// The counts of `data`, the parsed JSON files under `harness/` by their path from
 /// the repository root. An open entry counts once for each case it names, under
@@ -86,7 +101,8 @@ fn not_compared(data: &[(String, Value)]) -> Value {
 
 /// Why [`NOT_COMPARED`] is not a well-formed list: each crate a library package under
 /// `crates/` names, listed once, each of its features once, by a lowercase name of
-/// letters, digits and `-`, with at least one entry point and a one-line `needs`.
+/// letters, digits and `-`, with at least one entry point, one of the [`DEGREES`] and
+/// a one-line `needs`.
 pub fn not_compared_errors(root: &Path, list: Option<&Value>) -> Vec<String> {
     let Some(list) = list else {
         return vec![format!("{NOT_COMPARED}: missing")];
@@ -131,15 +147,18 @@ pub fn not_compared_errors(root: &Path, list: Option<&Value>) -> Vec<String> {
             }) {
                 errors.push(format!("{at}: entry_points names no public item"));
             }
+            if text("degree").is_none_or(|degree| !DEGREES.contains(&degree)) {
+                errors.push(format!("{at}: degree is one of {}", DEGREES.join(", ")));
+            }
             if text("needs").is_none_or(|needs| needs.trim().is_empty() || needs.contains('\n')) {
                 errors.push(format!(
                     "{at}: needs is one line saying what a comparison would need"
                 ));
             }
             if let Value::Object(fields) = feature
-                && let Some((key, _)) = fields
-                    .iter()
-                    .find(|(key, _)| !["name", "entry_points", "needs"].contains(&key.as_str()))
+                && let Some((key, _)) = fields.iter().find(|(key, _)| {
+                    !["name", "entry_points", "degree", "needs"].contains(&key.as_str())
+                })
             {
                 errors.push(format!("{at}: no field {key}"));
             }
@@ -352,7 +371,7 @@ mod tests {
                 &format!(r#"{{"crates": {{"triergon-core": [{features}], "triergon-ogg": []}}}}"#),
             )])
         };
-        let feature = r#"{"name": "a", "entry_points": ["A"], "needs": "a reference of A"}"#;
+        let feature = r#"{"name": "a", "entry_points": ["A"], "degree": "step", "needs": "a reference of A"}"#;
         let base = list(feature);
         let record = Value::object([("counts", counted(&base))]);
         assert_eq!(
@@ -363,7 +382,7 @@ mod tests {
             ]))
         );
         let grown = list(&format!(
-            r#"{feature}, {{"name": "b", "entry_points": ["B"], "needs": "x"}}"#
+            r#"{feature}, {{"name": "b", "entry_points": ["B"], "degree": "untested", "needs": "x"}}"#
         ));
         let errors = check(Some(&record), &grown);
         assert!(
@@ -373,11 +392,12 @@ mod tests {
     }
 
     #[test]
-    fn an_uncompared_feature_is_named_once_in_a_library_crate_with_what_it_needs() {
+    fn an_uncompared_feature_is_named_once_in_a_library_crate_with_its_degree_and_needs() {
         let root = crate::root();
         let well_formed = parse(
             r#"{"crates": {"triergon-core": [
-                {"name": "a-1", "entry_points": ["Time"], "needs": "a reference of A"}]}}"#,
+                {"name": "a-1", "entry_points": ["Time"], "degree": "unit-tests",
+                 "needs": "a reference of A"}]}}"#,
         )
         .unwrap();
         assert_eq!(
@@ -390,11 +410,13 @@ mod tests {
             Some(
                 &parse(
                     r#"{"crates": {"codec-worker-x": [], "triergon-core": [
-                    {"name": "A", "entry_points": ["X"], "needs": "x"},
-                    {"name": "b", "entry_points": [], "needs": "x"},
-                    {"name": "c", "entry_points": ["C"], "needs": "two\nlines"},
-                    {"name": "d", "entry_points": ["D"], "needs": "x", "note": "x"},
-                    {"name": "d", "entry_points": ["D"], "needs": "x"}]}}"#,
+                    {"name": "A", "entry_points": ["X"], "degree": "step", "needs": "x"},
+                    {"name": "b", "entry_points": [], "degree": "step", "needs": "x"},
+                    {"name": "c", "entry_points": ["C"], "degree": "step", "needs": "two\nlines"},
+                    {"name": "d", "entry_points": ["D"], "degree": "step", "needs": "x", "note": "x"},
+                    {"name": "d", "entry_points": ["D"], "degree": "step", "needs": "x"},
+                    {"name": "e", "entry_points": ["E"], "needs": "x"},
+                    {"name": "f", "entry_points": ["F"], "degree": "close", "needs": "x"}]}}"#,
                 )
                 .unwrap(),
             ),
@@ -408,6 +430,8 @@ mod tests {
                 "harness/not-compared.json: triergon-core: c: needs is one line saying what a comparison would need",
                 "harness/not-compared.json: triergon-core: d: no field note",
                 "harness/not-compared.json: triergon-core: d: listed twice",
+                "harness/not-compared.json: triergon-core: e: degree is one of step, recorded, outside-gate, unit-tests, untested, no-reference",
+                "harness/not-compared.json: triergon-core: f: degree is one of step, recorded, outside-gate, unit-tests, untested, no-reference",
             ]
         );
     }

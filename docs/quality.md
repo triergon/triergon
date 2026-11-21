@@ -19,10 +19,10 @@ The harness reads these limits from `harness/policy.json`. Each feature's contra
 corpus manifest live in `harness/features/<feature>/`. What the gates require and every
 exception to them are counted in `harness/gate-exceptions.json`: the contracts by gate
 and runner, the features the gate plan leaves out, every list under `harness/` whose
-name starts with `open_` and, per library crate, the public features its README
-describes that no contract compares
-([harness/not-compared.json](../harness/not-compared.json), each with what a comparison
-would need). `cargo xtask check-design` counts them again, so a change that loosens a
+name starts with `open_` and, per library crate, the public features that no gated
+comparison compares directly
+([harness/not-compared.json](../harness/not-compared.json), each with how near it comes
+to one and what a comparison would need). `cargo xtask check-design` counts them again, so a change that loosens a
 gate or leaves a feature uncompared changes that file too.
 RSS growth from the start of the operation is reported separately when every pair
 has positive growth bounds.
