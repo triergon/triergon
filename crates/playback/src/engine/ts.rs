@@ -71,43 +71,45 @@ impl Delivery {
 /// purpose: `poll` tests them per carrier, and one enum for each pair cost 0.04
 /// to 0.21% of the instructions of a program read.
 #[derive(Debug)]
+// Fields in the order the compiler chose for them, held by `repr(C)`.
+#[repr(C)]
 pub struct TsEngine {
+    pub(crate) source_pes_clock: Option<DemuxClock>,
+    pub(crate) pes_clock: Option<DemuxClock>,
+    pub(crate) policy: SourceTimePolicy,
+    pub(crate) stream: TransportStream,
+    pub(crate) pes_active: Option<usize>,
+    pub(crate) pes_updates_from: Option<usize>,
+    pub(crate) pes_pending: Option<FeedPacket>,
+    pub(crate) pending: Option<TraceEvent>,
+    /// The reported end of the current entity, until the caller continues with
+    /// the next entity or finishes the logical source.
+    pub(crate) entity_end: Option<ts::stream::MediaEntityEnd>,
+    pub(crate) limits: ts::ParseLimits,
+    pub(crate) input: InputCursor,
     /// The startup context the observers are bound to, if any.
     pub(crate) bound_context: Option<ts::compat::input::InputContext>,
+    pub(crate) pes_tracks: PesTracks,
+    pub(crate) facts: BudgetVec<TrackFact>,
+    pub(crate) pes_adopting: usize,
+    pub(crate) event_ordinal: u64,
+    pub(crate) suppressed_events: u64,
+    pub(crate) tsid: Option<u16>,
+    pub(crate) pcr_pid: Option<u16>,
+    pub(crate) program: u16,
     /// Whether a bound M2TS prefix input lost its carrier grid, after which every
     /// selected track is refused.
     pub(crate) grid_lost: bool,
-    pub(crate) input: InputCursor,
-    pub(crate) stream: TransportStream,
     pub(crate) format: ts::PacketFormat,
-    pub(crate) program: u16,
-    pub(crate) limits: ts::ParseLimits,
-    pub(crate) policy: SourceTimePolicy,
-    pub(crate) namespace: DescriptorNamespace,
-    pub(crate) source_pes_clock: Option<DemuxClock>,
-    pub(crate) tsid: Option<u16>,
-    pub(crate) pcr_pid: Option<u16>,
-    pub(crate) facts: BudgetVec<TrackFact>,
-    pub(crate) pending: Option<TraceEvent>,
     /// Whether the stream reported its end. Only after `draining`: the stream
     /// reports its end only after the source's end started the drain.
     pub(crate) ended: bool,
     /// Whether the source ended and the stream and the tracks drain.
     pub(crate) draining: bool,
-    pub(crate) pes_tracks: PesTracks,
-    pub(crate) pes_active: Option<usize>,
-    pub(crate) pes_adopting: usize,
-    pub(crate) pes_pending: Option<FeedPacket>,
-    pub(crate) pes_clock: Option<DemuxClock>,
-    pub(crate) event_ordinal: u64,
-    pub(crate) suppressed_events: u64,
-    pub(crate) pes_updates_from: Option<usize>,
-    pub(crate) delivery: Delivery,
     /// Whether the source is a sequence of entities, each of whose ends is reported.
     pub(crate) entity_sequence: bool,
-    /// The reported end of the current entity, until the caller continues with
-    /// the next entity or finishes the logical source.
-    pub(crate) entity_end: Option<ts::stream::MediaEntityEnd>,
+    pub(crate) namespace: DescriptorNamespace,
+    pub(crate) delivery: Delivery,
 }
 
 impl TsEngine {
