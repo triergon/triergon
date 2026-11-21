@@ -62,6 +62,48 @@ pub(crate) fn cluster(time: u64, blocks: impl AsRef<[u8]>) -> Vec<u8> {
     )
 }
 
+/// Single AAC-LC track 7 with two independently addressed canonical Cues.
+pub(crate) fn cued_aac() -> (Vec<u8>, u64, u64) {
+    let entry = element(
+        0xae,
+        &[
+            uint(0xd7, 7),
+            uint(0x73c5, 7),
+            uint(0x83, 2),
+            element(0x86, b"A_AAC"),
+            element(0x63a2, &[0x12, 0x10]),
+        ]
+        .concat(),
+    );
+    let tracks = element(0x1654ae6b, &entry);
+    let first = cluster(0, simple(7, 0, 0x80, b"first"));
+    let second = cluster(
+        1000,
+        [simple(7, 0, 0x80, b"second"), simple(7, 20, 0x80, b"third")].concat(),
+    );
+    let cue = |time, position| {
+        element(
+            0xbb,
+            &[
+                uint(0xb3, time),
+                element(0xb7, &[uint(0xf7, 7), uint(0xf1, position)].concat()),
+            ]
+            .concat(),
+        )
+    };
+    let cues_len = element(0x1c53bb6b, &[cue(0, 0), cue(1000, 0)].concat()).len();
+    let first_position = (tracks.len() + cues_len) as u64;
+    let second_position = first_position + first.len() as u64;
+    let cues = element(
+        0x1c53bb6b,
+        &[cue(0, first_position), cue(1000, second_position)].concat(),
+    );
+    let segment = [tracks, cues, first, second].concat();
+    let raw = mkv(&segment);
+    let segment_data = (raw.len() - segment.len()) as u64;
+    (raw, segment_data + second_position, second_position)
+}
+
 /// The file shape of the BlockAdditions tests: one authored track, one Cluster.
 pub(crate) mod side_data {
     use super::{cluster, element, mkv};

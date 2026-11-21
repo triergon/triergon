@@ -39,6 +39,19 @@ pub(crate) struct SeekPlan {
 pub(crate) enum RecoveryAudio {
     Overlap,
     BlockStart,
+    CuedAac,
+}
+
+pub(crate) fn cued_aac_profile(tracks: &[crate::matroska::Track], track: usize) -> bool {
+    tracks.len() == 1
+        && track == 0
+        && tracks.first().is_some_and(|t| {
+            t.kind == 2
+                && t.codec.as_str() == "A_AAC"
+                && t.codec_private.as_ref() == [0x12, 0x10]
+                && t.codec_delay_ns == 0
+                && t.seek_preroll_ns == 0
+        })
 }
 
 impl RecoveryAudio {
@@ -125,10 +138,12 @@ impl SeekPlanJob {
         first_cluster: u64,
         recovery_audio: RecoveryAudio,
     ) -> Result<Self> {
-        if configuration
-            .tracks()
-            .get(track)
-            .is_none_or(|t| t.kind != 1)
+        if !(recovery_audio == RecoveryAudio::CuedAac
+            && cued_aac_profile(configuration.tracks(), track))
+            && configuration
+                .tracks()
+                .get(track)
+                .is_none_or(|t| t.kind != 1)
         {
             return Err(Error::Unsupported("seek requires video track"));
         }
@@ -234,6 +249,11 @@ impl SeekPlanJob {
                         });
                         self.best = cue;
                         if cue.is_none() {
+                            if self.recovery_audio == RecoveryAudio::CuedAac {
+                                return Err(Error::Unsupported(
+                                    "audio seek requires a preceding Cue",
+                                ));
+                            }
                             self.finish(LandingPlan::Scan(ScanPlan {
                                 start: self.first_cluster,
                                 stop: None,
@@ -273,6 +293,14 @@ impl SeekPlanJob {
                 }
                 Phase::Stop => {
                     let cue = self.best.required("missing planned cue")?;
+                    if self.recovery_audio == RecoveryAudio::CuedAac {
+                        self.finish(LandingPlan::Cue {
+                            cue,
+                            whole_cluster: false,
+                            scan_after_validation: None,
+                        });
+                        continue;
+                    }
                     let tail_gap = self.preroll
                         && self.before == self.track_count
                         && i128::from(cue.ticks) < self.target_ticks;

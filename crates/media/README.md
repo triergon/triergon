@@ -112,8 +112,8 @@ floors the target to nanoseconds and calls `seek_previous` for
 Refused with `Error::Unsupported`: encryption, bzip2/lzo compression, preset
 zlib dictionaries, ContentEncoding scope 4, `TrackTimestampScale` other than 1.0,
 multiple EBML documents or Segments, EBMLReadVersion above 1,
-DocTypeReadVersion above 4, EBMLMaxIDLength above 4, EBMLMaxSizeLength above 8,
-and seeking on a non-video track.
+DocTypeReadVersion above 4, EBMLMaxIDLength above 4 and EBMLMaxSizeLength above 8.
+The general seek methods require a video track.
 
 ## Behaviour and limits
 
@@ -155,7 +155,7 @@ laced frame is decoded separately. `zlib::decompress` reads one complete RFC 195
 (stored, fixed and dynamic blocks), checks Adler-32 before returning anything and rejects
 trailing bytes.
 
-**Seeking.** Requests name a track index (must be video) and a presentation time in
+**Seeking.** The video seek methods name a track index and a presentation time in
 nanoseconds. `seek_previous` lands on the latest video keyframe at or before the
 target. `seek_for_playback` first subtracts the largest track SeekPreRoll, then
 replays the landing Cluster, including interleaved audio before the keyframe. A cue is
@@ -166,6 +166,13 @@ keyframes. The `SeekReceipt` reports `actual_ns`, `used_index`, `scanned_bytes`,
 `replays_from_start` (so one-time start trimming is not repeated). Recovery can fail
 with `missing timed audio duration` if a timed packet has no duration. After any failure
 or cancellation the caller must seek or `reset` before reading more packets.
+
+The typed reader's `seek_cued_aac` selects the preceding validated Cue for a
+single audio track with `A_AAC` AudioSpecificConfig `12 10` (AAC-LC, 44.1 kHz,
+stereo), zero CodecDelay and zero SeekPreRoll. It requires a preceding Cue and
+does not scan for uncued packets. It validates the referenced block and returns
+its source clock and bytes; it does not validate or decode AAC payloads. The
+general playback and video seek operations continue to require video.
 
 **Colour.** `Track::colour` keeps every source field: bit depth, both chroma and Cb
 subsampling axes, siting, optional MaxCLL/MaxFALL and each optional mastering value as

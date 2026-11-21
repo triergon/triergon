@@ -340,6 +340,19 @@ impl Reader {
             RecoveryAudio::Overlap,
         )
     }
+    /// Seek to the preceding validated Cue in a single-track AAC-LC Segment.
+    /// This operation accepts AudioSpecificConfig 0x1210 and zero codec delay
+    /// and seek preroll; it does not scan for uncued packets.
+    pub fn seek_cued_aac(&mut self, track: usize, requested_ns: i64) -> Result<InputRequest> {
+        self.begin_seek(
+            SeekRequest {
+                track,
+                requested_ns,
+                playback_preroll: false,
+            },
+            RecoveryAudio::CuedAac,
+        )
+    }
     pub fn seek_for_playback(&mut self, track: usize, requested_ns: i64) -> Result<InputRequest> {
         self.begin_seek(
             SeekRequest {
@@ -356,11 +369,14 @@ impl Reader {
         audio: RecoveryAudio,
     ) -> Result<InputRequest> {
         let result = (|| {
-            if self
-                .tracks()
-                .get(request.track)
-                .is_none_or(|track| track.kind != 1)
-            {
+            let supported = if audio == RecoveryAudio::CuedAac {
+                crate::matroska::typed::seek::cued_aac_profile(self.tracks(), request.track)
+            } else {
+                self.tracks()
+                    .get(request.track)
+                    .is_some_and(|track| track.kind == 1)
+            };
+            if !supported {
                 return Err(Error::Unsupported("seek requires video track"));
             }
             let first = self
