@@ -125,7 +125,7 @@ impl StreamView {
     pub fn new(header: &TrackHeader, entry: &SampleDescription) -> Result<Self> {
         Self::with_projection_base(header, entry, header.time_base()?)
     }
-    pub(crate) fn with_projection_base(
+    pub fn with_projection_base(
         header: &TrackHeader,
         entry: &SampleDescription,
         demux_base: TimeBase,
@@ -249,7 +249,7 @@ impl PacketProjector {
     pub fn project(&self, source: &Sample, edit: Option<ProjectedEdit>) -> Result<PacketView> {
         self.project_inner(source, Clock::Source(edit))
     }
-    pub(crate) fn project_demux_edit(
+    pub fn project_demux_edit(
         &self,
         source: &Sample,
         edit: ProjectedEdit,

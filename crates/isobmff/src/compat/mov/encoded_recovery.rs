@@ -55,7 +55,7 @@ impl RecoveryGroup {
     pub fn descriptions(&self) -> Option<&RecoveryDescriptions> {
         self.descriptions.as_ref()
     }
-    pub fn mappings(&self) -> Option<&RecoveryMappings> {
+    pub(crate) fn mappings(&self) -> Option<&RecoveryMappings> {
         self.mappings.as_ref()
     }
 }

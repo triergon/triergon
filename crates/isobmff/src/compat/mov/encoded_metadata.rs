@@ -119,7 +119,7 @@ impl SoundV1Source {
     pub(crate) fn parse_contexts(entry: &SampleDescription) -> Result<Self> {
         Self::parse_mode(entry, true)
     }
-    pub fn compression_id(&self) -> i16 {
+    pub(crate) fn compression_id(&self) -> i16 {
         let b = self.raw.payload();
         i16::from_be_bytes([b[20], b[21]])
     }
@@ -143,9 +143,6 @@ impl SoundV1Source {
             raw,
         })
     }
-    pub fn raw(&self) -> &BoxView {
-        &self.raw
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -157,7 +154,7 @@ pub enum LanguageCause {
 #[derive(Clone, Copy, Debug)]
 pub struct LanguageSource {
     pub raw_word: u16,
-    pub demux: [u8; 3],
+    pub(crate) demux: [u8; 3],
     pub cause: LanguageCause,
 }
 pub(crate) fn language(header: &TrackHeader, allow_unspecified: bool) -> Result<LanguageSource> {
@@ -287,7 +284,7 @@ pub struct DependencyView {
     pub depended_on: DependedOn,
 }
 impl DependencyView {
-    pub fn from_source(raw: u8) -> Self {
+    pub(crate) fn from_source(raw: u8) -> Self {
         let depended_on = match raw & 0x0c {
             0 => DependedOn::Unspecified,
             4 => DependedOn::Referenced,
@@ -299,7 +296,7 @@ impl DependencyView {
     /// Only the separate metadata edit-plan view uses this hint after checking its
     /// source/group context. It does not reinterpret source leading/key facts.
     /// Source reserved values remain refused by the metadata view and distinct in the recovery view.
-    pub fn demux_disposable_hint(self) -> bool {
+    pub(crate) fn demux_disposable_hint(self) -> bool {
         self.depended_on == DependedOn::Unreferenced
     }
 }

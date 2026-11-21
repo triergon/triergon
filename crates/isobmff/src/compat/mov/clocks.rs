@@ -98,7 +98,7 @@ impl SchedulingClock {
 
     /// [`Self::from_demux_clock`] with the demux base's conversion to
     /// microseconds prepared once for the track (`to` is microseconds).
-    pub fn from_scaled_clock(field: ClockField, micros: &TickScale) -> Result<Self> {
+    pub(crate) fn from_scaled_clock(field: ClockField, micros: &TickScale) -> Result<Self> {
         debug_assert_eq!(micros.to(), TimeBase::MICROSECONDS);
         Self::from_clock(field, micros.from(), Some(micros))
     }

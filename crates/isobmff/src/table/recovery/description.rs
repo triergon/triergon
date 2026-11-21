@@ -65,13 +65,13 @@ pub enum DescriptionEmission {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DescriptionRowDiagnostic {
-    pub row: u32,
+    pub(crate) row: u32,
     pub raw_description: u32,
-    pub declared_first_chunk: u32,
-    pub declared_samples_per_chunk: u32,
+    pub(crate) declared_first_chunk: u32,
+    pub(crate) declared_samples_per_chunk: u32,
     pub field_start: u64,
     pub field_end: u64,
-    pub strict_error: Error,
+    pub(crate) strict_error: Error,
 }
 
 /// All original source declarations are retained, including clock rows omitted

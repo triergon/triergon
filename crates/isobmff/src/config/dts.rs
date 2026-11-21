@@ -22,7 +22,7 @@ impl DtsCoreDescription {
     }
 
     /// Media ticks per sample-entry tick and, when signalled, per access unit.
-    pub(crate) fn media_clock(self, base: TimeBase) -> Result<(u32, Option<u32>)> {
+    pub fn media_clock(self, base: TimeBase) -> Result<(u32, Option<u32>)> {
         let rate = u64::from(self.sample_entry_rate_hz);
         let scale = base.denominator();
         if base.numerator() != 1 || !scale.is_multiple_of(rate) {

@@ -125,10 +125,10 @@ fn packed_language(mdhd: &[u8]) -> Result<Option<[u8; 3]>> {
 /// Bounds of one [`Reader`], on top of the caller's memory [`Budget`](triergon_core::Budget).
 #[derive(Clone, Copy, Debug)]
 pub struct ReaderLimits {
-    pub open: OpenLimits,
+    pub(crate) open: OpenLimits,
     /// Largest sample.
-    pub packet_bytes: usize,
-    pub configuration: ConfigurationLimits,
+    pub(crate) packet_bytes: usize,
+    pub(crate) configuration: ConfigurationLimits,
 }
 impl Default for ReaderLimits {
     fn default() -> Self {

@@ -289,7 +289,7 @@ impl FragmentIndex {
         self.count
     }
     /// Original container sample ordinal, not a clock or request generation.
-    pub(crate) fn first_ordinal(&self) -> u64 {
+    pub fn first_ordinal(&self) -> u64 {
         self.first_ordinal
     }
     pub fn track_id(&self) -> u32 {
@@ -427,7 +427,7 @@ impl FragmentBuilder {
     }
     /// The reference MOV receiver rejects a zero-size sample in a fragment
     /// reached during header opening. Source and packet-stage parsing retain it.
-    pub fn new_header_open(
+    pub(crate) fn new_header_open(
         raw: BoxView,
         trex: Trex,
         context: FragmentContext,

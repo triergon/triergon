@@ -31,7 +31,7 @@ pub struct HeaderRejection {
 pub struct SampleEntryHeader {
     /// Complete source entry, including every opaque/private child and reserved bit.
     pub description: SampleDescription,
-    pub rejection: Option<HeaderRejection>,
+    pub(crate) rejection: Option<HeaderRejection>,
     pub inspected_children: u32,
     /// Receiver-selected opaque storage in original child order. A nontrivial
     /// configuration persists; all original ordered entry bytes stay retained.

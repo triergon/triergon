@@ -50,9 +50,6 @@ pub struct FrontReadBoundary {
     pub source_offset: u64,
 }
 impl FrontSample {
-    pub fn read_boundary(&self) -> Result<Option<FrontReadBoundary>> {
-        self.read_boundary_in_media(true)
-    }
     /// A final zero sample in the admitted media extent can end the demux
     /// packet sequence. The caller still owns all samples in later extents.
     pub fn read_boundary_in_media(

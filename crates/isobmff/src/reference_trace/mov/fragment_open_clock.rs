@@ -22,7 +22,7 @@ pub struct FragmentClockResult {
     pub source_end: i128,
     pub demux_start: i64,
     pub demux_end: Option<i64>,
-    pub rejected_source_ordinal: Option<u64>,
+    pub(crate) rejected_source_ordinal: Option<u64>,
 }
 impl FragmentClockResult {
     /// None admits only this clock domain, never the rest of demux open.

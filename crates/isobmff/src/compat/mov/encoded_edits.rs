@@ -125,7 +125,7 @@ impl EncodedEditPlan {
     pub fn recovery_facts(&self) -> Option<&crate::compat::mov::encoded_recovery::RecoveryFacts> {
         self.recovery_facts.as_ref()
     }
-    pub(crate) fn has_dependency_view(&self) -> bool {
+    pub fn has_dependency_view(&self) -> bool {
         self.dependency_table
     }
     pub fn source_table(&self) -> &BoxView {
@@ -140,7 +140,7 @@ impl EncodedEditPlan {
     pub fn source_entry(&self) -> EditEntry {
         self.entry
     }
-    pub(crate) fn edit_ordinal(&self) -> u32 {
+    pub fn edit_ordinal(&self) -> u32 {
         self.edit_ordinal
     }
     pub(crate) fn seek_offset(&self) -> i64 {

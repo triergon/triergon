@@ -44,7 +44,7 @@ impl QtPcmLayoutV0 {
     pub fn channels(self) -> u16 {
         self.channels
     }
-    pub fn frame_bytes(self) -> usize {
+    pub(crate) fn frame_bytes(self) -> usize {
         self.frame_bytes
     }
     pub fn sample_rate_16_16(self) -> u32 {

@@ -11,7 +11,7 @@ use triergon_core::{Error, Result, Time, TimeBase};
 pub struct MovieHeader {
     pub timescale: u32,
     pub duration: u64,
-    pub raw: BoxView,
+    pub(crate) raw: BoxView,
 }
 impl MovieHeader {
     pub fn time_base(&self) -> Result<TimeBase> {
@@ -80,7 +80,7 @@ impl TrackHeader {
     pub fn parse(tkhd: &BoxView, mdhd: &BoxView, hdlr: &BoxView) -> Result<Self> {
         Self::parse_inner(tkhd, mdhd, hdlr, false)
     }
-    pub(crate) fn parse_inner(
+    pub fn parse_inner(
         tkhd: &BoxView,
         mdhd: &BoxView,
         hdlr: &BoxView,

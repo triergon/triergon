@@ -84,7 +84,7 @@ impl BoxReader {
     /// end. It never admits incomplete metadata or changes the Strict parser.
     /// Callers must preserve declared/available bounds and stop before skip when
     /// the terminal declaration exceeds known length; no range beyond EOF is made.
-    pub fn new_recovery(
+    pub(crate) fn new_recovery(
         input: &InputCursor,
         metadata_limit: usize,
         _profile: crate::table::recovery::RunRecoveryProfile,

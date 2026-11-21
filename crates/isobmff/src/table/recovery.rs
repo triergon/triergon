@@ -26,13 +26,13 @@ pub enum RunKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RunCoverage {
     pub kind: RunKind,
-    pub first_excess_row: u32,
+    pub(crate) first_excess_row: u32,
     pub count_field_start: u64,
     pub count_field_end: u64,
     pub declared_samples: u64,
     pub bounded_samples: u64,
     pub surplus_samples: u64,
-    pub strict_error: Error,
+    pub(crate) strict_error: Error,
 }
 /// Separate bounded builder. Only the final positive STTS run may overcover;
 /// CTTS may have an overcovering positive prefix and positive trailing runs.
@@ -148,13 +148,6 @@ impl RunRecoveryTable {
         }
         Ok(stream)
     }
-    pub fn stream_view(
-        &self,
-        header: &crate::movie::TrackHeader,
-        major_brand: Option<[u8; 4]>,
-    ) -> Result<crate::compat::mov::view::StreamView> {
-        crate::compat::mov::view::StreamView::for_source(header, &self.storage, false, major_brand)
-    }
     fn track(
         &self,
         track_id: u32,
@@ -226,9 +219,9 @@ impl RunRecoveryTable {
 pub struct SyncDiagnostic {
     pub first_bad_row: u32,
     pub source_value: u32,
-    pub field_start: u64,
-    pub field_end: u64,
-    pub strict_error: Error,
+    pub(crate) field_start: u64,
+    pub(crate) field_end: u64,
+    pub(crate) strict_error: Error,
 }
 /// A recovered declaration whose sync rows were rejected has unknown access.
 fn recovery_access(mut source: Sample, unknown_access: bool) -> Sample {
@@ -288,11 +281,11 @@ impl RecoveryPacketCursor<'_> {
 }
 #[derive(Debug)]
 pub struct RecoveryIndexEntry {
-    pub ordinal: u64,
-    pub position: i64,
-    pub timestamp: i64,
+    pub(crate) ordinal: u64,
+    pub(crate) position: i64,
+    pub(crate) timestamp: i64,
     pub flags: i32,
-    pub size: u32,
+    pub(crate) size: u32,
     pub min_distance: i32,
     pub source: Sample,
     pub source_timescale: u32,

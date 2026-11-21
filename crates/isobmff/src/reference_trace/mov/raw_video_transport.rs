@@ -43,11 +43,11 @@ pub struct ModeledOpenState {
 /// source callback at its known end returns EOF under the original adapter.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ModeledInitialRead {
-    pub possible_windows: u32,
+    pub(crate) possible_windows: u32,
     pub positive_callback_calls_min: u64,
     pub positive_callback_calls_max: u64,
     pub terminal_callback_position: u64,
-    pub terminal_callback_requested: u32,
+    pub(crate) terminal_callback_requested: u32,
 }
 
 #[derive(Debug)]

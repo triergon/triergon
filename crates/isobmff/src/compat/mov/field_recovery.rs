@@ -73,7 +73,7 @@ pub enum RecoverySampleExtent {
 pub struct PayloadBounds {
     pub declared: Range<u64>,
     pub available: Option<Range<u64>>,
-    pub known_source_length: u64,
+    pub(crate) known_source_length: u64,
     pub incomplete_at_known_eof: bool,
 }
 impl PayloadBounds {

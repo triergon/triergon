@@ -46,10 +46,10 @@ pub enum DurationBasis {
 #[derive(Clone, Debug)]
 pub struct EditOccurrence {
     pub sequence: u64,
-    pub edit_ordinal: u32,
+    pub(crate) edit_ordinal: u32,
     pub source: Sample,
     pub demux: PacketView,
-    pub duration_basis: DurationBasis,
+    pub(crate) duration_basis: DurationBasis,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

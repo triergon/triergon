@@ -367,11 +367,11 @@ impl<'a> SourceCompositionLookup<'a> {
 
 #[derive(Clone, Copy, Debug)]
 pub struct MovieSeekLimits {
-    pub max_edits: u32,
-    pub max_scanned_samples: u64,
-    pub max_recovery_scopes: usize,
-    pub source: SourceSeekLimits,
-    pub recovery: RecoveryLimits,
+    pub(crate) max_edits: u32,
+    pub(crate) max_scanned_samples: u64,
+    pub(crate) max_recovery_scopes: usize,
+    pub(crate) source: SourceSeekLimits,
+    pub(crate) recovery: RecoveryLimits,
 }
 impl Default for MovieSeekLimits {
     fn default() -> Self {

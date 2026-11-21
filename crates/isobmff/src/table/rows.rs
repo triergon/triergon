@@ -8,10 +8,10 @@ use triergon_core::{Error, Result};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Words {
-    pub raw: BoxView,
-    pub count: u32,
+    pub(crate) raw: BoxView,
+    pub(crate) count: u32,
     /// The full box version.
-    pub version: u8,
+    pub(crate) version: u8,
     start: usize,
     stride: usize,
 }
@@ -88,9 +88,9 @@ impl Words {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Sizes {
-    pub raw: BoxView,
-    pub count: u32,
-    pub constant: u32,
+    pub(crate) raw: BoxView,
+    pub(crate) count: u32,
+    pub(crate) constant: u32,
     width: u8,
 }
 impl Sizes {
@@ -212,8 +212,8 @@ impl Sizes {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Offsets {
-    pub table: Words,
-    pub wide: bool,
+    pub(crate) table: Words,
+    pub(crate) wide: bool,
 }
 impl Offsets {
     pub(crate) fn parse(raw: BoxView, limits: Limits) -> Result<Self> {

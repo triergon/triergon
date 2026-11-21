@@ -1544,11 +1544,7 @@ impl<'a> PacketCursor<'a> {
     }
     /// Runs the checks that precede the first occurrence: the sample extents,
     /// the clocks and the edit setup. `Ready` once the cursor would fill.
-    pub(crate) fn prepare(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<CursorStatus> {
+    pub fn prepare(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         self.poll_until::<true>(work, cancel)
     }
     /// Polls; with `PREPARE`, only up to the first fill.

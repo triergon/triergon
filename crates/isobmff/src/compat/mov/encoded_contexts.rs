@@ -13,12 +13,12 @@ pub struct EncodedContextProfile;
 #[derive(Clone, Debug)]
 pub struct WaveObservation {
     pub raw: BoxView,
-    pub format: Option<BoxView>,
-    pub marker: Option<BoxView>,
-    pub terminator: Option<BoxView>,
-    pub format_count: u32,
-    pub configuration_count: u32,
-    pub child_count: u32,
+    pub(crate) format: Option<BoxView>,
+    pub(crate) marker: Option<BoxView>,
+    pub(crate) terminator: Option<BoxView>,
+    pub(crate) format_count: u32,
+    pub(crate) configuration_count: u32,
+    pub(crate) child_count: u32,
     pub fault_count: u32,
     pub first_default_profile_fault: Option<SourceProfileFault>,
 }

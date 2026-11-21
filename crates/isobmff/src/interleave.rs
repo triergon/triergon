@@ -41,7 +41,7 @@ impl<'a> SourceTrack<'a> {
             fragments,
         })
     }
-    pub fn track_id(self) -> u32 {
+    pub(crate) fn track_id(self) -> u32 {
         self.track_id
     }
     // Borrow the existing format indexes for source seek planning. No new
@@ -359,25 +359,6 @@ impl<'a> PhysicalSampleCursor<'a> {
             budget,
             tracks,
             Some(media_extents),
-            limits,
-            TimingRunPolicy::Strict,
-        )
-    }
-    /// Preserve regular table declarations beyond the observed first MDAT.
-    /// The caller must admit each deferred row against a real later extent
-    /// before reading or publishing its payload.
-    pub fn new_forward_regular(
-        budget: &Budget,
-        tracks: &[SourceTrack<'a>],
-        media: &'a [Range<u64>],
-        bounds: ForwardRegularMdat,
-        limits: PhysicalInterleaveLimits,
-    ) -> Result<Self> {
-        Self::new_forward_regular_with_timing_policy(
-            budget,
-            tracks,
-            media,
-            bounds,
             limits,
             TimingRunPolicy::Strict,
         )

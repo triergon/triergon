@@ -42,7 +42,7 @@ impl TerminalMdat {
     pub fn header(self) -> BoxHeader {
         self.header
     }
-    pub fn payload_start(self) -> u64 {
+    pub(crate) fn payload_start(self) -> u64 {
         self.payload_start
     }
     /// Checks the source-declared lower bound. Actual sample bytes must still be
@@ -50,7 +50,7 @@ impl TerminalMdat {
     pub fn require_sample(self, sample: &Sample) -> Result<()> {
         self.require_range(&sample.range)
     }
-    pub(crate) fn require_range(self, range: &Range<u64>) -> Result<()> {
+    pub fn require_range(self, range: &Range<u64>) -> Result<()> {
         if range.start > range.end || range.start < self.payload_start {
             return Err(Error::Invalid("sample outside terminal MDAT declaration"));
         }

@@ -31,7 +31,7 @@ pub struct InitialDescriptionDiagnostic {
     pub declared_first_chunk_samples: u32,
     pub observed_first_chunk_samples: u32,
     pub demux_catalogue_entry: u32,
-    pub strict_error: Error,
+    pub(crate) strict_error: Error,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct DirectContext {
@@ -56,9 +56,9 @@ pub enum DirectRead {
 pub struct DirectOccurrence {
     pub declaration: Sample,
     pub demux: PacketView,
-    pub source_timescale: u32,
+    pub(crate) source_timescale: u32,
     pub association: DirectAssociation,
-    pub raw_chunk_description: u32,
+    pub(crate) raw_chunk_description: u32,
     pub range_error: Option<Error>,
     pub read: DirectRead,
 }

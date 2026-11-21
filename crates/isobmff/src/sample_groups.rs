@@ -141,7 +141,7 @@ impl RecoveryDescriptions {
     pub fn version(&self) -> u8 {
         self.version
     }
-    pub(crate) fn fixed_entry_length(&self) -> u32 {
+    pub fn fixed_entry_length(&self) -> u32 {
         self.length
     }
     pub fn entry_count(&self) -> u32 {
@@ -150,7 +150,7 @@ impl RecoveryDescriptions {
     pub fn default_index(&self) -> Option<u32> {
         self.default
     }
-    pub(crate) fn validation_start(&self) -> usize {
+    pub fn validation_start(&self) -> usize {
         self.records
     }
     // A private continuation for the original lookup parser. Its caller stores
@@ -331,7 +331,7 @@ impl RecoveryMappings {
     pub fn grouping_parameter(&self) -> Option<u32> {
         self.parameter
     }
-    pub(crate) fn run(&self, row: u32) -> Result<(u32, u32)> {
+    pub fn run(&self, row: u32) -> Result<(u32, u32)> {
         if row >= self.count {
             return Err(Error::Invalid("recovery run index"));
         }
