@@ -53,26 +53,26 @@ fn vector_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.research/fate-samples/hevc-conformance")
 }
 
+/// The raw samples of every output picture of `data`, and the errors on the way.
 fn decode_all(data: &[u8]) -> (Vec<u8>, Vec<DecodeError>) {
     let mut dec = Decoder::new();
     let mut out = Vec::new();
     let mut errs = Vec::new();
+    let drain = |dec: &mut Decoder, out: &mut Vec<u8>| {
+        while let Some(p) = dec.receive() {
+            for pl in &p.planes {
+                pl.write_raw(out);
+            }
+        }
+    };
     for au in AccessUnitSplitter::new(data) {
         if let Err(e) = dec.send(au, None) {
             errs.push(e);
         }
-        while let Some(p) = dec.receive() {
-            for pl in &p.planes {
-                pl.write_raw(&mut out);
-            }
-        }
+        drain(&mut dec, &mut out);
     }
     dec.flush();
-    while let Some(p) = dec.receive() {
-        for pl in &p.planes {
-            pl.write_raw(&mut out);
-        }
-    }
+    drain(&mut dec, &mut out);
     (out, errs)
 }
 
@@ -125,8 +125,6 @@ fn conformance_vectors_match_ffmpeg() {
     eprintln!("ran {ran} vectors");
     assert!(failures.is_empty(), "failures:\n{}", failures.join("\n"));
 }
-
-/// Minimal MD5 (RFC 1321) for test comparison only.
 
 #[test]
 fn plane_raw_matches_rows() {
