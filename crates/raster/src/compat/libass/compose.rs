@@ -236,6 +236,19 @@ pub struct Composite {
 }
 
 impl Composite {
+    /// The [`origin`](Composite::origin) the composite of `glyphs` has: the
+    /// least x and the least y of their [`origin`](GlyphBitmaps::origin)s.
+    /// `None` without glyphs. A renderer that keeps composites needs it to
+    /// place a run's glyphs in the run before the composite exists.
+    pub fn origin_of<'g, B: 'g>(
+        glyphs: impl IntoIterator<Item = &'g GlyphBitmaps<B>>,
+    ) -> Option<Vector> {
+        glyphs
+            .into_iter()
+            .map(GlyphBitmaps::origin)
+            .reduce(|a, b| Vector::new(a.x.min(b.x), a.y.min(b.y)))
+    }
+
     /// Combines the glyphs of a run, in the order
     /// [`Run::render`](super::Run::render) drew them, under `effects` in a
     /// frame scaled by `frame`, as libass composites a run: fills and borders
@@ -259,11 +272,7 @@ impl Composite {
         B: Deref<Target = Bitmap> + 'g,
     {
         let glyphs = glyphs.into_iter();
-        let Some(origin) = glyphs
-            .clone()
-            .map(GlyphBitmaps::origin)
-            .reduce(|a, b| Vector::new(a.x.min(b.x), a.y.min(b.y)))
-        else {
+        let Some(origin) = Self::origin_of(glyphs.clone()) else {
             return Ok(Composite::default());
         };
         let filter = Filter::new(effects, frame);
@@ -271,11 +280,7 @@ impl Composite {
         let placed = |bitmap: fn(&GlyphBitmaps<B>) -> Option<&PlacedBitmap<B>>| {
             glyphs.clone().filter_map(move |g| {
                 let placed = bitmap(g)?;
-                let at = Vector::new(
-                    placed.origin.x.wrapping_sub(origin.x),
-                    placed.origin.y.wrapping_sub(origin.y),
-                );
-                Some((&*placed.bitmap, at))
+                Some((&*placed.bitmap, placed.origin.offset_from(origin)))
             })
         };
         let mut fill = combine(raster, placed(GlyphBitmaps::fill), pad, work)?;

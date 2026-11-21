@@ -31,6 +31,13 @@ impl Vector {
     pub const fn in_outline_range(self) -> bool {
         self.x.unsigned_abs() <= OUTLINE_MAX as u32 && self.y.unsigned_abs() <= OUTLINE_MAX as u32
     }
+
+    /// This point counted from `origin`, each coordinate wrapping in 32 bits.
+    #[inline]
+    #[must_use]
+    pub const fn offset_from(self, origin: Self) -> Self {
+        Self::new(self.x.wrapping_sub(origin.x), self.y.wrapping_sub(origin.y))
+    }
 }
 
 /// The closed rectangle `x_min ≤ x ≤ x_max`, `y_min ≤ y ≤ y_max`. It bounds

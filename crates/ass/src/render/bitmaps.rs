@@ -336,17 +336,11 @@ impl Painter {
         work: &mut WorkBudget,
     ) -> Result<()> {
         let drawn = self.drawn.as_mut_slice();
-        let Some(origin) = drawn
-            .iter()
-            .map(|d| d.bitmaps.origin())
-            .reduce(|a, b| Vector::new(a.x.min(b.x), a.y.min(b.y)))
-        else {
+        let Some(origin) = Composite::origin_of(drawn.iter().map(|d| &d.bitmaps)) else {
             return Ok(());
         };
         let effect_timing = placed.effect_timing(leftmost_x, frame.pixel_aspect);
         charge(work, LOOKUP_UNITS.saturating_mul(drawn.len()))?;
-        let in_run =
-            |at: Vector| Vector::new(at.x.wrapping_sub(origin.x), at.y.wrapping_sub(origin.y));
         let glyphs = &mut self.glyphs;
         glyphs.clear();
         glyphs.try_reserve_exact(drawn.len())?;
@@ -357,8 +351,8 @@ impl Painter {
                 .try_push(GlyphRef {
                     fill: glyph.fill.take(),
                     border: glyph.border.take(),
-                    origin: in_run(glyph.bitmaps.origin()),
-                    border_origin: in_run(glyph.bitmaps.border_origin()),
+                    origin: glyph.bitmaps.origin().offset_from(origin),
+                    border_origin: glyph.bitmaps.border_origin().offset_from(origin),
                 })
                 .map_err(|e| e.error)?;
         }

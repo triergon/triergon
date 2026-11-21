@@ -107,11 +107,7 @@ pub trait Sink {
         let Some(placed) = placed else {
             return self.absent();
         };
-        let shift = Vector::new(
-            placed.origin.x.wrapping_sub(origin.x),
-            placed.origin.y.wrapping_sub(origin.y),
-        );
-        self.bitmap_at(Some(&placed.bitmap), shift)
+        self.bitmap_at(Some(&placed.bitmap), placed.origin.offset_from(origin))
     }
 
     /// A bitmap with its position moved by `shift`.
