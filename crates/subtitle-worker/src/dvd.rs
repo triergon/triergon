@@ -165,10 +165,10 @@ impl Prepared for Dvd {
 
 /// `value` ticks of `base` in milliseconds, rounded to nearest with ties away
 /// from zero and saturated.
+/// A positive duration in milliseconds, rounded to nearest and saturated to
+/// 32 bits.
 fn milliseconds(value: i64, base: TimeBase) -> u32 {
-    let num = i128::from(value) * i128::from(base.numerator()) * 1000;
-    let den = i128::from(base.denominator());
-    u32::try_from((num + den / 2) / den).unwrap_or(u32::MAX)
+    u32::try_from(container::rounded(value, base, 1000)).unwrap_or(u32::MAX)
 }
 
 fn packet(pts: Option<i64>, data: &[u8]) -> Packet {
