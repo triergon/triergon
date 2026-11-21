@@ -316,7 +316,10 @@ impl Catalogue {
             } => self.pmt(map, cancel)?,
             TraceEvent::Diagnostic(f)
                 if f.kind == crate::stream::FaultKind::Psi
-                    && matches!(f.error, DESCRIPTOR_LENGTH | PMT_PROGRAM_IDENTITY) =>
+                    && matches!(
+                        f.error,
+                        Error::Invalid(DESCRIPTOR_LENGTH | PMT_PROGRAM_IDENTITY)
+                    ) =>
             {
                 return Err(Error::Unsupported(
                     "rejected PMT requires explicit compatibility review",

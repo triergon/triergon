@@ -55,12 +55,12 @@ pub enum PesFaultKind {
 impl PesFaultKind {
     fn source_error(self) -> Error {
         match self {
-            Self::TransportError => TRANSPORT_ERROR_INDICATOR,
-            Self::Scrambling => SCRAMBLED_PAYLOAD,
-            Self::TimestampMarkers => TIMESTAMP_MARKERS,
-            Self::ForbiddenTimeFlags => FORBIDDEN_TIME_FLAGS,
-            Self::PcrEncoding => PCR_ENCODING,
-            Self::OpcrWithoutPcr => OPCR_WITHOUT_PCR,
+            Self::TransportError => Error::Invalid(TRANSPORT_ERROR_INDICATOR),
+            Self::Scrambling => Error::Unsupported(SCRAMBLED_PAYLOAD),
+            Self::TimestampMarkers => Error::Invalid(TIMESTAMP_MARKERS),
+            Self::ForbiddenTimeFlags => Error::Invalid(FORBIDDEN_TIME_FLAGS),
+            Self::PcrEncoding => Error::Invalid(PCR_ENCODING),
+            Self::OpcrWithoutPcr => Error::Invalid(OPCR_WITHOUT_PCR),
         }
     }
     fn source_layer(self) -> FaultKind {
@@ -606,8 +606,8 @@ impl TransportFaultJob {
                 .ok_or(Error::Invalid("rejected carrier missing"))?;
             let budget = inner.rejected_fault_input(rejected, input)?;
             let kind = match rejected.error() {
-                PCR_ENCODING => PesFaultKind::PcrEncoding,
-                OPCR_WITHOUT_PCR => PesFaultKind::OpcrWithoutPcr,
+                Error::Invalid(PCR_ENCODING) => PesFaultKind::PcrEncoding,
+                Error::Invalid(OPCR_WITHOUT_PCR) => PesFaultKind::OpcrWithoutPcr,
                 _ => return Err(Error::Unsupported("rejected clock source fault unobserved")),
             };
             let envelope = rejected.envelope();

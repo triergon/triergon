@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Refused, Result, SourceId, WorkBudget};
 
 /// A pointer field that points past the end of the payload.
-pub(crate) const POINTER_FIELD: Error = Error::Invalid("PSI pointer");
+pub(crate) const POINTER_FIELD: &str = "PSI pointer";
 
 pub use triergon_bitstream::crc::Crc32Mpeg as PsiCrc32;
 
@@ -141,7 +141,7 @@ impl SectionAssembler {
         } else if offset.checked_add(bytes.len() as u64).is_none() {
             Some(Error::Overflow)
         } else if pusi && (bytes.is_empty() || usize::from(bytes.as_ref()[0]) + 1 > bytes.len()) {
-            Some(POINTER_FIELD)
+            Some(Error::Invalid(POINTER_FIELD))
         } else {
             None
         };

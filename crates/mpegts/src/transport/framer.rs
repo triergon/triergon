@@ -880,7 +880,7 @@ mod tests {
         assert_eq!(input.position(), 188);
         assert_eq!(
             framer.poll(&mut input, &mut work, &cancel).unwrap_err(),
-            SYNC_BYTE
+            Error::Invalid(SYNC_BYTE)
         );
         let rejected = framer.take_rejection().unwrap();
         assert_eq!(rejected.source_offset(), 188);

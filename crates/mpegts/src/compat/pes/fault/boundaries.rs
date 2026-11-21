@@ -316,7 +316,7 @@ impl TransportFaultRecovery {
         let last = self.boundaries.last_carrier;
         let carrier = match fault.error {
             Error::Truncated => fault.rejected.is_none(),
-            SYNC_BYTE => fault.rejected.as_ref().is_some_and(|rejected| {
+            Error::Invalid(SYNC_BYTE) => fault.rejected.as_ref().is_some_and(|rejected| {
                 rejected.format() == PacketFormat::Ts188
                     && rejected.source_id() == Some(scope.entity)
                     && rejected.source_offset() == fault.location.offset
@@ -396,7 +396,7 @@ impl TransportFaultRecovery {
         let tail_bytes = end.location.offset.checked_sub(tail.fault.location.offset);
         let extent = match tail.fault.error {
             Error::Truncated => tail_bytes.is_some_and(|bytes| (1..188).contains(&bytes)),
-            SYNC_BYTE => tail_bytes == Some(188),
+            Error::Invalid(SYNC_BYTE) => tail_bytes == Some(188),
             _ => false,
         };
         if tail.end.is_some()

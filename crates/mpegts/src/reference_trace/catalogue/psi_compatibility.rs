@@ -454,7 +454,7 @@ fn decode_rejected_pmt(
             }
             let d = match item {
                 Ok(d) => d,
-                Err(DESCRIPTOR_LENGTH)
+                Err(Error::Invalid(DESCRIPTOR_LENGTH))
                     if policy == PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity
                         && stop.is_none() =>
                 {
@@ -743,8 +743,10 @@ impl Catalogue {
     ) -> Result<PsiCompatibilityRecord> {
         s.require(policy)?;
         let expected = match policy {
-            PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity => DESCRIPTOR_LENGTH,
-            PsiCompatibility::PmtNonzeroSection => PMT_PROGRAM_IDENTITY,
+            PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity => {
+                Error::Invalid(DESCRIPTOR_LENGTH)
+            }
+            PsiCompatibility::PmtNonzeroSection => Error::Invalid(PMT_PROGRAM_IDENTITY),
             PsiCompatibility::CurrentPatSectionBeforeWholeTable => {
                 return Err(Error::Invalid(
                     "PSI compatibility rejection policy is not PMT",
@@ -1096,8 +1098,10 @@ impl Catalogue {
                 if s.pending_source.is_some() && fault.kind == FaultKind::Psi =>
             {
                 let policy = match fault.error {
-                    DESCRIPTOR_LENGTH => PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity,
-                    PMT_PROGRAM_IDENTITY => PsiCompatibility::PmtNonzeroSection,
+                    Error::Invalid(DESCRIPTOR_LENGTH) => {
+                        PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity
+                    }
+                    Error::Invalid(PMT_PROGRAM_IDENTITY) => PsiCompatibility::PmtNonzeroSection,
                     _ => {
                         return Err(Error::Unsupported(
                             "PSI compatibility different actual source rejection",

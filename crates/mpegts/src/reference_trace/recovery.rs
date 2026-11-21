@@ -399,7 +399,7 @@ impl RecoveryObserver {
             })
         {
             Some(Error::Invalid("native recovery source event order"))
-        } else if rejection.error() != OPCR_WITHOUT_PCR
+        } else if rejection.error() != Error::Invalid(OPCR_WITHOUT_PCR)
             || rejection.secondary_error().is_some()
             || !rejection.fully_checked()
         {

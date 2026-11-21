@@ -4,13 +4,13 @@ use std::ops::Range;
 use triergon_core::{Bytes, Error, Result, SourceId, Time};
 
 /// A carrier with nonzero transport scrambling control.
-pub(crate) const SCRAMBLED_PAYLOAD: Error = Error::Unsupported("scrambled TS payload");
+pub(crate) const SCRAMBLED_PAYLOAD: &str = "scrambled TS payload";
 
 /// A carrier with its transport error indicator set.
-pub(crate) const TRANSPORT_ERROR_INDICATOR: Error = Error::Invalid("TS transport error indicator");
+pub(crate) const TRANSPORT_ERROR_INDICATOR: &str = "TS transport error indicator";
 
 /// A PCR whose reserved bits are not all set or whose extension exceeds 299.
-pub(crate) const PCR_ENCODING: Error = Error::Invalid("PCR reserved bits/extension");
+pub(crate) const PCR_ENCODING: &str = "PCR reserved bits/extension";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PacketFormat {
@@ -129,7 +129,7 @@ pub(crate) fn pcr_with_policy(data: &[u8], policy: PcrPolicy) -> Result<Pcr> {
         | u64::from(data[4] >> 7);
     let extension = (u16::from(data[4] & 1) << 8) | u16::from(data[5]);
     if extension > 299 || (data[4] & 0x7e != 0x7e && policy == PcrPolicy::Strict) {
-        return Err(PCR_ENCODING);
+        return Err(Error::Invalid(PCR_ENCODING));
     }
     Ok(Pcr { base, extension })
 }

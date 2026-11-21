@@ -49,10 +49,15 @@ impl RecoveryTrigger {
         let proof = match (fault.kind, fault.error) {
             (
                 FaultKind::Transport,
-                TRANSPORT_ERROR_INDICATOR | PCR_ENCODING | OPCR_WITHOUT_PCR | SCRAMBLED_PAYLOAD,
+                Error::Invalid(TRANSPORT_ERROR_INDICATOR | PCR_ENCODING | OPCR_WITHOUT_PCR)
+                | Error::Unsupported(SCRAMBLED_PAYLOAD),
             )
-            | (FaultKind::Pes, TIMESTAMP_MARKERS | FORBIDDEN_TIME_FLAGS) => Proof::PacketFault,
-            (FaultKind::Transport, Error::Truncated | SYNC_BYTE) => Proof::FinalCarrier,
+            | (FaultKind::Pes, Error::Invalid(TIMESTAMP_MARKERS | FORBIDDEN_TIME_FLAGS)) => {
+                Proof::PacketFault
+            }
+            (FaultKind::Transport, Error::Truncated | Error::Invalid(SYNC_BYTE)) => {
+                Proof::FinalCarrier
+            }
             (FaultKind::Pes, Error::Truncated) => Proof::FiniteEof,
             (FaultKind::Pes, Error::Invalid("bytes beyond finite PES")) => Proof::FiniteOverrun,
             _ => return None,
@@ -581,7 +586,8 @@ impl OpaqueRecovery {
         ))?;
         if observer.awaiting_source_fault() {
             observer.confirm_source_fault(&fault, context)?;
-        } else if fault.rejected.is_some() && matches!(fault.error, PCR_ENCODING | OPCR_WITHOUT_PCR)
+        } else if fault.rejected.is_some()
+            && matches!(fault.error, Error::Invalid(PCR_ENCODING | OPCR_WITHOUT_PCR))
         {
             observer
                 .push_rejected_fault(fault.clone(), context)
@@ -751,7 +757,7 @@ mod tests {
                 source,
                 offset: 564,
             },
-            error: SYNC_BYTE,
+            error: Error::Invalid(SYNC_BYTE),
             rejected: None,
         })
         .unwrap();

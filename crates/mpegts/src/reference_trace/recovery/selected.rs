@@ -15,11 +15,11 @@ pub enum SelectedFault {
 impl SelectedFault {
     pub fn source_error(self) -> Error {
         match self {
-            Self::PcrEncoding => PCR_ENCODING,
-            Self::TransportError => TRANSPORT_ERROR_INDICATOR,
-            Self::Scrambling => SCRAMBLED_PAYLOAD,
-            Self::TimestampMarkers => TIMESTAMP_MARKERS,
-            Self::ForbiddenTimeFlags => FORBIDDEN_TIME_FLAGS,
+            Self::PcrEncoding => Error::Invalid(PCR_ENCODING),
+            Self::TransportError => Error::Invalid(TRANSPORT_ERROR_INDICATOR),
+            Self::Scrambling => Error::Unsupported(SCRAMBLED_PAYLOAD),
+            Self::TimestampMarkers => Error::Invalid(TIMESTAMP_MARKERS),
+            Self::ForbiddenTimeFlags => Error::Invalid(FORBIDDEN_TIME_FLAGS),
         }
     }
     pub fn source_layer(self) -> FaultKind {

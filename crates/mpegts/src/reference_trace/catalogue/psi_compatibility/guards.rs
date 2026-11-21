@@ -436,7 +436,7 @@ fn original_nonzero_section_numbers_are_not_rewritten() {
     assert!(matches!(
         e.source_status(),
         PsiCompatibilitySourceStatus::RejectedPmt {
-            error: PMT_PROGRAM_IDENTITY,
+            error: Error::Invalid(PMT_PROGRAM_IDENTITY),
             ..
         }
     ));

@@ -47,9 +47,9 @@ impl TransportStream {
         let pid = packet.pid;
         let start = packet.payload_unit_start;
         let bad = if packet.transport_error {
-            Some(TRANSPORT_ERROR_INDICATOR)
+            Some(Error::Invalid(TRANSPORT_ERROR_INDICATOR))
         } else if packet.scrambling != 0 {
-            Some(SCRAMBLED_PAYLOAD)
+            Some(Error::Unsupported(SCRAMBLED_PAYLOAD))
         } else if matches!(outcome, Some(ContinuityOutcome::Lost { .. })) {
             Some(Error::Invalid("TS continuity loss"))
         } else if outcome == Some(ContinuityOutcome::ExcessDuplicate) {
@@ -198,7 +198,8 @@ impl TransportStream {
         match pushed {
             Ok(()) => self.phase = 6,
             Err(error)
-                if matches!(self.route, Route::Pat | Route::Pmt) && error == POINTER_FIELD =>
+                if matches!(self.route, Route::Pat | Route::Pmt)
+                    && error == Error::Invalid(POINTER_FIELD) =>
             {
                 // This wire-syntax fault is rejected by push before acceptance.
                 // Use the same explicit source-diagnostic recovery as poll faults;
