@@ -16,7 +16,7 @@ use triergon::{
     SourceCapabilities, SourceId, Step, TrackInfo, WorkBudget,
 };
 
-# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../media/tests/fixtures/seek/cues-front.mkv");
+# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../matroska/tests/fixtures/seek/cues-front.mkv");
 let file = std::fs::read(path)?;                      // any transport; the reader does no I/O
 let pool = Budget::new(64 << 20)?;
 let caps = SourceCapabilities { length: Some(file.len() as u64), random_access: true };
@@ -73,7 +73,7 @@ releases its retained capacity after replaying the last byte.
 
 | Feature | Default | Module | Through `AnyReader` |
 |---|---|---|---|
-| `matroska` | yes | `triergon::matroska` ([triergon-matroska](../media/README.md)) | yes |
+| `matroska` | yes | `triergon::matroska` ([triergon-matroska](../matroska/README.md)) | yes |
 | `isobmff` | no | `triergon::isobmff` ([triergon-isobmff](../isobmff/README.md)) | yes, for seekable sources |
 | `mpegts` | no | `triergon::mpegts` ([triergon-mpegts](../mpegts/README.md)) | yes, source access units in TS188/M2TS192 |
 | `ogg` | no | `triergon::ogg` ([triergon-ogg](../ogg/README.md)) | yes |
@@ -113,7 +113,7 @@ The meaning of each type is documented in
   (`triergon_matroska::Limits`, `triergon_isobmff::ReaderLimits`,
   `triergon_mpegts::ReaderLimits`) and asks for at most
   64 KiB per `NeedInput`. For other limits or windows, construct
-  `matroska::typed::Reader` or `isobmff::Reader` directly and wrap it as
+  `matroska::Reader` or `isobmff::Reader` directly and wrap it as
   `AnyReader::Matroska` or `AnyReader::Isobmff`.
 - **Dispatch.** Forwarding is one `match` per call with no allocation and no
   dynamic dispatch on the packet path. Tracks are returned as `&dyn TrackInfo`.

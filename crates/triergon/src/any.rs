@@ -41,7 +41,7 @@ const WINDOW: usize = 64 * 1024;
 #[derive(Debug)]
 pub enum AnyReader {
     #[cfg(feature = "matroska")]
-    Matroska(triergon_matroska::typed::Reader),
+    Matroska(triergon_matroska::Reader),
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::Reader),
     #[cfg(feature = "mpegts")]
@@ -64,7 +64,7 @@ pub enum AnyReader {
 #[derive(Clone, Debug)]
 pub enum AnyPacket {
     #[cfg(feature = "matroska")]
-    Matroska(triergon_matroska::typed::Packet),
+    Matroska(triergon_matroska::TypedPacket),
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::Packet),
     #[cfg(feature = "mpegts")]
@@ -82,7 +82,7 @@ pub enum AnyPacket {
 #[derive(Clone, Debug)]
 pub enum AnyOther {
     #[cfg(feature = "matroska")]
-    Matroska(triergon_matroska::typed::Event),
+    Matroska(triergon_matroska::Event),
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::ReaderEvent),
     #[cfg(feature = "mpegts")]
@@ -190,7 +190,7 @@ impl AnyReader {
     ) -> Result<Self> {
         match kind {
             #[cfg(feature = "matroska")]
-            Probe::Matroska => Ok(Self::Matroska(triergon_matroska::typed::Reader::new(
+            Probe::Matroska => Ok(Self::Matroska(triergon_matroska::Reader::new(
                 pool,
                 source,
                 capabilities,

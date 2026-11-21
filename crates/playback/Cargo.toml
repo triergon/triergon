@@ -10,7 +10,7 @@ publish.workspace = true
 [dependencies]
 triergon-bitstream = { path = "../bitstream" }
 triergon-core = { path = "../core" }
-triergon-matroska = { path = "../media" }
+triergon-matroska = { path = "../matroska" }
 triergon-isobmff = { path = "../isobmff" }
 triergon-mpegts = { path = "../mpegts" }
 triergon-framing = { path = "../framing" }

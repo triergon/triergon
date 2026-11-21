@@ -1,0 +1,703 @@
+use super::*;
+use crate::reader::input_feeder::{FeedStep, InputFeeder};
+use std::io::{Read, Seek};
+use triergon_core::InputCursor;
+
+type Reposition<R> = fn(&mut R, u64) -> std::io::Result<u64>;
+type Position<R> =
+    fn(&mut InputFeeder<R>, &mut InputCursor, &InputRequest, &AtomicBool) -> Result<()>;
+/// How a seekable source repositions and resynchronizes its cursor.
+type Seeking<R> = (Reposition<R>, Position<R>);
+
+/// The one source a blocking reader reads.
+const SOURCE: SourceId = SourceId(1);
+/// Input window and per-step work of a blocking reader.
+const WINDOW: usize = 8192;
+const WORK: u64 = 8192;
+/// Blocking adapter over the same retained typed jobs. It adds only std I/O
+/// supply; it does not own a second input cursor, parser, clock or pool.
+#[derive(Debug)]
+pub struct BlockingReader<R: Read> {
+    reader: Reader,
+    input: InputFeeder<R>,
+    seek: Option<Seeking<R>>,
+}
+
+/// Seek for playback with audio selected by whole block in the prefix
+/// recovered for subtitles. Packet timing and the video landing stay in the
+/// normal reader's source clock.
+pub fn at_block_start<R: Read>(
+    reader: &mut BlockingReader<R>,
+    track: usize,
+    requested_ns: i64,
+    cancel: &AtomicBool,
+) -> Result<SeekReceipt> {
+    reader.seek(
+        SeekRequest {
+            track,
+            requested_ns,
+            playback_preroll: true,
+        },
+        RecoveryAudio::BlockStart,
+        cancel,
+    )
+}
+
+/// Whether the seek trace includes initial padding after reopening at the start.
+#[cfg(feature = "reference-trace")]
+pub fn seek_initial_trim<R: Read>(
+    reader: &BlockingReader<R>,
+    track: usize,
+    landing: &SeekReceipt,
+) -> Result<bool> {
+    if !landing.replays_from_start {
+        return Ok(false);
+    }
+    let tracks = reader.tracks();
+    let video = tracks
+        .get(track)
+        .ok_or(Error::Unsupported("seek requires video track"))?;
+    let time = i128::from(landing.actual_ns) + i128::from(video.codec_delay_ns);
+    let scale = reader.timestamp_scale_ns();
+    let mut delay = 0;
+    for audio in tracks.iter().filter(|track| track.kind == 2) {
+        delay = delay.max(RecoveryAudio::BlockStart.delay_ns(audio, scale)?);
+    }
+    Ok(delay != 0 && time < i128::from(delay))
+}
+
+impl<R: Read> BlockingReader<R> {
+    pub fn open(source: R, limits: Limits) -> Result<Self> {
+        let pool = Budget::new(limits.live_storage_bytes)?;
+        Self::open_in(source, limits, &pool)
+    }
+    pub fn open_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
+        let policy = crate::storage::PayloadOwnership::OwnedExact;
+        Self::open_in_with_payload_ownership(source, limits, pool, policy)
+    }
+    pub fn open_with_payload_ownership(
+        source: R,
+        limits: Limits,
+        policy: crate::storage::PayloadOwnership,
+    ) -> Result<Self> {
+        let pool = Budget::new(limits.live_storage_bytes)?;
+        Self::open_in_with_payload_ownership(source, limits, &pool, policy)
+    }
+    pub fn open_in_with_payload_ownership(
+        source: R,
+        limits: Limits,
+        pool: &Budget,
+        policy: crate::storage::PayloadOwnership,
+    ) -> Result<Self> {
+        let reader = Reader::new(pool, SOURCE, capabilities(false), limits, WINDOW)?;
+        Self::construct(reader, InputFeeder::new(source, WINDOW)?, None, policy)
+    }
+    pub fn payload_ownership(&self) -> crate::storage::PayloadOwnership {
+        self.reader.payload_ownership()
+    }
+    fn reposition(&self) -> Option<Reposition<R>> {
+        self.seek.map(|(reposition, _)| reposition)
+    }
+    fn construct(
+        mut reader: Reader,
+        input: InputFeeder<R>,
+        seek: Option<Seeking<R>>,
+        policy: crate::storage::PayloadOwnership,
+    ) -> Result<Self> {
+        reader.envelope.set_payload_ownership(policy);
+        Self::initialize(Self {
+            reader,
+            input,
+            seek,
+        })
+    }
+    fn initialize(mut result: Self) -> Result<Self> {
+        let cancel = AtomicBool::new(false);
+        while !result.reader.is_ready() {
+            match result.poll(&cancel)? {
+                ParseStep::Event(Event::Packet(_)) => {
+                    return Err(Error::Invalid("packet before stream initialization"));
+                }
+                ParseStep::Finished => return Err(Error::Truncated),
+                _ => (),
+            }
+        }
+        result.synchronize(&cancel)?;
+        Ok(result)
+    }
+    fn poll(&mut self, cancel: &AtomicBool) -> Result<ParseStep<Event>> {
+        self.poll_projected::<TypedProjection>(cancel)
+    }
+    fn poll_projected<D: PacketProjection>(
+        &mut self,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<D::Event>> {
+        if self.input.has_pending_read() {
+            self.input.discard_stale(&self.reader.request());
+        }
+        self.reader
+            .set_adapter_storage(self.input.retained_buffer_bytes());
+        match self.reader.step_projected_with_source::<D>(
+            &mut WorkBudget::new(WORK),
+            cancel,
+            self.input.owned_source_storage(),
+        )? {
+            ParseStep::NeedInput(request) => {
+                let header = self.reader.needs_header_input();
+                // Ordinary canonical refill stays unchanged. The seek engine
+                // can separately certify a whole core-owned input response,
+                // bounded by its active stop, parent/source and scan allowance.
+                // Existing pre-read exact-prefix pressure fallback is retained.
+                let discard = !header && self.reader.needs_discard_input();
+                let refill = match self.reader.header_refill_for_request(&request)? {
+                    Some(plan) => Some(plan),
+                    None if discard && self.input.owned_source().is_some() => {
+                        self.reader.blocking_seek_discard_refill(&request)?
+                    }
+                    None => self.reader.blocking_seek_header_refill(&request)?,
+                };
+                let reposition = self.reposition();
+                let result = if let Some(plan) = refill.as_ref().filter(|_| discard) {
+                    self.input.feed_typed_discard_refill(
+                        self.reader.envelope.range_input(),
+                        plan,
+                        cancel,
+                        reposition,
+                    )
+                } else if let Some(plan) = refill {
+                    self.input.feed_typed_header_refill(
+                        self.reader.envelope.range_input(),
+                        &plan,
+                        cancel,
+                        reposition,
+                    )
+                } else if discard {
+                    self.input.feed_typed_discard_request(
+                        self.reader.envelope.range_input(),
+                        &request,
+                        cancel,
+                        reposition,
+                    )
+                } else {
+                    self.input.feed_typed_request(
+                        self.reader.envelope.range_input(),
+                        &request,
+                        header,
+                        cancel,
+                        reposition,
+                    )
+                };
+                self.reader
+                    .set_adapter_storage(self.input.retained_buffer_bytes());
+                match result {
+                    Ok(FeedStep::Provided | FeedStep::End) => Ok(ParseStep::Yield),
+                    Ok(FeedStep::Backpressure { requested, .. }) => {
+                        self.reader.allocation_blocked(requested);
+                        Ok(ParseStep::Yield)
+                    }
+                    Err(error) => {
+                        if !matches!(error, Error::Backpressure { .. }) {
+                            self.reader.failed = true;
+                        }
+                        Err(error)
+                    }
+                }
+            }
+            ParseStep::Backpressure {
+                requested,
+                available,
+            } => Err(Error::Backpressure {
+                requested,
+                available,
+            }),
+            other => Ok(other),
+        }
+    }
+    fn synchronize(&mut self, cancel: &AtomicBool) -> Result<()> {
+        if let Some((_, position)) = self.seek {
+            let request = self.reader.request();
+            if let Err(error) = position(
+                &mut self.input,
+                self.reader.envelope.range_input(),
+                &request,
+                cancel,
+            ) {
+                self.reader.failed = true;
+                return Err(error);
+            }
+        }
+        self.reader
+            .set_adapter_storage(self.input.retained_buffer_bytes());
+        Ok(())
+    }
+    /// Closes parser jobs and pending supply before returning the input source.
+    /// Caller-retained packet/configuration aliases retain their original charge.
+    pub fn into_inner(self) -> R {
+        let Self { reader, input, .. } = self;
+        drop(reader);
+        input.into_inner()
+    }
+    pub fn budget(&self) -> &Budget {
+        self.reader.budget()
+    }
+    pub fn tracks(&self) -> &[crate::track::Track] {
+        self.reader.tracks()
+    }
+    pub fn timestamp_scale_ns(&self) -> u64 {
+        self.reader.timestamp_scale_ns()
+    }
+    pub fn metadata_documents(&self) -> &[SharedDocument] {
+        self.reader.catalogue()
+    }
+    pub fn metadata_retained_bytes(&self) -> usize {
+        self.reader.catalogue.retained_bytes()
+    }
+    pub fn opaque_metadata(&self) -> impl Iterator<Item = (u64, &[u8])> + '_ {
+        self.reader
+            .catalogue()
+            .iter()
+            .map(|document| (document.kind(), document.raw()))
+    }
+    pub fn next_typed_packet(&mut self, cancel: &AtomicBool) -> Result<Option<TypedPacket>> {
+        if self.reader.pending_seek().is_some() {
+            return Err(Error::Invalid("pending seek must be completed"));
+        }
+        loop {
+            match self.poll(cancel)? {
+                ParseStep::Event(Event::Packet(packet)) => return Ok(Some(packet)),
+                ParseStep::Finished => return Ok(None),
+                _ => (),
+            }
+        }
+    }
+    pub fn next_packet(&mut self, cancel: &AtomicBool) -> Result<Option<crate::packet::Packet>> {
+        if self.reader.pending_seek().is_some() {
+            return Err(Error::Invalid("pending seek must be completed"));
+        }
+        loop {
+            match self.poll_projected::<LegacyProjection>(cancel)? {
+                ParseStep::Event(LegacyEvent::Packet(packet)) => return Ok(Some(packet)),
+                ParseStep::Event(LegacyEvent::FullPacket(packet)) => {
+                    if packet.group.as_ref().is_some_and(|group| {
+                        group.additions().len() != 0 || group.codec_state().is_some()
+                    }) {
+                        self.reader.failed = true;
+                        return Err(Error::Unsupported(
+                            "Block additions/CodecState require next_typed_packet",
+                        ));
+                    }
+                    return Ok(Some(packet.packet));
+                }
+                ParseStep::Event(LegacyEvent::Envelope(event)) => drop(event),
+                ParseStep::Event(LegacyEvent::Configuration(configuration)) => drop(configuration),
+                ParseStep::Event(LegacyEvent::Document(document)) => drop(document),
+                ParseStep::Event(LegacyEvent::Seek(receipt)) => {
+                    let _ = receipt;
+                }
+                ParseStep::Finished => return Ok(None),
+                _ => (),
+            }
+        }
+    }
+    pub fn seek_previous(
+        &mut self,
+        track: usize,
+        requested_ns: i64,
+        cancel: &AtomicBool,
+    ) -> Result<SeekReceipt> {
+        self.seek(
+            SeekRequest {
+                track,
+                requested_ns,
+                playback_preroll: false,
+            },
+            RecoveryAudio::Overlap,
+            cancel,
+        )
+    }
+    pub fn seek_for_playback(
+        &mut self,
+        track: usize,
+        requested_ns: i64,
+        cancel: &AtomicBool,
+    ) -> Result<SeekReceipt> {
+        self.seek(
+            SeekRequest {
+                track,
+                requested_ns,
+                playback_preroll: true,
+            },
+            RecoveryAudio::Overlap,
+            cancel,
+        )
+    }
+    fn seek(
+        &mut self,
+        request: SeekRequest,
+        audio: RecoveryAudio,
+        cancel: &AtomicBool,
+    ) -> Result<SeekReceipt> {
+        if self.reader.failed
+            || self.reader.pending_seek() != Some(request)
+            || self.reader.recovery_audio != audio
+        {
+            self.reader.begin_seek(request, audio)?;
+        }
+        loop {
+            // Lent for this poll only; see EpochRestoreJob::try_owned_prefix.
+            self.reader.owned_root = self.input.owned_source().cloned();
+            let step = self.poll(cancel);
+            self.reader.owned_root = None;
+            match step? {
+                ParseStep::Event(Event::Seek(receipt)) => {
+                    self.synchronize(cancel)?;
+                    return Ok(receipt);
+                }
+                ParseStep::Event(Event::Packet(_)) => {
+                    return Err(Error::Invalid("packet before seek receipt"));
+                }
+                ParseStep::Finished => {
+                    return Err(Error::Invalid("seek completed without receipt"));
+                }
+                _ => (),
+            }
+        }
+    }
+}
+impl<R: Read + Seek> BlockingReader<R> {
+    const SEEK: Seeking<R> = (
+        |reader, offset| Seek::seek(reader, std::io::SeekFrom::Start(offset)),
+        |feed, cursor, request, cancel| feed.synchronize_seekable_position(cursor, request, cancel),
+    );
+    pub fn open_seekable(source: R, limits: Limits) -> Result<Self> {
+        let pool = Budget::new(limits.live_storage_bytes)?;
+        Self::open_seekable_in(source, limits, &pool)
+    }
+    pub fn open_seekable_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
+        let policy = crate::storage::PayloadOwnership::OwnedExact;
+        Self::open_seekable_in_with_payload_ownership(source, limits, pool, policy)
+    }
+    pub fn open_seekable_with_payload_ownership(
+        source: R,
+        limits: Limits,
+        policy: crate::storage::PayloadOwnership,
+    ) -> Result<Self> {
+        let pool = Budget::new(limits.live_storage_bytes)?;
+        Self::open_seekable_in_with_payload_ownership(source, limits, &pool, policy)
+    }
+    pub fn open_seekable_in_with_payload_ownership(
+        source: R,
+        limits: Limits,
+        pool: &Budget,
+        policy: crate::storage::PayloadOwnership,
+    ) -> Result<Self> {
+        let reader = Reader::new(pool, SOURCE, capabilities(true), limits, WINDOW)?;
+        Self::construct(
+            reader,
+            InputFeeder::new(source, WINDOW)?,
+            Some(Self::SEEK),
+            policy,
+        )
+    }
+}
+
+fn capabilities(random_access: bool) -> SourceCapabilities {
+    SourceCapabilities {
+        length: None,
+        random_access,
+    }
+}
+
+impl BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>> {
+    /// Explicit immutable-input operation. The complete caller-supplied input capability
+    /// owner must already belong to this pool; windows and packet views retain
+    /// that full charge. No source is buffered here. Generic Read/Seek and its
+    /// default OwnedExact payload policy remain unchanged.
+    pub fn open_owned_seekable_in(
+        source: triergon_core::OwnedInputBytes,
+        limits: Limits,
+        pool: &Budget,
+        policy: crate::storage::PayloadOwnership,
+    ) -> Result<Self> {
+        Self::open_owned_with_profile(source, limits, pool, policy, false)
+    }
+
+    fn open_owned_with_profile(
+        source: triergon_core::OwnedInputBytes,
+        limits: Limits,
+        pool: &Budget,
+        policy: crate::storage::PayloadOwnership,
+        webm_vp9_t35: bool,
+    ) -> Result<Self> {
+        if !source.as_bytes().belongs_to(pool) {
+            return Err(Error::ForeignPool);
+        }
+        let reader = if webm_vp9_t35 {
+            new_reader(pool, SOURCE, capabilities(true), limits, WINDOW)?
+        } else {
+            Reader::new(pool, SOURCE, capabilities(true), limits, WINDOW)?
+        };
+        let input = InputFeeder::from_owned(std::io::Cursor::new(source), WINDOW)?;
+        Self::construct(reader, input, Some(Self::SEEK), policy)
+    }
+}
+
+/// [`BlockingReader::open_owned_seekable_in`] with WebM VP9's implicit ITU-T T.35
+/// addition admitted, as [`new_reader`](super::new_reader) does. Documented on
+/// [`compat::block_additions`](crate::compat::block_additions).
+pub fn open_owned_seekable_in(
+    source: triergon_core::OwnedInputBytes,
+    limits: Limits,
+    pool: &Budget,
+    policy: crate::storage::PayloadOwnership,
+) -> Result<BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>>> {
+    BlockingReader::open_owned_with_profile(source, limits, pool, policy, true)
+}
+
+#[cfg(test)]
+mod header_refill_blocking_tests {
+    use super::*;
+    use crate::ebml_kit::{element, mkv};
+    use std::{
+        cell::RefCell,
+        io::{self, Cursor},
+        rc::Rc,
+    };
+    use triergon_core::Bytes;
+    fn source() -> Vec<u8> {
+        let tracks = element(
+            0x1654ae6b,
+            &element(
+                0xae,
+                &[
+                    element(0xd7, &[1]),
+                    element(0x73c5, &[1]),
+                    element(0x83, &[1]),
+                    element(0x86, b"V_AUTHORED/OPAQUE"),
+                ]
+                .concat(),
+            ),
+        );
+        let mut body = element(0xe7, &[0]);
+        for tick in 0..3 {
+            body.extend(element(0xa3, &[0x81, 0, tick, 0x80, b'x', b'y']));
+        }
+        mkv(&[tracks, element(0x1f43b675, &body)].concat())
+    }
+    type Calls = Rc<RefCell<Vec<(u64, usize)>>>;
+    struct Recorded {
+        cursor: Cursor<Vec<u8>>,
+        calls: Calls,
+    }
+    impl Read for Recorded {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            self.calls
+                .borrow_mut()
+                .push((self.cursor.position(), output.len()));
+            self.cursor.read(output)
+        }
+    }
+    #[test]
+    fn header_refill_default_matches_canonical_io_packets_and_output_capacity() {
+        let raw = source();
+        let canonical_pool = Budget::new(4 * 1024 * 1024).unwrap();
+        let mut canonical = Reader::new(
+            &canonical_pool,
+            SourceId(2106),
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            },
+            Limits::default(),
+            8192,
+        )
+        .unwrap();
+        let cancel = AtomicBool::new(false);
+        let (mut expected_calls, mut canonical_packets) = (Vec::new(), Vec::new());
+        let mut finished = false;
+        for _ in 0..100_000 {
+            match canonical
+                .step_parse(&mut WorkBudget::new(8192), &cancel)
+                .unwrap()
+            {
+                ParseStep::NeedInput(request) => {
+                    let maximum = request.maximum.min(8192);
+                    expected_calls.push((request.offset, maximum.max(1)));
+                    let at = request.offset as usize;
+                    if at == raw.len() {
+                        canonical.finish(request.source, request.token).unwrap();
+                    } else {
+                        let end = (at + maximum).min(raw.len());
+                        assert!(end > at);
+                        let bytes = Bytes::copy_from_slice(&canonical_pool, &raw[at..end]).unwrap();
+                        canonical
+                            .provide(
+                                &InputWindow::new(
+                                    request.source,
+                                    request.token,
+                                    request.offset,
+                                    bytes,
+                                )
+                                .unwrap(),
+                            )
+                            .unwrap();
+                    }
+                }
+                ParseStep::Event(Event::Packet(packet)) => canonical_packets.push(packet),
+                ParseStep::Event(_) | ParseStep::Yield => (),
+                ParseStep::Finished => {
+                    finished = true;
+                    break;
+                }
+                other => panic!("canonical complete source: {other:?}"),
+            }
+        }
+        assert!(finished);
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let mut blocking = BlockingReader::open(
+            Recorded {
+                cursor: Cursor::new(raw),
+                calls: calls.clone(),
+            },
+            Limits::default(),
+        )
+        .unwrap();
+        let mut packets = Vec::new();
+        while let Some(packet) = blocking.next_typed_packet(&cancel).unwrap() {
+            packets.push(packet);
+        }
+        assert_eq!(packets.len(), 3);
+        assert_eq!(canonical_packets.len(), 3);
+        for (at, (a, b)) in packets.iter().zip(&canonical_packets).enumerate() {
+            assert_eq!(a.packet.data.as_ref(), b.packet.data.as_ref());
+            assert_eq!(a.packet.data.as_ref(), b"xy");
+            assert_eq!(a.packet.pts_ns, Some(at as i64 * 1_000_000));
+            assert_eq!(
+                (
+                    a.packet.pts_ns,
+                    a.packet.dts_ns,
+                    a.packet.duration_ns,
+                    a.packet.keyframe
+                ),
+                (
+                    b.packet.pts_ns,
+                    b.packet.dts_ns,
+                    b.packet.duration_ns,
+                    b.packet.keyframe
+                )
+            );
+            assert_eq!(
+                a.packet.data.retained_capacity(),
+                b.packet.data.retained_capacity()
+            );
+            assert!(
+                a.packet.data.retained_capacity() <= 6,
+                "tiny output must not retain hidden 1KiB input capacity"
+            );
+            assert_eq!(a.configuration.revision(), b.configuration.revision());
+        }
+        assert_eq!(
+            *calls.borrow(),
+            expected_calls,
+            "blocking Read never widens a canonical engine hint"
+        );
+        assert_eq!(calls.borrow()[0].1, 4096);
+        assert!(calls.borrow().iter().all(|(_, size)| *size <= 4096));
+        let pool = blocking.budget().clone();
+        let live = pool.used();
+        drop(blocking);
+        assert!(pool.used() <= live);
+        assert_eq!(packets[0].packet.data.as_ref(), b"xy");
+        drop(packets);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
+}
+
+#[cfg(test)]
+mod header_refill_runtime_red {
+    use super::*;
+    use crate::ebml_kit::{element as e, mkv};
+    use std::{
+        cell::RefCell,
+        io::{self, Cursor},
+        rc::Rc,
+    };
+    #[test]
+    fn ordinary_default_header_refill_is_real_io_and_complete_output() {
+        let tracks = e(
+            0x1654ae6b,
+            &e(
+                0xae,
+                &[
+                    e(0xd7, &[1]),
+                    e(0x73c5, &[1]),
+                    e(0x83, &[1]),
+                    e(0x86, b"V_AUTHORED/OPAQUE"),
+                ]
+                .concat(),
+            ),
+        );
+        let raw = mkv(&[
+            tracks,
+            e(
+                0x1f43b675,
+                &[e(0xe7, &[0]), e(0xa3, &[0x81, 0, 0, 0x80, b'x', b'y'])].concat(),
+            ),
+        ]
+        .concat());
+        struct Recorded {
+            inner: Cursor<Vec<u8>>,
+            calls: Rc<RefCell<Vec<usize>>>,
+        }
+        impl Read for Recorded {
+            fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+                self.calls.borrow_mut().push(output.len());
+                self.inner.read(output)
+            }
+        }
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let mut reader = BlockingReader::open(
+            Recorded {
+                inner: Cursor::new(raw),
+                calls: calls.clone(),
+            },
+            Limits::default(),
+        )
+        .unwrap();
+        let packet = reader
+            .next_packet(&AtomicBool::new(false))
+            .unwrap()
+            .unwrap();
+        assert_eq!(packet.data.as_ref(), b"xy");
+        assert!(packet.data.retained_capacity() <= 6);
+        assert!(
+            reader
+                .next_packet(&AtomicBool::new(false))
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            calls.borrow()[0],
+            4096,
+            "actual default supply must use the explicit bounded header policy"
+        );
+    }
+}
+
+#[cfg(test)]
+mod legacy_projection_regressions;
+
+#[cfg(test)]
+mod seek_window_regressions;
+
+#[cfg(test)]
+mod seek_window_independent_helpers;
+
+#[cfg(test)]
+mod scan_projection_regressions;
+
+#[cfg(test)]
+mod owned_blocking_source;
+
+#[cfg(test)]
+mod owned_epoch_prefix_tests;

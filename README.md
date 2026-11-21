@@ -41,7 +41,7 @@ libass for rasterising and ASS parsing.
 | [`triergon`](crates/triergon) | Facade: core vocabulary, container model, `AnyReader` and one Cargo feature per format |
 | [`triergon-core`](crates/core) | Budgets, shared byte buffers, exact time, input windows, resumable steps, the neutral container model |
 | [`triergon-bitstream`](crates/bitstream) | Bit readers, exp-Golomb, RBSP, CABAC and CRCs shared by the format, framing and codec crates |
-| [`triergon-matroska`](crates/media) | Matroska and WebM reader with seeking, chapters, tags, attachments, colour and HDR |
+| [`triergon-matroska`](crates/matroska) | Matroska and WebM reader with seeking, chapters, tags, attachments, colour and HDR |
 | [`triergon-isobmff`](crates/isobmff) | MP4, MOV and fragmented MP4: sample tables, edit lists, range-based playback |
 | [`triergon-mpegts`](crates/mpegts) | MPEG-TS and M2TS: PSI, PES assembly, timestamps, HLS segments |
 | [`triergon-ogg`](crates/ogg) | Ogg with the FLAC, Opus and Vorbis mappings: chained and multiplexed streams, granule timing, trims, seeking |
@@ -73,7 +73,7 @@ Reading a Matroska file:
 
 ```rust
 use std::{fs::File, sync::atomic::AtomicBool};
-use triergon_matroska::{Limits, typed::BlockingReader};
+use triergon_matroska::{BlockingReader, Limits};
 
 let cancel = AtomicBool::new(false);
 let mut reader = BlockingReader::open_seekable(File::open("movie.mkv")?, Limits::default())?;

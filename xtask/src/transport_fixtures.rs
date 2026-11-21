@@ -49,7 +49,7 @@ const SOURCES: [(&str, &str); 9] = [
         "ee2888ab6e9b6256177708023c8966c615b8feb90a6c52dc6f2a9a1d1c6aa4e1",
     ),
     (
-        "crates/media/tests/fixtures/cue-ties/aac-packet.bin",
+        "crates/matroska/tests/fixtures/cue-ties/aac-packet.bin",
         "4315bdf0b9ac88eaad1c09d9c4c7a2a934a3500904cace032ef527fbe4a30277",
     ),
     (
