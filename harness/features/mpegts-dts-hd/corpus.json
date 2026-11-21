@@ -52,6 +52,40 @@
         "bytes": 1656,
         "digest": 4146184786426843139
       }
+    },
+    {
+      "id": "dts-hd-extension-only-short",
+      "profile": "dts-hd-extension-only-short",
+      "file": "harness/features/mpegts-dts-hd/inputs/dts-hd-extension-only-short.ts",
+      "sha256": "fce7b0b9ff2a25f40be0a83712615be64c4c258c35e481a7016cbe873dcf8b88",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 60,
+        "digest": 4519563290305160085
+      }
+    },
+    {
+      "id": "dts-hd-extension-only-long",
+      "profile": "dts-hd-extension-only-long",
+      "file": "harness/features/mpegts-dts-hd/inputs/dts-hd-extension-only-long.m2ts",
+      "sha256": "1947d0eb93794b07d6dcbf73f27cb9cbc7e8b855598a21f9b700e9332c0fdf40",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 36912,
+        "digest": 6677305841403640092
+      }
     }
   ]
 }

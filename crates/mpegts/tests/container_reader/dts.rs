@@ -134,6 +134,12 @@ fn dts_hd_extension() -> [u8; 16] {
     // followed by four opaque asset bytes.
     let mut extension = [0; 16];
     extension[..9].copy_from_slice(&[0x64, 0x58, 0x20, 0x25, 0xa5, 0x01, 0x60, 0x01, 0xe0]);
+    seal_extension(&mut extension);
+    extension[12..].copy_from_slice(&[0xab, 0xcd, 0x12, 0x34]);
+    extension
+}
+
+fn seal_extension(extension: &mut [u8; 16]) {
     let mut crc = u16::MAX;
     for &byte in &extension[5..10] {
         crc ^= u16::from(byte) << 8;
@@ -146,8 +152,6 @@ fn dts_hd_extension() -> [u8; 16] {
         }
     }
     extension[10..12].copy_from_slice(&crc.to_be_bytes());
-    extension[12..].copy_from_slice(&[0xab, 0xcd, 0x12, 0x34]);
-    extension
 }
 
 #[test]
@@ -191,6 +195,58 @@ fn aligned_dts_hd_keeps_the_complete_unit_and_original_core() {
                 }
             }
         }
+    }
+}
+
+#[test]
+fn extension_only_dts_hd_splits_one_pes_and_uses_static_timing() {
+    let descriptor = &[0x7f, 8, 0x0e, 0x40, 5, 1, 0x60, 0x48, 0, 0];
+    let inherited = dts_hd_extension();
+    let mut static_fields = inherited;
+    static_fields[8] |= 0x18; // Static fields with a 48 kHz reference clock.
+    seal_extension(&mut static_fields);
+    let mut ts = Transport::new();
+    ts.tables(&[(0x06, PID, descriptor)], 0);
+    for (payload, pts) in [
+        ([static_fields, inherited].concat(), 90_000),
+        (inherited.to_vec(), 91_920),
+    ] {
+        let start = ts.bytes.len();
+        ts.pes(PID, 0xbd, &payload, Some(pts), None);
+        let at = ts.bytes[start..start + 188]
+            .windows(4)
+            .position(|prefix| prefix == [0, 0, 1, 0xbd])
+            .expect("test PES start");
+        ts.bytes[start + at + 6] |= 4;
+    }
+    for (chunk, grant) in [(7, 1), (4096, 8192)] {
+        let mut drive = Drive::new(&ts.bytes, limits(), chunk, grant);
+        let mut index = 0;
+        while let Some(event) = drive.next().unwrap() {
+            let Event::Packet(packet) = event else {
+                continue;
+            };
+            let AccessUnit::DtsExtension(frame) = packet.access_unit() else {
+                panic!("expected an extension-only DTS-HD access unit");
+            };
+            assert_eq!(packet.track_info().codec(), CodecId::Dts);
+            assert_eq!(packet.pts(), [Some(90_000), None, Some(91_920)][index]);
+            assert_eq!(packet.duration(), Some(960));
+            assert_eq!(
+                packet.payload(),
+                [static_fields, inherited, inherited][index]
+            );
+            assert_eq!(
+                frame.elementary_range(),
+                index as u64 * 16..index as u64 * 16 + 16
+            );
+            assert_eq!(
+                packet.sources()[0].payload_range,
+                if index == 1 { 16..32 } else { 0..16 }
+            );
+            index += 1;
+        }
+        assert_eq!(index, 3);
     }
 }
 

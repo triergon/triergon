@@ -705,9 +705,9 @@ pub fn author_dts_seek(root: &Path, args: &[String]) -> R<()> {
     manifest(root, FEATURE, cases)
 }
 
-fn extension_substream(index: u32, long: bool) -> Vec<u8> {
+fn extension_substream(index: u32, long: bool, asset_bytes: usize) -> Vec<u8> {
     let header_bytes = if long { 16 } else { 12 };
-    let frame_bytes = header_bytes + 8;
+    let frame_bytes = header_bytes + asset_bytes;
     let mut bytes = vec![0; frame_bytes];
     bytes[..5].copy_from_slice(&[0x64, 0x58, 0x20, 0x25, 0xa5]);
     let mut position = 40;
@@ -730,7 +730,8 @@ fn extension_substream(index: u32, long: bool) -> Vec<u8> {
         }
     }
     bytes[header_bytes - 2..header_bytes].copy_from_slice(&crc.to_be_bytes());
-    bytes[header_bytes..].copy_from_slice(&[0x11, 0x8a, 0x95, 0xe1, 0x35, 0x55, 0x8c, 0x01]);
+    bytes[header_bytes..header_bytes + 8]
+        .copy_from_slice(&[0x11, 0x8a, 0x95, 0xe1, 0x35, 0x55, 0x8c, 0x01]);
     bytes
 }
 
@@ -774,8 +775,8 @@ pub fn author_dts_hd(root: &Path, args: &[String]) -> R<()> {
             descriptor.extend([5, 1, 0x60, 0x48, 0, 0]);
         }
         ts.tables(&codec, &descriptor)?;
-        let extension = extension_substream(0, long);
-        let second = extension_substream(1, long);
+        let extension = extension_substream(0, long, 8);
+        let second = extension_substream(1, long, 8);
         for (i, frame) in core.chunks_exact(512).take(3).enumerate() {
             let mut payload = Vec::from(frame);
             payload.extend_from_slice(&extension);
@@ -803,5 +804,38 @@ pub fn author_dts_hd(root: &Path, args: &[String]) -> R<()> {
             "ts-au-fold",
         )?);
     }
+    extension_only_cases(root, FEATURE, &codec, Path::new(reference), &mut cases)?;
     manifest(root, FEATURE, cases)
+}
+
+fn extension_only_cases(
+    root: &Path,
+    feature: &str,
+    codec: &Codec,
+    reference: &Path,
+    cases: &mut Vec<Value>,
+) -> R<()> {
+    let descriptor = &[0x7f, 8, 0x0e, 0x40, 5, 1, 0x60, 0x48, 0, 0];
+    for (name, m2ts, long, asset_bytes) in [
+        ("dts-hd-extension-only-short", false, false, 8),
+        ("dts-hd-extension-only-long", true, true, 12 * 1024),
+    ] {
+        let mut ts = Transport::new();
+        ts.tables(codec, descriptor)?;
+        let payload = extension_substream(0, long, asset_bytes);
+        for (index, pts) in [90_000, 91_920, 93_840].into_iter().enumerate() {
+            let packet = Part {
+                aligned: true,
+                ..part(&payload, Some(pts), (index == 1).then_some(pts - 90))
+            };
+            ts.pes(codec.stream_id, &packet)?;
+        }
+        let input = Input {
+            name,
+            m2ts,
+            data: ts.finish(m2ts),
+        };
+        cases.push(input.record(root, feature, name, &["--dvb"], reference, "ts-au-fold")?);
+    }
+    Ok(())
 }

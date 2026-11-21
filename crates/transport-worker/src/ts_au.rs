@@ -230,6 +230,7 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
             AccessUnit::Dts(frame) if frame.core_bytes().len() < frame.bytes().len() => {
                 (0, PositionSource::FirstPes)
             }
+            AccessUnit::DtsExtension(_) => (0, PositionSource::FirstPes),
             AccessUnit::MpegAudio(_) | AccessUnit::Dts(_) => (1, PositionSource::ClockAnchor),
             AccessUnit::Adts(_)
             | AccessUnit::AdtsFragment(_)
