@@ -490,6 +490,66 @@
       }
     },
     {
+      "id": "latm-large-split-preroll",
+      "profile": "latm-large-split-preroll",
+      "file": "harness/features/mpegts-previous-audio/inputs/latm-large-split-envelope.ts",
+      "sha256": "4bedc1122583372cbab37df673c915a0789df36d240522e382112938a1c62a06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "212881",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 24218,
+        "digest": 7268936768352596892
+      }
+    },
+    {
+      "id": "latm-large-split-entity",
+      "profile": "latm-large-split-entity",
+      "file": "harness/features/mpegts-previous-audio/inputs/latm-large-split-envelope.ts",
+      "sha256": "4bedc1122583372cbab37df673c915a0789df36d240522e382112938a1c62a06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "212881",
+        "preroll",
+        "split=564"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 24218,
+        "digest": 7268936768352596892
+      }
+    },
+    {
+      "id": "latm-large-split-repeated",
+      "profile": "latm-large-split-repeated",
+      "file": "harness/features/mpegts-previous-audio/inputs/latm-large-split-envelope.ts",
+      "sha256": "4bedc1122583372cbab37df673c915a0789df36d240522e382112938a1c62a06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "212881",
+        "preroll",
+        "274321",
+        "split=564"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 30275,
+        "digest": 17618589272232045691
+      }
+    },
+    {
       "id": "mpeg1-layer1-physical-repeated-preroll",
       "profile": "mpeg1-layer1-physical-repeated-preroll",
       "file": "harness/features/mpegts-previous-audio/inputs/mpeg1-layer1-physical-repeated-preroll.ts",

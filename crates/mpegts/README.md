@@ -148,13 +148,18 @@ Tables 1.20–1.23 (2001/Cor.2:2004).
 It validates every declared payload extent cooperatively before accepting the
 whole envelope. Truncated lengths or payloads, empty subframes and trailing
 whole bytes refuse landing. Multiple programs or layers, version-one syntax,
-configuration inheritance and unknown multiplex groups remain outside seek
-coverage. Their envelopes remain available through sequential carriage.
+independent landing on inherited configuration and unknown multiplex groups
+remain outside seek coverage. Their envelopes remain available through sequential carriage.
 The complete in-band decoder configuration stays in the original LOAS bytes;
 subframes are not split and no subframe timestamps or duration are inferred.
-Subsequent dependent frames are
-delivered as preroll. The landing is the
-last eligible packet with the greatest presentation time at or before the target.
+Subsequent `useSameStreamMux` envelopes are delivered intact as preroll;
+they do not become independent landing points. Complete envelopes may span
+transport carriers, PES packets and contiguous input entities. Large-envelope
+comparisons cover 32 subframes per envelope, timed and untimed dependent
+envelopes, an entity cut inside a PES and an indexed repeat. The stock boundary
+comparison requires one complete envelope per PES: its LATM packets preserve
+PES boundaries, whereas the strict reader assembles split envelopes.
+The landing is the last eligible packet with the greatest presentation time at or before the target.
 Audio frames without a source PTS are delivered
 with their original timing when they follow a landing.
 `ReaderLimits::maximum_seek_scan_bytes` limits the scan to 64 MiB by default.

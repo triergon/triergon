@@ -771,6 +771,38 @@ fn latm_seek_cases(root: &Path, feature: &str, reference: &Path, cases: &mut Vec
             )?);
         }
     }
+    // A large complete envelope spans TS carriers. The entity boundary is
+    // inside its PES; later envelopes reuse its in-band configuration.
+    let configured = loas_aac_subframes(&raw, true, 32)?;
+    let dependent = loas_aac_subframes(&raw, false, 32)?;
+    let mut ts = Transport::new();
+    ts.tables(&latm, &[])?;
+    ts.pes(latm.stream_id, &part(&configured, Some(90_000), None))?;
+    let split = "split=564";
+    ts.pes(latm.stream_id, &part(&dependent, Some(151_440), None))?;
+    ts.pes(latm.stream_id, &part(&dependent, None, None))?;
+    ts.pes(latm.stream_id, &part(&configured, Some(274_320), None))?;
+    let input = Input {
+        name: "latm-large-split-envelope",
+        m2ts: false,
+        data: ts.finish(false),
+    };
+    for (id, options) in [
+        (
+            "latm-large-split-preroll",
+            vec![pid.as_str(), "212881", "preroll"],
+        ),
+        (
+            "latm-large-split-entity",
+            vec![pid.as_str(), "212881", "preroll", split],
+        ),
+        (
+            "latm-large-split-repeated",
+            vec![pid.as_str(), "212881", "preroll", "274321", split],
+        ),
+    ] {
+        cases.push(input.record(root, feature, id, &options, reference, "ts-audio-seek-fold")?);
+    }
     Ok(())
 }
 

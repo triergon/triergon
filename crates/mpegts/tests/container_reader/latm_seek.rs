@@ -2,6 +2,10 @@ use super::*;
 
 // Author the syntax fields, including each length immediately before its payload.
 fn envelope(count: u8, payloads: &[&[u8]]) -> Vec<u8> {
+    mux_envelope(count, payloads, true)
+}
+
+fn mux_envelope(count: u8, payloads: &[&[u8]], configured: bool) -> Vec<u8> {
     let mut mux = Vec::new();
     let mut position = 0;
     let mut write = |value: u16, width: usize| {
@@ -13,13 +17,17 @@ fn envelope(count: u8, payloads: &[&[u8]]) -> Vec<u8> {
             position += 1;
         }
     };
-    write(1, 3); // in-band, version zero, common time framing
-    write(u16::from(count - 1), 6);
-    write(0, 7); // one program, one layer
-    write(0x1190, 16); // AAC-LC, 48 kHz stereo
-    write(0, 3); // frameLengthType
-    write(255, 8); // buffer fullness
-    write(0, 2); // no other data or CRC
+    if configured {
+        write(1, 3); // in-band, version zero, common time framing
+        write(u16::from(count - 1), 6);
+        write(0, 7); // one program, one layer
+        write(0x1190, 16); // AAC-LC, 48 kHz stereo
+        write(0, 3); // frameLengthType
+        write(255, 8); // buffer fullness
+        write(0, 2); // no other data or CRC
+    } else {
+        write(1, 1); // useSameStreamMux
+    }
     for payload in payloads {
         let mut length = payload.len();
         while length >= 255 {
@@ -48,17 +56,40 @@ fn set(frame: &mut [u8], bit: usize, width: usize, value: u16) {
 
 #[test]
 fn latm_subframes_preserve_complete_split_envelopes_and_indexed_suffixes() {
-    for count in [2, 64] {
+    check_split_suffixes(false);
+}
+
+#[test]
+fn latm_large_inherited_envelopes_preserve_clocks_sources_and_indexed_suffixes() {
+    check_split_suffixes(true);
+}
+
+fn check_split_suffixes(inherited: bool) {
+    for count in [2, 14, 64] {
         let large = [0x55; 510]; // Includes a terminating zero length octet.
         let small = [0x33; 3];
-        let mut payloads = vec![small.as_slice(); count];
+        let mut payloads = vec![
+            if count == 14 {
+                large.as_slice()
+            } else {
+                small.as_slice()
+            };
+            count
+        ];
         payloads[0] = &large;
         let frame = envelope(count as u8, &payloads);
-        let dependent = [0x56, 0xe0, 3, 0x80, 0xf0, 0];
+        let dependent = if inherited {
+            mux_envelope(count as u8, &payloads, false)
+        } else {
+            vec![0x56, 0xe0, 3, 0x80, 0xf0, 0]
+        };
         let mut ts = Transport::new();
         ts.tables(&[(0x11, PID, &[])], 0);
         ts.pes(PID, 0xc0, &frame[..9], Some(90_000), Some(89_000));
         ts.pes(PID, 0xc0, &frame[9..], Some(91_000), None);
+        if inherited {
+            ts.pes(PID, 0xc0, &dependent, Some(93_000), None);
+        }
         ts.pes(PID, 0xc0, &dependent, None, None);
         let pool = Budget::new(1 << 20).unwrap();
         let mut baseline = reader(&pool, &ts.bytes, PacketFormat::Ts188);
@@ -68,11 +99,14 @@ fn latm_subframes_preserve_complete_split_envelopes_and_indexed_suffixes() {
                 original.push(packet);
             }
         }
-        assert_eq!(original.len(), 2);
+        assert_eq!(original.len(), if inherited { 3 } else { 2 });
         assert_eq!(original[0].sources().len(), 2);
         assert_eq!(original[0].pts(), Some(90_000));
         assert_eq!(original[0].dts(), Some(89_000));
-        assert_eq!(original[1].pts(), None);
+        if inherited {
+            assert_eq!(original[1].pts(), Some(93_000));
+        }
+        assert_eq!(original.last().unwrap().pts(), None);
         let mut seeking = reader(&pool, &ts.bytes, PacketFormat::Ts188);
         let request = SeekRequest {
             track: TrackId(PID.into()),
