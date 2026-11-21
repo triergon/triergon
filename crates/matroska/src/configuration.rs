@@ -30,15 +30,24 @@ pub struct Configuration {
     states: Option<CodecStates>,
 }
 impl Configuration {
+    /// The reader input generation ([`Reader::generation`](crate::Reader::generation))
+    /// this snapshot is bound to; the reader rebinds it when a seek or reset starts a
+    /// new generation.
     pub fn generation(&self) -> u64 {
         self.generation
     }
+    /// Increases each time the reader publishes a changed configuration: new Tracks,
+    /// or a CodecState change, including the state a seek restores. A reset starts
+    /// the count again.
     pub fn revision(&self) -> u64 {
         self.revision
     }
+    /// The Segment's tracks in TrackEntry order. Every track index in this crate
+    /// indexes this slice.
     pub fn tracks(&self) -> &[Track] {
         self.data.tracks.as_slice()
     }
+    /// Whether this configuration is charged to `pool`.
     pub fn belongs_to(&self, pool: &Budget) -> bool {
         self.data.pool.same_pool(pool)
     }
@@ -68,6 +77,8 @@ impl Configuration {
     pub(crate) fn has_codec_states(&self) -> bool {
         self.states.is_some()
     }
+    /// The CodecState in effect for the track at index `track`; `None` while the
+    /// track uses its initial CodecPrivate or when the index is out of range.
     pub fn codec_state(&self, track: usize) -> Option<&CodecState> {
         self.tracks().get(track)?;
         self.states
@@ -135,6 +146,10 @@ impl Configuration {
         }
         Err(Error::Invalid("BlockAddID exceeds track maximum"))
     }
+    /// A job that parses MaxBlockAdditionID and the BlockAdditionMappings of the
+    /// TrackEntry at index `track`, charged to this configuration's pool. Fails with
+    /// [`Error::Invalid`] for an unknown index and [`Error::Policy`] when the
+    /// TrackEntry exceeds `limits.metadata_bytes`.
     pub fn track_extensions_job(
         &self,
         track: usize,
@@ -289,16 +304,25 @@ crate::storage::usage::storage!(ConfigurationJob, |s| [
     s.states
 ]);
 
+/// Where a track's effective initialization record comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InitializationOrigin {
+    /// The TrackEntry's CodecPrivate, with its content encodings removed.
     InitialTrackEntry,
+    /// A BlockGroup's CodecState, at this source position when known.
     CodecState(Option<crate::packet::block_group::SourcePosition>),
 }
+/// A track's effective initialization record: the CodecState in effect, otherwise
+/// the initial CodecPrivate.
 #[derive(Clone, Copy, Debug)]
 pub struct Initialization<'a> {
+    /// The record bytes; empty when the track has no CodecPrivate.
     pub data: &'a [u8],
+    /// Which element `data` comes from.
     pub origin: InitializationOrigin,
+    /// [`Configuration::generation`] of the configuration it was read from.
     pub generation: u64,
+    /// [`Configuration::revision`] of the configuration it was read from.
     pub revision: u64,
 }
 /// Raw written CodecState bytes. This does not infer a content-encoding scope or
@@ -309,12 +333,15 @@ pub struct CodecState {
     position: Option<crate::packet::block_group::SourcePosition>,
 }
 impl CodecState {
+    /// The CodecState payload as written.
     pub fn data(&self) -> &[u8] {
         &self.data
     }
+    /// Where the CodecState element was read, when known.
     pub fn position(&self) -> Option<crate::packet::block_group::SourcePosition> {
         self.position
     }
+    /// Capacity in bytes of the allocation this state keeps charged.
     pub fn retained_capacity(&self) -> usize {
         self.data.retained_capacity()
     }

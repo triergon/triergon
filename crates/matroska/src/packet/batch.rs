@@ -266,16 +266,20 @@ fn recovery_uses_the_exact_end_of_a_fractional_audio_lace() {
     assert!(keep_recovery_packet(2, &packet, cutoff(40_000_000)).unwrap());
 }
 
+/// A packet with the track configuration it was read under and the side data of
+/// its BlockGroup.
 #[derive(Clone, Debug)]
 pub struct TypedPacket {
+    /// The frame, its timing and payload.
     pub packet: Packet,
+    /// The configuration in effect for this packet, CodecState changes included.
     pub configuration: Configuration,
     /// Shared BlockGroup wire facts; all laces share one complete source owner.
     pub group: Option<BlockGroupSource>,
 }
 impl TypedPacket {
-    /// A view in the shared core's exact seconds. No second arithmetic/timebase
-    /// implementation; the pinned format clock remains the compatibility source.
+    /// The exact presentation time from [`BlockTiming::source`] as a [`Time`] in
+    /// seconds; `None` when the frame has no derivable PTS. Fails as that does.
     pub fn source_pts(&self) -> Result<Option<Time>> {
         self.packet
             .timing

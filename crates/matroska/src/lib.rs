@@ -1,21 +1,13 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr,
-    clippy::unwrap_used
-)]
-// Pending: `missing_docs`, `clippy::expect_used`.
-// Pending: these rewrites change the generated code of measured hot paths and are
-// adopted with an A/B timing run.
-#![allow(
-    clippy::assigning_clones,
-    clippy::bool_to_int_with_if,
-    clippy::match_wildcard_for_single_variants,
-    clippy::redundant_closure_for_method_calls,
-    clippy::unnested_or_patterns
+    clippy::unwrap_used,
+    clippy::expect_used
 )]
 pub mod colour;
 pub mod compat;
@@ -62,19 +54,32 @@ pub struct Limits {
     /// Cumulative live library-owned capacity, including caller-retained aliases.
     /// Explicit `*_in` constructors can share a caller-provided core pool instead.
     pub live_storage_bytes: usize,
+    /// Bytes of all structural metadata held since the reader started or was reset:
+    /// the EBML header and level-one metadata elements, attachment payloads excepted.
+    /// Also bounds each TrackEntry and decoded CodecPrivate.
     pub metadata_bytes: usize,
+    /// Bytes of one SimpleBlock or BlockGroup, and of all decoded frames of one lace.
     pub block_bytes: usize,
+    /// TrackEntry elements per Segment.
     pub tracks: usize,
     /// Cumulative segment-metadata source/arena storage, including validation workspace.
     pub metadata_storage_bytes: usize,
+    /// Nodes of one segment-metadata document; also the descriptors (additions,
+    /// references, mappings) kept for one BlockGroup or TrackEntry.
     pub metadata_nodes: usize,
+    /// Nesting depth of a segment-metadata document, capped at 64.
     pub metadata_depth: usize,
+    /// Attachment payload bytes of all Attachments together.
     pub attachment_bytes: usize,
+    /// Element headers read between resets and seeks.
     pub elements: u64,
     /// Maximum bytes consumed in one bounded input/seek scan phase.
     pub scan_bytes: u64,
+    /// CueTrackPositions entries kept from Cues.
     pub index_entries: usize,
+    /// Most decoded bytes per compressed byte of one zlib-encoded value.
     pub decompression_ratio: usize,
+    /// Work units (blocks, symbols, checksum chunks) for one zlib-encoded value.
     pub decompression_work: u64,
 }
 

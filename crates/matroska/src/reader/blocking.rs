@@ -67,14 +67,21 @@ pub fn seek_initial_trim<R: Read>(
 }
 
 impl<R: Read> BlockingReader<R> {
+    /// Opens a sequential source in a new pool of `limits.live_storage_bytes` and
+    /// reads until Tracks and the first Cluster are known; the metadata must precede
+    /// that Cluster. Fails with [`Error::Limit`] for a pool too small to create,
+    /// [`Error::Truncated`] when the source ends first, [`Error::Transport`] for an
+    /// I/O error, and with the parse error of malformed or refused metadata.
     pub fn open(source: R, limits: Limits) -> Result<Self> {
         let pool = Budget::new(limits.live_storage_bytes)?;
         Self::open_in(source, limits, &pool)
     }
+    /// [`open`](Self::open), charging all storage to the caller's `pool`.
     pub fn open_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
         let policy = crate::storage::PayloadOwnership::OwnedExact;
         Self::open_in_with_payload_ownership(source, limits, pool, policy)
     }
+    /// [`open`](Self::open) with the block-payload policy `policy`.
     pub fn open_with_payload_ownership(
         source: R,
         limits: Limits,
@@ -83,6 +90,7 @@ impl<R: Read> BlockingReader<R> {
         let pool = Budget::new(limits.live_storage_bytes)?;
         Self::open_in_with_payload_ownership(source, limits, &pool, policy)
     }
+    /// [`open_in`](Self::open_in) with the block-payload policy `policy`.
     pub fn open_in_with_payload_ownership(
         source: R,
         limits: Limits,
@@ -92,6 +100,7 @@ impl<R: Read> BlockingReader<R> {
         let reader = Reader::new(pool, SOURCE, capabilities(false), limits, WINDOW)?;
         Self::construct(reader, InputFeeder::new(source, WINDOW)?, None, policy)
     }
+    /// The block-payload policy this reader was opened with.
     pub fn payload_ownership(&self) -> crate::storage::PayloadOwnership {
         self.reader.payload_ownership()
     }
@@ -237,27 +246,37 @@ impl<R: Read> BlockingReader<R> {
         drop(reader);
         input.into_inner()
     }
+    /// The pool all reader storage is charged to.
     pub fn budget(&self) -> &Budget {
         self.reader.budget()
     }
+    /// The tracks of the current configuration, in TrackEntry order.
     pub fn tracks(&self) -> &[crate::track::Track] {
         self.reader.tracks()
     }
+    /// TimestampScale: nanoseconds per Segment tick.
     pub fn timestamp_scale_ns(&self) -> u64 {
         self.reader.timestamp_scale_ns()
     }
+    /// The segment-metadata documents read so far, in reading order.
     pub fn metadata_documents(&self) -> &[SharedDocument] {
         self.reader.catalogue()
     }
+    /// Bytes the metadata documents and their list keep charged.
     pub fn metadata_retained_bytes(&self) -> usize {
         self.reader.catalogue.retained_bytes()
     }
+    /// Each metadata document as its element ID and payload bytes, in reading order.
     pub fn opaque_metadata(&self) -> impl Iterator<Item = (u64, &[u8])> + '_ {
         self.reader
             .catalogue()
             .iter()
             .map(|document| (document.kind(), document.raw()))
     }
+    /// The next packet with its configuration and BlockGroup side data; `None` at the
+    /// end of the Segment. Fails with [`Error::Invalid`] while a failed seek is
+    /// pending, with retryable [`Error::Backpressure`] when the pool is full of
+    /// packets the caller holds, and with the error of malformed or refused input.
     pub fn next_typed_packet(&mut self, cancel: &AtomicBool) -> Result<Option<TypedPacket>> {
         if self.reader.pending_seek().is_some() {
             return Err(Error::Invalid("pending seek must be completed"));
@@ -270,6 +289,9 @@ impl<R: Read> BlockingReader<R> {
             }
         }
     }
+    /// The next packet's frame alone, as [`next_typed_packet`](Self::next_typed_packet)
+    /// reads it. Fails with [`Error::Unsupported`] for a packet whose BlockGroup
+    /// carries block additions or CodecState.
     pub fn next_packet(&mut self, cancel: &AtomicBool) -> Result<Option<crate::packet::Packet>> {
         if self.reader.pending_seek().is_some() {
             return Err(Error::Invalid("pending seek must be completed"));
@@ -299,6 +321,11 @@ impl<R: Read> BlockingReader<R> {
             }
         }
     }
+    /// Seeks video track index `track` to its latest keyframe at or before
+    /// `requested_ns` nanoseconds; packets continue from the landing. Fails as
+    /// [`Reader::seek_previous`] does; a call that failed with
+    /// [`Error::Backpressure`] can be repeated, and after any other failure the next
+    /// seek starts over.
     pub fn seek_previous(
         &mut self,
         track: usize,
@@ -315,6 +342,9 @@ impl<R: Read> BlockingReader<R> {
             cancel,
         )
     }
+    /// [`seek_previous`](Self::seek_previous) to the target less the largest track
+    /// SeekPreRoll, replaying the landing Cluster's interleaved audio so every track
+    /// can decode from the target.
     pub fn seek_for_playback(
         &mut self,
         track: usize,
@@ -369,14 +399,19 @@ impl<R: Read + Seek> BlockingReader<R> {
         |reader, offset| Seek::seek(reader, std::io::SeekFrom::Start(offset)),
         |feed, cursor, request, cancel| feed.synchronize_seekable_position(cursor, request, cancel),
     );
+    /// Opens a seekable source in a new pool of `limits.live_storage_bytes`, following
+    /// SeekHead chains to load late Tracks, Cues and segment metadata; the reader can
+    /// then seek. Fails as [`open`](Self::open) does.
     pub fn open_seekable(source: R, limits: Limits) -> Result<Self> {
         let pool = Budget::new(limits.live_storage_bytes)?;
         Self::open_seekable_in(source, limits, &pool)
     }
+    /// [`open_seekable`](Self::open_seekable), charging all storage to the caller's `pool`.
     pub fn open_seekable_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
         let policy = crate::storage::PayloadOwnership::OwnedExact;
         Self::open_seekable_in_with_payload_ownership(source, limits, pool, policy)
     }
+    /// [`open_seekable`](Self::open_seekable) with the block-payload policy `policy`.
     pub fn open_seekable_with_payload_ownership(
         source: R,
         limits: Limits,
@@ -385,6 +420,7 @@ impl<R: Read + Seek> BlockingReader<R> {
         let pool = Budget::new(limits.live_storage_bytes)?;
         Self::open_seekable_in_with_payload_ownership(source, limits, &pool, policy)
     }
+    /// [`open_seekable_in`](Self::open_seekable_in) with the block-payload policy `policy`.
     pub fn open_seekable_in_with_payload_ownership(
         source: R,
         limits: Limits,

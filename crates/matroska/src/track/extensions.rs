@@ -38,21 +38,27 @@ struct Data {
 #[derive(Clone, Debug)]
 pub struct TrackExtensions(Arc<Data>);
 impl TrackExtensions {
+    /// The TrackEntry payload these extensions were parsed from, every child included.
     pub fn raw_track_entry(&self) -> &[u8] {
         &self.0.raw
     }
+    /// MaxBlockAdditionID: the largest BlockAddID the track's blocks may carry;
+    /// 0 (the default) when absent.
     pub fn max_block_addition_id(&self) -> u64 {
         self.0.maximum.map_or(0, |(_, value)| value)
     }
+    /// How MaxBlockAdditionID appeared in the TrackEntry.
     pub fn maximum_presence(&self) -> Presence {
         presence(self.0.maximum.map(|(span, _)| span))
     }
+    /// The BlockAdditionMapping elements in source order.
     pub fn mappings(&self) -> impl ExactSizeIterator<Item = MappingView<'_>> {
         self.0.mappings.as_slice().iter().map(|record| MappingView {
             owner: self,
             record,
         })
     }
+    /// The BlockAdditionMapping children the parser does not interpret, in source order.
     pub fn unknown_mapping_fields(&self) -> impl ExactSizeIterator<Item = MappingExtension<'_>> {
         self.0
             .unknown
@@ -90,21 +96,28 @@ fn presence(span: Option<Span>) -> Presence {
         Some(_) => Presence::Value,
     }
 }
+/// One BlockAdditionMapping, borrowed from its [`TrackExtensions`].
 #[derive(Clone, Copy, Debug)]
 pub struct MappingView<'a> {
     owner: &'a TrackExtensions,
     record: &'a Mapping,
 }
 impl<'a> MappingView<'a> {
+    /// BlockAddIDValue: the BlockAddID this mapping describes, at least 2; `None`
+    /// when absent.
     pub fn value(self) -> Option<u64> {
         self.record.value.map(|(_, value)| value)
     }
+    /// How BlockAddIDValue appeared in the mapping.
     pub fn value_presence(self) -> Presence {
         presence(self.record.value.map(|(span, _)| span))
     }
+    /// BlockAddIDType: the registered type of the mapped additions; 0 (the
+    /// default) when absent.
     pub fn kind(self) -> u64 {
         self.record.kind.map_or(0, |(_, value)| value)
     }
+    /// How BlockAddIDType appeared in the mapping.
     pub fn kind_presence(self) -> Presence {
         presence(self.record.kind.map(|(span, _)| span))
     }
@@ -113,6 +126,8 @@ impl<'a> MappingView<'a> {
     pub fn type_zero_value_conflict(self) -> bool {
         self.kind() == 0 && self.value().is_some()
     }
+    /// BlockAddIDName up to its first zero byte, checked as ASCII when parsed;
+    /// `None` when absent. Fails with [`Error::Invalid`] only if those bytes are not UTF-8.
     pub fn name(self) -> Result<Option<&'a str>> {
         self.record
             .name
@@ -122,35 +137,45 @@ impl<'a> MappingView<'a> {
             })
             .transpose()
     }
+    /// The whole BlockAddIDName payload, zero padding included; `None` when absent.
     pub fn raw_name(self) -> Option<&'a [u8]> {
         self.record
             .name
             .map(|span| &self.owner.0.raw[span.payload()])
     }
+    /// The BlockAddIDExtraData payload, private data for the mapping's type;
+    /// `None` when absent.
     pub fn extra_data(self) -> Option<&'a [u8]> {
         self.record
             .extra
             .map(|span| &self.owner.0.raw[span.payload()])
     }
+    /// The complete BlockAdditionMapping element, header included.
     pub fn raw(self) -> &'a [u8] {
         &self.owner.0.raw[self.record.span.header..self.record.span.end]
     }
 }
+/// A BlockAdditionMapping child kept without interpretation, borrowed from its
+/// [`TrackExtensions`].
 #[derive(Clone, Copy, Debug)]
 pub struct MappingExtension<'a> {
     owner: &'a TrackExtensions,
     record: &'a Unknown,
 }
 impl<'a> MappingExtension<'a> {
+    /// Index in [`TrackExtensions::mappings`] of the mapping that contains this child.
     pub fn mapping_index(self) -> usize {
         self.record.mapping
     }
+    /// The EBML element ID, marker bits included.
     pub fn id(self) -> u64 {
         self.record.id
     }
+    /// The complete element, header included.
     pub fn raw(self) -> &'a [u8] {
         &self.owner.0.raw[self.record.span.header..self.record.span.end]
     }
+    /// The element payload.
     pub fn data(self) -> &'a [u8] {
         &self.owner.0.raw[self.record.span.payload()]
     }
@@ -214,6 +239,12 @@ impl TrackExtensionsJob {
             failed: false,
         })
     }
+    /// Parses within `work`: [`ParseStep::Yield`] when the budget runs out,
+    /// [`ParseStep::Backpressure`] when the pool is full, then [`ParseStep::Event`]
+    /// with the extensions, repeated on later calls. Fails with [`Error::Invalid`]
+    /// for duplicate or malformed children, [`Error::Policy`] beyond
+    /// `Limits::metadata_nodes` mappings and [`Error::Cancelled`]; a failed job only
+    /// fails again.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

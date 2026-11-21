@@ -39,9 +39,13 @@ use triergon_core::{
 pub enum Event {
     /// Source structure or syntax; the other variants express typed acceptance.
     Envelope(ElementEvent),
+    /// A new or changed track configuration, before the first packet that uses it.
     Configuration(Configuration),
+    /// A validated Info, Chapters, Tags or Attachments document.
     Document(SharedDocument),
+    /// One frame with its configuration and BlockGroup side data.
     Packet(TypedPacket),
+    /// The receipt that completes a seek, before the first packet after it.
     Seek(SeekReceipt),
 }
 
@@ -216,6 +220,9 @@ pub fn new_reader(
 }
 
 impl Reader {
+    /// A reader at offset 0 of `source`, all storage charged to `pool`, asking for
+    /// windows of at most `maximum_window` bytes. Fails with [`Error::Invalid`] for a
+    /// zero `maximum_window`.
     #[inline(always)]
     pub fn new(
         pool: &Budget,
@@ -316,6 +323,7 @@ impl Reader {
         )?);
         Ok(reader)
     }
+    /// The block-payload policy chosen at construction.
     pub fn payload_ownership(&self) -> crate::storage::PayloadOwnership {
         self.envelope.payload_ownership()
     }
@@ -327,50 +335,71 @@ impl Reader {
     pub fn is_unstarted(&self) -> bool {
         matches!(self.state, State::Envelope) && self.envelope.input().position() == 0
     }
+    /// The pool all reader storage is charged to.
     pub fn budget(&self) -> &Budget {
         &self.pool
     }
+    /// The current input generation. A seek or reset starts a new one, after which
+    /// answers to earlier requests are refused with [`Error::StaleGeneration`].
     pub fn generation(&self) -> u64 {
         self.envelope.generation()
     }
+    /// Source byte offset of the next byte the reader reads.
     pub fn position(&self) -> u64 {
         self.envelope.position()
     }
+    /// The request for the bytes at [`position`](Self::position), with the token an
+    /// answer must carry.
     pub fn request(&self) -> InputRequest {
         self.envelope.request()
     }
+    /// The source capabilities; `length` becomes known once the caller
+    /// [`finish`](Self::finish)es the source.
     pub fn capabilities(&self) -> SourceCapabilities {
         self.envelope.input_capabilities()
     }
+    /// The current track configuration; `None` until Tracks has been read.
     pub fn configuration(&self) -> Option<&Configuration> {
         self.configuration.as_ref()
     }
+    /// The seek in progress, until its [`Event::Seek`] receipt has been returned.
     pub fn pending_seek(&self) -> Option<SeekRequest> {
         self.pending_seek
     }
+    /// The tracks of the current configuration; empty until Tracks has been read.
     pub fn tracks(&self) -> &[crate::track::Track] {
         self.configuration
             .as_ref()
             .map_or(&[], Configuration::tracks)
     }
+    /// TimestampScale: nanoseconds per Segment tick; 1000000 until Info sets it.
     pub fn timestamp_scale_ns(&self) -> u64 {
         self.scale
     }
+    /// The segment-metadata documents read so far, in reading order.
     pub fn catalogue(&self) -> &[SharedDocument] {
         self.catalogue.documents()
     }
+    /// The attachments of every Attachments document in the
+    /// [`catalogue`](Self::catalogue).
     pub fn attachments(&self) -> impl Iterator<Item = Attachment> + '_ {
         self.catalogue
             .documents()
             .iter()
             .flat_map(SharedDocument::attachments)
     }
+    /// Whether opening is complete: Tracks read, the first Cluster found and every
+    /// metadata element the SeekHead points to resolved.
     pub fn is_ready(&self) -> bool {
         self.first_cluster.is_some()
             && !self.tracks().is_empty()
             && self.opening.is_none()
             && self.resolver.is_none()
     }
+    /// Answers the current [`request`](Self::request) with `window`. A refused window
+    /// leaves the reader unchanged: a stale token ([`Error::StaleGeneration`],
+    /// [`Error::StaleRequest`]), another source or pool, more bytes than requested
+    /// ([`Error::Limit`]), or a window at the wrong offset ([`Error::Invalid`]).
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         if let Some(index) = &self.seek_index {
             index.verify(window)?;
@@ -381,9 +410,14 @@ impl Reader {
         }
         Ok(())
     }
+    /// Answers the current request with the end of the source. A source that ends
+    /// before its known length is [`Error::Truncated`]; a stale token is refused as
+    /// by [`provide`](Self::provide).
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.envelope.finish(source, token)
     }
+    /// Answers the current request with a failure; later steps return
+    /// [`Error::Transport`] or [`Error::Cancelled`] to match it.
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -392,6 +426,9 @@ impl Reader {
     ) -> Result<()> {
         self.envelope.fail(source, token, failure)
     }
+    /// Restarts at offset 0 in a new input generation, dropping the configuration,
+    /// metadata and seek state, and returns the first request. Packets and documents
+    /// the caller holds stay valid and charged.
     pub fn reset(&mut self) -> Result<InputRequest> {
         let request = self.envelope.reset()?;
         self.state = State::Envelope;

@@ -8,6 +8,10 @@ use triergon_core::{Budget, BudgetVec, Bytes};
 #[derive(Clone, Debug, Default)]
 pub struct SharedBytes(Option<Bytes>);
 impl SharedBytes {
+    /// A copy of `bytes` in a new allocation charged to `pool`; empty input
+    /// allocates nothing. Fails with [`Error::Limit`] when the copy can never fit
+    /// the pool and [`Error::Backpressure`] when it fits only after other charges
+    /// are released.
     pub fn copy_from_slice(pool: &Budget, bytes: &[u8]) -> Result<Self> {
         if bytes.is_empty() {
             return Ok(Self::default());
@@ -29,6 +33,8 @@ impl SharedBytes {
             .map(Self::from_core)
             .map_err(|e| e.error)
     }
+    /// A view of `range` of these bytes that shares, and keeps charged, the whole
+    /// backing allocation. A reversed range or one past the end is [`Error::Invalid`].
     pub fn slice(&self, range: Range<usize>) -> Result<Self> {
         match &self.0 {
             Some(bytes) => Ok(Self::from_core(bytes.slice(range)?)),
@@ -46,9 +52,12 @@ impl SharedBytes {
             None => Err(Error::Invalid("empty byte span range")),
         }
     }
+    /// Capacity in bytes of the backing allocation this view keeps charged, which
+    /// can exceed its length; 0 for an empty value.
     pub fn retained_capacity(&self) -> usize {
         self.0.as_ref().map_or(0, Bytes::retained_capacity)
     }
+    /// Whether the storage is charged to `pool`; an empty value belongs to every pool.
     pub fn belongs_to(&self, pool: &Budget) -> bool {
         self.0.as_ref().is_none_or(|bytes| bytes.belongs_to(pool))
     }
@@ -60,6 +69,7 @@ impl SharedBytes {
         // reservation, Arc counters and handle. Budget counts actual charges.
         size_of::<BudgetVec<u8>>() + 2 * size_of::<usize>() + size_of::<Bytes>()
     }
+    /// Whether both views lie in one backing allocation; two empty values do.
     pub fn shares_storage_with(&self, other: &Self) -> bool {
         match (&self.0, &other.0) {
             (Some(a), Some(b)) => a.shares_storage_with(b),
@@ -103,6 +113,7 @@ impl SharedText {
         clippy::expect_used,
         reason = "the bytes were validated as UTF-8 when the text was built and never change"
     )]
+    /// The text, borrowed from the validated source bytes or a static default.
     pub fn as_str(&self) -> &str {
         self.constant
             .unwrap_or_else(|| std::str::from_utf8(&self.bytes).expect("validated immutable UTF-8"))
@@ -193,7 +204,10 @@ crate::storage::usage::storage!(SharedText, |s| [s.bytes]);
 /// SharedBounded reports the full real parent capacity/charge of borrowed views.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum PayloadOwnership {
+    /// Each block payload is copied into storage of exactly its size.
     #[default]
     OwnedExact,
+    /// Block payloads alias their parent input allocation, whose whole capacity
+    /// stays charged and is reported as retained while any view holds it.
     SharedBounded,
 }

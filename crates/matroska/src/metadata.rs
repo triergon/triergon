@@ -9,9 +9,13 @@ use crate::{
 use std::{mem::size_of, ops::Range, sync::Arc};
 use triergon_core::{Budget, Reservation};
 
+/// EBML element ID of Info, the [`Document::kind`] of segment information.
 pub const INFO: u64 = 0x1549a966;
+/// EBML element ID of Attachments, the [`Document::kind`] of attached files.
 pub const ATTACHMENTS: u64 = 0x1941a469;
+/// EBML element ID of Chapters, the [`Document::kind`] of editions and chapters.
 pub const CHAPTERS: u64 = 0x1043a770;
+/// EBML element ID of Tags, the [`Document::kind`] of tags.
 pub const TAGS: u64 = 0x1254c367;
 pub(crate) const SEGMENT: u64 = 0x18538067;
 pub(crate) const CLUSTER: u64 = 0x1f43b675;
@@ -35,6 +39,8 @@ struct Node {
     parent: u16,
 }
 
+/// One validated Info, Chapters, Tags or Attachments element: its payload and a
+/// preorder arena of its nodes. Readers hand it out as a [`SharedDocument`].
 #[derive(Debug)]
 pub struct Document {
     raw: SharedBytes,
@@ -60,6 +66,8 @@ impl std::ops::Deref for SharedDocument {
 }
 
 impl SharedDocument {
+    /// The AttachedFile entries of an Attachments document in source order; none for
+    /// other kinds. Each handle keeps the document alive.
     pub fn attachments(&self) -> impl Iterator<Item = Attachment> + '_ {
         self.0.attachments()
     }
@@ -72,6 +80,7 @@ pub struct Element<'a> {
     index: u16,
 }
 
+/// The direct children of an [`Element`] in source order.
 #[derive(Debug)]
 pub struct Children<'a> {
     doc: &'a Document,
@@ -94,15 +103,19 @@ impl<'a> Iterator for Children<'a> {
 }
 
 impl<'a> Element<'a> {
+    /// Index of this element in the document's preorder arena; the root is 0.
     pub fn ordinal(self) -> usize {
         self.index as usize
     }
+    /// The ordinal one past this element's last descendant.
     pub fn subtree_end(self) -> usize {
         self.doc.nodes[self.index as usize].next as usize
     }
+    /// The EBML element ID, marker bits included.
     pub fn id(self) -> u64 {
         u64::from(self.doc.nodes[self.index as usize].id)
     }
+    /// Byte range of the payload within [`Document::raw`]; all of it for the root.
     pub fn range(self) -> Range<usize> {
         self.range_in(self.doc.raw.as_ref())
     }
@@ -128,10 +141,12 @@ impl<'a> Element<'a> {
         }
         start..start + ebml::size_at(raw, at, width)
     }
+    /// The payload bytes.
     pub fn raw(self) -> &'a [u8] {
         let raw = self.doc.raw.as_ref();
         &raw[self.range_in(raw)]
     }
+    /// The direct children in source order.
     pub fn children(self) -> Children<'a> {
         Children {
             doc: self.doc,
@@ -139,9 +154,13 @@ impl<'a> Element<'a> {
             end: self.doc.nodes[self.index as usize].next,
         }
     }
+    /// The first direct child with element ID `id`.
     pub fn field(self, id: u64) -> Option<Self> {
         self.children().find(|e| e.id() == id)
     }
+    /// The payload as an unsigned integer. An empty payload reads as the schema
+    /// default: 1000000 for TimestampScale, 1 for ChapterFlagEnabled and TagDefault,
+    /// 50 for TargetTypeValue, otherwise 0. Wider than 8 bytes is [`Error::Invalid`].
     pub fn uint(self) -> Result<u64> {
         let raw = self.raw();
         if raw.is_empty() {
@@ -149,9 +168,13 @@ impl<'a> Element<'a> {
         }
         ebml::uint(raw)
     }
+    /// The payload as a signed integer; empty reads as 0, wider than 8 bytes is
+    /// [`Error::Invalid`].
     pub fn sint(self) -> Result<i64> {
         ebml::sint(self.raw())
     }
+    /// The payload as a big-endian IEEE 754 float of 4 or 8 bytes; empty reads as 0.
+    /// Any other width is [`Error::Invalid`].
     pub fn float(self) -> Result<f64> {
         let raw = self.raw();
         match raw.len() {
@@ -167,6 +190,10 @@ impl<'a> Element<'a> {
             _ => Err(Error::Invalid("metadata float width")),
         }
     }
+    /// The payload as a string, without its zero padding. An empty ChapLanguage
+    /// reads as `eng` and an empty TagLanguage as `und`. Fails with
+    /// [`Error::Invalid`] for invalid UTF-8, nonzero bytes after the first zero, or a
+    /// byte outside printable ASCII in an ASCII field.
     pub fn text(self) -> Result<&'a str> {
         let raw = self.raw();
         if raw.is_empty() {
@@ -178,9 +205,11 @@ impl<'a> Element<'a> {
         }
         text(raw, ascii(self.id()))
     }
+    /// [`uint`](Self::uint) of the first child `id`; `None` when absent.
     pub fn number(self, id: u64) -> Result<Option<u64>> {
         self.field(id).map(Self::uint).transpose()
     }
+    /// [`text`](Self::text) of the first child `id`; `None` when absent.
     pub fn string(self, id: u64) -> Result<Option<&'a str>> {
         self.field(id).map(Self::text).transpose()
     }
@@ -192,6 +221,7 @@ impl<'a> Element<'a> {
     pub fn is_text(self) -> bool {
         utf8(self.id()) || ascii(self.id())
     }
+    /// The enclosing element; `None` for the root.
     pub fn parent(self) -> Option<Self> {
         let p = self.doc.nodes[self.index as usize].parent;
         (p != u16::MAX).then_some(Self {
@@ -208,48 +238,60 @@ pub struct Attachment {
     index: u16,
 }
 impl Attachment {
+    /// The AttachedFile element.
     pub fn element(&self) -> Element<'_> {
         Element {
             doc: &self.document,
             index: self.index,
         }
     }
+    /// FileUID. Fails with [`Error::Invalid`] when absent.
     pub fn uid(&self) -> Result<u64> {
         self.element()
             .number(0x46ae)?
             .ok_or(Error::Invalid("attachment UID"))
     }
+    /// FileName. Fails with [`Error::Invalid`] when absent.
     pub fn filename(&self) -> Result<&str> {
         self.element()
             .string(0x466e)?
             .ok_or(Error::Invalid("attachment filename"))
     }
+    /// FileMediaType, the attachment's media type. Fails with [`Error::Invalid`]
+    /// when absent.
     pub fn media_type(&self) -> Result<&str> {
         self.element()
             .string(0x4660)?
             .ok_or(Error::Invalid("attachment media type"))
     }
+    /// FileDescription; `None` when absent.
     pub fn description(&self) -> Result<Option<&str>> {
         self.element().string(0x467e)
     }
+    /// The FileData payload, borrowed from the document. Fails with
+    /// [`Error::Invalid`] when absent.
     pub fn data(&self) -> Result<&[u8]> {
         self.element()
             .field(0x465c)
             .map(Element::raw)
             .ok_or(Error::Invalid("attachment data"))
     }
+    /// Whether both attachments are held by the same document.
     pub fn shares_storage_with(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.document, &other.document)
     }
 }
 
 impl Document {
+    /// The element ID of the document: [`INFO`], [`CHAPTERS`], [`TAGS`] or [`ATTACHMENTS`].
     pub fn kind(&self) -> u64 {
         u64::from(self.nodes[0].id)
     }
+    /// The element payload as read.
     pub fn raw(&self) -> &[u8] {
         &self.raw
     }
+    /// The level-one element itself, ordinal 0.
     pub fn root(&self) -> Element<'_> {
         Element {
             doc: self,
@@ -260,9 +302,12 @@ impl Document {
     pub fn source_offset(&self) -> Option<u64> {
         self.source_offset
     }
+    /// Elements in the document, the root included.
     pub fn node_count(&self) -> usize {
         self.nodes.len()
     }
+    /// An upper bound of the bytes this document keeps charged: source capacity,
+    /// node arena and owner overhead.
     pub fn retained_bytes(&self) -> usize {
         self.raw.retained_capacity()
             + self.nodes.capacity() * size_of::<Node>()
@@ -279,6 +324,7 @@ impl Document {
                 index: e.index,
             })
     }
+    /// Every element in preorder, the root first.
     pub fn elements(&self) -> impl Iterator<Item = Element<'_>> {
         (0..self.nodes.len()).map(|i| Element {
             doc: self,

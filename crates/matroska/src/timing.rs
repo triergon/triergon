@@ -13,6 +13,8 @@ pub struct ExactTime {
 }
 
 impl ExactTime {
+    /// `numerator / denominator` nanoseconds in lowest terms. Fails with
+    /// [`Error::Invalid`] for a zero denominator.
     pub fn new(numerator: i128, denominator: u16) -> Result<Self> {
         if denominator == 0 {
             return Err(Error::Invalid("zero time denominator"));
@@ -40,9 +42,11 @@ impl ExactTime {
             denominator: (i128::from(denominator) / divisor) as u16,
         })
     }
+    /// The signed numerator of the reduced fraction, in nanoseconds.
     pub fn numerator(self) -> i128 {
         self.numerator
     }
+    /// The denominator of the reduced fraction, at least 1.
     pub fn denominator(self) -> u16 {
         self.denominator
     }
@@ -62,6 +66,8 @@ impl ExactTime {
         };
         i64::try_from(v).map_err(|_| Error::Overflow)
     }
+    /// Round once, to the nearest nanosecond with ties upward, as a duration. Fails
+    /// with [`Error::Invalid`] for a negative value and [`Error::Overflow`] past `u64`.
     pub fn rounded_duration_ns(self) -> Result<u64> {
         let n = u128::try_from(self.numerator).map_err(|_| Error::Invalid("negative duration"))?;
         if self.denominator == 1 {
@@ -72,20 +78,35 @@ impl ExactTime {
     }
 }
 
+/// The source timing facts of one frame of a Block, from which
+/// [`source`](Self::source) derives its exact time.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BlockTiming {
+    /// The Block's timestamp in Segment ticks: Cluster Timestamp plus the Block's
+    /// signed relative timestamp.
     pub timestamp_ticks: i128,
+    /// TimestampScale: nanoseconds per Segment tick, nonzero.
     pub scale_ns: u64,
+    /// The track's CodecDelay in nanoseconds; 0 when absent.
     pub codec_delay_ns: u64,
+    /// The track's DefaultDuration in nanoseconds; `None` when absent.
     pub default_duration_ns: Option<u64>,
+    /// BlockDuration in Segment ticks, covering every frame of the Block; `None`
+    /// when absent.
     pub duration_ticks: Option<u64>,
+    /// Index of this frame in the Block's lace, below `frames`.
     pub frame: u16,
+    /// Number of frames in the Block's lace; 1 when it is not laced.
     pub frames: u16,
 }
 
+/// Exact presentation time and duration of one frame, in rational nanoseconds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PacketTiming {
+    /// Presentation time; `None` when it cannot be derived, as for a later laced
+    /// frame without a known duration.
     pub pts: Option<ExactTime>,
+    /// Frame duration; `None` when unknown.
     pub duration: Option<ExactTime>,
 }
 
@@ -107,6 +128,11 @@ impl BlockTiming {
             .ok_or(Error::Overflow)
     }
 
+    /// The exact source time (RFC 9559 §11.2): the Block timestamp in nanoseconds
+    /// less CodecDelay, plus the earlier frames' share of BlockDuration, or of
+    /// DefaultDuration when BlockDuration is absent. Fails with [`Error::Invalid`]
+    /// for zero `scale_ns` or `frame` not below `frames`, and with
+    /// [`Error::Overflow`] when a value does not fit.
     pub fn source(self) -> Result<PacketTiming> {
         let base = self.source_base_ns()?;
         let duration = if let Some(ticks) = self.duration_ticks {

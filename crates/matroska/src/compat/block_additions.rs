@@ -12,9 +12,13 @@ pub use crate::reader::{blocking::open_owned_seekable_in, new_reader};
 use std::{mem::discriminant, sync::atomic::AtomicBool};
 use triergon_core::WorkBudget;
 
+/// The container family named by the source DocType, which decides whether a
+/// BlockAddID without a BlockAdditionMapping is exported.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BlockAdditionContainer {
+    /// DocType `matroska`: only BlockAddID 1 is exported without a mapping.
     Matroska,
+    /// DocType `webm`: an unmapped BlockAddID is exported as its own type.
     WebM,
 }
 
@@ -22,7 +26,12 @@ pub enum BlockAdditionContainer {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PacketSideData<'a> {
     /// A mapped or default addition, exported with its 64-bit type as a prefix.
-    Opaque { id: u64, payload: &'a [u8] },
+    Opaque {
+        /// The mapping's nonzero BlockAddIDType, otherwise the BlockAddID itself.
+        id: u64,
+        /// The BlockAdditional bytes, borrowed from the packet.
+        payload: &'a [u8],
+    },
     /// LCEVC enhancement data from an ITU-T T.35 addition, without its header.
     Lcevc(&'a [u8]),
 }

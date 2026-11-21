@@ -326,6 +326,11 @@ impl Reader {
         }
         Ok(())
     }
+    /// Starts a seek of video track index `track` to its latest keyframe at or before
+    /// `requested_ns` nanoseconds and returns the first input request; steps then
+    /// return [`Event::Seek`] before any packet. Fails with [`Error::Unsupported`] for
+    /// an unknown or non-video track or a source without random access, and with
+    /// [`Error::Invalid`] before the first Cluster has been found.
     pub fn seek_previous(&mut self, track: usize, requested_ns: i64) -> Result<InputRequest> {
         self.begin_seek(
             SeekRequest {
@@ -336,6 +341,9 @@ impl Reader {
             RecoveryAudio::Overlap,
         )
     }
+    /// [`seek_previous`](Self::seek_previous) to the target less the largest track
+    /// SeekPreRoll, replaying the landing Cluster's interleaved audio so every track
+    /// can decode from the target.
     pub fn seek_for_playback(&mut self, track: usize, requested_ns: i64) -> Result<InputRequest> {
         self.begin_seek(
             SeekRequest {

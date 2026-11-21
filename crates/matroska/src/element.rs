@@ -21,12 +21,19 @@ use crate::metadata::{
 };
 const EBML: u64 = 0x1a45dfa3;
 
+/// One decoded EBML element header (RFC 8794 §§4–6) and where it was read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ElementHeader {
+    /// The EBML element ID, marker bits included (for example `0x1f43b675` for Cluster).
     pub id: u64,
+    /// Payload size in bytes; `None` for an unknown size, accepted only on Segment
+    /// and Cluster.
     pub size: Option<u64>,
+    /// Source byte offset of the element ID.
     pub start: u64,
+    /// Source byte offset of the payload.
     pub data: u64,
+    /// The reader input generation the header was read in.
     pub generation: u64,
 }
 impl ElementHeader {
@@ -37,17 +44,30 @@ impl ElementHeader {
     }
 }
 
+/// One step through the Segment's element structure.
 #[derive(Clone, Debug)]
 pub enum ElementEvent {
+    /// A Segment or Cluster began; its children follow.
     Start(ElementHeader),
+    /// An element the reader collects whole: the EBML header, a level-one metadata
+    /// element (Info, Tracks, Cues, SeekHead, Chapters, Tags, Attachments), or a
+    /// Cluster's Timestamp, SimpleBlock or BlockGroup.
     Leaf {
+        /// The element's header.
         header: ElementHeader,
+        /// The element's payload.
         data: SharedBytes,
     },
+    /// Any other element; its payload was passed over unread.
     Skipped(ElementHeader),
+    /// A Segment or Cluster ended.
     End {
+        /// The element ID of the Segment or Cluster.
         id: u64,
+        /// Source byte offset where it ended: the end of its payload, or for an
+        /// unknown size the start of the element that closed it or the end of the source.
         offset: u64,
+        /// The reader input generation it ended in.
         generation: u64,
     },
 }

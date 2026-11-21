@@ -404,6 +404,9 @@ struct State {
     failed: bool,
 }
 impl Inflater {
+    /// Prepares to decode the complete RFC 1950 stream in `source`, its output
+    /// charged to `pool` and bounded by `limits`. Fails with [`Error::ForeignPool`]
+    /// when `source` is charged to another pool.
     #[inline(always)]
     pub fn new(source: SharedBytes, limits: InflateLimits, pool: &Budget) -> Result<Self> {
         if !source.belongs_to(pool) {
@@ -444,10 +447,17 @@ impl Inflater {
             },
         })
     }
+    /// Bytes decoded so far; the whole output length once decoding has finished.
     #[cfg(any(test, feature = "reference-trace"))]
     pub fn output_len(&self) -> usize {
         self.state.output_len()
     }
+    /// Decodes within `work`: [`ParseStep::Yield`] when the budget runs out,
+    /// [`ParseStep::Backpressure`] when the pool cannot hold more output, then
+    /// [`ParseStep::Event`] with the output once Adler-32 matches, repeated on later
+    /// calls. Fails with [`Error::Invalid`] or [`Error::Truncated`] for a malformed
+    /// stream, [`Error::Unsupported`] for a preset dictionary, [`Error::Policy`] past
+    /// `limits` and [`Error::Cancelled`]; after a failure it only fails again.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

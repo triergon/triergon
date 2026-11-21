@@ -39,14 +39,17 @@ pub struct Hdr10PlusPeakGrid<'a> {
 }
 
 impl Hdr10PlusPeakGrid<'_> {
+    /// Number of grid rows, 2 to 25.
     pub fn rows(&self) -> u8 {
         self.rows
     }
 
+    /// Number of grid columns, 2 to 25.
     pub fn columns(&self) -> u8 {
         self.columns
     }
 
+    /// The `rows × columns` 4-bit samples, each 0 to 15, read from the borrowed record.
     pub fn values(&self) -> impl ExactSizeIterator<Item = u8> + '_ {
         let count = usize::from(self.rows) * usize::from(self.columns);
         (0..count).map(|index| {
@@ -77,15 +80,24 @@ fn peak_grid<'a>(bits: &mut Bits<'a>) -> Result<Option<Hdr10PlusPeakGrid<'a>>> {
     }))
 }
 
+/// The transmitted geometry of an elliptical processing window (every window
+/// after the first), in the record's wire units.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Hdr10PlusGeometry {
     /// Left, top, right, bottom coordinates in pixels.
     pub rectangle: [u16; 4],
+    /// Centre of the ellipses, x then y, in pixels.
     pub ellipse_center: [u16; 2],
+    /// Rotation angle of the ellipses in degrees, as transmitted.
     pub rotation: u8,
+    /// Semi-major axis of the internal ellipse in pixels.
     pub internal_semimajor_axis: u16,
+    /// Semi-major axis of the external ellipse in pixels.
     pub external_semimajor_axis: u16,
+    /// Semi-minor axis of the external ellipse in pixels.
     pub external_semiminor_axis: u16,
+    /// The overlap_process_option flag: `false` for weighted averaging, `true` for
+    /// layering of overlapping windows.
     pub overlap_process_option: bool,
 }
 
@@ -107,13 +119,16 @@ impl Hdr10PlusGeometry {
     }
 }
 
+/// One entry of a window's maxRGB percentile distribution.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Hdr10PlusPercentile {
+    /// The percentile in percent, as transmitted in 7 bits.
     pub percentage: u8,
     /// Linearized RGB in units of 1/100000.
     pub max_rgb: u32,
 }
 
+/// A window's Bézier tone-mapping curve: knee point and up to 15 anchors.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Hdr10PlusToneCurve {
     /// Knee coordinates in units of 1/4095.
@@ -146,15 +161,18 @@ impl Hdr10PlusToneCurve {
     }
 }
 
+/// One processing window: the whole frame first, then up to two elliptical windows.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Hdr10PlusWindow {
     /// The first window covers the frame and has no transmitted geometry.
     pub geometry: Option<Hdr10PlusGeometry>,
     /// Linearized RGB in units of 1/100000.
     pub max_scl: [u32; 3],
+    /// Average linearized maxRGB in units of 1/100000.
     pub average_max_rgb: u32,
     /// In units of 1/1000.
     pub fraction_bright_pixels: u16,
+    /// The tone-mapping curve; `None` when the window does not transmit one.
     pub tone_curve: Option<Hdr10PlusToneCurve>,
     /// In units of 1/8.
     pub saturation_weight: Option<u8>,
@@ -163,6 +181,7 @@ pub struct Hdr10PlusWindow {
 }
 
 impl Hdr10PlusWindow {
+    /// The maxRGB percentile distribution, up to 15 entries in transmitted order.
     pub fn percentiles(&self) -> &[Hdr10PlusPercentile] {
         &self.percentiles[..usize::from(self.percentile_count)]
     }
@@ -184,14 +203,19 @@ impl Hdr10PlusWindow {
     }
 }
 
+/// One HDR10+ dynamic metadata record (ITU-T T.35 Application 4), borrowed from
+/// the block addition that carries it.
 #[derive(Clone, Debug)]
 pub struct Hdr10Plus<'a> {
     raw: &'a [u8],
     body_bits: usize,
+    /// The application_version field, as transmitted.
     pub application_version: u8,
     /// Targeted display maximum luminance in cd/m².
     pub target_luminance: u32,
+    /// The targeted display's actual peak luminance grid; `None` when not transmitted.
     pub target_grid: Option<Hdr10PlusPeakGrid<'a>>,
+    /// The mastering display's actual peak luminance grid; `None` when not transmitted.
     pub mastering_grid: Option<Hdr10PlusPeakGrid<'a>>,
     windows: [Hdr10PlusWindow; 3],
     window_count: u8,
@@ -204,10 +228,13 @@ impl<'a> Hdr10Plus<'a> {
         self.raw
     }
 
+    /// Bits of the record after its six-byte T.35 header that the syntax consumed;
+    /// any later bytes of [`raw`](Self::raw) are unread.
     pub fn body_bits(&self) -> usize {
         self.body_bits
     }
 
+    /// The processing windows, 1 to 3, the whole-frame window first.
     pub fn windows(&self) -> &[Hdr10PlusWindow] {
         &self.windows[..usize::from(self.window_count)]
     }

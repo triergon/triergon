@@ -10,7 +10,9 @@ pub(crate) mod parse;
 pub struct MasteringMetadata {
     /// CIE xy coordinates in R, G, B, white-point order.
     pub chromaticity: [Option<f64>; 8],
+    /// LuminanceMax: peak mastering display luminance in cd/m², finite and nonnegative.
     pub luminance_max: Option<f64>,
+    /// LuminanceMin: minimum mastering display luminance in cd/m², finite and nonnegative.
     pub luminance_min: Option<f64>,
 }
 
@@ -18,16 +20,31 @@ pub struct MasteringMetadata {
 /// Defaults apply only to elements for which the Matroska schema defines them.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Colour {
+    /// MatrixCoefficients code point (ITU-T H.273); 2 (unspecified) when absent or empty.
     pub matrix_coefficients: u64,
+    /// BitsPerChannel per colour component; 0 (unspecified) when absent.
     pub bits_per_channel: u64,
+    /// ChromaSubsamplingHorz and ChromaSubsamplingVert: pixels removed from Cr and Cb
+    /// per pixel kept, in horizontal, vertical order; `None` when absent.
     pub chroma_subsampling: [Option<u64>; 2],
+    /// CbSubsamplingHorz and CbSubsamplingVert: pixels removed from Cb on top of the
+    /// chroma subsampling, in horizontal, vertical order; `None` when absent.
     pub cb_subsampling: [Option<u64>; 2],
+    /// ChromaSitingHorz and ChromaSitingVert in horizontal, vertical order: 0
+    /// unspecified (the default), 1 collocated, 2 half.
     pub chroma_siting: [u64; 2],
+    /// Range: 0 unspecified (the default), 1 broadcast, 2 full, 3 defined by the
+    /// matrix and transfer characteristics.
     pub range: u64,
+    /// TransferCharacteristics code point (ITU-T H.273); 2 (unspecified) when absent or empty.
     pub transfer_characteristics: u64,
+    /// Primaries code point (ITU-T H.273); 2 (unspecified) when absent or empty.
     pub primaries: u64,
+    /// MaxCLL: maximum content light level in cd/m², `None` when absent.
     pub max_cll: Option<u64>,
+    /// MaxFALL: maximum frame-average light level in cd/m², `None` when absent.
     pub max_fall: Option<u64>,
+    /// The MasteringMetadata child, `None` when absent.
     pub mastering: Option<MasteringMetadata>,
 }
 

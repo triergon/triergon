@@ -12,12 +12,20 @@ use std::{
 use triergon_bitstream::crc::Crc32Ieee;
 use triergon_core::{Budget, BudgetVec, Reservation, SourceId, WorkBudget};
 
+/// Where an element was read: absolute source offsets of its EBML header and
+/// payload, and its offset as a Segment Position.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourcePosition {
+    /// The source the element was read from.
     pub source: SourceId,
+    /// Byte offset of the element's ID in the source.
     pub header: u64,
+    /// Byte offset of the element's payload in the source.
     pub data: u64,
+    /// Payload length in bytes.
     pub length: u64,
+    /// `header` relative to the first byte of the Segment payload, as Cues and
+    /// SeekHead positions count it.
     pub segment_position: u64,
 }
 #[derive(Clone, Copy, Debug)]
@@ -74,10 +82,14 @@ impl Span {
         self.data..self.end
     }
 }
+/// How an optional element appeared in the source.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Presence {
+    /// The element is not present.
     Absent,
+    /// The element is present with a zero-length payload.
     Empty,
+    /// The element is present with a payload.
     Value,
 }
 #[derive(Clone, Copy, Debug)]
@@ -87,10 +99,15 @@ struct Addition {
     more: Span,
     data: Span,
 }
+/// The parent of a BlockGroup descendant that the reader does not interpret.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExtensionScope {
+    /// A direct child of the BlockGroup.
     Group,
+    /// A child of BlockAdditions.
     Additions,
+    /// A child of the BlockMore whose addition has this index in
+    /// [`BlockGroupSource::additions`].
     More(usize),
 }
 #[derive(Clone, Copy, Debug)]
@@ -125,12 +142,16 @@ struct Data {
 #[derive(Clone, Debug)]
 pub struct BlockGroupSource(Arc<Data>);
 impl BlockGroupSource {
+    /// The BlockGroup payload as read: every child element, the Block included.
     pub fn raw_body(&self) -> &[u8] {
         &self.0.raw
     }
+    /// Whether this group's storage is charged to `pool`.
     pub fn belongs_to(&self, pool: &Budget) -> bool {
         self.0.pool.same_pool(pool)
     }
+    /// The BlockMore entries of BlockAdditions in source order; their effective
+    /// BlockAddIDs are unique within the group.
     pub fn additions(&self) -> impl ExactSizeIterator<Item = AdditionView<'_>> {
         self.0
             .additions
@@ -141,6 +162,8 @@ impl BlockGroupSource {
                 record,
             })
     }
+    /// The descendants the reader does not interpret (for example
+    /// ReferencePriority or Void) in source order; CRC-32 elements are verified, not listed.
     pub fn extensions(&self) -> impl ExactSizeIterator<Item = ExtensionView<'_>> {
         self.0
             .extensions
@@ -151,24 +174,35 @@ impl BlockGroupSource {
                 record,
             })
     }
+    /// The ReferenceBlock values in source order: timestamps relative to this
+    /// Block's, in Segment ticks. A zero reference is only accepted on its own.
     pub fn references(&self) -> &[i64] {
         self.0.references.as_slice()
     }
+    /// BlockDuration in Segment ticks; `None` when absent.
     pub fn duration_ticks(&self) -> Option<u64> {
         self.0.duration.map(|(_, value)| value)
     }
+    /// DiscardPadding in nanoseconds: positive pads the end of the Block,
+    /// negative its start; `None` when absent.
     pub fn discard_padding_ns(&self) -> Option<i64> {
         self.0.discard.map(|(_, value)| value)
     }
+    /// The CodecState child; `None` when absent.
     pub fn codec_state(&self) -> Option<StateView<'_>> {
         self.0.state.map(|span| StateView { group: self, span })
     }
+    /// Whether both handles are clones of the same parsed group.
     pub fn shares_owner_with(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
     }
+    /// The largest effective BlockAddID in the group; 0 when it has no additions.
     pub fn max_addition_id(&self) -> u64 {
         self.0.highest
     }
+    /// Where the BlockGroup element was read; `None` when it was parsed without a
+    /// source location. Fails with [`Error::Overflow`] when the Segment Position
+    /// cannot be computed.
     pub fn position(&self) -> Result<Option<SourcePosition>> {
         self.0
             .location
@@ -209,15 +243,18 @@ impl BlockGroupSource {
             .ok_or(Error::Overflow)
     }
 }
+/// One BlockMore of a [`BlockGroupSource`], borrowed from the group.
 #[derive(Clone, Copy, Debug)]
 pub struct AdditionView<'a> {
     group: &'a BlockGroupSource,
     record: &'a Addition,
 }
 impl<'a> AdditionView<'a> {
+    /// The effective BlockAddID: nonzero, and 1 when BlockAddID is absent or empty.
     pub fn id(self) -> u64 {
         self.record.id
     }
+    /// How BlockAddID appeared in the BlockMore.
     pub fn id_presence(self) -> Presence {
         match self.record.id_field {
             None => Presence::Absent,
@@ -225,12 +262,16 @@ impl<'a> AdditionView<'a> {
             Some(_) => Presence::Value,
         }
     }
+    /// The BlockAdditional payload.
     pub fn data(self) -> &'a [u8] {
         &self.group.0.raw[self.record.data.payload()]
     }
+    /// The complete BlockMore element, header included.
     pub fn raw_more(self) -> &'a [u8] {
         &self.group.0.raw[self.record.more.header..self.record.more.end]
     }
+    /// Where the BlockAdditional element was read; `None` and failures as for
+    /// [`BlockGroupSource::position`].
     pub fn position(self) -> Result<Option<SourcePosition>> {
         self.group
             .0
@@ -239,37 +280,47 @@ impl<'a> AdditionView<'a> {
             .transpose()
     }
 }
+/// One BlockGroup descendant the reader keeps without interpreting it.
 #[derive(Clone, Copy, Debug)]
 pub struct ExtensionView<'a> {
     group: &'a BlockGroupSource,
     record: &'a Extension,
 }
 impl<'a> ExtensionView<'a> {
+    /// The EBML element ID, marker bits included (for example `0xfa` for ReferencePriority).
     pub fn id(self) -> u64 {
         self.record.id
     }
+    /// The element's parent within the BlockGroup.
     pub fn scope(self) -> ExtensionScope {
         self.record.scope
     }
+    /// The complete element, header included.
     pub fn raw(self) -> &'a [u8] {
         &self.group.0.raw[self.record.span.header..self.record.span.end]
     }
+    /// The element payload.
     pub fn data(self) -> &'a [u8] {
         &self.group.0.raw[self.record.span.payload()]
     }
 }
+/// The CodecState element of a [`BlockGroupSource`], borrowed from the group.
 #[derive(Clone, Copy, Debug)]
 pub struct StateView<'a> {
     group: &'a BlockGroupSource,
     span: Span,
 }
 impl<'a> StateView<'a> {
+    /// The CodecState payload as written.
     pub fn data(self) -> &'a [u8] {
         &self.group.0.raw[self.span.payload()]
     }
+    /// The complete CodecState element, header included.
     pub fn raw(self) -> &'a [u8] {
         &self.group.0.raw[self.span.header..self.span.end]
     }
+    /// Where the CodecState element was read; `None` and failures as for
+    /// [`BlockGroupSource::position`].
     pub fn position(self) -> Result<Option<SourcePosition>> {
         self.group
             .0

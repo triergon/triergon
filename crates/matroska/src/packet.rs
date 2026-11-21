@@ -10,6 +10,8 @@ pub(crate) mod lace;
 
 pub use batch::TypedPacket;
 
+/// One frame's payload with its content encodings removed, in charged storage that
+/// can be shared with the rest of its Block or input window.
 #[derive(Clone, Debug)]
 pub struct PacketData {
     pub(crate) storage: SharedBytes,
@@ -35,25 +37,37 @@ impl PacketData {
             .transpose()
     }
 
+    /// Capacity in bytes of the allocation this frame keeps charged, which exceeds
+    /// its length when it shares a larger Block or input allocation.
     pub fn retained_capacity(&self) -> usize {
         self.storage.retained_capacity()
     }
+    /// Whether both frames lie in one backing allocation.
     pub fn shares_storage_with(&self, other: &Self) -> bool {
         self.storage.shares_storage_with(&other.storage)
     }
 }
 
+/// One frame of a SimpleBlock or BlockGroup with its source timing.
 #[derive(Clone, Debug)]
 pub struct Packet {
+    /// The frame's source timing facts; [`BlockTiming::source`] gives its exact time.
     pub timing: BlockTiming,
+    /// Index of the track in [`Configuration::tracks`](crate::Configuration::tracks),
+    /// not its TrackNumber.
     pub track: usize,
     /// Later laced frames are unknown unless the container supplies their duration.
     pub pts_ns: Option<i64>,
     /// Matroska supplies presentation time, not a codec-derived decode timestamp.
     pub dts_ns: Option<i64>,
+    /// Frame duration in nanoseconds, rounded once from the exact source duration;
+    /// `None` when neither BlockDuration nor DefaultDuration is known.
     pub duration_ns: Option<u64>,
+    /// The SimpleBlock keyframe flag; for a BlockGroup, whether it has no ReferenceBlock.
     pub keyframe: bool,
+    /// The Block's DiscardPadding in nanoseconds; 0 when absent.
     pub discard_padding_ns: i64,
+    /// The frame payload.
     pub data: PacketData,
 }
 
