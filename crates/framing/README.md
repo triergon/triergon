@@ -140,9 +140,11 @@ parser over raw 14-bit DTS.
 **Input model.** Incremental readers own a core `InputCursor` and accept same-pool
 windows of any size with the exact token, source and offset. An empty window is
 starvation; a known length is not EOF. Truncation, transport failure and
-cancellation are sticky errors, never a synthetic end. A new source or reset needs
-a new reader. Record parsers take a complete pool-owned record (box payload, no
-size/type header); sample jobs take one complete container sample.
+cancellation are sticky errors, never a synthetic end. A new source needs a new
+reader, and so does a restart, except in the ADTS readers and the DTS packing
+readers, which restart on their source with `reset`. Record parsers take a complete
+pool-owned record (box payload, no size/type header); sample jobs take one complete
+container sample.
 
 **Source preservation.** Outputs keep exact source bytes, offsets, source ID and
 generation. Raw and reserved fields stay readable; local violations are reported
