@@ -196,7 +196,7 @@ impl Engine {
     ) -> Result<Self> {
         let engine = TsEngine::program(input, format, program, limits, policy, namespace)?;
         Ok(Self::Ts(TsEngine {
-            entities: ts::Entities::Sequence(None),
+            entity_sequence: true,
             ..engine
         }))
     }
@@ -235,9 +235,10 @@ impl Engine {
         let Self::Ts(t) = self else {
             return Err(Error::Invalid("entity continuation requires TS source"));
         };
-        let ts::Entities::Sequence(Some(end)) = &t.entities else {
-            return Err(Error::Invalid("actual entity End required"));
-        };
+        let end = t
+            .entity_end
+            .as_ref()
+            .ok_or(Error::Invalid("actual entity End required"))?;
         if source == end.location().source {
             return Err(Error::SourceMismatch);
         }
@@ -246,18 +247,18 @@ impl Engine {
         }
         t.input.continue_source(source, caps)?;
         end.validate_continuation(&t.input)?;
-        t.entities = ts::Entities::Sequence(None);
+        t.entity_end = None;
         Ok(())
     }
     pub(crate) fn finish_logical_source(&mut self) -> Result<()> {
         let Self::Ts(t) = self else {
             return Err(Error::Invalid("logical TS End required"));
         };
-        if !matches!(t.entities, ts::Entities::Sequence(Some(_))) {
+        if t.entity_end.is_none() {
             return Err(Error::Invalid("actual source entity End required"));
         }
         t.stream.end_of_source()?;
-        t.entities = ts::Entities::Sequence(None);
+        t.entity_end = None;
         t.life = ts::Life::Draining;
         Ok(())
     }
@@ -545,9 +546,7 @@ impl Engine {
                 r.pes_clock = Some(DemuxClock::new(r.program)?);
                 r.event_ordinal = 0;
                 r.pes_updates_from = None;
-                if let ts::Entities::Sequence(end) = &mut r.entities {
-                    *end = None;
-                }
+                r.entity_end = None;
             }
         }
         Ok(())

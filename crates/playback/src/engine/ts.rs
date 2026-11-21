@@ -76,15 +76,6 @@ pub(crate) enum Life {
     Ended = 2,
 }
 
-/// How a TS engine's source entities end.
-pub(crate) enum Entities {
-    /// One entity: its end ends the stream.
-    One,
-    /// A sequence. `Some` from an entity's reported end until the caller
-    /// continues with the next entity or finishes the logical source.
-    Sequence(Option<ts::stream::MediaEntityEnd>),
-}
-
 pub struct TsEngine {
     /// The startup context the observers are bound to, if any.
     pub(crate) bound_context: Option<ts::compat::input::InputContext>,
@@ -113,7 +104,11 @@ pub struct TsEngine {
     pub(crate) suppressed_events: u64,
     pub(crate) pes_updates_from: Option<usize>,
     pub(crate) delivery: Delivery,
-    pub(crate) entities: Entities,
+    /// Whether the source is a sequence of entities, each of whose ends is reported.
+    pub(crate) entity_sequence: bool,
+    /// The reported end of the current entity, until the caller continues with
+    /// the next entity or finishes the logical source.
+    pub(crate) entity_end: Option<ts::stream::MediaEntityEnd>,
 }
 
 impl TsEngine {
@@ -156,7 +151,8 @@ impl TsEngine {
             suppressed_events: 0,
             pes_updates_from: None,
             delivery: Delivery::Program,
-            entities: Entities::One,
+            entity_sequence: false,
+            entity_end: None,
         })
     }
 
@@ -549,9 +545,9 @@ impl TsEngine {
         if self.life != Life::Reading {
             return Err(Error::Invalid("TS repeated undrained entity End"));
         }
-        if let Entities::Sequence(boundary) = &mut self.entities {
+        if self.entity_sequence {
             if let Some(end) = self.stream.media_entity_end(&mut self.input, w, c)? {
-                *boundary = Some(end.clone());
+                self.entity_end = Some(end.clone());
                 return T::project(FeedStep::EntityEnd(end));
             }
             return T::project(FeedStep::Yield);
@@ -650,7 +646,7 @@ impl TsEngine {
         if self.life == Life::Ended {
             return T::project(FeedStep::End);
         }
-        if matches!(self.entities, Entities::Sequence(Some(_))) {
+        if self.entity_end.is_some() {
             return T::project(FeedStep::AwaitEntity);
         }
         loop {
