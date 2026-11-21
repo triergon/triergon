@@ -93,6 +93,10 @@ The Huffman tables are checked to be complete prefix codes.
 
 ## Verification
 
+The codec correctness comparison checks `he_mode.bit` frame by frame in its native
+mono and stereo layouts, including every float sample and end of stream. The separate
+stereo device-path comparison remains subject to its fixed-format conversion.
+
 `harness/codecs/mp3/make_vectors.sh FFMPEG OUT` generates the test streams (libmp3lame,
 mp2 and mp2fixed encodes at MPEG-1, 2 and 2.5 rates, and random Layer I/II frames from
 `harness/codecs/mp3/random_frames.py`) with the FFmpeg it is given. Comparison:
