@@ -1,11 +1,11 @@
 //! ADTS: the header, complete AAC LC frames of one raw data block, and the writer
 //! that wraps a raw access unit. Payload and CRC are kept as bytes, neither decoded
 //! nor checked. No timing is derived.
+use crate::retryable;
 use crate::{
     BuildStep,
     aac::{AacAscFacts, AacSource, indexed_frequency},
 };
-use crate::{freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
@@ -359,15 +359,19 @@ impl AacAdtsParser {
                     let header_size = header
                         .single_block_header_bytes()
                         .ok_or(Error::Unsupported("ADTS block layout"))?;
-                    let output = AacAdtsFrame {
-                        payload: raw.slice(header_size..raw.len())?,
-                        raw: raw.clone(),
+                    let payload = raw.slice(header_size..raw.len())?;
+                    let ParseState::Parsing { raw, .. } =
+                        std::mem::replace(&mut self.state, ParseState::Complete)
+                    else {
+                        unreachable!("the parser is parsing")
+                    };
+                    return Ok(BuildStep::Ready(AacAdtsFrame {
+                        payload,
+                        raw,
                         source: self.source,
                         header,
                         crc,
-                    };
-                    self.state = ParseState::Complete;
-                    return Ok(BuildStep::Ready(output));
+                    }));
                 }
             }
         }
@@ -514,13 +518,10 @@ impl AacAdtsOutput {
 /// of the payload, in a pool allocation of its own.
 #[derive(Debug)]
 pub struct AacAdtsWriter {
-    pool: Budget,
     source: AacSource,
     header: [u8; 7],
     total: usize,
     copied: usize,
-    /// The frame, empty until it is reserved.
-    output: BudgetVec<u8>,
     reserved: bool,
     state: WriteState,
 }
@@ -528,10 +529,14 @@ pub struct AacAdtsWriter {
 /// Where a write stands.
 #[derive(Debug)]
 enum WriteState {
-    /// The header and the payload are copied.
-    Copying(Bytes),
+    /// The header and the payload are copied into the frame, empty until it is
+    /// reserved.
+    Copying {
+        input: Bytes,
+        output: BudgetVec<u8>,
+    },
     /// Every byte is copied and the payload released; the frame is frozen.
-    Freezing,
+    Freezing(BudgetVec<u8>),
     Complete,
     Failed(Error),
 }
@@ -578,14 +583,15 @@ impl AacAdtsWriter {
             });
         }
         Ok(Self {
-            pool: pool.clone(),
             source,
             header,
             total,
             copied: 0,
-            output: BudgetVec::new(pool),
             reserved: false,
-            state: WriteState::Copying(payload),
+            state: WriteState::Copying {
+                input: payload,
+                output: BudgetVec::new(pool),
+            },
         })
     }
     /// Writes for as long as `work` lasts: one unit for the allocation, one per
@@ -612,7 +618,6 @@ impl AacAdtsWriter {
             && !retryable(e)
         {
             self.state = WriteState::Failed(e);
-            self.output = BudgetVec::new(&self.pool);
         }
         result
     }
@@ -627,14 +632,14 @@ impl AacAdtsWriter {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        if !self.reserved {
-            if !work.try_charge(1) {
-                return Ok(BuildStep::Yield);
+        if let WriteState::Copying { input, output } = &mut self.state {
+            if !self.reserved {
+                if !work.try_charge(1) {
+                    return Ok(BuildStep::Yield);
+                }
+                output.try_reserve_exact(self.total)?;
+                self.reserved = true;
             }
-            self.output.try_reserve_exact(self.total)?;
-            self.reserved = true;
-        }
-        if let WriteState::Copying(input) = &self.state {
             while self.copied < self.total {
                 if cancel.load(Ordering::Relaxed) {
                     return Err(Error::Cancelled);
@@ -652,24 +657,36 @@ impl AacAdtsWriter {
                     return Ok(BuildStep::Yield);
                 }
                 if self.copied < 7 {
-                    self.output
-                        .try_extend_from_slice(&self.header[self.copied..self.copied + count])?;
+                    output.try_extend_from_slice(&self.header[self.copied..self.copied + count])?;
                 } else {
                     let start = self.copied - 7;
-                    self.output
-                        .try_extend_from_slice(&input[start..start + count])?;
+                    output.try_extend_from_slice(&input[start..start + count])?;
                 }
                 self.copied += count;
             }
             // Every source byte has been copied. Release our source owner before
             // adding the frozen output's owner header; retries retain real output.
-            self.state = WriteState::Freezing;
+            let WriteState::Copying { output, .. } =
+                std::mem::replace(&mut self.state, WriteState::Complete)
+            else {
+                unreachable!("the writer is copying")
+            };
+            self.state = WriteState::Freezing(output);
         }
         if !work.try_charge(1) {
             return Ok(BuildStep::Yield);
         }
-        let bytes = freeze_whole(&mut self.output)?;
-        self.state = WriteState::Complete;
+        let WriteState::Freezing(output) = std::mem::replace(&mut self.state, WriteState::Complete)
+        else {
+            unreachable!("the writer is freezing")
+        };
+        let bytes = match output.freeze() {
+            Ok(bytes) => bytes,
+            Err(refused) => {
+                self.state = WriteState::Freezing(refused.value);
+                return Err(refused.error);
+            }
+        };
         Ok(BuildStep::Ready(AacAdtsOutput {
             bytes,
             source: self.source,
