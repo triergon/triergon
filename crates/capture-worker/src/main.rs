@@ -13,7 +13,8 @@
 //! first) and reports totals over its sessions, as every timed worker does.
 //! `bench` and `memory` feed every frame's bytes to a hashing sink that keeps
 //! nothing, exactly like the reference worker.
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
+#![cfg_attr(not(test), no_main)]
 
 use std::io::Write;
 use std::process::ExitCode;
@@ -80,7 +81,8 @@ fn session(
     Ok(s.vbv_underflow_bits())
 }
 
-fn main() -> ExitCode {
+#[cfg_attr(test, allow(dead_code))]
+fn worker_main() -> ExitCode {
     let mut args: Vec<String> = std::env::args().collect();
     if args.len() == 9 && args[1] == "bench" {
         // The timing command line, input and iterations first, in the order of
@@ -246,6 +248,18 @@ fn main() -> ExitCode {
         _ => return fail("usage"),
     }
     ExitCode::SUCCESS
+}
+
+/// C's entry point, the one exception to the worker's `deny(unsafe_code)`
+/// (`triergon-worker-entry`).
+#[cfg(not(test))]
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+extern "C" fn main(
+    _argc: std::ffi::c_int,
+    _argv: *const *const std::ffi::c_char,
+) -> std::ffi::c_int {
+    triergon_worker_entry::enter(worker_main)
 }
 
 /// The visible planes of an 8-bit 4:2:0 view, tightly packed (Y, then Cb, then Cr), as

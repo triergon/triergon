@@ -3,13 +3,6 @@
 # Written by `cargo xtask link-order train`; see docs/quality.md.
 std::sys::args::unix::imp::ARGV_INIT_ARRAY::init_wrapper
 main
-__aeabi_read_tp
-__aeabi_uidivmod
-__udivmodsi4
-std::sys::pal::unix::stack_overflow::imp::make_handler
-std::sys::pal::unix::stack_overflow::thread_info::set_current_info
-std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-media_worker::main
 core::str::converts::from_utf8
 <std::sys::fs::unix::File>::open_c
 alloc::io::read::default_read_to_end::small_probe_read::<core::io::util::Take<std::fs::File>>
@@ -20,6 +13,7 @@ media_worker::memory
 <std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>
 <std::sys::sync::once::futex::Once>::call
 <std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0}
+__aeabi_read_tp
 <std::io::stdio::StdoutLock as core::io::write::Write>::write_all
 <std::sys::stdio::unix::Stdout as core::io::write::Write>::write_all
 <alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutRaw>>::flush_buf
@@ -123,6 +117,7 @@ compiler_builtins::int::specialized_div_rem::u64_div_rem
 __aeabi_uidiv
 __udivsi3
 media_worker::trims
+<triergon_matroska::storage::SharedText>::as_str
 trunc
 <triergon_matroska::typed::reader::Reader>::start_group_batch
 <triergon_matroska::matroska::typed::side_data::GroupJob>::new
@@ -169,8 +164,6 @@ core::fmt::write
 <core::fmt::Formatter>::pad_integral::write_prefix
 core::ptr::drop_glue::<std::io::stdio::StdoutLock>
 core::ptr::drop_glue::<alloc::vec::Vec<alloc::string::String>>
-<std::sync::once::Once>::call_once::<std::rt::cleanup::{closure#0}>::{closure#0}
-<triergon_matroska::storage::SharedText>::as_str
 <triergon_matroska::colour::Colour>::trace_fields
 <media_worker::catalogue::CatalogueView>::new::<core::io::cursor::Cursor<triergon_core::bytes::OwnedInputBytes>>
 <alloc::raw_vec::RawVec<(u64, u32, media_worker::catalogue::Dictionary)>>::grow_one
@@ -188,7 +181,6 @@ core::slice::sort::shared::smallsort::insertion_sort_shift_left::<usize, <[usize
 core::ptr::drop_glue::<media_worker::catalogue::CatalogueView>
 <i64>::from_ascii_bytes_radix_impl
 <triergon_matroska::typed::reader::blocking::BlockingReader<core::io::cursor::Cursor<triergon_core::bytes::OwnedInputBytes>>>::seek
-<triergon_matroska::typed::reader::Reader>::begin_seek
 <triergon_core::input::InputCursor>::reset
 <triergon_matroska::typed::reader::Reader>::step_projected_with_source::<triergon_matroska::typed::reader::projection::TypedProjection>
 <triergon_matroska::typed::reader::Reader>::step_resolver
@@ -199,8 +191,10 @@ core::ptr::drop_glue::<triergon_matroska::matroska::typed::copy_vec::CopyVec<tri
 <triergon_matroska::typed::reader::Reader>::start_seek_plan
 core::ptr::drop_glue::<triergon_matroska::typed::reader::resolving::Resolver>
 <triergon_matroska::typed::reader::Reader>::step_seeking
-<triergon_core::time::Time>::combine
+<triergon_matroska::matroska::typed::seek::RecoveryAudio>::delay_ns
 <triergon_core::time::Time>::to_ticks
+<triergon_core::time::Time>::new
+<triergon_core::time::Time>::combine
 <triergon_matroska::incremental::ElementReader>::begin_internal_cluster_range
 <triergon_core::input::InputCursor>::request_range
 <triergon_matroska::incremental::ElementReader>::step_mode::<triergon_matroska::incremental::PublicDelivery>
@@ -225,6 +219,7 @@ core::ptr::drop_glue::<triergon_matroska::typed::reader::seeking::ScanState>
 <triergon_matroska::matroska::typed::epoch::EpochRestoreJob>::after_group
 <triergon_matroska::matroska::typed::epoch::RestoredEpoch as core::clone::Clone>::clone
 core::ptr::drop_glue::<triergon_matroska::typed::reader::seeking::ScanBoundary>
+triergon_matroska::matroska::typed::packet::keep_recovery_packet
 <triergon_matroska::incremental::ElementReader>::admit_typed_leaf
 core::ptr::drop_glue::<triergon_matroska::incremental::ParseStep>
 <triergon_matroska::incremental::ElementReader>::owned_plain_prefix

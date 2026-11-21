@@ -3,13 +3,6 @@
 # Written by `cargo xtask link-order train`; see docs/quality.md.
 std::sys::args::unix::imp::ARGV_INIT_ARRAY::init_wrapper
 main
-__aeabi_read_tp
-__aeabi_uidivmod
-__udivmodsi4
-std::sys::pal::unix::stack_overflow::imp::make_handler
-std::sys::pal::unix::stack_overflow::thread_info::set_current_info
-std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> std::process::ExitCode, std::process::ExitCode>
-transport_worker::main
 std::env::args
 <std::env::Args as core::iter::traits::iterator::Iterator>::nth
 core::str::converts::from_utf8
@@ -29,8 +22,7 @@ alloc::io::read::default_read_exact::<std::fs::File>
 <triergon_core::bytes::BudgetVec<u8>>::freeze
 triergon_harness_runner::measure_dyn
 <std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>
-<std::sys::sync::once::futex::Once>::call
-<std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0}
+__aeabi_read_tp
 <std::io::stdio::StdoutLock as core::io::write::Write>::write_all
 <std::sys::stdio::unix::Stdout as core::io::write::Write>::write_all
 <alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutRaw>>::flush_buf
@@ -211,7 +203,6 @@ core::fmt::write
 <core::io::write::default_write_fmt::Adapter<std::io::stdio::StdoutLock> as core::fmt::Write>::write_str
 core::ptr::drop_glue::<transport_worker::ts_input::Request>
 <alloc::sync::Arc<triergon_core::budget::Inner>>::drop_slow
-<std::sync::once::Once>::call_once::<std::rt::cleanup::{closure#0}>::{closure#0}
 <triergon_mpegts::psi::descriptors::Descriptor>::dvb_eac3
 <triergon_mpegts::demux_pes::audio::PrivateAudioCarriage>::from_pmt
 <triergon_mpegts::reader::lane::eac3::Reader>::new
