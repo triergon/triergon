@@ -1,5 +1,6 @@
 use super::*;
 use crate::SourceEpochs;
+use crate::psi::PMT_PROGRAM_IDENTITY;
 use crate::stream::TransportStream;
 use triergon_core::{InputWindow, SourceCapabilities, Step};
 const BAD_DESC: &[u8] = include_bytes!("../../../../tests/data/pmt-descriptor-overrun.ts");
@@ -435,7 +436,7 @@ fn original_nonzero_section_numbers_are_not_rewritten() {
     assert!(matches!(
         e.source_status(),
         PsiCompatibilitySourceStatus::RejectedPmt {
-            error: Error::Invalid("PMT single-section program identity"),
+            error: PMT_PROGRAM_IDENTITY,
             ..
         }
     ));

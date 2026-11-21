@@ -670,10 +670,7 @@ impl TransportFramer {
                     }
                     Ok(None) => FrameState::Yield,
                     Err(error) => {
-                        if !matches!(
-                            error,
-                            Error::Backpressure { .. } | Error::Allocation | Error::Cancelled
-                        ) {
+                        if !crate::retryable(error) {
                             consumed = count;
                             self.push_ack = None;
                         }
@@ -733,10 +730,7 @@ impl TransportFramer {
                 }
                 Ok(None) => FrameState::Yield,
                 Err(error) => {
-                    if !matches!(
-                        error,
-                        Error::Backpressure { .. } | Error::Allocation | Error::Cancelled
-                    ) {
+                    if !crate::retryable(error) {
                         consumed = self.push_ack.take().map_or(0, |(_, count)| count);
                     }
                     FrameState::Error(error)
@@ -761,6 +755,7 @@ impl TransportFramer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transport::SYNC_BYTE;
     use triergon_core::{InputWindow, SourceCapabilities};
 
     #[test]
@@ -885,7 +880,7 @@ mod tests {
         assert_eq!(input.position(), 188);
         assert_eq!(
             framer.poll(&mut input, &mut work, &cancel).unwrap_err(),
-            Error::Invalid("TS sync byte")
+            SYNC_BYTE
         );
         let rejected = framer.take_rejection().unwrap();
         assert_eq!(rejected.source_offset(), 188);

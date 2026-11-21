@@ -10,9 +10,13 @@ use super::pes::{
     DemuxSpan, PesFaultPolicy, RecoveredPes, RegisteredCarriage, SourceContext,
     TransportFaultRecovery,
 };
+use crate::pes::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS};
 use crate::psi::{DescriptorNamespace, ProgramMap};
 use crate::stream::{
     FaultKind, MediaEntityEnd, ObservedTrace, TraceEvent, TraceFault, TransportStream,
+};
+use crate::transport::{
+    OPCR_WITHOUT_PCR, PCR_ENCODING, SCRAMBLED_PAYLOAD, SYNC_BYTE, TRANSPORT_ERROR_INDICATOR,
 };
 use crate::{AssemblyStep, PacketFormat, ParseLimits};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -45,20 +49,10 @@ impl RecoveryTrigger {
         let proof = match (fault.kind, fault.error) {
             (
                 FaultKind::Transport,
-                Error::Invalid(
-                    "TS transport error indicator"
-                    | "PCR reserved bits/extension"
-                    | "OPCR without PCR",
-                )
-                | Error::Unsupported("scrambled TS payload"),
+                TRANSPORT_ERROR_INDICATOR | PCR_ENCODING | OPCR_WITHOUT_PCR | SCRAMBLED_PAYLOAD,
             )
-            | (
-                FaultKind::Pes,
-                Error::Invalid("PES timestamp markers" | "forbidden PES time flags"),
-            ) => Proof::PacketFault,
-            (FaultKind::Transport, Error::Truncated | Error::Invalid("TS sync byte")) => {
-                Proof::FinalCarrier
-            }
+            | (FaultKind::Pes, TIMESTAMP_MARKERS | FORBIDDEN_TIME_FLAGS) => Proof::PacketFault,
+            (FaultKind::Transport, Error::Truncated | SYNC_BYTE) => Proof::FinalCarrier,
             (FaultKind::Pes, Error::Truncated) => Proof::FiniteEof,
             (FaultKind::Pes, Error::Invalid("bytes beyond finite PES")) => Proof::FiniteOverrun,
             _ => return None,
@@ -587,11 +581,7 @@ impl OpaqueRecovery {
         ))?;
         if observer.awaiting_source_fault() {
             observer.confirm_source_fault(&fault, context)?;
-        } else if fault.rejected.is_some()
-            && matches!(
-                fault.error,
-                Error::Invalid("PCR reserved bits/extension" | "OPCR without PCR")
-            )
+        } else if fault.rejected.is_some() && matches!(fault.error, PCR_ENCODING | OPCR_WITHOUT_PCR)
         {
             observer
                 .push_rejected_fault(fault.clone(), context)
@@ -728,6 +718,7 @@ mod tests {
     use crate::ParseLimits;
     use crate::psi::DescriptorNamespace;
     use crate::stream::{FaultKind, TraceFault};
+    use crate::transport::SYNC_BYTE;
     use std::sync::atomic::AtomicBool;
     use triergon_core::{
         Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure,
@@ -760,7 +751,7 @@ mod tests {
                 source,
                 offset: 564,
             },
-            error: Error::Invalid("TS sync byte"),
+            error: SYNC_BYTE,
             rejected: None,
         })
         .unwrap();

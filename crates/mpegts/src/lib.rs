@@ -114,6 +114,15 @@ pub(crate) fn table_storage<T>(table: &BudgetVec<T>) -> Result<usize> {
         .ok_or(Error::Overflow)
 }
 
+/// Whether an operation that failed with `error` can be retried unchanged: the pool
+/// was full, an allocation failed or the caller cancelled.
+pub(crate) fn retryable(error: Error) -> bool {
+    matches!(
+        error,
+        Error::Backpressure(..) | Error::Allocation | Error::Cancelled
+    )
+}
+
 pub(crate) fn limit(requested: usize, maximum: usize) -> Error {
     Error::Limit { requested, maximum }
 }

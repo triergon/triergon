@@ -10,6 +10,8 @@ mod signalling;
 mod tables;
 
 pub(crate) use codec::PES_PRIVATE_DATA;
+#[cfg(feature = "reference-trace")]
+pub(crate) use descriptors::DESCRIPTOR_LENGTH;
 pub use descriptors::{Descriptor, Descriptors};
 pub use dts_hd::{DvbDtsHd, DvbDtsHdAsset, DvbDtsHdSubstream};
 pub use dvb::{
@@ -17,10 +19,13 @@ pub use dvb::{
     DvbSubtitlingService, DvbSubtitlingServices, DvbSubtitlingSignalling,
 };
 pub use pat_table::{PatCollector, PatSourceRange, PatTable};
+pub(crate) use section::POINTER_FIELD;
 pub use section::{PsiCrc32, Section, SectionAssembler};
 pub use signalling::{
     AvcVideo, DvbAc3, DvbEac3, HevcVideo, LanguageEntries, LanguageEntry, Registration,
 };
+#[cfg(feature = "reference-trace")]
+pub(crate) use tables::PMT_PROGRAM_IDENTITY;
 pub use tables::{
     ElementaryStream, PatReader, PatSection, PmtReader, ProgramAssociation, ProgramMap,
     SectionHeader, TableStep,

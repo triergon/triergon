@@ -13,6 +13,7 @@
 //! H.222.0 2.4.4/2.6 remain the source grammar. The separate flags48
 //! compatibility view supplies demux stream order, absent-PCR zero and language
 //! tags. It does not activate incomplete PATs or rejected PMTs.
+use crate::psi::{DESCRIPTOR_LENGTH, PMT_PROGRAM_IDENTITY};
 use crate::psi::{PatTable, ProgramMap, PsiCrc32};
 use crate::stream::{MediaEntityEnd, TraceEvent};
 use crate::{PacketFormat, ParseLimits, SourceRange};
@@ -315,10 +316,7 @@ impl Catalogue {
             } => self.pmt(map, cancel)?,
             TraceEvent::Diagnostic(f)
                 if f.kind == crate::stream::FaultKind::Psi
-                    && matches!(
-                        f.error,
-                        Error::Invalid("descriptor length" | "PMT single-section program identity")
-                    ) =>
+                    && matches!(f.error, DESCRIPTOR_LENGTH | PMT_PROGRAM_IDENTITY) =>
             {
                 return Err(Error::Unsupported(
                     "rejected PMT requires explicit compatibility review",

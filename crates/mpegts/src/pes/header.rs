@@ -1,6 +1,12 @@
 //! The PES header fields: prefix, flags and timestamps.
 use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};
 
+/// PTS_DTS_flags set to the forbidden value 01.
+pub(crate) const FORBIDDEN_TIME_FLAGS: Error = Error::Invalid("forbidden PES time flags");
+
+/// A PTS or DTS field whose prefix or marker bits are wrong.
+pub(crate) const TIMESTAMP_MARKERS: Error = Error::Invalid("PES timestamp markers");
+
 use super::{HeaderBytes, INLINE_HEADER_BYTES, PesHeader};
 
 fn take<'a>(bytes: &'a [u8], position: &mut usize, count: usize) -> Result<&'a [u8]> {
@@ -19,7 +25,7 @@ pub(crate) fn timestamp(bytes: &[u8], prefix: u8) -> Result<u64> {
         || bytes[2] & 1 == 0
         || bytes[4] & 1 == 0
     {
-        return Err(Error::Invalid("PES timestamp markers"));
+        return Err(TIMESTAMP_MARKERS);
     }
     Ok(timestamp_bits(bytes))
 }
@@ -88,7 +94,7 @@ pub(crate) fn parse_header(budget: &Budget, bytes: &[u8]) -> Result<PesHeader> {
     let flags = bytes[7];
     let timing = flags >> 6;
     if timing == 1 {
-        return Err(Error::Invalid("forbidden PES time flags"));
+        return Err(FORBIDDEN_TIME_FLAGS);
     }
     let mut position = 9;
     let pts_raw33 = if timing >= 2 {

@@ -1,7 +1,8 @@
 //! Entity ends, logical EOF, discontinuities and trace identity.
 use super::event::{CompactTraceEvent, FaultKind, TraceEvent};
-use super::{PsiRoute, TransportStream, retryable};
+use super::{PsiRoute, TransportStream};
 use crate::AssemblyStep;
+use crate::retryable;
 use crate::stream::entity::{ObservedTrace, TraceOrigin};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use triergon_core::{BudgetVec, Error, InputCursor, Result, Step, WorkBudget};

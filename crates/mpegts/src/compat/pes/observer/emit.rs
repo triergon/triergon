@@ -12,10 +12,7 @@ impl DemuxObserver {
     /// Keeps a failure that ends the observer, so that every later poll reports it.
     #[cold]
     pub(super) fn keep_fault(&mut self, error: Error) {
-        if !matches!(
-            error,
-            Error::Backpressure { .. } | Error::Allocation | Error::Cancelled
-        ) {
+        if !crate::retryable(error) {
             self.fault = Some(error);
         }
     }

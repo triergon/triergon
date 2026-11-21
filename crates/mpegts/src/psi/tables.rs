@@ -3,6 +3,10 @@ use crate::{ELEMENTARY_PID_RANGE, ParseLimits, SourceRange, limit};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
+/// A PMT section other than section 0 of 0.
+pub(crate) const PMT_PROGRAM_IDENTITY: Error =
+    Error::Invalid("PMT single-section program identity");
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SectionHeader {
     pub table_id: u8,
@@ -230,7 +234,7 @@ impl PmtReader {
             || header.section_number != 0
             || header.last_section_number != 0
         {
-            return Err(Error::Invalid("PMT single-section program identity"));
+            return Err(PMT_PROGRAM_IDENTITY);
         }
         let pcr = u16::from_be_bytes([data[8], data[9]]);
         let length = u16::from_be_bytes([data[10], data[11]]);

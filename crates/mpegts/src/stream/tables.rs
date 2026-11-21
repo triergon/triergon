@@ -1,9 +1,10 @@
 //! Program tables and the routes they bind.
 use super::event::{FaultKind, TraceEvent, TraceFault};
-use super::{PesRoute, PsiRoute, Route, TransportStream, retryable};
+use super::{PesRoute, PsiRoute, Route, TransportStream};
 use crate::SourceEpochs;
 use crate::pes::PesAssembler;
 use crate::psi::{PatReader, PatTable, PmtReader, ProgramMap, TableStep};
+use crate::retryable;
 use crate::transport::Continuity;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Bytes, Error, Result, WorkBudget};

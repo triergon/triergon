@@ -108,13 +108,6 @@ pub struct TransportStream {
     trace_generation: Option<u64>,
 }
 
-fn retryable(error: Error) -> bool {
-    matches!(
-        error,
-        Error::Backpressure { .. } | Error::Allocation | Error::Cancelled
-    )
-}
-
 impl TransportStream {
     pub fn new(
         budget: Budget,

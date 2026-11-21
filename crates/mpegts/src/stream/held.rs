@@ -1,10 +1,13 @@
 //! The stages of the carrier in hand.
 use super::event::{FaultKind, TraceEvent, TraceFault};
-use super::{Route, TransportStream, retryable};
+use super::{Route, TransportStream};
 use crate::AssemblyStep;
 use crate::pes::{Pes, PesAssembler};
+use crate::psi::POINTER_FIELD;
 use crate::psi::Section;
+use crate::retryable;
 use crate::transport::ContinuityOutcome;
+use crate::transport::{SCRAMBLED_PAYLOAD, TRANSPORT_ERROR_INDICATOR};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Error, Result, SourceLocation, WorkBudget};
 
@@ -44,9 +47,9 @@ impl TransportStream {
         let pid = packet.pid;
         let start = packet.payload_unit_start;
         let bad = if packet.transport_error {
-            Some(Error::Invalid("TS transport error indicator"))
+            Some(TRANSPORT_ERROR_INDICATOR)
         } else if packet.scrambling != 0 {
-            Some(Error::Unsupported("scrambled TS payload"))
+            Some(SCRAMBLED_PAYLOAD)
         } else if matches!(outcome, Some(ContinuityOutcome::Lost { .. })) {
             Some(Error::Invalid("TS continuity loss"))
         } else if outcome == Some(ContinuityOutcome::ExcessDuplicate) {
@@ -195,8 +198,7 @@ impl TransportStream {
         match pushed {
             Ok(()) => self.phase = 6,
             Err(error)
-                if matches!(self.route, Route::Pat | Route::Pmt)
-                    && error == Error::Invalid("PSI pointer") =>
+                if matches!(self.route, Route::Pat | Route::Pmt) && error == POINTER_FIELD =>
             {
                 // This wire-syntax fault is rejected by push before acceptance.
                 // Use the same explicit source-diagnostic recovery as poll faults;

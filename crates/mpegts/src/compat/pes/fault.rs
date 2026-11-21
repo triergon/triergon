@@ -5,8 +5,12 @@
 use crate::compat::pes::observer::{
     DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, SourceContext,
 };
+use crate::pes::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS};
 use crate::stream::{FaultKind, TraceFault};
 use crate::transport::TransportPacket;
+use crate::transport::{
+    OPCR_WITHOUT_PCR, PCR_ENCODING, SCRAMBLED_PAYLOAD, TRANSPORT_ERROR_INDICATOR,
+};
 use crate::{AssemblyStep, SourceEpochs, SourceRange};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Bytes, Error, Refused, Result, SourceLocation, WorkBudget};
@@ -51,12 +55,12 @@ pub enum PesFaultKind {
 impl PesFaultKind {
     fn source_error(self) -> Error {
         match self {
-            Self::TransportError => Error::Invalid("TS transport error indicator"),
-            Self::Scrambling => Error::Unsupported("scrambled TS payload"),
-            Self::TimestampMarkers => Error::Invalid("PES timestamp markers"),
-            Self::ForbiddenTimeFlags => Error::Invalid("forbidden PES time flags"),
-            Self::PcrEncoding => Error::Invalid("PCR reserved bits/extension"),
-            Self::OpcrWithoutPcr => Error::Invalid("OPCR without PCR"),
+            Self::TransportError => TRANSPORT_ERROR_INDICATOR,
+            Self::Scrambling => SCRAMBLED_PAYLOAD,
+            Self::TimestampMarkers => TIMESTAMP_MARKERS,
+            Self::ForbiddenTimeFlags => FORBIDDEN_TIME_FLAGS,
+            Self::PcrEncoding => PCR_ENCODING,
+            Self::OpcrWithoutPcr => OPCR_WITHOUT_PCR,
         }
     }
     fn source_layer(self) -> FaultKind {
@@ -404,10 +408,7 @@ impl TransportFaultRecovery {
             self.boundaries.note_packet(packet);
         }
         if let Err(error) = result
-            && !matches!(
-                error,
-                Error::Cancelled | Error::Allocation | Error::Backpressure { .. }
-            )
+            && !crate::retryable(error)
         {
             self.fault = Some(error);
         }
@@ -605,8 +606,8 @@ impl TransportFaultJob {
                 .ok_or(Error::Invalid("rejected carrier missing"))?;
             let budget = inner.rejected_fault_input(rejected, input)?;
             let kind = match rejected.error() {
-                Error::Invalid("PCR reserved bits/extension") => PesFaultKind::PcrEncoding,
-                Error::Invalid("OPCR without PCR") => PesFaultKind::OpcrWithoutPcr,
+                PCR_ENCODING => PesFaultKind::PcrEncoding,
+                OPCR_WITHOUT_PCR => PesFaultKind::OpcrWithoutPcr,
                 _ => return Err(Error::Unsupported("rejected clock source fault unobserved")),
             };
             let envelope = rejected.envelope();

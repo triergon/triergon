@@ -3,6 +3,7 @@
 use super::*;
 use crate::AssemblyStep;
 use crate::compat::pes::observer::{DemuxObserver, SourceContext};
+use crate::psi::{DESCRIPTOR_LENGTH, PMT_PROGRAM_IDENTITY};
 use crate::psi::{
     Descriptors, PatReader, PmtReader, Section, SectionAssembler, SectionHeader, TableStep,
 };
@@ -453,7 +454,7 @@ fn decode_rejected_pmt(
             }
             let d = match item {
                 Ok(d) => d,
-                Err(Error::Invalid("descriptor length"))
+                Err(DESCRIPTOR_LENGTH)
                     if policy == PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity
                         && stop.is_none() =>
                 {
@@ -742,12 +743,8 @@ impl Catalogue {
     ) -> Result<PsiCompatibilityRecord> {
         s.require(policy)?;
         let expected = match policy {
-            PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity => {
-                Error::Invalid("descriptor length")
-            }
-            PsiCompatibility::PmtNonzeroSection => {
-                Error::Invalid("PMT single-section program identity")
-            }
+            PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity => DESCRIPTOR_LENGTH,
+            PsiCompatibility::PmtNonzeroSection => PMT_PROGRAM_IDENTITY,
             PsiCompatibility::CurrentPatSectionBeforeWholeTable => {
                 return Err(Error::Invalid(
                     "PSI compatibility rejection policy is not PMT",
@@ -1099,12 +1096,8 @@ impl Catalogue {
                 if s.pending_source.is_some() && fault.kind == FaultKind::Psi =>
             {
                 let policy = match fault.error {
-                    Error::Invalid("descriptor length") => {
-                        PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity
-                    }
-                    Error::Invalid("PMT single-section program identity") => {
-                        PsiCompatibility::PmtNonzeroSection
-                    }
+                    DESCRIPTOR_LENGTH => PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity,
+                    PMT_PROGRAM_IDENTITY => PsiCompatibility::PmtNonzeroSection,
                     _ => {
                         return Err(Error::Unsupported(
                             "PSI compatibility different actual source rejection",

@@ -3,6 +3,8 @@ use super::*;
 use crate::AssemblyStep;
 use crate::compat::pes::{DemuxObserver, ReadyContinuation, SourceContext};
 use crate::compat::pes::{DemuxProfile, DemuxScope, DemuxSpan, RegisteredCarriage};
+use crate::psi::POINTER_FIELD;
+use crate::transport::SYNC_BYTE;
 use crate::transport::carrier::TS188_BYTES;
 use crate::transport::framer::FramedCarrier;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -253,7 +255,7 @@ fn output_modes_preserve_null_carriers_faults_and_cancelled_partial_input() {
                             offset: 3 * TS188_BYTES as u64
                         }
                     );
-                    assert_eq!(fault.error, Error::Invalid("TS sync byte"));
+                    assert_eq!(fault.error, SYNC_BYTE);
                     assert_eq!(
                         fault.rejected.unwrap().bytes().as_ref(),
                         &wire[3 * TS188_BYTES..]
@@ -701,10 +703,7 @@ fn invalid_psi_pointer_restores_payload_before_diagnostic_recovery() {
     stream.phase = 5;
     stream.feed::<false>(&mut WorkBudget::new(1)).unwrap();
     assert_eq!(stream.phase, 7);
-    assert_eq!(
-        stream.fault.as_ref().unwrap().error,
-        Error::Invalid("PSI pointer")
-    );
+    assert_eq!(stream.fault.as_ref().unwrap().error, POINTER_FIELD);
     let payload = stream.packet.as_ref().unwrap().payload.as_ref().unwrap();
     assert_eq!(payload.storage_address(), address);
     assert_eq!(payload.as_ref(), &raw[4..]);

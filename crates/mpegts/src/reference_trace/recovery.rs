@@ -16,6 +16,7 @@ use crate::compat::pes::observer::{
     DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, PrivateAudioCarriage,
     PrivateAudioDescriptors, RegisteredCarriage, SourceContext,
 };
+use crate::transport::OPCR_WITHOUT_PCR;
 use crate::transport::{RejectedTransport, TransportPacket};
 use crate::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, SourceRange};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -398,7 +399,7 @@ impl RecoveryObserver {
             })
         {
             Some(Error::Invalid("native recovery source event order"))
-        } else if rejection.error() != Error::Invalid("OPCR without PCR")
+        } else if rejection.error() != OPCR_WITHOUT_PCR
             || rejection.secondary_error().is_some()
             || !rejection.fully_checked()
         {
@@ -471,10 +472,7 @@ impl RecoveryObserver {
         }
         let result = self.poll_inner(work, cancel, input);
         if let Err(error) = &result
-            && !matches!(
-                error,
-                Error::Cancelled | Error::Allocation | Error::Backpressure { .. }
-            )
+            && !crate::retryable(*error)
         {
             self.fault = Some(*error);
         }

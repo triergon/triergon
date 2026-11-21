@@ -438,10 +438,7 @@ impl PesAssembler {
         }
         let result = self.poll_inner::<RETAIN>(work, cancel);
         if let Err(error) = result.as_ref()
-            && !matches!(
-                error,
-                Error::Backpressure { .. } | Error::Allocation | Error::Cancelled
-            )
+            && !crate::retryable(*error)
         {
             self.fault = Some(*error);
         }

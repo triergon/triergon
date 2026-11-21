@@ -1,5 +1,8 @@
 use triergon_core::{Error, Result};
 
+/// A descriptor that overruns its loop.
+pub(crate) const DESCRIPTOR_LENGTH: Error = Error::Invalid("descriptor length");
+
 /// Borrowed source view. Its storage is the charged section/descriptor Bytes.
 #[derive(Clone, Copy, Debug)]
 pub struct Descriptor<'a> {
@@ -55,7 +58,7 @@ impl<'a> Iterator for Descriptors<'a> {
         let end = 2 + usize::from(self.remaining[1]);
         if end > self.remaining.len() {
             self.failed = true;
-            return Some(Err(Error::Invalid("descriptor length")));
+            return Some(Err(DESCRIPTOR_LENGTH));
         }
         let source = &self.remaining[..end];
         self.remaining = &self.remaining[end..];

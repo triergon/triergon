@@ -7,6 +7,12 @@ use std::{
 };
 use triergon_core::{Budget, Bytes, Error, Refused, Result, SourceId, SourceLocation, WorkBudget};
 
+/// A carrier that does not start with the 0x47 sync byte.
+pub(crate) const SYNC_BYTE: Error = Error::Invalid("TS sync byte");
+
+/// An adaptation field that signals an OPCR without a PCR.
+pub(crate) const OPCR_WITHOUT_PCR: Error = Error::Invalid("OPCR without PCR");
+
 const STUFFING: [u8; 182] = [0xff; 182];
 pub(crate) const TS188_BYTES: usize = 188;
 pub(crate) const TS_PAYLOAD_START: usize = 4;
@@ -38,7 +44,7 @@ struct CarrierHeader {
 impl CarrierHeader {
     fn parse(data: &[u8]) -> Result<Self> {
         let [0x47, high, low, control, ..] = data else {
-            return Err(Error::Invalid("TS sync byte"));
+            return Err(SYNC_BYTE);
         };
         Ok(Self {
             pid: (u16::from(high & 31) << 8) | u16::from(*low),
@@ -557,7 +563,7 @@ impl TransportInspector {
                         // Continue the remaining real checks so this first semantic
                         // fault cannot conceal a second envelope/clock fault.
                         if data[5] & 0x18 == 0x08 {
-                            self.error = Some(Error::Invalid("OPCR without PCR"));
+                            self.error = Some(OPCR_WITHOUT_PCR);
                         }
                         self.phase = if self.fields.flags & 31 == 0 && work.try_charge(5) {
                             Phase::Stuffing

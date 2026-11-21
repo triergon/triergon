@@ -1,6 +1,8 @@
 //! Explicit finite AVC diagnostic view.
 use super::*;
+use crate::pes::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS};
 use crate::stream::{FaultKind, TraceFault};
+use crate::transport::{PCR_ENCODING, SCRAMBLED_PAYLOAD, TRANSPORT_ERROR_INDICATOR};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SelectedFault {
@@ -13,11 +15,11 @@ pub enum SelectedFault {
 impl SelectedFault {
     pub fn source_error(self) -> Error {
         match self {
-            Self::PcrEncoding => Error::Invalid("PCR reserved bits/extension"),
-            Self::TransportError => Error::Invalid("TS transport error indicator"),
-            Self::Scrambling => Error::Unsupported("scrambled TS payload"),
-            Self::TimestampMarkers => Error::Invalid("PES timestamp markers"),
-            Self::ForbiddenTimeFlags => Error::Invalid("forbidden PES time flags"),
+            Self::PcrEncoding => PCR_ENCODING,
+            Self::TransportError => TRANSPORT_ERROR_INDICATOR,
+            Self::Scrambling => SCRAMBLED_PAYLOAD,
+            Self::TimestampMarkers => TIMESTAMP_MARKERS,
+            Self::ForbiddenTimeFlags => FORBIDDEN_TIME_FLAGS,
         }
     }
     pub fn source_layer(self) -> FaultKind {

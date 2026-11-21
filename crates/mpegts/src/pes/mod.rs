@@ -5,6 +5,7 @@ mod header;
 
 pub use assembler::PesAssembler;
 pub(crate) use assembler::UNBOUNDED_NON_VIDEO;
+pub(crate) use header::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS};
 pub(crate) use header::{parse_header, parse_timed_header, timestamp_bits};
 
 use crate::{SourceEpochs, SourceRange};
