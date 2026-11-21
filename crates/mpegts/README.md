@@ -204,7 +204,7 @@ Seeks across selected-track source epochs and ambiguous clock wraps are refused.
 | Method | Adds |
 | --- | --- |
 | `request_seek_in_epoch` | land only within one clock/configuration pair from `Packet::epochs()` |
-| `request_seek_in_entities` | an ordered `SeekEntity` plan of contiguous entities; the scan bound covers their total |
+| `request_seek_in_entities` | an ordered `SeekEntity` plan of contiguous entities; the scan bound covers their total, and short single-track suffixes can be retained through the cuts |
 | `request_seek_and_index` | a bounded landing index for later seeks to the same track |
 | `request_seek_in_epoch_and_index` | the same, keyed by the epoch pair |
 | `request_seek_in_entities_in_epoch`, `request_seek_in_entities_in_epoch_and_index` | both |

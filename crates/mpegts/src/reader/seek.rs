@@ -755,7 +755,6 @@ impl Reader {
             // the suffix without keeping both the index and the output packets.
             let retain = (selected_epochs.is_none()
                 && index_entries.is_none()
-                && entities.is_none()
                 && length <= 256 * 1024
                 && single_track)
                 .then(|| Retain::new(&self.pool));
@@ -997,8 +996,11 @@ impl Reader {
                     if let Some(retain) = seek.retain.take() {
                         self.seek_index =
                             scan.finish_index(&self.pool, request.track, seek.selected_epochs);
-                        let result =
-                            seek_result(request, landing, Some(end.offset), retain.skipped);
+                        let scanned = self
+                            .seek_entities
+                            .as_deref()
+                            .map_or(end.offset, |plan| plan.total);
+                        let result = seek_result(request, landing, Some(scanned), retain.skipped);
                         let tracks =
                             std::mem::replace(&mut self.tracks, BudgetVec::new(&self.pool));
                         seek.phase = Phase::Retained(retain.finish(result, tracks));

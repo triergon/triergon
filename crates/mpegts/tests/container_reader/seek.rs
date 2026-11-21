@@ -633,94 +633,119 @@ fn seek_across_entities_replays_a_split_pes_and_continues_through_eof() {
         },
     ];
     let pool = Budget::new(1 << 20).unwrap();
-    let mut reader = reader(&pool, segments[0], PacketFormat::Ts188);
     let seek = |ticks| SeekRequest {
         track: TrackId(PID.into()),
         target: clock(ticks),
         policy: SeekPolicy::PlaybackPreroll,
     };
-    for (target, landed, count, explicit_end, collect_index, method) in [
-        (109_000, 105_000, 2, true, false, SeekMethod::BoundedScan),
-        (90_000, 90_000, 3, false, false, SeekMethod::BoundedScan),
-        (109_000, 105_000, 2, true, true, SeekMethod::BoundedScan),
-        (90_000, 90_000, 3, false, false, SeekMethod::Index),
-    ] {
-        let request = if collect_index {
-            reader.request_seek_in_entities_and_index(seek(target), &plan, 16)
+    for selected in [false, true] {
+        let mut reader = if selected {
+            Reader::new_with_packet_tracks(
+                &pool,
+                ID,
+                SourceCapabilities {
+                    length: Some(segments[0].len() as u64),
+                    random_access: true,
+                },
+                ReaderLimits::default(),
+                4096,
+                &[TrackId(PID.into())],
+            )
+            .unwrap()
         } else {
-            reader.request_seek_in_entities(seek(target), &plan)
-        }
-        .unwrap();
-        assert_eq!((request.source, request.offset), (ID, 0));
-        let mut read = 0;
-        let mut announced = false;
-        for _ in 0..20_000 {
-            match reader.step(&mut WorkBudget::new(39), &OFF).unwrap() {
-                Step::NeedInput(request) => {
-                    let segment = segments[usize::from(request.source == plan[1].source)];
-                    let start = usize::try_from(request.offset).unwrap();
-                    if request.maximum == 0 {
-                        assert_eq!(request.source, plan[1].source);
-                        reader.finish(request.source, request.token).unwrap();
-                    } else {
-                        let end = start + request.maximum.min(121);
-                        let bytes = Bytes::copy_from_slice(&pool, &segment[start..end]).unwrap();
-                        reader
-                            .provide(
-                                &InputWindow::new(
-                                    request.source,
-                                    request.token.clone(),
-                                    request.offset,
-                                    bytes,
-                                )
-                                .unwrap(),
-                            )
-                            .unwrap();
-                        if explicit_end && request.source == ID && end == segment.len() {
+            reader(&pool, segments[0], PacketFormat::Ts188)
+        };
+        for (target, landed, count, explicit_end, collect_index, method) in [
+            (109_000, 105_000, 2, true, false, SeekMethod::BoundedScan),
+            (90_000, 90_000, 3, false, false, SeekMethod::BoundedScan),
+            (109_000, 105_000, 2, true, true, SeekMethod::BoundedScan),
+            (90_000, 90_000, 3, false, false, SeekMethod::Index),
+        ] {
+            let request = if collect_index {
+                reader.request_seek_in_entities_and_index(seek(target), &plan, 16)
+            } else {
+                reader.request_seek_in_entities(seek(target), &plan)
+            }
+            .unwrap();
+            assert_eq!((request.source, request.offset), (ID, 0));
+            let mut read = 0;
+            let mut prefix_reads = 0;
+            let mut announced = false;
+            for _ in 0..20_000 {
+                match reader.step(&mut WorkBudget::new(39), &OFF).unwrap() {
+                    Step::NeedInput(request) => {
+                        let segment = segments[usize::from(request.source == plan[1].source)];
+                        let start = usize::try_from(request.offset).unwrap();
+                        if request.source == ID && start == 0 && request.maximum != 0 {
+                            prefix_reads += 1;
+                        }
+                        if request.maximum == 0 {
+                            assert_eq!(request.source, plan[1].source);
                             reader.finish(request.source, request.token).unwrap();
+                        } else {
+                            let end = start + request.maximum.min(121);
+                            let bytes =
+                                Bytes::copy_from_slice(&pool, &segment[start..end]).unwrap();
+                            reader
+                                .provide(
+                                    &InputWindow::new(
+                                        request.source,
+                                        request.token.clone(),
+                                        request.offset,
+                                        bytes,
+                                    )
+                                    .unwrap(),
+                                )
+                                .unwrap();
+                            if explicit_end && request.source == ID && end == segment.len() {
+                                reader.finish(request.source, request.token).unwrap();
+                            }
                         }
                     }
-                }
-                Step::Ready(Event::Seek(result)) => {
-                    assert!(!announced);
-                    assert_eq!(result.landing, clock(landed));
-                    assert_eq!(result.discard_until, clock(target));
-                    let scanned = if method == SeekMethod::BoundedScan {
-                        ts.bytes.len() as u64
-                    } else {
-                        0
-                    };
-                    assert_eq!(result.method, method);
-                    assert_eq!(result.scanned_bytes, scanned);
-                    announced = true;
-                }
-                Step::Ready(Event::Packet(packet)) => {
-                    assert!(announced);
-                    assert_eq!(packet.payload(), frame);
-                    if packet.pts() == Some(105_000) {
-                        let TraceEvent::Pes(pes) = packet.sources()[0].pes.event() else {
-                            panic!("missing source PES");
+                    Step::Ready(Event::Seek(result)) => {
+                        assert!(!announced);
+                        assert_eq!(result.landing, clock(landed));
+                        assert_eq!(result.discard_until, clock(target));
+                        let scanned = if method == SeekMethod::BoundedScan {
+                            ts.bytes.len() as u64
+                        } else {
+                            0
                         };
-                        assert!(pes.source_ranges().any(|range| range.entity == ID));
-                        assert!(
-                            pes.source_ranges()
-                                .any(|range| range.entity == plan[1].source)
-                        );
+                        assert_eq!(result.method, method);
+                        assert_eq!(result.scanned_bytes, scanned);
+                        announced = true;
                     }
-                    read += 1;
+                    Step::Ready(Event::Packet(packet)) => {
+                        assert!(announced);
+                        assert_eq!(packet.payload(), frame);
+                        if packet.pts() == Some(105_000) {
+                            let TraceEvent::Pes(pes) = packet.sources()[0].pes.event() else {
+                                panic!("missing source PES");
+                            };
+                            assert!(pes.source_ranges().any(|range| range.entity == ID));
+                            assert!(
+                                pes.source_ranges()
+                                    .any(|range| range.entity == plan[1].source)
+                            );
+                        }
+                        read += 1;
+                    }
+                    Step::Ready(Event::Other(_)) | Step::Yield => (),
+                    Step::End(end) => {
+                        assert_eq!(end.source, plan[1].source);
+                        break;
+                    }
+                    Step::Backpressure(pressure) => panic!("unexpected pressure {pressure:?}"),
                 }
-                Step::Ready(Event::Other(_)) | Step::Yield => (),
-                Step::End(end) => {
-                    assert_eq!(end.source, plan[1].source);
-                    break;
-                }
-                Step::Backpressure(pressure) => panic!("unexpected pressure {pressure:?}"),
+            }
+            assert!(announced);
+            assert_eq!(read, count);
+            if selected && method == SeekMethod::BoundedScan && !collect_index {
+                assert_eq!(prefix_reads, 1, "retained seek reads the prefix only once");
             }
         }
-        assert!(announced);
-        assert_eq!(read, count);
+        reader.close();
     }
-    reader.close();
     assert_eq!(pool.used(), Budget::control_storage_bytes());
 }
 
