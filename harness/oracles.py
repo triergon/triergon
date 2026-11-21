@@ -29,6 +29,14 @@ ORACLES = {
 }
 # Trace oracles return canonical text rows without line endings. Load each on demand.
 TRACE_ORACLES = {
+    "qt-sound-v0": ("harness.isobmff_entry_oracle", "qt_sound"),
+    "ddts": ("harness.isobmff_entry_oracle", "ddts"),
+    "dts-header": ("harness.dts_oracle", "header"),
+    "dts-unpack": ("harness.dts_oracle", "unpack"),
+    "store": ("harness.store_oracle", "store_trace"),
+    "mkv-metadata": ("harness.matroska_metadata_oracle", "metadata"),
+    "mkv-track-extensions": ("harness.matroska_metadata_oracle", "extensions"),
+    "mkv-codec-state": ("harness.matroska_metadata_oracle", "codec_state"),
     "views-smoke": ("harness.oracles", "views_smoke"),
 }
 
