@@ -5,7 +5,8 @@ use triergon_codec::{
     Speaker, VideoDecoder,
 };
 use triergon_session::{
-    AudioSession, Canvas, FeedError, OnRefusal, PcmBlock, QueueLimits, SessionState, VideoSession,
+    AudioSession, Canvas, FeedError, OnRefusal, PcmBlock, Planar, QueueLimits, SessionState,
+    VideoSession,
 };
 
 /// A reordering decoder: access unit `[luma, display_order]`, delay of two.
@@ -454,6 +455,53 @@ fn a_sample_rate_change_starts_a_new_block_and_surround_is_downmixed() {
         Err(FeedError::Idle),
         "no audio lane for unknown codecs"
     );
+}
+
+/// Each unit `[channels, value]` decodes to four samples at value/100, mono or stereo.
+struct Channels;
+impl AudioDecoder for Channels {
+    type Error = Error;
+
+    fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<Option<DownmixLevels>, Error> {
+        let speakers: &[Speaker] = match au[0] {
+            1 => &[Speaker::FrontCenter],
+            _ => &[Speaker::FrontLeft, Speaker::FrontRight],
+        };
+        out.sample_rate = 48_000;
+        out.layout = ChannelLayout::new(speakers.iter().copied()).unwrap();
+        out.samples_per_channel = 4;
+        out.planes = vec![vec![f32::from(au[1]) / 100.0; 4]; speakers.len()];
+        Ok(None)
+    }
+    fn reset(&mut self) {}
+}
+
+#[test]
+fn a_planar_lane_delivers_the_decoders_planes_one_layout_per_block() {
+    let mut audio = AudioSession::with_form(QueueLimits::AUDIO, Planar);
+    audio.load(Some(Box::new(Channels)));
+    for unit in [[2, 10], [2, 20], [1, 30]] {
+        audio.feed(&unit, Some(i64::from(unit[1]))).unwrap();
+    }
+    let mut block = PcmBlock::default();
+    assert_eq!(audio.pull(None, 0, &mut block), 3);
+    let stereo = ChannelLayout::new([Speaker::FrontLeft, Speaker::FrontRight]).unwrap();
+    let plane = [0.1, 0.1, 0.1, 0.1, 0.2, 0.2, 0.2, 0.2];
+    assert_eq!(
+        (block.sample_rate, block.pts, block.samples.layout),
+        (48_000, Some(10), stereo)
+    );
+    assert_eq!(block.samples.planes, [plane, plane]);
+    block.samples.clear();
+    assert_eq!(
+        audio.pull(None, 0, &mut block),
+        0,
+        "the mono frame was carried"
+    );
+    assert_eq!(block.pts, Some(30));
+    assert_eq!(block.samples.layout.speakers(), [Speaker::FrontCenter]);
+    assert_eq!(block.samples.planes, [[0.3; 4]]);
+    assert_eq!(audio.state(), SessionState::Starved);
 }
 
 #[cfg(feature = "codecs")]

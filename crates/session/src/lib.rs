@@ -36,7 +36,7 @@ mod queue;
 mod track;
 mod video;
 
-pub use audio::{AudioSession, PcmBlock};
+pub use audio::{AudioSession, PcmBlock, PcmForm, Planar, Planes};
 pub use discard::Discard;
 pub use lane::OnRefusal;
 pub use queue::{FeedError, QueueLimits};

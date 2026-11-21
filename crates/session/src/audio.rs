@@ -1,7 +1,8 @@
-//! Audio lane: compressed frames in, clock-paced stereo s16 PCM out.
+//! Audio lane: compressed frames in, clock-paced PCM out, by default interleaved stereo
+//! s16 ([`PcmForm`]).
 //!
 //! Each access unit is held until the sink clock is within `lead` of its PTS;
-//! `pull` then decodes exactly those units and returns their stereo samples for
+//! `pull` then decodes exactly those units and returns their samples for
 //! the caller's device writer. A paused clock
 //! therefore yields nothing, and flush/stop discard everything queued.
 use crate::Discard;
@@ -9,38 +10,122 @@ use crate::SessionState;
 use crate::lane::{OnRefusal, Phase, Refusals};
 use crate::mix::Downmix;
 use crate::queue::{FeedError, QueueLimits, UnitQueue};
-use triergon_codec::{AudioFrame, DownmixLevels, DynAudioDecoder, Error};
+use triergon_codec::{AudioFrame, ChannelLayout, DownmixLevels, DynAudioDecoder, Error};
 
-/// One block of output: interleaved stereo s16 at one sample rate.
+/// One block of output at one sample rate, its samples in the lane's [`PcmForm`]: by
+/// default interleaved stereo s16.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct PcmBlock {
+pub struct PcmBlock<S = Vec<i16>> {
     /// Samples per second per channel; meaningful while `samples` is not empty.
     pub sample_rate: u32,
     /// The caller PTS of the first access unit in the block; `None` when that unit had
     /// none, or when the block holds only samples the decoder released at end of stream.
     pub pts: Option<i64>,
-    /// Left and right samples in turn.
-    pub samples: Vec<i16>,
+    /// The samples; for the default form left and right samples in turn.
+    pub samples: S,
+}
+
+/// How an audio lane turns decoded frames into the samples of its [`PcmBlock`]s.
+/// [`Downmix`] (interleaved stereo s16, the default) and [`Planar`] (the decoder's planes
+/// as they are) are this crate's; a caller may implement another.
+pub trait PcmForm {
+    /// The samples of one block.
+    type Samples: Default;
+    /// Whether `samples` holds none.
+    fn is_empty(samples: &Self::Samples) -> bool;
+    /// Whether `frame` may follow `samples` in one block; a frame at another sample rate
+    /// never does. The default takes every frame.
+    fn continues(samples: &Self::Samples, frame: &AudioFrame) -> bool {
+        let _ = (samples, frame);
+        true
+    }
+    /// Append the samples of `frame` to `samples`; `levels` are the stream's downmix
+    /// levels (their default when it carries none).
+    fn append(&mut self, frame: &AudioFrame, levels: DownmixLevels, samples: &mut Self::Samples);
+}
+
+impl PcmForm for Downmix {
+    type Samples = Vec<i16>;
+
+    #[inline]
+    fn is_empty(samples: &Vec<i16>) -> bool {
+        samples.is_empty()
+    }
+    #[inline]
+    fn append(&mut self, frame: &AudioFrame, levels: DownmixLevels, samples: &mut Vec<i16>) {
+        self.mix(frame, levels, samples);
+    }
+}
+
+/// The decoder's planes as they are: `f32` at full scale 1.0, one plane per speaker, no
+/// downmix and no conversion. A block holds one layout; a frame of another starts the
+/// next block.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Planar;
+
+/// The samples of a [`Planar`] block.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Planes {
+    /// The speaker of each plane.
+    pub layout: ChannelLayout,
+    /// One plane per speaker of `layout`, all of one length.
+    pub planes: Vec<Vec<f32>>,
+}
+
+impl Planes {
+    /// Samples in each plane.
+    pub fn samples_per_channel(&self) -> usize {
+        self.planes.first().map_or(0, Vec::len)
+    }
+    /// Drop every sample, keeping the planes' allocations.
+    pub fn clear(&mut self) {
+        for plane in &mut self.planes {
+            plane.clear();
+        }
+    }
+}
+
+impl PcmForm for Planar {
+    type Samples = Planes;
+
+    fn is_empty(samples: &Planes) -> bool {
+        samples.samples_per_channel() == 0
+    }
+    fn continues(samples: &Planes, frame: &AudioFrame) -> bool {
+        samples.layout == frame.layout
+    }
+    fn append(&mut self, frame: &AudioFrame, _: DownmixLevels, samples: &mut Planes) {
+        if Self::is_empty(samples) {
+            samples.layout = frame.layout;
+            samples
+                .planes
+                .resize_with(frame.layout.channels(), Vec::new);
+        }
+        for (plane, decoded) in samples.planes.iter_mut().zip(&frame.planes) {
+            plane.extend_from_slice(&decoded[..frame.samples_per_channel]);
+        }
+    }
 }
 
 /// The usual audio lead for [`AudioSession::pull`]: 120 ms.
 pub const DEFAULT_LEAD_NS: i64 = 120_000_000;
 
 /// The audio lane of a playback session: a bounded queue of compressed access units, a
-/// decoder, and a stereo downmix paced by the caller's clock.
-pub struct AudioSession {
+/// decoder, and its output in the form `F` (a stereo downmix unless chosen otherwise),
+/// paced by the caller's clock.
+pub struct AudioSession<F: PcmForm = Downmix> {
     decoder: Option<Box<DynAudioDecoder>>,
     /// Samples of the decoder's start delay not discarded yet.
     delay: usize,
     queue: UnitQueue,
     frame: AudioFrame,
-    output: Output,
+    output: Output<F>,
     generation: u64,
     phase: Phase,
     refusals: Refusals,
 }
 
-impl core::fmt::Debug for AudioSession {
+impl<F: PcmForm> core::fmt::Debug for AudioSession<F> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("AudioSession")
             .field("state", &self.state())
@@ -51,15 +136,22 @@ impl core::fmt::Debug for AudioSession {
 }
 
 impl AudioSession {
-    /// An idle lane whose queue holds at most `limits`. A refused access unit fails it
-    /// ([`OnRefusal::Fail`]).
+    /// An idle lane whose queue holds at most `limits`, delivering interleaved stereo s16.
+    /// A refused access unit fails it ([`OnRefusal::Fail`]).
     pub fn new(limits: QueueLimits) -> Self {
+        Self::with_form(limits, Downmix::default())
+    }
+}
+
+impl<F: PcmForm> AudioSession<F> {
+    /// [`new`](AudioSession::new) delivering its samples in `form`.
+    pub fn with_form(limits: QueueLimits, form: F) -> Self {
         Self {
             decoder: None,
             delay: 0,
             queue: UnitQueue::new(limits),
             frame: AudioFrame::default(),
-            output: Output::default(),
+            output: Output { form, carry: None },
             generation: 0,
             phase: Phase::Open,
             refusals: Refusals::default(),
@@ -129,21 +221,27 @@ impl AudioSession {
         if self.queue.is_empty() && self.output.carry.is_none() {
             let mut held = PcmBlock::default();
             self.drain(&mut held);
-            if !held.samples.is_empty() {
+            if !F::is_empty(&held.samples) {
                 self.output.carry = Some(held);
             }
         }
     }
     /// Decode every queued unit that is due at `clock_ns` (PTS minus `lead_ns`
-    /// reached, or unknown PTS) into `out`. A sample-rate change ends the block
-    /// early so one block never mixes rates. Returns the units consumed.
-    /// `lead_ns` applies as given; see [`DEFAULT_LEAD_NS`].
-    pub fn pull(&mut self, clock_ns: Option<i64>, lead_ns: i64, out: &mut PcmBlock) -> usize {
+    /// reached, or unknown PTS) into `out`. A sample-rate change, or a frame the form
+    /// does not continue a block with, ends the block early so one block never mixes
+    /// rates. Returns the units consumed. `lead_ns` applies as given; see
+    /// [`DEFAULT_LEAD_NS`].
+    pub fn pull(
+        &mut self,
+        clock_ns: Option<i64>,
+        lead_ns: i64,
+        out: &mut PcmBlock<F::Samples>,
+    ) -> usize {
         let Some(decoder) = self.decoder.as_mut() else {
             return 0;
         };
         if let Some(carry) = self.output.carry.take() {
-            if out.samples.is_empty() {
+            if F::is_empty(&out.samples) {
                 *out = carry;
             } else {
                 self.output.carry = Some(carry);
@@ -180,7 +278,7 @@ impl AudioSession {
     }
     /// Append the samples the decoder still holds back to `out`, as they are: no discard
     /// and no start delay apply to them.
-    fn drain(&mut self, out: &mut PcmBlock) {
+    fn drain(&mut self, out: &mut PcmBlock<F::Samples>) {
         let Some(decoder) = self.decoder.as_mut() else {
             return;
         };
@@ -212,36 +310,38 @@ impl AudioSession {
 }
 
 /// Decoded frames on their way into the caller's blocks.
-#[derive(Default)]
-struct Output {
-    downmix: Downmix,
-    /// Samples decoded at a new rate while the caller's block held another.
-    carry: Option<PcmBlock>,
+struct Output<F: PcmForm> {
+    form: F,
+    /// Samples decoded at a new rate, or that the form does not continue the caller's
+    /// block with.
+    carry: Option<PcmBlock<F::Samples>>,
 }
 
-impl Output {
-    /// Mix `frame` onto `out`, or into a carried block when `out` holds samples at another
-    /// rate; `pts` becomes the block's when the frame starts it.
+impl<F: PcmForm> Output<F> {
+    /// Append `frame` to `out`, or to a carried block when `out` holds samples it does not
+    /// continue; `pts` becomes the block's when the frame starts it.
     fn append(
         &mut self,
         frame: &AudioFrame,
         levels: Option<DownmixLevels>,
         pts: Option<i64>,
-        out: &mut PcmBlock,
+        out: &mut PcmBlock<F::Samples>,
     ) {
         if frame.samples_per_channel == 0 {
             return;
         }
-        let target = if out.samples.is_empty() || out.sample_rate == frame.sample_rate {
+        let continues = F::is_empty(&out.samples)
+            || (out.sample_rate == frame.sample_rate && F::continues(&out.samples, frame));
+        let target = if continues {
             out
         } else {
             self.carry.get_or_insert_with(PcmBlock::default)
         };
-        if target.samples.is_empty() {
+        if F::is_empty(&target.samples) {
             target.sample_rate = frame.sample_rate;
             target.pts = pts;
         }
-        self.downmix
-            .mix(frame, levels.unwrap_or_default(), &mut target.samples);
+        self.form
+            .append(frame, levels.unwrap_or_default(), &mut target.samples);
     }
 }

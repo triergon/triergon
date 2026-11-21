@@ -4,7 +4,7 @@ A decode-session layer for desktop playback. It takes AVC/HEVC Annex B access
 units and AC-3, E-AC-3, ADTS AAC, DTS core, FLAC, Opus, Vorbis or MPEG audio frames, drives the pure-Rust codec
 crates through the [triergon-codec](../codec/README.md) traits, and publishes
 clock-gated RGBA pictures (1920×1080 unless the caller picks another canvas) and
-interleaved stereo s16 PCM. It is a
+PCM (interleaved stereo s16 unless the caller picks another form). It is a
 composition-layer crate over triergon-codec and
 [triergon-pixel](../pixel/README.md). The caller owns the clock, packet framing,
 output devices and GPU upload. Nothing here spawns a process or links a native
@@ -70,7 +70,7 @@ also builds a decoder for an audio session.
 | Stream | Input | Output |
 |---|---|---|
 | Video | H.264, HEVC Annex B access units with optional PTS | RGBA letterboxed into a `Canvas` (1920×1080 by default), 8- and 10-bit 4:2:0 sources |
-| Audio | AC-3, E-AC-3, AAC (ADTS or configured raw LC), DTS core, FLAC, Opus, Vorbis, MPEG audio Layer I-III | interleaved stereo s16 at the decoder's rate |
+| Audio | AC-3, E-AC-3, AAC (ADTS or configured raw LC), DTS core, FLAC, Opus, Vorbis, MPEG audio Layer I-III | at the decoder's rate: interleaved stereo s16 (`AudioSession::new`), or the decoder's `f32` planes as they are (`AudioSession::with_form(limits, Planar)`) |
 | Container track | any `TrackInfo` of a supported codec, its packets | `TrackDecoder`: decoded frames with the container's trims applied |
 
 `TrackDecoder::new(track)` picks the decoder from a track's codec (`audio_codec`) and
@@ -123,6 +123,11 @@ The `mix` module holds the stereo downmix (`mix::Downmix`) and the s16 conversio
   into the lane's RGBA canvas: 1920×1080 for `VideoSession::new`, any `Canvas` for
   `VideoSession::with_canvas`. The fit, padding and conversion rules are in
   [triergon-pixel](../pixel/README.md).
+- **Output forms.** A `PcmForm` turns decoded frames into the samples of a
+  `PcmBlock<F::Samples>` and says which frames continue a block. `mix::Downmix` is the
+  default: `PcmBlock` holds `Vec<i16>`. `Planar` keeps the decoder's planes (`Planes`:
+  the layout and one `f32` plane per speaker) and starts a new block when the layout
+  changes. Another form, such as a stereo `f32` mix, is a `PcmForm` of the caller's.
 - **Downmix.** `mix::Downmix`: front pair at unity, centre and surrounds at −3 dB,
   LFE dropped, normalised so no output exceeds full scale; mono goes to both sides
   at −3 dB. The `DownmixLevels` an AC-3/E-AC-3 stream carries (mix levels, Dolby or
