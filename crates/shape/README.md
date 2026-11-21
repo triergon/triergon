@@ -311,6 +311,11 @@ The comparison establishes agreement with HarfBuzz and FriBidi on that corpus,
 not conformance with the OpenType or Unicode specifications; for bidi, the
 conformance files check UAX #9 itself.
 
+The [ASS rendering comparison](../../harness/features/ass-render/contract.json)
+covers `@` font metrics through rendered image placement. Its vertical fixtures
+include code points on either side of U+02F1 that share a glyph, with each side
+loading its glyph first.
+
 ## Licence
 
 MIT or Apache-2.0, at your option, with HarfBuzz 14.6.0's "Old MIT" licence and libass

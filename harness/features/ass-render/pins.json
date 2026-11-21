@@ -483,6 +483,16 @@
       "bytes": 2920440,
       "digest": 11813353727600396068
     },
+    "vertical-first-lookup-ass-1080p": {
+      "packets": 34,
+      "bytes": 204948,
+      "digest": 8644008135725063234
+    },
+    "vertical-first-lookup-ass-720p": {
+      "packets": 34,
+      "bytes": 135688,
+      "digest": 18357563473093060653
+    },
     "vertical-styles-ass-1080p": {
       "packets": 36,
       "bytes": 378524,
