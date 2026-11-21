@@ -28,6 +28,7 @@ use crate::{
     storage::SharedBytes,
 };
 use head::{EbmlJob, SeekHeadJob};
+use std::convert::Infallible;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Backpressure, Budget, BudgetVec, InputRequest, InputToken, InputWindow, SourceCapabilities,
@@ -1142,292 +1143,25 @@ impl Reader {
                         }
                     }
                 }
-                State::Admission(admission) => match admission.phase {
-                    AdmitPhase::Lookup => {
-                        if !is_segment_metadata(admission.header.id) {
-                            admission.phase = AdmitPhase::Admit;
-                            continue;
-                        }
-                        if admission.at == self.loaded.len() {
-                            let maximum = if admission.header.id == crate::metadata::ATTACHMENTS {
-                                left.checked_add(
-                                    self.limits
-                                        .attachment_bytes
-                                        .checked_sub(self.catalogue.attachment_bytes())
-                                        .ok_or(Error::Policy("attachment payload bytes"))?,
-                                )
-                                .ok_or(Error::Overflow)?
-                            } else {
-                                left
-                            };
-                            if admission
-                                .header
-                                .size
-                                .is_some_and(|size| size > maximum as u64)
-                            {
-                                return Err(Error::Policy("element bytes"));
-                            }
-                            admission.phase = AdmitPhase::Reserve;
-                            continue;
-                        }
-                        if !work.try_charge(1) {
-                            return Ok(ParseStep::Yield);
-                        }
-                        let (position, id) = self.loaded.as_slice()[admission.at];
-                        admission.at += 1;
-                        if position == admission.header.start {
-                            if id != admission.header.id {
-                                return Err(Error::Invalid("cached metadata identity changed"));
-                            }
-                            self.envelope
-                                .admit_typed_leaf(admission.header, None, true)?;
-                            self.state = State::Envelope;
-                        }
-                    }
-                    AdmitPhase::Reserve => {
-                        self.loaded.reserve(1)?;
-                        admission.phase = AdmitPhase::WaitReserve;
-                    }
-                    AdmitPhase::WaitReserve => match self.loaded.step(work, cancel)? {
-                        ParseStep::Event(()) => {
-                            let max = if admission.header.id == crate::metadata::ATTACHMENTS {
-                                left.checked_add(
-                                    self.limits
-                                        .attachment_bytes
-                                        .checked_sub(self.catalogue.attachment_bytes())
-                                        .ok_or(Error::Policy("attachment payload bytes"))?,
-                                )
-                                .ok_or(Error::Overflow)?
-                            } else {
-                                left
-                            };
-                            admission.maximum = Some(max);
-                            if document(admission.header.id) {
-                                admission.prepare = Some(CataloguePrepareJob::new());
-                                admission.phase = AdmitPhase::Catalogue;
-                            } else {
-                                admission.phase = AdmitPhase::Admit;
-                            }
-                        }
-                        other => return crate::step::pending(other),
-                    },
-                    AdmitPhase::Catalogue => match admission
-                        .prepare
-                        .as_mut()
-                        .required("missing catalogue admission")?
-                        .step(&mut self.catalogue, self.limits, work, cancel)?
+                State::Admission(_) => {
+                    if let Some(step) =
+                        self.step_admission(left, work, cancel, stop, scan_prefix)?
                     {
-                        ParseStep::Event(available) => {
-                            admission.maximum =
-                                Some(admission.maximum.unwrap_or(available).min(available));
-                            admission.prepare = None;
-                            admission.phase = AdmitPhase::Admit;
-                        }
-                        other => return crate::step::pending(other),
-                    },
-                    AdmitPhase::Admit => {
-                        if !work.try_charge(1) {
-                            return Ok(ParseStep::Yield);
-                        }
-                        self.envelope.admit_typed_leaf(
-                            admission.header,
-                            admission.maximum,
-                            false,
-                        )?;
-                        // A block touching a finite scan stop keeps the old
-                        // body/stop scheduling, including work-boundary cases.
-                        if scan_prefix
-                            && admission.header.id == 0xa3
-                            && stop.is_none_or(|stop| {
-                                admission
-                                    .header
-                                    .size
-                                    .and_then(|size| admission.header.data.checked_add(size))
-                                    .is_some_and(|end| end < stop)
-                            })
-                        {
-                            self.envelope.arm_scan_prefix(admission.header)?;
-                        }
-                        self.state = State::Envelope;
-                    }
-                },
-                State::Ebml { header, job } => match job.step(work, cancel)? {
-                    ParseStep::Event(doctype) => {
-                        self.webm_vp9_t35 &= doctype == BlockAdditionContainer::WebM;
-                        self.metadata_used = job.source().len();
-                        let event = ElementEvent::Leaf {
-                            header: *header,
-                            data: job.source().clone(),
-                        };
-                        self.state = State::Envelope;
-                        return Ok(ParseStep::Event(D::envelope(event)?));
-                    }
-                    other => return crate::step::pending(other),
-                },
-                State::Tracks { header, job } => match job.step(work, cancel)? {
-                    ParseStep::Event(configuration) => {
-                        let h = *header;
-                        let structural = job.metadata_bytes()?;
-                        self.commit_metadata(h, structural)?;
-                        self.revision = configuration.revision();
-                        self.configuration = Some(configuration.clone());
-                        self.state = State::Envelope;
-                        return Ok(ParseStep::Event(D::configuration(configuration)?));
-                    }
-                    other => return crate::step::pending(other),
-                },
-                State::Document { header, job } => {
-                    match job.step(&mut self.catalogue, work, cancel)? {
-                        ParseStep::Event(commit) => {
-                            let h = *header;
-                            let scale = commit.timestamp_scale.unwrap_or(1_000_000);
-                            if h.id == INFO && scale == 0 {
-                                return Err(Error::Invalid("zero TimestampScale"));
-                            }
-                            self.commit_metadata(h, commit.structural_bytes)?;
-                            if h.id == INFO {
-                                self.scale = scale;
-                            }
-                            self.state = State::Envelope;
-                            return Ok(ParseStep::Event(D::document(commit.document)?));
-                        }
-                        other => return crate::step::pending(other),
+                        return crate::step::pending(step);
                     }
                 }
-                State::Cues { header, job } => match job.step(work, cancel)? {
-                    ParseStep::Event(cues) => {
-                        let h = *header;
-                        let source = cues.source;
-                        self.commit_metadata(h, source.len())?;
-                        self.cues = Some(cues.entries);
-                        self.state = State::Envelope;
-                        return Ok(ParseStep::Event(D::envelope(ElementEvent::Leaf {
-                            header: h,
-                            data: source,
-                        })?));
+                State::Ebml { .. }
+                | State::Tracks { .. }
+                | State::Document { .. }
+                | State::Cues { .. } => return self.step_metadata::<D>(work, cancel),
+                State::Head { .. } | State::MergeHead { .. } => {
+                    if let Some(step) = self.step_seek_head::<D>(work, cancel)? {
+                        return Ok(step);
                     }
-                    other => return crate::step::pending(other),
-                },
-                State::Head { header, job } => match job.step(work, cancel)? {
-                    ParseStep::Event(entries) => {
-                        self.state = State::MergeHead {
-                            header: *header,
-                            source: job.source().clone(),
-                            entries,
-                            at: 0,
-                            reserved: false,
-                            previous_len: self.seek_targets.len(),
-                        };
-                    }
-                    other => return crate::step::pending(other),
-                },
-                State::MergeHead {
-                    header,
-                    source,
-                    entries,
-                    at,
-                    reserved,
-                    ..
-                } => {
-                    if !*reserved {
-                        self.seek_targets.reserve(entries.len())?;
-                        *reserved = true;
-                    }
-                    match self.seek_targets.step(work, cancel)? {
-                        ParseStep::Event(()) | ParseStep::Finished => (),
-                        other => return crate::step::pending(other),
-                    }
-                    if *at == entries.len() {
-                        let h = *header;
-                        let source = source.clone();
-                        self.commit_metadata(h, source.len())?;
-                        self.state = State::Envelope;
-                        return Ok(ParseStep::Event(D::envelope(ElementEvent::Leaf {
-                            header: h,
-                            data: source,
-                        })?));
-                    }
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    self.seek_targets.push_precharged(entries.as_slice()[*at])?;
-                    *at += 1;
                 }
-                State::ScanSimple(job) => {
-                    if !scan_prefix {
-                        return Err(Error::Invalid("scan probe outside seek scan"));
-                    }
-                    let context = ScanContext {
-                        configuration: self.configuration.as_ref(),
-                        pool: &self.pool,
-                        source: self.envelope.request().source,
-                        generation: self.envelope.generation(),
-                        cluster_ticks: self.cluster_time,
-                        scale: self.scale,
-                    };
-                    if job.completed_fields().is_some() {
-                        // advance_scan consumes this scalar completion in this
-                        // same call; it is never a public packet/event boundary.
-                        return Ok(ParseStep::Yield);
-                    }
-                    if job.draining() {
-                        if !job.context_matches(&context) {
-                            return Err(Error::Invalid("scan drain source context changed"));
-                        }
-                        if let Some(remaining) = self.scan_remaining {
-                            self.envelope.set_scan_remaining(remaining);
-                        }
-                        let before = self.envelope.position();
-                        let progress = self.envelope.step_typed_compact_after_input_health(
-                            Admit::Pause,
-                            work,
-                            cancel,
-                        );
-                        if let Err(error) = Self::record_demux_bytes(
-                            &mut self.scan_remaining,
-                            &mut self.demux_read_bytes,
-                            before,
-                            self.envelope.position(),
-                        ) {
-                            self.envelope.discard_compact_leaf();
-                            return Err(error);
-                        }
-                        let progress = progress?;
-                        if self.envelope.finish_scanned_leaf(job.header())? {
-                            job.finish();
-                            return Ok(ParseStep::Yield);
-                        }
-                        match progress {
-                            EnvelopeProgress::Step(step) => {
-                                return crate::step::pending(step);
-                            }
-                            EnvelopeProgress::Header(_) => {
-                                return Err(Error::Invalid(
-                                    "new header before scan drain completed",
-                                ));
-                            }
-                        }
-                    }
-                    let header = job.header();
-                    match job.step_prefix(
-                        self.envelope.scan_prefix_bytes(header)?,
-                        &context,
-                        work,
-                        cancel,
-                    )? {
-                        ParseStep::Event(drain) => {
-                            if self
-                                .envelope
-                                .resolve_scan_prefix(header, drain, work, cancel)?
-                            {
-                                job.finish();
-                                return Ok(ParseStep::Yield);
-                            }
-                            if !drain {
-                                self.state = State::Envelope;
-                            }
-                        }
-                        step => return crate::step::pending(step),
+                State::ScanSimple(_) => {
+                    if let Some(step) = self.step_scan_simple(work, cancel, scan_prefix)? {
+                        return crate::step::pending(step);
                     }
                 }
                 State::Cue(_) | State::Epoch(_) => {
@@ -1485,6 +1219,349 @@ impl Reader {
                 }
             }
         }
+    }
+
+    /// One step of admitting a level-one leaf: the cached-metadata lookup, the
+    /// position reservation, the catalogue preparation of a document and the
+    /// envelope's admission. `Ok(None)` continues the demux loop.
+    #[cold]
+    #[inline(never)]
+    fn step_admission(
+        &mut self,
+        left: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        stop: Option<u64>,
+        scan_prefix: bool,
+    ) -> Result<Option<ParseStep<Infallible>>> {
+        let State::Admission(admission) = &mut self.state else {
+            return Err(Error::Invalid("admission outside its state"));
+        };
+        match admission.phase {
+            AdmitPhase::Lookup => {
+                if !is_segment_metadata(admission.header.id) {
+                    admission.phase = AdmitPhase::Admit;
+                    return Ok(None);
+                }
+                if admission.at == self.loaded.len() {
+                    let maximum = if admission.header.id == crate::metadata::ATTACHMENTS {
+                        left.checked_add(
+                            self.limits
+                                .attachment_bytes
+                                .checked_sub(self.catalogue.attachment_bytes())
+                                .ok_or(Error::Policy("attachment payload bytes"))?,
+                        )
+                        .ok_or(Error::Overflow)?
+                    } else {
+                        left
+                    };
+                    if admission
+                        .header
+                        .size
+                        .is_some_and(|size| size > maximum as u64)
+                    {
+                        return Err(Error::Policy("element bytes"));
+                    }
+                    admission.phase = AdmitPhase::Reserve;
+                    return Ok(None);
+                }
+                if !work.try_charge(1) {
+                    return Ok(Some(ParseStep::Yield));
+                }
+                let (position, id) = self.loaded.as_slice()[admission.at];
+                admission.at += 1;
+                if position == admission.header.start {
+                    if id != admission.header.id {
+                        return Err(Error::Invalid("cached metadata identity changed"));
+                    }
+                    self.envelope
+                        .admit_typed_leaf(admission.header, None, true)?;
+                    self.state = State::Envelope;
+                }
+            }
+            AdmitPhase::Reserve => {
+                self.loaded.reserve(1)?;
+                admission.phase = AdmitPhase::WaitReserve;
+            }
+            AdmitPhase::WaitReserve => match self.loaded.step(work, cancel)? {
+                ParseStep::Event(()) => {
+                    let max = if admission.header.id == crate::metadata::ATTACHMENTS {
+                        left.checked_add(
+                            self.limits
+                                .attachment_bytes
+                                .checked_sub(self.catalogue.attachment_bytes())
+                                .ok_or(Error::Policy("attachment payload bytes"))?,
+                        )
+                        .ok_or(Error::Overflow)?
+                    } else {
+                        left
+                    };
+                    admission.maximum = Some(max);
+                    if document(admission.header.id) {
+                        admission.prepare = Some(CataloguePrepareJob::new());
+                        admission.phase = AdmitPhase::Catalogue;
+                    } else {
+                        admission.phase = AdmitPhase::Admit;
+                    }
+                }
+                other => return crate::step::pending(other).map(Some),
+            },
+            AdmitPhase::Catalogue => match admission
+                .prepare
+                .as_mut()
+                .required("missing catalogue admission")?
+                .step(&mut self.catalogue, self.limits, work, cancel)?
+            {
+                ParseStep::Event(available) => {
+                    admission.maximum = Some(admission.maximum.unwrap_or(available).min(available));
+                    admission.prepare = None;
+                    admission.phase = AdmitPhase::Admit;
+                }
+                other => return crate::step::pending(other).map(Some),
+            },
+            AdmitPhase::Admit => {
+                if !work.try_charge(1) {
+                    return Ok(Some(ParseStep::Yield));
+                }
+                self.envelope
+                    .admit_typed_leaf(admission.header, admission.maximum, false)?;
+                // A block touching a finite scan stop keeps the old
+                // body/stop scheduling, including work-boundary cases.
+                if scan_prefix
+                    && admission.header.id == 0xa3
+                    && stop.is_none_or(|stop| {
+                        admission
+                            .header
+                            .size
+                            .and_then(|size| admission.header.data.checked_add(size))
+                            .is_some_and(|end| end < stop)
+                    })
+                {
+                    self.envelope.arm_scan_prefix(admission.header)?;
+                }
+                self.state = State::Envelope;
+            }
+        }
+        Ok(None)
+    }
+
+    /// Completes the EBML header, Tracks, an Info, Chapters, Tags or Attachments
+    /// document, or Cues, and returns its event.
+    #[cold]
+    #[inline(never)]
+    fn step_metadata<D: PacketProjection>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<D::Event>> {
+        match &mut self.state {
+            State::Ebml { header, job } => match job.step(work, cancel)? {
+                ParseStep::Event(doctype) => {
+                    self.webm_vp9_t35 &= doctype == BlockAdditionContainer::WebM;
+                    self.metadata_used = job.source().len();
+                    let event = ElementEvent::Leaf {
+                        header: *header,
+                        data: job.source().clone(),
+                    };
+                    self.state = State::Envelope;
+                    Ok(ParseStep::Event(D::envelope(event)?))
+                }
+                other => crate::step::pending(other),
+            },
+            State::Tracks { header, job } => match job.step(work, cancel)? {
+                ParseStep::Event(configuration) => {
+                    let h = *header;
+                    let structural = job.metadata_bytes()?;
+                    self.commit_metadata(h, structural)?;
+                    self.revision = configuration.revision();
+                    self.configuration = Some(configuration.clone());
+                    self.state = State::Envelope;
+                    Ok(ParseStep::Event(D::configuration(configuration)?))
+                }
+                other => crate::step::pending(other),
+            },
+            State::Document { header, job } => {
+                match job.step(&mut self.catalogue, work, cancel)? {
+                    ParseStep::Event(commit) => {
+                        let h = *header;
+                        let scale = commit.timestamp_scale.unwrap_or(1_000_000);
+                        if h.id == INFO && scale == 0 {
+                            return Err(Error::Invalid("zero TimestampScale"));
+                        }
+                        self.commit_metadata(h, commit.structural_bytes)?;
+                        if h.id == INFO {
+                            self.scale = scale;
+                        }
+                        self.state = State::Envelope;
+                        Ok(ParseStep::Event(D::document(commit.document)?))
+                    }
+                    other => crate::step::pending(other),
+                }
+            }
+            State::Cues { header, job } => match job.step(work, cancel)? {
+                ParseStep::Event(cues) => {
+                    let h = *header;
+                    let source = cues.source;
+                    self.commit_metadata(h, source.len())?;
+                    self.cues = Some(cues.entries);
+                    self.state = State::Envelope;
+                    Ok(ParseStep::Event(D::envelope(ElementEvent::Leaf {
+                        header: h,
+                        data: source,
+                    })?))
+                }
+                other => crate::step::pending(other),
+            },
+            _ => Err(Error::Invalid("metadata step outside a metadata job")),
+        }
+    }
+
+    /// Completes a SeekHead and merges its entries into the seek targets; returns the
+    /// SeekHead's envelope event once every entry is in. `Ok(None)` continues the
+    /// demux loop.
+    #[cold]
+    #[inline(never)]
+    fn step_seek_head<D: PacketProjection>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<ParseStep<D::Event>>> {
+        match &mut self.state {
+            State::Head { header, job } => match job.step(work, cancel)? {
+                ParseStep::Event(entries) => {
+                    self.state = State::MergeHead {
+                        header: *header,
+                        source: job.source().clone(),
+                        entries,
+                        at: 0,
+                        reserved: false,
+                        previous_len: self.seek_targets.len(),
+                    };
+                }
+                other => return crate::step::pending(other).map(Some),
+            },
+            State::MergeHead {
+                header,
+                source,
+                entries,
+                at,
+                reserved,
+                ..
+            } => {
+                if !*reserved {
+                    self.seek_targets.reserve(entries.len())?;
+                    *reserved = true;
+                }
+                match self.seek_targets.step(work, cancel)? {
+                    ParseStep::Event(()) | ParseStep::Finished => (),
+                    other => return crate::step::pending(other).map(Some),
+                }
+                if *at == entries.len() {
+                    let h = *header;
+                    let source = source.clone();
+                    self.commit_metadata(h, source.len())?;
+                    self.state = State::Envelope;
+                    return Ok(Some(ParseStep::Event(D::envelope(ElementEvent::Leaf {
+                        header: h,
+                        data: source,
+                    })?)));
+                }
+                if !work.try_charge(1) {
+                    return Ok(Some(ParseStep::Yield));
+                }
+                self.seek_targets.push_precharged(entries.as_slice()[*at])?;
+                *at += 1;
+            }
+            _ => return Err(Error::Invalid("SeekHead step outside a SeekHead job")),
+        }
+        Ok(None)
+    }
+
+    /// One step of probing a SimpleBlock prefix during a bounded seek scan, or of
+    /// draining the rest of a probed block. `Ok(None)` continues the demux loop.
+    #[cold]
+    #[inline(never)]
+    fn step_scan_simple(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        scan_prefix: bool,
+    ) -> Result<Option<ParseStep<Infallible>>> {
+        let State::ScanSimple(job) = &mut self.state else {
+            return Err(Error::Invalid("scan probe outside its state"));
+        };
+        if !scan_prefix {
+            return Err(Error::Invalid("scan probe outside seek scan"));
+        }
+        let context = ScanContext {
+            configuration: self.configuration.as_ref(),
+            pool: &self.pool,
+            source: self.envelope.request().source,
+            generation: self.envelope.generation(),
+            cluster_ticks: self.cluster_time,
+            scale: self.scale,
+        };
+        if job.completed_fields().is_some() {
+            // advance_scan consumes this scalar completion in this
+            // same call; it is never a public packet/event boundary.
+            return Ok(Some(ParseStep::Yield));
+        }
+        if job.draining() {
+            if !job.context_matches(&context) {
+                return Err(Error::Invalid("scan drain source context changed"));
+            }
+            if let Some(remaining) = self.scan_remaining {
+                self.envelope.set_scan_remaining(remaining);
+            }
+            let before = self.envelope.position();
+            let progress =
+                self.envelope
+                    .step_typed_compact_after_input_health(Admit::Pause, work, cancel);
+            if let Err(error) = Self::record_demux_bytes(
+                &mut self.scan_remaining,
+                &mut self.demux_read_bytes,
+                before,
+                self.envelope.position(),
+            ) {
+                self.envelope.discard_compact_leaf();
+                return Err(error);
+            }
+            let progress = progress?;
+            if self.envelope.finish_scanned_leaf(job.header())? {
+                job.finish();
+                return Ok(Some(ParseStep::Yield));
+            }
+            match progress {
+                EnvelopeProgress::Step(step) => {
+                    return crate::step::pending(step).map(Some);
+                }
+                EnvelopeProgress::Header(_) => {
+                    return Err(Error::Invalid("new header before scan drain completed"));
+                }
+            }
+        }
+        let header = job.header();
+        match job.step_prefix(
+            self.envelope.scan_prefix_bytes(header)?,
+            &context,
+            work,
+            cancel,
+        )? {
+            ParseStep::Event(drain) => {
+                if self
+                    .envelope
+                    .resolve_scan_prefix(header, drain, work, cancel)?
+                {
+                    job.finish();
+                    return Ok(Some(ParseStep::Yield));
+                }
+                if !drain {
+                    self.state = State::Envelope;
+                }
+            }
+            step => return crate::step::pending(step).map(Some),
+        }
+        Ok(None)
     }
 }
 
