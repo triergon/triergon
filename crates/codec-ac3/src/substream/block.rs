@@ -1,9 +1,10 @@
 //! One audio block (5.3.3, Annex E 2.3.3): block switch and dither flags, dynamic
 //! range, rematrixing and the sequence of side-information sections up to the mantissas.
 
-use super::{E, NoiseMode, Substream, Trace};
+use super::{E, NoiseMode, Substream};
 use crate::noise::Rng;
 use crate::quant::GroupTables;
+use crate::trace::Trace;
 use triergon_bitstream::BitReader;
 
 impl Substream {

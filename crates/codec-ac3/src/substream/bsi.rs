@@ -1,9 +1,10 @@
 //! Bit stream information (5.3.2, Annex E 2.3.1) and the E-AC-3 audio frame element
 //! (Annex E 2.3.2).
 
-use super::{CPL, DownmixCodes, E, LFE, NCH, NFCHANS, REUSE, Substream, Trace, bad};
+use super::{CPL, DownmixCodes, E, LFE, NCH, NFCHANS, REUSE, Substream, bad};
 use crate::error::{DecodeError, Feature};
 use crate::tables::{DEF_SPX_BNDSTRC, FRM_EXPSTR};
+use crate::trace::Trace;
 use triergon_bitstream::BitReader;
 
 impl Substream {

@@ -23,14 +23,17 @@ mod quant;
 mod spec_tables;
 mod substream;
 mod tables;
+mod trace;
 
 pub use downmix::{DownmixInfo, DownmixType};
 pub use error::{DecodeError, Feature};
 pub use header::{FrameHeader, StreamType, Syntax, access_unit_len, parse_header};
 pub use layout::{MAX_CHANNELS, layout_name};
-#[doc(hidden)]
-pub use substream::{BlockTrace, FrameTrace, Trace};
 pub use substream::{DownmixCodes, FrameFeatures, NoiseMode};
+#[cfg(not(feature = "reference-trace"))]
+use trace::Trace;
+#[cfg(feature = "reference-trace")]
+pub use trace::{BlockTrace, FrameTrace, Trace};
 pub use triergon_bitstream::crc::crc16_a52 as crc16;
 pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 
@@ -282,12 +285,14 @@ impl Decoder {
         Ok(())
     }
 
-    #[doc(hidden)]
+    /// Record the bit positions of every following access unit (off by default).
+    #[cfg(feature = "reference-trace")]
     pub fn set_trace(&mut self, on: bool) {
         self.trace.enabled = on;
     }
 
-    #[doc(hidden)]
+    /// The bit positions recorded for the last access unit.
+    #[cfg(feature = "reference-trace")]
     pub fn trace(&self) -> &Trace {
         &self.trace
     }

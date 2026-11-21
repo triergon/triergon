@@ -1,8 +1,9 @@
 //! Bit allocation side information (5.4.3) and the per-channel allocation run (7.2).
 
-use super::{BlockTrace, CPL, E, LFE, NCH, Substream, Trace, bad};
+use super::{CPL, E, LFE, NCH, Substream, bad};
 use crate::bitalloc::{self, BaParams, MaskParams};
 use crate::tables::FASTGAIN;
+use crate::trace::{BlockTrace, Trace};
 use triergon_bitstream::BitReader;
 
 impl Substream {

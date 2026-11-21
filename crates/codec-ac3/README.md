@@ -110,7 +110,8 @@ hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
   from FFmpeg's own encoders covering every acmod, rate, coupling and E-AC-3. Every sample
   is compared: exact rate, layout and count; per channel RMS ≤ 8.8e-6 and
   max |diff| ≤ 6.1035e-5 (`harness/codecs/numeric-rules.json`). Dither-free comparisons use
-  streams rewritten by `examples/strip_dither.rs`.
+  streams rewritten by `examples/strip_dither.rs` (feature `reference-trace`, which
+  exposes the bit positions `Decoder::trace` records).
 - Gate item `codecs-audio` grades the FATE AC-3 and E-AC-3 vectors and the AC-3 streams
   copied out of FATE's WAV and transport stream on Linux AArch64 and 32-bit ARMv7
   (`thumbv7neon-unknown-linux-gnueabihf`): 6/6 AC-3 and 6/6 E-AC-3 pass on both at

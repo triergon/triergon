@@ -11,5 +11,18 @@ publish.workspace = true
 triergon-bitstream = { path = "../bitstream" }
 triergon-codec = { path = "../codec" }
 
+[features]
+# Bit positions of the syntax elements the dither-stripping and patching tools rewrite;
+# comparison tooling only, not shipped behaviour.
+reference-trace = []
+
+[[example]]
+name = "strip_dither"
+required-features = ["reference-trace"]
+
+[[example]]
+name = "trace"
+required-features = ["reference-trace"]
+
 [lints]
 workspace = true

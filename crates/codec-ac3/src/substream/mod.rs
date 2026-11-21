@@ -15,6 +15,7 @@ use crate::error::DecodeError;
 use crate::imdct::Imdct;
 use crate::noise::Rng;
 use crate::quant::GroupTables;
+use crate::trace::{FrameTrace, Trace};
 use triergon_bitstream::BitReader;
 
 pub(crate) const CPL: usize = 5;
@@ -38,63 +39,6 @@ pub enum NoiseMode {
     Normal,
     /// Replace dither, SPX noise and AHT zero-bin noise by zero.
     Off,
-}
-
-/// Bit positions recorded for test tooling (dither stripping).
-#[doc(hidden)]
-#[derive(Clone, Debug, Default)]
-pub struct Trace {
-    pub enabled: bool,
-    /// One record per decoded syncframe of the last access unit.
-    pub frames: Vec<FrameTrace>,
-}
-
-#[doc(hidden)]
-#[derive(Clone, Debug, Default)]
-pub struct FrameTrace {
-    /// Byte offset of the syncframe within the access unit.
-    pub offset: usize,
-    pub frame_bytes: usize,
-    pub eac3: bool,
-    pub num_blocks: usize,
-    pub nfchans: usize,
-    /// Bit positions (within the syncframe) of every dithflag bit.
-    pub dithflag_bits: Vec<usize>,
-    /// E-AC-3: bit position of dithflage, and where per-block dithflags would be inserted.
-    pub dithflage_bit: Option<usize>,
-    pub dithflag_insert_bits: Vec<usize>,
-    /// Bit position just after the last mantissa of the last block.
-    pub audio_end_bit: usize,
-    /// E-AC-3: bit positions of every ecplinu flag (blocks with a coupling strategy).
-    pub ecplinu_bits: Vec<usize>,
-    /// E-AC-3: bit position of transproce and of the (possibly absent) TPNP data.
-    pub transproce_bit: Option<usize>,
-    pub transproc_data_bit: Option<usize>,
-    pub dbaflde_bit: Option<usize>,
-    pub blocks: Vec<BlockTrace>,
-    pub features: FrameFeatures,
-}
-
-#[doc(hidden)]
-#[derive(Clone, Debug, Default)]
-pub struct BlockTrace {
-    pub blk: usize,
-    pub cplstre: bool,
-    pub phsflginu_bit: Option<usize>,
-    pub phsflg_bit: usize,
-    pub ncplbnd: usize,
-    pub cplcoe_any: bool,
-    pub dba_bit: usize,
-}
-
-impl Trace {
-    fn cur(&mut self) -> Option<&mut FrameTrace> {
-        if self.enabled {
-            self.frames.last_mut()
-        } else {
-            None
-        }
-    }
 }
 
 /// Downmix metadata as transmitted (raw codes; `None` when the field is absent).
@@ -428,7 +372,7 @@ impl Substream {
             self.parse_bsi_ac3(&mut br)
         };
         r.map_err(|e| (0, e))?;
-        if trace.enabled {
+        if trace.enabled() {
             trace.frames.push(FrameTrace {
                 frame_bytes,
                 eac3,

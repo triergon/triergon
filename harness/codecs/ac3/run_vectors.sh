@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Reproduce the harness/codecs/ac3/STATUS.md vector table (development oracle only).
 # Run from the worktree root after building examples into target/agent-ac3:
-#   CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=target/agent-ac3 cargo +nightly build --release -p triergon-codec-ac3 --examples
+#   CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=target/agent-ac3 cargo +nightly build --release -p triergon-codec-ac3 --features reference-trace --examples
 # Inputs: elementary streams in target/agent-ac3/es (FATE .ac3/.eac3 copied, the .ts/.wav
 # AC-3 tracks extracted with `ffmpeg -c copy -f ac3`). Media never enters git.
 set -e
