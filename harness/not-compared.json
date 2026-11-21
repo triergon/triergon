@@ -134,14 +134,7 @@
         "needs": "Annex B streams split by AccessUnitSplitter, compared with the units of the reference's HEVC parser; the codec worker splits with its own measurement splitter"
       }
     ],
-    "triergon-codec-mp3": [
-      {
-        "name": "decoding",
-        "entry_points": ["Decoder"],
-        "degree": "outside-gate",
-        "needs": "a gate item running the mp3, mp2 and mp1 lanes of cargo xtask codecs grade; the timed file workloads require equal work, not equal output"
-      }
-    ],
+    "triergon-codec-mp3": [],
     "triergon-codec-mpeg1": [
       {
         "name": "encoder",
@@ -150,14 +143,7 @@
         "needs": "capture qualification compares construction and encoding at additional geometries, rates, VBV sizes and GOP lengths. Encoder quality cases are open and the budget-taking entry points need separate comparison"
       }
     ],
-    "triergon-codec-opus": [
-      {
-        "name": "decoding",
-        "entry_points": ["Decoder"],
-        "degree": "outside-gate",
-        "needs": "a gate item running the opus lane of cargo xtask codecs grade; the timed file workloads require equal work, not equal output"
-      }
-    ],
+    "triergon-codec-opus": [],
     "triergon-codec-vorbis": [],
     "triergon-core": [
       {
@@ -180,12 +166,6 @@
       }
     ],
     "triergon-elementary": [
-      {
-        "name": "packet-reading",
-        "entry_points": ["BlockingReader::open", "BlockingReader::next_packet", "Reader", "Flac", "MpegAudio", "Adts", "Ac3"],
-        "degree": "outside-gate",
-        "needs": "a gate item running the reader-flac, reader-mp3, reader-aac, reader-ac3 and reader-eac3 lanes of cargo xtask codecs readers; the gate runs the Ogg lanes only"
-      },
       {
         "name": "seeking",
         "entry_points": ["BlockingReader::seek", "Reader::last_seek", "SeekDetail", "SeekBasis", "Format::PREROLL"],
@@ -214,12 +194,6 @@
         "needs": "a corpus of whole and truncated hvcC records with a reference view of the fields the prefix inspection reports"
       },
       {
-        "name": "av1-obu-reading",
-        "entry_points": ["av1::Av1ObuReader"],
-        "degree": "unit-tests",
-        "needs": "a worker operation reading OBUs incrementally, folded against the reference's OBUs of the same temporal units"
-      },
-      {
         "name": "vp9-configuration",
         "entry_points": ["vp9::Vp9ConfigParser"],
         "degree": "unit-tests",
@@ -230,12 +204,6 @@
         "entry_points": ["aac::AacAscScopeParser", "aac::decoder_configuration_view", "aac::decoder_channel_view"],
         "degree": "unit-tests",
         "needs": "a reference view of AudioSpecificConfig at both extents and of the decoder configuration and channel views it gives"
-      },
-      {
-        "name": "aac-adts-buffer-parsing",
-        "entry_points": ["aac::AacAdtsParser"],
-        "degree": "unit-tests",
-        "needs": "a worker operation parsing ADTS frames from complete buffers, compared with the reference's frames and headers"
       },
       {
         "name": "eac3-bsi",
