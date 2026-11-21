@@ -980,7 +980,7 @@ mod authoring;
 
 #[cfg(test)]
 mod tests {
-    use super::authoring::{CffProgram, Part, charstring, number};
+    use super::authoring::{CffProgram, charstring, number};
     use super::{Cff, FdSelect, HintDict, Version, dict, fd_index, region_scalar};
     use crate::fixed::Scale;
     use crate::outline::Outline;
@@ -989,11 +989,11 @@ mod tests {
     use crate::{GlyphId, Limits};
     use triergon_core::{Budget, Error, Result, WorkBudget};
 
-    /// A name-keyed CFF table whose glyph 1 is `glyph`, with `private` added
-    /// to its Private DICT, at 1000 units per em.
-    fn table(glyph: &[Part], private: Vec<u8>) -> Vec<u8> {
+    /// A name-keyed CFF table whose glyph 1 is the charstring `glyph`, with
+    /// `private` added to its Private DICT, at 1000 units per em.
+    fn table(glyph: &str, private: Vec<u8>) -> Vec<u8> {
         CffProgram {
-            glyphs: vec![charstring(&[Op(14)]), charstring(glyph)],
+            glyphs: vec![charstring("endchar"), charstring(glyph)],
             global: Vec::new(),
             local: Vec::new(),
             charset: None,
@@ -1037,16 +1037,10 @@ mod tests {
             .collect())
     }
 
-    use Part::{Byte, N, Op};
-
     /// A rectangle from (0, `bottom`), 100 wide, through `heights` above it.
-    fn rectangle(bottom: i16, heights: &[i16]) -> Vec<Part> {
-        let mut parts = vec![N(0), N(bottom), Op(21), N(100), Op(6)];
-        for &height in heights {
-            parts.extend([N(height), Op(7)]);
-        }
-        parts.extend([N(-100), Op(6), Op(14)]);
-        parts
+    fn rectangle(bottom: i16, heights: &[i16]) -> String {
+        let heights: String = heights.iter().map(|h| format!("{h} vlineto ")).collect();
+        format!("0 {bottom} rmoveto 100 hlineto {heights}-100 hlineto endchar")
     }
 
     /// Two in 16.16, whose 64th FreeType's hinter scales by: 2048, exactly a
@@ -1102,7 +1096,7 @@ mod tests {
 
     /// The unhinted points of glyph 1, `glyph` run as a CFF2 charstring
     /// over a variation store of one region that weighs one.
-    fn cff2_points(glyph: &[Part]) -> Result<Vec<(i32, i32)>> {
+    fn cff2_points(glyph: &str) -> Result<Vec<(i32, i32)>> {
         let table = table(glyph, Vec::new());
         let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
         let whole = Table {
@@ -1132,40 +1126,27 @@ mod tests {
 
     #[test]
     fn charstring_vsindex_follows_freetypes_cff2_interpreter() {
-        // rmoveto 0 100; 10 5 1 blend (15 with the region's 5); hlineto; vlineto 50.
-        let path = [
-            N(0),
-            N(100),
-            Op(21),
-            N(10),
-            N(5),
-            N(1),
-            Op(16),
-            Op(6),
-            N(50),
-            Op(7),
-        ];
+        // 10 5 1 blend: 15 with the region's 5.
+        let path = "0 100 rmoveto 10 5 1 blend hlineto 50 vlineto";
         let drawn = [(0, 200), (30, 200), (30, 300)];
-        assert_eq!(cff2_points(&path), Ok(drawn.to_vec()));
+        assert_eq!(cff2_points(path), Ok(drawn.to_vec()));
         // A negative vsindex is ignored.
         assert_eq!(
-            cff2_points(&[&[N(-1), Op(15)][..], &path].concat()),
+            cff2_points(&format!("-1 vsindex {path}")),
             Ok(drawn.to_vec())
         );
         // One outside the variation store fails only at a blend.
-        let outside = [N(5), Op(15)];
         assert_eq!(
-            cff2_points(&[&outside[..], &path].concat()),
+            cff2_points(&format!("5 vsindex {path}")),
             Err(Error::Invalid("CFF2 vsindex outside the variation store"))
         );
-        let without_blend = [N(0), N(100), Op(21), N(15), Op(6), N(50), Op(7)];
         assert_eq!(
-            cff2_points(&[&outside[..], &without_blend].concat()),
+            cff2_points("5 vsindex 0 100 rmoveto 15 hlineto 50 vlineto"),
             Ok(drawn.to_vec())
         );
         // vsindex after a blend is refused.
         assert_eq!(
-            cff2_points(&[&path[..], &[N(0), Op(15)]].concat()),
+            cff2_points(&format!("{path} 0 vsindex")),
             Err(Error::Invalid("CFF2 vsindex after blend"))
         );
     }
@@ -1283,11 +1264,7 @@ mod tests {
 
     #[test]
     fn a_glyph_without_stems_scales_uniformly_at_the_hinted_scale() {
-        // rmoveto 10 20, hlineto 100, rlineto 50 50.
-        let glyph = table(
-            &[N(10), N(20), Op(21), N(100), Op(6), N(50), N(50), Op(5)],
-            Vec::new(),
-        );
+        let glyph = table("10 20 rmoveto 100 hlineto 50 50 rlineto", Vec::new());
         assert_eq!(points(&glyph, TWO, true), [(20, 40), (220, 40), (320, 140)]);
         assert_eq!(points(&glyph, TWO, false), points(&glyph, TWO, true));
         // At 100000 the hinter scales by (100000 + 32) / 64 = 1563: 110 units
@@ -1310,9 +1287,10 @@ mod tests {
         // stem where the scale does; adjusting the map moves the pair
         // down by 0.125 (less than up by 0.3125) to 3 and 4.5625 pixels, 192
         // and 292 in 26.6, and points below follow at the nominal scale.
-        let mut glyph = vec![N(100), N(50), Op(1)];
-        glyph.extend(rectangle(100, &[50]));
-        let glyph = table(&glyph, Vec::new());
+        let glyph = table(
+            &format!("100 50 hstem {}", rectangle(100, &[50])),
+            Vec::new(),
+        );
         assert_eq!(
             points(&glyph, TWO, true),
             [(0, 192), (200, 192), (200, 292), (0, 292)]
@@ -1331,11 +1309,11 @@ mod tests {
         // to 9.4375 and 11, 604 and 704 in 26.6. The point at 150 ends the
         // line before the second mask, so the first map still places it, and
         // the closing line ends where the first map put the start.
-        let mut glyph = vec![N(100), N(50), N(150), N(50), Op(18), Op(19), Byte(0x80)];
-        let mut path = rectangle(100, &[50, 150, 50]);
-        path.splice(7..7, [Op(19), Byte(0x40)]);
-        glyph.extend(path);
-        let glyph = table(&glyph, Vec::new());
+        let glyph = table(
+            "100 50 150 50 hstemhm hintmask 0x80 0 100 rmoveto 100 hlineto 50 vlineto \
+             hintmask 0x40 150 vlineto 50 vlineto -100 hlineto endchar",
+            Vec::new(),
+        );
         assert_eq!(
             points(&glyph, TWO, true),
             [
@@ -1359,9 +1337,7 @@ mod tests {
         // glyph's other points lie below the map's only edge and keep the
         // nominal scale from it: 0 maps to 16 - 505 / 32 pixels, 14 in 26.6.
         let blues = [number(-10), number(10), number(500), number(10), vec![6]].concat();
-        let mut glyph = vec![N(505), N(-20), Op(1)];
-        glyph.extend(rectangle(0, &[505]));
-        let glyph = table(&glyph, blues);
+        let glyph = table(&format!("505 -20 hstem {}", rectangle(0, &[505])), blues);
         assert_eq!(
             points(&glyph, TWO, true),
             [(0, 14), (200, 14), (200, 1024), (0, 1024)]
@@ -1375,9 +1351,10 @@ mod tests {
     #[test]
     fn sizes_beyond_2000_pixels_per_em_load_unhinted() {
         // (8388672 + 32) / 64 = 131073 is above 2000 / 1000 in 16.16.
-        let mut glyph = vec![N(100), N(50), Op(1)];
-        glyph.extend(rectangle(100, &[50]));
-        let glyph = table(&glyph, Vec::new());
+        let glyph = table(
+            &format!("100 50 hstem {}", rectangle(100, &[50])),
+            Vec::new(),
+        );
         let big = 8_388_672;
         assert_eq!(points(&glyph, big, true), points(&glyph, big, false));
         assert_eq!(points(&glyph, big, false)[1], (12800, 12800));
@@ -1385,33 +1362,19 @@ mod tests {
 
     /// `count` horizontal stems 10 units high, 5 apart, declared by `hstem`
     /// operators of at most 20 stems each.
-    fn many_stems(count: i16) -> Vec<Part> {
-        let mut parts = Vec::new();
-        for first in (0..count).step_by(20) {
-            for _ in first..(first + 20).min(count) {
-                parts.extend([N(5), N(10)]);
-            }
-            parts.push(Op(1));
-        }
-        parts
+    fn many_stems(count: usize) -> String {
+        let hstem = |first: usize| "5 10 ".repeat((count - first).min(20)) + "hstem ";
+        (0..count).step_by(20).map(hstem).collect()
     }
 
     #[test]
     fn stems_declared_after_the_first_move_are_ignored() {
         // Eight stems take one mask byte. A ninth after the move would make
         // the hint mask two bytes long and swallow the hlineto's operand.
-        let mut glyph = many_stems(8);
-        glyph.extend([
-            N(0),
-            N(100),
-            Op(21),
-            N(300),
-            N(50),
-            Op(1),
-            Op(19),
-            Byte(0xff),
-        ]);
-        glyph.extend([N(100), Op(6), N(50), Op(7), N(-100), Op(6), Op(14)]);
+        let glyph = format!(
+            "{}0 100 rmoveto 300 50 hstem hintmask 0xff 100 hlineto 50 vlineto -100 hlineto endchar",
+            many_stems(8)
+        );
         let glyph = table(&glyph, Vec::new());
         let square = [(0, 200), (200, 200), (200, 300), (0, 300)];
         assert_eq!(points(&glyph, TWO, false), square);
@@ -1422,10 +1385,11 @@ mod tests {
     fn a_later_mask_with_operands_reads_no_mask_bytes() {
         // After the first mask fixes the stems, `1 2 hintmask` is skipped and
         // the bytes after it run as charstring: vlineto 50.
-        let mut glyph = vec![N(100), N(50), Op(18), Op(19), Byte(0x80)];
-        glyph.extend([N(0), N(100), Op(21), N(100), Op(6), N(1), N(2), Op(19)]);
-        glyph.extend([N(50), Op(7), N(-100), Op(6), Op(14)]);
-        let glyph = table(&glyph, Vec::new());
+        let glyph = table(
+            "100 50 hstemhm hintmask 0x80 0 100 rmoveto 100 hlineto 1 2 hintmask \
+             50 vlineto -100 hlineto endchar",
+            Vec::new(),
+        );
         let square = [(0, 200), (200, 200), (200, 300), (0, 300)];
         assert_eq!(points(&glyph, TWO, false), square);
         assert_eq!(points(&glyph, TWO, true).len(), 4);
@@ -1433,12 +1397,12 @@ mod tests {
 
     #[test]
     fn more_than_96_stems_fail_only_once_a_mask_or_move_uses_them() {
-        let unused = [many_stems(100), vec![Op(14)]].concat();
+        let unused = many_stems(100) + "endchar";
         assert_eq!(
             try_points(&table(&unused, Vec::new()), TWO, false),
             Ok(Vec::new())
         );
-        let moved = [many_stems(100), rectangle(0, &[50])].concat();
+        let moved = many_stems(100) + &rectangle(0, &[50]);
         for hinted in [false, true] {
             assert_eq!(
                 try_points(&table(&moved, Vec::new()), TWO, hinted),
@@ -1446,7 +1410,7 @@ mod tests {
             );
         }
         // 96 stems still load.
-        let most = [many_stems(96), rectangle(0, &[50])].concat();
+        let most = many_stems(96) + &rectangle(0, &[50]);
         assert_eq!(points(&table(&most, Vec::new()), TWO, false).len(), 4);
     }
 

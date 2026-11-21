@@ -1,5 +1,5 @@
-//! CFF tables built in memory: INDEXes, DICT numbers, charstrings and a
-//! name-keyed font program. The crate's own tests include this file too, so it
+//! CFF tables built in memory: INDEXes, DICT numbers, charstrings from Type 2
+//! text and a name-keyed font program. The crate's own tests include this file too, so it
 //! uses nothing from outside it.
 
 #![allow(
@@ -30,11 +30,6 @@ pub(crate) fn index(objects: &[Vec<u8>]) -> Vec<u8> {
         out.extend(object);
     }
     out
-}
-
-/// A one-byte charstring number (-107..=107).
-pub(crate) fn n(value: i16) -> u8 {
-    (value + 139) as u8
 }
 
 /// A CFF number written as a real (TN 5176 Table 5), from its decimal text.
@@ -155,11 +150,11 @@ impl CffProgram {
     }
 }
 
-/// A two-byte charstring number (108..=1131 or -1131..=-108), or one byte inside
-/// -107..=107.
+/// A charstring or DICT integer in its shortest form: one byte inside
+/// -107..=107, two up to ±1131, else three.
 pub(crate) fn number(value: i16) -> Vec<u8> {
     match value {
-        -107..=107 => vec![n(value)],
+        -107..=107 => vec![(value + 139) as u8],
         108..=1131 => {
             let v = value - 108;
             vec![(v / 256 + 247) as u8, (v % 256) as u8]
@@ -176,25 +171,33 @@ pub(crate) fn number(value: i16) -> Vec<u8> {
     }
 }
 
-/// A charstring from numbers and operator bytes.
-pub(crate) fn charstring(parts: &[Part]) -> Vec<u8> {
-    parts
-        .iter()
-        .flat_map(|part| match *part {
-            Part::N(v) => number(v),
-            Part::Op(op) => vec![op],
-            Part::Escape(op) => vec![12, op],
-            Part::Byte(byte) => vec![byte],
-        })
-        .collect()
-}
+/// The one-byte Type 2 operators (TN 5177 Appendix A, with CFF2's `vsindex`
+/// and `blend`), in order of their code; `-` marks a code without one.
+const OPERATORS: &str = "- hstem - vstem vmoveto rlineto hlineto vlineto rrcurveto - callsubr \
+    return - - endchar vsindex blend - hstemhm hintmask cntrmask rmoveto hmoveto vstemhm \
+    rcurveline rlinecurve vvcurveto hhcurveto - callgsubr vhcurveto hvcurveto";
+/// The two-byte operators, 12 and the code, in order of the code.
+const ESCAPED: &str = "dotsection - - and or not - - - abs add sub div - neg eq - - drop - \
+    put get ifelse random mul - sqrt dup exch index roll - - - hflex flex hflex1 flex1";
 
-/// One element of an authored charstring.
-#[derive(Clone, Copy)]
-pub(crate) enum Part {
-    N(i16),
-    Op(u8),
-    Escape(u8),
-    /// A raw byte, such as a hint mask.
-    Byte(u8),
+/// A charstring from Type 2 text: numbers ([`number`]), operators by name,
+/// and bytes written `0x..`, such as hint masks, as they are.
+pub(crate) fn charstring(text: &str) -> Vec<u8> {
+    let code = |table: &str, word| {
+        let code = table.split_whitespace().position(|name| name == word)?;
+        u8::try_from(code).ok()
+    };
+    let mut out = Vec::new();
+    for word in text.split_whitespace() {
+        if let Ok(value) = word.parse() {
+            out.extend(number(value));
+        } else if let Some(hex) = word.strip_prefix("0x") {
+            out.push(u8::from_str_radix(hex, 16).expect("a byte"));
+        } else if let Some(op) = code(OPERATORS, word) {
+            out.push(op);
+        } else {
+            out.extend([12, code(ESCAPED, word).expect("an operator")]);
+        }
+    }
+    out
 }

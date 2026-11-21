@@ -8,7 +8,7 @@ use triergon_font::{Font, GlyphId, Limits, Load, Outline};
 
 mod cff;
 
-use cff::{CffProgram, Part, charstring, n};
+use cff::{CffProgram, charstring};
 
 pub fn u16s(values: &[u16]) -> Vec<u8> {
     values.iter().flat_map(|v| v.to_be_bytes()).collect()
@@ -317,56 +317,18 @@ pub fn cjk_tables() -> Tables {
 /// subroutine; glyph 2 a curve through a global subroutine and a flex.
 pub fn cff_table() -> Vec<u8> {
     CffProgram {
-        // Local subr 0 (biased -107): vlineto 100; return.
-        local: vec![vec![n(100), 7, 11]],
-        // Global subr 0: rrcurveto 10 20 30 0 20 -20; return.
-        global: vec![vec![n(10), n(20), n(30), n(0), n(20), n(-20), 8, 11]],
+        // Local and global subroutine 0, both called as -107 (biased).
+        local: vec![charstring("100 vlineto return")],
+        global: vec![charstring("10 20 30 0 20 -20 rrcurveto return")],
         glyphs: vec![
-            vec![14],
-            // width 10 (nominal 400), hstem 0 20, vstem 0 20, hintmask, rmoveto 50 0,
-            // hlineto 100, callsubr -107, hlineto -100, endchar.
-            vec![
-                n(10),
-                n(0),
-                n(20),
-                1,
-                n(0),
-                n(20),
-                3,
-                19,
-                0xc0,
-                n(50),
-                n(0),
-                21,
-                n(100),
-                6,
-                n(-107),
-                10,
-                n(-100),
-                6,
-                14,
-            ],
-            // rmoveto 0 0, callgsubr -107, rlineto 0 0 (dropped), hflex, endchar.
-            vec![
-                n(0),
-                n(0),
-                21,
-                n(-107),
-                29,
-                n(0),
-                n(0),
-                5,
-                n(10),
-                n(5),
-                n(5),
-                n(10),
-                n(10),
-                n(5),
-                n(10),
-                12,
-                34,
-                14,
-            ],
+            charstring("endchar"),
+            // Width 10 over the nominal 400.
+            charstring(
+                "10 0 20 hstem 0 20 vstem hintmask 0xc0 50 0 rmoveto 100 hlineto \
+                 -107 callsubr -100 hlineto endchar",
+            ),
+            // The line of zero length is dropped.
+            charstring("0 0 rmoveto -107 callgsubr 0 0 rlineto 10 5 5 10 10 5 10 hflex endchar"),
         ],
         charset: None,
         strings: Vec::new(),
@@ -384,244 +346,49 @@ pub fn cff_table() -> Vec<u8> {
 /// `sqrt` operators. Glyphs: .notdef, A, acute, D (A with an acute through
 /// `seac`), B (arithmetic), C (nested calls), E (flex and logic).
 fn cff_features_tables() -> Tables {
-    use Part::{Byte, Escape as E, N, Op};
-    let glyphs = vec![
-        charstring(&[Op(14)]),
+    let glyphs = [
+        "endchar",
         // A: width 600; a triangle.
-        charstring(&[
-            N(100),
-            N(100),
-            N(0),
-            Op(21),
-            N(200),
-            N(600),
-            N(200),
-            N(-600),
-            Op(5),
-            Op(14),
-        ]),
+        "100 100 0 rmoveto 200 600 200 -600 rlineto endchar",
         // acute: a quadrilateral above.
-        charstring(&[
-            N(250),
-            N(650),
-            Op(21),
-            N(100),
-            N(100),
-            N(-150),
-            N(0),
-            Op(5),
-            Op(14),
-        ]),
+        "250 650 rmoveto 100 100 -150 0 rlineto endchar",
         // D: seac with the acute offset by (50, 20): adx ady bchar achar.
-        charstring(&[N(50), N(20), N(65), N(194), Op(14)]),
-        // B: coordinates from arithmetic.
-        charstring(&[
-            N(100),
-            N(100),
-            Op(21),
-            N(600),
-            N(4),
-            E(12),
-            N(0),
-            Op(5), // 600/4 = 150
-            N(100),
-            N(3),
-            E(12),
-            N(50),
-            Op(5), // 33.33.., 50
-            N(7),
-            N(-9),
-            E(24),
-            E(9),
-            N(5),
-            E(14),
-            E(10),
-            N(0),
-            E(28),
-            Op(5), // |7*-9| + -5, exch
-            N(10),
-            E(27),
-            E(10),
-            N(-20),
-            Op(5), // dup add: 20, -20
-            N(3),
-            N(0),
-            E(20),
-            N(0),
-            E(21),
-            N(2),
-            N(1),
-            N(4),
-            N(3),
-            E(22),
-            N(9),
-            E(11),
-            Op(5), // put/get/ifelse/sub
-            N(11),
-            N(22),
-            N(33),
-            N(3),
-            N(1),
-            E(30),
-            N(1),
-            E(29),
-            E(18),
-            E(18),
-            Op(5), // roll, index, drop
-            Op(14),
-        ]),
+        "50 20 65 194 endchar",
+        // B: coordinates from arithmetic: 600/4 = 150, 0; 100/3 = 33.33..,
+        // 50; |7 × -9| + -5, then exchanged with 0; 10 dup add: 20, -20; put,
+        // get, ifelse and sub; roll, index and drop.
+        "100 100 rmoveto 600 4 div 0 rlineto 100 3 div 50 rlineto \
+         7 -9 mul abs 5 neg add 0 exch rlineto 10 dup add -20 rlineto \
+         3 0 put 0 get 2 1 4 3 ifelse 9 sub rlineto \
+         11 22 33 3 1 roll 1 index drop drop rlineto endchar",
         // C: twelve nested local subroutines, each drawing a line after its call.
-        charstring(&[N(100), N(100), Op(21), N(-107), Op(10), Op(14)]),
+        "100 100 rmoveto -107 callsubr endchar",
         // E: two stems and a counter mask over both, dotsection, the four flex
         // forms, then a line whose dx is ((1 and 1) + (0 or 1) + not 0 + (2 eq 2))
         // * 25 = 100 and whose dy is sqrt 81 = 9.
-        charstring(&[
-            N(0),
-            N(50),
-            N(100),
-            N(50),
-            Op(1),
-            Op(20),
-            Byte(0xc0),
-            E(0),
-            N(100),
-            N(100),
-            Op(21),
-            N(50),
-            N(50),
-            N(20),
-            N(50),
-            N(50),
-            N(50),
-            N(50),
-            E(34),
-            N(30),
-            N(10),
-            N(30),
-            N(10),
-            N(30),
-            N(0),
-            N(30),
-            N(0),
-            N(30),
-            N(-10),
-            N(30),
-            N(-10),
-            N(50),
-            E(35),
-            N(20),
-            N(10),
-            N(20),
-            N(10),
-            N(20),
-            N(20),
-            N(20),
-            N(-10),
-            N(20),
-            E(36),
-            N(10),
-            N(20),
-            N(10),
-            N(20),
-            N(10),
-            N(20),
-            N(10),
-            N(-20),
-            N(10),
-            N(-20),
-            N(10),
-            E(37),
-            N(1),
-            N(1),
-            E(3),
-            N(0),
-            N(1),
-            E(4),
-            E(10),
-            N(0),
-            E(5),
-            E(10),
-            N(2),
-            N(2),
-            E(15),
-            E(10),
-            N(25),
-            E(24),
-            N(81),
-            E(26),
-            Op(5),
-            N(-150),
-            Op(7),
-            Op(14),
-        ]),
+        "0 50 100 50 hstem cntrmask 0xc0 dotsection 100 100 rmoveto \
+         50 50 20 50 50 50 50 hflex \
+         30 10 30 10 30 0 30 0 30 -10 30 -10 50 flex \
+         20 10 20 10 20 20 20 -10 20 hflex1 \
+         10 20 10 20 10 20 10 -20 10 -20 10 flex1 \
+         1 1 and 0 1 or add 0 not add 2 2 eq add 25 mul 81 sqrt rlineto \
+         -150 vlineto endchar",
         // F: curve operators with operand counts the format does not allow,
         // read as FreeType's CFF engine reads them: vhcurveto with 11, vvcurveto
         // with 7, hhcurveto with 6, rlinecurve with 6, rcurveline with 9 and
         // hvcurveto with 7.
-        charstring(&[
-            N(100),
-            N(100),
-            Op(21),
-            N(-11),
-            N(-11),
-            N(-11),
-            N(-11),
-            N(-11),
-            N(-11),
-            N(19),
-            N(-1),
-            N(18),
-            N(-1),
-            N(18),
-            Op(30),
-            N(1),
-            N(2),
-            N(3),
-            N(4),
-            N(5),
-            N(6),
-            N(7),
-            Op(26),
-            N(10),
-            N(20),
-            N(30),
-            N(40),
-            N(50),
-            N(60),
-            Op(27),
-            N(10),
-            N(0),
-            N(10),
-            N(10),
-            N(0),
-            N(10),
-            Op(25),
-            N(10),
-            N(10),
-            N(10),
-            N(10),
-            N(10),
-            N(10),
-            N(5),
-            N(5),
-            N(99),
-            Op(24),
-            N(5),
-            N(5),
-            N(5),
-            N(5),
-            N(5),
-            N(5),
-            N(5),
-            Op(31),
-            Op(14),
-        ]),
-    ];
+        "100 100 rmoveto -11 -11 -11 -11 -11 -11 19 -1 18 -1 18 vhcurveto \
+         1 2 3 4 5 6 7 vvcurveto 10 20 30 40 50 60 hhcurveto \
+         10 0 10 10 0 10 rlinecurve 10 10 10 10 10 10 5 5 99 rcurveline \
+         5 5 5 5 5 5 5 hvcurveto endchar",
+    ]
+    .map(charstring)
+    .to_vec();
     // Local subroutines 0..12: subr k calls subr k + 1, then draws; the last draws.
     let mut local: Vec<Vec<u8>> = (0..12)
-        .map(|k| charstring(&[N(k + 1 - 107), Op(10), N(10), N(20), Op(5), Op(11)]))
+        .map(|k| charstring(&format!("{} callsubr 10 20 rlineto return", k - 106)))
         .collect();
-    local.push(charstring(&[N(50), N(0), Op(5), Op(11)]));
+    local.push(charstring("50 0 rlineto return"));
     let program = CffProgram {
         glyphs,
         global: Vec::new(),
@@ -679,21 +446,9 @@ fn cff_features_tables() -> Tables {
 
 /// A CFF face whose FontMatrix slants and halves its glyphs (2000 units per em).
 fn cff_matrix_tables() -> Tables {
-    use Part::{N, Op};
-    let square = charstring(&[
-        N(100),
-        N(100),
-        Op(21),
-        N(500),
-        Op(6),
-        N(500),
-        Op(7),
-        N(-500),
-        Op(6),
-        Op(14),
-    ]);
+    let square = charstring("100 100 rmoveto 500 hlineto 500 vlineto -500 hlineto endchar");
     let program = CffProgram {
-        glyphs: vec![charstring(&[Op(14)]), square],
+        glyphs: vec![charstring("endchar"), square],
         global: Vec::new(),
         local: Vec::new(),
         charset: None,
@@ -1044,22 +799,13 @@ fn vertical_faces() -> Vec<(&'static [u8; 4], Tables)> {
 /// `Delta`, which FreeType maps twice, a name used by two glyphs and one that
 /// maps to no code point.
 fn charmaps_tables() -> Tables {
-    use Part::{N, Op};
     let square = |side: i16| {
-        charstring(&[
-            N(50),
-            N(0),
-            Op(21),
-            N(side),
-            Op(6),
-            N(side),
-            Op(7),
-            N(-side),
-            Op(6),
-            Op(14),
-        ])
+        charstring(&format!(
+            "50 0 rmoveto {side} hlineto {side} vlineto {} hlineto endchar",
+            -side
+        ))
     };
-    let mut glyphs = vec![charstring(&[Op(14)])];
+    let mut glyphs = vec![charstring("endchar")];
     glyphs.extend((1..10).map(|g| square(100 + 40 * g)));
     let program = CffProgram {
         glyphs,
