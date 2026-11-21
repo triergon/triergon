@@ -54,6 +54,19 @@ fn run(
     (directions, levels.iter().map(|l| l.get()).collect(), map)
 }
 
+/// `text` (code points) resolved as one piece and shaped simply.
+fn shape(text: &[u32], base: BaseDirection) -> Vec<u32> {
+    let mut text: Vec<char> = text.iter().filter_map(|&c| char::from_u32(c)).collect();
+    let classes: Vec<BidiClass> = text.iter().map(|&c| BidiClass::of(c)).collect();
+    let budget = Budget::new(1 << 20).expect("budget");
+    let mut levels = vec![Level::default(); text.len()];
+    Resolver::new(&budget)
+        .resolve(&classes, None, base, &mut levels)
+        .expect("resolve");
+    shape_simple(&mut text, &classes, &levels).expect("shape");
+    text.into_iter().map(u32::from).collect()
+}
+
 use BaseDirection::{Auto, LeftToRight as Ltr, RightToLeft as Rtl};
 const LTR: Direction = Direction::LeftToRight;
 const RTL: Direction = Direction::RightToLeft;
@@ -299,17 +312,6 @@ fn bracket_pairs() {
 /// FriBidi's simple shaping, as its comparison shows it.
 #[test]
 fn simple_shaping_choices() {
-    let shape = |text: &[u32], base| {
-        let mut text: Vec<char> = text.iter().filter_map(|&c| char::from_u32(c)).collect();
-        let classes: Vec<BidiClass> = text.iter().map(|&c| BidiClass::of(c)).collect();
-        let budget = Budget::new(1 << 20).expect("budget");
-        let mut levels = vec![Level::default(); text.len()];
-        Resolver::new(&budget)
-            .resolve(&classes, None, base, &mut levels)
-            .expect("resolve");
-        shape_simple(&mut text, &classes, &levels).expect("shape");
-        text.into_iter().map(u32::from).collect::<Vec<_>>()
-    };
     // At an even level a right-joining letter joins the letter after it.
     assert_eq!(shape(&[0x202D, 0x76B, 0x62B], Rtl)[2], 0xFE9B);
     // A mark between LAM and ALEF stops the ligature, not the joining.
@@ -378,17 +380,6 @@ fn lines() {
 
 #[test]
 fn simple_shaping() {
-    let shape = |text: &[u32], base| {
-        let mut text: Vec<char> = text.iter().filter_map(|&c| char::from_u32(c)).collect();
-        let classes: Vec<BidiClass> = text.iter().map(|&c| BidiClass::of(c)).collect();
-        let budget = Budget::new(1 << 20).expect("budget");
-        let mut levels = vec![Level::default(); text.len()];
-        Resolver::new(&budget)
-            .resolve(&classes, None, base, &mut levels)
-            .expect("resolve");
-        shape_simple(&mut text, &classes, &levels).expect("shape");
-        text.into_iter().map(u32::from).collect::<Vec<_>>()
-    };
     assert_eq!(
         shape(&[0x644, 0x627, 0x20, 0x628, 0x628, 0x628], Rtl),
         [0xFEFF, 0xFEFB, 0x20, 0xFE91, 0xFE92, 0xFE90]
