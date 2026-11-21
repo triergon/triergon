@@ -11,6 +11,7 @@ use crate::{
     movie::{EditList, EntryLayout, MovieHeader, SampleDescription, TrackHeader},
     table::SampleTable,
 };
+use std::mem;
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{
@@ -323,18 +324,26 @@ enum EntryScan {
     Record(BoxChildren, [u8; 4]),
 }
 
-fn missing(reason: &'static str) -> Error {
-    Error::Invalid(reason)
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Where a reader stands. The tag is explicit, so that the per-packet dispatch reads one
+/// byte.
+// Boxing the opener would allocate on every open and reset.
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
+#[repr(u8)]
 enum Phase {
-    Open,
-    Tracks,
-    Entries,
-    Packets,
-    Seek,
-    Ended,
+    /// Walking the root boxes.
+    Open(MovieOpen) = 0,
+    /// Giving each track of the opened movie its reading state.
+    Tracks(BudgetVec<MovieTrack>) = 1,
+    /// Identifying the first sample entry of track `entry` on.
+    Entries {
+        entry: usize,
+        scan: Option<EntryScan>,
+    } = 2,
+    /// Delivering packets.
+    Packets = 3,
+    Seek(Seeking) = 4,
+    Ended = 5,
 }
 
 #[derive(Debug)]
@@ -342,6 +351,14 @@ struct Reading {
     track: usize,
     sample: Sample,
     buffer: Option<BudgetVec<u8>>,
+}
+
+/// How far a payload read got.
+enum Read {
+    /// The payload is complete.
+    Payload(Bytes),
+    /// What to return, or `None` to read on.
+    Pending(Option<Output>),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -380,13 +397,9 @@ pub struct Reader {
     input: InputCursor,
     limits: ReaderLimits,
     phase: Phase,
-    opener: Option<MovieOpen>,
     movie: Option<Movie>,
     tracks: BudgetVec<Track>,
-    entry: usize,
-    scan: Option<EntryScan>,
     reading: Option<Reading>,
-    seeking: Option<Seeking>,
     failed: Option<Error>,
 }
 
@@ -408,14 +421,10 @@ impl Reader {
         Ok(Self {
             input,
             limits,
-            phase: Phase::Open,
-            opener: Some(opener),
+            phase: Phase::Open(opener),
             movie: None,
             tracks: BudgetVec::new(pool),
-            entry: 0,
-            scan: None,
             reading: None,
-            seeking: None,
             failed: None,
         })
     }
@@ -428,7 +437,7 @@ impl Reader {
         }
     }
     fn movie_open(&self) -> bool {
-        matches!(self.phase, Phase::Packets | Phase::Seek | Phase::Ended)
+        matches!(self.phase, Phase::Packets | Phase::Seek(_) | Phase::Ended)
     }
     /// The `ftyp` major brand; that of the first `ftyp` where the source has several.
     pub fn major_brand(&self) -> Option<[u8; 4]> {
@@ -458,12 +467,54 @@ impl Reader {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            let output = match self.phase {
-                Phase::Open => self.open(work, cancel)?,
-                Phase::Tracks => self.adopt_tracks(work)?,
-                Phase::Entries => self.identify_entry(work)?,
+            let output = match &mut self.phase {
+                Phase::Open(opener) => match opener.advance(&mut self.input, work, cancel)? {
+                    OpenStep::Yield => Some(Step::Yield),
+                    OpenStep::NeedInput(request) => Some(Step::NeedInput(request)),
+                    OpenStep::Root(header) => {
+                        Some(Step::Ready(Neutral::Other(ReaderEvent::Box(header))))
+                    }
+                    OpenStep::Ready => {
+                        let mut movie = opener.finish(&self.input)?;
+                        let sources = mem::replace(&mut movie.tracks, BudgetVec::new(&movie.pool));
+                        self.movie = Some(movie);
+                        self.phase = Phase::Tracks(sources);
+                        None
+                    }
+                },
+                Phase::Tracks(sources) => {
+                    self.tracks.try_reserve_exact(sources.len())?;
+                    work.take(sources.len() as u64);
+                    let sources = mem::replace(sources, BudgetVec::new(self.tracks.budget()));
+                    adopt_tracks(&mut self.tracks, sources)?;
+                    self.phase = Phase::Entries {
+                        entry: 0,
+                        scan: None,
+                    };
+                    None
+                }
+                Phase::Entries { entry, scan } => {
+                    let output = identify_entry(
+                        self.tracks.as_mut_slice(),
+                        entry,
+                        scan,
+                        &self.limits,
+                        work,
+                    )?;
+                    // The movie is announced once every entry is identified.
+                    if matches!(output, Some(Step::Ready(_))) {
+                        self.phase = Phase::Packets;
+                    }
+                    output
+                }
                 Phase::Packets => self.packet(work, cancel)?,
-                Phase::Seek => self.seek(work)?,
+                Phase::Seek(seeking) => {
+                    let output = seeking.poll(self.tracks.as_mut_slice(), work)?;
+                    if matches!(output, Some(Step::Ready(_))) {
+                        self.phase = Phase::Packets;
+                    }
+                    output
+                }
                 Phase::Ended => Some(Step::End(SourceLocation {
                     source: self.input.source(),
                     offset: self.input.position(),
@@ -475,103 +526,39 @@ impl Reader {
         }
     }
 
-    fn open(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<Output>> {
-        let opener = self.opener.as_mut().ok_or(missing("missing opener"))?;
-        Ok(match opener.advance(&mut self.input, work, cancel)? {
-            OpenStep::Yield => Some(Step::Yield),
-            OpenStep::NeedInput(request) => Some(Step::NeedInput(request)),
-            OpenStep::Root(header) => Some(Step::Ready(Neutral::Other(ReaderEvent::Box(header)))),
-            OpenStep::Ready => {
-                self.movie = Some(opener.finish(&self.input)?);
-                self.opener = None;
-                self.phase = Phase::Tracks;
-                None
-            }
-        })
-    }
-
-    /// Give each opened track its reading state, within the opener's track limit.
-    fn adopt_tracks(&mut self, work: &mut WorkBudget) -> Result<Option<Output>> {
-        let movie = self.movie.as_mut().ok_or(missing("missing movie"))?;
-        self.tracks.try_reserve_exact(movie.tracks.len())?;
-        work.take(movie.tracks.len() as u64);
-        let tracks = std::mem::replace(&mut movie.tracks, BudgetVec::new(&movie.pool));
-        for source in tracks {
-            let start = source.table().cursor().position();
-            let adopted = Track {
-                base: source.header().time_base()?,
-                language: packed_language(source.header().raw_mdhd.payload())?,
-                object_type: None,
-                configuration: None,
-                start,
-                regular: Some(start),
-                fragment: 0,
-                fragment_position: FragmentCursorPosition::default(),
-                head: None,
-                source,
-            };
-            self.tracks.try_push(adopted).map_err(|e| e.error)?;
-        }
-        self.phase = Phase::Entries;
-        Ok(None)
-    }
-
-    fn identify_entry(&mut self, work: &mut WorkBudget) -> Result<Option<Output>> {
-        let Some(track) = self.tracks.as_mut_slice().get_mut(self.entry) else {
-            self.phase = Phase::Packets;
-            return Ok(Some(Step::Ready(Neutral::Other(ReaderEvent::Movie))));
-        };
-        if track.configuration.is_none() {
-            if !work.try_charge(1) {
-                return Ok(Some(Step::Yield));
-            }
-            let entry = track
-                .descriptions()
-                .first()
-                .ok_or(missing("empty sample descriptions"))?;
-            let (scan, configuration) = entry_scan(track.header(), entry, &self.limits);
-            self.scan = scan;
-            track.configuration = Some(configuration);
-        }
-        if self.scan.is_none() {
-            self.entry += 1;
-        } else if step_entry_scan(&mut self.scan, track, work)? {
-            return Ok(Some(Step::Yield));
-        }
-        Ok(None)
-    }
-
     fn packet(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<Output>> {
-        if self.reading.is_none() {
+        let mut reading = if let Some(reading) = self.reading.take() {
+            reading
+        } else {
             for track in self.tracks.as_mut_slice() {
                 if !track.fill(work)? {
                     return Ok(Some(Step::Yield));
                 }
             }
-            let next = self
-                .tracks
-                .as_slice()
-                .iter()
-                .enumerate()
-                .filter_map(|(at, track)| track.head.as_ref().map(|s| (s.range.start, at)))
-                .min();
-            let Some((_, track)) = next else {
+            let Some((track, sample)) = take_earliest(self.tracks.as_mut_slice()) else {
                 self.phase = Phase::Ended;
                 return Ok(None);
             };
             if !work.try_charge(1) {
+                self.tracks.as_mut_slice()[track].head = Some(sample);
                 return Ok(Some(Step::Yield));
             }
-            let sample = self.tracks.as_mut_slice()[track]
-                .head
-                .take()
-                .ok_or(missing("missing sample"))?;
-            self.begin_reading(track, sample)?;
+            self.begin_reading(track, sample)?
+        };
+        match self.read_payload(&mut reading, work, cancel) {
+            Ok(Read::Payload(payload)) => self.finish_packet(reading, payload).map(Some),
+            Ok(Read::Pending(output)) => {
+                self.reading = Some(reading);
+                Ok(output)
+            }
+            Err(error) => {
+                self.reading = Some(reading);
+                Err(error)
+            }
         }
-        self.read_payload(work, cancel)
     }
 
-    fn begin_reading(&mut self, track: usize, sample: Sample) -> Result<()> {
+    fn begin_reading(&mut self, track: usize, sample: Sample) -> Result<Reading> {
         let extents = self.media_extents();
         let after = extents.partition_point(|extent| extent.start <= sample.range.start);
         let extent = after
@@ -590,36 +577,28 @@ impl Reader {
         if length != 0 && self.input.position() != sample.range.start {
             self.input.request_range(sample.range.start)?;
         }
-        self.reading = Some(Reading {
+        Ok(Reading {
             track,
             sample,
             buffer: None,
-        });
-        Ok(())
+        })
     }
 
     fn read_payload(
         &mut self,
+        reading: &mut Reading,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<Output>> {
+    ) -> Result<Read> {
         let pool = self.input.budget().clone();
-        let reading = self.reading.as_mut().ok_or(missing("missing read"))?;
         let range = &reading.sample.range;
         let length = usize::try_from(range.end - range.start).map_err(|_| Error::Overflow)?;
         if length == 0 {
-            return self
-                .finish_packet(Bytes::copy_from_slice(&pool, &[])?)
-                .map(Some);
+            return Ok(Read::Payload(Bytes::copy_from_slice(&pool, &[])?));
         }
-        let filled = reading.buffer.as_ref().map_or(0, BudgetVec::len);
-        if filled == length {
-            let buffer = reading
-                .buffer
-                .take()
-                .ok_or(missing("missing read buffer"))?;
+        if let Some(buffer) = reading.buffer.take_if(|buffer| buffer.len() == length) {
             return match buffer.freeze() {
-                Ok(payload) => self.finish_packet(payload).map(Some),
+                Ok(payload) => Ok(Read::Payload(payload)),
                 Err(rejected) => {
                     reading.buffer = Some(rejected.value);
                     Err(rejected.error)
@@ -629,7 +608,7 @@ impl Reader {
         if self.input.buffered().is_empty()
             && let Some(request) = self.input.pending_request(cancel)?
         {
-            return Ok(Some(Step::NeedInput(request)));
+            return Ok(Read::Pending(Some(Step::NeedInput(request))));
         }
         // A sample inside one window shares it; only a split sample is copied.
         if reading.buffer.is_none()
@@ -637,36 +616,37 @@ impl Reader {
             && work.remaining() >= length as u64
         {
             return match self.input.read_span(length, work, cancel)? {
-                Step::Ready(payload) => self.finish_packet(payload).map(Some),
-                Step::NeedInput(request) => Ok(Some(Step::NeedInput(request))),
-                Step::Yield => Ok(Some(Step::Yield)),
+                Step::Ready(payload) => Ok(Read::Payload(payload)),
+                Step::NeedInput(request) => Ok(Read::Pending(Some(Step::NeedInput(request)))),
+                Step::Yield => Ok(Read::Pending(Some(Step::Yield))),
                 Step::Backpressure(never) => match never {},
                 Step::End(_) => Err(Error::Truncated),
             };
         }
-        if reading.buffer.is_none() {
+        let buffer = if let Some(buffer) = &mut reading.buffer {
+            buffer
+        } else {
             let mut buffer = BudgetVec::new(&pool);
             buffer.try_reserve_exact(length)?;
-            reading.buffer = Some(buffer);
-        }
-        let buffer = reading
-            .buffer
-            .as_mut()
-            .ok_or(missing("missing read buffer"))?;
-        match self
-            .input
-            .read_append(buffer, length - filled, work, cancel)?
-        {
-            Step::Ready(_) => Ok(None),
-            Step::NeedInput(request) => Ok(Some(Step::NeedInput(request))),
-            Step::Yield => Ok(Some(Step::Yield)),
-            Step::Backpressure(never) => match never {},
-            Step::End(_) => Err(Error::Truncated),
-        }
+            reading.buffer.insert(buffer)
+        };
+        let filled = buffer.len();
+        Ok(Read::Pending(
+            match self
+                .input
+                .read_append(buffer, length - filled, work, cancel)?
+            {
+                Step::Ready(_) => None,
+                Step::NeedInput(request) => Some(Step::NeedInput(request)),
+                Step::Yield => Some(Step::Yield),
+                Step::Backpressure(never) => match never {},
+                Step::End(_) => return Err(Error::Truncated),
+            },
+        ))
     }
 
-    fn finish_packet(&mut self, payload: Bytes) -> Result<Output> {
-        let Reading { track, sample, .. } = self.reading.take().ok_or(missing("missing read"))?;
+    fn finish_packet(&self, reading: Reading, payload: Bytes) -> Result<Output> {
+        let Reading { track, sample, .. } = reading;
         let track = &self.tracks.as_slice()[track];
         let ticks = |value: Option<i128>| {
             value
@@ -682,78 +662,141 @@ impl Reader {
             payload,
         })))
     }
+}
 
-    fn seek(&mut self, work: &mut WorkBudget) -> Result<Option<Output>> {
-        let seeking = self.seeking.as_mut().ok_or(missing("missing seek"))?;
-        let tracks = self.tracks.as_mut_slice();
-        let Some(landing) = seeking.landing else {
-            let track = &mut tracks[seeking.track];
+/// Takes the head sample that starts first in the file, with its track's index; the
+/// earlier track on a tie.
+fn take_earliest(tracks: &mut [Track]) -> Option<(usize, Sample)> {
+    let (_, at) = tracks
+        .iter()
+        .enumerate()
+        .filter_map(|(at, track)| track.head.as_ref().map(|s| (s.range.start, at)))
+        .min()?;
+    tracks[at].head.take().map(|sample| (at, sample))
+}
+
+/// Gives each opened track its reading state, within the opener's track limit.
+fn adopt_tracks(tracks: &mut BudgetVec<Track>, sources: BudgetVec<MovieTrack>) -> Result<()> {
+    for source in sources {
+        let start = source.table().cursor().position();
+        let adopted = Track {
+            base: source.header().time_base()?,
+            language: packed_language(source.header().raw_mdhd.payload())?,
+            object_type: None,
+            configuration: None,
+            start,
+            regular: Some(start),
+            fragment: 0,
+            fragment_position: FragmentCursorPosition::default(),
+            head: None,
+            source,
+        };
+        tracks.try_push(adopted).map_err(|e| e.error)?;
+    }
+    Ok(())
+}
+
+/// Identifies the first sample entry of track `entry`, moving `entry` past it once done;
+/// past the last track, announces the movie.
+fn identify_entry(
+    tracks: &mut [Track],
+    entry: &mut usize,
+    scan: &mut Option<EntryScan>,
+    limits: &ReaderLimits,
+    work: &mut WorkBudget,
+) -> Result<Option<Output>> {
+    let Some(track) = tracks.get_mut(*entry) else {
+        return Ok(Some(Step::Ready(Neutral::Other(ReaderEvent::Movie))));
+    };
+    if track.configuration.is_none() {
+        if !work.try_charge(1) {
+            return Ok(Some(Step::Yield));
+        }
+        let first = track
+            .descriptions()
+            .first()
+            .ok_or(Error::Invalid("empty sample descriptions"))?;
+        let (found, configuration) = entry_scan(track.header(), first, limits);
+        *scan = found;
+        track.configuration = Some(configuration);
+    }
+    if scan.is_none() {
+        *entry += 1;
+    } else if step_entry_scan(scan, track, work)? {
+        return Ok(Some(Step::Yield));
+    }
+    Ok(None)
+}
+
+impl Seeking {
+    /// Finds the landing on the sought track, then positions every track after it;
+    /// `Some(Step::Ready)` with the receipt once done.
+    fn poll(&mut self, tracks: &mut [Track], work: &mut WorkBudget) -> Result<Option<Output>> {
+        let Some(landing) = self.landing else {
+            let track = &mut tracks[self.track];
             if !track.fill(work)? {
                 return Ok(Some(Step::Yield));
             }
             if let Some(sample) = track.head.take() {
                 if let (Access::ContainerSync, Some(cts)) = (sample.access, sample.cts_ticks) {
-                    seeking.first.get_or_insert((sample.ordinal, cts));
-                    if cts <= seeking.target && seeking.best.is_none_or(|(_, best)| cts >= best) {
-                        seeking.best = Some((sample.ordinal, cts));
+                    self.first.get_or_insert((sample.ordinal, cts));
+                    if cts <= self.target && self.best.is_none_or(|(_, best)| cts >= best) {
+                        self.best = Some((sample.ordinal, cts));
                     }
                 }
                 return Ok(None);
             }
-            let (ordinal, ticks) = seeking.best.or(seeking.first).ok_or(Error::Unsupported(
+            let (ordinal, ticks) = self.best.or(self.first).ok_or(Error::Unsupported(
                 "track states no timed random-access sample",
             ))?;
-            seeking.landing = Some(Landing {
+            self.landing = Some(Landing {
                 ordinal,
-                time: Time::from_ticks(ticks, tracks[seeking.track].base)?,
+                time: Time::from_ticks(ticks, tracks[self.track].base)?,
             });
             for track in tracks.iter_mut() {
                 track.rewind();
             }
             return Ok(None);
         };
-        if let Some(track) = tracks.get_mut(seeking.at) {
+        if let Some(track) = tracks.get_mut(self.at) {
             if !track.fill(work)? {
                 return Ok(Some(Step::Yield));
             }
-            if seeking.at != seeking.track && seeking.resume.is_none() {
-                seeking.resume = Some(landing.time.to_ticks(track.base, Rounding::Ceil)?);
+            if self.at != self.track && self.resume.is_none() {
+                self.resume = Some(landing.time.to_ticks(track.base, Rounding::Ceil)?);
             }
             let reached = track.head.as_ref().is_none_or(|head| {
-                if seeking.at == seeking.track {
+                if self.at == self.track {
                     head.ordinal == landing.ordinal
                 } else {
                     // A sample with no time cannot be placed, so it is not dropped.
                     head.dts_ticks
                         .or(head.cts_ticks)
-                        .zip(seeking.resume)
+                        .zip(self.resume)
                         .is_none_or(|(ticks, resume)| ticks >= resume)
                 }
             });
             if reached {
-                seeking.at += 1;
-                seeking.resume = None;
+                self.at += 1;
+                self.resume = None;
             } else {
                 track.head = None;
-                seeking.skipped = true;
+                self.skipped = true;
             }
             return Ok(None);
         }
-        let discard_until = match seeking.policy {
+        let discard_until = match self.policy {
             SeekPolicy::PreviousRandomAccess => landing.time,
-            SeekPolicy::PlaybackPreroll => landing.time.max(seeking.requested),
+            SeekPolicy::PlaybackPreroll => landing.time.max(self.requested),
         };
-        let receipt = SeekReceipt {
-            requested: seeking.requested,
+        Ok(Some(Step::Ready(Neutral::Seek(SeekReceipt {
+            requested: self.requested,
             landing: landing.time,
             discard_until,
             method: SeekMethod::Index,
             scanned_bytes: 0,
-            replays_from_start: !seeking.skipped,
-        };
-        self.seeking = None;
-        self.phase = Phase::Packets;
-        Ok(Some(Step::Ready(Neutral::Seek(receipt))))
+            replays_from_start: !self.skipped,
+        }))))
     }
 }
 
@@ -851,14 +894,10 @@ impl ContainerReader for Reader {
     /// Keeps nothing: the source is read and indexed again from its start.
     fn reset(&mut self) -> Result<InputRequest> {
         let request = self.input.reset(0)?;
-        self.opener = Some(MovieOpen::new(&self.input, self.limits.open)?);
-        self.phase = Phase::Open;
+        self.phase = Phase::Open(MovieOpen::new(&self.input, self.limits.open)?);
         self.movie = None;
         self.tracks.clear();
-        self.entry = 0;
-        self.scan = None;
         self.reading = None;
-        self.seeking = None;
         self.failed = None;
         Ok(request)
     }
@@ -898,7 +937,7 @@ impl ContainerReader for Reader {
             track.rewind();
         }
         self.reading = None;
-        self.seeking = Some(Seeking {
+        self.phase = Phase::Seek(Seeking {
             track,
             policy: request.policy,
             requested: request.target,
@@ -910,7 +949,6 @@ impl ContainerReader for Reader {
             resume: None,
             skipped: false,
         });
-        self.phase = Phase::Seek;
         Ok(position)
     }
     fn track_count(&self) -> usize {
