@@ -72,6 +72,27 @@ impl TransportStream {
             ),
             Route::Ignore => None,
         };
+        if !packet.transport_error
+            && packet.scrambling == 0
+            && matches!(
+                outcome,
+                None | Some(ContinuityOutcome::First | ContinuityOutcome::Continuous)
+            )
+        {
+            self.stage = Stage::Clock;
+        } else {
+            self.observe_exception(outcome)?;
+        }
+        Ok(Counted::Done(outcome))
+    }
+
+    /// The continuity stage of a damaged, scrambled, duplicate or discontinuous carrier.
+    #[cold]
+    fn observe_exception(&mut self, outcome: Option<ContinuityOutcome>) -> Result<()> {
+        let packet = self
+            .packet
+            .as_ref()
+            .ok_or(Error::Invalid("TS packet missing"))?;
         let pid = packet.pid;
         let start = packet.payload_unit_start;
         let bad = if packet.transport_error {
@@ -121,7 +142,7 @@ impl TransportStream {
         } else {
             self.stage = Stage::Clock;
         }
-        Ok(Counted::Done(outcome))
+        Ok(())
     }
 
     pub(super) fn feed<const FEED: bool>(&mut self, work: &mut WorkBudget) -> Result<()> {
