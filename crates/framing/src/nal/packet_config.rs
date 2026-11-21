@@ -245,7 +245,7 @@ impl<'a> NalPacketConfigWriter<'a> {
                     Err(declared) => {
                         self.rejected_array = Some(declared);
                         return Err(Error::Unsupported(
-                            "HEVC configuration array of an unsupported type",
+                            "HEVC array type outside the decoder set",
                         ));
                     }
                 },

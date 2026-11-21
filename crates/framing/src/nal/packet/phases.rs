@@ -165,7 +165,7 @@ impl PacketPlan {
             Ok(false) => return Ok(YIELD),
             Err(_) => {
                 return Err(Error::Unsupported(
-                    "HEVC configuration array of an unsupported type",
+                    "HEVC array type outside the decoder set",
                 ));
             }
         }
@@ -262,7 +262,7 @@ impl PacketPlan {
         }
         if self.length == 0 {
             state.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyHevcNal);
-            return Err(Error::Invalid("empty HEVC NAL unit"));
+            return Err(Error::Invalid("HEVC NAL length of zero"));
         }
         if self.look_nals == state.session.limits.maximum_nals {
             return Err(Error::Limit {

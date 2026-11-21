@@ -745,7 +745,7 @@ fn unsupported_hevc_initial_array_retains_raw_source_and_has_no_fake_output() {
     assert!(matches!(
         writer.step(&mut refusal, &cancel),
         Err(Error::Unsupported(
-            "HEVC configuration array of an unsupported type"
+            "HEVC array type outside the decoder set"
         ))
     ));
     assert_eq!(refusal.remaining(), 0);

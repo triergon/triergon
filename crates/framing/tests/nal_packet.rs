@@ -1180,12 +1180,15 @@ fn hevc_zero_nals_and_unknown_arrays_fail_before_any_exact_reservation() {
                 assert!(matches!(
                     result,
                     Err(Error::Unsupported(
-                        "HEVC configuration array of an unsupported type"
+                        "HEVC array type outside the decoder set"
                     ))
                 ));
                 assert!(j.take_receiver_rejection().is_none());
             } else {
-                assert!(matches!(result, Err(Error::Invalid("empty HEVC NAL unit"))));
+                assert!(matches!(
+                    result,
+                    Err(Error::Invalid("HEVC NAL length of zero"))
+                ));
                 assert_eq!(
                     j.take_receiver_rejection().unwrap().kind(),
                     NalPacketReceiverErrorKind::EmptyHevcNal
