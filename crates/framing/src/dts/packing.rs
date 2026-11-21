@@ -288,7 +288,7 @@ impl Dts14BitUnpacker {
                             self.phase = Phase::Publish;
                         }
                         Err(error) => {
-                            self.output = Some(error.buffer);
+                            self.output = Some(error.value);
                             return Err(error.error);
                         }
                     }

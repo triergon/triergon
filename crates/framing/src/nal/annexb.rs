@@ -154,7 +154,7 @@ impl AnnexBWriter {
         let bytes = match output.freeze() {
             Ok(bytes) => bytes,
             Err(rejected) => {
-                self.output = Some(rejected.buffer);
+                self.output = Some(rejected.value);
                 return Err(rejected.error);
             }
         };

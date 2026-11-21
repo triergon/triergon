@@ -942,7 +942,7 @@ mod descriptor_guards {
         let limit = Budget::control_storage_bytes() + owner_bytes + table_bytes;
         let pool = Budget::new(limit).unwrap();
         let owner = Bytes::try_from_vec(&pool, backing)
-            .map_err(|e| e.error())
+            .map_err(|e| e.error)
             .unwrap();
         let raw = owner.slice(19..record_end).unwrap();
         let source = HvcConfigSource {

@@ -496,7 +496,7 @@ impl Dts14CarrierReader {
                     match b.freeze() {
                         Ok(raw) => self.raw = Some(raw),
                         Err(e) => {
-                            self.buffer = Some(e.buffer);
+                            self.buffer = Some(e.value);
                             return Err(e.error);
                         }
                     }

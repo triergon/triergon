@@ -643,7 +643,7 @@ impl DtsCoreFrameReader {
                             self.phase = Phase::Publish;
                         }
                         Err(failure) => {
-                            self.buffer = Some(failure.buffer);
+                            self.buffer = Some(failure.value);
                             return Err(failure.error);
                         }
                     }

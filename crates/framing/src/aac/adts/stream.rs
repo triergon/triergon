@@ -5,7 +5,7 @@ use super::carrier::AacAdtsCarrier;
 use super::{AacAdtsFrame, AacAdtsHeader};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
-    Budget, BudgetVec, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
+    Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
     SourceCapabilities, SourceFailure, SourceId, Step, WorkBudget,
 };
 
@@ -333,8 +333,8 @@ impl AacAdtsStreamReader {
         let source = self
             .cursor
             .as_ref()
-            .and_then(InputCursor::retained_window)
-            .map_or(0, |b| b.retained_storage_bytes());
+            .and_then(InputCursor::buffered_owner)
+            .map_or(0, Bytes::retained_storage_bytes);
         let capacity = self.buffer.as_ref().map_or(0, BudgetVec::capacity);
         Budget::control_storage_bytes()
             .checked_add(source)

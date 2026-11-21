@@ -183,7 +183,7 @@ fn configuration_keeps_full_hidden_owner_after_record_closes() {
     let mut parent = vec![0xa5; raw.len() + 2048];
     parent[127..127 + raw.len()].copy_from_slice(&raw);
     let root = Bytes::try_from_vec(&pool, parent)
-        .map_err(|e| e.error())
+        .map_err(|e| e.error)
         .unwrap();
     let retained = root.retained_storage_bytes();
     let record = hevc(&pool, root.slice(127..127 + raw.len()).unwrap(), 1);

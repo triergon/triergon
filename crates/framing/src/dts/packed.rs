@@ -356,7 +356,7 @@ impl DtsPackedPayloadJob {
                             self.phase = Phase::Publish;
                         }
                         Err(failure) => {
-                            self.builder = Some(failure.buffer);
+                            self.builder = Some(failure.value);
                             return Err(failure.error);
                         }
                     }

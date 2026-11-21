@@ -358,7 +358,7 @@ impl AacAdtsStreamReader {
         let raw = match b.freeze() {
             Ok(b) => b,
             Err(e) => {
-                self.buffer = Some(e.buffer);
+                self.buffer = Some(e.value);
                 return Err(e.error);
             }
         };
@@ -464,7 +464,7 @@ impl AacAdtsStreamReader {
         let raw = match b.freeze() {
             Ok(b) => b,
             Err(e) => {
-                self.buffer = Some(e.buffer);
+                self.buffer = Some(e.value);
                 return Err(e.error);
             }
         };

@@ -132,7 +132,7 @@ pub(crate) fn freeze_annex_b_output(
     match buffer.freeze() {
         Ok(bytes) => Ok(bytes),
         Err(error) => {
-            *output = Some(error.buffer);
+            *output = Some(error.value);
             Err(error.error)
         }
     }

@@ -106,7 +106,7 @@ fn source(pool: &Budget, raw: &[u8]) -> NalPacket {
     let mut backing = vec![0x7f; 1024];
     backing[100..100 + raw.len()].copy_from_slice(raw);
     let owner = Bytes::try_from_vec(pool, backing)
-        .map_err(|e| e.error())
+        .map_err(|e| e.error)
         .unwrap();
     NalPacket {
         bytes: owner.slice(100..100 + raw.len()).unwrap(),

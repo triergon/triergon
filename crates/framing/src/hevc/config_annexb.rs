@@ -197,7 +197,7 @@ impl HvcAnnexBWriter {
                     let bytes = match out.freeze() {
                         Ok(b) => b,
                         Err(e) => {
-                            self.output = Some(e.buffer);
+                            self.output = Some(e.value);
                             return Err(e.error);
                         }
                     };

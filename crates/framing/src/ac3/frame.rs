@@ -894,7 +894,7 @@ impl Ac3FrameReader {
                     let bytes = match buffer.freeze() {
                         Ok(bytes) => bytes,
                         Err(rejected) => {
-                            self.buffer = Some(rejected.buffer);
+                            self.buffer = Some(rejected.value);
                             return Err(rejected.error);
                         }
                     };

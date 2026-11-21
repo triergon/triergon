@@ -731,7 +731,7 @@ fn hidden_parent_offsets_are_record_relative_and_fully_charged() {
         let mut parent = vec![0xa5; record.len() + 4096];
         parent[127..127 + record.len()].copy_from_slice(&record);
         let root = Bytes::try_from_vec(&pool, parent)
-            .map_err(|e| e.error())
+            .map_err(|e| e.error)
             .unwrap();
         let full = root.retained_storage_bytes();
         let span = root.slice(127..127 + record.len()).unwrap();
@@ -997,7 +997,10 @@ fn hevc_late_nal_spill_preserves_the_array_prefix_after_backpressure() {
     let mut work = WorkBudget::new(1);
     assert!(matches!(
         parser.step(&mut work, &NO),
-        Err(Error::Backpressure { available: 0, .. })
+        Err(Error::Backpressure(triergon_core::Backpressure {
+            available: 0,
+            ..
+        }))
     ));
     assert_eq!(work.remaining(), 0);
     drop(blocker);

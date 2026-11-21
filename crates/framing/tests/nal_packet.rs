@@ -764,7 +764,11 @@ fn spill_pressure_keeps_a_verified_update_until_resume_or_cancellation() {
         loop {
             match j.step(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
                 Ok(BuildStep::Yield) => (),
-                Err(Error::Backpressure { requested, .. }) if requested == table => break,
+                Err(Error::Backpressure(triergon_core::Backpressure { requested, .. }))
+                    if requested == table =>
+                {
+                    break;
+                }
                 _ => panic!("spill must pause without publishing"),
             }
         }

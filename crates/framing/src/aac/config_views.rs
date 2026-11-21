@@ -254,7 +254,7 @@ impl AacAscScopeParser {
                         *output = Some(AacAscScopeOutcome::Refused(e));
                         *slot = None;
                     }
-                    Err(e @ Error::Backpressure { requested, .. }) => {
+                    Err(e @ Error::Backpressure(triergon_core::Backpressure { requested, .. })) => {
                         let minimum = self.minimum_owned_storage(requested)?;
                         if minimum > self.pool.limit() {
                             return Err(Error::Limit {

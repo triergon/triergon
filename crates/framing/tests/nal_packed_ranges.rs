@@ -67,7 +67,7 @@ fn all255_array_indices_and_source_fields_survive_hidden_parent_and_close() {
         let mut storage = vec![0xa5; bytes.len() + 511];
         storage[31..31 + bytes.len()].copy_from_slice(&bytes);
         let root = Bytes::try_from_vec(&pool, storage)
-            .map_err(|e| e.error())
+            .map_err(|e| e.error)
             .unwrap();
         let retained = root.retained_storage_bytes();
         let config = parsed(&pool, root.slice(31..31 + bytes.len()).unwrap(), quantum);

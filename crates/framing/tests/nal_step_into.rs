@@ -63,7 +63,7 @@ fn hidden(pool: &Budget, raw: &[u8]) -> Bytes {
     let mut owner = vec![0xa5; 512];
     owner[32..32 + raw.len()].copy_from_slice(raw);
     Bytes::try_from_vec(pool, owner)
-        .map_err(|e| e.error())
+        .map_err(|e| e.error)
         .unwrap()
         .slice(32..32 + raw.len())
         .unwrap()

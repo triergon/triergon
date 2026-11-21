@@ -749,14 +749,14 @@ fn mixed_tables_retry_the_array_then_nal_reservation_without_repeating_fill() {
         let arrays_reserved = array_bytes == 0 || admit_arrays;
         assert_eq!(
             error,
-            Error::Backpressure {
+            Error::Backpressure(triergon_core::Backpressure {
                 requested: if arrays_reserved {
                     nal_bytes
                 } else {
                     array_bytes
                 },
                 available: 0,
-            }
+            })
         );
         let count_work = 2 + 2 * u64::from(array_count) + u64::from(nal_count);
         assert_eq!(

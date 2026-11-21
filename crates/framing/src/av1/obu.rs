@@ -584,7 +584,7 @@ impl Av1ObuReader {
                     let wire = match output.freeze() {
                         Ok(wire) => wire,
                         Err(rejected) => {
-                            self.output = Some(rejected.buffer);
+                            self.output = Some(rejected.value);
                             return Err(rejected.error);
                         }
                     };
