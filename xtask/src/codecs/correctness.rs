@@ -670,7 +670,7 @@ fn audio_decoder(
 
 // Compare native MP3 frames in source order, accumulating each speaker separately.
 fn native_mp3_compare(candidate: &[u8], reference: &[u8], rules: &Rules) -> Option<Value> {
-    fn parse(bytes: &[u8]) -> Option<Vec<(u32, u32, Vec<u8>)>> {
+    fn parse(bytes: &[u8]) -> Option<Vec<(u32, u32, &[u8])>> {
         let mut pos = 0usize;
         let mut frames = Vec::new();
         loop {
@@ -691,7 +691,7 @@ fn native_mp3_compare(candidate: &[u8], reference: &[u8], rules: &Rules) -> Opti
                     .checked_mul(samples as usize)?
                     .checked_mul(4)?,
             )?;
-            frames.push((rate, channels, bytes.get(pos..end)?.to_vec()));
+            frames.push((rate, channels, bytes.get(pos..end)?));
             pos = end;
         }
     }

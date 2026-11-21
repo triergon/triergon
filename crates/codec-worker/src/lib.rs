@@ -215,14 +215,7 @@ fn file_audio<const FLAC_FRAMES: bool, const MP3_FRAMES: bool>(data: &[u8], out:
         }
         let decoded = decoder.decode(&packet, &mut frame);
         if FLAC_FRAMES || MP3_FRAMES {
-            if MP3_FRAMES && frame.samples_per_channel > 0 {
-                use triergon_codec::Speaker::{FrontCenter, FrontLeft, FrontRight};
-                assert!(matches!(
-                    frame.layout.speakers(),
-                    [FrontCenter] | [FrontLeft, FrontRight]
-                ));
-            }
-            emit_flac_frame(decoded, &frame, &mut bytes, out);
+            emit_native_frame::<MP3_FRAMES>(decoded, &frame, &mut bytes, out);
         } else {
             emit_mixed(decoded, &frame, &mut downmix, &mut pcm, &mut bytes, out);
         }
@@ -230,14 +223,7 @@ fn file_audio<const FLAC_FRAMES: bool, const MP3_FRAMES: bool>(data: &[u8], out:
     if let Some((_, decoder)) = decoder.as_mut() {
         let flushed = decoder.flush(&mut frame).map(|()| None);
         if FLAC_FRAMES || MP3_FRAMES {
-            if MP3_FRAMES && frame.samples_per_channel > 0 {
-                use triergon_codec::Speaker::{FrontCenter, FrontLeft, FrontRight};
-                assert!(matches!(
-                    frame.layout.speakers(),
-                    [FrontCenter] | [FrontLeft, FrontRight]
-                ));
-            }
-            emit_flac_frame(flushed, &frame, &mut bytes, out);
+            emit_native_frame::<MP3_FRAMES>(flushed, &frame, &mut bytes, out);
         } else {
             emit_mixed(flushed, &frame, &mut downmix, &mut pcm, &mut bytes, out);
         }
@@ -248,16 +234,23 @@ fn file_audio<const FLAC_FRAMES: bool, const MP3_FRAMES: bool>(data: &[u8], out:
 }
 
 /// Emit the current format followed by the interleaved samples of this frame.
-fn emit_flac_frame(
+fn emit_native_frame<const MP3: bool>(
     decoded: Result<Option<triergon_codec::DownmixLevels>, triergon_codec::DecodeFailure>,
     frame: &AudioFrame,
     bytes: &mut Vec<u8>,
     out: &mut Output,
 ) {
-    decoded.expect("decode FLAC frame");
+    decoded.expect("decode native audio frame");
     let samples = frame.samples_per_channel;
     if samples == 0 {
         return;
+    }
+    if MP3 {
+        use triergon_codec::Speaker::{FrontCenter, FrontLeft, FrontRight};
+        assert!(matches!(
+            frame.layout.speakers(),
+            [FrontCenter] | [FrontLeft, FrontRight]
+        ));
     }
     let channels = frame.layout.channels();
     assert_eq!(frame.planes.len(), channels);
