@@ -10,7 +10,7 @@ use crate::{
     Error, Limits, Result, ebml,
     element::{
         ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader, EpochAdmission,
-        control::{EnvelopeProgress, ReplayLocation},
+        control::EnvelopeProgress, replay::ReplayLocation,
     },
     storage::SharedBytes,
 };

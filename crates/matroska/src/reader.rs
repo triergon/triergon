@@ -17,9 +17,8 @@ use crate::{
     Error, Limits, Result, ebml,
     element::{
         Admit, ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader,
-        control::{
-            CompactElementEvent, CompactEnvelopeProgress as EnvelopeProgress, ReplayLocation,
-        },
+        control::{CompactElementEvent, CompactEnvelopeProgress as EnvelopeProgress},
+        replay::ReplayLocation,
     },
     metadata::{
         Attachment, Catalogue, SharedDocument,
@@ -584,7 +583,7 @@ impl Reader {
     // Seek and metadata transactions have separate refill boundaries.
     fn ordinary_header_refill(
         &self,
-    ) -> Result<Option<crate::element::control::HeaderRefillRequest>> {
+    ) -> Result<Option<crate::element::refill::HeaderRefillRequest>> {
         if self.resolver.is_some()
             || self.opening.is_some()
             || self.pending_seek.is_some()
@@ -627,7 +626,7 @@ impl Reader {
     fn header_refill_for_request(
         &self,
         request: &InputRequest,
-    ) -> Result<Option<crate::element::control::HeaderRefillRequest>> {
+    ) -> Result<Option<crate::element::refill::HeaderRefillRequest>> {
         let Some(plan) = self.ordinary_header_refill()? else {
             return Ok(None);
         };
@@ -643,7 +642,7 @@ impl Reader {
     fn blocking_seek_header_refill(
         &self,
         request: &InputRequest,
-    ) -> Result<Option<crate::element::control::HeaderRefillRequest>> {
+    ) -> Result<Option<crate::element::refill::HeaderRefillRequest>> {
         if self.pending_seek.is_none() || self.resolver.is_some() || self.opening.is_some() {
             return Ok(None);
         }
@@ -676,7 +675,7 @@ impl Reader {
     fn blocking_seek_discard_refill(
         &self,
         request: &InputRequest,
-    ) -> Result<Option<crate::element::control::HeaderRefillRequest>> {
+    ) -> Result<Option<crate::element::refill::HeaderRefillRequest>> {
         if self.pending_seek.is_none() || self.resolver.is_some() || self.opening.is_some() {
             return Ok(None);
         }

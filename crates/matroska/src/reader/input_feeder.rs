@@ -152,7 +152,7 @@ impl<R: Read> InputFeeder<R> {
     pub(crate) fn feed_typed_discard_refill(
         &mut self,
         input: &mut InputCursor,
-        plan: &crate::element::control::HeaderRefillRequest,
+        plan: &crate::element::refill::HeaderRefillRequest,
         cancel: &AtomicBool,
         reposition: Option<fn(&mut R, u64) -> io::Result<u64>>,
     ) -> Result<FeedStep> {
@@ -166,7 +166,7 @@ impl<R: Read> InputFeeder<R> {
     pub(crate) fn feed_typed_header_refill(
         &mut self,
         input: &mut InputCursor,
-        plan: &crate::element::control::HeaderRefillRequest,
+        plan: &crate::element::refill::HeaderRefillRequest,
         cancel: &AtomicBool,
         reposition: Option<fn(&mut R, u64) -> io::Result<u64>>,
     ) -> Result<FeedStep> {

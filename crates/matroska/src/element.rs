@@ -967,6 +967,8 @@ impl ElementReader {
     }
 }
 pub(crate) mod control;
+pub(crate) mod refill;
+pub(crate) mod replay;
 
 #[cfg(test)]
 pub(crate) mod tests;

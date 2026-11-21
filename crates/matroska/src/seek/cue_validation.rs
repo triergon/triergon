@@ -9,7 +9,7 @@ use crate::step::{ParseStep, Required, check};
 use crate::{
     Error, Limits, Result, ebml,
     element::{
-        ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader, control::ReplayLocation,
+        ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader, replay::ReplayLocation,
     },
 };
 use std::sync::atomic::AtomicBool;
