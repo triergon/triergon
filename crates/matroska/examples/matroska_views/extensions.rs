@@ -148,7 +148,11 @@ pub(super) fn operation<'a>(
         _ => return Err("expected no argument or source".into()),
     };
     Ok(Operation {
-        name: "mkv-track-extensions",
+        name: if raw {
+            "mkv-track-extensions-oracle"
+        } else {
+            "mkv-track-extensions"
+        },
         run: Box::new(move |work, trace| {
             let mut rows = Rows { work, trace };
             let result = run(bytes, raw, &mut rows);
