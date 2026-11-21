@@ -2,6 +2,7 @@
 
 use super::event::TraceEvent;
 use super::{Held, Route, Stage, TransportStream};
+use crate::pes::PesAssembler;
 use crate::table_storage;
 use triergon_core::{Bytes, Error, Result};
 
@@ -57,7 +58,11 @@ impl TransportStorageCursor {
         let routes = stream.routes.as_slice();
         let item = match *self {
             Self::BlockedSpan(index) => {
-                if let Some(bytes) = routes[blocked].assembler.span_backing(index) {
+                if let Some(bytes) = routes[blocked]
+                    .assembler
+                    .as_ref()
+                    .and_then(|assembler| assembler.span_backing(index))
+                {
                     *self = Self::BlockedSpan(index + 1);
                     Some(StorageItem::CountedBytes(bytes))
                 } else {
@@ -69,7 +74,8 @@ impl TransportStorageCursor {
                 *self = Self::Carrier;
                 routes[blocked]
                     .assembler
-                    .pending_backing()
+                    .as_ref()
+                    .and_then(PesAssembler::pending_backing)
                     .map(StorageItem::CountedBytes)
             }
             Self::Carrier => {
@@ -130,8 +136,9 @@ impl TransportStorageCursor {
                 }
             }
             Self::Assembler(index) => {
-                if index != blocked {
-                    let assembler = &routes[index].assembler;
+                if index != blocked
+                    && let Some(assembler) = &routes[index].assembler
+                {
                     *self = Self::Span(index, 0);
                     Some(StorageItem::Fixed(assembler.table_storage()?))
                 } else {
@@ -140,7 +147,10 @@ impl TransportStorageCursor {
                 }
             }
             Self::Span(route, index) => {
-                let assembler = &routes[route].assembler;
+                let assembler = routes[route]
+                    .assembler
+                    .as_ref()
+                    .expect("retained PES route");
                 if let Some(bytes) = assembler.span_backing(index) {
                     *self = Self::Span(route, index + 1);
                     Some(StorageItem::Bytes(bytes))
@@ -153,7 +163,8 @@ impl TransportStorageCursor {
                 *self = Self::Route(route + 1);
                 routes[route]
                     .assembler
-                    .pending_backing()
+                    .as_ref()
+                    .and_then(PesAssembler::pending_backing)
                     .map(StorageItem::Bytes)
             }
             Self::End => None,
@@ -178,7 +189,8 @@ impl TransportStream {
         }
         let Some(span_floor) = self.routes.as_slice()[index]
             .assembler
-            .blocked_growth_floor()
+            .as_ref()
+            .and_then(PesAssembler::blocked_growth_floor)
         else {
             return Ok(None);
         };

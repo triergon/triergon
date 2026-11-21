@@ -67,7 +67,9 @@ impl TransportStream {
             self.clock_samples = Some(1);
             for route in self.routes.as_mut_slice() {
                 route.epochs.clock = self.clock_epoch;
-                route.assembler.discard(route.epochs);
+                if let Some(assembler) = route.assembler.as_mut() {
+                    assembler.discard(route.epochs);
+                }
             }
             return Ok(Some(TraceEvent::Timeline {
                 program: self.program,

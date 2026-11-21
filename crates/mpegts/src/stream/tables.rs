@@ -111,8 +111,13 @@ impl TransportStream {
                 }
             }
             Route::Pes(index) => {
-                if let Some(route) = self.routes.as_mut_slice().get_mut(index) {
-                    route.assembler.discard(route.epochs);
+                if let Some(PesRoute {
+                    assembler: Some(assembler),
+                    epochs,
+                    ..
+                }) = self.routes.as_mut_slice().get_mut(index)
+                {
+                    assembler.discard(*epochs);
                 }
             }
             Route::Clock | Route::Ignore => {}
@@ -207,18 +212,21 @@ impl TransportStream {
                 clock: self.clock_epoch,
                 configuration: build.epoch,
             };
-            // A reused route gets the active route's assembly at commit; the
-            // fresh one built here reserves nothing.
-            let mut assembler = PesAssembler::new(
-                stream.pid,
-                is_video_stream_type(stream.stream_type),
-                self.budget.clone(),
-                self.limits,
-                epochs,
-            )?;
-            if self.unbounded_adts && stream.stream_type == 0x0f {
-                assembler.allow_unbounded_adts();
-            }
+            let assembler = if reuse.is_some() {
+                None
+            } else {
+                let mut assembler = PesAssembler::new(
+                    stream.pid,
+                    is_video_stream_type(stream.stream_type),
+                    self.budget.clone(),
+                    self.limits,
+                    epochs,
+                )?;
+                if self.unbounded_adts && stream.stream_type == 0x0f {
+                    assembler.allow_unbounded_adts();
+                }
+                Some(assembler)
+            };
             build
                 .routes
                 .try_push(PesRoute {
@@ -226,7 +234,7 @@ impl TransportStream {
                     stream_type: stream.stream_type,
                     descriptors: stream.descriptor_bytes.clone(),
                     epochs,
-                    continuity: Continuity::new(stream.pid)?,
+                    continuity: Some(Continuity::new(stream.pid)?),
                     assembler,
                     reuse,
                 })
@@ -244,8 +252,8 @@ impl TransportStream {
         for route in build.routes.as_mut_slice() {
             if let Some(index) = route.reuse.take() {
                 let previous = &mut self.routes.as_mut_slice()[index];
-                std::mem::swap(&mut route.assembler, &mut previous.assembler);
-                std::mem::swap(&mut route.continuity, &mut previous.continuity);
+                route.assembler = previous.assembler.take();
+                route.continuity = previous.continuity.take();
                 route.epochs = previous.epochs;
             }
         }
@@ -506,15 +514,8 @@ mod tests {
                     stream_type: 0x1b,
                     descriptors: Bytes::copy_from_slice(&pool, &[]).unwrap(),
                     epochs: stream.source_epochs(),
-                    continuity: Continuity::new(pid).unwrap(),
-                    assembler: PesAssembler::new(
-                        pid,
-                        true,
-                        pool.clone(),
-                        limits,
-                        stream.source_epochs(),
-                    )
-                    .unwrap(),
+                    continuity: Some(Continuity::new(pid).unwrap()),
+                    assembler: None,
                     reuse: None,
                 })
                 .unwrap();

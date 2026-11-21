@@ -206,9 +206,6 @@ impl PesAssembler {
 
     /// One TS payload at a time. Drain poll before supplying another. A rejected
     /// input is returned intact; no bytes have been consumed from that input.
-    // Out of line: inlined into the payload stage, it makes every carrier save the
-    // registers only a PES start needs.
-    #[inline(never)]
     pub fn push(
         &mut self,
         bytes: Bytes,

@@ -46,11 +46,8 @@ struct PesRoute {
     stream_type: u8,
     descriptors: Bytes,
     epochs: SourceEpochs,
-    continuity: Continuity,
-    assembler: PesAssembler,
-    /// While a map is staged: the active route with the same stream, whose
-    /// continuity and assembly this one takes over at commit. Committed routes
-    /// keep it `None`; it stays in every route so the charged route size is fixed.
+    continuity: Option<Continuity>,
+    assembler: Option<PesAssembler>,
     reuse: Option<usize>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -281,7 +278,11 @@ impl TransportStream {
         {
             return Err(Error::SourceMismatch);
         }
-        route.assembler.resume_elementary_offset(offset)
+        route
+            .assembler
+            .as_mut()
+            .ok_or(Error::SourceMismatch)?
+            .resume_elementary_offset(offset)
     }
     pub(crate) fn route_state(
         &self,
@@ -293,7 +294,10 @@ impl TransportStream {
             .get(index)
             .filter(|route| route.pid == pid)
             .map(|route| {
-                let pending = route.assembler.pending_header_location();
+                let pending = route
+                    .assembler
+                    .as_ref()
+                    .and_then(PesAssembler::pending_header_location);
                 (route.epochs, pending)
             })
     }

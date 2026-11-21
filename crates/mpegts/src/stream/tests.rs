@@ -389,8 +389,8 @@ impl PayloadFeed {
                 stream_type: 0x1b,
                 descriptors: Bytes::copy_from_slice(&pool, &[]).unwrap(),
                 epochs,
-                continuity,
-                assembler,
+                continuity: Some(continuity),
+                assembler: Some(assembler),
                 reuse: None,
             })
             .unwrap();
@@ -639,6 +639,8 @@ fn rejected_pes_payload_stays_available_for_a_drained_retry() {
     let blocker = Bytes::copy_from_slice(&pool, &[2; 4]).unwrap();
     feed.stream.routes.as_mut_slice()[0]
         .assembler
+        .as_mut()
+        .unwrap()
         .push(blocker, false, SOURCE, 188)
         .unwrap();
     let mut packet = crate::transport::parse_transport(
@@ -674,6 +676,8 @@ fn rejected_pes_payload_stays_available_for_a_drained_retry() {
     assert!(matches!(
         feed.stream.routes.as_mut_slice()[0]
             .assembler
+            .as_mut()
+            .unwrap()
             .poll_source::<false>(&mut work, &AtomicBool::new(false))
             .unwrap(),
         AssemblyStep::NeedPayload

@@ -73,6 +73,8 @@ impl TransportStream {
             Route::Pes(index) => Some(
                 self.routes.as_mut_slice()[index]
                     .continuity
+                    .as_mut()
+                    .ok_or(Error::Invalid("PES continuity missing"))?
                     .observe(packet)?,
             ),
             Route::Clock => Some(
@@ -182,7 +184,10 @@ impl TransportStream {
             }
         };
         let payload = &mut packet.payload;
-        let assembler = &mut self.routes.as_mut_slice()[index].assembler;
+        let assembler = self.routes.as_mut_slice()[index]
+            .assembler
+            .as_mut()
+            .ok_or(Error::Invalid("PES route missing"))?;
         if !pusi
             && self.feed_omissions.is_none()
             && assembler.retain_body_carrier(
@@ -344,7 +349,10 @@ impl TransportStream {
         let result = match self.route {
             Route::Pat | Route::Pmt => return self.drain_section(work, cancel),
             Route::Pes(index) => {
-                let assembler = &mut self.routes.as_mut_slice()[index].assembler;
+                let assembler = self.routes.as_mut_slice()[index]
+                    .assembler
+                    .as_mut()
+                    .ok_or(Error::Invalid("PES route missing"))?;
                 let step = Self::poll_pes(
                     assembler,
                     !FEED || self.feed_omissions.is_none(),
