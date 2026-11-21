@@ -322,67 +322,6 @@
         "needs": "ass-render compares character-first and advance-first rotation through image placement. A direct comparison is needed for GlyphRotations::get, len and is_empty and for an extent-first lookup, since rendering never queries the accessors or loads extents before the advance."
       }
     ],
-    "triergon-subtitles": [
-      {
-        "name": "text-extraction",
-        "entry_points": ["text::Extractor", "text::Cue", "text::RawClock", "text::Addition"],
-        "degree": "unit-tests",
-        "needs": "a worker operation extracting WebVTT in Matroska, tx3g, UTF-8 and ASS samples, folded against the packets and WebVTT side data the reference's demuxers return; only triergon-bridge's tests drive it"
-      },
-      {
-        "name": "charset-conversion",
-        "entry_points": ["text::charset::CharsetJob", "text::charset::Charset", "text::charset::multibyte::MultibyteCharset", "text::charset::multibyte::MultibyteDecoder"],
-        "degree": "step",
-        "needs": "a worker operation converting whole byte streams with every Charset and MultibyteCharset profile against the reference's iconv; compared only as the conversion inside compat::ass::Decoder for labelled packets"
-      },
-      {
-        "name": "compat-charset-packets",
-        "entry_points": ["compat::charset::AssPacketJob", "compat::charset::receiver_charset", "compat::charset::receiver_charset_with_glibc_euc_kr"],
-        "degree": "unit-tests",
-        "needs": "a worker operation converting labelled ASS packets through AssPacketJob against the reference's sub_charenc; subtitle-text compares that conversion through compat::ass::Decoder only"
-      },
-      {
-        "name": "tx3g-configuration",
-        "entry_points": ["text::tx3g_config::ConfigJob", "text::tx3g_config::Configuration"],
-        "degree": "unit-tests",
-        "needs": "a corpus of tx3g sample descriptions with a reference view of their default style, text box, fonts and boxes"
-      },
-      {
-        "name": "tx3g-semantics",
-        "entry_points": ["text::tx3g_semantics::SemanticJob", "text::tx3g_semantics::Semantics", "text::tx3g_semantics::PointQuery"],
-        "degree": "no-reference",
-        "needs": "a reference that resolves 3GPP TS 26.245 styles, highlights, karaoke and links per character; none of the pinned references exposes one"
-      },
-      {
-        "name": "renderer-context",
-        "entry_points": ["context::Builder", "context::Context"],
-        "degree": "unit-tests",
-        "needs": "a worker operation building contexts from Matroska track headers, tags and attachments, compared with the header and fonts the reference hands libass"
-      },
-      {
-        "name": "dvb-source-boundary",
-        "entry_points": ["dvb::SourceConfiguration", "dvb::DvbPacket"],
-        "degree": "unit-tests",
-        "needs": "a worker operation building DVB configurations from TS subtitling descriptors and Matroska CodecPrivate, and packets with their source clocks, against the reference's extradata and packet times; only triergon-bridge's tests drive it"
-      },
-      {
-        "name": "pgs-segments",
-        "entry_points": ["pgs::SegmentIter", "pgs::Composition", "pgs::Palette", "pgs::ObjectFragment", "pgs::Windows"],
-        "degree": "step",
-        "needs": "a worker operation comparing each parsed segment field. The matroska-startup-seek case startup-avc-pgs-early-canvas drives discovery through segment kind, raw length and composition width and height. The fold covers selected AVC packet timing, sizes and bytes, with no PGS fields or discovery cutoff."
-      },
-      {
-        "name": "vobsub-index-lines",
-        "entry_points": ["dvd::vobsub::Lines", "dvd::vobsub::Line"],
-        "degree": "step",
-        "needs": "a corpus of .idx files with a reference view of each line; compared only as the parse inside compat::dvd::VobSubIndex"
-      },
-      {
-        "name": "carriage-reference-trace",
-        "entry_points": ["reference_trace::carriage::Session", "reference_trace::carriage::Snapshot"],
-        "degree": "recorded",
-        "needs": "a worker operation that runs this comparison projection against the reference; tests compare it with recorded reference output"
-      }
-    ]
+    "triergon-subtitles": []
   }
 }
