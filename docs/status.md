@@ -348,6 +348,20 @@ measures a codec workload list: 34/34 cases pass runtime on each target, the hig
 logs, build identities and gate results, and `aac-access-units-5b8dd88f-TARGET` the AAC in
 MOV measurements with the build identity.
 
+The ARMv7 MPEG-TS access unit row at `c1ace6c8` comes from one partial gate run per target of
+the `mpegts-access-units` item (timing, memory and grade) on one c6g.4xlarge host each, built and
+measured as at `5b8dd88f`. Every step passes 179 of 179 cases on both targets. On ARMv7 the
+reduction of exact time without division moves `au-dvb-eac3-32000` from 0.9984 (median
+0.9921) to 0.9643 (median 0.9480). On Linux AArch64 the change compiles to the same
+arithmetic; that case's instruction count is unchanged and its bound is 0.9426 (median
+0.9254), against 0.9381 at `5b8dd88f`, so that target's row stands at the later `f1fabdc3`. Sets
+`gate-run-armv7-c1ace6c8-20261121-125023-shard-1` and
+`gate-run-aarch64-c1ace6c8-20261121-125138-shard-1` hold the outputs, build identities,
+plans, step records and logs, and `time-divide-free-c1ace6c8` the instruction counts of 630
+ARMv7 and 185 Linux AArch64 cases across the transport, subtitle text, MP4 range and Matroska
+legacy AAC corpora (every output digest unchanged), the profiles, and the core tests and
+exact-arithmetic oracle passing on both targets at that revision.
+
 At `fa7e4621`, a partial gate run on one ARMv7 c6g.4xlarge host, as the full run measures,
 ran the `subtitle-dvb` item and the workspace and worker tests again; all seven steps pass.
 The framing test now frames one segment descriptor more than a packet keeps inline, so it
@@ -1315,6 +1329,9 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
+| MPEG-TS access units item, ARMv7 | `c1ace6c80974a8ebf136bfdf4b9cf714fd068e9a` | [`b0712bbf5be0add76cc1eae42af75ad9bf067fd20118c2f8fee59b72f2a00518`](../harness/evidence/sets/gate-run-armv7-c1ace6c8-20261121-125023-shard-1.json) |
+| MPEG-TS access units item, Linux AArch64 | `c1ace6c80974a8ebf136bfdf4b9cf714fd068e9a` | [`d552bb2f5c484c1d13631f9a6fa90c47ecf06b7d0bb30aaa2ab677b7720426a8`](../harness/evidence/sets/gate-run-aarch64-c1ace6c8-20261121-125138-shard-1.json) |
+| ARMv7 and Linux AArch64: instruction counts, profiles and core tests of exact time without division | `c1ace6c80974a8ebf136bfdf4b9cf714fd068e9a` | [`347f6976c323a2ca2ec4a87c2dc95e39749edcd7afad66b5fa9c596dece697f4`](../harness/evidence/sets/time-divide-free-c1ace6c8.json) |
 | Full gate run, Linux AArch64, shard 1 of 8 | `5b8dd88fde60314257060bf7f594d1886812219d` | [`efacbb28b54d5888307c8460752d8cd9a871b07b17eff5a7c28a57fad91a0f4c`](../harness/evidence/sets/gate-run-aarch64-5b8dd88f-20261121-085805-shard-1.json) |
 | Full gate run, Linux AArch64, shard 2 of 8 | `5b8dd88fde60314257060bf7f594d1886812219d` | [`83a4c97f8f47d278879ed893d8bfd22945a40cee24f5c7ddbf7363e80dd72204`](../harness/evidence/sets/gate-run-aarch64-5b8dd88f-20261121-085805-shard-2.json) |
 | Full gate run, Linux AArch64, shard 3 of 8 | `5b8dd88fde60314257060bf7f594d1886812219d` | [`76b2d6014dcc1ba3c016e68af4c4a5e32b6086864fa8abaad84c7455fec40278`](../harness/evidence/sets/gate-run-aarch64-5b8dd88f-20261121-085805-shard-3.json) |
@@ -2123,7 +2140,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | Capture | 15/15 at `c30b9c80`. Conversion is byte-identical to FFmpeg's on all 15, and mux and encoder pass. | 0.9850 (15/15 pass, worst `c14-motion-960-rate255`) | heap ≤0.6086, total RSS ≤0.9759 (15/15 lower, kernel-bound) |
 | Matroska audio clocks | 10/10 packet folds (`matroska-audio-clocks`) | 0.7630 (10/10 pass, worst `laced-unknown-duration`) | heap ≤0.7323, total RSS ≤0.8528 (10/10 lower), on `playback-matroska-worker` |
 | MPEG-TS | 97/97 compat-view operations (`mpegts-pes`) | 0.86632 (97/97 pass) at `f1fabdc3` | heap ≤0.09018, total RSS ≤0.80430 (97/97 lower, kernel-bound) at `f1fabdc3` |
-| MPEG-TS access units | 179/179 transport compatibility folds (`mpegts-access-units`) | 0.98824 (179/179 pass) at `f1fabdc3` | heap ≤0.16314, total RSS ≤0.88013 (179/179 lower, kernel-bound) at `f1fabdc3` |
+| MPEG-TS access units | 179/179 transport compatibility folds (`mpegts-access-units`) at `c1ace6c8` | 0.9643 at `c1ace6c8` (179/179 pass, worst `au-dvb-eac3-32000`) | heap ≤0.1628, total RSS ≤0.8694 at `c1ace6c8` (179/179 lower) |
 | MPEG-TS DTS core | 6/6 authored packet folds in the [DTS core comparison](../harness/features/mpegts-dts-core/contract.json) and all 253 packets in the [FATE DTS transport](../harness/features/mpegts-dts-legacy/contract.json) | 0.55412 (7/7 pass) at `f1fabdc3` | heap ≤0.08498, total RSS ≤0.94704 (7/7 lower, kernel-bound) at `f1fabdc3` |
 | MPEG-TS free-format audio | 8/8 frame folds (`mpegts-free-audio`) | 0.90719 (8/8 pass) at `f1fabdc3` | heap ≤0.08004, total RSS ≤0.71760 (8/8 lower, kernel-bound) at `f1fabdc3` |
 | MPEG-TS previous picture | 4/4 landing, discard and packet folds (`mpegts-previous-picture`) | 0.50057 (4/4 pass) at `f1fabdc3` | heap ≤0.49031, total RSS ≤0.77382 (4/4 lower, kernel-bound) at `f1fabdc3` |
