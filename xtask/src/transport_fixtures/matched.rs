@@ -1,5 +1,6 @@
 //! Independently authored TS controls for selected-track seek and audio framing.
 mod xll;
+mod xll_mode_zero;
 
 use super::{Codec, PID, PROGRAM, Part, R, Transport, part, source};
 use crate::corpus::write_json;
@@ -492,6 +493,35 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
     )?);
     epoch_cases(root, seek, &mut cases)?;
     physical_video_seek_cases(root, seek, &mut cases)?;
+    // Carrier authoring is independently reproduced by the reader's
+    // codec_changing_epoch_matches_the_original_carrier_suffix test.
+    let changing = source(
+        root,
+        "harness/features/mpegts-previous-picture/inputs/avc-hevc-configuration-epoch.ts",
+    )?;
+    if sha256::hex(&changing) != "569daedf1cf3cc709eb12cb3d16dfb73ba68a1fe83bff04fba6959d33a2dceac"
+    {
+        return Err("codec-changing epoch carrier bytes changed".into());
+    }
+    let row = Input {
+        name: "avc-hevc-configuration-epoch",
+        m2ts: false,
+        data: changing,
+    }
+    .record(
+        root,
+        feature,
+        "avc-hevc-configuration-epoch-ts188-preroll",
+        &["256", "112000", "preroll", "epoch=0:3", "epoch-start=11468"],
+        seek,
+        "ts-seek-fold",
+    )?;
+    if row.get("reference_refusal").is_some()
+        || row.get("expected").and_then(|value| value.get("packets")) != Some(&Value::int(12))
+    {
+        return Err("codec-changing epoch requires the complete twelve-picture suffix".into());
+    }
+    cases.push(row);
     manifest(root, feature, cases)?;
 
     let raw = fs::read(root.join(AUDIO)).map_err(|e| format!("{AUDIO}: {e}"))?;

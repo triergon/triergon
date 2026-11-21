@@ -1,0 +1,27 @@
+{
+ "name": "gate-run-aarch64-ca7e19e1-20261121-182652-shard-1",
+ "path": "gate-run-aarch64-ca7e19e1-20261121-182652-shard-1",
+ "retention": "retained",
+ "reason": "Fixed-pair progressive playback comparisons on Linux AArch64.",
+ "key": "evidence/gate-runs/ca7e19e1c5b3cc3d85655889ede642a4b44e4690-aarch64-20261121-182652/shard-1/5c99fc6cb5e6155e63b38038db3f691ff9168294f15443465083d692dfa70978.tar.zst",
+ "sha256": "5c99fc6cb5e6155e63b38038db3f691ff9168294f15443465083d692dfa70978",
+ "bytes": 3540210,
+ "results": [
+  {
+   "path": "memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "4b154d51a5c73bf2a4d42da92df858ccaaf3bdfb77ec6d2a1a5986a3b3b75671",
+   "status": 0,
+   "report_sha256": "7b1aa3379bf14ec4eafcc1ebd214b3a60ae02b771f68edc2420f8b178c6e5672",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b293b12cb64802357abd113917e75f511647554accaaf95ff8fd721113ee4daf",
+   "status": 0,
+   "report_sha256": "c7c3fdaa9d77f597f67aa3297a0ccecd6273ccdfe47f90732cdec70f5c4655b8",
+   "cases_checked": true
+  }
+ ]
+}

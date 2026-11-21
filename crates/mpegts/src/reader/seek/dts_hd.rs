@@ -190,10 +190,13 @@ fn entry_bytes(bytes: &[u8], core: bool) -> Result<Option<Header>> {
     if drc && stereo {
         skip(&mut bits, 8)?;
     }
-    // Table 7-7: lossless without a CBR component. No core, residual coding
-    // component, auxiliary codec or other asset is silently discarded.
-    if read(&mut bits, 2)? != 1 {
-        return Err(UNSUPPORTED);
+    // Tables 7-7/7-15: mode zero may name the separate core and XLL.
+    // Neither occupies a prefix inside this asset: 0x001 is outside ExSS,
+    // and 0x200 fills the asset. Reject every other component combination.
+    match read(&mut bits, 2)? {
+        1 => (),
+        0 if core && read(&mut bits, 12)? == 0x201 => (),
+        _ => return Err(UNSUPPORTED),
     }
     if read(&mut bits, size_bits)? as usize + 1 != asset_bytes {
         return Err(UNSUPPORTED);
