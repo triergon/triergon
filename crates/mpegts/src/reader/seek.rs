@@ -256,7 +256,7 @@ fn mpeg_audio_entry(frame: &MpegAudioFrame) -> Result<bool> {
     Ok(side[0] == 0 && (!mpeg1 || side[1] & 0x80 == 0))
 }
 
-fn packet_probe(packet: Packet, latest_landing: Option<Time>) -> Result<Probing> {
+fn packet_probe(packet: Packet, check_latm: impl FnOnce(Time) -> bool) -> Result<Probing> {
     let clock = packet.clock();
     let time = clock.and_then(|clock| clock.pts.exact);
     let mut xll_header = None;
@@ -267,7 +267,7 @@ fn packet_probe(packet: Packet, latest_landing: Option<Time>) -> Result<Probing>
         AccessUnit::Loas(frame) => {
             // An unindexed scan still observes clocks and delivers the suffix.
             // An envelope after its target cannot supply a landing.
-            if time.is_some_and(|time| latest_landing.is_none_or(|latest| time <= latest)) {
+            if time.is_some_and(check_latm) {
                 latm = latm::Probe::new(frame.multiplex_element());
             }
             (frame.elementary_range().start, latm.is_some())
@@ -966,8 +966,9 @@ impl Reader {
                         if let Some(index) = &mut scan.index {
                             index.packet(&packet);
                         }
-                        let latest_landing = scan.index.is_none().then_some(request.target);
-                        seek.probing = Some(packet_probe(packet, latest_landing)?);
+                        seek.probing = Some(packet_probe(packet, |time| {
+                            scan.index.is_some() || time <= request.target
+                        })?);
                     }
                 }
                 (Phase::Scan(scan), Step::Ready(Event::Other(event))) => {
@@ -1077,7 +1078,7 @@ impl Reader {
                         return Err(Error::SourceMismatch);
                     }
                     seek.probing =
-                        Some(packet_probe(packet, None).map_err(|_| Error::SourceMismatch)?);
+                        Some(packet_probe(packet, |_| true).map_err(|_| Error::SourceMismatch)?);
                 }
                 (Phase::Replay { .. }, Step::Ready(Event::Other(event))) => {
                     if matches!(&event, ReaderEvent::Source(source)
