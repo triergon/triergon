@@ -176,7 +176,7 @@ mod tests {
     /// One recorded case per runner, from the reference folds in each contract's corpus.
     #[test]
     fn each_runner_reproduces_a_recorded_reference_fold() {
-        let cases: [Case; 7] = [
+        let cases: [Case; 8] = [
             (
                 crate::matroska_audio::operate,
                 "crates/playback/tests/fixtures/mkv-feed/audio-mixed-discovery.mkv",
@@ -206,6 +206,12 @@ mod tests {
                 "harness/fixtures/ts-program/replay-avc-aac-00.m2ts",
                 "m2ts192:256=avc",
                 (24, 1673, 11_987_636_495_647_279_255),
+            ),
+            (
+                crate::ts_program::operate,
+                "harness/fixtures/ts-program/replay-avc-aac-00.m2ts",
+                "m2ts192:256=avc,257=aac",
+                (33, 26592, 12_066_748_960_095_057_291),
             ),
             (
                 crate::mp4_forward::operate,

@@ -854,6 +854,7 @@ fn prepare_ffmpeg(root: &Path, args: &[String]) -> Task {
 const FIXTURE_USAGE: &str = "usage: cargo xtask fixture <family> [options] --output FILE
 
 families and options:
+  m2ts-program --record REFERENCE   record the complete authored M2TS program
   m2ts INPUT.ts OUTPUT.m2ts   wrap TS188 packets for the program fixtures
   transport-access-units --output ROOT [--record --reference-worker FILE --observations DIR]
            regenerate MPEG-TS access-unit inputs and their reference-pinned corpus
@@ -871,6 +872,15 @@ families and options:
 /// One corpus variant, for harness tests that need cases beyond the manifests.
 fn fixture(root: &Path, args: &[String]) -> Task {
     let family = args.first().map(String::as_str).ok_or(FIXTURE_USAGE)?;
+    if family == "m2ts-program" {
+        let [flag, reference] = &args[1..] else {
+            return Err(FIXTURE_USAGE.into());
+        };
+        if flag != "--record" {
+            return Err(FIXTURE_USAGE.into());
+        }
+        return transport_fixtures::program::record(root, Path::new(reference));
+    }
     if family == "m2ts" {
         let [source, target] = &args[1..] else {
             return Err(FIXTURE_USAGE.into());

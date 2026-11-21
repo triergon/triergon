@@ -249,7 +249,10 @@ physical end, or as an unsupported layout once the source passes its start.
 Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB
 admission, and a subtitle track when a DVB namespace names DVB subtitling or
 teletext; stream type `0x90` (PGS) is a subtitle track. M2TS prefix startup (`NativeStartup::new_m2ts_prefix_v2`) needs an
-8 KiB input window. The DVB native PES parser caps a continued segment at
+8 KiB input window. `PreparedNative::into_program_player` selects up to 64 PIDs
+from that same prepared M2TS source, sharing its input context and native program
+clock through physical EOF. Carrier ranges retain their original 192-byte offsets
+and opaque four-byte prefixes. The DVB native PES parser caps a continued segment at
 65,536 bytes. PES outputs reuse their payload storage's budget handle, which
 remains valid while a caller retains an output after closing the player.
 Delivery without a seek uses the presence of the projected presentation

@@ -44,7 +44,7 @@ and the input event it is attributed to.
 | `progressive-` | CLOCK (`pts-only`, `pts-dts`) and PROGRESS (`before-eof`, `at-eof`) | a forward-only AVC/AAC TS188 session read from the file in 4 KiB windows, two retained units per stream; `bench` runs 50 sessions, and `trace` prints every unit with the stream facts on stderr | `progressive-ts188` |
 | `mkv-audio-` | `aac`, `dolby` or `all` | Matroska stream discovery in 4 KiB windows; the AAC-LC, AC-3 and E-AC-3 tracks the reader identifies through `native_aac_clock_probe` or `native_dolby_clock_probe` over the discovery prefix, then the forward clock; times in nanoseconds | `matroska-audio-clocks` |
 | `mp4-forward-` | `regular` or `progressive` | `Mp4Open` and `Mp4IndexJob` in the native MOV view; a seekable file through the checked range index and `Engine::mp4`, with encoded plans for edits over composition offsets, or a forward-only front-`moov` file through its native front plan and `Engine::mp4_native_terminal_v1`; every track, times in the track time base | `mp4-forward` |
-| `ts-program-` | `ts188:PID=CARRIAGE,...` or `m2ts192:PID=CARRIAGE` | explicit PIDs of program 1 through `Engine::ts_native_program_v1`, or one M2TS192 PID through `NativeStartup::new_m2ts_prefix_v2`; native 90 kHz clocks | `ts-program` |
+| `ts-program-` | `ts188:PID=CARRIAGE,...` or `m2ts192:PID=CARRIAGE,...` | explicit PIDs of program 1 through `Engine::ts_native_program_v1`, or M2TS192 PIDs through `NativeStartup::new_m2ts_prefix_v2` and `PreparedNative::into_program_player`; native 90 kHz clocks | `ts-program` |
 | `raw-video-` | `avc` or `hevc` | `RawVideoProbe`, `RawVideoSource` and `RawVideoFeed` over forward-only Annex B; no container clock, the duration is the active SPS picture period in 1/1,200,000 s | `raw-annex-b` |
 
 A capsule is `SMVCL001`, one operation byte (0 startup, 1 seek after discovery,
@@ -60,3 +60,8 @@ zero; `trace` prints one line per packet. The reference side is
 
 The [transport worker](../transport-worker/README.md) runs the MPEG-TS PES and
 access-unit comparisons.
+
+The TS program corpus contains 36 controls, including one complete M2TS AVC/AAC
+program: 24 video packets and 9 audio packets in the reference's interleaved order
+through physical EOF, 26,592 payload bytes. The 35 earlier controls retain their
+packet folds. The combined program has no native runtime or memory qualification.
