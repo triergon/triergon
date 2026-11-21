@@ -29,6 +29,9 @@ ORACLES = {
 }
 # Trace oracles return canonical text rows without line endings. Load each on demand.
 TRACE_ORACLES = {
+    "pgs-segments": ("harness.pgs_segment_oracle", "trace"),
+    "text-extraction": ("harness.text_extraction_oracle", "trace"),
+    "tx3g-config": ("harness.tx3g_oracle", "trace"),
     "opus-final-range": ("harness.opus_range_oracle", "ranges"),
     "core-budgets": ("harness.core_budget_oracle", "budget_trace"),
     "divide": ("harness.codec_dsp_oracle", "divide"),
