@@ -4,6 +4,7 @@
 use crate::SliceError;
 use crate::cabac::Cabac;
 use crate::cavlc::{self, CavlcTables};
+use crate::mbdec::Cavlc;
 use crate::mbinfo::*;
 use crate::picture::*;
 use crate::slice::{SliceHeader, SliceType};
@@ -131,7 +132,6 @@ pub(crate) struct SliceDecoder<'a> {
     pub refs: Refs<'a>,
     pub vlc: &'static CavlcTables,
     pub br: BitReader<'a>,
-    pub cabac: Option<Cabac<'a>>,
     pub cur: usize,
     pub nb: NbAddr,
     pub geom: MbGeom,
@@ -178,7 +178,6 @@ impl<'a> SliceDecoder<'a> {
             refs,
             vlc: cavlc::tables(),
             br,
-            cabac: None,
             cur: 0,
             nb: NbAddr::default(),
             geom: MbGeom::default(),
@@ -565,81 +564,111 @@ impl<'a> SliceDecoder<'a> {
 
     /// Decode all macroblocks of the slice (7.3.4 slice_data()).
     pub(crate) fn run(&mut self) -> Result<(), SliceError> {
-        let sh = &self.s.sh;
-        let mbaff = self.pic.mbaff;
-        let cabac = self.s.cabac;
-        let mut addr = sh.first_mb as usize * (1 + mbaff as usize);
-        let is_i = sh.slice_type.is_intra();
-        if cabac {
-            self.br.align(8);
-            let start = self.br.position() / 8;
-            let len = self.br.end() / 8;
-            let init_idx = if is_i {
-                0
-            } else {
-                sh.cabac_init_idc as usize + 1
-            };
-            self.cabac = Some(Cabac::new(
-                self.br.data(),
-                start,
-                len,
-                sh.slice_qp,
-                init_idx,
-            )?);
+        let s = self.s;
+        let sh = &s.sh;
+        let first = sh.first_mb as usize * (1 + self.pic.mbaff as usize);
+        if !s.cabac {
+            return self.run_cavlc(first);
         }
+        self.br.align(8);
+        let start = self.br.position() / 8;
+        let len = self.br.end() / 8;
+        let init_idx = if sh.slice_type.is_intra() {
+            0
+        } else {
+            sh.cabac_init_idc as usize + 1
+        };
+        let mut cabac = Cabac::new(self.br.data(), start, len, sh.slice_qp, init_idx)?;
+        self.run_cabac(&mut cabac, first)
+    }
+
+    /// The CAVLC macroblock loop from address `addr`.
+    fn run_cavlc(&mut self, mut addr: usize) -> Result<(), SliceError> {
+        let mbaff = self.pic.mbaff;
+        let is_i = self.s.sh.slice_type.is_intra();
+        let mut more = true;
+        let mut prev_skipped = false;
+        while more {
+            if !is_i {
+                let run = self.br.ue() as usize;
+                if run > self.pic_size() {
+                    return Err(SliceError::InvalidData("mb_skip_run"));
+                }
+                prev_skipped = run > 0;
+                for i in 0..run {
+                    self.pending_field = None;
+                    self.begin_mb(addr)?;
+                    if mbaff && addr & 1 == 0 && i + 1 == run && self.br.more_rbsp_data() {
+                        // The bottom MB is coded and its mb_field_decoding_flag follows.
+                        let f = self.br.bit();
+                        self.pending_field = Some(f);
+                        self.set_field(f);
+                    }
+                    self.decode_skip_mb()?;
+                    self.finish_mb();
+                    addr += 1;
+                }
+                if run > 0 {
+                    more = self.br.more_rbsp_data();
+                }
+            }
+            if more {
+                let pend = self.pending_field;
+                self.begin_mb(addr)?;
+                self.pending_field = pend;
+                if mbaff && (addr & 1 == 0 || prev_skipped) {
+                    let f = match self.pending_field.take() {
+                        Some(f) => f,
+                        None => self.br.bit(),
+                    };
+                    self.set_field(f);
+                }
+                self.pending_field = None;
+                self.decode_coded_mb(&mut Cavlc)?;
+                self.finish_mb();
+            }
+            more = self.br.more_rbsp_data();
+            if self.br.overrun() {
+                return Err(SliceError::InvalidData("CAVLC data overrun"));
+            }
+            addr += 1;
+        }
+        Ok(())
+    }
+
+    /// The CABAC macroblock loop from address `addr`.
+    fn run_cabac(&mut self, c: &mut Cabac<'_>, mut addr: usize) -> Result<(), SliceError> {
+        let mbaff = self.pic.mbaff;
+        let is_i = self.s.sh.slice_type.is_intra();
         let mut more = true;
         let mut prev_skipped = false;
         let mut bottom_skip: Option<bool> = None;
         while more {
             let mut skip_flag = false;
             if !is_i {
-                if !cabac {
-                    let run = self.br.ue() as usize;
-                    if run > self.pic_size() {
-                        return Err(SliceError::InvalidData("mb_skip_run"));
+                let pend = self.pending_field;
+                self.begin_mb(addr)?;
+                skip_flag = match bottom_skip.take() {
+                    Some(v) if addr & 1 == 1 => v,
+                    _ => self.decode_skip_flag_cabac(c),
+                };
+                if skip_flag && mbaff && addr & 1 == 0 {
+                    let (bs, f) = self.cabac_mbaff_lookahead(c);
+                    bottom_skip = Some(bs);
+                    self.pending_field = f;
+                    if let Some(f) = f {
+                        self.set_field(f);
                     }
-                    prev_skipped = run > 0;
-                    for i in 0..run {
-                        self.pending_field = None;
-                        self.begin_mb(addr)?;
-                        if mbaff && addr & 1 == 0 && i + 1 == run && self.br.more_rbsp_data() {
-                            // The bottom MB is coded and its mb_field_decoding_flag follows.
-                            let f = self.br.bit();
-                            self.pending_field = Some(f);
-                            self.set_field(f);
-                        }
-                        self.decode_skip_mb()?;
-                        self.finish_mb();
-                        addr += 1;
-                    }
-                    if run > 0 {
-                        more = self.br.more_rbsp_data();
-                    }
-                } else {
-                    let pend = self.pending_field;
-                    self.begin_mb(addr)?;
-                    skip_flag = match bottom_skip.take() {
-                        Some(v) if addr & 1 == 1 => v,
-                        _ => self.decode_skip_flag_cabac(),
-                    };
-                    if skip_flag && mbaff && addr & 1 == 0 {
-                        let (bs, f) = self.cabac_mbaff_lookahead();
-                        bottom_skip = Some(bs);
-                        self.pending_field = f;
-                        if let Some(f) = f {
-                            self.set_field(f);
-                        }
-                    } else if addr & 1 == 1 {
-                        self.pending_field = pend;
-                    }
-                    more = !skip_flag;
-                    if skip_flag {
-                        self.decode_skip_mb()?;
-                    }
+                } else if addr & 1 == 1 {
+                    self.pending_field = pend;
+                }
+                more = !skip_flag;
+                if skip_flag {
+                    self.decode_skip_mb()?;
                 }
             }
             if more {
-                if is_i || !cabac {
+                if is_i {
                     let pend = self.pending_field;
                     self.begin_mb(addr)?;
                     self.pending_field = pend;
@@ -647,42 +676,25 @@ impl<'a> SliceDecoder<'a> {
                 if mbaff && (addr & 1 == 0 || prev_skipped) {
                     let f = match self.pending_field.take() {
                         Some(f) => f,
-                        None => {
-                            if cabac {
-                                self.decode_field_flag_cabac()
-                            } else {
-                                self.br.bit()
-                            }
-                        }
+                        None => self.decode_field_flag_cabac(c),
                     };
                     self.set_field(f);
                 }
                 self.pending_field = None;
-                self.decode_coded_mb()?;
-                if !cabac {
-                    self.finish_mb();
-                }
+                self.decode_coded_mb(c)?;
             }
-            if !cabac {
-                more = self.br.more_rbsp_data();
-                if self.br.overrun() {
-                    return Err(SliceError::InvalidData("CAVLC data overrun"));
-                }
+            if !is_i {
+                prev_skipped = skip_flag;
+            }
+            if mbaff && addr & 1 == 0 {
+                more = true;
             } else {
-                if !is_i {
-                    prev_skipped = skip_flag;
+                more = c.terminate() == 0;
+                if c.overrun() {
+                    return Err(SliceError::InvalidData("CABAC data overrun"));
                 }
-                if mbaff && addr & 1 == 0 {
-                    more = true;
-                } else {
-                    let c = self.cabac.as_mut().unwrap();
-                    more = c.terminate() == 0;
-                    if c.overrun() {
-                        return Err(SliceError::InvalidData("CABAC data overrun"));
-                    }
-                }
-                self.finish_mb();
             }
+            self.finish_mb();
             addr += 1;
         }
         Ok(())
@@ -696,7 +708,7 @@ impl<'a> SliceDecoder<'a> {
 
     /// CABAC MBAFF: the top MB is skipped; decode the bottom MB's mb_skip_flag (and
     /// mb_field_decoding_flag when it is not skipped) so the pair's field mode is known.
-    fn cabac_mbaff_lookahead(&mut self) -> (bool, Option<bool>) {
+    fn cabac_mbaff_lookahead(&mut self, c: &mut Cabac<'_>) -> (bool, Option<bool>) {
         let top = self.cur;
         let bot = top + 1;
         let saved_top = self.pic.mbs[top];
@@ -712,9 +724,9 @@ impl<'a> SliceDecoder<'a> {
         };
         self.cur = bot;
         self.compute_nb();
-        let bot_skip = self.decode_skip_flag_cabac();
+        let bot_skip = self.decode_skip_flag_cabac(c);
         let f = if !bot_skip {
-            Some(self.decode_field_flag_cabac())
+            Some(self.decode_field_flag_cabac(c))
         } else {
             None
         };
