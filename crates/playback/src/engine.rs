@@ -293,25 +293,6 @@ impl Engine {
     pub(crate) fn assembles_pid(&self, pid: u16) -> bool {
         matches!(self, Self::Ts(t) if t.pes_tracks.index(pid).is_some())
     }
-    pub(crate) fn ts_hls_segment(
-        input: InputCursor,
-        limits: mpegts::ParseLimits,
-        media: bool,
-    ) -> Result<Self> {
-        TsEngine::segment(
-            input,
-            limits,
-            SourceTimePolicy::Unanchored,
-            DescriptorNamespace::Unspecified,
-            if media {
-                TsDelivery::MediaFeed
-            } else {
-                TsDelivery::AvcAacFeed
-            },
-        )
-        .map(Self::Ts)
-    }
-
     pub(crate) fn continue_entity(
         &mut self,
         source: SourceId,

@@ -5,9 +5,10 @@
 //! completed PES packets with their demux clock; it delivers only the rare
 //! table, clock and fault events of the source whole.
 
+use crate::engine::ts::Delivery;
 use crate::{Engine, Result};
 use triergon_core::InputCursor;
-use triergon_mpegts::ParseLimits;
+use triergon_mpegts::{ParseLimits, clock::SourceTimePolicy, psi::DescriptorNamespace};
 
 pub use crate::engine::ts::TsEngine;
 pub use crate::engine::ts::feed::{FeedPacket, FeedStep, PesFacts, PesInput, SpentLists};
@@ -16,5 +17,16 @@ pub use crate::engine::ts::feed::{FeedPacket, FeedStep, PesFacts, PesInput, Spen
 /// PMT, delivering demux PES of the tracks its PMT names: AVC and AAC, or with
 /// `media` the HLS audio carriage rules (AC-3 and E-AC-3 as well).
 pub fn open_segment_feed(input: InputCursor, limits: ParseLimits, media: bool) -> Result<Engine> {
-    Engine::ts_hls_segment(input, limits, media)
+    TsEngine::segment(
+        input,
+        limits,
+        SourceTimePolicy::Unanchored,
+        DescriptorNamespace::Unspecified,
+        if media {
+            Delivery::MediaFeed
+        } else {
+            Delivery::AvcAacFeed
+        },
+    )
+    .map(Engine::Ts)
 }

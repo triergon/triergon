@@ -307,17 +307,6 @@ impl TsEngine {
         })
     }
 
-    /// The source events of one independent TS188 segment and the demux PES of
-    /// the tracks its own PMT names.
-    pub(crate) fn discovered_segment(
-        input: InputCursor,
-        limits: ts::ParseLimits,
-        policy: SourceTimePolicy,
-        namespace: DescriptorNamespace,
-    ) -> Result<Self> {
-        Self::segment(input, limits, policy, namespace, Delivery::Segment)
-    }
-
     /// `delivery` is one of the modes that discover their tracks.
     pub(crate) fn segment(
         input: InputCursor,

@@ -2,6 +2,7 @@
 
 pub mod startup;
 
+use crate::engine::ts::Delivery;
 use crate::{Engine, Result, TrackKey, pes_feed::TsEngine};
 use triergon_core::InputCursor;
 use triergon_mpegts::{
@@ -51,7 +52,7 @@ pub fn open_segment(
     policy: SourceTimePolicy,
     namespace: DescriptorNamespace,
 ) -> Result<Engine> {
-    TsEngine::discovered_segment(input, limits, policy, namespace).map(Engine::Ts)
+    TsEngine::segment(input, limits, policy, namespace, Delivery::Segment).map(Engine::Ts)
 }
 
 /// [`open`] for one private-audio PID, its carriage checked against each active
