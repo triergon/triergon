@@ -254,7 +254,10 @@ pub struct HorizontalHeader {
 /// A face's glyph outlines: `glyf`, with how the default load hints it, or
 /// CFF and CFF2 charstrings.
 #[derive(Debug)]
-#[expect(clippy::large_enum_variant, reason = "one per face, read in place by every load")]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one per face, read in place by every load"
+)]
 enum Outlines {
     Glyf(Glyf, sized::TrueTypeHinting),
     Cff(Box<Cff>),

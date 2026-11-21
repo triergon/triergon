@@ -10,7 +10,7 @@ use crate::fixed::{Scale, div_fix, mul_div, mul_fix, pix_ceil, pix_floor, pix_ro
 use crate::glyf::{self, Glyf};
 use crate::name::NameRecord;
 use crate::outline::{Outline, Point};
-use crate::{Font, GlyphId, GlyphMetrics, Outlines, VerticalMetrics};
+use crate::{Advances, Font, GlyphId, GlyphMetrics, Outlines, VerticalMetrics};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 /// The metrics of a size: the scales from font units to 26.6 pixels, the
@@ -53,7 +53,10 @@ pub enum Load {
 /// hinting keeps between loads. CFF faces need nothing: their hinter keeps
 /// no state, and their advances are the unhinted ones.
 #[derive(Debug)]
-#[expect(clippy::large_enum_variant, reason = "one per face, read in place by every load")]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one per face, read in place by every load"
+)]
 pub(crate) enum TrueTypeHinting {
     /// Programs that keep the interpreter in backward compatibility mode,
     /// which leaves the advances unhinted: the interpreter.
@@ -389,13 +392,7 @@ impl<'f> SizedFont<'f> {
             work,
         )?;
         let advances = font.cff_advances(cff, glyph, index, self.hinted_scale)?;
-        let mut metrics = GlyphMetrics::of(advances, outline)?;
-        metrics.linear_vertical_advance =
-            linear_advance(metrics.linear_vertical_advance, self.metrics.y_scale);
-        self.fit_box(&mut metrics);
-        metrics.advance = glyf::narrow(pix_round(i64::from(metrics.advance)))?;
-        metrics.vertical_advance = glyf::narrow(pix_round(i64::from(metrics.vertical_advance)))?;
-        Ok(metrics)
+        self.fitted_metrics(advances, outline)
     }
 
     /// The default load of a glyph of a face with TrueType programs: its
@@ -462,19 +459,16 @@ impl<'f> SizedFont<'f> {
         if origin != 0 {
             glyf::translate(outline.points_mut(), (-origin, 0))?;
         }
-        let mut metrics = GlyphMetrics::of(advances, outline)?;
-        metrics.linear_vertical_advance =
-            linear_advance(metrics.linear_vertical_advance, self.metrics.y_scale);
-        self.fit_box(&mut metrics);
-        metrics.advance = glyf::narrow(pix_round(i64::from(metrics.advance)))?;
-        metrics.vertical_advance = glyf::narrow(pix_round(i64::from(metrics.vertical_advance)))?;
-        Ok(metrics)
+        self.fitted_metrics(advances, outline)
     }
 
-    /// Fits the box of a default load to whole pixels, for horizontal
-    /// layout: the left and top edges floored and ceiled, the right and
-    /// bottom ceiled and floored.
-    fn fit_box(&self, m: &mut GlyphMetrics) {
+    /// The metrics of a default load: `advances` and the box of `outline`,
+    /// fitted to whole pixels for horizontal layout (the left and top edges
+    /// floored and ceiled, the right and bottom ceiled and floored, the
+    /// advances rounded), with the linear vertical advance at the size.
+    fn fitted_metrics(&self, advances: Advances, outline: &Outline) -> Result<GlyphMetrics> {
+        let mut m = GlyphMetrics::of(advances, outline)?;
+        m.linear_vertical_advance = linear_advance(m.linear_vertical_advance, self.metrics.y_scale);
         let floor = |v: i32| v & !63;
         let ceil = |v: i32| floor(v.wrapping_add(63));
         let right = ceil(m.bearing_x.wrapping_add(m.width));
@@ -483,6 +477,9 @@ impl<'f> SizedFont<'f> {
         m.bearing_y = ceil(m.bearing_y);
         m.width = right.wrapping_sub(m.bearing_x);
         m.height = m.bearing_y.wrapping_sub(bottom);
+        m.advance = glyf::narrow(pix_round(i64::from(m.advance)))?;
+        m.vertical_advance = glyf::narrow(pix_round(i64::from(m.vertical_advance)))?;
+        Ok(m)
     }
 
     /// The advance of the default load, as [`Self::load`] with
