@@ -204,6 +204,9 @@ An `Event::Seek` precedes the landing and carries the discard time for
 clocks and source ranges. The caller supplies decoder setup. The scan is bounded by
 `ReaderLimits::maximum_seek_scan_bytes` (64 MiB by default; zero disables seeking).
 Seeks across selected-track source epochs and ambiguous clock wraps are refused.
+An unindexed LOAS seek checks the envelope layout for potential landings through
+the target time. The scan still observes later clocks and preserves later
+packets in the output suffix.
 
 | Method | Adds |
 | --- | --- |

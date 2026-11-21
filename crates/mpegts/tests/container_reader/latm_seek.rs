@@ -442,12 +442,14 @@ fn entity_retention_matches_replay_for_split_latm_and_fallbacks() {
     let first = envelope(1, &[&[0x11; 300]]);
     let second = mux_envelope(1, &[&[0x22; 30]], false);
     let third = mux_envelope(1, &[&[0x33; 31]], false);
+    let later = envelope(1, &[&[0x44; 300]]);
     let mut ts = Transport::new();
     ts.tables(&[(0x11, PID, &[])], 0);
     ts.pes(PID, 0xc0, &first, Some(90_000), None);
     let split = 3 * 188;
     ts.pes(PID, 0xc0, &second, Some(93_000), None);
     ts.pes(PID, 0xc0, &third, None, None);
+    ts.pes(PID, 0xc0, &later, Some(96_000), None);
     let (receipt, packets, reads) = entity_run(&ts, split, EntityMode::Replay);
     assert_eq!(reads, 2);
     assert_eq!(
@@ -455,7 +457,7 @@ fn entity_retention_matches_replay_for_split_latm_and_fallbacks() {
             .iter()
             .map(|p| p.payload.clone())
             .collect::<Vec<_>>(),
-        [first, second, third]
+        [first, second, third, later]
     );
     assert_eq!(packets[0].sources.len(), 1);
     assert_eq!(
@@ -505,6 +507,33 @@ fn entity_retention_matches_replay_for_split_latm_and_fallbacks() {
             "{mode:?}"
         );
     }
+}
+
+#[test]
+fn entity_seek_checks_reordered_layouts_at_or_before_the_target() {
+    let first = envelope(1, &[&[0x21; 300]]);
+    let later = envelope(1, &[&[0x22; 30]]);
+    let reordered = envelope(1, &[&[0x23; 31]]);
+    let tied = envelope(1, &[&[0x24; 32]]);
+    let mut ts = Transport::new();
+    ts.tables(&[(0x11, PID, &[])], 0);
+    for (pts, bytes) in [
+        (90_000, first),
+        (96_000, later),
+        (94_000, reordered),
+        (94_000, tied.clone()),
+    ] {
+        ts.pes(PID, 0xc0, &bytes, Some(pts), None);
+    }
+    let split = 3 * 188;
+    let (expected, packets, _) = entity_run(&ts, split, EntityMode::Replay);
+    assert_eq!(expected.landing, clock(94_000));
+    assert_eq!(packets.len(), 1);
+    assert_eq!(packets[0].payload, tied);
+    let (actual, retained, reads) = entity_run(&ts, split, EntityMode::Retain);
+    assert_eq!(actual, expected);
+    assert_eq!(retained, packets);
+    assert_eq!(reads, 1);
 }
 
 #[test]
