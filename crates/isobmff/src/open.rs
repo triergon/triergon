@@ -549,9 +549,9 @@ pub struct MovieOpen {
     moofs: BudgetVec<BoxView>,
     moov: Option<BoxView>,
     brand: Option<[u8; 4]>,
-    scan_done: bool,
     read_scope: MetadataReadScope,
     top_count: usize,
+    /// The walk of `moov`, once the root boxes are read.
     walk: Option<Walk>,
     tracks: BudgetVec<MovieTrack>,
     track_at: usize,
@@ -630,7 +630,6 @@ impl MovieOpen {
             moofs: BudgetVec::new(&pool),
             moov: None,
             brand: None,
-            scan_done: false,
             read_scope: MetadataReadScope::CompleteEntity,
             top_count: 0,
             walk: None,
@@ -692,7 +691,7 @@ impl MovieOpen {
                 Step::End(_) => Err(Error::Truncated),
             };
         }
-        if !self.scan_done {
+        let Some(walk) = self.walk.as_mut() else {
             return match self.reader.poll(input, w, c)? {
                 Step::NeedInput(r) => Ok(OpenStep::NeedInput(r)),
                 Step::Yield => Ok(OpenStep::Yield),
@@ -707,7 +706,6 @@ impl MovieOpen {
                         self.native_recovery,
                     )?;
                     self.walk = Some(walk);
-                    self.scan_done = true;
                     Ok(OpenStep::Yield)
                 }
                 Step::Ready(BoxEvent::Header(h)) => {
@@ -727,28 +725,12 @@ impl MovieOpen {
                 }
                 Step::Ready(BoxEvent::Skipped(header)) => Ok(OpenStep::Root(header)),
             };
-        }
-        if self
-            .walk
-            .as_ref()
-            .ok_or(Error::Invalid("walk missing"))?
-            .depth
-            != 0
-        {
-            self.walk
-                .as_mut()
-                .ok_or(Error::Invalid("walk missing"))?
-                .poll(w, c, self.limits)?;
+        };
+        if walk.depth != 0 {
+            walk.poll(w, c, self.limits)?;
             return Ok(OpenStep::Yield);
         }
-        if self.track_at
-            < self
-                .walk
-                .as_ref()
-                .ok_or(Error::Invalid("walk missing"))?
-                .parts
-                .len()
-        {
+        if self.track_at < walk.parts.len() {
             return self.track(w);
         }
         if self.fragment_moof < self.moofs.len() {
@@ -1027,7 +1009,6 @@ impl MovieOpen {
             if front {
                 self.terminal_mdat = terminal;
                 self.walk = walk;
-                self.scan_done = true;
                 self.read_scope = MetadataReadScope::FrontMetadataBeforeMdat(h);
             } else if pending_media.is_some() {
                 self.pending_media = pending_media;
