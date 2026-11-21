@@ -140,6 +140,62 @@
       ]
     },
     {
+      "area": "QuickTime PCM samples",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "quicktime-pcm-samples"
+    },
+    {
+      "area": "QuickTime sound descriptions",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "quicktime-sound-description"
+    },
+    {
+      "area": "MOV PCM packets",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "mov-pcm-packets"
+    },
+    {
+      "area": "MOV table and physical recovery",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "mov-run-recovery"
+    },
+    {
+      "area": "MOV encoded stream views",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "mov-encoded-views"
+    },
+    {
+      "area": "MOV DTS demuxed signalling",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "isobmff-dts-signalling"
+    },
+    {
+      "area": "MOV DTS source entries",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "isobmff-dts-entry-source"
+    },
+    {
       "area": "MP4 range playback",
       "targets": [
         "aarch64-unknown-linux-gnu",
@@ -169,14 +225,14 @@
       "targets": [
         "aarch64-unknown-linux-gnu"
       ],
-      "text": "within the codec workloads"
+      "text": "packet reading in the codec workloads, seeks unmeasured"
     },
     {
       "area": "Audio elementary streams",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ],
-      "text": "within the codec workloads"
+      "text": "FLAC and MPEG audio in the codec workloads, ADTS and AC-3 unmeasured"
     },
     {
       "area": "MPEG-TS",
@@ -437,6 +493,46 @@
       ]
     },
     {
+      "area": "DTS core frames and extents",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "dts-core-frames"
+    },
+    {
+      "area": "DTS core header fields",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "dts-core-header"
+    },
+    {
+      "area": "DTS packed readers",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "dts-packed-frames"
+    },
+    {
+      "area": "DTS unpacking",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "dts-unpacking"
+    },
+    {
+      "area": "DTS parser trace",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "dts-parser-trace"
+    },
+    {
       "area": "Subtitles, text",
       "targets": [
         "aarch64-unknown-linux-gnu",
@@ -478,6 +574,11 @@
       ]
     },
     {
+      "area": "PGS palette sweep",
+      "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],
+      "unmeasured": "pgs-palette-sweep"
+    },
+    {
       "area": "Subtitles, DVB",
       "targets": [
         "aarch64-unknown-linux-gnu",
@@ -488,28 +589,22 @@
       ]
     },
     {
+      "area": "DVB palette sweep",
+      "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],
+      "unmeasured": "dvb-palette-sweep"
+    },
+    {
       "area": "Subtitles, DVD",
       "targets": [
         "aarch64-unknown-linux-gnu",
         "thumbv7neon-unknown-linux-gnueabihf"
       ],
-      "parts": [
-        {
-          "label": "`subtitle-dvd`",
-          "results": [
-            "subtitle-dvd"
-          ]
-        },
-        {
-          "label": "`subtitle-dvd-host`",
-          "results": [
-            "subtitle-dvd-host"
-          ],
-          "targets": [
-            "thumbv7neon-unknown-linux-gnueabihf"
-          ]
-        }
-      ]
+      "unmeasured": "subtitle-dvd"
+    },
+    {
+      "area": "Subtitles, DVD host variants",
+      "targets": ["thumbv7neon-unknown-linux-gnueabihf"],
+      "results": ["subtitle-dvd-host"]
     },
     {
       "area": "Closed captions",
@@ -592,6 +687,8 @@
         "codec-file-workloads-3"
       ]
     },
+    {"area": "AAC default build", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "awaiting paired collection"},
+    {"area": "HEVC SIMD build", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "awaiting paired collection"},
     {
       "area": "Decode sessions",
       "targets": [
@@ -606,6 +703,14 @@
         "thumbv7neon-unknown-linux-gnueabihf"
       ],
       "text": "not measured"
+    },
+    {
+      "area": "Font store",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "font-store"
     },
     {
       "area": "Shaping",
@@ -637,23 +742,12 @@
         "aarch64-unknown-linux-gnu",
         "thumbv7neon-unknown-linux-gnueabihf"
       ],
-      "parts": [
-        {
-          "label": "`ass-render`",
-          "results": [
-            "ass-render"
-          ]
-        },
-        {
-          "label": "`ass-render-host`",
-          "results": [
-            "ass-render-host"
-          ],
-          "targets": [
-            "thumbv7neon-unknown-linux-gnueabihf"
-          ]
-        }
-      ]
+      "unmeasured": "ass-render"
+    },
+    {
+      "area": "ASS render host variants",
+      "targets": ["thumbv7neon-unknown-linux-gnueabihf"],
+      "results": ["ass-render-host"]
     },
     {
       "area": "ASS renderer settings",
@@ -686,7 +780,8 @@
         "capture-c14-motion-960-rate255",
         "capture-c15-noise-480-bottomup"
       ]
-    }
+    },
+    {"area": "Capture configurations", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "not yet measured"}
   ],
   "open_cells": [
     {
@@ -857,11 +952,8 @@
       ]
     },
     {
-      "area": "Subtitles, DVD",
-      "targets": [
-        "aarch64-unknown-linux-gnu",
-        "thumbv7neon-unknown-linux-gnueabihf"
-      ]
+      "area": "Subtitles, DVD host variants",
+      "targets": ["thumbv7neon-unknown-linux-gnueabihf"]
     },
     {
       "area": "Closed captions",
@@ -899,11 +991,8 @@
       ]
     },
     {
-      "area": "ASS rendering",
-      "targets": [
-        "aarch64-unknown-linux-gnu",
-        "thumbv7neon-unknown-linux-gnueabihf"
-      ]
+      "area": "ASS render host variants",
+      "targets": ["thumbv7neon-unknown-linux-gnueabihf"]
     },
     {
       "area": "Capture",
