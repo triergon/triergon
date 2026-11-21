@@ -2,14 +2,30 @@
   "schema": 1,
   "about": "What the gates require and every exception to them, counted from the feature contracts, the gate plan, every list under harness/ whose name starts with open_ (an entry counts once for each case it names, under each gate target it is open on) and the public features of each crate in harness/not-compared.json that no contract compares. `cargo xtask check-design` counts them again: a change that drops a requirement or adds an exception must change this file too.",
   "counts": {
-    "features": 97,
-    "required_by_check": 66,
+    "features": 113,
+    "required_by_check": 82,
     "on_demand": 3,
     "diagnostic": 1,
-    "gated_by_report": 56,
-    "gated_by_another_command": 38,
+    "gated_by_report": 66,
+    "gated_by_another_command": 44,
     "not_gated": 3,
     "open": {
+      "harness/features/carriage-trace/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 834, "thumbv7neon-unknown-linux-gnueabihf": 834}, "open_cases": {"aarch64-unknown-linux-gnu": 214}},
+      "harness/features/charset-packets/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 240, "thumbv7neon-unknown-linux-gnueabihf": 240}, "open_cases": {"aarch64-unknown-linux-gnu": 7}},
+      "harness/features/charset-streams/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 279, "thumbv7neon-unknown-linux-gnueabihf": 279}, "open_cases": {"aarch64-unknown-linux-gnu": 16}},
+      "harness/features/dvb-source/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 729, "thumbv7neon-unknown-linux-gnueabihf": 729}, "open_cases": {"aarch64-unknown-linux-gnu": 27}},
+      "harness/features/pgs-segments/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 2736, "thumbv7neon-unknown-linux-gnueabihf": 2736}},
+      "harness/features/renderer-context/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 51, "thumbv7neon-unknown-linux-gnueabihf": 51}},
+      "harness/features/text-extraction-oracle/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 120, "thumbv7neon-unknown-linux-gnueabihf": 120}},
+      "harness/features/text-extraction/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 642, "thumbv7neon-unknown-linux-gnueabihf": 642}, "open_cases": {"aarch64-unknown-linux-gnu": 3}},
+      "harness/features/tx3g-config-oracle/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 489, "thumbv7neon-unknown-linux-gnueabihf": 489}},
+      "harness/features/tx3g-configuration/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 483, "thumbv7neon-unknown-linux-gnueabihf": 483}, "open_cases": {"aarch64-unknown-linux-gnu": 133}},
+      "harness/features/tx3g-semantics/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 660, "thumbv7neon-unknown-linux-gnueabihf": 660}},
+      "harness/features/vobsub-index/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 630, "thumbv7neon-unknown-linux-gnueabihf": 630}, "open_cases": {"aarch64-unknown-linux-gnu": 13}},
+      "harness/features/av1-obu-reading/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 33, "thumbv7neon-unknown-linux-gnueabihf": 33}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 810, "thumbv7neon-unknown-linux-gnueabihf": 810}},
+      "harness/features/av1-obu-wire/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 810, "thumbv7neon-unknown-linux-gnueabihf": 810}},
+      "harness/features/aac-adts-frames/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 28, "thumbv7neon-unknown-linux-gnueabihf": 28}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 288, "thumbv7neon-unknown-linux-gnueabihf": 288}},
+      "harness/features/aac-adts-header/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 288, "thumbv7neon-unknown-linux-gnueabihf": 288}},
       "harness/features/bit-readers/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 507, "thumbv7neon-unknown-linux-gnueabihf": 507}},
       "harness/features/core-budgets/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 30, "thumbv7neon-unknown-linux-gnueabihf": 30}},
       "harness/features/dsp-divide/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 51, "thumbv7neon-unknown-linux-gnueabihf": 51}},
@@ -209,7 +225,7 @@
       "triergon-core": 3,
       "triergon-elementary": 4,
       "triergon-font": 0,
-      "triergon-framing": 6,
+      "triergon-framing": 4,
       "triergon-isobmff": 2,
       "triergon-matroska": 0,
       "triergon-ogg": 4,
@@ -217,7 +233,7 @@
       "triergon-raster": 0,
       "triergon-session": 3,
       "triergon-shape": 1,
-      "triergon-subtitles": 10
+      "triergon-subtitles": 0
     }
   }
 }
