@@ -46,11 +46,15 @@
     },
     "not_compared": {
       "triergon-ass": 1,
+      "triergon-elementary": 4,
       "triergon-font": 1,
       "triergon-framing": 13,
       "triergon-isobmff": 9,
+      "triergon-matroska": 5,
+      "triergon-ogg": 4,
       "triergon-raster": 0,
-      "triergon-shape": 0
+      "triergon-shape": 0,
+      "triergon-subtitles": 11
     }
   }
 }
