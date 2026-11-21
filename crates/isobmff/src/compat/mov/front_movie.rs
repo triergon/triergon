@@ -237,7 +237,7 @@ impl FrontTrack {
         }
         if sample.ordinal != self.next_source_ordinal()? {
             return Err(Error::Unsupported(
-                "native continuation source ordinal gap or reorder",
+                "continuation source ordinal gap or reorder",
             ));
         }
         let (dts, origin) = if let Some(ticks) = sample.dts_ticks {

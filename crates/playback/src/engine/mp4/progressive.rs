@@ -910,7 +910,7 @@ impl ProgressiveState {
     fn finish_merge(&mut self, plan: &PreparedMp4) -> Result<()> {
         if self.blocked_in_extent {
             return Err(Error::Unsupported(
-                "native continuation source ordinal gap or reorder",
+                "continuation source ordinal gap or reorder",
             ));
         }
         self.phase = if !self.needs_reorder {
