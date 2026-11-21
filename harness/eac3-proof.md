@@ -87,9 +87,9 @@ not claims of identical candidate error text.
 These results are independent of the ordinary FFmpeg comparison, which remains
 0/10 exact folds. They do not replace its pins, operation or accepted scopes.
 
-Native qualification remains required: runtime upper confidence bound at most
-1.00 and strictly lower peak heap and kernel-bound total RSS, separately on
-AArch64 and ARMv7. Untimed functional agreement supplies none of those results.
+The [shared quality gates](../docs/quality.md) apply separately on Linux AArch64
+and 32-bit ARMv7. [Status](../docs/status.md) records native timing and memory
+results.
 
 Reproduce the functional comparison from the repository root, after preparing
 its pinned formats reference (`cargo xtask prepare-ffmpeg --profile formats`):
