@@ -87,6 +87,13 @@
         "external-vector"
       ]
     },
+    {"area": "Matroska packet side data", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mkv-side-data"},
+    {"area": "Matroska coded track extensions", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mkv-track-extensions"},
+    {"area": "Matroska source track mappings", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mkv-track-extensions-oracle"},
+    {"area": "Matroska codec state", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mkv-codec-state"},
+    {"area": "Matroska typed attachments", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mkv-attachments"},
+    {"area": "Matroska published metadata", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mkv-metadata-fields"},
+    {"area": "Matroska typed metadata", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mkv-metadata-oracle"},
     {
       "area": "Matroska legacy AAC-LC",
       "targets": [
