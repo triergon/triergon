@@ -95,12 +95,35 @@ pub(crate) enum Entities {
     AtEnd(ts::stream::MediaEntityEnd),
 }
 
+/// Where a TS engine's stream is in its life. The discriminants are bit sets
+/// (2 drains, 1 ended), so each test is one bit test, as two flags were.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum Life {
+    /// Reading the source.
+    Reading = 0,
+    /// The source ended; the stream and the tracks drain.
+    Draining = 2,
+    /// The stream reported its end, which it does only while draining.
+    Ended = 3,
+}
+
+impl Life {
+    /// Whether the source ended, so the stream and the tracks drain.
+    #[inline]
+    const fn drains(self) -> bool {
+        !matches!(self, Self::Reading)
+    }
+
+    /// Whether the stream reported its end.
+    #[inline]
+    const fn ended(self) -> bool {
+        self as u8 & 1 != 0
+    }
+}
+
 /// The transport stream demuxer of one program: the engine of
 /// [`Engine::Ts`](crate::Engine::Ts) and of the PES feed.
-///
-/// `ended` with `draining` is one state in two fields on purpose: `poll` tests
-/// them per carrier, and one enum for the pair cost 0.04% of the instructions of
-/// a program read.
 #[derive(Debug)]
 // Fields in the order the compiler chose for them, held by `repr(C)`.
 #[repr(C)]
@@ -126,11 +149,7 @@ pub struct TsEngine {
     pub(crate) pcr_pid: Option<u16>,
     pub(crate) program: u16,
     pub(crate) format: ts::PacketFormat,
-    /// Whether the stream reported its end. Only after `draining`: the stream
-    /// reports its end only after the source's end started the drain.
-    pub(crate) ended: bool,
-    /// Whether the source ended and the stream and the tracks drain.
-    pub(crate) draining: bool,
+    pub(crate) life: Life,
     pub(crate) namespace: DescriptorNamespace,
     pub(crate) delivery: Delivery,
 }
@@ -172,8 +191,7 @@ impl TsEngine {
         self.tsid = None;
         self.pcr_pid = None;
         self.pending = None;
-        self.ended = false;
-        self.draining = false;
+        self.life = Life::Reading;
         for track in self.pes_tracks.as_mut_slice() {
             track.observer = None;
             track.update = None;
@@ -217,8 +235,7 @@ impl TsEngine {
             pcr_pid: None,
             facts: BudgetVec::new(&pool),
             pending: None,
-            ended: false,
-            draining: false,
+            life: Life::Reading,
             pes_tracks: PesTracks::Inline(None),
             pes_active: None,
             pes_adopting: 0,
@@ -608,7 +625,7 @@ impl TsEngine {
     /// end starts draining the stream and every selected track.
     #[cold]
     fn end_entity<T: TsStepProjection>(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<T> {
-        if self.draining {
+        if self.life.drains() {
             return Err(Error::Invalid("TS repeated undrained entity End"));
         }
         if !matches!(self.entities, Entities::One) {
@@ -622,7 +639,7 @@ impl TsEngine {
             return Err(Error::Invalid("TS segment ended without an active PMT"));
         }
         self.stream.end_of_source()?;
-        self.draining = true;
+        self.life = Life::Draining;
         for track in self.pes_tracks.as_mut_slice() {
             if let Some(observer) = track.observer.as_mut() {
                 observer.end_of_source()?;
@@ -706,16 +723,16 @@ impl TsEngine {
                     Err(error) => {
                         track.refuse(error);
                         self.pes_updates_from = Some(index);
-                        self.pes_active = self.draining.then_some(index + 1);
+                        self.pes_active = self.life.drains().then_some(index + 1);
                         return T::project(FeedStep::Yield);
                     }
                 }
             }
-            self.pes_active = self.draining.then_some(index + 1);
+            self.pes_active = self.life.drains().then_some(index + 1);
         }
         let progressive = T::PROGRESSIVE || self.delivery.is_progressive();
         let feed_only = progressive || self.delivery.is_feed();
-        if self.ended {
+        if self.life.ended() {
             return T::project(FeedStep::End);
         }
         if matches!(self.entities, Entities::AtEnd(_)) {
@@ -799,14 +816,14 @@ impl TsEngine {
                     TraceEvent::Pes(_) if self.program == 0 => {
                         return Err(Error::Invalid("TS PES before program discovery"));
                     }
-                    TraceEvent::Finished => self.ended = true,
+                    TraceEvent::Finished => self.life = Life::Ended,
                     _ => {}
                 }
                 self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
                 self.suppressed_events += 1;
                 // Return periodically to the player's cancellation and event cap.
                 if !drained
-                    || self.ended
+                    || self.life.ended()
                     || w.remaining() == 0
                     || self.suppressed_events >= Self::FEED_EVENT_QUANTUM
                 {
@@ -1001,7 +1018,7 @@ impl TsEngine {
         }
         self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
         if matches!(event, TraceEvent::Finished) {
-            self.ended = true;
+            self.life = Life::Ended;
         }
         T::project(FeedStep::Event(TsEvent {
             source: event,

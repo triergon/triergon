@@ -8,7 +8,7 @@ pub(crate) use mp4::{Mp4RangeLanding, Mp4SyncLanding};
 
 use crate::engine::matroska::MkvEngine;
 use crate::engine::mp4::Mp4Engine;
-use crate::engine::ts::{Delivery as TsDelivery, Entities, TsEngine};
+use crate::engine::ts::{Delivery as TsDelivery, Entities, Life, TsEngine};
 use crate::event::EngineStep;
 use crate::source::SourceReply;
 use crate::{
@@ -327,7 +327,7 @@ impl Engine {
         }
         t.stream.end_of_source()?;
         t.entities = Entities::Sequence;
-        t.draining = true;
+        t.life = Life::Draining;
         Ok(())
     }
     /// The Matroska reader of a Matroska engine.
