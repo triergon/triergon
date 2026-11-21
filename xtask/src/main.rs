@@ -41,6 +41,7 @@ mod shape;
 mod stats;
 mod subtitle_fixtures;
 mod toml;
+mod transport_fate;
 mod transport_fixtures;
 mod walk;
 mod worker_tests;
@@ -165,6 +166,8 @@ commands:
                  fails above the quick-check limit
   screen         REPORTS   grade one paired timing round, with each contract's report
                  under REPORTS/<contract>, against the quick-check tolerances
+  transport-fate check | inventory OUTPUT | observe SPEC OUTPUT_DIR
+                 check TS identity coverage or record pinned original-input observations
   fate-inventory --source DIR --output FILE [--configured-list FILE]
                  index FATE definitions as data; nothing is executed
   codecs         aac-access-units|manifest|grade|summarize|time|equivalence
@@ -223,6 +226,7 @@ fn main() -> ExitCode {
         Some("fixture") => fixture(&root, &args[1..]),
         Some("subtitle-fixtures") => subtitle_fixtures::main(&root, &args[1..]),
         Some("fate-inventory") => fate_inventory(&args[1..]),
+        Some("transport-fate") => transport_fate::main(&root, &args[1..]),
         Some("compare") => compare(&root, &args[1..]),
         Some("link-order") => link_order(&root, &args[1..]),
         Some("same-code") => match &args[1..] {
