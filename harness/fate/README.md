@@ -36,9 +36,9 @@ Its specification is JSON with these fields:
 | `reference_worker` | `{ "file": "<built formats reference worker>", "sha256": "<verified executable SHA-256>" }` |
 | `candidate_worker` | `{ "file": "<built transport-worker>", "sha256": "<verified executable SHA-256>" }` |
 
-Paths are relative to the repository or absolute. Replace the angle-bracket values
-with independently verified build and sample pins. The tool does not manufacture
-pins from an unverified download. A missing sample is fetched with the existing
+Paths are relative to the repository or absolute. Use the sample pin in the
+observation contract and independently verify the build pins. A missing sample
+is fetched with the existing
 SHA-256-checked download tooling into the ignored sample cache. Changed inputs are
 refused. Executable hashes and the build manifest identify the chosen observation;
 they do not independently certify that an executable was built from that manifest.

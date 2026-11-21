@@ -1,0 +1,9 @@
+{
+ "name": "time-divide-free-c1ace6c8",
+ "path": "time-divide-free-c1ace6c8",
+ "retention": "retained",
+ "reason": "Measurements behind c1ace6c8 against main a0aede6d on c6g.4xlarge hosts from the gate images, ARMv7 and Linux AArch64: perf stat and 50-iteration timings of au-dvb-eac3-32000 for main, the change and the FFmpeg reference, ARMv7 cycle profiles and 64-bit division callers, per-case instruction counts of the transport, subtitle text, MP4 range and Matroska legacy AAC corpora with digest checks, the core tests and core-time oracle on each target, and the gcd and exact-division microbenchmark with its scripts; cited by docs/status.md.",
+ "key": "evidence/time-divide-free-c1ace6c8/347f6976c323a2ca2ec4a87c2dc95e39749edcd7afad66b5fa9c596dece697f4.tar.gz",
+ "sha256": "347f6976c323a2ca2ec4a87c2dc95e39749edcd7afad66b5fa9c596dece697f4",
+ "bytes": 232486
+}

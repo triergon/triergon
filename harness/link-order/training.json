@@ -103,6 +103,30 @@
   {
    "worker": "playback-worker",
    "arguments": [
+    "progressive-memory",
+    "@program.ts",
+    "pts-dts",
+    "before-eof"
+   ],
+   "targets": [
+    "aarch64-unknown-linux-gnu"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "progressive-memory",
+    "@program.ts",
+    "pts-dts",
+    "at-eof"
+   ],
+   "targets": [
+    "aarch64-unknown-linux-gnu"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
     "mp4-range-memory",
     "@avc-aac.mp4"
    ]
@@ -277,30 +301,6 @@
     "mkv-audio-memory",
     "@avc-aac-text.mkv",
     "aac"
-   ]
-  },
-  {
-   "worker": "playback-worker",
-   "arguments": [
-    "progressive-memory",
-    "@program.ts",
-    "pts-dts",
-    "before-eof"
-   ],
-   "targets": [
-    "aarch64-unknown-linux-gnu"
-   ]
-  },
-  {
-   "worker": "playback-worker",
-   "arguments": [
-    "progressive-memory",
-    "@program.ts",
-    "pts-dts",
-    "at-eof"
-   ],
-   "targets": [
-    "aarch64-unknown-linux-gnu"
    ]
   },
   {

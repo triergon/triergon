@@ -1,0 +1,32 @@
+{
+ "name": "gate-run-armv7-3b1c527c-20261121-140206-shard-4",
+ "path": "gate-run-armv7-3b1c527c-20261121-140206-shard-4",
+ "retention": "retained",
+ "reason": "Partial gate run at 3b1c527c (the downmix's silent planes tested on their gains' bits on 32-bit ARM, on main f0805e93) on four c6g.4xlarge hosts, ARMv7, shard 4 of the codec workload items (codec-workloads and codec-file-workloads timing and their memory parts codec-workloads-1 to -5 and codec-file-workloads-1 to -3), codec-aac-worker built by the pinned nightly with codec-aac's simd feature and every other worker, codec-worker included, by stable: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md.",
+ "key": "evidence/gate-runs/3b1c527c2c905d68ad63c719965b00020845185c-armv7-20261121-140206/shard-4/9bb1d45f8bc61f620d71135e3aaef412ba257afcd2ffe91b83053bede9b25f1d.tar.zst",
+ "sha256": "9bb1d45f8bc61f620d71135e3aaef412ba257afcd2ffe91b83053bede9b25f1d",
+ "bytes": 1103816,
+ "results": [
+  {
+   "path": "memory/codec-file-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "32d450ce65271acf173384395427ee47b207edaddd2b74e98d2b730264891e1d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "e445187618e0a20f78a1463ef414b394afd3aabca3dd7b8184e8b11d016f4e9b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "85278ac84dba4f154bd97c8847d205b0b77e916676a437b9f945990d485089c3",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

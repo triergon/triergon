@@ -656,3 +656,262 @@ fn epoch_selection_preserves_input_identity_and_seek_preconditions() {
         Err(Error::Cancelled)
     ));
 }
+
+// Physical entities retain independent offsets, including a PES straddling EOF.
+fn entity_suffix(
+    reader: &mut Reader,
+    pool: &Budget,
+    parts: &[&[u8]],
+    plan: &[triergon_mpegts::SeekEntity],
+) -> (SeekMethod, Vec<Snapshot>) {
+    let mut method = None;
+    let mut packets = Vec::new();
+    for _ in 0..1_000_000 {
+        match reader.step(&mut WorkBudget::new(17), &OFF).unwrap() {
+            Step::NeedInput(input) => {
+                let part = parts[plan
+                    .iter()
+                    .position(|entry| entry.source == input.source)
+                    .unwrap()];
+                let at = usize::try_from(input.offset).unwrap();
+                if at == part.len() {
+                    reader.finish(input.source, input.token).unwrap();
+                } else {
+                    let end = part.len().min(at + input.maximum.min(7));
+                    let bytes = Bytes::copy_from_slice(pool, &part[at..end]).unwrap();
+                    reader
+                        .provide(
+                            &InputWindow::new(input.source, input.token, input.offset, bytes)
+                                .unwrap(),
+                        )
+                        .unwrap();
+                }
+            }
+            Step::Ready(Event::Seek(seek)) => {
+                assert!(method.replace(seek.method).is_none());
+                assert_eq!(
+                    seek.scanned_bytes,
+                    if seek.method == SeekMethod::Index {
+                        0
+                    } else {
+                        plan.iter().map(|entry| entry.length).sum()
+                    }
+                );
+            }
+            Step::Ready(Event::Packet(packet)) => {
+                assert!(method.is_some());
+                packets.push(snapshot(&packet));
+            }
+            Step::Ready(Event::Other(_)) | Step::Yield => (),
+            Step::End(end) => {
+                assert_eq!(end.source, plan.last().unwrap().source);
+                return (method.unwrap(), packets);
+            }
+            Step::Backpressure(pressure) => panic!("unexpected pressure {pressure:?}"),
+        }
+    }
+    panic!("entity seek made no progress");
+}
+
+#[test]
+fn entity_epoch_indexes_preserve_codec_changes_ties_and_exact_suffixes() {
+    use triergon_mpegts::SeekEntity;
+    for configuration in [false, true] {
+        let ts = changed_video(configuration);
+        for format in [PacketFormat::Ts188, PacketFormat::M2ts192] {
+            let raw = if format == PacketFormat::Ts188 {
+                ts.bytes.clone()
+            } else {
+                ts.m2ts()
+            };
+            let carrier = if format == PacketFormat::Ts188 {
+                188
+            } else {
+                192
+            };
+            // The first video PES spans this carrier boundary.
+            let split = 4 * carrier;
+            let parts = [&raw[..split], &raw[split..]];
+            let plan = [
+                SeekEntity {
+                    source: ID,
+                    length: split as u64,
+                },
+                SeekEntity {
+                    source: SourceId(99),
+                    length: (raw.len() - split) as u64,
+                },
+            ];
+            let pool = Budget::new(32 << 20).unwrap();
+            let mut seeking = reader(&pool, parts[0], format);
+            let selected = if configuration {
+                epoch(0, 3)
+            } else {
+                epoch(1, 2)
+            };
+            let mut expected = Vec::new();
+            for (epochs, build, method) in [
+                (selected, true, SeekMethod::BoundedScan),
+                (selected, false, SeekMethod::Index),
+                (epoch(0, 2), false, SeekMethod::BoundedScan),
+                (selected, true, SeekMethod::BoundedScan),
+                (selected, false, SeekMethod::Index),
+            ] {
+                if build {
+                    seeking
+                        .request_seek_in_entities_in_epoch_and_index(
+                            request(112_000),
+                            &plan,
+                            epochs,
+                            128,
+                        )
+                        .unwrap();
+                } else {
+                    seeking
+                        .request_seek_in_entities_in_epoch(request(112_000), &plan, epochs)
+                        .unwrap();
+                }
+                let (actual, suffix) = entity_suffix(&mut seeking, &pool, &parts, &plan);
+                assert_eq!(actual, method);
+                assert!(!suffix.is_empty());
+                assert_eq!(suffix[0].epochs, epochs);
+                if epochs == selected {
+                    if expected.is_empty() {
+                        expected = suffix;
+                    } else {
+                        assert_eq!(suffix, expected);
+                    }
+                }
+            }
+            // Changing an entity identity invalidates reuse, while preserving bytes.
+            let mut changed = plan;
+            changed[1].source = SourceId(100);
+            seeking
+                .request_seek_in_entities_in_epoch(request(112_000), &changed, selected)
+                .unwrap();
+            assert_eq!(
+                entity_suffix(&mut seeking, &pool, &parts, &changed).0,
+                SeekMethod::BoundedScan
+            );
+            // Identical IDs with a different carrier-aligned cut are a different plan.
+            let recut = split + carrier;
+            let recut_parts = [&raw[..recut], &raw[recut..]];
+            let mut resized = changed;
+            resized[0].length = recut as u64;
+            resized[1].length = (raw.len() - recut) as u64;
+            seeking
+                .request_seek_in_entities_in_epoch(request(112_000), &resized, selected)
+                .unwrap();
+            assert_eq!(
+                entity_suffix(&mut seeking, &pool, &recut_parts, &resized).0,
+                SeekMethod::BoundedScan
+            );
+            seeking.close();
+            assert_eq!(pool.used(), Budget::control_storage_bytes());
+        }
+    }
+}
+
+#[test]
+fn explicit_epoch_index_bounds_and_ties_match_the_full_scan() {
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    ts.pcr(80_000, true);
+    for (label, pts) in [
+        (b"first".as_slice(), 90_000),
+        (b"last", 90_000),
+        (b"tail", 93_000),
+    ] {
+        ts.pes(PID, 0xc0, &adts(label), Some(pts), None);
+    }
+    let pool = Budget::new(1 << 20).unwrap();
+    for (limit, method) in [(1, SeekMethod::BoundedScan), (2, SeekMethod::Index)] {
+        let mut seeking = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+        for build in [true, false] {
+            if build {
+                seeking
+                    .request_seek_in_epoch_and_index(request(91_000), epoch(1, 2), limit)
+                    .unwrap();
+            } else {
+                seeking
+                    .request_seek_in_epoch(request(91_000), epoch(1, 2))
+                    .unwrap();
+            }
+            let mut received = Vec::new();
+            while let Some(event) = next(&mut seeking, &pool, &ts.bytes, 7, 1).unwrap() {
+                match event {
+                    Event::Seek(seek) => assert_eq!(
+                        seek.method,
+                        if build {
+                            SeekMethod::BoundedScan
+                        } else {
+                            method
+                        }
+                    ),
+                    Event::Packet(packet) => received.push(packet.payload().to_vec()),
+                    Event::Other(_) => (),
+                }
+            }
+            assert_eq!(received, [adts(b"last"), adts(b"tail")]);
+        }
+    }
+}
+
+#[test]
+fn indexed_epoch_landing_keeps_a_pes_split_between_entities() {
+    use triergon_mpegts::SeekEntity;
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    ts.pes(PID, 0xc0, &adts(b"old epoch"), Some(90_000), None);
+    ts.pcr(80_000, true);
+    let start = ts.bytes.len();
+    let frame = adts(&[0x56; 250]);
+    ts.pes(PID, 0xc0, &frame, Some(90_000), None);
+    ts.pes(PID, 0xc0, &adts(b"untimed tail"), None, None);
+    let split = start + 188;
+    let parts = [&ts.bytes[..split], &ts.bytes[split..]];
+    let plan = [
+        SeekEntity {
+            source: ID,
+            length: split as u64,
+        },
+        SeekEntity {
+            source: SourceId(99),
+            length: parts[1].len() as u64,
+        },
+    ];
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut seeking = reader(&pool, parts[0], PacketFormat::Ts188);
+    let mut expected = Vec::new();
+    for build in [true, false] {
+        if build {
+            seeking
+                .request_seek_in_entities_in_epoch_and_index(request(91_000), &plan, epoch(1, 2), 1)
+                .unwrap();
+        } else {
+            seeking
+                .request_seek_in_entities_in_epoch(request(91_000), &plan, epoch(1, 2))
+                .unwrap();
+        }
+        let (method, suffix) = entity_suffix(&mut seeking, &pool, &parts, &plan);
+        assert_eq!(
+            method,
+            if build {
+                SeekMethod::BoundedScan
+            } else {
+                SeekMethod::Index
+            }
+        );
+        assert_eq!(suffix.len(), 2);
+        assert_eq!(suffix[0].bytes, frame);
+        assert_eq!(suffix[1].pts, None);
+        let ranges = &suffix[0].origins[0].ranges;
+        assert!(ranges.iter().any(|range| range.entity == ID));
+        assert!(ranges.iter().any(|range| range.entity == plan[1].source));
+        if build {
+            expected = suffix;
+        } else {
+            assert_eq!(suffix, expected);
+        }
+    }
+}

@@ -862,6 +862,7 @@ families and options:
   transport-access-units --output ROOT [--record --reference-worker FILE --observations DIR]
            regenerate MPEG-TS access-unit inputs and their reference-pinned corpus
   transport-dts --record REFERENCE   regenerate DVB DTS core transport inputs and pins
+  transport-dts-discovery FATE_DTS_TS [--record REFERENCE]   generate automatic DTS controls
   transport-dts-hd --record REFERENCE   regenerate DTS-HD transport inputs and pins
   transport-dts-hd-grouped [--record REFERENCE]   generate DTS-HD source AU controls
   transport-dts-seek --record REFERENCE   regenerate DTS core seek inputs and pins
@@ -883,6 +884,9 @@ fn fixture(root: &Path, args: &[String]) -> Task {
     }
     if family == "transport-access-units" {
         return transport_fixtures::main(root, &args[1..]);
+    }
+    if family == "transport-dts-discovery" {
+        return transport_fixtures::dts_discovery::main(root, &args[1..]);
     }
     if family == "transport-dts-hd-grouped" {
         return transport_fixtures::dts_hd::main(root, &args[1..]);
