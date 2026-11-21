@@ -9,7 +9,7 @@ use crate::SessionState;
 use crate::lane::Phase;
 use crate::mix::Downmix;
 use crate::queue::{FeedError, QueueLimits, UnitQueue};
-use triergon_codec::{AudioFrame, DynAudioDecoder};
+use triergon_codec::{AudioFrame, DownmixLevels, DynAudioDecoder};
 
 /// Interleaved stereo s16 at `sample_rate`; `pts` is the first unit's caller PTS.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -28,9 +28,7 @@ pub struct AudioSession {
     delay: usize,
     queue: UnitQueue,
     frame: AudioFrame,
-    downmix: Downmix,
-    // Samples decoded at a new rate while the caller's block held another.
-    carry: Option<PcmBlock>,
+    output: Output,
     generation: u64,
     phase: Phase,
 }
@@ -42,8 +40,7 @@ impl AudioSession {
             delay: 0,
             queue: UnitQueue::new(limits),
             frame: AudioFrame::default(),
-            downmix: Downmix::default(),
-            carry: None,
+            output: Output::default(),
             generation: 0,
             phase: Phase::Open,
         }
@@ -64,7 +61,7 @@ impl AudioSession {
     fn reset(&mut self) {
         self.generation += 1;
         self.queue.clear();
-        self.carry = None;
+        self.output.carry = None;
         self.phase = Phase::Open;
     }
     pub fn generation(&self) -> u64 {
@@ -85,9 +82,22 @@ impl AudioSession {
         self.phase.admit(self.decoder.is_some())?;
         self.queue.push_discarding(au, pts, discard)
     }
+    /// No more input for this generation. Once every queued unit is decoded, the samples
+    /// the decoder still holds back ([`AudioDecoder::flush`]) follow, and the lane reports
+    /// [`SessionState::Ended`] when they are delivered.
+    ///
+    /// [`AudioDecoder::flush`]: triergon_codec::AudioDecoder::flush
     pub fn end_of_stream(&mut self) {
-        if self.decoder.is_some() && self.phase == Phase::Open {
-            self.phase = Phase::Drained;
+        if self.decoder.is_none() || self.phase != Phase::Open {
+            return;
+        }
+        self.phase = Phase::Ending;
+        if self.queue.is_empty() && self.output.carry.is_none() {
+            let mut held = PcmBlock::default();
+            self.drain(&mut held);
+            if !held.samples.is_empty() {
+                self.output.carry = Some(held);
+            }
         }
     }
     /// Decode every queued unit that is due at `clock_ns` (PTS minus `lead_ns`
@@ -98,11 +108,11 @@ impl AudioSession {
         let Some(decoder) = self.decoder.as_mut() else {
             return 0;
         };
-        if let Some(carry) = self.carry.take() {
+        if let Some(carry) = self.output.carry.take() {
             if out.samples.is_empty() {
                 *out = carry;
             } else {
-                self.carry = Some(carry);
+                self.output.carry = Some(carry);
                 return 0;
             }
         }
@@ -112,40 +122,77 @@ impl AudioSession {
         };
         let mut consumed = 0;
         // A failed lane's queue is empty.
-        while self.carry.is_none()
+        while self.output.carry.is_none()
             && let Some(unit) = self.queue.pop_if(due)
         {
-            let result = decoder.decode(&unit.data, &mut self.frame);
-            if result.is_ok() {
-                unit.discard.apply(&mut self.frame, &mut self.delay);
-            }
             consumed += 1;
-            match result {
+            match decoder.decode(&unit.data, &mut self.frame) {
+                Ok(levels) => {
+                    unit.discard.apply(&mut self.frame, &mut self.delay);
+                    self.output.append(&self.frame, levels, unit.pts, out);
+                }
                 Err(error) => {
                     self.phase = Phase::Failed(error);
                     self.queue.clear();
                 }
-                Ok(_) if self.frame.samples_per_channel == 0 => {}
-                Ok(levels) => {
-                    let target =
-                        if out.samples.is_empty() || out.sample_rate == self.frame.sample_rate {
-                            &mut *out
-                        } else {
-                            self.carry.get_or_insert_with(PcmBlock::default)
-                        };
-                    if target.samples.is_empty() {
-                        target.sample_rate = self.frame.sample_rate;
-                        target.pts = unit.pts;
-                    }
-                    let levels = levels.unwrap_or_default();
-                    self.downmix.mix(&self.frame, levels, &mut target.samples);
-                }
             }
+        }
+        if self.phase == Phase::Ending && self.queue.is_empty() && self.output.carry.is_none() {
+            self.drain(out);
         }
         consumed
     }
+    /// Append the samples the decoder still holds back to `out`, as they are: no discard
+    /// and no start delay apply to them.
+    fn drain(&mut self, out: &mut PcmBlock) {
+        let Some(decoder) = self.decoder.as_mut() else {
+            return;
+        };
+        self.phase = match decoder.flush(&mut self.frame) {
+            Ok(()) => {
+                self.output.append(&self.frame, None, None, out);
+                Phase::Drained
+            }
+            Err(error) => Phase::Failed(error),
+        };
+    }
     pub fn state(&self) -> SessionState {
-        let pending = !self.queue.is_empty() || self.carry.is_some();
+        let pending = !self.queue.is_empty() || self.output.carry.is_some();
         self.phase.state(self.decoder.is_some(), pending)
+    }
+}
+
+/// Decoded frames on their way into the caller's blocks.
+#[derive(Default)]
+struct Output {
+    downmix: Downmix,
+    /// Samples decoded at a new rate while the caller's block held another.
+    carry: Option<PcmBlock>,
+}
+
+impl Output {
+    /// Mix `frame` onto `out`, or into a carried block when `out` holds samples at another
+    /// rate; `pts` becomes the block's when the frame starts it.
+    fn append(
+        &mut self,
+        frame: &AudioFrame,
+        levels: Option<DownmixLevels>,
+        pts: Option<i64>,
+        out: &mut PcmBlock,
+    ) {
+        if frame.samples_per_channel == 0 {
+            return;
+        }
+        let target = if out.samples.is_empty() || out.sample_rate == frame.sample_rate {
+            out
+        } else {
+            self.carry.get_or_insert_with(PcmBlock::default)
+        };
+        if target.samples.is_empty() {
+            target.sample_rate = frame.sample_rate;
+            target.pts = pts;
+        }
+        self.downmix
+            .mix(frame, levels.unwrap_or_default(), &mut target.samples);
     }
 }
