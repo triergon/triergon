@@ -182,6 +182,13 @@ palettes cover all 16 entries of the first VTS program chain, option precedence
 and fallback for missing, invalid or out-of-file tables. An overflowing sector
 offset is an open case against FFmpeg on AArch64.
 
+Matroska startup discovery reads the PGS segment kind and raw length and checks
+the composition width and height. With a PGS track present, the startup comparison
+folds the selected video packet timing, sizes and payloads.
+[`matroska-startup-seek`](../../harness/features/matroska-startup-seek/contract.json)
+The segment oracle compares the parsed fields directly.
+[`pgs-segments`](../../harness/features/pgs-segments/contract.json)
+
 ### Closed captions and teletext
 
 | Format | Decoded | Output |
