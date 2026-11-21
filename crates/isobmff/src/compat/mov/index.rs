@@ -1309,11 +1309,13 @@ impl<'a> GlobalSeekJob<'a> {
             match &mut self.stage {
                 GlobalStage::Failed(error) => return Err(*error),
                 GlobalStage::Reference(child) => {
-                    let Some((landing, resume)) =
-                        landed(child, &mut self.scanned, setup.limits, work, cancel)?
-                    else {
+                    if child.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1) {
                         return Ok(BuildStatus::Yield);
-                    };
+                    }
+                    // The landing and the packet state are taken in place: the state
+                    // is kilobytes, and an extra move of it costs more than the seek.
+                    let (landing, resume) = child.take_landing()?;
+                    self.scanned = scanned(self.scanned, &landing, setup.limits)?;
                     let at = setup.reference_index;
                     self.anchors.as_mut_slice()[at].occurrence = landing.selected.ordinal;
                     self.resumes.as_mut_slice()[at] = resume;
@@ -1341,11 +1343,11 @@ impl<'a> GlobalSeekJob<'a> {
                         *step = TrackStep::Start;
                     }
                     TrackStep::Seek(child) => {
-                        let Some((landing, resume)) =
-                            landed(child, &mut self.scanned, setup.limits, work, cancel)?
-                        else {
+                        if child.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1) {
                             return Ok(BuildStatus::Yield);
-                        };
+                        }
+                        let (landing, resume) = child.take_landing()?;
+                        self.scanned = scanned(self.scanned, &landing, setup.limits)?;
                         if setup.opus_track == Some(*at) {
                             let sample = &landing.selected.occurrence.source;
                             let edit = setup.opus_edit(*at)?;
@@ -1449,24 +1451,14 @@ impl<'a> GlobalSeekJob<'a> {
         })
     }
 }
-/// Polls `child`; once it has landed and one more work unit is charged, its landing,
-/// with the entries it read added to `scanned`.
-fn landed<'a>(
-    child: &mut SeekJob<'a>,
-    scanned: &mut u64,
-    limits: SeekLimits,
-    work: &mut WorkBudget,
-    cancel: &AtomicBool,
-) -> Result<Option<(SeekLanding, Option<TrackResume<'a>>)>> {
-    if child.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1) {
-        return Ok(None);
-    }
-    let (landing, resume) = child.take_landing()?;
-    *scanned = scanned
+/// `scanned` with the entries `landing`'s seek read added; `Error::Limit` past the index
+/// limit.
+fn scanned(scanned: u64, landing: &SeekLanding, limits: SeekLimits) -> Result<u64> {
+    let scanned = scanned
         .checked_add(landing.scanned_entries)
         .ok_or(Error::Overflow)?;
-    bound(*scanned, limits.index.max_entries)?;
-    Ok(Some((landing, resume)))
+    bound(scanned, limits.index.max_entries)?;
+    Ok(scanned)
 }
 impl<'a> GlobalSeekSetup<'a> {
     fn track_context(&self, at: usize) -> Context<'a> {
