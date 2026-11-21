@@ -64,7 +64,7 @@ impl PollOutput for CompactTraceEvent {
 impl TransportStream {
     #[expect(
         clippy::expect_used,
-        reason = "the observer callbacks borrow the carrier source but never take it"
+        reason = "an error return here measured with the span refusal: +0.24% (seek split-PES +0.72%)"
     )]
     fn retain_observed_continuation(
         &mut self,

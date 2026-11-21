@@ -26,7 +26,7 @@ struct Payload {
 impl Payload {
     #[expect(
         clippy::expect_used,
-        reason = "a payload is consumed only after its last read on the per-carrier path"
+        reason = "an error return here and in the body loop measured +0.09% (pes/cc-wrap +0.13%)"
     )]
     fn bytes(&self) -> &Bytes {
         self.bytes.as_ref().expect("PES payload not consumed")
@@ -279,7 +279,7 @@ impl PesAssembler {
     /// Keep a whole continuation when no span growth or PES publication is due.
     #[expect(
         clippy::expect_used,
-        reason = "the carrier was checked present above on the per-carrier path"
+        reason = "taking the carrier with take_if and handing a refused span back measured +0.24% (seek split-PES +0.72%): try_push no longer inlines"
     )]
     pub(crate) fn retain_body_carrier(
         &mut self,
@@ -329,7 +329,7 @@ impl PesAssembler {
     /// Commit a carrier after the complete span and work grant were checked.
     #[expect(
         clippy::expect_used,
-        reason = "callers check the span capacity before appending on the per-carrier path"
+        reason = "handing a refused span back to the caller measured +0.24% (seek split-PES +0.72%): try_push no longer inlines"
     )]
     pub(crate) fn append_body_carrier(
         &mut self,
@@ -594,17 +594,15 @@ impl PesAssembler {
     }
 
     #[cold]
-    #[expect(
-        clippy::expect_used,
-        reason = "the pending carrier is the only backing while a header waits for storage"
-    )]
     fn record_blocked_header_storage(&mut self, additional: usize) -> Result<()> {
         if matches!(self.span_growth, SpanGrowth::HeaderBlocked(_)) {
             return Ok(());
         }
         // The pending carrier is the only retained backing during header assembly.
         debug_assert!(self.spans.is_empty());
-        let pending = self.pending_backing().expect("pending PES header");
+        let pending = self
+            .pending_backing()
+            .ok_or(Error::Invalid("PES payload missing"))?;
         let minimum = Budget::control_storage_bytes()
             .checked_add(self.table_storage()?)
             .and_then(|bytes| bytes.checked_add(additional))
@@ -627,10 +625,6 @@ impl PesAssembler {
         Ok(())
     }
 
-    #[expect(
-        clippy::expect_used,
-        reason = "a span growth audit runs only while a span is pending"
-    )]
     fn reserve_body_span(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         let spans = self.spans.len();
         if spans < self.spans.capacity() {
@@ -650,7 +644,10 @@ impl PesAssembler {
         }
         loop {
             if let SpanGrowth::Audit(audit) = &mut self.span_growth {
-                let pending = self.payload.as_ref().expect("pending PES span");
+                let pending = self
+                    .payload
+                    .as_ref()
+                    .ok_or(Error::Invalid("PES payload missing"))?;
                 if !audit.step(self.spans.as_slice(), pending.bytes(), work, cancel)? {
                     return Ok(false);
                 }
@@ -688,7 +685,7 @@ impl PesAssembler {
 
     #[expect(
         clippy::expect_used,
-        reason = "the pending span is present while its body is drained in the per-carrier loop"
+        reason = "error returns in the body loop measured +0.09% (pes/cc-wrap +0.13%)"
     )]
     fn poll_inner<const RETAIN: bool>(
         &mut self,
