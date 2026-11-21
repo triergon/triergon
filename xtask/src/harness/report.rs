@@ -141,6 +141,12 @@ fn entity_input_failure(
         [namespace, remaining @ ..] if namespace == "--dvb" || namespace == "--atsc" => remaining,
         _ => args,
     };
+    let args = match (prefix, args.split_last()) {
+        (Some("ts-au-"), Some((option, remaining))) if option == "--ignore-pcr-reserved-bits" => {
+            remaining
+        }
+        _ => args,
+    };
     // This single-entity option declares a codec, so it has no companion input.
     let args = match (prefix, args) {
         (Some("ts-au-"), [option])
@@ -1709,6 +1715,22 @@ mod prefix_tests {
             let case = parse(&format!(r#"{{"arguments":["188","1",{options}]}}"#)).unwrap();
             assert!(entity_input_failure(root, &case, Some("ts-au-")).is_err());
         }
+    }
+
+    #[test]
+    fn pcr_compatibility_leaves_companion_input_pins_required() {
+        let root = Path::new(".");
+        let selected =
+            parse(r#"{"arguments":["188","1","--dts-core=256","--ignore-pcr-reserved-bits"]}"#)
+                .unwrap();
+        assert_eq!(
+            entity_input_failure(root, &selected, Some("ts-au-")).unwrap(),
+            None
+        );
+        assert!(entity_input_failure(root, &selected, Some("ts-")).is_err());
+        let unpinned =
+            parse(r#"{"arguments":["188","1","next.ts","--ignore-pcr-reserved-bits"]}"#).unwrap();
+        assert!(entity_input_failure(root, &unpinned, Some("ts-au-")).is_err());
     }
 
     #[test]

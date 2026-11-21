@@ -1934,6 +1934,10 @@ impl TransportStream {
         self.unbounded_adts = true;
     }
 
+    pub(crate) fn set_pcr_policy(&mut self, policy: crate::compat::pes::PcrPolicy) {
+        self.framer.set_pcr_policy(policy);
+    }
+
     pub(crate) fn share_input(&mut self) {
         self.framer.share_input();
     }

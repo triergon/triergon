@@ -116,7 +116,7 @@ done:
 /* ts-fold FILE SIZE PROGRAM [OPTIONS] | ts-bench FILE N SIZE PROGRAM [OPTIONS] |
  * ts-memory FILE SIZE PROGRAM [OPTIONS]; OPTIONS are --dvb or --atsc and further entities.
  * ts-au-fold, ts-au-bench and ts-au-memory enable parsing and accept an optional
- * trailing --dts-core=PID for a single entity. */
+ * trailing --dts-core=PID for a single entity, then --ignore-pcr-reserved-bits. */
 static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
 {
     const int access_units = !strncmp(argv[1], "ts-au-", 6);
@@ -142,6 +142,9 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
     long program = strtol(argv[at + 1], &end, 10);
     if (*end || program < 1 || program > 65535)
         return 2;
+    /* The demuxer already ignores the six reserved bits. */
+    if (access_units && argc > at + 2 && !strcmp(argv[argc - 1], "--ignore-pcr-reserved-bits"))
+        --argc;
     int unlabelled_dts_core = 0;
     if (access_units && argc > at + 2 && !strncmp(argv[argc - 1], "--dts-core=", 11)) {
         long pid = strtol(argv[argc - 1] + 11, &end, 10);

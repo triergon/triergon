@@ -81,6 +81,8 @@ pub struct ReaderLimits {
     pub unframed_audio_policy: UnframedAudioPolicy,
     /// Explicit DTS core identity for one unlabelled private-data route.
     pub unlabelled_dts_core: Option<crate::compat::dts::UnlabelledCore>,
+    /// Compatibility policy for the reserved bits in a program clock reference.
+    pub pcr_policy: crate::compat::pes::PcrPolicy,
     /// Framing policy for ADTS. The compatibility policy handles ADTS EOF itself.
     pub adts_packet_policy: PacketPolicy,
     /// Wire policy for ADTS PES with a zero packet-length field.
@@ -112,6 +114,7 @@ impl Default for ReaderLimits {
             audio_eof_policy: AudioEofPolicy::RejectIncomplete,
             unframed_audio_policy: UnframedAudioPolicy::Strict,
             unlabelled_dts_core: None,
+            pcr_policy: crate::compat::pes::PcrPolicy::Strict,
             adts_packet_policy: PacketPolicy::Strict,
             adts_pes_policy: adts::PesPolicy::Strict,
             latm_packet_policy: latm::PacketPolicy::Strict,
@@ -267,6 +270,7 @@ impl Reader {
             limits.descriptor_namespace,
         )?;
         stream.share_input();
+        stream.set_pcr_policy(limits.pcr_policy);
         if limits.adts_pes_policy == adts::PesPolicy::ReportUnbounded {
             stream.allow_unbounded_adts();
         }

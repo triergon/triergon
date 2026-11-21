@@ -2,7 +2,9 @@ use super::{
     AccessUnit, AudioEofPolicy, CodecId, Drive, Error, Event, MediaKind, PID, PROGRAM, PacketInfo,
     ReaderEvent, ReaderLimits, Time, TrackInfo, Transport, audio_eof_namespace,
 };
+use triergon_mpegts::TraceEvent;
 use triergon_mpegts::compat::dts::UnlabelledCore;
+use triergon_mpegts::compat::pes::PcrPolicy;
 
 // EN 300 468 G.2, corresponding to a 48 kHz, 512-sample mono core.
 const DESCRIPTOR: &[u8] = &[0x7b, 5, 0xd2, 0x87, 0x83, 0xfe, 0x00];
@@ -102,6 +104,66 @@ fn unlabelled_dts_core_requires_private_stream_one() {
             Err(Error::Invalid(_)) => break,
             _ => panic!("DTS must use private_stream_1"),
         }
+    }
+}
+
+#[test]
+fn compatibility_retains_reserved_pcr_bits_and_rejects_an_invalid_extension() {
+    let mut ts = Transport::new();
+    ts.tables(&[(0x06, PID, DESCRIPTOR)], 0);
+    let offset = ts.bytes.len();
+    ts.pcr(80_000, false);
+    ts.bytes[offset + 10] &= !0x7e;
+    ts.pes(PID, 0xbd, &BYTES[..FRAME], Some(90_000), None);
+    let mut invalid = ts.bytes.clone();
+    invalid[offset + 10] |= 1;
+    invalid[offset + 11] = 44;
+
+    for (bytes, policy, accepted) in [
+        (ts.bytes.as_slice(), PcrPolicy::Strict, false),
+        (ts.bytes.as_slice(), PcrPolicy::IgnoreReservedBits, true),
+        (invalid.as_slice(), PcrPolicy::IgnoreReservedBits, false),
+    ] {
+        let mut reader = Drive::new(
+            bytes,
+            ReaderLimits {
+                pcr_policy: policy,
+                ..limits()
+            },
+            7,
+            1,
+        );
+        let mut seen_clock = false;
+        let mut seen_fault = false;
+        let mut seen_frame = false;
+        while let Some(event) = reader.next().unwrap() {
+            match event {
+                Event::Other(ReaderEvent::Transport(packet))
+                    if packet.source_offset == offset as u64 =>
+                {
+                    let field = packet.adaptation.unwrap();
+                    assert_eq!(field.pcr_reserved_bits(), Some(0));
+                    let clock = field.pcr.unwrap();
+                    assert_eq!((clock.base, clock.extension), (80_000, 0));
+                    seen_clock = true;
+                }
+                Event::Other(ReaderEvent::Source(source)) => {
+                    if let TraceEvent::Diagnostic(fault) = source.event() {
+                        assert_eq!(fault.error, Error::Invalid("PCR reserved bits/extension"));
+                        seen_fault = true;
+                        break;
+                    }
+                }
+                Event::Packet(packet) => {
+                    assert_eq!(packet.payload(), &BYTES[..FRAME]);
+                    seen_frame = true;
+                }
+                _ => (),
+            }
+        }
+        assert_eq!(seen_fault, !accepted);
+        assert_eq!(seen_clock, accepted);
+        assert_eq!(seen_frame, accepted);
     }
 }
 
