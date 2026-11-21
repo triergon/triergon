@@ -1,4 +1,6 @@
 //! Bounded source seeks in the exact presentation clock.
+mod dts_hd;
+mod physical;
 mod retained;
 
 use super::{AccessUnit, MpegAudioFrame, Packet, PacketTracks, Reader, ReaderEvent, Shared};
@@ -78,6 +80,10 @@ impl EntityPlan {
             .ok_or(Error::Overflow)
     }
 
+    fn same_source(&self, other: &Self) -> bool {
+        self.entries.as_slice() == other.entries.as_slice()
+    }
+
     fn first(&self) -> (SourceId, SourceCapabilities) {
         let first = self.entries.as_slice()[0];
         (first.source, first.capabilities())
@@ -98,6 +104,7 @@ struct Landing {
     offset: u64,
     epochs: SourceEpochs,
     byte_run: u64,
+    pes_offset: u64,
 }
 
 #[derive(Default)]
@@ -111,6 +118,7 @@ struct Scan {
 pub(super) struct SeekIndex {
     track: TrackId,
     points: BudgetVec<Landing>,
+    physical: Option<Shared<physical::Index>>,
 }
 
 impl SeekIndex {
@@ -126,9 +134,28 @@ impl SeekIndex {
 struct IndexBuilder {
     points: BudgetVec<Landing>,
     maximum: usize,
+    physical: Option<Charged<Box<physical::Capture>>>,
 }
 
 impl IndexBuilder {
+    fn packet(&mut self, packet: &Packet) {
+        if let Some(capture) = &mut self.physical {
+            capture.packet(packet);
+            if !capture.usable() {
+                self.physical = None;
+            }
+        }
+    }
+
+    fn other(&mut self, event: &ReaderEvent) {
+        if let Some(capture) = &mut self.physical {
+            capture.other(event);
+            if !capture.usable() {
+                self.physical = None;
+            }
+        }
+    }
+
     fn record(&mut self, point: Landing) -> bool {
         if let Some(last) = self.points.as_mut_slice().last_mut() {
             match point.time.cmp(&last.time) {
@@ -157,9 +184,18 @@ enum Phase {
 
 pub(super) struct Seeking {
     request: SeekRequest,
+    selected_epochs: Option<SourceEpochs>,
     phase: Phase,
     retain: Option<Retain>,
     full_scan: bool,
+    direct: Option<physical::Direct>,
+    probing: Option<Probing>,
+}
+
+struct Probing {
+    packet: Packet,
+    probe: SeekProbe,
+    xll_header: Option<dts_hd::Header>,
 }
 
 #[derive(Clone, Copy)]
@@ -167,13 +203,18 @@ pub(super) enum PictureDelivery {
     Full,
     Scan,
     Discard,
-    Landing { offset: u64, byte_run: u64 },
+    Landing {
+        offset: u64,
+        byte_run: u64,
+        publish_headers: bool,
+    },
 }
 
 pub(super) struct SeekProbe {
     pub offset: u64,
     pub epochs: SourceEpochs,
     pub byte_run: u64,
+    pub pes_offset: u64,
     pub ticks: Option<i128>,
     pub time: Option<Time>,
     pub random_access: bool,
@@ -251,9 +292,10 @@ fn latm_entry(multiplex: &[u8]) -> Option<()> {
     (payload != 0 && bits.remaining() < 8).then_some(())
 }
 
-fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
+fn packet_probe(packet: Packet) -> Result<Probing> {
     let clock = packet.clock();
     let time = clock.and_then(|clock| clock.pts.exact);
+    let mut xll_header = None;
     let (offset, random_access) = match packet.access_unit() {
         AccessUnit::Video(unit) => (unit.range.start, unit.random_access),
         AccessUnit::Adts(frame) => (frame.source().offset, time.is_some()),
@@ -279,6 +321,13 @@ fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
                 time.is_some() && header.history == 0,
             )
         }
+        AccessUnit::DtsExtension(frame) => {
+            xll_header = dts_hd::entry(&packet)?;
+            (
+                frame.elementary_range().start,
+                time.is_some() && xll_header.is_some(),
+            )
+        }
         AccessUnit::AdtsFragment(fragment) => (fragment.source().offset, false),
         _ => {
             return Err(Error::Unsupported(
@@ -286,14 +335,21 @@ fn packet_probe(packet: &Packet) -> Result<SeekProbe> {
             ));
         }
     };
-    Ok(SeekProbe {
+    let pes = packet.sources()[0].pes.pes();
+    let probe = SeekProbe {
         offset,
         epochs: packet.epochs(),
-        byte_run: packet.sources()[0].pes.pes().byte_run_epoch,
+        byte_run: pes.byte_run_epoch,
+        pes_offset: pes.elementary_offset,
         ticks: clock.and_then(|clock| clock.pts.ticks90),
         time,
         random_access,
         has_vcl: true,
+    };
+    Ok(Probing {
+        packet,
+        probe,
+        xll_header,
     })
 }
 
@@ -302,18 +358,33 @@ impl Seeking {
         matches!(self.phase, Phase::Scan(_)).then_some(self.request.track)
     }
 
-    pub(super) fn publishes_tables(&self) -> bool {
+    pub(super) fn publishes_source(&self, event: &TraceEvent) -> bool {
         matches!(self.phase, Phase::Replay { .. })
+            && (matches!(event, TraceEvent::Pat(_) | TraceEvent::ProgramMap { .. })
+                || (self.selected_epochs.is_some()
+                    && matches!(
+                        event,
+                        TraceEvent::Timeline { .. } | TraceEvent::Discontinuity { .. }
+                    )))
     }
 
     pub(super) fn picture_delivery(&self, track: TrackId) -> PictureDelivery {
         match self.phase {
-            Phase::Scan(_) if self.full_scan => PictureDelivery::Full,
+            Phase::Scan(ref scan)
+                if self.full_scan
+                    || scan
+                        .index
+                        .as_ref()
+                        .is_some_and(|index| index.physical.is_some()) =>
+            {
+                PictureDelivery::Full
+            }
             Phase::Scan(_) => PictureDelivery::Scan,
             Phase::Replay { landing, .. } if track == self.request.track => {
                 PictureDelivery::Landing {
                     offset: landing.offset,
                     byte_run: landing.byte_run,
+                    publish_headers: self.selected_epochs.is_some(),
                 }
             }
             Phase::Replay { .. } => PictureDelivery::Discard,
@@ -330,6 +401,9 @@ impl Scan {
             SeekIndex {
                 track,
                 points: index.points,
+                physical: index
+                    .physical
+                    .and_then(|capture| physical::Capture::finish(capture, pool)),
             },
             charge,
         ))
@@ -340,16 +414,21 @@ impl Scan {
         probe: SeekProbe,
         target: Time,
         policy: SourceTimePolicy,
+        selected_epochs: Option<SourceEpochs>,
     ) -> Result<bool> {
         let SeekProbe {
             offset,
             epochs,
             byte_run,
+            pes_offset,
             ticks,
             time,
             random_access,
             ..
         } = probe;
+        if selected_epochs.is_some_and(|selected| selected != epochs) {
+            return Ok(false);
+        }
         if *self.epochs.get_or_insert(epochs) != epochs {
             return Err(Error::Unsupported("MPEG-TS seek across source epochs"));
         }
@@ -371,6 +450,7 @@ impl Scan {
                 offset,
                 epochs,
                 byte_run,
+                pes_offset,
             };
             if let Some(index) = &mut self.index
                 && !index.record(point)
@@ -417,7 +497,12 @@ impl Reader {
         let seek = &mut self.seek.as_mut_slice()[0];
         match &mut seek.phase {
             Phase::Scan(scan) => scan
-                .observe(picture, seek.request.target, self.limits.time_policy)
+                .observe(
+                    picture,
+                    seek.request.target,
+                    self.limits.time_policy,
+                    seek.selected_epochs,
+                )
                 .map(|_| ()),
             Phase::Replay { skipped, .. } => {
                 *skipped = true;
@@ -427,7 +512,8 @@ impl Reader {
         }
     }
 
-    /// Seek a selected AVC, HEVC, AAC-LC in ADTS or LOAS, AC-3, E-AC-3, MPEG audio or DTS core
+    /// Seek a selected AVC, HEVC, AAC-LC in ADTS or LOAS, AC-3, E-AC-3, MPEG audio,
+    /// DTS core or self-contained lossless-only DTS-HD XLL
     /// track in one length-known, seekable entity. The reader lands on the last coded
     /// random-access picture or complete audio frame carrying the greatest
     /// resolved PTS at or before the target. It delivers original transport,
@@ -436,10 +522,42 @@ impl Reader {
     /// The caller supplies any decoder configuration needed at the landing.
     /// Requests from a previously continued entity or with unresolved clock
     /// epochs are refused. A completed index for the same track skips the
-    /// landing scan while replay still reconstructs transport state.
+    /// landing scan. Verified in-band Layer I/II checkpoints can also skip
+    /// prefix reads; other indexed landings reconstruct state by replay.
+    /// DTS-HD entries require one extension-zero asset with its own static setup,
+    /// XLL sync at offset zero, no smoothing buffer or decoding delay, and a complete
+    /// XLL frame with a valid common-header CRC. Other DTS-HD recovery layouts are refused.
     #[cold]
     pub fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
-        self.begin_seek(request, None, None)
+        self.begin_seek(request, None, None, None)
+    }
+
+    /// Seek within the exact source clock and configuration pair reported by
+    /// [Packet::epochs] in this entity. Only access units with this pair compete
+    /// for the landing, even when other epochs have overlapping timestamps.
+    /// The existing timestamp-only seek still refuses epoch changes.
+    ///
+    /// Scans and replays one length-known, seekable entity from its start,
+    /// reconstructing transport state and original provenance. Replay publishes
+    /// program tables, clock transitions and selected-epoch video header groups
+    /// before the landing. The landing and complete following suffix retain
+    /// decode order, source clocks and track configurations. The caller supplies
+    /// any additional decoder configuration needed at the landing.
+    /// This operation does not use a timestamp-only index or retain the suffix.
+    /// The source must remain stable between scan and replay.
+    ///
+    /// # Errors
+    ///
+    /// Returns the source, track, clock and scan-limit errors of [Self::request_seek].
+    /// A missing pair, no eligible access unit at or before the target in that
+    /// pair, or an ambiguous clock wrap within it is refused during the scan.
+    #[cold]
+    pub fn request_seek_in_epoch(
+        &mut self,
+        request: SeekRequest,
+        epochs: SourceEpochs,
+    ) -> Result<InputRequest> {
+        self.begin_seek(request, None, None, Some(epochs))
     }
 
     /// Seek and retain an index of up to `maximum_entries` distinct landing
@@ -461,7 +579,7 @@ impl Reader {
         if maximum_entries == 0 {
             return Err(Error::Invalid("MPEG-TS seek index entry limit"));
         }
-        self.begin_seek(request, Some(maximum_entries), None)
+        self.begin_seek(request, Some(maximum_entries), None, None)
     }
 
     /// Seek over consecutive parts of one logical transport stream. Supply
@@ -480,9 +598,34 @@ impl Reader {
         request: SeekRequest,
         entities: &[SeekEntity],
     ) -> Result<InputRequest> {
+        self.seek_in_entity_plan(request, entities, None)
+    }
+
+    /// Build a bounded landing index over the declared contiguous entities.
+    /// Later calls to [Self::request_seek_in_entities] can reuse it if the
+    /// track, source IDs, lengths and order match. The sources must remain stable.
+    #[cold]
+    pub fn request_seek_in_entities_and_index(
+        &mut self,
+        request: SeekRequest,
+        entities: &[SeekEntity],
+        maximum_entries: usize,
+    ) -> Result<InputRequest> {
+        if maximum_entries == 0 {
+            return Err(Error::Invalid("MPEG-TS seek index entry limit"));
+        }
+        self.seek_in_entity_plan(request, entities, Some(maximum_entries))
+    }
+
+    fn seek_in_entity_plan(
+        &mut self,
+        request: SeekRequest,
+        entities: &[SeekEntity],
+        maximum_entries: Option<usize>,
+    ) -> Result<InputRequest> {
         self.healthy()?;
-        let entities = EntityPlan::new(&self.pool, entities, self.limits.maximum_seek_scan_bytes)?;
-        self.begin_seek(request, None, Some(entities))
+        let plan = EntityPlan::new(&self.pool, entities, self.limits.maximum_seek_scan_bytes)?;
+        self.begin_seek(request, maximum_entries, Some(plan), None)
     }
 
     fn begin_seek(
@@ -490,6 +633,7 @@ impl Reader {
         request: SeekRequest,
         index_entries: Option<usize>,
         entities: Option<Charged<Box<EntityPlan>>>,
+        selected_epochs: Option<SourceEpochs>,
     ) -> Result<InputRequest> {
         self.healthy()?;
         let length = if let Some(plan) = &entities {
@@ -517,7 +661,8 @@ impl Reader {
             .ok()
             .filter(|pid| crate::ELEMENTARY_PID_RANGE.contains(pid) && self.selected_track(*pid))
             .ok_or(Error::Invalid("MPEG-TS seek track is not selected"))?;
-        if entities.is_none()
+        if selected_epochs.is_none()
+            && entities.is_none()
             && let Some(track) = self.tracks().iter().find(|track| track.stream().pid == pid)
             && !matches!(track.codec(), CodecId::H264 | CodecId::Hevc)
             && !seekable_audio(track.codec())
@@ -532,10 +677,17 @@ impl Reader {
             .seek_index
             .as_ref()
             .filter(|index| {
-                entities.is_none() && index_entries.is_none() && index.track == request.track
+                selected_epochs.is_none()
+                    && index_entries.is_none()
+                    && index.track == request.track
+                    && match (entities.as_deref(), self.seek_entities.as_deref()) {
+                        (None, None) => true,
+                        (Some(next), Some(previous)) => next.same_source(previous),
+                        _ => false,
+                    }
             })
             .cloned();
-        let (phase, retain) = if let Some(index) = &index {
+        let (mut phase, retain) = if let Some(index) = &index {
             (
                 Phase::Replay {
                     landing: index.previous(request.target)?,
@@ -549,7 +701,8 @@ impl Reader {
                 matches!(&self.packet_tracks, PacketTracks::Selected(pids) if pids.len() == 1);
             // An indexed scan retains landing points. Replay can then stream
             // the suffix without keeping both the index and the output packets.
-            let retain = (index_entries.is_none()
+            let retain = (selected_epochs.is_none()
+                && index_entries.is_none()
                 && entities.is_none()
                 && length <= 256 * 1024
                 && single_track)
@@ -559,20 +712,43 @@ impl Reader {
                     index: index_entries.map(|maximum| IndexBuilder {
                         points: BudgetVec::new(&self.pool),
                         maximum,
+                        physical: (entities.is_none()
+                            && self.limits.format == crate::PacketFormat::Ts188)
+                            .then(|| {
+                                physical::Capture::new(&self.pool, self.source, length, maximum)
+                                    .ok()
+                            })
+                            .flatten(),
                     }),
                     ..Scan::default()
                 }),
                 retain,
             )
         };
+        let direct = match (&phase, &index) {
+            (Phase::Replay { landing, .. }, Some(index)) => {
+                physical::Direct::new(index.physical.as_ref(), *landing, self.source, self.caps)
+            }
+            _ => None,
+        };
+        if direct.is_some()
+            && let Phase::Replay {
+                landing, skipped, ..
+            } = &mut phase
+        {
+            *skipped = landing.offset != 0;
+        }
         seek.try_push(Seeking {
             request,
+            selected_epochs,
             phase,
             full_scan: retain.is_some(),
             retain,
+            direct,
+            probing: None,
         })
         .map_err(|rejected| rejected.error)?;
-        let input = if let Some(plan) = &entities {
+        let mut input = if let Some(plan) = &entities {
             let (source, caps) = plan.first();
             let mut next = Self::new(&self.pool, source, caps, self.limits, self.window)?;
             let input = next.request()?;
@@ -585,6 +761,13 @@ impl Reader {
         self.seek_entities = entities;
         self.seek_index = index;
         self.seek = seek;
+        if let Some(direct) = &self.seek.as_slice()[0].direct {
+            input = self
+                .input
+                .as_mut()
+                .expect("seek input")
+                .request_range(direct.offset())?;
+        }
         Ok(input)
     }
 
@@ -604,6 +787,55 @@ impl Reader {
             }
             let seek = &mut self.seek.as_mut_slice()[0];
             let request = seek.request;
+            if let Some(probing) = &mut seek.probing {
+                if let Some(header) = &mut probing.xll_header {
+                    let checked =
+                        header
+                            .step(probing.packet.bytes().as_ref(), work)
+                            .map_err(|error| {
+                                if matches!(seek.phase, Phase::Replay { .. }) {
+                                    Error::SourceMismatch
+                                } else {
+                                    error
+                                }
+                            })?;
+                    if !checked {
+                        return Ok(Step::Yield);
+                    }
+                }
+                let Probing { packet, probe, .. } =
+                    seek.probing.take().expect("pending seek probe");
+                match &mut seek.phase {
+                    Phase::Scan(scan) => {
+                        let better = scan.observe(
+                            probe,
+                            request.target,
+                            self.limits.time_policy,
+                            seek.selected_epochs,
+                        )?;
+                        if let Some(retain) = &mut seek.retain
+                            && !retain.packet(packet, better)
+                        {
+                            seek.retain = None;
+                        }
+                    }
+                    Phase::Replay {
+                        landing,
+                        scanned_bytes,
+                        skipped,
+                    } => {
+                        if !probe.random_access || probe.time != Some(landing.time) {
+                            return Err(Error::SourceMismatch);
+                        }
+                        let result = seek_result(request, *landing, *scanned_bytes, *skipped);
+                        seek.phase = Phase::Deliver(packet);
+                        seek.direct = None;
+                        return Ok(Step::Ready(Event::Seek(result)));
+                    }
+                    _ => unreachable!("seek probe precedes delivery"),
+                }
+                continue;
+            }
             if let Phase::Retained(output) = &mut seek.phase {
                 work.try_charge(1);
                 if let Some(event) = output.next(&mut self.tracks) {
@@ -622,7 +854,9 @@ impl Reader {
                 self.seek = BudgetVec::new(&self.pool);
                 return Ok(Step::Ready(Event::Packet(packet)));
             }
-            let step = if seek.retain.is_some() {
+            let capturing = matches!(&seek.phase, Phase::Scan(scan)
+                if scan.index.as_ref().is_some_and(|index| index.physical.is_some()));
+            let step = if seek.retain.is_some() || capturing || seek.direct.is_some() {
                 self.advance::<false, false>(work, cancel, |_| ())
             } else {
                 self.advance::<true, true>(work, cancel, |_| ())
@@ -632,6 +866,18 @@ impl Reader {
                 step,
                 Ok(Step::Backpressure(_)) | Err(Error::Backpressure { .. })
             ) {
+                if seek.direct.is_some() {
+                    // The checkpoint is optional storage. If it prevents the
+                    // restart from progressing, release it and replay normally.
+                    let mut seeking = std::mem::replace(&mut self.seek, BudgetVec::new(&self.pool));
+                    seeking.as_mut_slice()[0].direct = None;
+                    if let Phase::Replay { skipped, .. } = &mut seeking.as_mut_slice()[0].phase {
+                        *skipped = false;
+                    }
+                    let input = self.reset()?;
+                    self.seek = seeking;
+                    return Ok(Step::NeedInput(input));
+                }
                 let dropped_index = if let Phase::Scan(scan) = &mut seek.phase {
                     scan.index.take().is_some()
                 } else {
@@ -642,23 +888,30 @@ impl Reader {
                     continue;
                 }
             }
-            let step = step?;
+            let mut step = step?;
+            if let Some(mut direct) = self.seek.as_mut_slice()[0].direct.take() {
+                let result = direct.observe(self, &mut step);
+                self.seek.as_mut_slice()[0].direct = Some(direct);
+                result?;
+            }
+            let seek = &mut self.seek.as_mut_slice()[0];
             match (&mut seek.phase, step) {
                 (Phase::Scan(scan), Step::Ready(Event::Packet(packet))) => {
-                    if packet.track() == request.track {
-                        let better = scan.observe(
-                            packet_probe(&packet)?,
-                            request.target,
-                            self.limits.time_policy,
-                        )?;
-                        if let Some(retain) = &mut seek.retain
-                            && !retain.packet(packet, better)
-                        {
-                            seek.retain = None;
+                    if packet.track() == request.track
+                        && seek
+                            .selected_epochs
+                            .is_none_or(|epochs| epochs == packet.epochs())
+                    {
+                        if let Some(index) = &mut scan.index {
+                            index.packet(&packet);
                         }
+                        seek.probing = Some(packet_probe(packet)?);
                     }
                 }
-                (Phase::Scan(_), Step::Ready(Event::Other(event))) => {
+                (Phase::Scan(scan), Step::Ready(Event::Other(event))) => {
+                    if let Some(index) = &mut scan.index {
+                        index.other(&event);
+                    }
                     if let Some(retain) = &mut seek.retain
                         && !retain.other(event, !self.tracks.is_empty())
                     {
@@ -667,6 +920,11 @@ impl Reader {
                 }
                 (Phase::Scan(scan), Step::End(end)) => {
                     let landing = scan.landing.ok_or_else(|| {
+                        if seek.selected_epochs.is_some() {
+                            return Error::Unsupported(
+                                "MPEG-TS selected epoch has no eligible access unit at or before the target",
+                            );
+                        }
                         let audio = self.tracks.as_slice().iter().any(|track| {
                             track.id() == request.track && seekable_audio(track.codec())
                         });
@@ -696,8 +954,19 @@ impl Reader {
                             }
                             replay => replay?,
                         };
-                    let input = replay.request()?;
                     replay.seek_index = scan.finish_index(&self.pool, request.track);
+                    let direct = replay.seek_index.as_ref().and_then(|index| {
+                        physical::Direct::new(index.physical.as_ref(), landing, source, caps)
+                    });
+                    let input = if let Some(direct) = &direct {
+                        replay
+                            .input
+                            .as_mut()
+                            .expect("replay input")
+                            .request_range(direct.offset())?
+                    } else {
+                        replay.request()?
+                    };
                     let scanned = if let Some(mut plan) = self.seek_entities.take() {
                         plan.next = 1;
                         let total = plan.total;
@@ -709,8 +978,9 @@ impl Reader {
                     self.seek.as_mut_slice()[0].phase = Phase::Replay {
                         landing,
                         scanned_bytes: Some(scanned),
-                        skipped: false,
+                        skipped: direct.is_some() && landing.offset != 0,
                     };
+                    self.seek.as_mut_slice()[0].direct = direct;
                     std::mem::swap(&mut replay.packet_tracks, &mut self.packet_tracks);
                     std::mem::swap(&mut replay.seek, &mut self.seek);
                     *self = replay;
@@ -718,31 +988,35 @@ impl Reader {
                 }
                 (
                     Phase::Replay {
-                        landing,
-                        scanned_bytes,
-                        skipped,
+                        landing, skipped, ..
                     },
                     Step::Ready(Event::Packet(packet)),
                 ) => {
+                    let pes = packet.sources()[0].pes.pes();
                     if packet.track() != request.track
                         || packet.elementary_range().start != landing.offset
                         || packet.epochs() != landing.epochs
-                        || packet.sources()[0].pes.pes().byte_run_epoch != landing.byte_run
+                        || pes.byte_run_epoch != landing.byte_run
+                        || pes.elementary_offset != landing.pes_offset
                     {
                         *skipped = true;
                         continue;
                     }
-                    let probe = packet_probe(&packet).map_err(|_| Error::SourceMismatch)?;
-                    if !probe.random_access || probe.time != Some(landing.time) {
+                    if seek
+                        .direct
+                        .as_ref()
+                        .is_some_and(|direct| !direct.verified())
+                    {
                         return Err(Error::SourceMismatch);
                     }
-                    let receipt = seek_result(request, *landing, *scanned_bytes, *skipped);
-                    self.seek.as_mut_slice()[0].phase = Phase::Deliver(packet);
-                    return Ok(Step::Ready(Event::Seek(receipt)));
+                    seek.probing = Some(packet_probe(packet).map_err(|_| Error::SourceMismatch)?);
                 }
                 (Phase::Replay { .. }, Step::Ready(Event::Other(event))) => {
                     if matches!(&event, ReaderEvent::Source(source)
-                        if matches!(source.event(), TraceEvent::Pat(_) | TraceEvent::ProgramMap { .. }))
+                        if seek.publishes_source(source.event()))
+                        || matches!(&event, ReaderEvent::VideoHeaders(packet)
+                            if packet.track() == request.track
+                                && seek.selected_epochs == Some(packet.epochs()))
                     {
                         return Ok(Step::Ready(Event::Other(event)));
                     }
@@ -802,6 +1076,7 @@ mod tests {
             SeekIndex {
                 track: TrackId(256),
                 points,
+                physical: None,
             },
             charge,
         ));

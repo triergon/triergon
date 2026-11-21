@@ -185,6 +185,8 @@ mod tests {
             format: PacketFormat::Ts188,
             program: 1,
             namespace: DescriptorNamespace::Unspecified,
+            unlabelled_dts_core: None,
+            pcr_policy: triergon_mpegts::compat::pes::PcrPolicy::Strict,
             following: BudgetVec::new(&pool),
         };
         let mut diagnostic = Diagnostic {

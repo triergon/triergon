@@ -40,6 +40,13 @@ impl Reader {
         self.aligned.provide(window)
     }
 
+    pub(super) fn resume_at(&mut self, offset: u64, window: usize) -> Result<()> {
+        if self.free.is_some() {
+            return Err(Error::SourceMismatch);
+        }
+        self.aligned.resume_at(offset, window)
+    }
+
     pub(super) fn finish(&mut self, request: InputRequest) -> Result<()> {
         self.aligned.finish(request)
     }

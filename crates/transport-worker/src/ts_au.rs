@@ -230,6 +230,7 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
             AccessUnit::Dts(frame) if frame.core_bytes().len() < frame.bytes().len() => {
                 (0, PositionSource::FirstPes)
             }
+            AccessUnit::DtsExtension(_) => (0, PositionSource::FirstPes),
             AccessUnit::MpegAudio(_) | AccessUnit::Dts(_) => (1, PositionSource::ClockAnchor),
             AccessUnit::Adts(_)
             | AccessUnit::AdtsFragment(_)
@@ -437,6 +438,8 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
         format: request.format,
         program: Some(request.program),
         descriptor_namespace: request.namespace,
+        unlabelled_dts_core: request.unlabelled_dts_core,
+        pcr_policy: request.pcr_policy,
         audio_eof_policy: AudioEofPolicy::ReportIncomplete,
         unframed_audio_policy: UnframedAudioPolicy::ReportAtEof,
         adts_packet_policy: PacketPolicy::ReportFragments,
@@ -863,12 +866,13 @@ pub fn run(args: &[String]) -> Result<()> {
     let invocation = Invocation::parse(
         args,
         PREFIX,
-        " SIZE PROGRAM [--dvb] [[--discontinuity] ENTITY]...",
+        " SIZE PROGRAM [--dvb|--atsc] [[--discontinuity] ENTITY]... [--dts-core=PID] [--ignore-pcr-reserved-bits]",
         2..=usize::MAX,
         false,
     )?;
     let pool = Budget::new(256 * 1024 * 1024)?;
-    let request = ts_input::parse(&pool, Path::new(invocation.path), invocation.arguments)?;
+    let request =
+        ts_input::parse_access_units(&pool, Path::new(invocation.path), invocation.arguments)?;
     measure(&invocation, OPERATION, Some(&pool), || {
         operation(
             &pool,
@@ -901,6 +905,8 @@ mod tests {
             format: PacketFormat::Ts188,
             program: 1,
             namespace: DescriptorNamespace::Unspecified,
+            unlabelled_dts_core: None,
+            pcr_policy: triergon_mpegts::compat::pes::PcrPolicy::Strict,
             following: BudgetVec::new(&pool),
         };
         let baseline = pool.used();

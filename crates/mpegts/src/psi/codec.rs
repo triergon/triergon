@@ -29,7 +29,9 @@ impl ElementaryStream {
             PES_PRIVATE_DATA if matches!(self.namespace, DescriptorNamespace::Dvb(_)) => {
                 self.dvb_descriptor_codec().or_else(|| {
                     let hd = self.dvb_dts_hd().ok().flatten()?;
-                    (hd.core.is_some() && hd.extensions.iter().any(Option::is_some))
+                    hd.extensions
+                        .iter()
+                        .any(Option::is_some)
                         .then_some(CodecId::Dts)
                 })
             }

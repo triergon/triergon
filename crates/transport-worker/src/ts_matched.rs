@@ -10,7 +10,7 @@ use triergon_core::{
     Budget, Error, InputWindow, Rounding, SourceId, Step, Time, TimeBase, WorkBudget,
 };
 use triergon_harness_protocol::digest::{fold, fold_framed, signed};
-use triergon_mpegts::{AccessUnit, Reader, ReaderLimits, SeekEntity};
+use triergon_mpegts::{AccessUnit, Reader, ReaderLimits, SeekEntity, SourceEpochs};
 
 #[derive(Clone, Copy)]
 pub(crate) enum Kind {
@@ -53,10 +53,63 @@ fn ticks(time: Time) -> Result<i64> {
 
 const SECOND_SOURCE: SourceId = SourceId(2);
 
-#[derive(Clone, Copy)]
-enum FollowUp {
-    Repeated(Time),
-    Split(usize),
+#[derive(Clone, Copy, Default)]
+struct FollowUp {
+    repeated: Option<Time>,
+    split: Option<usize>,
+    epochs: Option<SourceEpochs>,
+}
+
+fn options(kind: Kind, arguments: &[String], length: usize, carrier: usize) -> Result<FollowUp> {
+    let mut follow_up = FollowUp::default();
+    let mut epoch_start = None;
+    for argument in arguments {
+        if let Some(offset) = argument.strip_prefix("split=") {
+            let offset = offset.parse()?;
+            if !(1..length).contains(&offset) {
+                return Err("transport entity split outside input".into());
+            }
+            if follow_up.split.replace(offset).is_some() {
+                return Err("repeated transport split option".into());
+            }
+        } else if let Some(pair) = argument.strip_prefix("epoch=") {
+            let (clock, configuration) =
+                pair.split_once(':').ok_or("expected epoch=CLOCK:CONFIG")?;
+            let epochs = SourceEpochs {
+                clock: clock.parse()?,
+                configuration: configuration.parse()?,
+            };
+            if follow_up.epochs.replace(epochs).is_some() {
+                return Err("repeated transport epoch option".into());
+            }
+        } else if let Some(offset) = argument.strip_prefix("epoch-start=") {
+            let offset: usize = offset.parse()?;
+            if offset >= length || !offset.is_multiple_of(carrier) {
+                return Err("transport epoch start must be a carrier boundary inside input".into());
+            }
+            if epoch_start.replace(offset).is_some() {
+                return Err("repeated transport epoch start option".into());
+            }
+        } else {
+            let target = Time::new(i128::from(argument.parse::<i64>()?), 90_000)?;
+            if follow_up.repeated.replace(target).is_some() {
+                return Err("repeated transport seek target".into());
+            }
+        }
+    }
+    if follow_up.epochs.is_some() != epoch_start.is_some()
+        || (follow_up.epochs.is_some()
+            && (!matches!(kind, Kind::Seek)
+                || follow_up.repeated.is_some()
+                || follow_up.split.is_some()))
+    {
+        return Err(
+            "epoch and epoch-start require a single-entity picture seek without repeat".into(),
+        );
+    }
+    // The physical boundary identifies the reference control only. The reader
+    // selects its landing solely with the complete source epoch pair.
+    Ok(follow_up)
 }
 
 fn execute(
@@ -65,7 +118,7 @@ fn execute(
     track: TrackId,
     seek: Option<SeekRequest>,
     kind: Kind,
-    follow_up: Option<FollowUp>,
+    follow_up: FollowUp,
 ) -> Result<Totals> {
     let mut caps = ts_input::capabilities(&input.input);
     caps.random_access = true;
@@ -82,35 +135,42 @@ fn execute(
         32 * 1024,
         &[track],
     )?;
-    let split = match follow_up {
-        Some(FollowUp::Split(offset)) => Some(offset),
-        _ => None,
-    };
+    let entities = follow_up.split.map(|offset| {
+        [
+            SeekEntity {
+                source: FIRST_SOURCE,
+                length: offset as u64,
+            },
+            SeekEntity {
+                source: SECOND_SOURCE,
+                length: (input.input.len() - offset) as u64,
+            },
+        ]
+    });
     if let Some(request) = seek {
-        match follow_up {
-            Some(FollowUp::Repeated(_)) => reader.request_seek_and_index(request, 4096)?,
-            Some(FollowUp::Split(offset)) => reader.request_seek_in_entities(
-                request,
-                &[
-                    SeekEntity {
-                        source: FIRST_SOURCE,
-                        length: offset as u64,
-                    },
-                    SeekEntity {
-                        source: SECOND_SOURCE,
-                        length: (input.input.len() - offset) as u64,
-                    },
-                ],
-            )?,
-            None => reader.request_seek(request)?,
-        };
+        if let Some(epochs) = follow_up.epochs {
+            reader.request_seek_in_epoch(request, epochs)?;
+        } else {
+            match (entities.as_ref(), follow_up.repeated.is_some()) {
+                (Some(parts), true) => {
+                    reader.request_seek_in_entities_and_index(request, parts, 4096)?
+                }
+                (Some(parts), false) => reader.request_seek_in_entities(request, parts)?,
+                (None, true) => reader.request_seek_and_index(request, 4096)?,
+                (None, false) => reader.request_seek(request)?,
+            };
+        }
     }
     let mut out = Totals::default();
-    drain(&mut reader, input, track, kind, split, false, &mut out)?;
-    if let (Some(mut request), Some(FollowUp::Repeated(target))) = (seek, follow_up) {
+    drain(&mut reader, input, track, kind, follow_up, false, &mut out)?;
+    if let (Some(mut request), Some(target)) = (seek, follow_up.repeated) {
         request.target = target;
-        reader.request_seek(request)?;
-        drain(&mut reader, input, track, kind, None, true, &mut out)?;
+        if let Some(parts) = &entities {
+            reader.request_seek_in_entities(request, parts)?;
+        } else {
+            reader.request_seek(request)?;
+        }
+        drain(&mut reader, input, track, kind, follow_up, true, &mut out)?;
     }
     Ok(out)
 }
@@ -120,7 +180,7 @@ fn drain(
     input: &Request,
     track: TrackId,
     kind: Kind,
-    split: Option<usize>,
+    follow_up: FollowUp,
     indexed: bool,
     out: &mut Totals,
 ) -> Result<()> {
@@ -134,6 +194,12 @@ fn drain(
                 if !seek || landed || (indexed && landing.method != SeekMethod::Index) {
                     return Err("unexpected transport seek result".into());
                 }
+                if follow_up.epochs.is_some()
+                    && (landing.method != SeekMethod::BoundedScan
+                        || landing.scanned_bytes != input.input.len() as u64)
+                {
+                    return Err("explicit epoch seek did not scan the complete input".into());
+                }
                 for time in [landing.requested, landing.landing, landing.discard_until] {
                     fold(&mut out.digest, signed(ticks(time)?));
                 }
@@ -142,6 +208,13 @@ fn drain(
             Step::Ready(Event::Packet(packet)) => {
                 if packet.track() != track || (seek && !landed) {
                     return Err("unexpected transport packet".into());
+                }
+                if out.packets == start
+                    && follow_up
+                        .epochs
+                        .is_some_and(|epochs| packet.epochs() != epochs)
+                {
+                    return Err("transport landing belongs to another source epoch".into());
                 }
                 let missing = i64::MIN;
                 fold(&mut out.digest, signed(packet.pts().unwrap_or(missing)));
@@ -170,6 +243,7 @@ fn drain(
                     | AccessUnit::Ac3(_)
                     | AccessUnit::MpegAudio(_)
                     | AccessUnit::Dts(_)
+                    | AccessUnit::DtsExtension(_)
                         if matches!(kind, Kind::AudioSeek) =>
                     {
                         fold(
@@ -184,7 +258,7 @@ fn drain(
                 out.bytes += packet.payload().len() as u64;
             }
             Step::NeedInput(request) => {
-                let (start, end) = match (request.source, split) {
+                let (start, end) = match (request.source, follow_up.split) {
                     (FIRST_SOURCE, split) => (0, split.unwrap_or(input.input.len())),
                     (SECOND_SOURCE, Some(start)) => (start, input.input.len()),
                     _ => return Err("unexpected transport entity".into()),
@@ -222,15 +296,15 @@ pub(crate) fn run(kind: Kind, args: &[String]) -> Result<()> {
         Kind::Seek => Invocation::parse(
             args,
             kind.prefix(),
-            " SIZE PROGRAM PID PTS90 POLICY [REPEAT_PTS90|split=BYTES]",
-            5..=6,
+            " SIZE PROGRAM PID PTS90 POLICY [REPEAT_PTS90] [split=BYTES] | SIZE PROGRAM PID PTS90 POLICY epoch=CLOCK:CONFIG epoch-start=BYTES",
+            5..=7,
             false,
         )?,
         Kind::AudioSeek => Invocation::parse(
             args,
             kind.prefix(),
-            " SIZE PROGRAM [--dvb|--atsc] PID PTS90 POLICY [REPEAT_PTS90|split=BYTES]",
-            5..=7,
+            " SIZE PROGRAM [--dvb|--atsc] PID PTS90 POLICY [REPEAT_PTS90] [split=BYTES]",
+            5..=8,
             false,
         )?,
         Kind::FreeAudio => Invocation::parse(
@@ -246,9 +320,9 @@ pub(crate) fn run(kind: Kind, args: &[String]) -> Result<()> {
         && matches!(invocation.arguments[2].as_str(), "--dvb" | "--atsc");
     let track_index = 2 + usize::from(has_namespace);
     if matches!(kind, Kind::Seek | Kind::AudioSeek)
-        && !(3..=4).contains(&(invocation.arguments.len() - track_index))
+        && !(3..=5).contains(&(invocation.arguments.len() - track_index))
     {
-        return Err("expected PID PTS90 POLICY [REPEAT_PTS90|split=BYTES]".into());
+        return Err("expected PID PTS90 POLICY [REPEAT_PTS90] [split=BYTES]".into());
     }
     let input = ts_input::parse(
         &pool,
@@ -285,28 +359,191 @@ pub(crate) fn run(kind: Kind, args: &[String]) -> Result<()> {
         }
     };
     let follow_up = if seek.is_some() {
-        invocation
-            .arguments
-            .get(track_index + 3)
-            .map(|argument| -> Result<FollowUp> {
-                if let Some(offset) = argument.strip_prefix("split=") {
-                    let offset = offset.parse()?;
-                    if !(1..input.input.len()).contains(&offset) {
-                        return Err("transport entity split outside input".into());
-                    }
-                    Ok(FollowUp::Split(offset))
-                } else {
-                    Ok(FollowUp::Repeated(Time::new(
-                        i128::from(argument.parse::<i64>()?),
-                        90_000,
-                    )?))
-                }
-            })
-            .transpose()?
+        options(
+            kind,
+            &invocation.arguments[track_index + 3..],
+            input.input.len(),
+            invocation.arguments[0].parse()?,
+        )?
     } else {
-        None
+        FollowUp::default()
     };
     measure(&invocation, kind.operation(), Some(&pool), || {
         execute(&pool, &input, track, seek, kind, follow_up)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(kind: Kind, args: &[&str]) -> Result<FollowUp> {
+        options(
+            kind,
+            &args.iter().map(ToString::to_string).collect::<Vec<_>>(),
+            1880,
+            188,
+        )
+    }
+
+    #[test]
+    fn epoch_control_keeps_both_source_identifiers() {
+        let parsed = parse(Kind::Seek, &["epoch=1:3", "epoch-start=564"]).unwrap();
+        assert_eq!(
+            parsed.epochs,
+            Some(SourceEpochs {
+                clock: 1,
+                configuration: 3
+            })
+        );
+        assert!(parsed.repeated.is_none());
+        assert!(parsed.split.is_none());
+        assert!(parse(Kind::Seek, &["epoch-start=564", "epoch=0:2"]).is_ok());
+    }
+
+    #[test]
+    fn incomplete_or_incompatible_epoch_controls_are_refused() {
+        for args in [
+            vec!["epoch=1:2"],
+            vec!["epoch-start=564"],
+            vec!["epoch=1", "epoch-start=564"],
+            vec!["epoch=1:2:3", "epoch-start=564"],
+            vec!["epoch=1:2", "epoch-start=565"],
+            vec!["epoch=1:2", "epoch-start=1880"],
+            vec!["epoch=1:2", "epoch-start=564", "epoch=1:2"],
+            vec!["epoch=1:2", "epoch-start=564", "epoch-start=564"],
+            vec!["epoch=1:2", "epoch-start=564", "90000"],
+            vec!["epoch=1:2", "epoch-start=564", "split=564"],
+        ] {
+            assert!(parse(Kind::Seek, &args).is_err(), "{args:?}");
+        }
+        assert!(parse(Kind::AudioSeek, &["epoch=1:2", "epoch-start=564"]).is_err());
+    }
+
+    #[test]
+    fn repeated_audio_fixtures_read_only_the_physical_suffix() {
+        for (name, header, length, step, first, repeated) in [
+            (
+                "mpeg1-layer1-physical-repeated-preroll",
+                [0xff, 0xff, 0x14, 0xc0],
+                32,
+                720,
+                7,
+                1,
+            ),
+            (
+                "mpeg1-layer2-physical-repeated-preroll",
+                [0xff, 0xfd, 0x14, 0xc0],
+                96,
+                2160,
+                1,
+                7,
+            ),
+        ] {
+            let pool = Budget::new(2 << 20).unwrap();
+            let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
+                "../../harness/features/mpegts-previous-audio/inputs/{name}.ts"
+            ));
+            let input = ts_input::parse(&pool, &path, &["188".into(), "7".into()]).unwrap();
+            let mut caps = ts_input::capabilities(&input.input);
+            caps.random_access = true;
+            let track = TrackId(256);
+            let mut reader = Reader::new_with_packet_tracks(
+                &pool,
+                FIRST_SOURCE,
+                caps,
+                ReaderLimits {
+                    format: input.format,
+                    program: Some(input.program),
+                    descriptor_namespace: input.namespace,
+                    ..ReaderLimits::default()
+                },
+                32 * 1024,
+                &[track],
+            )
+            .unwrap();
+            let mut request = SeekRequest {
+                track,
+                target: Time::new(90_001 + first * step, 90_000).unwrap(),
+                policy: SeekPolicy::PlaybackPreroll,
+            };
+            reader.request_seek_and_index(request, 4096).unwrap();
+            drain(
+                &mut reader,
+                &input,
+                track,
+                Kind::AudioSeek,
+                FollowUp::default(),
+                false,
+                &mut Totals::default(),
+            )
+            .unwrap();
+
+            request.target = Time::new(90_001 + repeated * step, 90_000).unwrap();
+            let floor = (17 + 3 * repeated as u64) * 188;
+            let start = reader.request_seek(request).unwrap();
+            assert_eq!(start.offset, floor, "{name}: physical PAT offset");
+            let mut next = floor;
+            let mut landed = false;
+            let mut index = repeated;
+            let mut frame = vec![0; length];
+            frame[..4].copy_from_slice(&header);
+            let cancel = AtomicBool::new(false);
+            loop {
+                match reader.step(&mut WorkBudget::new(43), &cancel).unwrap() {
+                    Step::NeedInput(read) => {
+                        assert_eq!(read.source, FIRST_SOURCE);
+                        assert!(read.offset >= floor, "{name}: read discarded prefix");
+                        assert_eq!(read.offset, next, "{name}: contiguous suffix reads");
+                        let offset = read.offset as usize;
+                        if offset == input.input.len() {
+                            reader.finish(read.source, read.token).unwrap();
+                        } else {
+                            let end = input.input.len().min(offset + read.maximum.min(7));
+                            reader
+                                .provide(
+                                    &InputWindow::new(
+                                        read.source,
+                                        read.token,
+                                        read.offset,
+                                        input.input.slice(offset..end).unwrap(),
+                                    )
+                                    .unwrap(),
+                                )
+                                .unwrap();
+                            next = end as u64;
+                        }
+                    }
+                    Step::Ready(Event::Seek(result)) => {
+                        assert!(!landed);
+                        assert_eq!(result.method, SeekMethod::Index);
+                        assert_eq!(result.scanned_bytes, 0);
+                        assert!(!result.replays_from_start);
+                        assert_eq!(result.requested, request.target);
+                        assert_eq!(result.discard_until, request.target);
+                        assert_eq!(
+                            result.landing,
+                            Time::new(90_000 + repeated * step, 90_000).unwrap()
+                        );
+                        landed = true;
+                    }
+                    Step::Ready(Event::Packet(packet)) => {
+                        assert!(landed);
+                        let pts = (90_000 + index * step) as i64;
+                        assert_eq!(packet.track(), track);
+                        assert_eq!(packet.pts(), Some(pts));
+                        assert_eq!(packet.dts(), (index % 2 != 0).then_some(pts));
+                        assert_eq!(packet.payload(), frame);
+                        index += 1;
+                    }
+                    Step::Ready(Event::Other(_)) | Step::Yield => (),
+                    Step::End(_) => break,
+                    Step::Backpressure(pressure) => panic!("{pressure:?}"),
+                }
+            }
+            assert!(landed);
+            assert_eq!(index, 10, "{name}: every frame through EOF");
+            assert_eq!(next, input.input.len() as u64);
+        }
+    }
 }

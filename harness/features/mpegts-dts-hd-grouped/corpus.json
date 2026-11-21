@@ -1,0 +1,259 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "extension-single-control",
+      "profile": "extension-single-control",
+      "file": ".research/fixtures-mpegts-dts-hd-grouped/extension-single-control.ts",
+      "sha256": "640fa4858f07bc4354077dfc56c40ce1f4369ddf257d0d32c036ade8d470e41a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": [
+        {
+          "access_unit_bytes": [
+            40
+          ],
+          "pts_raw33": 90000,
+          "dts_raw33": null
+        },
+        {
+          "access_unit_bytes": [
+            44
+          ],
+          "pts_raw33": 99000,
+          "dts_raw33": 98100
+        },
+        {
+          "access_unit_bytes": [
+            48
+          ],
+          "pts_raw33": null,
+          "dts_raw33": null
+        }
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 132,
+        "digest": 4745022211085166966
+      }
+    },
+    {
+      "id": "extension-grouped-short",
+      "profile": "extension-grouped-short",
+      "file": ".research/fixtures-mpegts-dts-hd-grouped/extension-grouped-short.ts",
+      "sha256": "f1abdb113ac4ab70d2fcc6b80af1b0a089de1dfd529ddc2caf6c4dbdbbec562f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": [
+        {
+          "access_unit_bytes": [
+            40,
+            44,
+            48
+          ],
+          "pts_raw33": 90000,
+          "dts_raw33": null
+        },
+        {
+          "access_unit_bytes": [
+            52
+          ],
+          "pts_raw33": 99000,
+          "dts_raw33": 98100
+        },
+        {
+          "access_unit_bytes": [
+            56,
+            60
+          ],
+          "pts_raw33": null,
+          "dts_raw33": null
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 300,
+        "digest": 8713898910608854329
+      }
+    },
+    {
+      "id": "extension-grouped-long",
+      "profile": "extension-grouped-long",
+      "file": ".research/fixtures-mpegts-dts-hd-grouped/extension-grouped-long.m2ts",
+      "sha256": "52967ea23342369de39b852b56890bfecfa3c3ecfc46c386749a46bd1a16a771",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb"
+      ],
+      "construction": [
+        {
+          "access_unit_bytes": [
+            296,
+            12576
+          ],
+          "pts_raw33": 90000,
+          "dts_raw33": null
+        },
+        {
+          "access_unit_bytes": [
+            304,
+            308,
+            312
+          ],
+          "pts_raw33": 99000,
+          "dts_raw33": 98100
+        },
+        {
+          "access_unit_bytes": [
+            316
+          ],
+          "pts_raw33": null,
+          "dts_raw33": null
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 14112,
+        "digest": 9075799875369356752
+      }
+    },
+    {
+      "id": "extension-grouped-index-two",
+      "profile": "extension-grouped-index-two",
+      "file": ".research/fixtures-mpegts-dts-hd-grouped/extension-grouped-index-two.ts",
+      "sha256": "74c4d70ca5a07ecffe757ad571f286dcf23e1219dc3de0ed0916416e61a70e4d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": [
+        {
+          "access_unit_bytes": [
+            40,
+            44
+          ],
+          "pts_raw33": 90000,
+          "dts_raw33": null
+        },
+        {
+          "access_unit_bytes": [
+            48
+          ],
+          "pts_raw33": 99000,
+          "dts_raw33": 98100
+        },
+        {
+          "access_unit_bytes": [
+            52,
+            56
+          ],
+          "pts_raw33": null,
+          "dts_raw33": null
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 240,
+        "digest": 12829248848303752179
+      }
+    },
+    {
+      "id": "extension-grouped-no-timing",
+      "profile": "extension-grouped-no-timing",
+      "file": ".research/fixtures-mpegts-dts-hd-grouped/extension-grouped-no-timing.m2ts",
+      "sha256": "aa051b6160f80a28440b662246d589603fed5e302bb2f8191ac50f84c53f9098",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb"
+      ],
+      "construction": [
+        {
+          "access_unit_bytes": [
+            40,
+            44
+          ],
+          "pts_raw33": 90000,
+          "dts_raw33": null
+        },
+        {
+          "access_unit_bytes": [
+            48
+          ],
+          "pts_raw33": 99000,
+          "dts_raw33": 98100
+        },
+        {
+          "access_unit_bytes": [
+            52,
+            56
+          ],
+          "pts_raw33": null,
+          "dts_raw33": null
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 240,
+        "digest": 1388952230280785162
+      }
+    },
+    {
+      "id": "extension-grouped-late-timing",
+      "profile": "extension-grouped-late-timing",
+      "file": ".research/fixtures-mpegts-dts-hd-grouped/extension-grouped-late-timing.ts",
+      "sha256": "9df704324bc7bb41766b27c280daa2713bcde4993cc1f35af0c8ba69ac6128be",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": [
+        {
+          "access_unit_bytes": [
+            40,
+            44,
+            48
+          ],
+          "pts_raw33": 90000,
+          "dts_raw33": null
+        },
+        {
+          "access_unit_bytes": [
+            52
+          ],
+          "pts_raw33": 99000,
+          "dts_raw33": 98100
+        },
+        {
+          "access_unit_bytes": [
+            56,
+            60
+          ],
+          "pts_raw33": null,
+          "dts_raw33": null
+        }
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 300,
+        "digest": 15505795745327962988
+      }
+    }
+  ]
+}

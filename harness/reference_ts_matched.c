@@ -30,6 +30,7 @@ typedef struct {
     AVIOContext *io;
     AVPacket *packet;
     int program, pid, carrier_size;
+    int64_t epoch_start;
 } TsReader;
 
 static void reader_close(TsReader *reader)
@@ -121,8 +122,25 @@ static int match(TsReader *reader, int64_t target, int preroll, TsWork *out)
         return rc;
     int64_t landing = AV_NOPTS_VALUE;
     uint64_t ordinal = 0, chosen = 0;
+    int64_t chosen_position = -1;
+    int boundary_seen = reader->epoch_start < 0;
     while ((rc = reader_next(reader)) == 0) {
         const AVPacket *p = reader->packet;
+        int eligible = 1;
+        if (reader->epoch_start >= 0) {
+            /* Authored controls carry one complete picture per PES. Use the
+             * public packet position, never a source epoch guessed from clocks.
+             * The offset names the carrier containing the epoch's first PES,
+             * including the four-byte prefix for an M2TS192 carrier. */
+            if (p->pos < 0 || (uint64_t)p->pos >= reader->input.size)
+                return AVERROR_INVALIDDATA;
+            eligible = p->pos >= reader->epoch_start;
+            if (eligible && !boundary_seen) {
+                if (p->pos / reader->carrier_size * reader->carrier_size != reader->epoch_start)
+                    return AVERROR_INVALIDDATA;
+                boundary_seen = 1;
+            }
+        }
 #ifdef TRIERGON_REFERENCE_AUDIO_SEEK
         if (p->size <= 0)
             return AVERROR_INVALIDDATA;
@@ -132,14 +150,15 @@ static int match(TsReader *reader, int64_t target, int preroll, TsWork *out)
             if (p->pts == AV_NOPTS_VALUE)
                 return AVERROR_INVALIDDATA;
 #endif
-            if (p->pts <= target && p->pts >= landing) {
+            if (eligible && p->pts <= target && p->pts >= landing) {
                 landing = p->pts;
                 chosen = ordinal;
+                chosen_position = p->pos;
             }
         }
         ++ordinal;
     }
-    if (rc != AVERROR_EOF || landing == AV_NOPTS_VALUE)
+    if (rc != AVERROR_EOF || !boundary_seen || landing == AV_NOPTS_VALUE)
         return AVERROR_INVALIDDATA;
     reader_close(reader);
     if ((rc = reader_open(reader, 1)) < 0)
@@ -151,6 +170,8 @@ static int match(TsReader *reader, int64_t target, int preroll, TsWork *out)
         if (ordinal < chosen)
             continue;
         const AVPacket *p = reader->packet;
+        if (ordinal == chosen && reader->epoch_start >= 0 && p->pos != chosen_position)
+            return AVERROR_INVALIDDATA;
 #ifdef TRIERGON_REFERENCE_AUDIO_SEEK
         if (ordinal == chosen && (p->pts != landing || !audio_entry(reader, p)))
             return AVERROR_INVALIDDATA;
@@ -415,6 +436,25 @@ static int number(const char *text, long long min, long long max, long long *val
     return !errno && end != text && !*end && *value >= min && *value <= max;
 }
 
+#if !defined(TRIERGON_REFERENCE_MPG123) && !defined(TRIERGON_REFERENCE_AUDIO_SEEK)
+/* Validate the candidate's complete identity, but do not interpret it here.
+ * Only the independently supplied physical boundary selects this reference. */
+static int epoch_pair(const char *text)
+{
+    char *end;
+    for (int component = 0; component < 2; ++component) {
+        if (*text != '+' && (*text < '0' || *text > '9'))
+            return 0;
+        errno = 0;
+        (void)strtoull(text, &end, 10);
+        if (errno || end == text || *end != (component ? '\0' : ':'))
+            return 0;
+        text = end + !component;
+    }
+    return 1;
+}
+#endif
+
 static uint64_t monotonic_ns(void)
 {
     struct timespec time;
@@ -435,6 +475,7 @@ int main(int argc, char **argv)
     long long iterations = 1, program, pid, target = 0;
     int option = 0, track = start + 2;
     long long split = 0;
+    long long epoch_start = -1;
 #ifdef TRIERGON_REFERENCE_AUDIO_SEEK
     if (argc >= start + 6 && (!strcmp(argv[track], "--dvb") || !strcmp(argv[track], "--atsc")))
         ++track;
@@ -444,22 +485,34 @@ int main(int argc, char **argv)
     if (!option && argc != start + 3)
         return 2;
 #else
-    const int extended = argc == track + 4;
     int repeat = 0;
+    int epoch = 0;
     long long repeat_target = 0;
-    if ((!extended && argc != track + 3) || !number(argv[track+1], INT64_MIN, INT64_MAX, &target))
+    if (argc < track + 3 || argc > track + 5
+        || !number(argv[track+1], INT64_MIN, INT64_MAX, &target))
         return 2;
-    if (extended) {
-        const char *extra = argv[track+3];
+    for (int i = track + 3; i < argc; ++i) {
+        const char *extra = argv[i];
         if (!strncmp(extra, "split=", 6)) {
-            if (!number(extra + 6, 1, LLONG_MAX, &split))
+            if (split || !number(extra + 6, 1, LLONG_MAX, &split))
                 return 2;
+#ifndef TRIERGON_REFERENCE_AUDIO_SEEK
+        } else if (!strncmp(extra, "epoch=", 6)) {
+            if (epoch || !epoch_pair(extra + 6))
+                return 2;
+            epoch = 1;
+        } else if (!strncmp(extra, "epoch-start=", 12)) {
+            if (epoch_start >= 0 || !number(extra + 12, 0, LLONG_MAX, &epoch_start))
+                return 2;
+#endif
         } else {
-            repeat = 1;
-            if (!number(extra, INT64_MIN, INT64_MAX, &repeat_target))
+            if (repeat || !number(extra, INT64_MIN, INT64_MAX, &repeat_target))
                 return 2;
+            repeat = 1;
         }
     }
+    if (epoch != (epoch_start >= 0) || (epoch && (repeat || split)))
+        return 2;
     option = !strcmp(argv[track+2], "preroll");
     if (!option && strcmp(argv[track+2], "previous"))
         return 2;
@@ -473,7 +526,9 @@ int main(int argc, char **argv)
     if (!file)
         return 2;
     long length = fseek(file, 0, SEEK_END) ? -1 : ftell(file);
-    if (length <= split || length > 64 * 1024 * 1024 || fseek(file, 0, SEEK_SET)) {
+    if (length <= split || length > 64 * 1024 * 1024
+        || (epoch_start >= 0 && (epoch_start >= length || epoch_start % atoi(argv[start])))
+        || fseek(file, 0, SEEK_SET)) {
         fclose(file);
         return 2;
     }
@@ -497,7 +552,7 @@ int main(int argc, char **argv)
     for (long long i = 0; i < iterations; ++i) {
         TsReader reader = {
             .input = {bytes, (size_t)length, 0}, .program = (int)program,
-            .pid = (int)pid, .carrier_size = atoi(argv[start])
+            .pid = (int)pid, .carrier_size = atoi(argv[start]), .epoch_start = epoch_start
         };
         TsWork work = {0};
         rc = match(&reader, (int64_t)target, option, &work);

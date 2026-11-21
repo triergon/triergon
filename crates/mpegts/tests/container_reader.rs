@@ -9,6 +9,8 @@ mod adts_unbounded;
 mod direct_audio;
 #[path = "container_reader/dts.rs"]
 mod dts;
+#[path = "container_reader/dts_hd.rs"]
+mod dts_hd;
 #[path = "container_reader/dvb.rs"]
 mod dvb;
 #[path = "container_reader/eac3.rs"]
@@ -21,6 +23,8 @@ mod latm;
 mod mpeg_audio;
 #[path = "container_reader/opaque_video.rs"]
 mod opaque_video;
+#[path = "container_reader/physical_seek.rs"]
+mod physical_seek;
 #[path = "container_reader/seek.rs"]
 mod seek;
 #[path = "container_reader/unframed_audio.rs"]
