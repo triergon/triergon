@@ -2,7 +2,7 @@
 use crate::nal::annexb::START_CODE;
 use crate::{
     BuildStep,
-    avc::{AvcConfigArrayKind, AvcConfigNal, AvcConfiguration},
+    avc::{AvcConfigArrayKind, AvcConfigNal, AvcConfiguration, IDR},
     nal::{Codec, NalHeader, split_length_prefixed},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -258,7 +258,7 @@ impl<'a> AvcAnnexBJob<'a> {
             self.nals = self.nals.checked_add(1).ok_or(Error::Overflow)?;
             check_limit(self.nals, self.limits.maximum_nals)?;
             let (nal, tail) = next_nal(rest, width)?;
-            self.idr |= NalHeader::parse(Codec::Avc, nal)?.nal_unit_type() == 5;
+            self.idr |= NalHeader::parse(Codec::Avc, nal)?.nal_unit_type() == IDR;
             self.bytes = add_nal_bytes(self.bytes, nal.len())?;
             check_limit(self.bytes, self.limits.maximum_output_bytes)?;
             self.rest = Some(tail);

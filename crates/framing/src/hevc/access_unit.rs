@@ -3,7 +3,7 @@ use crate::nal::annexb::START_CODE;
 use crate::{
     BuildStep,
     avc::AvcAnnexBLimits,
-    hevc::{HvcConfigNal, HvcConfiguration},
+    hevc::{HvcConfigNal, HvcConfiguration, PPS, VPS, is_irap},
     nal::{Codec, NalHeader, split_length_prefixed},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -85,7 +85,7 @@ impl HevcAnnexBConfig {
 }
 
 fn is_parameter_set(nal: &HvcConfigNal<'_>) -> bool {
-    matches!(nal.declared_nal_type(), 32..=34)
+    matches!(nal.declared_nal_type(), VPS..=PPS)
 }
 
 /// Borrows a fully checked access unit and its configuration. The HEVC IRAP
@@ -213,7 +213,7 @@ impl<'a> HevcAnnexBJob<'a> {
             check_limit(self.nals, self.limits.maximum_nals)?;
             let (nal, tail) = next_nal(rest, width)?;
             let nal_type = NalHeader::parse(Codec::Hevc, nal)?.nal_unit_type();
-            self.random_access |= (16..=23).contains(&nal_type);
+            self.random_access |= is_irap(nal_type);
             self.bytes = add_nal_bytes(self.bytes, nal.len())?;
             check_limit(self.bytes, self.limits.maximum_output_bytes)?;
             self.rest = Some(tail);
