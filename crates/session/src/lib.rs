@@ -102,6 +102,16 @@ pub fn video_decoder_in(
 }
 
 /// The decoder lane for a container track's codec, if this crate decodes it.
+pub fn video_codec(codec: triergon_core::container::CodecId) -> Option<VideoCodec> {
+    use triergon_core::container::CodecId;
+    match codec {
+        CodecId::H264 => Some(VideoCodec::H264),
+        CodecId::Hevc => Some(VideoCodec::Hevc),
+        _ => None,
+    }
+}
+
+/// The audio decoder lane for a container track's codec, if this crate decodes it.
 pub fn audio_codec(codec: triergon_core::container::CodecId) -> Option<AudioCodec> {
     use triergon_core::container::CodecId;
     Some(match codec {

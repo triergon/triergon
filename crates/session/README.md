@@ -43,7 +43,8 @@ fn play(
 ```
 
 `video_decoder`, `audio_decoder` and `StreamSelection::load` need the `codecs`
-feature, which adds the nine decoder crates. `audio_decoder(codec, configuration)` takes
+feature, which adds the nine decoder crates. `video_codec` and `audio_codec` map
+a container track's codec to a decoder lane. `audio_decoder(codec, configuration)` takes
 the canonical configuration of FLAC, Opus and Vorbis (see `audio_configuration`) and
 ignores it for the others. Each decoder charges its storage to a pool of its codec's
 default limit; `video_decoder_in` and `audio_decoder_in` charge the caller's `Budget`
@@ -96,7 +97,8 @@ The `mix` module holds the stereo downmix (`mix::Downmix`) and the s16 conversio
   `QueueLimits::AUDIO` 256 units / 4 MiB (1 MiB per unit). A full queue
   returns `FeedError::Backpressure` and the caller keeps the unit. Empty or
   oversized units, and units fed after `end_of_stream`, are `FeedError::Invalid`;
-  feeding with no decoder or after a failure is `FeedError::Idle`.
+  feeding with no decoder or after a failure is `FeedError::Idle`. The error
+  keeps these variants when propagated through a standard error trait object.
 - **Video timing.** Each picture keeps the PTS its access unit carried through
   decoder reordering. The session holds at most one converted picture ahead
   of the clock and publishes it when `clock_ns >= pts` (or immediately when

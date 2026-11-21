@@ -40,6 +40,18 @@ pub enum FeedError {
     Idle,
 }
 
+impl std::fmt::Display for FeedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Backpressure => "decode queue is full",
+            Self::Invalid => "access unit cannot be queued",
+            Self::Idle => "decode session is idle",
+        })
+    }
+}
+
+impl std::error::Error for FeedError {}
+
 #[derive(Debug)]
 pub(crate) struct Unit {
     pub(crate) data: Vec<u8>,
