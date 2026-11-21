@@ -35,6 +35,7 @@ impl Kind {
             "pgs-segments",
             "text-extraction",
             "tx3g-config",
+            "tx3g-semantics",
             "mkv-metadata",
             "mkv-track-extensions",
             "mkv-codec-state",
