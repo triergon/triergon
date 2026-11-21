@@ -50,10 +50,10 @@ pub fn vorbis_window(out: &mut [f32]) {
 mod tests {
     use super::kbd_window;
 
-    /// The windows the AAC and AC-3 decoders each derived before they shared this one,
-    /// as an FNV-1a digest of their `f32` bits.
+    /// The windows whose bits the AAC and AC-3 decoders' output depends on, as an FNV-1a
+    /// digest of their `f32` bits.
     #[test]
-    fn windows_keep_the_bits_both_decoders_used() {
+    fn windows_have_the_bits_the_decoders_depend_on() {
         for (half, alpha, digest) in [
             (256, 5.0, 0x8c61_d5ab_3247_54c8_u64),
             (1024, 4.0, 0x4c1b_5dd8_a7b1_0737),

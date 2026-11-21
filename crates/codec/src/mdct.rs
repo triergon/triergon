@@ -105,11 +105,9 @@ fn radices(len: usize) -> Option<([usize; 32], usize)> {
 }
 
 impl Fft {
-    /// `Ok(None)` unless `len` is a product of 2, 3 and 5.
-    fn new(len: usize, budget: &Budget) -> Result<Option<Fft>, Error> {
-        let Some((radices, count)) = radices(len) else {
-            return Ok(None);
-        };
+    /// `Invalid` unless `len` is a product of 2, 3 and 5; a refused charge.
+    fn new(len: usize, budget: &Budget) -> Result<Fft, Error> {
+        let (radices, count) = radices(len).ok_or(Error::Invalid("IMDCT length"))?;
         let radices = &radices[..count];
         let mut order = BudgetVec::try_filled(budget, 0, len)?;
         let mut next = 0;
@@ -137,7 +135,7 @@ impl Fft {
             stages.try_push(stage).map_err(|refused| refused.error)?;
             span *= radix;
         }
-        Ok(Some(Fft { len, stages, order }))
+        Ok(Fft { len, stages, order })
     }
 
     /// The input index each slot of the in-place buffer starts from.
@@ -479,12 +477,12 @@ impl Imdct {
     /// # Errors
     /// `Invalid` unless [`Imdct::supports`] `n`; a refused charge.
     pub fn new(n: usize, scale: f64, budget: &Budget) -> Result<Imdct, Error> {
-        if !Imdct::supports(n) {
+        if !n.is_multiple_of(4) {
             return Err(Error::Invalid("IMDCT length"));
         }
         let q = n / 4;
         let k = n / 2;
-        let fft = Fft::new(q, budget)?.ok_or(Error::Invalid("IMDCT length"))?;
+        let fft = Fft::new(q, budget)?;
         // The twiddles of each `j` that `index` yields, scaled by `s`.
         let twiddles = |s: f64,
                         index: &mut dyn Iterator<Item = usize>|
@@ -676,7 +674,7 @@ mod tests {
         for len in [
             1, 2, 3, 4, 5, 6, 8, 12, 15, 16, 30, 60, 64, 120, 240, 480, 512,
         ] {
-            let fft = Fft::new(len, &budget()).unwrap().unwrap();
+            let fft = Fft::new(len, &budget()).unwrap();
             let input: Vec<(f32, f32)> =
                 (0..len).map(|_| (lcg(&mut seed), lcg(&mut seed))).collect();
             let mut re: Vec<f32> = fft.order().iter().map(|&j| input[j as usize].0).collect();
@@ -699,7 +697,10 @@ mod tests {
                 );
             }
         }
-        assert!(Fft::new(7, &budget()).unwrap().is_none());
+        assert_eq!(
+            Fft::new(7, &budget()).err(),
+            Some(Error::Invalid("IMDCT length"))
+        );
     }
 
     #[test]
