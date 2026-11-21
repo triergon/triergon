@@ -94,8 +94,9 @@ The Huffman tables are checked to be complete prefix codes.
 
 ## Verification
 
-The `codecs-files` item grades Layers I, II and III against the FFmpeg float decoders and
-includes the MPEG audio timing inputs.
+The `codecs-files` gate grades Layers I, II and III against the FFmpeg float decoders.
+It compares decoded PCM with container trims applied and stereo device output,
+including the three MPEG audio workload files.
 
 `harness/codecs/mp3/make_vectors.sh FFMPEG OUT` generates the test streams (libmp3lame,
 mp2 and mp2fixed encodes at MPEG-1, 2 and 2.5 rates, and random Layer I/II frames from
@@ -103,9 +104,8 @@ mp2 and mp2fixed encodes at MPEG-1, 2 and 2.5 rates, and random Layer I/II frame
 `cargo xtask codecs grade` decodes them and the ISO conformance streams through the
 container readers under the [numeric rules](../../harness/codecs/numeric-rules.json) (the
 `mp1`, `mp2` and `mp3` lanes, [harness/codecs/STATUS.md](../../harness/codecs/STATUS.md));
-Layer I and II compare with FFmpeg's float decoders. On the gate build 62/64 pass
-(Layer I 5/5, Layer II 20/20, Layer III 37/39). Open: `he_mode` changes channel mode
-mid-stream, which FFmpeg's CLI converts to the first frame's format; `he_free` is free
-format (bit rate index 0, each frame running to the next header): FFmpeg's demuxer finds no
-two consecutive frames and refuses the file, and this decoder refuses free-format frames. Runtime and memory against the [gates](../../docs/quality.md#gates):
-[status](../../docs/status.md).
+On AArch64, 65 of 67 files match (Layer I 5/5, Layer II 21/21, Layer III 39/41).
+The open Layer III case `he_mode` changes channel mode mid-stream. FFmpeg's CLI
+converts to the first frame's format and its stereo device path stops at the change.
+Both sides refuse `he_free`, which uses free-format frames (bit rate index zero).
+See the [runtime and memory results](../../docs/status.md).

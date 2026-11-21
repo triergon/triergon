@@ -75,8 +75,8 @@ exceeding a limit is a typed error.
 
 ## Comparison with FFmpeg
 
-The `elementary-readers` item compares native FLAC, MPEG audio, ADTS, AC-3 and E-AC-3
-packets under the reader rules below.
+The `elementary-readers` gate compares native FLAC, MPEG audio, ADTS, AC-3 and E-AC-3
+packets with FFmpeg and checks each reviewed difference against its frozen values.
 
 `cargo xtask codecs readers` compares every packet's size, position, timestamps and trim as
 the readers deliver them with the pinned `ffprobe -show_packets` of FFmpeg 9.0.2, under the
@@ -84,10 +84,10 @@ reviewed rules and dispositions of
 [harness/codecs/reader-rules.json](../../harness/codecs/reader-rules.json); gates:
 [docs/quality.md](../../docs/quality.md#gates). Over the IETF FLAC decoder testbench, the
 MPEG audio conformance bitstreams, streams FFmpeg writes (FLAC, MP3 with and without
-Xing/Info and LAME tags, MP2, ADTS, AC-3, E-AC-3) and crafted damaged ones, 253/271 pass
-and 2 are refused by both (testbench faulty 06 and 07); the frozen differences of the
-others are in [reader-differences.json](../../harness/codecs/reader-differences.json), and
-each lies in the scope of one disposition. They differ only where FFmpeg:
+Xing/Info and LAME tags, MP2, ADTS, AC-3, E-AC-3) and crafted damaged ones, 253 of 271
+match on AArch64. Both readers refuse testbench faulty 06 and 07. The remaining 16
+files match their reviewed [packet differences](../../harness/codecs/reader-differences.json).
+Those cases exercise the following FFmpeg behaviours.
 
 - delivers a FLAC frame's duration rescaled to the first frame's rate when the rate
   changes, no duration at 768 kHz, and the last frame of a stream with varying block
