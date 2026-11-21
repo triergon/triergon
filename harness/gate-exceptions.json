@@ -34,7 +34,7 @@
       "harness/features/subtitle-dvd/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 1}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 9, "thumbv7neon-unknown-linux-gnueabihf": 9}},
       "harness/codecs/correctness-manifest.json": {"open_cases": {"aarch64-unknown-linux-gnu": 5, "thumbv7neon-unknown-linux-gnueabihf": 5}},
       "harness/capture/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 3, "thumbv7neon-unknown-linux-gnueabihf": 1}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 36, "thumbv7neon-unknown-linux-gnueabihf": 36}},
-      "harness/codecs/gate-lanes.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 18, "thumbv7neon-unknown-linux-gnueabihf": 18}},
+      "harness/codecs/gate-lanes.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 66, "thumbv7neon-unknown-linux-gnueabihf": 66}},
       "harness/codecs/aac/ps-open-manifest.json": {
         "open_cases": {
           "aarch64-unknown-linux-gnu": 4,
