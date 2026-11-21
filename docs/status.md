@@ -106,6 +106,26 @@ access unit. All 5,760 ordered payload bytes and clocks at access-unit starts
 agree. Exact folds match 0/10. The short-group comparison and its native gates
 remain open.
 
+The optional [ATSC six-block reference adapter](../harness/eac3-proof.md)
+agrees with the retained full ordered packet records, packet folds and terminal
+outcomes in 24 untimed controls: the ten original controls publish 30 access
+units / 5,760 bytes; fourteen mutation controls publish 6 / 1,152 bytes, with
+13 refusals and one acceptance. Separately, the transport worker's
+packet trace agrees with the adapter on all ten original cases: every field in
+30 ordered packet records, all 5,760 payload bytes, side data, exact folds, EOF
+and successful exits. No group-field mismatch occurs. The fourteen mutations
+remain comparisons against retained expectations; these ten accepting cases
+do not establish live candidate refusal equality. The [per-case folds](../harness/eac3-proof.md)
+are separate from ordinary FFmpeg's unchanged 0/10 result.
+The adapter is compiled as a separate comparison-only worker using the formats
+profile; ordinary reference sources are unchanged. The opt-in packet trace uses
+a const-generic operation selected before measurement and leaves ordinary candidate stdout, stderr and exit status
+byte-identical on all 179 registered access-unit cases, with their existing
+expected folds unchanged.
+The adapter does not change ordinary FFmpeg reference sources, registered
+operations, corpus cases, expectations or gates. Runtime, peak heap and kernel-bound RSS for this
+boundary remain unmeasured on both AArch64 and ARMv7.
+
 ## Subtitle text comparisons
 
 At `f13dcaf3`, a partial gate run of `subtitle-text` per target passed parity,
@@ -2656,3 +2676,9 @@ raw samples.
 
 The [measured revisions](#measured-revisions) table names the revision and raw samples
 behind each ARMv7 row.
+
+The opt-in functional check `cargo xtask worker-tests transport::eac3-experiment`
+regenerates the ten authored ATSC inputs and compares complete ordered traces,
+literal folds and EOF with the isolated six-block adapter. It displays the
+10/10 adapter and separate 0/10 stock results; it is outside the default tests
+and registered gates. See the [reproduction commands](../harness/eac3-proof.md).

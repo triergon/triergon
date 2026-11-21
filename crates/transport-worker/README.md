@@ -24,6 +24,14 @@ duration, position, flags, payload and side data. A contiguous entity carries
 parser state across its boundary. An explicit discontinuity resets it and the
 final EOF drains it.
 
+`ts-au-trace` takes the same arguments as `ts-au-fold` and prints each framed
+or preserved PES packet projection as JSON before the ordinary summary: stream,
+PID, projected PTS/DTS, duration, position, flags, hexadecimal payload and side
+data. Control-only and opaque-recovery results retain their summary projection.
+The ten ATSC E-AC-3 controls agree with the separate six-block adapter on all
+30 packet records, 5,760 payload bytes, folds, EOF and successful exits. This
+independent result leaves ordinary FFmpeg's 0/10 exact folds unchanged.
+
 `ts-seek-{fold,bench,memory}` takes `FILE [ITERATIONS] SIZE PROGRAM PID PTS90
 POLICY`, where POLICY is `previous` or `preroll`. Optional `REPEAT_PTS90` and
 `split=BYTES` select repeated indexed seeks and contiguous entity parts.
@@ -55,3 +63,22 @@ comparison, where each aligned finite PES contains exactly one complete access
 unit. Generate both sets of inputs with
 `cargo xtask fixture transport-dts-hd-grouped`; add `--record REFERENCE` to record
 their folds from the pinned reference worker. Generated inputs stay in `.research/`.
+
+A separate comparison-only worker offers an untimed, opt-in ATSC E-AC-3 adapter:
+
+```text
+ffmpeg-ts-eac3-worker ts-eac3-proof FILE
+ffmpeg-ts-eac3-worker ts-eac3-proof-trace FILE
+```
+
+It selects program 7 in one TS188 entity and groups independently delimited
+six-block access units through public demuxer and parser APIs. Trace mode emits
+complete packet records before its summary, including a successfully published
+prefix on refusal. The ordinary `ts-au-` comparison remains the accepted operation.
+See the [adapter boundary](../../harness/eac3-proof.md) for limits and fold scope.
+
+The opt-in functional check `cargo xtask worker-tests transport::eac3-experiment`
+regenerates the ten authored ATSC inputs and compares complete ordered traces,
+literal folds and EOF with the isolated six-block adapter. It displays the
+10/10 adapter and separate 0/10 stock results; it is outside the default tests
+and registered gates. See the [reproduction commands](../../harness/eac3-proof.md).

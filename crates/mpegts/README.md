@@ -370,6 +370,17 @@ the reference's durations are zero throughout, while the reader derives 2,880
 90 kHz ticks per access unit. Even the two six-block controls therefore differ.
 The existing parser-packet comparison and all its expectations are unchanged.
 
+An optional [in-process reference adapter](../../harness/eac3-proof.md) groups
+these independently delimited ATSC access units using public FFmpeg APIs.
+Its packet records and ordered folds agree with the retained expectations in
+24 functional controls, including complete prefixes before refusal. The ordinary
+parser-packet comparison still differs as described above; native runtime and
+memory qualification of the adapter boundary remains unavailable.
+The live transport worker additionally agrees with this adapter on every packet
+field, payload byte, side-data element, fold and successful terminal outcome in
+the ten original controls (30 access units / 5,760 bytes). Live refusal equality
+for the mutation controls remains unverified.
+
 An exact dependent-group reproduction, after building `transport-worker` and
 locating the pinned formats worker, is:
 
@@ -959,3 +970,9 @@ Verification:
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).
+
+The opt-in functional check `cargo xtask worker-tests transport::eac3-experiment`
+regenerates the ten authored ATSC inputs and compares complete ordered traces,
+literal folds and EOF with the isolated six-block adapter. It displays the
+10/10 adapter and separate 0/10 stock results; it is outside the default tests
+and registered gates. See the [reproduction commands](../../harness/eac3-proof.md).
