@@ -87,9 +87,12 @@ impl UnitQueue {
         self.bytes -= unit.data.len();
         Some(unit)
     }
-    #[allow(clippy::option_option)] // `None`: empty queue; `Some(None)`: unit without a timestamp.
-    pub fn front_pts(&self) -> Option<Option<i64>> {
-        self.units.front().map(|unit| unit.pts)
+    /// The front unit, if there is one and `due` accepts its timestamp.
+    pub fn pop_if(&mut self, due: impl FnOnce(Option<i64>) -> bool) -> Option<Unit> {
+        if !due(self.units.front()?.pts) {
+            return None;
+        }
+        self.pop()
     }
     pub fn is_empty(&self) -> bool {
         self.units.is_empty()

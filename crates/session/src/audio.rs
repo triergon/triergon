@@ -6,10 +6,10 @@
 //! therefore yields nothing, and flush/stop discard everything queued.
 use crate::Discard;
 use crate::SessionState;
+use crate::lane::Phase;
 use crate::mix::Downmix;
 use crate::queue::{FeedError, QueueLimits, UnitQueue};
 use triergon_codec::{AudioFrame, DynAudioDecoder};
-use triergon_core::Error;
 
 /// Interleaved stereo s16 at `sample_rate`; `pts` is the first unit's caller PTS.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -32,8 +32,7 @@ pub struct AudioSession {
     // Samples decoded at a new rate while the caller's block held another.
     carry: Option<PcmBlock>,
     generation: u64,
-    ended: bool,
-    failure: Option<Error>,
+    phase: Phase,
 }
 
 impl AudioSession {
@@ -46,8 +45,7 @@ impl AudioSession {
             downmix: Downmix::default(),
             carry: None,
             generation: 0,
-            ended: false,
-            failure: None,
+            phase: Phase::Open,
         }
     }
     /// A new stream; `None` plays no audio.
@@ -67,19 +65,13 @@ impl AudioSession {
         self.generation += 1;
         self.queue.clear();
         self.carry = None;
-        self.ended = false;
-        self.failure = None;
+        self.phase = Phase::Open;
     }
     pub fn generation(&self) -> u64 {
         self.generation
     }
     pub fn feed(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
-        if self.decoder.is_none() || self.failure.is_some() {
-            return Err(FeedError::Idle);
-        }
-        if self.ended {
-            return Err(FeedError::Invalid);
-        }
+        self.phase.admit(self.decoder.is_some())?;
         self.queue.push(au, pts)
     }
     /// [`feed`](Self::feed) a container packet's payload, whose decoded output then drops
@@ -90,17 +82,12 @@ impl AudioSession {
         pts: Option<i64>,
         discard: Discard,
     ) -> Result<(), FeedError> {
-        if self.decoder.is_none() || self.failure.is_some() {
-            return Err(FeedError::Idle);
-        }
-        if self.ended {
-            return Err(FeedError::Invalid);
-        }
+        self.phase.admit(self.decoder.is_some())?;
         self.queue.push_discarding(au, pts, discard)
     }
     pub fn end_of_stream(&mut self) {
-        if self.decoder.is_some() {
-            self.ended = true;
+        if self.decoder.is_some() && self.phase == Phase::Open {
+            self.phase = Phase::Drained;
         }
     }
     /// Decode every queued unit that is due at `clock_ns` (PTS minus `lead_ns`
@@ -119,17 +106,15 @@ impl AudioSession {
                 return 0;
             }
         }
+        let due = |pts: Option<i64>| match (pts, clock_ns) {
+            (Some(pts), Some(clock)) => clock >= pts.saturating_sub(lead_ns),
+            _ => true,
+        };
         let mut consumed = 0;
-        while self.failure.is_none() && self.carry.is_none() {
-            let Some(pts) = self.queue.front_pts() else {
-                break;
-            };
-            if let (Some(pts), Some(clock)) = (pts, clock_ns)
-                && clock < pts.saturating_sub(lead_ns)
-            {
-                break;
-            }
-            let unit = self.queue.pop().expect("front unit");
+        // A failed lane's queue is empty.
+        while self.carry.is_none()
+            && let Some(unit) = self.queue.pop_if(due)
+        {
             let result = decoder.decode(&unit.data, &mut self.frame);
             if result.is_ok() {
                 unit.discard.apply(&mut self.frame, &mut self.delay);
@@ -137,7 +122,7 @@ impl AudioSession {
             consumed += 1;
             match result {
                 Err(error) => {
-                    self.failure = Some(error);
+                    self.phase = Phase::Failed(error);
                     self.queue.clear();
                 }
                 Ok(_) if self.frame.samples_per_channel == 0 => {}
@@ -160,12 +145,7 @@ impl AudioSession {
         consumed
     }
     pub fn state(&self) -> SessionState {
-        match (&self.decoder, self.failure) {
-            (None, _) => SessionState::Idle,
-            (_, Some(error)) => SessionState::Failed(error),
-            _ if !self.queue.is_empty() || self.carry.is_some() => SessionState::Running,
-            _ if self.ended => SessionState::Ended,
-            _ => SessionState::Starved,
-        }
+        let pending = !self.queue.is_empty() || self.carry.is_some();
+        self.phase.state(self.decoder.is_some(), pending)
     }
 }

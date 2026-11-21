@@ -4,10 +4,10 @@
 //! decoder's reordering. The lane holds at most one converted picture ahead of
 //! the clock and publishes it once the clock reaches its PTS.
 use crate::SessionState;
+use crate::lane::Phase;
 use crate::queue::{FeedError, QueueLimits, UnitQueue};
 use std::sync::Arc;
 use triergon_codec::DynVideoDecoder;
-use triergon_core::Error;
 use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
 
 /// The current picture for the compositor. `sequence` increases for every
@@ -36,9 +36,7 @@ pub struct VideoSession {
     latest: Option<Published>,
     generation: u64,
     sequence: u64,
-    ended: bool,
-    drained: bool,
-    failure: Option<Error>,
+    phase: Phase,
 }
 
 impl VideoSession {
@@ -52,9 +50,7 @@ impl VideoSession {
             latest: None,
             generation: 0,
             sequence: 0,
-            ended: false,
-            drained: false,
-            failure: None,
+            phase: Phase::Open,
         }
     }
     /// A new stream: old input, decoder state and picture go.
@@ -80,9 +76,7 @@ impl VideoSession {
         if let Some(ahead) = self.ahead.take() {
             self.spare = Some(ahead.rgba);
         }
-        self.ended = false;
-        self.drained = false;
-        self.failure = None;
+        self.phase = Phase::Open;
         if clear_picture {
             self.latest = None;
         }
@@ -91,19 +85,14 @@ impl VideoSession {
         self.generation
     }
     pub fn feed(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
-        if self.decoder.is_none() || self.failure.is_some() {
-            return Err(FeedError::Idle);
-        }
-        if self.ended {
-            return Err(FeedError::Invalid);
-        }
+        self.phase.admit(self.decoder.is_some())?;
         self.queue.push(au, pts)
     }
     /// No more input for this generation: the decoder drains and the lane
     /// reports `Ended` once every picture has been published.
     pub fn end_of_stream(&mut self) {
-        if self.decoder.is_some() && !self.ended {
-            self.ended = true;
+        if self.decoder.is_some() && self.phase == Phase::Open {
+            self.phase = Phase::Ending;
         }
     }
     /// Bounded work: decode until one picture waits ahead of the clock or the
@@ -111,15 +100,14 @@ impl VideoSession {
     /// Returns true when a new picture was published.
     pub fn step(&mut self, clock_ns: Option<i64>) -> bool {
         self.fill_ahead();
-        let due = self.ahead.as_ref().is_some_and(|ahead| {
+        let due = |ahead: &mut Ahead| {
             ahead
                 .pts
                 .is_none_or(|pts| clock_ns.is_none_or(|clock| clock >= pts))
-        });
-        if !due {
+        };
+        let Some(ahead) = self.ahead.take_if(due) else {
             return false;
-        }
-        let ahead = self.ahead.take().expect("due picture");
+        };
         let previous = self.latest.take();
         self.sequence += 1;
         self.latest = Some(Published {
@@ -138,7 +126,7 @@ impl VideoSession {
         let Some(decoder) = self.decoder.as_mut() else {
             return;
         };
-        while self.ahead.is_none() && self.failure.is_none() {
+        while self.ahead.is_none() && !matches!(self.phase, Phase::Failed(_)) {
             if let Some(view) = decoder.receive() {
                 let mut rgba = self.spare.take().unwrap_or_default();
                 rgba.resize(CANVAS_BYTES, 0);
@@ -152,13 +140,13 @@ impl VideoSession {
             match self.queue.pop() {
                 Some(unit) => {
                     if let Err(error) = decoder.send(&unit.data, unit.pts) {
-                        self.failure = Some(error);
+                        self.phase = Phase::Failed(error);
                         self.queue.clear();
                     }
                 }
-                None if self.ended && !self.drained => {
+                None if self.phase == Phase::Ending => {
                     decoder.flush();
-                    self.drained = true;
+                    self.phase = Phase::Drained;
                 }
                 None => return,
             }
@@ -168,12 +156,7 @@ impl VideoSession {
         self.latest.as_ref()
     }
     pub fn state(&self) -> SessionState {
-        match (&self.decoder, self.failure) {
-            (None, _) => SessionState::Idle,
-            (_, Some(error)) => SessionState::Failed(error),
-            _ if self.ahead.is_some() || !self.queue.is_empty() => SessionState::Running,
-            _ if self.drained => SessionState::Ended,
-            _ => SessionState::Starved,
-        }
+        let pending = self.ahead.is_some() || !self.queue.is_empty();
+        self.phase.state(self.decoder.is_some(), pending)
     }
 }

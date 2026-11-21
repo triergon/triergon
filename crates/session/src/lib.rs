@@ -22,6 +22,7 @@ pub mod compat {
     }
 }
 mod discard;
+mod lane;
 pub mod mix;
 pub mod queue;
 #[cfg(feature = "codecs")]
