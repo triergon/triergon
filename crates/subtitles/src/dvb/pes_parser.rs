@@ -153,41 +153,44 @@ impl PesParser {
             return Ok(PesProgress::Yield);
         }
 
-        if pending.scan.is_none() {
-            let fresh = pending.pts.is_some() && pending.pts != self.last_pts;
-            if fresh {
-                self.tail = None;
-            }
-            let new_group = fresh && pending.pes.starts_with(&[0x20, 0]);
-            let start = usize::from(new_group) * 2;
-            let prior_len = self.tail.as_ref().map_or(0, Tail::len);
-            if new_group {
-                self.active = true;
-            }
-            let body_len = pending.pes.len() - start;
-            if (fresh && !new_group) || !self.active || body_len > MAX_GROUP_BYTES - prior_len {
-                work.take(1);
-                return self.passthrough();
-            }
-            let copy = if matches!(self.tail, Some(Tail::Buffered(_))) {
-                match self.tail.take() {
-                    Some(Tail::Buffered(buffer)) => Some(buffer),
-                    _ => unreachable!("selected buffered DVB tail"),
+        let scan = match &mut pending.scan {
+            Some(scan) => scan,
+            slot @ None => {
+                let fresh = pending.pts.is_some() && pending.pts != self.last_pts;
+                if fresh {
+                    self.tail = None;
                 }
-            } else {
-                None
-            };
-            pending.scan = Some(Scan {
-                start,
-                prior_len,
-                at: 0,
-                copy,
-                end: None,
-            });
-        }
+                let new_group = fresh && pending.pes.starts_with(&[0x20, 0]);
+                let start = usize::from(new_group) * 2;
+                let prior_len = self.tail.as_ref().map_or(0, Tail::len);
+                if new_group {
+                    self.active = true;
+                }
+                let body_len = pending.pes.len() - start;
+                if (fresh && !new_group) || !self.active || body_len > MAX_GROUP_BYTES - prior_len {
+                    work.take(1);
+                    return self.passthrough();
+                }
+                let copy = match self.tail.take() {
+                    Some(Tail::Buffered(buffer)) => Some(buffer),
+                    shared => {
+                        self.tail = shared;
+                        None
+                    }
+                };
+                slot.insert(Scan {
+                    start,
+                    prior_len,
+                    at: 0,
+                    copy,
+                    end: None,
+                })
+            }
+        };
 
-        let scan = pending.scan.as_mut().expect("admitted DVB scan");
-        if scan.end.is_none() {
+        let end = if let Some(end) = scan.end {
+            end
+        } else {
             if scan.prior_len != 0 {
                 let prior = match &self.tail {
                     Some(Tail::Shared(bytes)) => Some(bytes),
@@ -224,27 +227,27 @@ impl PesParser {
                 }
                 scan.at += size;
             }
-            scan.end = Some(ScanEnd {
+            *scan.end.insert(ScanEnd {
                 active,
                 complete: scan.at,
                 len: body.len(),
-            });
-        }
-        let end = scan.end.expect("completed DVB scan");
-        let joined = if end.complete != 0 && scan.copy.is_some() {
-            if !work.try_charge(1) {
-                return Ok(PesProgress::Yield);
-            }
-            let copy = scan.copy.take().expect("assembled DVB segments");
-            match copy.freeze() {
-                Ok(bytes) => Some(bytes),
-                Err(error) => {
-                    scan.copy = Some(error.value);
-                    return Err(error.error);
+            })
+        };
+        let joined = match scan.copy.take_if(|_| end.complete != 0) {
+            Some(copy) => {
+                if !work.try_charge(1) {
+                    scan.copy = Some(copy);
+                    return Ok(PesProgress::Yield);
+                }
+                match copy.freeze() {
+                    Ok(bytes) => Some(bytes),
+                    Err(error) => {
+                        scan.copy = Some(error.value);
+                        return Err(error.error);
+                    }
                 }
             }
-        } else {
-            None
+            None => None,
         };
         self.complete(end, joined)
     }
@@ -266,14 +269,17 @@ impl PesParser {
     }
 
     fn complete(&mut self, end: ScanEnd, joined: Option<Bytes>) -> Result<PesProgress> {
-        let pending = self
-            .input
-            .take()
-            .ok_or(Error::Invalid("DVB PES parser input absent"))?;
-        let scan = pending.scan.expect("completed DVB scan");
+        let Some(Pending {
+            pes,
+            pts,
+            scan: Some(scan),
+        }) = self.input.take()
+        else {
+            return Err(Error::Invalid("DVB PES parser input absent"));
+        };
         let prior = self.tail.take();
         let (codec, framing, prior_tail) = if end.complete != 0 {
-            let codec = view(&pending.pes, scan.start, joined.as_ref(), 0..end.complete)?;
+            let codec = view(&pes, scan.start, joined.as_ref(), 0..end.complete)?;
             let prior_tail = if scan.prior_len == 0 {
                 None
             } else if let Some(Tail::Shared(bytes)) = prior {
@@ -283,14 +289,14 @@ impl PesParser {
             };
             (codec, PesFraming::CompleteSegments, prior_tail)
         } else {
-            (pending.pes.clone(), PesFraming::Passthrough, None)
+            (pes.clone(), PesFraming::Passthrough, None)
         };
         self.tail = if end.active && end.complete < end.len {
             if let Some(copy) = scan.copy {
                 Some(Tail::Buffered(copy))
             } else {
                 Some(Tail::Shared(view(
-                    &pending.pes,
+                    &pes,
                     scan.start,
                     joined.as_ref(),
                     end.complete..end.len,
@@ -300,12 +306,12 @@ impl PesParser {
             None
         };
         self.active = end.active;
-        self.last_pts = pending.pts.or(self.last_pts);
+        self.last_pts = pts.or(self.last_pts);
         Ok(PesProgress::Packet(PesPacket {
-            pes: pending.pes,
+            pes,
             codec,
             framing,
-            source_pts: pending.pts,
+            source_pts: pts,
             codec_pts: self.last_pts,
             prior_tail,
         }))
