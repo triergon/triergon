@@ -12,17 +12,16 @@ use crate::matroska::{AVC_AAC, HEVC_DOLBY, WORK, ready};
 use crate::packet_fold::{Packet, Work, drive};
 use crate::runner::Result;
 use std::sync::atomic::AtomicBool;
+use triergon_bridge::matroska::{
+    MatroskaClock, MatroskaClockPrefix, MatroskaCompactDiscovery, MatroskaDiscoveryLimits,
+    MatroskaDiscoveryStep, MatroskaFeedSetup, MatroskaHevcDolbyFeed, MatroskaHevcDolbySetup,
+    MatroskaPacketTiming, MatroskaTrackFeed,
+};
 use triergon_core::container::{CodecId, MediaKind, TrackInfo};
 use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId, WorkBudget};
 use triergon_matroska::{Configuration, Event, LegacyAacProfile, TypedPacket as MatroskaPacket};
 use triergon_playback::{
-    ByteSource, Engine, Output, PlayerPolicy, Progress, RawEvent, Selection,
-    io::SourceOwner,
-    matroska_feed::{
-        MatroskaClock, MatroskaClockPrefix, MatroskaCompactDiscovery, MatroskaDiscoveryLimits,
-        MatroskaDiscoveryStep, MatroskaFeedSetup, MatroskaHevcDolbyFeed, MatroskaHevcDolbySetup,
-        MatroskaPacketTiming, MatroskaTrackFeed,
-    },
+    ByteSource, Engine, Output, PlayerPolicy, Progress, RawEvent, Selection, io::SourceOwner,
 };
 
 pub const PREFIX: &str = "mkv-audio-";
@@ -326,10 +325,7 @@ mod tests {
             assert_eq!(select.family(audio, CodecId::Eac3, None), dolby);
             assert_eq!(select.family(MediaKind::Video, CodecId::Aac, None), None);
             assert_eq!(select.family(audio, CodecId::Opus, None), None);
-            assert_eq!(
-                select.family(audio, CodecId::Other, None),
-                None
-            );
+            assert_eq!(select.family(audio, CodecId::Other, None), None);
         }
     }
 }

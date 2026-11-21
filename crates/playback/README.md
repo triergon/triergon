@@ -2,9 +2,8 @@
 
 Composes the Matroska, MP4 and MPEG-TS readers into a player-facing packet
 feed: caller-owned sources, format probing, bounded container events, track
-selection, seeking, packet and subtitle bridges, and a producer/sink pump. It
-sits above `triergon-matroska`, `triergon-isobmff`, `triergon-mpegts`,
-`triergon-framing` and `triergon-subtitles`. It does not fetch over HTTP,
+selection, seeking, and a producer/sink pump. It sits above
+`triergon-matroska`, `triergon-isobmff`, `triergon-mpegts` and `triergon-framing`. It does not fetch over HTTP,
 parse playlists, retry transports, decode media or render.
 
 The MP4 range comparison includes two upstream samples, one with an initial
@@ -115,42 +114,18 @@ video and audio tracks.
 | Source protocol | `Source`, `SourceReply`, `ByteSource`, `io::SourceOwner` |
 | Probe | `io::PlaybackProbe`: Matroska, MP4, TS188, M2TS192, AVC and HEVC Annex B |
 | Matroska | `Engine::matroska`, `Engine::matroska_reader` (an unstarted reader built with `Reader::new_with_payload_ownership`, `new_with_immutable_seek_index` or `compat::block_additions::new_reader`) |
-| Matroska feeds | `matroska_feed::MatroskaFeedSetup` (AVC Annex B, AAC ADTS), `MatroskaHevcDolbySetup` (HEVC Annex B, AC-3/E-AC-3), `MatroskaDiscovery`, `MatroskaCompactDiscovery`, `MatroskaVideoSeekGate` |
-| Matroska clocks | feed methods `native_avc_clock`, `native_aac_clock_probe` (`MatroskaTrackFeed`), `native_hevc_clock`, `native_dolby_clock_probe` (`MatroskaHevcDolbyFeed`); the audio probes are `MatroskaClockProbe`s; `MatroskaBitmapClockProbe` |
 | MP4 / MOV | `mp4_open::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `Engine::mp4`, `Engine::mp4_progressive`, `Engine::mp4_native_terminal_v1`, `Mp4RangeOpen` / `Mp4RangePlayer` |
 | MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_native_seek` / `apply_mp4_native_seek`, progressive variants, `PreparedMp4::movie_seek` |
 | MP4 catalogue replacement | `catalogue::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
 | TS / M2TS | `Engine::ts`, `ts_with_namespace`, `ts_segmented`, `ts_native`, `compat::pes::open_private_audio`, `ts_native_program_v1`, `ts_native_segment_v1`; `native_startup::NativeStartup` |
 | PES feed | `pes_feed`: the feed [`triergon-hls`](../hls/README.md) reads HLS segments and progressive TS188 input from |
 | Raw Annex B | `raw_video::RawVideoProbe`, `RawVideoSource`, `RawVideoConfigTracker`, `RawVideoFeed` |
-| Packet bridges | `aac_bridge::AacBridge`, `av1_bridge::Av1Bridge` (including MP4 `av01` and `dav1`); MP4 AVC and HEVC samples frame through `triergon_framing::nal::NalPacketSession` |
-| Subtitles | `text_bridge::TextBridge`, `bitmap_bridge::{PgsBridge, DvdReceiver}`, `matroska_feed::MatroskaBitmapTrack`, `mp4_dvd::{Mp4DvdSetup, Mp4DvdTrack}`, `dvb_ts::DvbTsBridge`, `pgs_ts::PgsTsTrack`, `teletext_ts::TeletextTsBridge`, `caption_bridge::CaptionBridge` |
 | Sink handoff | `pump::{Pump, Sink, CatalogueSink, Feed}` |
 
+Matroska feeds, packet bridges and subtitle receivers over these outputs are in
+[`triergon-bridge`](../bridge/README.md).
+
 ## Behaviour and limits
-
-**Compact Matroska replay.** `MatroskaReplayPrefix::feed_packet` prepares a
-buffered AAC or AVC packet through the same selection and configuration checks
-as the live feed. A caller can inspect the prefix before delivering its events
-in order.
-
-**Matroska HEVC discovery.** Startup requires one distinct parameter set of
-each type. It accepts byte-identical repeats in CodecPrivate and before the
-first slice of an access unit. Configuration array types must match parameter
-set NAL headers. Repeated VPS timing requires positive tick units and time
-scale when those fields are present. The single-layer VPS is checked through
-its trailing bits, the SPS through its timing fields, and the base PPS through
-its extension flags. The native packet clock also accepts matching in-band
-sets before a picture's first slice.
-
-**Legacy Matroska AAC.** Discovery and `MatroskaFeedSetup` accept
-`A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC`. When a track has no initialization
-record, `compat::matroska::legacy_aac_lc_initialization` derives AAC-LC
-configuration from the Audio element's indexed sampling frequency and a count
-of one to six channels. A present Audio element can use the EBML defaults for
-its children. Larger layouts require explicit initialization. The feed
-preserves the source packet bytes.
-The legacy compatibility clock keeps a missing duration unknown.
 
 **Source protocol.** `Source::poll` must return promptly. `Pending` and empty
 data never mean end of stream; only `SourceReply::End` does, and transport
@@ -176,18 +151,15 @@ emit events the source view does not, such as `Mp4Event::NativeShortPacket`,
 `NativeEmptyPacket`, `NativeMissingSample` and native refusals.
 
 **Generations.** A seek, track switch or configuration change starts a new
-generation. Check outputs with `Player::may_deliver`. Feeds, bridges, clocks
-and subtitle receivers are bound to one generation and configuration; rebuild
-them after a change. `Delivery::DecodeOnly` marks preroll before the seek
-target.
+generation. Check outputs with `Player::may_deliver`. `Delivery::DecodeOnly`
+marks preroll before the seek target.
 
 **Matroska.** `SharedBounded` payload ownership lets packets borrow complete
 blocks from the source window; a borrowed packet keeps the whole backing
 allocation charged until it drops. Blocks split across reads are copied. The
 packet's configuration supplies its allocation budget to the output.
 The immutable seek index reuses keyframe positions after one sequential read and
-needs no Cues. The Dolby clock probe retains at most 4,096 timing rows and
-inspects up to 32 syncframes to infer a missing duration.
+needs no Cues.
 
 **MP4.** Progressive playback of a front-`moov` file continues through later
 `moof`/`mdat` pairs with at most 64 pending fragment slots. A size-zero
@@ -254,28 +226,6 @@ remains valid while a caller retains an output after closing the player.
 Delivery without a seek uses the presence of the projected presentation
 timestamp directly.
 
-**Subtitles.** The TS bridges bind to one PID of one active PMT and take its
-strict private-stream PES; a new generation, PMT epoch or clock epoch needs a
-new bridge. Their times are the PES times on the player's timeline; teletext
-times are bounded by the program clock as FFmpeg's demuxer bounds them, read
-from the transport packets offered to `TeletextTsBridge::observe`.
-`PgsTsTrack` hands each PES to `PgsBridge`. `Mp4DvdSetup` reads the colour
-table of an `mp4s` entry, and its `Mp4DvdTrack` hands each sample to
-`DvdReceiver`; a subpicture without a stop ends with its packet's duration.
-A Matroska VobSub track's `vobsub_settings` reads its palette and canvas; the
-DVD queue places pictures on that canvas.
-Teletext pages and closed captions become opaque ASS `TextSource`s, which
-`TextBridge` reports as it reports a Matroska ASS track's cues; an empty
-teletext page is a clear. A teletext decode needs the decoder's whole packet
-work in one budget. `CaptionBridge` takes H.264 or HEVC access units or MPEG-2
-PES payloads in decode order and decodes the caption frames FFmpeg's
-extraction settles, in its order. It is made with the track's `avcC` or `hvcC`
-record when its samples are length-prefixed, again after a seek: samples often
-carry no parameter sets, and pictures without them lose their captions. It
-charges one unit per packet byte and,
-per frame, the receiver's packet work for its size, each paid over as many
-polls as needed.
-
 **Sinks.** `pump::Sink` owns accepted `Feed` envelopes until their callbacks
 retire; `Submission::Blocked` returns the same envelope. Threading and
 platform decoder configuration are the sink's responsibility; no `Send` bound
@@ -283,13 +233,8 @@ is imposed.
 
 ## Conformance
 
-- Matroska: [codec mappings](https://www.ietf.org/archive/id/draft-ietf-cellar-codec-21.html).
-- MP4: ISO/IEC 14496-12 and the [QuickTime seek tables](https://developer.apple.com/documentation/quicktime-file-format/seeking_with_a_quicktime_file);
-  AV1 per the [AV1-ISOBMFF sample format](https://aomediacodec.github.io/av1-isobmff/v1.3.0.html#av1-sample-format).
-- MPEG-TS: ITU-T H.222.0 (§2.14.1 AVC delimiters); DVB subtitles per
-  [ETSI EN 300 468 §6.2.41](https://www.etsi.org/deliver/etsi_en/300400_300499/300468/01.18.01_60/en_300468v011801p.pdf),
-  teletext per ETSI EN 300 472.
-- Closed captions: ATSC A/53 Part 4 `cc_data()` in ITU-T T.35 SEI messages.
+- MP4: ISO/IEC 14496-12 and the [QuickTime seek tables](https://developer.apple.com/documentation/quicktime-file-format/seeking_with_a_quicktime_file).
+- MPEG-TS: ITU-T H.222.0.
 - AVC/HEVC parameter sets: ITU-T H.264 §7.3 and Annex B, ITU-T H.265.
 
 Integration tests in `tests/` replay authored and FFmpeg-generated fixtures
@@ -339,4 +284,5 @@ Fixture provenance: [AV1](tests/fixtures/av1/README.md),
 [subtitle probes](tests/fixtures/matroska-subtitle-probe/README.md),
 [subtitle bridges](tests/fixtures/subtitles/README.md),
 [terminal-media FFprobe records](tests/fixtures/terminal-matrix/README.md).
+The `triergon-hls` and `triergon-bridge` tests read their fixtures here too.
 Gates and measurement policy: [docs/quality.md](../../docs/quality.md).

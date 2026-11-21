@@ -152,7 +152,8 @@ impl Output {
     pub fn belongs_to(&self, pool: &Budget) -> bool {
         self.pool().same_pool(pool)
     }
-    pub(crate) fn pool(&self) -> &Budget {
+    /// The budget the output's storage is charged to.
+    pub fn pool(&self) -> &Budget {
         Self::event_budget(&self.event)
             .or(self.pool.as_ref())
             .expect("output without a payload budget retains its allocation budget")

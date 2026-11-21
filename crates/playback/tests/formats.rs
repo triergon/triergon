@@ -2334,11 +2334,11 @@ fn native_pressure_retries_instead_of_disabling_the_observer() {
 
 #[test]
 fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
+    use triergon_bridge::av1::{Av1BridgeSetup, Av1Input};
     use triergon_framing::{
         BuildStep,
         av1::{Av1ConfigLimits, Av1ObuLimits, Av1TemporalUnitLimits},
     };
-    use triergon_playback::av1_bridge::{Av1BridgeSetup, Av1Input};
 
     let mp4_raw = include_bytes!("fixtures/av1/six-frames.mp4");
     let mut dolby_entry = mp4_raw.to_vec();

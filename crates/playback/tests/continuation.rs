@@ -4,6 +4,10 @@ use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, AtomicUsize, Ordering},
 };
+use triergon_bridge::{
+    aac as aac_bridge, bitmap as bitmap_bridge, matroska as matroska_feed, text as text_bridge,
+    ts::dvb as dvb_ts,
+};
 use triergon_core::{
     Budget, Bytes, Error as C, InputCursor, SourceCapabilities, SourceId, Time, WorkBudget,
 };
