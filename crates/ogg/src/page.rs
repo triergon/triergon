@@ -2,9 +2,7 @@
 //! whole pages from incremental input, and a page writer for tests and fixture tools.
 use std::sync::atomic::AtomicBool;
 use triergon_bitstream::crc::Crc32Mpeg;
-use triergon_core::{
-    BudgetVec, Bytes, Error, InputCursor, InputRequest, Result, SourceLocation, Step, WorkBudget,
-};
+use triergon_core::{BudgetVec, Bytes, Error, InputCursor, Result, Step, WorkBudget};
 
 /// The page continues a packet from the previous page.
 pub const CONTINUED: u8 = 1;
@@ -231,19 +229,6 @@ pub(crate) struct PageReader {
     max_skip: u64,
 }
 
-/// What [`PageReader::next`] produced.
-#[derive(Debug)]
-pub(crate) enum PageStep {
-    Page(Page),
-    NeedInput(InputRequest),
-    Yield,
-    /// The input ended; a trailing partial page is counted in `skipped`.
-    End {
-        location: SourceLocation,
-        skipped: u64,
-    },
-}
-
 impl PageReader {
     pub(crate) fn new(input: &InputCursor, max_skip: u64) -> PageReader {
         PageReader {
@@ -269,6 +254,12 @@ impl PageReader {
         }
     }
 
+    /// Bytes skipped since the last page, a trailing partial page at the end of the input
+    /// included; the count starts again from zero.
+    pub(crate) fn take_skipped(&mut self) -> u64 {
+        std::mem::take(&mut self.skipped)
+    }
+
     fn skip(&mut self, bytes: usize) -> Result<()> {
         self.skipped += bytes as u64;
         if self.skipped > self.max_skip {
@@ -277,13 +268,14 @@ impl PageReader {
         Ok(())
     }
 
-    /// The next whole page.
+    /// The next whole page. At [`Step::End`], [`PageReader::take_skipped`] has the bytes
+    /// skipped since the last page.
     pub(crate) fn next(
         &mut self,
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<PageStep> {
+    ) -> Result<Step<Page>> {
         loop {
             if !self.buffer.is_empty() {
                 match examine(&self.buffer) {
@@ -318,20 +310,20 @@ impl PageReader {
                                 }
                             }
                         };
-                        return Ok(PageStep::Page(self.page(header, bytes, offset)));
+                        return Ok(Step::Ready(self.page(header, bytes, offset)));
                     }
                     Examined::Need(needed) => {
                         let missing = needed - self.buffer.len();
                         match input.read_append(&mut self.buffer, missing, work, cancel)? {
                             Step::Ready(_) => {}
-                            Step::NeedInput(request) => return Ok(PageStep::NeedInput(request)),
-                            Step::Yield => return Ok(PageStep::Yield),
+                            Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
+                            Step::Yield => return Ok(Step::Yield),
                             Step::Backpressure(never) => match never {},
                             Step::End(location) => {
                                 let partial = self.buffer.len();
                                 self.buffer.clear();
                                 self.skipped += partial as u64;
-                                return Ok(self.end(location));
+                                return Ok(Step::End(location));
                             }
                         }
                     }
@@ -341,8 +333,8 @@ impl PageReader {
             let offset = input.position();
             if input.buffered().is_empty() {
                 match input.read_discard(1, work, cancel)? {
-                    Step::NeedInput(request) => return Ok(PageStep::NeedInput(request)),
-                    Step::End(location) => return Ok(self.end(location)),
+                    Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
+                    Step::End(location) => return Ok(Step::End(location)),
                     _ => return Err(Error::Invalid("empty Ogg input window")),
                 }
             }
@@ -356,7 +348,7 @@ impl PageReader {
                 },
                 Examined::Page(header) if work.remaining() >= header.page_len() as u64 => {
                     return match input.read_span(header.page_len(), work, cancel)? {
-                        Step::Ready(bytes) => Ok(PageStep::Page(self.page(header, bytes, offset))),
+                        Step::Ready(bytes) => Ok(Step::Ready(self.page(header, bytes, offset))),
                         // The page is buffered and the work suffices.
                         _ => Err(Error::Invalid("buffered Ogg page")),
                     };
@@ -372,10 +364,10 @@ impl PageReader {
             };
             match step {
                 Step::Ready(_) => {}
-                Step::NeedInput(request) => return Ok(PageStep::NeedInput(request)),
-                Step::Yield => return Ok(PageStep::Yield),
+                Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
+                Step::Yield => return Ok(Step::Yield),
                 Step::Backpressure(never) => match never {},
-                Step::End(location) => return Ok(self.end(location)),
+                Step::End(location) => return Ok(Step::End(location)),
             }
         }
     }
@@ -385,13 +377,6 @@ impl PageReader {
             header,
             bytes,
             offset,
-            skipped: std::mem::take(&mut self.skipped),
-        }
-    }
-
-    fn end(&mut self, location: SourceLocation) -> PageStep {
-        PageStep::End {
-            location,
             skipped: std::mem::take(&mut self.skipped),
         }
     }

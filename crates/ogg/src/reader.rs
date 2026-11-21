@@ -2,7 +2,7 @@
 use crate::compat::clock::ReferenceClock;
 use crate::mapping::{Configuration, HeaderStep, Headers, Mapping, Previous};
 use crate::packets::{Assembler, Completed, Continuity};
-use crate::page::{MAX_PAGE, Page, PageHeader, PageReader, PageStep};
+use crate::page::{MAX_PAGE, Page, PageHeader, PageReader};
 use crate::queue::Queue;
 use crate::seek::{Bisection, Landing, Offer, Output, Probe};
 use crate::timing::{Clock, PageClock, Slot};
@@ -271,7 +271,7 @@ impl Reader {
                 },
             };
             match step {
-                PageStep::Page(page) => {
+                Step::Ready(page) => {
                     self.current = Some(Current {
                         page,
                         stream: None,
@@ -279,9 +279,11 @@ impl Reader {
                         next: 0,
                     });
                 }
-                PageStep::NeedInput(request) => return Ok(Step::NeedInput(request)),
-                PageStep::Yield => return Ok(Step::Yield),
-                PageStep::End { location, skipped } => {
+                Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
+                Step::Yield => return Ok(Step::Yield),
+                Step::Backpressure(never) => match never {},
+                Step::End(location) => {
+                    let skipped = self.pages.take_skipped();
                     if skipped > 0 {
                         self.pending.push(Event::Other(ReaderEvent::Resync {
                             offset: location.offset - skipped,
@@ -717,13 +719,17 @@ impl Reader {
         Ok(())
     }
 
-    fn end_scan(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<PageStep>> {
+    fn end_scan(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<Step<Page>>> {
         let Phase::EndScan { resume, chained } = &mut self.phase else {
             return Ok(None);
         };
         let resume = *resume;
         let step = match self.pages.next(&mut self.input, work, cancel) {
-            Ok(PageStep::Page(page)) => {
+            Ok(Step::Ready(page)) => {
                 let header = page.header;
                 if header.begin_of_stream()
                     && !self.streams.iter().any(|s| s.serial == header.serial)
@@ -742,8 +748,9 @@ impl Reader {
                 }
                 return Ok(None);
             }
-            Ok(PageStep::End { .. }) | Err(Error::Policy(_)) => None,
-            Ok(step @ (PageStep::NeedInput(_) | PageStep::Yield)) => return Ok(Some(step)),
+            Ok(Step::End(_)) | Err(Error::Policy(_)) => None,
+            Ok(step @ (Step::NeedInput(_) | Step::Yield)) => return Ok(Some(step)),
+            Ok(Step::Backpressure(never)) => match never {},
             Err(error) => return Err(error),
         };
         if *chained {
@@ -757,7 +764,7 @@ impl Reader {
         Ok(step)
     }
 
-    fn bisect(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<PageStep>> {
+    fn bisect(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<Step<Page>>> {
         let Phase::Bisect(bisection) = &mut self.phase else {
             return Ok(None);
         };
@@ -775,7 +782,7 @@ impl Reader {
             return Ok(None);
         }
         match self.pages.next(&mut self.input, work, cancel) {
-            Ok(PageStep::Page(page)) => {
+            Ok(Step::Ready(page)) => {
                 let known = self.streams.iter().any(|s| s.serial == page.header.serial)
                     || self
                         .tracks
@@ -788,7 +795,7 @@ impl Reader {
                 }
                 Ok(None)
             }
-            Ok(PageStep::End { .. }) | Err(Error::Policy(_)) => {
+            Ok(Step::End(_)) | Err(Error::Policy(_)) => {
                 if let Phase::Bisect(bisection) = &mut self.phase {
                     bisection.exhausted();
                 }
