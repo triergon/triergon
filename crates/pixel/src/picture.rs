@@ -118,21 +118,18 @@ impl Picture {
     }
     /// The visible samples of Cb row `row`; `None` when there is no such row.
     pub fn cb_row(&self, row: usize) -> Option<&[u8]> {
-        if row >= self.geometry.height / 2 {
-            return None;
-        }
-        let start = row.checked_mul(self.geometry.chroma_stride())?;
-        self.cb
-            .get(start..start.checked_add(self.geometry.width / 2)?)
+        self.chroma_row(&self.cb, row)
     }
     /// The visible samples of Cr row `row`; `None` when there is no such row.
     pub fn cr_row(&self, row: usize) -> Option<&[u8]> {
+        self.chroma_row(&self.cr, row)
+    }
+    fn chroma_row<'a>(&self, plane: &'a [u8], row: usize) -> Option<&'a [u8]> {
         if row >= self.geometry.height / 2 {
             return None;
         }
         let start = row.checked_mul(self.geometry.chroma_stride())?;
-        self.cr
-            .get(start..start.checked_add(self.geometry.width / 2)?)
+        plane.get(start..start.checked_add(self.geometry.width / 2)?)
     }
 
     /// A picture of luma 0 and chroma 128 throughout.
