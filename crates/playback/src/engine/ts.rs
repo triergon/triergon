@@ -83,12 +83,24 @@ impl Binding {
     }
 }
 
+/// How a TS engine's source entities end.
+#[derive(Debug)]
+pub(crate) enum Entities {
+    /// One entity, whose end ends the stream.
+    One,
+    /// A sequence of entities, each of whose ends is reported.
+    Sequence,
+    /// A sequence whose current entity reported this end, until the caller
+    /// continues with the next entity or finishes the logical source.
+    AtEnd(ts::stream::MediaEntityEnd),
+}
+
 /// The transport stream demuxer of one program: the engine of
 /// [`Engine::Ts`](crate::Engine::Ts) and of the PES feed.
 ///
-/// `ended` with `draining`, and `entity_sequence` with `entity_end` are each one
-/// state in two fields on purpose: `poll` tests them per carrier, and one enum for
-/// each pair cost 0.04 to 0.09% of the instructions of a program read.
+/// `ended` with `draining` is one state in two fields on purpose: `poll` tests
+/// them per carrier, and one enum for the pair cost 0.04% of the instructions of
+/// a program read.
 #[derive(Debug)]
 // Fields in the order the compiler chose for them, held by `repr(C)`.
 #[repr(C)]
@@ -101,9 +113,7 @@ pub struct TsEngine {
     pub(crate) pes_updates_from: Option<usize>,
     pub(crate) pes_pending: Option<FeedPacket>,
     pub(crate) pending: Option<TraceEvent>,
-    /// The reported end of the current entity, until the caller continues with
-    /// the next entity or finishes the logical source.
-    pub(crate) entity_end: Option<ts::stream::MediaEntityEnd>,
+    pub(crate) entities: Entities,
     pub(crate) limits: ts::ParseLimits,
     pub(crate) input: InputCursor,
     pub(crate) binding: Binding,
@@ -121,8 +131,6 @@ pub struct TsEngine {
     pub(crate) ended: bool,
     /// Whether the source ended and the stream and the tracks drain.
     pub(crate) draining: bool,
-    /// Whether the source is a sequence of entities, each of whose ends is reported.
-    pub(crate) entity_sequence: bool,
     pub(crate) namespace: DescriptorNamespace,
     pub(crate) delivery: Delivery,
 }
@@ -176,7 +184,9 @@ impl TsEngine {
         self.pes_clock = Some(DemuxClock::new(self.program)?);
         self.event_ordinal = 0;
         self.pes_updates_from = None;
-        self.entity_end = None;
+        if matches!(self.entities, Entities::AtEnd(_)) {
+            self.entities = Entities::Sequence;
+        }
         Ok(())
     }
     fn from_stream(
@@ -218,8 +228,7 @@ impl TsEngine {
             suppressed_events: 0,
             pes_updates_from: None,
             delivery: Delivery::Program,
-            entity_sequence: false,
-            entity_end: None,
+            entities: Entities::One,
         })
     }
 
@@ -602,9 +611,9 @@ impl TsEngine {
         if self.draining {
             return Err(Error::Invalid("TS repeated undrained entity End"));
         }
-        if self.entity_sequence {
+        if !matches!(self.entities, Entities::One) {
             if let Some(end) = self.stream.media_entity_end(&mut self.input, w, c)? {
-                self.entity_end = Some(end.clone());
+                self.entities = Entities::AtEnd(end.clone());
                 return T::project(FeedStep::EntityEnd(end));
             }
             return T::project(FeedStep::Yield);
@@ -709,7 +718,7 @@ impl TsEngine {
         if self.ended {
             return T::project(FeedStep::End);
         }
-        if self.entity_end.is_some() {
+        if matches!(self.entities, Entities::AtEnd(_)) {
             return T::project(FeedStep::AwaitEntity);
         }
         loop {

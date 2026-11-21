@@ -8,7 +8,7 @@ pub(crate) use mp4::{Mp4RangeLanding, Mp4SyncLanding};
 
 use crate::engine::matroska::MkvEngine;
 use crate::engine::mp4::Mp4Engine;
-use crate::engine::ts::{Delivery as TsDelivery, TsEngine};
+use crate::engine::ts::{Delivery as TsDelivery, Entities, TsEngine};
 use crate::event::EngineStep;
 use crate::source::SourceReply;
 use crate::{
@@ -281,7 +281,7 @@ impl Engine {
     ) -> Result<Self> {
         let engine = TsEngine::program(input, format, program, limits, policy, namespace)?;
         Ok(Self::Ts(TsEngine {
-            entity_sequence: true,
+            entities: Entities::Sequence,
             ..engine
         }))
     }
@@ -304,10 +304,9 @@ impl Engine {
         let Self::Ts(t) = self else {
             return Err(Error::Invalid("entity continuation requires TS source"));
         };
-        let end = t
-            .entity_end
-            .as_ref()
-            .ok_or(Error::Invalid("actual entity End required"))?;
+        let Entities::AtEnd(end) = &t.entities else {
+            return Err(Error::Invalid("actual entity End required"));
+        };
         if source == end.location().source {
             return Err(Error::SourceMismatch);
         }
@@ -316,18 +315,18 @@ impl Engine {
         }
         t.input.continue_source(source, caps)?;
         end.validate_continuation(&t.input)?;
-        t.entity_end = None;
+        t.entities = Entities::Sequence;
         Ok(())
     }
     pub(crate) fn finish_logical_source(&mut self) -> Result<()> {
         let Self::Ts(t) = self else {
             return Err(Error::Invalid("logical TS End required"));
         };
-        if t.entity_end.is_none() {
+        if !matches!(t.entities, Entities::AtEnd(_)) {
             return Err(Error::Invalid("actual source entity End required"));
         }
         t.stream.end_of_source()?;
-        t.entity_end = None;
+        t.entities = Entities::Sequence;
         t.draining = true;
         Ok(())
     }
