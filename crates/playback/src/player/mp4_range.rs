@@ -38,6 +38,8 @@ pub struct Mp4RangeOpen<'a> {
 }
 
 impl<'a> Mp4RangeOpen<'a> {
+    /// Range playback of every track of `movie`, with `edits` the encoded edit plans in
+    /// source track order.
     pub fn new(movie: &'a Movie, edits: Option<Edits<'a>>, limits: PlanLimits) -> Result<Self> {
         Self::open(movie, edits, limits, false)
     }
@@ -67,6 +69,7 @@ impl<'a> Mp4RangeOpen<'a> {
         })
     }
 
+    /// Indexes within `work`, and returns whether the index is complete.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         self.index.poll(work, cancel)
     }
@@ -121,14 +124,17 @@ pub struct Mp4RangePlayer<'a, S: Source> {
 }
 
 impl<'a, S: Source> Mp4RangePlayer<'a, S> {
+    /// The presentation duration in microseconds.
     pub fn duration_us(&self) -> i64 {
         self.duration_us
     }
 
+    /// Pauses or resumes delivery.
     pub fn pause(&mut self, paused: bool) -> Result<()> {
         self.player.pause(paused)
     }
 
+    /// Whether `output` belongs to the current generation.
     pub fn current(&self, output: &Output) -> bool {
         self.player.current(output)
     }
@@ -139,6 +145,9 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
         self.cursor.discard_seek_checkpoints()
     }
 
+    /// Reads the next output into `output`, the caller's one slot, within `work`. After
+    /// backpressure with an empty slot, it drops the seek checkpoints and tries once
+    /// more.
     pub fn read_output(
         &mut self,
         output: &mut Option<Output>,
@@ -298,6 +307,7 @@ struct SeekScope {
     target: Time,
 }
 
+/// Plans a range seek from the checked tables, within work budgets.
 #[derive(Debug)]
 pub struct Mp4RangeSeekJob<'a> {
     scope: SeekScope,
@@ -310,6 +320,9 @@ pub struct Mp4RangeSeekJob<'a> {
 }
 
 impl<'a> Mp4RangeSeekJob<'a> {
+    /// Plans within `work`, and returns whether the plan is complete. A failure is
+    /// final; it is `Limit` when the seek would replay more samples than its limits
+    /// allow.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -369,6 +382,8 @@ impl<'a> Mp4RangeSeekJob<'a> {
         }
     }
 
+    /// The planned seek. Fails with the job's failure, or with `Invalid` before the plan
+    /// is complete.
     pub fn finish(self) -> Result<Mp4RangeSeek<'a>> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -391,6 +406,7 @@ impl<'a> Mp4RangeSeekJob<'a> {
     }
 }
 
+/// A planned range seek for [`Mp4RangePlayer::apply_seek`].
 #[derive(Debug)]
 pub struct Mp4RangeSeek<'a> {
     scope: SeekScope,
@@ -400,14 +416,17 @@ pub struct Mp4RangeSeek<'a> {
 }
 
 impl Mp4RangeSeek<'_> {
+    /// The index entry the seek lands on; the same as `landing`.
     pub fn receipt(&self) -> &SeekLanding {
         self.landing()
     }
 
+    /// The index entry the seek lands on.
     pub fn landing(&self) -> &SeekLanding {
         &self.landing
     }
 
+    /// The byte offset of the first sample the seek reads.
     pub fn start_offset(&self) -> u64 {
         self.offset
     }

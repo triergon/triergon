@@ -11,9 +11,13 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, Rounding, Time, TimeBase, WorkBudget};
 
+/// A source-clock seek of an MP4 movie to the sync sample at or before `source_time`
+/// on track `video`.
 #[derive(Clone, Copy, Debug)]
 pub struct Mp4SyncSeekRequest {
+    /// The track ID of the video track.
     pub video: u32,
+    /// The target on the source clock.
     pub source_time: Time,
     /// Preserve this much audio decode time before the video sync point.
     pub audio_preroll: Time,
@@ -73,9 +77,11 @@ pub struct Mp4SyncSeekCommand {
 }
 
 impl Mp4SyncSeekCommand {
+    /// The byte offset of the first sample the seek reads.
     pub fn start_offset(&self) -> u64 {
         self.offset
     }
+    /// The ordinal of the video sync sample the seek lands on, in its track.
     #[cfg(feature = "reference-trace")]
     pub fn sync_ordinal(&self) -> u64 {
         self.sync_ordinal
@@ -99,6 +105,8 @@ impl Mp4SyncSeekCommand {
 }
 
 impl<S: Source> Player<S> {
+    /// Plans a source-clock seek of the indexed MP4 engine. Fails with `Invalid` for
+    /// another engine and with `Unsupported` on the demux clock.
     pub fn prepare_mp4_sync_seek(
         &self,
         request: Mp4SyncSeekRequest,
@@ -148,6 +156,7 @@ impl<S: Source> Player<S> {
         Ok(())
     }
 
+    /// Applies `command`; `false` when `work` ran out before the seek started.
     pub fn apply_mp4_sync_seek(
         &mut self,
         command: &Mp4SyncSeekCommand,
@@ -344,6 +353,8 @@ impl Mp4SyncSeekJob<'_> {
         Ok(Time::from_ticks(end, base)? > audio_from)
     }
 
+    /// The seek command. Fails with the job's failure, or with `Invalid` before the plan
+    /// is complete.
     pub fn finish(self) -> Result<Mp4SyncSeekCommand> {
         if let Some(error) = self.failure {
             return Err(error);

@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
@@ -8,7 +9,6 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// Pending: `missing_docs`.
 pub mod compat;
 mod engine;
 mod event;
@@ -29,10 +29,14 @@ pub use player::{
     Mp4SyncSeekCommand, Mp4SyncSeekJob, Mp4SyncSeekRequest, Output, OutputScope, Player,
     PlayerPolicy, Progress, SeekIntent, Selection, State, TrackKey, TrackKind,
 };
+/// The container format of an input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Format {
+    /// Matroska or WebM.
     Matroska,
+    /// MP4 or QuickTime.
     Mp4,
+    /// An MPEG transport stream in this packet format.
     Ts(triergon_mpegts::PacketFormat),
 }
 pub use triergon_core::{Error, Result};

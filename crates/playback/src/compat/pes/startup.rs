@@ -18,12 +18,19 @@ use triergon_mpegts::{
     compat::input::{InputBootstrap, InputContext, InputStep},
     compat::pes::RegisteredCarriage,
 };
+/// One step of a TS [`Startup`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StartupStep {
+    /// The work budget ran out or the source is pending: advance again.
     Yield,
+    /// The window is read and the source is pending on the end of file: advance again
+    /// once it can reply.
     NeedEof,
+    /// The startup context is known: call `finish`.
     Ready,
 }
+/// Reads the startup context of a TS input before playback: a finite entity read
+/// whole up to its confirmed end, or an M2TS prefix ([`Self::new_m2ts_prefix`]).
 #[derive(Debug)]
 pub struct Startup<S: Source> {
     input: Option<InputCursor>,
@@ -35,6 +42,7 @@ pub struct Startup<S: Source> {
     context: Option<InputContext>,
     failed: bool,
 }
+/// A TS input with its startup context, ready for a player.
 #[derive(Debug)]
 pub struct BoundInput<S: Source> {
     input: InputCursor,
@@ -43,6 +51,9 @@ pub struct BoundInput<S: Source> {
     context: InputContext,
 }
 impl<S: Source> Startup<S> {
+    /// Startup of a finite TS entity that fits the input window and ends with a
+    /// confirmed end of file. Fails with `Invalid` unless `selected` is a TS input at
+    /// offset zero.
     pub fn new(selected: SelectedInput<S>) -> Result<Self> {
         let Format::Ts(format) = selected.format else {
             return Err(Error::Invalid("native startup requires TS selection"));
@@ -81,6 +92,8 @@ impl<S: Source> Startup<S> {
         Ok(startup)
     }
 
+    /// Reads within `w`. A failure closes the source and is final, except backpressure
+    /// or an allocation failure while reading an M2TS prefix.
     pub fn advance(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<StartupStep> {
         if self.failed {
             return Err(Error::Closed);
@@ -216,6 +229,8 @@ impl<S: Source> Startup<S> {
             }
         }
     }
+    /// The bound input. Fails with `Closed` after a failure and with `Invalid` before
+    /// `Ready`.
     pub fn finish(mut self) -> Result<BoundInput<S>> {
         if self.failed {
             return Err(Error::Closed);
@@ -334,6 +349,7 @@ impl PrefixRead {
 }
 
 impl<S: Source> BoundInput<S> {
+    /// The startup context the input was read with.
     pub fn context(&self) -> &InputContext {
         &self.context
     }

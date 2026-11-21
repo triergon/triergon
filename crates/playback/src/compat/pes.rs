@@ -79,8 +79,11 @@ pub fn open_private_audio(
 /// Explicit packet interpretation for one selected PID of a TS program.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Carriage {
+    /// A registered stream type, such as AVC, HEVC or ADTS AAC.
     Registered(RegisteredCarriage),
+    /// AC-3, E-AC-3 or DVB audio in private-stream PES.
     PrivateAudio(PrivateAudioCarriage),
+    /// DVB subtitles.
     DvbSubtitles,
     /// Resolve the established AAC and private-audio profiles from each active PMT.
     AudioFromPmt,
@@ -89,7 +92,9 @@ pub enum Carriage {
 /// Snapshot of a track's admitted carriage for one active source PMT.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AdmittedCarriage {
+    /// The track.
     pub track: TrackKey,
+    /// The PMT epoch the carriage was admitted in.
     pub configuration_epoch: u64,
     /// The resolved registered or private-audio carriage.
     pub carriage: Carriage,

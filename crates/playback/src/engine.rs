@@ -39,14 +39,18 @@ pub(crate) fn track_kind(kind: MediaKind) -> TrackKind {
     }
 }
 
+/// The demuxer of one container input, as a [`Player`](crate::Player) drives it.
 #[expect(
     clippy::large_enum_variant,
     reason = "bounded inline format state; no uncharged boxed parser"
 )]
 #[derive(Debug)]
 pub enum Engine {
+    /// A Matroska reader.
     Matroska(MkvEngine),
+    /// An indexed or progressive MP4 plan.
     Mp4(Mp4Engine),
+    /// A transport stream program.
     Ts(TsEngine),
 }
 
@@ -67,6 +71,9 @@ impl Engine {
         let source = reader.source();
         Self::Matroska(MkvEngine { reader, source })
     }
+    /// Plays the indexed MP4 `plan` over `input`, with packets of at most `maximum_packet`
+    /// bytes. Fails with `Unsupported` for a front demux plan, which
+    /// [`compat::mov::open_front`](crate::compat::mov::open_front) plays.
     pub fn mp4(input: InputCursor, plan: PreparedMp4, maximum_packet: usize) -> Result<Self> {
         let engine = Self::mp4_unattached(input, plan, maximum_packet)?;
         if matches!(&engine, Self::Mp4(mp4) if mp4.plan.demux_front) {
@@ -133,6 +140,8 @@ impl Engine {
         }
         Ok(Self::Mp4(engine))
     }
+    /// As [`Self::mp4`], continuing through later `moof` and `mdat` pairs within
+    /// `limits`. Fails with `Unsupported` for a front demux plan.
     pub fn mp4_progressive(
         input: InputCursor,
         plan: PreparedMp4,
@@ -203,6 +212,8 @@ impl Engine {
         }))
     }
 
+    /// Whether the engine delivers demux PES: a TS engine with selected PIDs, or one
+    /// that finds its segment's tracks.
     #[cfg(feature = "reference-trace")]
     pub fn delivers_demux_pes(&self) -> bool {
         matches!(self, Self::Ts(t) if t.delivery.discovers_tracks() || !t.pes_tracks.as_slice().is_empty())
@@ -265,6 +276,7 @@ impl Engine {
         t.draining = true;
         Ok(())
     }
+    /// The container format.
     pub fn format(&self) -> Format {
         match self {
             Self::Matroska(_) => Format::Matroska,
@@ -297,6 +309,7 @@ impl Engine {
         }
         Ok(())
     }
+    /// The source the engine reads.
     pub fn source(&self) -> SourceId {
         match self {
             Self::Matroska(m) => m.source,
@@ -304,6 +317,7 @@ impl Engine {
             Self::Ts(t) => t.input.source(),
         }
     }
+    /// The input generation; a seek starts a new one.
     pub fn generation(&self) -> u64 {
         match self {
             Self::Matroska(r) => r.generation(),
@@ -311,6 +325,7 @@ impl Engine {
             Self::Ts(r) => r.input.generation(),
         }
     }
+    /// The budget the engine's storage is charged to.
     pub fn pool(&self) -> &Budget {
         match self {
             Self::Matroska(r) => r.budget(),
@@ -318,6 +333,9 @@ impl Engine {
             Self::Ts(r) => r.input.budget(),
         }
     }
+    /// Hands a source reply to the engine, and returns whether it made progress: `false`
+    /// for `Pending` or empty data. A failure reply fails with `Transport` or
+    /// `Cancelled`.
     pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
         match self {
             Self::Mp4(r) => provide(&mut r.input, reply),
@@ -346,6 +364,8 @@ impl Engine {
             },
         }
     }
+    /// Demuxes within `w`. Fails with `Invalid` for a compact progressive TS engine,
+    /// which only its reader polls.
     pub fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<EngineStep> {
         match self {
             Self::Matroska(r) => Ok(EngineStep::from_matroska(r.step(w, c)?)),

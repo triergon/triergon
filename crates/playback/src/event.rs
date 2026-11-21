@@ -16,13 +16,18 @@ use triergon_mpegts::{
     clock::{ClockKey, SourceTimestamp},
 };
 use ts::compat::pes::{DemuxPacket, DemuxTimeView};
+/// One MP4 sample with its configuration and, on the demux view, its occurrence.
 #[derive(Clone, Debug)]
 pub struct Mp4Packet {
     /// Explicit native read boundary, independent of the full Source stream.
     /// Later Source packets remain present with `native == None`.
     pub front_read_boundary: Option<FrontReadBoundary>,
+    /// The sample and its payload.
     pub source: SourcePacket,
+    /// The configuration of the sample's description.
     pub configuration: Mp4Configuration,
+    /// The demux view's occurrence of the sample, with its clocks; `None` on the source
+    /// view.
     pub occurrence: Option<PacketOccurrence>,
     /// Sample trim from the associated encoded edit plan, in native skip-samples layout.
     pub encoded_skip_samples: Option<[u8; 10]>,
@@ -32,13 +37,21 @@ pub struct Mp4Packet {
 /// position is a receiver field, with no corresponding physical sample.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Mp4EmptyPacket {
+    /// The read boundary the packet reports.
     pub boundary: FrontReadBoundary,
+    /// The time base of `pts`, `dts` and `duration`.
     pub time_base: TimeBase,
+    /// The track's handler type.
     pub handler: [u8; 4],
+    /// The presentation time, in ticks of `time_base`.
     pub pts: i64,
+    /// The decode time, in ticks of `time_base`.
     pub dts: i64,
+    /// The duration, in ticks of `time_base`.
     pub duration: i64,
+    /// The byte position the packet reports.
     pub position: u64,
+    /// The packet flags the packet reports.
     pub flags: u32,
 }
 
@@ -46,8 +59,11 @@ pub struct Mp4EmptyPacket {
 /// retained sample declaration. It is never a complete Source packet.
 #[derive(Clone, Debug)]
 pub struct Mp4ShortPacket {
+    /// The bytes present of the truncated sample.
     pub prefix: ShortSample,
+    /// The configuration of the sample's description.
     pub configuration: Mp4Configuration,
+    /// The demux view's occurrence of the declared sample.
     pub occurrence: PacketOccurrence,
     /// Decoder trim attached to the recovered occurrence.
     pub encoded_skip_samples: Option<[u8; 10]>,
@@ -57,60 +73,103 @@ pub struct Mp4ShortPacket {
 /// confirmed physical end. The view ends without emitting a packet.
 #[derive(Clone, Debug)]
 pub struct Mp4MissingSample {
+    /// The sample the table declares.
     pub declared: triergon_isobmff::Sample,
+    /// Its track ID.
     pub track_id: u32,
+    /// The source's end.
     pub end: SourceLocation,
 }
 
+/// An event of an MP4 engine.
 #[derive(Clone, Debug)]
 pub enum Mp4Event {
+    /// A track's configuration, before its first packet and at each change.
     Configuration(Mp4Configuration),
+    /// A sample.
     Packet(Mp4Packet),
+    /// The demux view's empty packet.
     EmptyPacket(Mp4EmptyPacket),
+    /// The demux view's truncated packet.
     ShortPacket(Mp4ShortPacket),
+    /// The demux view's end at a first sample outside the source.
     MissingSample(Mp4MissingSample),
 }
 
+/// A transport stream source event with its clocks.
 #[derive(Debug)]
 pub struct TsEvent {
+    /// The source event.
     pub source: TraceEvent,
+    /// The PES presentation time, as coded and on the source clock.
     pub source_pts: Option<SourceTimestamp>,
+    /// The PES decode time, as coded and on the source clock.
     pub source_dts: Option<SourceTimestamp>,
+    /// The PES times on the program's demux clock.
     pub demux_clock: Option<DemuxTimeView>,
+    /// The program clock the times belong to.
     pub clock_key: Option<ClockKey>,
 }
 
+/// One event of an engine: a packet, a configuration or a source fact.
 #[derive(Debug)]
 pub enum Event {
+    /// A top-level box of a progressive MP4 source.
     Mp4Root(triergon_isobmff::boxes::BoxView),
+    /// The end of one entity of a TS entity sequence.
     EntityEnd(ts::stream::MediaEntityEnd),
+    /// A demux PES of a selected TS track.
     DemuxPes {
+        /// The PES and its payload spans.
         packet: DemuxPacket,
+        /// Its times on the program's demux clock.
         clock: DemuxTimeView,
     },
+    /// The carriage of a selected TS track, admitted from the active PMT.
     PesCarriage(AdmittedCarriage),
+    /// A selected TS track the demux view refuses.
     PesRefusal {
+        /// The track.
         track: TrackKey,
+        /// Why it is refused.
         error: Error,
+        /// The ordinal of the source event the refusal follows.
         source_event_ordinal: u64,
     },
+    /// A Matroska reader event.
     Matroska(MkvEvent),
+    /// An MP4 engine event.
     Mp4(Mp4Event),
+    /// A transport stream source event.
     Ts(TsEvent),
+    /// A seek started: later outputs belong to its generation.
     Seek(SeekIntent),
 }
 
+/// One step of an engine.
 #[derive(Debug)]
 #[expect(
     clippy::large_enum_variant,
     reason = "one bounded inline event; queue slots and all retained buffers use Budget; a per-event Box would add an untracked allocation"
 )]
 pub enum EngineStep {
+    /// An event.
     Event(Event),
+    /// The engine waits on this input request.
     NeedInput(InputRequest),
+    /// The work budget ran out.
     Yield,
+    /// The source ended and the engine drained.
     End,
-    Backpressure { requested: usize, available: usize },
+    /// The pool is full of output the caller still holds: release some, then
+    /// advance again.
+    Backpressure {
+        /// Bytes the step needed.
+        requested: usize,
+        /// Bytes the pool had free.
+        available: usize,
+    },
+    /// A TS entity ended: continue with the next entity or finish the logical source.
     AwaitEntity,
 }
 
@@ -147,6 +206,7 @@ impl Event {
         }
     }
 
+    /// The track the event belongs to, if any.
     pub fn track(&self) -> Option<TrackKey> {
         match self {
             Self::DemuxPes { packet, .. } => Some(TrackKey::Ts {
@@ -171,6 +231,7 @@ impl Event {
             _ => None,
         }
     }
+    /// The presentation time on the source clock, if the event has one.
     pub fn source_pts(&self) -> Result<Option<Time>> {
         match self {
             Self::Matroska(MkvEvent::Packet(p)) => Ok(p.source_pts()?),
@@ -184,6 +245,7 @@ impl Event {
             _ => Ok(None),
         }
     }
+    /// The presentation time on the demux clock, if the event has one.
     pub fn demux_pts(&self) -> Result<Option<Time>> {
         match self {
             Self::DemuxPes { clock, .. } => clock.pts90.map(|t| Time::new(t, 90_000)).transpose(),
@@ -219,6 +281,7 @@ impl Event {
             _ => Ok(None),
         }
     }
+    /// The payload length in bytes, or 0 for an event without one.
     #[inline]
     pub fn payload_bytes(&self) -> usize {
         match self {

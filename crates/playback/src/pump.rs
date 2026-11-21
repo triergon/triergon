@@ -11,47 +11,66 @@ use triergon_core::{
     BudgetVec, Error, InputCursor, InputToken, SourceCapabilities, SourceId, Time, WorkBudget,
 };
 
+/// Names one feed a pump handed to its sink; the sink reports its completion with it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FeedToken {
     scope: InputToken,
     ordinal: u64,
 }
 impl FeedToken {
+    /// The feed's position in the pump's order.
     pub fn ordinal(&self) -> u64 {
         self.ordinal
     }
 }
+/// One player output on its way to a sink.
 #[derive(Debug)]
 pub struct Feed {
     token: FeedToken,
     output: Output,
 }
 impl Feed {
+    /// The feed's token.
     pub fn token(&self) -> &FeedToken {
         &self.token
     }
+    /// The output.
     pub fn output(&self) -> &Output {
         &self.output
     }
+    /// Takes the output.
     pub fn into_output(self) -> Output {
         self.output
     }
 }
+/// A sink's answer to one feed.
 #[derive(Debug)]
 pub enum Submission {
+    /// The sink owns the feed until it reports this token complete.
     Accepted(FeedToken),
+    /// The sink is full: the same feed comes back for a later step.
     Blocked(Feed),
-    Failed { feed: Feed, error: Error },
+    /// The sink failed; the feed comes back.
+    Failed {
+        /// The feed.
+        feed: Feed,
+        /// Why the sink failed.
+        error: Error,
+    },
 }
+/// A consumer of player outputs, such as a decoder queue.
 pub trait Sink {
     /// Accepted means this sink owns the envelope; a hardware adapter retains it
     /// independently until its actual callback/native borrow has retired.
     fn submit(&mut self, feed: Feed) -> Submission;
+    /// The token of a feed that finished, if one did.
     fn completion(&mut self) -> Option<FeedToken>;
+    /// Pauses or resumes the consumer.
     fn pause(&mut self, paused: bool) -> Result<()>;
     /// Scope changes fence callbacks. This must not free a still-borrowed native
     /// buffer; those owners remain in the sink's callback/retirement registry.
     fn reset(&mut self, intent: &SeekIntent) -> Result<()>;
+    /// Stops the consumer.
     fn stop(&mut self);
 }
 /// Optional two-phase catalogue boundary for a sink with no outstanding feeds.
@@ -61,20 +80,33 @@ pub trait Sink {
 /// pause state; platform scheduling and
 /// native lifetime proof remain the caller's implementation responsibility.
 pub trait CatalogueSink: Sink {
+    /// Prepares for the outputs of `next`, reserving what the change needs.
     fn prepare_catalogue(&mut self, next: &crate::Engine) -> Result<()>;
+    /// Undoes `prepare_catalogue` after the change was refused.
     fn abandon_catalogue(&mut self);
+    /// Switches to the new catalogue, whose outputs begin at `boundary`.
     fn commit_catalogue(&mut self, boundary: crate::catalogue::CatalogueBoundary);
 }
+/// One step of a [`Pump`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PumpStep {
+    /// The work budget ran out or the step made progress: step again.
     Yield,
+    /// The player produced the next feed.
     Produced,
+    /// The sink accepted a feed.
     Fed,
+    /// The sink is full: step again once it completes a feed.
     SinkFull,
+    /// The in-flight bound is reached and no feed completed.
     InFlightFull,
+    /// The sink completed a feed the pump no longer tracks.
     StaleCompletion,
+    /// The pump is paused.
     Paused,
+    /// The source ended and every feed completed.
     Ended,
+    /// The pump stopped.
     Stopped,
 }
 enum CatalogueChange<'a> {
@@ -82,6 +114,7 @@ enum CatalogueChange<'a> {
     ProgressiveSeek(crate::catalogue::RangeSeek<'a>),
 }
 
+/// Moves a player's outputs into a sink, with a bounded number of feeds in flight.
 #[derive(Debug)]
 pub struct Pump<S: Source, T: Sink> {
     player: Option<Player<S>>,
@@ -95,6 +128,8 @@ pub struct Pump<S: Source, T: Sink> {
     ended: bool,
 }
 impl<S: Source, T: Sink> Pump<S, T> {
+    /// A pump with up to `maximum_in_flight` feeds in flight. Fails with `Invalid`
+    /// unless that is 1 to 64.
     pub fn new(player: Player<S>, sink: T, maximum_in_flight: usize) -> Result<Self> {
         if maximum_in_flight == 0 || maximum_in_flight > 64 {
             return Err(Error::Invalid("pump in-flight policy"));
@@ -127,15 +162,19 @@ impl<S: Source, T: Sink> Pump<S, T> {
             ended: false,
         })
     }
+    /// The player.
     pub fn player(&self) -> Option<&Player<S>> {
         self.player.as_ref()
     }
+    /// The sink.
     pub fn sink(&self) -> Option<&T> {
         self.sink.as_ref()
     }
+    /// The sink, mutably.
     pub fn sink_mut(&mut self) -> Option<&mut T> {
         self.sink.as_mut()
     }
+    /// The number of feeds the sink holds.
     pub fn in_flight(&self) -> usize {
         self.credits
             .as_slice()
@@ -143,9 +182,12 @@ impl<S: Source, T: Sink> Pump<S, T> {
             .filter(|s| s.is_some())
             .count()
     }
+    /// The feed the sink has not accepted yet, if any.
     pub fn pending(&self) -> Option<&Feed> {
         self.pending.as_ref()
     }
+    /// Pauses or resumes the sink, then the player. A sink failure stops the pump.
+    /// Fails with `Closed` once the pump stopped or the player ended.
     pub fn pause(&mut self, paused: bool) -> Result<()> {
         if self.stopped {
             return Err(Error::Closed);
@@ -164,6 +206,9 @@ impl<S: Source, T: Sink> Pump<S, T> {
         self.paused = paused;
         Ok(())
     }
+    /// Seeks the player to `target` on `track` with `selection`, then resets the sink
+    /// and forgets the feeds in flight; `false` when the player had no work to start
+    /// the seek. A sink failure stops the pump.
     pub fn seek_and_select(
         &mut self,
         track: TrackKey,
@@ -339,6 +384,8 @@ impl<S: Source, T: Sink> Pump<S, T> {
             Ok(PumpStep::StaleCompletion)
         }
     }
+    /// Completes, feeds or produces within `w`. Cancellation and a player failure stop
+    /// the pump.
     pub fn step(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<PumpStep> {
         if c.load(Ordering::Relaxed) {
             self.stop();
@@ -433,6 +480,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
             }
         }
     }
+    /// Stops the player, then the sink, and drops the feeds; once.
     pub fn stop(&mut self) {
         if self.stopped {
             return;
@@ -450,6 +498,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
         }
         self.stopped = true;
     }
+    /// Stops the pump and returns its sink.
     pub fn into_sink(mut self) -> Result<T> {
         self.stop();
         self.player = None;

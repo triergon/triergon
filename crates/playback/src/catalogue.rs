@@ -12,18 +12,25 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, InputRequest, SourceId};
 
+/// How a replacement catalogue plays its MP4 source.
 #[derive(Clone, Copy, Debug)]
 pub enum Mp4CatalogueMode {
+    /// An indexed plan, as [`Engine::mp4`] plays it.
     Indexed,
+    /// A progressive plan, as [`Engine::mp4_progressive`] plays it.
     Progressive(ProgressiveLimits),
     /// Explicit native view of a nonseekable MP4 starting with front metadata.
     NativeTerminalV1(ProgressiveLimits),
 }
 
+/// Where the outputs of a replacement catalogue begin.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CatalogueBoundary {
+    /// The new source.
     pub source: SourceId,
+    /// Its input generation.
     pub input_generation: u64,
+    /// The player's delivery epoch of its outputs.
     pub delivery_epoch: u64,
 }
 
@@ -36,6 +43,8 @@ pub struct Mp4Catalogue<S: Source> {
     pub(crate) source: SourceOwner<S>,
 }
 impl<S: Source> Mp4Catalogue<S> {
+    /// A candidate catalogue playing `plan` over `opened` in `mode`. Fails as the engine
+    /// constructor of `mode` does.
     pub fn new(
         opened: OpenedMp4<S>,
         plan: PreparedMp4,
@@ -69,9 +78,11 @@ impl<S: Source> Mp4Catalogue<S> {
             opened.movie,
         ))
     }
+    /// The candidate's engine.
     pub fn engine(&self) -> &Engine {
         &self.engine
     }
+    /// The candidate's source.
     pub fn source(&self) -> SourceId {
         self.engine.source()
     }
@@ -109,29 +120,36 @@ impl RetiredCatalogue {
             _ => None,
         }
     }
+    /// The retired engine, if the player had one.
     pub fn engine(&self) -> Option<&Engine> {
         self.engine.as_ref()
     }
+    /// The number of outputs still queued.
     pub fn queued(&self) -> usize {
         self.queue.len() - self.head
     }
+    /// The next queued output, in queue order.
     pub fn pop(&mut self) -> Option<Output> {
         let slot = self.queue.as_mut_slice().get_mut(self.head)?;
         let out = slot.take();
         self.head += 1;
         out
     }
+    /// The event the retired engine produced but the player had not queued.
     #[cfg(feature = "reference-trace")]
     pub fn pending_event(&self) -> Option<&Event> {
         self.pending.as_ref()
     }
+    /// The source of the pending event.
     #[cfg(feature = "reference-trace")]
     pub fn pending_source(&self) -> Option<SourceId> {
         self.pending_source
     }
+    /// The input request the player was waiting on.
     pub fn pending_request(&self) -> Option<&InputRequest> {
         self.request.as_ref()
     }
+    /// The seek the player was carrying out.
     pub fn seek_intent(&self) -> Option<SeekIntent> {
         self.seek
     }
@@ -161,6 +179,8 @@ pub struct CatalogueCommit<'a, S: Source> {
     pub(crate) seek: Option<(SeekIntent, Mp4RangeLanding<'a>)>,
 }
 impl<S: Source> CatalogueCommit<'_, S> {
+    /// Where the replacement's outputs will begin. Fails with `Invalid` when the
+    /// candidate is gone.
     pub fn boundary(&self) -> Result<CatalogueBoundary> {
         let engine = self.next_engine()?;
         Ok(CatalogueBoundary {
@@ -169,6 +189,7 @@ impl<S: Source> CatalogueCommit<'_, S> {
             delivery_epoch: self.epoch,
         })
     }
+    /// The candidate's engine. Fails with `Invalid` when the candidate is gone.
     pub fn next_engine(&self) -> Result<&Engine> {
         Ok(&self
             .next

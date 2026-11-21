@@ -15,16 +15,24 @@ use triergon_isobmff::{
     table::TimingRunPolicy,
 };
 
+/// An opened MP4 movie with the input and source it was read from.
 #[derive(Debug)]
 pub struct OpenedMp4<S: Source> {
+    /// The movie's metadata.
     pub movie: Movie,
+    /// The input cursor, after the metadata.
     pub input: InputCursor,
+    /// The source.
     pub source: SourceOwner<S>,
 }
+/// One step of an [`Mp4Open`].
 #[derive(Debug)]
 pub enum OpenProgress {
+    /// The work budget ran out: advance again.
     Yield,
+    /// The source is pending on this request: advance again once it can reply.
     NeedInput(triergon_core::InputRequest),
+    /// The movie is open: call `finish`.
     Ready,
 }
 pub(crate) fn word(b: &[u8], at: usize) -> Result<u32> {
@@ -41,6 +49,7 @@ fn check_format<S: Source>(selected: &SelectedInput<S>) -> Result<()> {
     }
     Ok(())
 }
+/// Opens the movie of a selected MP4 input: reads its metadata within work budgets.
 #[derive(Debug)]
 pub struct Mp4Open<S: Source> {
     input: Option<InputCursor>,
@@ -50,6 +59,8 @@ pub struct Mp4Open<S: Source> {
     failed: bool,
 }
 impl<S: Source> Mp4Open<S> {
+    /// An opener that refuses out-of-source, truncated and zero-timescale media. Fails
+    /// with `Invalid` unless `selected` is an MP4 input.
     pub fn new(selected: SelectedInput<S>, limits: OpenLimits) -> Result<Self> {
         check_format(&selected)?;
         let opener = MovieOpen::new(&selected.input, limits)?;
@@ -93,6 +104,8 @@ impl<S: Source> Mp4Open<S> {
             failed: false,
         }
     }
+    /// Reads metadata within `w`. A failure other than backpressure closes the source
+    /// and is final.
     pub fn advance(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<OpenProgress> {
         if self.failed {
             return Err(Error::Closed);
@@ -141,6 +154,8 @@ impl<S: Source> Mp4Open<S> {
             OpenStep::Ready => OpenProgress::Ready,
         })
     }
+    /// The opened movie. Fails with `Closed` after a failure and as the opener does
+    /// before `Ready`.
     pub fn finish(mut self) -> Result<OpenedMp4<S>> {
         if self.failed {
             return Err(Error::Closed);

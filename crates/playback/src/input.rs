@@ -8,6 +8,8 @@ use triergon_core::{
 /// Any external producer must be quiesced by abort before close releases its state.
 /// Neither pending nor an empty response signifies EOF. HTTP policy stays outside.
 pub trait Source {
+    /// Answers `request` within `work`, promptly: data, the end, a transport failure,
+    /// or `Pending`.
     fn poll(
         &mut self,
         request: &InputRequest,
@@ -18,20 +20,31 @@ pub trait Source {
     fn invalidate(&mut self);
     /// Wake/cancel any producer, and synchronously make its ownership quiescent.
     fn abort(&mut self);
+    /// Releases the source. It follows `abort`, and no call follows it.
     fn close(&mut self);
 }
+/// A source's answer to one input request.
 #[derive(Debug)]
 pub enum SourceReply {
+    /// Bytes at the requested offset. An empty window is not the end.
     Data(InputWindow),
+    /// The source ends at the requested offset.
     End {
+        /// The source the request named.
         source: SourceId,
+        /// The request's token.
         token: InputToken,
     },
+    /// The transport failed.
     Failed {
+        /// The source the request named.
         source: SourceId,
+        /// The request's token.
         token: InputToken,
+        /// How it failed.
         failure: SourceFailure,
     },
+    /// No answer yet: poll again later.
     Pending,
 }
 
@@ -45,6 +58,8 @@ pub struct ByteSource {
     closed: bool,
 }
 impl ByteSource {
+    /// A source of `bytes` as `source`, replying with at most `quantum` bytes. Fails with
+    /// `Invalid` when `quantum` is zero.
     pub fn new(source: SourceId, bytes: Bytes, quantum: usize) -> triergon_core::Result<Self> {
         if quantum == 0 {
             return Err(Error::Invalid("zero read quantum"));

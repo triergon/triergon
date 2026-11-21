@@ -1,3 +1,5 @@
+//! Source ownership and container probing: [`Probe`] selects Matroska, MP4, TS188 or
+//! M2TS192 from a bounded prefix, and the selected input replays that prefix.
 use crate::{
     Format, Result,
     input::{Source, SourceReply},
@@ -19,6 +21,7 @@ pub struct SourceOwner<S: Source> {
     aborted: bool,
 }
 impl<S: Source> SourceOwner<S> {
+    /// Takes ownership of `source`.
     pub fn new(source: S) -> Self {
         Self {
             source: Some(source),
@@ -36,11 +39,14 @@ impl<S: Source> SourceOwner<S> {
     pub(crate) fn source_mut(&mut self) -> Option<&mut S> {
         self.source.as_mut()
     }
+    /// Invalidates an outstanding range operation of the source.
     pub fn invalidate(&mut self) {
         if let Some(s) = self.source.as_mut() {
             s.invalidate();
         }
     }
+    /// Polls the source: `Pending` without work left, `Cancelled` when `c` is set, and
+    /// `Invalid` after `close`.
     pub fn poll(
         &mut self,
         r: &InputRequest,
@@ -58,6 +64,7 @@ impl<S: Source> SourceOwner<S> {
             .ok_or(Error::Invalid("source closed"))?
             .poll(r, w, c)
     }
+    /// Aborts the source, once.
     pub fn abort(&mut self) {
         if !self.aborted {
             if let Some(s) = self.source.as_mut() {
@@ -66,6 +73,7 @@ impl<S: Source> SourceOwner<S> {
             self.aborted = true;
         }
     }
+    /// Aborts, then closes the source, once.
     pub fn close(&mut self) {
         self.abort();
         if let Some(mut s) = self.source.take() {
@@ -78,6 +86,8 @@ impl<S: Source> Drop for SourceOwner<S> {
         self.close();
     }
 }
+/// Hands `reply` to `input`, and returns whether it made progress: `false` for
+/// `Pending` or empty data. A failure reply fails with `Transport` or `Cancelled`.
 pub fn provide(input: &mut InputCursor, reply: &SourceReply) -> Result<bool> {
     match reply {
         SourceReply::Pending => Ok(false),
@@ -102,16 +112,24 @@ pub fn provide(input: &mut InputCursor, reply: &SourceReply) -> Result<bool> {
         }
     }
 }
+/// An input whose container format is known, with its source.
 #[derive(Debug)]
 pub struct SelectedInput<S: Source> {
+    /// The input cursor, at offset zero.
     pub input: InputCursor,
+    /// The source.
     pub source: SourceOwner<S>,
+    /// The container format.
     pub format: Format,
 }
+/// One step of a [`Probe`].
 #[derive(Debug)]
 pub enum ProbeProgress {
+    /// The work budget ran out: advance again.
     Yield,
+    /// The source is pending on this request: advance again once it can reply.
     NeedInput(InputRequest),
+    /// The format is known: call `finish`.
     Selected(Format),
 }
 /// Original bounded signature selection. Filenames and caller expected output
@@ -130,6 +148,7 @@ pub struct Probe<S: Source> {
     cache: BudgetVec<CachedWindow>,
 }
 impl<S: Source> Probe<S> {
+    /// A probe of `source`; `window` is the input window of the selected input.
     pub fn new(
         pool: &Budget,
         id: SourceId,
@@ -152,6 +171,9 @@ impl<S: Source> Probe<S> {
             cache: BudgetVec::new(pool),
         })
     }
+    /// Reads and checks the prefix within `w`. Fails with `Unsupported` when no
+    /// signature matches and with `Invalid` when both TS packet sizes match. A failure
+    /// other than backpressure closes the source and is final.
     pub fn advance(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<ProbeProgress> {
         if self.failed {
             return Err(Error::Closed);
@@ -254,6 +276,8 @@ impl<S: Source> Probe<S> {
             )),
         }
     }
+    /// The selected input, replaying the probed prefix. Fails with `Closed` after a
+    /// failure and with `Invalid` before selection.
     pub fn finish(mut self) -> Result<SelectedInput<ReplaySource<S>>> {
         if self.failed {
             return Err(Error::Closed);

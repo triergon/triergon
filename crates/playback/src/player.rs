@@ -11,25 +11,45 @@ mod mp4_sync_seek;
 pub use mp4_demux_seek::{Mp4DemuxSeekCommand, Mp4DemuxSeekJob, Mp4DemuxSeekRequest};
 pub use mp4_range::{Mp4RangeOpen, Mp4RangePlayer, Mp4RangeSeek, Mp4RangeSeekJob};
 pub use mp4_sync_seek::{Mp4SyncSeekCommand, Mp4SyncSeekJob, Mp4SyncSeekRequest};
+/// A track of a source.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TrackKey {
+    /// A Matroska track by its track number.
     Matroska(u64),
+    /// An MP4 track by its track ID.
     Mp4(u32),
-    Ts { program: u16, pid: u16 },
+    /// A transport stream track.
+    Ts {
+        /// The program number.
+        program: u16,
+        /// The elementary stream PID.
+        pid: u16,
+    },
 }
+/// The kind of a track.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TrackKind {
+    /// Video.
     Video,
+    /// Audio.
     Audio,
+    /// Subtitles.
     Subtitle,
+    /// Data and unknown tracks.
     Other,
 }
+/// The tracks a player delivers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Selection {
+    /// Every track.
     All,
+    /// At most one track of each kind; each must exist, be enabled and be of its kind.
     Tracks {
+        /// The video track.
         video: Option<TrackKey>,
+        /// The audio track.
         audio: Option<TrackKey>,
+        /// The subtitle track.
         subtitle: Option<TrackKey>,
     },
 }
@@ -73,24 +93,41 @@ impl Selection {
         Ok(())
     }
 }
+/// A seek a player carries out.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SeekIntent {
+    /// The video track the target is on.
     pub track: TrackKey,
+    /// The target time.
     pub target: Time,
+    /// Whether the engine reads the source again from its start to reach the target.
     pub replay_from_start: bool,
+    /// The clock the target is on.
     pub clock: ClockChoice,
 }
+/// The clock a player times packets with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClockChoice {
+    /// The source's own timestamps.
     Source,
+    /// The demux view's packet clocks, as FFmpeg's demuxers report them.
     Demux,
 }
+/// How a caller delivers an output.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Delivery {
+    /// A source fact without a track, such as a configuration.
     Source,
+    /// A packet of a track outside the selection.
     Unselected,
-    DecodeOnly { until: Time },
+    /// A packet before the seek target: decode it, but do not present it.
+    DecodeOnly {
+        /// The seek target.
+        until: Time,
+    },
+    /// A packet to present.
     Present,
+    /// A packet without a presentation time on the player's clock.
     UnknownTime,
 }
 /// The source, pool, session, epoch and generation an output belongs to, kept
@@ -115,6 +152,8 @@ impl OutputScope {
     }
 }
 
+/// One output of a player: an event with its delivery and the playback state it
+/// belongs to.
 #[derive(Debug)]
 pub struct Output {
     source: triergon_core::SourceId,
@@ -146,9 +185,11 @@ impl Output {
         })
     }
 
+    /// The source the output came from.
     pub fn source_id(&self) -> triergon_core::SourceId {
         self.source
     }
+    /// Whether the output's storage is charged to `pool`.
     pub fn belongs_to(&self, pool: &Budget) -> bool {
         self.pool().same_pool(pool)
     }
@@ -190,6 +231,7 @@ impl Output {
             generation: self.generation,
         }
     }
+    /// The event.
     pub fn event(&self) -> &Event {
         &self.event
     }
@@ -198,15 +240,19 @@ impl Output {
     pub fn packet(&self) -> Option<crate::Packet<'_>> {
         self.event.packet()
     }
+    /// How to deliver the event.
     pub fn delivery(&self) -> Delivery {
         self.delivery
     }
+    /// The delivery epoch; each seek and selection change starts a new one.
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
+    /// The input generation the output was read in.
     pub fn generation(&self) -> u64 {
         self.generation
     }
+    /// Takes the event.
     pub fn into_event(self) -> Event {
         self.event
     }
@@ -240,21 +286,32 @@ impl MatroskaReplayOutput {
     }
 }
 
+/// The state of a player.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum State {
+    /// Reading and delivering.
     Running,
+    /// Paused by the caller.
     Paused,
+    /// The source ended.
     Ended,
+    /// Stopped by the caller.
     Stopped,
+    /// Cancelled through the cancel flag.
     Cancelled,
+    /// Ended by a failure.
     Failed,
 }
+/// Bounds of a player.
 #[derive(Clone, Copy, Debug)]
 pub struct PlayerPolicy {
+    /// The output queue's slots, 1 to 64 (16 by default).
     pub slots: usize,
+    /// The most payload bytes queued (32 MiB by default); nonzero.
     pub queued_payload_bytes: usize,
     /// Input consumed before the seek reference track reaches the requested time.
     pub seek_input_bytes: u64,
+    /// The most events the player reads (10,000,000 by default); nonzero.
     pub maximum_events: u64,
 }
 impl Default for PlayerPolicy {
@@ -267,15 +324,30 @@ impl Default for PlayerPolicy {
         }
     }
 }
+/// One step of a player.
 #[derive(Debug)]
 pub enum Progress {
+    /// The work budget ran out: advance again.
     Yield,
+    /// An output was queued: pop it.
     Queued,
+    /// The source is pending on this request: provide a reply or advance again.
     NeedInput(InputRequest),
+    /// The player is paused.
     Paused,
+    /// The source ended.
     Ended,
+    /// The player stopped.
     Stopped,
-    Backpressure { requested: usize, available: usize },
+    /// The pool is full of output the caller still holds: release some, then
+    /// advance again.
+    Backpressure {
+        /// Bytes the step needed.
+        requested: usize,
+        /// Bytes the pool had free.
+        available: usize,
+    },
+    /// A TS entity ended: continue with the next entity or finish the logical source.
     AwaitEntity,
 }
 #[derive(Clone, Copy, Debug)]
@@ -400,6 +472,8 @@ fn mp4_seek_tick_comparison_keeps_exact_order() {
     }
 }
 
+/// Drives one engine over its source: reads within work budgets, classifies the
+/// delivery of each event, and queues outputs in a bounded FIFO.
 #[derive(Debug)]
 pub struct Player<S: Source> {
     engine: Option<Engine>,
@@ -425,6 +499,9 @@ pub struct Player<S: Source> {
     cancel: AtomicBool,
 }
 impl<S: Source> Player<S> {
+    /// A player of `engine` over `source`, delivering `selection`, with its FIFO
+    /// allocated. Fails with `Invalid` for a policy out of range or a selection the
+    /// engine's tracks do not have, and when the engine cannot start over this source.
     pub fn new(
         engine: Engine,
         source: SourceOwner<S>,
@@ -504,6 +581,8 @@ impl<S: Source> Player<S> {
         Ok(())
     }
 
+    /// Chooses the clock packets are timed with. Fails with `Invalid` once an event was
+    /// read.
     pub fn set_clock_view(&mut self, clock: ClockChoice) -> Result<()> {
         if self.count != 0 || self.pending.is_some() || self.events != 0 {
             return Err(Error::Invalid("clock view must be frozen before delivery"));
@@ -511,6 +590,7 @@ impl<S: Source> Player<S> {
         self.clock = clock;
         Ok(())
     }
+    /// The budget the player's storage is charged to.
     pub fn budget(&self) -> &Budget {
         &self.pool
     }
@@ -518,15 +598,19 @@ impl<S: Source> Player<S> {
     pub fn source_mut(&mut self) -> Option<&mut S> {
         self.source.as_mut().and_then(SourceOwner::source_mut)
     }
+    /// The seek in progress, if any.
     pub fn seek_intent(&self) -> Option<SeekIntent> {
         self.seek.map(|seek| seek.intent)
     }
+    /// The player's state.
     pub fn state(&self) -> State {
         self.state
     }
+    /// The number of queued outputs.
     pub fn queued(&self) -> usize {
         self.count
     }
+    /// The engine; `None` after the player stopped.
     pub fn engine(&self) -> Option<&Engine> {
         self.engine.as_ref()
     }
@@ -537,9 +621,12 @@ impl<S: Source> Player<S> {
             engine.reuse_pes_lists(pid, lists);
         }
     }
+    /// The input request the player waits on, if any.
     pub fn pending_request(&self) -> Option<&InputRequest> {
         self.request.as_ref()
     }
+    /// Whether `o` belongs to the player's current generation and epoch, and the player
+    /// is still running or paused.
     pub fn current(&self, o: &Output) -> bool {
         !matches!(
             self.state,
@@ -549,9 +636,11 @@ impl<S: Source> Player<S> {
             && self.generation == o.generation
             && self.epoch == o.epoch
     }
+    /// Whether `o` is current and the player is not paused.
     pub fn may_deliver(&self, o: &Output) -> bool {
         self.current(o) && self.state != State::Paused
     }
+    /// Pauses or resumes delivery. Fails with `Closed` unless running or paused.
     pub fn pause(&mut self, paused: bool) -> Result<()> {
         if !matches!(self.state, State::Running | State::Paused) {
             return Err(Error::Closed);
@@ -563,6 +652,7 @@ impl<S: Source> Player<S> {
         };
         Ok(())
     }
+    /// The next queued output; `None` when the queue is empty or the player is paused.
     pub fn pop(&mut self) -> Option<Output> {
         if self.count == 0 || self.state == State::Paused {
             return None;
@@ -610,12 +700,18 @@ impl<S: Source> Player<S> {
         }
         self.state = state;
     }
+    /// Aborts and closes the source and drops the queued outputs; the state becomes
+    /// `Stopped`.
     pub fn stop(&mut self) {
         self.shutdown(State::Stopped);
     }
+    /// As [`Self::stop`], with the state `Cancelled`.
     pub fn cancel(&mut self) {
         self.shutdown(State::Cancelled);
     }
+    /// Seeks to `target` on the video track `track` and switches to `selection`;
+    /// `false` when `w` had no work left. Outputs from before the seek are no longer
+    /// current. Fails with `Invalid` when `track` is not an enabled video track.
     pub fn seek_and_select(
         &mut self,
         track: TrackKey,
@@ -717,6 +813,9 @@ impl<S: Source> Player<S> {
         self.pending_source = self.engine.as_ref().map(Engine::source);
     }
 
+    /// Seeks to the media point `command` maps to, on the player's clock. Fails with
+    /// `Invalid` for an engine other than MP4, and with `ForeignPool` or
+    /// `SourceMismatch` for a command of another plan.
     pub fn apply_movie_seek(
         &mut self,
         command: &crate::mp4_plan::MovieSeekCommand,
@@ -763,6 +862,9 @@ impl<S: Source> Player<S> {
             }),
         }
     }
+    /// Continues a TS entity sequence with `next`, the source of the next entity, as
+    /// `id` with `caps`; `discontinuity` marks a clock discontinuity between them.
+    /// Returns `false` when `w` had no work left.
     pub fn continue_entity(
         &mut self,
         id: triergon_core::SourceId,
@@ -983,6 +1085,8 @@ impl<S: Source> Player<S> {
         }))
     }
 
+    /// Replaces the MP4 catalogue with `next`, preparing and committing in one call;
+    /// `None` when `w` had no work left.
     pub fn replace_mp4_catalogue(
         &mut self,
         next: &mut Option<crate::catalogue::Mp4Catalogue<S>>,
@@ -1034,6 +1138,8 @@ impl<S: Source> Player<S> {
         }
         retired
     }
+    /// Ends a TS entity sequence after its last entity; `false` when `w` had no work
+    /// left.
     pub fn finish_logical_source(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
         if c.load(Ordering::Relaxed) {
             self.cancel();
@@ -1051,6 +1157,9 @@ impl<S: Source> Player<S> {
             .finish_logical_source()?;
         Ok(true)
     }
+    /// Supplies a reply to the pending request, and returns whether the engine accepted
+    /// it. Fails with `Invalid` without a pending request, and with `Limit` for more
+    /// data than requested or more seek input than the policy allows.
     pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
         let r = self
             .request
@@ -1085,6 +1194,7 @@ impl<S: Source> Player<S> {
         }
         Ok(accepted)
     }
+    /// Reads, classifies and queues within `w`.
     pub fn advance(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<Progress> {
         self.drive::<false>(w, c, None, None)
     }

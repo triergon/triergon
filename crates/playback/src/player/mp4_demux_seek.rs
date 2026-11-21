@@ -22,11 +22,14 @@ use triergon_isobmff::{
     },
 };
 
+/// A demux-clock seek of an MP4 movie to `timestamp` on track `video`.
 #[derive(Clone, Copy, Debug)]
 pub struct Mp4DemuxSeekRequest {
+    /// The track ID of the reference video track.
     pub video: u32,
     /// Signed ticks in the reference track's native timebase.
     pub timestamp: i64,
+    /// Bounds of the index search.
     pub limits: SeekLimits,
 }
 
@@ -38,6 +41,7 @@ struct Anchor {
     row: usize,
 }
 
+/// Plans a demux-clock seek from the sample tables, within work budgets.
 #[derive(Debug)]
 pub struct Mp4DemuxSeekJob<'a> {
     plan: &'a PreparedMp4,
@@ -71,10 +75,12 @@ pub struct Mp4DemuxSeekCommand {
 }
 
 impl Mp4DemuxSeekCommand {
+    /// The index entry the seek lands on.
     pub fn receipt(&self) -> &SeekLanding {
         &self.receipt
     }
 
+    /// The byte offset of the first sample the seek reads.
     pub fn start_offset(&self) -> u64 {
         self.offset
     }
@@ -126,6 +132,8 @@ impl<S: Source> Player<S> {
         Mp4DemuxSeekJob::new(engine, movie, request, selection, Some(self.generation))
     }
 
+    /// Applies `command` by replacing the progressive player's catalogue with `next`;
+    /// `None` when `work` had no work left.
     pub fn apply_mp4_progressive_demux_seek(
         &mut self,
         next: &mut Option<Mp4Catalogue<S>>,
@@ -147,6 +155,7 @@ impl<S: Source> Player<S> {
         Ok(())
     }
 
+    /// Applies `command`; `false` when `work` ran out before the seek started.
     pub fn apply_mp4_demux_seek(
         &mut self,
         command: &Mp4DemuxSeekCommand,
@@ -283,6 +292,7 @@ pub(super) fn native_global_seek<'a>(
 }
 
 impl Mp4DemuxSeekJob<'_> {
+    /// Plans within `work`, and returns whether the plan is complete. A failure is final.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -388,6 +398,8 @@ impl Mp4DemuxSeekJob<'_> {
         Ok(true)
     }
 
+    /// The seek command. Fails with the job's failure, or with `Invalid` before the plan
+    /// is complete.
     pub fn finish(self) -> Result<Mp4DemuxSeekCommand> {
         if let Some(error) = self.failure {
             return Err(error);

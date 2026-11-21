@@ -63,6 +63,8 @@ impl Delivery {
     }
 }
 
+/// The transport stream demuxer of one program: the engine of
+/// [`Engine::Ts`](crate::Engine::Ts) and of the PES feed.
 #[derive(Debug)]
 pub struct TsEngine {
     /// The startup context the observers are bound to, if any.

@@ -42,11 +42,16 @@ pub(crate) enum PlanView {
     /// The MOV demux packet view.
     Demux,
 }
+/// Bounds of an MP4 index.
 #[derive(Clone, Copy, Debug)]
 pub struct PlanLimits {
+    /// The most tracks (64 by default).
     pub tracks: usize,
+    /// The most source samples (1,000,000 by default).
     pub samples: u64,
+    /// The most demux occurrences (1,000,000 by default).
     pub occurrences: u64,
+    /// The most media extents (4,096 by default).
     pub media_extents: usize,
 }
 impl Default for PlanLimits {
@@ -75,18 +80,30 @@ impl PlanLimits {
 #[derive(Clone, Debug)]
 pub struct TrackSnapshot(Arc<TrackMetadata>);
 
+/// The metadata of one track, shared by the plan and its packets.
 #[derive(Debug)]
 pub struct TrackMetadata {
+    /// The track ID.
     pub track_id: u32,
+    /// The media time base, when the media header states a usable one.
     pub base: SourceTimeBase,
+    /// The handler type, such as `vide` or `soun`.
     pub handler: [u8; 4],
+    /// Whether the track header enables the track.
     pub enabled: bool,
+    /// The track header box.
     pub raw_tkhd: BoxView,
+    /// The media header box.
     pub raw_mdhd: BoxView,
+    /// The handler box.
     pub raw_hdlr: BoxView,
+    /// The sample table box.
     pub raw_table: BoxView,
+    /// The edit box, if any.
     pub raw_edits: Option<BoxView>,
+    /// The data reference box.
     pub raw_dref: BoxView,
+    /// The track as the demux view reads it, or why the demux view leaves it out.
     pub demux_stream: std::result::Result<StreamView, Error>,
     _charge: Reservation,
 }
@@ -107,19 +124,27 @@ impl Deref for TrackSnapshot {
         &self.0
     }
 }
+/// The configuration of one track's sample description.
 #[derive(Clone, Debug)]
 pub struct Mp4Configuration {
+    /// The track's metadata.
     pub track: TrackSnapshot,
+    /// The sample description.
     pub description: SampleDescription,
+    /// The configuration revision; each change the engine publishes increases it.
     pub revision: u64,
 }
+/// One track of a plan.
 #[derive(Debug)]
 pub struct PlanTrack {
     pub(crate) trex: Option<iso::fragment::Trex>,
     pub(crate) next_ordinal: u64,
     pub(crate) fragment_aac_trim: u32,
+    /// The track's metadata.
     pub snapshot: TrackSnapshot,
+    /// The sample descriptions, in table order.
     pub descriptions: BudgetVec<SampleDescription>,
+    /// The edit list, if the track has one.
     pub edits: Option<EditList>,
 }
 impl PlanTrack {
@@ -141,9 +166,12 @@ impl PlanTrack {
         })
     }
 }
+/// One sample of a track, in the plan's order.
 #[derive(Clone, Debug)]
 pub struct SourceRow {
+    /// The track ID.
     pub track_id: u32,
+    /// The sample's table facts: byte range, clocks and flags.
     pub sample: Sample,
 }
 impl SourceRow {
@@ -207,12 +235,15 @@ impl PreparedMp4 {
         Ok(Some(extent.bytes().slice(start..end as usize)?))
     }
 
+    /// What the opener read before the media.
     pub fn read_scope(&self) -> crate::mp4_open::MetadataReadScope {
         self.read_scope
     }
+    /// The size-zero `mdat` that runs to the end of the source, if any.
     pub fn terminal_mdat(&self) -> Option<iso::payload::TerminalMdat> {
         self.terminal_mdat
     }
+    /// The movie header's time base.
     pub fn movie_base(&self) -> TimeBase {
         self.movie_base
     }
@@ -221,12 +252,15 @@ impl PreparedMp4 {
     pub fn source_rows(&self) -> &[SourceRow] {
         self.source_rows.as_slice()
     }
+    /// The demux view's occurrences, in delivery order.
     pub fn demux_rows(&self) -> &[PacketOccurrence] {
         self.demux_rows.as_slice()
     }
+    /// The plan's tracks.
     pub fn tracks(&self) -> &[PlanTrack] {
         self.tracks.as_slice()
     }
+    /// The top-level boxes the plan retains.
     #[cfg(feature = "reference-trace")]
     pub fn raw_roots(&self) -> &[BoxView] {
         self.raw_roots.as_slice()
@@ -255,6 +289,7 @@ impl PreparedMp4 {
             .checked_add(i64::from(packet.source.duration_ticks))?;
         Some(previous.max(end))
     }
+    /// The number of rows the engine reads in its view.
     pub fn rows(&self) -> usize {
         if self.demux_front && !self.demux_order_replay && self.encoded_edits.is_none() {
             return self.source_rows.len();
@@ -264,6 +299,7 @@ impl PreparedMp4 {
             PlanView::Demux => self.demux_rows.len(),
         }
     }
+    /// Row `at` of the engine's view, as a source row.
     pub fn row(&self, at: usize) -> Option<SourceRow> {
         if self.demux_front && !self.demux_order_replay && self.encoded_edits.is_none() {
             return self.source_rows.as_slice().get(at).cloned();
@@ -276,6 +312,7 @@ impl PreparedMp4 {
             }),
         }
     }
+    /// The plan track with ID `id`. Fails with `Invalid` for an unknown ID.
     pub fn track(&self, id: u32) -> Result<&PlanTrack> {
         self.tracks
             .as_slice()
@@ -283,6 +320,7 @@ impl PreparedMp4 {
             .find(|t| t.snapshot.track_id == id)
             .ok_or(Error::Invalid("unknown plan track"))
     }
+    /// Occurrence `at` of the demux view; `None` on the source view.
     pub fn demux_row(&self, at: usize) -> Option<&PacketOccurrence> {
         if self.view == PlanView::Demux {
             self.demux_rows.as_slice().get(at)
@@ -290,6 +328,8 @@ impl PreparedMp4 {
             None
         }
     }
+    /// The configuration of `row`'s sample description at `revision`. Fails with
+    /// `Invalid` for an unknown track or description.
     #[cfg(feature = "reference-trace")]
     pub fn config(&self, row: &SourceRow, revision: u64) -> Result<Mp4Configuration> {
         self.track(row.track_id)?
@@ -318,6 +358,7 @@ enum IndexPhase {
     Ready = 7,
 }
 
+/// Indexes an opened movie into a [`PreparedMp4`], within work budgets.
 pub struct Mp4IndexJob<'a> {
     movie: &'a Movie,
     plan: Option<PreparedMp4>,
@@ -749,6 +790,7 @@ impl<'a> Mp4IndexJob<'a> {
             first_sample_probe: None,
         })
     }
+    /// Indexes within `w`, and returns whether the plan is complete.
     pub fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
         if c.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
@@ -1178,6 +1220,7 @@ impl<'a> Mp4IndexJob<'a> {
         self.track += 1;
         Ok(false)
     }
+    /// The plan. Fails with `Invalid` before it is complete.
     pub fn finish(mut self) -> Result<PreparedMp4> {
         if self.phase != IndexPhase::Ready {
             return Err(Error::Invalid("playback plan not ready"));
@@ -1209,6 +1252,8 @@ pub struct MovieSeekJob<'a> {
     raw_media_clock: BoxView,
     raw_edits: Option<BoxView>,
 }
+/// A movie time mapped through a track's edit list, bound to the plan's source and
+/// generation.
 #[derive(Debug)]
 pub struct MovieSeekCommand {
     pub(crate) point: iso::seek::MoviePoint,
@@ -1228,19 +1273,26 @@ pub struct MovieSeekCommand {
     raw_edits: Option<BoxView>,
 }
 impl MovieSeekCommand {
+    /// The point the movie time maps to: a media time, an empty edit, or outside the
+    /// edits.
     pub fn point(&self) -> &iso::seek::MoviePoint {
         &self.point
     }
+    /// The track's media header box the mapping used.
     #[cfg(feature = "reference-trace")]
     pub fn raw_media_clock(&self) -> &BoxView {
         &self.raw_media_clock
     }
+    /// The track's edit box the mapping used, if any.
     #[cfg(feature = "reference-trace")]
     pub fn raw_edits(&self) -> Option<&BoxView> {
         self.raw_edits.as_ref()
     }
 }
 impl PreparedMp4 {
+    /// Maps `requested_movie_time` through the edit list of `track`, reading at most
+    /// `maximum_edits` edits. Fails with `Invalid` for an unknown track and when the
+    /// track has no media time base.
     pub fn movie_seek(
         &self,
         track: u32,
@@ -1270,9 +1322,11 @@ impl PreparedMp4 {
     }
 }
 impl MovieSeekJob<'_> {
+    /// Maps within `w`, and returns whether the mapping is complete.
     pub fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
         Ok(self.locator.poll(w, c)? == iso::BuildStatus::Ready)
     }
+    /// The command. Fails as the edit search does before it is complete.
     pub fn finish(self) -> Result<MovieSeekCommand> {
         Ok(MovieSeekCommand {
             point: self.locator.finish()?,
@@ -1285,10 +1339,18 @@ impl MovieSeekJob<'_> {
         })
     }
 }
+/// What applying a movie seek did.
 #[derive(Clone, Debug)]
 pub enum MovieSeekOutcome {
+    /// The seek started at this point.
     Applied(iso::seek::MovieSourcePoint),
+    /// The work budget ran out: apply again.
     Yield,
+    /// The movie time falls in an empty edit, where nothing plays.
     Empty(iso::seek::MovieEmptyEdit),
-    Outside { requested_movie_time: Time },
+    /// The movie time lies outside the edits.
+    Outside {
+        /// The requested movie time.
+        requested_movie_time: Time,
+    },
 }

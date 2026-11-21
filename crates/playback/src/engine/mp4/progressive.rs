@@ -14,12 +14,18 @@ use triergon_isobmff::{
     fragment::{FragmentBuilder, FragmentContext, ImplicitBase, OwnedFragmentCursor},
 };
 
+/// Bounds of progressive MP4 playback through later fragments.
 #[derive(Clone, Copy, Debug)]
 pub struct ProgressiveLimits {
+    /// The largest metadata box read whole, in bytes (16 MiB by default); at least 8.
     pub metadata_bytes: usize,
+    /// The most top-level boxes read (1,000,000 by default); nonzero.
     pub roots: u64,
+    /// The most fragments merged in one batch, 1 to 64 (64 by default).
     pub fragments_per_batch: usize,
+    /// The most samples pending in one batch (65,536 by default); nonzero.
     pub samples_per_batch: usize,
+    /// Box parse bounds.
     pub format: iso::Limits,
 }
 impl Default for ProgressiveLimits {
