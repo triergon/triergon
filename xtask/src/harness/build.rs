@@ -827,7 +827,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 21] = [
+const PROFILE_REFERENCES: &[ProfileReference] = &[
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
