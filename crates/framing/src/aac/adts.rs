@@ -1,6 +1,7 @@
 //! ADTS: the header, complete AAC LC frames of one raw data block, and the writer
 //! that wraps a raw access unit. Payload and CRC are kept as bytes, neither decoded
 //! nor checked. No timing is derived.
+use crate::retryable;
 use crate::{
     BuildStep,
     aac::{AacAscFacts, AacSource, indexed_frequency},
@@ -621,7 +622,7 @@ impl AacAdtsWriter {
         }
         let result = self.advance(work, cancel);
         if let Err(e) = result
-            && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(e)
         {
             self.failure = Some(e);
             self.input = None;

@@ -1,6 +1,7 @@
 //! AC-3 and E-AC-3 syncframe headers (ATSC A/52:2018) and the frames they declare.
 //! A frame is returned whole without further checks: its CRCs, the rest of its bit
 //! stream information and its audio blocks are not read.
+use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::bits_at;
 use triergon_core::{
@@ -876,7 +877,7 @@ impl Ac3FrameReader {
         }
         let result = self.step_inner(work, cancel);
         if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(error)
         {
             self.stop(error);
         }

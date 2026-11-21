@@ -2,6 +2,7 @@
 //! fields, arrays and NAL unit headers, within bounded extents. NAL unit payloads
 //! are not read.
 use crate::inline_storage::InlineStorage;
+use crate::retryable;
 use crate::{
     BuildStep, ConfigProgress,
     nal::{Codec, LengthSize, NalHeader},
@@ -475,7 +476,7 @@ impl HvcConfigParser {
             Ok(progress)
         });
         if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(error)
         {
             self.failure = Some(error);
             self.raw = None;

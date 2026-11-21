@@ -4,6 +4,7 @@ mod phases;
 
 use super::carrier::AacAdtsCarrier;
 use super::{AacAdtsFrame, AacAdtsHeader};
+use crate::retryable;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
@@ -388,7 +389,7 @@ impl AacAdtsStreamReader {
         }
         let result = self.advance(work, cancel);
         if let Err(e) = result
-            && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(e)
         {
             self.stop(e);
         }

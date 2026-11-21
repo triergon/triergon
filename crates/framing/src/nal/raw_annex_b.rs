@@ -1,5 +1,6 @@
 //! Ordered access-unit bytes for an Annex B source, without a container clock.
 
+use crate::retryable;
 use crate::{
     avc::picture::AvcPictures,
     hevc,
@@ -381,7 +382,7 @@ impl RawAnnexBReader {
         self.healthy()?;
         let result = self.advance(work, cancel);
         if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(error)
         {
             self.stop(error);
         }

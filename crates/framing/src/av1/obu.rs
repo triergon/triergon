@@ -1,6 +1,7 @@
 //! Open bitstream units of AV1 v1.0.0 with Errata 1 (§5.3): headers, sizes and
 //! payload spans. Payloads stay unread: no operating point is selected, no
 //! trailing bits are removed and no frame is assembled.
+use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
@@ -450,7 +451,7 @@ impl Av1ObuReader {
         }
         let result = self.step_inner(work, cancel);
         if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(error)
         {
             self.stop(error);
         }

@@ -3,6 +3,7 @@
 //! output byte traceable to its source.
 //! NAL bodies stay opaque; this does not establish access-unit/decoder validity.
 mod phases;
+use crate::retryable;
 use phases::AvcBufferingLookahead;
 
 use crate::inline_storage::InlineStorage;
@@ -1524,7 +1525,7 @@ impl<M> NalPacketJob<'_, M> {
         }
         let result = self.advance_into(work, cancel, ready);
         if let Err(e) = result
-            && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(e)
         {
             self.fail(e);
         }

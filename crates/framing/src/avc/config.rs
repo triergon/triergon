@@ -2,6 +2,7 @@
 //! amendment. NAL bodies, sample-entry rules and record/SPS consistency are not
 //! decoded or certified here.
 use crate::inline_storage::InlineStorage;
+use crate::retryable;
 use crate::{
     BuildStep, ConfigProgress,
     nal::{Codec, LengthSize, NalHeader},
@@ -512,7 +513,7 @@ impl AvcConfigParser {
             Ok(progress)
         });
         if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+            && !retryable(error)
         {
             self.failure = Some(error);
             self.raw = None;
