@@ -5,10 +5,10 @@ use crate::AssemblyStep;
 use crate::compat::pes::{DemuxObserver, ReadyContinuation, SourceContext};
 use crate::compat::pes::{DemuxProfile, DemuxScope, DemuxSpan, RegisteredCarriage};
 use crate::psi::POINTER_FIELD;
-use crate::transport::ContinuityOutcome;
 use crate::transport::SYNC_BYTE;
 use crate::transport::carrier::TS188_BYTES;
 use crate::transport::framer::FramedCarrier;
+use crate::transport::{ContinuityOutcome, TransportPacket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{InputCursor, Step, WorkBudget};
 use triergon_core::{InputWindow, SourceCapabilities};
@@ -652,8 +652,10 @@ fn rejected_pes_payload_stays_available_for_a_drained_retry() {
     packet.source_id = Some(SOURCE);
     let address = packet.payload.as_ref().unwrap().storage_address();
     let expected = packet.payload.as_ref().unwrap().as_ref().to_vec();
-    feed.stream.packet = Some(packet);
-    feed.stream.stage = Stage::Payload;
+    feed.stream.held = Some(Held {
+        packet,
+        stage: Stage::Payload,
+    });
     let mut work = WorkBudget::new(limits.pes_bytes as u64);
     assert_eq!(
         feed.stream.feed::<true>(&mut work),
@@ -661,15 +663,16 @@ fn rejected_pes_payload_stays_available_for_a_drained_retry() {
     );
     let payload = feed
         .stream
-        .packet
+        .held
         .as_ref()
         .unwrap()
+        .packet
         .payload
         .as_ref()
         .unwrap();
     assert_eq!(payload.storage_address(), address);
     assert_eq!(payload.as_ref(), expected);
-    assert_eq!(feed.stream.stage, Stage::Payload);
+    assert_eq!(feed.stream.held.as_ref().unwrap().stage, Stage::Payload);
     assert!(matches!(
         feed.stream.routes.as_mut_slice()[0]
             .assembler
@@ -680,8 +683,8 @@ fn rejected_pes_payload_stays_available_for_a_drained_retry() {
         AssemblyStep::NeedPayload
     ));
     feed.stream.feed::<true>(&mut work).unwrap();
-    assert_eq!(feed.stream.stage, Stage::Assemble);
-    assert!(feed.stream.packet.as_ref().unwrap().payload.is_none());
+    assert_eq!(feed.stream.held.as_ref().unwrap().stage, Stage::Assemble);
+    assert!(feed.stream.held.as_ref().unwrap().packet.payload.is_none());
 }
 
 #[test]
@@ -700,16 +703,25 @@ fn invalid_psi_pointer_restores_payload_before_diagnostic_recovery() {
     .unwrap();
     packet.source_id = Some(SOURCE);
     let address = packet.payload.as_ref().unwrap().storage_address();
-    stream.packet = Some(packet);
+    stream.held = Some(Held {
+        packet,
+        stage: Stage::Payload,
+    });
     stream.route = Route::Pat;
-    stream.stage = Stage::Payload;
     stream.feed::<false>(&mut WorkBudget::new(1)).unwrap();
-    assert_eq!(stream.stage, Stage::Release);
+    assert_eq!(stream.held.as_ref().unwrap().stage, Stage::Release);
     let PsiWork::Fault(fault) = &stream.psi else {
         panic!("PSI pointer fault not kept");
     };
     assert_eq!(fault.error, Error::Invalid(POINTER_FIELD));
-    let payload = stream.packet.as_ref().unwrap().payload.as_ref().unwrap();
+    let payload = stream
+        .held
+        .as_ref()
+        .unwrap()
+        .packet
+        .payload
+        .as_ref()
+        .unwrap();
     assert_eq!(payload.storage_address(), address);
     assert_eq!(payload.as_ref(), &raw[4..]);
 }

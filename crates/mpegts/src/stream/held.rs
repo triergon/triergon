@@ -7,7 +7,7 @@ use crate::pes::{Pes, PesAssembler};
 use crate::psi::POINTER_FIELD;
 use crate::psi::Section;
 use crate::retryable;
-use crate::transport::ContinuityOutcome;
+use crate::transport::{ContinuityOutcome, TransportPacket};
 use crate::transport::{SCRAMBLED_PAYLOAD, TRANSPORT_ERROR_INDICATOR};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Error, Result, SourceId, SourceLocation, WorkBudget};
@@ -16,8 +16,6 @@ use triergon_core::{Error, Result, SourceId, SourceLocation, WorkBudget};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub(super) enum Stage {
-    /// No carrier is in hand.
-    Read = 0,
     /// Check its continuity counter on its route.
     Continuity = 1,
     /// Apply a clock discontinuity or PCR if it is on the PCR PID.
@@ -32,6 +30,13 @@ pub(super) enum Stage {
     Refused = 8,
 }
 
+/// A carrier read from the framer and how far it has been processed.
+#[derive(Debug)]
+pub(super) struct Held {
+    pub(super) packet: TransportPacket,
+    pub(super) stage: Stage,
+}
+
 /// What checking the continuity of the carrier in hand found.
 pub(super) enum Counted {
     /// The work grant is spent; nothing changed.
@@ -41,14 +46,21 @@ pub(super) enum Counted {
 }
 
 impl TransportStream {
+    /// Advances the carrier in hand, if there is one.
+    pub(super) fn set_stage(&mut self, stage: Stage) {
+        if let Some(held) = self.held.as_mut() {
+            held.stage = stage;
+        }
+    }
+
     pub(super) fn observe(&mut self, work: &mut WorkBudget) -> Result<Counted> {
         if !work.try_charge(1) {
             return Ok(Counted::Yield);
         }
-        let packet = self
-            .packet
-            .as_ref()
-            .ok_or(Error::Invalid("TS packet missing"))?;
+        let Some(held) = self.held.as_mut() else {
+            return Err(Error::Invalid("TS packet missing"));
+        };
+        let packet = &held.packet;
         let outcome = match self.route {
             Route::Pat => Some(self.pat.continuity.observe(packet)?),
             Route::Pmt => Some(
@@ -80,7 +92,7 @@ impl TransportStream {
                 None | Some(ContinuityOutcome::First | ContinuityOutcome::Continuous)
             )
         {
-            self.stage = Stage::Clock;
+            held.stage = Stage::Clock;
         } else {
             self.observe_exception(outcome)?;
         }
@@ -90,10 +102,11 @@ impl TransportStream {
     /// The continuity stage of a damaged, scrambled, duplicate or discontinuous carrier.
     #[cold]
     fn observe_exception(&mut self, outcome: Option<ContinuityOutcome>) -> Result<()> {
-        let packet = self
-            .packet
+        let packet = &self
+            .held
             .as_ref()
-            .ok_or(Error::Invalid("TS packet missing"))?;
+            .ok_or(Error::Invalid("TS packet missing"))?
+            .packet;
         let pid = packet.pid;
         let start = packet.payload_unit_start;
         let bad = if packet.transport_error {
@@ -130,29 +143,31 @@ impl TransportStream {
                 error,
                 rejected: None,
             });
-            self.stage = if kind == FaultKind::Continuity
-                && start
-                && outcome != Some(ContinuityOutcome::ExcessDuplicate)
-            {
-                Stage::Clock
-            } else {
-                Stage::Release
-            };
+            self.set_stage(
+                if kind == FaultKind::Continuity
+                    && start
+                    && outcome != Some(ContinuityOutcome::ExcessDuplicate)
+                {
+                    Stage::Clock
+                } else {
+                    Stage::Release
+                },
+            );
         } else if outcome == Some(ContinuityOutcome::Duplicate) {
-            self.stage = Stage::Release;
+            self.set_stage(Stage::Release);
         } else {
-            self.stage = Stage::Clock;
+            self.set_stage(Stage::Clock);
         }
         Ok(())
     }
 
     pub(super) fn feed<const FEED: bool>(&mut self, work: &mut WorkBudget) -> Result<()> {
-        let packet = self
-            .packet
-            .as_ref()
-            .ok_or(Error::Invalid("TS packet missing"))?;
+        let Some(held) = self.held.as_mut() else {
+            return Err(Error::Invalid("TS packet missing"));
+        };
+        let packet = &mut held.packet;
         if packet.payload.is_none() {
-            self.stage = Stage::Release;
+            held.stage = Stage::Release;
             return Ok(());
         }
         let entity = packet.source_id.ok_or(Error::SourceMismatch)?;
@@ -164,11 +179,11 @@ impl TransportStream {
                 return self.feed_section::<FEED>(entity, pusi, offset, work);
             }
             Route::Clock | Route::Ignore => {
-                self.stage = Stage::Release;
+                held.stage = Stage::Release;
                 return Ok(());
             }
         };
-        let payload = &mut self.packet.as_mut().expect("TS packet present").payload;
+        let payload = &mut packet.payload;
         let assembler = self.routes.as_mut_slice()[index]
             .assembler
             .as_mut()
@@ -184,7 +199,7 @@ impl TransportStream {
                 work,
             )
         {
-            self.stage = Stage::Release;
+            held.stage = Stage::Release;
             return Ok(());
         }
         let pushed = assembler.push(
@@ -194,7 +209,7 @@ impl TransportStream {
             offset,
         );
         match pushed {
-            Ok(()) => self.stage = Stage::Assemble,
+            Ok(()) => held.stage = Stage::Assemble,
             Err(rejected) => {
                 *payload = Some(rejected.value);
                 return Err(rejected.error);
@@ -213,10 +228,11 @@ impl TransportStream {
         offset: u64,
         work: &mut WorkBudget,
     ) -> Result<()> {
-        let packet = self
-            .packet
+        let packet = &self
+            .held
             .as_ref()
-            .ok_or(Error::Invalid("TS packet missing"))?;
+            .ok_or(Error::Invalid("TS packet missing"))?
+            .packet;
         let payload = packet
             .payload
             .as_ref()
@@ -252,10 +268,13 @@ impl TransportStream {
                 };
             }
             work.take(length);
-            self.stage = Stage::Release;
+            self.set_stage(Stage::Release);
             return Ok(());
         }
-        let payload = &mut self.packet.as_mut().expect("TS packet present").payload;
+        let Some(held) = self.held.as_mut() else {
+            return Err(Error::Invalid("TS packet missing"));
+        };
+        let payload = &mut held.packet.payload;
         let assembler = if self.route == Route::Pat {
             &mut self.pat.assembler
         } else {
@@ -272,7 +291,7 @@ impl TransportStream {
             offset,
         );
         match pushed {
-            Ok(()) => self.stage = Stage::Assemble,
+            Ok(()) => held.stage = Stage::Assemble,
             Err(rejected) => {
                 *payload = Some(rejected.value);
                 if rejected.error != Error::Invalid(POINTER_FIELD) {
@@ -289,21 +308,21 @@ impl TransportStream {
                     error: rejected.error,
                     rejected: None,
                 });
-                self.stage = Stage::Release;
+                self.set_stage(Stage::Release);
             }
         }
         Ok(())
     }
     #[cold]
     pub(super) fn discard_faulted_route(&mut self, error: Error) -> TraceEvent {
-        let pid = self.packet.as_ref().map(|packet| packet.pid);
+        let pid = self.held.as_ref().map(|held| held.packet.pid);
         let kind = if matches!(self.route, Route::Pes(_)) {
             FaultKind::Pes
         } else {
             FaultKind::Psi
         };
         self.discard_route(self.route);
-        self.stage = Stage::Release;
+        self.set_stage(Stage::Release);
         self.diagnostic(kind, pid, error)
     }
 
@@ -357,7 +376,7 @@ impl TransportStream {
         };
         match result {
             Ok(true) => {
-                self.stage = Stage::Release;
+                self.set_stage(Stage::Release);
                 Ok(None)
             }
             Ok(false) => Ok(None),
@@ -392,7 +411,7 @@ impl TransportStream {
         });
         match result {
             Ok(true) => {
-                self.stage = Stage::Release;
+                self.set_stage(Stage::Release);
                 Ok(None)
             }
             Ok(false) => Ok(None),

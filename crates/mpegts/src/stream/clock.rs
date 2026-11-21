@@ -5,10 +5,11 @@ use triergon_core::{Error, Result};
 
 impl TransportStream {
     pub(super) fn clock_transition(&mut self) -> Result<Option<TraceEvent>> {
-        let packet = self
-            .packet
+        let packet = &self
+            .held
             .as_ref()
-            .ok_or(Error::Invalid("TS packet missing"))?;
+            .ok_or(Error::Invalid("TS packet missing"))?
+            .packet;
         if self.pcr_pid != Some(packet.pid) {
             return Ok(None);
         }

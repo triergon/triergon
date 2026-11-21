@@ -13,7 +13,7 @@ impl TransportStream {
     /// Explicit logical discontinuity, at an entity boundary after jobs drain.
     /// Source IDs and core generations are not rewritten into clock/config epochs.
     pub fn discontinuity(&mut self) -> Result<()> {
-        if self.packet.is_some() || self.deferred_feed_events != 0 || self.psi.blocks_carriers() {
+        if self.held.is_some() || self.deferred_feed_events != 0 || self.psi.blocks_carriers() {
             return Err(Error::Invalid(
                 "discontinuity while TS operation is pending",
             ));
@@ -58,7 +58,7 @@ impl TransportStream {
             .ok_or(Error::Invalid("media entity End not observed"))?;
         if self.logical_end
             || self.finished
-            || self.packet.is_some()
+            || self.held.is_some()
             || self.psi.blocks_carriers()
             || self.boundary_event
             || location.source != input.source()
@@ -190,7 +190,7 @@ impl TransportStream {
 
     /// Call after an observed entity End and only when that is the logical EOF.
     pub fn end_of_source(&mut self) -> Result<()> {
-        if self.entity_end.is_none() || self.packet.is_some() || self.psi.blocks_carriers() {
+        if self.entity_end.is_none() || self.held.is_some() || self.psi.blocks_carriers() {
             return Err(Error::Invalid("logical EOF before TS entity drained"));
         }
         self.logical_end = true;

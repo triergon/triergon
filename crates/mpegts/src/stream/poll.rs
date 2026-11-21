@@ -3,7 +3,7 @@ use super::event::{CarrierObservation, CompactTraceEvent, FaultKind, TraceEvent,
 use super::feed::{FeedCarrier, FeedContinuation, FeedItem};
 use super::held::Counted;
 use super::tables::PsiWork;
-use super::{Route, Stage, TransportStream};
+use super::{Held, Route, Stage, TransportStream};
 use crate::SourceEpochs;
 use crate::pes::Pes;
 use crate::transport::carrier::{PlainContinuation, TransportObservation};
@@ -321,12 +321,11 @@ impl TransportStream {
     /// The carrier a feed consumer refused, for publication as a transport event.
     #[cold]
     fn take_refused(&mut self) -> Result<TransportPacket> {
-        let packet = self
-            .packet
+        let held = self
+            .held
             .take()
             .ok_or(Error::Invalid("TS packet missing"))?;
-        self.stage = Stage::Read;
-        Ok(packet)
+        Ok(held.packet)
     }
 
     /// The discontinuity event owed after [`TransportStream::discontinuity`].
@@ -366,7 +365,13 @@ impl TransportStream {
                 return Err(Error::Cancelled);
             }
             if FEED && self.deferred_feed_events != 0 {
-                if self.stage == Stage::Refused {
+                if matches!(
+                    self.held,
+                    Some(Held {
+                        stage: Stage::Refused,
+                        ..
+                    })
+                ) {
                     if work.remaining() == 0 {
                         return Ok(Step::Yield);
                     }
@@ -392,21 +397,22 @@ impl TransportStream {
             if work.remaining() == 0 {
                 return Ok(Step::Yield);
             }
-            if self.packet.is_some() {
-                match self.stage {
+            if let Some(held) = self.held.as_mut() {
+                match held.stage {
                     Stage::Continuity => {
                         let Counted::Done(outcome) = self.observe(work)? else {
                             return Ok(Step::Yield);
                         };
                         if FEED && self.feed_validated_carriers {
-                            let packet = self
-                                .packet
+                            let held = self
+                                .held
                                 .as_ref()
                                 .ok_or(Error::Invalid("TS packet missing"))?;
+                            let packet = &held.packet;
                             match outcome {
                                 Some(ContinuityOutcome::First | ContinuityOutcome::Continuous)
                                     if matches!(self.route, Route::Pes(_))
-                                        && self.stage == Stage::Clock =>
+                                        && held.stage == Stage::Clock =>
                                 {
                                     // Count the hidden continuity event after the
                                     // carrier so its full-trace ordinal is retained.
@@ -432,9 +438,10 @@ impl TransportStream {
                                 continue;
                             }
                             let pid = self
-                                .packet
+                                .held
                                 .as_ref()
                                 .ok_or(Error::Invalid("TS packet missing"))?
+                                .packet
                                 .pid;
                             if !matches!(
                                 outcome,
@@ -449,7 +456,7 @@ impl TransportStream {
                         }
                     }
                     Stage::Clock => {
-                        self.stage = Stage::Payload;
+                        held.stage = Stage::Payload;
                         if let Some(event) = self.clock_transition()? {
                             return Ok(ready(event));
                         }
@@ -461,11 +468,10 @@ impl TransportStream {
                         }
                     }
                     Stage::Release => {
-                        self.packet = None;
-                        self.stage = Stage::Read;
+                        self.held = None;
                     }
                     // A refused carrier is published only by a feed poll.
-                    Stage::Read | Stage::Refused => return Err(Error::Invalid("TS packet stage")),
+                    Stage::Refused => return Err(Error::Invalid("TS packet stage")),
                 }
                 continue;
             }
@@ -542,17 +548,21 @@ impl TransportStream {
                                     return Ok(Step::Yield);
                                 }
                                 Err(error) => {
-                                    self.packet = Some(carrier.into_packet()?);
-                                    self.stage = Stage::Refused;
+                                    self.held = Some(Held {
+                                        packet: carrier.into_packet()?,
+                                        stage: Stage::Refused,
+                                    });
                                     return Err(error);
                                 }
                             }
                             return Ok(ready(TraceEvent::Transport(carrier.into_packet()?)));
                         }
                         let packet = carrier.into_packet()?;
-                        self.stage = Stage::Continuity;
                         if FEED && self.feed_validated_carriers {
-                            self.packet = Some(packet);
+                            self.held = Some(Held {
+                                packet,
+                                stage: Stage::Continuity,
+                            });
                             continue 'events;
                         }
                         if OBSERVING
@@ -560,11 +570,17 @@ impl TransportStream {
                             && work.try_charge(OBSERVED_EVENT_WORK)
                         {
                             observe(CarrierObservation::Transport((&packet).into()));
-                            self.packet = Some(packet);
+                            self.held = Some(Held {
+                                packet,
+                                stage: Stage::Continuity,
+                            });
                             continue 'events;
                         }
                         let event = TraceEvent::Transport(packet.clone());
-                        self.packet = Some(packet);
+                        self.held = Some(Held {
+                            packet,
+                            stage: Stage::Continuity,
+                        });
                         return Ok(ready(event));
                     }
                     Ok(Step::NeedInput(request)) => return Ok(Step::NeedInput(request)),

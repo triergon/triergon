@@ -12,7 +12,7 @@ mod tables;
 pub use entity::{MediaEntityEnd, ObservedTrace};
 pub use event::{CarrierObservation, CompactTraceEvent, FaultKind, TraceEvent, TraceFault};
 pub use feed::{FeedCarrier, FeedContinuation, FeedItem, FeedPayloadRun};
-use held::Stage;
+use held::{Held, Stage};
 use tables::PsiWork;
 
 pub(crate) use storage::{StorageItem, TransportStorageCursor};
@@ -20,7 +20,7 @@ pub(crate) use storage::{StorageItem, TransportStorageCursor};
 use crate::pes::PesAssembler;
 use crate::psi::SectionAssembler;
 use crate::psi::{DescriptorNamespace, PatCollector};
-use crate::transport::{Continuity, TransportFramer, TransportPacket};
+use crate::transport::{Continuity, TransportFramer};
 use crate::{PacketFormat, ParseLimits, SourceEpochs};
 use std::sync::atomic::AtomicUsize;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation};
@@ -92,8 +92,7 @@ pub struct TransportStream {
     clock_quarantined: bool,
     clock_epoch: u64,
     config_epoch: u64,
-    packet: Option<TransportPacket>,
-    stage: Stage,
+    held: Option<Held>,
     route: Route,
     psi: PsiWork,
     entity_end: Option<SourceLocation>,
@@ -229,8 +228,7 @@ impl TransportStream {
             clock_quarantined: false,
             clock_epoch: 0,
             config_epoch: 0,
-            packet: None,
-            stage: Stage::Read,
+            held: None,
             route: Route::Ignore,
             psi: PsiWork::Idle,
             entity_end: None,
@@ -304,14 +302,14 @@ impl TransportStream {
             })
     }
     fn location(&self) -> SourceLocation {
-        self.packet.as_ref().map_or(
+        self.held.as_ref().map_or(
             self.entity_end.unwrap_or(SourceLocation {
                 source: SourceId(0),
                 offset: 0,
             }),
-            |packet| SourceLocation {
-                source: packet.source_id.unwrap_or(SourceId(0)),
-                offset: packet.source_offset,
+            |held| SourceLocation {
+                source: held.packet.source_id.unwrap_or(SourceId(0)),
+                offset: held.packet.source_offset,
             },
         )
     }
