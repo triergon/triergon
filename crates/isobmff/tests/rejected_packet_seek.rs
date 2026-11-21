@@ -22,7 +22,7 @@ use triergon_isobmff::{
         transport::{RootWalkTransportBuilder, RootWalkTransportModel, RootWalkTransportProfile},
     },
 };
-const BASE: &[u8] = include_bytes!("fixtures/transport-v3/geometry-00.mov");
+const BASE: &[u8] = include_bytes!("fixtures/transport/geometry-00.mov");
 struct Source {
     pool: Budget,
     ftyp: BoxView,

@@ -46,7 +46,7 @@ fn table(stbl: BoxView, p: &Budget) -> RunRecoveryTable {
 fn zero_scale_stays_zero_and_source_clock_cannot_be_constructed() {
     let p = Budget::new(1 << 20).unwrap();
     let (_, h, _) = source(
-        include_bytes!("fixtures/pinned-field-recovery/mdhd-zero-baseline.mov"),
+        include_bytes!("fixtures/field-recovery/mdhd-zero-baseline.mov"),
         &p,
     );
     assert_eq!(h.source().timescale, 0);
@@ -72,7 +72,7 @@ fn zero_scale_stays_zero_and_source_clock_cannot_be_constructed() {
 fn vfr_zero_source_scale_retains_raw_ticks_and_demux_base_only() {
     let p = Budget::new(1 << 20).unwrap();
     let (raw, h, media) = source(
-        include_bytes!("fixtures/pinned-field-recovery/mdhd-zero-vfr.mov"),
+        include_bytes!("fixtures/field-recovery/mdhd-zero-vfr.mov"),
         &p,
     );
     let t = table(raw, &p);
@@ -112,8 +112,7 @@ fn vfr_zero_source_scale_retains_raw_ticks_and_demux_base_only() {
 }
 #[test]
 fn unknown_media_header_version_is_not_a_zero_scale_recovery() {
-    let mut input =
-        include_bytes!("fixtures/pinned-field-recovery/mdhd-zero-baseline.mov").to_vec();
+    let mut input = include_bytes!("fixtures/field-recovery/mdhd-zero-baseline.mov").to_vec();
     let at = input.windows(4).position(|b| b == b"mdhd").unwrap();
     input[at + 4] = 2;
     let p = Budget::new(1 << 20).unwrap();
@@ -162,23 +161,23 @@ fn ordered_walk_never_sorts_filters_or_rewinds_positive_sync_rows() {
     let p = Budget::new(1 << 20).unwrap();
     for (input, expected) in [
         (
-            include_bytes!("fixtures/pinned-field-recovery/stss-100-4.mov").as_slice(),
+            include_bytes!("fixtures/field-recovery/stss-100-4.mov").as_slice(),
             vec![0, 0, 0, 0, 0, 0],
         ),
         (
-            include_bytes!("fixtures/pinned-field-recovery/stss-7-4.mov"),
+            include_bytes!("fixtures/field-recovery/stss-7-4.mov"),
             vec![0, 0, 0, 0, 0, 0],
         ),
         (
-            include_bytes!("fixtures/pinned-field-recovery/stss-4-1.mov"),
+            include_bytes!("fixtures/field-recovery/stss-4-1.mov"),
             vec![0, 0, 0, 1, 0, 0],
         ),
         (
-            include_bytes!("fixtures/pinned-field-recovery/stss-4-4.mov"),
+            include_bytes!("fixtures/field-recovery/stss-4-4.mov"),
             vec![0, 0, 0, 1, 0, 0],
         ),
         (
-            include_bytes!("fixtures/pinned-field-recovery/stss-1-100.mov"),
+            include_bytes!("fixtures/field-recovery/stss-1-100.mov"),
             vec![1, 0, 0, 0, 0, 0],
         ),
     ] {
@@ -270,7 +269,7 @@ fn recovery_demux_index_limit_is_sticky() {
 fn source_scale_one_is_not_diagnosed_as_demux_fallback() {
     let p = Budget::new(1 << 20).unwrap();
     let (_, h, _) = source(
-        include_bytes!("fixtures/pinned-field-recovery/mdhd-one-baseline.mov"),
+        include_bytes!("fixtures/field-recovery/mdhd-one-baseline.mov"),
         &p,
     );
     assert!(h.source_clock_valid());

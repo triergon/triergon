@@ -71,7 +71,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
     let output = paths.fixtures("mp4-range-fixtures")?;
     let seed = paths
         .root
-        .join("crates/isobmff/tests/fixtures/encoded-edit-v2/original.mp4");
+        .join("crates/isobmff/tests/fixtures/encoded-edit/original.mp4");
     let control = fs::read(&seed).map_err(|e| format!("{}: {e}", seed.display()))?;
     if sha256::hex(&control) != "7f2f92cb0e7a97920828fc9f79daeec2471a58d990572305d7aa08c30fb512fd" {
         return Err("MP4 range seed changed".into());

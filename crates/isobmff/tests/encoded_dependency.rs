@@ -10,7 +10,7 @@ use triergon_isobmff::{
         seek::{IndexCursor, IndexLimits},
     },
 };
-const BASE: &[u8] = include_bytes!("fixtures/encoded-dependency-v4/dep-unreferenced.mp4");
+const BASE: &[u8] = include_bytes!("fixtures/encoded-dependency/dep-unreferenced.mp4");
 #[path = "support/encoded_track.rs"]
 mod encoded_track;
 use encoded_track::{Source, finish, rows};
@@ -52,7 +52,7 @@ fn disposable_flag_is_separate_from_raw_dependency_stss_and_source_clock() {
 #[test]
 fn leading_byte_bits_remain_uninterpreted_source_facts() {
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-dependency-v4/dep-leading-raw-preserved.mp4"
+        "fixtures/encoded-dependency/dep-leading-raw-preserved.mp4"
     ));
     let rows = rows(&s, s.plan(1).unwrap());
     assert_eq!(rows.len(), 2);
@@ -66,7 +66,7 @@ fn leading_byte_bits_remain_uninterpreted_source_facts() {
 #[test]
 fn stss_is_not_overridden_by_a_conflicting_dependency_hint() {
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-dependency-v4/dep-STSS-conflict-preserved.mp4"
+        "fixtures/encoded-dependency/dep-STSS-conflict-preserved.mp4"
     ));
     let rows = rows(&s, s.plan(1).unwrap());
     assert_eq!(
@@ -81,7 +81,7 @@ fn stss_is_not_overridden_by_a_conflicting_dependency_hint() {
 #[test]
 fn unknown_dependency_zero_does_not_invent_a_disposable_fact() {
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-dependency-v4/dep-no-hint.mp4"
+        "fixtures/encoded-dependency/dep-no-hint.mp4"
     ));
     assert_eq!(
         rows(&s, s.plan(1).unwrap())
@@ -94,10 +94,10 @@ fn unknown_dependency_zero_does_not_invent_a_disposable_fact() {
 #[test]
 fn absent_groups_and_explicit_unassociated_groups_both_keep_source_ranges() {
     let a = Source::new(include_bytes!(
-        "fixtures/encoded-dependency-v4/dep-no-groups.mp4"
+        "fixtures/encoded-dependency/dep-no-groups.mp4"
     ));
     let b = Source::new(include_bytes!(
-        "fixtures/encoded-dependency-v4/dep-referenced.mp4"
+        "fixtures/encoded-dependency/dep-referenced.mp4"
     ));
     let aa = rows(&a, a.plan(1).unwrap());
     let bb = rows(&b, b.plan(1).unwrap());
@@ -119,7 +119,7 @@ fn absent_groups_and_explicit_unassociated_groups_both_keep_source_ranges() {
 #[test]
 fn actual_roll_membership_stays_unadmitted_not_ignored() {
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-dependency-v4/dep-real-roll-unadmitted.mp4"
+        "fixtures/encoded-dependency/dep-real-roll-unadmitted.mp4"
     ));
     assert!(matches!(s.plan(1), Err(Error::Unsupported(_))));
     assert_eq!(s.table.sample_count(), 2);
@@ -127,7 +127,7 @@ fn actual_roll_membership_stays_unadmitted_not_ignored() {
 #[test]
 fn reserved_depended_on_field_is_not_a_false_or_true_repair() {
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-dependency-v4/dep-reserved-referenced-field.mp4"
+        "fixtures/encoded-dependency/dep-reserved-referenced-field.mp4"
     ));
     assert_eq!(
         s.plan(1).unwrap_err(),

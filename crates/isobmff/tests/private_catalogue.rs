@@ -11,7 +11,7 @@ use triergon_isobmff::{
     },
     table::SampleTable,
 };
-const BASE: &[u8] = include_bytes!("fixtures/private-catalogue-v8/dOps-only-size-11.mov");
+const BASE: &[u8] = include_bytes!("fixtures/private-catalogue/dOps-only-size-11.mov");
 struct Source {
     pool: Budget,
     header: TrackHeader,
@@ -70,26 +70,26 @@ impl Source {
 }
 fn fixture(name: &str) -> &'static [u8] {
     match name {
-        "dOps-only-size-0" => include_bytes!("fixtures/private-catalogue-v8/dOps-only-size-0.mov"),
+        "dOps-only-size-0" => include_bytes!("fixtures/private-catalogue/dOps-only-size-0.mov"),
         "dOps-only-size-11" => {
-            include_bytes!("fixtures/private-catalogue-v8/dOps-only-size-11.mov")
+            include_bytes!("fixtures/private-catalogue/dOps-only-size-11.mov")
         }
         "dOps-valid-after-ddts" => {
-            include_bytes!("fixtures/private-catalogue-v8/dOps-valid-after-ddts.mov")
+            include_bytes!("fixtures/private-catalogue/dOps-valid-after-ddts.mov")
         }
-        "ddts-layout-ff00" => include_bytes!("fixtures/private-catalogue-v8/ddts-layout-ff00.mov"),
+        "ddts-layout-ff00" => include_bytes!("fixtures/private-catalogue/ddts-layout-ff00.mov"),
         "ddts-only-size-19" => {
-            include_bytes!("fixtures/private-catalogue-v8/ddts-only-size-19.mov")
+            include_bytes!("fixtures/private-catalogue/ddts-only-size-19.mov")
         }
         "ddts-only-size-20" => {
-            include_bytes!("fixtures/private-catalogue-v8/ddts-only-size-20.mov")
+            include_bytes!("fixtures/private-catalogue/ddts-only-size-20.mov")
         }
-        "ddts-only-size-7" => include_bytes!("fixtures/private-catalogue-v8/ddts-only-size-7.mov"),
-        "drop-dOps" => include_bytes!("fixtures/private-catalogue-v8/drop-dOps.mov"),
-        "fiel-av1C" => include_bytes!("fixtures/private-catalogue-v8/fiel-av1C.mov"),
-        "fiel-avcC" => include_bytes!("fixtures/private-catalogue-v8/fiel-avcC.mov"),
-        "fiel-hvcC" => include_bytes!("fixtures/private-catalogue-v8/fiel-hvcC.mov"),
-        "no-private-boxes" => include_bytes!("fixtures/private-catalogue-v8/no-private-boxes.mov"),
+        "ddts-only-size-7" => include_bytes!("fixtures/private-catalogue/ddts-only-size-7.mov"),
+        "drop-dOps" => include_bytes!("fixtures/private-catalogue/drop-dOps.mov"),
+        "fiel-av1C" => include_bytes!("fixtures/private-catalogue/fiel-av1C.mov"),
+        "fiel-avcC" => include_bytes!("fixtures/private-catalogue/fiel-avcC.mov"),
+        "fiel-hvcC" => include_bytes!("fixtures/private-catalogue/fiel-hvcC.mov"),
+        "no-private-boxes" => include_bytes!("fixtures/private-catalogue/no-private-boxes.mov"),
         _ => panic!("unknown frozen original control"),
     }
 }
@@ -429,7 +429,7 @@ fn prior_rejection_predicate_remains_independent_of_new_catalogue_view() {
 #[test]
 fn reversed_source_order_selects_first_real_backing() {
     let s = Source::new(include_bytes!(
-        "fixtures/private-catalogue-v8/reversed-opaque-order.mov"
+        "fixtures/private-catalogue/reversed-opaque-order.mov"
     ));
     let c = finish(&mut job(&s, 1 << 20), 1).unwrap();
     let demux = view(&s, &c).unwrap();
@@ -447,7 +447,7 @@ fn reversed_source_order_selects_first_real_backing() {
 #[test]
 fn one_byte_prefix_is_replaced_by_the_next_nontrivial_source_backing() {
     let s = Source::new(include_bytes!(
-        "fixtures/private-catalogue-v8/one-byte-prefix-then-real.mov"
+        "fixtures/private-catalogue/one-byte-prefix-then-real.mov"
     ));
     let c = finish(&mut job(&s, 1 << 20), 1).unwrap();
     let demux = view(&s, &c).unwrap();

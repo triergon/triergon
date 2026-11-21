@@ -4138,11 +4138,11 @@ fn edited_visual_description_fixture(
     config_kind: &[u8; 4],
     records: [&[u8]; 2],
 ) -> Vec<u8> {
-    // Derive in memory from the encoded-config-v3 1, 2, 1 transition fixture.
+    // Derive in memory from the encoded-config 1, 2, 1 transition fixture.
     // Keep its AVC packets as opaque bytes and replace each avcC with an
     // authored record and free padding. Both media and movie clocks are 1 kHz.
     let mut raw =
-        include_bytes!("../../isobmff/tests/fixtures/encoded-config-v3/different121.mp4").to_vec();
+        include_bytes!("../../isobmff/tests/fixtures/encoded-config/different121.mp4").to_vec();
     for ((entry, config, end), record) in
         [(417, 503, 556), (592, 678, 707)].into_iter().zip(records)
     {
@@ -4498,7 +4498,7 @@ fn range_player_keeps_the_active_seek_after_refusing_opus_recovery() {
 
 #[test]
 fn native_range_cursor_keeps_encoded_source_clocks_and_trim() {
-    let original = include_bytes!("../../isobmff/tests/fixtures/encoded-edit-v2/original.mp4");
+    let original = include_bytes!("../../isobmff/tests/fixtures/encoded-edit/original.mp4");
     let mut variable = original.to_vec();
     let audio_timing = variable
         .windows(4)
@@ -4593,7 +4593,7 @@ fn native_range_player_carries_dolby_leading_trim() {
 
 #[test]
 fn native_range_seek_replays_the_encoded_edit_occurrences() {
-    let raw = include_bytes!("../../isobmff/tests/fixtures/encoded-edit-v2/original.mp4");
+    let raw = include_bytes!("../../isobmff/tests/fixtures/encoded-edit/original.mp4");
     let (mut player, movie) = encoded_range_player(raw);
     let cancel = off();
     let leading = [0xf0, 3, 0, 0, 0, 0, 0, 0, 0, 0];

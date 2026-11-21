@@ -90,10 +90,10 @@ pub enum DemuxOperation {
 impl DemuxOperation {
     fn trace_name(self) -> &'static str {
         match self {
-            Self::Open => "mov-native-open-consumer-v33",
-            Self::Index => "mov-native-index-consumer-v33",
-            Self::Seek(_) => "mov-native-seek-consumer-v33",
-            Self::RangePlan(_) => "source-range-plan-consumer-v33",
+            Self::Open => "mov-open",
+            Self::Index => "mov-index",
+            Self::Seek(_) => "mov-seek",
+            Self::RangePlan(_) => "range-plan",
         }
     }
 }
@@ -1942,7 +1942,7 @@ mod signed_decode_comparison {
 
     #[test]
     fn signed_comparison_accepts_an_exact_end_and_rejects_one_tick_beyond() {
-        let original = include_bytes!("../../tests/fixtures/native-clock28/clock27-i63-step12.mp4");
+        let original = include_bytes!("../../tests/fixtures/demux-clock/clock27-i63-step12.mp4");
         let header = b"\x00\x00\x00\x14tfdt\x01\x00\x00\x00";
         let at = original
             .windows(header.len())
@@ -1961,10 +1961,10 @@ mod signed_decode_comparison {
     #[test]
     fn signed_comparison_preserves_large_legacy_and_modern_starts() {
         for bytes in [
-            include_bytes!("../../tests/fixtures/clock-boundary27/f-tfdt-above-i64.mp4").as_slice(),
-            include_bytes!("../../tests/fixtures/clock-boundary27/modern-iso6-tfdt-above-i64.mp4")
+            include_bytes!("../../tests/fixtures/clock-boundary/f-tfdt-above-i64.mp4").as_slice(),
+            include_bytes!("../../tests/fixtures/clock-boundary/modern-iso6-tfdt-above-i64.mp4")
                 .as_slice(),
-            include_bytes!("../../tests/fixtures/native-clock28/clock27-u64-minus1-step12.mp4")
+            include_bytes!("../../tests/fixtures/demux-clock/clock27-u64-minus1-step12.mp4")
                 .as_slice(),
         ] {
             check(bytes, None, true);

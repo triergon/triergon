@@ -8,7 +8,7 @@ use triergon::{
 };
 
 const FILE: &[u8] =
-    include_bytes!("../../isobmff/tests/fixtures/encoded-config-v3/creation-all.mp4");
+    include_bytes!("../../isobmff/tests/fixtures/encoded-config/creation-all.mp4");
 
 fn capabilities() -> SourceCapabilities {
     SourceCapabilities {

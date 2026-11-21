@@ -15,7 +15,7 @@ use triergon_isobmff::{
     table::SampleTable,
 };
 
-const WAVE: &[u8] = include_bytes!("fixtures/encoded-metadata-v4/qt-v1-wave.mov");
+const WAVE: &[u8] = include_bytes!("fixtures/encoded-metadata/qt-v1-wave.mov");
 struct Source {
     pool: Budget,
     header: TrackHeader,
@@ -134,7 +134,7 @@ fn wave_v1_retains_words_and_full_backing_without_retyping_audio_v0() {
 #[test]
 fn unknown_wave_child_is_retained_and_work_one_matches_bulk() {
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-metadata-v4/qt-v1-unknown.mov"
+        "fixtures/encoded-metadata/qt-v1-unknown.mov"
     ));
     let mut a = s.input();
     let one = finish(&mut s.job(&a).unwrap(), &mut a, 1).unwrap();
@@ -285,7 +285,7 @@ fn outer_and_nested_extensions_share_one_total_limit() {
 #[test]
 fn empty_iso_handler_is_source_owned_but_receiver_tag_is_absent() {
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-metadata-v4/creation-v0-1578905043.mov"
+        "fixtures/encoded-metadata/creation-v0-1578905043.mov"
     ));
     let mut i = s.input();
     let mut j = EncodedStreamJob::new_description_with_metadata(
@@ -315,7 +315,7 @@ macro_rules! refused {
         #[test]
         fn $name() {
             let s = Source::new(include_bytes!(concat!(
-                "fixtures/encoded-metadata-v4/",
+                "fixtures/encoded-metadata/",
                 $file,
                 ".mov"
             )));
@@ -350,7 +350,7 @@ refused!(
 #[test]
 fn uncompressed_sample_table_meaning_is_not_used_as_compressed_frames() {
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-metadata-v4/qt-v1-unframed-compression.mov"
+        "fixtures/encoded-metadata/qt-v1-unframed-compression.mov"
     ));
     let i = s.input();
     assert!(matches!(
@@ -365,7 +365,7 @@ macro_rules! date {
         #[test]
         fn $name() {
             let s = Source::new(include_bytes!(concat!(
-                "fixtures/encoded-metadata-v4/",
+                "fixtures/encoded-metadata/",
                 $file,
                 ".mov"
             )));

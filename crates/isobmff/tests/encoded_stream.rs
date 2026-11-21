@@ -14,11 +14,11 @@ use triergon_isobmff::{
     movie::TrackHeader,
     table::SampleTable,
 };
-const AVC: &[u8] = include_bytes!("fixtures/encoded-v1/control-avc-aac-front.mp4");
-const HEVC: &[u8] = include_bytes!("fixtures/encoded-v1/control-hevc-aac-front.mp4");
-const AAC: &[u8] = include_bytes!("fixtures/encoded-v1/control-aac-front.mp4");
-const AC3: &[u8] = include_bytes!("fixtures/encoded-v1/control-ac3-front.mp4");
-const EAC3: &[u8] = include_bytes!("fixtures/encoded-v1/control-eac3-front.mp4");
+const AVC: &[u8] = include_bytes!("fixtures/encoded-stream/control-avc-aac-front.mp4");
+const HEVC: &[u8] = include_bytes!("fixtures/encoded-stream/control-hevc-aac-front.mp4");
+const AAC: &[u8] = include_bytes!("fixtures/encoded-stream/control-aac-front.mp4");
+const AC3: &[u8] = include_bytes!("fixtures/encoded-stream/control-ac3-front.mp4");
+const EAC3: &[u8] = include_bytes!("fixtures/encoded-stream/control-eac3-front.mp4");
 struct Source {
     pool: Budget,
     header: TrackHeader,

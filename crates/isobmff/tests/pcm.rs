@@ -12,10 +12,10 @@ use triergon_isobmff::{
     table::SampleTable,
 };
 
-const MONO: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-u8-mono-front.mov");
-const STEREO: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-s16be-stereo-front.mov");
-const SWITCH: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-description-1-2-1-unused3.mov");
-const LONG: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-long-chunk-2049.mov");
+const MONO: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-u8-mono-front.mov");
+const STEREO: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-s16be-stereo-front.mov");
+const SWITCH: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-description-1-2-1-unused3.mov");
+const LONG: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-long-chunk-2049.mov");
 
 struct Parsed {
     pool: Budget,

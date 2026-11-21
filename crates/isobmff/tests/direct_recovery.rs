@@ -185,27 +185,27 @@ fn source_declared_six_demux_observed_five_whole_positions() {
 fn following_row_count_controls_not_singleton_or_whole_chunk_drop() {
     for (b, want) in [
         (
-            include_bytes!("fixtures/recovery-v2/counts-2,2,2.mov").as_slice(),
+            include_bytes!("fixtures/direct-recovery/counts-2,2,2.mov").as_slice(),
             vec![675, 687, 699, 711, 723, 735],
         ),
         (
-            include_bytes!("fixtures/recovery-v2/counts-3,1,2.mov"),
+            include_bytes!("fixtures/direct-recovery/counts-3,1,2.mov"),
             vec![675, 711, 723, 735],
         ),
         (
-            include_bytes!("fixtures/recovery-v2/counts-1,3,2.mov"),
+            include_bytes!("fixtures/direct-recovery/counts-1,3,2.mov"),
             vec![675, 687, 699, 687, 699, 711],
         ),
         (
-            include_bytes!("fixtures/recovery-v2/counts-3,2,1.mov"),
+            include_bytes!("fixtures/direct-recovery/counts-3,2,1.mov"),
             vec![675, 687, 711, 723, 735],
         ),
         (
-            include_bytes!("fixtures/recovery-v2/counts-2,3,1.mov"),
+            include_bytes!("fixtures/direct-recovery/counts-2,3,1.mov"),
             vec![675, 687, 699, 699, 711, 723],
         ),
         (
-            include_bytes!("fixtures/recovery-v2/counts-4,1,1.mov"),
+            include_bytes!("fixtures/direct-recovery/counts-4,1,1.mov"),
             vec![675, 723, 735],
         ),
     ] {
@@ -216,7 +216,7 @@ fn following_row_count_controls_not_singleton_or_whole_chunk_drop() {
 fn variable_size_prefix_is_demux_ordinal_not_source_payload_association() {
     assert_eq!(
         positions(include_bytes!(
-            "fixtures/recovery-v2/desc-zero-variable-sizes.mov"
+            "fixtures/direct-recovery/desc-zero-variable-sizes.mov"
         )),
         vec![
             (675, 5, 0),
@@ -230,7 +230,7 @@ fn variable_size_prefix_is_demux_ordinal_not_source_payload_association() {
 #[test]
 fn vfr_clock_prefix_is_read_from_raw_runs() {
     assert_eq!(
-        positions(include_bytes!("fixtures/recovery-v2/desc-zero-vfr.mov")),
+        positions(include_bytes!("fixtures/direct-recovery/desc-zero-vfr.mov")),
         vec![
             (715, 12, 0),
             (739, 12, 333),
@@ -244,11 +244,11 @@ fn vfr_clock_prefix_is_read_from_raw_runs() {
 fn noninitial_multiple_or_other_invalid_descriptions_remain_errors() {
     let p = Budget::new(1 << 20).unwrap();
     for b in [
-        include_bytes!("fixtures/recovery-v2/desc-1,0,1.mov").as_slice(),
-        include_bytes!("fixtures/recovery-v2/desc-0,0,0.mov"),
-        include_bytes!("fixtures/recovery-v2/desc-0,1,0.mov"),
-        include_bytes!("fixtures/recovery-v2/desc-2,1,1.mov"),
-        include_bytes!("fixtures/recovery-v2/desc-4294967295,1,1.mov"),
+        include_bytes!("fixtures/direct-recovery/desc-1,0,1.mov").as_slice(),
+        include_bytes!("fixtures/direct-recovery/desc-0,0,0.mov"),
+        include_bytes!("fixtures/direct-recovery/desc-0,1,0.mov"),
+        include_bytes!("fixtures/direct-recovery/desc-2,1,1.mov"),
+        include_bytes!("fixtures/direct-recovery/desc-4294967295,1,1.mov"),
     ] {
         let (r, _, _) = parts(b, &p);
         assert!(build(r, &p).is_err());
@@ -347,7 +347,7 @@ fn invalid_index_positions_are_not_clipped_sorted_or_removed() {
 }
 #[test]
 fn far_seek_never_invents_clean_eof() {
-    let b = include_bytes!("fixtures/recovery-v2/offset-4294967295.mov");
+    let b = include_bytes!("fixtures/direct-recovery/offset-4294967295.mov");
     let p = Budget::new(1 << 20).unwrap();
     let (r, h, m) = parts(b, &p);
     let t = build(r, &p).unwrap();

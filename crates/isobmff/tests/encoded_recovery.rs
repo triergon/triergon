@@ -16,7 +16,7 @@ use triergon_isobmff::{
     },
     sample_groups::{RecoveryKind, RecoveryLimits, RecoveryLookup},
 };
-const BASE: &[u8] = include_bytes!("fixtures/encoded-recovery-v5/roll-negative-v0.mp4");
+const BASE: &[u8] = include_bytes!("fixtures/encoded-recovery/roll-negative-v0.mp4");
 #[path = "support/encoded_track.rs"]
 mod encoded_track;
 use encoded_track::{Source, finish, rows};
@@ -40,47 +40,47 @@ impl Source {
 }
 fn fixture(name: &str) -> &'static [u8] {
     match name {
-        "coverage-under" => include_bytes!("fixtures/encoded-recovery-v5/coverage-under.mp4"),
-        "empty-run" => include_bytes!("fixtures/encoded-recovery-v5/empty-run.mp4"),
+        "coverage-under" => include_bytes!("fixtures/encoded-recovery/coverage-under.mp4"),
+        "empty-run" => include_bytes!("fixtures/encoded-recovery/empty-run.mp4"),
         "mapping-before-description" => {
-            include_bytes!("fixtures/encoded-recovery-v5/mapping-before-description.mp4")
+            include_bytes!("fixtures/encoded-recovery/mapping-before-description.mp4")
         }
         "description-without-map" => {
-            include_bytes!("fixtures/encoded-recovery-v5/description-without-map.mp4")
+            include_bytes!("fixtures/encoded-recovery/description-without-map.mp4")
         }
         "roll-zero-association" => {
-            include_bytes!("fixtures/encoded-recovery-v5/roll-zero-association.mp4")
+            include_bytes!("fixtures/encoded-recovery/roll-zero-association.mp4")
         }
         "duplicate-description" => {
-            include_bytes!("fixtures/encoded-recovery-v5/duplicate-description.mp4")
+            include_bytes!("fixtures/encoded-recovery/duplicate-description.mp4")
         }
-        "prol-negative-v1" => include_bytes!("fixtures/encoded-recovery-v5/prol-negative-v1.mp4"),
-        "roll-negative-v0" => include_bytes!("fixtures/encoded-recovery-v5/roll-negative-v0.mp4"),
-        "roll-positive-v1" => include_bytes!("fixtures/encoded-recovery-v5/roll-positive-v1.mp4"),
+        "prol-negative-v1" => include_bytes!("fixtures/encoded-recovery/prol-negative-v1.mp4"),
+        "roll-negative-v0" => include_bytes!("fixtures/encoded-recovery/roll-negative-v0.mp4"),
+        "roll-positive-v1" => include_bytes!("fixtures/encoded-recovery/roll-positive-v1.mp4"),
         "grouping-parameter" => {
-            include_bytes!("fixtures/encoded-recovery-v5/grouping-parameter.mp4")
+            include_bytes!("fixtures/encoded-recovery/grouping-parameter.mp4")
         }
         "dangling-description" => {
-            include_bytes!("fixtures/encoded-recovery-v5/dangling-description.mp4")
+            include_bytes!("fixtures/encoded-recovery/dangling-description.mp4")
         }
         "fragment-namespace" => {
-            include_bytes!("fixtures/encoded-recovery-v5/fragment-namespace.mp4")
+            include_bytes!("fixtures/encoded-recovery/fragment-namespace.mp4")
         }
         "roll-prol-independent" => {
-            include_bytes!("fixtures/encoded-recovery-v5/roll-prol-independent.mp4")
+            include_bytes!("fixtures/encoded-recovery/roll-prol-independent.mp4")
         }
-        "coverage-over" => include_bytes!("fixtures/encoded-recovery-v5/coverage-over.mp4"),
+        "coverage-over" => include_bytes!("fixtures/encoded-recovery/coverage-over.mp4"),
         "roll-multiple-descriptions" => {
-            include_bytes!("fixtures/encoded-recovery-v5/roll-multiple-descriptions.mp4")
+            include_bytes!("fixtures/encoded-recovery/roll-multiple-descriptions.mp4")
         }
         "variable-length-unadmitted" => {
-            include_bytes!("fixtures/encoded-recovery-v5/variable-length-unadmitted.mp4")
+            include_bytes!("fixtures/encoded-recovery/variable-length-unadmitted.mp4")
         }
         "unknown-group-unadmitted" => {
-            include_bytes!("fixtures/encoded-recovery-v5/unknown-group-unadmitted.mp4")
+            include_bytes!("fixtures/encoded-recovery/unknown-group-unadmitted.mp4")
         }
         "reserved-source-retained" => {
-            include_bytes!("fixtures/encoded-recovery-v5/reserved-source-retained.mp4")
+            include_bytes!("fixtures/encoded-recovery/reserved-source-retained.mp4")
         }
         _ => panic!("unknown authored fixture"),
     }
@@ -554,7 +554,7 @@ fn packet_hint_does_not_become_public_index_key() {
 #[test]
 fn original_reserved_without_membership_keeps_raw_and_packet_hint_absent() {
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-dependency-v4/dep-reserved-referenced-field.mp4"
+        "fixtures/encoded-dependency/dep-reserved-referenced-field.mp4"
     ));
     let result = rows(&s, s.plan(1).unwrap());
     assert_eq!(result.len(), 2);

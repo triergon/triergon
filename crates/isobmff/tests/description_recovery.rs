@@ -19,8 +19,8 @@ use triergon_isobmff::{
     },
 };
 
-const ZERO: &[u8] = include_bytes!("fixtures/recovery-v3/desc-0,0,0.mov");
-const POSITIVE: &[u8] = include_bytes!("fixtures/recovery-v3/desc-2,1,1.mov");
+const ZERO: &[u8] = include_bytes!("fixtures/description-recovery/desc-0,0,0.mov");
+const POSITIVE: &[u8] = include_bytes!("fixtures/description-recovery/desc-2,1,1.mov");
 
 fn parts(bytes: &[u8], p: &Budget) -> (BoxView, RecoveryTrackHeader, Vec<Range<u64>>) {
     let top = roots(p, bytes).unwrap();
@@ -151,24 +151,24 @@ fn all_zero_rows_retain_raw_configuration_and_all_source_ordinals() {
 fn multiple_and_noninitial_zero_rows_use_observed_successor_counts_without_source_repair() {
     for (bytes, expected) in [
         (
-            include_bytes!("fixtures/recovery-v3/desc-1,0,1.mov").as_slice(),
+            include_bytes!("fixtures/description-recovery/desc-1,0,1.mov").as_slice(),
             vec![675, 687, 699, 711, 723, 711],
         ),
         (
-            include_bytes!("fixtures/recovery-v3/desc-1,1,0.mov"),
+            include_bytes!("fixtures/description-recovery/desc-1,1,0.mov"),
             vec![675, 687, 699, 711, 723, 735],
         ),
         (ZERO, vec![675, 687, 699, 699, 711, 723]),
         (
-            include_bytes!("fixtures/recovery-v3/desc-0,1,0.mov"),
+            include_bytes!("fixtures/description-recovery/desc-0,1,0.mov"),
             vec![675, 699, 711, 723, 735],
         ),
         (
-            include_bytes!("fixtures/recovery-v3/desc-1,0,0.mov"),
+            include_bytes!("fixtures/description-recovery/desc-1,0,0.mov"),
             vec![675, 687, 699, 711, 723, 711],
         ),
         (
-            include_bytes!("fixtures/recovery-v3/desc-0,0,1.mov"),
+            include_bytes!("fixtures/description-recovery/desc-0,0,1.mov"),
             vec![675, 687, 699, 699, 711, 723],
         ),
     ] {
@@ -177,7 +177,7 @@ fn multiple_and_noninitial_zero_rows_use_observed_successor_counts_without_sourc
 }
 #[test]
 fn unsigned_all_ones_is_only_a_labelled_observation_not_a_source_description_fix() {
-    let bytes = include_bytes!("fixtures/recovery-v3/desc-4294967295,1,1.mov");
+    let bytes = include_bytes!("fixtures/description-recovery/desc-4294967295,1,1.mov");
     let rows = events(bytes, 1);
     assert_eq!(rows[0].declaration.description_index, u32::MAX);
     assert_eq!(rows[0].raw_chunk_description, u32::MAX);

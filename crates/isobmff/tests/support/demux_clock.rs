@@ -2,7 +2,7 @@
 // cover three authored inputs and exact reference-demux rows. Source
 // rows/rationals/raw boxes are checked independently of the demux rows.
 fn required_clock27_case(name: &str, extension: &str) {
-    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/clock-boundary27");
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/clock-boundary");
     let expected = fs::read_to_string(folder.join(format!("{name}.txt"))).unwrap();
     let rows = |prefix: &str| {
         expected

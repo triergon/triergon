@@ -163,7 +163,7 @@ fn patched(name: &str, find: &[u8], at: usize, bytes: &[u8]) -> Vec<u8> {
 
 #[test]
 fn a_named_track_reports_its_tag_record_and_clock() {
-    let file = include_bytes!("fixtures/encoded-config-v3/creation-all.mp4");
+    let file = include_bytes!("fixtures/encoded-config/creation-all.mp4");
     let pool = Budget::new(16 << 20).unwrap();
     let mut reader = open(&pool, file);
     let reading = read(&mut reader, &pool, file, 1 << 20, 1 << 16).unwrap();
@@ -230,7 +230,7 @@ fn an_opus_entry_is_named_and_a_missing_record_stays_empty() {
 
 #[test]
 fn a_flac_entry_is_named_with_its_dfla_record() {
-    let mut file = include_bytes!("fixtures/encoded-v1/control-ac3-front.mp4").to_vec();
+    let mut file = include_bytes!("fixtures/encoded-stream/control-ac3-front.mp4").to_vec();
     for (from, to) in [(b"ac-3", b"fLaC"), (b"dac3", b"dfLa")] {
         let at = file.windows(4).position(|w| w == from).unwrap();
         file[at..at + 4].copy_from_slice(to);
@@ -250,7 +250,7 @@ fn a_flac_entry_is_named_with_its_dfla_record() {
 
 #[test]
 fn an_mp3_entry_is_named_without_a_record() {
-    let mut file = include_bytes!("fixtures/encoded-v1/control-ac3-front.mp4").to_vec();
+    let mut file = include_bytes!("fixtures/encoded-stream/control-ac3-front.mp4").to_vec();
     let at = file.windows(4).position(|w| w == b"ac-3").unwrap();
     file[at..at + 4].copy_from_slice(b".mp3");
     let pool = Budget::new(16 << 20).unwrap();
@@ -331,7 +331,7 @@ fn a_fragment_without_a_decode_time_has_unknown_times() {
 
 #[test]
 fn tracks_appear_only_once_the_movie_is_open() {
-    let file = include_bytes!("fixtures/encoded-config-v3/creation-all.mp4");
+    let file = include_bytes!("fixtures/encoded-config/creation-all.mp4");
     let pool = Budget::new(16 << 20).unwrap();
     let mut reader = open(&pool, file);
     let cancel = AtomicBool::new(false);
@@ -364,7 +364,7 @@ fn every_root_box_is_reported() {
 
 #[test]
 fn a_later_file_type_box_does_not_replace_the_major_brand() {
-    let mut file = include_bytes!("fixtures/encoded-config-v3/creation-all.mp4").to_vec();
+    let mut file = include_bytes!("fixtures/encoded-config/creation-all.mp4").to_vec();
     // Two 16-byte boxes in place of the 32-byte `ftyp` keep every offset.
     assert_eq!(&file[..8], b"\0\0\0\x20ftyp");
     file[..32].copy_from_slice(b"\0\0\0\x10ftypisom\0\0\x02\0\0\0\0\x10ftypqt  \0\0\0\0");

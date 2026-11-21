@@ -135,7 +135,7 @@ fn sample(
 }
 
 fn exercise(group: &str, expected_cases: usize) {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/selected-fields18");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/table-fields");
     let text = fs::read_to_string(root.join(format!("{group}.txt"))).unwrap();
     let mut cases = 0;
     for block in text.split("\n\n") {

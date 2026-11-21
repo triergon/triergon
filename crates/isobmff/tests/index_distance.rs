@@ -89,7 +89,7 @@ fn one_trun_distance_is_independent_for_each_track_and_demux_null_clock() {
     let pool = Budget::new(2 * 1024 * 1024).unwrap();
     let movie = support::parse(
         &pool,
-        include_bytes!("fixtures/native-clock29/order27-MIN-scale1000-cat12.mp4"),
+        include_bytes!("fixtures/index-distance/order27-MIN-scale1000-cat12.mp4"),
     );
     assert_eq!(movie.tracks.len(), 2);
     let offsets = [0_i128, 1, 3, 4, 6, 7];
@@ -123,7 +123,7 @@ fn index_replay_uses_checked_facts_for_the_selected_track() {
     let pool = Budget::new(2 * 1024 * 1024).unwrap();
     let movie = support::parse(
         &pool,
-        include_bytes!("fixtures/native-clock29/order27-MIN-scale1000-cat12.mp4"),
+        include_bytes!("fixtures/index-distance/order27-MIN-scale1000-cat12.mp4"),
     );
     let tracks = movie.demux();
     let mut packets = PacketCursor::new_complete_source(
@@ -167,7 +167,7 @@ fn one_trun_distance_keeps_unsigned_source_dts_and_signed_cts_at_demux_sentinel(
     let pool = Budget::new(2 * 1024 * 1024).unwrap();
     let movie = support::parse(
         &pool,
-        include_bytes!("fixtures/native-clock28/clock27-DTS-MIN-PTS-next.mp4"),
+        include_bytes!("fixtures/demux-clock/clock27-DTS-MIN-PTS-next.mp4"),
     );
     for quantum in [1, 4096] {
         let rows = entries(&pool, &movie, 0, quantum);

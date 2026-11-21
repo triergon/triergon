@@ -14,17 +14,17 @@ use triergon_isobmff::{
     quicktime::{PcmEncoding, PcmSampleReader, PcmSourcePacket, SoundDescriptionV0},
     table::SampleTable,
 };
-const MONO: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-u8-mono-front.mov");
-const STEREO: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-s16be-stereo-front.mov");
-const CONFIG: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-description-1-2-1-unused3.mov");
+const MONO: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-u8-mono-front.mov");
+const STEREO: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-s16be-stereo-front.mov");
+const CONFIG: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-description-1-2-1-unused3.mov");
 const ALL: &[&[u8]] = &[
     MONO,
     STEREO,
-    include_bytes!("fixtures/pcm-v0/pcm-u8-stereo-end.mov"),
-    include_bytes!("fixtures/pcm-v0/pcm-s16be-mono-end.mov"),
+    include_bytes!("fixtures/qt-pcm/pcm-u8-stereo-end.mov"),
+    include_bytes!("fixtures/qt-pcm/pcm-s16be-mono-end.mov"),
     CONFIG,
-    include_bytes!("fixtures/pcm-v0/pcm-multi-8k-u8-and-48k-twos.mov"),
-    include_bytes!("fixtures/pcm-v0/pcm-long-chunk-2049.mov"),
+    include_bytes!("fixtures/qt-pcm/pcm-multi-8k-u8-and-48k-twos.mov"),
+    include_bytes!("fixtures/qt-pcm/pcm-long-chunk-2049.mov"),
 ];
 struct Parsed {
     pool: Budget,

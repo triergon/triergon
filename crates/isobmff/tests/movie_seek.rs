@@ -329,7 +329,7 @@ fn checked_seek_retains_a_non_sync_fragment_prefix_without_marking_it_sync() {
 fn fragment_sample_table(pool: &Budget) -> triergon_isobmff::table::SampleTable {
     let boxes = common::roots(
         pool,
-        include_bytes!("fixtures/native-open-v6/tfdt-control-08.mp4"),
+        include_bytes!("fixtures/fragment-open/tfdt-control-08.mp4"),
     )
     .unwrap();
     let movie = boxes

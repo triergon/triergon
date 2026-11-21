@@ -135,7 +135,7 @@ fn original_signed_cts_append_keeps_absent_first_field_and_negative_raw_bits() {
 fn selected_split_cts_append_preserves_each_source_sample_and_demux_distance() {
     // Actual demux-index/184-{ordinary,tiny}-reference.stdout.
     check(
-        include_bytes!("fixtures/native-append36/trun18-original-split-runs.mp4"),
+        include_bytes!("fixtures/cts-append/trun18-original-split-runs.mp4"),
         [771, 783, 795, 975, 987, 999],
         [0, 0, 1, 0, 0, 1],
     );
@@ -145,7 +145,7 @@ fn selected_split_cts_append_preserves_each_source_sample_and_demux_distance() {
 fn single_sample_cts_runs_carry_the_last_distance_once_per_real_append() {
     // Actual demux-index/185-{ordinary,tiny}-reference.stdout.
     check(
-        include_bytes!("fixtures/native-append36/trun18-original-single-sample-runs.mp4"),
+        include_bytes!("fixtures/cts-append/trun18-original-single-sample-runs.mp4"),
         [791, 803, 815, 1015, 1027, 1039],
         [0, 0, 0, 0, 0, 0],
     );

@@ -24,12 +24,12 @@ use triergon_isobmff::{
     movie::{EditList, MovieHeader, TrackHeader},
     table::SampleTable,
 };
-const ORIGINAL: &[u8] = include_bytes!("fixtures/encoded-edit-v2/original.mp4");
-const AUDIO0: &[u8] = include_bytes!("fixtures/encoded-edit-v2/audio0.mp4");
-const AUDIO1024: &[u8] = include_bytes!("fixtures/encoded-edit-v2/audio1024.mp4");
-const AUDIO2048: &[u8] = include_bytes!("fixtures/encoded-edit-v2/audio2048.mp4");
-const VIDEO0: &[u8] = include_bytes!("fixtures/encoded-edit-v2/video0.mp4");
-const VIDEO2673: &[u8] = include_bytes!("fixtures/encoded-edit-v2/video2673.mp4");
+const ORIGINAL: &[u8] = include_bytes!("fixtures/encoded-edit/original.mp4");
+const AUDIO0: &[u8] = include_bytes!("fixtures/encoded-edit/audio0.mp4");
+const AUDIO1024: &[u8] = include_bytes!("fixtures/encoded-edit/audio1024.mp4");
+const AUDIO2048: &[u8] = include_bytes!("fixtures/encoded-edit/audio2048.mp4");
+const VIDEO0: &[u8] = include_bytes!("fixtures/encoded-edit/video0.mp4");
+const VIDEO2673: &[u8] = include_bytes!("fixtures/encoded-edit/video2673.mp4");
 const LEADING_AC3: &[u8] = include_bytes!("fixtures/range-encoded-edits/leading-ac3.mp4");
 const LEADING_EAC3: &[u8] = include_bytes!("fixtures/range-encoded-edits/leading-eac3.mp4");
 struct Source {

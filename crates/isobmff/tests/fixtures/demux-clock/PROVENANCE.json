@@ -50,7 +50,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "45bc136dea4e143594f362e9be9ff8c3e324e9c3e55aded33bc59350f6449a1c",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-i63-step12.mp4"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/clock27-i63-step12.mp4"
     },
     {
       "id": "clock27-i63-step21",
@@ -59,7 +59,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "d972db6dafd7b78348fac0e6956d02717b282012587d61a7226fbff8f20c398d",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-i63-step21.mp4"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/clock27-i63-step21.mp4"
     },
     {
       "id": "clock27-i63-plus1-step12",
@@ -68,7 +68,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "dc21a3e408a0024f8792e3927028614ca85aae80b8c3dff8321204065dc5c1c2",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-i63-plus1-step12.mp4"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/clock27-i63-plus1-step12.mp4"
     },
     {
       "id": "clock27-i63-plus1-step21",
@@ -77,7 +77,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "d2799d014115ced085e05d6327e2cc88bb55179a06d3abc39fdb0abf9bfc5508",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-i63-plus1-step21.mp4"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/clock27-i63-plus1-step21.mp4"
     },
     {
       "id": "clock27-u64-minus2-step12",
@@ -86,7 +86,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "40ab517b9e2412bf27b9b2947b81658c637204781c7afc7ebf331247ebc89124",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-u64-minus2-step12.mp4"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/clock27-u64-minus2-step12.mp4"
     },
     {
       "id": "clock27-u64-minus2-step21",
@@ -95,7 +95,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "ac9460685db69ad3b6862390420bc94ab34572f7af97ef0b50e9f78459f9a51d",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-u64-minus2-step21.mp4"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/clock27-u64-minus2-step21.mp4"
     },
     {
       "id": "clock27-u64-minus1-step12",
@@ -104,7 +104,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "8b9c51efc6bcb30aaf1e4b902165b3f24c0ebce37e829ab45da37277ee0d83d5",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-u64-minus1-step12.mp4"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/clock27-u64-minus1-step12.mp4"
     },
     {
       "id": "clock27-u64-minus1-step21",
@@ -113,7 +113,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "c890569baab19f1f12f8cb637c0f4c60a63b0cff44bfe9680894568dcad57aea",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-u64-minus1-step21.mp4"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/clock27-u64-minus1-step21.mp4"
     },
     {
       "id": "clock27-PTS-enters-MIN-before-DTS",
@@ -130,7 +130,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "1d0e57f94078229db205ff75c9e25966009bd4020394ae5cc378d029c9ce129b",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-DTS-MIN-PTS-next.mp4"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/clock27-DTS-MIN-PTS-next.mp4"
     },
     {
       "id": "clock27-signed-CTO-crossing",
@@ -219,7 +219,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "9b41860247dd77781dded1a3c0f79b1c41740b44cd4f7407be158c42065e6190",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/order27-u64-last-scale1000-cat12.mp4"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/order27-u64-last-scale1000-cat12.mp4"
     },
     {
       "id": "order27-u64-last-scale1000-cat21",
@@ -228,7 +228,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "435e1279534ed13a60adee3e5162535ec2a46c4e7fd119396ab8952c2603934c",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/order27-u64-last-scale1000-cat21.mp4"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/order27-u64-last-scale1000-cat21.mp4"
     },
     {
       "id": "order27-signed-max-rescale-overflow",
@@ -253,7 +253,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "e4efafaf4900d1ba4b7dd564a2c96884ead2b4967854fca05cd6893122d616f4",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-count5.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-count5.mov"
     },
     {
       "id": "edit27-count6",
@@ -262,7 +262,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "fcf1045657c82df853d2abfb8e7641cfdf33a02fe219a00dbaece82abb71e5c4",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-count6.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-count6.mov"
     },
     {
       "id": "edit27-count8",
@@ -271,7 +271,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "cee9028d20c3cc1d8665f4fdee3766c1a232abd2c0882b456cdd53c872007e01",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-count8.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-count8.mov"
     },
     {
       "id": "edit27-sixths",
@@ -280,7 +280,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "a44fea1273eca26daec1826139c0c35a8eb115797eb0b90cd6b425824f7d5929",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-sixths.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-sixths.mov"
     },
     {
       "id": "edit27-half-tick",
@@ -289,7 +289,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "7be7fbfd63df5a9dabf6bcf71e800f05265f088d6a99a0d26ab123b057a84373",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-half-tick.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-half-tick.mov"
     },
     {
       "id": "edit27-sixty-two-half-ticks",
@@ -298,7 +298,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "5b1b65131f00c678032d75ced9932a01956cb71487f02885a3cbabe358998c18",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-sixty-two-half-ticks.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-sixty-two-half-ticks.mov"
     },
     {
       "id": "edit27-sevenths",
@@ -307,7 +307,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "951f14a65c03ad6075f8f16ff43d5d8976b5ffc2c6532d70d01c55fba1f0c625",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-sevenths.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-sevenths.mov"
     },
     {
       "id": "edit27-alternating12",
@@ -316,7 +316,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "bb09f55e091a0dec9f5484fa437d5e851f170fc1b339a3dccaa59028db6efd7c",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-alternating12.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-alternating12.mov"
     },
     {
       "id": "edit27-alternating21",
@@ -325,7 +325,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "b5eb11956fe2a7e496717a6bd0c9d7d65ccf7cfb9d59413d4a488d6b4078162a",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-alternating21.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-alternating21.mov"
     },
     {
       "id": "edit27-leading-empty",
@@ -334,7 +334,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "5d4eadf2b9046405abbc808ada316c9e1fcc060c4316aa5360d9d477be083f09",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-leading-empty.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-leading-empty.mov"
     },
     {
       "id": "edit27-trailing-empty",
@@ -351,7 +351,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "e8b6e1a9e7c414f192573e0b8ed81c8bd0d0515a80c10796ec0d3d9eec4877d5",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-nonzero-media-sync.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-nonzero-media-sync.mov"
     },
     {
       "id": "edit27-alternating-media",
@@ -360,7 +360,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "8fe686c97e93da9d14264133176874f32523aa55fb284937e2262e997dae42e6",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-alternating-media.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-alternating-media.mov"
     },
     {
       "id": "edit27-head-half-sample",
@@ -377,7 +377,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "1a9ee4a62c714a3fbc9c7746b8951ef668b952ae2537fcfc7efe7f788f6cb486",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-source-count4.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-source-count4.mov"
     },
     {
       "id": "edit27-source-count8",
@@ -386,7 +386,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "09b5edd79ec2f1ef2d82c07e01ed56aff2a76791591db112a8125e6a686b96f7",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-source-count8.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-source-count8.mov"
     },
     {
       "id": "edit27-first-delta500",
@@ -395,7 +395,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "ea136e3c411060b0718634da7974f7f44d2c73d15f1c8bff97ff34e4d4954922",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-first-delta500.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-first-delta500.mov"
     },
     {
       "id": "edit27-first-delta1500",
@@ -404,7 +404,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "91a0ab30edf2b0a6a3184ec95b9b704d5c57d9b32ad3ee68903690d05497f170",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-first-delta1500.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-first-delta1500.mov"
     },
     {
       "id": "edit27-final-two-thirds",
@@ -413,7 +413,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "da2c80a28e7fdd2a267c7d57234b37993babb94915bcd0cb964b01b47049fd79",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-final-two-thirds.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-final-two-thirds.mov"
     },
     {
       "id": "edit27-final-four-thirds",
@@ -422,7 +422,7 @@
       "gap": null,
       "new_regression_coverage": true,
       "native_stdout_sha256": "323f81bb51bb84e4c470931873dad31ed71bde389c3952e30e3a674a1ebb2f52",
-      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-final-four-thirds.mov"
+      "fixture": "crates/isobmff/tests/fixtures/demux-clock/edit27-final-four-thirds.mov"
     }
   ]
 }

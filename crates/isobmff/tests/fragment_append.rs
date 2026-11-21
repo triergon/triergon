@@ -195,20 +195,20 @@ fn check_wide_origin(bytes: &[u8]) {
 fn legacy_tfdt_demux_null_does_not_erase_known_source_or_block_run_append() {
     // Actual demux-index/055-reference: the first demux API clock is null.
     check_wide_origin(include_bytes!(
-        "fixtures/native-append37/f-tfdt-above-i64.mp4"
+        "fixtures/fragment-append/f-tfdt-above-i64.mp4"
     ));
 }
 #[test]
 fn iso6_tfdt_demux_null_preserves_unsigned_source_and_raw_index_clock() {
     // Actual demux-index/090-reference, distinct unchanged source input.
     check_wide_origin(include_bytes!(
-        "fixtures/native-append37/modern-iso6-tfdt-above-i64.mp4"
+        "fixtures/fragment-append/modern-iso6-tfdt-above-i64.mp4"
     ));
 }
 #[test]
 fn new_fragment_nonkey_starts_zero_without_a_synthetic_container_key() {
     check(
-        include_bytes!("fixtures/native-append37/flag-contiguous-nonkey.mp4"),
+        include_bytes!("fixtures/fragment-append/flag-contiguous-nonkey.mp4"),
         &[
             Some(0),
             Some(1000),
@@ -232,7 +232,7 @@ fn new_fragment_nonkey_starts_zero_without_a_synthetic_container_key() {
 #[test]
 fn overlapping_fragment_keeps_nonkey_discard_bits_and_source_position_order() {
     check(
-        include_bytes!("fixtures/native-append37/flag-one-sample-overlap-nonkey.mp4"),
+        include_bytes!("fixtures/fragment-append/flag-one-sample-overlap-nonkey.mp4"),
         &[
             Some(0),
             Some(1000),
@@ -256,7 +256,7 @@ fn overlapping_fragment_keeps_nonkey_discard_bits_and_source_position_order() {
 #[test]
 fn backward_third_fragment_resets_distance_without_sorting_or_removing_discard() {
     check(
-        include_bytes!("fixtures/native-append37/follow-flag-three-fragment-backward.mp4"),
+        include_bytes!("fixtures/fragment-append/follow-flag-three-fragment-backward.mp4"),
         &[
             Some(0),
             Some(1000),
@@ -280,7 +280,7 @@ fn backward_third_fragment_resets_distance_without_sorting_or_removing_discard()
 #[test]
 fn absent_origin_after_gap_keeps_source_none_and_explicit_demux_prefix() {
     check(
-        include_bytes!("fixtures/native-append37/origin18-three-gap-then-absent.mp4"),
+        include_bytes!("fixtures/fragment-append/origin18-three-gap-then-absent.mp4"),
         &[Some(0), Some(1000), Some(7000), Some(8000), None, None],
         &[1000; 6],
         &[1, 4],
@@ -297,7 +297,7 @@ fn absent_origin_after_gap_keeps_source_none_and_explicit_demux_prefix() {
 #[test]
 fn absent_origin_after_rollback_keeps_source_none_and_actual_discard_history() {
     check(
-        include_bytes!("fixtures/native-append37/origin18-three-backward-then-absent.mp4"),
+        include_bytes!("fixtures/fragment-append/origin18-three-backward-then-absent.mp4"),
         &[Some(7000), Some(8000), Some(1000), Some(2000), None, None],
         &[1000; 6],
         &[1, 4],
@@ -314,7 +314,7 @@ fn absent_origin_after_rollback_keeps_source_none_and_actual_discard_history() {
 #[test]
 fn explicit_origin_control_preserves_source_knownness_with_same_demux_counter() {
     check(
-        include_bytes!("fixtures/native-append37/discard22-explicit-equivalent.mp4"),
+        include_bytes!("fixtures/fragment-append/discard22-explicit-equivalent.mp4"),
         &[
             Some(7000),
             Some(8000),
@@ -338,7 +338,7 @@ fn explicit_origin_control_preserves_source_knownness_with_same_demux_counter() 
 #[test]
 fn later_anchor_control_keeps_all_demux_entries_and_original_source_identity() {
     check(
-        include_bytes!("fixtures/native-append37/discard22-later-anchor-5000.mp4"),
+        include_bytes!("fixtures/fragment-append/discard22-later-anchor-5000.mp4"),
         &[
             Some(7000),
             Some(8000),
@@ -367,7 +367,7 @@ fn later_anchor_control_keeps_all_demux_entries_and_original_source_identity() {
 fn long_predecessor_duration_and_intermediate_anchor_do_not_raise_index_distance() {
     check(
         include_bytes!(
-            "fixtures/native-append37/discard22-long-derived-then-intermediate-anchor.mp4"
+            "fixtures/fragment-append/discard22-long-derived-then-intermediate-anchor.mp4"
         ),
         &[
             Some(7000),
@@ -396,7 +396,7 @@ fn long_predecessor_duration_and_intermediate_anchor_do_not_raise_index_distance
 #[test]
 fn zero_delta_derived_clock_equality_keeps_source_none_and_both_entries() {
     check(
-        include_bytes!("fixtures/native-append37/discard22-zero-delta-derived-equality.mp4"),
+        include_bytes!("fixtures/fragment-append/discard22-zero-delta-derived-equality.mp4"),
         &[Some(7000), Some(8000), Some(1000), Some(2000), None, None],
         &[1000, 1000, 1000, 1000, 0, 1000],
         &[1, 4],
@@ -413,7 +413,7 @@ fn zero_delta_derived_clock_equality_keeps_source_none_and_both_entries() {
 #[test]
 fn split_backward_run_preserves_the_observed_flag_discriminator() {
     check(
-        include_bytes!("fixtures/native-append37/discard24-split-backward-run.mp4"),
+        include_bytes!("fixtures/fragment-append/discard24-split-backward-run.mp4"),
         &[
             Some(7000),
             Some(8000),

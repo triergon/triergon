@@ -14,12 +14,12 @@ use triergon_isobmff::{
     movie::TrackHeader,
     table::SampleTable,
 };
-const BASE: &[u8] = include_bytes!("fixtures/encoded-v1/control-avc-aac-front.mp4");
-const DIFFERENT: &[u8] = include_bytes!("fixtures/encoded-config-v3/different121.mp4");
-const INITIAL2: &[u8] = include_bytes!("fixtures/encoded-config-v3/initial21.mp4");
-const EQUAL: &[u8] = include_bytes!("fixtures/encoded-config-v3/equal121.mp4");
-const CREATED: &[u8] = include_bytes!("fixtures/encoded-config-v3/creation-all.mp4");
-const TRACK_ONLY: &[u8] = include_bytes!("fixtures/encoded-config-v3/creation-track.mp4");
+const BASE: &[u8] = include_bytes!("fixtures/encoded-stream/control-avc-aac-front.mp4");
+const DIFFERENT: &[u8] = include_bytes!("fixtures/encoded-config/different121.mp4");
+const INITIAL2: &[u8] = include_bytes!("fixtures/encoded-config/initial21.mp4");
+const EQUAL: &[u8] = include_bytes!("fixtures/encoded-config/equal121.mp4");
+const CREATED: &[u8] = include_bytes!("fixtures/encoded-config/creation-all.mp4");
+const TRACK_ONLY: &[u8] = include_bytes!("fixtures/encoded-config/creation-track.mp4");
 struct Source {
     pool: Budget,
     table: SampleTable,

@@ -71,13 +71,11 @@ fn bounded_timing_keeps_short_runs_and_invalid_sync_entries_strict() {
     let pool = Budget::new(1 << 20).unwrap();
     for (bytes, expected) in [
         (
-            include_bytes!("fixtures/pinned-run-recovery/run57-04-r-front-stco-lastcount5.mov")
-                .as_slice(),
+            include_bytes!("fixtures/run-recovery/run57-04-r-front-stco-lastcount5.mov").as_slice(),
             Error::Invalid("time table sample count mismatch"),
         ),
         (
-            include_bytes!("fixtures/pinned-run-recovery/run57-05-r-front-stco-lastcount0.mov")
-                .as_slice(),
+            include_bytes!("fixtures/run-recovery/run57-05-r-front-stco-lastcount0.mov").as_slice(),
             Error::Invalid("zero sample count in time run"),
         ),
         (
@@ -209,14 +207,13 @@ fn ctts_keeps_all_twelve_declared_occurrences_and_first_six_source_values() {
 fn run_controls_cover_large_final_counts_and_vfr() {
     let p = Budget::new(1 << 20).unwrap();
     for bytes in [
-        include_bytes!("fixtures/pinned-run-recovery/run57-00-r-front-stco-unchanged.mov")
-            .as_slice(),
-        include_bytes!("fixtures/pinned-run-recovery/run57-01-r-front-stco-lastcount7.mov"),
-        include_bytes!("fixtures/pinned-run-recovery/run57-02-r-front-stco-lastcount8.mov"),
-        include_bytes!("fixtures/pinned-run-recovery/run57-03-r-front-stco-lastcount12.mov"),
-        include_bytes!("fixtures/pinned-run-recovery/run57-06-r-vfr-unchanged.mov"),
-        include_bytes!("fixtures/pinned-run-recovery/run57-07-r-vfr-lastcount2.mov"),
-        include_bytes!("fixtures/pinned-run-recovery/run57-08-r-vfr-lastcount8.mov"),
+        include_bytes!("fixtures/run-recovery/run57-00-r-front-stco-unchanged.mov").as_slice(),
+        include_bytes!("fixtures/run-recovery/run57-01-r-front-stco-lastcount7.mov"),
+        include_bytes!("fixtures/run-recovery/run57-02-r-front-stco-lastcount8.mov"),
+        include_bytes!("fixtures/run-recovery/run57-03-r-front-stco-lastcount12.mov"),
+        include_bytes!("fixtures/run-recovery/run57-06-r-vfr-unchanged.mov"),
+        include_bytes!("fixtures/run-recovery/run57-07-r-vfr-lastcount2.mov"),
+        include_bytes!("fixtures/run-recovery/run57-08-r-vfr-lastcount8.mov"),
     ] {
         assert_eq!(clock_prefix(&build(bytes, &p, 1).unwrap()).len(), 6);
     }
@@ -225,9 +222,8 @@ fn run_controls_cover_large_final_counts_and_vfr() {
 fn zero_and_short_run_counts_are_not_recovered() {
     let p = Budget::new(1 << 20).unwrap();
     for bytes in [
-        include_bytes!("fixtures/pinned-run-recovery/run57-04-r-front-stco-lastcount5.mov")
-            .as_slice(),
-        include_bytes!("fixtures/pinned-run-recovery/run57-05-r-front-stco-lastcount0.mov"),
+        include_bytes!("fixtures/run-recovery/run57-04-r-front-stco-lastcount5.mov").as_slice(),
+        include_bytes!("fixtures/run-recovery/run57-05-r-front-stco-lastcount0.mov"),
     ] {
         assert!(build(bytes, &p, 1).is_err());
     }
@@ -259,7 +255,7 @@ fn unrelated_description_and_zero_sync_values_stay_errors() {
     let p = Budget::new(1 << 20).unwrap();
     for bytes in [
         include_bytes!("fixtures/bad-stsc-description-zero.mov").as_slice(),
-        include_bytes!("fixtures/pinned-field-recovery/stss-0-4.mov"),
+        include_bytes!("fixtures/field-recovery/stss-0-4.mov"),
     ] {
         assert!(build(bytes, &p, 1).is_err());
     }

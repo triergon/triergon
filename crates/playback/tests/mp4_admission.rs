@@ -7,9 +7,9 @@ use triergon_playback::{
     mp4_open::{MetadataReadScope, Movie, Mp4Open, OpenLimits},
 };
 
-const ISO: &[u8] = include_bytes!("../../isobmff/tests/fixtures/encoded-edit-v2/original.mp4");
+const ISO: &[u8] = include_bytes!("../../isobmff/tests/fixtures/encoded-edit/original.mp4");
 const QUICKTIME: &[u8] =
-    include_bytes!("../../isobmff/tests/fixtures/encoded-metadata-v4/qt-v1-wave.mov");
+    include_bytes!("../../isobmff/tests/fixtures/encoded-metadata/qt-v1-wave.mov");
 const DATA_HANDLER: &[u8] =
     b"\0\0\0\x2chdlr\0\0\0\0dhlrurl \0\0\0\0\0\0\0\0\0\0\0\0\x0bDataHandler";
 

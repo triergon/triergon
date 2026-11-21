@@ -245,7 +245,7 @@ fn source_mdat_boundary_is_not_replaced_with_the_physical_file_boundary() {
 
 #[test]
 fn large_source_prefix_is_factual_without_a_small_buffer_alignment_model() {
-    let original = include_bytes!("fixtures/transport-v3/geometry-20.mov");
+    let original = include_bytes!("fixtures/transport/geometry-20.mov");
     let bytes = short(original);
     let source = Source::new(&bytes);
     let input = source.input();

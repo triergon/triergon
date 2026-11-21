@@ -10,7 +10,7 @@ use triergon_isobmff::{
     },
 };
 
-const DATA: &[u8] = include_bytes!("fixtures/native-open-v6/tfdt-control-08.mp4");
+const DATA: &[u8] = include_bytes!("fixtures/fragment-open/tfdt-control-08.mp4");
 
 fn fragment(pool: &Budget, data: &[u8]) -> FragmentIndex {
     let top = roots(pool, data).unwrap();

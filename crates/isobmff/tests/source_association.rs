@@ -26,8 +26,8 @@ use triergon_isobmff::{
     table::SampleTable,
 };
 #[cfg(feature = "reference-trace")]
-const RAW: &[u8] = include_bytes!("fixtures/private-catalogue-v8/dOps-only-size-11.mov");
-const AVC: &[u8] = include_bytes!("fixtures/encoded-dependency-v4/dep-unreferenced.mp4");
+const RAW: &[u8] = include_bytes!("fixtures/private-catalogue/dOps-only-size-11.mov");
+const AVC: &[u8] = include_bytes!("fixtures/encoded-dependency/dep-unreferenced.mp4");
 struct Source {
     pool: Budget,
     header: TrackHeader,
