@@ -5,6 +5,7 @@ mod eac3;
 mod loas;
 mod mpeg_audio;
 mod mpeg_video;
+mod pes_storage;
 mod unframed_audio;
 
 use super::model::{ClockContext, PacketData, PayloadSources, Shared, UnframedData};

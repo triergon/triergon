@@ -244,6 +244,45 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
         }
         cases.push(row);
     }
+    // Same supported picture syntax, carried in several adaptation-stuffed
+    // packets. 19-byte PES headers plus the selected payload prefix put the
+    // picture start code exactly across the first carrier boundary.
+    for (mpeg2, m2ts, name, size) in [
+        (false, false, "mpeg1-split-ts188-25", 32),
+        (true, true, "mpeg2-split-m2ts192-25", 43),
+    ] {
+        let codec = Codec {
+            name: if mpeg2 { "mpeg2" } else { "mpeg1" },
+            stream_type: if mpeg2 { 2 } else { 1 },
+            stream_id: 0xe0,
+            dvb: false,
+            bytes: Vec::new(),
+            first: 0,
+            header: 0,
+        };
+        let mut ts = Transport::new();
+        ts.tables(&codec, &[])?;
+        for index in 0..2 {
+            let bytes = picture(mpeg2, index, 3);
+            let mut packet = part(
+                &bytes,
+                Some(90000 + u64::from(index) * 3600),
+                Some(87000 + u64::from(index) * 3600),
+            );
+            packet.aligned = true;
+            ts.pes_at_chunks(PID, 0xe0, &packet, size)?;
+        }
+        let input = Input {
+            name,
+            m2ts,
+            data: ts.finish(m2ts),
+        };
+        let row = input.record(root, FEATURE, name, &[], &reference, "ts-au-fold")?;
+        if row.get("reference_refusal").is_some() {
+            return Err(format!("{name}: reference did not reach EOF"));
+        }
+        cases.push(row);
+    }
     manifest(root, FEATURE, cases)?;
     write_json(
         &root.join(format!("harness/features/{FEATURE}/reference.json")),

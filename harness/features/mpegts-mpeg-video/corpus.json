@@ -193,6 +193,38 @@
         "bytes": 158,
         "digest": 3019124303192749746
       }
+    },
+    {
+      "id": "mpeg1-split-ts188-25",
+      "profile": "mpeg1-split-ts188-25",
+      "file": "harness/features/mpegts-mpeg-video/inputs/mpeg1-split-ts188-25.ts",
+      "sha256": "bfa26ebeb15bd6757dfe47ca5c162f7b96fba550dccee0c9036e2cf23a256363",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66,
+        "digest": 5360867965093604264
+      }
+    },
+    {
+      "id": "mpeg2-split-m2ts192-25",
+      "profile": "mpeg2-split-m2ts192-25",
+      "file": "harness/features/mpegts-mpeg-video/inputs/mpeg2-split-m2ts192-25.m2ts",
+      "sha256": "6a5b5fab21cd2adc0a6ea79dae783595dbd7114ed14ffa827fd3922ecc0bfd99",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 104,
+        "digest": 12848936554999659678
+      }
     }
   ]
 }

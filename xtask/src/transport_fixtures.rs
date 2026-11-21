@@ -211,7 +211,11 @@ impl Transport {
     }
 
     fn payload(&mut self, pid: u16, raw: &[u8]) {
-        for (index, chunk) in raw.chunks(184).enumerate() {
+        self.payload_chunks(pid, raw, 184);
+    }
+
+    fn payload_chunks(&mut self, pid: u16, raw: &[u8], size: usize) {
+        for (index, chunk) in raw.chunks(size).enumerate() {
             let mut packet = [0xff; 188];
             let cc = &mut self.counters[usize::from(pid)];
             packet[..4].copy_from_slice(&[
@@ -330,6 +334,10 @@ impl Transport {
     }
 
     fn pes_at(&mut self, pid: u16, stream_id: u8, part: &Part<'_>) -> R<()> {
+        self.pes_at_chunks(pid, stream_id, part, 184)
+    }
+
+    fn pes_at_chunks(&mut self, pid: u16, stream_id: u8, part: &Part<'_>, size: usize) -> R<()> {
         let mut optional = Vec::new();
         for (value, prefix) in [
             (part.pts, if part.dts.is_some() { 3 } else { 2 }),
@@ -372,7 +380,7 @@ impl Transport {
         ];
         pes.extend(optional);
         pes.extend_from_slice(part.body);
-        self.payload(pid, &pes);
+        self.payload_chunks(pid, &pes, size);
         Ok(())
     }
 

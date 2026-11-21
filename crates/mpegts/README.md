@@ -353,13 +353,16 @@ Existing framers delimit the complete source bytes before decoder-feed conversio
 MPEG-1/2 video stream types `0x01` and `0x02` admit a bounded
 picture profile. MPEG-1 admits I pictures; MPEG-2 admits progressive I/P/B
 pictures. Each finite, aligned video PES (`0xe0`–`0xef`) must have
-one payload span containing a sequence header with default matrices, an optional
-GOP header, one picture header, ordered slice start codes and a final sequence-end
+at most 175 payload bytes across one or more carrier spans, containing a sequence
+header with default matrices, an optional GOP header, one picture header, ordered slice start codes and a final sequence-end
 code. MPEG-2 additionally requires Main Profile / Main Level, progressive 4:2:0
 frame pictures with base dimensions and frame rate, no repeated fields and no
 composite display extension. Heights above 2800, user data, other extensions,
 MPEG-1 P/B pictures, field pictures, multiple pictures per PES, split pictures and
-unbounded PES are unsupported by this access-unit profile. Source PES assembly still retains
+unbounded PES are unsupported by this access-unit profile. Start-code prefixes and
+headers may straddle carrier spans. Parsing retains only fixed-size header state;
+publication coalesces a scattered picture once into its contiguous packet bytes,
+while a single span shares its original allocation. Source PES assembly still retains
 unbounded video byte runs.
 
 `AccessUnit::MpegVideo` retains the original bytes, private elementary range,
@@ -376,8 +379,9 @@ The syntax follows [H.262 (02/2000)](https://www.itu.int/rec/T-REC-H.262-200002-
 [H.222.0 (10/2014)](https://www.itu.int/rec/T-REC-H.222.0-201410-S/en)
 §2.4.3.6 and Table 2-34. The independent
 [comparison](../../harness/features/mpegts-mpeg-video/contract.json) selects
-16×16 pictures in TS188 and M2TS192 at 25 and 30000/1001 fps: eight inputs
-contain two I pictures and four contain three pictures in I/P/B decode order.
+16×16 pictures in TS188 and M2TS192 at 25 and 30000/1001 fps: ten inputs
+contain two I pictures (two split across carriers) and four contain three pictures
+in I/P/B decode order.
 The synthetic P/B slices use intra macroblocks; motion decoding is not tested. Its parser-enabled `NOFILLIN` reference leaves
 packet duration zero without stream discovery; this comparison projection does
 not erase the source picture's sequence-derived duration. Native performance and

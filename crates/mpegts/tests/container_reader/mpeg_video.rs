@@ -271,3 +271,247 @@ fn mpeg2_envelope(body: &[u8]) -> Vec<u8> {
     ts.bytes[at + 6] |= 4;
     ts.bytes
 }
+
+// Put an unchanged finite PES into exactly two adaptation-stuffed carriers.
+fn split_envelope(body: &[u8], mpeg2: bool, cut: usize, m2ts: bool) -> Vec<u8> {
+    let raw = if mpeg2 {
+        mpeg2_envelope(body)
+    } else {
+        envelope(body, None)
+    };
+    let start = raw.windows(4).position(|b| b == [0, 0, 1, 0xe0]).unwrap();
+    let pes = &raw[start..start + 9 + body.len()];
+    let mut ts = super::Transport::new();
+    ts.bytes.extend_from_slice(&raw[..376]);
+    for (index, payload) in [&pes[..9 + cut], &pes[9 + cut..]].into_iter().enumerate() {
+        let mut carrier = [0xff; 188];
+        carrier[..6].copy_from_slice(&[
+            0x47,
+            if index == 0 { 0x41 } else { 1 },
+            0,
+            0x30 | index as u8,
+            (183 - payload.len()) as u8,
+            0,
+        ]);
+        carrier[188 - payload.len()..].copy_from_slice(payload);
+        ts.bytes.extend_from_slice(&carrier);
+    }
+    if m2ts { ts.m2ts() } else { ts.bytes }
+}
+
+#[test]
+fn mpeg_video_every_carrier_split_preserves_picture_and_physical_ranges() {
+    for (original, mpeg2) in [(TS1, false), (TS2, true)] {
+        let start = original
+            .windows(4)
+            .position(|b| b == [0, 0, 1, 0xb3])
+            .unwrap();
+        let body = &original[start..564];
+        for cut in 1..body.len() {
+            for (m2ts, format) in [(false, PacketFormat::Ts188), (true, PacketFormat::M2ts192)] {
+                let raw = split_envelope(body, mpeg2, cut, m2ts);
+                for (chunk, work) in [(1, 1), (7, 7), (4096, 4096)] {
+                    let mut drive = Drive::new(
+                        &raw,
+                        ReaderLimits {
+                            format,
+                            ..ReaderLimits::default()
+                        },
+                        chunk,
+                        work,
+                    );
+                    let mut retained = Vec::new();
+                    while let Some(event) = drive.next().unwrap() {
+                        if let Event::Packet(packet) = event {
+                            assert_eq!(packet.payload(), body);
+                            assert_eq!(
+                                (packet.pts(), packet.dts(), packet.duration()),
+                                (None, None, Some(3600))
+                            );
+                            assert_eq!(packet.elementary_range(), 0..body.len() as u64);
+                            let AccessUnit::MpegVideo(unit) = packet.access_unit() else {
+                                panic!("picture");
+                            };
+                            assert_eq!(unit.picture_offset, if mpeg2 { 22 } else { 12 });
+                            assert_eq!(
+                                (unit.width, unit.height, unit.slice_count, unit.mpeg2),
+                                (16, 16, 1, mpeg2)
+                            );
+                            let [origin] = packet.sources() else {
+                                panic!("one PES");
+                            };
+                            assert_eq!(origin.payload_range, 0..body.len());
+                            let TraceEvent::Pes(pes) = origin.pes.event() else {
+                                panic!("PES");
+                            };
+                            assert_eq!(pes.spans().len(), 2);
+                            assert_eq!(pes.spans()[0].as_ref(), &body[..cut]);
+                            assert_eq!(pes.spans()[1].as_ref(), &body[cut..]);
+                            for span in pes.spans() {
+                                let range = span.source_range();
+                                let offset = range.offset as usize;
+                                assert_eq!(&raw[offset..offset + range.bytes], span.as_ref());
+                            }
+                            retained.push(packet);
+                        }
+                    }
+                    drop(drive);
+                    assert_eq!(retained.len(), 1);
+                    assert_eq!(retained[0].payload(), body);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn mpeg_video_authored_split_controls_keep_exact_clocks_through_eof() {
+    for (raw, format, size, mpeg2) in [
+        (
+            include_bytes!(
+                "../../../../harness/features/mpegts-mpeg-video/inputs/mpeg1-split-ts188-25.ts"
+            )
+            .as_slice(),
+            PacketFormat::Ts188,
+            33,
+            false,
+        ),
+        (
+            include_bytes!(
+                "../../../../harness/features/mpegts-mpeg-video/inputs/mpeg2-split-m2ts192-25.m2ts"
+            )
+            .as_slice(),
+            PacketFormat::M2ts192,
+            52,
+            true,
+        ),
+    ] {
+        for (chunk, work) in [(1, 1), (7, 7), (4096, 4096)] {
+            let mut drive = Drive::new(
+                raw,
+                ReaderLimits {
+                    format,
+                    ..ReaderLimits::default()
+                },
+                chunk,
+                work,
+            );
+            let mut count = 0;
+            while let Some(event) = drive.next().unwrap() {
+                if let Event::Packet(packet) = event {
+                    assert_eq!(packet.payload().len(), size);
+                    assert_eq!(
+                        (packet.pts(), packet.dts(), packet.duration()),
+                        (
+                            Some(90000 + count * 3600),
+                            Some(87000 + count * 3600),
+                            Some(3600)
+                        )
+                    );
+                    let AccessUnit::MpegVideo(unit) = packet.access_unit() else {
+                        panic!("picture");
+                    };
+                    assert_eq!(unit.mpeg2, mpeg2);
+                    assert_eq!(unit.temporal_reference, count as u16);
+                    let TraceEvent::Pes(pes) = packet.sources()[0].pes.event() else {
+                        panic!("PES");
+                    };
+                    assert_eq!(pes.spans().len(), 2);
+                    assert_eq!(
+                        packet.payload(),
+                        pes.payload().flatten().copied().collect::<Vec<_>>()
+                    );
+                    count += 1;
+                }
+            }
+            assert_eq!(count, 2);
+        }
+    }
+}
+
+fn advance_to_split_pes(drive: &mut Drive<'_>) {
+    loop {
+        match drive.next().unwrap() {
+            Some(Event::Other(super::ReaderEvent::Source(source)))
+                if matches!(source.event(), TraceEvent::Pes(_)) =>
+            {
+                return;
+            }
+            Some(Event::Other(_)) => (),
+            other => panic!("source PES expected: {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn mpeg_video_split_freeze_retries_without_duplicate_bytes_or_sources() {
+    let start = TS2.windows(4).position(|b| b == [0, 0, 1, 0xb3]).unwrap();
+    let body = &TS2[start..564];
+    let raw = split_envelope(body, true, 23, false);
+    let mut drive = Drive::new(&raw, ReaderLimits::default(), 1, 1);
+    advance_to_split_pes(&mut drive);
+    let pressure = drive
+        .pool
+        .reserve(drive.pool.available() - body.len())
+        .unwrap();
+    let Error::Backpressure {
+        requested,
+        available,
+    } = drive.next().unwrap_err()
+    else {
+        panic!("source-table pressure");
+    };
+    assert_eq!(available, body.len());
+    assert!(requested > available);
+    drop(pressure);
+    // Allow the pending source table and the AU bytes, but no byte-owner header.
+    let pressure = drive
+        .pool
+        .reserve(drive.pool.available() - body.len() - requested)
+        .unwrap();
+    for _ in 0..2 {
+        assert_eq!(
+            drive.next().unwrap_err(),
+            Error::Backpressure {
+                requested: triergon_core::Bytes::owner_overhead_bytes(),
+                available: 0,
+            }
+        );
+    }
+    drop(pressure);
+    let Some(Event::Packet(packet)) = drive.next().unwrap() else {
+        panic!("picture after pressure");
+    };
+    assert_eq!(packet.payload(), body);
+    assert_eq!(packet.sources().len(), 1);
+    while let Some(event) = drive.next().unwrap() {
+        assert!(!matches!(event, Event::Packet(_)));
+    }
+}
+
+#[test]
+fn mpeg_video_split_cancellation_releases_pending_storage() {
+    let start = TS2.windows(4).position(|b| b == [0, 0, 1, 0xb3]).unwrap();
+    let raw = split_envelope(&TS2[start..564], true, 23, false);
+    let mut drive = Drive::new(&raw, ReaderLimits::default(), 1, 1);
+    advance_to_split_pes(&mut drive);
+    assert!(matches!(
+        drive
+            .reader
+            .step(&mut triergon_core::WorkBudget::new(3), &super::OFF),
+        Ok(triergon_core::Step::Yield)
+    ));
+    let mut work = triergon_core::WorkBudget::new(0);
+    assert_eq!(
+        drive
+            .reader
+            .step(&mut work, &std::sync::atomic::AtomicBool::new(true))
+            .unwrap_err(),
+        Error::Cancelled
+    );
+    assert_eq!(work.spent(), 0);
+    assert_eq!(
+        drive.pool.used(),
+        triergon_core::Budget::control_storage_bytes()
+    );
+}
