@@ -6,11 +6,11 @@
 //! attached fonts it has read to the renderer (`ass_add_font`, which copies
 //! them), opens the default font file (which libass opens itself), creates
 //! and configures the renderer, reads the script or runs the stream and
-//! renders every frame. The timed span is the reading and the rendering, as
-//! the reference's is: it starts once the renderer is configured, since
-//! every libass setter empties the renderer's caches (`ass_reconfigure`), and
-//! it ends before the renderer, the script and the fonts are freed, so
-//! neither side times a cache reset or the teardown.
+//! renders every frame. The timed span is the reading and the rendering, on
+//! both sides: it starts once the renderer is configured, since every libass
+//! setter empties the renderer's caches, and it ends before the renderer, the
+//! script and the fonts are freed, so neither side times a cache reset or the
+//! teardown.
 
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -89,7 +89,7 @@ pub struct Case<'a> {
 
 /// libass's number for an image's kind (`IMAGE_TYPE_CHARACTER`, `_OUTLINE`,
 /// `_SHADOW`), and 3 for the box behind a `BorderStyle` 4 event, whose type
-/// libass leaves uninitialised: the reference tells the box by its buffer.
+/// libass leaves uninitialised: the libass worker tells the box by its buffer.
 const fn image_type(kind: ImageKind) -> i64 {
     match kind {
         ImageKind::Fill => 0,
@@ -144,7 +144,7 @@ impl Frames for Folded {
     }
 }
 
-/// The reference's dump lines.
+/// The dump lines, as the libass worker prints them.
 struct Printed<W: Write>(W);
 
 impl<W: Write> Frames for Printed<W> {
@@ -215,7 +215,7 @@ impl Case<'_> {
             self.storage.width,
             self.storage.height,
         ));
-        // A player's cache limits, as the reference sets them.
+        // A player's cache limits, as the libass worker sets them.
         settings.cache = CacheLimits::new(1000, 24);
         settings
     }

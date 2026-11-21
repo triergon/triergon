@@ -65,7 +65,7 @@ pub struct Options<'a> {
 }
 
 /// A parsed ASS or SSA script: header values, styles, events, embedded fonts
-/// and the parser state libass keeps between packets of a stream.
+/// and the parser state kept between packets of a stream.
 #[derive(Debug)]
 pub struct Script {
     id: u64,
@@ -327,9 +327,9 @@ impl Script {
         &self.limits
     }
 
-    /// The index into [`Script::styles`] of the style an event or `\r` names
-    /// (`ass_lookup_style`): leading `*` removed, `Default` in any case, the
-    /// last style with exactly that name, else the default style.
+    /// The index into [`Script::styles`] of the style an event or `\r` names:
+    /// leading `*` removed, `Default` in any case, the last style with exactly
+    /// that name, else the default style.
     pub fn lookup_style(&self, name: &[u8]) -> usize {
         let start = name.iter().position(|&c| c != b'*').unwrap_or(name.len());
         let name = &name[start..];
@@ -353,8 +353,8 @@ impl Script {
         Ok(())
     }
 
-    /// libass's `process_text`: lines split at CR and LF, with byte order
-    /// marks skipped at line starts, then any pending embedded font decoded.
+    /// Lines split at CR and LF, with byte order marks skipped at line
+    /// starts, then any pending embedded font decoded.
     fn process_text(&mut self, text: &[u8], work: &mut WorkBudget) -> Result<()> {
         let mut rest = text;
         loop {
@@ -434,7 +434,7 @@ impl Script {
         Ok(())
     }
 
-    /// libass's `process_style`: the fields in format order, normalised.
+    /// A `Style:` line: the fields in format order, normalised.
     fn style_line(&mut self, line: &[u8], work: &mut WorkBudget) -> Result<()> {
         if self.styles.len() >= self.limits.styles {
             return Err(Error::Policy("ass styles"));
@@ -510,8 +510,8 @@ impl Script {
         self.styles.try_push(style).map_err(|e| e.error)
     }
 
-    /// libass's `custom_format_line_compatibility`: a format line other than
-    /// the standard one makes `ScaledBorderAndShadow` default to yes.
+    /// A format line other than the standard one makes
+    /// `ScaledBorderAndShadow` default to yes.
     fn custom_format_compatibility(&mut self, format: &[u8], standard: &[u8]) {
         if !self.headers.contains(Header::ScaledBorderAndShadow) && !same_format(format, standard) {
             self.info.scaled_border_and_shadow = true;
@@ -541,8 +541,8 @@ impl Script {
         Ok(())
     }
 
-    /// libass's `detect_legacy_conv_subs`: FFmpeg's converted subtitles from
-    /// before it wrote `ScaledBorderAndShadow`, which expect it to be yes.
+    /// Subtitles FFmpeg converted before it wrote `ScaledBorderAndShadow`,
+    /// which expect it to be yes.
     fn is_legacy_ffmpeg(&self) -> bool {
         self.headers.is_legacy_ffmpeg()
             && self.styles.len() == 2
@@ -567,8 +567,8 @@ impl Script {
         self.events.try_push(event).map_err(|e| e.error)
     }
 
-    /// libass's `check_duplicate_event`: by the bitmap while it is active,
-    /// else by scanning the events held.
+    /// Whether `read_order` was seen: by the bitmap while it is active, else
+    /// by scanning the events held.
     fn is_duplicate(&mut self, read_order: i32, work: &mut WorkBudget) -> Result<bool> {
         if self.read_order.is_active() {
             return Ok(self.read_order.test_and_set(read_order)? == Some(true));
@@ -578,8 +578,8 @@ impl Script {
     }
 }
 
-/// libass's `format_line_compare`: the same field names, ignoring ASCII case
-/// and blanks around them, with `Actor` read as `Name`.
+/// Whether two format lines name the same fields, ignoring ASCII case and
+/// blanks around them, with `Actor` read as `Name`.
 fn same_format(mut a: &[u8], mut b: &[u8]) -> bool {
     loop {
         match (format_field(&mut a), format_field(&mut b)) {

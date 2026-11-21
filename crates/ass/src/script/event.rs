@@ -45,7 +45,7 @@ impl Event {
         self.strings.get(2)
     }
 
-    /// `start + duration`, wrapping as libass's arithmetic does.
+    /// `start + duration`, wrapping on overflow.
     pub const fn end(&self) -> i64 {
         self.start.wrapping_add(self.duration)
     }
@@ -56,8 +56,8 @@ impl Event {
     }
 }
 
-/// libass's `string2timecode`: `H:M:S.CS` read by `sscanf("%d:%d:%d.%d")`,
-/// with the last field taken as centiseconds; anything shorter is 0.
+/// `H:M:S.CS` read by `sscanf("%d:%d:%d.%d")`, with the last field taken as
+/// centiseconds; anything shorter is 0.
 fn timecode(s: &[u8]) -> i64 {
     let mut fields = [0_i64; 4];
     let mut rest = s;
@@ -79,9 +79,9 @@ fn timecode(s: &[u8]) -> i64 {
 }
 
 impl Script {
-    /// libass's `process_event_tail`: fields in event-format order after
-    /// skipping `skip` format names, up to `Text`, which takes the rest of the
-    /// line. `None` when the line ends before `Text` or the format has none.
+    /// An event from its fields in event-format order after skipping `skip`
+    /// format names, up to `Text`, which takes the rest of the line. `None`
+    /// when the line ends before `Text` or the format has none.
     pub(super) fn event_tail(
         &self,
         line: &[u8],

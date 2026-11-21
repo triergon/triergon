@@ -7,9 +7,9 @@ use triergon_core::{Budget, Result};
 use crate::number::{ffmax, header_int, strtod};
 use crate::strings::Strings;
 
-/// A colour as libass holds it: red in the top byte, then green and blue, and
-/// alpha in the low byte, where 0 is opaque. Scripts write `&HAABBGGRR`; the
-/// byte order is swapped on reading.
+/// A colour: red in the top byte, then green and blue, and alpha in the low
+/// byte, where 0 is opaque. Scripts write `&HAABBGGRR`; the byte order is
+/// swapped on reading.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Rgba(pub u32);
 
@@ -120,13 +120,13 @@ pub enum VAlign {
     Top,
     /// Centred.
     Middle,
-    /// Both of libass's vertical bits, which only a style override sets and
-    /// libass places as neither.
+    /// Both vertical bits, which only a style override sets; libass places it
+    /// as neither.
     TopAndMiddle,
 }
 
-/// Where an event is anchored: libass keeps it as two bits of horizontal and
-/// two of vertical alignment, which is all it reads of the value.
+/// Where an event is anchored: two bits of horizontal and two of vertical
+/// alignment, which is all libass reads of the value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Alignment {
     /// Left, centre or right.
@@ -136,9 +136,9 @@ pub struct Alignment {
 }
 
 impl Alignment {
-    /// The alignment in libass's bits, which is also VSFilter's legacy `\a`
+    /// The alignment from its bits, which are also VSFilter's legacy `\a`
     /// numbering: 1 to 3 at the bottom, 5 to 7 at the top and 9 to 11 in the
-    /// middle. Bits above the lowest four are ignored, as libass ignores them.
+    /// middle. Bits above the lowest four are ignored.
     pub const fn from_bits(bits: i32) -> Self {
         let horizontal = match bits & 0b11 {
             0 => HAlign::None,
@@ -159,8 +159,8 @@ impl Alignment {
     }
 
     /// The alignment from numeric-keypad numbering, as `\an` and v4+ styles
-    /// write it (libass's `numpad2align`): 1 to 9, negative values by their
-    /// magnitude, larger values wrapping horizontally and staying at the top.
+    /// write it: 1 to 9, negative values by their magnitude, larger values
+    /// wrapping horizontally and staying at the top.
     pub const fn from_numpad(value: i32) -> Self {
         let value = if value < -i32::MAX {
             2
@@ -179,7 +179,7 @@ impl Alignment {
         Self::from_bits(horizontal | vertical)
     }
 
-    /// The alignment in libass's bits.
+    /// The alignment's bits, as [`Alignment::from_bits`] reads them.
     pub const fn bits(self) -> i32 {
         let horizontal = match self.horizontal {
             HAlign::None => 0,
@@ -198,8 +198,8 @@ impl Alignment {
 }
 
 /// Text justification independent of alignment, which only a style override
-/// sets (`Justify`, libass's `ASS_JUSTIFY_*`). Values libass does not name act
-/// as [`Justify::Auto`].
+/// sets (`Justify`, libass's `ASS_JUSTIFY_*`). Values other than 1 to 3 act as
+/// [`Justify::Auto`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Justify {
     /// Lines are justified as the event is aligned.
@@ -214,7 +214,7 @@ pub enum Justify {
 }
 
 impl Justify {
-    /// The justification of libass's value.
+    /// The justification of a `Justify` value.
     pub const fn from_value(value: i32) -> Self {
         match value {
             1 => Self::Left,
@@ -225,15 +225,15 @@ impl Justify {
     }
 }
 
-/// A `Bold` field or `\b` value as libass keeps it: 0 regular, 1 bold, or a
-/// weight such as 100 or 900. Glyph runs split where it changes, so 1 and 700
-/// are different values even though both ask for weight 700.
+/// A `Bold` field or `\b` value: 0 regular, 1 bold, or a weight such as 100
+/// or 900. Glyph runs split where it changes, so 1 and 700 are different
+/// values even though both ask for weight 700.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Bold(pub i32);
 
 impl Bold {
-    /// The font weight libass requests (`ass_update_font`): 700 for 1 and -1,
-    /// 400 for 0, else the value read as unsigned.
+    /// The font weight libass requests: 700 for 1 and -1, 400 for 0, else the
+    /// value read as unsigned.
     pub const fn weight(self) -> u32 {
         match self.0 {
             1 | -1 => 700,
@@ -243,14 +243,14 @@ impl Bold {
     }
 }
 
-/// An `Italic` field or `\i` value as libass keeps it: 0 upright, 1 italic, or
-/// any other value a style override sets.
+/// An `Italic` field or `\i` value: 0 upright, 1 italic, or any other value a
+/// style override sets.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Italic(pub i32);
 
 impl Italic {
-    /// The slant libass requests (`ass_update_font`): 100 for 1, 0 for 0, else
-    /// the value read as unsigned.
+    /// The slant libass requests: 100 for 1, 0 for 0, else the value read as
+    /// unsigned.
     pub const fn slant(self) -> u32 {
         match self.0 {
             1 => 100,
@@ -259,9 +259,9 @@ impl Italic {
     }
 }
 
-/// A `BorderStyle` value as libass keeps it. 3 draws an opaque box for each
-/// glyph and 4 a background box behind the event; every other value draws an
-/// outline. Glyph runs split where the value changes.
+/// A `BorderStyle` value. 3 draws an opaque box for each glyph and 4 a
+/// background box behind the event; every other value draws an outline. Glyph
+/// runs split where the value changes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct BorderStyle(pub i32);
 
@@ -332,7 +332,7 @@ pub struct Style {
     pub alignment: Alignment,
     /// The margins events use where theirs are 0.
     pub margins: Margins,
-    /// The font charset, as Windows numbers it; libass's value -1 asks for the
+    /// The font charset, as Windows numbers it; the value -1 asks for the
     /// base direction to be found from the text.
     pub encoding: i32,
     /// The default `\blur`; only a style override sets it.
@@ -407,7 +407,7 @@ impl Field {
     }
 }
 
-/// libass's `parse_color_header`: a header integer with its bytes swapped.
+/// A colour field: a header integer with its bytes swapped.
 pub(crate) fn header_colour(s: &[u8]) -> Rgba {
     Rgba((header_int(s) as u32).swap_bytes())
 }
@@ -439,7 +439,7 @@ impl Style {
         Ok(style)
     }
 
-    /// A zeroed style, as libass allocates one.
+    /// A zeroed style.
     pub(crate) fn empty(budget: &Budget, name: &[u8], font_name: &[u8]) -> Result<Self> {
         Ok(Self {
             strings: Strings::new(budget, [Some(name), Some(font_name)])?,
@@ -484,8 +484,8 @@ impl Style {
         Ok(())
     }
 
-    /// libass's `set_style_alpha`: clamped alphas for the primary, secondary
-    /// and outline colours and for the back colour.
+    /// Sets clamped alphas for the primary, secondary and outline colours and
+    /// for the back colour.
     pub(crate) fn set_alpha(&mut self, front: i32, back: i32) {
         let front = front.clamp(0, 255) as u8;
         let back = back.clamp(0, 255) as u8;
@@ -566,7 +566,7 @@ mod tests {
     }
 
     #[test]
-    fn weights_and_slants_follow_ass_update_font() {
+    fn bold_and_italic_request_weights_and_slants() {
         assert_eq!(Bold(1).weight(), 700);
         assert_eq!(Bold(-1).weight(), 700);
         assert_eq!(Bold(0).weight(), 400);

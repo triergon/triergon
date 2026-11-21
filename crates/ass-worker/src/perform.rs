@@ -293,9 +293,9 @@ impl Walker {
         self.karaoke(sink, now.wrapping_sub(event.start))
     }
 
-    /// Karaoke over synthetic positions: run starts where libass's style-run
-    /// split puts them for karaoke alone, every glyph 10 pixels plus its
-    /// index mod 3 wide, spaces invisible.
+    /// Karaoke over synthetic positions: runs start at the first glyph, a
+    /// nonzero karaoke time, a new karaoke kind and either side of a drawing;
+    /// every glyph is 10 pixels plus its index mod 3 wide, spaces invisible.
     fn karaoke(&mut self, sink: &mut impl Sink, elapsed: i64) -> Result<()> {
         let mut last_kind = self.glyphs.first().and_then(|g| g.karaoke.mark.kind);
         let mut x = 0;

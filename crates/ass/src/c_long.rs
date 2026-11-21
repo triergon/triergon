@@ -3,13 +3,13 @@
 //! libass reads a few values through `long`: `atoi` (the parameters of a
 //! `Banner` or `Scroll` effect and a Matroska packet's ReadOrder) and the
 //! `%d` conversions of `sscanf` (event times) go through `strtol`,
-//! `parse_bool` calls `strtol` itself, and the karaoke split rounds with
+//! `header_bool` calls `strtol` itself, and the karaoke split rounds with
 //! `lrint`. `long` has 64 bits on LP64 targets and 32 on 32-bit ones, so a
 //! value beyond `int` saturates at different bounds before it is narrowed.
 //! These are the only results of the crate that depend on the width of
 //! `long`, and every conversion through `long` is here. One `lrint` is
-//! deliberately not: a drawing coordinate's (`double_to_d6`, `lrint` narrowed
-//! from `long` to `int`) follows libass on 32-bit ARM with GCC on every
+//! deliberately not: a drawing coordinate's (`lrint(v * 64)` narrowed from
+//! `long` to `int`) follows libass on 32-bit ARM with GCC on every
 //! target, as do the casts from `double` to `int` C leaves undefined out of
 //! range; see the crate's documentation.
 

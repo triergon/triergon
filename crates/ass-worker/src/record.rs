@@ -28,7 +28,7 @@ pub enum Kind {
     Font,
     /// No track: a whole script without a script type.
     NoTrack,
-    /// The play resolution after libass's lazy initialisation.
+    /// The play resolution with its defaults applied (`Info::play_res`).
     PlayRes,
     /// The start of an event's walk: the event and the time.
     Walk,
@@ -93,8 +93,8 @@ pub trait Sink {
 
     /// A drawing's control box, then its point and segment counts and the
     /// FNV-1a hash of each point's x and y as little-endian 32-bit values and
-    /// each segment as libass stores it (its order, plus 4 when it closes a
-    /// contour); absent for a drawing libass rejects.
+    /// each segment as one byte (its order, plus 4 when it closes a contour);
+    /// absent for a drawing libass rejects.
     fn outline(&mut self, drawing: Option<(&Outline, Rect)>) -> io::Result<()> {
         let Some((outline, cbox)) = drawing else {
             return self.absent();

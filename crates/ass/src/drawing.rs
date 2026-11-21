@@ -1,5 +1,5 @@
-//! The ASS drawing language (`\p`, vector `\clip`) as libass's
-//! `ass_drawing.c` reads it into outlines.
+//! The ASS drawing language (`\p`, vector `\clip`) as libass reads it into
+//! outlines.
 //!
 //! Coordinates are 26.6 fixed point (1/64 script pixel, `lrint(v * 64)`),
 //! with y growing downwards as on screen. Outlines are unscaled: the `\p`
@@ -19,7 +19,7 @@ pub fn drawing_scale(level: i32) -> f64 {
     if base > 0 { 1.0 / f64::from(base) } else { 0.0 }
 }
 
-/// The token kinds of libass's drawing tokenizer.
+/// The token kinds of the drawing tokenizer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Token {
     Move,
@@ -36,20 +36,20 @@ pub struct Drawing<'o> {
     /// Lines and cubic splines in closed contours, 26.6, y down.
     pub outline: &'o Outline,
     /// The box of every point named, control points and B-spline points
-    /// included; [`Rect::EMPTY`] for a drawing without points. libass sizes a
-    /// drawing glyph by it.
+    /// included; [`Rect::EMPTY`] for a drawing without points. A drawing
+    /// glyph is sized by it.
     pub cbox: Rect,
 }
 
 impl Drawing<'_> {
-    /// Parses drawing commands into `outline` (cleared first), as libass's
-    /// `ass_drawing_parse` does: `m` moves (closing the open contour), `n`
-    /// moves without closing, `l` lines, `b` cubic Béziers, `s` uniform cubic
-    /// B-splines, `p` extends them and `c` closes them; other bytes are
-    /// skipped. Commands before the first valid `m` are ignored, and an `n`
-    /// first rejects the whole drawing (an empty outline).
+    /// Parses drawing commands into `outline` (cleared first): `m` moves
+    /// (closing the open contour), `n` moves without closing, `l` lines, `b`
+    /// cubic Béziers, `s` uniform cubic B-splines, `p` extends them and `c`
+    /// closes them; other bytes are skipped. Commands before the first valid
+    /// `m` are ignored, and an `n` first rejects the whole drawing (an empty
+    /// outline).
     ///
-    /// Returns `None` when a point lies beyond libass's coordinate bound
+    /// Returns `None` when a point lies beyond the coordinate bound
     /// ([`OUTLINE_MAX`](triergon_raster::OUTLINE_MAX)), for which libass
     /// discards the drawing; the outline is then empty.
     ///
@@ -92,7 +92,7 @@ impl Drawing<'_> {
     }
 }
 
-/// libass's `drawing_tokenize`, emitting tokens as it finds them.
+/// Reads the commands of `text`, emitting each token and its point as found.
 fn tokenize(
     text: &[u8],
     work: &mut WorkBudget,
@@ -106,7 +106,7 @@ fn tokenize(
     };
     let mut have_root = false;
     let mut m_seen = false;
-    let mut tokens = 0_usize; // libass's `points`, which `c` does not count
+    let mut tokens = 0_usize; // points read, not counting those `c` emits
     // The current point when `s` started and the spline's first two points.
     let mut spline: Option<[Vector; 3]> = None;
     while let Some(&command) = text.get(t.at) {
@@ -137,7 +137,7 @@ fn tokenize(
             b'b' if have_root => tokens += t.many(Token::Cubic, 3, work)?,
             b's' if have_root => {
                 let start = t.last;
-                // Like libass, stop reading at the first point that fails.
+                // Stop reading at the first point that fails.
                 let Some([a, b, c]) = (|| Some([t.point()?, t.point()?, t.point()?]))() else {
                     spline = None;
                     continue;
@@ -169,7 +169,7 @@ struct Tokenizer<'t, 'e> {
 }
 
 impl Tokenizer<'_, '_> {
-    /// libass's `get_point`: two numbers, each consumed if it converts.
+    /// Two numbers, each consumed if it converts.
     fn point(&mut self) -> Option<Vector> {
         let x = self.coordinate()?;
         let y = self.coordinate()?;
@@ -179,9 +179,9 @@ impl Tokenizer<'_, '_> {
     fn coordinate(&mut self) -> Option<i32> {
         let (value, used) = strtod(&self.text[self.at..]);
         self.at += used;
-        // libass's `double_to_d6` narrows `lrint` to `int`; out of `int`'s
-        // range C leaves the result to the target, and libass on 32-bit ARM
-        // with GCC saturates, which puts the point out of bounds.
+        // `lrint(v * 64)` narrowed to `int`; out of `int`'s range C leaves the
+        // result to the target, and libass on 32-bit ARM with GCC saturates,
+        // which puts the point out of bounds.
         (used != 0).then(|| pixels_26_6(value))
     }
 
@@ -212,20 +212,17 @@ impl Tokenizer<'_, '_> {
     }
 }
 
-/// libass's conversion of the token list into an outline, fed one token at a
-/// time; curves look back at the most recent points.
+/// Converts tokens into an outline, fed one token at a time; curves look back
+/// at the most recent points.
 ///
-/// libass adds each point as it comes and tags a segment onto the point that
-/// ends it; here a segment is pushed with the points it owns once its end is
-/// known, so `start` holds the last point added, which starts the next
-/// segment. The result is the same outline, and a point beyond the bound
-/// makes the drawing invalid either way.
+/// A segment is pushed with the points it owns once its end is known, so
+/// `start` holds the last point added, which starts the next segment. A point
+/// beyond the bound makes the drawing invalid.
 struct Builder<'o> {
     outline: &'o mut Outline,
     cbox: Rect,
     pen: Vector,
-    /// The open contour's current point, `None` before a contour starts
-    /// (libass's `started`).
+    /// The open contour's current point; `None` before a contour starts.
     start: Option<Vector>,
     /// The last four token points, the newest last.
     recent: [Vector; 4],
@@ -266,14 +263,15 @@ impl Builder<'_> {
         Ok(())
     }
 
-    /// libass's `drawing_add_curve` over the last four points.
+    /// Adds a cubic Bézier on the last four points, converted from uniform
+    /// B-spline points when `spline` is set.
     fn curve(&mut self, spline: bool) -> Result<()> {
         let mut p = self.recent;
         for &q in &p {
             self.cbox.include_point(q);
         }
         if spline {
-            // Uniform B-spline to Bézier, in libass's integer arithmetic.
+            // Uniform B-spline to Bézier in wrapping integer arithmetic.
             let third = |a: i32, b: i32| b.wrapping_sub(a) / 3;
             let (x01, y01) = (third(p[0].x, p[1].x), third(p[0].y, p[1].y));
             let (x12, y12) = (third(p[1].x, p[2].x), third(p[1].y, p[2].y));

@@ -1,4 +1,4 @@
-//! Karaoke timing over laid-out glyphs, libass's `ass_process_karaoke_effects`.
+//! Karaoke timing over laid-out glyphs.
 
 use std::ops::Range;
 
@@ -8,12 +8,12 @@ use crate::{Karaoke, KaraokeMark};
 /// What karaoke needs of one laid-out glyph.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct KaraokeGlyph {
-    /// The glyph starts a run (libass's `starts_new_run` after shaping and
-    /// wrapping); the first glyph always does.
+    /// The glyph starts a run after shaping and wrapping; the first glyph
+    /// always does.
     pub starts_new_run: bool,
     /// The karaoke tags before the glyph.
     pub mark: KaraokeMark,
-    /// Invisible (libass's `skip`), so not part of a syllable's extent.
+    /// Invisible, so not part of a syllable's extent.
     pub skip: bool,
     /// Pen position in 26.6 fixed point.
     pub x: i32,
@@ -41,8 +41,7 @@ pub struct Syllable {
 }
 
 impl Syllable {
-    /// The boundary relative to a glyph's pen position, as libass stores it
-    /// per glyph (`effect_timing`).
+    /// The boundary relative to a glyph's pen position.
     pub const fn timing(&self, glyph: &KaraokeGlyph) -> i32 {
         self.boundary.wrapping_sub(glyph.x)
     }

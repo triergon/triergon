@@ -1,7 +1,5 @@
-//! Evaluating an event at one time: libass's render context, the state its
-//! override tags change, and the walk over the event text that gives each
-//! glyph a copy of it (`init_render_context`, `ass_parse_tags` and the text
-//! loop of `parse_events`).
+//! Evaluating an event at one time: the state its override tags change, and
+//! the walk over the event text that gives each glyph a copy of it.
 //!
 //! Values are in script units: sizes, borders, shadows and positions in
 //! script pixels, before the renderer's screen scaling.
@@ -81,7 +79,7 @@ pub struct GlyphState<'s> {
     pub encoding: i32,
 }
 
-/// The font a glyph asks for, as libass's `ass_update_font` describes it.
+/// The font a glyph asks for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FontDesc<'s> {
     /// The family name, without the `@` of vertical text.
@@ -109,7 +107,7 @@ impl<'s> GlyphState<'s> {
         }
     }
 
-    /// libass's `ass_reset_render_context`: everything `\r` resets.
+    /// Everything `\r` resets, from `style`.
     fn reset(style: &'s Style) -> Self {
         Self {
             family: style.font_name(),
@@ -170,8 +168,8 @@ pub struct EventState<'s> {
     /// Whether the event takes part in collision handling: not after `\pos`,
     /// `\move`, `\org`, `\t` or a scrolling effect.
     pub detect_collisions: bool,
-    /// libass's `explicit`: a scrolling effect, or a `\pos`, `\move`,
-    /// `\clip`, `\iclip`, `\org` or `\p...` anywhere in the text.
+    /// Placed explicitly: a scrolling effect, or a `\pos`, `\move`, `\clip`,
+    /// `\iclip`, `\org` or `\p...` anywhere in the text.
     pub explicit: bool,
     /// The alpha of `\fad`/`\fade` now, 0 to 255 (when positive it is
     /// applied over each glyph's alphas).
@@ -193,8 +191,7 @@ pub enum Symbol<'s> {
         text: &'s [u8],
         /// The `\p` level in force.
         scale: i32,
-        /// The `\pbo` in force, truncated to an integer as libass stores it
-        /// per glyph.
+        /// The `\pbo` in force, truncated to an integer.
         baseline: i32,
     },
 }
@@ -411,9 +408,9 @@ impl<'s> Context<'s> {
         }
     }
 
-    /// The first `}` at or after `from`, as libass's `strchr` finds it. A
-    /// `}` found earlier, or the absence of one, still answers for any later
-    /// `from` up to it, so the scan and its charge stay linear in the text.
+    /// The first `}` at or after `from`, as `strchr` finds it. A `}` found
+    /// earlier, or the absence of one, still answers for any later `from` up
+    /// to it, so the scan and its charge stay linear in the text.
     fn closing_brace(&mut self, from: usize) -> Result<Option<usize>> {
         match self.close {
             Brace::None => return Ok(None),
@@ -428,7 +425,7 @@ impl<'s> Context<'s> {
         Ok(close)
     }
 
-    /// libass's `ass_parse_tags` over `tags` with animation power `pwr`.
+    /// Applies `tags` with animation power `pwr`.
     /// Inside a `\t` (`nested`), a further `\t` sets the power for the tags
     /// after it; its own tags then always run to the end of the block, so
     /// they continue in place rather than recursing, and the recursion is at
@@ -652,19 +649,17 @@ impl<'s> Context<'s> {
     }
 }
 
-/// libass's `calc_anim_int32`: `(1 - pwr) * old + new * pwr` truncated by
-/// `dtoi32`.
+/// `(1 - pwr) * old + new * pwr` truncated by `dtoi32`.
 fn anim(new: u32, old: u32, pwr: f64) -> i32 {
     dtoi32((1.0 - pwr) * f64::from(old) + f64::from(new) * pwr)
 }
 
-/// libass's `change_alpha`: the low byte of the animated value.
+/// `colour` with the low byte of its animated alpha.
 fn change_alpha(colour: Rgba, new: u32, pwr: f64) -> Rgba {
     colour.with_alpha(anim(new, colour.a().into(), pwr) as u8)
 }
 
-/// libass's `change_color`: each of red, green and blue animated in its own
-/// byte position, alpha kept.
+/// Each of red, green and blue animated in its own byte position, alpha kept.
 fn change_colour(colour: Rgba, new: Rgba, pwr: f64) -> Rgba {
     let (old, new) = (colour.0.swap_bytes(), new.0.swap_bytes());
     let mixed = [0xff_0000_u32, 0xff00, 0xff]
@@ -695,8 +690,8 @@ fn move_position(m: Move, t: i32, duration: i32) -> (f64, f64) {
     )
 }
 
-/// libass's `interpolate_alpha` for `\fad`/`\fade` at `now` milliseconds into
-/// an event of `duration`.
+/// The alpha of `\fad`/`\fade` at `now` milliseconds into an event of
+/// `duration`.
 fn fade_alpha(fade: Fade, now: i64, duration: i32) -> i32 {
     let (a1, a2, a3, t1, t2, t3, t4) = match fade {
         Fade::InOut { fade_in, fade_out } => (255, 0, 255, -1, fade_in, fade_out, -1),
@@ -735,9 +730,9 @@ fn fade_alpha(fade: Fade, now: i64, duration: i32) -> i32 {
     }
 }
 
-/// libass's `ass_event_has_hard_overrides`: whether a block holds `\pos`,
-/// `\move`, `\clip`, `\iclip`, `\org` or any tag starting with `p`, which
-/// exempts an event from selective style overrides.
+/// Whether a block holds `\pos`, `\move`, `\clip`, `\iclip`, `\org` or any
+/// tag starting with `p`, which exempts an event from selective style
+/// overrides.
 fn has_hard_overrides(text: &[u8]) -> bool {
     const HARD: [&[u8]; 7] = [b"pos", b"move", b"clip", b"iclip", b"org", b"pbo", b"p"];
     let mut at = 0;

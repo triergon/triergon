@@ -15,7 +15,7 @@ pub enum ScriptType {
     Ssa,
 }
 
-/// How lines wrap (`WrapStyle`, `\q`). Values libass does not name wrap as
+/// How lines wrap (`WrapStyle`, `\q`). Values other than 0 to 3 wrap as
 /// [`WrapStyle::Smart`] does.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum WrapStyle {
@@ -31,7 +31,7 @@ pub enum WrapStyle {
 }
 
 impl WrapStyle {
-    /// The wrap style of libass's value.
+    /// The wrap style of a `WrapStyle` or `\q` value.
     pub const fn from_value(value: i32) -> Self {
         match value {
             1 => Self::EndOfLine,
@@ -48,7 +48,7 @@ pub enum YCbCrMatrix {
     /// No header, or an empty one.
     #[default]
     Default,
-    /// A value libass does not know.
+    /// An unrecognised value.
     Unknown,
     /// `None`: colours are not converted.
     None,
@@ -71,8 +71,8 @@ pub enum YCbCrMatrix {
 }
 
 impl YCbCrMatrix {
-    /// libass's `parse_ycbcr_matrix`: blanks trimmed, the first 15 bytes
-    /// compared ignoring ASCII case.
+    /// The header's value: blanks trimmed, the first 15 bytes compared
+    /// ignoring ASCII case.
     pub(crate) fn parse(value: &[u8]) -> Self {
         const NAMES: [(&[u8], YCbCrMatrix); 9] = [
             (b"none", YCbCrMatrix::None),
@@ -141,9 +141,9 @@ impl Info {
         }
     }
 
-    /// The play resolution libass renders with (`ass_lazy_track_init`): 384×288
-    /// when neither dimension is positive, 1280×1024 from either half, else
-    /// the missing one from a 4:3 aspect.
+    /// The play resolution libass renders with: 384×288 when neither
+    /// dimension is positive, 1280×1024 from either half, else the missing
+    /// one from a 4:3 aspect.
     pub const fn play_res(&self) -> (i32, i32) {
         let (x, y) = (self.play_res_x, self.play_res_y);
         if x > 0 && y > 0 {
@@ -153,7 +153,7 @@ impl Info {
         } else if y <= 0 && x == 1280 {
             (x, 1024)
         } else if y <= 0 {
-            // libass computes `x * 3 / 4` without overflow as (x-1) - (x-1)/4.
+            // `x * 3 / 4` without overflow: (x-1) - (x-1)/4.
             let x1 = x as u32 - 1;
             let y = (x1 - x1 / 4) as i32;
             (x, if y > 1 { y } else { 1 })
@@ -172,8 +172,7 @@ impl Info {
         }
     }
 
-    /// libass's `process_info_line`: a `Key: value` header, keys compared
-    /// exactly. Returns the header read.
+    /// A `Key: value` header, keys compared exactly. Returns the header read.
     pub(super) fn read_line(&mut self, line: &[u8]) -> Option<Header> {
         let colon = line.iter().position(|&c| c == b':')?;
         let (key, value) = (&line[..colon], &line[colon + 1..]);
@@ -227,8 +226,8 @@ impl Info {
     }
 }
 
-/// libass's `parse_script_type`: `4.00` before the last blank-trimmed byte,
-/// optionally followed by `+`; no leading `v` is required.
+/// A `ScriptType` value: ending in `4.00`, or `4.00+` for ASS, before any
+/// trailing blanks; no leading `v` is required.
 fn script_type(value: &[u8]) -> Option<ScriptType> {
     let value = trim_end(value);
     if value.len() < 4 {
@@ -241,7 +240,7 @@ fn script_type(value: &[u8]) -> Option<ScriptType> {
     value.ends_with(b"4.00").then_some(kind)
 }
 
-/// A `[Script Info]` line libass records for its compatibility rules.
+/// A `[Script Info]` line recorded for the compatibility rules.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Header {
     Language,

@@ -31,15 +31,14 @@ pub(crate) fn trim_end(s: &[u8]) -> &[u8] {
     &s[..end]
 }
 
-/// Whether `s` starts with `prefix`, ignoring ASCII case (libass's
-/// `ass_strncasecmp(s, prefix, len) == 0`).
+/// Whether `s` starts with `prefix`, ignoring ASCII case.
 pub(crate) fn starts_with_ignore_case(s: &[u8], prefix: &[u8]) -> bool {
     s.len() >= prefix.len() && s[..prefix.len()].eq_ignore_ascii_case(prefix)
 }
 
-/// Splits the next comma-separated token off `rest`, as libass's `next_token`:
-/// leading blanks are skipped, an exhausted string yields `None`, and the
-/// token is trimmed at the end only when `trim` is set.
+/// Splits the next comma-separated token off `rest`: leading blanks are
+/// skipped, an exhausted string yields `None`, and the token is trimmed at
+/// the end only when `trim` is set.
 pub(crate) fn next_token<'a>(rest: &mut &'a [u8], trim: bool) -> Option<&'a [u8]> {
     let s = trim_start(rest);
     if s.is_empty() {

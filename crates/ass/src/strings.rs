@@ -2,8 +2,8 @@
 
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};
 
-/// `N` byte strings, each possibly absent (a NULL pointer in libass), stored
-/// back to back in one allocation.
+/// `N` byte strings, each possibly absent, stored back to back in one
+/// allocation.
 #[derive(Clone, Debug)]
 pub(crate) struct Strings<const N: usize> {
     data: Bytes,

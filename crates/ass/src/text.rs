@@ -2,10 +2,10 @@
 
 use crate::WrapStyle;
 
-/// libass's `ass_utf8_get_char`: a lead byte with one to four continuation
-/// bytes and exactly that many following (overlong forms and surrogates are
-/// accepted); anything else yields its first byte alone. Returns the code and
-/// the bytes used; the end of `s` reads as NUL.
+/// One character: a lead byte announcing one to four continuation bytes and
+/// exactly that many following (overlong forms and surrogates are accepted);
+/// anything else yields its first byte alone. Returns the code and the bytes
+/// used; the end of `s` reads as NUL.
 pub(crate) fn utf8_char(s: &[u8]) -> (u32, usize) {
     let Some(&lead) = s.first() else {
         return (0, 0);
@@ -29,10 +29,10 @@ pub(crate) fn utf8_char(s: &[u8]) -> (u32, usize) {
     (u32::from(lead), 1)
 }
 
-/// libass's `ass_get_next_char` for text outside override blocks: a tab is a
-/// space, `\N` a line break (and `\n` too under wrap style 2, else a space),
-/// `\h` a no-break space, `\{` and `\}` braces. Returns the code and the
-/// bytes used; 0 ends the text.
+/// The next character of text outside override blocks: a tab is a space,
+/// `\N` a line break (and `\n` too under wrap style 2, else a space), `\h` a
+/// no-break space, `\{` and `\}` braces. Returns the code and the bytes used;
+/// 0 ends the text.
 pub(crate) fn next_char(s: &[u8], wrap_style: WrapStyle) -> (u32, usize) {
     match s {
         [b'\t', ..] => (u32::from(b' '), 1),

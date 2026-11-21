@@ -1,7 +1,7 @@
 //! The numeric conversions libass applies to script text, each with its
 //! quirks: header integers reduced modulo 2^32, override integers saturated by
-//! `strtoll` and clamped to 32 bits, `ass_strtod`'s decimal conversion and the
-//! `sscanf` time fields.
+//! `strtoll` and clamped to 32 bits, a decimal conversion of libass's own and
+//! the `sscanf` time fields.
 //!
 //! Every function reads from the start of a slice whose end stands for the C
 //! terminator, and returns the value with the number of bytes consumed (0 when
@@ -9,11 +9,11 @@
 
 use crate::scan::{is_blank, is_space, starts_with_ignore_case};
 
-/// libass's `ass_strtod`: an optionally signed decimal mantissa of at most 18
-/// significant digits and an optional exponent, converted with the binary
-/// powers of ten in the order libass multiplies them. Exponents saturate at
-/// 511. An `e` or `E` is consumed even without exponent digits. Nothing
-/// converted yields 0 (or -0 after a minus sign) with nothing consumed.
+/// An optionally signed decimal mantissa of at most 18 significant digits and
+/// an optional exponent, scaled by the product of binary powers of ten taken
+/// smallest first. Exponents saturate at 511. An `e` or `E` is consumed even
+/// without exponent digits. Nothing converted yields 0 (or -0 after a minus
+/// sign) with nothing consumed.
 pub(crate) fn strtod(s: &[u8]) -> (f64, usize) {
     const POSITIVE: [f64; 9] = [10.0, 100.0, 1e4, 1e8, 1e16, 1e32, 1e64, 1e128, 1e256];
     const NEGATIVE: [f64; 9] = [0.1, 0.01, 1e-4, 1e-8, 1e-16, 1e-32, 1e-64, 1e-128, 1e-256];
@@ -104,7 +104,7 @@ pub(crate) fn strtod(s: &[u8]) -> (f64, usize) {
             at += 1;
         }
         if overflow {
-            // libass keeps the written sign and saturates.
+            // Keep the written sign and saturate.
             exponent = MAX_EXPONENT;
             fraction_negative = written_negative;
         } else if written_negative == fraction_negative {
@@ -179,14 +179,14 @@ pub(crate) fn strtoll(s: &[u8], base: u32) -> (i64, usize) {
     (value, at)
 }
 
-/// libass's `mystrtoi32`: `strtoll` clamped to the `i32` range.
+/// `strtoll` clamped to the `i32` range.
 pub(crate) fn strtoi32(s: &[u8], base: u32) -> (i32, usize) {
     let (value, used) = strtoll(s, base);
     (value.clamp(i32::MIN.into(), i32::MAX.into()) as i32, used)
 }
 
-/// libass's `parse_int_header`: an `&h` or `0x` prefix right at the start
-/// selects hexadecimal; then blanks, a sign, for hexadecimal another `0x`, and
+/// A header integer: an `&h` or `0x` prefix right at the start selects
+/// hexadecimal; then blanks, a sign, for hexadecimal another `0x`, and
 /// digits reduced modulo 2^32, as VSFilter's `scanf` does. No digits is 0.
 pub(crate) fn header_int(s: &[u8]) -> i32 {
     let (base, s) = if starts_with_ignore_case(s, b"&h") || starts_with_ignore_case(s, b"0x") {
@@ -213,7 +213,7 @@ pub(crate) fn header_int(s: &[u8]) -> i32 {
     }) as i32
 }
 
-/// libass's `parse_bool`: `yes` in any case, or a positive integer.
+/// A header boolean: `yes` in any case, or a positive integer.
 pub(crate) fn header_bool(s: &[u8]) -> bool {
     let s = &s[s.iter().position(|&c| !is_blank(c)).unwrap_or(s.len())..];
     starts_with_ignore_case(s, b"yes") || crate::c_long::strtol(s).0 > 0
@@ -249,8 +249,8 @@ pub(crate) fn hex_tag_value(s: &[u8]) -> i32 {
     strtoi32(&s[start..], 16).0
 }
 
-/// libass's `dtoi32`: truncation toward zero with x86's result, `i32::MIN`,
-/// for NaN and values outside the range.
+/// Truncation toward zero, with x86's result, `i32::MIN`, for NaN and values
+/// outside the range.
 pub(crate) fn dtoi32(value: f64) -> i32 {
     if value.is_nan() || value <= f64::from(i32::MIN) || value >= f64::from(i32::MAX) + 1.0 {
         i32::MIN
@@ -259,7 +259,7 @@ pub(crate) fn dtoi32(value: f64) -> i32 {
     }
 }
 
-/// C's `FFMAX` on doubles: `a > b ? a : b`, so a NaN `a` yields `b`.
+/// The larger double as C's `a > b ? a : b`, so a NaN `a` yields `b`.
 pub(crate) fn ffmax(a: f64, b: f64) -> f64 {
     if a > b { a } else { b }
 }

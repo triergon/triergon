@@ -2,8 +2,8 @@
 
 use triergon_core::{Budget, BudgetVec, Result};
 
-/// libass's ReadOrder bitmap. It is absent until a packet needs it, and
-/// dropped whenever an identifier falls outside 0 to 2^23·10 − 1; while
+/// The ReadOrder values seen. The bitmap is absent until a packet needs it,
+/// and dropped whenever an identifier falls outside 0 to 2^23·10 − 1; while
 /// absent, duplicates are found by scanning the held events instead, which
 /// differs for events that were rejected after their identifier was marked.
 #[derive(Debug)]
@@ -43,7 +43,7 @@ impl ReadOrder {
             .words
             .get_or_insert_with(|| BudgetVec::new(&self.budget));
         if index >= words.len() {
-            // libass's growth: ((id + 31) / 32 + 1) * 2 words.
+            // Grow to ((id + 31) / 32 + 1) * 2 words.
             let len = (((id + 31) / 32 + 1) * 2) as usize;
             if let Err(error) = words.try_resize(len, 0) {
                 self.words = None;

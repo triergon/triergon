@@ -1,10 +1,10 @@
 //! Override tags: libass's lexing of `{...}` blocks into typed tags.
 //!
-//! A block is read as libass's `ass_parse_tags` reads it: from each backslash,
-//! the name runs to the next `(` or backslash; parenthesised arguments are
-//! split at commas until a backslash, after which everything up to the next
-//! `)` is one argument (the tags of `\t`); a missing `)` ends at the block's
-//! end. The text after a plain tag's name is one more argument, after the
+//! A block is read as libass reads it: from each backslash, the name runs to
+//! the next `(` or backslash; parenthesised arguments are split at commas
+//! until a backslash, after which everything up to the next `)` is one
+//! argument (the tags of `\t`); a missing `)` ends at the block's end. The
+//! text after a plain tag's name is one more argument, after the
 //! parenthesised ones. Names match by prefix in libass's order, so `\fsize`
 //! is `\fs` with the argument `ize`. Numbers convert from the argument's
 //! start and, as in libass, may read on past its end.
@@ -15,7 +15,8 @@ use crate::number::{dtoi32, hex_tag_value, strtod, strtoi32};
 use crate::scan::is_blank;
 use crate::{Alignment, Bold, ColourSlot, Italic, Rgba, WrapStyle};
 
-/// libass's `MAX_VALID_NARGS` plus one, to detect excess arguments.
+/// The most arguments a tag takes (seven, for `\fade`) plus one, to detect
+/// excess arguments.
 const MAX_ARGS: usize = 8;
 
 /// The times of a `\t` in milliseconds from the event start, with the
@@ -227,8 +228,7 @@ pub enum Tag<'a> {
 type Interpret = for<'a> fn(&Args<'a>, bool) -> Option<Tag<'a>>;
 
 /// How a tag's name ends: a plain tag takes the rest of its name as one more
-/// argument (libass's `tag`), a complex one only parenthesised arguments
-/// (`complex_tag`).
+/// argument, a complex one only parenthesised arguments.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Kind {
     Plain,
@@ -357,8 +357,8 @@ impl<'a> Args<'a> {
         }
     }
 
-    /// libass's `push_arg`: trailing blanks trimmed, empty arguments and
-    /// those beyond the eighth dropped.
+    /// Adds an argument: trailing blanks trimmed, empty arguments and those
+    /// beyond the eighth dropped.
     fn push(&mut self, start: usize, mut end: usize) {
         if self.count < MAX_ARGS {
             while end > start && is_blank(self.text[end - 1]) {
@@ -385,12 +385,12 @@ impl<'a> Args<'a> {
         &self.text[self.ranges[i].start..]
     }
 
-    /// `argtod`; an absent argument converts as an empty string.
+    /// Argument `i` by `strtod`; an absent argument converts as an empty string.
     fn float(&self, i: usize) -> f64 {
         strtod(self.from(i)).0
     }
 
-    /// `argtoi32`.
+    /// Argument `i` by `strtoi32` in base 10.
     fn int(&self, i: usize) -> i32 {
         strtoi32(self.from(i), 10).0
     }
@@ -403,12 +403,12 @@ impl<'a> Args<'a> {
         (self.count > 0).then(|| self.int(0))
     }
 
-    /// The first argument as libass's `parse_alpha_tag` reads it.
+    /// The first argument read as an override alpha (`hex_tag_value`).
     fn hex(&self) -> Option<i32> {
         (self.count > 0).then(|| hex_tag_value(self.from(0)))
     }
 
-    /// The first argument as `parse_color_tag` reads it, byte-swapped.
+    /// The first argument read as an override colour, byte-swapped.
     fn colour(&self) -> Option<Rgba> {
         self.hex().map(|c| Rgba((c as u32).swap_bytes()))
     }
