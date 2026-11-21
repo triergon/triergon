@@ -107,6 +107,11 @@ The [original-input controls](../harness/fate/README.md) verify PMT replacement
 on `pmtchange.ts` and transport faults on the unaligned `loewe.ts` sync grid
 under two delivery granularities. Probe metadata and full packet-fold parity
 remain open on both inputs.
+The explicit TS188 prefix probe finds the offset-one grid in `loewe.ts`. Opening
+the original entity at that offset gives the pinned reference's program 769, PMT
+PID 1363, PCR PID 1361 and HEVC/AAC track PIDs 1361/1362. Source positions keep
+the leading byte in their coordinate system. This control checks program
+membership, with full probe metadata and packet-fold comparisons still open.
 
 ## Subtitle text comparisons
 

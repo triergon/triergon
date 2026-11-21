@@ -646,6 +646,7 @@ file.
 | FFmpeg-compatible streams | `compat::stream::{ProgramReader, codec, configuration, is_video}`: programs, stream codecs (adds 0x81, 0x87, 0x90 and DVB tags outside a DVB namespace) and subtitle configuration |
 | FFmpeg-compatible clock | `compat::pes::DemuxClock::{project_header, place}`, `compat::pes::pcr_bounded_pts` (teletext PTS) |
 | FFmpeg-compatible start position | `compat::input::InputBootstrap` |
+| TS188 start after a short leading prefix | `compat::input::ts188_carrier_offset` and `InputCursor::request_range` |
 
 The PMT track view borrows its one-byte `stream_type` tag. It reports the codec
 identified by the stream type or, for private PES data in a DVB namespace, the
@@ -661,6 +662,11 @@ audio, and 0x90 indicates presentation graphics in this view. MPEG-1 video
 The startup probe scores sync bytes in groups while charging each inspected
 byte. Complete TS188 and M2TS192 carriers use one validator for common
 payload and adaptation layouts, including PCR. M2TS prefixes stay opaque.
+For a seekable entity known to contain TS188, `compat::input::ts188_carrier_offset`
+finds a unique initial grid using the first 1,504 bytes. Start a
+`TransportStream` at that offset using `InputCursor::request_range`. Its carrier
+and payload positions remain relative to the original entity. Later damaged
+carriers and a partial final carrier still emit source diagnostics.
 Program playback keeps tight carrier storage so a packet cannot retain an
 entire input window. A complete buffered carrier can reserve its storage and
 shared header together. The PES observer checks that the payload is the exact

@@ -6,6 +6,33 @@ use triergon_core::{
     Bytes, Error, InputCursor, InputToken, InputWindow, Result, SourceId, WorkBudget,
 };
 
+/// Find the first carrier when the caller expects TS188 and the initial prefix
+/// can contain fewer than 188 leading bytes. The prefix must include at least
+/// eight carrier widths. Seven complete headers must agree on a unique phase.
+/// The offset is relative to the supplied prefix and leaves it untouched.
+pub fn ts188_carrier_offset(prefix: &[u8]) -> Result<usize> {
+    const PACKETS: usize = 7;
+    const WIDTH: usize = crate::carrier::TS188_BYTES;
+    let prefix = prefix
+        .get(..(PACKETS + 1) * WIDTH)
+        .ok_or(Error::Truncated)?;
+    let mut starts = (0..WIDTH).filter(|&start| {
+        prefix[start..]
+            .chunks_exact(WIDTH)
+            .take(PACKETS)
+            .all(|carrier| carrier[0] == 0x47 && carrier[3] & 0x30 != 0)
+    });
+    let start = starts
+        .next()
+        .ok_or(Error::Unsupported("TS188 startup without a sync grid"))?;
+    if starts.next().is_some() {
+        return Err(Error::Unsupported(
+            "TS188 startup with competing sync grids",
+        ));
+    }
+    Ok(start)
+}
+
 /// Explicit result of the observed default-callback, finite aligned operation.
 /// Other delivery, mixed stride, damaged sync and ambiguous grids are unproven.
 #[cfg_attr(

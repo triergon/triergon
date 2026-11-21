@@ -250,7 +250,12 @@ pub mod input {
     //! grid without consuming input. The [`InputContext`] it produces binds a
     //! [`DemuxObserver`](super::pes::DemuxObserver) to the same positions through
     //! [`bind_input`](super::pes::DemuxObserver::bind_input).
+    //! [`ts188_carrier_offset`] locates a unique TS188 grid in a bounded prefix.
+    //! Use its offset for the initial [`InputCursor::request_range`] so that
+    //! subsequent packet positions stay relative to the original entity.
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
-    pub use crate::demux_input::{InputBootstrap, InputContext, InputStep};
+    //!
+    //! [`InputCursor::request_range`]: triergon_core::InputCursor::request_range
+    pub use crate::demux_input::{InputBootstrap, InputContext, InputStep, ts188_carrier_offset};
 }
