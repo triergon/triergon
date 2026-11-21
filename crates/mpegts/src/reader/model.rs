@@ -208,7 +208,7 @@ pub(super) struct DependentSyncframe {
     pub pending_bytes: Option<Bytes>,
 }
 
-/// A complete AC-3 syncframe or a DVB E-AC-3 syncframe group.
+/// A complete AC-3 syncframe or an E-AC-3 access-unit group.
 /// Clones share the charged bytes and syncframe facts.
 #[derive(Clone, Debug)]
 pub struct Ac3AccessUnit {
@@ -235,7 +235,7 @@ impl Ac3AccessUnit {
         self.bytes
     }
 
-    /// Facts of the primary syncframe, which supplies the unit's sample span.
+    /// Unchanged facts of the first primary syncframe.
     pub const fn facts(&self) -> Ac3FrameFacts {
         self.first
     }
@@ -246,6 +246,27 @@ impl Ac3AccessUnit {
             self.dependents
                 .iter()
                 .flat_map(|frames| frames.as_slice().iter().map(|frame| frame.facts)),
+        )
+    }
+
+    /// Combined primary sample span; dependent substreams add no time.
+    pub fn sample_span(&self) -> Result<Time> {
+        if self.first.header.blocks == 6 {
+            return self.first.header.sample_span();
+        }
+        let blocks: u16 = self
+            .syncframes()
+            .filter(|facts| {
+                !matches!(
+                    facts.header.details,
+                    triergon_framing::Ac3FrameDetails::Eac3 { stream_type: 1, .. }
+                )
+            })
+            .map(|facts| u16::from(facts.header.blocks))
+            .sum();
+        Time::new(
+            i128::from(blocks) * 256,
+            u128::from(self.first.header.sample_rate_hz),
         )
     }
 
@@ -476,7 +497,7 @@ impl AccessUnit {
                     .ok_or(Error::Invalid("ADTS frequency"))?;
                 Ok(Some(Time::new(1024, u128::from(rate))?))
             }
-            Self::Ac3(frame) => Ok(Some(frame.facts().header.sample_span()?)),
+            Self::Ac3(frame) => Ok(Some(frame.sample_span()?)),
             Self::Dts(frame) => Ok(Some(frame.sample_span())),
             Self::DtsExtension(frame) => Ok(frame.sample_span()),
             Self::MpegAudio(frame) => Ok(Some(Time::new(
