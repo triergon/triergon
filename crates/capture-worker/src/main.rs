@@ -61,6 +61,8 @@ fn open_session(cfg: &SessionConfig) -> triergon_capture::Result<Session> {
     }
 }
 
+/// Runs one session over the first `count` frames into `sink`; returns its VBV
+/// underflow, or the error's text. The timed `bench` loop runs this.
 fn session(
     cfg: &SessionConfig,
     orientation: Orientation,
@@ -79,6 +81,33 @@ fn session(
         .map_err(|e| e.to_string())?;
     }
     Ok(s.vbv_underflow_bits())
+}
+
+/// Runs one session over the first `count` frames into a hashing sink, appends
+/// `frame_output` of the session after each frame, and writes what it appended to
+/// `path`. A failure names the step: `open`, `encode` or `output`.
+fn write_per_frame(
+    cfg: &SessionConfig,
+    orientation: Orientation,
+    frames: &[u8],
+    count: usize,
+    path: &str,
+    mut frame_output: impl FnMut(&Session, &mut Vec<u8>),
+) -> Result<(), &'static str> {
+    let frame_bytes = cfg.width as usize * cfg.height as usize * 4;
+    let mut s = open_session(cfg).map_err(|_| "open")?;
+    let mut out = Vec::new();
+    let mut sink = HashSink::new();
+    for i in 0..count {
+        s.encode(
+            &frames[i * frame_bytes..(i + 1) * frame_bytes],
+            orientation,
+            &mut sink,
+        )
+        .map_err(|_| "encode")?;
+        frame_output(&s, &mut out);
+    }
+    std::fs::write(path, out).map_err(|_| "output")
 }
 
 #[cfg_attr(test, allow(dead_code))]
@@ -114,25 +143,12 @@ fn worker_main() -> ExitCode {
                 return fail("input");
             };
             let cfg = SessionConfig::with_rate_rule(w, h, 2_500_000);
-            let Ok(mut s) = open_session(&cfg) else {
-                return fail("open");
-            };
-            let mut out = Vec::new();
-            let mut sink = HashSink::new();
-            for i in 0..count {
-                if s.encode(
-                    &rgba[i * frame_bytes..(i + 1) * frame_bytes],
-                    orientation,
-                    &mut sink,
-                )
-                .is_err()
-                {
-                    return fail("encode");
-                }
+            let converted = |s: &Session, out: &mut Vec<u8>| {
                 out.extend_from_slice(&s.converted().visible_yuv420());
-            }
-            if std::fs::write(&args[7], out).is_err() {
-                return fail("output");
+            };
+            if let Err(step) = write_per_frame(&cfg, orientation, &rgba, count, &args[7], converted)
+            {
+                return fail(step);
             }
         }
         "recon" if args.len() == 9 => {
@@ -141,25 +157,13 @@ fn worker_main() -> ExitCode {
             let (Some(bitrate), Some(rgba)) = (parse(6), load(&args[7])) else {
                 return fail("input");
             };
-            let Ok(mut s) = open_session(&SessionConfig::with_rate_rule(w, h, bitrate)) else {
-                return fail("open");
-            };
-            let mut out = Vec::new();
-            let mut sink = HashSink::new();
-            for i in 0..count {
-                if s.encode(
-                    &rgba[i * frame_bytes..(i + 1) * frame_bytes],
-                    orientation,
-                    &mut sink,
-                )
-                .is_err()
-                {
-                    return fail("encode");
-                }
-                visible_yuv420(&s.reconstruction(), &mut out);
-            }
-            if std::fs::write(&args[8], out).is_err() {
-                return fail("output");
+            let cfg = SessionConfig::with_rate_rule(w, h, bitrate);
+            let reconstructed =
+                |s: &Session, out: &mut Vec<u8>| visible_yuv420(&s.reconstruction(), out);
+            if let Err(step) =
+                write_per_frame(&cfg, orientation, &rgba, count, &args[8], reconstructed)
+            {
+                return fail(step);
             }
         }
         "pipeline" if args.len() == 9 => {
