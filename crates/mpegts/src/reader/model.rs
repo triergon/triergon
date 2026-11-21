@@ -595,12 +595,8 @@ impl PacketInfo for Packet {
     fn payload(&self) -> &[u8] {
         self.bytes().as_ref()
     }
-    #[expect(
-        clippy::expect_used,
-        reason = "1/90000 is a nonzero time base; core has no constant for it"
-    )]
     fn time_base(&self) -> TimeBase {
-        TimeBase::new(1, 90_000).expect("nonzero TS clock")
+        TimeBase::HZ_90000
     }
     fn pts(&self) -> Option<i64> {
         self.0.pts
