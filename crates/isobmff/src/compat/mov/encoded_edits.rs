@@ -757,7 +757,9 @@ impl<'a> EncodedEditJob<'a> {
             || context.table.sample_count() == 0
             || context.media_base != context.stream.demux().time_base
         {
-            return Err(Error::Unsupported("encoded edit description/base profile"));
+            return Err(Error::Unsupported(
+                "encoded edit description count, empty table or time base",
+            ));
         }
         let declared = &context.table.descriptions()[0];
         if declared.raw().header() != context.stream.source_description().raw().header()
@@ -869,7 +871,9 @@ impl<'a> EncodedEditJob<'a> {
             || !config_matches_rate
             || self.entry.media_time >= i64::from(DOLBY_SAMPLE_TICKS)
         {
-            return Err(Error::Unsupported("encoded Dolby audio clock profile"));
+            return Err(Error::Unsupported(
+                "encoded Dolby audio clock other than the sample rate",
+            ));
         }
         Ok(())
     }

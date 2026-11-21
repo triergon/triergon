@@ -641,7 +641,7 @@ impl<'a> EncodedStreamJob<'a> {
                             }
                             x if x == self.config_kind => self.accept_configuration(raw)?,
                             x if x == *b"wave" => {
-                                return Err(Error::Unsupported("encoded nested wave profile"));
+                                return Err(Error::Unsupported("encoded nested wave box"));
                             }
                             _ => {}
                         }
@@ -956,7 +956,9 @@ fn metadata(
     if metadata_source.is_none()
         && (fields::u32_at(h, 4)? != 0 || fields::slice(h, 12, 12)? != [0; 12])
     {
-        return Err(Error::Unsupported("encoded legacy handler profile"));
+        return Err(Error::Unsupported(
+            "encoded handler with QuickTime component fields",
+        ));
     }
     let tail = h.get(24..).ok_or(Error::Truncated)?;
     if tail.len() > 256 {
@@ -980,7 +982,7 @@ fn metadata(
             .position(|b| *b == 0)
             .ok_or(Error::Unsupported("encoded unterminated handler"))?;
         if !tail[..n].iter().all(u8::is_ascii) {
-            return Err(Error::Unsupported("encoded handler text profile"));
+            return Err(Error::Unsupported("encoded handler name not ASCII"));
         }
         let start = usize::from(header.raw_hdlr.header().header_size) + 24;
         header.raw_hdlr.bytes().slice(start..start + n)?
