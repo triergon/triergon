@@ -517,68 +517,64 @@ impl PacketPlan {
                 .ok_or(Error::Invalid("missing packet width"))?
                 .bytes(),
         );
-        let valid = state
-            .session
-            .avc_buffering
-            .as_mut()
-            .ok_or(Error::Invalid("missing AVC buffering lookahead"))?;
-
         // Only the rest of this packet can already supply the parameter sets.
         // Charge each length and header. The regular scan still owns the input
         // and reports malformed lengths and headers where it reaches them.
-        while valid.remaining_nals != 0 {
-            if valid.offset == bytes.len() && valid.prefix_read == 0 {
-                break;
-            }
-            let available = bytes.len() - valid.offset;
-            let missing = width - valid.prefix_read;
-            if available < missing {
-                break;
-            }
-            if missing > 0 {
-                let count = work_count(work).min(missing);
-                if count == 0 {
+        if let Some(valid) = &mut state.session.avc_buffering {
+            while valid.remaining_nals != 0 {
+                if valid.offset == bytes.len() && valid.prefix_read == 0 {
+                    break;
+                }
+                let available = bytes.len() - valid.offset;
+                let missing = width - valid.prefix_read;
+                if available < missing {
+                    break;
+                }
+                if missing > 0 {
+                    let count = work_count(work).min(missing);
+                    if count == 0 {
+                        return Ok(YIELD);
+                    }
+                    valid.length =
+                        extend_length(valid.length, &bytes[valid.offset..valid.offset + count]);
+                    work.take(count as u64);
+                    valid.offset += count;
+                    valid.prefix_read += count;
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
+                    }
+                    if valid.prefix_read < width {
+                        return Ok(YIELD);
+                    }
+                }
+                if !work.try_charge(1) {
                     return Ok(YIELD);
                 }
-                valid.length =
-                    extend_length(valid.length, &bytes[valid.offset..valid.offset + count]);
-                work.take(count as u64);
-                valid.offset += count;
-                valid.prefix_read += count;
+                let Some(end) = valid
+                    .offset
+                    .checked_add(valid.length)
+                    .filter(|&end| end <= bytes.len())
+                else {
+                    break;
+                };
+                if valid.length > 0 {
+                    valid.remaining_nals -= 1;
+                    let kind = bytes[valid.offset] & 31;
+                    if matches!(kind, avc::IDR | avc::SLICE) {
+                        break;
+                    }
+                    match kind {
+                        avc::SPS => valid.sps = Some(valid.offset..end),
+                        avc::PPS => valid.pps = Some(valid.offset..end),
+                        _ => {}
+                    }
+                }
+                valid.offset = end;
+                valid.length = 0;
+                valid.prefix_read = 0;
                 if cancel.load(Ordering::Relaxed) {
                     return Err(Error::Cancelled);
                 }
-                if valid.prefix_read < width {
-                    return Ok(YIELD);
-                }
-            }
-            if !work.try_charge(1) {
-                return Ok(YIELD);
-            }
-            let Some(end) = valid
-                .offset
-                .checked_add(valid.length)
-                .filter(|&end| end <= bytes.len())
-            else {
-                break;
-            };
-            if valid.length > 0 {
-                valid.remaining_nals -= 1;
-                let kind = bytes[valid.offset] & 31;
-                if matches!(kind, avc::IDR | avc::SLICE) {
-                    break;
-                }
-                match kind {
-                    avc::SPS => valid.sps = Some(valid.offset..end),
-                    avc::PPS => valid.pps = Some(valid.offset..end),
-                    _ => {}
-                }
-            }
-            valid.offset = end;
-            valid.length = 0;
-            valid.prefix_read = 0;
-            if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
             }
         }
         state.avc.set(AvcState::BUFFERING_PERIOD);
@@ -639,13 +635,13 @@ impl PacketPlan {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        let lookahead = state
-            .session
-            .avc_buffering
-            .as_ref()
-            .ok_or(Error::Invalid("missing AVC buffering lookahead"))?;
-        let index = lookahead.insertion_index;
         let count = state.config().config_nal_count();
+        // The lookahead is dropped once every set is inserted.
+        let Some(lookahead) = &state.session.avc_buffering else {
+            self.phase = PlanPhase::Nal;
+            return Ok(NEXT);
+        };
+        let index = lookahead.insertion_index;
         if index >= count + 2 {
             state.session.avc_buffering = None;
             self.phase = PlanPhase::Nal;
@@ -662,11 +658,9 @@ impl PacketPlan {
         };
         let segment = if let Some(range) = packet_range {
             Some(NalPacketSegment::packet(range.clone(), 4, state.total))
-        } else if let Some(index) = config_index {
-            let n = state
-                .config()
-                .config_nal(index)
-                .ok_or(Error::Invalid("missing AVC parameter set"))?;
+        } else if let Some(index) = config_index
+            && let Some(n) = state.config().config_nal(index)
+        {
             let include = match n.kind {
                 Some(AvcConfigArrayKind::Sequence) => lookahead.sps.is_none(),
                 Some(AvcConfigArrayKind::Picture) => lookahead.pps.is_none(),
@@ -679,12 +673,9 @@ impl PacketPlan {
         if let Some(segment) = segment {
             self.append(state, input, segment)?;
         }
-        state
-            .session
-            .avc_buffering
-            .as_mut()
-            .ok_or(Error::Invalid("missing AVC buffering lookahead"))?
-            .insertion_index += 1;
+        if let Some(lookahead) = &mut state.session.avc_buffering {
+            lookahead.insertion_index += 1;
+        }
         Ok(NEXT)
     }
 
