@@ -318,6 +318,9 @@ impl Active {
         Ok(true)
     }
 
+    // Out of line, the lane's dispatch and the NAL loop each keep their state in
+    // registers: about 0.1% fewer instructions per HEVC segment than inlined.
+    #[inline(never)]
     fn poll(
         &mut self,
         work: &mut WorkBudget,
