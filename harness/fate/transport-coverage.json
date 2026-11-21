@@ -1,0 +1,794 @@
+{
+  "schema": 1,
+  "reference_revision": "d32b387f2b0a484599d4587d651891f0c63c4238",
+  "qualification": false,
+  "indexes": [
+    {
+      "file": "harness/fate/index.json",
+      "sha256": "6fd66491a8159d538f72c811a6344f1cc20a0bb6763d1815db00ab1608178ae7"
+    },
+    {
+      "file": "harness/fate/formats-index.json",
+      "sha256": "e9f933774ad21276e62c8b412a24f7ad70988664f48c1c22c2f8bd0dc81e3972"
+    }
+  ],
+  "cases": [
+    {
+      "id": "fate-matroska-dvbsub-remux",
+      "kind": "remux",
+      "samples": [
+        "sub/dvbsubtest_filter.ts"
+      ],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [
+        "subtitle-dvb:fate-dvbsubtest_filter"
+      ],
+      "related_controls": [],
+      "uncovered": "Complete remux output, metadata and destination-container behavior remain uncovered; TS packet extraction alone is insufficient.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-matroska-dvbsub-remux",
+            "definition_files": [
+              "tests/fate/matroska.mak:246",
+              "tests/fate/matroska.mak:247"
+            ],
+            "command_sha256": [
+              "1ce4be527b34625f36fdfaf8ad66fd7f00105f9c6d20a548acef4f7f9866ac5f"
+            ],
+            "sample_references": [
+              "sub/dvbsubtest_filter.ts"
+            ],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-matroska-dvbsub-remux",
+            "definition_files": [
+              "tests/fate/matroska.mak:246",
+              "tests/fate/matroska.mak:247"
+            ],
+            "command_sha256": [
+              "1ce4be527b34625f36fdfaf8ad66fd7f00105f9c6d20a548acef4f7f9866ac5f"
+            ],
+            "sample_references": [
+              "sub/dvbsubtest_filter.ts"
+            ],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "fate-matroska-h264-remux",
+      "kind": "remux",
+      "samples": [
+        "h264/h264_intra_first-small.ts"
+      ],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [],
+      "related_controls": [],
+      "uncovered": "Complete remux output, metadata and destination-container behavior remain uncovered; TS packet extraction alone is insufficient.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-matroska-h264-remux",
+            "definition_files": [
+              "tests/fate/matroska.mak:195",
+              "tests/fate/matroska.mak:196"
+            ],
+            "command_sha256": [
+              "021ded0c54f6374174aa9f6748d19dcf279929f739a0c29943fcc65e2c99f229"
+            ],
+            "sample_references": [
+              "h264/h264_intra_first-small.ts"
+            ],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-matroska-h264-remux",
+            "definition_files": [
+              "tests/fate/matroska.mak:195",
+              "tests/fate/matroska.mak:196"
+            ],
+            "command_sha256": [
+              "021ded0c54f6374174aa9f6748d19dcf279929f739a0c29943fcc65e2c99f229"
+            ],
+            "sample_references": [
+              "h264/h264_intra_first-small.ts"
+            ],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "fate-matroska-mpegts-remux",
+      "kind": "remux",
+      "samples": [
+        "mpegts/pmtchange.ts"
+      ],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [],
+      "related_controls": [],
+      "uncovered": "Complete remux output, metadata and destination-container behavior remain uncovered; TS packet extraction alone is insufficient.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-matroska-mpegts-remux",
+            "definition_files": [
+              "tests/fate/matroska.mak:208",
+              "tests/fate/matroska.mak:209"
+            ],
+            "command_sha256": [
+              "0a5a54a75e177d7aef8b351c93d168dcd4129b1ac4066a731ec438b5ae00f025"
+            ],
+            "sample_references": [
+              "mpegts/pmtchange.ts"
+            ],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-matroska-mpegts-remux",
+            "definition_files": [
+              "tests/fate/matroska.mak:208",
+              "tests/fate/matroska.mak:209"
+            ],
+            "command_sha256": [
+              "0a5a54a75e177d7aef8b351c93d168dcd4129b1ac4066a731ec438b5ae00f025"
+            ],
+            "sample_references": [
+              "mpegts/pmtchange.ts"
+            ],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "fate-mov-mp4-disposition-mpegts-remux",
+      "kind": "remux",
+      "samples": [
+        "mpegts/pmtchange.ts"
+      ],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [],
+      "related_controls": [],
+      "uncovered": "Complete remux output, metadata and destination-container behavior remain uncovered; TS packet extraction alone is insufficient.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-mov-mp4-disposition-mpegts-remux",
+            "definition_files": [
+              "tests/fate/mov.mak:255",
+              "tests/fate/mov.mak:256"
+            ],
+            "command_sha256": [
+              "6f271e13cb25ff1199d49d20e3a7c476f8c1b72dff6b5a1cfea4a7d90cfd0e2d"
+            ],
+            "sample_references": [
+              "mpegts/pmtchange.ts"
+            ],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-mov-mp4-disposition-mpegts-remux",
+            "definition_files": [
+              "tests/fate/mov.mak:255",
+              "tests/fate/mov.mak:256"
+            ],
+            "command_sha256": [
+              "6f271e13cb25ff1199d49d20e3a7c476f8c1b72dff6b5a1cfea4a7d90cfd0e2d"
+            ],
+            "sample_references": [
+              "mpegts/pmtchange.ts"
+            ],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "fate-mpegts",
+      "kind": "aggregate",
+      "samples": [],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [],
+      "related_controls": [],
+      "uncovered": "Aggregate identity; no independent operation or sample.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-mpegts",
+            "definition_files": [
+              "tests/fate/mpegts.mak:55"
+            ],
+            "command_sha256": [],
+            "sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-mpegts",
+            "definition_files": [
+              "tests/fate/mpegts.mak:55"
+            ],
+            "command_sha256": [],
+            "sample_references": [],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "fate-mpegts-lcevc-h264-dual-track",
+      "kind": "enhancement",
+      "samples": [
+        "lcevc/L_H264_640x360p_8bit8bit_2D_dd_dualTrack.ts"
+      ],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [],
+      "related_controls": [],
+      "uncovered": "Separate LCEVC track identification, association and payload mapping remain uncovered; opaque PMT descriptor retention is insufficient.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-mpegts-lcevc-h264-dual-track",
+            "definition_files": [
+              "tests/fate/mpegts.mak:37",
+              "tests/fate/mpegts.mak:38"
+            ],
+            "command_sha256": [
+              "6e7f12e709c8e4063daa1f4e0aa9c1f581999758b84b1fbb28e1bcb8b0f821da"
+            ],
+            "sample_references": [
+              "lcevc/L_H264_640x360p_8bit8bit_2D_dd_dualTrack.ts"
+            ],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-mpegts-lcevc-h264-dual-track",
+            "definition_files": [
+              "tests/fate/mpegts.mak:37",
+              "tests/fate/mpegts.mak:38"
+            ],
+            "command_sha256": [
+              "6e7f12e709c8e4063daa1f4e0aa9c1f581999758b84b1fbb28e1bcb8b0f821da"
+            ],
+            "sample_references": [
+              "lcevc/L_H264_640x360p_8bit8bit_2D_dd_dualTrack.ts"
+            ],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "fate-mpegts-lcevc-h264-single-track",
+      "kind": "enhancement",
+      "samples": [
+        "lcevc/L_H264_640x360p_8bit8bit_2D_dd.ts"
+      ],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [],
+      "related_controls": [],
+      "uncovered": "In-band LCEVC enhancement metadata is not established by base AVC/HEVC packet parity; no enhancement decoding is claimed.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-mpegts-lcevc-h264-single-track",
+            "definition_files": [
+              "tests/fate/mpegts.mak:22",
+              "tests/fate/mpegts.mak:23"
+            ],
+            "command_sha256": [
+              "009d2c311d12cc886ffa4cffd19748223de197a9b1eb2a9c593f0759696842d9"
+            ],
+            "sample_references": [
+              "lcevc/L_H264_640x360p_8bit8bit_2D_dd.ts"
+            ],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-mpegts-lcevc-h264-single-track",
+            "definition_files": [
+              "tests/fate/mpegts.mak:22",
+              "tests/fate/mpegts.mak:23"
+            ],
+            "command_sha256": [
+              "009d2c311d12cc886ffa4cffd19748223de197a9b1eb2a9c593f0759696842d9"
+            ],
+            "sample_references": [
+              "lcevc/L_H264_640x360p_8bit8bit_2D_dd.ts"
+            ],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "fate-mpegts-lcevc-hevc-dual-track",
+      "kind": "enhancement",
+      "samples": [
+        "lcevc/L_HEVC_640x360p_8bit8bit_2D_dd_dualTrack.ts"
+      ],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [],
+      "related_controls": [],
+      "uncovered": "Separate LCEVC track identification, association and payload mapping remain uncovered; opaque PMT descriptor retention is insufficient.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-mpegts-lcevc-hevc-dual-track",
+            "definition_files": [
+              "tests/fate/mpegts.mak:42",
+              "tests/fate/mpegts.mak:43"
+            ],
+            "command_sha256": [
+              "354fac246966d0f1128df28487e1d698967c18856a87a8e913d0a808543a2f60"
+            ],
+            "sample_references": [
+              "lcevc/L_HEVC_640x360p_8bit8bit_2D_dd_dualTrack.ts"
+            ],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-mpegts-lcevc-hevc-dual-track",
+            "definition_files": [
+              "tests/fate/mpegts.mak:42",
+              "tests/fate/mpegts.mak:43"
+            ],
+            "command_sha256": [
+              "354fac246966d0f1128df28487e1d698967c18856a87a8e913d0a808543a2f60"
+            ],
+            "sample_references": [
+              "lcevc/L_HEVC_640x360p_8bit8bit_2D_dd_dualTrack.ts"
+            ],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "fate-mpegts-lcevc-hevc-single-track",
+      "kind": "enhancement",
+      "samples": [
+        "lcevc/L_HEVC_640x360p_8bit8bit_2D_dd.ts"
+      ],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [],
+      "related_controls": [],
+      "uncovered": "In-band LCEVC enhancement metadata is not established by base AVC/HEVC packet parity; no enhancement decoding is claimed.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-mpegts-lcevc-hevc-single-track",
+            "definition_files": [
+              "tests/fate/mpegts.mak:27",
+              "tests/fate/mpegts.mak:28"
+            ],
+            "command_sha256": [
+              "f2b6d1359ded8277bdc363deeb81a4e31bcdad3bc9d4b4633a757665ab605457"
+            ],
+            "sample_references": [
+              "lcevc/L_HEVC_640x360p_8bit8bit_2D_dd.ts"
+            ],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-mpegts-lcevc-hevc-single-track",
+            "definition_files": [
+              "tests/fate/mpegts.mak:27",
+              "tests/fate/mpegts.mak:28"
+            ],
+            "command_sha256": [
+              "f2b6d1359ded8277bdc363deeb81a4e31bcdad3bc9d4b4633a757665ab605457"
+            ],
+            "sample_references": [
+              "lcevc/L_HEVC_640x360p_8bit8bit_2D_dd.ts"
+            ],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "fate-mpegts-lcevc-vvc-dual-track",
+      "kind": "codec-and-enhancement",
+      "samples": [
+        "lcevc/L_VVC_640x360p_8bit8bit_2D_dd_dualTrack.ts"
+      ],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [],
+      "related_controls": [],
+      "uncovered": "VVC track mapping/framing and LCEVC enhancement identification/association remain uncovered; unknown stream types retain their original tag, not a guessed codec.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-mpegts-lcevc-vvc-dual-track",
+            "definition_files": [
+              "tests/fate/mpegts.mak:47",
+              "tests/fate/mpegts.mak:48"
+            ],
+            "command_sha256": [
+              "ce70ff3f22d03828ac790933ea0d0964df9697f06887ca689ec6a25c3f265d52"
+            ],
+            "sample_references": [
+              "lcevc/L_VVC_640x360p_8bit8bit_2D_dd_dualTrack.ts"
+            ],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-mpegts-lcevc-vvc-dual-track",
+            "definition_files": [
+              "tests/fate/mpegts.mak:47",
+              "tests/fate/mpegts.mak:48"
+            ],
+            "command_sha256": [
+              "ce70ff3f22d03828ac790933ea0d0964df9697f06887ca689ec6a25c3f265d52"
+            ],
+            "sample_references": [
+              "lcevc/L_VVC_640x360p_8bit8bit_2D_dd_dualTrack.ts"
+            ],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "fate-mpegts-lcevc-vvc-single-track",
+      "kind": "codec-and-enhancement",
+      "samples": [
+        "lcevc/L_VVC_640x360p_8bit8bit_2D_dd.ts"
+      ],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [],
+      "related_controls": [],
+      "uncovered": "VVC track mapping/framing and LCEVC enhancement identification/association remain uncovered; unknown stream types retain their original tag, not a guessed codec.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-mpegts-lcevc-vvc-single-track",
+            "definition_files": [
+              "tests/fate/mpegts.mak:32",
+              "tests/fate/mpegts.mak:33"
+            ],
+            "command_sha256": [
+              "5297f66ee5132cf731487be7c41ebadae15a2eafcb0ff22872fd44c6ddd8b9c8"
+            ],
+            "sample_references": [
+              "lcevc/L_VVC_640x360p_8bit8bit_2D_dd.ts"
+            ],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-mpegts-lcevc-vvc-single-track",
+            "definition_files": [
+              "tests/fate/mpegts.mak:32",
+              "tests/fate/mpegts.mak:33"
+            ],
+            "command_sha256": [
+              "5297f66ee5132cf731487be7c41ebadae15a2eafcb0ff22872fd44c6ddd8b9c8"
+            ],
+            "sample_references": [
+              "lcevc/L_VVC_640x360p_8bit8bit_2D_dd.ts"
+            ],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "fate-mpegts-probe-latm",
+      "kind": "probe",
+      "samples": [
+        "mpegts/loewe.ts"
+      ],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [],
+      "related_controls": [
+        "mpegts-access-units:au-latm-aac-lc-three-frames-in-pes",
+        "mpegts-pes:carriage-aac-latm-direct"
+      ],
+      "uncovered": "LATM discovery, configuration and stream metadata on the original input; finite PES observations and strict LOAS framing are separate controls.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-mpegts-probe-latm",
+            "definition_files": [
+              "tests/fate/mpegts.mak:8",
+              "tests/fate/mpegts.mak:9",
+              "tests/fate/mpegts.mak:10"
+            ],
+            "command_sha256": [
+              "dee9f38b92b6601f0946c8e9e436f2ea410be8d5977908b937e75a4da6dcfa50"
+            ],
+            "sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-mpegts-probe-latm",
+            "definition_files": [
+              "tests/fate/mpegts.mak:8",
+              "tests/fate/mpegts.mak:9",
+              "tests/fate/mpegts.mak:10"
+            ],
+            "command_sha256": [
+              "dee9f38b92b6601f0946c8e9e436f2ea410be8d5977908b937e75a4da6dcfa50"
+            ],
+            "sample_references": [
+              "mpegts/loewe.ts"
+            ],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "fate-mpegts-probe-pmt-merge",
+      "kind": "probe",
+      "samples": [
+        "mpegts/pmtchange.ts"
+      ],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [],
+      "related_controls": [
+        "mpegts-pes:pmt-version-wrap-retypes-pid",
+        "ts-program:program-pmt-retype"
+      ],
+      "uncovered": "Stream discovery with PMT version merging; source PMT replacement is only a related control, not merged stream identity parity.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-mpegts-probe-pmt-merge",
+            "definition_files": [
+              "tests/fate/mpegts.mak:18",
+              "tests/fate/mpegts.mak:19",
+              "tests/fate/mpegts.mak:20"
+            ],
+            "command_sha256": [
+              "b7b55c78354d678f1759a23735969286bb01abc4397a6b2b5ecf8d55ca5a6b45"
+            ],
+            "sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-mpegts-probe-pmt-merge",
+            "definition_files": [
+              "tests/fate/mpegts.mak:18",
+              "tests/fate/mpegts.mak:19",
+              "tests/fate/mpegts.mak:20"
+            ],
+            "command_sha256": [
+              "b7b55c78354d678f1759a23735969286bb01abc4397a6b2b5ecf8d55ca5a6b45"
+            ],
+            "sample_references": [
+              "mpegts/pmtchange.ts"
+            ],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "fate-mpegts-probe-program",
+      "kind": "program-choice",
+      "samples": [
+        "mpegts/loewe.ts"
+      ],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [],
+      "related_controls": [
+        "ts-program:program-eof-avc-aac"
+      ],
+      "uncovered": "Probe program catalogue, membership and selection on the original multi-program input; explicit program 1 playback is only related.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-mpegts-probe-program",
+            "definition_files": [
+              "tests/fate/mpegts.mak:13",
+              "tests/fate/mpegts.mak:14",
+              "tests/fate/mpegts.mak:15"
+            ],
+            "command_sha256": [
+              "2d76c6e0bbf1574f94b372d3f4b0f677aabcc363206b549ea5a9787453406bdd"
+            ],
+            "sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-mpegts-probe-program",
+            "definition_files": [
+              "tests/fate/mpegts.mak:13",
+              "tests/fate/mpegts.mak:14",
+              "tests/fate/mpegts.mak:15"
+            ],
+            "command_sha256": [
+              "2d76c6e0bbf1574f94b372d3f4b0f677aabcc363206b549ea5a9787453406bdd"
+            ],
+            "sample_references": [
+              "mpegts/loewe.ts"
+            ],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "fate-sub-dvb",
+      "kind": "codec",
+      "samples": [
+        "sub/dvbsubtest_filter.ts"
+      ],
+      "exact_equivalent_cases": [],
+      "exact_input_cases": [
+        "subtitle-dvb:fate-dvbsubtest_filter"
+      ],
+      "related_controls": [
+        "mpegts-access-units:dvb2-literals-fields"
+      ],
+      "uncovered": "DVB subtitle decoding of the original sample is distinct from transport framing and program discovery.",
+      "observations": [
+        {
+          "index": "harness/fate/index.json",
+          "identity": {
+            "id": "fate-sub-dvb",
+            "definition_files": [
+              "tests/fate/subtitles.mak:154",
+              "tests/fate/subtitles.mak:155"
+            ],
+            "command_sha256": [
+              "b0db34710909c71a7be68656e79c25fd04b6fb863bca78aab59b7957ac6a91f2"
+            ],
+            "sample_references": [
+              "sub/dvbsubtest_filter.ts"
+            ],
+            "status": "unmapped",
+            "rights": "unreviewed"
+          }
+        },
+        {
+          "index": "harness/fate/formats-index.json",
+          "identity": {
+            "id": "fate-sub-dvb",
+            "definition_files": [
+              "tests/fate/subtitles.mak:154",
+              "tests/fate/subtitles.mak:155"
+            ],
+            "command_sha256": [
+              "b0db34710909c71a7be68656e79c25fd04b6fb863bca78aab59b7957ac6a91f2"
+            ],
+            "sample_references": [
+              "sub/dvbsubtest_filter.ts"
+            ],
+            "unresolved_sample_references": [],
+            "status": "unmapped",
+            "rights": "unreviewed",
+            "configured": false
+          }
+        }
+      ]
+    }
+  ],
+  "missing_program_profiles": [
+    "original-pmt-version-merge",
+    "original-multiple-program-catalogue-and-selection",
+    "original-latm-discovery",
+    "automatic-single-program-selection-and-multiple-program-refusal",
+    "selected-program-removal-and-pmt-pid-change",
+    "m2ts192-complete-multi-pid-program",
+    "strict-original-pcr-pes-header-and-raw33-clock-facts"
+  ],
+  "note": "No exact equivalent upstream operation is established by the authored packet controls. Configured identities are not executed cases. Probe metadata, source facts, compatibility packets, remux output and codec decoding are separate comparisons."
+}
