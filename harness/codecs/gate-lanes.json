@@ -1,6 +1,7 @@
 {
  "schema": 1,
  "items": {
+  "codec-dsp": ["imdct"],
   "codecs": ["h264", "hevc", "hevc-simd"],
   "codecs-audio": ["aac", "ac3", "eac3", "dts", "aac-container-priming", "aac-default"],
   "codecs-files": ["flac", "mp3", "mp2", "mp1", "vorbis", "opus", "aac-mov"],
@@ -8,6 +9,7 @@
   "elementary-readers": ["reader-flac", "reader-mp3", "reader-aac", "reader-ac3", "reader-eac3"]
  },
  "lanes": {
+  "imdct": {"build": "stable", "measured_by": "codec-file-workloads"},
   "h264": {"build": "stable", "measured_by": "codec-workloads"},
   "hevc": {"build": "stable", "measured_by": "codec-workloads"},
   "hevc-simd": {"build": "simd", "measured_by": "hevc-simd-workloads"},
