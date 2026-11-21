@@ -175,6 +175,12 @@ fn read_hrd(r: &mut Rbsp<'_>) -> Result<bool> {
     Ok(true)
 }
 
+/// The `seq_parameter_set_id`, the display raster and whether only frames are
+/// coded. [`read_sps`](crate::avc::read_sps) walks the same syntax for picture
+/// output; this walk reads lenient RBSPs only, refuses profiles whose SPS syntax it
+/// does not know, ignores `reserved_zero_2bits`, reads Exp-Golomb codes of up to 31
+/// leading zero bits, fails on an overflowing frame size, checks the cropping, and
+/// reports a field out of range as "AVC RBSP field out of range".
 fn sps_prefix(r: &mut Rbsp<'_>) -> Result<(u8, AvcRaster, bool)> {
     let profile = r.fixed(8)?;
     r.fixed(16)?;

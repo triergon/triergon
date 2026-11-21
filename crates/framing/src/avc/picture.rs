@@ -328,9 +328,16 @@ impl Picture {
 /// count goes to `cycle` (index, `offset_for_ref_frame`); the VUI is read only
 /// when `vui` is set.
 ///
+/// The prefix readers ([`read_sps_raster`](crate::avc::read_sps_raster) and its
+/// siblings) walk the same syntax for a container and draw the edges differently.
+/// This reader also reads strict RBSPs, accepts every `profile_idc`, refuses set
+/// `reserved_zero_2bits`, reads Exp-Golomb codes of up to 32 leading zero bits,
+/// saturates the frame size and leaves the cropping unchecked.
+///
 /// # Errors
 ///
-/// When the SPS is cut short or a field is out of range.
+/// When the SPS is cut short or a field is out of range ("AVC Exp-Golomb field out
+/// of range").
 pub fn read_sps(
     payload: &[u8],
     reading: AvcReading,
