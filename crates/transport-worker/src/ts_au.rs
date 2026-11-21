@@ -12,7 +12,7 @@ use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputWindow, Rounding, SourceCapabilities, SourceId,
     SourceLocation, Step, TimeBase, WorkBudget,
 };
-use triergon_framing::{Ac3Family, MpegLayer};
+use triergon_framing::{Ac3Family, Ac3FrameHeader, MpegLayer};
 use triergon_harness_protocol::digest::signed;
 use triergon_mpegts::compat::adts::{PacketPolicy, PesPolicy};
 use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, ContinuityResidue};
@@ -84,7 +84,7 @@ fn is_ac3(packet: &Packet) -> bool {
     }
 }
 
-fn ac3_header(packet: &Packet) -> Option<triergon_framing::Ac3FrameHeader> {
+fn ac3_header(packet: &Packet) -> Option<Ac3FrameHeader> {
     match packet.access_unit() {
         AccessUnit::Ac3(frame) => Some(frame.facts().header),
         AccessUnit::IncompleteAudio { bytes, .. } if is_ac3(packet) => {
@@ -98,10 +98,18 @@ fn ac3_duration(packet: &Packet, known: bool) -> Result<i64> {
     if !known {
         return Ok(0);
     }
-    ac3_header(packet).map_or(Ok(0), |header| {
-        Ok(header
-            .sample_span()?
-            .to_i64_ticks(TimeBase::new(1, 90_000)?, Rounding::NearestAway)?)
+    if let Some(ticks) = packet.duration() {
+        return Ok(ticks);
+    }
+    let span = if let Some(span) = packet.sample_duration() {
+        Some(span)
+    } else {
+        ac3_header(packet)
+            .map(Ac3FrameHeader::sample_span)
+            .transpose()?
+    };
+    span.map_or(Ok(0), |span| {
+        Ok(span.to_i64_ticks(TimeBase::new(1, 90_000)?, Rounding::NearestAway)?)
     })
 }
 
@@ -219,6 +227,10 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
             AccessUnit::DvbSubtitle(_) => (1, PositionSource::FirstPes),
             // A PES beginning inside an aligned audio frame stamps the next
             // frame, including that PES's carrier position.
+            AccessUnit::Dts(frame) if frame.core_bytes().len() < frame.bytes().len() => {
+                (0, PositionSource::FirstPes)
+            }
+            AccessUnit::DtsExtension(_) => (0, PositionSource::FirstPes),
             AccessUnit::MpegAudio(_) | AccessUnit::Dts(_) => (1, PositionSource::ClockAnchor),
             AccessUnit::Adts(_)
             | AccessUnit::AdtsFragment(_)
@@ -426,6 +438,8 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
         format: request.format,
         program: Some(request.program),
         descriptor_namespace: request.namespace,
+        unlabelled_dts_core: request.unlabelled_dts_core,
+        pcr_policy: request.pcr_policy,
         audio_eof_policy: AudioEofPolicy::ReportIncomplete,
         unframed_audio_policy: UnframedAudioPolicy::ReportAtEof,
         adts_packet_policy: PacketPolicy::ReportFragments,
@@ -517,7 +531,11 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                                     / i64::from(header.sample_rate)
                             }
                         }
-                        AccessUnit::Dts(frame) => {
+                        // In the parser-enabled comparison without stream discovery,
+                        // the DVB DTS-HD extension descriptor leaves PES duration unset.
+                        AccessUnit::Dts(frame)
+                            if frame.core_bytes().len() == frame.bytes().len() =>
+                        {
                             let span = frame.sample_span();
                             i64::try_from(span.numerator() * 90_000 / span.denominator() as i128)?
                         }
@@ -848,12 +866,13 @@ pub fn run(args: &[String]) -> Result<()> {
     let invocation = Invocation::parse(
         args,
         PREFIX,
-        " SIZE PROGRAM [--dvb] [[--discontinuity] ENTITY]...",
+        " SIZE PROGRAM [--dvb|--atsc] [[--discontinuity] ENTITY]... [--dts-core=PID] [--ignore-pcr-reserved-bits]",
         2..=usize::MAX,
         false,
     )?;
     let pool = Budget::new(256 * 1024 * 1024)?;
-    let request = ts_input::parse(&pool, Path::new(invocation.path), invocation.arguments)?;
+    let request =
+        ts_input::parse_access_units(&pool, Path::new(invocation.path), invocation.arguments)?;
     measure(&invocation, OPERATION, Some(&pool), || {
         operation(
             &pool,
@@ -886,6 +905,8 @@ mod tests {
             format: PacketFormat::Ts188,
             program: 1,
             namespace: DescriptorNamespace::Unspecified,
+            unlabelled_dts_core: None,
+            pcr_policy: triergon_mpegts::compat::pes::PcrPolicy::Strict,
             following: BudgetVec::new(&pool),
         };
         let baseline = pool.used();

@@ -4,6 +4,7 @@
 
 mod ts;
 mod ts_au;
+mod ts_dts_hd;
 mod ts_input;
 mod ts_matched;
 
@@ -17,7 +18,9 @@ mod runner {
 
 fn dispatch(args: &[String]) -> runner::Result<()> {
     let mode = args.first().map_or("", String::as_str);
-    if let Some(kind) = ts_matched::Kind::for_mode(mode) {
+    if mode.starts_with(ts_dts_hd::PREFIX) {
+        ts_dts_hd::run(args)
+    } else if let Some(kind) = ts_matched::Kind::for_mode(mode) {
         ts_matched::run(kind, args)
     } else if mode.starts_with(ts_au::PREFIX) {
         ts_au::run(args)
@@ -25,7 +28,7 @@ fn dispatch(args: &[String]) -> runner::Result<()> {
         ts::run(args)
     } else {
         Err(
-            "usage: transport-worker PREFIX{fold,bench,memory} FILE ...; prefixes: ts-au-, ts-, ts-seek-, ts-free-audio-"
+            "usage: transport-worker PREFIX{fold,bench,memory} FILE ...; prefixes: ts-au-, ts-, ts-seek-, ts-audio-seek-, ts-free-audio-, ts-dts-hd-"
                 .into(),
         )
     }

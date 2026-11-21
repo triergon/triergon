@@ -27,7 +27,13 @@ impl ElementaryStream {
             0x81 if self.namespace == DescriptorNamespace::Atsc => Some(CodecId::Ac3),
             0x87 if self.namespace == DescriptorNamespace::Atsc => Some(CodecId::Eac3),
             PES_PRIVATE_DATA if matches!(self.namespace, DescriptorNamespace::Dvb(_)) => {
-                self.dvb_descriptor_codec()
+                self.dvb_descriptor_codec().or_else(|| {
+                    let hd = self.dvb_dts_hd().ok().flatten()?;
+                    hd.extensions
+                        .iter()
+                        .any(Option::is_some)
+                        .then_some(CodecId::Dts)
+                })
             }
             _ => None,
         }

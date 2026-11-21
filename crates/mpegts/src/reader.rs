@@ -13,16 +13,18 @@ use crate::{
 };
 use lane::{Lane, LaneStep, PesRun, StorageScan};
 pub use model::{
-    Ac3AccessUnit, AccessUnit, DtsAudioFrame, DvbSubtitleUnit, IncompleteVideo, LoasFrame,
-    MpegAudioFrame, Packet, PacketClock, PayloadSource, ReaderEvent, SourceEvent, Track,
+    Ac3AccessUnit, AccessUnit, DtsAudioFrame, DtsExtensionFrame, DvbSubtitleUnit, IncompleteVideo,
+    LoasFrame, MpegAudioFrame, Packet, PacketClock, PayloadSource, ReaderEvent, SourceEvent, Track,
     UnframedAudio,
 };
 use model::{ClockContext, Shared};
+pub use seek::SeekEntity;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{ContainerReader, Event, ReaderStep, SeekRequest, TrackId};
 use triergon_core::{
-    Backpressure, Budget, BudgetVec, Error, InputCursor, InputRequest, InputToken, InputWindow,
-    Result, SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, WorkBudget,
+    Backpressure, Budget, BudgetVec, Charged, Error, InputCursor, InputRequest, InputToken,
+    InputWindow, Result, SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step,
+    WorkBudget,
 };
 use triergon_framing::RawAnnexBLimits;
 
@@ -73,8 +75,14 @@ pub struct ReaderLimits {
     pub video: RawAnnexBLimits,
     /// Maximum bytes in one audio syncframe. E-AC-3 groups have a derived bound.
     pub maximum_audio_frame_bytes: usize,
+    /// Maximum bytes in a finite aligned DVB DTS-HD PES.
+    pub maximum_dts_hd_pes_bytes: usize,
     pub audio_eof_policy: AudioEofPolicy,
     pub unframed_audio_policy: UnframedAudioPolicy,
+    /// Explicit DTS core identity for one unlabelled private-data route.
+    pub unlabelled_dts_core: Option<crate::compat::dts::UnlabelledCore>,
+    /// Compatibility policy for the reserved bits in a program clock reference.
+    pub pcr_policy: crate::compat::pes::PcrPolicy,
     /// Framing policy for ADTS. The compatibility policy handles ADTS EOF itself.
     pub adts_packet_policy: PacketPolicy,
     /// Wire policy for ADTS PES with a zero packet-length field.
@@ -86,7 +94,7 @@ pub struct ReaderLimits {
     pub maximum_access_units: usize,
     pub maximum_pes_per_access_unit: usize,
     pub elementary_input_window: usize,
-    /// Largest single entity examined by a seek. Zero disables seeking.
+    /// Largest physical byte extent examined by a seek. Zero disables seeking.
     pub maximum_seek_scan_bytes: u64,
     /// Period-zero timestamps by default. Every lifted value carries its
     /// SourceTimeStatus; no missing DTS or per-frame timestamp is synthesized.
@@ -102,8 +110,11 @@ impl Default for ReaderLimits {
             transport: ParseLimits::default(),
             video: RawAnnexBLimits::default(),
             maximum_audio_frame_bytes: 8192,
+            maximum_dts_hd_pes_bytes: 65_535,
             audio_eof_policy: AudioEofPolicy::RejectIncomplete,
             unframed_audio_policy: UnframedAudioPolicy::Strict,
+            unlabelled_dts_core: None,
+            pcr_policy: crate::compat::pes::PcrPolicy::Strict,
             adts_packet_policy: PacketPolicy::Strict,
             adts_pes_policy: adts::PesPolicy::Strict,
             latm_packet_policy: latm::PacketPolicy::Strict,
@@ -170,6 +181,8 @@ pub struct Reader {
     deferred_fragment: bool,
     storage: Option<StorageScan>,
     seek: BudgetVec<seek::Seeking>,
+    seek_index: Option<Shared<seek::SeekIndex>>,
+    seek_entities: Option<Charged<Box<seek::EntityPlan>>>,
     continued_entity: bool,
 }
 
@@ -235,7 +248,13 @@ impl Reader {
         limits: ReaderLimits,
         input_window: usize,
     ) -> Result<Self> {
+        if let Some(selection) = limits.unlabelled_dts_core
+            && (selection.program == 0 || !crate::ELEMENTARY_PID_RANGE.contains(&selection.pid))
+        {
+            return Err(Error::Invalid("unlabelled DTS core selection"));
+        }
         if limits.maximum_audio_frame_bytes == 0
+            || limits.maximum_dts_hd_pes_bytes == 0
             || limits.maximum_access_units == 0
             || limits.maximum_pes_per_access_unit == 0
             || limits.elementary_input_window == 0
@@ -251,6 +270,7 @@ impl Reader {
             limits.descriptor_namespace,
         )?;
         stream.share_input();
+        stream.set_pcr_policy(limits.pcr_policy);
         if limits.adts_pes_policy == adts::PesPolicy::ReportUnbounded {
             stream.allow_unbounded_adts();
         }
@@ -284,6 +304,8 @@ impl Reader {
             deferred_fragment: false,
             storage: None,
             seek: BudgetVec::new(pool),
+            seek_index: None,
+            seek_entities: None,
             continued_entity: false,
         })
     }
@@ -378,6 +400,24 @@ impl Reader {
     }
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
+        if let Some(next) = self.seek_entities.as_deref().and_then(|plan| plan.next()) {
+            self.queue_entity(
+                source,
+                token,
+                next.source,
+                next.capabilities(),
+                EntityTransition::Contiguous,
+            )?;
+            self.seek_entities
+                .as_deref_mut()
+                .expect("active seek entity plan")
+                .advance();
+            return Ok(());
+        }
+        self.finish_input(source, token)
+    }
+
+    fn finish_input(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         let input = self
             .input
             .as_mut()
@@ -404,9 +444,25 @@ impl Reader {
         transition: EntityTransition,
     ) -> Result<()> {
         self.healthy()?;
+        if self.seek_entities.is_some() {
+            return Err(Error::Invalid(
+                "MPEG-TS entity continuation is managed by seek",
+            ));
+        }
         if !self.seek.is_empty() {
             return Err(Error::Unsupported("MPEG-TS seek across entities"));
         }
+        self.queue_entity(source, token, next, capabilities, transition)
+    }
+
+    fn queue_entity(
+        &mut self,
+        source: SourceId,
+        token: InputToken,
+        next: SourceId,
+        capabilities: SourceCapabilities,
+        transition: EntityTransition,
+    ) -> Result<()> {
         if self.next_entity.is_some() || self.end.is_some() {
             return Err(Error::Invalid(
                 "MPEG-TS entity completion already specified",
@@ -416,13 +472,16 @@ impl Reader {
             return Err(Error::SourceMismatch);
         }
         token.request().checked_add(1).ok_or(Error::Overflow)?;
-        self.finish(source, token)?;
+        self.finish_input(source, token)?;
         self.next_entity = Some(NextEntity {
             source: next,
             capabilities,
             transition,
         });
         self.continued_entity = true;
+        if self.seek_entities.is_none() {
+            self.seek_index = None;
+        }
         Ok(())
     }
     pub fn fail(
@@ -483,6 +542,8 @@ impl Reader {
         self.next_entity = None;
         self.storage = None;
         self.seek = BudgetVec::new(&self.pool);
+        self.seek_index = None;
+        self.seek_entities = None;
     }
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
         self.step_observing::<false>(work, cancel, |_| ())
@@ -516,13 +577,24 @@ impl Reader {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        observe: impl FnMut(CarrierObservation<'_>),
+        mut observe: impl FnMut(CarrierObservation<'_>),
     ) -> Result<ReaderStep<Self>> {
         self.healthy()?;
-        let result = if self.seek.is_empty() {
-            self.advance::<OBSERVING, false>(work, cancel, observe)
-        } else {
-            self.advance_seek(work, cancel)
+        let result = loop {
+            let result = if self.seek.is_empty() {
+                self.advance::<OBSERVING, false>(work, cancel, &mut observe)
+            } else {
+                self.advance_seek(work, cancel)
+            };
+            if matches!(
+                &result,
+                Ok(Step::Backpressure(_)) | Err(Error::Backpressure { .. })
+            ) && self.seek_index.take().is_some()
+            {
+                self.storage = None;
+                continue;
+            }
+            break result;
         };
         match result {
             Err(Error::Backpressure {
@@ -840,10 +912,21 @@ impl Reader {
                                 .expect("active transport")
                                 .route_state(index, source.map().streams.as_slice()[index].pid)
                                 .ok_or(Error::Invalid("MPEG-TS track route missing"))?;
+                            let stream = &source.map().streams.as_slice()[index];
+                            let unlabelled_dts_core =
+                                self.limits.unlabelled_dts_core.is_some_and(|selection| {
+                                    selection.program == source.map().header.extension
+                                        && selection.pid == stream.pid
+                                        && stream.stream_type == crate::psi::PES_PRIVATE_DATA
+                                        && stream.descriptor_bytes.is_empty()
+                                        && source.map().program_descriptors.is_empty()
+                                });
                             let track = Track {
                                 source: source.clone(),
-                                index,
+                                // A PMT cannot have more entries than the 13-bit PID space.
+                                index: u16::try_from(index).map_err(|_| Error::Overflow)?,
                                 epoch: epochs.configuration,
+                                unlabelled_dts_core,
                             };
                             let retained = self.lanes.as_slice()[index..]
                                 .iter()
@@ -1002,12 +1085,7 @@ impl Reader {
                         TraceEvent::Finished => self.finished = true,
                         _ => (),
                     }
-                    if SEEKING
-                        && (!matches!(
-                            source.event(),
-                            TraceEvent::Pat(_) | TraceEvent::ProgramMap { .. }
-                        ) || !self.seek.as_slice()[0].publishes_tables())
-                    {
+                    if SEEKING && !self.seek.as_slice()[0].publishes_source(source.event()) {
                         continue;
                     }
                     return Ok(Step::Ready(Event::Other(ReaderEvent::Source(source))));
@@ -1095,7 +1173,19 @@ impl Reader {
                     self.raw = Some(event);
                     self.phase = Phase::Prepare;
                 }
-                Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
+                Step::NeedInput(request) => {
+                    if request.maximum == 0
+                        && self
+                            .seek_entities
+                            .as_deref()
+                            .and_then(|plan| plan.next())
+                            .is_some()
+                    {
+                        self.finish(request.source, request.token)?;
+                        continue;
+                    }
+                    return Ok(Step::NeedInput(request));
+                }
                 Step::Yield => return Ok(Step::Yield),
                 Step::End(location) => {
                     let stream = self.stream.as_mut().expect("active transport");

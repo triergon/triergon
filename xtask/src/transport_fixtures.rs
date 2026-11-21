@@ -1,6 +1,7 @@
 //! MPEG-TS AU controls, authored independently of the container and codec crates.
 //! PES requests remain separate rows; their input bytes never change.
 
+pub mod dts_hd;
 pub mod matched;
 
 use std::ffi::OsString;
@@ -258,6 +259,10 @@ impl Transport {
     }
 
     fn tables_for(&mut self, streams: &[(&Codec, u16, &[u8])]) -> R<()> {
+        self.tables_for_version(streams, 0)
+    }
+
+    fn tables_for_version(&mut self, streams: &[(&Codec, u16, &[u8])], version: u8) -> R<()> {
         for (codec, _, descriptors) in streams {
             if codec.name == "dvb-ac3"
                 && (descriptors.len() < 3
@@ -277,7 +282,7 @@ impl Transport {
             (13 + streams.iter().map(|(_, _, d)| 5 + d.len()).sum::<usize>()) as u8,
             0,
             PROGRAM as u8,
-            0xc1,
+            0xc1 | (version << 1),
             0,
             0,
             0xe1,
@@ -297,6 +302,27 @@ impl Transport {
         }
         self.section(4096, pmt);
         Ok(())
+    }
+
+    fn pcr(&mut self, base: u64, discontinuity: bool) {
+        let mut packet = [0xff; 188];
+        packet[..6].copy_from_slice(&[
+            0x47,
+            (PID >> 8) as u8,
+            PID as u8,
+            0x20 | (self.counters[usize::from(PID)].wrapping_sub(1) & 15),
+            183,
+            0x10 | if discontinuity { 0x80 } else { 0 },
+        ]);
+        packet[6..12].copy_from_slice(&[
+            (base >> 25) as u8,
+            (base >> 17) as u8,
+            (base >> 9) as u8,
+            (base >> 1) as u8,
+            ((base & 1) as u8) << 7 | 0x7e,
+            0,
+        ]);
+        self.bytes.extend_from_slice(&packet);
     }
 
     fn pes(&mut self, stream_id: u8, part: &Part<'_>) -> R<()> {
@@ -334,7 +360,7 @@ impl Transport {
             stream_id,
             (length >> 8) as u8,
             length as u8,
-            0x80,
+            if part.aligned { 0x84 } else { 0x80 },
             if part.dts.is_some() {
                 0xc0
             } else if part.pts.is_some() {
@@ -396,6 +422,7 @@ struct Part<'a> {
     pts: Option<u64>,
     dts: Option<u64>,
     unbounded: bool,
+    aligned: bool,
 }
 
 fn part(body: &[u8], pts: Option<u64>, dts: Option<u64>) -> Part<'_> {
@@ -404,6 +431,7 @@ fn part(body: &[u8], pts: Option<u64>, dts: Option<u64>) -> Part<'_> {
         pts,
         dts,
         unbounded: false,
+        aligned: false,
     }
 }
 
@@ -640,13 +668,7 @@ fn audio(root: &Path, ac3: bool) -> R<Codec> {
     })
 }
 
-fn direct_audio_cases(root: &Path) -> R<[Case; 2]> {
-    let ac3 = Codec {
-        name: "atsc-ac3",
-        stream_type: 0x81,
-        dvb: false,
-        ..audio(root, true)?
-    };
+fn direct_eac3(root: &Path) -> R<Codec> {
     let eac3_pes = first_audio_pes(&source(root, ATSC_EAC3_SEED)?)?;
     let [0x0b, 0x77, size_high, size_low, flags, ..] = eac3_pes.as_slice() else {
         return Err("expected a coded E-AC-3 syncframe".into());
@@ -659,7 +681,7 @@ fn direct_audio_cases(root: &Path) -> R<[Case; 2]> {
     let frame = eac3_pes
         .get(..frame_bytes)
         .ok_or("incomplete E-AC-3 seed syncframe")?;
-    let eac3 = Codec {
+    Ok(Codec {
         name: "atsc-eac3",
         stream_type: 0x87,
         stream_id: 0xbd,
@@ -667,7 +689,17 @@ fn direct_audio_cases(root: &Path) -> R<[Case; 2]> {
         bytes: frame.repeat(2),
         first: frame_bytes,
         header: 7,
+    })
+}
+
+fn direct_audio_cases(root: &Path) -> R<[Case; 2]> {
+    let ac3 = Codec {
+        name: "atsc-ac3",
+        stream_type: 0x81,
+        dvb: false,
+        ..audio(root, true)?
     };
+    let eac3 = direct_eac3(root)?;
     Ok([
         authored_case(
             &ac3,
