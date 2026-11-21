@@ -466,6 +466,19 @@ bound of the item is 0.9546 there (`fragmented-two-gops-t1-start-eof-seek-ordina
 kernel-bound total RSS stay lower than the reference in every case. Sets
 `gate-run-TARGET-f8661cb0-*-shard-1` hold the runs.
 
+The playback worker links the same seek code, and its trained orders named the function the
+change replaces. Linked by the stale order on ARMv7, its start-up resident set grew by 64 to
+88 KiB, and `progressive-pending-reverse-ranges` peaked one 64 KiB window higher (median
+2,084 to 2,174 KiB of kernel-bound resident memory over 8 pairs). Both playback orders are
+retrained at `e1ad28b3`, on main's start-up through C's `main`, and `cargo xtask link-order
+check` passes on both targets there. One partial gate run of MP4 forward and MP4 range on
+ARMv7 at `e1ad28b3`, on one c6g.4xlarge, passed every step: the highest runtime upper bounds
+are 0.9045 (`progressive-ten-sequential-batches`) and 0.9763 (`fragmented-before-sync`),
+and the highest total RSS bounds 0.8926 and 0.8844. On Linux AArch64 the playback worker at
+`e1ad28b3` runs 0.9993 of main's instructions in sum over MP4 forward and 0.9967 over MP4
+range (main at `e61dd1db`). Set `gate-run-armv7-e1ad28b3-20261121-024034-shard-1` holds the
+run.
+
 The Matroska / WebM and subtitle rows, earlier capture comparisons and ARMv7 workspace
 tests at `f8e1c4d9` come from one partial gate run per target of 33 items: the
 15 capture cases, the six Matroska feature groups and the external HDR vector, every
@@ -1255,6 +1268,7 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | PES list and unit reuse, 32-bit ARMv7, shard 6 of 8 | `31d2994522f116b4404916cb51f82b03a29c158f` | [`df45e5dec57be8214116c988d726215f8269af6d0a921e75a47a53bca8203f9b`](../harness/evidence/sets/gate-run-armv7-31d29945-20261119-061148-shard-6.json) |
 | PES list and unit reuse, 32-bit ARMv7, shard 7 of 8 | `31d2994522f116b4404916cb51f82b03a29c158f` | [`1aa5e28305f4991a29de7745afacd7cbedb33cc2b749f95e62f9c011d60ce7f5`](../harness/evidence/sets/gate-run-armv7-31d29945-20261119-061148-shard-7.json) |
 | PES list and unit reuse, 32-bit ARMv7, shard 8 of 8 | `31d2994522f116b4404916cb51f82b03a29c158f` | [`25231e5c43054ebc0585162903f9d564e182b83dbda7240c41758104aadfce60`](../harness/evidence/sets/gate-run-armv7-31d29945-20261119-061148-shard-8.json) |
+| ISO BMFF seek state moves, 32-bit ARMv7: MP4 forward and range with the retrained playback order | `e1ad28b333349c79231cba3567c4612c2454fae7` | [`131d824d5b9f1b5ca059618c959a296abdbadb56db47de20ece75a43d582af56`](../harness/evidence/sets/gate-run-armv7-e1ad28b3-20261121-024034-shard-1.json) |
 | ISO BMFF seek state moves, Linux AArch64: ISO BMFF seeks and range plans | `f8661cb08b7a67b6f52aedbd15d3237c0ba85ede` | [`5aa8f78be5d925e31c2c5a16f67556145c764720fca289695fd5479868a5051e`](../harness/evidence/sets/gate-run-aarch64-f8661cb0-20261121-001945-shard-1.json) |
 | ISO BMFF seek state moves, 32-bit ARMv7: ISO BMFF seeks and range plans | `f8661cb08b7a67b6f52aedbd15d3237c0ba85ede` | [`ea54c25233dcefe4200057f6f2bf12ce2b9cb9c08abfe1851bc3dfb5b7533c5f`](../harness/evidence/sets/gate-run-armv7-f8661cb0-20261121-001842-shard-1.json) |
 | PGS run fills, Linux AArch64, shard 1 of 8 | `546045db0473d0e39d70f67ec0e247e21e18e68b` | [`829049b804ee25b9da4231683749fe8a838e705c21223ed4d52a0e0646d783aa`](../harness/evidence/sets/gate-run-aarch64-546045db-20261119-143720-shard-1.json) |
@@ -1901,8 +1915,8 @@ gated as on AArch64, and no codec workload is open on this target.
 | MPEG-TS DTS core | 4/4 packet folds (`mpegts-dts-core`) | 0.4951 (4/4 pass) at `861201e3` | heap ≤0.0849, total RSS ≤0.9060 (4/4 lower) at `861201e3` |
 | MPEG-TS free-format audio | 8/8 frame folds (`mpegts-free-audio`) | 0.8843 (8/8 pass) at `861201e3` | heap ≤0.0800, total RSS ≤0.7408 (8/8 lower) at `861201e3`
 | MPEG-TS previous picture | 4/4 landing, discard and packet folds (`mpegts-previous-picture`) | 0.4731 (4/4 pass) at `861201e3` | heap ≤0.4896, total RSS ≤0.7877 (4/4 lower) at `861201e3`
-| Playback: MP4 forward | 46/46 packet folds (`mp4-forward`) | 0.9055 (51/51 pass, worst `progressive-ten-sequential-batches`) at `ce55904b` | heap ≤0.5920, total RSS ≤0.9671 (51/51 lower) at `ce55904b` |
-| Playback: MP4 range | 51/51 open and backward-seek comparisons (`mp4-range`) | 0.9942 (64/64 pass) at `ce55904b` | heap ≤0.7849, total RSS ≤0.9197 (64/64 lower) at `ce55904b` |
+| Playback: MP4 forward | 46/46 packet folds (`mp4-forward`) | 0.9045 (51/51 pass, worst `progressive-ten-sequential-batches`) at `e1ad28b3` | heap ≤0.5920, total RSS ≤0.8926 (51/51 lower) at `e1ad28b3` |
+| Playback: MP4 range | 51/51 open and backward-seek comparisons (`mp4-range`) | 0.9763 (64/64 pass, worst `fragmented-before-sync`) at `e1ad28b3` | heap ≤0.7849, total RSS ≤0.8844 (64/64 lower) at `e1ad28b3` |
 | Playback: TS program | 35/35 packet folds (`ts-program`) | 0.7645 (35/35 pass) at `ce55904b` | heap ≤0.1179, total RSS ≤0.8723 (35/35 lower) at `ce55904b` |
 | MPEG-TS progressive playback | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 0.7374 (3/3 pass) at `ce55904b` | heap ≤0.0154, total RSS ≤0.6934 (3/3 lower) at `ce55904b` |
 | Playback: raw Annex B | 7/7 packet folds (`raw-annex-b`) | 0.7526 (7/7 pass) at `ce55904b` | heap ≤0.1265, total RSS ≤0.7967 (7/7 lower) at `ce55904b` |
