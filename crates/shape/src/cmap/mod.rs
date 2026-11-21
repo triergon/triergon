@@ -196,7 +196,7 @@ impl<'a> Cmap<'a> {
             remap,
         };
         if let Some(at) = self.find(3, 0) {
-            // `OS2::get_font_page`: the high byte of `fsSelection` in a
+            // The font page: the high byte of `fsSelection` in a
             // version 0 table that sanitizes, else none.
             let os2 = Data(os2);
             let page = if os2.0.len() >= 78 && os2.u16(0) == 0 {
