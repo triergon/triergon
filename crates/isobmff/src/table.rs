@@ -12,6 +12,7 @@ use crate::{
 };
 use recovery::{InitialDescriptionDiagnostic, RunCoverage, RunKind, SyncDiagnostic};
 use rows::{Offsets, Sizes, Words};
+use std::mem;
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 pub(crate) mod recovery;
@@ -313,13 +314,53 @@ fn required(slot: Option<&BoxView>) -> Result<BoxView> {
         .ok_or(Error::Invalid("missing mandatory sample table"))
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Stage {
-    Boxes,
-    Descriptions,
-    Validate,
-    Ready,
+impl Parts {
+    /// Keeps `raw` where it is one of the tables the builder reads; other boxes stay
+    /// only in the raw `stbl`.
+    fn insert(&mut self, raw: BoxView) -> Result<()> {
+        match &raw.header().kind {
+            b"stsd" => single(&mut self.stsd, raw),
+            b"stts" => single(&mut self.stts, raw),
+            b"ctts" => single(&mut self.ctts, raw),
+            b"stsc" => single(&mut self.stsc, raw),
+            b"stsz" => single(&mut self.sizes, raw),
+            b"stz2" => single(&mut self.compact, raw),
+            b"stco" | b"co64" => single(&mut self.offsets, raw),
+            b"stss" => single(&mut self.sync, raw),
+            b"stps" => single(&mut self.partial, raw),
+            b"sdtp" => single(&mut self.dependency, raw),
+            _ => Ok(()),
+        }
+    }
 }
+
+/// What a [`SampleTableBuilder`] accepts beyond strict tables.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Acceptance {
+    /// Strict tables only.
+    Strict,
+    /// Strict tables, with an `sdtp` whose flags word is 1, as legacy QuickTime exports
+    /// write it.
+    LegacyDependencyFlags,
+    /// Run recovery: the timing runs may overrun the sample count, and `stss` entries
+    /// may be out of order or past the last sample.
+    Runs,
+    /// Run recovery that also accepts a zero description index in the first `stsc` row,
+    /// when the table has one description and the second row starts at chunk 2 with
+    /// index 1.
+    RunsAndInitialDescription,
+    /// Run recovery that accepts any description index.
+    RunsAndDescriptions,
+}
+impl Acceptance {
+    fn recovers_runs(self) -> bool {
+        matches!(
+            self,
+            Self::Runs | Self::RunsAndInitialDescription | Self::RunsAndDescriptions
+        )
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Check {
     Decode,
@@ -330,6 +371,60 @@ enum Check {
     Done,
 }
 
+/// Where the row checks of a built table stand.
+#[derive(Clone, Copy, Debug)]
+struct RowCheck {
+    check: Check,
+    row: u32,
+    total: u64,
+    previous: u32,
+}
+impl RowCheck {
+    fn new(check: Check) -> Self {
+        Self {
+            check,
+            row: 0,
+            total: 0,
+            previous: 0,
+        }
+    }
+}
+
+/// What run recovery found while checking the rows.
+#[derive(Clone, Copy, Debug, Default)]
+struct Findings {
+    coverage: [Option<RunCoverage>; 2],
+    sync_diagnostic: Option<SyncDiagnostic>,
+    initial_description: Option<InitialDescriptionDiagnostic>,
+    sync_prefix: Option<u32>,
+}
+
+/// Where a build stands. Each stage owns what it reads and what the stages before it
+/// found.
+#[derive(Debug)]
+enum Stage {
+    /// Collecting the tables among the `stbl` children.
+    Boxes {
+        boxes: BoxChildren,
+        parts: Parts,
+        descriptions: BudgetVec<SampleDescription>,
+    },
+    /// Parsing the `stsd` entries; `pending` is one parsed but not yet stored.
+    Descriptions {
+        entries: BoxChildren,
+        parts: Parts,
+        descriptions: BudgetVec<SampleDescription>,
+        pending: Option<SampleDescription>,
+    },
+    /// Checking the rows of the built table, one per work unit.
+    Validate {
+        table: SampleTable,
+        rows: RowCheck,
+    },
+    Ready(SampleTable),
+    Failed(Error),
+}
+
 /// Checks one `stbl` into a [`SampleTable`] under a work budget, one table row per work
 /// unit. Poll until [`BuildStatus::Ready`], then call [`finish`](Self::finish). A failure
 /// other than backpressure is kept for later polls.
@@ -337,34 +432,17 @@ enum Check {
 pub struct SampleTableBuilder {
     raw: BoxView,
     limits: Limits,
-    boxes: BoxChildren,
-    parts: Parts,
-    stage: Stage,
-    description_boxes: Option<BoxChildren>,
-    descriptions: Option<BudgetVec<SampleDescription>>,
-    pending_description: Option<SampleDescription>,
-    description_count: u32,
-    table: Option<SampleTable>,
-    check: Check,
-    row: u32,
-    total: u64,
-    previous: u32,
-    failed: Option<Error>,
     policy: SampleTablePolicy,
-    sync_prefix: Option<u32>,
-    recover_sync: bool,
-    recover_initial_description: bool,
-    recover_descriptions: bool,
-    legacy_dependency_flags: bool,
-    initial_description: Option<InitialDescriptionDiagnostic>,
-    coverage: [Option<RunCoverage>; 2],
-    sync_diagnostic: Option<SyncDiagnostic>,
+    acceptance: Acceptance,
+    description_count: u32,
+    stage: Stage,
+    findings: Findings,
 }
 impl SampleTableBuilder {
     /// Allow the dependency flag used by legacy QuickTime exports in the
     /// recovery view. The version and row count are still checked.
     pub(crate) fn allow_legacy_dependency_flags(&mut self) {
-        self.legacy_dependency_flags = true;
+        self.acceptance = Acceptance::LegacyDependencyFlags;
     }
 
     /// A builder with strict policies for `raw`, an `stbl` stored in `budget`; see
@@ -412,28 +490,15 @@ impl SampleTableBuilder {
         Ok(Self {
             raw,
             limits,
-            boxes,
-            parts: Parts::default(),
-            stage: Stage::Boxes,
-            description_boxes: None,
-            descriptions: Some(BudgetVec::new(&budget)),
-            pending_description: None,
-            description_count: 0,
-            table: None,
-            check: Check::Decode,
-            row: 0,
-            total: 0,
-            previous: 0,
-            failed: None,
             policy,
-            sync_prefix: None,
-            recover_sync: false,
-            recover_initial_description: false,
-            recover_descriptions: false,
-            legacy_dependency_flags: false,
-            initial_description: None,
-            coverage: [None, None],
-            sync_diagnostic: None,
+            acceptance: Acceptance::Strict,
+            description_count: 0,
+            stage: Stage::Boxes {
+                boxes,
+                parts: Parts::default(),
+                descriptions: BudgetVec::new(&budget),
+            },
+            findings: Findings::default(),
         })
     }
     /// The `stbl` box being checked.
@@ -443,84 +508,46 @@ impl SampleTableBuilder {
     /// One bounded step. `Error::Invalid` for missing, duplicate or inconsistent tables,
     /// `Error::Unsupported` for unknown versions or flags, `Error::Limit` past the limits.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<BuildStatus> {
-        if let Some(error) = self.failed {
+        if let Stage::Failed(error) = self.stage {
             return Err(error);
         }
         let result = self.poll_inner(work);
         if let Err(error) = result
             && !matches!(error, Error::Backpressure { .. })
         {
-            self.failed = Some(error);
+            self.stage = Stage::Failed(error);
         }
         result
     }
     fn poll_inner(&mut self, work: &mut WorkBudget) -> Result<BuildStatus> {
         loop {
-            match self.stage {
-                Stage::Ready => return Ok(BuildStatus::Ready),
-                Stage::Boxes => match self.boxes.poll(work)? {
+            let complete = match &mut self.stage {
+                Stage::Boxes { boxes, parts, .. } => match boxes.poll(work)? {
                     Next::Yield => return Ok(BuildStatus::Yield),
-                    Next::Item(raw) => match &raw.header().kind {
-                        b"stsd" => single(&mut self.parts.stsd, raw)?,
-                        b"stts" => single(&mut self.parts.stts, raw)?,
-                        b"ctts" => single(&mut self.parts.ctts, raw)?,
-                        b"stsc" => single(&mut self.parts.stsc, raw)?,
-                        b"stsz" => single(&mut self.parts.sizes, raw)?,
-                        b"stz2" => single(&mut self.parts.compact, raw)?,
-                        b"stco" | b"co64" => single(&mut self.parts.offsets, raw)?,
-                        b"stss" => single(&mut self.parts.sync, raw)?,
-                        b"stps" => single(&mut self.parts.partial, raw)?,
-                        b"sdtp" => single(&mut self.parts.dependency, raw)?,
-                        _ => {} // Full raw stbl remains owned, including all opaque metadata.
-                    },
-                    Next::End => {
-                        if self.parts.compact.is_some() && self.parts.sizes.is_some() {
-                            return Err(Error::Invalid("both stsz and stz2"));
-                        }
-                        if let Some(ctts) = &self.parts.ctts {
-                            let (version, flags) = fields::full(ctts.payload())?;
-                            if version > 1 || flags != 0 {
-                                return Err(Error::Unsupported("ctts version/flags"));
-                            }
-                        }
-                        let stsd = required(self.parts.stsd.as_ref())?;
-                        fields::full_zero(stsd.payload())?;
-                        self.description_count = fields::u32_at(stsd.payload(), 4)?;
-                        if self.description_count == 0 {
-                            return Err(Error::Invalid("empty sample descriptions"));
-                        }
-                        policy(self.description_count, self.limits.max_descriptions)?;
-                        self.description_boxes = Some(stsd.children(8, self.limits)?);
-                        self.stage = Stage::Descriptions;
+                    Next::Item(raw) => {
+                        parts.insert(raw)?;
+                        false
                     }
+                    Next::End => true,
                 },
-                Stage::Descriptions => {
-                    if let Some(value) = self.pending_description.take() {
+                Stage::Descriptions {
+                    entries,
+                    descriptions,
+                    pending,
+                    ..
+                } => {
+                    if let Some(value) = pending.take() {
                         if !work.try_charge(1) {
-                            self.pending_description = Some(value);
+                            *pending = Some(value);
                             return Ok(BuildStatus::Yield);
                         }
-                        if let Err(rejected) = self
-                            .descriptions
-                            .as_mut()
-                            .ok_or(Error::Invalid("missing descriptions"))?
-                            .try_push(value)
-                        {
-                            self.pending_description = Some(rejected.value);
+                        if let Err(rejected) = descriptions.try_push(value) {
+                            *pending = Some(rejected.value);
                             return Err(rejected.error);
                         }
                         continue;
                     }
-                    let descriptions = self
-                        .descriptions
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing descriptions"))?;
-                    match self
-                        .description_boxes
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing description cursor"))?
-                        .poll(work)?
-                    {
+                    match entries.poll(work)? {
                         Next::Yield => return Ok(BuildStatus::Yield),
                         Next::Item(raw) => {
                             let ordinal = u32::try_from(descriptions.len())
@@ -530,127 +557,207 @@ impl SampleTableBuilder {
                             if ordinal > self.description_count {
                                 return Err(Error::Invalid("extra sample description"));
                             }
-                            self.pending_description =
-                                Some(SampleDescription::parse(raw, ordinal)?);
+                            *pending = Some(SampleDescription::parse(raw, ordinal)?);
+                            false
                         }
                         Next::End => {
                             if descriptions.len() != self.description_count as usize {
                                 return Err(Error::Invalid("sample description count mismatch"));
                             }
-                            // All constructors below only inspect fixed headers/checked row extents.
-                            let stts =
-                                Words::parse(required(self.parts.stts.as_ref())?, 8, self.limits)?;
-                            let stsc =
-                                Words::parse(required(self.parts.stsc.as_ref())?, 12, self.limits)?;
-                            let sizes = Sizes::parse(
-                                self.parts
-                                    .sizes
-                                    .clone()
-                                    .or_else(|| self.parts.compact.clone())
-                                    .ok_or(Error::Invalid("missing sample size table"))?,
-                            )?;
-                            let offsets = Offsets::parse(
-                                required(self.parts.offsets.as_ref())?,
-                                self.limits,
-                            )?;
-                            let ctts = self
-                                .parts
-                                .ctts
-                                .clone()
-                                .map(|v| Words::parse_ctts(v, self.limits))
-                                .transpose()?;
-                            let sync = self
-                                .parts
-                                .sync
-                                .clone()
-                                .map(|v| Words::parse(v, 4, self.limits))
-                                .transpose()?;
-                            let partial = self
-                                .parts
-                                .partial
-                                .clone()
-                                .map(|v| Words::parse(v, 4, self.limits))
-                                .transpose()?;
-                            if let Some(raw) = &self.parts.dependency {
-                                if !self.legacy_dependency_flags
-                                    || raw.payload().get(..4) != Some(&[0, 0, 0, 1])
-                                {
-                                    fields::full_zero(raw.payload())?;
-                                }
-                                fields::exact_rows(raw.payload(), 4, sizes.count, 1)?;
-                            }
-                            self.table = Some(SampleTable {
-                                raw: self.raw.clone(),
-                                descriptions: self
-                                    .descriptions
-                                    .take()
-                                    .ok_or(Error::Invalid("missing descriptions"))?,
-                                stts,
-                                ctts,
-                                stsc,
-                                sizes,
-                                offsets,
-                                sync,
-                                partial,
-                                dependency: self.parts.dependency.clone(),
-                                timing_run_surplus: TimingRunSurplus::default(),
-                                unused_sync_entries: 0,
-                            });
-                            self.stage = Stage::Validate;
+                            true
                         }
                     }
                 }
-                Stage::Validate => {
-                    if self.check == Check::Done {
-                        self.stage = Stage::Ready;
-                        continue;
+                Stage::Validate { table, rows } => {
+                    if rows.check == Check::Done {
+                        true
+                    } else {
+                        if !work.try_charge(1) {
+                            return Ok(BuildStatus::Yield);
+                        }
+                        self.findings.check_row(
+                            table,
+                            rows,
+                            self.policy,
+                            self.acceptance,
+                            self.description_count,
+                        )?;
+                        false
                     }
-                    if !work.try_charge(1) {
-                        return Ok(BuildStatus::Yield);
-                    }
-                    self.validate_one()?;
                 }
+                Stage::Ready(_) => return Ok(BuildStatus::Ready),
+                Stage::Failed(error) => return Err(*error),
+            };
+            if complete {
+                // The stage's work is done. The builder counts as failed until the
+                // next stage is in place; `poll` records the error if that fails.
+                let finished = mem::replace(&mut self.stage, Stage::Failed(Error::Cancelled));
+                self.stage = self.next_stage(finished)?;
             }
         }
     }
-    fn next_check(&mut self, check: Check) {
-        self.check = check;
-        self.row = 0;
-        self.total = 0;
-        self.previous = 0;
+    /// The stage that follows `finished`, whose work is complete.
+    fn next_stage(&mut self, finished: Stage) -> Result<Stage> {
+        Ok(match finished {
+            Stage::Boxes {
+                parts,
+                descriptions,
+                ..
+            } => {
+                if parts.compact.is_some() && parts.sizes.is_some() {
+                    return Err(Error::Invalid("both stsz and stz2"));
+                }
+                if let Some(ctts) = &parts.ctts {
+                    let (version, flags) = fields::full(ctts.payload())?;
+                    if version > 1 || flags != 0 {
+                        return Err(Error::Unsupported("ctts version/flags"));
+                    }
+                }
+                let stsd = required(parts.stsd.as_ref())?;
+                fields::full_zero(stsd.payload())?;
+                self.description_count = fields::u32_at(stsd.payload(), 4)?;
+                if self.description_count == 0 {
+                    return Err(Error::Invalid("empty sample descriptions"));
+                }
+                policy(self.description_count, self.limits.max_descriptions)?;
+                Stage::Descriptions {
+                    entries: stsd.children(8, self.limits)?,
+                    parts,
+                    descriptions,
+                    pending: None,
+                }
+            }
+            Stage::Descriptions {
+                parts,
+                descriptions,
+                ..
+            } => {
+                // All constructors below only inspect fixed headers/checked row extents.
+                let stts = Words::parse(required(parts.stts.as_ref())?, 8, self.limits)?;
+                let stsc = Words::parse(required(parts.stsc.as_ref())?, 12, self.limits)?;
+                let sizes = Sizes::parse(
+                    parts
+                        .sizes
+                        .clone()
+                        .or_else(|| parts.compact.clone())
+                        .ok_or(Error::Invalid("missing sample size table"))?,
+                )?;
+                let offsets = Offsets::parse(required(parts.offsets.as_ref())?, self.limits)?;
+                let ctts = parts
+                    .ctts
+                    .clone()
+                    .map(|v| Words::parse_ctts(v, self.limits))
+                    .transpose()?;
+                let sync = parts
+                    .sync
+                    .clone()
+                    .map(|v| Words::parse(v, 4, self.limits))
+                    .transpose()?;
+                let partial = parts
+                    .partial
+                    .clone()
+                    .map(|v| Words::parse(v, 4, self.limits))
+                    .transpose()?;
+                if let Some(raw) = &parts.dependency {
+                    if self.acceptance != Acceptance::LegacyDependencyFlags
+                        || raw.payload().get(..4) != Some(&[0, 0, 0, 1])
+                    {
+                        fields::full_zero(raw.payload())?;
+                    }
+                    fields::exact_rows(raw.payload(), 4, sizes.count, 1)?;
+                }
+                Stage::Validate {
+                    table: SampleTable {
+                        raw: self.raw.clone(),
+                        descriptions,
+                        stts,
+                        ctts,
+                        stsc,
+                        sizes,
+                        offsets,
+                        sync,
+                        partial,
+                        dependency: parts.dependency,
+                        timing_run_surplus: TimingRunSurplus::default(),
+                        unused_sync_entries: 0,
+                    },
+                    rows: RowCheck::new(Check::Decode),
+                }
+            }
+            Stage::Validate { table, .. } => Stage::Ready(table),
+            settled @ (Stage::Ready(_) | Stage::Failed(_)) => settled,
+        })
     }
-    fn validate_one(&mut self) -> Result<()> {
-        let t = self.table.as_ref().ok_or(Error::Invalid("missing index"))?;
-        match self.check {
+    /// The table; the error that stopped the build, or `Error::Invalid` before
+    /// [`BuildStatus::Ready`].
+    pub fn finish(self) -> Result<SampleTable> {
+        if self.acceptance.recovers_runs() {
+            return Err(Error::Invalid(
+                "recovered table cannot become a Strict sample table",
+            ));
+        }
+        let mut table = match self.stage {
+            Stage::Ready(table) => table,
+            Stage::Failed(error) => return Err(error),
+            _ => return Err(Error::Invalid("sample table builder not ready")),
+        };
+        if self.policy.timing_runs == TimingRunPolicy::BoundedPrefix {
+            let [decode, composition] = self.findings.coverage;
+            table.timing_run_surplus = TimingRunSurplus {
+                decode_samples: decode.map_or(0, |run| run.surplus_samples),
+                composition_samples: composition.map_or(0, |run| run.surplus_samples),
+            };
+        }
+        if let Some(prefix) = self.findings.sync_prefix
+            && let Some(sync) = &mut table.sync
+        {
+            table.unused_sync_entries = sync.count - prefix;
+            sync.count = prefix;
+        }
+        Ok(table)
+    }
+}
+
+impl Findings {
+    /// Checks one row of `table` at `rows`, or moves `rows` to the next table.
+    fn check_row(
+        &mut self,
+        t: &SampleTable,
+        rows: &mut RowCheck,
+        policy: SampleTablePolicy,
+        acceptance: Acceptance,
+        description_count: u32,
+    ) -> Result<()> {
+        match rows.check {
             Check::Decode | Check::Composition => {
-                let source = if self.check == Check::Decode {
+                let source = if rows.check == Check::Decode {
                     Some(&t.stts)
                 } else {
                     t.ctts.as_ref()
                 };
                 if let Some(source) = source {
-                    if self.row < source.count {
-                        let count = source.word(self.row, 0)?;
+                    if rows.row < source.count {
+                        let count = source.word(rows.row, 0)?;
                         if count == 0 {
                             return Err(Error::Invalid("zero sample count in time run"));
                         }
-                        let total = self
+                        let total = rows
                             .total
                             .checked_add(u64::from(count))
                             .ok_or(Error::Overflow)?;
                         if total > t.sample_count() {
-                            let decode = self.check == Check::Decode;
-                            if self.policy.timing_runs == TimingRunPolicy::Strict
+                            let decode = rows.check == Check::Decode;
+                            if policy.timing_runs == TimingRunPolicy::Strict
                                 || t.sample_count() == 0
                                 || (decode
-                                    && (self.row + 1 != source.count
-                                        || self.total >= t.sample_count()))
+                                    && (rows.row + 1 != source.count
+                                        || rows.total >= t.sample_count()))
                             {
                                 return Err(Error::Invalid("time run exceeds sample count"));
                             }
                             let slot = usize::from(!decode);
                             let first =
-                                self.coverage[slot].map_or(self.row, |v| v.first_excess_row);
+                                self.coverage[slot].map_or(rows.row, |v| v.first_excess_row);
                             let field_start = source
                                 .raw
                                 .header()
@@ -676,53 +783,54 @@ impl SampleTableBuilder {
                                 strict_error: Error::Invalid("time run exceeds sample count"),
                             });
                         }
-                        self.total = total;
-                        self.row += 1;
+                        rows.total = total;
+                        rows.row += 1;
                         return Ok(());
                     }
-                    if self.total != t.sample_count()
-                        && !(self.policy.timing_runs == TimingRunPolicy::BoundedPrefix
-                            && self.total > t.sample_count())
+                    if rows.total != t.sample_count()
+                        && !(policy.timing_runs == TimingRunPolicy::BoundedPrefix
+                            && rows.total > t.sample_count())
                     {
                         return Err(Error::Invalid("time table sample count mismatch"));
                     }
                 }
-                self.next_check(if self.check == Check::Decode {
+                *rows = RowCheck::new(if rows.check == Check::Decode {
                     Check::Composition
                 } else {
                     Check::Chunks
                 });
             }
             Check::Chunks => {
-                if self.row < t.stsc.count {
-                    let first = t.stsc.word(self.row, 0)?;
-                    let per_chunk = t.stsc.word(self.row, 4)?;
-                    let description = t.stsc.word(self.row, 8)?;
+                if rows.row < t.stsc.count {
+                    let first = t.stsc.word(rows.row, 0)?;
+                    let per_chunk = t.stsc.word(rows.row, 4)?;
+                    let description = t.stsc.word(rows.row, 8)?;
                     let chunks = u64::from(t.offsets.table.count);
-                    let next = if self.row + 1 < t.stsc.count {
-                        u64::from(t.stsc.word(self.row + 1, 0)?)
+                    let next = if rows.row + 1 < t.stsc.count {
+                        u64::from(t.stsc.word(rows.row + 1, 0)?)
                     } else {
                         chunks + 1
                     };
+                    let any_description = acceptance == Acceptance::RunsAndDescriptions;
                     if first == 0
-                        || (self.row == 0 && first != 1)
+                        || (rows.row == 0 && first != 1)
                         || u64::from(first) > chunks
                         || next <= u64::from(first)
                         || next > chunks + 1
                         || per_chunk == 0
                         || (description == 0
-                            && !(self.recover_initial_description
-                                && self.row == 0
+                            && !(acceptance == Acceptance::RunsAndInitialDescription
+                                && rows.row == 0
                                 && t.stsc.count >= 2
                                 && t.stsc.word(1, 0)? == 2
                                 && t.stsc.word(1, 8)? == 1
-                                && self.description_count == 1)
-                            && !self.recover_descriptions)
-                        || (description > self.description_count && !self.recover_descriptions)
+                                && description_count == 1)
+                            && !any_description)
+                        || (description > description_count && !any_description)
                     {
                         return Err(Error::Invalid("stsc order/count/description"));
                     }
-                    if description == 0 && !self.recover_descriptions {
+                    if description == 0 && !any_description {
                         let field_start = t
                             .stsc
                             .raw
@@ -744,41 +852,41 @@ impl SampleTableBuilder {
                     let span = (next - u64::from(first))
                         .checked_mul(u64::from(per_chunk))
                         .ok_or(Error::Overflow)?;
-                    self.total = self.total.checked_add(span).ok_or(Error::Overflow)?;
-                    if self.total > t.sample_count() {
+                    rows.total = rows.total.checked_add(span).ok_or(Error::Overflow)?;
+                    if rows.total > t.sample_count() {
                         return Err(Error::Invalid("chunks exceed sample count"));
                     }
-                    self.row += 1;
+                    rows.row += 1;
                     return Ok(());
                 }
-                if self.total != t.sample_count()
+                if rows.total != t.sample_count()
                     || (t.sample_count() == 0 && t.offsets.table.count != 0)
                 {
                     return Err(Error::Invalid("chunk coverage mismatch"));
                 }
-                self.next_check(Check::Sync);
+                *rows = RowCheck::new(Check::Sync);
             }
             Check::Sync | Check::Partial => {
-                let source = if self.check == Check::Sync {
+                let source = if rows.check == Check::Sync {
                     t.sync.as_ref()
                 } else {
                     t.partial.as_ref()
                 };
                 if let Some(source) = source
-                    && self.row < source.count
+                    && rows.row < source.count
                 {
-                    let sample = source.word(self.row, 0)?;
+                    let sample = source.word(rows.row, 0)?;
                     let past_end = u64::from(sample) > t.sample_count();
-                    if sample == 0 || sample <= self.previous || past_end {
+                    if sample == 0 || sample <= rows.previous || past_end {
                         if past_end
-                            && self.check == Check::Sync
-                            && self.policy.sync_samples == SyncSamplePolicy::BoundedPrefix
+                            && rows.check == Check::Sync
+                            && policy.sync_samples == SyncSamplePolicy::BoundedPrefix
                         {
-                            self.sync_prefix = Some(self.row);
-                            self.next_check(Check::Partial);
+                            self.sync_prefix = Some(rows.row);
+                            *rows = RowCheck::new(Check::Partial);
                             return Ok(());
                         }
-                        if !self.recover_sync || self.check != Check::Sync || sample == 0 {
+                        if !acceptance.recovers_runs() || rows.check != Check::Sync || sample == 0 {
                             return Err(Error::Invalid("sync sample order/range"));
                         }
                         if self.sync_diagnostic.is_none() {
@@ -787,10 +895,10 @@ impl SampleTableBuilder {
                                 .header()
                                 .start
                                 .checked_add(u64::from(source.raw.header().header_size))
-                                .and_then(|v| v.checked_add(8 + u64::from(self.row) * 4))
+                                .and_then(|v| v.checked_add(8 + u64::from(rows.row) * 4))
                                 .ok_or(Error::Overflow)?;
                             self.sync_diagnostic = Some(SyncDiagnostic {
-                                first_bad_row: self.row,
+                                first_bad_row: rows.row,
                                 source_value: sample,
                                 field_start: start,
                                 field_end: start.checked_add(4).ok_or(Error::Overflow)?,
@@ -798,11 +906,11 @@ impl SampleTableBuilder {
                             });
                         }
                     }
-                    self.previous = sample;
-                    self.row += 1;
+                    rows.previous = sample;
+                    rows.row += 1;
                     return Ok(());
                 }
-                self.next_check(if self.check == Check::Sync {
+                *rows = RowCheck::new(if rows.check == Check::Sync {
                     Check::Partial
                 } else {
                     Check::Done
@@ -811,39 +919,6 @@ impl SampleTableBuilder {
             Check::Done => {}
         }
         Ok(())
-    }
-    /// The table; the error that stopped the build, or `Error::Invalid` before
-    /// [`BuildStatus::Ready`].
-    pub fn finish(mut self) -> Result<SampleTable> {
-        if self.recover_sync {
-            return Err(Error::Invalid(
-                "recovered table cannot become a Strict sample table",
-            ));
-        }
-        if let Some(error) = self.failed {
-            return Err(error);
-        }
-        if self.stage != Stage::Ready {
-            return Err(Error::Invalid("sample table builder not ready"));
-        }
-        let mut table = self
-            .table
-            .take()
-            .ok_or(Error::Invalid("missing completed index"))?;
-        if self.policy.timing_runs == TimingRunPolicy::BoundedPrefix {
-            let [decode, composition] = self.coverage;
-            table.timing_run_surplus = TimingRunSurplus {
-                decode_samples: decode.map_or(0, |run| run.surplus_samples),
-                composition_samples: composition.map_or(0, |run| run.surplus_samples),
-            };
-        }
-        if let Some(prefix) = self.sync_prefix
-            && let Some(sync) = &mut table.sync
-        {
-            table.unused_sync_entries = sync.count - prefix;
-            sync.count = prefix;
-        }
-        Ok(table)
     }
 }
 

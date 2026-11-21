@@ -78,7 +78,7 @@ impl RunRecoveryBuilder {
             limits,
             TimingRunPolicy::BoundedPrefix,
         )?;
-        inner.recover_sync = true;
+        inner.acceptance = Acceptance::Runs;
         Ok(Self { inner })
     }
     /// Advances the build. A failure other than backpressure is sticky, as is
@@ -88,33 +88,29 @@ impl RunRecoveryBuilder {
         work: &mut WorkBudget,
         cancel: &std::sync::atomic::AtomicBool,
     ) -> Result<BuildStatus> {
-        if let Some(error) = self.inner.failed {
+        if let Stage::Failed(error) = self.inner.stage {
             return Err(error);
         }
         if cancel.load(std::sync::atomic::Ordering::Relaxed) {
-            self.inner.failed = Some(Error::Cancelled);
+            self.inner.stage = Stage::Failed(Error::Cancelled);
             return Err(Error::Cancelled);
         }
         self.inner.poll(work)
     }
     /// Returns the table once [`poll`](Self::poll) has returned [`BuildStatus::Ready`];
     /// fails with `Error::Invalid` before that, or with the failure `poll` returned.
-    pub fn finish(mut self) -> Result<RunRecoveryTable> {
-        if let Some(error) = self.inner.failed {
-            return Err(error);
-        }
-        if self.inner.stage != Stage::Ready {
-            return Err(Error::Invalid("run recovery builder not ready"));
-        }
+    pub fn finish(self) -> Result<RunRecoveryTable> {
+        let storage = match self.inner.stage {
+            Stage::Ready(table) => table,
+            Stage::Failed(error) => return Err(error),
+            _ => return Err(Error::Invalid("run recovery builder not ready")),
+        };
+        let found = self.inner.findings;
         Ok(RunRecoveryTable {
-            storage: self
-                .inner
-                .table
-                .take()
-                .ok_or(Error::Invalid("missing recovery storage"))?,
-            coverage: self.inner.coverage,
-            sync_diagnostic: self.inner.sync_diagnostic,
-            initial_description: self.inner.initial_description,
+            storage,
+            coverage: found.coverage,
+            sync_diagnostic: found.sync_diagnostic,
+            initial_description: found.initial_description,
         })
     }
 }

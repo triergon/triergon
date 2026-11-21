@@ -109,7 +109,7 @@ impl RunRecoveryBuilder {
         _profile: DirectRecoveryProfile,
     ) -> Result<Self> {
         let mut b = Self::new(raw, budget, limits, RunRecoveryProfile)?;
-        b.inner.recover_initial_description = true;
+        b.inner.acceptance = Acceptance::RunsAndInitialDescription;
         Ok(b)
     }
 }

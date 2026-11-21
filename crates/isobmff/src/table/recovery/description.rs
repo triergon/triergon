@@ -10,6 +10,7 @@ use crate::{
     compat::mov::{cursor::PacketLimits, index::IndexLimits, view::PacketView},
 };
 use std::{
+    mem,
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -152,13 +153,20 @@ pub struct DescriptionEvent {
 /// description indexes, as FFmpeg's MOV demuxer reads it. Run recovery applies as well.
 #[derive(Debug)]
 pub struct DescriptionRecoveryBuilder {
-    inner: RunRecoveryBuilder,
-    base_ready: bool,
+    stage: DescriptionStage,
     at: u32,
     invalid: u32,
     special: Option<u32>,
-    ready: bool,
-    failed: Option<Error>,
+}
+/// Where a description recovery build stands.
+#[derive(Debug)]
+enum DescriptionStage {
+    /// Building the table under run recovery.
+    Runs(RunRecoveryBuilder),
+    /// Checking the description index of each `stsc` row, from row `at`.
+    Rows(RunRecoveryTable),
+    Ready(RunRecoveryTable),
+    Failed(Error),
 }
 impl DescriptionRecoveryBuilder {
     /// Starts description recovery of `raw`, charging storage to `budget`. Fails with
@@ -174,15 +182,12 @@ impl DescriptionRecoveryBuilder {
             return Err(Error::ForeignPool);
         }
         let mut inner = RunRecoveryBuilder::new(raw, budget, limits, RunRecoveryProfile)?;
-        inner.inner.recover_descriptions = true;
+        inner.inner.acceptance = Acceptance::RunsAndDescriptions;
         Ok(Self {
-            inner,
-            base_ready: false,
+            stage: DescriptionStage::Runs(inner),
             at: 0,
             invalid: 0,
             special: None,
-            ready: false,
-            failed: None,
         })
     }
     /// Advances the build. The table must have one sample description, and each row's
@@ -191,14 +196,14 @@ impl DescriptionRecoveryBuilder {
     /// chunk 2. With any invalid row, `ctts` may have at most two rows. Anything else fails
     /// with `Error::Unsupported`. A failure other than backpressure is sticky.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
-        if let Some(e) = self.failed {
+        if let DescriptionStage::Failed(e) = self.stage {
             return Err(e);
         }
         let result = self.poll_inner(work, cancel);
         if let Err(e) = result
             && !matches!(e, Error::Backpressure { .. })
         {
-            self.failed = Some(e);
+            self.stage = DescriptionStage::Failed(e);
         }
         result
     }
@@ -206,82 +211,88 @@ impl DescriptionRecoveryBuilder {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        if self.ready {
-            return Ok(BuildStatus::Ready);
-        }
-        if !self.base_ready {
-            if self.inner.poll(work, cancel)? != BuildStatus::Ready {
-                return Ok(BuildStatus::Yield);
-            }
-            self.base_ready = true;
-        }
-        let table = self
-            .inner
-            .inner
-            .table
-            .as_ref()
-            .ok_or(Error::Invalid("description recovery missing raw storage"))?;
-        if table.descriptions().len() != 1 {
-            return Err(Error::Unsupported(
-                "description recovery needs one sample description",
-            ));
-        }
-        while self.at < table.stsc.count {
-            if !work.try_charge(1) {
-                return Ok(BuildStatus::Yield);
-            }
-            let description = table.stsc.word(self.at, 8)?;
-            match description {
-                1 => {}
-                0 => {
-                    self.invalid = self.invalid.checked_add(1).ok_or(Error::Overflow)?;
+        loop {
+            match &mut self.stage {
+                DescriptionStage::Runs(inner) => {
+                    if inner.poll(work, cancel)? != BuildStatus::Ready {
+                        return Ok(BuildStatus::Yield);
+                    }
                 }
-                2 | u32::MAX => {
-                    if self.at != 0 {
+                DescriptionStage::Rows(table) => {
+                    let table = &table.storage;
+                    if table.descriptions().len() != 1 {
                         return Err(Error::Unsupported(
-                            "description recovery noninitial missing/all-ones catalogue domain",
+                            "description recovery needs one sample description",
                         ));
                     }
-                    self.special = Some(description);
-                    self.invalid = self.invalid.checked_add(1).ok_or(Error::Overflow)?;
+                    while self.at < table.stsc.count {
+                        if !work.try_charge(1) {
+                            return Ok(BuildStatus::Yield);
+                        }
+                        let description = table.stsc.word(self.at, 8)?;
+                        match description {
+                            1 => {}
+                            0 => {
+                                self.invalid =
+                                    self.invalid.checked_add(1).ok_or(Error::Overflow)?;
+                            }
+                            2 | u32::MAX => {
+                                if self.at != 0 {
+                                    return Err(Error::Unsupported(
+                                        "description recovery noninitial missing/all-ones catalogue domain",
+                                    ));
+                                }
+                                self.special = Some(description);
+                                self.invalid =
+                                    self.invalid.checked_add(1).ok_or(Error::Overflow)?;
+                            }
+                            _ => {
+                                return Err(Error::Unsupported(
+                                    "description recovery unobserved raw description value",
+                                ));
+                            }
+                        }
+                        self.at += 1;
+                    }
+                    if self.special.is_some()
+                        && (self.invalid != 1
+                            || table.stsc.count < 2
+                            || table.stsc.word(1, 0)? != 2)
+                    {
+                        return Err(Error::Unsupported(
+                            "description recovery mixed/missing immediate successor for special description",
+                        ));
+                    }
+                    if self.invalid != 0 && table.ctts.as_ref().is_some_and(|t| t.count > 2) {
+                        return Err(Error::Unsupported(
+                            "description recovery direct composition domain has more than two rows",
+                        ));
+                    }
                 }
-                _ => {
-                    return Err(Error::Unsupported(
-                        "description recovery unobserved raw description value",
-                    ));
-                }
+                DescriptionStage::Ready(_) => return Ok(BuildStatus::Ready),
+                DescriptionStage::Failed(e) => return Err(*e),
             }
-            self.at += 1;
+            // The stage's work is done; `poll` records the error if the next fails.
+            self.stage =
+                match mem::replace(&mut self.stage, DescriptionStage::Failed(Error::Cancelled)) {
+                    DescriptionStage::Runs(inner) => DescriptionStage::Rows(inner.finish()?),
+                    DescriptionStage::Rows(table) => DescriptionStage::Ready(table),
+                    settled => settled,
+                };
         }
-        if self.special.is_some()
-            && (self.invalid != 1 || table.stsc.count < 2 || table.stsc.word(1, 0)? != 2)
-        {
-            return Err(Error::Unsupported(
-                "description recovery mixed/missing immediate successor for special description",
-            ));
-        }
-        if self.invalid != 0 && table.ctts.as_ref().is_some_and(|t| t.count > 2) {
-            return Err(Error::Unsupported(
-                "description recovery direct composition domain has more than two rows",
-            ));
-        }
-        self.ready = true;
-        Ok(BuildStatus::Ready)
     }
     /// Returns the table once [`poll`](Self::poll) has returned [`BuildStatus::Ready`];
     /// fails with `Error::Invalid` before that, or with the failure `poll` returned.
     pub fn finish(self) -> Result<DescriptionRecoveryTable> {
-        if let Some(e) = self.failed {
-            return Err(e);
+        match self.stage {
+            DescriptionStage::Ready(base) => Ok(DescriptionRecoveryTable {
+                base,
+                invalid: self.invalid,
+                special: self.special,
+            }),
+            DescriptionStage::Failed(e) => Err(e),
+            _ => Err(Error::Invalid("description recovery builder not ready")),
         }
-        if !self.ready {
-            return Err(Error::Invalid("description recovery builder not ready"));
-        }
-        Ok(DescriptionRecoveryTable {
-            base: self.inner.finish()?,
-            invalid: self.invalid,
-            special: self.special,
-        })
     }
 }
 
