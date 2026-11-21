@@ -1,12 +1,14 @@
 """Command-line entry to the independent Python oracles.
 
     python3 -m harness.oracles timing|content|chain|colour|catalogue FILE
+    python3 -m harness.oracles KIND FILE [ARG...]
     python3 -m harness.oracles inflate
 
 Prints {"data": ...} or, for the malformed-input errors an oracle raises on
 purpose, {"error": "..."}. Any other failure exits non-zero.
 """
 import json
+from importlib import import_module
 from pathlib import Path
 import sys
 import zlib
@@ -25,6 +27,17 @@ ORACLES = {
     "colour": (source_colour, EXPECTED),
     "catalogue": (source_catalogue, EXPECTED),
 }
+# Trace oracles return canonical text rows without line endings. Load each on demand.
+TRACE_ORACLES = {
+    "views-smoke": ("harness.oracles", "views_smoke"),
+}
+
+
+def views_smoke(path):
+    data = path.read_bytes()
+    return [f"3 {len(data)} {zlib.adler32(data)}"]
+
+
 # Oracles that read no input file.
 GENERATORS = {
     "inflate": inflate_cases,
@@ -32,7 +45,11 @@ GENERATORS = {
 
 
 def main():
-    if len(sys.argv) == 3 and sys.argv[1] in ORACLES:
+    if len(sys.argv) >= 3 and sys.argv[1] in TRACE_ORACLES:
+        module, function = TRACE_ORACLES[sys.argv[1]]
+        oracle = getattr(import_module(module), function)
+        result = {"data": oracle(Path(sys.argv[2]), *sys.argv[3:])}
+    elif len(sys.argv) == 3 and sys.argv[1] in ORACLES:
         oracle, expected = ORACLES[sys.argv[1]]
         try:
             result = {"data": oracle(Path(sys.argv[2]))}

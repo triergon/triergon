@@ -274,7 +274,7 @@ fn prefix_loading_uses_the_shared_report_and_keeps_all_required_profiles() {
     .unwrap();
     assert_eq!(au.prefix, "ts-au-");
     assert_eq!(au.candidate, "transport-worker");
-    assert_eq!(au.reference, "ffmpeg-formats-native");
+    assert_eq!(au.reference.as_deref(), Some("ffmpeg-formats-native"));
     assert_eq!(au.cases.len(), 179);
     let contract = json::read(&au.contract).unwrap();
     assert_eq!(

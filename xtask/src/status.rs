@@ -48,6 +48,7 @@ struct Part<'a> {
 enum Cells<'a> {
     /// The same text in both cells, for a row with no measurement of its own.
     Text(&'a str),
+    Unmeasured(&'a str),
     Parts(Vec<Part<'a>>),
 }
 
@@ -192,14 +193,20 @@ impl<'a> Rows<'a> {
                     })
                     .collect()
             };
-            let cells = match (text(row, "text"), row.get("results"), row.get("parts")) {
-                (Some(shown), None, None) => Cells::Text(shown),
-                (None, Some(_), None) => Cells::Parts(vec![Part {
+            let cells = match (
+                text(row, "text"),
+                text(row, "unmeasured"),
+                row.get("results"),
+                row.get("parts"),
+            ) {
+                (Some(shown), None, None, None) => Cells::Text(shown),
+                (None, Some(feature), None, None) => Cells::Unmeasured(feature),
+                (None, None, Some(_), None) => Cells::Parts(vec![Part {
                     label: None,
                     results: strings(row, "results").unwrap_or_default(),
                     targets: None,
                 }]),
-                (None, None, Some(Value::Array(list))) => {
+                (None, None, None, Some(Value::Array(list))) => {
                     let parts = parts(list, &mut error);
                     if parts.iter().any(|p| p.label.is_none_or(str::is_empty)) {
                         error(format!("{area}: each of several parts has a label"));
@@ -207,7 +214,9 @@ impl<'a> Rows<'a> {
                     Cells::Parts(parts)
                 }
                 _ => {
-                    error(format!("{area}: one of text, results and parts"));
+                    error(format!(
+                        "{area}: one of text, unmeasured, results and parts"
+                    ));
                     continue;
                 }
             };
@@ -269,6 +278,7 @@ impl<'a> Rows<'a> {
         let at = format!("{} on {}", row.area, table.target);
         let parts = match &row.cells {
             Cells::Text(shown) => return Ok(Some(((*shown).to_owned(), (*shown).to_owned()))),
+            Cells::Unmeasured(_) => return Err(vec![format!("{at}: missing bound declarations")]),
             Cells::Parts(parts) => parts,
         };
         let name = row
@@ -536,7 +546,57 @@ fn page_table<'p>(lines: &[&'p str], heading: &str) -> Result<PageTable<'p>, Str
 /// row lines and the rendered cells of each (`None` where open).
 type Rendered<'p> = Vec<(PageTable<'p>, Vec<Option<(String, String)>>)>;
 
+fn unmeasured_cells(root: &Path, id: &str, target: &str) -> Result<(String, String), String> {
+    use crate::harness::bounds::{Bound, Unmeasured};
+
+    if id.is_empty()
+        || !id
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+    {
+        return Err("unmeasured status needs a feature ID".into());
+    }
+    let directory = root.join("harness/features").join(id);
+    let contract = json::read(&directory.join("contract.json"))?;
+    let (manifest, _) = crate::harness::manifest::read(root, &directory.join("corpus.json"))?;
+    let unmeasured = Unmeasured::read(&contract, &manifest, target)?;
+    let cases = manifest
+        .get("cases")
+        .and_then(Value::as_array)
+        .ok_or("missing corpus cases")?;
+    let cell = |bounds: &[Bound], parity_only| -> Result<String, String> {
+        let causes: BTreeSet<_> = cases
+            .iter()
+            .filter_map(|case| text(case, "id"))
+            .flat_map(|case| unmeasured.causes(case))
+            .filter_map(|(bound, cause)| bounds.contains(&bound).then_some(cause))
+            .collect();
+        if causes.is_empty() {
+            return Err(format!(
+                "{id}: unmeasured status must cite bounds for {target}"
+            ));
+        }
+        let label = if parity_only {
+            "parity only"
+        } else {
+            "not measured"
+        };
+        let causes = causes
+            .into_iter()
+            .map(|cause| cause.replace('|', "\\|"))
+            .collect::<Vec<_>>();
+        Ok(format!("{label} ({})", causes.join(", ")))
+    };
+    let parity_only =
+        unmeasured.all_skip(&manifest, "timing") && unmeasured.all_skip(&manifest, "memory");
+    Ok((
+        cell(&[Bound::Runtime], parity_only)?,
+        cell(&[Bound::Heap, Bound::TotalRss], parity_only)?,
+    ))
+}
+
 fn render<'p>(
+    root: &Path,
     rows: &Rows<'_>,
     index: &Index<'_>,
     page: &[&'p str],
@@ -586,7 +646,13 @@ fn render<'p>(
         }
         let mut cells = Vec::new();
         for row in shown {
-            match rows.cells(index, table, row) {
+            let cell = match row.cells {
+                Cells::Unmeasured(id) => unmeasured_cells(root, id, table.target)
+                    .map(Some)
+                    .map_err(|error| vec![format!("{}: {error}", row.area)]),
+                _ => rows.cells(index, table, row),
+            };
+            match cell {
                 Ok(cell) => cells.push(cell),
                 Err(row_errors) => {
                     errors.extend(row_errors);
@@ -632,7 +698,7 @@ pub fn check(root: &Path, data: &[(String, Value)]) -> Vec<String> {
         Err(error) => return vec![format!("{PAGE}: {error}")],
     };
     let lines: Vec<&str> = page.lines().collect();
-    let rendered = match render(&rows, &index, &lines) {
+    let rendered = match render(root, &rows, &index, &lines) {
         Ok(rendered) => rendered,
         Err(errors) => return errors,
     };
@@ -682,7 +748,7 @@ pub fn tables(root: &Path, write: bool) -> Result<String, String> {
     let rows = Rows::parse(&document).map_err(|errors| errors.join("\n"))?;
     let page = fs::read_to_string(root.join(PAGE)).map_err(|e| format!("{PAGE}: {e}"))?;
     let lines: Vec<&str> = page.lines().collect();
-    let rendered = render(&rows, &index, &lines).map_err(|errors| errors.join("\n"))?;
+    let rendered = render(root, &rows, &index, &lines).map_err(|errors| errors.join("\n"))?;
     let mut rewritten: Vec<String> = lines.iter().map(|line| (*line).to_owned()).collect();
     let mut printed = Vec::new();
     for ((table, cells), heading) in rendered.iter().zip(rows.tables.iter().map(|t| t.heading)) {

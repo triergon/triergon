@@ -38,7 +38,7 @@ fn prefix_traces_require_the_reference_and_secondary_input_pins() {
             id: "feature".into(),
             prefix: prefix.into(),
             candidate: "candidate".into(),
-            reference: "reference".into(),
+            reference: Some("reference".into()),
             contract: root.join("contract.json"),
             manifest: root.join("corpus.json"),
             cases: vec![case],

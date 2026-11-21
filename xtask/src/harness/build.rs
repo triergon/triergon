@@ -317,7 +317,7 @@ const MEDIA_WORKER: Candidate = Candidate {
 
 /// Measurement workers a contract may name as its candidate besides
 /// `media-worker`.
-const ADDITIONAL_CANDIDATES: [Candidate; 14] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 16] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
@@ -422,6 +422,20 @@ const ADDITIONAL_CANDIDATES: [Candidate; 14] = [
         features: &["reference-trace"],
         nightly: false,
     },
+    Candidate {
+        name: "framing-views-worker",
+        package: "triergon-framing",
+        example: Some("framing_views_worker"),
+        features: &["reference-trace"],
+        nightly: false,
+    },
+    Candidate {
+        name: "isobmff-views-worker",
+        package: "triergon-isobmff",
+        example: Some("isobmff_views_worker"),
+        features: &["reference-trace"],
+        nightly: false,
+    },
 ];
 
 /// Every measurement worker, `media-worker` first.
@@ -501,6 +515,29 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             inputs.push(format!("harness/features/packet-framing/{file}"));
         }
     }
+    let view_headers: &[&str] = match name {
+        "framing-views-worker" => &[
+            "harness/reference_framing_views.c",
+            "harness/reference_views_protocol.h",
+            "harness/reference_framing.h",
+            "harness/reference_nal_units.h",
+            "harness/reference_obu.h",
+            "harness/reference_adts.h",
+            "harness/reference_config_views.h",
+            "harness/reference_dts_frames.h",
+        ],
+        "isobmff-views-worker" => &[
+            "crates/framing/examples/framing_views/fold.rs",
+            "crates/framing/examples/framing_views/protocol.rs",
+            "harness/reference_isobmff_views.c",
+            "harness/reference_views_protocol.h",
+            "harness/reference_isobmff_packets.h",
+            "harness/reference_isobmff_index.h",
+            "harness/reference_isobmff_trace.h",
+        ],
+        _ => &[],
+    };
+    inputs.extend(view_headers.iter().map(ToString::to_string));
     inputs.sort();
     inputs.dedup();
     selected_graph(root, &metadata, spec.package, &inputs)
@@ -791,7 +828,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 20] = [
+const PROFILE_REFERENCES: [ProfileReference; 22] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -993,6 +1030,28 @@ const PROFILE_REFERENCES: [ProfileReference; 20] = [
         ..REFERENCE
     },
     ProfileReference {
+        profile: ".research/reference-framing-views",
+        binary: "ffmpeg-framing-views-worker",
+        source: "harness/reference_framing_views.c",
+        record: "ffmpeg-framing-views-native",
+        kind: "pinned FFmpeg framing public-API views",
+        libraries: "framing_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-formats",
+        binary: "ffmpeg-isobmff-views-worker",
+        source: "harness/reference_isobmff_views.c",
+        record: "ffmpeg-isobmff-views-native",
+        kind: "pinned FFmpeg isobmff public-API views",
+        libraries: "isobmff_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
         profile: ".research/freetype",
         binary: "freetype-font-worker",
         define: Some("-DTRIERGON_FONT_REFERENCE=1"),
@@ -1093,12 +1152,21 @@ fn build_selected(
     let linux = cfg!(target_os = "linux");
     let mut candidate_command = cargo_rustc(&MEDIA_WORKER, &root.join("target"), true)?;
     candidate_command.extend(gate_build::worker_link_arguments()?);
-    let candidate_order = build_in_link_order(
-        root,
-        &mut candidate_command,
-        &root.join(gate_build::release_dir()?).join("media-worker"),
-        "media-worker",
-    )?;
+    // The views use the media worker only to share the report's build identity.
+    // Its trained layout does not qualify a comparison-only build of either view.
+    let candidate_order = if comparison_build
+        && matches!(only, Some("framing-views-worker" | "isobmff-views-worker"))
+    {
+        run(&candidate_command)?;
+        None
+    } else {
+        build_in_link_order(
+            root,
+            &mut candidate_command,
+            &root.join(gate_build::release_dir()?).join("media-worker"),
+            "media-worker",
+        )?
+    };
     if selected.iter().any(|spec| spec.nightly) {
         crate::simd_toolchain()?;
     }

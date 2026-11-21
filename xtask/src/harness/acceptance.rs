@@ -201,7 +201,17 @@ pub(crate) fn timing_outputs_match(raw: &Value, expected: &Value) -> bool {
 }
 
 /// Check exact key sets and field types for all four memory observer roles.
+#[cfg(test)]
 pub(crate) fn memory_outputs_match(raw: &Value, expected: &Value) -> bool {
+    selected_memory_outputs_match(raw, expected, super::memory::Selection::Both)
+}
+
+pub(super) fn selected_memory_outputs_match(
+    raw: &Value,
+    expected: &Value,
+    selection: super::memory::Selection,
+) -> bool {
+    let roles = selection.roles();
     output_roles(expected)
         && raw
             .get("samples")
@@ -209,17 +219,18 @@ pub(crate) fn memory_outputs_match(raw: &Value, expected: &Value) -> bool {
             .is_some_and(|samples| {
                 !samples.is_empty()
                     && samples.iter().all(|sample| {
-                        matches!(sample, Value::Object(entries) if entries.len() == 4)
-                            && ["candidate", "reference"].iter().all(|role| {
-                                ["heap", "rss"].iter().all(|mode| {
-                                    sample
-                                        .get(&format!("{role}_{mode}"))
-                                        .and_then(|value| value.get("work"))
-                                        .zip(expected.get(role))
-                                        .is_some_and(|(actual, expected)| {
-                                            output_matches(actual, expected, false)
-                                        })
-                                })
+                        matches!(sample, Value::Object(entries) if entries.len() == roles.len())
+                            && roles.iter().all(|name| {
+                                let expected = name
+                                    .split_once('_')
+                                    .and_then(|(role, _)| expected.get(role));
+                                sample
+                                    .get(name)
+                                    .and_then(|value| value.get("work"))
+                                    .zip(expected)
+                                    .is_some_and(|(actual, expected)| {
+                                        output_matches(actual, expected, false)
+                                    })
                             })
                     })
             })
@@ -384,13 +395,19 @@ fn grade_case_with_policy(
         && upper.is_finite()
         && upper > 0.0
         && policy.is_some_and(|policy| upper <= policy.runtime.ceiling);
-    if !timing_ok {
+    let not_measured = row.get("not_measured");
+    if !timing_ok
+        && not_measured
+            .and_then(|bounds| bounds.get("runtime"))
+            .is_none()
+    {
         reasons.push(format!("{id}: runtime gate unproven or failed"));
     }
     let memory = row.get("memory").unwrap_or(&Value::Null);
     // Graded as harness/policy.json states; RSS growth is reported only.
     let ratios = ["total_rss_ratio_upper_95", "heap_ratio_upper_95"]
         .map(|k| float(memory.get(k)).unwrap_or(f64::INFINITY));
+    let selection = super::memory::Selection::for_case(row);
     let memory_ok = super::memory::evidence_valid(
         root,
         row,
@@ -401,18 +418,26 @@ fn grade_case_with_policy(
         require_linux,
     ) && row
         .get("expected_memory_outputs")
-        .is_none_or(|expected| memory_outputs_match(memory, expected))
+        .is_none_or(|expected| selected_memory_outputs_match(memory, expected, selection))
         && s(memory, "status") == Some("qualified")
-        && ratios.iter().all(|r| r.is_finite())
         && policy.is_some_and(|policy| {
-            ratios[0] < policy.memory.total_rss && ratios[1] < policy.memory.heap
-        })
-        && ratios[0] > 0.0
-        && ratios[1] >= 0.0;
-    if !memory_ok {
+            (!selection.rss() || (ratios[0] > 0.0 && ratios[0] < policy.memory.total_rss))
+                && (!selection.heap() || (ratios[1] >= 0.0 && ratios[1] < policy.memory.heap))
+        });
+    if !memory_ok
+        && !not_measured
+            .is_some_and(|bounds| bounds.get("heap").is_some() && bounds.get("total_rss").is_some())
+    {
         reasons.push(format!(
             "{id}: lower RSS/live allocation gate unproven or failed"
         ));
+    }
+    if let Some(Value::Object(bounds)) = not_measured {
+        for (bound, cause) in bounds {
+            if let Some(cause) = cause.as_str() {
+                reasons.push(format!("{id}: {bound} not measured: {cause}"));
+            }
+        }
     }
     CaseVerdict {
         timing_pass: prerequisites_pass && timing_ok,

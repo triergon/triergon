@@ -24,6 +24,10 @@ reference-trace = []
 name = "isobmff_consumer_worker"
 required-features = ["reference-trace"]
 
+[[example]]
+name = "isobmff_views_worker"
+required-features = ["reference-trace"]
+
 [[test]]
 name = "fragment_open_clock"
 required-features = ["reference-trace"]

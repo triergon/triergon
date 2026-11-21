@@ -709,6 +709,7 @@ fn open_case(timed: &Value, measured: &Value) -> R<Value> {
 
 /// `ceiling` is the policy's runtime ceiling, which a timing record that may
 /// stop early must name.
+#[allow(clippy::too_many_arguments)] // Grading binds the case, collections, workers, target and bound policy.
 fn join_case(
     timed: &Value,
     measured: &Value,
@@ -717,6 +718,7 @@ fn join_case(
     identity: &Value,
     target: &str,
     ceiling: f64,
+    unmeasured: &super::bounds::Unmeasured<'_>,
 ) -> R<Value> {
     require_same(
         &joined_fields(timed)?,
@@ -724,119 +726,158 @@ fn join_case(
         "case fields/parity",
     )?;
     let workers = selected(timed, expected, contract, identity)?;
+    let id = text(expected, "id")?;
+    let annotation = unmeasured.annotation(id);
+    if unmeasured.causes(id).next().is_some() {
+        require_same(
+            field(timed, "not_measured")?,
+            &annotation,
+            "not measured bounds",
+        )?;
+    } else if timed.get("not_measured").is_some() {
+        return Err("undeclared not measured bounds".into());
+    }
     if expected.get("outcome").and_then(Value::as_str) == Some("refusal") {
         if has_measurement(timed) || has_measurement(measured) {
             return Err("a registered refusal cannot contain successful measurements".into());
         }
         return Ok(timed.clone());
     }
-    let fields = super::comparison::work_fields(contract)?;
-    let clock = field(timed, "timing")?;
-    let memory = field(measured, "memory")?;
-    if let Some(previous) = timed.get("memory").filter(|value| **value != Value::Null) {
-        require_same(previous, memory, "retained memory measurement")?;
-    }
-    if let Some(previous) = measured
-        .get("timing")
-        .filter(|value| **value != Value::Null)
-    {
-        require_same(previous, clock, "retained timing measurement")?;
-    }
-    let minimum = integer(contract, "minimum_pairs")?;
-    let memory_raw = samples(memory, minimum, text(memory, "status")? != "qualified")?;
-    if text(clock, "status")? != "measured" || integer(clock, "iterations")? < 1 {
-        return Err("timing is not measured".into());
-    }
-    if !validation::iterations_valid(contract, field(clock, "iterations")?) {
-        return Err("iterations do not match the contract".into());
-    }
-    for measurement in [clock, memory] {
+    let measurement = |first: &Value, other: &Value, key: &str| -> R<Option<Value>> {
+        let present = |row: &Value| row.get(key).filter(|value| **value != Value::Null).cloned();
+        let value = present(first);
+        if unmeasured.skips(id, key) {
+            if value.is_some() || present(other).is_some() {
+                return Err(format!("unmeasured case contains {key} samples"));
+            }
+            return Ok(None);
+        }
+        let value = value.ok_or_else(|| format!("missing {key} measurement"))?;
+        if let Some(previous) = present(other) {
+            require_same(&previous, &value, &format!("retained {key} measurement"))?;
+        }
         require_same(
-            field(measurement, "input_sha256")?,
+            field(&value, "input_sha256")?,
             field(timed, "input_sha256")?,
             "measurement input hash",
         )?;
-    }
+        Ok(Some(value))
+    };
+    let clock = measurement(timed, measured, "timing")?;
+    let memory = measurement(measured, timed, "memory")?;
+    let fields = super::comparison::work_fields(contract)?;
+    let minimum = integer(contract, "minimum_pairs")?;
     let linux = target.contains("linux")
         || identity
             .get("host_platform")
             .and_then(|h| h.get("system"))
             .and_then(Value::as_str)
             == Some("Linux");
-    timing::validate(
-        clock,
-        &timing::Expected {
-            worker_hashes: &workers,
-            input_sha256: Some(field(timed, "input_sha256")?),
-            minimum_pairs: minimum.max(GATE_PAIRS as i128),
-            work: &timing::Work {
-                fields: fields.clone(),
-                own: vec![],
-            },
-            require_linux: linux,
-            module_absence: true,
-            ceiling: Some(ceiling),
-        },
-    )
-    .map_err(|error| format!("timing: {error}"))?;
-    memory_binding(memory, identity, &workers, linux)?;
-    if let Some(outputs) = expected.get("expected_time_outputs")
-        && !super::acceptance::timing_outputs_match(clock, outputs)
-    {
-        return Err("measurements do not match expected_time_outputs".into());
-    }
-    if let Some(outputs) = expected.get("expected_memory_outputs")
-        && !super::acceptance::memory_outputs_match(memory, outputs)
-    {
-        return Err("measurements do not match expected_memory_outputs".into());
-    }
-    // The validator has shown both workers do this work in every pair.
-    let timed_output = work(
-        field(field(&array(clock, "samples")?[0], "reference")?, "data")?,
-        &fields,
-    )?;
-    let output = work(
-        field(field(&memory_raw[0], "reference_heap")?, "work")?,
-        &fields,
-    )?;
-    // Timing folds every iteration into one result; memory folds one operation.
-    // Counts scale with iterations. Digests are compared within each phase,
-    // whose complete operation, input, workers and parity were bound above.
-    for key in ["packets", "bytes"] {
-        if integer(&output, key)?.checked_mul(integer(clock, "iterations")?)
-            != Some(integer(&timed_output, key)?)
-        {
-            return Err(format!("timing/memory {key} work mismatch"));
-        }
-    }
-    for sample in memory_raw {
-        for role in [
-            "candidate_heap",
-            "candidate_rss",
-            "reference_heap",
-            "reference_rss",
-        ] {
-            require_same(
-                &work(field(field(sample, role)?, "work")?, &fields)?,
-                &output,
-                "memory output",
-            )?;
-        }
-    }
     let parity = field(timed, "parity")?;
-    for expected in [
-        expected.get("expected"),
-        parity.get("expected"),
-        parity.get("candidate"),
-        parity.get("reference"),
-    ]
-    .into_iter()
-    .flatten()
-    {
-        require_same(&work(expected, &fields)?, &output, "expected output")?;
+    let check_work = |output: &Value, iterations: i128| -> R<()> {
+        for expected in [
+            expected.get("expected"),
+            parity.get("expected"),
+            parity.get("candidate"),
+            parity.get("reference"),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            let expected = work(expected, &fields)?;
+            if iterations == 1 {
+                require_same(&expected, output, "expected output")?;
+            } else {
+                for key in ["packets", "bytes"] {
+                    if integer(&expected, key)?.checked_mul(iterations)
+                        != Some(integer(output, key)?)
+                    {
+                        return Err(format!("timing {key} work mismatch"));
+                    }
+                }
+            }
+        }
+        Ok(())
+    };
+    let mut timed_work = None;
+    if let Some(clock) = &clock {
+        if text(clock, "status")? != "measured" || integer(clock, "iterations")? < 1 {
+            return Err("timing is not measured".into());
+        }
+        if !validation::iterations_valid(contract, field(clock, "iterations")?) {
+            return Err("iterations do not match the contract".into());
+        }
+        timing::validate(
+            clock,
+            &timing::Expected {
+                worker_hashes: &workers,
+                input_sha256: Some(field(timed, "input_sha256")?),
+                minimum_pairs: minimum.max(GATE_PAIRS as i128),
+                work: &timing::Work {
+                    fields: fields.clone(),
+                    own: vec![],
+                },
+                require_linux: linux,
+                module_absence: true,
+                ceiling: Some(ceiling),
+            },
+        )
+        .map_err(|error| format!("timing: {error}"))?;
+        if let Some(outputs) = expected.get("expected_time_outputs")
+            && !super::acceptance::timing_outputs_match(clock, outputs)
+        {
+            return Err("measurements do not match expected_time_outputs".into());
+        }
+        let output = work(
+            field(field(&array(clock, "samples")?[0], "reference")?, "data")?,
+            &fields,
+        )?;
+        let iterations = integer(clock, "iterations")?;
+        if memory.is_none() {
+            check_work(&output, iterations)?;
+        }
+        timed_work = Some((output, iterations));
     }
     let mut row = timed.clone();
-    put(&mut row, "memory", memory.clone())?;
+    if let Some(memory) = memory {
+        let memory_raw = samples(&memory, minimum, text(&memory, "status")? != "qualified")?;
+        memory_binding(&memory, identity, &workers, linux)?;
+        let selection = super::memory::Selection::for_case(timed);
+        if let Some(outputs) = expected.get("expected_memory_outputs")
+            && !super::acceptance::selected_memory_outputs_match(&memory, outputs, selection)
+        {
+            return Err("measurements do not match expected_memory_outputs".into());
+        }
+        let output = work(
+            selection
+                .reference_work(&memory_raw[0])
+                .ok_or("missing reference memory work")?,
+            &fields,
+        )?;
+        if let Some((timed_output, iterations)) = timed_work {
+            for key in ["packets", "bytes"] {
+                if integer(&output, key)?.checked_mul(iterations)
+                    != Some(integer(&timed_output, key)?)
+                {
+                    return Err(format!("timing/memory {key} work mismatch"));
+                }
+            }
+        }
+        for sample in memory_raw {
+            if members(sample)?.len() != selection.roles().len() {
+                return Err("memory samples do not match the scheduled observers".into());
+            }
+            for role in selection.roles() {
+                require_same(
+                    &work(field(field(sample, role)?, "work")?, &fields)?,
+                    &output,
+                    "memory output",
+                )?;
+            }
+        }
+        check_work(&output, 1)?;
+        put(&mut row, "memory", memory)?;
+    }
     Ok(row)
 }
 
@@ -909,6 +950,7 @@ fn validate_additional(
             identity,
             target,
             ceiling,
+            &super::bounds::Unmeasured::default(),
         )?;
     }
     Ok(())
@@ -1008,6 +1050,7 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
     )?;
     let identity = field(&memory, "identity")?;
     let target = text(&memory, "target")?;
+    let unmeasured = super::bounds::Unmeasured::read(&contract, &manifest, target)?;
     let pinned = gate_build::pinned_release(root)?;
     println!("{}", gate_build::describe(identity, &pinned));
     let refusals = gate_build::refusals(identity, &pinned);
@@ -1047,8 +1090,18 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
         if open.iter().any(|listed| listed == id) {
             return open_case(&clock, &measured).map_err(|e| format!("{id}: {e}"));
         }
+        for (bound, cause) in unmeasured.causes(id) {
+            println!("{id}: {bound} not measured: {cause}");
+        }
         join_case(
-            &clock, &measured, spec, &contract, identity, target, ceiling,
+            &clock,
+            &measured,
+            spec,
+            &contract,
+            identity,
+            target,
+            ceiling,
+            &unmeasured,
         )
         .map_err(|e| format!("{id}: {e}"))
     };

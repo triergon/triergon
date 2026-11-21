@@ -416,7 +416,7 @@ pub fn fate_coverage(
 /// which list `samples` with their `sha256`.
 const REVIEWED_INPUTS: [&str; 2] = ["harness/fonts/corpus.json", "harness/fate/samples.json"];
 
-fn reviewed_inputs(root: &Path) -> Result<Vec<Value>, String> {
+pub(super) fn reviewed_inputs(root: &Path) -> Result<Vec<Value>, String> {
     REVIEWED_INPUTS
         .iter()
         .map(|path| json::read(&root.join(path)).map_err(|e| format!("{path}: {e}")))
@@ -427,7 +427,7 @@ fn reviewed_inputs(root: &Path) -> Result<Vec<Value>, String> {
 /// `reviewed-licence` file whose hash a reviewed input manifest records under the
 /// licence the case names, or a `fetched-not-redistributed` sample whose hash a
 /// manifest of fetched samples records. Any other rights value is unreviewed.
-fn rights_reviewed(reviewed: &[Value], case: &Value) -> bool {
+pub(super) fn rights_reviewed(reviewed: &[Value], case: &Value) -> bool {
     fn list<'a>(value: &'a Value, key: &str) -> &'a [Value] {
         value.get(key).and_then(Value::as_array).unwrap_or_default()
     }
@@ -493,7 +493,7 @@ pub fn case_arguments(case: &Value) -> Vec<std::ffi::OsString> {
 }
 
 /// Rebase DVD palette options onto the same corpus used to check companion pins.
-pub(super) fn resolved_case_arguments(
+pub(crate) fn resolved_case_arguments(
     corpus: &Path,
     case: &Value,
     mut arguments: Vec<std::ffi::OsString>,
@@ -546,7 +546,7 @@ pub struct PrefixFeature {
     pub prefix: String,
     pub candidate: String,
     /// The comparison reference's name in the build identity.
-    pub reference: String,
+    pub reference: Option<String>,
     pub contract: PathBuf,
     pub manifest: PathBuf,
     pub cases: Vec<Value>,
@@ -587,7 +587,11 @@ impl PrefixFeature {
         Ok(Self {
             prefix: text("worker_operation")?,
             candidate: text("candidate")?,
-            reference: text("reference")?,
+            reference: if document.get("oracle").is_some() {
+                None
+            } else {
+                Some(text("reference")?)
+            },
             cases: listing
                 .get("cases")
                 .and_then(Value::as_array)
@@ -645,13 +649,14 @@ impl PrefixFeature {
         root: &Path,
         identity: &Value,
     ) -> Result<PathBuf, String> {
-        let record = super::comparison::reference_named(identity, &self.reference)?;
+        let name = self
+            .reference
+            .as_deref()
+            .ok_or("oracle feature has no reference worker")?;
+        let record = super::comparison::reference_named(identity, name)?;
         let reference = root.join(validation::text(&record, "path")?);
         if super::linux::file_sha(&reference)? != validation::hash(&record, "sha256")? {
-            return Err(format!(
-                "{} changed since build identity; rebuild",
-                self.reference
-            ));
+            return Err(format!("{name} changed since build identity; rebuild"));
         }
         Ok(reference)
     }
@@ -669,7 +674,7 @@ impl PrefixFeature {
         Ok(self.corpus.join(file))
     }
 
-    pub(super) fn verified_input(&self, case: &Value) -> Result<PathBuf, String> {
+    pub(crate) fn verified_input(&self, case: &Value) -> Result<PathBuf, String> {
         let path = self.input(case)?;
         if digest(&path)? != validation::hash(case, "sha256")? {
             return Err(format!("input changed: {}", path.display()));
@@ -721,7 +726,7 @@ fn input_failure(
 
 /// Why a case cannot be measured from `corpus`, before anything runs: a missing
 /// or changed input, ordered entity or companion.
-pub(super) fn input_problem(
+pub(crate) fn input_problem(
     corpus: &Path,
     case: &Value,
     prefix: Option<&str>,
@@ -757,7 +762,7 @@ pub(crate) fn case_files(corpus: &Path, case: &Value) -> Result<Vec<PathBuf>, St
     Ok(files)
 }
 
-fn save_checkpoint(path: &Path, value: &Value) -> Result<(), String> {
+pub(crate) fn save_checkpoint(path: &Path, value: &Value) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
     json::write(&temporary, value)?;
     fs::rename(&temporary, path).map_err(|e| format!("{}: {e}", path.display()))
@@ -1060,7 +1065,9 @@ pub(crate) fn collect(
     }
     let contract_sha = digest(&options.contract)?;
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
-    let open = open_cases(&contract, &manifest, &gate_target()?)?;
+    let target = gate_target()?;
+    let open = open_cases(&contract, &manifest, &target)?;
+    let unmeasured = super::bounds::Unmeasured::read(&contract, &manifest, &target)?;
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();
     for path in &options.additional_reports {
@@ -1079,7 +1086,6 @@ pub(crate) fn collect(
         let samples = options.output.join("measurements");
         fs::create_dir(&samples).map_err(|e| format!("{}: {e}", samples.display()))?;
     }
-    let target = gate_target()?;
     let coverage = fate_coverage(
         root,
         &json::read(&root.join("harness/fate/index.json"))?,
@@ -1178,7 +1184,10 @@ pub(crate) fn collect(
             ));
         }
         let measured = root.join(s(&selected.measured, "path").unwrap_or_default());
-        if (options.benchmark || options.memory) && options.baseline_worker.is_none() {
+        if ((options.benchmark && !unmeasured.skips(&id, "timing"))
+            || (options.memory && !unmeasured.skips(&id, "memory")))
+            && options.baseline_worker.is_none()
+        {
             super::comparison::measurable(&selected.measured)?;
         }
         let file = s(case, "file").unwrap_or_default();
@@ -1315,10 +1324,17 @@ pub(crate) fn collect(
         }
         let passed = s(&parity, "status") == Some("pass");
         row.push(("parity", parity));
+        let causes = unmeasured.annotation(&id);
+        if unmeasured.causes(&id).next().is_some() {
+            for (bound, cause) in unmeasured.causes(&id) {
+                println!("{id}: {bound} not measured: {cause}");
+            }
+            row.push(("not_measured", causes));
+        }
         if let (true, Some((measured, input, operation))) = (passed, timed) {
             let reference = options.baseline_worker.clone().unwrap_or(measured);
             let prefix = worker_operation.as_deref();
-            if options.benchmark {
+            if options.benchmark && !unmeasured.skips(&id, "timing") {
                 let timing = measure_pinned(
                     || input_failure(&corpus, case, &input, sha, prefix),
                     || {
@@ -1338,7 +1354,12 @@ pub(crate) fn collect(
                     store_measurement(&options.output, rows.len(), "timing", &timing)?,
                 ));
             }
-            if options.memory {
+            if options.memory && !unmeasured.skips(&id, "memory") {
+                use super::bounds::Bound;
+                let memory_selection = super::memory::Selection::from_deferred(
+                    unmeasured.has(&id, Bound::Heap),
+                    unmeasured.has(&id, Bound::TotalRss),
+                );
                 let index = rows.len();
                 let registered = options.baseline_worker.is_none();
                 let workers = super::memory::WorkerPaths {
@@ -1353,7 +1374,7 @@ pub(crate) fn collect(
                     let memory = measure_pinned(
                         || input_failure(&corpus, case, &input, sha, prefix),
                         || {
-                            super::memory::collect(
+                            super::memory::collect_selected(
                                 slot,
                                 root,
                                 super::memory::WorkerPaths {
@@ -1365,6 +1386,7 @@ pub(crate) fn collect(
                                 memory_pairs,
                                 options.seed,
                                 &operation,
+                                memory_selection,
                             )
                         },
                     )?;

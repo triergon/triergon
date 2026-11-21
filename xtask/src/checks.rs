@@ -144,28 +144,30 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
     }
 }
 
-/// Why a contract's `open_bounds` are not valid against its feature's committed
-/// `corpus.json`, on any gate target; nothing for a contract that lists none.
-fn open_bounds_error(contract_path: &Path, contract: &Value) -> Option<String> {
-    contract.get("open_bounds")?;
+/// Why a contract's bound exceptions are invalid against its registered corpus.
+fn open_bounds_error(root: &Path, contract_path: &Path, contract: &Value) -> Option<String> {
+    if contract.get("open_bounds").is_none() && contract.get("open_unmeasured").is_none() {
+        return None;
+    }
     let corpus = contract_path.with_file_name("corpus.json");
-    let manifest = match json::read(&corpus) {
-        Ok(manifest) => manifest,
+    let manifest = match crate::harness::manifest::read(root, &corpus) {
+        Ok((manifest, _)) => manifest,
         Err(error) => {
             return Some(format!(
-                "open_bounds needs the committed corpus.json: {error}"
+                "bound exceptions need the registered corpus: {error}"
             ));
         }
     };
-    crate::gate::TARGETS
-        .iter()
-        .find_map(|target| crate::harness::bounds::open_bounds(contract, &manifest, target).err())
+    crate::gate::TARGETS.iter().find_map(|target| {
+        crate::harness::bounds::open_bounds(contract, &manifest, target)
+            .err()
+            .or_else(|| crate::harness::bounds::Unmeasured::read(contract, &manifest, target).err())
+    })
 }
 
 /// The fields every feature contract (`harness/features/<id>/contract.json`) may
 /// declare that the harness reads the same way for all of them: `timeout_seconds`,
-/// `measurement_reference` and, against the feature's committed `corpus.json`,
-/// `open_bounds`.
+/// `measurement_reference`, oracle pins and case-specific bound exceptions.
 fn contract_fields(root: &Path) -> Vec<String> {
     let features = root.join("harness/features");
     walk::files(&features, &|rel| rel.ends_with("contract.json"))
@@ -182,7 +184,21 @@ fn contract_fields(root: &Path) -> Vec<String> {
                         .and(crate::harness::worker::contract_parity_timeout(&contract))
                         .err(),
                     crate::harness::build::measurement_reference_error(&contract),
-                    open_bounds_error(&path, &contract),
+                    open_bounds_error(root, &path, &contract),
+                    contract.get("oracle").and_then(|_| {
+                        crate::harness::oracle_compare::kind(&contract)
+                            .err()
+                            .or_else(|| {
+                                let manifest = json::read(&path.with_file_name("corpus.json"));
+                                manifest
+                                    .and_then(|manifest| {
+                                        crate::harness::manifest::validate_required(
+                                            &contract, &manifest,
+                                        )
+                                    })
+                                    .err()
+                            })
+                    }),
                 ]
                 .into_iter()
                 .flatten()

@@ -46,7 +46,7 @@ pub(super) fn require_same(a: &Value, b: &Value, label: &str) -> Result<(), Stri
     }
 }
 
-pub(super) fn put(value: &mut Value, key: &str, replacement: Value) -> Result<(), String> {
+pub(crate) fn put(value: &mut Value, key: &str, replacement: Value) -> Result<(), String> {
     let Value::Object(fields) = value else {
         return Err("expected a JSON object".into());
     };

@@ -76,7 +76,9 @@ impl Measured {
         });
         let measured: Vec<&CaseBounds> = cases
             .iter()
-            .filter(|case| case.value(Bound::Heap).is_some())
+            .filter(|case| {
+                case.value(Bound::Heap).is_some() || case.value(Bound::TotalRss).is_some()
+            })
             .collect();
         let memory = (!measured.is_empty()).then(|| Memory {
             heap: largest(Bound::Heap),

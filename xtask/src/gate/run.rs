@@ -582,6 +582,31 @@ pub(super) fn unmeasured_in(
         return Err(format!("wrong report shape for {command}"));
     }
     let selection = collection_selection(step, command, report, rows)?;
+    let contract =
+        if command == "report" && rows.iter().any(|row| row.get("not_measured").is_some()) {
+            let path = flag_value(step, "--contract")
+                .ok_or("report with unmeasured bounds needs --contract")?;
+            let manifest = flag_value(step, "--manifest")
+                .ok_or("report with unmeasured bounds needs --manifest")?;
+            let root = crate::root();
+            Some((
+                json::read(&root.join(path))?,
+                crate::harness::manifest::read(&root, &root.join(manifest))?.0,
+            ))
+        } else {
+            None
+        };
+    let unmeasured = contract
+        .as_ref()
+        .map(|(contract, manifest)| {
+            let target = report
+                .get("target")
+                .and_then(Value::as_str)
+                .ok_or("report needs its target")?;
+            crate::harness::bounds::Unmeasured::read(contract, manifest, target)
+        })
+        .transpose()?
+        .unwrap_or_default();
     let mut missing = Vec::new();
     for (index, row) in rows.iter().enumerate() {
         let id = row
@@ -598,13 +623,21 @@ pub(super) fn unmeasured_in(
         } else {
             !external && matches!(parity, Some("unpinned" | "mismatch"))
         };
-        let collected = match row.get(key) {
-            None | Some(Value::Null) => parity_only,
-            Some(value) => {
-                parity == Some("pass")
-                    && value.get("status").and_then(Value::as_str) == Some(measured)
-            }
+        let skipped = unmeasured.skips(id, key);
+        let annotation_ok = if unmeasured.causes(id).next().is_some() {
+            row.get("not_measured") == Some(&unmeasured.annotation(id))
+        } else {
+            row.get("not_measured").is_none()
         };
+        let collected = annotation_ok
+            && match row.get(key) {
+                None | Some(Value::Null) => parity_only || (parity == Some("pass") && skipped),
+                Some(value) => {
+                    !skipped
+                        && parity == Some("pass")
+                        && value.get("status").and_then(Value::as_str) == Some(measured)
+                }
+            };
         if !collected {
             missing.push(id.to_owned());
         }

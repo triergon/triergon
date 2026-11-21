@@ -430,7 +430,7 @@ fn missing_registered_report_fails_planning() {
     let mut contracts = crate::harness::features::discover(root).unwrap();
     contracts.retain(|contract| contract.id != "subtitle-text");
     assert_eq!(
-        report_contracts(contracts).err().as_deref(),
+        report_contracts(root, contracts).err().as_deref(),
         Some("subtitle-text: planned, but not registered")
     );
 }
@@ -446,7 +446,7 @@ fn every_registered_feature_is_planned_or_excluded() {
         document: Value::object([("runner", Value::str("cargo xtask report"))]),
         compare_order: 0,
     });
-    let reports = report_contracts(contracts).unwrap();
+    let reports = report_contracts(root, contracts).unwrap();
     let new = reports.iter().find(|report| report.id == id).unwrap();
     assert_eq!(new.weight, 1);
     assert!(

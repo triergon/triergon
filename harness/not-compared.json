@@ -1,14 +1,7 @@
 {
   "about": "Public features of each library crate that no gated comparison compares directly with its reference, by crate: each by a short stable name, the public items it is reached through, how near it comes to a direct comparison and what a comparison would need. `degree` is one of `step` (compared only as a step inside a larger compared operation), `recorded` (checked against reference output recorded once, which no worker re-runs), `outside-gate` (compared with the reference by an opt-in test or a command the gate does not run), `unit-tests` (unit tests only), `untested` (no tests) and `no-reference` (no reference implements it). A crate listed with no features was reviewed and has none; a crate not listed is not reviewed yet. A feature leaves its list when a gated comparison compares it directly. `cargo xtask check-design` checks the list and holds the count per crate to harness/gate-exceptions.json, so a feature left uncompared is recorded as visibly as a loosened gate.",
   "crates": {
-    "triergon-ass": [
-      {
-        "name": "renderer-settings",
-        "entry_points": ["Settings::margins", "Settings::use_margins", "Settings::pixel_aspect", "Settings::font_scale", "Settings::line_spacing", "Settings::line_position"],
-        "degree": "untested",
-        "needs": "ass-render fixtures rendered with each setting changed from its default, against libass configured with the same values"
-      }
-    ],
+    "triergon-ass": [],
     "triergon-bitstream": [
       {
         "name": "bit-readers",

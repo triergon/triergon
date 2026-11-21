@@ -2,7 +2,7 @@
 //! runtime, heap or total-RSS bound fails fails the step, unless the contract's
 //! `open_bounds` lists that bound for the case on the measured target.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::path::Path;
 
@@ -21,7 +21,15 @@ pub enum Bound {
 }
 
 impl Bound {
-    const ALL: [Bound; 3] = [Bound::Runtime, Bound::Heap, Bound::TotalRss];
+    pub(crate) const ALL: [Bound; 3] = [Bound::Runtime, Bound::Heap, Bound::TotalRss];
+
+    fn key(self) -> &'static str {
+        match self {
+            Self::Runtime => "runtime",
+            Self::Heap => "heap",
+            Self::TotalRss => "total_rss",
+        }
+    }
 
     fn parse(name: &str) -> Option<Bound> {
         match name {
@@ -99,10 +107,17 @@ pub fn case_bounds(row: &Value) -> Option<CaseBounds> {
             ratio("total_rss_ratio_upper_95"),
         )
     });
-    Some(CaseBounds {
-        id,
-        values: [runtime, memory.map(|m| m.0), memory.map(|m| m.1)],
-    })
+    let mut values = [runtime, memory.map(|m| m.0), memory.map(|m| m.1)];
+    for (bound, value) in Bound::ALL.into_iter().zip(&mut values) {
+        if row
+            .get("not_measured")
+            .and_then(|bounds| bounds.get(bound.key()))
+            .is_some()
+        {
+            *value = None;
+        }
+    }
+    Some(CaseBounds { id, values })
 }
 
 /// The contract's `open_bounds` on `target`: each entry names a `bound` (`runtime`,
@@ -178,6 +193,126 @@ pub fn open_bounds(
         }
     }
     Ok(open)
+}
+
+/// Bounds without measurements, by case and bound on a target.
+#[derive(Default)]
+pub struct Unmeasured<'a>(BTreeMap<&'a str, BTreeMap<Bound, &'a str>>);
+
+impl<'a> Unmeasured<'a> {
+    pub fn read(contract: &'a Value, manifest: &'a Value, target: &str) -> Result<Self, String> {
+        let Some(entries) = contract.get("open_unmeasured") else {
+            return Ok(Self::default());
+        };
+        let entries = entries
+            .as_array()
+            .ok_or("open_unmeasured must be an array")?;
+        let cases: BTreeSet<_> = manifest
+            .get("cases")
+            .and_then(Value::as_array)
+            .ok_or("manifest has no cases")?
+            .iter()
+            .filter_map(|case| case.get("id").and_then(Value::as_str))
+            .collect();
+        let mut seen = BTreeSet::new();
+        let mut active = Self::default();
+        for entry in entries {
+            let text = |key| entry.get(key).and_then(Value::as_str);
+            let bound = text("bound")
+                .and_then(Bound::parse)
+                .ok_or("open_unmeasured needs a bound (runtime, heap or total_rss)")?;
+            let cause = text("cause")
+                .filter(|s| !s.trim().is_empty() && !s.contains(['\r', '\n']))
+                .ok_or("open_unmeasured cause must be one nonempty line")?;
+            let ids = entry
+                .get("cases")
+                .and_then(Value::as_array)
+                .filter(|ids| !ids.is_empty())
+                .ok_or("open_unmeasured needs a nonempty list of cases")?;
+            let targets = if let Some(targets) = entry.get("targets") {
+                targets
+                    .as_array()
+                    .filter(|targets| !targets.is_empty())
+                    .ok_or("open_unmeasured targets must be a nonempty array")?
+                    .iter()
+                    .map(|value| {
+                        value
+                            .as_str()
+                            .filter(|name| crate::gate::TARGETS.contains(name))
+                            .ok_or("open_unmeasured names an unknown target")
+                    })
+                    .collect::<Result<Vec<_>, _>>()?
+            } else {
+                crate::gate::TARGETS.to_vec()
+            };
+            for id in ids {
+                let id = id.as_str().filter(|id| cases.contains(id)).ok_or_else(|| {
+                    format!("open_unmeasured: {id:?} is not a case of the manifest")
+                })?;
+                for &on in &targets {
+                    if !seen.insert((id, bound, on)) {
+                        return Err(format!(
+                            "open_unmeasured: {id} {bound} listed twice on {on}"
+                        ));
+                    }
+                    if on == target {
+                        active.0.entry(id).or_default().insert(bound, cause);
+                    }
+                }
+            }
+        }
+        for (bound, id) in open_bounds(contract, manifest, target)? {
+            if active.has(&id, bound) {
+                return Err(format!(
+                    "{id}: {bound} listed in both open_bounds and open_unmeasured on {target}"
+                ));
+            }
+        }
+        Ok(active)
+    }
+
+    pub fn has(&self, id: &str, bound: Bound) -> bool {
+        self.0
+            .get(id)
+            .is_some_and(|bounds| bounds.contains_key(&bound))
+    }
+
+    pub fn causes(&self, id: &str) -> impl Iterator<Item = (Bound, &'a str)> + '_ {
+        self.0
+            .get(id)
+            .into_iter()
+            .flatten()
+            .map(|(&bound, &cause)| (bound, cause))
+    }
+
+    pub fn skips(&self, id: &str, collection: &str) -> bool {
+        match collection {
+            "timing" => self.has(id, Bound::Runtime),
+            "memory" => self.has(id, Bound::Heap) && self.has(id, Bound::TotalRss),
+            _ => false,
+        }
+    }
+
+    pub fn all_skip(&self, manifest: &Value, collection: &str) -> bool {
+        manifest
+            .get("cases")
+            .and_then(Value::as_array)
+            .is_some_and(|cases| {
+                !cases.is_empty()
+                    && cases.iter().all(|case| {
+                        case.get("id")
+                            .and_then(Value::as_str)
+                            .is_some_and(|id| self.skips(id, collection))
+                    })
+            })
+    }
+
+    pub fn annotation(&self, id: &str) -> Value {
+        Value::object(
+            self.causes(id)
+                .map(|(bound, cause)| (bound.key(), Value::str(cause))),
+        )
+    }
 }
 
 /// One line per failing bound of `cases`, telling those the contract lists as open from
@@ -411,6 +546,48 @@ mod tests {
                 open_bounds(&contract(entries), &manifest(), arm),
                 Err(error.to_owned()),
                 "{entries}"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod unmeasured_tests {
+    use super::*;
+
+    #[test]
+    fn unmeasured_bounds_keep_other_cases_and_targets_scheduled() {
+        let manifest = json::parse(r#"{"cases":[{"id":"a"},{"id":"b"}]}"#).unwrap();
+        let contract = json::parse(r#"{"open_unmeasured":[
+            {"bound":"runtime","cases":["a"],"cause":"needs a gate host"},
+            {"bound":"heap","cases":["a"],"cause":"needs a gate host"},
+            {"bound":"total_rss","cases":["a"],"cause":"needs a gate host","targets":["thumbv7neon-unknown-linux-gnueabihf"]}
+        ]}"#).unwrap();
+        let arm64 = Unmeasured::read(&contract, &manifest, "aarch64-unknown-linux-gnu").unwrap();
+        let armv7 =
+            Unmeasured::read(&contract, &manifest, "thumbv7neon-unknown-linux-gnueabihf").unwrap();
+        assert!(arm64.skips("a", "timing"));
+        assert!(!arm64.skips("a", "memory"));
+        assert!(armv7.skips("a", "memory"));
+        assert!(!armv7.all_skip(&manifest, "memory"));
+        assert!(!armv7.skips("b", "timing"));
+    }
+
+    #[test]
+    fn invalid_unmeasured_entries_cannot_excuse_a_measurement() {
+        let manifest = json::parse(r#"{"cases":[{"id":"a"}]}"#).unwrap();
+        for list in [
+            "false",
+            r#"[{"bound":"cpu","cases":["a"],"cause":"why"}]"#,
+            r#"[{"bound":"heap","cases":["b"],"cause":"why"}]"#,
+            r#"[{"bound":"heap","cases":["a"],"cause":"line\nbreak"}]"#,
+            r#"[{"bound":"heap","cases":["a","a"],"cause":"why"}]"#,
+            r#"[{"bound":"heap","cases":["a"],"cause":"why","targets":[]}]"#,
+        ] {
+            let contract = json::parse(&format!("{{\"open_unmeasured\":{list}}}")).unwrap();
+            assert!(
+                Unmeasured::read(&contract, &manifest, crate::gate::TARGETS[0]).is_err(),
+                "{list}"
             );
         }
     }

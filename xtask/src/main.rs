@@ -19,12 +19,14 @@ mod fetch;
 mod ffprobe;
 mod fonts;
 mod framing_bench;
+mod framing_views;
 mod fuzz;
 mod gate;
 mod generators;
 mod harness;
 mod isobmff_bench;
 mod isobmff_seek;
+mod isobmff_views;
 mod json;
 mod mpg123;
 mod numpy;
@@ -87,8 +89,11 @@ commands:
   subtitle-fixtures record|verify FEATURE REFERENCE [options]   record or verify subtitle folds
   prepare-ffmpeg [--jobs N] [--profile PROFILE]
                  build a pinned FFmpeg reference into .research/reference[-PROFILE]:
-                 matroska (default), formats, video, subtitles, transport-dts (git revision on the 9.0 branch);
+                 matroska (default), formats, framing-views, video, subtitles, transport-dts (git revision on the 9.0 branch);
                  decode, capture, capture-small (the 9.0.2 release)
+  oracle-compare [--contract FILE] [--output DIR]  compare candidate traces with an independent oracle
+  framing-views fixtures|manifest --record [FEATURE]
+  isobmff-views fixtures|manifest --record [FEATURE]
   prepare-mpg123 [--jobs N]   build the pinned static free-format MPEG audio reference
   references     keys|pack|fetch|upload   the keys of the pinned reference builds, and
                  their packs in .research/reference-cache and the evidence archive, which
@@ -255,6 +260,9 @@ fn main() -> ExitCode {
             [reports] => return passing(harness::screen::screen(&root, Path::new(reports))),
             _ => Err("usage: cargo xtask screen REPORTS".into()),
         },
+        Some("framing-views") => framing_views::main(&root, &args[1..]),
+        Some("isobmff-views") => isobmff_views::main(&root, &args[1..]),
+        Some("oracle-compare") => return exit(harness::oracle_compare::main(&root, &args[1..])),
         Some("report") => return report(&root, &args[1..]),
         Some("framing") => {
             return failing(framing_bench::main(&root, &args[1..]), framing_bench::USAGE);
@@ -728,9 +736,19 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
         // Without --corpus, a manifest that records its directory names it.
         options.corpus = match corpus {
             Some(corpus) => corpus,
-            None => harness::manifest::read(root, &options.manifest)
+            None => json::read(&options.contract)
                 .ok()
-                .and_then(|(manifest, _)| harness::report::recorded_corpus(root, &manifest))
+                .and_then(|contract| {
+                    contract
+                        .get("corpus_directory")
+                        .and_then(json::Value::as_str)
+                        .map(|directory| root.join(directory))
+                })
+                .or_else(|| {
+                    harness::manifest::read(root, &options.manifest)
+                        .ok()
+                        .and_then(|(manifest, _)| harness::report::recorded_corpus(root, &manifest))
+                })
                 .unwrap_or_else(|| std::mem::take(&mut options.corpus)),
         };
         Ok(())
@@ -1065,6 +1083,7 @@ fn prepare_check(part: Option<Part>) -> Task {
         None | Some(Part::Parity) => &[
             &["prepare-ffmpeg"],
             &["prepare-ffmpeg", "--profile", "formats"],
+            &["prepare-ffmpeg", "--profile", "framing-views"],
             &["prepare-ffmpeg", "--profile", "transport-dts"],
             &["prepare-mpg123"],
             &["prepare-ffmpeg", "--profile", "video"],
@@ -1217,8 +1236,21 @@ fn check_features(root: &Path) -> Task {
         .join(".research/feature-reports")
         .join(format!("check-{}-{stamp}", std::process::id()));
     harness::report::create_output(&output)?;
+    for contract in contracts
+        .iter()
+        .filter(|contract| contract.document.get("oracle").is_some())
+    {
+        if harness::oracle_compare::compare(root, &contract.path, &output.join(&contract.id))? != 0
+        {
+            return Err(format!(
+                "{}: required oracle comparison failed",
+                contract.id
+            ));
+        }
+    }
     let reports = contracts
         .iter()
+        .filter(|contract| contract.document.get("oracle").is_none())
         .map(|contract| {
             let manifest = contract.manifest();
             let (document, _) = harness::manifest::read(root, &manifest)?;

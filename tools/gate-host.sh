@@ -158,7 +158,7 @@ EOF
 
 prepare() {
     local profile
-    for profile in matroska formats transport-dts video subtitles decode capture capture-small; do
+    for profile in matroska formats framing-views transport-dts video subtitles decode capture capture-small; do
         step "prepare-ffmpeg $profile" inside "cargo xtask prepare-ffmpeg --jobs 8 --profile $profile"
     done
     for command in "fonts prepare --jobs 8" "shape prepare --jobs 8" "ass prepare --jobs 8" "prepare-mpg123 --jobs 8" \

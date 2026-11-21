@@ -232,6 +232,7 @@ fn unreadable_memory_input_returns_a_failed_row() {
         0,
         &certificate,
         Invocation {
+            selection: Selection::Both,
             operation: Some("memory"),
             input: &input,
             arguments: &[],
@@ -311,6 +312,7 @@ fn distinct_commands_keep_compatibility_options_on_the_candidate() {
     let reference = ["open-memory", "input.mov", "1"].map(String::from);
     let candidate = ["--bounded-timing", "open-memory", "input.mov", "1"].map(String::from);
     let invocation = Invocation {
+        selection: Selection::Both,
         operation: None,
         input: Path::new("input.mov"),
         arguments: &reference,
@@ -327,6 +329,7 @@ fn distinct_commands_keep_compatibility_options_on_the_candidate() {
 fn shared_commands_remain_identical_for_both_roles() {
     let arguments = ["avc", "aac"].map(String::from);
     let invocation = Invocation {
+        selection: Selection::Both,
         operation: Some("hls-memory"),
         input: Path::new("input.ts"),
         arguments: &arguments,
@@ -337,4 +340,46 @@ fn shared_commands_remain_identical_for_both_roles() {
     };
     assert_eq!(invocation.arguments_for(true), arguments);
     assert_eq!(invocation.arguments_for(false), arguments);
+}
+
+#[test]
+fn a_deferred_memory_bound_collects_and_grades_only_the_selected_observer() {
+    let observed = json::parse(
+        r#"{"status":"measured","work":{"packets":1,"bytes":1,"digest":1},
+            "observer":{"heap_peak_bytes":50,"page_size":10,"rss_start":100,
+            "hwm_end":300,"rss_peak_observed":300}}"#,
+    )
+    .unwrap();
+    for (selection, measured, omitted) in [
+        (
+            Selection::Heap,
+            "heap_ratio_upper_95",
+            "total_rss_ratio_upper_95",
+        ),
+        (
+            Selection::Rss,
+            "total_rss_ratio_upper_95",
+            "heap_ratio_upper_95",
+        ),
+    ] {
+        let sample =
+            |roles: &[&str]| Value::object(roles.iter().map(|&role| (role, observed.clone())));
+        let grade = |row: Value| {
+            evaluate_selected(
+                Path::new("."),
+                &[row.clone(), row],
+                Pairs::fixed(2),
+                0,
+                &Value::Null,
+                None,
+                selection,
+            )
+        };
+        let accepted = grade(sample(selection.roles()));
+        assert_eq!(s(&accepted, "status"), Some("qualified"));
+        assert!(accepted.get(measured).and_then(Value::as_f64).is_some());
+        assert_eq!(accepted.get(omitted), Some(&Value::Null));
+        let surplus = grade(sample(Selection::Both.roles()));
+        assert_eq!(s(&surplus, "status"), Some("invalid-memory-observation"));
+    }
 }

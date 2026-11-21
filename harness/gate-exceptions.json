@@ -2,11 +2,11 @@
   "schema": 1,
   "about": "What the gates require and every exception to them, counted from the feature contracts, the gate plan, every list under harness/ whose name starts with open_ (an entry counts once for each case it names, under each gate target it is open on) and the public features of each crate in harness/not-compared.json that no contract compares. `cargo xtask check-design` counts them again: a change that drops a requirement or adds an exception must change this file too.",
   "counts": {
-    "features": 62,
-    "required_by_check": 32,
+    "features": 63,
+    "required_by_check": 33,
     "on_demand": 4,
     "diagnostic": 1,
-    "gated_by_report": 36,
+    "gated_by_report": 37,
     "gated_by_another_command": 22,
     "not_gated": 4,
     "open": {
@@ -27,6 +27,12 @@
           "aarch64-unknown-linux-gnu": 4
         }
       },
+      "harness/features/ass-render-settings/contract.json": {
+        "open_unmeasured": {
+          "aarch64-unknown-linux-gnu": 399,
+          "thumbv7neon-unknown-linux-gnueabihf": 399
+        }
+      },
       "harness/features/raster-sweep/contract.json": {
         "open_cases": {
           "thumbv7neon-unknown-linux-gnueabihf": 2
@@ -45,7 +51,7 @@
       }
     },
     "not_compared": {
-      "triergon-ass": 1,
+      "triergon-ass": 0,
       "triergon-bitstream": 4,
       "triergon-capture": 1,
       "triergon-codec": 3,

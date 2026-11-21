@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "framing-views-smoke",
+  "candidate": "framing-views-worker",
+  "operation": "views-smoke",
+  "worker_operation": "views-smoke-",
+  "contract": [
+    "Fold the input size and its Adler-32 checksum in one field record."
+  ],
+  "required_profiles": [
+    "smoke"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 1,
+  "reference": "ffmpeg-framing-views-native",
+  "runner": "cargo xtask report"
+}

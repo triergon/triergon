@@ -656,6 +656,14 @@
       ]
     },
     {
+      "area": "ASS renderer settings",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "ass-render-settings"
+    },
+    {
       "area": "Capture",
       "targets": [
         "aarch64-unknown-linux-gnu",

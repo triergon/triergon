@@ -63,6 +63,10 @@ pub fn validate_required(contract: &Value, manifest: &Value) -> Result<(), Strin
         if let Some(profile) = case.get("profile").and_then(Value::as_str) {
             profiles.insert(profile.to_owned());
         }
+        if contract.get("oracle").is_some() {
+            super::oracle_compare::pin(case)?;
+            continue;
+        }
         let Some(fields) = &work_fields else {
             continue;
         };

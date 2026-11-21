@@ -29,6 +29,7 @@ const REPORT_WEIGHTS: &[(&str, u32)] = &[
     ("matroska-zlib", 1),
     ("ass-render", 22),
     ("ass-render-host", 1),
+    ("ass-render-settings", 1),
     ("subtitle-text", 16),
     ("subtitle-text-host", 2),
     ("subtitle-pgs", 18),
@@ -43,7 +44,7 @@ const REPORT_WEIGHTS: &[(&str, u32)] = &[
 /// through the command that measures or compares it, or why it is not gated.
 /// `gate plan` and `gate summary` fail on a registered feature that is neither here
 /// nor registered with the report runner.
-pub(super) const COVERED: [(&str, Coverage); 26] = [
+pub(super) const COVERED: &[(&str, Coverage)] = &[
     (
         "isobmff-open-index",
         Coverage::Item("isobmff-bench, in parts"),
@@ -98,7 +99,7 @@ pub fn dedicated_coverage() -> (usize, usize) {
 }
 
 /// How a registered feature with a specialized runner or exclusion is covered.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Coverage {
     /// By the gate step that runs this command.
     Item(&'static str),
@@ -108,6 +109,8 @@ pub(super) enum Coverage {
 
 /// Settings the generic report runner reads from one feature contract.
 pub(super) struct ReportFeature {
+    oracle: bool,
+    parity_only: Vec<&'static str>,
     pub(super) id: String,
     corpus: Option<String>,
     manifest_directory: Option<&'static str>,
@@ -117,10 +120,11 @@ pub(super) struct ReportFeature {
 /// Use only registered runners. Scheduling an unknown contract as a generic
 /// report could skip the controls a dedicated runner needs.
 pub(super) fn report_features(root: &Path) -> R<Vec<ReportFeature>> {
-    report_contracts(crate::harness::features::discover(root)?)
+    report_contracts(root, crate::harness::features::discover(root)?)
 }
 
 pub(super) fn report_contracts(
+    root: &Path,
     contracts: Vec<crate::harness::features::Contract>,
 ) -> R<Vec<ReportFeature>> {
     let mut special: BTreeSet<_> = COVERED.iter().map(|(id, _)| *id).collect();
@@ -132,6 +136,31 @@ pub(super) fn report_contracts(
     let mut reports = Vec::new();
     for contract in contracts {
         let specialized = special.remove(contract.id.as_str());
+        let oracle = contract.document.get("oracle").is_some();
+        if oracle {
+            crate::harness::oracle_compare::kind(&contract.document)?;
+            if !COVERED.contains(&(contract.id.as_str(), Coverage::Item("oracle-compare")))
+                || crate::harness::features::gate(&contract.id, &contract.document)?
+                    != Some(crate::harness::features::Gate::Required)
+            {
+                return Err(format!(
+                    "{}: a required oracle comparison needs oracle-compare coverage",
+                    contract.id
+                ));
+            }
+            reports.push((
+                usize::MAX,
+                ReportFeature {
+                    id: contract.id,
+                    corpus: None,
+                    manifest_directory: None,
+                    weight: 1,
+                    oracle: true,
+                    parity_only: Vec::new(),
+                },
+            ));
+            continue;
+        }
         if contract.document.get("runner").and_then(Value::as_str) != Some("cargo xtask report") {
             if specialized {
                 continue;
@@ -157,6 +186,22 @@ pub(super) fn report_contracts(
         let (position, weight) = weights
             .remove(contract.id.as_str())
             .unwrap_or((usize::MAX, 1));
+        let mut parity_only = Vec::new();
+        if contract.document.get("open_unmeasured").is_some() {
+            let (manifest, _) = crate::harness::manifest::read(root, &contract.manifest())?;
+            for target in super::TARGETS {
+                let unmeasured = crate::harness::bounds::Unmeasured::read(
+                    &contract.document,
+                    &manifest,
+                    target,
+                )?;
+                if unmeasured.all_skip(&manifest, "timing")
+                    && unmeasured.all_skip(&manifest, "memory")
+                {
+                    parity_only.push(target);
+                }
+            }
+        }
         reports.push((
             position,
             ReportFeature {
@@ -164,6 +209,8 @@ pub(super) fn report_contracts(
                 corpus,
                 manifest_directory,
                 weight,
+                oracle: false,
+                parity_only,
             },
         ));
     }
@@ -310,7 +357,11 @@ pub(super) fn items(
         release,
         pairs: crate::harness::timing::GATE_PAIRS.to_string(),
     };
-    let mut items: Vec<Item> = reports.iter().map(|feature| plan.report(feature)).collect();
+    let mut items: Vec<Item> = reports
+        .iter()
+        .filter(|feature| !feature.oracle)
+        .map(|feature| plan.report(feature))
+        .collect();
     items.push(plan.external_vector());
     items.extend((1..=ISOBMFF_PARTS).map(|part| plan.isobmff_part(part)));
     items.extend([
@@ -326,7 +377,11 @@ pub(super) fn items(
         items.extend(plan.workloads(list));
     }
     items.extend(capture.iter().map(|id| plan.capture(id)));
-    items.extend([plan.release_tests(), plan.tests(), plan.comparisons()]);
+    items.extend([
+        plan.release_tests(),
+        plan.tests(),
+        plan.comparisons(reports),
+    ]);
     items
 }
 
@@ -411,7 +466,7 @@ impl Plan<'_> {
         let corpus = feature.corpus.as_deref();
         let manifest_directory = feature.manifest_directory.unwrap_or("harness/features");
         let manifest = format!("{manifest_directory}/{id}/corpus.json");
-        let report = |mode: &str| {
+        let report = |mode: Option<&str>| {
             let mut args = xtask(&[
                 "report",
                 "--contract",
@@ -422,14 +477,18 @@ impl Plan<'_> {
             if let Some(corpus) = corpus {
                 args.extend(owned(&["--corpus", corpus]));
             }
+            if let Some(mode) = mode {
+                args.extend(owned(&[&format!("--{mode}"), "--pairs", &self.pairs]));
+            }
             args.extend(owned(&[
-                &format!("--{mode}"),
-                "--pairs",
-                &self.pairs,
                 "--output",
-                &format!("{}/{mode}/{id}", self.out),
+                &format!("{}/{}/{id}", self.out, mode.unwrap_or("parity")),
             ]));
-            self.full(args)
+            if mode.is_some() {
+                self.full(args)
+            } else {
+                args
+            }
         };
         let mut preflight = owned(&["--feature", id]);
         if let Some(corpus) = corpus {
@@ -441,7 +500,22 @@ impl Plan<'_> {
         Item {
             name: id.to_owned(),
             weight: feature.weight,
-            steps: self.graded(id, report("benchmark"), report("memory"), id, &manifest),
+            steps: if feature.parity_only.contains(&self.target) {
+                vec![step(
+                    format!("{id}-compare"),
+                    Stage::Timing,
+                    Placement::Free,
+                    report(None),
+                )]
+            } else {
+                self.graded(
+                    id,
+                    report(Some("benchmark")),
+                    report(Some("memory")),
+                    id,
+                    &manifest,
+                )
+            },
             preflight,
         }
     }
@@ -985,7 +1059,7 @@ impl Plan<'_> {
     }
 
     /// The font, shaping, rasterising and ASS reference comparisons.
-    fn comparisons(&self) -> Item {
+    fn comparisons(&self, reports: &[ReportFeature]) -> Item {
         let compare = |name: &str, args: &[&str]| {
             let mut command = xtask(args);
             command.extend(owned(&["--output", &format!("{}/parity/{name}", self.out)]));
@@ -996,15 +1070,26 @@ impl Plan<'_> {
                 command,
             )
         };
+        let mut steps = vec![
+            compare("fonts", &["fonts", "compare"]),
+            compare("shape", &["shape", "compare"]),
+            compare("raster", &["raster", "compare", "--all"]),
+            compare("ass", &["ass", "compare"]),
+        ];
+        for feature in reports.iter().filter(|feature| feature.oracle) {
+            steps.push(compare(
+                &feature.id,
+                &[
+                    "oracle-compare",
+                    "--contract",
+                    &format!("harness/features/{}/contract.json", feature.id),
+                ],
+            ));
+        }
         Item {
             name: "font-shape-raster-ass".into(),
             weight: 11,
-            steps: vec![
-                compare("fonts", &["fonts", "compare"]),
-                compare("shape", &["shape", "compare"]),
-                compare("raster", &["raster", "compare", "--all"]),
-                compare("ass", &["ass", "compare"]),
-            ],
+            steps,
             preflight: Vec::new(),
         }
     }
@@ -1020,4 +1105,44 @@ pub(super) fn capture_cases(root: &Path) -> R<Vec<String>> {
         .iter()
         .filter_map(|case| case.get("id").and_then(Value::as_str).map(str::to_owned))
         .collect())
+}
+
+#[cfg(test)]
+mod views_tests {
+    use super::*;
+
+    #[test]
+    fn parity_only_feature_and_oracle_run_without_observers() {
+        let target = super::super::TARGETS[0];
+        let feature = |id: &str, oracle, parity_only| ReportFeature {
+            id: id.into(),
+            corpus: None,
+            manifest_directory: None,
+            weight: 1,
+            oracle,
+            parity_only,
+        };
+        let reports = [
+            feature("deferred", false, vec![target]),
+            feature("measured", false, vec![]),
+            feature("independent", true, vec![]),
+        ];
+        let plan = items(&reports, "OUT", false, target, "release", &[]);
+        assert_eq!(plan[0].steps.len(), 1);
+        assert_eq!(plan[0].steps[0].placement, Placement::Free);
+        assert!(
+            plan[0].steps[0]
+                .command
+                .iter()
+                .all(|argument| argument != "--benchmark" && argument != "--memory")
+        );
+        assert_eq!(plan[1].steps.len(), 3);
+        let oracle = plan.last().unwrap().steps.last().unwrap();
+        assert_eq!(oracle.placement, Placement::Free);
+        assert_eq!(oracle.command[1], "oracle-compare");
+        assert_eq!(
+            oracle.command[3],
+            "harness/features/independent/contract.json"
+        );
+    }
 }

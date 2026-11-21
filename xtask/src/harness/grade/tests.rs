@@ -399,6 +399,7 @@ impl Fixture {
             &self.identity,
             "unqualified-test",
             1.2,
+            &super::super::bounds::Unmeasured::default(),
         )
     }
 

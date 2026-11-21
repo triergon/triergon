@@ -37,26 +37,93 @@ const FOREIGN_UPDATE: i128 = 1;
 /// (`ERR_CONFIG` in `harness/allocations-linux.c`).
 const KERNEL_BOUND_REFUSED: i128 = 1 << 9;
 
+/// Which bounds this case must collect.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum Selection {
+    #[default]
+    Both,
+    Heap,
+    Rss,
+}
+
+impl Selection {
+    pub(crate) fn for_case(row: &Value) -> Self {
+        let deferred = |name| {
+            row.get("not_measured")
+                .and_then(|row| row.get(name))
+                .is_some()
+        };
+        Self::from_deferred(deferred("heap"), deferred("total_rss"))
+    }
+
+    pub(super) fn from_deferred(heap: bool, rss: bool) -> Self {
+        match (heap, rss) {
+            (true, false) => Self::Rss,
+            (false, true) => Self::Heap,
+            _ => Self::Both,
+        }
+    }
+
+    pub(super) fn heap(self) -> bool {
+        self != Self::Rss
+    }
+
+    pub(super) fn rss(self) -> bool {
+        self != Self::Heap
+    }
+
+    pub(super) fn roles(self) -> &'static [&'static str] {
+        match self {
+            Self::Both => &[
+                "candidate_heap",
+                "candidate_rss",
+                "reference_heap",
+                "reference_rss",
+            ],
+            Self::Heap => &["candidate_heap", "reference_heap"],
+            Self::Rss => &["candidate_rss", "reference_rss"],
+        }
+    }
+
+    fn reference(self) -> &'static str {
+        if self.heap() {
+            "reference_heap"
+        } else {
+            "reference_rss"
+        }
+    }
+
+    pub(super) fn reference_work(self, row: &Value) -> Option<&Value> {
+        row.get(self.reference())?.get("work")
+    }
+
+    fn pairs(self, pairs: Pairs) -> Pairs {
+        if self == Self::Both {
+            pairs
+        } else {
+            Pairs::fixed(pairs.planned)
+        }
+    }
+}
+
 /// Whether the kernel RSS bound alone voided this pair: every observation was
 /// measured and has a valid receipt, except resident runs on which the module
 /// reported that another task updated the worker's resident counters during the
 /// window. The module decides this from the update's task, never from the values,
 /// so measuring such a pair again cannot favour either worker; any other fault in
 /// the pair still fails the collection.
+#[cfg(test)]
 pub(super) fn voided_by_foreign_update(row: &Value, observer_sha256: Option<&Value>) -> bool {
+    foreign_update(row, observer_sha256, Selection::Both)
+}
+
+fn foreign_update(row: &Value, observer_sha256: Option<&Value>, selection: Selection) -> bool {
     let Value::Object(entries) = row else {
         return false;
     };
     let mut keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
     keys.sort_unstable();
-    if keys
-        != [
-            "candidate_heap",
-            "candidate_rss",
-            "reference_heap",
-            "reference_rss",
-        ]
-    {
+    if !selection.rss() || keys != selection.roles() {
         return false;
     }
     let mut voided = false;
@@ -140,10 +207,20 @@ fn host_memory_change(
 
 /// Whether a collection's discarded pairs (`retried_pairs`) were each voided by
 /// the kernel bound alone, within [`MAX_RETRIES`], at pairs it measured.
+#[cfg(test)]
 pub(super) fn retries_valid(
     retried: Option<&Value>,
     measured: usize,
     observer_sha256: Option<&Value>,
+) -> bool {
+    selected_retries_valid(retried, measured, observer_sha256, Selection::Both)
+}
+
+fn selected_retries_valid(
+    retried: Option<&Value>,
+    measured: usize,
+    observer_sha256: Option<&Value>,
+    selection: Selection,
 ) -> bool {
     let Some(retried) = retried else {
         return true;
@@ -153,7 +230,7 @@ pub(super) fn retries_valid(
             && list.iter().all(|r| {
                 py_int(r.get("pair")).is_some_and(|p| (0..measured as i128).contains(&p))
                     && r.get("sample")
-                        .is_some_and(|row| voided_by_foreign_update(row, observer_sha256))
+                        .is_some_and(|row| foreign_update(row, observer_sha256, selection))
             })
     })
 }
@@ -1040,6 +1117,7 @@ pub(super) fn kernel_used(certificate: &Value, samples: &[Value]) -> bool {
 
 /// Recompute the memory verdict of raw samples. Failures return the failing
 /// status with the samples and certificate kept.
+#[cfg(test)]
 pub fn evaluate(
     root: &Path,
     samples: &[Value],
@@ -1047,6 +1125,26 @@ pub fn evaluate(
     seed: u64,
     certificate: &Value,
     expected_outputs: Option<&Value>,
+) -> Value {
+    evaluate_selected(
+        root,
+        samples,
+        pairs,
+        seed,
+        certificate,
+        expected_outputs,
+        Selection::Both,
+    )
+}
+
+fn evaluate_selected(
+    root: &Path,
+    samples: &[Value],
+    pairs: Pairs,
+    seed: u64,
+    certificate: &Value,
+    expected_outputs: Option<&Value>,
+    selection: Selection,
 ) -> Value {
     let linux = s(certificate, "platform") == Some("Linux");
     let failed = |status: &str| {
@@ -1112,24 +1210,19 @@ pub fn evaluate(
         {
             return failed("invalid-memory-observation");
         }
+        let mut keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
+        keys.sort_unstable();
+        if keys != selection.roles() {
+            return failed("invalid-memory-observation");
+        }
         if linux {
-            let mut keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
-            keys.sort_unstable();
             let receipts_ok = entries.iter().all(|(k, v)| {
                 let mode = k.rsplit('_').next().unwrap_or_default();
                 v.get("observer")
                     .is_some_and(|o| linux::valid_receipt(o, mode))
                     && s(v, "instrument_sha256") == observer
             });
-            if keys
-                != [
-                    "candidate_heap",
-                    "candidate_rss",
-                    "reference_heap",
-                    "reference_rss",
-                ]
-                || !receipts_ok
-            {
+            if !receipts_ok {
                 return failed("invalid-memory-observation");
             }
         }
@@ -1139,7 +1232,7 @@ pub fn evaluate(
         {
             return failed("measurement-failed");
         }
-        let reference_output = row.get("reference_heap").and_then(|h| h.get("work"));
+        let reference_output = selection.reference_work(row);
         if expected_outputs.is_none() && reference_output.is_none() {
             return failed("invalid-memory-observation");
         }
@@ -1156,15 +1249,22 @@ pub fn evaluate(
         if !work_matches {
             return failed("unequal-memory-work");
         }
-        let Some(pair) = pair_values(row, linux) else {
-            return failed("invalid-memory-observation");
-        };
-        if pair.total.0 <= 0 || pair.total.1 <= 0 {
-            return failed("total-rss-attribution-unresolved");
+        if selection.heap() {
+            let Some(heap) = heap_values(row) else {
+                return failed("invalid-memory-observation");
+            };
+            heaps.push(heap);
         }
-        rss.push(pair.growth);
-        heaps.push(pair.heap);
-        totals.push(pair.total);
+        if selection.rss() {
+            let Some((total, growth)) = rss_values(row, linux) else {
+                return failed("invalid-memory-observation");
+            };
+            if total.0 <= 0 || total.1 <= 0 {
+                return failed("total-rss-attribution-unresolved");
+            }
+            totals.push(total);
+            rss.push(growth);
+        }
     }
     let interval = |values: &[(i128, i128)], nonnegative: bool| -> R<Value> {
         let pairs: Vec<(f64, f64)> = values.iter().map(|&(a, b)| (a as f64, b as f64)).collect();
@@ -1183,7 +1283,7 @@ pub fn evaluate(
         values.iter().map(|&(a, b)| (a as f64, b as f64)).collect()
     };
     let (heap_ratios, total_ratios) = (as_f64(&heaps), as_f64(&totals));
-    let first_stop = (1..=samples.len())
+    let first_stop = (1..=heap_ratios.len().min(total_ratios.len()))
         .find_map(|n| settled(&heap_ratios[..n], &total_ratios[..n], pairs).map(|s| (n, s)));
     let (heap, total, growth) = match first_stop {
         Some((n, (heap, total))) if n == samples.len() => {
@@ -1192,7 +1292,14 @@ pub fn evaluate(
             (interval_value(&heap), interval_value(&total), growth)
         }
         None if samples.len() as i128 == pairs.planned as i128 => {
-            let (Ok(heap), Ok(total)) = (interval(&heaps, true), interval(&totals, false)) else {
+            let part = |values: &[_], nonnegative| {
+                if values.is_empty() {
+                    Ok(Value::Null)
+                } else {
+                    interval(values, nonnegative)
+                }
+            };
+            let (Ok(heap), Ok(total)) = (part(&heaps, true), part(&totals, false)) else {
                 return failed("invalid-memory-observation");
             };
             // The page allowance can make a growth bound nonpositive even when
@@ -1205,11 +1312,11 @@ pub fn evaluate(
         ("status", Value::str("qualified")),
         (
             "total_rss_ratio_upper_95",
-            total.get("upper_95").cloned().unwrap(),
+            total.get("upper_95").cloned().unwrap_or(Value::Null),
         ),
         (
             "heap_ratio_upper_95",
-            heap.get("upper_95").cloned().unwrap(),
+            heap.get("upper_95").cloned().unwrap_or(Value::Null),
         ),
         (
             "rss_growth_ratio_upper_95",
@@ -1220,9 +1327,10 @@ pub fn evaluate(
         (
             "heap_lower_in_each_pair",
             Value::Bool(
-                heaps
-                    .iter()
-                    .all(|(candidate, reference)| candidate < reference),
+                selection.heap()
+                    && heaps
+                        .iter()
+                        .all(|(candidate, reference)| candidate < reference),
             ),
         ),
         ("rss_growth_ratio", growth),
@@ -1263,19 +1371,15 @@ pub fn evaluate(
     obj(fields)
 }
 
-/// One pair's measured values, each as (candidate, reference).
-struct PairValues {
-    heap: (i128, i128),
-    /// Total resident peak: the candidate's ceiling plus two pages against the
-    /// reference's observed peak minus two pages.
-    total: (i128, i128),
-    /// Resident growth from the start, the same way.
-    growth: (i128, i128),
+type Pair = (i128, i128);
+
+fn heap_values(row: &Value) -> Option<Pair> {
+    let heap = |key| py_int(row.get(key)?.get("observer")?.get("heap_peak_bytes"));
+    Some((heap("candidate_heap")?, heap("reference_heap")?))
 }
 
-/// The values the gates compare in one pair, or `None` when an observation
-/// lacks them.
-fn pair_values(row: &Value, linux: bool) -> Option<PairValues> {
+/// Total resident peak and growth, with the policy's page allowances.
+fn rss_values(row: &Value, linux: bool) -> Option<(Pair, Pair)> {
     let observer = |key: &str| row.get(key).and_then(|r| r.get("observer"));
     let (a, b) = (observer("candidate_rss")?, observer("reference_rss")?);
     let field = |o: &Value, k: &str| py_int(o.get(k));
@@ -1290,15 +1394,13 @@ fn pair_values(row: &Value, linux: bool) -> Option<PairValues> {
         field(b, "hwm_end")?.max(field(b, "rss_peak_observed")?)
     };
     let (a_page, b_page) = (field(a, "page_size")?, field(b, "page_size")?);
-    let heap = |key: &str| observer(key).and_then(|o| field(o, "heap_peak_bytes"));
-    Some(PairValues {
-        heap: (heap("candidate_heap")?, heap("reference_heap")?),
-        total: (candidate_peak + 2 * a_page, reference_total - 2 * b_page),
-        growth: (
+    Some((
+        (candidate_peak + 2 * a_page, reference_total - 2 * b_page),
+        (
             candidate_peak - field(a, "rss_start")? + 2 * a_page,
             field(b, "rss_peak_observed")? - field(b, "rss_start")? - 2 * b_page,
         ),
-    })
+    ))
 }
 
 /// The heap and total resident intervals a collection stops with, if it stops
@@ -1368,6 +1470,7 @@ fn work_valid(
 }
 
 struct Invocation<'a> {
+    selection: Selection,
     operation: Option<&'a str>,
     input: &'a Path,
     arguments: &'a [String],
@@ -1423,6 +1526,8 @@ fn measure(
             ]);
         }
     };
+    let selection = invocation.selection;
+    let pairs = selection.pairs(pairs);
     let mut rng = PyRandom::new(seed);
     let kernel = certificate
         .get("kernel_rss_required")
@@ -1460,12 +1565,11 @@ fn measure(
     let (mut heaps, mut totals) = (Vec::new(), Vec::new());
     let mut usable = true;
     for pair in 0..pairs.planned {
-        let mut jobs = [
-            ("candidate", "heap"),
-            ("candidate", "rss"),
-            ("reference", "heap"),
-            ("reference", "rss"),
-        ];
+        let mut jobs: Vec<_> = selection
+            .roles()
+            .iter()
+            .filter_map(|role| role.split_once('_'))
+            .collect();
         rng.shuffle(&mut jobs);
         // A pair the kernel bound alone voided is measured again in the same
         // order, at most MAX_RETRIES times per collection; the voided pair is kept.
@@ -1473,7 +1577,7 @@ fn measure(
             let row = observe_pair(&jobs);
             if kernel
                 && retried.len() < MAX_RETRIES
-                && voided_by_foreign_update(&row, observer_sha256)
+                && foreign_update(&row, observer_sha256, selection)
             {
                 println!(
                     "memory of {}: the kernel RSS bound voided pair {} (another task updated a worker's resident counters); measuring it again",
@@ -1490,12 +1594,16 @@ fn measure(
         };
         // A pair with no usable values never settles the session; the full
         // validation is evaluate's.
-        let values = pair_values(&row, linux);
+        let values = if pairs.stop_below.is_some() {
+            heap_values(&row).zip(rss_values(&row, linux))
+        } else {
+            None
+        };
         samples.push(row);
         match values {
-            Some(pair) if usable => {
-                heaps.push((pair.heap.0 as f64, pair.heap.1 as f64));
-                totals.push((pair.total.0 as f64, pair.total.1 as f64));
+            Some(((ah, bh), ((ar, br), _))) if usable => {
+                heaps.push((ah as f64, bh as f64));
+                totals.push((ar as f64, br as f64));
                 if let Some((heap, total)) = settled(&heaps, &totals, pairs) {
                     println!(
                         "memory of {}: stopped after {} of {} pairs, heap and total RSS order statistics {:.4} and {:.4} below 1",
@@ -1521,13 +1629,14 @@ fn measure(
             ("certificate", certificate.clone()),
         ])
     } else {
-        evaluate(
+        evaluate_selected(
             root,
             &samples,
             pairs,
             seed,
             certificate,
             invocation.expected_outputs,
+            selection,
         )
     };
     if !retried.is_empty() {
@@ -1812,6 +1921,29 @@ pub fn collect(
     seed: u64,
     operation: &Operation,
 ) -> R<Value> {
+    collect_selected(
+        slot,
+        root,
+        workers,
+        input,
+        pairs,
+        seed,
+        operation,
+        Selection::Both,
+    )
+}
+
+#[allow(clippy::too_many_arguments)] // A selected observer uses the same worker and pair bindings.
+pub(crate) fn collect_selected(
+    slot: &Slot,
+    root: &Path,
+    workers: WorkerPaths<'_>,
+    input: &Path,
+    pairs: Pairs,
+    seed: u64,
+    operation: &Operation,
+    selection: Selection,
+) -> R<Value> {
     if !operation.candidate_options.is_empty() {
         let arguments = |candidate| {
             operation
@@ -1833,6 +1965,7 @@ pub fn collect(
             pairs,
             seed,
             Invocation {
+                selection,
                 operation: None,
                 input,
                 arguments: &reference_arguments,
@@ -1856,6 +1989,7 @@ pub fn collect(
         pairs,
         seed,
         Invocation {
+            selection,
             operation: Some(&name),
             input,
             arguments: &arguments,
@@ -1887,6 +2021,7 @@ pub(crate) fn collect_command(
         pairs,
         seed,
         Invocation {
+            selection: Selection::Both,
             operation: None,
             input,
             arguments,
@@ -1928,6 +2063,7 @@ pub(crate) fn collect_commands(
         pairs,
         seed,
         Invocation {
+            selection: Selection::Both,
             operation: None,
             input,
             arguments: commands.reference,
@@ -2067,6 +2203,10 @@ pub fn evidence_valid_with_outputs(
     expected_outputs: Option<&Value>,
 ) -> bool {
     let check = || -> Option<bool> {
+        let selection = Selection::for_case(row);
+        if selection != Selection::Both && memory.get("early_stop").is_some() {
+            return Some(false);
+        }
         let certificate = memory.get("certificate")?;
         let raw = memory.get("samples")?.as_array()?;
         let probe = certificate.get("probe_heap")?;
@@ -2108,10 +2248,11 @@ pub fn evidence_valid_with_outputs(
         if !(covered
             && py_int(memory.get("pairs")) == Some(raw.len() as i128)
             && planned >= minimum
-            && retries_valid(
+            && selected_retries_valid(
                 memory.get("retried_pairs"),
                 raw.len(),
                 certificate.get("observer_sha256"),
+                selection,
             ))
         {
             return Some(false);
@@ -2149,7 +2290,15 @@ pub fn evidence_valid_with_outputs(
             }
         }
         let seed = py_int(memory.get("seed")).unwrap_or(280) as u64;
-        let recomputed = evaluate(root, raw, pairs, seed, certificate, expected_outputs);
+        let recomputed = evaluate_selected(
+            root,
+            raw,
+            pairs,
+            seed,
+            certificate,
+            expected_outputs,
+            selection,
+        );
         let same = [
             "status",
             "total_rss_ratio_upper_95",

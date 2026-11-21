@@ -356,6 +356,16 @@ resource limit becomes an explicit, reviewed rule for that case.
   timing and memory collections, and `capture qualify --stage memory` for each case
   not open on the target; the ISO BMFF suites and the codec workload lists already
   fail on a failing bound.
+- **Unmeasured bounds.** A contract can list `open_unmeasured` with one
+  entry per bound, a list of case ids, a one-line cause and optional gate
+  targets. Every case still runs for parity. Timing and each memory observer
+  run only for bounds due on that case and target. A memory collection with
+  one observer runs the full planned pair count. A feature whose
+  every case lists all three bounds is parity only on that target. The gate
+  plan runs only its comparison, and a status row with `unmeasured` set to
+  the feature id displays the recorded causes. `check-design` verifies the
+  declarations and their per-target counts. Remove a deferred entry when
+  collecting the bound on its gate target.
 - **Input rights.** A case is measured only when its `rights` are
   `authored-synthetic`, `reviewed-licence` with a `licence` under which a
   reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash, or
