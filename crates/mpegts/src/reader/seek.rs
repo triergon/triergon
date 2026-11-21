@@ -9,8 +9,78 @@ use triergon_core::container::{
     CodecId, Event, PacketInfo, ReaderStep, SeekMethod, SeekPolicy, SeekReceipt, SeekRequest,
     TrackId, TrackInfo,
 };
-use triergon_core::{Budget, BudgetVec, Error, InputRequest, Result, Step, Time, WorkBudget};
+use triergon_core::{
+    Budget, BudgetVec, Charged, Error, InputRequest, Result, SourceCapabilities, SourceId, Step,
+    Time, WorkBudget,
+};
 use triergon_framing::MpegLayer;
+
+/// A length-known, seekable part of the original contiguous transport stream.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SeekEntity {
+    pub source: SourceId,
+    pub length: u64,
+}
+
+impl SeekEntity {
+    pub(super) const fn capabilities(self) -> SourceCapabilities {
+        SourceCapabilities {
+            length: Some(self.length),
+            random_access: true,
+        }
+    }
+}
+
+pub(super) struct EntityPlan {
+    entries: BudgetVec<SeekEntity>,
+    total: u64,
+    next: usize,
+}
+
+impl EntityPlan {
+    fn new(
+        pool: &Budget,
+        entities: &[SeekEntity],
+        maximum_bytes: u64,
+    ) -> Result<Charged<Box<Self>>> {
+        if entities.is_empty() || entities.len() > 4096 {
+            return Err(Error::Policy("MPEG-TS seek entity count"));
+        }
+        let mut total = 0_u64;
+        for (i, entity) in entities.iter().enumerate() {
+            if entity.length == 0 || (i != 0 && entity.source == entities[i - 1].source) {
+                return Err(Error::Invalid("MPEG-TS seek entity layout"));
+            }
+            total = total.checked_add(entity.length).ok_or(Error::Overflow)?;
+        }
+        if total > maximum_bytes {
+            return Err(Error::Policy("MPEG-TS seek scan bytes"));
+        }
+        let mut entries = BudgetVec::new(pool);
+        entries.try_extend_from_slice(entities)?;
+        Charged::boxed(
+            pool,
+            Self {
+                entries,
+                total,
+                next: 1,
+            },
+        )
+    }
+
+    fn first(&self) -> (SourceId, SourceCapabilities) {
+        let first = self.entries.as_slice()[0];
+        (first.source, first.capabilities())
+    }
+
+    pub(super) fn next(&self) -> Option<SeekEntity> {
+        self.entries.as_slice().get(self.next).copied()
+    }
+
+    pub(super) fn advance(&mut self) {
+        self.next += 1;
+    }
+}
 
 #[derive(Clone, Copy)]
 struct Landing {
@@ -277,7 +347,7 @@ impl Reader {
     /// landing scan while replay still reconstructs transport state.
     #[cold]
     pub fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
-        self.begin_seek(request, None)
+        self.begin_seek(request, None, None)
     }
 
     /// Seek and retain an index of up to `maximum_entries` distinct landing
@@ -299,22 +369,51 @@ impl Reader {
         if maximum_entries == 0 {
             return Err(Error::Invalid("MPEG-TS seek index entry limit"));
         }
-        self.begin_seek(request, Some(maximum_entries))
+        self.begin_seek(request, Some(maximum_entries), None)
+    }
+
+    /// Seek over consecutive parts of one logical transport stream. Supply
+    /// the exact order and lengths of up to 4096 seekable entities. The reader
+    /// requests each part by its source ID, preserving parser state across
+    /// boundaries including a PES or access unit split across parts. Supply
+    /// input by source ID as usual and signal EOF for the final entity.
+    ///
+    /// # Errors
+    ///
+    /// Refuses empty parts, adjacent repeated source IDs, scan limits and
+    /// unresolved clock or configuration epochs.
+    #[cold]
+    pub fn request_seek_in_entities(
+        &mut self,
+        request: SeekRequest,
+        entities: &[SeekEntity],
+    ) -> Result<InputRequest> {
+        self.healthy()?;
+        let entities = EntityPlan::new(&self.pool, entities, self.limits.maximum_seek_scan_bytes)?;
+        self.begin_seek(request, None, Some(entities))
     }
 
     fn begin_seek(
         &mut self,
         request: SeekRequest,
         index_entries: Option<usize>,
+        entities: Option<Charged<Box<EntityPlan>>>,
     ) -> Result<InputRequest> {
         self.healthy()?;
-        let length = self
-            .caps
-            .length
-            .filter(|_| self.caps.random_access && !self.continued_entity)
-            .ok_or(Error::Unsupported(
-                "MPEG-TS seek needs one length-known seekable entity",
-            ))?;
+        let length = if let Some(plan) = &entities {
+            plan.total
+        } else {
+            self.caps
+                .length
+                .filter(|_| {
+                    self.caps.random_access
+                        && !self.continued_entity
+                        && self.seek_entities.is_none()
+                })
+                .ok_or(Error::Unsupported(
+                    "MPEG-TS seek needs one length-known seekable entity",
+                ))?
+        };
         if length > self.limits.maximum_seek_scan_bytes || self.limits.maximum_seek_scan_bytes == 0
         {
             return Err(Error::Policy("MPEG-TS seek scan bytes"));
@@ -326,7 +425,8 @@ impl Reader {
             .ok()
             .filter(|pid| crate::ELEMENTARY_PID_RANGE.contains(pid) && self.selected_track(*pid))
             .ok_or(Error::Invalid("MPEG-TS seek track is not selected"))?;
-        if let Some(track) = self.tracks().iter().find(|track| track.stream().pid == pid)
+        if entities.is_none()
+            && let Some(track) = self.tracks().iter().find(|track| track.stream().pid == pid)
             && !matches!(track.codec(), CodecId::H264 | CodecId::Hevc)
             && !seekable_audio(track.codec())
         {
@@ -339,7 +439,9 @@ impl Reader {
         let index = self
             .seek_index
             .as_ref()
-            .filter(|index| index_entries.is_none() && index.track == request.track)
+            .filter(|index| {
+                entities.is_none() && index_entries.is_none() && index.track == request.track
+            })
             .cloned();
         let (phase, retain) = if let Some(index) = &index {
             (
@@ -353,7 +455,8 @@ impl Reader {
         } else {
             let single_track =
                 matches!(&self.packet_tracks, PacketTracks::Selected(pids) if pids.len() == 1);
-            let retain = (length <= 256 * 1024 && single_track).then(|| Retain::new(&self.pool));
+            let retain = (entities.is_none() && length <= 256 * 1024 && single_track)
+                .then(|| Retain::new(&self.pool));
             (
                 Phase::Scan(Scan {
                     index: index_entries.map(|maximum| IndexBuilder {
@@ -372,7 +475,17 @@ impl Reader {
             retain,
         })
         .map_err(|rejected| rejected.error)?;
-        let input = self.reset()?;
+        let input = if let Some(plan) = &entities {
+            let (source, caps) = plan.first();
+            let mut next = Self::new(&self.pool, source, caps, self.limits, self.window)?;
+            let input = next.request()?;
+            std::mem::swap(&mut next.packet_tracks, &mut self.packet_tracks);
+            *self = next;
+            input
+        } else {
+            self.reset()?
+        };
+        self.seek_entities = entities;
         self.seek_index = index;
         self.seek = seek;
         Ok(input)
@@ -475,21 +588,30 @@ impl Reader {
                         seek.phase = Phase::Retained(retain.finish(result, tracks));
                         continue;
                     }
-                    let mut replay = match Self::new(
-                        &self.pool,
-                        self.source,
-                        self.caps,
-                        self.limits,
-                        self.window,
-                    ) {
-                        Err(Error::Backpressure { .. }) if scan.index.take().is_some() => continue,
-                        replay => replay?,
-                    };
+                    let (source, caps) = self
+                        .seek_entities
+                        .as_deref()
+                        .map_or((self.source, self.caps), |plan| plan.first());
+                    let mut replay =
+                        match Self::new(&self.pool, source, caps, self.limits, self.window) {
+                            Err(Error::Backpressure { .. }) if scan.index.take().is_some() => {
+                                continue;
+                            }
+                            replay => replay?,
+                        };
                     let input = replay.request()?;
                     replay.seek_index = scan.finish_index(&self.pool, request.track);
+                    let scanned = if let Some(mut plan) = self.seek_entities.take() {
+                        plan.next = 1;
+                        let total = plan.total;
+                        replay.seek_entities = Some(plan);
+                        total
+                    } else {
+                        end.offset
+                    };
                     self.seek.as_mut_slice()[0].phase = Phase::Replay {
                         landing,
-                        scanned_bytes: Some(end.offset),
+                        scanned_bytes: Some(scanned),
                         skipped: false,
                     };
                     std::mem::swap(&mut replay.packet_tracks, &mut self.packet_tracks);

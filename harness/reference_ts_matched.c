@@ -1,6 +1,7 @@
 /* Selected transport access units through public demuxer and framer APIs. */
 #include <errno.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -407,6 +408,7 @@ int main(int argc, char **argv)
     const int start = bench ? 4 : 3;
     long long iterations = 1, program, pid, target = 0;
     int option = 0, track = start + 2;
+    long long split = 0;
 #ifdef TRIERGON_REFERENCE_AUDIO_SEEK
     if (argc >= start + 6 && (!strcmp(argv[track], "--dvb") || !strcmp(argv[track], "--atsc")))
         ++track;
@@ -416,11 +418,22 @@ int main(int argc, char **argv)
     if (!option && argc != start + 3)
         return 2;
 #else
-    const int repeat = argc == track + 4;
+    const int extended = argc == track + 4;
+    int repeat = 0;
     long long repeat_target = 0;
-    if ((!repeat && argc != track + 3) || !number(argv[track+1], INT64_MIN, INT64_MAX, &target)
-        || (repeat && !number(argv[track+3], INT64_MIN, INT64_MAX, &repeat_target)))
+    if ((!extended && argc != track + 3) || !number(argv[track+1], INT64_MIN, INT64_MAX, &target))
         return 2;
+    if (extended) {
+        const char *extra = argv[track+3];
+        if (!strncmp(extra, "split=", 6)) {
+            if (!number(extra + 6, 1, LLONG_MAX, &split))
+                return 2;
+        } else {
+            repeat = 1;
+            if (!number(extra, INT64_MIN, INT64_MAX, &repeat_target))
+                return 2;
+        }
+    }
     option = !strcmp(argv[track+2], "preroll");
     if (!option && strcmp(argv[track+2], "previous"))
         return 2;
@@ -434,7 +447,7 @@ int main(int argc, char **argv)
     if (!file)
         return 2;
     long length = fseek(file, 0, SEEK_END) ? -1 : ftell(file);
-    if (length < 1 || length > 64 * 1024 * 1024 || fseek(file, 0, SEEK_SET)) {
+    if (length <= split || length > 64 * 1024 * 1024 || fseek(file, 0, SEEK_SET)) {
         fclose(file);
         return 2;
     }

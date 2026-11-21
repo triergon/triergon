@@ -578,3 +578,100 @@ fn layer_three_seek_requires_reservoir_preroll() {
         ))
     ));
 }
+
+#[test]
+fn seek_across_entities_replays_a_split_pes_and_continues_through_eof() {
+    use triergon_mpegts::SeekEntity;
+    let frame = adts(&[0x56; 250]);
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    let table_bytes = ts.bytes.len();
+    for pts in [90_000, 105_000, 135_000] {
+        ts.pes(PID, 0xc0, &frame, Some(pts), None);
+    }
+    let split = table_bytes + 3 * 188;
+    let segments = [&ts.bytes[..split], &ts.bytes[split..]];
+    let plan = [
+        SeekEntity {
+            source: ID,
+            length: segments[0].len() as u64,
+        },
+        SeekEntity {
+            source: SourceId(99),
+            length: segments[1].len() as u64,
+        },
+    ];
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = reader(&pool, segments[0], PacketFormat::Ts188);
+    let seek = |ticks| SeekRequest {
+        track: TrackId(PID.into()),
+        target: clock(ticks),
+        policy: SeekPolicy::PlaybackPreroll,
+    };
+    for (target, landed, count) in [(109_000, 105_000, 2), (90_000, 90_000, 3)] {
+        let request = reader
+            .request_seek_in_entities(seek(target), &plan)
+            .unwrap();
+        assert_eq!((request.source, request.offset), (ID, 0));
+        let mut read = 0;
+        let mut receipt = false;
+        for _ in 0..20_000 {
+            match reader.step(&mut WorkBudget::new(39), &OFF).unwrap() {
+                Step::NeedInput(request) => {
+                    let segment = segments[usize::from(request.source == plan[1].source)];
+                    let start = usize::try_from(request.offset).unwrap();
+                    if request.maximum == 0 {
+                        assert_eq!(request.source, plan[1].source);
+                        reader.finish(request.source, request.token).unwrap();
+                    } else {
+                        let end = start + request.maximum.min(121);
+                        let bytes = Bytes::copy_from_slice(&pool, &segment[start..end]).unwrap();
+                        reader
+                            .provide(
+                                &InputWindow::new(
+                                    request.source,
+                                    request.token,
+                                    request.offset,
+                                    bytes,
+                                )
+                                .unwrap(),
+                            )
+                            .unwrap();
+                    }
+                }
+                Step::Ready(Event::Seek(result)) => {
+                    assert!(!receipt);
+                    assert_eq!(result.landing, clock(landed));
+                    assert_eq!(result.discard_until, clock(target));
+                    assert_eq!(result.scanned_bytes, ts.bytes.len() as u64);
+                    receipt = true;
+                }
+                Step::Ready(Event::Packet(packet)) => {
+                    assert!(receipt);
+                    assert_eq!(packet.payload(), frame);
+                    if packet.pts() == Some(105_000) {
+                        let TraceEvent::Pes(pes) = packet.sources()[0].pes.event() else {
+                            panic!("missing source PES");
+                        };
+                        assert!(pes.source_ranges().any(|range| range.entity == ID));
+                        assert!(
+                            pes.source_ranges()
+                                .any(|range| range.entity == plan[1].source)
+                        );
+                    }
+                    read += 1;
+                }
+                Step::Ready(Event::Other(_)) | Step::Yield => (),
+                Step::End(end) => {
+                    assert_eq!(end.source, plan[1].source);
+                    break;
+                }
+                Step::Backpressure(pressure) => panic!("unexpected pressure {pressure:?}"),
+            }
+        }
+        assert!(receipt);
+        assert_eq!(read, count);
+    }
+    reader.close();
+    assert_eq!(pool.used(), Budget::control_storage_bytes());
+}

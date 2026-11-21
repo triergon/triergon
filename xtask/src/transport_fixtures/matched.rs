@@ -233,6 +233,19 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
             "ts-seek-fold",
         )?);
     }
+    for (input, name, target, split) in [
+        (&avc, "avc-split-pes", "90000", "split=564"),
+        (&hevc, "hevc-m2ts-split-pes", "121000", "split=576"),
+    ] {
+        cases.push(input.record(
+            root,
+            feature,
+            name,
+            &[pid.as_str(), target, "preroll", split],
+            seek,
+            "ts-seek-fold",
+        )?);
+    }
     manifest(root, feature, cases)?;
 
     let raw = fs::read(root.join(AUDIO)).map_err(|e| format!("{AUDIO}: {e}"))?;
@@ -494,6 +507,17 @@ pub fn author_audio_seek(root: &Path, args: &[String]) -> R<()> {
                 root,
                 FEATURE,
                 &format!("{name}-repeated-preroll"),
+                &options,
+                Path::new(reference),
+                "ts-audio-seek-fold",
+            )?);
+            let mut options = namespace.to_vec();
+            let split = if m2ts { "split=576" } else { "split=564" };
+            options.extend([pid.as_str(), "90000", "preroll", split]);
+            cases.push(input.record(
+                root,
+                FEATURE,
+                &format!("{name}-split-pes"),
                 &options,
                 Path::new(reference),
                 "ts-audio-seek-fold",

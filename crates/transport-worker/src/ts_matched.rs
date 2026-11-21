@@ -6,9 +6,11 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
     Event, PacketInfo, RandomAccess, SeekMethod, SeekPolicy, SeekRequest, TrackId,
 };
-use triergon_core::{Budget, Error, InputWindow, Rounding, Step, Time, TimeBase, WorkBudget};
+use triergon_core::{
+    Budget, Error, InputWindow, Rounding, SourceId, Step, Time, TimeBase, WorkBudget,
+};
 use triergon_harness_protocol::digest::{fold, fold_framed, signed};
-use triergon_mpegts::{AccessUnit, Reader, ReaderLimits};
+use triergon_mpegts::{AccessUnit, Reader, ReaderLimits, SeekEntity};
 
 #[derive(Clone, Copy)]
 pub(crate) enum Kind {
@@ -49,13 +51,21 @@ fn ticks(time: Time) -> Result<i64> {
     Ok(i64::try_from(ticks)?)
 }
 
+const SECOND_SOURCE: SourceId = SourceId(2);
+
+#[derive(Clone, Copy)]
+enum FollowUp {
+    Repeated(Time),
+    Split(usize),
+}
+
 fn execute(
     pool: &Budget,
     input: &Request,
     track: TrackId,
     seek: Option<SeekRequest>,
     kind: Kind,
-    repeat: Option<Time>,
+    follow_up: Option<FollowUp>,
 ) -> Result<Totals> {
     let mut caps = ts_input::capabilities(&input.input);
     caps.random_access = true;
@@ -72,19 +82,35 @@ fn execute(
         32 * 1024,
         &[track],
     )?;
+    let split = match follow_up {
+        Some(FollowUp::Split(offset)) => Some(offset),
+        _ => None,
+    };
     if let Some(request) = seek {
-        if repeat.is_some() {
-            reader.request_seek_and_index(request, 4096)?;
-        } else {
-            reader.request_seek(request)?;
-        }
+        match follow_up {
+            Some(FollowUp::Repeated(_)) => reader.request_seek_and_index(request, 4096)?,
+            Some(FollowUp::Split(offset)) => reader.request_seek_in_entities(
+                request,
+                &[
+                    SeekEntity {
+                        source: FIRST_SOURCE,
+                        length: offset as u64,
+                    },
+                    SeekEntity {
+                        source: SECOND_SOURCE,
+                        length: (input.input.len() - offset) as u64,
+                    },
+                ],
+            )?,
+            None => reader.request_seek(request)?,
+        };
     }
     let mut out = Totals::default();
-    drain(&mut reader, input, track, kind, false, &mut out)?;
-    if let (Some(mut request), Some(target)) = (seek, repeat) {
+    drain(&mut reader, input, track, kind, split, false, &mut out)?;
+    if let (Some(mut request), Some(FollowUp::Repeated(target))) = (seek, follow_up) {
         request.target = target;
         reader.request_seek(request)?;
-        drain(&mut reader, input, track, kind, true, &mut out)?;
+        drain(&mut reader, input, track, kind, None, true, &mut out)?;
     }
     Ok(out)
 }
@@ -94,6 +120,7 @@ fn drain(
     input: &Request,
     track: TrackId,
     kind: Kind,
+    split: Option<usize>,
     indexed: bool,
     out: &mut Totals,
 ) -> Result<()> {
@@ -153,13 +180,18 @@ fn drain(
                 out.bytes += packet.payload().len() as u64;
             }
             Step::NeedInput(request) => {
-                let offset = usize::try_from(request.offset)?;
-                if offset == input.input.len() {
-                    reader.finish(FIRST_SOURCE, request.token)?;
+                let (start, end) = match (request.source, split) {
+                    (FIRST_SOURCE, split) => (0, split.unwrap_or(input.input.len())),
+                    (SECOND_SOURCE, Some(start)) => (start, input.input.len()),
+                    _ => return Err("unexpected transport entity".into()),
+                };
+                let offset = start + usize::try_from(request.offset)?;
+                if offset == end {
+                    reader.finish(request.source, request.token)?;
                 } else {
-                    let end = input.input.len().min(offset + request.maximum);
+                    let end = end.min(offset + request.maximum);
                     let window = InputWindow::new(
-                        FIRST_SOURCE,
+                        request.source,
                         request.token,
                         request.offset,
                         input.input.slice(offset..end)?,
@@ -186,14 +218,14 @@ pub(crate) fn run(kind: Kind, args: &[String]) -> Result<()> {
         Kind::Seek => Invocation::parse(
             args,
             kind.prefix(),
-            " SIZE PROGRAM PID PTS90 POLICY [REPEAT_PTS90]",
+            " SIZE PROGRAM PID PTS90 POLICY [REPEAT_PTS90|split=BYTES]",
             5..=6,
             false,
         )?,
         Kind::AudioSeek => Invocation::parse(
             args,
             kind.prefix(),
-            " SIZE PROGRAM [--dvb|--atsc] PID PTS90 POLICY [REPEAT_PTS90]",
+            " SIZE PROGRAM [--dvb|--atsc] PID PTS90 POLICY [REPEAT_PTS90|split=BYTES]",
             5..=7,
             false,
         )?,
@@ -212,7 +244,7 @@ pub(crate) fn run(kind: Kind, args: &[String]) -> Result<()> {
     if matches!(kind, Kind::Seek | Kind::AudioSeek)
         && !(3..=4).contains(&(invocation.arguments.len() - track_index))
     {
-        return Err("expected PID PTS90 POLICY [REPEAT_PTS90]".into());
+        return Err("expected PID PTS90 POLICY [REPEAT_PTS90|split=BYTES]".into());
     }
     let input = ts_input::parse(
         &pool,
@@ -248,18 +280,29 @@ pub(crate) fn run(kind: Kind, args: &[String]) -> Result<()> {
             None
         }
     };
-    let repeat = if seek.is_some() {
+    let follow_up = if seek.is_some() {
         invocation
             .arguments
             .get(track_index + 3)
-            .map(|target| -> Result<Time> {
-                Ok(Time::new(i128::from(target.parse::<i64>()?), 90_000)?)
+            .map(|argument| -> Result<FollowUp> {
+                if let Some(offset) = argument.strip_prefix("split=") {
+                    let offset = offset.parse()?;
+                    if !(1..input.input.len()).contains(&offset) {
+                        return Err("transport entity split outside input".into());
+                    }
+                    Ok(FollowUp::Split(offset))
+                } else {
+                    Ok(FollowUp::Repeated(Time::new(
+                        i128::from(argument.parse::<i64>()?),
+                        90_000,
+                    )?))
+                }
             })
             .transpose()?
     } else {
         None
     };
     measure(&invocation, kind.operation(), Some(&pool), || {
-        execute(&pool, &input, track, seek, kind, repeat)
+        execute(&pool, &input, track, seek, kind, follow_up)
     })
 }

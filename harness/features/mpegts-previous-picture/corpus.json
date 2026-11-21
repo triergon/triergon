@@ -117,6 +117,46 @@
         "bytes": 21303,
         "digest": 6736888287049410993
       }
+    },
+    {
+      "id": "avc-split-pes",
+      "profile": "avc-split-pes",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc.ts",
+      "sha256": "8c0e8f659fc8b4eeb9094a2d201a5fc80c95e023f4f8f052ad80f8c03c03bb87",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "90000",
+        "preroll",
+        "split=564"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 9221,
+        "digest": 5679831116521932256
+      }
+    },
+    {
+      "id": "hevc-m2ts-split-pes",
+      "profile": "hevc-m2ts-split-pes",
+      "file": "harness/features/mpegts-previous-picture/inputs/hevc.m2ts",
+      "sha256": "20320afc50e97b5806a556808171dcfc220747797a9133d5882616ec2ae80163",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "121000",
+        "preroll",
+        "split=576"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 5523,
+        "digest": 14828060183821136300
+      }
     }
   ]
 }

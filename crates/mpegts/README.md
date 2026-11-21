@@ -142,9 +142,15 @@ Packets retain their original bytes, clocks and source ranges. The reader retain
 a bounded single-track suffix when possible and otherwise replays the entity.
 An `Event::Seek` precedes the landing packet and carries the requested
 discard time for `PlaybackPreroll`. The caller supplies decoder setup.
-The reader refuses seeks across selected-track source epochs, ambiguous clock
-wraps, and continued entities. A coded random-access picture must have resolved
-timing.
+The reader refuses seeks across selected-track source epochs and ambiguous clock
+wraps. A coded random-access picture must have resolved timing.
+
+Use `Reader::request_seek_in_entities` for consecutive length-known, seekable
+parts of one logical transport stream. The ordered `SeekEntity` list supplies
+source IDs and lengths, and the scan bound applies to their combined size. Feed
+input by the requested source ID and finish the final entity. The reader advances
+the intermediate boundaries during scan, replay and delivery, preserving in-flight
+PES and access units. The ordinary single-entity method requires a single source.
 
 Call `Reader::request_seek_and_index` to collect a bounded timestamp index
 during the first scan. Later seeks to the same track can use the index to select

@@ -61,6 +61,26 @@
       }
     },
     {
+      "id": "adts-aac-lc-split-pes",
+      "profile": "adts-aac-lc-split-pes",
+      "file": "harness/features/mpegts-previous-audio/inputs/adts-aac-lc.ts",
+      "sha256": "de2b5c9b1482ea65e3edaa15e1a13f91554d2962acd5ea55788caf61162ba5dd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "90000",
+        "preroll",
+        "split=564"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1170,
+        "digest": 14481749787097193298
+      }
+    },
+    {
       "id": "dvb-ac3-previous",
       "profile": "dvb-ac3-previous",
       "file": "harness/features/mpegts-previous-audio/inputs/dvb-ac3.m2ts",
@@ -119,6 +139,27 @@
         "packets": 9,
         "bytes": 3456,
         "digest": 17035717296625073693
+      }
+    },
+    {
+      "id": "dvb-ac3-split-pes",
+      "profile": "dvb-ac3-split-pes",
+      "file": "harness/features/mpegts-previous-audio/inputs/dvb-ac3.m2ts",
+      "sha256": "9d6507893aea7c5d431490dff84047272a08fdbb8f51aeeb5cafe354390e0dea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb",
+        "256",
+        "90000",
+        "preroll",
+        "split=576"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 2304,
+        "digest": 17476959613441802058
       }
     },
     {
