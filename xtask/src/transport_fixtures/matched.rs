@@ -139,6 +139,82 @@ fn video(root: &Path, hevc: bool, repeat: usize) -> R<Input> {
     })
 }
 
+fn physical_video_seek_cases(root: &Path, reference: &Path, cases: &mut Vec<Value>) -> R<()> {
+    let pid = PID.to_string();
+    for (hevc, name, first, second) in [
+        (false, "avc-physical-repeated-preroll", "105121", "92161"),
+        (true, "hevc-physical-repeated-preroll", "92161", "105121"),
+    ] {
+        let (codec, pictures) = pictures(root, hevc)?;
+        let picture = pictures.first().ok_or("missing first coded picture")?;
+        // Keep the first coded picture's complete parameter chain and all IDR
+        // slices. Omit SEI explicitly; its state is outside the direct profile.
+        let starts: Vec<_> = picture
+            .windows(3)
+            .enumerate()
+            .filter_map(|(at, bytes)| (bytes == [0, 0, 1]).then_some(at + 3))
+            .collect();
+        let mut body = Vec::new();
+        let mut nals = 0;
+        for (index, &start) in starts.iter().enumerate() {
+            let end = starts.get(index + 1).map_or(picture.len(), |next| next - 3);
+            let mut nal = &picture[start..end];
+            while nal.last() == Some(&0) {
+                nal = &nal[..nal.len() - 1];
+            }
+            let Some(&header) = nal.first() else { continue };
+            let kind = if hevc {
+                (header >> 1) & 63
+            } else {
+                header & 31
+            };
+            if matches!((hevc, kind), (false, 5 | 7 | 8) | (true, 20 | 32..=34)) {
+                body.extend_from_slice(&[0, 0, 0, 1]);
+                body.extend_from_slice(nal);
+                nals += 1;
+            }
+        }
+        if nals != 4 {
+            return Err("physical video parameter chain or coded picture changed".into());
+        }
+        let mut ts = Transport::new();
+        for _ in 0..17 {
+            ts.payload(0x1fff, &[0xff; 184]);
+        }
+        for index in 0..10 {
+            ts.tables(&codec, &[])?;
+            let pts = 90_000 + index * 2160;
+            ts.pes(
+                0xe0,
+                &Part {
+                    aligned: true,
+                    ..part(
+                        &body,
+                        Some(pts),
+                        (index % 2 != 0).then_some(85_000 + index * 2160),
+                    )
+                },
+            )?;
+        }
+        cases.push(
+            Input {
+                name,
+                m2ts: false,
+                data: ts.finish(false),
+            }
+            .record(
+                root,
+                "mpegts-previous-picture",
+                name,
+                &[&pid, first, "preroll", second],
+                reference,
+                "ts-seek-fold",
+            )?,
+        );
+    }
+    Ok(())
+}
+
 fn epoch_video(root: &Path, configuration: bool, m2ts: bool) -> R<(Input, usize)> {
     let (codec, pictures) = pictures(root, false)?;
     if pictures.len() != 12 {
@@ -373,6 +449,7 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
         "ts-seek-fold",
     )?);
     epoch_cases(root, seek, &mut cases)?;
+    physical_video_seek_cases(root, seek, &mut cases)?;
     manifest(root, feature, cases)?;
 
     let raw = fs::read(root.join(AUDIO)).map_err(|e| format!("{AUDIO}: {e}"))?;

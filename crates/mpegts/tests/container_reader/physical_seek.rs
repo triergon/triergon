@@ -4,6 +4,9 @@ use std::ops::Range;
 use triergon_core::container::{SeekMethod, SeekPolicy, SeekRequest};
 use triergon_mpegts::clock::{SourceClockAnchor, SourceClockSample, SourceTimePolicy};
 
+#[path = "physical_seek_video.rs"]
+mod video;
+
 const FRAMES: usize = 10;
 const FRAME_BYTES: usize = 96;
 
@@ -187,6 +190,20 @@ fn facts(packet: &Packet) -> String {
             )
         })
         .collect();
+    let video = match packet.access_unit() {
+        AccessUnit::Video(unit) => Some((
+            unit.source,
+            unit.codec,
+            unit.range.clone(),
+            unit.has_vcl,
+            unit.random_access,
+            unit.nals()
+                .iter()
+                .map(triergon_framing::NalUnit::facts)
+                .collect::<Vec<_>>(),
+        )),
+        _ => None,
+    };
     format!(
         "{:?}",
         (
@@ -204,7 +221,13 @@ fn facts(packet: &Packet) -> String {
                 map.source_ranges.as_slice(),
                 packet.track_info().configuration_epoch()
             ),
-            origins
+            origins,
+            (
+                packet.random_access(),
+                packet.track_info().configuration(),
+                clock.quarantined,
+                video
+            ),
         )
     )
 }

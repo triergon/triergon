@@ -370,7 +370,15 @@ impl Seeking {
 
     pub(super) fn picture_delivery(&self, track: TrackId) -> PictureDelivery {
         match self.phase {
-            Phase::Scan(_) if self.full_scan => PictureDelivery::Full,
+            Phase::Scan(ref scan)
+                if self.full_scan
+                    || scan
+                        .index
+                        .as_ref()
+                        .is_some_and(|index| index.physical.is_some()) =>
+            {
+                PictureDelivery::Full
+            }
             Phase::Scan(_) => PictureDelivery::Scan,
             Phase::Replay { landing, .. } if track == self.request.track => {
                 PictureDelivery::Landing {

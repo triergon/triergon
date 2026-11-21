@@ -8,6 +8,47 @@ use triergon_framing::{Codec, RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};
 const ID: SourceId = SourceId(712);
 static OFF: AtomicBool = AtomicBool::new(false);
 
+#[test]
+fn independent_resume_preserves_elementary_offsets_and_nal_limit() {
+    let pool = Budget::new(1 << 20).unwrap();
+    // Two base-layer first slices, each starting its own picture.
+    let prefix = [0x55; 13];
+    let picture = [0, 0, 1, 0x28, 1, 0x80];
+    let raw = [prefix.as_slice(), &picture, &picture].concat();
+    let bytes = Bytes::copy_from_slice(&pool, &raw).unwrap();
+    for maximum in [5, 6] {
+        let limits = RawAnnexBLimits {
+            nal: triergon_framing::ReaderLimits {
+                maximum_nal_units: maximum,
+                ..RawAnnexBLimits::default().nal
+            },
+            ..RawAnnexBLimits::default()
+        };
+        let mut drive = Drive::new(&pool, Codec::Hevc, &bytes, 1, true, limits);
+        let stale = drive.reader.request();
+        drive.reader.resume_at(prefix.len() as u64, 4).unwrap();
+        assert_eq!(drive.reader.request().offset, prefix.len() as u64);
+        assert_ne!(
+            drive.reader.request().token.generation(),
+            stale.token.generation()
+        );
+        if maximum == 5 {
+            assert!(matches!(drive.next(1), Err(Error::Limit { .. })));
+        } else {
+            let first = drive.next(1).unwrap().unwrap();
+            assert_eq!(first.range, 13..19);
+            assert_eq!(first.nals()[0].bytes().as_ref(), &picture[3..]);
+            let second = drive.next(1).unwrap().unwrap();
+            assert_eq!(second.range, 19..25);
+            assert!(drive.next(1).unwrap().is_none());
+            assert!(matches!(
+                drive.reader.resume_at(13, 4),
+                Err(Error::SourceMismatch)
+            ));
+        }
+    }
+}
+
 struct Drive<'a> {
     reader: RawAnnexBReader,
     source: &'a Bytes,
