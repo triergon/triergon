@@ -49,8 +49,8 @@ default limit; `video_decoder_in` and `audio_decoder_in` charge the caller's `Bu
 instead, so several decoders can share one limit. Without it, implement `VideoDecoder`
 and `AudioDecoder` (re-exported from triergon-codec) with `Error = triergon_session::Error`
 yourself, or box a decoder with another error type through `boxed()`; the tests use
-scripted decoders. The `simd` feature forwards to the HEVC decoder's nightly-only
-SIMD kernels.
+scripted decoders. The `hevc-simd` and `aac-simd` features turn on the HEVC and AAC
+decoders' nightly-only SIMD kernels (their `simd` features).
 
 For ADTS packets carrying an explicit container priming edit, use
 `compat::aac::adts_decoder(PrimingPolicy::Container)` and apply the edit to

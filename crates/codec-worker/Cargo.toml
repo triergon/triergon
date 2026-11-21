@@ -24,7 +24,7 @@ triergon-worker-entry = { path = "../worker-entry" }
 
 [features]
 # Nightly-only explicit SIMD kernels in the HEVC decoder; output is identical.
-simd = ["triergon-session/simd"]
+hevc-simd = ["triergon-session/hevc-simd"]
 # Nightly-only explicit SIMD forms of the AAC decoder's SBR QMF banks; the gate build
 # builds `codec-aac-worker` with it.
 aac-simd = ["triergon-session/aac-simd"]

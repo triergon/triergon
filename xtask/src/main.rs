@@ -1064,7 +1064,7 @@ fn simd_lints(root: &Path) -> Task {
             "-p",
             "codec-worker",
             "--features",
-            "triergon-codec-hevc/simd,triergon-codec-aac/simd,codec-worker/simd,codec-worker/aac-simd",
+            "triergon-codec-hevc/simd,triergon-codec-aac/simd,codec-worker/hevc-simd,codec-worker/aac-simd",
             "--all-targets",
             "--locked",
             "--",

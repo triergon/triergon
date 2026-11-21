@@ -24,8 +24,8 @@ codec-worker seek ogg FILE TRACK SECONDS exact|preroll
 
 `KIND-CODEC` is one of `video-h264`, `video-hevc`, `audio-ac3`, `audio-eac3`,
 `audio-aac`, `audio-aac-access-units`, `audio-aac-access-units-compat`, `audio-dts`, `audio-flac`, `audio-mp3`,
-`audio-vorbis` or `audio-opus`. The `simd` feature enables the HEVC decoder's nightly-only
-SIMD kernels, and `aac-simd` the AAC decoder's; output is identical.
+`audio-vorbis` or `audio-opus`. The `hevc-simd` feature enables the HEVC decoder's
+nightly-only SIMD kernels, and `aac-simd` the AAC decoder's; output is identical.
 
 Video is split into Annex B access units and audio into frames (AC-3/E-AC-3 by
 `access_unit_len`, AAC by the ADTS header, DTS by the core FSIZE) the same way the
