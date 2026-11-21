@@ -471,6 +471,14 @@ loaded; every step passes 319 of 319 cases. Sets
 `gate-run-armv7-99f1027b-20261116-050516-shard-1` hold each target's outputs, build
 identities, plan, step records and logs.
 
+The ARMv7 codec row's workload timings and memory at `d1526aa0` come from one partial gate
+run of the codec workload items (`codec-workloads` and its memory parts `codec-workloads-1`
+to `-5`) on three c6g.4xlarge hosts, built and measured as at `f9fd4030`. Every step passes.
+Sets `gate-run-armv7-d1526aa0-20261121-034448-shard-1` to `-3` hold the outputs, build
+identities, plans, step records and logs. On Linux AArch64 the change leaves the codec
+workloads' instruction counts within 0.04% of main's (evidence set `h264-cabac32-d1526aa0`),
+and that row stands at its earlier revisions.
+
 The codec rows' workload timings and memory at `fc65d9fc` come from one partial gate run
 per target of the codec workload items (`codec-workloads` and its memory parts
 `codec-workloads-1` to `-5`) on three c6g.4xlarge hosts, built and measured as at `f9fd4030`.
@@ -1393,6 +1401,10 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | H.264-linked items, ARMv7, shard 3 of 4 | `906d0a36a98d379412d43b5c24f5ecb304313450` | [`97bcd3aec0bdfea0643bf58c7e7886913df425eeec9629ba903fef3dafd6831c`](../harness/evidence/sets/gate-run-armv7-906d0a36-20261116-213256-shard-3.json) |
 | H.264-linked items, ARMv7, shard 4 of 4 | `906d0a36a98d379412d43b5c24f5ecb304313450` | [`5d59d5f08934a38da54ce0253a414486f8b4df0ae277de4579b47467531aa511`](../harness/evidence/sets/gate-run-armv7-906d0a36-20261116-213256-shard-4.json) |
 | ARMv7 and Linux AArch64: the H.264 decoder's stage account at `256aa348`, counts, profiles and tests at `7c534afb` | `7c534afbadcc2aebb31314e5281c7d5d7e0c83a1` | [`6e96b8c53eead71c0d36bbd3ce600ee87d3e8ad667317e2984453390e69ca667`](../harness/evidence/sets/h264-division-7c534afb.json) |
+| Codec workload items, ARMv7, shard 1 of 3 | `d1526aa04e53aa945ac80e187a9bef1fb498253b` | [`585a6010d91c5bbcab573519f7b0f90861296ca48772fafe2f0b55bf5fc8d7bd`](../harness/evidence/sets/gate-run-armv7-d1526aa0-20261121-034448-shard-1.json) |
+| Codec workload items, ARMv7, shard 2 of 3 | `d1526aa04e53aa945ac80e187a9bef1fb498253b` | [`f709b0ad372c842eb962ab2b6d55dfdc214dea1f173be7cb7447dbf3fe849d28`](../harness/evidence/sets/gate-run-armv7-d1526aa0-20261121-034448-shard-2.json) |
+| Codec workload items, ARMv7, shard 3 of 3 | `d1526aa04e53aa945ac80e187a9bef1fb498253b` | [`244182dabbf316fef79c184d2c4be7029bc7d89f04c461059f023059eee2946a`](../harness/evidence/sets/gate-run-armv7-d1526aa0-20261121-034448-shard-3.json) |
+| ARMv7 and Linux AArch64: the H.264 decoder's profile at `41031255`, counts and tests of the 32-bit CABAC register at `d1526aa0` | `d1526aa04e53aa945ac80e187a9bef1fb498253b` | [`30cc9f8561a5792db2353744b30ff0147b539b7c68242e3db11b0d191b168ec4`](../harness/evidence/sets/h264-cabac32-d1526aa0.json) |
 | Codec workload items, Linux AArch64, shard 1 of 3 | `fc65d9fcf4ea2f1171c78eebb2f8daf7d1e022e6` | [`48c0e1ad8976eaf5904a0d974f7c86d7e39e892802d12ceddf21ad6cde48bc44`](../harness/evidence/sets/gate-run-aarch64-fc65d9fc-20261121-015034-shard-1.json) |
 | Codec workload items, Linux AArch64, shard 2 of 3 | `fc65d9fcf4ea2f1171c78eebb2f8daf7d1e022e6` | [`2ff08308bd429cbe0d60c33f7b95e052eeca16a7fc3dc966f7712e5a8c61b465`](../harness/evidence/sets/gate-run-aarch64-fc65d9fc-20261121-015034-shard-2.json) |
 | Codec workload items, Linux AArch64, shard 3 of 3 | `fc65d9fcf4ea2f1171c78eebb2f8daf7d1e022e6` | [`308113622eb147e2e1c194363c29073158f32f1d1192223deb43a2ac2a1becde`](../harness/evidence/sets/gate-run-aarch64-fc65d9fc-20261121-015034-shard-3.json) |
@@ -1882,7 +1894,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | ISO BMFF seek and range plans | 476/476 (378 seeks, 94 range plans, 4 refusals) | 1.0222 (472/472 pass) | heap ≤0.8541, total RSS ≤0.8704 (472/472 lower) |
 | AAC in MOV | the configured decoder comparison: 34 clips, 3,544 access units | 1.0074 (34/34 pass) at `414b4cb5` | heap ≤0.6756, total RSS ≤0.5230 (34/34 lower, kernel-bound) at `414b4cb5` |
 | Packet framing | 135/135 AVC/HEVC reference comparisons. [DTS header instruction counts](#dts-core-header-inspection) at `7c730ff8`. | 0.9122 (135/135 pass) at `5ee3eba8` | heap ≤0.2633, total RSS ≤0.9789 (135/135 lower) at `5ee3eba8` |
-| Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the audio correctness check `codecs-audio` at `4b87991e`, as on AArch64: AAC 39/39, AC-3 6/6, E-AC-3 6/6, DTS core 22/22, and `xll_51_24_48_none` out of set (no core substream); the six video timing workloads decode to FFmpeg's digests | 20/20 pass at `2d82a042`: the six video workloads 0.6136 to 1.0087 (`h264-high-1080p` 1.0087), the fourteen audio workloads 0.7446 to 0.9709 (worst `eac3-stereo-spx`; `aac-hev2-stereo` 0.9276, `aac-he-5.1` 0.9015, `aac-he-stereo` 0.8951); the codec workload items alone at `fc65d9fc` (the H.264 change before `2d82a042` joined it): the six video workloads 0.6016 to 0.9935 (`h264-high-1080p` 0.9935) | heap ≤0.9434, total RSS ≤0.8387 (20/20 lower) at `2d82a042`; heap ≤0.9421, total RSS ≤0.8420 (20/20 lower) at `fc65d9fc` |
+| Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the audio correctness check `codecs-audio` at `4b87991e`, as on AArch64: AAC 39/39, AC-3 6/6, E-AC-3 6/6, DTS core 22/22, and `xll_51_24_48_none` out of set (no core substream); the six video timing workloads decode to FFmpeg's digests | 20/20 pass at `d1526aa0`: the six video workloads 0.6032 to 0.9837 (`h264-high-1080p` 0.9837), the fourteen audio workloads 0.7375 to 0.9692 (worst `eac3-stereo-spx`; `eac3-7.1` 0.9644, `aac-hev2-stereo` 0.9396) | heap ≤0.9434, total RSS ≤0.8411 (20/20 lower) at `d1526aa0` |
 | Audio codecs in files | the 10 workloads of `file-workloads.json`, each worker's work checked equal before it is measured. At `a875b007`, 10/10 pass both FFmpeg grades and 10/10 match main (`838a07a5`) byte for byte on stereo s16 | 0.9812 (10/10 pass, worst `vorbis-q3-5.1`) at `36cead7d` | heap ≤0.8994, total RSS ≤0.7680 (10/10 lower) at `36cead7d` |
 | Capture | 15/15 at `c30b9c80`. Conversion is byte-identical to FFmpeg's on all 15, and mux and encoder pass. | 0.9838 (15/15 pass, worst `c14-motion-960-rate255`, median of the cases 0.8081) at `c30b9c80` | heap ≤0.6086, total RSS ≤0.9767 (15/15 lower, kernel-bound) at `c30b9c80` |
 | Matroska audio clocks | 10/10 packet folds (`matroska-audio-clocks`) | 0.7871 (10/10 pass, worst `laced-unknown-duration`) at `ce55904b` | heap ≤0.7323, total RSS ≤0.9451 (10/10 lower), on `playback-matroska-worker`, at `ce55904b`
@@ -2120,6 +2132,19 @@ for `hevc-main-1080p` on ARMv7 (0.7% fewer, the RGBA conversion). Output is unch
 Reference-frame loads remain the largest decoder cost: the decoder refills L1 39M times on
 this workload, the reference 22M. Evidence set `h264-narrow-arm-fc65d9fc` holds the
 profiles, loop-shape probes, counts and tests.
+
+`h264-high-1080p` measures 0.9837 (median 0.9807) at `d1526aa0`. At main `41031255`, 10.4% of
+the workload's cycles went to the CABAC decision, whose 9-bit offset and look-ahead lived in
+a 64-bit register: on this target each 64-bit shift by a variable amount is 11 instructions
+and each comparison two. The arithmetic decoder now keeps them in a 32-bit word on 32-bit
+targets, refilled to capacity from the stream's bit position, and the deblocking filter takes
+an inter macroblock's uniform-motion summary when the macroblock decodes instead of a row
+later, when its motion has left the cache. Against `41031255` the decoder takes 3.2% fewer
+instructions and 2.8% fewer cycles on `h264-high-1080p`, 3.1% and 1.9% on
+`h264-main-1920x800`, and 3.2% and 2.1% on `hevc-main-1080p`, whose CABAC shares the engine;
+the audio workloads run the same instructions, and on Linux AArch64, which keeps the 64-bit
+register, the H.264 workloads take within 0.04% of main's instructions. Output is unchanged.
+Evidence set `h264-cabac32-d1526aa0` holds the profile, counts and tests.
 
 The MP4 forward case `progressive-ten-sequential-batches` (a front `moov` and ten
 `moof`/`mdat` pairs of three packets) measures 0.9013 (95% 0.8945 to 0.9100) at `419a8493`,
