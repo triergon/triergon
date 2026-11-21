@@ -358,6 +358,20 @@ fn tracked_xll_inputs_preserve_both_landings_policies_and_indexed_suffixes() {
             PacketFormat::M2ts192,
             944,
         ),
+        (
+            include_bytes!(
+                "../../../../harness/features/mpegts-dts-seek/inputs/dts-core-xll-mode-zero-188.ts"
+            ).as_slice(),
+            PacketFormat::Ts188,
+            560,
+        ),
+        (
+            include_bytes!(
+                "../../../../harness/features/mpegts-dts-seek/inputs/dts-core-xll-mode-zero-192.m2ts"
+            ).as_slice(),
+            PacketFormat::M2ts192,
+            560,
+        ),
     ] {
         let pool = Budget::new(32 << 20).unwrap();
         let mut reader = new_reader(&pool, bytes, format, true);
@@ -865,5 +879,324 @@ fn fate_lossless_only_entries_decode_the_exact_pcm_suffix() {
         );
         same_packets(&packets, &sequential[index..]);
         assert_eq!(decode(&packets), all_pcm[index * 1024 * 6 * 4..]);
+    }
+}
+
+// Author mode-zero navigation from the same Tables 7-7/7-15 fields. The
+// additional mask needs a larger descriptor and DWORD-aligned ExSS header.
+fn mode_zero_extension(mask: u32, tag: u8) -> Vec<u8> {
+    let original = frame(true, 0, 0, tag);
+    let mut bits = Bits::new(48);
+    for at in 0..145 {
+        bits.put(1, u32::from((original[at / 8] >> (7 - at % 8)) & 1));
+    }
+    bits.put(2, 0);
+    bits.put(12, mask);
+    for at in 147..198 {
+        bits.put(1, u32::from((original[at / 8] >> (7 - at % 8)) & 1));
+    }
+    bits.at = 218; // 14-byte descriptor beginning at bit 106.
+    bits.put(1, 1); // Backward-compatible separate core.
+    bits.put(5, 0); // Extension zero, asset zero.
+    set(&mut bits.bytes, 43, 8, 31);
+    set(&mut bits.bytes, 51, 16, 47);
+    set(&mut bits.bytes, 106, 9, 13);
+    bits.bytes[32..].copy_from_slice(&original[28..]);
+    crc(&mut bits.bytes, 5, 32);
+    bits.bytes
+}
+
+#[test]
+fn mode_zero_separate_core_xll_preserves_full_suffix_and_history_refusal() {
+    let descriptor = &[
+        0x7f, 14, 0x0e, 0xc0, 5, 1, 0x60, 0x08, 0, 0, 5, 2, 0x64, 0x74, 0, 0,
+    ];
+    let frames: Vec<_> = (0..4)
+        .map(|i| {
+            let mut core = include_bytes!("../../../../harness/fixtures/mpegts/dts-core-mono.dts")
+                [..512]
+                .to_vec();
+            set(&mut core, 87, 1, u32::from(i == 2));
+            core.extend(mode_zero_extension(0x201, i));
+            core
+        })
+        .collect();
+    let inputs: Vec<_> = frames
+        .iter()
+        .enumerate()
+        .map(|(i, bytes)| {
+            (
+                bytes.as_slice(),
+                Some(90_000 + i as u64 * 960),
+                Some(89_880 + i as u64 * 960),
+            )
+        })
+        .collect();
+    let ts = transport_with_descriptor(&inputs, descriptor);
+    for format in [PacketFormat::Ts188, PacketFormat::M2ts192] {
+        let m2ts = ts.m2ts();
+        let bytes = if format == PacketFormat::Ts188 {
+            &ts.bytes
+        } else {
+            &m2ts
+        };
+        let pool = Budget::new(32 << 20).unwrap();
+        let mut reader = new_reader(&pool, bytes, format, true);
+        let (_, sequential) = drain(&mut reader, &pool, bytes, 7, 1).unwrap();
+        assert_eq!(sequential.len(), 4);
+        reader.close();
+        drop(reader);
+        for policy in [
+            SeekPolicy::PreviousRandomAccess,
+            SeekPolicy::PlaybackPreroll,
+        ] {
+            let mut reader = new_reader(&pool, bytes, format, true);
+            for (ordinal, (target, start)) in [(92_500, 1), (90_500, 0), (94_000, 3)]
+                .into_iter()
+                .enumerate()
+            {
+                let request = SeekRequest {
+                    track: TrackId(PID.into()),
+                    target: clock(target),
+                    policy,
+                };
+                if ordinal == 0 {
+                    reader.request_seek_and_index(request, 8).unwrap();
+                } else {
+                    reader.request_seek(request).unwrap();
+                }
+                let (result, packets) = drain(&mut reader, &pool, bytes, 7, 1).unwrap();
+                let result = result.unwrap();
+                assert_eq!(result.landing, clock(90_000 + start as u64 * 960));
+                assert_eq!(
+                    result.discard_until,
+                    if policy == SeekPolicy::PlaybackPreroll {
+                        request.target
+                    } else {
+                        result.landing
+                    }
+                );
+                assert_eq!(
+                    result.method,
+                    if ordinal == 0 {
+                        SeekMethod::BoundedScan
+                    } else {
+                        SeekMethod::Index
+                    }
+                );
+                same_packets(&packets, &sequential[start..]);
+            }
+            reader.close();
+        }
+        drop(sequential);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
+}
+
+#[test]
+fn mode_zero_refuses_unproved_components() {
+    let descriptor = &[
+        0x7f, 14, 0x0e, 0xc0, 5, 1, 0x60, 0x08, 0, 0, 5, 2, 0x64, 0x74, 0, 0,
+    ];
+    for mask in [0, 0x200, 0x211, 0x221, 0x241, 0x281, 0x301, 0x601, 0xa01] {
+        let mut core =
+            include_bytes!("../../../../harness/fixtures/mpegts/dts-core-mono.dts")[..512].to_vec();
+        set(&mut core, 87, 1, 0);
+        core.extend(mode_zero_extension(mask, 1));
+        let ts = transport_with_descriptor(&[(&core, Some(90_000), None)], descriptor);
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut reader = new_reader(&pool, &ts.bytes, PacketFormat::Ts188, true);
+        reader
+            .request_seek(SeekRequest {
+                track: TrackId(PID.into()),
+                target: clock(90_000),
+                policy: SeekPolicy::PreviousRandomAccess,
+            })
+            .unwrap();
+        assert_eq!(
+            drain(&mut reader, &pool, &ts.bytes, 7, 1).unwrap_err(),
+            Error::Unsupported("MPEG-TS DTS-HD seek recovery layout")
+        );
+    }
+}
+
+#[test]
+#[ignore = "requires pinned transport reference and freshly built transport-worker"]
+fn mode_zero_coded_suffix_matches_ordinary_reference() {
+    use std::path::Path;
+    use std::process::Command;
+    let reference =
+        std::env::var_os("TRIERGON_DTS_SEEK_REFERENCE").expect("TRIERGON_DTS_SEEK_REFERENCE");
+    let candidate =
+        std::env::var_os("TRIERGON_TRANSPORT_WORKER").expect("TRIERGON_TRANSPORT_WORKER");
+    // Pinned transport-dts d32b387f public demuxer/parser worker, macOS build.
+    assert_eq!(
+        sha256::file_hex(Path::new(&reference)).unwrap(),
+        "64af76e1a3f0732d7b5861bc9bd423bb6412fe3cfed340c1fa4b141c115b44ad"
+    );
+    let descriptor = &[
+        0x7f, 14, 0x0e, 0xc0, 5, 1, 0x60, 0x08, 0, 0, 5, 2, 0x64, 0x74, 0, 0,
+    ];
+    let frames: Vec<_> = (0..4)
+        .map(|i| {
+            let mut core = include_bytes!("../../../../harness/fixtures/mpegts/dts-core-mono.dts")
+                [..512]
+                .to_vec();
+            set(&mut core, 87, 1, 0);
+            core.extend(mode_zero_extension(0x201, i));
+            core
+        })
+        .collect();
+    let inputs: Vec<_> = frames
+        .iter()
+        .enumerate()
+        .map(|(i, bytes)| {
+            (
+                bytes.as_slice(),
+                Some(90_000 + i as u64 * 960),
+                (i % 2 == 0).then_some(89_880 + i as u64 * 960),
+            )
+        })
+        .collect();
+    let ts = transport_with_descriptor(&inputs, descriptor);
+    let directory = std::env::temp_dir().join(format!("triergon-mode-zero-{}", std::process::id()));
+    std::fs::create_dir(&directory).unwrap();
+    for (size, bytes) in [("188", ts.bytes.clone()), ("192", ts.m2ts())] {
+        let path = directory.join(format!("mode-zero-{size}.ts"));
+        std::fs::write(&path, bytes).unwrap();
+        for policy in ["previous", "preroll"] {
+            for (target, repeat) in [("90500", None), ("92500", None), ("92500", Some("90500"))] {
+                let run = |worker: &std::ffi::OsStr| {
+                    let mut command = Command::new(worker);
+                    command
+                        .arg("ts-audio-seek-fold")
+                        .arg(&path)
+                        .args([size, "7", "--dvb", "256", target, policy]);
+                    if let Some(repeat) = repeat {
+                        command.arg(repeat);
+                    }
+                    let output = command.output().unwrap();
+                    assert!(
+                        output.status.success(),
+                        "{}",
+                        String::from_utf8_lossy(&output.stderr)
+                    );
+                    output.stdout
+                };
+                assert_eq!(
+                    run(&candidate),
+                    run(&reference),
+                    "{size} {policy} {target} {repeat:?}"
+                );
+            }
+        }
+    }
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+#[ignore = "requires hash-pinned unmodified FATE dcadec-suite originals"]
+fn original_core_xll_history_never_establishes_a_mode_zero_entry() {
+    let root = std::env::var_os("TRIERGON_DTS_HD_SUITE").expect("TRIERGON_DTS_HD_SUITE");
+    for (name, hash) in [
+        (
+            "xll_51_16_192_768_0.dtshd",
+            "34441a4f2df89e086f67a7b0f72aa871e1cbb3b04b301470a7727038bb91b618",
+        ),
+        (
+            "xll_51_16_192_768_1.dtshd",
+            "ff9067cf5685d38f6d20d607559b69f14b43d6c5a20fa8438bd8862ab98f375d",
+        ),
+        (
+            "xll_51_24_48_768.dtshd",
+            "c0830af121ec78a8271d008999cc54b99843f17b9b33203bb9adbcbc3271d0a9",
+        ),
+        (
+            "xll_71_24_48_768_0.dtshd",
+            "8d380d1323a6fff90a8885d65697217b1bbc4f2c027e30af870fa0dfa50f8eb3",
+        ),
+        (
+            "xll_71_24_48_768_1.dtshd",
+            "267828d7db493d16a43d238a7e94c0c20ecd35426f11143683079e67bb2dab2b",
+        ),
+        (
+            "xll_71_24_96_768.dtshd",
+            "d2911b34183f7379359cf914ee93228796894e0b0f0055e6ee5baefa4fd6a923",
+        ),
+        (
+            "xll_x96_51_24_96_1509.dtshd",
+            "ac8de7e1f2875145aff90db2953f62fb4910e301d7fb48007eb3db0a36d09e90",
+        ),
+        (
+            "xll_xch_61_24_48_768.dtshd",
+            "ab29359bd0fbb958ce730496243aa082f4e8cdbd4cf058fe59867db130d755ad",
+        ),
+    ] {
+        let path = std::path::Path::new(&root).join(name);
+        assert_eq!(sha256::file_hex(&path).unwrap(), hash);
+        let raw = std::fs::read(path).unwrap();
+        let start = raw.windows(8).position(|b| b == b"STRMDATA").unwrap();
+        let size = u64::from_be_bytes(raw[start + 8..start + 16].try_into().unwrap()) as usize;
+        let payload = &raw[start + 16..start + 16 + size];
+        let mut at = 0;
+        let mut count = 0;
+        while at < payload.len() {
+            let start = at;
+            let core = triergon_framing::probe_dts_core_header(&payload[at..]).unwrap();
+            assert_eq!(core.history, 1);
+            at += core.frame_bytes;
+            let extent = triergon_framing::probe_dts_extension_substream_extent(
+                &payload[at..],
+                triergon_framing::DtsFrameExtentLimits {
+                    maximum_header_bytes: 4096,
+                    maximum_frame_bytes: 65_535,
+                },
+            )
+            .unwrap();
+            let mode_bit = if name.starts_with("xll_71") {
+                161
+            } else if name.contains("xch") {
+                157
+            } else {
+                152
+            };
+            let mut bits = triergon_bitstream::BitCursor::at(&payload[at..], mode_bit);
+            assert_eq!(
+                triergon_bitstream::BitSource::read(&mut bits, 2).unwrap(),
+                0
+            );
+            at += extent.frame_bytes;
+            let ts = transport_with_descriptor(
+                &[(&payload[start..at], Some(90_000), None)],
+                &[
+                    0x7f, 14, 0x0e, 0xc0, 5, 1, 0x60, 0x08, 0, 0, 5, 2, 0x64, 0x74, 0, 0,
+                ],
+            );
+            let pool = Budget::new(4 << 20).unwrap();
+            let mut reader = new_reader(&pool, &ts.bytes, PacketFormat::Ts188, true);
+            reader
+                .request_seek(SeekRequest {
+                    track: TrackId(PID.into()),
+                    target: clock(90_000),
+                    policy: SeekPolicy::PreviousRandomAccess,
+                })
+                .unwrap();
+            let expected = if name.contains("x96") || name.contains("xch") {
+                Error::Unsupported("MPEG-TS DTS-HD seek recovery layout")
+            } else {
+                Error::Unsupported("MPEG-TS has no timestamped audio frame at or before the target")
+            };
+            assert_eq!(
+                drain(&mut reader, &pool, &ts.bytes, 4096, 8192).unwrap_err(),
+                expected,
+                "{name} frame {count}"
+            );
+            reader.close();
+            drop(reader);
+            assert_eq!(pool.used(), Budget::control_storage_bytes());
+            count += 1;
+        }
+        assert_eq!(at, payload.len());
+        assert_eq!(count, 6);
     }
 }
