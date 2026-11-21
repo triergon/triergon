@@ -563,7 +563,7 @@ fn compare_identity_cascades(probe: &std::ffi::OsStr) {
             std::fs::write(&input, &ts).unwrap();
             summary.push_str(&format!("{name}-{end} input {}\n", sha256::hex(&ts)));
             for merge in ["0", "1"] {
-                let output = std::process::Command::new(&probe)
+                let output = std::process::Command::new(probe)
                     .args([
                         "-v",
                         "error",
