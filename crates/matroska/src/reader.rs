@@ -143,7 +143,6 @@ enum State {
         source: SharedBytes,
         entries: BudgetVec<(u64, u64)>,
         at: usize,
-        reserved: bool,
         previous_len: usize,
     },
     Simple(SimplePacketJob),
@@ -1504,13 +1503,14 @@ impl Reader {
         match &mut self.state {
             State::Head { header, job } => match job.step(work, cancel)? {
                 ParseStep::Event(entries) => {
+                    let previous_len = self.seek_targets.len();
+                    self.seek_targets.reserve(entries.len())?;
                     self.state = State::MergeHead {
                         header: *header,
                         source: job.source().clone(),
                         entries,
                         at: 0,
-                        reserved: false,
-                        previous_len: self.seek_targets.len(),
+                        previous_len,
                     };
                 }
                 other => return crate::step::pending(other).map(Some),
@@ -1520,13 +1520,8 @@ impl Reader {
                 source,
                 entries,
                 at,
-                reserved,
                 ..
             } => {
-                if !*reserved {
-                    self.seek_targets.reserve(entries.len())?;
-                    *reserved = true;
-                }
                 match self.seek_targets.step(work, cancel)? {
                     ParseStep::Event(()) | ParseStep::Finished => (),
                     other => return crate::step::pending(other).map(Some),
