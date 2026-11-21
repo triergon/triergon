@@ -1,5 +1,6 @@
 //! Structural recovery controls; the external FATE test also checks decoded PCM.
 use super::*;
+#[derive(Debug)]
 struct SeekResult {
     requested: Time,
     landing: Time,
