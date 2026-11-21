@@ -782,10 +782,6 @@ impl<'a> RecoveryLookup<'a> {
     /// The selection, once [`poll`](Self::poll) has returned `Ready`; `Error::Invalid`
     /// before that, or the error a poll returned.
     pub fn finish(mut self) -> Result<RecoverySelection> {
-        self.take_selection()
-    }
-    /// [`finish`](Self::finish), in place.
-    pub(crate) fn take_selection(&mut self) -> Result<RecoverySelection> {
         if let Some(error) = self.failed {
             return Err(error);
         }

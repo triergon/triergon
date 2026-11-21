@@ -135,35 +135,23 @@ impl<'a> IndexedLookup<'a> {
             active,
         })
     }
-    /// The lookup in `lookup` for `ordinal`: the same lookup while it looks for
+    /// Sets `lookup` to one for `ordinal`: the same lookup while it looks for
     /// `ordinal`, the same one continued where `ordinal` follows its located
     /// sample in the same fragment, or else a fresh one.
-    fn locate<'l>(
-        lookup: &'l mut Option<Self>,
-        source: SourceTrack<'a>,
-        ordinal: u64,
-    ) -> Result<&'l mut Self> {
-        let reuse = lookup
-            .as_mut()
-            .is_some_and(|current| current.continue_to(ordinal));
-        match (reuse, lookup) {
-            (true, Some(current)) => Ok(current),
-            (_, lookup) => Ok(lookup.insert(Self::new(source, ordinal)?)),
+    fn locate(lookup: &mut Option<Self>, source: SourceTrack<'a>, ordinal: u64) -> Result<()> {
+        if let Some(current) = lookup {
+            if current.ordinal == ordinal {
+                return Ok(());
+            }
+            if let Some(LocatedIn::Fragment(locator)) = &mut current.active
+                && locator.continue_to(ordinal)
+            {
+                current.ordinal = ordinal;
+                return Ok(());
+            }
         }
-    }
-    /// Whether this lookup looks for `ordinal`, or now does because `ordinal` follows
-    /// its located sample in the same fragment.
-    fn continue_to(&mut self, ordinal: u64) -> bool {
-        if self.ordinal == ordinal {
-            return true;
-        }
-        if let Some(LocatedIn::Fragment(locator)) = &mut self.active
-            && locator.continue_to(ordinal)
-        {
-            self.ordinal = ordinal;
-            return true;
-        }
-        false
+        *lookup = Some(Self::new(source, ordinal)?);
+        Ok(())
     }
     /// The last sync sample before a located fragment sample in its run, where
     /// locating it stepped past one.
@@ -199,115 +187,14 @@ impl<'a> IndexedLookup<'a> {
     }
 }
 
-/// The walk from the decode start to the target that checks each sample's byte range
-/// against the media extents.
-#[derive(Debug)]
-struct RangeWalk<'a> {
-    /// The ordinal of the sample being checked.
-    ordinal: u64,
-    lookup: Option<IndexedLookup<'a>>,
-    /// The sample at `ordinal`, once located, and the extent it is checked against.
-    pending: Option<Sample>,
-    extent: usize,
-    validated: u64,
-}
-impl<'a> RangeWalk<'a> {
-    fn new(ordinal: u64) -> Self {
-        Self {
-            ordinal,
-            lookup: None,
-            pending: None,
-            extent: 0,
-            validated: 0,
-        }
-    }
-    /// Locates the sample at `ordinal` and finds an extent that holds it, one extent per
-    /// work unit; `Some` with the sample once one does, which stays until
-    /// [`advance`](Self::advance), and `None` when the work is spent.
-    fn check(
-        &mut self,
-        source: SourceTrack<'a>,
-        media: &[Range<u64>],
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<Option<&Sample>> {
-        loop {
-            let sample = if let Some(sample) = &self.pending {
-                sample
-            } else {
-                match IndexedLookup::locate(&mut self.lookup, source, self.ordinal)?.poll(work)? {
-                    Next::Yield => return Ok(None),
-                    Next::End => return Err(Error::Invalid("seek range lookup exhausted")),
-                    Next::Item(sample) => {
-                        // The lookup stays to continue to the next sample.
-                        self.extent = 0;
-                        self.pending.insert(sample)
-                    }
-                }
-            };
-            let Some(extent) = media.get(self.extent) else {
-                return Err(Error::Invalid("seek sample outside media extents"));
-            };
-            if !work.try_charge(1) {
-                return Ok(None);
-            }
-            if sample.require_within(extent.clone()).is_ok() {
-                self.validated = self.validated.checked_add(1).ok_or(Error::Overflow)?;
-                return Ok(self.pending.as_ref());
-            }
-            self.extent = self.extent.checked_add(1).ok_or(Error::Overflow)?;
-            if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
-            }
-        }
-    }
-    /// Moves on to the next ordinal after a checked sample.
-    fn advance(&mut self) -> Result<()> {
-        self.pending = None;
-        self.ordinal = self.ordinal.checked_add(1).ok_or(Error::Overflow)?;
-        Ok(())
-    }
-}
-
-/// Where a plan stands. Each phase owns what it reads and what the phases before it
-/// found, and changes in place.
-// Boxing the walk would put the per-sample state behind a pointer.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug)]
-enum Phase<'a> {
-    /// Checking that no media extent is reversed, from extent `next`; `next_ordinal`
-    /// follows the last sample of the sample table.
-    Extents {
-        next: usize,
-        next_ordinal: u64,
-    },
-    /// Checking that the track's fragments do not overlap, from fragment `next`;
-    /// `next_ordinal` follows the last sample indexed so far.
-    Fragments {
-        next: usize,
-        next_ordinal: u64,
-    },
-    /// Finding the target sample.
-    Target(IndexedLookup<'a>),
-    /// Looking back from `sync_ordinal` for a container sync sample, after `probes`
-    /// probes; `lookup` is the probe at hand.
-    Sync {
-        target: Sample,
-        sync_ordinal: u64,
-        probes: u64,
-        lookup: Option<IndexedLookup<'a>>,
-    },
-    /// Checking the samples from the decode start through the target; `decode_start`
-    /// once the walk has passed it.
-    Ranges {
-        target: Sample,
-        sync_sample: Sample,
-        available_preroll: u16,
-        decode_start: Option<Sample>,
-        walk: RangeWalk<'a>,
-    },
-    Ready(SourceSeekLanding),
-    Failed(Error),
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Phase {
+    Extents,
+    Fragments,
+    Target,
+    Sync,
+    Ranges,
+    Ready,
 }
 
 /// Plans a seek to one sample of a track. It finds the latest container sync sample at
@@ -321,7 +208,23 @@ pub struct SourceSeekPlanner<'a> {
     request: SourceSeekRequest,
     media: &'a [Range<u64>],
     limits: SourceSeekLimits,
-    phase: Phase<'a>,
+    phase: Phase,
+    extent: usize,
+    fragment: usize,
+    next_ordinal: u64,
+    lookup: Option<IndexedLookup<'a>>,
+    target: Option<Sample>,
+    sync_sample: Option<Sample>,
+    decode_start: Option<Sample>,
+    sync_ordinal: u64,
+    sync_probes: u64,
+    range_ordinal: u64,
+    range_start: u64,
+    pending: Option<Sample>,
+    available_preroll: u16,
+    validated: u64,
+    landing: Option<SourceSeekLanding>,
+    failed: Option<Error>,
 }
 impl<'a> SourceSeekPlanner<'a> {
     /// A planner for `request` on `source`, whose samples must lie in
@@ -351,10 +254,23 @@ impl<'a> SourceSeekPlanner<'a> {
             request,
             media: media_extents,
             limits,
-            phase: Phase::Extents {
-                next: 0,
-                next_ordinal,
-            },
+            phase: Phase::Extents,
+            extent: 0,
+            fragment: 0,
+            next_ordinal,
+            lookup: None,
+            target: None,
+            sync_sample: None,
+            decode_start: None,
+            sync_ordinal: 0,
+            sync_probes: 0,
+            range_ordinal: 0,
+            range_start: 0,
+            pending: None,
+            available_preroll: 0,
+            validated: 0,
+            landing: None,
+            failed: None,
         })
     }
     /// Advances the plan. Fails with `Error::Unsupported` when no container sync
@@ -364,12 +280,12 @@ impl<'a> SourceSeekPlanner<'a> {
     /// extent, and `Error::Limit` past `limits`. An error is kept and returned by every
     /// later poll.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
-        if let Phase::Failed(error) = self.phase {
+        if let Some(error) = self.failed {
             return Err(error);
         }
         let result = self.poll_inner(work, cancel);
         if let Err(error) = result {
-            self.phase = Phase::Failed(error);
+            self.failed = Some(error);
         }
         result
     }
@@ -378,215 +294,245 @@ impl<'a> SourceSeekPlanner<'a> {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            match &mut self.phase {
-                Phase::Extents { next, next_ordinal } => {
-                    if let Some(extent) = self.media.get(*next) {
+            match self.phase {
+                Phase::Extents => {
+                    if let Some(extent) = self.media.get(self.extent) {
                         if !work.try_charge(1) {
                             return Ok(BuildStatus::Yield);
                         }
                         if extent.start > extent.end {
                             return Err(Error::Invalid("reversed seek media extent"));
                         }
-                        *next = next.checked_add(1).ok_or(Error::Overflow)?;
+                        self.extent = self.extent.checked_add(1).ok_or(Error::Overflow)?;
                     } else {
-                        self.phase = Phase::Fragments {
-                            next: 0,
-                            next_ordinal: *next_ordinal,
-                        };
+                        self.phase = Phase::Fragments;
                     }
                 }
-                Phase::Fragments { next, next_ordinal } => {
-                    if let Some(index) = self.source.fragment_indexes().get(*next) {
+                Phase::Fragments => {
+                    if let Some(index) = self.source.fragment_indexes().get(self.fragment) {
                         if !work.try_charge(1) {
                             return Ok(BuildStatus::Yield);
                         }
                         if index.track_id() == self.source.track_id() && index.sample_count() != 0 {
-                            if index.first_ordinal() < *next_ordinal {
+                            if index.first_ordinal() < self.next_ordinal {
                                 return Err(Error::Invalid("overlapping seek sample ordinals"));
                             }
-                            *next_ordinal = index
+                            self.next_ordinal = index
                                 .first_ordinal()
                                 .checked_add(index.sample_count())
                                 .ok_or(Error::Overflow)?;
                         }
-                        *next = next.checked_add(1).ok_or(Error::Overflow)?;
+                        self.fragment = self.fragment.checked_add(1).ok_or(Error::Overflow)?;
                     } else {
-                        if self.request.target_ordinal >= *next_ordinal {
+                        if self.request.target_ordinal >= self.next_ordinal {
                             return Err(Error::Invalid("seek target outside indexed samples"));
                         }
-                        self.phase = Phase::Target(IndexedLookup::new(
+                        self.lookup = Some(IndexedLookup::new(
                             self.source,
                             self.request.target_ordinal,
                         )?);
+                        self.phase = Phase::Target;
                     }
                 }
-                Phase::Target(lookup) => match lookup.poll(work)? {
-                    Next::Yield => return Ok(BuildStatus::Yield),
-                    Next::End => {
-                        return Err(Error::Invalid("seek target lookup exhausted"));
+                Phase::Target => {
+                    match self
+                        .lookup
+                        .as_mut()
+                        .ok_or(Error::Invalid("missing seek target lookup"))?
+                        .poll(work)?
+                    {
+                        Next::Yield => return Ok(BuildStatus::Yield),
+                        Next::End => {
+                            return Err(Error::Invalid("seek target lookup exhausted"));
+                        }
+                        Next::Item(sample) => {
+                            self.sync_ordinal = sample.ordinal;
+                            self.target = Some(sample);
+                            self.lookup = None;
+                            self.phase = Phase::Sync;
+                        }
                     }
-                    Next::Item(sample) => {
-                        self.phase = Phase::Sync {
-                            sync_ordinal: sample.ordinal,
-                            target: sample,
-                            probes: 0,
-                            lookup: None,
-                        };
-                    }
-                },
-                Phase::Sync {
-                    target,
-                    sync_ordinal,
-                    probes,
-                    lookup,
-                } => {
-                    let probe = if let Some(probe) = lookup {
-                        probe
-                    } else {
+                }
+                Phase::Sync => {
+                    if self.lookup.is_none() {
                         if !work.try_charge(1) {
                             return Ok(BuildStatus::Yield);
                         }
-                        let next = probes.checked_add(1).ok_or(Error::Overflow)?;
-                        sample_limit(next, self.limits.max_sync_scan_samples)?;
+                        let probes = self.sync_probes.checked_add(1).ok_or(Error::Overflow)?;
+                        sample_limit(probes, self.limits.max_sync_scan_samples)?;
                         // A validated regular stss uses <=32 probes, not a walk
                         // from the source's first sample. Fragments use bounded
                         // source flag lookups, retaining their locator progress.
                         if let Some(table) = self
                             .source
                             .regular_index()
-                            .filter(|table| *sync_ordinal <= table.sample_count())
+                            .filter(|table| self.sync_ordinal <= table.sample_count())
                         {
-                            *sync_ordinal = table
-                                .previous_sync(*sync_ordinal)?
+                            self.sync_ordinal = table
+                                .previous_sync(self.sync_ordinal)?
                                 .ok_or(Error::Unsupported("no preceding container sync sample"))?;
                         }
-                        let probe = lookup.insert(IndexedLookup::new(self.source, *sync_ordinal)?);
-                        *probes = next;
-                        probe
-                    };
-                    let sample = match probe.poll(work)? {
+                        self.lookup = Some(IndexedLookup::new(self.source, self.sync_ordinal)?);
+                        self.sync_probes = probes;
+                    }
+                    match self
+                        .lookup
+                        .as_mut()
+                        .ok_or(Error::Invalid("missing seek sync lookup"))?
+                        .poll(work)?
+                    {
                         Next::Yield => return Ok(BuildStatus::Yield),
                         Next::End => {
                             return Err(Error::Invalid("seek sync lookup exhausted"));
                         }
-                        Next::Item(sample) => sample,
-                    };
-                    let passed_sync = probe.passed_sync();
-                    *lookup = None;
-                    if sample.access == Access::ContainerSync {
-                        let preceding = sample
-                            .ordinal
-                            .checked_sub(1)
-                            .ok_or(Error::Invalid("zero seek sync ordinal"))?;
-                        let available = preceding.min(u64::from(self.request.preroll_samples));
-                        let available_preroll =
-                            u16::try_from(available).map_err(|_| Error::Overflow)?;
-                        let range_start = sample
-                            .ordinal
-                            .checked_sub(available)
-                            .ok_or(Error::Overflow)?;
-                        let range_count = self
-                            .request
-                            .target_ordinal
-                            .checked_sub(range_start)
-                            .and_then(|value| value.checked_add(1))
-                            .ok_or(Error::Overflow)?;
-                        sample_limit(range_count, self.limits.max_range_samples)?;
-                        let target = target.clone();
-                        self.phase = Phase::Ranges {
-                            target,
-                            sync_sample: sample,
-                            available_preroll,
-                            decode_start: None,
-                            walk: RangeWalk::new(range_start),
-                        };
-                    } else {
-                        *sync_ordinal =
-                            sample
-                                .ordinal
-                                .checked_sub(1)
-                                .filter(|value| *value != 0)
-                                .ok_or(Error::Unsupported("no preceding container sync sample"))?;
-                        // Locating this sample passed the run's samples
-                        // before it: probe its last sync directly, counting
-                        // the non-sync probes in between.
-                        if let Some(sync) = passed_sync {
-                            let between = *sync_ordinal - sync;
-                            let passed = probes.checked_add(between).ok_or(Error::Overflow)?;
-                            sample_limit(
-                                passed.min(self.limits.max_sync_scan_samples.saturating_add(1)),
-                                self.limits.max_sync_scan_samples,
-                            )?;
-                            *probes = passed;
-                            *sync_ordinal = sync;
+                        Next::Item(sample) => {
+                            let located = self
+                                .lookup
+                                .take()
+                                .ok_or(Error::Invalid("missing seek sync lookup"))?;
+                            if sample.access == Access::ContainerSync {
+                                let preceding = sample
+                                    .ordinal
+                                    .checked_sub(1)
+                                    .ok_or(Error::Invalid("zero seek sync ordinal"))?;
+                                let available =
+                                    preceding.min(u64::from(self.request.preroll_samples));
+                                self.available_preroll =
+                                    u16::try_from(available).map_err(|_| Error::Overflow)?;
+                                self.range_start = sample
+                                    .ordinal
+                                    .checked_sub(available)
+                                    .ok_or(Error::Overflow)?;
+                                let range_count = self
+                                    .request
+                                    .target_ordinal
+                                    .checked_sub(self.range_start)
+                                    .and_then(|value| value.checked_add(1))
+                                    .ok_or(Error::Overflow)?;
+                                sample_limit(range_count, self.limits.max_range_samples)?;
+                                self.range_ordinal = self.range_start;
+                                self.sync_sample = Some(sample);
+                                self.phase = Phase::Ranges;
+                            } else {
+                                self.sync_ordinal = sample
+                                    .ordinal
+                                    .checked_sub(1)
+                                    .filter(|value| *value != 0)
+                                    .ok_or(Error::Unsupported(
+                                        "no preceding container sync sample",
+                                    ))?;
+                                // Locating this sample passed the run's samples
+                                // before it: probe its last sync directly, counting
+                                // the non-sync probes in between.
+                                if let Some(sync) = located.passed_sync() {
+                                    let between = self.sync_ordinal - sync;
+                                    let probes = self
+                                        .sync_probes
+                                        .checked_add(between)
+                                        .ok_or(Error::Overflow)?;
+                                    sample_limit(
+                                        probes.min(
+                                            self.limits.max_sync_scan_samples.saturating_add(1),
+                                        ),
+                                        self.limits.max_sync_scan_samples,
+                                    )?;
+                                    self.sync_probes = probes;
+                                    self.sync_ordinal = sync;
+                                }
+                            }
                         }
                     }
                 }
-                Phase::Ranges {
-                    target,
-                    sync_sample,
-                    available_preroll,
-                    decode_start,
-                    walk,
-                } => {
-                    let at_target = walk.ordinal == self.request.target_ordinal;
-                    let Some(sample) = walk.check(self.source, self.media, work, cancel)? else {
-                        return Ok(BuildStatus::Yield);
-                    };
-                    if !at_target {
-                        if decode_start.is_none() {
-                            *decode_start = Some(sample.clone());
+                Phase::Ranges => {
+                    if self.pending.is_none() {
+                        IndexedLookup::locate(&mut self.lookup, self.source, self.range_ordinal)?;
+                        match self
+                            .lookup
+                            .as_mut()
+                            .ok_or(Error::Invalid("missing seek range lookup"))?
+                            .poll(work)?
+                        {
+                            Next::Yield => return Ok(BuildStatus::Yield),
+                            Next::End => {
+                                return Err(Error::Invalid("seek range lookup exhausted"));
+                            }
+                            Next::Item(sample) => {
+                                // The lookup stays to continue to the next sample.
+                                self.pending = Some(sample);
+                                self.extent = 0;
+                            }
                         }
-                        walk.advance()?;
+                    }
+                    let sample = self
+                        .pending
+                        .as_ref()
+                        .ok_or(Error::Invalid("missing seek range sample"))?;
+                    let Some(extent) = self.media.get(self.extent) else {
+                        return Err(Error::Invalid("seek sample outside media extents"));
+                    };
+                    if !work.try_charge(1) {
+                        return Ok(BuildStatus::Yield);
+                    }
+                    if sample.require_within(extent.clone()).is_err() {
+                        self.extent = self.extent.checked_add(1).ok_or(Error::Overflow)?;
                         continue;
                     }
-                    // The target is the decode start where the walk began at it.
-                    let decode_start = decode_start.take().unwrap_or_else(|| sample.clone());
-                    let landing = SourceSeekLanding {
-                        track_id: self.source.track_id(),
-                        requested_ordinal: self.request.target_ordinal,
-                        target: target.clone(),
-                        sync_sample: sync_sample.clone(),
-                        decode_start,
-                        requested_preroll_samples: self.request.preroll_samples,
-                        available_preroll_samples: *available_preroll,
-                        missing_preroll_samples: self
-                            .request
-                            .preroll_samples
-                            .checked_sub(*available_preroll)
-                            .ok_or(Error::Overflow)?,
-                        validated_samples: walk.validated,
-                    };
-                    self.phase = Phase::Ready(landing);
+                    if sample.ordinal == self.range_start {
+                        self.decode_start = Some(sample.clone());
+                    }
+                    self.validated = self.validated.checked_add(1).ok_or(Error::Overflow)?;
+                    self.pending = None;
+                    if self.range_ordinal == self.request.target_ordinal {
+                        self.landing = Some(SourceSeekLanding {
+                            track_id: self.source.track_id(),
+                            requested_ordinal: self.request.target_ordinal,
+                            target: self
+                                .target
+                                .take()
+                                .ok_or(Error::Invalid("missing seek target"))?,
+                            sync_sample: self
+                                .sync_sample
+                                .take()
+                                .ok_or(Error::Invalid("missing seek sync"))?,
+                            decode_start: self
+                                .decode_start
+                                .take()
+                                .ok_or(Error::Invalid("missing seek decode start"))?,
+                            requested_preroll_samples: self.request.preroll_samples,
+                            available_preroll_samples: self.available_preroll,
+                            missing_preroll_samples: self
+                                .request
+                                .preroll_samples
+                                .checked_sub(self.available_preroll)
+                                .ok_or(Error::Overflow)?,
+                            validated_samples: self.validated,
+                        });
+                        self.phase = Phase::Ready;
+                    } else {
+                        self.range_ordinal =
+                            self.range_ordinal.checked_add(1).ok_or(Error::Overflow)?;
+                    }
                 }
-                Phase::Ready(_) => return Ok(BuildStatus::Ready),
-                Phase::Failed(error) => return Err(*error),
+                Phase::Ready => return Ok(BuildStatus::Ready),
             }
         }
     }
-    /// [`poll`](Self::poll), with the landing once the plan is ready.
-    pub(crate) fn poll_landing(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<Option<&SourceSeekLanding>> {
-        self.poll(work, cancel)?;
-        Ok(match &self.phase {
-            Phase::Ready(landing) => Some(landing),
-            _ => None,
-        })
-    }
     /// The plan, once [`poll`](Self::poll) has returned `Ready`; `Error::Invalid`
     /// before that, or the error a poll returned.
-    pub fn finish(self) -> Result<SourceSeekPlan<'a>> {
-        match self.phase {
-            Phase::Ready(landing) => Ok(SourceSeekPlan {
-                source: self.source,
-                landing,
-            }),
-            Phase::Failed(error) => Err(error),
-            _ => Err(Error::Invalid("source seek planner not ready")),
+    pub fn finish(mut self) -> Result<SourceSeekPlan<'a>> {
+        if let Some(error) = self.failed {
+            return Err(error);
         }
+        if self.phase != Phase::Ready {
+            return Err(Error::Invalid("source seek planner not ready"));
+        }
+        Ok(SourceSeekPlan {
+            source: self.source,
+            landing: self
+                .landing
+                .take()
+                .ok_or(Error::Invalid("missing source seek receipt"))?,
+        })
     }
 }
 
@@ -648,7 +594,13 @@ impl SourceSeekSamples<'_> {
         if self.done {
             return Ok(Next::End);
         }
-        match IndexedLookup::locate(&mut self.lookup, self.source, self.next)?.poll(work)? {
+        IndexedLookup::locate(&mut self.lookup, self.source, self.next)?;
+        match self
+            .lookup
+            .as_mut()
+            .ok_or(Error::Invalid("missing planned sample lookup"))?
+            .poll(work)?
+        {
             Next::Item(sample) => {
                 if sample.ordinal != self.next {
                     return Err(Error::Invalid("planned sample ordinal changed"));
