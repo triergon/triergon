@@ -1,7 +1,7 @@
 //! The bitmap subtitle clock for an explicitly buffered stream-probe prefix.
 use super::{
     MatroskaBitmapSource, MatroskaBitmapTrack, MatroskaDvbPacket,
-    probe_clock::{NativePacketTiming, PacketClock, ProbeTimeline, Timeline},
+    probe_clock::{DemuxPacketTiming, PacketClock, ProbeTimeline, Timeline},
 };
 use crate::bitmap::BitmapInput;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -60,7 +60,7 @@ impl<'track, 'prefix> MatroskaBitmapClockProbe<'track, 'prefix> {
             }
             if let Some(packet) = self.track.selected_packet(output)? {
                 let mut next = self.clock;
-                let clock = next.push(self.rows.len(), NativePacketTiming::demux(packet)?)?;
+                let clock = next.push(self.rows.len(), DemuxPacketTiming::demux(packet)?)?;
                 self.rows
                     .try_push(Row {
                         output: self.cursor,
@@ -153,7 +153,7 @@ impl MatroskaBitmapLiveClock<'_> {
             return Ok(None);
         };
         let mut next = self.timeline;
-        let clock = next.push(NativePacketTiming::demux(packet)?)?;
+        let clock = next.push(DemuxPacketTiming::demux(packet)?)?;
         let clock = next.resolve(clock)?;
         Ok(Some((
             self.track

@@ -22,7 +22,7 @@ pub struct MatroskaAvcClock<'feed> {
 impl MatroskaTrackFeed {
     /// Bind a native packet clock to this feed's single AVC parameter-set
     /// chain. An AAC feed returns `None`.
-    pub fn native_avc_clock(&self) -> Result<Option<MatroskaAvcClock<'_>>> {
+    pub fn demux_avc_clock(&self) -> Result<Option<MatroskaAvcClock<'_>>> {
         let FeedCodec::Avc(config) = &self.codec else {
             return Ok(None);
         };

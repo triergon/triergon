@@ -23,7 +23,7 @@ pub struct MatroskaHevcClock<'feed> {
 impl MatroskaHevcDolbyFeed {
     /// Bind a native clock to this feed's single base-layer parameter-set
     /// chain and temporal sublayer. A Dolby audio feed returns `None`.
-    pub fn native_hevc_clock(&self) -> Result<Option<MatroskaHevcClock<'_>>> {
+    pub fn demux_hevc_clock(&self) -> Result<Option<MatroskaHevcClock<'_>>> {
         let FeedCodec::Hevc(config) = &self.codec else {
             return Ok(None);
         };

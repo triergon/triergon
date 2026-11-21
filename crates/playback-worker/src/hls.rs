@@ -8,7 +8,7 @@ use crate::runner::{Invocation, MAX_INPUT, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
 use triergon_hls::{
-    clock::HlsParserOnlyAudioClock,
+    clock::HlsAudioClockNs,
     segment::{
         HlsAudioCodec, HlsFeedUnit, HlsMediaProfile, HlsMediaSegment, HlsMediaSegmentReader,
         HlsSegment, HlsSegmentLimits, HlsSegmentProgress, HlsSegmentReader, HlsSegmentTracks,
@@ -29,7 +29,7 @@ enum Reader {
 }
 
 enum Segment {
-    AvcAac(HlsSegment<HlsParserOnlyAudioClock>),
+    AvcAac(HlsSegment<HlsAudioClockNs>),
     Family(HlsMediaSegment),
 }
 
@@ -140,7 +140,7 @@ fn open_segment(pool: &Budget, raw: &Bytes, profile: HlsMediaProfile) -> Result<
             HlsSegmentProgress::Ready => {
                 let segment = match &mut reader {
                     Reader::AvcAac(reader) => reader
-                        .take_parser_only(&cancel)
+                        .take_with_ns_clocks(&cancel)
                         .map(|s| s.map(Segment::AvcAac)),
                     Reader::Family(reader) => reader.take(&cancel).map(|s| s.map(Segment::Family)),
                 }

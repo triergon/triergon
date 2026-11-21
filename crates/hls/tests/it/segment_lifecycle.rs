@@ -334,17 +334,17 @@ fn parser_only_output_uses_the_queue_clock_and_preserves_the_pes_facts() {
     )
     .unwrap();
     let cancel = AtomicBool::new(false);
-    assert!(reader.take_parser_only(&cancel).unwrap().is_none());
+    assert!(reader.take_with_ns_clocks(&cancel).unwrap().is_none());
     ready(&mut reader).unwrap();
     assert_closed(&trace);
 
     let reserve = pool.reserve(pool.available()).unwrap();
     assert!(matches!(
-        reader.take_parser_only(&cancel),
+        reader.take_with_ns_clocks(&cancel),
         Err(Error::Backpressure { .. })
     ));
     drop(reserve);
-    let output = reader.take_parser_only(&cancel).unwrap().unwrap();
+    let output = reader.take_with_ns_clocks(&cancel).unwrap().unwrap();
     assert!(reader.take(&cancel).unwrap().is_none());
     let mut audio = output.access_units().filter_map(|unit| match unit {
         HlsFeedUnit::Audio(frame, clock) => Some((frame, clock)),

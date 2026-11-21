@@ -61,15 +61,15 @@ fn video_row(out: &mut String, unit: &AvcTsAccessUnit, raster: AvcRaster) {
 fn audio_row(out: &mut String, unit: &HlsAacFrame, clock: &HlsAacClock) {
     let tick = TimeBase::new(1, 90_000).unwrap();
     let rounded_exact = clock.pts.to_i64_ticks(tick, Rounding::NearestAway).unwrap();
-    assert!(rounded_exact.abs_diff(clock.ffmpeg90.pts_and_dts) <= 1);
+    assert!(rounded_exact.abs_diff(clock.demux90.pts_and_dts) <= 1);
     write!(
         out,
         "a {} {} {} {} {} ",
         ticks(unit.pts.map(at_90khz)),
         ticks(unit.dts.map(at_90khz)),
-        clock.ffmpeg90.pts_and_dts,
-        clock.ffmpeg90.pts_and_dts,
-        clock.ffmpeg90.duration
+        clock.demux90.pts_and_dts,
+        clock.demux90.pts_and_dts,
+        clock.demux90.duration
     )
     .unwrap();
     payload(out, unit.bytes.as_ref());
@@ -347,7 +347,7 @@ fn complete_segment_preserves_ffmpeg_cross_track_feed_order() {
                         video_row(&mut actual, unit, raster);
                     }
                     HlsFeedUnit::Audio(unit, clock) => {
-                        audio_tail = Some(clock.ffmpeg90.pts_and_dts);
+                        audio_tail = Some(clock.demux90.pts_and_dts);
                         bytes += unit.bytes.len();
                         audio_row(&mut actual, unit, clock);
                     }

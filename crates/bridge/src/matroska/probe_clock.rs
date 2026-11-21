@@ -12,8 +12,8 @@ pub struct MatroskaPacketTiming {
     pub duration_ns: Option<u64>,
 }
 
-impl From<NativePacketTiming> for MatroskaPacketTiming {
-    fn from(timing: NativePacketTiming) -> Self {
+impl From<DemuxPacketTiming> for MatroskaPacketTiming {
+    fn from(timing: DemuxPacketTiming) -> Self {
         Self {
             pts_ns: timing.pts,
             dts_ns: timing.dts,
@@ -46,7 +46,7 @@ impl<'feed, F> MatroskaClockProbe<'feed, F> {
     /// Allocation pressure leaves both the ordinal and the clock unchanged.
     pub(super) fn push_timing(
         &mut self,
-        project: impl FnOnce(&F) -> Result<NativePacketTiming>,
+        project: impl FnOnce(&F) -> Result<DemuxPacketTiming>,
     ) -> Result<usize> {
         let ordinal = self.rows.len();
         super::check_limit(
@@ -104,7 +104,7 @@ pub struct MatroskaClock<'feed, F> {
 impl<F> MatroskaClock<'_, F> {
     pub(super) fn advance(
         &mut self,
-        project: impl FnOnce(&F) -> Result<NativePacketTiming>,
+        project: impl FnOnce(&F) -> Result<DemuxPacketTiming>,
     ) -> Result<MatroskaPacketTiming> {
         let timing = project(self.feed)?;
         let mut next = self.timeline;
@@ -116,13 +116,13 @@ impl<F> MatroskaClock<'_, F> {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct NativePacketTiming {
+pub(super) struct DemuxPacketTiming {
     pub pts: Option<i64>,
     pub dts: Option<i64>,
     pub duration_ns: Option<u64>,
 }
 
-impl NativePacketTiming {
+impl DemuxPacketTiming {
     pub fn demux(packet: &Packet) -> Result<Self> {
         let timing = triergon_matroska::compat::clock::packet_timing(packet.packet.timing)?;
         Ok(Self {
@@ -165,7 +165,7 @@ pub(super) struct PacketClock {
 }
 
 impl PacketClock {
-    fn resolve(self, shift: Option<i128>) -> Result<NativePacketTiming> {
+    fn resolve(self, shift: Option<i128>) -> Result<DemuxPacketTiming> {
         let pts = match self.stamp {
             None => None,
             Some(Stamp::Absolute(value)) => Some(value),
@@ -178,7 +178,7 @@ impl PacketClock {
         .map(i64::try_from)
         .transpose()
         .map_err(|_| Error::Overflow)?;
-        Ok(NativePacketTiming {
+        Ok(DemuxPacketTiming {
             pts,
             dts: pts,
             duration_ns: self.duration_ns,
@@ -194,7 +194,7 @@ pub(super) struct Timeline {
 }
 
 impl Timeline {
-    pub fn push(&mut self, timing: NativePacketTiming) -> Result<PacketClock> {
+    pub fn push(&mut self, timing: DemuxPacketTiming) -> Result<PacketClock> {
         let stamp = if let Some(pts) = timing.pts {
             let pts = i128::from(pts);
             if self.shift.is_none() {
@@ -223,7 +223,7 @@ impl Timeline {
         })
     }
 
-    pub fn resolve(self, clock: PacketClock) -> Result<NativePacketTiming> {
+    pub fn resolve(self, clock: PacketClock) -> Result<DemuxPacketTiming> {
         clock.resolve(self.shift)
     }
 }
@@ -260,7 +260,7 @@ pub(super) struct ProbeTimeline {
 }
 
 impl ProbeTimeline {
-    pub fn push(&mut self, count: usize, timing: NativePacketTiming) -> Result<PacketClock> {
+    pub fn push(&mut self, count: usize, timing: DemuxPacketTiming) -> Result<PacketClock> {
         if !self.seen_duration {
             if let Some(duration_ns) = timing.duration_ns {
                 self.seen_duration = true;
@@ -308,7 +308,7 @@ impl ProbeTimeline {
         self.timeline.push(timing)
     }
 
-    pub fn resolve(self, index: usize, original: PacketClock) -> Result<NativePacketTiming> {
+    pub fn resolve(self, index: usize, original: PacketClock) -> Result<DemuxPacketTiming> {
         let clock = match self.fill.filter(|fill| index < fill.packets) {
             Some(fill) => fill.clock(index)?,
             None => original,

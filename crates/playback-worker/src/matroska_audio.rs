@@ -1,7 +1,7 @@
 //! Matroska audio startup and forward clocks through the playback engine: open a
 //! preloaded seekable input read in 4 KiB windows, discover the streams, bind every
 //! selected AAC-LC, AC-3 or E-AC-3 track to its feed, project the discovery prefix
-//! through `native_aac_clock_probe` or `native_dolby_clock_probe`, continue with the
+//! through `demux_aac_clock_probe` or `demux_dolby_clock_probe`, continue with the
 //! forward clock through the end of file and fold every selected packet with its
 //! native PTS, DTS and duration in nanoseconds.
 //!
@@ -199,7 +199,7 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
             None => None,
             Some(Feed::Aac(feed)) => {
                 let mut probe = feed
-                    .native_aac_clock_probe(pool, count)?
+                    .demux_aac_clock_probe(pool, count)?
                     .ok_or("AAC clock probe")?;
                 for (ordinal, event) in prefix.events().enumerate() {
                     if source_packet(event).is_some_and(|p| p.packet.track == track) {
@@ -213,7 +213,7 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
             }
             Some(Feed::Dolby(feed)) => {
                 let mut probe = feed
-                    .native_dolby_clock_probe(pool, count)?
+                    .demux_dolby_clock_probe(pool, count)?
                     .ok_or("Dolby clock probe")?;
                 for packet in prefix.events().filter_map(source_packet) {
                     if packet.packet.track == track {

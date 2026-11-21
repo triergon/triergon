@@ -4,8 +4,7 @@ use super::{
     check_limit, dolby_final_syncframe, syncframe_duration_ns,
 };
 use crate::matroska::probe_clock::{
-    MatroskaClock, MatroskaClockPrefix, MatroskaClockProbe, MatroskaPacketTiming,
-    NativePacketTiming,
+    DemuxPacketTiming, MatroskaClock, MatroskaClockPrefix, MatroskaClockProbe, MatroskaPacketTiming,
 };
 use triergon_core::{Budget, Error, Result};
 use triergon_framing::ac3::Ac3Family;
@@ -14,7 +13,7 @@ use triergon_matroska::TypedPacket as Packet;
 impl MatroskaHevcDolbyFeed {
     /// Prepare one bounded prefix in the same generation as this feed.
     /// The caller retains the original packets in playback order.
-    pub fn native_dolby_clock_probe(
+    pub fn demux_dolby_clock_probe(
         &self,
         budget: &Budget,
         maximum_packets: usize,
@@ -28,7 +27,7 @@ impl MatroskaHevcDolbyFeed {
         MatroskaClockProbe::new(self, budget, maximum_packets).map(Some)
     }
 
-    fn dolby_timing(&self, packet: &MatroskaHevcDolbyPacket<'_>) -> Result<NativePacketTiming> {
+    fn dolby_timing(&self, packet: &MatroskaHevcDolbyPacket<'_>) -> Result<DemuxPacketTiming> {
         let (FeedCodec::Dolby(codec), MatroskaHevcDolbyPayload::Dolby { family, raw }) =
             (&self.codec, &packet.payload)
         else {
@@ -40,7 +39,7 @@ impl MatroskaHevcDolbyFeed {
         self.dolby_source_timing(packet.source)
     }
 
-    fn dolby_source_timing(&self, packet: &Packet) -> Result<NativePacketTiming> {
+    fn dolby_source_timing(&self, packet: &Packet) -> Result<DemuxPacketTiming> {
         let FeedCodec::Dolby(codec) = &self.codec else {
             return Err(Error::Invalid("native Dolby clock packet codec"));
         };
@@ -49,7 +48,7 @@ impl MatroskaHevcDolbyFeed {
         }
         let raw = packet.packet.data.as_ref();
         check_limit(raw.len(), self.limits.dolby_packet.maximum_packet_bytes)?;
-        let mut timing = NativePacketTiming::demux(packet)?;
+        let mut timing = DemuxPacketTiming::demux(packet)?;
         if timing.duration_ns.is_none() {
             let scale = packet.packet.timing.scale_ns;
             timing.duration_ns = match dolby_final_syncframe(codec.family(), raw) {

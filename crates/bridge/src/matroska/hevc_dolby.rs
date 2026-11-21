@@ -249,7 +249,7 @@ impl MatroskaHevcDolbyPacket<'_> {
     /// the final CRC-valid independent syncframe of an admitted Dolby packet.
     /// The fallback checks up to 32 complete syncframes. The typed source
     /// keeps its original container timing.
-    pub fn native_duration_ns(&self) -> Result<Option<u64>> {
+    pub fn demux_duration_ns(&self) -> Result<Option<u64>> {
         let timing = self.source.packet.timing;
         if let Some(declared) = triergon_matroska::compat::clock::packet_timing(timing)?.duration {
             return Ok(Some(declared.rounded_duration_ns()?));

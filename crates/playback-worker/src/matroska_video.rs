@@ -215,10 +215,10 @@ fn session(pool: &Budget, raw: &Bytes, operation: Operation) -> Work {
     };
     let mut avc_clock = avc
         .as_ref()
-        .map(|feed| feed.native_avc_clock().unwrap().unwrap());
+        .map(|feed| feed.demux_avc_clock().unwrap().unwrap());
     let mut hevc_clock = hevc
         .as_ref()
-        .map(|feed| feed.native_hevc_clock().unwrap().unwrap());
+        .map(|feed| feed.demux_hevc_clock().unwrap().unwrap());
     let mut work = Work::default();
     let mut output = |event: &Output| {
         let Event::Matroska(MkvEvent::Packet(packet)) = event.event() else {

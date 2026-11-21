@@ -4,8 +4,8 @@ use crate::{
     aac::{HlsAac, HlsAacFrame},
     avc::{AvcRaster, AvcTsAccessUnit, AvcTsLimits, AvcTsReader},
     clock::{
-        HlsAacClock, HlsParserOnlyAudioClock, parser_only_aac_clocks, parser_only_aac_pts_ns,
-        parser_only_audio_clocks, resolve_hls_aac_clocks,
+        HlsAacClock, HlsAudioClockNs, ns_aac_clocks, ns_aac_pts, ns_audio_clocks,
+        resolve_hls_aac_clocks,
     },
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -88,18 +88,18 @@ impl HlsSegment {
         self.clocks
             .as_slice()
             .last()
-            .map(|clock| clock.ffmpeg90.pts_and_dts)
+            .map(|clock| clock.demux90.pts_and_dts)
     }
 
     /// Presentation times for the AAC units in access_units order. This view
     /// matches the application path that fills durations missing from a
     /// parser-only AAC reference using the ADTS header.
-    pub fn parser_only_audio_pts_ns(&self, cancel: &AtomicBool) -> Result<BudgetVec<i64>> {
-        parser_only_aac_pts_ns(&self.audio, cancel)
+    pub fn audio_pts_ns(&self, cancel: &AtomicBool) -> Result<BudgetVec<i64>> {
+        ns_aac_pts(&self.audio, cancel)
     }
 }
 
-impl<V, A> HlsSegment<HlsParserOnlyAudioClock, V, A> {
+impl<V, A> HlsSegment<HlsAudioClockNs, V, A> {
     pub fn audio_tail_ns(&self) -> Option<i64> {
         self.clocks.as_slice().last().map(|clock| clock.pts_ns)
     }
@@ -188,8 +188,7 @@ pub struct HlsMediaProfile {
     pub audio: Option<HlsAudioCodec>,
 }
 
-pub type HlsMediaSegment =
-    HlsSegment<HlsParserOnlyAudioClock, HlsMediaVideoUnit, HlsMediaAudioUnit>;
+pub type HlsMediaSegment = HlsSegment<HlsAudioClockNs, HlsMediaVideoUnit, HlsMediaAudioUnit>;
 
 pub struct HlsMediaSegmentReader<S: Source> {
     inner: SegmentReader<S, VideoAssembler, AudioAssembler>,
@@ -268,12 +267,12 @@ impl<S: Source> HlsSegmentReader<S> {
         })
     }
 
-    pub fn take_parser_only(
+    pub fn take_with_ns_clocks(
         &mut self,
         cancel: &AtomicBool,
-    ) -> Result<Option<HlsSegment<HlsParserOnlyAudioClock>>> {
+    ) -> Result<Option<HlsSegment<HlsAudioClockNs>>> {
         self.inner.take_with(cancel, |reader| {
-            parser_only_aac_clocks(&reader.audio, cancel, |clock| clock)
+            ns_aac_clocks(&reader.audio, cancel, |clock| clock)
         })
     }
 }
@@ -304,7 +303,7 @@ impl<S: Source> HlsMediaSegmentReader<S> {
 
     pub fn take(&mut self, cancel: &AtomicBool) -> Result<Option<HlsMediaSegment>> {
         self.inner.take_with(cancel, |reader| {
-            parser_only_audio_clocks(
+            ns_audio_clocks(
                 &reader.audio,
                 cancel,
                 |frame| (frame.pts.or(frame.dts), frame.duration),

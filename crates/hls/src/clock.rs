@@ -17,20 +17,20 @@ pub struct HlsAacClock {
     pub pts: Time,
     pub dts: Time,
     pub origin: HlsAacPtsOrigin,
-    pub ffmpeg90: HlsAacFfmpegClock90,
+    pub demux90: HlsAacDemuxClock90,
 }
 
 /// The AAC demux clock in 90 kHz ticks. The reference reports the same decode
 /// and presentation tick for AAC. Source DTS stays available on the frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct HlsAacFfmpegClock90 {
+pub struct HlsAacDemuxClock90 {
     pub pts_and_dts: i64,
     pub duration: i64,
 }
 
 /// Presentation and frame duration in integer nanoseconds before playlist mapping.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct HlsParserOnlyAudioClock {
+pub struct HlsAudioClockNs {
     pub pts_ns: i64,
     pub duration_ns: i64,
 }
@@ -111,7 +111,7 @@ pub fn resolve_hls_aac_clocks(
             return Err(Error::Invalid("AAC segment timestamps move backwards"));
         }
         let dts = frame.dts.unwrap_or(pts);
-        let ffmpeg90 = HlsAacFfmpegClock90 {
+        let demux90 = HlsAacDemuxClock90 {
             pts_and_dts: pts90,
             duration: frame.duration.to_i64_ticks(tick, Rounding::Floor)?,
         };
@@ -120,7 +120,7 @@ pub fn resolve_hls_aac_clocks(
                 pts,
                 dts,
                 origin,
-                ffmpeg90,
+                demux90,
             })
             .map_err(|error| error.error)?;
         previous = Some(pts);
@@ -134,19 +134,19 @@ pub fn resolve_hls_aac_clocks(
 /// reference. Its missing frame durations use the ADTS-derived integer
 /// nanoseconds. This view is separate from exact sample time and the full
 /// FFmpeg demux clock.
-pub(crate) fn parser_only_aac_pts_ns(
+pub(crate) fn ns_aac_pts(
     frames: &BudgetVec<HlsAacFrame>,
     cancel: &AtomicBool,
 ) -> Result<BudgetVec<i64>> {
-    parser_only_aac_clocks(frames, cancel, |clock| clock.pts_ns)
+    ns_aac_clocks(frames, cancel, |clock| clock.pts_ns)
 }
 
-pub(crate) fn parser_only_aac_clocks<T>(
+pub(crate) fn ns_aac_clocks<T>(
     frames: &BudgetVec<HlsAacFrame>,
     cancel: &AtomicBool,
-    make: impl Fn(HlsParserOnlyAudioClock) -> T,
+    make: impl Fn(HlsAudioClockNs) -> T,
 ) -> Result<BudgetVec<T>> {
-    parser_only_audio_clocks(
+    ns_audio_clocks(
         frames,
         cancel,
         |frame| (frame.pts.or(frame.dts), frame.duration),
@@ -154,11 +154,11 @@ pub(crate) fn parser_only_aac_clocks<T>(
     )
 }
 
-pub(crate) fn parser_only_audio_clocks<F, T>(
+pub(crate) fn ns_audio_clocks<F, T>(
     frames: &BudgetVec<F>,
     cancel: &AtomicBool,
     facts: impl Fn(&F) -> (Option<Time>, Time),
-    make: impl Fn(HlsParserOnlyAudioClock) -> T,
+    make: impl Fn(HlsAudioClockNs) -> T,
 ) -> Result<BudgetVec<T>> {
     let mut output = BudgetVec::new(frames.budget());
     if cancel.load(Ordering::Relaxed) {
@@ -209,7 +209,7 @@ pub(crate) fn parser_only_audio_clocks<F, T>(
         }
         let duration_ns = duration_nanoseconds(duration)?;
         output
-            .try_push(make(HlsParserOnlyAudioClock {
+            .try_push(make(HlsAudioClockNs {
                 pts_ns: pts,
                 duration_ns,
             }))
@@ -297,7 +297,7 @@ mod tests {
         for pts in [None, Some(3), None, Some(8), None] {
             frames.try_push(frame(&pool, pts)).unwrap();
         }
-        let stamps = parser_only_aac_pts_ns(&frames, &AtomicBool::new(false)).unwrap();
+        let stamps = ns_aac_pts(&frames, &AtomicBool::new(false)).unwrap();
         let step = 1_024_000_000_000 / 44_100;
         let first = frames.as_slice()[1]
             .pts

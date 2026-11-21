@@ -1,5 +1,5 @@
 //! Matroska bitmap subtitle handoff to the existing bounded receivers.
-use super::{Association, probe_clock::NativePacketTiming};
+use super::{Association, probe_clock::DemuxPacketTiming};
 use crate::{
     bitmap::{BitmapInput, BitmapScope},
     ts::dvb::{DvbQueueAction, microseconds},
@@ -275,7 +275,7 @@ impl MatroskaBitmapTrack {
             packet,
             output.delivery(),
             sequence,
-            NativePacketTiming::demux(packet)?,
+            DemuxPacketTiming::demux(packet)?,
         )
         .map(Some)
     }
@@ -312,7 +312,7 @@ impl MatroskaBitmapTrack {
         packet: &Packet,
         delivery: Delivery,
         sequence: u64,
-        timing: NativePacketTiming,
+        timing: DemuxPacketTiming,
     ) -> Result<BitmapInput<MatroskaBitmapSource>> {
         let raw = match packet.packet.data.shared_bytes()? {
             Some(raw) => raw,

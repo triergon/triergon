@@ -597,7 +597,7 @@ fn matroska_hevc_ac3_and_eac3_match_complete_feed_packets_and_source_pts() {
                         MatroskaHevcDolbyPayload::Dolby { family, raw } => {
                             assert_eq!(*family, [Ac3Family::Ac3, Ac3Family::Eac3][track - 1]);
                             assert!(std::ptr::eq(*raw, packet.packet.data.as_ref()));
-                            assert_eq!(output.native_duration_ns().unwrap(), Some(32_000_000));
+                            assert_eq!(output.demux_duration_ns().unwrap(), Some(32_000_000));
                         }
                     }
                     let (mut expected, after) = rest.split_at(size);
@@ -637,7 +637,7 @@ fn matroska_native_video_clocks_preserve_unknown_and_source_timing() {
         .unwrap();
     let feed = setup(&pool, configuration, 0);
     let foreign_feed = setup(&pool, configuration, 0);
-    let mut clock = feed.native_avc_clock().unwrap().unwrap();
+    let mut clock = feed.demux_avc_clock().unwrap().unwrap();
     let packets = events
         .iter()
         .filter(|event| event.event().track().is_some());
@@ -660,7 +660,7 @@ fn matroska_native_video_clocks_preserve_unknown_and_source_timing() {
         })
         .unwrap();
     let feed = hevc_dolby_setup(&pool, configuration, 0);
-    let mut clock = feed.native_hevc_clock().unwrap().unwrap();
+    let mut clock = feed.demux_hevc_clock().unwrap().unwrap();
     let packets = events
         .iter()
         .filter(|event| event.event().track().is_some());
@@ -759,7 +759,7 @@ fn matroska_video_seek_gate_admits_the_cue_keyframe_and_preserves_preroll() {
     );
 
     let feed = hevc_dolby_setup(&pool, &landing.configuration, 0);
-    let mut clock = feed.native_hevc_clock().unwrap().unwrap();
+    let mut clock = feed.demux_hevc_clock().unwrap().unwrap();
     let dts: Vec<_> = admitted
         .iter()
         .take(3)
@@ -1323,7 +1323,7 @@ fn hevc_repeated_configuration_preserves_packet_clocks() {
             })
             .unwrap();
         let feed = hevc_dolby_setup(&pool, configuration, 0);
-        let mut clock = feed.native_hevc_clock().unwrap().unwrap();
+        let mut clock = feed.demux_hevc_clock().unwrap().unwrap();
         events
             .iter()
             .filter(|output| output.event().track().is_some())
@@ -1534,10 +1534,7 @@ fn matroska_dolby_clock_matches_pinned_startup_and_forward_lace_timestamps() {
             })
             .unwrap();
         let feed = hevc_dolby_setup(&pool, configuration, 0);
-        let mut probe = feed
-            .native_dolby_clock_probe(&pool, count)
-            .unwrap()
-            .unwrap();
+        let mut probe = feed.demux_dolby_clock_probe(&pool, count).unwrap().unwrap();
         for (ordinal, output) in packets.by_ref().take(count).enumerate() {
             let packet = hevc_dolby_frame(&feed, output);
             assert_eq!(probe.push(&packet).unwrap(), ordinal);
@@ -1587,14 +1584,14 @@ fn matroska_aac_clock_matches_pinned_mixed_rates_from_probe_through_eof() {
     ];
     for &(track, duration_ns, expected) in cases {
         let feed = setup(&pool, configuration, track);
-        assert!(feed.native_aac_clock_probe(&pool, 4097).is_err());
+        assert!(feed.demux_aac_clock_probe(&pool, 4097).is_err());
         let foreign = Budget::new(1 << 20).unwrap();
-        assert!(feed.native_aac_clock_probe(&foreign, 2).is_err());
+        assert!(feed.demux_aac_clock_probe(&foreign, 2).is_err());
         let mut packets = outputs.iter().filter(|output| {
             matches!(output.event(), Event::Matroska(MkvEvent::Packet(packet))
                 if packet.packet.track == track)
         });
-        let mut probe = feed.native_aac_clock_probe(&pool, 2).unwrap().unwrap();
+        let mut probe = feed.demux_aac_clock_probe(&pool, 2).unwrap().unwrap();
         for (ordinal, output) in packets.by_ref().take(2).enumerate() {
             let packet = frame(&feed, output);
             assert_eq!(packet.source.packet.dts_ns, None);
@@ -1651,7 +1648,7 @@ fn matroska_dolby_source_clock_preserves_damaged_ac3_before_decoder_admission() 
     let cancel = AtomicBool::new(false);
     assert!(frame.step(&mut WorkBudget::new(4096), &cancel).is_err());
 
-    let mut probe = feed.native_dolby_clock_probe(&pool, 1).unwrap().unwrap();
+    let mut probe = feed.demux_dolby_clock_probe(&pool, 1).unwrap().unwrap();
     assert_eq!(probe.push_source(source).unwrap(), 0);
     let prefix = probe.finish();
     let expected = |pts_ns| MatroskaPacketTiming {

@@ -2,8 +2,8 @@
 use super::{
     FeedCodec, MatroskaFeedPacket, MatroskaFeedPayload, MatroskaTrackFeed, check_limit,
     probe_clock::{
-        MatroskaClock, MatroskaClockPrefix, MatroskaClockProbe, MatroskaPacketTiming,
-        NativePacketTiming, syncframe_duration_ns,
+        DemuxPacketTiming, MatroskaClock, MatroskaClockPrefix, MatroskaClockProbe,
+        MatroskaPacketTiming, syncframe_duration_ns,
     },
 };
 use triergon_core::{Budget, Error, Result};
@@ -12,7 +12,7 @@ use triergon_framing::aac;
 impl MatroskaTrackFeed {
     /// Prepare one bounded prefix in the same generation as this feed.
     /// The caller retains the original packets in playback order.
-    pub fn native_aac_clock_probe(
+    pub fn demux_aac_clock_probe(
         &self,
         budget: &Budget,
         maximum_packets: usize,
@@ -26,7 +26,7 @@ impl MatroskaTrackFeed {
         MatroskaClockProbe::new(self, budget, maximum_packets).map(Some)
     }
 
-    fn aac_timing(&self, packet: &MatroskaFeedPacket<'_>) -> Result<NativePacketTiming> {
+    fn aac_timing(&self, packet: &MatroskaFeedPacket<'_>) -> Result<DemuxPacketTiming> {
         let (
             FeedCodec::Aac {
                 params,
@@ -46,7 +46,7 @@ impl MatroskaTrackFeed {
             raw.len().checked_add(7).ok_or(Error::Overflow)?,
             self.limits.aac_output_bytes,
         )?;
-        let mut timing = NativePacketTiming::demux(packet.source)?;
+        let mut timing = DemuxPacketTiming::demux(packet.source)?;
         if timing.duration_ns.is_none() && *infer_duration {
             // Indexed AAC-LC cores admitted by this feed have 1024 samples.
             let rate = aac::indexed_frequency(params.frequency_index)
