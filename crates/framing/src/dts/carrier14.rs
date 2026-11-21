@@ -11,7 +11,7 @@ use crate::dts::{
     Dts14BitPayload, Dts14BitUnpacker, DtsCoreHeader, DtsPackingLimits, DtsSourceIdentity,
     DtsWordOrder, probe_core_header,
 };
-use crate::retryable;
+use crate::{freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
@@ -576,14 +576,7 @@ impl Dts14CarrierReader {
                                 maximum: self.limits.maximum_packets,
                             });
                         }
-                        let raw =
-                            match std::mem::replace(buffer, BudgetVec::new(&self.pool)).freeze() {
-                                Ok(raw) => raw,
-                                Err(refused) => {
-                                    *buffer = refused.value;
-                                    return Err(refused.error);
-                                }
-                            };
+                        let raw = freeze_whole(buffer)?;
                         self.packet =
                             if raw.len() >= 6 && conventional_sync(raw.as_ref(), self.order) {
                                 if raw.len() % 2 != 0 {

@@ -2,7 +2,7 @@
 //! (ETSI TS 102 114 V1.6.1 §3.4, §5.3, §5.4.2). Coded audio and the extensions
 //! inside a frame stay unread source bytes.
 use crate::dts::reader::{ReaderInput, source_error};
-use crate::retryable;
+use crate::{freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::{BitCursor, BitSource};
 use triergon_core::{
@@ -669,17 +669,14 @@ impl DtsCoreFrameReader {
                             return Ok(Step::Yield);
                         }
                         let header = *header;
-                        let empty = BudgetVec::new(buffer.budget());
-                        match std::mem::replace(buffer, empty).freeze() {
-                            Ok(bytes) => self.frame = Frame::Ready { header, bytes },
-                            Err(refused) => {
-                                *buffer = refused.value;
-                                return Err(refused.error);
-                            }
-                        }
+                        let bytes = freeze_whole(buffer)?;
+                        self.frame = Frame::Ready { header, bytes };
                     }
                 },
-                Frame::Ready { .. } => return self.publish(work),
+                &mut Frame::Ready { header, ref bytes } => {
+                    let bytes = bytes.clone();
+                    return self.publish(work, header, bytes);
+                }
                 Frame::Ended(end) => return Ok(Step::End(*end)),
             }
         }
@@ -760,14 +757,16 @@ impl DtsCoreFrameReader {
         })
     }
     /// Returns the ready frame and moves on to the next one.
-    fn publish(&mut self, work: &mut WorkBudget) -> Result<Step<DtsCoreFrame>> {
+    fn publish(
+        &mut self,
+        work: &mut WorkBudget,
+        header: DtsCoreHeader,
+        bytes: Bytes,
+    ) -> Result<Step<DtsCoreFrame>> {
         if !work.try_charge(1) {
             return Ok(Step::Yield);
         }
-        let next = Frame::Header(HeaderPart::Sync);
-        let Frame::Ready { header, bytes } = std::mem::replace(&mut self.frame, next) else {
-            return Err(Error::Invalid("missing DTS published bytes"));
-        };
+        self.frame = Frame::Header(HeaderPart::Sync);
         if bytes.len() != header.frame_bytes {
             return Err(Error::Invalid("DTS output/envelope size disagreement"));
         }

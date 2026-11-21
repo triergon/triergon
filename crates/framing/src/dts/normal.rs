@@ -7,7 +7,7 @@ use crate::dts::{
     DtsCoreField, DtsPackedHeader, DtsPackedLimits, DtsPackedPayload, DtsPackedPayloadJob,
     DtsPacking, DtsSourceIdentity, inspect_header_bits,
 };
-use crate::retryable;
+use crate::{freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
@@ -523,13 +523,8 @@ impl DtsNormalSourceReader {
                             return Ok(Step::Yield);
                         }
                         let header = *header;
-                        match std::mem::replace(buffer, BudgetVec::new(&self.pool)).freeze() {
-                            Ok(raw) => self.frame = Frame::Frozen { header, raw },
-                            Err(refused) => {
-                                *buffer = refused.value;
-                                return Err(refused.error);
-                            }
-                        }
+                        let raw = freeze_whole(buffer)?;
+                        self.frame = Frame::Frozen { header, raw };
                     }
                 },
                 Frame::Frozen { header, raw } => {

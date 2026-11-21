@@ -7,7 +7,7 @@ use crate::dts::{
     Dts14BitPayload, Dts14BitUnpacker, DtsCoreHeader, DtsPackingLimits, DtsSourceIdentity,
     DtsWordOrder, probe_core_header,
 };
-use crate::retryable;
+use crate::{freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
@@ -593,13 +593,8 @@ impl Dts14SyncReader {
                         if !work.try_charge(1) {
                             return Ok(Step::Yield);
                         }
-                        match std::mem::replace(buffer, BudgetVec::new(&self.pool)).freeze() {
-                            Ok(raw) => self.frame = Frame::Frozen { facts, raw },
-                            Err(refused) => {
-                                *buffer = refused.value;
-                                return Err(refused.error);
-                            }
-                        }
+                        let raw = freeze_whole(buffer)?;
+                        self.frame = Frame::Frozen { facts, raw };
                     }
                 },
                 Frame::Frozen { facts, raw } => {
@@ -634,7 +629,10 @@ impl Dts14SyncReader {
                         return Err(Error::Invalid("DTS14 owned unpack progress"));
                     }
                 },
-                Frame::Ready(_) => return self.publish(work),
+                Frame::Ready(ready) => {
+                    let ready = ready.clone();
+                    return self.publish(work, ready);
+                }
                 Frame::Ended(end) => return Ok(Step::End(*end)),
             }
         }
@@ -692,13 +690,15 @@ impl Dts14SyncReader {
         }
     }
     /// Returns the ready frame and moves on to the next one.
-    fn publish(&mut self, work: &mut WorkBudget) -> Result<Step<Dts14SyncFrame>> {
+    fn publish(
+        &mut self,
+        work: &mut WorkBudget,
+        ready: Dts14SyncFrame,
+    ) -> Result<Step<Dts14SyncFrame>> {
         if !work.try_charge(1) {
             return Ok(Step::Yield);
         }
-        let Frame::Ready(ready) = std::mem::replace(&mut self.frame, Frame::Header) else {
-            return Err(Error::Invalid("missing DTS14 ready envelope"));
-        };
+        self.frame = Frame::Header;
         self.completed = self.completed.checked_add(1).ok_or(Error::Overflow)?;
         self.interval = Some(ready.facts.physical_bytes);
         if let Some(end) = self.source_end {
