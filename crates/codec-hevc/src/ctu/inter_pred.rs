@@ -4,7 +4,7 @@ use super::{Scratch, SliceDecoder};
 use crate::error::{DecodeError, Result};
 use crate::inter;
 use crate::picture::{Frame, Pixel, PuMotion};
-use crate::slice::SLICE_P;
+use crate::slice::SliceType;
 
 impl<P: Pixel> SliceDecoder<'_, P> {
     #[inline(never)]
@@ -19,7 +19,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         let bd_y = self.bd_y;
         let bd_c = self.bd_c;
         let explicit = match self.sh.slice_type {
-            SLICE_P => self.pps.weighted_pred,
+            SliceType::P => self.pps.weighted_pred,
             _ => self.pps.weighted_bipred,
         };
         let table = if explicit { self.sh.pwt.as_ref() } else { None };

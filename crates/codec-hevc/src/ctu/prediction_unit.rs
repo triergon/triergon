@@ -8,7 +8,7 @@ use super::{
 use crate::cabac::ctx;
 use crate::error::{DecodeError, Result};
 use crate::picture::{ColMotion, Mv, Pixel, PuMotion};
-use crate::slice::{SLICE_B, SLICE_P};
+use crate::slice::SliceType;
 use crate::state::*;
 
 impl<P: Pixel> SliceDecoder<'_, P> {
@@ -43,7 +43,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             m = self.merge_candidate(cu, xp, yp, w, h, part_idx, idx as usize);
         } else {
             let mut pred_idc = 0u32; // 0 = L0, 1 = L1, 2 = BI
-            if self.sh.slice_type == SLICE_B {
+            if self.sh.slice_type == SliceType::B {
                 if w + h != 12 {
                     let d = self.blk(cu.x0, cu.y0).depth as usize;
                     if self.cabac.decision(&mut self.c[ctx::INTER_PRED_IDC + d]) != 0 {
@@ -327,7 +327,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                 col.ref_idx[0] = 0;
                 avail = true;
             }
-            if self.sh.slice_type == SLICE_B
+            if self.sh.slice_type == SliceType::B
                 && let Some(mv) = self.temporal_mv(xp, yp, w, h, 0, 1)
             {
                 col.mv[1] = mv;
@@ -344,7 +344,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         }
         let num_orig = n;
         // Combined bi-predictive candidates (8.5.3.2.4).
-        if self.sh.slice_type == SLICE_B && num_orig > 1 && num_orig < max {
+        if self.sh.slice_type == SliceType::B && num_orig > 1 && num_orig < max {
             const L0: [usize; 12] = [0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3];
             const L1: [usize; 12] = [1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2];
             let mut comb_idx = 0;
@@ -372,7 +372,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             return finish(cand[merge_idx]);
         }
         // Zero candidates (8.5.3.2.5).
-        let num_ref = if self.sh.slice_type == SLICE_P {
+        let num_ref = if self.sh.slice_type == SliceType::P {
             self.sh.num_ref_idx[0]
         } else {
             self.sh.num_ref_idx[0].min(self.sh.num_ref_idx[1])
@@ -386,7 +386,14 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             };
             cand[n] = PuMotion {
                 mv: [Mv::ZERO; 2],
-                ref_idx: [r, if self.sh.slice_type == SLICE_B { r } else { -1 }],
+                ref_idx: [
+                    r,
+                    if self.sh.slice_type == SliceType::B {
+                        r
+                    } else {
+                        -1
+                    },
+                ],
             };
             n += 1;
             zero_idx += 1;

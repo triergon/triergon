@@ -9,7 +9,7 @@ use crate::bits::{BitCursor, BitSource};
 use crate::cabac::ctx;
 use crate::error::{DecodeError, Result};
 use crate::picture::{Pixel, PuMotion};
-use crate::slice::SLICE_I;
+use crate::slice::SliceType;
 use crate::state::*;
 
 impl<P: Pixel> SliceDecoder<'_, P> {
@@ -196,7 +196,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             false
         };
         let mut skip = false;
-        if self.sh.slice_type != SLICE_I {
+        if self.sh.slice_type != SliceType::I {
             let mut inc = 0;
             if self.avail(x0, y0, x0 as i32 - 1, y0 as i32)
                 && self.blk(x0 - 1, y0).flags & F_SKIP != 0
@@ -238,7 +238,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             self.fill_blk(x0, y0, n, n, info(F_SKIP));
             self.prediction_unit(&cu, x0, y0, n, n, 0, true)?;
         } else {
-            let intra = if self.sh.slice_type != SLICE_I {
+            let intra = if self.sh.slice_type != SliceType::I {
                 self.cabac.decision(&mut self.c[ctx::PRED_MODE]) != 0
             } else {
                 true

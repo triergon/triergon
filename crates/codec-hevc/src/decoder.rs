@@ -12,7 +12,7 @@ use crate::nal::{self, NalHeader};
 use crate::output::{OutInfo, Picture};
 use crate::picture::{AnyFrame, ColMotion, ColMv, Frame, FramePool, Pixel, SharedFrame};
 use crate::ps::{self, Layout, Pps, Shared, Sps};
-use crate::slice::{self, SLICE_B, SLICE_I, SliceHeader};
+use crate::slice::{self, SliceHeader, SliceType};
 use crate::state::{PicState, SliceInfo};
 use crate::{deblock, sao};
 use triergon_codec::{Budget, BudgetVec, Charged, PictureView, VideoDecoder};
@@ -829,7 +829,7 @@ fn ref_pic_lists(
     info: &mut SliceInfo,
 ) -> Result<[[Option<usize>; 16]; 2]> {
     let mut lists = [[None; 16]; 2];
-    if sh.slice_type == SLICE_I {
+    if sh.slice_type == SliceType::I {
         return Ok(lists);
     }
     let total = cur.st_before.len() + cur.st_after.len() + cur.lt_curr.len();
@@ -837,7 +837,7 @@ fn ref_pic_lists(
         return Err(DecodeError::InvalidData("no reference pictures"));
     }
     let mut temp: Vec<(usize, bool)> = Vec::with_capacity(32);
-    for l in 0..(if sh.slice_type == SLICE_B { 2 } else { 1 }) {
+    for l in 0..(if sh.slice_type == SliceType::B { 2 } else { 1 }) {
         temp.clear();
         let n = (sh.num_ref_idx[l] as usize).max(total);
         let (a, b) = if l == 0 {
@@ -1078,8 +1078,8 @@ fn decode_slice_generic<P: Pixel>(
             }
         }
     }
-    if sh.temporal_mvp && sh.slice_type != SLICE_I {
-        let l = if sh.slice_type == SLICE_B && !sh.collocated_from_l0 {
+    if sh.temporal_mvp && sh.slice_type != SliceType::I {
+        let l = if sh.slice_type == SliceType::B && !sh.collocated_from_l0 {
             1
         } else {
             0

@@ -5,9 +5,14 @@ use crate::error::{DecodeError, Result};
 use crate::ps::{Pps, ShortTermRps, Sps, parse_st_rps};
 use triergon_framing::hevc;
 
-pub(crate) const SLICE_B: u8 = 0;
-pub(crate) const SLICE_P: u8 = 1;
-pub(crate) const SLICE_I: u8 = 2;
+/// slice_type (Table 7-7).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum SliceType {
+    B = 0,
+    P = 1,
+    I = 2,
+}
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct LongTermEntry {
@@ -43,7 +48,7 @@ pub(crate) struct SliceHeader {
     pub(crate) pps_id: u8,
     pub(crate) dependent_slice_segment: bool,
     pub(crate) segment_address: u32,
-    pub(crate) slice_type: u8,
+    pub(crate) slice_type: SliceType,
     pub(crate) pic_output_flag: bool,
     pub(crate) poc_lsb: u32,
     pub(crate) st_rps: ShortTermRps,
@@ -127,7 +132,7 @@ fn parse_pwt(r: &mut BitCursor<'_>, sh: &SliceHeader) -> Result<PredWeightTable>
         chroma_log2_denom,
         l: [[WeightEntry::default(); 16]; 2],
     };
-    let lists = if sh.slice_type == SLICE_B { 2 } else { 1 };
+    let lists = if sh.slice_type == SliceType::B { 2 } else { 1 };
     let half_c = 128i32; // WpOffsetHalfRangeC without high_precision_offsets
     for list in 0..lists {
         let n = sh.num_ref_idx[list] as usize;
@@ -216,7 +221,7 @@ pub(crate) fn parse_slice_header(
             pps_id,
             dependent_slice_segment: false,
             segment_address,
-            slice_type: SLICE_I,
+            slice_type: SliceType::I,
             pic_output_flag: true,
             poc_lsb: 0,
             st_rps: ShortTermRps::default(),
@@ -249,7 +254,11 @@ pub(crate) fn parse_slice_header(
     sh.pps_id = pps_id;
     if !dependent {
         r.skip(pps.num_extra_slice_header_bits as usize)?;
-        let st = r.ue_max(2, "slice_type")? as u8;
+        let st = match r.ue_max(2, "slice_type")? {
+            0 => SliceType::B,
+            1 => SliceType::P,
+            _ => SliceType::I,
+        };
         sh.slice_type = st;
         if pps.output_flag_present {
             sh.pic_output_flag = r.flag()?;
@@ -330,10 +339,10 @@ pub(crate) fn parse_slice_header(
             sh.sao_luma = r.flag()?;
             sh.sao_chroma = r.flag()?;
         }
-        if sh.slice_type != SLICE_I {
+        if sh.slice_type != SliceType::I {
             sh.num_ref_idx = [
                 pps.num_ref_idx_l0_default,
-                if st == SLICE_B {
+                if st == SliceType::B {
                     pps.num_ref_idx_l1_default
                 } else {
                     0
@@ -341,7 +350,7 @@ pub(crate) fn parse_slice_header(
             ];
             if r.flag()? {
                 sh.num_ref_idx[0] = r.ue_max(14, "num_ref_idx_l0_active_minus1")? + 1;
-                if st == SLICE_B {
+                if st == SliceType::B {
                     sh.num_ref_idx[1] = r.ue_max(14, "num_ref_idx_l1_active_minus1")? + 1;
                 }
             }
@@ -363,7 +372,7 @@ pub(crate) fn parse_slice_header(
                         sh.list_entry[0][i] = v as u8;
                     }
                 }
-                if st == SLICE_B {
+                if st == SliceType::B {
                     sh.rpl_mod[1] = r.flag()?;
                     if sh.rpl_mod[1] {
                         for i in 0..sh.num_ref_idx[1] as usize {
@@ -376,14 +385,14 @@ pub(crate) fn parse_slice_header(
                     }
                 }
             }
-            if st == SLICE_B {
+            if st == SliceType::B {
                 sh.mvd_l1_zero = r.flag()?;
             }
             if pps.cabac_init_present {
                 sh.cabac_init = r.flag()?;
             }
             if sh.temporal_mvp {
-                if st == SLICE_B {
+                if st == SliceType::B {
                     sh.collocated_from_l0 = r.flag()?;
                 }
                 if (sh.collocated_from_l0 && sh.num_ref_idx[0] > 1)
@@ -397,7 +406,9 @@ pub(crate) fn parse_slice_header(
                     sh.collocated_ref_idx = r.ue_max(lim, "collocated_ref_idx")?;
                 }
             }
-            if (pps.weighted_pred && st == SLICE_P) || (pps.weighted_bipred && st == SLICE_B) {
+            if (pps.weighted_pred && st == SliceType::P)
+                || (pps.weighted_bipred && st == SliceType::B)
+            {
                 sh.pwt = Some(parse_pwt(&mut r, &sh)?);
             }
             let five_minus = r.ue_max(4, "five_minus_max_num_merge_cand")?;

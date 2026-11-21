@@ -14,7 +14,7 @@ use crate::error::{DecodeError, Result};
 use crate::inter::{McScratch, PRED_STRIDE};
 use crate::picture::{ColMotion, Frame, Pixel, PuMotion};
 use crate::ps::{Layout, Pps, Sps};
-use crate::slice::{SLICE_I, SLICE_P, SliceHeader};
+use crate::slice::{SliceHeader, SliceType};
 use crate::state::*;
 use crate::transform;
 use triergon_codec::{Budget, BudgetVec};
@@ -164,15 +164,15 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
         poc: i32,
     ) -> Result<Self> {
         let init_type = match sh.slice_type {
-            SLICE_I => 0,
-            SLICE_P => {
+            SliceType::I => 0,
+            SliceType::P => {
                 if sh.cabac_init {
                     2
                 } else {
                     1
                 }
             }
-            _ => {
+            SliceType::B => {
                 if sh.cabac_init {
                     1
                 } else {
