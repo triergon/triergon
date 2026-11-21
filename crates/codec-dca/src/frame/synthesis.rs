@@ -213,7 +213,7 @@ impl FrameDecoder {
         f: &CoreFrame<'_>,
         xch: bool,
         have_x96: bool,
-    ) -> Result<([usize; MAX_SLOTS], Option<usize>), StorageError> {
+    ) -> Result<([usize; MAX_SLOTS], Option<usize>), DecodeError> {
         let (h, set) = (&f.h, &f.set);
         let nsamples = h.blocks * if have_x96 { 64 } else { 32 };
         let mut order: [(Speaker, usize); MAX_SLOTS + 1] = [(Speaker::FrontLeft, 0); MAX_SLOTS + 1];
@@ -242,7 +242,8 @@ impl FrameDecoder {
             h.sample_rate
         };
         out.samples_per_channel = nsamples;
-        out.layout = ChannelLayout::new(order.iter().map(|e| e.0)).expect("at most 9 planes");
+        out.layout = ChannelLayout::new(order.iter().map(|e| e.0))
+            .ok_or(DecodeError::InvalidData("more than 16 output planes"))?;
         for (i, &(_, src)) in order.iter().enumerate() {
             if src == LFE_SRC {
                 lfe_plane = Some(i);

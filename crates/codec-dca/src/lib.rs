@@ -1,16 +1,16 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr,
-    clippy::unwrap_used
+    clippy::unwrap_used,
+    clippy::expect_used
 )]
-// Pending: `missing_docs`, `clippy::expect_used`.
-#![allow(clippy::needless_range_loop, clippy::too_many_arguments)]
-// Pending: these rewrites change the generated code of measured hot paths and are
-// adopted with an A/B timing run.
+// The subband and history clears keep their `for_each` loops: `fill` changes the
+// generated code of the synthesis path and is adopted only with a timing run.
 #![allow(clippy::needless_for_each)]
 mod bits;
 mod books;
@@ -76,7 +76,10 @@ impl Default for Decoder {
 impl Decoder {
     /// A decoder with a pool of the default limit.
     pub fn new() -> Self {
-        #[allow(clippy::expect_used)] // The default limit is far above a pool's own charge.
+        #[expect(
+            clippy::expect_used,
+            reason = "the default limit is far above a pool's own charge"
+        )]
         Self::with_limits(Limits::default()).expect("default storage budget")
     }
 
