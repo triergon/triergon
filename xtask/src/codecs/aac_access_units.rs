@@ -144,24 +144,62 @@ pub(super) fn measurement_parity(
         .get("workloads")
         .and_then(Value::as_array)
         .unwrap_or_default();
-    if !cases.iter().any(|case| {
+    let has_lc = cases.iter().any(|case| {
         matches!(
             case.get("operation").and_then(Value::as_str),
             Some(OPERATION | COMPAT_OPERATION)
         )
-    }) {
+    });
+    let has_sbr = cases
+        .iter()
+        .any(|case| case.get("operation").and_then(Value::as_str) == Some(SBR_OPERATION));
+    if !has_lc && !has_sbr {
         return Ok(None);
     }
-    if *manifest != checks::read_json(&root.join(FEATURE).join("corpus.json"))? {
+    let (pin, operation) = if has_sbr && !has_lc {
+        ("sbr-corpus.json", SBR_OPERATION)
+    } else if has_lc && !has_sbr {
+        ("corpus.json", OPERATION)
+    } else {
+        return Err("AAC measurement requires one complete pinned workload set".into());
+    };
+    if *manifest != checks::read_json(&root.join(FEATURE).join(pin))? {
         return Err("AAC measurement requires the complete pinned workload set".into());
     }
-    let comparison = Comparison::load(root, Some((candidates.of(OPERATION), reference)))?;
+    let comparison = Comparison::load(root, Some((candidates.of(operation), reference)))?;
     let parity_path = inputs.join(PARITY_FILE);
     let bytes = read(&parity_path)?;
     let parity = json::parse(std::str::from_utf8(&bytes).map_err(|error| error.to_string())?)
         .map_err(|error| format!("{}: {error}", parity_path.display()))?;
-    if parity.get("comparison") != Some(&comparison.binding)
-        || string(&parity, "workloads_sha256")? != file_sha(workload_path)?
+    validate_parity(
+        &parity,
+        &comparison.binding,
+        &file_sha(workload_path)?,
+        cases,
+    )?;
+    Ok(Some(MeasurementParity {
+        sha256: sha256::hex(&bytes),
+        workers: Value::object([
+            (
+                "candidate",
+                Value::str(string(&comparison.binding, "candidate_sha256")?),
+            ),
+            (
+                "reference",
+                Value::str(string(&comparison.binding, "reference_sha256")?),
+            ),
+        ]),
+    }))
+}
+
+fn validate_parity(
+    parity: &Value,
+    binding: &Value,
+    workloads_sha: &str,
+    cases: &[Value],
+) -> Result<(), String> {
+    if parity.get("comparison") != Some(binding)
+        || string(parity, "workloads_sha256")? != workloads_sha
     {
         return Err("AAC parity inputs, tools or rules changed".into());
     }
@@ -178,19 +216,7 @@ pub(super) fn measurement_parity(
     {
         return Err("AAC measurement requires passing parity for every workload".into());
     }
-    Ok(Some(MeasurementParity {
-        sha256: sha256::hex(&bytes),
-        workers: Value::object([
-            (
-                "candidate",
-                Value::str(string(&comparison.binding, "candidate_sha256")?),
-            ),
-            (
-                "reference",
-                Value::str(string(&comparison.binding, "reference_sha256")?),
-            ),
-        ]),
-    }))
+    Ok(())
 }
 
 fn access_units(
@@ -525,6 +551,174 @@ pub fn run(root: &Path, out: &Path, record: bool, sbr: bool) -> Result<(), Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pinned_profiles_require_bound_passing_parity() {
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let root = std::env::temp_dir().join(format!("aac-admission-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        for dir in [
+            FEATURE,
+            "harness/codecs",
+            "target/harness",
+            ".research/reference-decode/install/bin",
+            "inputs",
+        ] {
+            fs::create_dir_all(root.join(dir)).unwrap();
+        }
+        for file in ["contract.json", "corpus.json", "sbr-corpus.json"] {
+            fs::copy(
+                source.join(FEATURE).join(file),
+                root.join(FEATURE).join(file),
+            )
+            .unwrap();
+        }
+        fs::copy(source.join(NUMERIC_RULES), root.join(NUMERIC_RULES)).unwrap();
+        for file in [
+            "candidate",
+            "reference",
+            ".research/reference-decode/install/bin/ffprobe",
+        ] {
+            fs::write(root.join(file), file).unwrap();
+        }
+        let sha = |file: &str| Value::str(file_sha(&root.join(file)).unwrap());
+        let profile = Value::object([
+            ("profile", Value::str("decode")),
+            ("release", Value::str(prepare::RELEASE)),
+            ("archive_sha256", Value::str(prepare::RELEASE_SHA256)),
+            (
+                "installed",
+                Value::object([(
+                    FFPROBE,
+                    sha(".research/reference-decode/install/bin/ffprobe"),
+                )]),
+            ),
+        ]);
+        let identity = Value::object([
+            (
+                "additional_candidates",
+                Value::object([(
+                    "codec-aac-worker",
+                    Value::object([
+                        ("path", Value::str("candidate")),
+                        ("sha256", sha("candidate")),
+                    ]),
+                )]),
+            ),
+            (
+                "comparison_references",
+                Value::object([(
+                    "ffmpeg-decode-native",
+                    Value::object([
+                        ("path", Value::str("reference")),
+                        ("sha256", sha("reference")),
+                        ("reference_build", profile),
+                    ]),
+                )]),
+            ),
+        ]);
+        corpus::write_json(&root.join("target/harness/identity.json"), &identity).unwrap();
+        let candidates = super::super::Candidates {
+            default: root.join("candidate"),
+            by_operation: vec![],
+        };
+        let reference = root.join("reference");
+        let inputs = root.join("inputs");
+        for pin in ["corpus.json", "sbr-corpus.json"] {
+            let manifest = checks::read_json(&root.join(FEATURE).join(pin)).unwrap();
+            let path = inputs.join("workloads.json");
+            corpus::write_json(&path, &manifest).unwrap();
+            let cases = manifest.get("workloads").unwrap().as_array().unwrap();
+            let rows = cases
+                .iter()
+                .map(|case| {
+                    Value::object([
+                        ("id", case.get("id").unwrap().clone()),
+                        ("input_sha256", case.get("sha256").unwrap().clone()),
+                        ("pass", Value::Bool(true)),
+                    ])
+                })
+                .collect();
+            let binding = Comparison::load(&root, Some((&root.join("candidate"), &reference)))
+                .unwrap()
+                .binding;
+            let parity = Value::object([
+                ("comparison", binding),
+                ("workloads_sha256", Value::str(file_sha(&path).unwrap())),
+                ("cases", Value::Array(rows)),
+            ]);
+            let parity_path = inputs.join(PARITY_FILE);
+            corpus::write_json(&parity_path, &parity).unwrap();
+            let admit =
+                |m: &Value| measurement_parity(&root, &candidates, &reference, &path, &inputs, m);
+            assert!(admit(&manifest).unwrap().is_some());
+            for key in [
+                "candidate_sha256",
+                "reference_sha256",
+                "ffprobe_sha256",
+                "numeric_rules_sha256",
+                "contract_sha256",
+            ] {
+                let mut changed = parity.clone();
+                if let Value::Object(ref mut fields) = changed {
+                    if let Value::Object(ref mut binding) = fields
+                        .iter_mut()
+                        .find(|(k, _)| k == "comparison")
+                        .unwrap()
+                        .1
+                    {
+                        binding.iter_mut().find(|(k, _)| k == key).unwrap().1 =
+                            Value::str("altered");
+                    }
+                }
+                corpus::write_json(&parity_path, &changed).unwrap();
+                assert!(admit(&manifest).is_err(), "{key}");
+            }
+            for key in ["pass", "id", "input_sha256"] {
+                let mut changed = parity.clone();
+                if let Value::Object(ref mut fields) = changed {
+                    if let Value::Array(ref mut rows) =
+                        fields.iter_mut().find(|(k, _)| k == "cases").unwrap().1
+                    {
+                        if let Value::Object(ref mut row) = rows[0] {
+                            row.iter_mut().find(|(k, _)| k == key).unwrap().1 = Value::Null;
+                        }
+                    }
+                }
+                corpus::write_json(&parity_path, &changed).unwrap();
+                assert!(admit(&manifest).is_err(), "{key}");
+            }
+            corpus::write_json(&parity_path, &parity).unwrap();
+            let mut changed = manifest.clone();
+            if let Value::Object(ref mut fields) = changed {
+                fields.push(("extra".into(), Value::Bool(true)));
+            }
+            assert!(admit(&changed).is_err());
+            fs::write(&path, b"altered").unwrap();
+            assert!(admit(&manifest).is_err());
+        }
+        let mut mixed = checks::read_json(&root.join(FEATURE).join("corpus.json")).unwrap();
+        let sbr = checks::read_json(&root.join(FEATURE).join("sbr-corpus.json")).unwrap();
+        if let Value::Object(ref mut fields) = mixed {
+            if let Value::Array(ref mut rows) =
+                fields.iter_mut().find(|(k, _)| k == "workloads").unwrap().1
+            {
+                rows.push(sbr.get("workloads").unwrap().as_array().unwrap()[0].clone());
+            }
+        }
+        assert!(
+            measurement_parity(
+                &root,
+                &candidates,
+                &reference,
+                &inputs.join("workloads.json"),
+                &inputs,
+                &mixed
+            )
+            .is_err()
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn pcm_comparison_checks_both_plane_shapes_and_the_last_sample() {

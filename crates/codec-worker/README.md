@@ -6,7 +6,8 @@ decoders, letterbox video with [`triergon_pixel::letterbox`](../pixel/README.md)
 downmix audio with `triergon_session::mix::Downmix`, performing the same operations as the
 FFmpeg reference decode worker in `harness/`. `codec-worker` serves every operation below;
 `codec-aac-worker` serves the AAC decode operations alone (`audio-aac`,
-`audio-aac-access-units` and `audio-aac-access-units-compat`).
+`audio-aac-access-units`, `audio-aac-access-units-compat` and
+`audio-aac-access-units-sbr`).
 
 ## Command line
 
@@ -21,7 +22,8 @@ codec-worker seek ogg FILE TRACK SECONDS exact|preroll
 ```
 
 `KIND-CODEC` is one of `video-h264`, `video-hevc`, `audio-ac3`, `audio-eac3`,
-`audio-aac`, `audio-aac-access-units`, `audio-aac-access-units-compat`, `audio-dts`,
+`audio-aac`, `audio-aac-access-units`, `audio-aac-access-units-compat`,
+`audio-aac-access-units-sbr`, `audio-dts`,
 `audio-flac`, `audio-mp3`, `audio-vorbis` or `audio-opus`. The nightly-only `simd` and
 `aac-simd` features enable the HEVC and AAC decoders' SIMD kernels; output is identical.
 Decode errors are printed to stderr and decoding continues.
@@ -35,6 +37,20 @@ mapping, `-compat` the conventional surround mapping. `audio-aac-access-units-sb
 uses the same capsule for the pinned 48 kHz stereo 2× SBR configuration and requires
 2048 samples per plane. `cargo xtask codecs aac-access-units --sbr --out DIR` fetches the pinned FATE
 sample and compares every native output sample against the pinned reference.
+
+The configured AAC collections are separate from `cargo xtask gate`. After preparing
+and building the gate workers and decode reference as described in
+[quality.md](../../docs/quality.md), run the SBR comparison and its native collections:
+
+```sh
+CARGO_INCREMENTAL=0 cargo xtask codecs aac-access-units --sbr --out target/aac-sbr
+CARGO_INCREMENTAL=0 cargo xtask codecs time --candidate target/release/codec-aac-worker --reference target/harness/ffmpeg-decode-worker --workloads target/aac-sbr/workloads.json --root target/aac-sbr --ledger target/aac-sbr-ledger.json --out target/aac-sbr-time --label aac-sbr
+CARGO_INCREMENTAL=0 cargo xtask codecs memory --candidate target/release/codec-aac-worker --reference target/harness/ffmpeg-decode-worker --workloads target/aac-sbr/workloads.json --root target/aac-sbr --out target/aac-sbr-memory
+```
+
+The full pinned SBR list and passing parity report are required; the LC list is a
+separate collection. The report binds the workers, input, probe, numeric rules and
+contract. Native timing and memory qualification remains open.
 
 ## Outputs
 
