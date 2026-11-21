@@ -186,7 +186,7 @@ impl Engine {
     }
 
     /// [`Self::ts`] over a sequence of entities: each entity's end is reported
-    /// as [`Event::EntityEnd`], and the caller continues with the next one or
+    /// as [`Event::EntityEnd`](crate::Event::EntityEnd), and the caller continues with the next one or
     /// finishes the logical source.
     pub fn ts_entities(
         input: InputCursor,
