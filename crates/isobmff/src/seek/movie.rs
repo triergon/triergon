@@ -325,6 +325,8 @@ impl<'a> SourceCompositionLookup<'a> {
     }
     /// Advances the scan. Fails with `Error::Invalid` when sample ordinals do not
     /// increase from 1; an error is kept and returned by every later poll.
+    // Out of line, the per-sample scan keeps its registers whatever the planner does.
+    #[inline(never)]
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
