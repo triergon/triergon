@@ -112,6 +112,9 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
     ));
     errors.extend(crate::status::check(root, &data));
     errors.extend(crate::test_skips::design_errors(&data));
+    if let Some(lanes) = document(crate::gate::lanes::FILE) {
+        errors.extend(crate::gate::lanes::design_errors(root, lanes));
+    }
     // Generated manifests: the case ids and the pins match, in the recorded form.
     for generator in crate::generators::GENERATORS {
         errors.extend(generator.check(root));

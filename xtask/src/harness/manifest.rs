@@ -29,10 +29,22 @@ pub fn read(root: &Path, path: &Path) -> Result<(Value, String), String> {
     Ok((value.clone(), sha256::hex(canonical(&value).as_bytes())))
 }
 
+/// Whether the required comparison prepares and checks configured AAC workloads.
+pub(crate) fn configured_aac_runner(contract: &Value) -> bool {
+    contract.get("runner").and_then(Value::as_str) == Some("cargo xtask codecs aac-access-units")
+}
+
 /// Check the declared membership and pin coverage before a required report.
 pub fn validate_required(contract: &Value, manifest: &Value) -> Result<(), String> {
+    let configured_aac = configured_aac_runner(contract);
+    if configured_aac
+        && manifest.get("schema").and_then(Value::as_str) != Some("triergon.codecs.workloads.v1")
+    {
+        return Err("configured AAC corpus is not a codec workload list".into());
+    }
+    let cases_key = if configured_aac { "workloads" } else { "cases" };
     let cases = manifest
-        .get("cases")
+        .get(cases_key)
         .and_then(Value::as_array)
         .filter(|cases| !cases.is_empty())
         .ok_or("required manifest has no cases")?;
@@ -59,6 +71,20 @@ pub fn validate_required(contract: &Value, manifest: &Value) -> Result<(), Strin
             .ok_or("required manifest has a case without an ID")?;
         if !ids.insert(id) {
             return Err(format!("duplicate case ID {id}"));
+        }
+        if configured_aac {
+            for key in ["sha256", "source_sha256"] {
+                super::validation::hash(case, key).map_err(|error| format!("{id}: {error}"))?;
+            }
+            if !matches!(
+                case.get("operation").and_then(Value::as_str),
+                Some("audio-aac-access-units" | "audio-aac-access-units-compat")
+            ) || case.get("iterations") != contract.get("iterations")
+            {
+                return Err(format!(
+                    "{id}: invalid configured AAC operation or iteration count"
+                ));
+            }
         }
         if let Some(profile) = case.get("profile").and_then(Value::as_str) {
             profiles.insert(profile.to_owned());

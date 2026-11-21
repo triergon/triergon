@@ -1,0 +1,49 @@
+{
+ "schema": 1,
+ "items": {
+  "codecs": ["h264", "hevc", "hevc-simd"],
+  "codecs-audio": ["aac", "ac3", "eac3", "dts", "aac-container-priming", "aac-default"],
+  "codecs-files": ["flac", "mp3", "mp2", "mp1", "vorbis", "opus", "aac-mov"],
+  "ogg-readers": ["reader-ogg", "reader-ogg-seek"],
+  "elementary-readers": ["reader-flac", "reader-mp3", "reader-aac", "reader-ac3", "reader-eac3"]
+ },
+ "lanes": {
+  "h264": {"build": "stable", "measured_by": "codec-workloads"},
+  "hevc": {"build": "stable", "measured_by": "codec-workloads"},
+  "hevc-simd": {"build": "simd", "measured_by": "hevc-simd-workloads"},
+  "aac": {"build": "simd", "measured_by": "codec-workloads"},
+  "ac3": {"build": "stable", "measured_by": "codec-workloads"},
+  "eac3": {"build": "stable", "measured_by": "codec-workloads"},
+  "dts": {"build": "stable", "measured_by": "codec-workloads"},
+  "aac-container-priming": {"build": "simd", "measured_by": "codec-workloads"},
+  "aac-default": {"build": "stable", "measured_by": "aac-default-workloads"},
+  "flac": {"build": "session", "measured_by": "codec-file-workloads"},
+  "mp3": {"build": "session", "measured_by": "codec-file-workloads"},
+  "mp2": {"build": "session", "measured_by": "codec-file-workloads"},
+  "mp1": {"build": "session", "measured_by": "codec-file-workloads"},
+  "vorbis": {"build": "session", "measured_by": "codec-file-workloads"},
+  "opus": {"build": "session", "measured_by": "codec-file-workloads"},
+  "aac-mov": {"build": "session", "measured_by": "aac-access-units"},
+  "reader-ogg": {"build": "stable", "measured_by": "codec-file-workloads"},
+  "reader-ogg-seek": {"build": "stable", "measured_by": null},
+  "reader-flac": {"build": "stable", "measured_by": "codec-file-workloads"},
+  "reader-mp3": {"build": "stable", "measured_by": "codec-file-workloads"},
+  "reader-aac": {"build": "stable", "measured_by": null},
+  "reader-ac3": {"build": "stable", "measured_by": null},
+  "reader-eac3": {"build": "stable", "measured_by": null}
+ },
+ "open_unmeasured": [
+  {"bound": "runtime", "cases": ["reader-aac", "reader-ac3", "reader-eac3"], "cause": "The codec workloads read ADTS and AC-3 with the worker splitter."},
+  {"bound": "heap", "cases": ["reader-aac", "reader-ac3", "reader-eac3"], "cause": "The codec workloads read ADTS and AC-3 with the worker splitter."},
+  {"bound": "total_rss", "cases": ["reader-aac", "reader-ac3", "reader-eac3"], "cause": "The codec workloads read ADTS and AC-3 with the worker splitter."},
+  {"bound": "runtime", "cases": ["reader-ogg-seek"], "cause": "The file codec workloads decode sequentially and do not seek."},
+  {"bound": "heap", "cases": ["reader-ogg-seek"], "cause": "The file codec workloads decode sequentially and do not seek."},
+  {"bound": "total_rss", "cases": ["reader-ogg-seek"], "cause": "The file codec workloads decode sequentially and do not seek."},
+  {"bound": "runtime", "cases": ["aac-default"], "cause": "The stable AAC workload list needs paired collection on the gate hosts."},
+  {"bound": "heap", "cases": ["aac-default"], "cause": "The stable AAC workload list needs paired collection on the gate hosts."},
+  {"bound": "total_rss", "cases": ["aac-default"], "cause": "The stable AAC workload list needs paired collection on the gate hosts."},
+  {"bound": "runtime", "cases": ["hevc-simd"], "cause": "The HEVC SIMD workload list needs paired collection on the gate hosts."},
+  {"bound": "heap", "cases": ["hevc-simd"], "cause": "The HEVC SIMD workload list needs paired collection on the gate hosts."},
+  {"bound": "total_rss", "cases": ["hevc-simd"], "cause": "The HEVC SIMD workload list needs paired collection on the gate hosts."}
+ ]
+}

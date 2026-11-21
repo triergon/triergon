@@ -32,9 +32,25 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(120);
 const CANVAS: usize = 1920 * 1080 * 4;
 const AAC_SINGLE_SCE_STEREO_SHA256: &str =
     "04947370585296a25c63f1e31252c4290328151a0fa2ecf3271518b4d4db8796";
+const AAC_CONTAINER_PRIMING: &str = "aac-container-priming";
+
+/// The example exposes a decoder policy the device-output worker does not select.
+pub(super) fn decoder_only_lane(lane: &str) -> bool {
+    matches!(lane, "aac-mov" | AAC_CONTAINER_PRIMING)
+}
 
 fn uses_initialized_aac_reference(lane: &str, name: &str, sha256: &str) -> bool {
-    lane == "aac" && name == "aac-sce-in-stereo.adts" && sha256 == AAC_SINGLE_SCE_STEREO_SHA256
+    matches!(lane, "aac" | AAC_CONTAINER_PRIMING)
+        && name == "aac-sce-in-stereo.adts"
+        && sha256 == AAC_SINGLE_SCE_STEREO_SHA256
+}
+
+/// Which manifest vectors a lane uses when it changes a decoder option.
+pub fn vector_lane(lane: &str) -> &str {
+    match lane {
+        AAC_CONTAINER_PRIMING => "aac",
+        lane => lane,
+    }
 }
 
 fn complete_single_sce_stereo(sample_bytes: usize, outputs: [(i64, usize); 2]) -> bool {
@@ -74,7 +90,7 @@ fn audio_format(lane: &str) -> Result<Option<&'static str>, String> {
     Ok(match lane {
         "ac3" => Some("ac3"),
         "eac3" => Some("eac3"),
-        "aac" => Some("aac"),
+        "aac" | AAC_CONTAINER_PRIMING => Some("aac"),
         "aac-mov" => Some("mov"),
         "dts" => Some("dts"),
         "flac" => Some("flac"),
@@ -106,12 +122,17 @@ fn example(lane: &str) -> Option<&'static str> {
         "h264" => "codec-h264-decode",
         "hevc" => "codec-hevc-decode",
         "ac3" | "eac3" => "codec-ac3-decode",
-        "aac" => "codec-aac-decode",
+        "aac" | AAC_CONTAINER_PRIMING => "codec-aac-decode",
         "dts" => "codec-dca-decode",
         // File-format lanes decode through a container reader, as a player does.
         "aac-mov" | "flac" | "mp3" | "mp2" | "mp1" | "vorbis" | "opus" => "audio-decode",
         _ => return None,
     })
+}
+
+/// Whether the correctness runner can grade this lane.
+pub fn is_lane(lane: &str) -> bool {
+    example(lane).is_some()
 }
 
 fn operation(lane: &str) -> Option<&'static str> {
@@ -471,6 +492,9 @@ fn audio_decoder(
             .map(String::from),
         );
     }
+    if lane == AAC_CONTAINER_PRIMING {
+        reference_argv.extend(["-flags2".into(), "+skip_manual".into()]);
+    }
     reference_argv.extend(["-i", path].map(String::from));
     if lane == "aac-mov" {
         reference_argv.extend(["-map", "0:a:0"].map(String::from));
@@ -499,10 +523,11 @@ fn audio_decoder(
     } else {
         run_text(&reference_argv, RUN_TIMEOUT)?
     };
-    let ours_run = run_text(
-        &[a.example(lane)?, path.to_owned(), python::path(&ours_path)],
-        RUN_TIMEOUT,
-    )?;
+    let mut ours_argv = vec![a.example(lane)?, path.to_owned(), python::path(&ours_path)];
+    if lane == AAC_CONTAINER_PRIMING {
+        ours_argv.extend(["--priming".into(), "container".into()]);
+    }
+    let ours_run = run_text(&ours_argv, RUN_TIMEOUT)?;
     let info = json_lines(&ours_run.stderr)
         .pop()
         .unwrap_or_else(|| Value::object::<&str>([]));
@@ -790,21 +815,29 @@ pub fn grade(a: &Grade) -> Result<(), String> {
         .and_then(Value::as_array)
         .ok_or("manifest has no vectors")?;
     let open = open_cases(&manifest, vectors)?;
-    let in_lanes = |v: &Value| {
-        a.lanes.as_ref().is_none_or(|lanes| {
-            v.get("lane")
-                .and_then(Value::as_str)
-                .is_some_and(|lane| lanes.iter().any(|l| l == lane))
-        })
+    let in_lanes = |lane: Option<&str>| {
+        a.lanes
+            .as_ref()
+            .is_none_or(|lanes| lane.is_some_and(|lane| lanes.iter().any(|l| l == lane)))
     };
     for lane in a.lanes.iter().flatten() {
         if !vectors
             .iter()
-            .any(|v| v.get("lane").and_then(Value::as_str) == Some(lane))
+            .any(|v| v.get("lane").and_then(Value::as_str) == Some(vector_lane(lane)))
         {
             return Err(format!("lane {lane}: no vectors in the manifest"));
         }
     }
+    let container_priming = a
+        .lanes
+        .as_ref()
+        .is_some_and(|lanes| lanes.iter().any(|lane| lane == AAC_CONTAINER_PRIMING));
+    let scheduled = vectors.iter().flat_map(|vector| {
+        let lane = vector.get("lane").and_then(Value::as_str);
+        let priming = (lane == Some("aac") && container_priming)
+            .then_some((vector, Some(AAC_CONTAINER_PRIMING)));
+        std::iter::once((vector, lane)).chain(priming)
+    });
     let only: Option<Vec<&str>> = a.only.as_deref().map(|o| o.split(',').collect());
     let mut out = fs::OpenOptions::new()
         .create(true)
@@ -817,8 +850,9 @@ pub fn grade(a: &Grade) -> Result<(), String> {
             .map(str::to_owned)
             .ok_or_else(|| format!("vector without {key}"))
     };
-    for v in vectors.iter().filter(|v| in_lanes(v)) {
-        let (lane, name, relative) = (text(v, "lane")?, text(v, "name")?, text(v, "path")?);
+    for (v, lane) in scheduled.filter(|(_, lane)| in_lanes(*lane)) {
+        let lane = lane.ok_or("vector without lane")?.to_owned();
+        let (name, relative) = (text(v, "name")?, text(v, "path")?);
         if let Some(only) = &only
             && !only.iter().any(|o| name.contains(o) || *o == lane)
         {
@@ -859,7 +893,9 @@ pub fn grade(a: &Grade) -> Result<(), String> {
                     Err(Stop::Fatal(message)) => return Err(message),
                 },
             ));
-            if lane != "aac-mov" {
+            // These lanes exercise policies of the decoder example. The measured
+            // worker's default operation does not make the same request.
+            if !decoder_only_lane(&lane) {
                 let output_dir = tmp.0.join("o");
                 fs::create_dir(&output_dir).map_err(|e| e.to_string())?;
                 row.push((

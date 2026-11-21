@@ -45,7 +45,10 @@ fn every_step_is_named_once_and_every_collection_is_graded_or_suite_run() {
         let memory = item.steps.iter().any(|s| s.placement == Placement::Memory);
         // A collection is timed in its item, but for a codec list's memory parts,
         // whose list is timed in an item of its own.
-        let part = item.name.starts_with("codec-") && item.steps.len() == 1;
+        let part = item.steps.len() == 1
+            && item.steps[0]
+                .command
+                .starts_with(&owned(&["xtask", "codecs", "memory"]));
         assert!(!memory || timed || part, "{}", item.name);
         for step in &item.steps {
             assert_eq!(
@@ -83,7 +86,14 @@ fn aarch64_plan_binds_each_isobmff_grade_to_its_shard_and_collections() {
         &[],
     );
     let mut records = BTreeMap::new();
-    for item in realized.iter().filter(|i| i.name.starts_with("isobmff-")) {
+    let mut suite_names: Vec<_> = (1..=ISOBMFF_PARTS)
+        .map(|part| format!("isobmff-{part}"))
+        .collect();
+    suite_names.extend(["isobmff-seek".into(), "isobmff-reader".into()]);
+    for item in realized
+        .iter()
+        .filter(|item| suite_names.contains(&item.name))
+    {
         let steps = item.steps.iter().map(|step| {
             let mut command = step.command.clone();
             let cpus = match step.placement {

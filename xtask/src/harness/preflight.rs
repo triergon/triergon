@@ -22,7 +22,7 @@ use crate::sha256;
 pub const USAGE: &str = "usage: cargo xtask preflight [--feature ID]... [--corpus ID=DIR]...
        [--manifest ID=FILE]... [--isobmff] [--isobmff-seek] [--isobmff-reader]
        [--codecs WORKLOADS]...
-       [--readers LANE,...] [--correctness LANE,...]
+       [--readers LANE,...] [--correctness LANE,...] [--aac-access-units]
        [--external-vector] [--capture CASES] [--reference NAME]...
        [--review FILE | --standard-memory] [--kernel]
 
@@ -64,6 +64,7 @@ struct Options {
     readers: Vec<String>,
     /// Correctness lanes.
     correctness: Vec<String>,
+    aac_access_units: bool,
     external_vector: bool,
     capture: Option<PathBuf>,
     references: Vec<String>,
@@ -106,6 +107,7 @@ impl Options {
                 "--correctness" => options
                     .correctness
                     .extend(value()?.split(',').map(str::to_owned)),
+                "--aac-access-units" => options.aac_access_units = true,
                 "--external-vector" => options.external_vector = true,
                 "--capture" => options.capture = Some(root.join(value()?)),
                 "--reference" => options.references.push(value()?),
@@ -212,6 +214,12 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
             correctness_files(root, &options.correctness).and_then(|files| pinned_inputs(&files)),
         );
     }
+    if options.aac_access_units {
+        checks.check(
+            "configured AAC sources",
+            aac_access_unit_files(root).and_then(|files| pinned_inputs(&files)),
+        );
+    }
     if options.external_vector {
         checks.check("external vector", external_vector(root));
     }
@@ -300,7 +308,11 @@ impl Options {
         if self.isobmff || self.isobmff_seek {
             names.push(crate::isobmff_bench::REFERENCE.to_owned());
         }
-        if !self.codecs.is_empty() || !self.readers.is_empty() || !self.correctness.is_empty() {
+        if !self.codecs.is_empty()
+            || !self.readers.is_empty()
+            || !self.correctness.is_empty()
+            || self.aac_access_units
+        {
             names.push("ffmpeg-decode-native".to_owned());
         }
         if self.capture.is_some() {
@@ -462,8 +474,56 @@ fn reader_files(root: &Path, lanes: &[String]) -> R<Vec<(PathBuf, Option<String>
 
 /// The correctness manifest's vectors of `lanes`, after the manifest.
 fn correctness_files(root: &Path, lanes: &[String]) -> R<Vec<(PathBuf, Option<String>)>> {
-    let wanted: Vec<&str> = lanes.iter().map(String::as_str).collect();
-    lane_files(root, crate::codecs::derived::MANIFEST, &wanted)
+    let mut seen = std::collections::BTreeSet::new();
+    let (mov, regular): (Vec<_>, Vec<_>) = lanes
+        .iter()
+        .map(|lane| crate::codecs::correctness::vector_lane(lane))
+        .filter(|lane| seen.insert(*lane))
+        .partition(|lane| *lane == "aac-mov");
+    let mut files = Vec::new();
+    if !regular.is_empty() {
+        files.extend(lane_files(
+            root,
+            crate::codecs::derived::MANIFEST,
+            &regular,
+        )?);
+    }
+    if !mov.is_empty() {
+        files.extend(lane_files(root, AAC_MOV_MANIFEST, &mov)?);
+    }
+    Ok(files)
+}
+
+const AAC_MOV_MANIFEST: &str = "harness/codecs/aac/mov-manifest.json";
+const AAC_FEATURE: &str = "harness/features/aac-access-units";
+
+fn aac_access_unit_files(root: &Path) -> R<Vec<(PathBuf, Option<String>)>> {
+    let mut files = lane_files(root, AAC_MOV_MANIFEST, &["aac-mov"])?;
+    let feature = root.join(AAC_FEATURE);
+    let sources = feature.join("sources.json");
+    let manifest = json::read(&sources)?;
+    files.extend([
+        (feature.join("contract.json"), None),
+        (feature.join("corpus.json"), None),
+        (sources, None),
+    ]);
+    for source in manifest
+        .get("vectors")
+        .and_then(Value::as_array)
+        .ok_or("no AAC sources")?
+    {
+        let field = |key| {
+            source
+                .get(key)
+                .and_then(Value::as_str)
+                .ok_or("AAC source lacks name or SHA-256")
+        };
+        files.push((
+            feature.join("inputs").join(field("name")?),
+            Some(field("sha256")?.to_owned()),
+        ));
+    }
+    Ok(files)
 }
 
 /// `manifest` and every vector of `lanes` it lists, with its pin. A lane without
@@ -631,6 +691,11 @@ pub fn inputs(root: &Path, args: &[String], manifest: &dyn Fn(&Path) -> R<Value>
     }
     if !options.correctness.is_empty() {
         for (path, pin) in correctness_files(root, &options.correctness)? {
+            add(path, pin.as_deref());
+        }
+    }
+    if options.aac_access_units {
+        for (path, pin) in aac_access_unit_files(root)? {
             add(path, pin.as_deref());
         }
     }

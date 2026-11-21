@@ -91,6 +91,9 @@ identical output.
 
 ## Conformance
 
+The `codecs` item compares the nightly SIMD build’s decoded planes and the SIMD worker’s
+RGBA output. The three HEVC workloads have a separate SIMD collection.
+
 - Specification: Rec. ITU-T H.265 (V11, 01/2026). Tables are transcribed or regenerated
   from the text with the table or equation number in a comment.
 - Reference: FFmpeg 9.0.2 raw output on the FATE `hevc-conformance` suite and on

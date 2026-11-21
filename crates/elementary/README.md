@@ -75,6 +75,9 @@ exceeding a limit is a typed error.
 
 ## Comparison with FFmpeg
 
+The `elementary-readers` item compares native FLAC, MPEG audio, ADTS, AC-3 and E-AC-3
+packets under the reader rules below.
+
 `cargo xtask codecs readers` compares every packet's size, position, timestamps and trim as
 the readers deliver them with the pinned `ffprobe -show_packets` of FFmpeg 9.0.2, under the
 reviewed rules and dispositions of

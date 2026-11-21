@@ -82,6 +82,9 @@ layout holds) at any sample rate.
 
 ## Conformance
 
+The `codecs-files` item grades decoded PCM and stereo device output, including the two timed
+Vorbis inputs.
+
 - Specification: Vorbis I (Xiph.Org, 2020-07-04 revision with the 2015 errata).
 - `cargo xtask codecs grade` runs the `vorbis` lane
   ([harness/codecs/STATUS.md](../../harness/codecs/STATUS.md)), which decodes each file

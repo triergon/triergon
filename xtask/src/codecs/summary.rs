@@ -162,7 +162,7 @@ fn classify(row: &Value, lane: &str) -> String {
     let ds = get(decoder, "status").or_else(|| get(row, "status"));
     let os = get(output, "status");
     let is = |v: Option<&Value>, s: &str| text(v) == Some(s);
-    if lane == "aac-mov" {
+    if super::correctness::decoder_only_lane(lane) {
         return if is(ds, "pass") { "pass" } else { "FAIL" }.into();
     }
     let os_none = matches!(os, None | Some(Value::Null));
@@ -404,6 +404,13 @@ mod tests {
 
     #[test]
     fn classifies_refusals_and_failures() {
+        assert_eq!(
+            classify(
+                &row(r#"{"decoder":{"status":"pass"}}"#),
+                "aac-container-priming"
+            ),
+            "pass"
+        );
         assert_eq!(
             classify(&row(r#"{"decoder":{"status":"pass"}}"#), "aac-mov"),
             "pass"

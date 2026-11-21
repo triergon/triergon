@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 mod check;
+pub(crate) mod lanes;
 mod plan;
 mod run;
 mod summary;

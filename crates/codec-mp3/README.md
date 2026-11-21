@@ -94,6 +94,9 @@ The Huffman tables are checked to be complete prefix codes.
 
 ## Verification
 
+The `codecs-files` item grades Layers I, II and III against the FFmpeg float decoders and
+includes the MPEG audio timing inputs.
+
 `harness/codecs/mp3/make_vectors.sh FFMPEG OUT` generates the test streams (libmp3lame,
 mp2 and mp2fixed encodes at MPEG-1, 2 and 2.5 rates, and random Layer I/II frames from
 `harness/codecs/mp3/random_frames.py`) with the FFmpeg it is given.

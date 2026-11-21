@@ -13,7 +13,7 @@
         "name": "cabac",
         "entry_points": ["cabac::Engine"],
         "degree": "step",
-        "needs": "H.264 and HEVC picture comparisons exercise every Engine method. The HEVC overrun check observes only the length of the slice returned by data(). A specification oracle needs to compare the returned slice and cursor values and cover initial offsets 510 and 511 and bypass reads of 17 through 32 bins"
+        "needs": "H.264 and HEVC picture comparisons exercise every Engine method. The HEVC overrun check observes only the length of the slice returned by data(). A specification oracle needs to compare the returned slice and cursor values and cover initial offsets 510 and 511, bypass reads of 17 through 32 bins, and capped unary reads"
       },
       {
         "name": "crc",
@@ -238,28 +238,10 @@
     "triergon-font": [],
     "triergon-framing": [
       {
-        "name": "nal-length-prefixed-reading",
-        "entry_points": ["nal::NalReader with nal::Framing::LengthPrefixed"],
-        "degree": "unit-tests",
-        "needs": "a worker operation reading length-prefixed NAL units from MP4 and Matroska samples, folded against the reference's units; only Annex B reading is compared (raw-annex-b, mpegts-access-units)"
-      },
-      {
-        "name": "nal-configuration-inputs",
-        "entry_points": ["nal::AnnexBConfigParser", "nal::DeclaredConfigParser", "nal::Configuration::declared_record", "nal::AnnexBWriter"],
-        "degree": "unit-tests",
-        "needs": "a corpus of Annex B and declared parameter sets with a reference projection of the configuration each gives and of its Annex B form"
-      },
-      {
         "name": "hevc-hvcc-prefix-inspection",
         "entry_points": ["hevc::inspect_config_prefix"],
         "degree": "unit-tests",
         "needs": "a corpus of whole and truncated hvcC records with a reference view of the fields the prefix inspection reports"
-      },
-      {
-        "name": "hevc-record-writing",
-        "entry_points": ["hevc::HvcAnnexBWriter", "hevc::HvcDecoderConfigWriter"],
-        "degree": "unit-tests",
-        "needs": "a worker operation writing hvcC records and their Annex B form, compared byte for byte with the reference's conversion of the same samples"
       },
       {
         "name": "av1-obu-reading",

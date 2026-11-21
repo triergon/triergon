@@ -88,6 +88,9 @@ channel counts that change between frames.
 
 ## Conformance
 
+The `codecs-files` item grades decoded PCM and stereo device output through the file reader,
+including both timed FLAC inputs.
+
 - Specification: RFC 9639.
 - The external vectors come from the IETF CELLAR decoder testbench (`subset`,
   `uncommon`, `faulty`, licensed CC0) and from

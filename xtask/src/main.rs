@@ -1269,9 +1269,24 @@ fn check_features(root: &Path) -> Task {
             ));
         }
     }
+    let configured_aac = |contract: &harness::features::Contract| {
+        harness::manifest::configured_aac_runner(&contract.document)
+    };
+    for contract in contracts.iter().filter(|contract| configured_aac(contract)) {
+        let (manifest, _) = harness::manifest::read(root, &contract.manifest())?;
+        harness::manifest::validate_required(&contract.document, &manifest)?;
+        let args = [
+            "aac-access-units".to_owned(),
+            "--out".to_owned(),
+            output.join(&contract.id).display().to_string(),
+        ];
+        if codecs::main(root, &args)? != 0 {
+            return Err(format!("{}: required AAC comparison failed", contract.id));
+        }
+    }
     let reports = contracts
         .iter()
-        .filter(|contract| contract.document.get("oracle").is_none())
+        .filter(|contract| contract.document.get("oracle").is_none() && !configured_aac(contract))
         .map(|contract| {
             let manifest = contract.manifest();
             let (document, _) = harness::manifest::read(root, &manifest)?;
@@ -1293,19 +1308,23 @@ fn check_features(root: &Path) -> Task {
             output.display()
         ));
     }
-    let passed = contracts.iter().all(|contract| {
-        json::read(&output.join(&contract.id).join("report.json"))
-            .ok()
-            .and_then(|report| {
-                report
-                    .get("cases")
-                    .and_then(json::Value::as_array)
-                    .map(|cases| {
-                        !cases.is_empty() && cases.iter().all(harness::acceptance::parity_passes)
-                    })
-            })
-            == Some(true)
-    });
+    let passed = contracts
+        .iter()
+        .filter(|contract| !configured_aac(contract))
+        .all(|contract| {
+            json::read(&output.join(&contract.id).join("report.json"))
+                .ok()
+                .and_then(|report| {
+                    report
+                        .get("cases")
+                        .and_then(json::Value::as_array)
+                        .map(|cases| {
+                            !cases.is_empty()
+                                && cases.iter().all(harness::acceptance::parity_passes)
+                        })
+                })
+                == Some(true)
+        });
     if passed {
         std::fs::remove_dir_all(&output)
             .map_err(|error| format!("{}: {error}", output.display()))?;

@@ -1,18 +1,31 @@
 //! Decode an ADTS AAC elementary stream to interleaved f32le (planes in FFmpeg native
 //! order). Prints one JSON line to stderr: rate, channels, layout, frames.
 //!
-//! usage: decode IN.aac OUT.f32
+//! usage: decode IN.aac OUT.f32 [--priming encoder-signature|container]
 use std::io::Write;
+use triergon_codec_aac::compat::priming::Policy;
 use triergon_codec_aac::{AudioFrame, Decoder, adts};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() < 3 {
-        eprintln!("usage: decode IN.aac OUT.f32");
-        std::process::exit(2);
-    }
-    let data = std::fs::read(&args[1]).expect("read input");
-    let mut out = std::io::BufWriter::new(std::fs::File::create(&args[2]).expect("create output"));
+    let usage = || -> ! {
+        eprintln!("usage: decode IN.aac OUT.f32 [--priming encoder-signature|container]");
+        std::process::exit(2)
+    };
+    let [_, input, output, options @ ..] = args.as_slice() else {
+        usage();
+    };
+    let priming = match options {
+        [] => Policy::EncoderSignature,
+        [flag, value] if flag == "--priming" => match value.as_str() {
+            "encoder-signature" => Policy::EncoderSignature,
+            "container" => Policy::Container,
+            _ => usage(),
+        },
+        _ => usage(),
+    };
+    let data = std::fs::read(input).expect("read input");
+    let mut out = std::io::BufWriter::new(std::fs::File::create(output).expect("create output"));
     // skip an ID3v2 tag
     let mut pos = 0usize;
     while data.len() >= pos + 10 && &data[pos..pos + 3] == b"ID3" {
@@ -23,7 +36,7 @@ fn main() {
         let footer = if data[pos + 5] & 0x10 != 0 { 10 } else { 0 };
         pos += 10 + sz + footer;
     }
-    let mut dec = Decoder::new();
+    let mut dec = Decoder::new().with_priming_policy(priming);
     let mut frame = AudioFrame::default();
     let (mut frames, mut errors, mut samples) = (0u64, 0u64, 0u64);
     let mut last: Option<(u32, String, usize)> = None;

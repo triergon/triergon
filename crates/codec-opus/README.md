@@ -110,6 +110,9 @@ Constant tables are taken from RFC 6716; see [THIRD-PARTY.md](THIRD-PARTY.md).
 
 ## Conformance
 
+The `codecs-files` item grades decoded PCM with container trims applied and stereo device
+output, including the three timed Opus inputs.
+
 - Specifications: RFC 6716 with the RFC 8251 updates, and RFC 7845 for the identification
   header and the channel mappings.
 - `cargo xtask codecs grade` runs the `opus` lane

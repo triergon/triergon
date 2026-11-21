@@ -151,6 +151,11 @@ on both targets; every other worker stays on stable.
 
 ## Conformance
 
+The `codecs-audio` item grades the stable scalar and nightly SIMD builds against the live
+reference. Its container priming lane compares retained PCM against FFmpeg with `-flags2
++skip_manual`. The `aac-access-units` item compares configured AAC-LC across the fixed and
+program layouts.
+
 - Specifications: ISO/IEC 14496-3 (subpart 4 AAC, 4.6.18 SBR); QMF window from ETSI TS 101
   980 Annex I Table I.1; QMF flowcharts from 3GPP TS 26.404 Figure 6 and TS 26.405 Figure 4.
   PS: H. Purnhagen, DAFx 2004 (mixing, hybrid filterbank, decorrelator structure),

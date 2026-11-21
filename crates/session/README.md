@@ -147,6 +147,11 @@ The `mix` module holds the stereo downmix (`mix::Downmix`) and the s16 conversio
 
 ## Conformance
 
+The `codecs-files` comparison exercises track selection and packet decoding through
+`TrackDecoder::new` and `decode`. The `aac-access-units` comparison exercises
+`TrackDecoder::aac_access_units_with_layout_in` and compares decoded sample planes and
+speaker order.
+
 The letterbox and downmix rules are native observations of FFmpeg 9.0.2,
 recorded as `RGBA-CONTRACT.json` and `DOWNMIX-CONTRACT.json` in the research
 tree; `triergon_pixel::letterbox` and `mix.rs` implement them and their unit tests

@@ -1,5 +1,11 @@
 {
  "schema": "triergon.codecs.correctness-manifest.v1",
+ "open_cases": [
+  "01 - changing samplerate.flac",
+  "02 - increasing number of channels.flac",
+  "03 - decreasing number of channels.flac",
+  "flac_3ch_odd_mask.flac"
+ ],
  "vectors": [
   {
    "lane": "h264",
@@ -5446,6 +5452,216 @@
    "path": ".research/opus-generated/ts71.mka",
    "bytes": 415287,
    "sha256": "53c92c27dfa01fa713e96626040c9ef66f5218a88d54c0fe369e4361ad98f6a3"
+  },
+  {
+   "lane": "h264",
+   "name": "h264-high-1080p.h264",
+   "path": ".research/codec-inputs/h264-high-1080p.h264",
+   "bytes": 2937517,
+   "sha256": "4d7abd5fa936096028cab705dc513f5c30c829020c783164ec666a6ed6a0ac64"
+  },
+  {
+   "lane": "h264",
+   "name": "h264-main-1920x800.h264",
+   "path": ".research/codec-inputs/h264-main-1920x800.h264",
+   "bytes": 2102873,
+   "sha256": "3cb5324d42b8d35219208da7620c3dc71d8c08fdf93660e67d5cbcd2a4443f89"
+  },
+  {
+   "lane": "h264",
+   "name": "h264-high-720p.h264",
+   "path": ".research/codec-inputs/h264-high-720p.h264",
+   "bytes": 1469100,
+   "sha256": "f3b75499bd3a7d300d70110f5c640beb59788f7cc61143810a576a93317fd701"
+  },
+  {
+   "lane": "hevc",
+   "name": "hevc-main-1080p.hevc",
+   "path": ".research/codec-inputs/hevc-main-1080p.hevc",
+   "bytes": 2525973,
+   "sha256": "d72d53118fcf832485201682dcb80c7bbaeabd392b5fe493ba5e4b1cb25f1421"
+  },
+  {
+   "lane": "hevc",
+   "name": "hevc-main10-1080p.hevc",
+   "path": ".research/codec-inputs/hevc-main10-1080p.hevc",
+   "bytes": 2301304,
+   "sha256": "d00f2cabfd5a079d94d594c0f98c24d4fa474cf63d1ceef645949611ad23fcd9"
+  },
+  {
+   "lane": "hevc",
+   "name": "hevc-main10-2160p.hevc",
+   "path": ".research/codec-inputs/hevc-main10-2160p.hevc",
+   "bytes": 1884534,
+   "sha256": "5fcd4a7ad7c95c5bb17e7cf6302b02b97fb547433460e4bff716ef565781f681"
+  },
+  {
+   "lane": "aac",
+   "name": "aac-lc-5.1.aac",
+   "path": ".research/codec-inputs/aac-lc-5.1.aac",
+   "bytes": 484341,
+   "sha256": "266795d0d249358e1773ea2ff575d1c49730ae2a6f7f5b7b93129323cdfe8839"
+  },
+  {
+   "lane": "aac",
+   "name": "aac-lc-stereo.aac",
+   "path": ".research/codec-inputs/aac-lc-stereo.aac",
+   "bytes": 163539,
+   "sha256": "8211fabe2b5d6448420e31cae63839be4f876ad9a54a70a2a53bf31620e74537"
+  },
+  {
+   "lane": "aac",
+   "name": "al_sbr_cm_48_2.adts",
+   "path": ".research/codec-inputs/al_sbr_cm_48_2.adts",
+   "bytes": 198304,
+   "sha256": "0d17bc6adcb8dbebc4c5f1dc447d8631d0b1e0797ba5c3a4884e0e58230440d8"
+  },
+  {
+   "lane": "aac",
+   "name": "al_sbr_cm_48_5.1.adts",
+   "path": ".research/codec-inputs/al_sbr_cm_48_5.1.adts",
+   "bytes": 520018,
+   "sha256": "2f756af575771e9890c97841c13c555612599ce85e82af47df175a1e0e16d6a8"
+  },
+  {
+   "lane": "aac",
+   "name": "al_sbr_ps_06_new.adts",
+   "path": ".research/codec-inputs/al_sbr_ps_06_new.adts",
+   "bytes": 55767,
+   "sha256": "cc7e5b18455c04c76efa8a87bf7db40f297fb38aa56b93d4bd7f97a397b4fa87"
+  },
+  {
+   "lane": "dts",
+   "name": "core-dts_es.dts",
+   "path": ".research/codec-inputs/core-dts_es.dts",
+   "bytes": 503000,
+   "sha256": "2e2530d220d51b914d1e7acb63badb5b2dae1578f3274116206fa1aa5e597638"
+  },
+  {
+   "lane": "dts",
+   "name": "core-master_audio_7.1_24bit.dts",
+   "path": ".research/codec-inputs/core-master_audio_7.1_24bit.dts",
+   "bytes": 2358064,
+   "sha256": "fd230401e49b41fbc892246cf22d7b04419104e02978215b50dcba3751c8de5f"
+  },
+  {
+   "lane": "ac3",
+   "name": "monsters_inc_5.1_448_small.ac3",
+   "path": ".research/fate-samples/ac3/monsters_inc_5.1_448_small.ac3",
+   "bytes": 100000,
+   "sha256": "74fefeef070f663378a0864beb064cf88ee1186152f7ac320984af15be2f22db"
+  },
+  {
+   "lane": "ac3",
+   "name": "monsters_inc_2.0_192_small.ac3",
+   "path": ".research/fate-samples/ac3/monsters_inc_2.0_192_small.ac3",
+   "bytes": 100000,
+   "sha256": "4df071457c23d1a39fe52322892bc9333921ad6dfc8f87ffa0797bdfb5101bae"
+  },
+  {
+   "lane": "ac3",
+   "name": "millers_crossing_4.0.ac3",
+   "path": ".research/fate-samples/ac3/millers_crossing_4.0.ac3",
+   "bytes": 95232,
+   "sha256": "faa06c7b1ccbc5cf3c7897afb50004dd3d49feaa19d26bdeb03dc9bb4ec20802"
+  },
+  {
+   "lane": "eac3",
+   "name": "the_great_wall_7.1.eac3",
+   "path": ".research/fate-samples/eac3/the_great_wall_7.1.eac3",
+   "bytes": 723456,
+   "sha256": "d698981ddc1c10e65d234dd6a02ff2b0f4c88787595c9d3e5adf7f097f2c9e50"
+  },
+  {
+   "lane": "eac3",
+   "name": "csi_miami_5.1_256_spx_small.eac3",
+   "path": ".research/fate-samples/eac3/csi_miami_5.1_256_spx_small.eac3",
+   "bytes": 48128,
+   "sha256": "84f50317a49a98509bf174ace814b39860e6ab2a1d61bdbd10ada9081f2bb2b3"
+  },
+  {
+   "lane": "eac3",
+   "name": "csi_miami_stereo_128_spx.eac3",
+   "path": ".research/fate-samples/eac3/csi_miami_stereo_128_spx.eac3",
+   "bytes": 333664,
+   "sha256": "f96b45fa4d249522cd83dea009cd528ce552ec9d947e03cdecab44652bc86ecb"
+  },
+  {
+   "lane": "eac3",
+   "name": "serenity_english_5.1_1536_small.eac3",
+   "path": ".research/fate-samples/eac3/serenity_english_5.1_1536_small.eac3",
+   "bytes": 99328,
+   "sha256": "3d81c22610a2602b7799ec5e59c2677e8ab23e03e4abc03c2a16b683aa3d5f0a"
+  },
+  {
+   "lane": "flac",
+   "name": "flac-16-44k-stereo.flac",
+   "path": ".research/codec-inputs/flac-16-44k-stereo.flac",
+   "bytes": 2160564,
+   "sha256": "481aeb8ab56e57948e56cf308d2a457ade063e4d1564c93a23dc716aea402364"
+  },
+  {
+   "lane": "flac",
+   "name": "flac-24-96k-5.1.flac",
+   "path": ".research/codec-inputs/flac-24-96k-5.1.flac",
+   "bytes": 13025447,
+   "sha256": "d1362bda1ffec3ffbf1e17f928305f323fa3a44ae30c94f3b5e31de70c067142"
+  },
+  {
+   "lane": "mp3",
+   "name": "mp3-cbr-128-joint.mp3",
+   "path": ".research/codec-inputs/mp3-cbr-128-joint.mp3",
+   "bytes": 481070,
+   "sha256": "829d58c07690b06675f8fb4151dfeab5b41bd6f017c1cffcfbdad71b6d24f81f"
+  },
+  {
+   "lane": "mp3",
+   "name": "mp3-vbr-v2.mp3",
+   "path": ".research/codec-inputs/mp3-vbr-v2.mp3",
+   "bytes": 477382,
+   "sha256": "463afda155d878b8c56f94e522a1ee0533e86a2cff164a4d60c1cad82bf6e376"
+  },
+  {
+   "lane": "mp2",
+   "name": "mp2-256-48k.mp2",
+   "path": ".research/codec-inputs/mp2-256-48k.mp2",
+   "bytes": 960000,
+   "sha256": "77241c48c7edb65ec0c8b48e9511399d3e6a9f8178dc120c3a68d1bfcd532030"
+  },
+  {
+   "lane": "vorbis",
+   "name": "vorbis-q5-stereo.ogg",
+   "path": ".research/codec-inputs/vorbis-q5-stereo.ogg",
+   "bytes": 383046,
+   "sha256": "9c1a76b5f322590ea9d13df55627a30a7b8fa6e34e4573be1d2eed893e6ca44b"
+  },
+  {
+   "lane": "vorbis",
+   "name": "vorbis-q3-5.1.ogg",
+   "path": ".research/codec-inputs/vorbis-q3-5.1.ogg",
+   "bytes": 192954,
+   "sha256": "f81902a813fed92af7005e551d4fb956ac115e0a083a7359b559804254d8a998"
+  },
+  {
+   "lane": "opus",
+   "name": "opus-music-128-stereo.opus",
+   "path": ".research/codec-inputs/opus-music-128-stereo.opus",
+   "bytes": 439465,
+   "sha256": "80b95dcf025d636dc747b67d14d8a532f0bed4e1f1dbeb61c16591ba0fe29e6c"
+  },
+  {
+   "lane": "opus",
+   "name": "opus-speech-24-mono.opus",
+   "path": ".research/codec-inputs/opus-speech-24-mono.opus",
+   "bytes": 94003,
+   "sha256": "41c55bb1f4cdffbab74d4a04dce8afc857d7c1ab2d5b8704ec6952efe9a075bf"
+  },
+  {
+   "lane": "opus",
+   "name": "opus-5.1-256.opus",
+   "path": ".research/codec-inputs/opus-5.1-256.opus",
+   "bytes": 373086,
+   "sha256": "0434eebcdfff1dd9d7351cada961fa8befffb03d8eaa3f1a1396f3cdb9a80e0c"
   }
  ]
 }

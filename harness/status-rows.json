@@ -493,6 +493,30 @@
       ]
     },
     {
+      "area": "Length-prefixed NAL units",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "nal-length-prefixed"
+    },
+    {
+      "area": "NAL configuration inputs",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "nal-config-inputs"
+    },
+    {
+      "area": "HEVC record writing",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "hevc-record-annexb"
+    },
+    {
       "area": "DTS core frames and extents",
       "targets": [
         "aarch64-unknown-linux-gnu",
