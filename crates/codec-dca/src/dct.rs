@@ -47,7 +47,9 @@ impl Dct4 {
 
     /// Transform `x` (N = 2 M, the size the transform was built for), handing each
     /// output pair `(k, y[k], y[N-1-k])` for even `k` to `emit`.
-    #[inline]
+    ///
+    /// Kept out of line: inlined into the synthesis, its butterflies spill more.
+    #[inline(never)]
     #[expect(
         clippy::expect_used,
         reason = "N- and M-entry ranges convert to arrays"
