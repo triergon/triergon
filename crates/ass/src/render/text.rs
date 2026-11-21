@@ -6,6 +6,7 @@ use std::ops::Range;
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 use triergon_raster::pixels_26_6;
+use triergon_shape::compat::libass::rotates;
 
 use super::fonts::{FontId, Library};
 use super::geometry::Scales;
@@ -259,7 +260,7 @@ impl Text {
             let decorations = Decorations {
                 underline: glyph.state.underline,
                 strike_out: glyph.state.strike_out,
-                rotate: desc.vertical && triergon_shape::compat::libass::rotates(symbol),
+                rotate: desc.vertical && rotates(symbol),
             };
             let style = GlyphStyle::new(&glyph.state, decorations, drawing.is_some(), scales, par);
             // The previous character's style is the last one kept: an equal
