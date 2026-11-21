@@ -275,18 +275,35 @@ impl LineParams {
     fn uniform<const SEG: usize>(bs4: [u8; 4], qp_avg: i32, a_off: i32, b_off: i32) -> Self {
         let ia = (qp_avg + a_off).clamp(0, 51) as usize;
         let ib = (qp_avg + b_off).clamp(0, 51) as usize;
-        let tc4 = bs4.map(|b| {
+        let tc = |b: u8| -> i16 {
             if b > 0 && b < 4 {
                 TC0[b as usize - 1][ia] as i16
             } else {
                 0
             }
-        });
+        };
+        let tc4 = [tc(bs4[0]), tc(bs4[1]), tc(bs4[2]), tc(bs4[3])];
         LineParams {
             bs: std::array::from_fn(|i| if i < 4 * SEG { bs4[i / SEG] } else { 0 }),
             alpha: [ALPHA[ia] as i16; 16],
             beta: [BETA[ib] as i16; 16],
             tc0: std::array::from_fn(|i| if i < 4 * SEG { tc4[i / SEG] } else { 0 }),
+        }
+    }
+    /// Parameters of a chroma edge of both planes: Cb's 8 lines in lanes 0..8 (qPav `qp[0]`),
+    /// Cr's in lanes 8..16 (`qp[1]`), bS constant per segment of 2 lines.
+    #[inline(always)]
+    fn chroma(bs4: [u8; 4], qp: [i32; 2], a_off: i32, b_off: i32) -> Self {
+        let cb = Self::uniform::<2>(bs4, qp[0], a_off, b_off);
+        let cr = Self::uniform::<2>(bs4, qp[1], a_off, b_off);
+        let half = |a: [i16; 16], b: [i16; 16]| -> [i16; 16] {
+            std::array::from_fn(|i| if i < 8 { a[i] } else { b[i - 8] })
+        };
+        LineParams {
+            bs: std::array::from_fn(|i| if i < 8 { cb.bs[i] } else { cr.bs[i - 8] }),
+            alpha: half(cb.alpha, cr.alpha),
+            beta: half(cb.beta, cr.beta),
+            tc0: half(cb.tc0, cr.tc0),
         }
     }
     fn new() -> Self {
@@ -312,28 +329,49 @@ impl LineParams {
     }
 }
 
-/// Gather an edge whose lines run along a row (horizontal edge): lane k = row q0 + (k-4)*step.
+/// qPav of each chroma component across an edge (8.7.2.2), from the QPc values of both sides.
+#[inline(always)]
+fn qp_avg(p: [i8; 2], q: [i32; 2]) -> [i32; 2] {
+    [(p[0] as i32 + q[0] + 1) >> 1, (p[1] as i32 + q[1] + 1) >> 1]
+}
+
+/// Gather an edge whose lines run along a row (horizontal edge) into lanes `at..at + N`: lane
+/// k = row q0 + (k-4)*step.
 #[inline(always)]
 #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
-fn load_h<const N: usize>(s: &[u8], q0: usize, step: usize, l: &mut Lanes) {
+fn load_h<const N: usize>(s: &[u8], q0: usize, step: usize, l: &mut Lanes, at: usize) {
     for k in 0..8 {
         let o = q0 + k * step - 4 * step;
         let src: &[u8; N] = s[o..o + N].try_into().unwrap();
-        l[k][..N].copy_from_slice(src);
+        l[k][at..at + N].copy_from_slice(src);
     }
 }
 
+/// Scatter rows `lo..hi` of a horizontal edge back from lanes `at..at + N`.
 #[inline(always)]
 #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
-fn store_h<const N: usize>(s: &mut [u8], q0: usize, step: usize, l: &Lanes, lo: usize, hi: usize) {
+fn store_h<const N: usize>(
+    s: &mut [u8],
+    q0: usize,
+    step: usize,
+    l: &Lanes,
+    lo: usize,
+    hi: usize,
+    at: usize,
+) {
     for k in lo..hi {
         let o = q0 + k * step - 4 * step;
         let dst: &mut [u8; N] = (&mut s[o..o + N]).try_into().unwrap();
-        dst.copy_from_slice(&l[k][..N]);
+        dst.copy_from_slice(&l[k][at..at + N]);
     }
 }
 
+// Vertical edges are gathered into lanes and scattered back by byte transposes in
+// general-purpose registers: 8x8 blocks in u64 words on 64-bit targets, 4x4 blocks in u32 words
+// on 32-bit ones, where a u64 shift costs several instructions.
+
 /// In-register transpose of an 8x8 byte matrix held as big-endian rows (column 0 = MSB).
+#[cfg(target_pointer_width = "64")]
 #[inline(always)]
 fn transpose8(r: &mut [u64; 8]) {
     for i in 0..4 {
@@ -353,10 +391,12 @@ fn transpose8(r: &mut [u64; 8]) {
     }
 }
 
-/// Gather a vertical edge: line i is row q0 + i*line_step, lane k = column (k - 4).
+/// Gather a vertical edge into lanes `at..at + N`: line i is row q0 + i*line_step, lane k =
+/// column (k - 4).
+#[cfg(target_pointer_width = "64")]
 #[inline(always)]
 #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
-fn load_v<const N: usize>(s: &[u8], q0: usize, line_step: usize, l: &mut Lanes) {
+fn load_v<const N: usize>(s: &[u8], q0: usize, line_step: usize, l: &mut Lanes, at: usize) {
     for half in 0..N / 8 {
         let mut r = [0u64; 8];
         for i in 0..8 {
@@ -365,31 +405,88 @@ fn load_v<const N: usize>(s: &[u8], q0: usize, line_step: usize, l: &mut Lanes) 
         }
         transpose8(&mut r);
         for k in 0..8 {
-            l[k][half * 8..half * 8 + 8].copy_from_slice(&r[k].to_be_bytes());
+            l[k][at + half * 8..at + half * 8 + 8].copy_from_slice(&r[k].to_be_bytes());
         }
     }
 }
 
-/// Scatter a vertical edge back (all 8 samples of each line; p3 / q3 are unchanged).
+/// Scatter a vertical edge back from lanes `at..at + N` (all 8 samples of each line; p3 / q3
+/// are unchanged).
+#[cfg(target_pointer_width = "64")]
 #[inline(always)]
 #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
-fn store_v<const N: usize>(
-    s: &mut [u8],
-    q0: usize,
-    line_step: usize,
-    l: &Lanes,
-    _lo: usize,
-    _hi: usize,
-) {
+fn store_v<const N: usize>(s: &mut [u8], q0: usize, line_step: usize, l: &Lanes, at: usize) {
     for half in 0..N / 8 {
         let mut r = [0u64; 8];
         for k in 0..8 {
-            r[k] = u64::from_be_bytes(l[k][half * 8..half * 8 + 8].try_into().unwrap());
+            let lane = &l[k][at + half * 8..at + half * 8 + 8];
+            r[k] = u64::from_be_bytes(lane.try_into().unwrap());
         }
         transpose8(&mut r);
         for i in 0..8 {
             let o = q0 + (half * 8 + i) * line_step - 4;
             s[o..o + 8].copy_from_slice(&r[i].to_be_bytes());
+        }
+    }
+}
+
+/// In-register transpose of a 4x4 byte matrix held as little-endian rows (column 0 = LSB).
+#[cfg(not(target_pointer_width = "64"))]
+#[inline(always)]
+fn transpose4(r: &mut [u32; 4]) {
+    for i in 0..2 {
+        let t = ((r[i] >> 16) ^ r[i + 2]) & 0x0000_FFFF;
+        r[i] ^= t << 16;
+        r[i + 2] ^= t;
+    }
+    for i in [0, 2] {
+        let t = ((r[i] >> 8) ^ r[i + 1]) & 0x00FF_00FF;
+        r[i] ^= t << 8;
+        r[i + 1] ^= t;
+    }
+}
+
+/// Gather a vertical edge into lanes `at..at + N`: line i is row q0 + i*line_step, lane k =
+/// column (k - 4).
+#[cfg(not(target_pointer_width = "64"))]
+#[inline(always)]
+fn load_v<const N: usize>(s: &[u8], q0: usize, line_step: usize, l: &mut Lanes, at: usize) {
+    for quarter in 0..N / 4 {
+        // Columns p3..p0 and q0..q3 of four lines.
+        let (mut p, mut q) = ([0u32; 4], [0u32; 4]);
+        for i in 0..4 {
+            let o = q0 + (quarter * 4 + i) * line_step - 4;
+            p[i] = u32::from_le_bytes(s[o..o + 4].try_into().unwrap());
+            q[i] = u32::from_le_bytes(s[o + 4..o + 8].try_into().unwrap());
+        }
+        transpose4(&mut p);
+        transpose4(&mut q);
+        let lanes = at + quarter * 4..at + quarter * 4 + 4;
+        for k in 0..4 {
+            l[k][lanes.clone()].copy_from_slice(&p[k].to_le_bytes());
+            l[k + 4][lanes.clone()].copy_from_slice(&q[k].to_le_bytes());
+        }
+    }
+}
+
+/// Scatter a vertical edge back from lanes `at..at + N` (all 8 samples of each line; p3 / q3
+/// are unchanged).
+#[cfg(not(target_pointer_width = "64"))]
+#[inline(always)]
+fn store_v<const N: usize>(s: &mut [u8], q0: usize, line_step: usize, l: &Lanes, at: usize) {
+    for quarter in 0..N / 4 {
+        let lanes = at + quarter * 4..at + quarter * 4 + 4;
+        let (mut p, mut q) = ([0u32; 4], [0u32; 4]);
+        for k in 0..4 {
+            p[k] = u32::from_le_bytes(l[k][lanes.clone()].try_into().unwrap());
+            q[k] = u32::from_le_bytes(l[k + 4][lanes.clone()].try_into().unwrap());
+        }
+        transpose4(&mut p);
+        transpose4(&mut q);
+        for i in 0..4 {
+            let o = q0 + (quarter * 4 + i) * line_step - 4;
+            s[o..o + 4].copy_from_slice(&p[i].to_le_bytes());
+            s[o + 4..o + 8].copy_from_slice(&q[i].to_le_bytes());
         }
     }
 }
@@ -404,13 +501,12 @@ fn sel16(m: i16, a: i16, b: i16) -> i16 {
 }
 
 /// Luma edge filter (8.7.2.3 / 8.7.2.4) on all 16 lines of `l`: straight-line integer code with
-/// mask selects so the loops vectorise. Edges without bS = 4 lines use the cheaper normal filter.
+/// mask selects so the loops vectorise. Returns whether any sample changed.
 #[inline(never)]
-fn filter_luma(l: &mut Lanes, pr: &LineParams) {
+fn filter_luma(l: &mut Lanes, pr: &LineParams) -> bool {
     // filterSamplesFlag per line (8-460).
     let mut f = [0i16; 16];
     let mut any = 0i16;
-    let mut any4 = 0i16;
     for i in 0..16 {
         let p1 = l[2][i] as i16;
         let p0 = l[3][i] as i16;
@@ -424,20 +520,16 @@ fn filter_luma(l: &mut Lanes, pr: &LineParams) {
             & m16((q1 - q0).abs() < be);
         f[i] = m;
         any |= m;
-        any4 |= m & m16(pr.bs[i] == 4);
     }
-    if any == 0 {
-        return;
-    }
-    let _ = any4;
-    filter_luma_full(l, pr, &f);
+    any != 0 && filter_luma_lines(l, pr, &f)
 }
 
-/// Luma filter for edges containing bS = 4 lines (8.7.2.3 and 8.7.2.4).
+/// Luma filter of the lines flagged in `f` (8.7.2.3 and 8.7.2.4), in place: each lane reads
+/// only its own samples. Returns whether any sample changed.
 #[inline(always)]
 #[allow(clippy::manual_clamp)] // Ord::clamp asserts min <= max at run time, which blocks vectorisation
-fn filter_luma_full(l: &mut Lanes, pr: &LineParams, f: &[i16; 16]) {
-    let mut o = [[0u8; 16]; 6];
+fn filter_luma_lines(l: &mut Lanes, pr: &LineParams, f: &[i16; 16]) -> bool {
+    let mut diff = [0u8; 16];
     for i in 0..16 {
         let p3 = l[0][i] as i16;
         let p2 = l[1][i] as i16;
@@ -484,23 +576,32 @@ fn filter_luma_full(l: &mut Lanes, pr: &LineParams, f: &[i16; 16]) {
         let fq0 = sel16(is4, sq0, nq0);
         let fq1 = sel16(is4, sq1, sel16(aq, nq1, q1));
         let fq2 = sel16(is4, sq2, q2);
-        o[0][i] = sel16(f, fp2, p2) as u8;
-        o[1][i] = sel16(f, fp1, p1).clamp(0, 255) as u8;
-        o[2][i] = sel16(f, fp0, p0) as u8;
-        o[3][i] = sel16(f, fq0, q0) as u8;
-        o[4][i] = sel16(f, fq1, q1).clamp(0, 255) as u8;
-        o[5][i] = sel16(f, fq2, q2) as u8;
+        let o = [
+            sel16(f, fp2, p2) as u8,
+            sel16(f, fp1, p1).clamp(0, 255) as u8,
+            sel16(f, fp0, p0) as u8,
+            sel16(f, fq0, q0) as u8,
+            sel16(f, fq1, q1).clamp(0, 255) as u8,
+            sel16(f, fq2, q2) as u8,
+        ];
+        for (k, o) in o.into_iter().enumerate() {
+            diff[i] |= o ^ l[k + 1][i];
+            l[k + 1][i] = o;
+        }
     }
-    l[1..7].copy_from_slice(&o);
+    diff != [0; 16]
 }
 
-/// Chroma edge filter (chromaStyleFilteringFlag = 1) on 8 lines.
+/// Chroma edge filter (chromaStyleFilteringFlag = 1) on 16 lines: those of Cb in lanes 0..8
+/// and of Cr in lanes 8..16. Returns whether samples changed: bit 0 in Cb's lanes, bit 1 in
+/// Cr's.
 #[inline(never)]
 #[allow(clippy::manual_clamp)] // Ord::clamp asserts min <= max at run time, which blocks vectorisation
-fn filter_chroma(l: &mut Lanes, pr: &LineParams, _n: usize) {
-    let mut op = [0u8; 8];
-    let mut oq = [0u8; 8];
-    for i in 0..8 {
+fn filter_chroma(l: &mut Lanes, pr: &LineParams) -> u8 {
+    let mut op = [0u8; 16];
+    let mut oq = [0u8; 16];
+    let mut diff = [0u8; 16];
+    for i in 0..16 {
         let p1 = l[2][i] as i16;
         let p0 = l[3][i] as i16;
         let q0 = l[4][i] as i16;
@@ -521,9 +622,66 @@ fn filter_chroma(l: &mut Lanes, pr: &LineParams, _n: usize) {
         let sq0 = (2 * q1 + q0 + p1 + 2) >> 2;
         op[i] = sel16(f, sel16(is4, sp0, np0), p0) as u8;
         oq[i] = sel16(f, sel16(is4, sq0, nq0), q0) as u8;
+        diff[i] = (op[i] ^ l[3][i]) | (oq[i] ^ l[4][i]);
     }
-    l[3][..8].copy_from_slice(&op);
-    l[4][..8].copy_from_slice(&oq);
+    l[3] = op;
+    l[4] = oq;
+    let [cb, cr]: [[u8; 8]; 2] = [diff[..8].try_into().unwrap(), diff[8..].try_into().unwrap()];
+    u8::from(cb != [0; 8]) | (u8::from(cr != [0; 8]) << 1)
+}
+
+/// Filter a vertical luma edge of 16 lines whose q0 column starts at `q0`.
+#[inline(always)]
+fn luma_edge_v(ys: &mut [u8], q0: usize, line_step: usize, pr: &LineParams, l: &mut Lanes) {
+    load_v::<16>(ys, q0, line_step, l, 0);
+    if filter_luma(l, pr) {
+        store_v::<16>(ys, q0, line_step, l, 0);
+    }
+}
+
+/// Filter a horizontal luma edge of 16 lines whose q0 row starts at `q0`.
+#[inline(always)]
+fn luma_edge_h(ys: &mut [u8], q0: usize, step: usize, pr: &LineParams, l: &mut Lanes) {
+    load_h::<16>(ys, q0, step, l, 0);
+    if filter_luma(l, pr) {
+        store_h::<16>(ys, q0, step, l, 1, 7, 0);
+    }
+}
+
+/// Filter a vertical chroma edge of both planes (8 lines each) at `q0`.
+#[inline(always)]
+fn chroma_edge_v(
+    planes: [&mut [u8]; 2],
+    q0: usize,
+    line_step: usize,
+    pr: &LineParams,
+    l: &mut Lanes,
+) {
+    let [cb, cr] = planes;
+    load_v::<8>(cb, q0, line_step, l, 0);
+    load_v::<8>(cr, q0, line_step, l, 8);
+    let changed = filter_chroma(l, pr);
+    if changed & 1 != 0 {
+        store_v::<8>(cb, q0, line_step, l, 0);
+    }
+    if changed & 2 != 0 {
+        store_v::<8>(cr, q0, line_step, l, 8);
+    }
+}
+
+/// Filter a horizontal chroma edge of both planes (8 lines each) at `q0`.
+#[inline(always)]
+fn chroma_edge_h(planes: [&mut [u8]; 2], q0: usize, step: usize, pr: &LineParams, l: &mut Lanes) {
+    let [cb, cr] = planes;
+    load_h::<8>(cb, q0, step, l, 0);
+    load_h::<8>(cr, q0, step, l, 8);
+    let changed = filter_chroma(l, pr);
+    if changed & 1 != 0 {
+        store_h::<8>(cb, q0, step, l, 3, 5, 0);
+    }
+    if changed & 2 != 0 {
+        store_h::<8>(cr, q0, step, l, 3, 5, 8);
+    }
 }
 
 /// Deblocking progress of the picture being decoded. Rows of macroblocks (MB pair rows with
@@ -694,9 +852,10 @@ fn motion_bs(rp: [i32; 2], mp: [[i16; 2]; 2], rq: [i32; 2], mq: [[i16; 2]; 2], l
     }
 }
 
-/// Internal edge strengths of a non-intra MB: [vertical edge e][row], [horizontal edge e][column].
+/// Internal edge strengths of a non-intra MB: [vertical edge e][row], [horizontal edge e][column],
+/// for the edges filtered: only e = 2 with the 8x8 transform (`t8`), else 1..4.
 #[inline(never)]
-fn internal_bs(ctx: &BsCtx<'_>, q: usize) -> ([[u8; 4]; 4], [[u8; 4]; 4]) {
+fn internal_bs(ctx: &BsCtx<'_>, q: usize, t8: bool) -> ([[u8; 4]; 4], [[u8; 4]; 4]) {
     let mq = &ctx.mbs[q];
     let nz = mq.nzmask as u32;
     let m = ctx.motion;
@@ -721,7 +880,7 @@ fn internal_bs(ctx: &BsCtx<'_>, q: usize) -> ([[u8; 4]; 4], [[u8; 4]; 4]) {
     };
     let mut v = [[0u8; 4]; 4];
     let mut h = [[0u8; 4]; 4];
-    for e in 1..4 {
+    for e in if t8 { 2..3 } else { 1..4 } {
         for k in 0..4 {
             v[e][k] = pair(k * 4 + e - 1, k * 4 + e);
             h[e][k] = pair((e - 1) * 4 + k, e * 4 + k);
@@ -780,7 +939,7 @@ fn deblock_mb(
     let (ibs_v, ibs_h) = if q_intra || int_zero {
         ([[3u8; 4]; 4], [[3u8; 4]; 4])
     } else {
-        internal_bs(&ctx, addr)
+        internal_bs(&ctx, addr, t8)
     };
     let ybase_q = vy.base + yi * vy.stride + mbx * 16;
     let lstride = vy.stride * dy;
@@ -805,18 +964,11 @@ fn deblock_mb(
                 let mp = &pic.mbs[p];
                 let pr =
                     LineParams::uniform::<4>(bs4, (mp.qp as i32 + qp_q + 1) >> 1, a_off, b_off);
-                load_v::<16>(ys, ybase_q, lstride, &mut lanes);
-                filter_luma(&mut lanes, &pr);
-                store_v::<16>(ys, ybase_q, lstride, &lanes, 1, 7);
+                luma_edge_v(ys, ybase_q, lstride, &pr, &mut lanes);
                 if chroma {
-                    for comp in 0..2 {
-                        let s: &mut [u8] = if comp == 0 { cbs } else { crs };
-                        let qpav = (mp.qpc[comp] as i32 + qpc_q[comp] + 1) >> 1;
-                        let pr = LineParams::uniform::<2>(bs4, qpav, a_off, b_off);
-                        load_v::<8>(s, cbase_q, cstride, &mut lanes);
-                        filter_chroma(&mut lanes, &pr, 8);
-                        store_v::<8>(s, cbase_q, cstride, &lanes, 3, 5);
-                    }
+                    let qpav = qp_avg(mp.qpc, qpc_q);
+                    let pr = LineParams::chroma(bs4, qpav, a_off, b_off);
+                    chroma_edge_v([cbs, crs], cbase_q, cstride, &pr, &mut lanes);
                 }
             }
         }
@@ -849,13 +1001,11 @@ fn deblock_mb(
                     );
                 }
             }
-            load_v::<16>(ys, ybase_q, lstride, &mut lanes);
-            filter_luma(&mut lanes, &pr);
-            store_v::<16>(ys, ybase_q, lstride, &lanes, 1, 7);
+            luma_edge_v(ys, ybase_q, lstride, &pr, &mut lanes);
             if chroma {
+                // Cb's lines in lanes 0..8, Cr's in 8..16.
+                let mut pr = LineParams::new();
                 for comp in 0..2 {
-                    let s: &mut [u8] = if comp == 0 { cbs } else { crs };
-                    let mut pr = LineParams::new();
                     for k in 0..8 {
                         // Luma line in the same field (8.7.2: luma sample (2x, 2y) of that field).
                         let lk = if !qfield {
@@ -866,13 +1016,11 @@ fn deblock_mb(
                         if bs_left[lk] != 0 {
                             let qpav =
                                 (pic.mbs[pmb_left[lk]].qpc[comp] as i32 + qpc_q[comp] + 1) >> 1;
-                            pr.set(k, bs_left[lk], qpav, a_off, b_off);
+                            pr.set(8 * comp + k, bs_left[lk], qpav, a_off, b_off);
                         }
                     }
-                    load_v::<8>(s, cbase_q, cstride, &mut lanes);
-                    filter_chroma(&mut lanes, &pr, 8);
-                    store_v::<8>(s, cbase_q, cstride, &lanes, 3, 5);
                 }
+                chroma_edge_v([cbs, crs], cbase_q, cstride, &pr, &mut lanes);
             }
         }
     }
@@ -890,18 +1038,11 @@ fn deblock_mb(
                 continue;
             }
             let pr = LineParams::uniform::<4>(bs_int_v[e], qp_q, a_off, b_off);
-            load_v::<16>(ys, ybase_q + e * 4, lstride, &mut lanes);
-            filter_luma(&mut lanes, &pr);
-            store_v::<16>(ys, ybase_q + e * 4, lstride, &lanes, 1, 7);
+            luma_edge_v(ys, ybase_q + e * 4, lstride, &pr, &mut lanes);
         }
         if chroma && bs_int_v[2] != [0; 4] {
-            for comp in 0..2 {
-                let s: &mut [u8] = if comp == 0 { cbs } else { crs };
-                let pr = LineParams::uniform::<2>(bs_int_v[2], qpc_q[comp], a_off, b_off);
-                load_v::<8>(s, cbase_q + 4, cstride, &mut lanes);
-                filter_chroma(&mut lanes, &pr, 8);
-                store_v::<8>(s, cbase_q + 4, cstride, &lanes, 3, 5);
-            }
+            let pr = LineParams::chroma(bs_int_v[2], qpc_q, a_off, b_off);
+            chroma_edge_v([cbs, crs], cbase_q + 4, cstride, &pr, &mut lanes);
         }
     }
 
@@ -928,19 +1069,13 @@ fn deblock_mb(
                 let qpav = (pic.mbs[p].qp as i32 + qp_q + 1) >> 1;
                 let pr = LineParams::uniform::<4>(bs, qpav, a_off, b_off);
                 let q0 = vy.base + (yi + ye) * vy.stride + mbx * 16;
-                load_h::<16>(ys, q0, 2 * vy.stride, &mut lanes);
-                filter_luma(&mut lanes, &pr);
-                store_h::<16>(ys, q0, 2 * vy.stride, &lanes, 1, 7);
+                luma_edge_h(ys, q0, 2 * vy.stride, &pr, &mut lanes);
                 if chroma {
-                    for comp in 0..2 {
-                        let s: &mut [u8] = if comp == 0 { cbs } else { crs };
-                        let qpav = (pic.mbs[p].qpc[comp] as i32 + qpc_q[comp] + 1) >> 1;
-                        let pr = LineParams::uniform::<2>(bs, qpav, a_off, b_off);
-                        let q0 = vc.base + (cyi + ye) * vc.stride + mbx * 8;
-                        load_h::<8>(s, q0, 2 * vc.stride, &mut lanes);
-                        filter_chroma(&mut lanes, &pr, 8);
-                        store_h::<8>(s, q0, 2 * vc.stride, &lanes, 3, 5);
-                    }
+                    let mp = &pic.mbs[p];
+                    let qpav = qp_avg(mp.qpc, qpc_q);
+                    let pr = LineParams::chroma(bs, qpav, a_off, b_off);
+                    let q0 = vc.base + (cyi + ye) * vc.stride + mbx * 8;
+                    chroma_edge_h([cbs, crs], q0, 2 * vc.stride, &pr, &mut lanes);
                 }
             }
         } else {
@@ -967,18 +1102,12 @@ fn deblock_mb(
                 if bs != [0; 4] {
                     let qpav = (pic.mbs[p].qp as i32 + qp_q + 1) >> 1;
                     let pr = LineParams::uniform::<4>(bs, qpav, a_off, b_off);
-                    load_h::<16>(ys, ybase_q, lstride, &mut lanes);
-                    filter_luma(&mut lanes, &pr);
-                    store_h::<16>(ys, ybase_q, lstride, &lanes, 1, 7);
+                    luma_edge_h(ys, ybase_q, lstride, &pr, &mut lanes);
                     if chroma {
-                        for comp in 0..2 {
-                            let s: &mut [u8] = if comp == 0 { cbs } else { crs };
-                            let qpav = (pic.mbs[p].qpc[comp] as i32 + qpc_q[comp] + 1) >> 1;
-                            let pr = LineParams::uniform::<2>(bs, qpav, a_off, b_off);
-                            load_h::<8>(s, cbase_q, cstride, &mut lanes);
-                            filter_chroma(&mut lanes, &pr, 8);
-                            store_h::<8>(s, cbase_q, cstride, &lanes, 3, 5);
-                        }
+                        let mp = &pic.mbs[p];
+                        let qpav = qp_avg(mp.qpc, qpc_q);
+                        let pr = LineParams::chroma(bs, qpav, a_off, b_off);
+                        chroma_edge_h([cbs, crs], cbase_q, cstride, &pr, &mut lanes);
                     }
                 }
             }
@@ -998,20 +1127,11 @@ fn deblock_mb(
                 continue;
             }
             let pr = LineParams::uniform::<4>(bs_int_h[e], qp_q, a_off, b_off);
-            let row = ybase_q + e * 4 * lstride;
-            load_h::<16>(ys, row, lstride, &mut lanes);
-            filter_luma(&mut lanes, &pr);
-            store_h::<16>(ys, row, lstride, &lanes, 1, 7);
+            luma_edge_h(ys, ybase_q + e * 4 * lstride, lstride, &pr, &mut lanes);
         }
         if chroma && bs_int_h[2] != [0; 4] {
-            for comp in 0..2 {
-                let s: &mut [u8] = if comp == 0 { cbs } else { crs };
-                let pr = LineParams::uniform::<2>(bs_int_h[2], qpc_q[comp], a_off, b_off);
-                let row = cbase_q + 4 * cstride;
-                load_h::<8>(s, row, cstride, &mut lanes);
-                filter_chroma(&mut lanes, &pr, 8);
-                store_h::<8>(s, row, cstride, &lanes, 3, 5);
-            }
+            let pr = LineParams::chroma(bs_int_h[2], qpc_q, a_off, b_off);
+            chroma_edge_h([cbs, crs], cbase_q + 4 * cstride, cstride, &pr, &mut lanes);
         }
     }
     let _ = Kind::None;
@@ -1028,14 +1148,14 @@ mod tests {
             *v = (i * 7 + 3) as u8;
         }
         let mut l: Lanes = [[0; 16]; 8];
-        load_v::<16>(&s, 4, 8, &mut l);
+        load_v::<16>(&s, 4, 8, &mut l, 0);
         for i in 0..16 {
             for k in 0..8 {
                 assert_eq!(l[k][i], s[i * 8 + k]);
             }
         }
         let mut s2 = vec![0u8; 16 * 8];
-        store_v::<16>(&mut s2, 4, 8, &l, 0, 8);
+        store_v::<16>(&mut s2, 4, 8, &l, 0);
         assert_eq!(s, s2);
     }
 }

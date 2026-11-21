@@ -770,10 +770,7 @@ impl SliceDecoder<'_> {
             let (mv0, mv1) = if p0.long || p1.poc - p0.poc == 0 {
                 (mv_col, [0, 0])
             } else {
-                let tb = (self.cur_poc() - p0.poc).clamp(-128, 127);
-                let td = (p1.poc - p0.poc).clamp(-128, 127);
-                let tx = (16384 + (td / 2).abs()) / td;
-                let dsf = ((tb * tx + 32) >> 6).clamp(-1024, 1023);
+                let dsf = dist_scale_factor(self.cur_poc() - p0.poc, p1.poc - p0.poc);
                 let m0 = [(dsf * mv_col[0] + 128) >> 8, (dsf * mv_col[1] + 128) >> 8];
                 (m0, [m0[0] - mv_col[0], m0[1] - mv_col[1]])
             };
@@ -1050,19 +1047,40 @@ impl SliceDecoder<'_> {
 
     /// Implicit bi-predictive weights (8.4.2.3.1, equations 8-275 .. 8-280).
     fn implicit_weights(&self, p0: &RefPic, p1: &RefPic) -> (i32, i32) {
-        let cur_poc = self.cur_poc();
-        let tb = (cur_poc - p0.poc).clamp(-128, 127);
-        let td = (p1.poc - p0.poc).clamp(-128, 127);
         if p1.poc - p0.poc == 0 || p0.long || p1.long {
             return (32, 32);
         }
-        let tx = (16384 + (td / 2).abs()) / td;
-        let dsf = ((tb * tx + 32) >> 6).clamp(-1024, 1023);
+        let dsf = dist_scale_factor(self.cur_poc() - p0.poc, p1.poc - p0.poc);
         if (dsf >> 2) < -64 || (dsf >> 2) > 128 {
             return (32, 32);
         }
         (64 - (dsf >> 2), dsf >> 2)
     }
+}
+
+/// tx = (16384 + Abs(td / 2)) / td for td in -128..=127 (index td + 128; 0 where td = 0), so
+/// that temporal direct prediction and implicit weights divide nothing at run time (32-bit
+/// ARM's baseline has no divide instruction).
+const TX: [i32; 256] = {
+    let mut tx = [0; 256];
+    let mut i = 0;
+    while i < 256 {
+        let td = i as i32 - 128;
+        if td != 0 {
+            tx[i] = (16384 + (td / 2).abs()) / td;
+        }
+        i += 1;
+    }
+    tx
+};
+
+/// DistScaleFactor (8.4.1.2.3, 8.4.2.3.1) for the POC distances tb and td, td != 0, both
+/// clipped to -128..=127.
+#[inline]
+fn dist_scale_factor(tb: i32, td: i32) -> i32 {
+    let (tb, td) = (tb.clamp(-128, 127), td.clamp(-128, 127));
+    let tx = TX[(td + 128) as usize];
+    ((tb * tx + 32) >> 6).clamp(-1024, 1023)
 }
 
 /// Motion of one prediction block.
@@ -1246,6 +1264,24 @@ fn chroma_src<'a>(
     (&tmp[..], 8)
 }
 
+/// Luma prediction of one list of a block narrower than 16 samples, interpolated into `tmp`
+/// (stride 16).
+#[inline]
+fn luma_scratch(lp: &ListPos<'_>, w: usize, h: usize, tmp: &mut [u8; 256]) {
+    let fb = lp.fb;
+    let r = PlaneRef::new(&fb.y, fb.width, fb.height, lp.parity);
+    luma_mc(&r, lp.xi, lp.yi, lp.fx, lp.fy, w, h, &mut tmp[..], 16);
+}
+
+/// Chroma prediction of one list for plane `k`, packed (stride `w`) into `tmp`.
+#[inline]
+fn chroma_packed(lp: &ListPos<'_>, k: usize, w: usize, h: usize, tmp: &mut [u8; 64]) {
+    let fb = lp.fb;
+    let plane = if k == 0 { &fb.cb } else { &fb.cr };
+    let r = PlaneRef::new(plane, fb.cwidth, fb.cheight, lp.parity);
+    chroma_mc(&r, lp.xc, lp.yc, lp.cfx, lp.cfy, w, h, &mut tmp[..], w);
+}
+
 /// Motion-compensated prediction of one block (8.4.2.2) with weighted sample prediction
 /// (8.4.2.3), written into `out` at the geometry's offsets.
 #[inline]
@@ -1297,18 +1333,30 @@ fn mc_part<'r, F: Fn(usize) -> &'r FrameBuf, O: McOut>(
             }
         };
         let [ty0, ty1] = &mut tmp.y;
-        let (a, sa) = luma_src(&l0, wu, hu, ty0);
-        let (b, sb) = luma_src(&l1, wu, hu, ty1);
         let (lw, w0, w1, o) = wts[0];
-        weight_bi(&mut out.y()[oy..], sy, a, sa, b, sb, wu, hu, lw, w0, w1, o);
+        if wu < 16 && NARROW_IN_SCRATCH {
+            luma_scratch(&l0, wu, hu, ty0);
+            luma_scratch(&l1, wu, hu, ty1);
+            weight_bi_narrow(&mut out.y()[oy..], sy, ty0, ty1, 16, wu, hu, lw, w0, w1, o);
+        } else {
+            let (a, sa) = luma_src(&l0, wu, hu, ty0);
+            let (b, sb) = luma_src(&l1, wu, hu, ty1);
+            weight_bi(&mut out.y()[oy..], sy, a, sa, b, sb, wu, hu, lw, w0, w1, o);
+        }
         if chroma {
             let [tc0, tc1] = &mut tmp.c;
             for (k, (t0, t1)) in tc0.iter_mut().zip(tc1.iter_mut()).enumerate() {
-                let (a, sa) = chroma_src(&l0, k, wc, hc, t0);
-                let (b, sb) = chroma_src(&l1, k, wc, hc, t1);
                 let (lw, w0, w1, o) = wts[1 + k];
                 let pl = if k == 0 { out.cb() } else { out.cr() };
-                weight_bi(&mut pl[oc..], sc, a, sa, b, sb, wc, hc, lw, w0, w1, o);
+                if NARROW_IN_SCRATCH {
+                    chroma_packed(&l0, k, wc, hc, t0);
+                    chroma_packed(&l1, k, wc, hc, t1);
+                    weight_bi_narrow(&mut pl[oc..], sc, t0, t1, wc, wc, hc, lw, w0, w1, o);
+                } else {
+                    let (a, sa) = chroma_src(&l0, k, wc, hc, t0);
+                    let (b, sb) = chroma_src(&l1, k, wc, hc, t1);
+                    weight_bi(&mut pl[oc..], sc, a, sa, b, sb, wc, hc, lw, w0, w1, o);
+                }
             }
         }
         return;
@@ -1387,6 +1435,23 @@ fn mc_part<'r, F: Fn(usize) -> &'r FrameBuf, O: McOut>(
                 wt[2].0,
                 wt[2].1,
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dist_scale_factor_matches_division() {
+        for td in (-300..=300).filter(|&td| td != 0) {
+            for tb in -300..=300 {
+                let (b, d) = (i32::clamp(tb, -128, 127), i32::clamp(td, -128, 127));
+                let tx = (16384 + (d / 2).abs()) / d;
+                let want = ((b * tx + 32) >> 6).clamp(-1024, 1023);
+                assert_eq!(dist_scale_factor(tb, td), want, "{tb} {td}");
+            }
         }
     }
 }

@@ -675,12 +675,24 @@ impl Scaler {
             {
                 // l = ((y - offset) * cy + 2^14) >> 14, then out = (l + term) >> 1.
                 let l = ((i32::from(l) * k.cy + base) >> (SHIFT - 1)) as i16;
-                px[0] = ((l + r) >> 1).clamp(0, 255) as u8;
-                px[1] = ((l + g) >> 1).clamp(0, 255) as u8;
-                px[2] = ((l + b) >> 1).clamp(0, 255) as u8;
+                px[0] = half_u8(l + r);
+                px[1] = half_u8(l + g);
+                px[2] = half_u8(l + b);
                 px[3] = 255;
             }
         }
+    }
+}
+
+/// `(v >> 1)` clamped to 0..=255. 64-bit ARM narrows a vector with saturation in one
+/// instruction; 32-bit ARM code has none, and takes one instruction fewer per vector with the
+/// clamp to 0..=511 before the shift, which gives the same result.
+#[inline(always)]
+fn half_u8(v: i16) -> u8 {
+    if cfg!(target_arch = "arm") {
+        (v.clamp(0, 511) >> 1) as u8
+    } else {
+        (v >> 1).clamp(0, 255) as u8
     }
 }
 
