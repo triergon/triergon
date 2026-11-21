@@ -24,17 +24,14 @@ enum HeaderBytes {
 }
 
 impl HeaderBytes {
-    #[expect(
-        clippy::expect_used,
-        reason = "callers pass at most INLINE_HEADER_BYTES bytes"
-    )]
-    fn inline(bytes: &[u8]) -> Self {
+    /// `bytes` held inline; `None` when they are longer than `INLINE_HEADER_BYTES`.
+    fn inline(bytes: &[u8]) -> Option<Self> {
         let mut data = [0; INLINE_HEADER_BYTES];
-        data[..bytes.len()].copy_from_slice(bytes);
-        Self::Inline {
+        data.get_mut(..bytes.len())?.copy_from_slice(bytes);
+        Some(Self::Inline {
             data,
-            length: u8::try_from(bytes.len()).expect("inline PES header length"),
-        }
+            length: bytes.len() as u8,
+        })
     }
 }
 

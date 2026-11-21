@@ -7,7 +7,7 @@ pub(crate) const FORBIDDEN_TIME_FLAGS: &str = "forbidden PES time flags";
 /// A PTS or DTS field whose prefix or marker bits are wrong.
 pub(crate) const TIMESTAMP_MARKERS: &str = "PES timestamp markers";
 
-use super::{HeaderBytes, INLINE_HEADER_BYTES, PesHeader};
+use super::{HeaderBytes, PesHeader};
 
 fn take<'a>(bytes: &'a [u8], position: &mut usize, count: usize) -> Result<&'a [u8]> {
     let end = position.checked_add(count).ok_or(Error::Overflow)?;
@@ -77,7 +77,7 @@ pub(crate) fn parse_timed_header(
             dts_raw33,
             data_alignment_indicator: prefix[6] & 4 != 0,
             priority: prefix[6] & 8 != 0,
-            raw: HeaderBytes::inline(bytes),
+            raw: HeaderBytes::inline(bytes)?,
         },
         declared,
     ))
@@ -180,10 +180,9 @@ pub(crate) fn parse_header(budget: &Budget, bytes: &[u8]) -> Result<PesHeader> {
     if bytes[position..].iter().any(|byte| *byte != 255) {
         return Err(Error::Invalid("PES header stuffing"));
     }
-    let raw = if used <= INLINE_HEADER_BYTES {
-        HeaderBytes::inline(bytes)
-    } else {
-        HeaderBytes::Extended(Bytes::copy_from_slice(budget, bytes)?)
+    let raw = match HeaderBytes::inline(bytes) {
+        Some(raw) => raw,
+        None => HeaderBytes::Extended(Bytes::copy_from_slice(budget, bytes)?),
     };
     Ok(PesHeader {
         stream_id: bytes[3],
