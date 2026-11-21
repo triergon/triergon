@@ -317,6 +317,11 @@ On Linux AArch64, 40 pass and the other two fail only on their listed open cases
 configured AAC access-unit comparison passes all 34 cases on each target for
 parity, paired runtime, peak heap and kernel-bound total peak RSS.
 
+The AVC body scanner checks short remainders with one eight-byte mask and
+passes possible split prefixes to the bytewise parser. The five pinned
+progressive traces and packet folds match in the playback worker tests.
+The recorded AArch64 timing bound for `reordered-48000` remains open.
+
 The rows without a revision come from one full sharded gate run per target at `5b8dd88f`,
 main `133ad93d` with the runtime [ceiling](quality.md#gates) lowered
 ([running the gates](quality.md#running-the-gates)), each on eight c6g.4xlarge hosts

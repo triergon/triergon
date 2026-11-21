@@ -604,6 +604,22 @@ fn nal_body_scan_matches_scalar_search_for_mixed_bytes() {
     }
 }
 
+#[test]
+fn nal_body_scan_checks_block_tails_and_carrier_extents() {
+    for len in [16, 17, 32, 33, 48, 49, 176, 177, 184, 4096] {
+        let mut bytes = vec![1; len];
+        assert_eq!(nal_body_prefix_len(&bytes), len);
+        bytes[len - 1] = 0;
+        assert_eq!(nal_body_prefix_len(&bytes), len - 1);
+        bytes[len - 1] = 1;
+        for at in 0..len - 1 {
+            bytes[at..at + 2].fill(0);
+            assert_eq!(nal_body_prefix_len(&bytes), at, "{len}, {at}");
+            bytes[at..at + 2].fill(1);
+        }
+    }
+}
+
 /// Assembles `unit` and publishes it once the next delimiter's lookahead
 /// arrives, as a progressive reader does, leaving that lookahead in the
 /// builder. Publication costs one work unit.

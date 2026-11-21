@@ -286,6 +286,9 @@ validation, work and retirement boundaries. Independently retained AAC frames
 still keep the full backing allocation charged. Both framers also expose
 `push_compact` for explicit `CompactDemuxPacket` delivery alongside ordinary `push`.
 Both paths share track, configuration-epoch and source-clock admission checks.
+The AVC body scanner checks full 16-byte blocks in order. It checks one
+trailing byte directly and uses one eight-byte mask for short remainders.
+A possible split Annex B prefix passes to the bytewise parser.
 
 **Subtitles.** The TS bridges bind to one PID of one active PMT and take its
 strict private-stream PES; a new generation, PMT epoch or clock epoch needs a

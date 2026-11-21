@@ -827,11 +827,12 @@ fn adjacent_zero_masks(chunk: &[u8; 16], next: u8) -> (u64, u64) {
     let second = u64::from_le_bytes(words[1]);
     let first_pairs = first | (first >> 8) | (second << 56);
     let second_pairs = second | (second >> 8) | (u64::from(next) << 56);
-    let zeroes = |pairs: u64| {
-        // Borrow can mark a later byte. The first mark starts a zero pair.
-        pairs.wrapping_sub(0x0101_0101_0101_0101) & !pairs & 0x8080_8080_8080_8080
-    };
-    (zeroes(first_pairs), zeroes(second_pairs))
+    (zero_pair_mask(first_pairs), zero_pair_mask(second_pairs))
+}
+
+fn zero_pair_mask(pairs: u64) -> u64 {
+    // Borrow can mark a later byte. The first mark starts a zero pair.
+    pairs.wrapping_sub(0x0101_0101_0101_0101) & !pairs & 0x8080_8080_8080_8080
 }
 
 fn first_zero_pair(first: u64, second: u64) -> usize {
@@ -844,14 +845,29 @@ fn first_zero_pair(first: u64, second: u64) -> usize {
 
 fn nal_body_prefix_len(bytes: &[u8]) -> usize {
     let mut rest = bytes;
-    while let Some((chunk, tail)) = rest.split_first_chunk::<16>()
-        && let Some(&next) = tail.first()
-    {
-        let (first, second) = adjacent_zero_masks(chunk, next);
+    while let Some((chunk, tail)) = rest.split_first_chunk::<16>() {
+        // At the span's end, use the tail scan's synthetic following zero
+        // to keep a final zero for accept() and a possible split prefix.
+        let (first, second) = adjacent_zero_masks(chunk, tail.first().copied().unwrap_or(0));
         if first | second != 0 {
             return bytes.len() - rest.len() + first_zero_pair(first, second);
         }
         rest = tail;
+    }
+    if rest.len() <= 1 {
+        // All pairs before this remainder were checked, including the pair
+        // crossing the block boundary. Only a final possible prefix remains.
+        return bytes.len() - usize::from(rest.last() == Some(&0));
+    }
+    if rest.len() <= 8
+        && let Some((head, tail)) = bytes.split_last_chunk::<8>()
+    {
+        // Earlier blocks already excluded every pair before rest, including
+        // its incoming boundary. Only the last word can contain a new pair.
+        // The zero high byte also preserves a final zero for the next span.
+        let word = u64::from_le_bytes(*tail);
+        let mask = zero_pair_mask(word | (word >> 8));
+        return head.len() + mask.trailing_zeros() as usize / 8;
     }
     if let Some((head, tail)) = bytes.split_last_chunk::<16>() {
         // The overlap has already been checked. Treat a trailing zero as a
