@@ -10,8 +10,10 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Bytes, Error, Result, WorkBudget};
 
 mod dts;
+mod entry;
 pub use dts::DtsCoreDescription;
 pub(crate) use dts::{check_dts_sample_entry, check_mp4a_dts, dts_entry_children, dts_object_type};
+pub use entry::{EntryConfiguration, codec_id};
 
 /// Limits for inspecting an encoded sample description and its configuration.
 #[derive(Clone, Copy, Debug)]

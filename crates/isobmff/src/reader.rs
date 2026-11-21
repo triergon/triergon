@@ -1,14 +1,13 @@
 //! [`Reader`], the source view through the neutral container model.
-use crate::config::ObjectTypeScan;
 use crate::fragment::FragmentCursorPosition;
 use crate::open::{Movie, MovieOpen, MovieTrack, OpenLimits, OpenStep};
 use crate::table::SampleCursorPosition;
 use crate::{
-    Access, Limits, Next, Sample,
-    boxes::{BoxChildren, BoxHeader, BoxView},
-    config::{ConfigurationLimits, dts_entry_children},
+    Access, BuildStatus, Next, Sample,
+    boxes::{BoxHeader, BoxView},
+    config::{ConfigurationLimits, EntryConfiguration, codec_id},
     fields,
-    movie::{EditList, EntryLayout, MovieHeader, SampleDescription, TrackHeader},
+    movie::{EditList, MovieHeader, SampleDescription, TrackHeader},
     table::SampleTable,
 };
 use std::mem;
@@ -23,57 +22,6 @@ use triergon_core::{
     Result, Rounding, SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, Time,
     TimeBase, WorkBudget,
 };
-
-/// The one mapping from a track handler and sample entry code. `raw ` needs the
-/// handler, and `mp4a` and `mp4s` need their stated object type (ISO/IEC 14496-1
-/// objectTypeIndication; 0xDD is the private value FFmpeg reads as Vorbis, 0xE0
-/// the one it reads as VobSub): without one they stay [`CodecId::Other`].
-fn codec_id(handler: &[u8; 4], format: &[u8; 4], object_type: Option<u8>) -> CodecId {
-    match (handler, format) {
-        (b"vide", b"avc1" | b"avc3") => CodecId::H264,
-        (b"vide", b"hvc1" | b"hev1" | b"dvh1" | b"dvhe") => CodecId::Hevc,
-        (b"vide", b"av01" | b"dav1") => CodecId::Av1,
-        (b"vide", b"vp09") => CodecId::Vp9,
-        (b"vide", b"raw ") => CodecId::RawVideo,
-        (b"soun", b"mp4a") => match object_type {
-            Some(0x40) => CodecId::Aac,
-            // MPEG-2 audio (ISO/IEC 13818-3) and MPEG-1 audio (ISO/IEC 11172-3).
-            Some(0x69 | 0x6b) => CodecId::MpegAudio,
-            Some(0xa9 | 0xaa) => CodecId::Dts,
-            Some(0xdd) => CodecId::Vorbis,
-            _ => CodecId::Other,
-        },
-        (b"soun", b"ac-3") => CodecId::Ac3,
-        (b"soun", b"ec-3") => CodecId::Eac3,
-        (b"soun", b"dtsc" | b"dtsh" | b"dtsl") => CodecId::Dts,
-        (b"soun", b"Opus") => CodecId::Opus,
-        (b"soun", b"fLaC") => CodecId::Flac,
-        (b"soun", b".mp3") => CodecId::MpegAudio,
-        (b"soun", b"raw " | b"twos") => CodecId::Pcm,
-        (b"sbtl" | b"text" | b"subt", b"tx3g") => CodecId::Tx3g,
-        (b"subp", b"mp4s") => match object_type {
-            Some(0xe0) => CodecId::VobSub,
-            _ => CodecId::Other,
-        },
-        _ => CodecId::Other,
-    }
-}
-
-/// The sample entry child holding a codec's configuration record.
-fn configuration_box(codec: CodecId) -> Option<[u8; 4]> {
-    Some(match codec {
-        CodecId::H264 => *b"avcC",
-        CodecId::Hevc => *b"hvcC",
-        CodecId::Av1 => *b"av1C",
-        CodecId::Vp9 => *b"vpcC",
-        CodecId::Ac3 => *b"dac3",
-        CodecId::Eac3 => *b"dec3",
-        CodecId::Dts => *b"ddts",
-        CodecId::Opus => *b"dOps",
-        CodecId::Flac => *b"dfLa",
-        _ => return None,
-    })
-}
 
 /// Classify an `hdlr` handler code without copying or allocating.
 /// Unrecognized handlers remain [`MediaKind::Unknown`].
@@ -178,23 +126,14 @@ impl PacketInfo for Packet {
     }
 }
 
-#[derive(Debug)]
-enum Configuration {
-    Record(Bytes),
-    /// The codec's record is absent or could not be read.
-    Absent,
-    /// The entry's layout is not known, so the whole entry payload stands in.
-    Entry,
-}
-
 /// One `trak`: its headers, its index and the reader's place in it.
 #[derive(Debug)]
 pub struct Track {
     source: MovieTrack,
     base: TimeBase,
     language: Option<[u8; 3]>,
-    object_type: Option<u8>,
-    configuration: Option<Configuration>,
+    /// The first sample entry's identity, once read.
+    entry: Option<EntryConfiguration>,
     start: SampleCursorPosition,
     regular: Option<SampleCursorPosition>,
     fragment: usize,
@@ -220,7 +159,9 @@ impl Track {
     }
     /// The object type `esds` states for an `mp4a` entry.
     pub fn object_type(&self) -> Option<u8> {
-        self.object_type
+        self.entry
+            .as_ref()
+            .and_then(EntryConfiguration::object_type)
     }
     fn rewind(&mut self) {
         self.regular = Some(self.start);
@@ -278,25 +219,20 @@ impl TrackInfo for Track {
             .map_or(&[], |entry| entry.format.as_slice())
     }
     fn codec(&self) -> CodecId {
-        self.descriptions().first().map_or(CodecId::Other, |entry| {
-            codec_id(&self.header().handler, &entry.format, self.object_type)
-        })
+        match &self.entry {
+            Some(entry) => entry.codec(),
+            None => self.descriptions().first().map_or(CodecId::Other, |entry| {
+                codec_id(&self.header().handler, &entry.format, None)
+            }),
+        }
     }
     /// The configuration record's payload (AudioSpecificConfig for AAC), empty
     /// when it is absent, or the whole sample entry payload when the entry has
     /// no known record.
     fn configuration(&self) -> &[u8] {
-        match self
-            .configuration
-            .as_ref()
-            .unwrap_or(&Configuration::Absent)
-        {
-            Configuration::Record(bytes) => bytes.as_ref(),
-            Configuration::Absent => &[],
-            Configuration::Entry => self
-                .descriptions()
-                .first()
-                .map_or(&[], |entry| entry.raw().payload()),
+        match (&self.entry, self.descriptions().first()) {
+            (Some(identity), Some(entry)) => identity.bytes(entry),
+            _ => &[],
         }
     }
     /// The `mdhd` code; `None` for a QuickTime language code.
@@ -316,14 +252,6 @@ pub enum ReaderEvent {
     Movie,
 }
 
-// One scan runs per track during opening, so its size does not matter.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug)]
-enum EntryScan {
-    ObjectType(ObjectTypeScan),
-    Record(BoxChildren, [u8; 4]),
-}
-
 /// Where a reader stands. The tag is explicit, so that the per-packet dispatch reads one
 /// byte.
 // Boxing the opener would allocate on every open and reset.
@@ -338,7 +266,6 @@ enum Phase {
     /// Identifying the first sample entry of track `entry` on.
     Entries {
         entry: usize,
-        scan: Option<EntryScan>,
     } = 2,
     /// Delivering packets.
     Packets = 3,
@@ -487,20 +414,12 @@ impl Reader {
                     work.take(sources.len() as u64);
                     let sources = mem::replace(sources, BudgetVec::new(self.tracks.budget()));
                     adopt_tracks(&mut self.tracks, sources)?;
-                    self.phase = Phase::Entries {
-                        entry: 0,
-                        scan: None,
-                    };
+                    self.phase = Phase::Entries { entry: 0 };
                     None
                 }
-                Phase::Entries { entry, scan } => {
-                    let output = identify_entry(
-                        self.tracks.as_mut_slice(),
-                        entry,
-                        scan,
-                        &self.limits,
-                        work,
-                    )?;
+                Phase::Entries { entry } => {
+                    let output =
+                        identify_entry(self.tracks.as_mut_slice(), entry, &self.limits, work)?;
                     // The movie is announced once every entry is identified.
                     if matches!(output, Some(Step::Ready(_))) {
                         self.phase = Phase::Packets;
@@ -682,8 +601,7 @@ fn adopt_tracks(tracks: &mut BudgetVec<Track>, sources: BudgetVec<MovieTrack>) -
         let adopted = Track {
             base: source.header().time_base()?,
             language: packed_language(source.header().raw_mdhd.payload())?,
-            object_type: None,
-            configuration: None,
+            entry: None,
             start,
             regular: Some(start),
             fragment: 0,
@@ -701,30 +619,36 @@ fn adopt_tracks(tracks: &mut BudgetVec<Track>, sources: BudgetVec<MovieTrack>) -
 fn identify_entry(
     tracks: &mut [Track],
     entry: &mut usize,
-    scan: &mut Option<EntryScan>,
     limits: &ReaderLimits,
     work: &mut WorkBudget,
 ) -> Result<Option<Output>> {
     let Some(track) = tracks.get_mut(*entry) else {
         return Ok(Some(Step::Ready(Neutral::Other(ReaderEvent::Movie))));
     };
-    if track.configuration.is_none() {
+    let identity = if let Some(identity) = &mut track.entry {
+        identity
+    } else {
         if !work.try_charge(1) {
             return Ok(Some(Step::Yield));
         }
         let first = track
+            .source
+            .table()
             .descriptions()
             .first()
             .ok_or(Error::Invalid("empty sample descriptions"))?;
-        let (found, configuration) = entry_scan(track.header(), first, limits);
-        *scan = found;
-        track.configuration = Some(configuration);
-    }
-    if scan.is_none() {
-        *entry += 1;
-    } else if step_entry_scan(scan, track, work)? {
+        let identity = EntryConfiguration::new(
+            track.source.header(),
+            first,
+            limits.configuration,
+            limits.open.format,
+        );
+        track.entry.insert(identity)
+    };
+    if identity.poll(work)? == BuildStatus::Yield {
         return Ok(Some(Step::Yield));
     }
+    *entry += 1;
     Ok(None)
 }
 
@@ -798,82 +722,6 @@ impl Seeking {
             replays_from_start: !self.skipped,
         }))))
     }
-}
-
-/// What identifying a track's first entry still has to read, and what its
-/// configuration is if that reading finds nothing.
-fn entry_scan(
-    header: &TrackHeader,
-    entry: &SampleDescription,
-    limits: &ReaderLimits,
-) -> (Option<EntryScan>, Configuration) {
-    if matches!(
-        (&header.handler, &entry.format),
-        (b"soun", b"mp4a") | (b"subp", b"mp4s")
-    ) {
-        let scan = ObjectTypeScan::new(entry, limits.configuration).ok();
-        return (scan.map(EntryScan::ObjectType), Configuration::Entry);
-    }
-    let codec = codec_id(&header.handler, &entry.format, None);
-    let Some(record) = configuration_box(codec) else {
-        return (None, Configuration::Entry);
-    };
-    let child_limits = Limits {
-        max_boxes: limits.configuration.max_child_boxes,
-        ..limits.open.format
-    };
-    let children = match codec {
-        CodecId::Dts => dts_entry_children(entry, child_limits),
-        CodecId::Ac3 | CodecId::Eac3 | CodecId::Opus | CodecId::Flac => {
-            entry.extensions(EntryLayout::AudioV0, child_limits)
-        }
-        _ => entry.extensions(EntryLayout::Visual, child_limits),
-    };
-    (
-        children
-            .ok()
-            .map(|children| EntryScan::Record(children, record)),
-        Configuration::Absent,
-    )
-}
-
-/// Advance the scan. `true` means the work is spent. A sample entry that cannot
-/// be read keeps the identity and configuration its code alone gives.
-fn step_entry_scan(
-    active: &mut Option<EntryScan>,
-    track: &mut Track,
-    work: &mut WorkBudget,
-) -> Result<bool> {
-    match active.as_mut() {
-        Some(EntryScan::ObjectType(scan)) => {
-            let found = match scan.poll(work) {
-                Ok(None) => return Ok(true),
-                Ok(Some(found)) => Some(found),
-                Err(_) => None,
-            };
-            if let Some((object_type, specific)) = found {
-                track.object_type = Some(object_type);
-                if track.codec() != CodecId::Other {
-                    track.configuration =
-                        Some(specific.map_or(Configuration::Absent, Configuration::Record));
-                }
-            }
-            *active = None;
-        }
-        Some(EntryScan::Record(children, record)) => match children.poll(work) {
-            Ok(Next::Yield) => return Ok(true),
-            Ok(Next::Item(raw)) if raw.header().kind == *record => {
-                let start = usize::from(raw.header().header_size);
-                let bytes = raw.bytes().slice(start..raw.bytes().len())?;
-                track.configuration = Some(Configuration::Record(bytes));
-                *active = None;
-            }
-            Ok(Next::Item(_)) => {}
-            Ok(Next::End) | Err(_) => *active = None,
-        },
-        None => {}
-    }
-    Ok(false)
 }
 
 impl ContainerReader for Reader {
@@ -965,66 +813,6 @@ impl ContainerReader for Reader {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn every_recognised_entry_has_one_name() {
-        for (handler, format, object_type, id) in [
-            (b"vide", b"avc1", None, CodecId::H264),
-            (b"vide", b"avc3", None, CodecId::H264),
-            (b"vide", b"hvc1", None, CodecId::Hevc),
-            (b"vide", b"hev1", None, CodecId::Hevc),
-            (b"vide", b"dvh1", None, CodecId::Hevc),
-            (b"vide", b"dvhe", None, CodecId::Hevc),
-            (b"vide", b"av01", None, CodecId::Av1),
-            (b"vide", b"dav1", None, CodecId::Av1),
-            (b"vide", b"vp09", None, CodecId::Vp9),
-            (b"vide", b"raw ", None, CodecId::RawVideo),
-            (b"soun", b"mp4a", Some(0x40), CodecId::Aac),
-            (b"soun", b"mp4a", Some(0x69), CodecId::MpegAudio),
-            (b"soun", b"mp4a", Some(0x6b), CodecId::MpegAudio),
-            (b"soun", b"mp4a", Some(0xdd), CodecId::Vorbis),
-            (b"soun", b".mp3", None, CodecId::MpegAudio),
-            (b"soun", b"fLaC", None, CodecId::Flac),
-            (b"soun", b"mp4a", Some(0xa9), CodecId::Dts),
-            (b"soun", b"mp4a", Some(0xaa), CodecId::Dts),
-            (b"soun", b"ac-3", None, CodecId::Ac3),
-            (b"soun", b"ec-3", None, CodecId::Eac3),
-            (b"soun", b"dtsc", None, CodecId::Dts),
-            (b"soun", b"dtsh", None, CodecId::Dts),
-            (b"soun", b"dtsl", None, CodecId::Dts),
-            (b"soun", b"Opus", None, CodecId::Opus),
-            (b"soun", b"raw ", None, CodecId::Pcm),
-            (b"soun", b"twos", None, CodecId::Pcm),
-            (b"sbtl", b"tx3g", None, CodecId::Tx3g),
-            (b"text", b"tx3g", None, CodecId::Tx3g),
-            (b"subt", b"tx3g", None, CodecId::Tx3g),
-            (b"subp", b"mp4s", Some(0xe0), CodecId::VobSub),
-        ] {
-            assert_eq!(codec_id(handler, format, object_type), id);
-        }
-    }
-
-    #[test]
-    fn an_unrecognised_entry_is_reported_with_its_own_code() {
-        for (handler, format, object_type) in [
-            (b"vide", b"xyz1", None),
-            (b"soun", b"mp4a", None),
-            (b"soun", b"mp4a", Some(0x6a)),
-            (b"soun", b"mp4a", Some(0xac)),
-            (b"soun", b"flac", None),
-            (b"vide", b"fLaC", None),
-            (b"soun", b"dtse", None),
-            (b"soun", b"dtsx", None),
-            (b"vide", b"Opus", None),
-            (b"vide", b"mp4a", Some(0x40)),
-            (b"soun", b"avc1", None),
-            (b"meta", b"tx3g", None),
-            (b"subp", b"mp4s", None),
-            (b"subp", b"mp4s", Some(0x40)),
-        ] {
-            assert_eq!(codec_id(handler, format, object_type), CodecId::Other);
-        }
-    }
 
     #[test]
     fn only_a_packed_iso_code_is_a_language() {
