@@ -57,6 +57,21 @@ pub mod adts {
 
 pub mod annex_b;
 
+pub mod dts {
+    //! Explicit selection of DTS core on private-data routes without a descriptor.
+    //! The comparison uses the same codec declaration with FFmpeg git revision
+    //! `d32b387f` on the 9.0 branch.
+
+    /// A caller-identified DTS core stream with empty program and elementary
+    /// descriptor loops. The reader validates each frame and keeps the original
+    /// PMT and PES data.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct UnlabelledCore {
+        pub program: u16,
+        pub pid: u16,
+    }
+}
+
 pub mod latm {
     //! Packet boundaries for LATM in MPEG-TS, as observed with FFmpeg git
     //! revision `d32b387f` on the 9.0 branch with parsers and NOFILLIN.

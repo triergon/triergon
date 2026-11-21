@@ -8,15 +8,17 @@
   "worker_operation": "ts-au-",
   "reference": "ffmpeg-transport-dts",
   "contract": [
-    "Start with one preloaded TS188 or M2TS192 entity carrying canonical normal DTS core in the selected DVB program. ETSI EN 300 468 Annex G defines the DTS descriptor in the PMT.",
+    "Start with one preloaded TS188 or M2TS192 entity carrying canonical normal DTS core in the selected program. ETSI EN 300 468 Annex G defines the DVB DTS descriptor in the PMT.",
     "Read all frames through physical EOF. Compare the complete payload, program stream index and PID, packet flags, duration, 90 kHz PTS and DTS, position and stream-ID side data. The reference uses the MPEG-TS demuxer and DTS parser with NOFILLIN and no stream discovery or decoding.",
-    "Cases cover one frame, multiple frames in a PES, a split core header in M2TS192, and a split frame body with independently signalled presentation and decode clocks."
+    "Cases cover one frame, multiple frames in a PES, a split core header in M2TS192, and a split frame body with independently signalled presentation and decode clocks.",
+    "For the unlabelled private-data case both workers receive the same program and DTS PID. The reference sets the codec identity through AVCodecParameters after opening the unchanged transport. Both parse and compare every frame."
   ],
   "required_profiles": [
     "dts-core-single-frame",
     "dts-core-multiple-per-pes",
     "dts-core-header-across-pes",
-    "dts-core-body-across-pes"
+    "dts-core-body-across-pes",
+    "dts-core-unlabelled-private-data"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",

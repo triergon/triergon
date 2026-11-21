@@ -343,7 +343,7 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
     manifest(root, feature, cases)
 }
 
-/// Rewrap the checked DTS core frames with literal DVB descriptors and PES clocks.
+/// Rewrap the checked DTS core frames with and without a DVB descriptor.
 pub fn author_dts(root: &Path, args: &[String]) -> R<()> {
     let [record, reference] = args else {
         return Err("usage: cargo xtask fixture transport-dts --record REFERENCE".into());
@@ -411,6 +411,22 @@ pub fn author_dts(root: &Path, args: &[String]) -> R<()> {
         };
         cases.push(input.record(root, FEATURE, name, &["--dvb"], reference, "ts-au-fold")?);
     }
+    let name = "dts-core-unlabelled-private-data";
+    let mut ts = Transport::new();
+    ts.tables(&codec, &[])?;
+    for index in 0..4 {
+        ts.pes(
+            codec.stream_id,
+            &part(&bytes, Some(90_000 + 11_520 * index), None),
+        )?;
+    }
+    let input = Input {
+        name,
+        m2ts: false,
+        data: ts.finish(false),
+    };
+    let selection = format!("--dts-core={PID}");
+    cases.push(input.record(root, FEATURE, name, &[&selection], reference, "ts-au-fold")?);
     manifest(root, FEATURE, cases)
 }
 

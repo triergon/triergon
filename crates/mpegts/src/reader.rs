@@ -79,6 +79,8 @@ pub struct ReaderLimits {
     pub maximum_dts_hd_pes_bytes: usize,
     pub audio_eof_policy: AudioEofPolicy,
     pub unframed_audio_policy: UnframedAudioPolicy,
+    /// Explicit DTS core identity for one unlabelled private-data route.
+    pub unlabelled_dts_core: Option<crate::compat::dts::UnlabelledCore>,
     /// Framing policy for ADTS. The compatibility policy handles ADTS EOF itself.
     pub adts_packet_policy: PacketPolicy,
     /// Wire policy for ADTS PES with a zero packet-length field.
@@ -109,6 +111,7 @@ impl Default for ReaderLimits {
             maximum_dts_hd_pes_bytes: 65_535,
             audio_eof_policy: AudioEofPolicy::RejectIncomplete,
             unframed_audio_policy: UnframedAudioPolicy::Strict,
+            unlabelled_dts_core: None,
             adts_packet_policy: PacketPolicy::Strict,
             adts_pes_policy: adts::PesPolicy::Strict,
             latm_packet_policy: latm::PacketPolicy::Strict,
@@ -242,6 +245,11 @@ impl Reader {
         limits: ReaderLimits,
         input_window: usize,
     ) -> Result<Self> {
+        if let Some(selection) = limits.unlabelled_dts_core
+            && (selection.program == 0 || !crate::ELEMENTARY_PID_RANGE.contains(&selection.pid))
+        {
+            return Err(Error::Invalid("unlabelled DTS core selection"));
+        }
         if limits.maximum_audio_frame_bytes == 0
             || limits.maximum_dts_hd_pes_bytes == 0
             || limits.maximum_access_units == 0
@@ -900,10 +908,21 @@ impl Reader {
                                 .expect("active transport")
                                 .route_state(index, source.map().streams.as_slice()[index].pid)
                                 .ok_or(Error::Invalid("MPEG-TS track route missing"))?;
+                            let stream = &source.map().streams.as_slice()[index];
+                            let unlabelled_dts_core =
+                                self.limits.unlabelled_dts_core.is_some_and(|selection| {
+                                    selection.program == source.map().header.extension
+                                        && selection.pid == stream.pid
+                                        && stream.stream_type == crate::psi::PES_PRIVATE_DATA
+                                        && stream.descriptor_bytes.is_empty()
+                                        && source.map().program_descriptors.is_empty()
+                                });
                             let track = Track {
                                 source: source.clone(),
-                                index,
+                                // A PMT cannot have more entries than the 13-bit PID space.
+                                index: u16::try_from(index).map_err(|_| Error::Overflow)?,
                                 epoch: epochs.configuration,
+                                unlabelled_dts_core,
                             };
                             let retained = self.lanes.as_slice()[index..]
                                 .iter()

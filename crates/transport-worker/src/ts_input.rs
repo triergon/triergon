@@ -5,6 +5,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceCapabilities, SourceId};
 use triergon_mpegts::PacketFormat;
+use triergon_mpegts::compat::dts::UnlabelledCore;
 use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence};
 
 /// Bound the preloaded entity list independently of the byte budget.
@@ -30,6 +31,7 @@ pub(crate) struct Request {
     pub(crate) format: PacketFormat,
     pub(crate) program: u16,
     pub(crate) namespace: DescriptorNamespace,
+    pub(crate) unlabelled_dts_core: Option<UnlabelledCore>,
     /// The first physical entity, with source ID 1.
     pub(crate) input: Bytes,
     pub(crate) following: BudgetVec<Entity>,
@@ -46,6 +48,34 @@ impl Request {
             .get(index)
             .map(|entity| entity.position_base)
     }
+}
+
+pub(crate) fn parse_access_units(
+    pool: &Budget,
+    path: &Path,
+    arguments: &[String],
+) -> Result<Request> {
+    let Some((pid, rest)) = arguments
+        .split_last()
+        .and_then(|(last, rest)| last.strip_prefix("--dts-core=").map(|pid| (pid, rest)))
+    else {
+        return parse(pool, path, arguments);
+    };
+    let pid = pid.parse()?;
+    let single_entity = match rest {
+        [_, _] => true,
+        [_, _, namespace] => namespace == "--dvb" || namespace == "--atsc",
+        _ => false,
+    };
+    if !single_entity {
+        return Err("--dts-core requires one physical entity".into());
+    }
+    let mut request = parse(pool, path, rest)?;
+    request.unlabelled_dts_core = Some(UnlabelledCore {
+        program: request.program,
+        pid,
+    });
+    Ok(request)
 }
 
 pub(crate) fn parse(pool: &Budget, path: &Path, arguments: &[String]) -> Result<Request> {
@@ -98,6 +128,7 @@ pub(crate) fn parse(pool: &Budget, path: &Path, arguments: &[String]) -> Result<
         format,
         program,
         namespace,
+        unlabelled_dts_core: None,
         input,
         following,
     })

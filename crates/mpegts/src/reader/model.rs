@@ -81,13 +81,14 @@ impl SourceEvent {
 #[derive(Clone, Debug)]
 pub struct Track {
     pub(super) source: SourceEvent,
-    pub(super) index: usize,
+    pub(super) index: u16,
     pub(super) epoch: u64,
+    pub(super) unlabelled_dts_core: bool,
 }
 
 impl Track {
     pub fn stream(&self) -> &ElementaryStream {
-        &self.source.map().streams.as_slice()[self.index]
+        &self.source.map().streams.as_slice()[usize::from(self.index)]
     }
     pub fn program_map(&self) -> &ProgramMap {
         self.source.map()
@@ -108,13 +109,21 @@ impl TrackInfo for Track {
         self.stream().id()
     }
     fn kind(&self) -> MediaKind {
-        self.stream().kind()
+        if self.unlabelled_dts_core {
+            MediaKind::Audio
+        } else {
+            self.stream().kind()
+        }
     }
     fn codec_tag(&self) -> &[u8] {
         self.stream().codec_tag()
     }
     fn codec(&self) -> CodecId<'_> {
-        TrackInfo::codec(self.stream())
+        if self.unlabelled_dts_core {
+            CodecId::Dts
+        } else {
+            TrackInfo::codec(self.stream())
+        }
     }
     fn configuration(&self) -> &[u8] {
         self.stream().configuration()
