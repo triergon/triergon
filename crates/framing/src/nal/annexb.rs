@@ -1,4 +1,5 @@
 use crate::BuildStep;
+use crate::nal::packet::freeze_whole;
 use crate::nal::{NalFacts, NalUnit};
 use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -32,15 +33,23 @@ impl AnnexBOutput {
 /// need not guess whether this NAL starts an access unit.
 #[derive(Debug)]
 pub struct AnnexBWriter {
-    pool: Budget,
-    input: Option<NalUnit>,
     facts: NalFacts,
-    output: Option<BudgetVec<u8>>,
     total: usize,
     copied: usize,
     reserved: bool,
-    complete: bool,
-    failure: Option<Error>,
+    state: State,
+}
+
+/// Where a write stands. The NAL unit and the output are held only while it is
+/// written.
+#[derive(Debug)]
+enum State {
+    Writing {
+        input: NalUnit,
+        output: BudgetVec<u8>,
+    },
+    Complete,
+    Failed(Error),
 }
 
 impl AnnexBWriter {
@@ -60,15 +69,14 @@ impl AnnexBWriter {
             });
         }
         Ok(Self {
-            pool: pool.clone(),
             facts: input.facts(),
-            input: Some(input),
-            output: None,
             total,
             copied: 0,
             reserved: false,
-            complete: false,
-            failure: None,
+            state: State::Writing {
+                input,
+                output: BudgetVec::new(pool),
+            },
         })
     }
 
@@ -82,47 +90,35 @@ impl AnnexBWriter {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<AnnexBOutput>> {
-        if let Some(error) = self.failure {
+        if let State::Failed(error) = self.state {
             return Err(error);
         }
         if cancel.load(Ordering::Relaxed) {
-            self.stop(Error::Cancelled);
+            self.state = State::Failed(Error::Cancelled);
             return Err(Error::Cancelled);
         }
-        let result = self.step_inner(work, cancel);
+        let result = self.write(work, cancel);
         if let Err(error) = result
             && !retryable(error)
         {
-            self.stop(error);
+            self.state = State::Failed(error);
         }
         result
     }
 
-    fn stop(&mut self, error: Error) {
-        self.failure = Some(error);
-        self.input = None;
-        self.output = None;
-    }
-
-    fn step_inner(
+    fn write(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<AnnexBOutput>> {
-        if self.complete {
+        let State::Writing { input, output } = &mut self.state else {
             return Ok(BuildStep::Complete);
-        }
+        };
         if !self.reserved {
             if !work.try_charge(1) {
                 return Ok(BuildStep::Yield);
             }
-            if self.output.is_none() {
-                self.output = Some(BudgetVec::new(&self.pool));
-            }
-            self.output
-                .as_mut()
-                .ok_or(Error::Invalid("missing Annex B builder"))?
-                .try_reserve_exact(self.total)?;
+            output.try_reserve_exact(self.total)?;
             self.reserved = true;
         }
         while self.copied < self.total {
@@ -140,17 +136,9 @@ impl AnnexBWriter {
             if count == 0 {
                 return Ok(BuildStep::Yield);
             }
-            let output = self
-                .output
-                .as_mut()
-                .ok_or(Error::Invalid("missing Annex B builder"))?;
             if self.copied < 4 {
                 output.try_extend_from_slice(&START_CODE[self.copied..self.copied + count])?;
             } else {
-                let input = self
-                    .input
-                    .as_ref()
-                    .ok_or(Error::Invalid("missing Annex B input"))?;
                 let start = self.copied - 4;
                 output.try_extend_from_slice(&input.bytes()[start..start + count])?;
             }
@@ -159,19 +147,8 @@ impl AnnexBWriter {
         if !work.try_charge(1) {
             return Ok(BuildStep::Yield);
         }
-        let output = self
-            .output
-            .take()
-            .ok_or(Error::Invalid("missing Annex B builder"))?;
-        let bytes = match output.freeze() {
-            Ok(bytes) => bytes,
-            Err(rejected) => {
-                self.output = Some(rejected.value);
-                return Err(rejected.error);
-            }
-        };
-        self.input = None;
-        self.complete = true;
+        let bytes = freeze_whole(output)?;
+        self.state = State::Complete;
         Ok(BuildStep::Ready(AnnexBOutput {
             bytes,
             source_facts: self.facts,

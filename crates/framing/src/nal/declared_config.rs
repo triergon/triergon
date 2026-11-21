@@ -179,7 +179,18 @@ enum Phase {
     PublishNal,
     PublishArray,
     Finish,
+}
+
+/// Where a parse stands. The record and the views over it are held only while it is
+/// read.
+enum State {
+    Reading {
+        raw: Bytes,
+        arrays: BudgetVec<DeclaredConfigArrayView>,
+        nals: BudgetVec<DeclaredConfigNalView>,
+    },
     Complete,
+    Failed(Error),
 }
 
 /// A complete owned record plus immutable external layout. Each count, range
@@ -192,12 +203,10 @@ pub struct DeclaredConfigParser<'a> {
     pool: Budget,
     source: SourceId,
     codec: Codec,
-    raw: Option<Bytes>,
     sample_width: LengthSize,
     declarations: &'a [DeclaredConfigArray<'a>],
     limits: DeclaredConfigLimits,
-    arrays: BudgetVec<DeclaredConfigArrayView>,
-    nals: BudgetVec<DeclaredConfigNalView>,
+    state: State,
     phase: Phase,
     count_index: usize,
     total_nals: usize,
@@ -208,11 +217,15 @@ pub struct DeclaredConfigParser<'a> {
     previous_nal_end: usize,
     field_position: usize,
     field_value: u32,
-    failure: Option<Error>,
 }
 
 impl std::fmt::Debug for DeclaredConfigParser<'_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (arrays, nals, failure) = match &self.state {
+            State::Reading { arrays, nals, .. } => (arrays.len(), nals.len(), None),
+            State::Complete => (0, 0, None),
+            &State::Failed(error) => (0, 0, Some(error)),
+        };
         formatter
             .debug_struct("DeclaredConfigParser")
             .field("source", &self.source)
@@ -220,9 +233,9 @@ impl std::fmt::Debug for DeclaredConfigParser<'_> {
             .field("sample_width", &self.sample_width)
             .field("limits", &self.limits)
             .field("declared_arrays", &self.declarations.len())
-            .field("checked_arrays", &self.arrays.len())
-            .field("checked_nals", &self.nals.len())
-            .field("failure", &self.failure)
+            .field("checked_arrays", &arrays)
+            .field("checked_nals", &nals)
+            .field("failure", &failure)
             .finish_non_exhaustive()
     }
 }
@@ -254,12 +267,14 @@ impl<'a> DeclaredConfigParser<'a> {
             pool: pool.clone(),
             source,
             codec,
-            raw: Some(raw),
             sample_width,
             declarations: arrays,
             limits,
-            arrays: BudgetVec::new(pool),
-            nals: BudgetVec::new(pool),
+            state: State::Reading {
+                raw,
+                arrays: BudgetVec::new(pool),
+                nals: BudgetVec::new(pool),
+            },
             phase: Phase::Count,
             count_index: 0,
             total_nals: 0,
@@ -270,7 +285,6 @@ impl<'a> DeclaredConfigParser<'a> {
             previous_nal_end: 0,
             field_position: 0,
             field_value: 0,
-            failure: None,
         })
     }
 
@@ -290,27 +304,20 @@ impl<'a> DeclaredConfigParser<'a> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<DeclaredConfiguration>> {
-        if let Some(error) = self.failure {
+        if let State::Failed(error) = self.state {
             return Err(error);
         }
         if cancel.load(Ordering::Relaxed) {
-            self.stop(Error::Cancelled);
+            self.state = State::Failed(Error::Cancelled);
             return Err(Error::Cancelled);
         }
         let result = self.advance(work, cancel);
         if let Err(error) = result
             && !retryable(error)
         {
-            self.stop(error);
+            self.state = State::Failed(error);
         }
         result
-    }
-
-    fn stop(&mut self, error: Error) {
-        self.failure = Some(error);
-        self.raw = None;
-        self.arrays = BudgetVec::new(&self.pool);
-        self.nals = BudgetVec::new(&self.pool);
     }
 
     fn advance(
@@ -322,9 +329,9 @@ impl<'a> DeclaredConfigParser<'a> {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if matches!(self.phase, Phase::Complete) {
+            let State::Reading { raw, arrays, nals } = &mut self.state else {
                 return Ok(BuildStep::Complete);
-            }
+            };
             if !work.try_charge(1) {
                 return Ok(BuildStep::Yield);
             }
@@ -335,7 +342,6 @@ impl<'a> DeclaredConfigParser<'a> {
                         continue;
                     }
                     let array = &self.declarations[self.count_index];
-                    let raw = self.raw.as_ref().ok_or(Error::Invalid("missing record"))?;
                     check_range(&array.raw_range, self.previous_array_end, raw.len())?;
                     let type_maximum = match self.codec {
                         Codec::Avc => 31,
@@ -353,18 +359,18 @@ impl<'a> DeclaredConfigParser<'a> {
                     self.count_index += 1;
                 }
                 Phase::ReserveArrays => {
-                    self.arrays.try_reserve_exact(self.declarations.len())?;
+                    arrays.try_reserve_exact(self.declarations.len())?;
                     self.phase = Phase::ReserveNals;
                 }
                 Phase::ReserveNals => {
-                    self.nals.try_reserve_exact(self.total_nals)?;
+                    nals.try_reserve_exact(self.total_nals)?;
                     self.phase = Phase::StartArray;
                 }
                 Phase::StartArray => {
                     if self.array_index == self.declarations.len() {
                         self.phase = Phase::Finish;
                     } else {
-                        self.array_nal_start = self.nals.len();
+                        self.array_nal_start = nals.len();
                         self.nal_index = 0;
                         self.previous_nal_end = self.declarations[self.array_index].raw_range.start;
                         self.phase = Phase::StartNal;
@@ -405,7 +411,6 @@ impl<'a> DeclaredConfigParser<'a> {
                         }
                         self.phase = Phase::PublishNal;
                     } else {
-                        let raw = self.raw.as_ref().ok_or(Error::Invalid("missing record"))?;
                         self.field_value =
                             (self.field_value << 8) | u32::from(raw.as_ref()[self.field_position]);
                         self.field_position += 1;
@@ -414,7 +419,6 @@ impl<'a> DeclaredConfigParser<'a> {
                 Phase::PublishNal => {
                     let array = &self.declarations[self.array_index];
                     let nal = &array.nals[self.nal_index];
-                    let raw = self.raw.as_ref().ok_or(Error::Invalid("missing record"))?;
                     let bytes = raw.slice(nal.payload.clone())?;
                     let header = NalHeader::parse(self.codec, bytes.as_ref())?;
                     let view = DeclaredConfigNalView {
@@ -424,39 +428,36 @@ impl<'a> DeclaredConfigParser<'a> {
                         header,
                         mismatch: header.nal_unit_type() != array.nal_unit_type,
                     };
-                    self.nals.try_push(view).map_err(|error| error.error)?;
+                    nals.try_push(view).map_err(|error| error.error)?;
                     self.previous_nal_end = nal.payload.end;
                     self.nal_index += 1;
                     self.phase = Phase::StartNal;
                 }
                 Phase::PublishArray => {
                     let array = &self.declarations[self.array_index];
-                    let raw = self.raw.as_ref().ok_or(Error::Invalid("missing record"))?;
                     let view = DeclaredConfigArrayView {
                         bytes: raw.slice(array.raw_range.clone())?,
                         range: array.raw_range.clone(),
-                        nal_indices: self.array_nal_start..self.nals.len(),
+                        nal_indices: self.array_nal_start..nals.len(),
                         declared_type: array.nal_unit_type,
                         declared_completeness: array.completeness,
                     };
-                    self.arrays.try_push(view).map_err(|error| error.error)?;
+                    arrays.try_push(view).map_err(|error| error.error)?;
                     self.array_index += 1;
                     self.phase = Phase::StartArray;
                 }
                 Phase::Finish => {
-                    let raw = self.raw.take().ok_or(Error::Invalid("missing record"))?;
                     let output = DeclaredConfiguration {
                         source: self.source,
                         codec: self.codec,
-                        raw,
+                        raw: raw.clone(),
                         sample_width: self.sample_width,
-                        arrays: std::mem::replace(&mut self.arrays, BudgetVec::new(&self.pool)),
-                        nals: std::mem::replace(&mut self.nals, BudgetVec::new(&self.pool)),
+                        arrays: std::mem::replace(arrays, BudgetVec::new(&self.pool)),
+                        nals: std::mem::replace(nals, BudgetVec::new(&self.pool)),
                     };
-                    self.phase = Phase::Complete;
+                    self.state = State::Complete;
                     return Ok(BuildStep::Ready(output));
                 }
-                Phase::Complete => return Ok(BuildStep::Complete),
             }
         }
     }

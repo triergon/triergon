@@ -124,6 +124,19 @@ pub(crate) fn start_annex_b_output(pool: &Budget, bytes: usize) -> Result<Budget
     BudgetVec::try_with_owner_capacity(pool, bytes)
 }
 
+/// Freezes `output`, leaving an empty vector on its pool; a refused freeze leaves the
+/// charged bytes in `output` for retry.
+pub(crate) fn freeze_whole(output: &mut BudgetVec<u8>) -> Result<Bytes> {
+    let empty = BudgetVec::new(output.budget());
+    match std::mem::replace(output, empty).freeze() {
+        Ok(bytes) => Ok(bytes),
+        Err(refused) => {
+            *output = refused.value;
+            Err(refused.error)
+        }
+    }
+}
+
 /// Retain the charged bytes for retry if publishing the result fails.
 #[inline(never)]
 pub(crate) fn freeze_annex_b_output(

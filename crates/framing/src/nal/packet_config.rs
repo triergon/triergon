@@ -2,7 +2,7 @@
 //! bitstream filters named on [`crate::compat::nal`] publish it when they are
 //! initialised, in a bounded output.
 use crate::nal::packet::{
-    NalConfigurationRefusal, copy_annex_b_segment, copy_annex_b_whole, freeze_annex_b_output,
+    NalConfigurationRefusal, copy_annex_b_segment, copy_annex_b_whole, freeze_whole,
     start_annex_b_output,
 };
 use crate::retryable;
@@ -108,6 +108,8 @@ enum Phase {
     Publish,
     /// Published: every later step reports completion.
     Complete,
+    /// Failed: every later step returns the error.
+    Failed(Error),
 }
 
 /// Writes the configuration of a [`NalPacketSession`](crate::nal::NalPacketSession)
@@ -116,14 +118,14 @@ enum Phase {
 pub struct NalPacketConfigWriter<'a> {
     config: &'a NalPacketConfiguration,
     length_prefixed: bool,
-    output: Option<BudgetVec<u8>>,
+    /// The extradata, empty until it is sized and reserved.
+    output: BudgetVec<u8>,
     maximum: usize,
     total: usize,
     array: usize,
     index: usize,
     copied: usize,
     phase: Phase,
-    failure: Option<Error>,
     rejected_array: Option<u8>,
     rejection_taken: bool,
 }
@@ -134,7 +136,7 @@ impl std::fmt::Debug for NalPacketConfigWriter<'_> {
             .field("codec", &self.config.codec())
             .field("source_bytes", &self.config.bytes().len())
             .field("maximum_output_bytes", &self.maximum)
-            .field("failure", &self.failure)
+            .field("failure", &self.failure())
             .field("rejected_array_type", &self.rejected_array)
             .finish_non_exhaustive()
     }
@@ -154,14 +156,13 @@ impl<'a> NalPacketConfigWriter<'a> {
         Ok(Self {
             config: configuration,
             length_prefixed: configuration.width().is_some(),
-            output: None,
+            output: BudgetVec::new(pool),
             maximum: maximum_output_bytes,
             total: 0,
             array: 0,
             index: 0,
             copied: 0,
             phase: Phase::Arrays,
-            failure: None,
             rejected_array: None,
             rejection_taken: false,
         })
@@ -193,7 +194,7 @@ impl<'a> NalPacketConfigWriter<'a> {
             return None;
         }
         let declared_array_type = self.rejected_array?;
-        let error = self.failure?;
+        let error = self.failure()?;
         self.rejection_taken = true;
         Some(NalPacketConfigRejection {
             source: self.config.bytes().clone(),
@@ -217,17 +218,23 @@ impl<'a> NalPacketConfigWriter<'a> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<NalPacketConfigOutput>> {
-        if let Some(e) = self.failure {
+        if let Phase::Failed(e) = self.phase {
             return Err(e);
         }
         let r = self.advance(work, cancel);
         if let Err(e) = r
             && !retryable(e)
         {
-            self.failure = Some(e);
-            self.output = None;
+            self.phase = Phase::Failed(e);
+            self.output = BudgetVec::new(self.config.bytes().budget());
         }
         r
+    }
+    fn failure(&self) -> Option<Error> {
+        match self.phase {
+            Phase::Failed(error) => Some(error),
+            _ => None,
+        }
     }
     fn advance(
         &mut self,
@@ -292,17 +299,11 @@ impl<'a> NalPacketConfigWriter<'a> {
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
-                    self.output = Some(start_annex_b_output(
-                        self.config.bytes().budget(),
-                        self.total,
-                    )?);
+                    self.output = start_annex_b_output(self.config.bytes().budget(), self.total)?;
                     self.phase = Phase::Copy;
                 }
                 Phase::Copy => {
-                    let output = self
-                        .output
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing config output"))?;
+                    let output = &mut self.output;
                     let (config, length_prefixed) = (self.config, self.length_prefixed);
                     if self.index == 0 && self.copied == 0 {
                         let entries = if length_prefixed {
@@ -340,7 +341,7 @@ impl<'a> NalPacketConfigWriter<'a> {
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
-                    let bytes = freeze_annex_b_output(&mut self.output, "missing config output")?;
+                    let bytes = freeze_whole(&mut self.output)?;
                     self.phase = Phase::Complete;
                     return Ok(BuildStep::Ready(NalPacketConfigOutput {
                         bytes,
@@ -349,6 +350,7 @@ impl<'a> NalPacketConfigWriter<'a> {
                     }));
                 }
                 Phase::Complete => return Ok(BuildStep::Complete),
+                Phase::Failed(error) => return Err(error),
             }
         }
     }

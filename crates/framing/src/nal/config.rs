@@ -177,16 +177,33 @@ impl Configuration {
 #[derive(Debug)]
 pub struct AnnexBConfigParser {
     pool: Budget,
-    source: Option<Bytes>,
-    reader: Option<NalReader>,
     codec: Codec,
     sample_framing: Framing,
     limits: ConfigLimits,
+    state: State,
+}
+
+/// Where a parse stands. The source, its reader and the parameter sets are held
+/// only while it is read.
+#[derive(Debug)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one read per parser; boxing it would allocate outside the pool"
+)]
+enum State {
+    Reading(Read),
+    Complete,
+    Failed(Error),
+}
+
+/// A parse in progress, with a NAL unit read and not yet kept.
+#[derive(Debug)]
+struct Read {
+    source: Bytes,
+    reader: NalReader,
     parameters: BudgetVec<ParameterSet>,
     pending: Option<NalUnit>,
     reserved: bool,
-    complete: bool,
-    failure: Option<Error>,
 }
 
 impl AnnexBConfigParser {
@@ -218,25 +235,17 @@ impl AnnexBConfigParser {
         )?;
         Ok(Self {
             pool: pool.clone(),
-            source: Some(source),
-            reader: Some(reader),
             codec,
             sample_framing,
             limits,
-            parameters: BudgetVec::new(pool),
-            pending: None,
-            reserved: false,
-            complete: false,
-            failure: None,
+            state: State::Reading(Read {
+                source,
+                reader,
+                parameters: BudgetVec::new(pool),
+                pending: None,
+                reserved: false,
+            }),
         })
-    }
-
-    fn stop(&mut self, error: Error) {
-        self.failure = Some(error);
-        self.pending = None;
-        self.reader = None;
-        self.source = None;
-        self.parameters = BudgetVec::new(&self.pool);
     }
 
     /// Frames the source's NAL units and keeps each as a parameter set. Work is
@@ -254,52 +263,48 @@ impl AnnexBConfigParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<Configuration>> {
-        if let Some(error) = self.failure {
+        if let State::Failed(error) = self.state {
             return Err(error);
         }
         if cancel.load(Ordering::Relaxed) {
-            self.stop(Error::Cancelled);
+            self.state = State::Failed(Error::Cancelled);
             return Err(Error::Cancelled);
         }
-        let result = self.step_inner(work, cancel);
+        let result = self.read(work, cancel);
         if let Err(error) = result
             && !retryable(error)
         {
-            self.stop(error);
+            self.state = State::Failed(error);
         }
         result
     }
 
-    fn step_inner(
+    fn read(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<Configuration>> {
-        if self.complete {
+        let State::Reading(read) = &mut self.state else {
             return Ok(BuildStep::Complete);
-        }
-        if !self.reserved {
+        };
+        if !read.reserved {
             if !work.try_charge(1) {
                 return Ok(BuildStep::Yield);
             }
             // Preallocate empty slots, avoiding unbudgeted growth/copies of
             // retained parameter-set descriptors in later steps.
-            self.parameters
+            read.parameters
                 .try_reserve_exact(self.limits.maximum_parameter_sets)?;
-            self.reserved = true;
+            read.reserved = true;
         }
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if self.pending.is_some() {
-                if !work.try_charge(1) {
-                    return Ok(BuildStep::Yield);
-                }
-                let unit = self
-                    .pending
-                    .take()
-                    .ok_or(Error::Invalid("missing parameter set"))?;
+            if read.pending.is_some() && !work.try_charge(1) {
+                return Ok(BuildStep::Yield);
+            }
+            if let Some(unit) = read.pending.take() {
                 let kind = unit
                     .facts()
                     .header
@@ -307,9 +312,9 @@ impl AnnexBConfigParser {
                     .ok_or(Error::Unsupported(
                         "configuration NAL is outside the bounded parameter-set types",
                     ))?;
-                if self.parameters.len() >= self.limits.maximum_parameter_sets {
+                if read.parameters.len() >= self.limits.maximum_parameter_sets {
                     return Err(Error::Limit {
-                        requested: self
+                        requested: read
                             .parameters
                             .len()
                             .checked_add(1)
@@ -317,28 +322,18 @@ impl AnnexBConfigParser {
                         maximum: self.limits.maximum_parameter_sets,
                     });
                 }
-                let source = self
-                    .source
-                    .as_ref()
-                    .ok_or(Error::Invalid("missing configuration source"))?;
-                let unit = unit.configuration_view(&self.pool, source)?;
-                if let Err(rejected) = self.parameters.try_push(ParameterSet { kind, unit }) {
-                    self.pending = Some(rejected.value.unit);
+                let unit = unit.configuration_view(&self.pool, &read.source)?;
+                if let Err(rejected) = read.parameters.try_push(ParameterSet { kind, unit }) {
+                    read.pending = Some(rejected.value.unit);
                     return Err(rejected.error);
                 }
             }
-            let reader = self
-                .reader
-                .as_mut()
-                .ok_or(Error::Invalid("missing configuration reader"))?;
+            let reader = &mut read.reader;
+            let source = &read.source;
             match reader.step(work, cancel)? {
-                Step::Ready(unit) => self.pending = Some(unit),
+                Step::Ready(unit) => read.pending = Some(unit),
                 Step::Yield => return Ok(BuildStep::Yield),
                 Step::NeedInput(request) => {
-                    let source = self
-                        .source
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing configuration source"))?;
                     let start = usize::try_from(request.offset).map_err(|_| Error::Overflow)?;
                     if start == source.len() {
                         reader.finish(request.source, request.token)?;
@@ -359,28 +354,25 @@ impl AnnexBConfigParser {
                     }
                 }
                 Step::End(_) => {
-                    if self.parameters.is_empty() {
+                    if read.parameters.is_empty() {
                         return Err(Error::Invalid("configuration has no parameter sets"));
                     }
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
-                    let parameters =
-                        std::mem::replace(&mut self.parameters, BudgetVec::new(&self.pool));
-                    let source = self
-                        .source
-                        .take()
-                        .ok_or(Error::Invalid("missing configuration source"))?;
-                    self.reader = None;
-                    self.complete = true;
-                    return Ok(BuildStep::Ready(Configuration {
+                    let configuration = Configuration {
                         codec: self.codec,
                         encoding: ConfigEncoding::AnnexBParameterSets,
                         inspection: ConfigInspection::AnnexBFramed,
-                        source,
+                        source: source.clone(),
                         sample_framing: self.sample_framing,
-                        parameters,
-                    }));
+                        parameters: std::mem::replace(
+                            &mut read.parameters,
+                            BudgetVec::new(&self.pool),
+                        ),
+                    };
+                    self.state = State::Complete;
+                    return Ok(BuildStep::Ready(configuration));
                 }
             }
         }
