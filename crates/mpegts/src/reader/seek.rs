@@ -78,6 +78,10 @@ impl EntityPlan {
             .ok_or(Error::Overflow)
     }
 
+    fn same_source(&self, other: &Self) -> bool {
+        self.entries.as_slice() == other.entries.as_slice()
+    }
+
     fn first(&self) -> (SourceId, SourceCapabilities) {
         let first = self.entries.as_slice()[0];
         (first.source, first.capabilities())
@@ -480,9 +484,34 @@ impl Reader {
         request: SeekRequest,
         entities: &[SeekEntity],
     ) -> Result<InputRequest> {
+        self.seek_in_entity_plan(request, entities, None)
+    }
+
+    /// Build a bounded landing index over the declared contiguous entities.
+    /// Later calls to [Self::request_seek_in_entities] can reuse it if the
+    /// track, source IDs, lengths and order match. The sources must remain stable.
+    #[cold]
+    pub fn request_seek_in_entities_and_index(
+        &mut self,
+        request: SeekRequest,
+        entities: &[SeekEntity],
+        maximum_entries: usize,
+    ) -> Result<InputRequest> {
+        if maximum_entries == 0 {
+            return Err(Error::Invalid("MPEG-TS seek index entry limit"));
+        }
+        self.seek_in_entity_plan(request, entities, Some(maximum_entries))
+    }
+
+    fn seek_in_entity_plan(
+        &mut self,
+        request: SeekRequest,
+        entities: &[SeekEntity],
+        maximum_entries: Option<usize>,
+    ) -> Result<InputRequest> {
         self.healthy()?;
-        let entities = EntityPlan::new(&self.pool, entities, self.limits.maximum_seek_scan_bytes)?;
-        self.begin_seek(request, None, Some(entities))
+        let plan = EntityPlan::new(&self.pool, entities, self.limits.maximum_seek_scan_bytes)?;
+        self.begin_seek(request, maximum_entries, Some(plan))
     }
 
     fn begin_seek(
@@ -532,7 +561,13 @@ impl Reader {
             .seek_index
             .as_ref()
             .filter(|index| {
-                entities.is_none() && index_entries.is_none() && index.track == request.track
+                index_entries.is_none()
+                    && index.track == request.track
+                    && match (entities.as_deref(), self.seek_entities.as_deref()) {
+                        (None, None) => true,
+                        (Some(next), Some(previous)) => next.same_source(previous),
+                        _ => false,
+                    }
             })
             .cloned();
         let (phase, retain) = if let Some(index) = &index {

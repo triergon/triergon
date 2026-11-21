@@ -53,10 +53,10 @@ fn ticks(time: Time) -> Result<i64> {
 
 const SECOND_SOURCE: SourceId = SourceId(2);
 
-#[derive(Clone, Copy)]
-enum FollowUp {
-    Repeated(Time),
-    Split(usize),
+#[derive(Clone, Copy, Default)]
+struct FollowUp {
+    repeated: Option<Time>,
+    split: Option<usize>,
 }
 
 fn execute(
@@ -65,7 +65,7 @@ fn execute(
     track: TrackId,
     seek: Option<SeekRequest>,
     kind: Kind,
-    follow_up: Option<FollowUp>,
+    follow_up: FollowUp,
 ) -> Result<Totals> {
     let mut caps = ts_input::capabilities(&input.input);
     caps.random_access = true;
@@ -82,35 +82,54 @@ fn execute(
         32 * 1024,
         &[track],
     )?;
-    let split = match follow_up {
-        Some(FollowUp::Split(offset)) => Some(offset),
-        _ => None,
-    };
+    let entities = follow_up.split.map(|offset| {
+        [
+            SeekEntity {
+                source: FIRST_SOURCE,
+                length: offset as u64,
+            },
+            SeekEntity {
+                source: SECOND_SOURCE,
+                length: (input.input.len() - offset) as u64,
+            },
+        ]
+    });
     if let Some(request) = seek {
-        match follow_up {
-            Some(FollowUp::Repeated(_)) => reader.request_seek_and_index(request, 4096)?,
-            Some(FollowUp::Split(offset)) => reader.request_seek_in_entities(
-                request,
-                &[
-                    SeekEntity {
-                        source: FIRST_SOURCE,
-                        length: offset as u64,
-                    },
-                    SeekEntity {
-                        source: SECOND_SOURCE,
-                        length: (input.input.len() - offset) as u64,
-                    },
-                ],
-            )?,
-            None => reader.request_seek(request)?,
+        match (entities.as_ref(), follow_up.repeated.is_some()) {
+            (Some(parts), true) => {
+                reader.request_seek_in_entities_and_index(request, parts, 4096)?
+            }
+            (Some(parts), false) => reader.request_seek_in_entities(request, parts)?,
+            (None, true) => reader.request_seek_and_index(request, 4096)?,
+            (None, false) => reader.request_seek(request)?,
         };
     }
     let mut out = Totals::default();
-    drain(&mut reader, input, track, kind, split, false, &mut out)?;
-    if let (Some(mut request), Some(FollowUp::Repeated(target))) = (seek, follow_up) {
+    drain(
+        &mut reader,
+        input,
+        track,
+        kind,
+        follow_up.split,
+        false,
+        &mut out,
+    )?;
+    if let (Some(mut request), Some(target)) = (seek, follow_up.repeated) {
         request.target = target;
-        reader.request_seek(request)?;
-        drain(&mut reader, input, track, kind, None, true, &mut out)?;
+        if let Some(parts) = &entities {
+            reader.request_seek_in_entities(request, parts)?;
+        } else {
+            reader.request_seek(request)?;
+        }
+        drain(
+            &mut reader,
+            input,
+            track,
+            kind,
+            follow_up.split,
+            true,
+            &mut out,
+        )?;
     }
     Ok(out)
 }
@@ -222,15 +241,15 @@ pub(crate) fn run(kind: Kind, args: &[String]) -> Result<()> {
         Kind::Seek => Invocation::parse(
             args,
             kind.prefix(),
-            " SIZE PROGRAM PID PTS90 POLICY [REPEAT_PTS90|split=BYTES]",
-            5..=6,
+            " SIZE PROGRAM PID PTS90 POLICY [REPEAT_PTS90] [split=BYTES]",
+            5..=7,
             false,
         )?,
         Kind::AudioSeek => Invocation::parse(
             args,
             kind.prefix(),
-            " SIZE PROGRAM [--dvb|--atsc] PID PTS90 POLICY [REPEAT_PTS90|split=BYTES]",
-            5..=7,
+            " SIZE PROGRAM [--dvb|--atsc] PID PTS90 POLICY [REPEAT_PTS90] [split=BYTES]",
+            5..=8,
             false,
         )?,
         Kind::FreeAudio => Invocation::parse(
@@ -246,9 +265,9 @@ pub(crate) fn run(kind: Kind, args: &[String]) -> Result<()> {
         && matches!(invocation.arguments[2].as_str(), "--dvb" | "--atsc");
     let track_index = 2 + usize::from(has_namespace);
     if matches!(kind, Kind::Seek | Kind::AudioSeek)
-        && !(3..=4).contains(&(invocation.arguments.len() - track_index))
+        && !(3..=5).contains(&(invocation.arguments.len() - track_index))
     {
-        return Err("expected PID PTS90 POLICY [REPEAT_PTS90|split=BYTES]".into());
+        return Err("expected PID PTS90 POLICY [REPEAT_PTS90] [split=BYTES]".into());
     }
     let input = ts_input::parse(
         &pool,
@@ -284,28 +303,25 @@ pub(crate) fn run(kind: Kind, args: &[String]) -> Result<()> {
             None
         }
     };
-    let follow_up = if seek.is_some() {
-        invocation
-            .arguments
-            .get(track_index + 3)
-            .map(|argument| -> Result<FollowUp> {
-                if let Some(offset) = argument.strip_prefix("split=") {
-                    let offset = offset.parse()?;
-                    if !(1..input.input.len()).contains(&offset) {
-                        return Err("transport entity split outside input".into());
-                    }
-                    Ok(FollowUp::Split(offset))
-                } else {
-                    Ok(FollowUp::Repeated(Time::new(
-                        i128::from(argument.parse::<i64>()?),
-                        90_000,
-                    )?))
+    let mut follow_up = FollowUp::default();
+    if seek.is_some() {
+        for argument in &invocation.arguments[track_index + 3..] {
+            if let Some(offset) = argument.strip_prefix("split=") {
+                let offset = offset.parse()?;
+                if !(1..input.input.len()).contains(&offset) {
+                    return Err("transport entity split outside input".into());
                 }
-            })
-            .transpose()?
-    } else {
-        None
-    };
+                if follow_up.split.replace(offset).is_some() {
+                    return Err("repeated transport split option".into());
+                }
+            } else {
+                let target = Time::new(i128::from(argument.parse::<i64>()?), 90_000)?;
+                if follow_up.repeated.replace(target).is_some() {
+                    return Err("repeated transport seek target".into());
+                }
+            }
+        }
+    }
     measure(&invocation, kind.operation(), Some(&pool), || {
         execute(&pool, &input, track, seek, kind, follow_up)
     })

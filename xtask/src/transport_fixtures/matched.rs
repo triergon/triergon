@@ -246,6 +246,14 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
             "ts-seek-fold",
         )?);
     }
+    cases.push(avc.record(
+        root,
+        feature,
+        "avc-split-repeated-preroll",
+        &[pid.as_str(), "90000", "preroll", "112000", "split=564"],
+        seek,
+        "ts-seek-fold",
+    )?);
     manifest(root, feature, cases)?;
 
     let raw = fs::read(root.join(AUDIO)).map_err(|e| format!("{AUDIO}: {e}"))?;
@@ -602,6 +610,17 @@ pub fn author_audio_seek(root: &Path, args: &[String]) -> R<()> {
                 Path::new(reference),
                 "ts-audio-seek-fold",
             )?);
+            if !m2ts {
+                options.push("100000");
+                cases.push(input.record(
+                    root,
+                    FEATURE,
+                    &format!("{name}-split-repeated-preroll"),
+                    &options,
+                    Path::new(reference),
+                    "ts-audio-seek-fold",
+                )?);
+            }
         }
     }
     for (name, stream_type, header, side) in [
