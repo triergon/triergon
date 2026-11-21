@@ -2,10 +2,10 @@
 //! explicit sink clock. Annex B carries no container PTS/DTS.
 
 use super::{RawVideoConfigTracker, RawVideoConfiguration, RawVideoSource, State as SourceState};
-use crate::{Error, Result, input::Source};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Rounding, SourceLocation, Step, Time, WorkBudget};
+use triergon_core::{Error, Result, Rounding, SourceLocation, Step, Time, WorkBudget};
 use triergon_framing::nal::RawAccessUnit;
+use triergon_playback::Source;
 
 /// A caller-supplied cadence is an ordered submission clock for a sink that
 /// wants it, such as a local sample player. It is separate from display order
@@ -210,14 +210,14 @@ impl<S: Source> Active<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ByteSource;
     use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId};
     use triergon_framing::nal::{Codec, RawAnnexBLimits, RawAnnexBReader};
+    use triergon_playback::ByteSource;
 
     #[test]
     fn configuration_pressure_retains_pending_packet_and_submission_clock() {
         let pool = Budget::new(1 << 20).unwrap();
-        let bytes = include_bytes!("../../tests/fixtures/raw-video/avc-short.h264");
+        let bytes = include_bytes!("../../playback/tests/fixtures/raw-video/avc-short.h264");
         let input = || {
             let id = SourceId(22);
             let reader = RawAnnexBReader::new(

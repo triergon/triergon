@@ -32,7 +32,6 @@ pub use triergon_core::{Error, Result};
 
 pub mod progressive;
 pub mod pump;
-pub mod raw_video;
 
 pub mod native_startup;
 

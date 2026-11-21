@@ -12,10 +12,13 @@ triergon-core = { path = "../core" }
 triergon-matroska = { path = "../matroska" }
 triergon-isobmff = { path = "../isobmff" }
 triergon-mpegts = { path = "../mpegts" }
-triergon-framing = { path = "../framing" }
+
 [dev-dependencies]
 triergon-bridge = { path = "../bridge" }
+triergon-framing = { path = "../framing" }
+triergon-raw-video = { path = "../raw-video" }
 triergon-subtitles = { path = "../subtitles" }
 triergon-session = { path = "../session", features = ["codecs"] }
+
 [lints]
 workspace = true

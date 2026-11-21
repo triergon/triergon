@@ -2854,7 +2854,7 @@ fn indexed_mp4_seek_reads_aac_preroll_and_matches_the_encoded_suffix() {
 #[test]
 fn combined_playback_probe_opens_real_sequential_mp4() {
     use triergon_framing::nal::RawAnnexBLimits;
-    use triergon_playback::io::{
+    use triergon_raw_video::{
         PlaybackInput, PlaybackInputKind, PlaybackProbe, PlaybackProbeStep, RawVideoProbeLimits,
     };
 

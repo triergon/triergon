@@ -1,17 +1,16 @@
 //! Bounded playback format selection over one source and retained prefix.
 
 use super::RawVideoSource;
-use crate::{
-    Error, Format, Result,
-    input::{Source, SourceReply},
-    io::{CONTAINER_SIGNATURE_BYTES, SelectedInput, SourceOwner, detect_container, provide},
-};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Budget, BudgetVec, Bytes, InputCursor, InputRequest, InputWindow, SourceCapabilities, SourceId,
-    Step, WorkBudget, nonzero_prefix_len,
+    Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, Result,
+    SourceCapabilities, SourceId, Step, WorkBudget, nonzero_prefix_len,
 };
 use triergon_framing::nal::{Codec, NalHeader, RawAnnexBLimits, RawAnnexBReader};
+use triergon_playback::{
+    Format, Source, SourceReply,
+    io::{CONTAINER_SIGNATURE_BYTES, SelectedInput, SourceOwner, detect_container, provide},
+};
 
 const MAXIMUM_PROBE_WINDOW: usize = 4096;
 
@@ -85,7 +84,7 @@ impl<S: Source> RawVideoProbe<S> {
     }
 
     /// Allocation pressure leaves the retained prefix and source retryable.
-    pub fn finish(&mut self) -> Result<RawVideoSource<RawVideoReplay<S>>> {
+    pub fn finish(&mut self) -> Result<RawVideoSource<ProbeReplay<S>>> {
         let Some(PlaybackInputKind::RawVideo(codec)) = self.driver.detected else {
             return Err(Error::Invalid("raw video probe not ready"));
         };
@@ -411,8 +410,6 @@ pub struct ProbeReplay<S: Source> {
     source: SourceOwner<S>,
 }
 
-pub type RawVideoReplay<S> = ProbeReplay<S>;
-
 impl<S: Source> Source for ProbeReplay<S> {
     fn poll(
         &mut self,
@@ -635,7 +632,7 @@ impl Signatures {
 #[cfg(test)]
 mod tests {
     use super::Signatures;
-    use crate::Result;
+    use triergon_core::Result;
     use triergon_framing::nal::Codec;
 
     const MAXIMUM_NALS: usize = 64;
@@ -669,12 +666,12 @@ mod tests {
     #[test]
     fn scanning_runs_selects_at_the_byte_one_byte_at_a_time_does() {
         let inputs: [&[u8]; 9] = [
-            include_bytes!("../../../framing/fixtures/raw-annex-b/hevc-aud0.hevc"),
-            include_bytes!("../../../framing/fixtures/raw-annex-b/hevc-aud1.hevc"),
-            include_bytes!("../../../framing/fixtures/raw-annex-b/avc-aud0.h264"),
-            include_bytes!("../../../framing/fixtures/raw-annex-b/avc-aud1.h264"),
-            include_bytes!("../../tests/fixtures/raw-video/avc-80x48.h264"),
-            include_bytes!("../../tests/fixtures/raw-video/avc-short.h264"),
+            include_bytes!("../../framing/fixtures/raw-annex-b/hevc-aud0.hevc"),
+            include_bytes!("../../framing/fixtures/raw-annex-b/hevc-aud1.hevc"),
+            include_bytes!("../../framing/fixtures/raw-annex-b/avc-aud0.h264"),
+            include_bytes!("../../framing/fixtures/raw-annex-b/avc-aud1.h264"),
+            include_bytes!("../../playback/tests/fixtures/raw-video/avc-80x48.h264"),
+            include_bytes!("../../playback/tests/fixtures/raw-video/avc-short.h264"),
             // A NAL body with emulation prevention, then padding inside it.
             &[
                 0, 0, 1, 0x40, 1, 0x0c, 1, 0xff, 0, 0, 3, 1, 0x5a, 0, 0, 0, 7,

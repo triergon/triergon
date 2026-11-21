@@ -11,7 +11,8 @@ use triergon_framing::{
     nal::{Codec, LengthSize},
 };
 use triergon_matroska::{Track, TypedPacket as Packet};
-use triergon_playback::{Output, raw_video::hevc_startup as hevc};
+use triergon_playback::Output;
+use triergon_raw_video::hevc_startup as hevc;
 
 #[derive(Clone, Copy)]
 enum TrackProbe {

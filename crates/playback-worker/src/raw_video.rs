@@ -14,11 +14,9 @@ use crate::runner::Result;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId, Step, WorkBudget};
 use triergon_framing::nal::{Codec, RawAnnexBLimits};
-use triergon_playback::{
-    ByteSource,
-    raw_video::{
-        RawFeedClock, RawVideoConfiguration, RawVideoProbe, RawVideoProbeLimits, RawVideoProbeStep,
-    },
+use triergon_playback::ByteSource;
+use triergon_raw_video::{
+    RawFeedClock, RawVideoConfiguration, RawVideoProbe, RawVideoProbeLimits, RawVideoProbeStep,
 };
 
 pub const PREFIX: &str = "raw-video-";

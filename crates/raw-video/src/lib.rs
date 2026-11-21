@@ -1,13 +1,12 @@
-//! Typed Annex B input over the same source ownership protocol as playback.
+#![doc = include_str!("../README.md")]
+#![forbid(unsafe_code)]
+#![warn(clippy::print_stdout, clippy::print_stderr, clippy::unwrap_used)]
+// Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::expect_used`.
 
-use crate::{
-    Result,
-    input::{Source, SourceReply},
-    io::SourceOwner,
-};
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Error, SourceFailure, SourceLocation, Step, WorkBudget};
+use triergon_core::{Error, Result, SourceFailure, SourceLocation, Step, WorkBudget};
 use triergon_framing::nal::{RawAccessUnit, RawAnnexBReader};
+use triergon_playback::{Source, SourceReply, io::SourceOwner};
 
 mod config;
 mod feed;
@@ -22,7 +21,7 @@ pub use config::{AvcVuiTiming, HevcVuiTiming, RawVideoConfigTracker, RawVideoCon
 pub use feed::{RawFeedClock, RawVideoFeed, RawVideoFeedPacket};
 pub use probe::{
     PlaybackInput, PlaybackInputKind, PlaybackProbe, PlaybackProbeStep, ProbeReplay, RawVideoProbe,
-    RawVideoProbeLimits, RawVideoProbeStep, RawVideoReplay,
+    RawVideoProbeLimits, RawVideoProbeStep,
 };
 
 #[allow(

@@ -9,7 +9,7 @@ use triergon_framing::{
     nal::{Codec, NalHeader},
 };
 use triergon_matroska::TypedPacket as Packet;
-use triergon_playback::raw_video::hevc_startup as hevc;
+use triergon_raw_video::hevc_startup as hevc;
 
 /// One timing projection for an ordered progressive AVC feed, beginning at
 /// an admitted IDR. Observe each checked sample once.

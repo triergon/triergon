@@ -4,7 +4,8 @@ use triergon_core::{
     Step, WorkBudget,
 };
 use triergon_framing::nal::{Codec, RawAnnexBLimits, RawAnnexBReader};
-use triergon_playback::{ByteSource, Source, SourceReply, raw_video::RawVideoSource};
+use triergon_playback::{ByteSource, Source, SourceReply};
+use triergon_raw_video::RawVideoSource;
 
 const SOURCE: SourceId = SourceId(72);
 static OFF: AtomicBool = AtomicBool::new(false);
@@ -222,25 +223,25 @@ impl Source for Sequential {
 const RAW_FIXTURES: [(Codec, &[u8]); 4] = [
     (
         Codec::Avc,
-        include_bytes!("../../framing/fixtures/raw-annex-b/avc-aud0.h264"),
+        include_bytes!("../../../framing/fixtures/raw-annex-b/avc-aud0.h264"),
     ),
     (
         Codec::Avc,
-        include_bytes!("../../framing/fixtures/raw-annex-b/avc-aud1.h264"),
+        include_bytes!("../../../framing/fixtures/raw-annex-b/avc-aud1.h264"),
     ),
     (
         Codec::Hevc,
-        include_bytes!("../../framing/fixtures/raw-annex-b/hevc-aud0.hevc"),
+        include_bytes!("../../../framing/fixtures/raw-annex-b/hevc-aud0.hevc"),
     ),
     (
         Codec::Hevc,
-        include_bytes!("../../framing/fixtures/raw-annex-b/hevc-aud1.hevc"),
+        include_bytes!("../../../framing/fixtures/raw-annex-b/hevc-aud1.hevc"),
     ),
 ];
 
 #[test]
 fn raw_probe_preserves_all_bytes_from_forward_only_sources() {
-    use triergon_playback::raw_video::{RawVideoProbe, RawVideoProbeLimits, RawVideoProbeStep};
+    use triergon_raw_video::{RawVideoProbe, RawVideoProbeLimits, RawVideoProbeStep};
     for (codec, bytes) in RAW_FIXTURES {
         for (quantum, work) in [(1, 1), (7, 31), (4096, 1), (4096, 4096)] {
             let pool = Budget::new(1 << 20).unwrap();
@@ -325,7 +326,7 @@ fn raw_probe_preserves_all_bytes_from_forward_only_sources() {
 
 #[test]
 fn raw_probe_refuses_mixed_evidence_and_uses_explicit_scan_bounds() {
-    use triergon_playback::raw_video::{RawVideoProbe, RawVideoProbeLimits, RawVideoProbeStep};
+    use triergon_raw_video::{RawVideoProbe, RawVideoProbeLimits, RawVideoProbeStep};
     let mixed: &[u8] = &[
         0, 0, 1, 0x67, 100, 0, 31, 0x80, 0, 0, 1, 0x68, 0x80, 0, 0, 1, 0x40, 1, 0x80, 0, 0, 1,
         0x42, 1, 1, 0x80, 0, 0, 1, 0x44, 2, 0x80, 0, 0, 1, 0x46, 1, 0x80,
@@ -393,7 +394,7 @@ fn raw_probe_refuses_mixed_evidence_and_uses_explicit_scan_bounds() {
 
 #[test]
 fn auto_detected_raw_streams_resolve_exact_active_decoder_parameter_sets() {
-    use triergon_playback::raw_video::{
+    use triergon_raw_video::{
         AvcVuiTiming, RawVideoConfigTracker, RawVideoProbe, RawVideoProbeLimits, RawVideoProbeStep,
     };
     for (codec, bytes) in RAW_FIXTURES {
@@ -471,9 +472,9 @@ fn auto_detected_raw_streams_resolve_exact_active_decoder_parameter_sets() {
 
 #[test]
 fn raw_configuration_switches_on_reused_ids_and_old_owners_remain_valid() {
-    use triergon_playback::raw_video::RawVideoConfigTracker;
+    use triergon_raw_video::RawVideoConfigTracker;
     let original = RAW_FIXTURES[0].1;
-    let suffix = include_bytes!("fixtures/raw-video/avc-80x48.h264");
+    let suffix = include_bytes!("../../../playback/tests/fixtures/raw-video/avc-80x48.h264");
     let bytes = [original, suffix].concat();
     let pool = Budget::new(1 << 20).unwrap();
     let reader = RawAnnexBReader::new(
@@ -501,8 +502,7 @@ fn raw_configuration_switches_on_reused_ids_and_old_owners_remain_valid() {
                 counts[usize::from(second)] += 1;
                 if second {
                     assert_eq!((active.width, active.height), (80, 48));
-                    let first: &triergon_playback::raw_video::RawVideoConfiguration =
-                        first.as_ref().unwrap();
+                    let first: &triergon_raw_video::RawVideoConfiguration = first.as_ref().unwrap();
                     assert_eq!((first.width, first.height), (64, 64));
                     assert_ne!(first.sps.as_ref(), active.sps.as_ref());
                     assert!(
@@ -524,7 +524,7 @@ fn raw_configuration_switches_on_reused_ids_and_old_owners_remain_valid() {
 
 #[test]
 fn raw_probe_backpressure_retains_the_delivered_source_window() {
-    use triergon_playback::raw_video::{RawVideoProbe, RawVideoProbeLimits, RawVideoProbeStep};
+    use triergon_raw_video::{RawVideoProbe, RawVideoProbeLimits, RawVideoProbeStep};
     let (codec, bytes) = RAW_FIXTURES[0];
     let pool = Budget::new(1 << 20).unwrap();
     let cursor = Rc::new(RefCell::new(0));
@@ -570,30 +570,29 @@ fn raw_probe_backpressure_retains_the_delivered_source_window() {
 #[test]
 fn playback_probe_selects_containers_and_replays_the_exact_forward_prefix() {
     use triergon_mpegts::PacketFormat;
-    use triergon_playback::{
-        Format,
-        io::{PlaybackInput, PlaybackInputKind, PlaybackProbe, PlaybackProbeStep, provide},
-        raw_video::RawVideoProbeLimits,
+    use triergon_playback::{Format, io::provide};
+    use triergon_raw_video::{
+        PlaybackInput, PlaybackInputKind, PlaybackProbe, PlaybackProbeStep, RawVideoProbeLimits,
     };
     let inputs: [(Format, &[u8], u64); 4] = [
         (
             Format::Matroska,
-            include_bytes!("fixtures/mkv-feed/three-tracks.mkv"),
+            include_bytes!("../../../playback/tests/fixtures/mkv-feed/three-tracks.mkv"),
             4,
         ),
         (
             Format::Mp4,
-            include_bytes!("fixtures/mp4/encoded-avc-aac-front.mp4"),
+            include_bytes!("../../../playback/tests/fixtures/mp4/encoded-avc-aac-front.mp4"),
             8,
         ),
         (
             Format::Ts(PacketFormat::Ts188),
-            include_bytes!("fixtures/ts/ts188-basic.ts"),
+            include_bytes!("../../../playback/tests/fixtures/ts/ts188-basic.ts"),
             389,
         ),
         (
             Format::Ts(PacketFormat::M2ts192),
-            include_bytes!("fixtures/ts/m2ts192-opaque-prefix.m2ts"),
+            include_bytes!("../../../playback/tests/fixtures/ts/m2ts192-opaque-prefix.m2ts"),
             389,
         ),
     ];
@@ -674,11 +673,10 @@ fn playback_probe_selects_containers_and_replays_the_exact_forward_prefix() {
 
 #[test]
 fn playback_probe_hands_off_raw_video_and_preserves_already_observed_eof() {
-    use triergon_playback::{
-        io::{PlaybackInput, PlaybackInputKind, PlaybackProbe, PlaybackProbeStep},
-        raw_video::RawVideoProbeLimits,
+    use triergon_raw_video::{
+        PlaybackInput, PlaybackInputKind, PlaybackProbe, PlaybackProbeStep, RawVideoProbeLimits,
     };
-    let short = include_bytes!("fixtures/raw-video/avc-short.h264");
+    let short = include_bytes!("../../../playback/tests/fixtures/raw-video/avc-short.h264");
     for (codec, bytes, eof_at_selection, expected_packets) in [
         (Codec::Avc, short.as_slice(), true, 1),
         (RAW_FIXTURES[0].0, RAW_FIXTURES[0].1, false, 12),
@@ -758,10 +756,7 @@ fn playback_probe_hands_off_raw_video_and_preserves_already_observed_eof() {
 
 #[test]
 fn playback_probe_rejects_conflicting_transport_signatures() {
-    use triergon_playback::{
-        io::{PlaybackProbe, PlaybackProbeStep},
-        raw_video::RawVideoProbeLimits,
-    };
+    use triergon_raw_video::{PlaybackProbe, PlaybackProbeStep, RawVideoProbeLimits};
     let mut bytes = [0; 389];
     for at in [0, 188, 376, 4, 196, 388] {
         bytes[at] = 0x47;
@@ -797,8 +792,8 @@ fn open_raw_feed(
     pool: &Budget,
     codec: Codec,
     bytes: &[u8],
-    clock: triergon_playback::raw_video::RawFeedClock,
-) -> triergon_playback::raw_video::RawVideoFeed<ByteSource> {
+    clock: triergon_raw_video::RawFeedClock,
+) -> triergon_raw_video::RawVideoFeed<ByteSource> {
     let reader = RawAnnexBReader::new(
         pool,
         codec,
@@ -818,7 +813,7 @@ fn open_raw_feed(
 
 #[test]
 fn raw_feed_delivers_annex_b_and_configuration_with_the_unstamped_queue_value() {
-    use triergon_playback::raw_video::RawFeedClock;
+    use triergon_raw_video::RawFeedClock;
     for (codec, bytes) in RAW_FIXTURES {
         let pool = Budget::new(1 << 20).unwrap();
         let mut feed = open_raw_feed(&pool, codec, bytes, RawFeedClock::Unspecified);
@@ -842,14 +837,13 @@ fn raw_feed_delivers_annex_b_and_configuration_with_the_unstamped_queue_value() 
                     assert_eq!(packet.configuration_changed, count == 0);
                     let config = packet.configuration.as_ref().unwrap();
                     assert_eq!(config.codec, codec);
-                    let expected_hevc = (codec == Codec::Hevc).then_some(
-                        triergon_playback::raw_video::HevcVuiTiming {
+                    let expected_hevc =
+                        (codec == Codec::Hevc).then_some(triergon_raw_video::HevcVuiTiming {
                             num_units_in_tick: 1,
                             time_scale: 12,
                             poc_proportional_to_timing_flag: false,
                             num_ticks_poc_diff_one_minus1: None,
-                        },
-                    );
+                        });
                     assert_eq!(config.hevc_timing().unwrap(), expected_hevc);
                     assert_eq!(packet.submission_time, None);
                     assert_eq!(packet.queue_timestamp_ns(), 0);
@@ -872,10 +866,10 @@ fn raw_feed_delivers_annex_b_and_configuration_with_the_unstamped_queue_value() 
 #[test]
 fn raw_feed_fixed_submission_clock_and_reconfiguration_are_independent() {
     use triergon_core::Time;
-    use triergon_playback::raw_video::RawFeedClock;
+    use triergon_raw_video::RawFeedClock;
 
     let first = RAW_FIXTURES[0].1;
-    let second = include_bytes!("fixtures/raw-video/avc-80x48.h264");
+    let second = include_bytes!("../../../playback/tests/fixtures/raw-video/avc-80x48.h264");
     let trailing_aud = [0, 0, 1, 9, 0xf0];
     let input = [first, second, trailing_aud.as_slice()].concat();
     let pool = Budget::new(1 << 20).unwrap();

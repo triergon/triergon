@@ -73,6 +73,7 @@ dependencies = [
  "triergon-matroska",
  "triergon-mpegts",
  "triergon-playback",
+ "triergon-raw-video",
  "triergon-worker-entry",
 ]
 
@@ -163,6 +164,7 @@ dependencies = [
  "triergon-matroska",
  "triergon-mpegts",
  "triergon-playback",
+ "triergon-raw-video",
  "triergon-subtitles",
 ]
 
@@ -329,6 +331,7 @@ dependencies = [
  "triergon-framing",
  "triergon-mpegts",
  "triergon-playback",
+ "triergon-raw-video",
 ]
 
 [[package]]
@@ -383,6 +386,7 @@ dependencies = [
  "triergon-isobmff",
  "triergon-matroska",
  "triergon-mpegts",
+ "triergon-raw-video",
  "triergon-session",
  "triergon-subtitles",
 ]
@@ -393,6 +397,16 @@ version = "0.0.0"
 dependencies = [
  "triergon-core",
  "triergon-font",
+]
+
+[[package]]
+name = "triergon-raw-video"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-framing",
+ "triergon-mpegts",
+ "triergon-playback",
 ]
 
 [[package]]

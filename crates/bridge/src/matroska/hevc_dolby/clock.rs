@@ -6,7 +6,7 @@ use triergon_framing::{
     hevc::{HevcAnnexBConfig, check_parameter_sets, read_sps_timing, read_vps_timing},
     nal::Codec,
 };
-use triergon_playback::raw_video::hevc_startup as hevc;
+use triergon_raw_video::hevc_startup as hevc;
 
 /// One timing projection for an ordered HEVC feed from a random-access
 /// picture. Observe each packet once, in the original decode order.

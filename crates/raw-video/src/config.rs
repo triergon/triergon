@@ -635,7 +635,7 @@ mod tests {
     #[test]
     fn hevc_active_timing_matches_annex_b_fixture() {
         let pool = Budget::new(256 * 1024).unwrap();
-        let input = include_bytes!("../../../framing/fixtures/raw-annex-b/hevc-aud0.hevc");
+        let input = include_bytes!("../../framing/fixtures/raw-annex-b/hevc-aud0.hevc");
         let units = read_annex_b(&pool, Codec::Hevc, input);
         let mut tracker = RawVideoConfigTracker::new(&pool, Codec::Hevc, 4096).unwrap();
         let mut pictures = 0;
@@ -780,7 +780,7 @@ mod tests {
     #[test]
     fn avc_active_timing_matches_annex_b_fixture() {
         let pool = Budget::new(256 * 1024).unwrap();
-        let input = include_bytes!("../../tests/fixtures/raw-video/avc-80x48.h264");
+        let input = include_bytes!("../../playback/tests/fixtures/raw-video/avc-80x48.h264");
         let units = read_annex_b(&pool, Codec::Avc, input);
         let mut tracker = RawVideoConfigTracker::new(&pool, Codec::Avc, 4096).unwrap();
         let configurations: Vec<_> = units

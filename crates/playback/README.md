@@ -50,15 +50,13 @@ assert!(packets > 0);
 ```
 
 Implement `Source` for real transports. `ByteSource` serves immutable local
-bytes. Use `io::PlaybackProbe` (or `io::Probe` for containers only) when the
-format is unknown; its `PlaybackInput` holds a `SelectedInput` or a
-`RawVideoSource` that replays the probed prefix and then continues reading.
-Both probes accept the MP4 opening boxes `ftyp`, `styp`, `moov`, `free`,
-`wide` and `mdat`. For transport streams they examine a 389-byte prefix and
-require exactly one of the TS188 and M2TS192 three-sync patterns to match.
-The raw Annex B probe selects AVC or HEVC at the first slice after its
-parameter sets. It reads each NAL's first five bytes and skips the rest of the
-NAL body in word-sized steps, charging one work unit per byte either way.
+bytes. Use `io::Probe` when the container is unknown; its `SelectedInput`
+replays the probed prefix and then continues reading. The probe accepts the MP4
+opening boxes `ftyp`, `styp`, `moov`, `free`, `wide` and `mdat`. For transport
+streams it examines a 389-byte prefix and requires exactly one of the TS188 and
+M2TS192 three-sync patterns to match. Raw AVC and HEVC Annex B input is
+[`triergon-raw-video`](../raw-video/README.md), whose `PlaybackProbe` tells it
+apart from these containers.
 MP4 needs an open and index step first: `mp4_open::Mp4Open` →
 `mp4_plan::Mp4IndexJob` → `Engine::mp4`.
 Indexed MP4 packets share immutable track metadata. A complete sample in a
@@ -112,14 +110,13 @@ video and audio tracks.
 | Area | Entry points |
 |---|---|
 | Source protocol | `Source`, `SourceReply`, `ByteSource`, `io::SourceOwner` |
-| Probe | `io::PlaybackProbe`: Matroska, MP4, TS188, M2TS192, AVC and HEVC Annex B |
+| Probe | `io::Probe`: Matroska, MP4, TS188 and M2TS192 |
 | Matroska | `Engine::matroska`, `Engine::matroska_reader` (an unstarted reader built with `Reader::new_with_payload_ownership`, `new_with_immutable_seek_index` or `compat::block_additions::new_reader`) |
 | MP4 / MOV | `mp4_open::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `Engine::mp4`, `Engine::mp4_progressive`, `Engine::mp4_native_terminal_v1`, `Mp4RangeOpen` / `Mp4RangePlayer` |
 | MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_native_seek` / `apply_mp4_native_seek`, progressive variants, `PreparedMp4::movie_seek` |
 | MP4 catalogue replacement | `catalogue::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
 | TS / M2TS | `Engine::ts`, `ts_with_namespace`, `ts_segmented`, `ts_native`, `compat::pes::open_private_audio`, `ts_native_program_v1`, `ts_native_segment_v1`; `native_startup::NativeStartup` |
 | PES feed | `pes_feed`: the feed [`triergon-hls`](../hls/README.md) reads HLS segments and progressive TS188 input from |
-| Raw Annex B | `raw_video::RawVideoProbe`, `RawVideoSource`, `RawVideoConfigTracker`, `RawVideoFeed` |
 | Sink handoff | `pump::{Pump, Sink, CatalogueSink, Feed}` |
 
 Matroska feeds, packet bridges and subtitle receivers over these outputs are in
@@ -284,5 +281,5 @@ Fixture provenance: [AV1](tests/fixtures/av1/README.md),
 [subtitle probes](tests/fixtures/matroska-subtitle-probe/README.md),
 [subtitle bridges](tests/fixtures/subtitles/README.md),
 [terminal-media FFprobe records](tests/fixtures/terminal-matrix/README.md).
-The `triergon-hls` and `triergon-bridge` tests read their fixtures here too.
+The `triergon-hls`, `triergon-bridge` and `triergon-raw-video` tests read their fixtures here too.
 Gates and measurement policy: [docs/quality.md](../../docs/quality.md).

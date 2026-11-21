@@ -18,10 +18,8 @@ use triergon_mpegts::{
     AssemblyStep,
     compat::pes::{DemuxPacket, DemuxPayloadKind, DemuxSpan, DemuxTimeView, RegisteredCarriage},
 };
-use triergon_playback::{
-    TrackKey, TsNativeCarriage, TsNativeConfiguration, pes_feed::PesInput,
-    raw_video::RawVideoConfigTracker,
-};
+use triergon_playback::{TrackKey, TsNativeCarriage, TsNativeConfiguration, pes_feed::PesInput};
+use triergon_raw_video::RawVideoConfigTracker;
 
 const ELEMENTARY: SourceId = SourceId(0);
 
