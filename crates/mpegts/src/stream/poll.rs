@@ -1,6 +1,7 @@
 //! The entry points and the carrier loop.
 use super::event::{CarrierObservation, CompactTraceEvent, FaultKind, TraceEvent, TraceFault};
 use super::feed::{FeedCarrier, FeedContinuation, FeedItem};
+use super::held::Counted;
 use super::{Route, Stage, TransportStream};
 use crate::SourceEpochs;
 use crate::pes::Pes;
@@ -386,10 +387,9 @@ impl TransportStream {
             if self.packet.is_some() {
                 match self.stage {
                     Stage::Continuity => {
-                        if !self.observe(work)? {
+                        let Counted::Done(outcome) = self.observe(work)? else {
                             return Ok(Step::Yield);
-                        }
-                        let outcome = self.outcome.take();
+                        };
                         if FEED && self.feed_validated_carriers {
                             let packet = self
                                 .packet

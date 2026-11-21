@@ -31,10 +31,18 @@ pub(super) enum Stage {
     Refused = 8,
 }
 
+/// What checking the continuity of the carrier in hand found.
+pub(super) enum Counted {
+    /// The work grant is spent; nothing changed.
+    Yield,
+    /// The stage has advanced. `None` for a PID without a route.
+    Done(Option<ContinuityOutcome>),
+}
+
 impl TransportStream {
-    pub(super) fn observe(&mut self, work: &mut WorkBudget) -> Result<bool> {
+    pub(super) fn observe(&mut self, work: &mut WorkBudget) -> Result<Counted> {
         if !work.try_charge(1) {
-            return Ok(false);
+            return Ok(Counted::Yield);
         }
         let packet = self
             .packet
@@ -113,8 +121,7 @@ impl TransportStream {
         } else {
             self.stage = Stage::Clock;
         }
-        self.outcome = outcome;
-        Ok(true)
+        Ok(Counted::Done(outcome))
     }
 
     pub(super) fn feed<const FEED: bool>(&mut self, work: &mut WorkBudget) -> Result<()> {

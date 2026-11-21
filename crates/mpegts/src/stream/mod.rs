@@ -20,7 +20,7 @@ pub(crate) use storage::{StorageItem, TransportStorageCursor};
 use crate::pes::PesAssembler;
 use crate::psi::SectionAssembler;
 use crate::psi::{DescriptorNamespace, PatCollector, Section};
-use crate::transport::{Continuity, ContinuityOutcome, TransportFramer, TransportPacket};
+use crate::transport::{Continuity, TransportFramer, TransportPacket};
 use crate::{PacketFormat, ParseLimits, SourceEpochs};
 use std::sync::atomic::AtomicUsize;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation};
@@ -95,7 +95,6 @@ pub struct TransportStream {
     packet: Option<TransportPacket>,
     stage: Stage,
     route: Route,
-    outcome: Option<ContinuityOutcome>,
     fault: Option<TraceFault>,
     section: Option<Section>,
     job: Option<Job>,
@@ -236,7 +235,6 @@ impl TransportStream {
             packet: None,
             stage: Stage::Read,
             route: Route::Ignore,
-            outcome: None,
             fault: None,
             section: None,
             job: None,
