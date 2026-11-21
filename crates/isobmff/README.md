@@ -502,12 +502,16 @@ corpus:
 every Nth of them; every case is compared in every run. The worker runs a range plan
 for a seek mode given `--range-plan`.
 
-Gate results (c6g.4xlarge, `e2d4a6a3`): every case matches, and all 472 timed cases
-pass runtime and memory on both targets (worst upper bound 0.8908 on Linux AArch64 and
-1.0130 on 32-bit ARMv7, peak heap at most 0.9032 of the reference's). Seeks read
+Gate results (c6g.4xlarge, `f8661cb0`): every case matches, and all 472 timed cases
+pass runtime and memory on both targets (worst upper bound 0.9136 on Linux AArch64 and
+0.9546 on 32-bit ARMv7, peak heap at most 0.9032 of the reference's). Seeks read
 plain and single-edit regular tracks and fragment-only tracks from their sample tables,
 build only the occurrence they land on, start each track of a global seek where its own
-seek stopped, and check sample byte ranges a chunk or a fragment run at a time.
+seek stopped, and check sample byte ranges a chunk or a fragment run at a time. A
+global seek keeps the seek of the track at hand boxed, and a track seek refreshes the
+packet state it keeps at its best entry in place, so a seek never moves its several
+kilobytes of state whole; the box scan checks its input once per event, not once per
+byte of a one-byte window.
 
 Not compared yet: the compatibility seek refuses a global seek across tracks with
 unequal clocks, overlapping or null index clocks and regular table recovery as
