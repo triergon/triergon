@@ -259,7 +259,7 @@ impl Engine {
         }
         t.stream.end_of_source()?;
         t.entities = ts::Entities::Sequence(None);
-        t.draining = true;
+        t.life = ts::Life::Draining;
         Ok(())
     }
     pub fn format(&self) -> Format {
@@ -536,8 +536,7 @@ impl Engine {
                 r.tsid = None;
                 r.pcr_pid = None;
                 r.pending = None;
-                r.ended = false;
-                r.draining = false;
+                r.life = ts::Life::Reading;
                 for track in r.pes_tracks.as_mut_slice() {
                     track.observer = None;
                     track.update = None;

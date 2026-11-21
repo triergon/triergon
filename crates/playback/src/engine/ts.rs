@@ -63,6 +63,19 @@ impl Delivery {
     }
 }
 
+/// Where a TS engine's stream is in its life. `Ended` follows `Draining`: the
+/// stream reports its end only after the source's end started the drain.
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum Life {
+    /// Reading the source.
+    Reading = 0,
+    /// The source ended; the stream and the tracks drain.
+    Draining = 1,
+    /// The stream reported its end.
+    Ended = 2,
+}
+
 /// How a TS engine's source entities end.
 pub(crate) enum Entities {
     /// One entity: its end ends the stream.
@@ -118,8 +131,7 @@ pub struct TsEngine {
     pub(crate) pcr_pid: Option<u16>,
     pub(crate) facts: BudgetVec<TrackFact>,
     pub(crate) pending: Option<TraceEvent>,
-    pub(crate) ended: bool,
-    pub(crate) draining: bool,
+    pub(crate) life: Life,
     pub(crate) pes_tracks: PesTracks,
     pub(crate) pes_active: Option<usize>,
     pub(crate) pes_adopting: usize,
@@ -161,8 +173,7 @@ impl TsEngine {
             pcr_pid: None,
             facts: BudgetVec::new(&pool),
             pending: None,
-            ended: false,
-            draining: false,
+            life: Life::Reading,
             pes_tracks: PesTracks::Inline(None),
             pes_active: None,
             pes_adopting: 0,
@@ -565,7 +576,7 @@ impl TsEngine {
     /// end starts draining the stream and every native track.
     #[cold]
     fn end_entity<T: TsStepProjection>(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<T> {
-        if self.draining {
+        if self.life != Life::Reading {
             return Err(Error::Invalid("TS repeated undrained entity End"));
         }
         if let Entities::Sequence(boundary) = &mut self.entities {
@@ -579,7 +590,7 @@ impl TsEngine {
             return Err(Error::Invalid("TS segment ended without an active PMT"));
         }
         self.stream.end_of_source()?;
-        self.draining = true;
+        self.life = Life::Draining;
         for track in self.pes_tracks.as_mut_slice() {
             if let Some(observer) = track.observer.as_mut() {
                 observer.end_of_source()?;
@@ -659,16 +670,16 @@ impl TsEngine {
                     Err(error) => {
                         track.refuse(error);
                         self.pes_updates_from = Some(index);
-                        self.pes_active = self.draining.then_some(index + 1);
+                        self.pes_active = (self.life != Life::Reading).then_some(index + 1);
                         return T::project(FeedStep::Yield);
                     }
                 }
             }
-            self.pes_active = self.draining.then_some(index + 1);
+            self.pes_active = (self.life != Life::Reading).then_some(index + 1);
         }
         let progressive = T::PROGRESSIVE || self.delivery.is_progressive();
         let feed_only = progressive || self.delivery.is_feed();
-        if self.ended {
+        if self.life == Life::Ended {
             return T::project(FeedStep::End);
         }
         if matches!(self.entities, Entities::Sequence(Some(_))) {
@@ -757,14 +768,14 @@ impl TsEngine {
                     TraceEvent::Pes(_) if self.program == 0 => {
                         return Err(Error::Invalid("TS PES before program discovery"));
                     }
-                    TraceEvent::Finished => self.ended = true,
+                    TraceEvent::Finished => self.life = Life::Ended,
                     _ => {}
                 }
                 self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
                 self.suppressed_events += 1;
                 // Return periodically to the player's cancellation and event cap.
                 if !drained
-                    || self.ended
+                    || self.life == Life::Ended
                     || w.remaining() == 0
                     || self.suppressed_events >= Self::FEED_EVENT_QUANTUM
                 {
@@ -959,7 +970,7 @@ impl TsEngine {
         }
         self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
         if matches!(event, TraceEvent::Finished) {
-            self.ended = true;
+            self.life = Life::Ended;
         }
         T::project(FeedStep::Event(TsEvent {
             source: event,
