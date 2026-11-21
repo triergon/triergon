@@ -92,12 +92,42 @@ reference links as under `static-toolchain-runtime-v1`.
 The [original-input inventory](../harness/fate/README.md) classifies 15 unmapped
 MPEG-TS identities. On `pmtchange.ts` and `loewe.ts`, the pinned reference
 probe reports program and stream metadata. The existing candidate PES operation
-requires a program-level reader for both sources. Access-unit comparisons
+uses an explicit discovery and replay operation for the original TS188 sample. Access-unit comparisons
 remain open for a PSI diagnostic and a transport diagnostic respectively.
 The [original-input controls](../harness/fate/README.md) verify PMT replacement
 on `pmtchange.ts` and transport faults on the unaligned `loewe.ts` sync grid
-under two delivery granularities. Probe metadata and full packet-fold parity
-remain open on both inputs.
+under two delivery granularities. Complete probe metadata and the
+`pmtchange.ts` packet comparison remain open.
+The explicit TS188 prefix probe finds the offset-one grid in `loewe.ts`. Opening
+the original entity at that offset gives the pinned reference's program 769, PMT
+PID 1363, PCR PID 1361 and HEVC/AAC track PIDs 1361/1362. Source positions keep
+the leading byte in their coordinate system. This control checks program
+membership and original physical offsets.
+`compat::input::Ts188Startup` provides that explicit operation on a seekable
+original cursor before `TransportStream` program/PES traversal, with charged
+input windows, bounded work and cancellation. Authored phase-zero and phase-one
+controls compare complete source-byte/event records with explicit-offset
+traversal, including continuity and partial-tail diagnostics. Phases 0, 1 and
+187 also cover one-byte input and one-unit work grants. The hash-pinned
+`loewe.ts` integration control checks the same program facts and original
+carrier offsets as explicit-offset traversal; it requires the external sample
+cache. Native runtime, heap and kernel-bound RSS qualification of this opt-in
+operation remains open on AArch64 and ARMv7.
+
+For the original shifted `loewe.ts`, a discovery and replay control using the
+existing PES cutter recovers 23 selected-program payloads (85,990 bytes), with
+matching PIDs, PTS, physical positions and order in the local reference
+observation. Eight source DTS values are absent where that observation supplies
+DTS equal to PTS; the cutter also does not expose the terminal corruption flag.
+A separate registered HEVC/AAC observer replay, with `DemuxClock` and transport
+fault recovery, matches all 23 reference packet records in order, including
+payload bytes, positions, timestamps, flags and stream-ID side data, at three
+input and work grants. This is a local correctness control, not performance
+qualification.
+An authored TS188 control with finite PES packets also observes the reference
+filling a missing DTS from PTS, retaining an explicit DTS, and marking a
+length-truncated terminal packet corrupt. `DemuxClock` reproduces the observed
+timestamps; the cutter retains the terminal bytes without a flag projection.
 
 The [DTS seek comparison](../harness/features/mpegts-dts-seek/contract.json)
 includes 12 coded suffix cases for static mode-zero component navigation.
@@ -1283,3 +1313,7 @@ ARMv7; on Linux AArch64 packet framing's rises from 1.0290 (134/135) to 1.0469 (
 
 The [measured revisions](#measured-revisions) table names the revision and raw samples
 behind each ARMv7 row.
+
+The transport worker also offers opt-in TS188 source discovery and replay for a single
+entity whose requested program contains registered HEVC and ADTS AAC tracks. It refuses
+program map or clock interval changes and unsupported source faults.

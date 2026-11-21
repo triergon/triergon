@@ -793,7 +793,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 20] = [
+const PROFILE_REFERENCES: [ProfileReference; 21] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -815,6 +815,24 @@ const PROFILE_REFERENCES: [ProfileReference; 20] = [
         libraries: "formats_reference",
         packages: CONTAINER_PACKAGES,
         options: CONTAINER_OPTIONS,
+        identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-formats",
+        binary: "ffmpeg-ts188-discovery-worker",
+        define: Some("-DTRIERGON_HLS_REFERENCE=1"),
+        record: "ffmpeg-ts188-discovery",
+        kind: "FFmpeg MPEG-TS PES with automatic carrier and program discovery",
+        libraries: "ts188_discovery_reference",
+        packages: CONTAINER_PACKAGES,
+        options: &[
+            "-O3",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-DTRIERGON_TS188_DISCOVERY=1",
+        ],
         identity: true,
         ..REFERENCE
     },

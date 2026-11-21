@@ -282,3 +282,115 @@ fn formats_are_detected_by_repeated_sync_bytes() {
     assert_eq!(PacketFormat::detect(b"PG\0\0"), None);
     assert_eq!(PacketFormat::detect(&[]), None);
 }
+
+#[test]
+#[ignore = "requires the pinned TS188 comparison ffprobe"]
+fn authored_reference_clock_and_terminal_controls() {
+    use std::process::Command;
+    let reference = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../.research/ts188-comparison-reference/ffprobe");
+    let mut ts = Vec::new();
+    fn section(pid: u16, mut section: Vec<u8>) -> Vec<u8> {
+        let mut crc = u32::MAX;
+        for byte in &section {
+            crc ^= u32::from(*byte) << 24;
+            for _ in 0..8 {
+                crc = (crc << 1)
+                    ^ if crc & 0x8000_0000 != 0 {
+                        0x04c1_1db7
+                    } else {
+                        0
+                    };
+            }
+        }
+        section.extend_from_slice(&crc.to_be_bytes());
+        section.insert(0, 0);
+        packet(pid, true, &section, None)
+    }
+    ts.push(section(
+        0,
+        vec![0, 0xb0, 13, 0, 1, 0xc1, 0, 0, 0, 1, 0xf0, 0],
+    ));
+    ts.push(section(
+        4096,
+        vec![
+            2, 0xb0, 18, 0, 1, 0xc1, 0, 0, 0xe1, 0, 0xf0, 0, 6, 0xe1, 0, 0xf0, 0,
+        ],
+    ));
+    ts.extend(carried(&pes(Some(90_000), None, b"first", true), 184));
+    ts.extend(carried(
+        &pes(Some(180_000), Some(170_000), b"second", true),
+        184,
+    ));
+    let mut terminal = pes(Some(270_000), None, b"terminal", true);
+    terminal.truncate(terminal.len() - 3);
+    ts.extend(carried(&terminal, 184));
+    let path =
+        std::env::temp_dir().join(format!("triergon-ts188-control-{}.ts", std::process::id()));
+    std::fs::write(&path, ts.concat()).unwrap();
+    let output = Command::new(reference)
+        .args([
+            "-v",
+            "error",
+            "-f",
+            "mpegts",
+            "-show_packets",
+            "-show_entries",
+            "packet=pts,dts,pos,size,flags",
+            "-of",
+            "compact=p=0:nk=0",
+        ])
+        .arg(&path)
+        .output()
+        .unwrap();
+    std::fs::remove_file(path).unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        concat!(
+            "pts=90000|dts=90000|size=5|pos=376|flags=K__|side_datum/mpegts_stream_id:side_data_type=MPEGTS Stream ID|side_datum/mpegts_stream_id:id=189\n",
+            "pts=180000|dts=170000|size=6|pos=564|flags=K__|side_datum/mpegts_stream_id:side_data_type=MPEGTS Stream ID|side_datum/mpegts_stream_id:id=189\n",
+            "pts=270000|dts=270000|size=5|pos=752|flags=K_C|side_datum/mpegts_stream_id:side_data_type=MPEGTS Stream ID|side_datum/mpegts_stream_id:id=189\n",
+        )
+    );
+    let packets = cut(&ts[2..]);
+    assert_eq!(
+        summary(&packets),
+        [
+            (
+                Some(90_000),
+                None,
+                DemuxBoundary::FiniteLength,
+                b"first".to_vec()
+            ),
+            (
+                Some(180_000),
+                Some(170_000),
+                DemuxBoundary::FiniteLength,
+                b"second".to_vec()
+            ),
+            (
+                Some(270_000),
+                None,
+                DemuxBoundary::LogicalEof,
+                b"termi".to_vec()
+            ),
+        ]
+    );
+    let mut clock = DemuxClock::new(1).unwrap();
+    assert_eq!(
+        packets
+            .iter()
+            .map(|p| clock.place(p.pts_raw33, p.dts_raw33).unwrap())
+            .collect::<Vec<_>>(),
+        [
+            (Some(90_000), Some(90_000)),
+            (Some(180_000), Some(170_000)),
+            (Some(270_000), Some(270_000)),
+        ]
+    );
+}
