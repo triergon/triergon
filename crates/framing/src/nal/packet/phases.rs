@@ -51,27 +51,34 @@ impl<M> NalPacketJob<'_, M> {
         cancel: &AtomicBool,
         ready: &mut Option<NalPacketOutput<M>>,
     ) -> Result<NalPacketProgress> {
-        if let PacketPhase::Prepare(plan) = &mut self.phase {
-            let packet = self
-                .source
-                .as_ref()
-                .ok_or(Error::Invalid("missing packet source"))?;
-            let input = PacketInput {
-                bytes: &packet.bytes,
-                new_extradata: packet.new_extradata.as_ref(),
-            };
-            if let Some(status) = plan.advance(&mut self.state, input, work, cancel)? {
-                return Ok(status);
+        loop {
+            match &mut self.phase {
+                PacketPhase::Prepare(plan) => {
+                    // A job no longer holding its source has published it.
+                    let Some(packet) = &self.source else {
+                        return Ok(NalPacketProgress::Complete);
+                    };
+                    let input = PacketInput {
+                        bytes: &packet.bytes,
+                        new_extradata: packet.new_extradata.as_ref(),
+                    };
+                    if let Some(status) = plan.advance(&mut self.state, input, work, cancel)? {
+                        return Ok(status);
+                    }
+                    // Preparation scratch holds no allocations. The emission loop
+                    // checks cancellation before it reserves.
+                    self.phase = PacketPhase::Emit(PacketEmission::new());
+                }
+                PacketPhase::Emit(emission) => {
+                    return emission.advance(
+                        &mut self.state,
+                        &mut self.source,
+                        work,
+                        cancel,
+                        ready,
+                    );
+                }
             }
-            // Preparation scratch holds no allocations. The emission loop checks
-            // cancellation before it reserves.
-            self.phase = PacketPhase::Emit(PacketEmission::new());
-        }
-        match &mut self.phase {
-            PacketPhase::Emit(emission) => {
-                emission.advance(&mut self.state, &mut self.source, work, cancel, ready)
-            }
-            PacketPhase::Prepare(_) => Err(Error::Invalid("packet emission phase missing")),
         }
     }
 }
@@ -120,13 +127,10 @@ impl PacketPlan {
         work: &mut WorkBudget,
     ) -> Result<Step> {
         if let Some(update) = &state.session.pending_update {
-            let extra = input
-                .new_extradata
-                .ok_or(Error::Invalid("missing source update"))?;
             let raw = update.bytes();
-            if extra.len() != raw.len() {
+            let Some(extra) = input.new_extradata.filter(|extra| extra.len() == raw.len()) else {
                 return Err(Error::Invalid("configuration update bytes differ"));
-            }
+            };
             if self.offset < raw.len() {
                 let count = (raw.len() - self.offset)
                     .min(4096)
@@ -727,18 +731,15 @@ impl PacketEmission {
                 return Err(Error::Cancelled);
             }
             let step = match self.phase {
-                EmissionPhase::Reserve => {
-                    let packet = source
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing packet source"))?;
-                    self.reserve_output(state, &packet.bytes, work)?
-                }
-                EmissionPhase::Copy => {
-                    let packet = source
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing packet source"))?;
-                    self.copy_output(state, &packet.bytes, work, cancel)?
-                }
+                // A job no longer holding its source has published it.
+                EmissionPhase::Reserve => match source {
+                    Some(packet) => self.reserve_output(state, &packet.bytes, work)?,
+                    None => return Ok(NalPacketProgress::Complete),
+                },
+                EmissionPhase::Copy => match source {
+                    Some(packet) => self.copy_output(state, &packet.bytes, work, cancel)?,
+                    None => return Ok(NalPacketProgress::Complete),
+                },
                 EmissionPhase::Freeze => self.freeze_output(state, source, work, ready)?,
                 EmissionPhase::Complete => return Ok(NalPacketProgress::Complete),
             };
@@ -829,18 +830,21 @@ impl PacketEmission {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        let bytes = if state.length_width.is_none() {
-            source
-                .as_ref()
-                .ok_or(Error::Invalid("missing packet source"))?
-                .bytes
-                .clone()
-        } else {
-            freeze_annex_b_output(&mut self.output, "missing packet buffer")?
+        let Some(packet) = source.take() else {
+            return Ok(Step::Break(NalPacketProgress::Complete));
         };
-        let source = source
-            .take()
-            .ok_or(Error::Invalid("missing packet source"))?;
+        let bytes = if state.length_width.is_none() {
+            packet.bytes.clone()
+        } else {
+            match freeze_annex_b_output(&mut self.output, "missing packet buffer") {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    *source = Some(packet);
+                    return Err(error);
+                }
+            }
+        };
+        let source = packet;
         let record = state.config();
         let configuration = record.bytes().clone();
         let configuration_identity = record.source_identity();
