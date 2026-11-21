@@ -10,6 +10,7 @@ dependencies = [
  "triergon-core",
  "triergon-harness-protocol",
  "triergon-raster",
+ "triergon-worker-entry",
 ]
 
 [[package]]
@@ -17,6 +18,7 @@ name = "capture-worker"
 version = "0.0.0"
 dependencies = [
  "triergon-capture",
+ "triergon-worker-entry",
 ]
 
 [[package]]
@@ -31,6 +33,7 @@ dependencies = [
  "triergon-isobmff",
  "triergon-pixel",
  "triergon-session",
+ "triergon-worker-entry",
 ]
 
 [[package]]
@@ -40,6 +43,7 @@ dependencies = [
  "triergon-core",
  "triergon-font",
  "triergon-harness-protocol",
+ "triergon-worker-entry",
 ]
 
 [[package]]
@@ -48,6 +52,7 @@ version = "0.0.0"
 dependencies = [
  "triergon-harness-protocol",
  "triergon-matroska",
+ "triergon-worker-entry",
 ]
 
 [[package]]
@@ -62,6 +67,7 @@ dependencies = [
  "triergon-matroska",
  "triergon-mpegts",
  "triergon-playback",
+ "triergon-worker-entry",
 ]
 
 [[package]]
@@ -72,6 +78,7 @@ dependencies = [
  "triergon-font",
  "triergon-harness-protocol",
  "triergon-raster",
+ "triergon-worker-entry",
 ]
 
 [[package]]
@@ -82,6 +89,7 @@ dependencies = [
  "triergon-font",
  "triergon-harness-protocol",
  "triergon-shape",
+ "triergon-worker-entry",
 ]
 
 [[package]]
@@ -94,6 +102,7 @@ dependencies = [
  "triergon-harness-runner",
  "triergon-mpegts",
  "triergon-subtitles",
+ "triergon-worker-entry",
 ]
 
 [[package]]
@@ -105,6 +114,7 @@ dependencies = [
  "triergon-harness-protocol",
  "triergon-harness-runner",
  "triergon-mpegts",
+ "triergon-worker-entry",
 ]
 
 [[package]]
@@ -275,6 +285,7 @@ dependencies = [
  "triergon-bitstream",
  "triergon-core",
  "triergon-harness-protocol",
+ "triergon-worker-entry",
 ]
 
 [[package]]
@@ -296,6 +307,7 @@ dependencies = [
  "triergon-core",
  "triergon-framing",
  "triergon-harness-protocol",
+ "triergon-worker-entry",
 ]
 
 [[package]]
@@ -392,6 +404,10 @@ dependencies = [
  "triergon-harness-protocol",
  "triergon-pixel",
 ]
+
+[[package]]
+name = "triergon-worker-entry"
+version = "0.0.0"
 
 [[package]]
 name = "xtask"

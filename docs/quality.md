@@ -596,6 +596,24 @@ may override that count for diagnostic comparisons.
   libatomic today: the FFmpeg references name it, and the linker leaves it out. glibc's
   static libm needs the static libc, so libm stays with libc. Elsewhere both sides link
   as their toolchains do.
+- Every Rust worker enters through C's `main`, as the C references do, instead of
+  through the Rust standard library's start-up, so a measurement compares the library's
+  work with the reference's and not the Rust runtime's start-up. On glibc that start-up
+  finds the main thread's stack guard by reading `/proc/self/maps` through
+  `pthread_getattr_np` and `sscanf`, which makes libc's stdio and scanf code resident,
+  about 40 pages of the ARMv7 framing worker that the reference never holds. Libraries
+  forbid unsafe code; worker packages deny it, and each worker binary's C entry point,
+  `#[allow(unsafe_code)] #[unsafe(no_mangle)] extern "C" fn main`, is its one allowed
+  exception. The entry point calls
+  [`triergon_worker_entry::enter`](../crates/worker-entry), which is safe: it runs the
+  worker's `fn() -> ExitCode`, flushes standard output and standard error, and returns
+  the exit status. `cargo xtask check` admits that item once per worker binary and no
+  other unsafe syntax, and keeps the worker packages' lints equal to the workspace's
+  apart from `unsafe_code`. A worker gives up the standard start-up's stack-overflow
+  message (an overflow ends with `SIGSEGV`), its `SIGPIPE` handling (a write to a closed
+  pipe ends the worker with `SIGPIPE`, as it ends the reference), its reopening of
+  closed standard streams and its implicit flush of standard output, which `enter`
+  replaces; a panic still ends with status 101, and `std::env::args` is unchanged.
 - On GNU/Linux the policy also changes how a Rust worker with a trained order for the
   target links: the pinned toolchain's own `lld` links it, in place of the toolchain's
   default linker, with the functions its trained order lists first, in that order, and

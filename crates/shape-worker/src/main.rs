@@ -2,7 +2,8 @@
 //! resolved and Unicode properties read through triergon-shape, in the order of
 //! `harness/reference_shape.h`. Reading the file, printing and process startup are
 //! outside the timed loop.
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
+#![cfg_attr(not(test), no_main)]
 
 mod record;
 mod unicode;
@@ -571,7 +572,8 @@ fn run(args: &[String]) -> Result<()> {
     Ok(out.flush()?)
 }
 
-fn main() -> ExitCode {
+#[cfg_attr(test, allow(dead_code))]
+fn worker_main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match run(&args) {
         Ok(()) => ExitCode::SUCCESS,
@@ -580,4 +582,16 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// C's entry point, the one exception to the worker's `deny(unsafe_code)`
+/// (`triergon-worker-entry`).
+#[cfg(not(test))]
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+extern "C" fn main(
+    _argc: std::ffi::c_int,
+    _argv: *const *const std::ffi::c_char,
+) -> std::ffi::c_int {
+    triergon_worker_entry::enter(worker_main)
 }
