@@ -1,12 +1,13 @@
-//! Bounded MP4 diagnostic consumer.
-//! Existing core owns input, resource charges, ranges and exact clocks.
+//! The ISO BMFF comparison worker: opens, indexes, seeks and plans source ranges in one
+//! input with the FFmpeg-compatible views of `triergon_isobmff::compat::mov`, and prints
+//! the traces and work counts the harness compares with the reference worker.
 #![deny(unsafe_code)]
 #![cfg_attr(not(test), no_main)]
 #[path = "isobmff_consumer/model.rs"]
 mod model;
 #[path = "isobmff_consumer/protocol.rs"]
 mod protocol;
-use model::{DemuxOperation, DemuxSeekRequest, Driver, Failure, OpenPolicy, Result, SourceRequest};
+use model::{DemuxOperation, DemuxSeekRequest, Driver, Failure, OpenPolicy, Result};
 use protocol::{Retention, Stats};
 use std::{
     env,
@@ -16,10 +17,9 @@ use std::{
     process::ExitCode,
     time::Instant,
 };
-use triergon_core::{Error, Time};
+use triergon_core::Error;
 use triergon_isobmff::{
     boxes::MediaDataPolicy,
-    sample_groups::{RecoveryKind, RecoverySyntax},
     table::{SampleTablePolicy, SyncSamplePolicy, TimingRunPolicy},
 };
 
@@ -186,7 +186,7 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
     }
     if mode == "identity" {
         println!(
-            "{{\"schema\":33,\"worker\":\"triergon-isobmff-consumer\",\"reference_api\":\"n9.0-public-mov\",\"native_seek\":\"bounded-aligned-native-view\",\"source_variant\":\"native37-profile-batch43-v2\",\"source_variant_sha256\":\"49d244ad58a4ea3c575dc5eebdba36edf86f27df1edb68949cd72566dcc479c9\",\"qualification\":false}}"
+            "{{\"schema\":33,\"worker\":\"triergon-isobmff-consumer\",\"reference_api\":\"n9.0-public-mov\",\"native_seek\":\"bounded-aligned-native-view\",\"qualification\":false}}"
         );
         return Ok(());
     }
@@ -207,8 +207,6 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
         if bench { 8 } else { 7 }
     } else if bench {
         4
-    } else if mode == "source-seek-trace" {
-        11
     } else {
         3
     };
@@ -280,69 +278,6 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
             io::stdout().write_all(b"TRIERGON_END_V1\n")?;
             io::stdout().flush()?;
             output_stats(&result?, 1, 0)?;
-        }
-        "index-trace" | "source-seek-trace" => {
-            if policy.tables.timing_runs != TimingRunPolicy::Strict {
-                return Err(Error::Invalid("source audit requires exact timing coverage").into());
-            }
-            if policy.tables.sync_samples != SyncSamplePolicy::Strict {
-                return Err(Error::Invalid("source audit requires in-range sync samples").into());
-            }
-            if policy.media_data != MediaDataPolicy::Strict {
-                return Err(Error::Invalid("source audit requires complete media").into());
-            }
-            if o.retain != 0 {
-                return Err(Error::Invalid(
-                    "source audit retention must be zero; native retention is a separate operation",
-                )
-                .into());
-            }
-            let length = length(&input)?;
-            let mut driver = Driver::new(&mut input, length, o.window, o.quantum)?;
-            let model = driver.open()?;
-            let mut out = String::new();
-            if mode == "index-trace" {
-                driver.index_trace(&model, &mut out)?;
-            } else {
-                let track = argument(&args, 3, 0)?;
-                let numerator = argument(&args, 4, 0i128)?;
-                let denominator = argument(&args, 5, 0u128)?;
-                let following = argument(&args, 6, 0)?;
-                let after_eof = match argument(&args, 7, 0u8)? {
-                    0 => false,
-                    1 => true,
-                    _ => return Err(Error::Invalid("after-EOF boolean").into()),
-                };
-                let kind = match args.get(8).map(String::as_str) {
-                    Some("roll") => RecoveryKind::Roll,
-                    Some("prol") => RecoveryKind::Prol,
-                    _ => return Err(Error::Invalid("recovery kind").into()),
-                };
-                let syntax = match args.get(9).map(String::as_str) {
-                    Some("published01") => RecoverySyntax::Versions0And1,
-                    Some("mpeg2026draft") => RecoverySyntax::Mpeg2026Draft,
-                    _ => return Err(Error::Invalid("recovery syntax authority").into()),
-                };
-                // Positional reserved field makes future request versions explicit.
-                if args.get(10).map(String::as_str) != Some("v1") {
-                    return Err(Error::Invalid("source seek request version").into());
-                }
-                driver.source_seek(
-                    &model,
-                    SourceRequest {
-                        track,
-                        at: Time::new(numerator, denominator)?,
-                        following,
-                        after_eof,
-                        kind,
-                        syntax,
-                    },
-                    &mut out,
-                )?;
-            }
-            drop(model);
-            drop(driver);
-            println!("{out}");
         }
         _ => return Err(Error::Invalid("unknown worker mode").into()),
     }
@@ -419,7 +354,7 @@ mod tests {
         let mut broken = Broken;
         let mut driver = Driver::new(&mut broken, 64, 1, 3).unwrap();
         assert!(matches!(
-            driver.open(),
+            driver.open_with_policy(OpenPolicy::default()),
             Err(Failure::Core(Error::Io(io::ErrorKind::Other)))
         ));
     }

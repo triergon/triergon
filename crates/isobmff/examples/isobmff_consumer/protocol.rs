@@ -1,5 +1,6 @@
-//! Matched research consumer fields. Checksums check work, not correctness:
-//! complete ordered trace equality and independent source audits are required.
+//! The trace fields and work digest the worker shares with the reference worker. The
+//! digest checks the work done, not its result: a comparison requires equal ordered
+//! traces.
 use std::fmt::Write as _;
 use triergon_core::{Budget, BudgetVec, Bytes, Error};
 pub use triergon_harness_protocol::digest::{append_words, fold, fold_framed, signed};
@@ -12,165 +13,6 @@ pub const EOF: i64 = -541478725;
 pub const DOMAIN: u64 = 0x4d4f5633;
 pub const CORRUPT_PACKET: u32 = 2;
 
-pub fn raw_box(out: &mut String, raw: &triergon_isobmff::boxes::BoxView) {
-    write!(out, "{{\"offset\":{},\"box_hex\":\"", raw.header().start).expect("String write");
-    push_hex(out, raw.bytes().as_ref());
-    out.push_str("\"}");
-}
-fn time(out: &mut String, t: &triergon_core::Time) {
-    write!(out, "[{},{}]", t.numerator(), t.denominator()).expect("String write");
-}
-fn edit(out: &mut String, e: &triergon_isobmff::movie::EditEntry) {
-    write!(
-        out,
-        "[{}, {}, {}, {}]",
-        e.segment_duration, e.media_time, e.rate_integer, e.rate_fraction
-    )
-    .expect("String write");
-}
-pub fn source_sample(out: &mut String, s: &triergon_isobmff::Sample) {
-    write!(
-        out,
-        "{{\"ordinal\":{},\"description\":{},\"range\":[{},{}],\"duration\":{},\"dts\":",
-        s.ordinal, s.description_index, s.range.start, s.range.end, s.duration_ticks
-    )
-    .expect("String write");
-    match s.dts_ticks {
-        Some(v) => write!(out, "{v}").expect("String write"),
-        None => out.push_str("null"),
-    }
-    out.push_str(",\"cts\":");
-    match s.cts_ticks {
-        Some(v) => write!(out, "{v}").expect("String write"),
-        None => out.push_str("null"),
-    }
-    match s.composition_offset {
-        Some(v) => write!(
-            out,
-            ",\"offset_version\":{},\"offset_bits\":{}",
-            v.version(),
-            v.raw_bits()
-        )
-        .expect("String write"),
-        None => out.push_str(",\"offset_version\":null,\"offset_bits\":null"),
-    }
-    write!(
-        out,
-        ",\"access\":\"{:?}\",\"partial_sync\":{},\"dependency\":",
-        s.access, s.partial_sync
-    )
-    .expect("String write");
-    match s.dependency {
-        Some(v) => write!(out, "{v}").expect("String write"),
-        None => out.push_str("null"),
-    }
-    out.push_str(",\"fragment_flags\":");
-    match s.fragment_flags {
-        Some(v) => write!(out, "{v}").expect("String write"),
-        None => out.push_str("null"),
-    }
-    out.push('}');
-}
-pub fn source_landings(out: &mut String, r: &triergon_isobmff::seek::MovieSeekResult<'_>) {
-    use triergon_isobmff::sample_groups::RecoveryDefinitionOrigin;
-    out.push_str(",\"point_receipt\":");
-    if let Some(p) = &r.point {
-        out.push_str("{\"requested_movie\":");
-        time(out, &p.requested_movie_time);
-        out.push_str(",\"source\":");
-        time(out, &p.source_time);
-        out.push_str(",\"movie_start\":");
-        time(out, &p.movie_start);
-        out.push_str(",\"movie_end\":");
-        if let Some(t) = &p.movie_end {
-            time(out, t);
-        } else {
-            out.push_str("null");
-        }
-        out.push_str(",\"edit_ordinal\":");
-        match p.edit_ordinal {
-            Some(v) => write!(out, "{v}").expect("String write"),
-            None => out.push_str("null"),
-        }
-        out.push_str(",\"raw_edit_fields\":");
-        if let Some(e) = &p.edit_entry {
-            edit(out, e);
-        } else {
-            out.push_str("null");
-        }
-        out.push('}');
-    } else {
-        out.push_str("null");
-    }
-    out.push_str(",\"gap_receipt\":");
-    if let Some(g) = &r.gap {
-        write!(
-            out,
-            "{{\"edit_ordinal\":{},\"requested_movie\":",
-            g.edit_ordinal
-        )
-        .expect("String write");
-        time(out, &g.requested_movie_time);
-        out.push_str(",\"movie_start\":");
-        time(out, &g.movie_range.start);
-        out.push_str(",\"movie_end\":");
-        time(out, &g.movie_range.end);
-        out.push_str(",\"raw_edit_fields\":");
-        edit(out, &g.entry);
-        out.push('}');
-    } else {
-        out.push_str("null");
-    }
-    out.push_str(",\"recovery_receipt\":");
-    if let Some(s) = &r.recovery {
-        write!(
-            out,
-            "{{\"kind\":\"{:?}\",\"mapping_origin\":\"{:?}\",\"raw_mapping_index\":",
-            s.kind, s.mapping_origin
-        )
-        .expect("String write");
-        match s.raw_mapping_index {
-            Some(v) => write!(out, "{v}").expect("String write"),
-            None => out.push_str("null"),
-        }
-        out.push_str(",\"definition_origin\":");
-        match s.definition_origin {
-            Some(RecoveryDefinitionOrigin::Track) => out.push_str("{\"kind\":\"track\"}"),
-            Some(RecoveryDefinitionOrigin::Fragment(v)) => {
-                write!(out, "{{\"kind\":\"fragment\",\"ordinal\":{v}}}").expect("String write");
-            }
-            None => out.push_str("null"),
-        }
-        out.push_str(",\"description\":");
-        if let Some(d) = &s.description {
-            write!(
-                out,
-                "{{\"index\":{},\"distance\":{},\"raw_bits\":{},\"source_range\":[{},{}]}}",
-                d.index, d.distance, d.raw_bits, d.source_range.start, d.source_range.end
-            )
-            .expect("String write");
-        } else {
-            out.push_str("null");
-        }
-        out.push('}');
-    } else {
-        out.push_str("null");
-    }
-    out.push_str(",\"plan_receipt\":");
-    if let Some(plan) = &r.plan {
-        let p = plan.landing();
-        write!(out,"{{\"track_id\":{},\"requested_ordinal\":{},\"requested_preroll\":{},\"available_preroll\":{},\"missing_preroll\":{},\"validated_samples\":{},\"target\":",
-            p.track_id,p.requested_ordinal,p.requested_preroll_samples,p.available_preroll_samples,p.missing_preroll_samples,p.validated_samples).expect("String write");
-        source_sample(out, &p.target);
-        out.push_str(",\"sync\":");
-        source_sample(out, &p.sync_sample);
-        out.push_str(",\"decode_start\":");
-        source_sample(out, &p.decode_start);
-        out.push('}');
-    } else {
-        out.push_str("null");
-    }
-}
 pub fn nullable(out: &mut String, value: i64) {
     if value == i64::MIN {
         out.push_str("null");
@@ -224,8 +66,8 @@ impl Packet {
         }
         fold(h, u64::from(self.flags));
         fold_framed(h, self.payload.as_ref());
-        // Current production demux view exposes no packet-side-data projection.
-        // Reference items remain fully consumed; any nonempty result mismatches.
+        // The demuxer view has no packet side data: an empty list, which any side data
+        // the reference reports does not match.
         fold(h, 0);
         Ok(())
     }

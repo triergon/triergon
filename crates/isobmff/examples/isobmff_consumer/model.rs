@@ -1,6 +1,7 @@
-//! Blocking research consumer over core InputCursor and existing format jobs.
-//! Parsing helper provenance: this repo's independently authored source-trace
-//! adapter. No FFmpeg/third-party implementation code or new core framework.
+//! The worker's reading of one input: a bounded open over `BoxReader` and the sample
+//! table and fragment builders, then the FFmpeg-compatible packet, index, seek and
+//! range-plan operations, each folded into the work digest and, for a trace, written
+//! as its rows.
 use super::protocol::{self, Packet, Retention, Stats};
 use std::{
     fmt,
@@ -504,7 +505,6 @@ struct Scanned {
     media: BudgetVec<Range<u64>>,
     truncated_media: Option<Range<u64>>,
     moofs: BudgetVec<BoxView>,
-    indexes: BudgetVec<BoxView>,
     brand: Option<[u8; 4]>,
 }
 struct RootWalk {
@@ -522,8 +522,6 @@ pub struct Model {
     pub media: BudgetVec<Range<u64>>,
     truncated_media: Option<Range<u64>>,
     pub movie: MovieHeader,
-    raw_movie: BoxView,
-    indexes: BudgetVec<BoxView>,
     brand: Option<[u8; 4]>,
 }
 
@@ -576,7 +574,6 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
         let mut media = BudgetVec::new(&self.budget);
         let mut truncated_media = None;
         let mut moofs = BudgetVec::new(&self.budget);
-        let mut indexes = BudgetVec::new(&self.budget);
         while let Some(event) =
             reader.next_event(&mut self.input, &mut self.feed, self.quantum, &self.cancel)?
         {
@@ -599,6 +596,8 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
                         truncated_media = Some(declared);
                         break;
                     }
+                    // Index roots are read whole, so that one past the metadata limit
+                    // fails the open, but their entries are not used.
                     if matches!(
                         &header.kind,
                         b"ftyp" | b"moov" | b"moof" | b"sidx" | b"mfra"
@@ -643,7 +642,6 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
                         }
                         append(&mut moofs, raw)?;
                     }
-                    b"sidx" | b"mfra" => append(&mut indexes, raw)?,
                     _ => {}
                 },
             }
@@ -653,14 +651,9 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
             media,
             truncated_media,
             moofs,
-            indexes,
             brand,
         })
     }
-    pub fn open(&mut self) -> Result<Model> {
-        self.open_with_policy(OpenPolicy::default())
-    }
-
     pub fn open_with_policy(&mut self, policy: OpenPolicy) -> Result<Model> {
         let scanned = self.scan(policy.media_data, None)?;
         let movie = MovieHeader::parse(&child(&scanned.movie, b"mvhd")?)?;
@@ -714,8 +707,6 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
             media: scanned.media,
             truncated_media: scanned.truncated_media,
             movie,
-            raw_movie: scanned.movie,
-            indexes: scanned.indexes,
             brand: scanned.brand,
         })
     }
@@ -1261,75 +1252,6 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
         }
         Ok(())
     }
-    pub fn index_trace(&self, model: &Model, out: &mut String) -> Result<()> {
-        use triergon_isobmff::{
-            Next,
-            index::{MovieFragmentRandomAccessTail, SegmentIndex, TrackFragmentRandomAccess},
-        };
-        out.push_str("{\"schema\":33,\"operation\":\"source-index-audit-v33\",\"verified_targets\":false,\"indexes\":[");
-        let mut first = true;
-        for raw in model.indexes.as_slice() {
-            if !first {
-                out.push(',');
-            }
-            first = false;
-            write!(out, "{{\"offset\":{},\"raw_hex\":\"", raw.header().start)
-                .expect("String write");
-            triergon_harness_protocol::push_hex(out, raw.bytes().as_ref());
-            out.push_str("\",\"entries\":[");
-            let mut entry_first = true;
-            if raw.header().kind == *b"sidx" {
-                let index = SegmentIndex::parse(raw.clone(), Limits::default())?;
-                let mut cursor = index.cursor();
-                loop {
-                    match cursor.poll(&mut WorkBudget::new(self.quantum))? {
-                        Next::Yield => {}
-                        Next::End => break,
-                        Next::Item(r) => {
-                            if !entry_first {
-                                out.push(',');
-                            }
-                            entry_first = false;
-                            write!(out,"{{\"ordinal\":{},\"range\":[{},{}],\"references_index\":{},\"sap_bits\":{},\"size_bits\":{},\"earliest\":[{},{}],\"duration\":[{},{}]}}",
-                            r.ordinal,r.range.start,r.range.end,r.references_index,r.raw_sap_word,r.raw_size_word,r.earliest_presentation.numerator(),r.earliest_presentation.denominator(),r.presentation_duration.numerator(),r.presentation_duration.denominator()).expect("String write");
-                        }
-                    }
-                }
-            } else {
-                for child in children(raw, 0, &self.budget)?.as_slice() {
-                    if child.header().kind == *b"tfra" {
-                        let index =
-                            TrackFragmentRandomAccess::parse(child.clone(), Limits::default())?;
-                        let mut cursor = index.cursor();
-                        loop {
-                            match cursor.poll(&mut WorkBudget::new(self.quantum))? {
-                                Next::Yield => {}
-                                Next::End => break,
-                                Next::Item(e) => {
-                                    if !entry_first {
-                                        out.push(',');
-                                    }
-                                    entry_first = false;
-                                    write!(out,"{{\"track_id\":{},\"ordinal\":{},\"time_ticks\":{},\"moof_offset\":{},\"traf\":{},\"trun\":{},\"sample\":{}}}",index.track_id(),e.ordinal,e.time_ticks,e.moof_offset,e.traf_number,e.trun_number,e.sample_number).expect("String write");
-                                }
-                            }
-                        }
-                    } else if child.header().kind == *b"mfro" {
-                        if raw.header().end()? != Some(self.length) {
-                            return Err(Error::Unsupported("nonterminal mfra tail audit").into());
-                        }
-                        MovieFragmentRandomAccessTail::parse(child.clone(), self.length)?
-                            .require_mfra(raw)?;
-                    }
-                }
-            }
-            out.push_str("]}");
-        }
-        out.push_str("],\"raw_movie\":");
-        protocol::raw_box(out, &model.raw_movie);
-        out.push('}');
-        Ok(())
-    }
 }
 
 struct GroupOwner {
@@ -1339,22 +1261,17 @@ struct GroupOwner {
     descriptions: Option<RecoveryDescriptions>,
     mappings: Option<RecoveryMappings>,
 }
-fn groups(
+/// The `roll` sample group description and mapping boxes among `raw`'s children.
+fn roll_groups(
     raw: &BoxView,
-    kind: RecoveryKind,
-    syntax: RecoverySyntax,
     pool: &Budget,
 ) -> Result<(Option<RecoveryDescriptions>, Option<RecoveryMappings>)> {
     let (mut descriptions, mut mappings) = (None, None);
-    let code = match kind {
-        RecoveryKind::Roll => *b"roll",
-        RecoveryKind::Prol => *b"prol",
-    };
     for box_ in children(raw, 0, pool)?.as_slice() {
         if !matches!(&box_.header().kind, b"sgpd" | b"sbgp") {
             continue;
         }
-        if box_.payload().get(4..8) != Some(code.as_slice()) {
+        if box_.payload().get(4..8) != Some(b"roll".as_slice()) {
             continue;
         }
         if box_.header().kind == *b"sgpd" {
@@ -1363,7 +1280,7 @@ fn groups(
             }
             descriptions = Some(RecoveryDescriptions::parse(
                 box_.clone(),
-                syntax,
+                RecoverySyntax::Versions0And1,
                 triergon_isobmff::sample_groups::RecoveryLimits::default(),
             )?);
         } else {
@@ -1396,234 +1313,21 @@ fn fold_source(stats: &mut Stats, packet: &SourcePacket) -> Result<()> {
     protocol::fold_framed(&mut stats.digest, packet.payload.as_ref());
     Ok(())
 }
-pub struct SourceRequest {
-    pub track: u32,
-    pub at: Time,
-    pub following: u32,
-    pub after_eof: bool,
-    pub kind: RecoveryKind,
-    pub syntax: RecoverySyntax,
+/// A source seek on one track to a movie time, after reading every track to the end
+/// when `after_eof` is set.
+struct SourceRequest {
+    track: u32,
+    at: Time,
+    after_eof: bool,
 }
 impl<T: Read + Seek> Driver<'_, T> {
-    fn source_row(
-        &mut self,
-        model: &Model,
-        sample: Sample,
-        out: &mut String,
-        stats: &mut Stats,
-    ) -> Result<()> {
-        let packet = self.packet(sample, model.media.as_slice())?;
-        let sample = &packet.sample;
-        fold_source(stats, &packet)?;
-        write!(
-            out,
-            "{{\"ordinal\":{},\"description\":{},\"range\":[{},{}],\"duration\":{},\"dts\":",
-            sample.ordinal,
-            sample.description_index,
-            sample.range.start,
-            sample.range.end,
-            sample.duration_ticks
-        )
-        .expect("String write");
-        match sample.dts_ticks {
-            Some(v) => write!(out, "{v}").expect("String write"),
-            None => out.push_str("null"),
-        }
-        out.push_str(",\"cts\":");
-        match sample.cts_ticks {
-            Some(v) => write!(out, "{v}").expect("String write"),
-            None => out.push_str("null"),
-        }
-        match sample.composition_offset {
-            Some(v) => write!(
-                out,
-                ",\"offset_version\":{},\"offset_bits\":{}",
-                v.version(),
-                v.raw_bits()
-            )
-            .expect("String write"),
-            None => out.push_str(",\"offset_version\":null,\"offset_bits\":null"),
-        }
-        write!(
-            out,
-            ",\"access\":\"{:?}\",\"partial_sync\":{},\"dependency\":",
-            sample.access, sample.partial_sync
-        )
-        .expect("String write");
-        match sample.dependency {
-            Some(v) => write!(out, "{v}").expect("String write"),
-            None => out.push_str("null"),
-        }
-        out.push_str(",\"fragment_flags\":");
-        match sample.fragment_flags {
-            Some(v) => write!(out, "{v}").expect("String write"),
-            None => out.push_str("null"),
-        }
-        write!(
-            out,
-            ",\"source\":{},\"generation\":{},\"request\":{},\"payload\":\"",
-            packet.source.0,
-            packet.token.generation(),
-            packet.token.request()
-        )
-        .expect("String write");
-        triergon_harness_protocol::push_hex(out, packet.payload.as_ref());
-        out.push_str("\"}");
-        Ok(())
-    }
-    pub fn source_seek(
-        &mut self,
-        model: &Model,
-        request: SourceRequest,
-        out: &mut String,
-    ) -> Result<Stats> {
-        if request.following > 64 {
-            return Err(Error::Limit {
-                requested: request.following as usize,
-                maximum: 64,
-            }
-            .into());
-        }
-        self.plan_source(model, &request, |driver, record, result, drain, next| {
-            write!(out,"{{\"schema\":33,\"operation\":\"source-movie-seek-consumer-v33\",\"native_comparable\":false,\"status\":\"{:?}\",\"track_id\":{},\"after_eof\":{},\"source_point\":",result.status,request.track,request.after_eof).expect("String write");
-            if let Some(point) = &result.point {
-                write!(
-                    out,
-                    "[{},{}]",
-                    point.source_time.numerator(),
-                    point.source_time.denominator()
-                )
-                .expect("String write");
-            } else {
-                out.push_str("null");
-            }
-            out.push_str(",\"edit\":");
-            match result.point.as_ref().and_then(|p| p.edit_ordinal) {
-                Some(v) => write!(out, "{v}").expect("String write"),
-                None => out.push_str("null"),
-            }
-            write!(
-                out,
-                ",\"source_drain\":{{\"packets\":{},\"bytes\":{},\"digest\":{}}}",
-                drain.packets, drain.bytes, drain.digest
-            )
-            .expect("String write");
-            protocol::source_landings(out, result);
-            out.push_str(",\"raw_sources\":[");
-            protocol::raw_box(out, record.table.raw());
-            if let Some(edits) = &record.edits {
-                out.push(',');
-                protocol::raw_box(out, edits.raw());
-            }
-            for fragment in model
-                .fragments
-                .as_slice()
-                .iter()
-                .filter(|f| f.track_id() == request.track)
-            {
-                out.push(',');
-                protocol::raw_box(out, fragment.raw());
-            }
-            out.push(']');
-            out.push_str(",\"packets\":[");
-            let mut stats = Stats::default();
-            let mut first = true;
-            if let Some(plan) = &result.plan {
-                driver.input.reset(plan.landing().decode_start.range.start)?;
-                let mut cursor = plan.cursor();
-                loop {
-                    match cursor.poll(&mut WorkBudget::new(driver.quantum), &driver.cancel)? {
-                        Next::Yield => {}
-                        Next::End => break,
-                        Next::Item(s) => {
-                            if !first {
-                                out.push(',');
-                            }
-                            first = false;
-                            driver.source_row(model, s, out, &mut stats)?;
-                        }
-                    }
-                }
-                for offset in 1..=u64::from(request.following) {
-                    let ordinal = plan
-                        .landing()
-                        .target
-                        .ordinal
-                        .checked_add(offset)
-                        .ok_or(Error::Overflow)?;
-                    if ordinal >= next {
-                        break;
-                    }
-                    let sample = if ordinal <= record.table.sample_count() {
-                        let mut locate = record.table.locate(ordinal)?;
-                        loop {
-                            match locate.poll(&mut WorkBudget::new(driver.quantum))? {
-                                Next::Item(s) => break s,
-                                Next::Yield => {}
-                                Next::End => {
-                                    return Err(Error::Invalid("followup locator exhausted").into());
-                                }
-                            }
-                        }
-                    } else {
-                        let mut first_ordinal = record
-                            .table
-                            .sample_count()
-                            .checked_add(1)
-                            .ok_or(Error::Overflow)?;
-                        let mut found = None;
-                        for f in model
-                            .fragments
-                            .as_slice()
-                            .iter()
-                            .filter(|f| f.track_id() == request.track)
-                        {
-                            let end = first_ordinal
-                                .checked_add(f.sample_count())
-                                .ok_or(Error::Overflow)?;
-                            if ordinal < end {
-                                let mut locate = f.locate(ordinal)?;
-                                loop {
-                                    match locate.poll(&mut WorkBudget::new(driver.quantum))? {
-                                        Next::Item(s) => {
-                                            found = Some(s);
-                                            break;
-                                        }
-                                        Next::Yield => {}
-                                        Next::End => {
-                                            return Err(Error::Invalid(
-                                                "fragment followup locator exhausted",
-                                            )
-                                            .into());
-                                        }
-                                    }
-                                }
-                                break;
-                            }
-                            first_ordinal = end;
-                        }
-                        found.ok_or(Error::Invalid("followup sample not indexed"))?
-                    };
-                    if !first {
-                        out.push(',');
-                    }
-                    first = false;
-                    driver.source_row(model, sample, out, &mut stats)?;
-                }
-            }
-            out.push_str("],\"decoder_recovery\":\"unverified\",\"qualification\":false}");
-            Ok(stats)
-        })
-    }
-
-    /// Plans a recovery-aware source seek on one track, after reading every track
-    /// to the end when asked, and hands the result to `finish` with the track, the
-    /// drain's work and the ordinal after the track's last sample.
+    /// Plans a source seek with the track's `roll` recovery groups and hands the result
+    /// to `finish` with the work of the drain to the end.
     fn plan_source<R>(
         &mut self,
         model: &Model,
         request: &SourceRequest,
-        finish: impl FnOnce(&mut Self, &Record, &MovieSeekResult<'_>, &Stats, u64) -> Result<R>,
+        finish: impl FnOnce(&mut Self, &MovieSeekResult<'_>, &Stats) -> Result<R>,
     ) -> Result<R> {
         let record = model
             .records
@@ -1680,12 +1384,7 @@ impl<T: Read + Seek> Driver<'_, T> {
                 }
             }
         }
-        let (track_descriptions, mapping) = groups(
-            record.table.raw(),
-            request.kind,
-            request.syntax,
-            &self.budget,
-        )?;
+        let (track_descriptions, mapping) = roll_groups(record.table.raw(), &self.budget)?;
         let mut backings = BudgetVec::new(&self.budget);
         let mut next = record
             .table
@@ -1711,8 +1410,7 @@ impl<T: Read + Seek> Driver<'_, T> {
             .enumerate()
             .filter(|(_, f)| f.track_id() == request.track)
         {
-            let (descriptions, mappings) =
-                groups(index.raw(), request.kind, request.syntax, &self.budget)?;
+            let (descriptions, mappings) = roll_groups(index.raw(), &self.budget)?;
             append(
                 &mut backings,
                 GroupOwner {
@@ -1737,7 +1435,7 @@ impl<T: Read + Seek> Driver<'_, T> {
             append(
                 &mut scopes,
                 RecoveryScope {
-                    kind: request.kind,
+                    kind: RecoveryKind::Roll,
                     first_ordinal: backing.first,
                     sample_count: backing.count,
                     fragment_ordinal: backing.fragment,
@@ -1761,7 +1459,7 @@ impl<T: Read + Seek> Driver<'_, T> {
                     media_duration: None,
                 },
                 media_extents: model.media.as_slice(),
-                recovery_kind: request.kind,
+                recovery_kind: RecoveryKind::Roll,
                 recovery_scopes: scopes.as_slice(),
             },
             request.at,
@@ -1771,7 +1469,7 @@ impl<T: Read + Seek> Driver<'_, T> {
         {
         }
         let result = planner.finish()?;
-        finish(self, record, &result, &drain, next)
+        finish(self, &result, &drain)
     }
 
     /// A source range plan at `ticks` of the track's media clock, taken as movie
@@ -1803,12 +1501,9 @@ impl<T: Read + Seek> Driver<'_, T> {
                 i128::from(r.ticks) * i128::from(base.numerator()),
                 u128::from(base.denominator()),
             )?,
-            following: 0,
             after_eof: r.after_eof,
-            kind: RecoveryKind::Roll,
-            syntax: RecoverySyntax::Versions0And1,
         };
-        self.plan_source(model, &request, |driver, _, result, drain, _| {
+        self.plan_source(model, &request, |driver, result, drain| {
             if r.after_eof {
                 for value in [0x44, drain.packets, drain.bytes, drain.digest] {
                     protocol::fold(&mut stats.digest, value);
@@ -1875,7 +1570,7 @@ impl<T: Read + Seek> Driver<'_, T> {
 }
 
 #[cfg(test)]
-mod refill_transcript42 {
+mod input_refill {
     use super::*;
     use std::io::{Cursor, SeekFrom};
 
@@ -2161,7 +1856,7 @@ mod private_configuration_comparison {
                 let mut input = Cursor::new(bytes);
                 let mut driver =
                     Driver::new(&mut input, bytes.len() as u64, window, quantum).unwrap();
-                let model = driver.open().unwrap();
+                let model = driver.open_with_policy(OpenPolicy::default()).unwrap();
                 let entry = model.records.as_slice()[0].table.descriptions()[0].raw();
                 let start = entry.header().start as usize;
                 assert_eq!(
@@ -2211,7 +1906,7 @@ mod signed_decode_comparison {
                     quantum,
                 )
                 .unwrap();
-                let model = driver.open().unwrap();
+                let model = driver.open_with_policy(OpenPolicy::default()).unwrap();
                 if let Some(end) = decode_end {
                     let [fragment] = model.fragments.as_slice() else {
                         panic!("expected one fragment");
