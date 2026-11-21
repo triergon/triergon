@@ -1,5 +1,7 @@
 //! `InputCursor`: requests and their answers, the four reads, what a window
 //! keeps charged, and the blocking feed.
+#![forbid(unsafe_code)]
+
 mod append;
 mod discard;
 mod feed;
