@@ -33,17 +33,17 @@ impl AdtsHeader {
     /// Parse the 7-byte fixed and variable header at the start of `b`.
     ///
     /// # Errors
-    /// `Truncated` when `b` is shorter than 7 bytes; `InvalidData` for a wrong syncword
+    /// `Truncated` when `b` is shorter than 7 bytes; `Invalid` for a wrong syncword
     /// or layer, or a frame length shorter than the header.
     pub fn parse(b: &[u8]) -> Result<AdtsHeader> {
         if b.len() < 7 {
             return Err(DecodeError::Truncated);
         }
         if b[0] != 0xff || (b[1] & 0xf0) != 0xf0 {
-            return Err(DecodeError::InvalidData("ADTS syncword"));
+            return Err(DecodeError::Invalid("ADTS syncword"));
         }
         if b[1] & 0x06 != 0 {
-            return Err(DecodeError::InvalidData("ADTS layer"));
+            return Err(DecodeError::Invalid("ADTS layer"));
         }
         let h = AdtsHeader {
             id: (b[1] >> 3) & 1,
@@ -58,7 +58,7 @@ impl AdtsHeader {
             raw_data_blocks: (b[6] & 3) + 1,
         };
         if h.frame_length < h.header_len() {
-            return Err(DecodeError::InvalidData("ADTS frame length"));
+            return Err(DecodeError::Invalid("ADTS frame length"));
         }
         Ok(h)
     }

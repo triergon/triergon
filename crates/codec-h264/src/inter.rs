@@ -440,9 +440,10 @@ impl SliceDecoder<'_> {
             self.mb_motion = Some((refs, [[0, 0]; 2]));
             return Ok(()); // all motion vectors are zero
         }
-        let col = self.s.col.ok_or(SliceError::InvalidData(
-            "direct prediction without RefPicList1",
-        ))?;
+        let col = self
+            .s
+            .col
+            .ok_or(SliceError::Invalid("direct prediction without RefPicList1"))?;
         // colZeroFlag only matters for a list whose refIdx is 0 (8-190 / 8-191).
         let mut colz: u16 = 0;
         let frm_frm = self.pic.structure == 0
@@ -457,9 +458,7 @@ impl SliceDecoder<'_> {
             // 8x8 uses its corner 4x4 block, as in `colocated`.
             let motion = &self.refs.dpb[col.idx].motion[0];
             if cur >= motion.mbs {
-                return Err(SliceError::InvalidData(
-                    "co-located macroblock out of range",
-                ));
+                return Err(SliceError::Invalid("co-located macroblock out of range"));
             }
             if motion.mb_flags[cur] & MBF_INTRA == 0 {
                 for (i, b4) in [0usize, 3, 12, 15].into_iter().enumerate() {
@@ -575,18 +574,17 @@ impl SliceDecoder<'_> {
         xcol: i32,
         ycol: i32,
     ) -> Result<([i32; 2], i32, i32, VertScale), SliceError> {
-        let col = self.s.col.ok_or(SliceError::InvalidData(
-            "direct prediction without RefPicList1",
-        ))?;
+        let col = self
+            .s
+            .col
+            .ok_or(SliceError::Invalid("direct prediction without RefPicList1"))?;
         let st = &self.refs.dpb[col.idx];
         if self.pic.structure == 0 && !self.pic.mbaff && st.coding == Coding::Frame {
             // FRM / FRM: co-located MB is CurrMbAddr, yM = yCol, One_To_One (Table 8-8).
             let motion = &st.motion[0];
             let mb_col = self.cur;
             if mb_col >= motion.mbs {
-                return Err(SliceError::InvalidData(
-                    "co-located macroblock out of range",
-                ));
+                return Err(SliceError::Invalid("co-located macroblock out of range"));
             }
             if motion.mb_flags[mb_col] & MBF_INTRA != 0 {
                 return Ok(([0, 0], -1, -1, VertScale::One));
@@ -705,9 +703,7 @@ impl SliceDecoder<'_> {
             }
         }
         if mb_col >= motion.mbs {
-            return Err(SliceError::InvalidData(
-                "co-located macroblock out of range",
-            ));
+            return Err(SliceError::Invalid("co-located macroblock out of range"));
         }
         if motion.mb_flags[mb_col] & MBF_INTRA != 0 {
             return Ok(([0, 0], -1, -1, vs));
@@ -763,10 +759,10 @@ impl SliceDecoder<'_> {
             }
             let p0 = self
                 .ref_pic(0, ref0)
-                .ok_or(SliceError::InvalidData("direct ref_idx_l0"))?;
+                .ok_or(SliceError::Invalid("direct ref_idx_l0"))?;
             let p1 = self
                 .ref_pic(1, 0)
-                .ok_or(SliceError::InvalidData("direct ref_idx_l1"))?;
+                .ok_or(SliceError::Invalid("direct ref_idx_l1"))?;
             let (mv0, mv1) = if p0.long || p1.poc - p0.poc == 0 {
                 (mv_col, [0, 0])
             } else {
@@ -822,7 +818,7 @@ impl SliceDecoder<'_> {
             }
             VertScale::FldToFrm => find(&|p: &RefPic| uid_of(p) == uid),
         };
-        res.ok_or(SliceError::InvalidData(
+        res.ok_or(SliceError::Invalid(
             "temporal direct: co-located reference not in RefPicList0",
         ))
     }
@@ -837,7 +833,7 @@ impl SliceDecoder<'_> {
             let refs = self.refs;
             for rp in p.refs.iter().flatten() {
                 if refs.dpb[rp.idx].buf.is_none() {
-                    return Err(SliceError::InvalidData("reference picture missing"));
+                    return Err(SliceError::Invalid("reference picture missing"));
                 }
             }
             let ctx = McCtx {
@@ -921,7 +917,7 @@ impl SliceDecoder<'_> {
                 let p = self.part_motion(x, y, w, h)?;
                 for r in p.refs.iter().flatten() {
                     if refs.dpb[r.idx].buf.is_none() {
-                        return Err(SliceError::InvalidData("reference picture missing"));
+                        return Err(SliceError::Invalid("reference picture missing"));
                     }
                 }
                 mc_part(
@@ -940,7 +936,7 @@ impl SliceDecoder<'_> {
                 pm[k] = self.part_motion(x, y, w, h)?;
                 for r in pm[k].refs.iter().flatten() {
                     if Some(r.idx) != self.pic.first_field && self.refs.dpb[r.idx].buf.is_none() {
-                        return Err(SliceError::InvalidData("reference picture missing"));
+                        return Err(SliceError::Invalid("reference picture missing"));
                     }
                 }
             }
@@ -1033,7 +1029,7 @@ impl SliceDecoder<'_> {
             pm.ref_idx[list] = r;
             pm.refs[list] = Some(
                 self.ref_pic(list, r)
-                    .ok_or(SliceError::InvalidData("ref_idx beyond reference list"))?,
+                    .ok_or(SliceError::Invalid("ref_idx beyond reference list"))?,
             );
             pm.mv[list] = mv[list];
         }

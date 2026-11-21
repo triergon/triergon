@@ -337,7 +337,7 @@ impl Context {
             && !Arc::ptr_eq(&cur.pps, &pps)
             && cur.pps.id != pps.id
         {
-            return Err(DecodeError::InvalidData("PPS changed within a picture"));
+            return Err(DecodeError::Invalid("PPS changed within a picture"));
         }
         let prev = self.cur.as_ref().and_then(|c| c.prev_sh.as_ref());
         let sh = slice::parse_slice_header(
@@ -367,7 +367,7 @@ impl Context {
         // A slice counts once its state is recorded, so a refused slice leaves nothing,
         // neither an index nor a header, that later slices of the picture could reach.
         let slice_idx = u16::try_from(self.st.slices.len())
-            .map_err(|_| DecodeError::InvalidData("too many slice segments in a picture"))?;
+            .map_err(|_| DecodeError::Invalid("too many slice segments in a picture"))?;
         // Cannot fail: `reserve_slice` made room before the picture state changed.
         self.st.slices.try_push(info).map_err(|e| e.error)?;
         if !sh.dependent_slice_segment {
@@ -834,7 +834,7 @@ fn ref_pic_lists(
     }
     let total = cur.st_before.len() + cur.st_after.len() + cur.lt_curr.len();
     if total == 0 {
-        return Err(DecodeError::InvalidData("no reference pictures"));
+        return Err(DecodeError::Invalid("no reference pictures"));
     }
     let mut temp: Vec<(usize, bool)> = Vec::with_capacity(32);
     for l in 0..(if sh.slice_type == SliceType::B { 2 } else { 1 }) {

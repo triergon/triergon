@@ -239,13 +239,13 @@ fn raw_lc_refuses_sbr_and_bytes_after_its_single_block() {
             &vec![0; RawLcDecoder::MAX_ACCESS_UNIT_BYTES + 1],
             &mut frame
         ),
-        Err(DecodeError::ResourceLimit("raw AAC access unit"))
+        Err(DecodeError::Policy("raw AAC access unit"))
     );
     let mut packet = block(false);
     packet.push(0);
     assert_eq!(
         decoder.decode(&packet, &mut frame),
-        Err(DecodeError::InvalidData("AAC access unit extent"))
+        Err(DecodeError::Invalid("AAC access unit extent"))
     );
     let mut bits = Bw::new();
     bits.put(6, 3); // FIL
@@ -466,7 +466,7 @@ fn typed_errors() {
     );
     assert!(matches!(
         d.decode(&[0x12; 16], &mut f),
-        Err(DecodeError::InvalidData(_))
+        Err(DecodeError::Invalid(_))
     ));
     // profile 2 = SSR
     assert_eq!(
@@ -486,7 +486,7 @@ fn typed_errors() {
     w.put(7, 3);
     assert!(matches!(
         d.decode(&adts(1, 4, 2, &[w.bytes()], false), &mut f),
-        Err(DecodeError::InvalidData(_))
+        Err(DecodeError::Invalid(_))
     ));
     // the decoder keeps working afterwards
     d.decode(&adts(1, 4, 1, &[block(false)], false), &mut f)

@@ -79,12 +79,12 @@ pub(crate) fn parse_pce(br: &mut CachedBitReader<'_>, align_base: usize) -> Resu
     br.skip((8 - (rel & 7)) & 7);
     let comment_bytes = br.read(8) as usize;
     if br.left() < (comment_bytes * 8) as isize {
-        return Err(DecodeError::InvalidData("PCE comment field"));
+        return Err(DecodeError::Invalid("PCE comment field"));
     }
     apply_heights(&mut p, *br, comment_bytes);
     br.skip(comment_bytes * 8);
     if br.overrun() {
-        return Err(DecodeError::InvalidData("PCE overrun"));
+        return Err(DecodeError::Invalid("PCE overrun"));
     }
     Ok(p)
 }

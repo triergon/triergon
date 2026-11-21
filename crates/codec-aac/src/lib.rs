@@ -192,7 +192,7 @@ impl RawLcDecoder {
         budget: &Budget,
     ) -> Result<Self, DecodeError> {
         if !matches!(channel_configuration, 1..=7 | 11 | 12 | 14) {
-            return Err(DecodeError::InvalidData("raw AAC channel configuration"));
+            return Err(DecodeError::Invalid("raw AAC channel configuration"));
         }
         let mut core = decoder::Core::new(budget);
         core.configure(
@@ -215,7 +215,7 @@ impl RawLcDecoder {
         let mut reader = CachedBitReader::new(program_config);
         let program = pce::parse_pce(&mut reader, 0)?;
         if reader.left() != 0 {
-            return Err(DecodeError::InvalidData("raw AAC program extent"));
+            return Err(DecodeError::Invalid("raw AAC program extent"));
         }
         let core = decoder::Core::with_program(budget, frequency_index, &program)?;
         Ok(Self { core })
@@ -225,7 +225,7 @@ impl RawLcDecoder {
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
         decode_with::<true>(&mut self.core, out, |core, out| {
             if au.len() > Self::MAX_ACCESS_UNIT_BYTES {
-                return Err(DecodeError::ResourceLimit("raw AAC access unit"));
+                return Err(DecodeError::Policy("raw AAC access unit"));
             }
             decode_blocks::<true>(core, au, 1, false, out)
         })
@@ -296,7 +296,7 @@ fn decode_adts(
         header_bytes += 2 * (usize::from(h.raw_data_blocks) - 1) + 2;
     }
     if h.frame_length < header_bytes {
-        return Err(DecodeError::InvalidData("ADTS frame length"));
+        return Err(DecodeError::Invalid("ADTS frame length"));
     }
     decode_blocks::<false>(
         core,

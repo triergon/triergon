@@ -47,10 +47,10 @@ substreams and writes interleaved f32le.
   FL FR FC LFE BC SL SR. `layout_name(&layout)` gives FFmpeg's layout name.
 - 14-bit packings are normalized to 16-bit big endian; FSIZE counts bytes of the 16-bit
   equivalent stream, as in FFmpeg.
-- Errors are typed: `Unsupported(&str)`, `InvalidData(&str)`, `ResourceLimit(&str)`,
-  `Budget(StorageError)`.
+- Errors are typed (`DecodeError`, the one of triergon-codec): `Unsupported(&str)`,
+  `Invalid(&str)`, `Policy(&str)`, `Budget(StorageError)`.
   Refused: AMODE 10–15, deficit samples (SHORT ≠ 31), XXCh inside the core frame, XCh with
-  more than one channel. A DSYNC mismatch is `InvalidData`.
+  more than one channel. A DSYNC mismatch is `Invalid`.
 - A failed frame is dropped without touching any history, so the next frame continues
   as if it were absent.
 - X96 with REVNO 0 or above 8 is ignored and the core is decoded at the core rate.

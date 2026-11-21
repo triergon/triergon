@@ -339,7 +339,7 @@ impl Core {
             )));
         }
         if program.object_type != AOT_LC - 1 || program.sf_index != frequency_index {
-            return Err(DecodeError::InvalidData("raw AAC program profile or rate"));
+            return Err(DecodeError::Invalid("raw AAC program profile or rate"));
         }
         let channels = program
             .front
@@ -350,7 +350,7 @@ impl Core {
             .sum::<usize>()
             + program.lfe.len();
         if channels == 0 {
-            return Err(DecodeError::InvalidData("empty raw AAC program"));
+            return Err(DecodeError::Invalid("empty raw AAC program"));
         }
         if channels > 8 {
             return Err(DecodeError::Unsupported(Feature::TooManyChannels));
@@ -364,9 +364,7 @@ impl Core {
                 .iter()
                 .any(|prior| prior.kind == slot.kind && prior.tag == slot.tag)
             {
-                return Err(DecodeError::InvalidData(
-                    "duplicate raw AAC program element",
-                ));
+                return Err(DecodeError::Invalid("duplicate raw AAC program element"));
             }
         }
         let mut core = Self::new(budget);
@@ -566,7 +564,7 @@ impl Core {
         let mut layout_changed = false;
         loop {
             if br.left() < 3 {
-                return Err(DecodeError::InvalidData("missing END element"));
+                return Err(DecodeError::Invalid("missing END element"));
             }
             let id = ElementId::from_bits(br.read(3));
             match id {
@@ -623,9 +621,8 @@ impl Core {
                         layout_changed = true;
                         ei = self.element_index(id, tag, o);
                     }
-                    let ei = ei.ok_or(DecodeError::InvalidData(
-                        "element not in channel configuration",
-                    ))?;
+                    let ei =
+                        ei.ok_or(DecodeError::Invalid("element not in channel configuration"))?;
                     self.elements[ei].bs_tag = tag;
                     if id == ElementId::Cpe {
                         self.decode_cpe(br, &cfg, ei)?;
@@ -661,22 +658,20 @@ impl Core {
                 ElementId::End => break,
             }
             if br.overrun() {
-                return Err(DecodeError::InvalidData("raw_data_block overrun"));
+                return Err(DecodeError::Invalid("raw_data_block overrun"));
             }
         }
         // byte_alignment after END
         let rel = br.position() - block_start;
         br.skip((8 - (rel & 7)) & 7);
         if RAW && (br.overrun() || br.left() != 0) {
-            return Err(DecodeError::InvalidData("AAC access unit extent"));
+            return Err(DecodeError::Invalid("AAC access unit extent"));
         }
         if RAW && raw_elements != self.slots.len() {
-            return Err(DecodeError::InvalidData(
-                "incomplete raw AAC channel layout",
-            ));
+            return Err(DecodeError::Invalid("incomplete raw AAC channel layout"));
         }
         if self.slots.is_empty() {
-            return Err(DecodeError::InvalidData(
+            return Err(DecodeError::Invalid(
                 "no channel configuration (missing PCE)",
             ));
         }
@@ -704,7 +699,7 @@ impl Core {
         }
         let end = br.position() + count * 8;
         if (br.left() as usize) < count * 8 {
-            return Err(DecodeError::InvalidData("fill element overrun"));
+            return Err(DecodeError::Invalid("fill element overrun"));
         }
         let ext = br.read(4);
         if RAW && matches!(ext, EXT_SBR_DATA | EXT_SBR_DATA_CRC) {
@@ -734,7 +729,7 @@ impl Core {
         if pos < end {
             br.skip(end - pos);
         } else if pos > end {
-            return Err(DecodeError::InvalidData("extension payload overrun"));
+            return Err(DecodeError::Invalid("extension payload overrun"));
         }
         Ok(layout_changed)
     }
@@ -782,7 +777,7 @@ impl Core {
                         }
                     }
                 }
-                _ => return Err(DecodeError::InvalidData("ms_mask_present 3")),
+                _ => return Err(DecodeError::Invalid("ms_mask_present 3")),
             }
             let mut info1 = info;
             // the right channel's LTP data is the second set

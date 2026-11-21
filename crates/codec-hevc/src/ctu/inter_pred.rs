@@ -30,13 +30,13 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         let frame = |l: usize| {
             refs.list[l][m.ref_idx[l] as usize]
                 .frame
-                .ok_or(DecodeError::InvalidData("missing reference picture"))
+                .ok_or(DecodeError::Invalid("missing reference picture"))
         };
         let (first, second) = match m.ref_idx {
             [r0, r1] if r0 >= 0 && r1 >= 0 => ((0, frame(0)?), Some((1, frame(1)?))),
             [r0, _] if r0 >= 0 => ((0, frame(0)?), None),
             [_, r1] if r1 >= 0 => ((1, frame(1)?), None),
-            _ => return Err(DecodeError::InvalidData("missing reference picture")),
+            _ => return Err(DecodeError::Invalid("missing reference picture")),
         };
         for c in 0..3usize {
             let (bw, bh, x0, y0) = if c == 0 {

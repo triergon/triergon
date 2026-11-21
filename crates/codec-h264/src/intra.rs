@@ -234,7 +234,7 @@ impl SliceDecoder<'_> {
                     _ => true,
                 };
                 if !ok {
-                    return Err(SliceError::InvalidData(
+                    return Err(SliceError::Invalid(
                         "Intra16x16 mode uses unavailable samples",
                     ));
                 }
@@ -288,7 +288,7 @@ impl SliceDecoder<'_> {
                 _ => true,
             };
             if !ok {
-                return Err(SliceError::InvalidData(
+                return Err(SliceError::Invalid(
                     "chroma intra mode uses unavailable samples",
                 ));
             }

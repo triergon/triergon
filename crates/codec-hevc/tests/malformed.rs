@@ -15,7 +15,7 @@ fn a_refused_slice_leaves_later_slices_of_its_picture_decodable() {
     let _ = decoder.send_nal(&bare_nal(1, &slice_segment(1, 0, 0)), None);
     let refused = decoder.send_nal(&bare_nal(1, &slice_segment(1, 4, 1)), None);
     assert!(
-        matches!(refused, Err(DecodeError::InvalidData(_))),
+        matches!(refused, Err(DecodeError::Invalid(_))),
         "{refused:?}"
     );
     let _ = decoder.send_nal(&bare_nal(1, &slice_segment(1, 8, 0)), None);

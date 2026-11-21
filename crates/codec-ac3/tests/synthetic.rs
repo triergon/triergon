@@ -170,7 +170,7 @@ fn decodes_silent_mono_frame() {
     assert!(info.concealed.is_none());
     assert_eq!(info.dialnorm, 27);
     assert_eq!(out.layout.speakers(), &[Speaker::FrontCenter]);
-    assert_eq!(triergon_codec_ac3::layout_name(&out.layout), "mono");
+    assert_eq!(out.layout.name(), "mono");
     assert_eq!(out.samples_per_channel, 1536);
     assert!(out.planes[0].iter().all(|&v| v == 0.0));
     assert!(info.downmix.is_none());
@@ -273,10 +273,7 @@ fn truncated_ac3_frame_repeats_last_block() {
 fn invalid_block_data_is_concealed() {
     let mut out = AudioFrame::default();
     let info = Decoder::new().decode(&mono_frame(61), &mut out).unwrap();
-    assert_eq!(
-        info.concealed,
-        Some(DecodeError::InvalidData("chbwcod > 60"))
-    );
+    assert_eq!(info.concealed, Some(DecodeError::Invalid("chbwcod > 60")));
     assert_eq!(out.samples_per_channel, 1536);
 }
 
@@ -293,7 +290,7 @@ fn typed_header_errors() {
     f[4] = 38; // frmsizecod 38 does not exist
     assert!(matches!(
         dec.decode(&f, &mut out).err(),
-        Some(DecodeError::InvalidData(_))
+        Some(DecodeError::Invalid(_))
     ));
     // bsid 9 (half-rate AC-3) decodes like FFmpeg 9.0.2 (tests/reduced_rate.rs).
     let mut f = mono_frame(0);

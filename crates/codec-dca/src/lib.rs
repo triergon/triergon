@@ -15,7 +15,6 @@
 mod bits;
 mod books;
 mod dct;
-mod error;
 mod frame;
 mod header;
 mod lfe;
@@ -33,9 +32,7 @@ pub mod vq;
 mod x96;
 
 pub use pack::Packing;
-pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
-
-pub use error::DecodeError;
+pub use triergon_codec::{AudioFrame, ChannelLayout, DecodeError, Speaker};
 
 use frame::FrameDecoder;
 use triergon_codec::{AudioDecoder, Budget, BudgetVec, DownmixLevels};
@@ -107,7 +104,7 @@ impl Decoder {
         // A failed frame is dropped without touching the synthesis, LFE or ADPCM history,
         // so the next frame continues as if the failed one were absent (FFmpeg's
         // behaviour; checked with the synthetic `bad_dsync5` stream).
-        let packing = Packing::detect(au).ok_or(DecodeError::InvalidData("no DTS core sync"))?;
+        let packing = Packing::detect(au).ok_or(DecodeError::Invalid("no DTS core sync"))?;
         let frame = match packing {
             Packing::Be16 => au,
             _ => pack::normalize(au, packing, &mut self.scratch)?,

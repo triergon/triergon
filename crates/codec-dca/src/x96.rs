@@ -46,7 +46,7 @@ impl X96Header {
         let sbs = if revno < 8 {
             let v = br.read(5) as usize;
             if v > 27 {
-                return Err(DecodeError::InvalidData("X96 nSBS96"));
+                return Err(DecodeError::Invalid("X96 nSBS96"));
             }
             v
         } else {
@@ -65,20 +65,20 @@ impl X96Header {
         for ch in 0..nch {
             h.sbe[ch] = br.read(6) as usize + 1;
             if h.sbe[ch] < 32 {
-                return Err(DecodeError::InvalidData("X96 SBE96 below 31"));
+                return Err(DecodeError::Invalid("X96 SBE96 below 31"));
             }
         }
         for ch in 0..nch {
             h.joinx[ch] = br.read(3) as u8;
             let j = h.joinx[ch] as usize;
             if j > ch {
-                return Err(DecodeError::InvalidData("X96 JOINX96 source channel"));
+                return Err(DecodeError::Invalid("X96 JOINX96 source channel"));
             }
         }
         for ch in 0..nch {
             h.shuff[ch] = br.read(3) as u8;
             if h.shuff[ch] > 5 {
-                return Err(DecodeError::InvalidData("X96 SHUFF96"));
+                return Err(DecodeError::Invalid("X96 SHUFF96"));
             }
         }
         for ch in 0..nch {
@@ -172,7 +172,7 @@ pub(crate) fn decode_subframe(
                 br.read(3) as i32
             };
             if v < 0 || v > maxabits {
-                return Err(DecodeError::InvalidData("X96 ABITS96"));
+                return Err(DecodeError::Invalid("X96 ABITS96"));
             }
             side.abits[ch][n] = v as u8;
         }
@@ -188,7 +188,7 @@ pub(crate) fn decode_subframe(
                 sum = br.read(6) as i32;
             }
             if !(0..63).contains(&sum) {
-                return Err(DecodeError::InvalidData("X96 scale factor index"));
+                return Err(DecodeError::Invalid("X96 scale factor index"));
             }
             side.scale[ch][n] = SCALE_6BIT[sum as usize] as f32;
         }
@@ -210,7 +210,7 @@ pub(crate) fn decode_subframe(
                     br.read(6) as i32
                 } + 64;
                 if !(0..=128).contains(&v) {
-                    return Err(DecodeError::InvalidData("X96 joint scale index"));
+                    return Err(DecodeError::Invalid("X96 joint scale index"));
                 }
                 side.jscale[ch][n] = JOINT_SCALE[v as usize];
             }
@@ -220,9 +220,7 @@ pub(crate) fn decode_subframe(
         let _sicrc96 = br.read(16);
     }
     if br.overrun() {
-        return Err(DecodeError::InvalidData(
-            "X96 side information past frame end",
-        ));
+        return Err(DecodeError::Invalid("X96 side information past frame end"));
     }
 
     // Clear the subframe span of every band.
@@ -281,11 +279,11 @@ pub(crate) fn decode_subframe(
             }
         }
         if (ssf == nssc - 1 || aspf) && br.read(16) != 0xFFFF {
-            return Err(DecodeError::InvalidData("X96 DSYNC"));
+            return Err(DecodeError::Invalid("X96 DSYNC"));
         }
     }
     if br.overrun() {
-        return Err(DecodeError::InvalidData("X96 audio data past frame end"));
+        return Err(DecodeError::Invalid("X96 audio data past frame end"));
     }
     // Inverse ADPCM over the subframe.
     for ch in 0..nch {

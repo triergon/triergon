@@ -15,7 +15,7 @@ impl Bands {
     fn from_slice(v: &[usize]) -> Result<Bands> {
         let mut b = Bands::default();
         b.v.get_mut(..v.len())
-            .ok_or(DecodeError::InvalidData("SBR band table"))?
+            .ok_or(DecodeError::Invalid("SBR band table"))?
             .copy_from_slice(v);
         b.len = v.len();
         Ok(b)
@@ -102,7 +102,7 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
         32000 => 3,
         44100..=64000 => 4,
         _ if fs > 64000 => 5,
-        _ => return Err(DecodeError::InvalidData("SBR sample rate")),
+        _ => return Err(DecodeError::Invalid("SBR sample rate")),
     };
     let temp = if fs < 32000 {
         3000
@@ -132,7 +132,7 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
         (3 * k0).min(64)
     };
     if k0 >= k2 || k0 == 0 {
-        return Err(DecodeError::InvalidData("SBR k0/k2"));
+        return Err(DecodeError::Invalid("SBR k0/k2"));
     }
     let max_diff = if fs <= 32000 {
         48
@@ -142,7 +142,7 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
         32
     };
     if k2 - k0 > max_diff {
-        return Err(DecodeError::InvalidData("SBR k2 - k0 too large"));
+        return Err(DecodeError::Invalid("SBR k2 - k0 too large"));
     }
     // master table
     let mut master: Vec<usize> = Vec::new();
@@ -155,7 +155,7 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
             2 * (((k2 - k0) as i64) / 2)
         };
         if num_bands <= 0 {
-            return Err(DecodeError::InvalidData("SBR master bands"));
+            return Err(DecodeError::Invalid("SBR master bands"));
         }
         let mut vdk = vec![dk; num_bands as usize];
         let mut k2_diff = k2 as i64 - (k0 as i64 + num_bands * dk);
@@ -178,11 +178,11 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
         let k1 = if two_regions { 2 * k0 } else { k2 };
         let n0 = 2 * nint(bands * (k1 as f64 / k0 as f64).ln() / (2.0 * 2f64.ln()));
         if n0 <= 0 {
-            return Err(DecodeError::InvalidData("SBR master bands"));
+            return Err(DecodeError::Invalid("SBR master bands"));
         }
         let dk0 = geometric_dk(k0, k1, n0 as usize);
         if dk0.iter().any(|&d| d <= 0) {
-            return Err(DecodeError::InvalidData("SBR master band width"));
+            return Err(DecodeError::Invalid("SBR master band width"));
         }
         master.push(k0);
         push_widths(&mut master, &dk0);
@@ -198,7 +198,7 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
                     dk1.sort_unstable();
                 }
                 if dk1.iter().any(|&d| d <= 0) {
-                    return Err(DecodeError::InvalidData("SBR master band width"));
+                    return Err(DecodeError::Invalid("SBR master band width"));
                 }
                 push_widths(&mut master, &dk1);
             }
@@ -206,7 +206,7 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
     }
     let n_master = master.len() - 1;
     if (h.xover_band as usize) >= n_master {
-        return Err(DecodeError::InvalidData("SBR xover band"));
+        return Err(DecodeError::Invalid("SBR xover band"));
     }
     let high: Vec<usize> = master[h.xover_band as usize..].to_vec();
     let n_high = high.len() - 1;
@@ -220,12 +220,12 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
     let kx = high[0];
     let m = high[n_high] - high[0];
     if kx > 32 || kx + m > 64 || m == 0 {
-        return Err(DecodeError::InvalidData("SBR kx / M"));
+        return Err(DecodeError::Invalid("SBR kx / M"));
     }
     let nq = (h.noise_bands as f64 * (k2 as f64 / kx as f64).ln() / 2f64.ln()).max(0.0);
     let n_q = nint(nq).max(1) as usize;
     if n_q > 5 {
-        return Err(DecodeError::InvalidData("SBR noise bands"));
+        return Err(DecodeError::Invalid("SBR noise bands"));
     }
     let mut noise = Vec::with_capacity(n_q + 1);
     let mut i = 0usize;
@@ -288,7 +288,7 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
     // The standard limits the patch count to 5, but the Coding Technologies decoder check
     // streams (CT_DecoderCheck) need 6 and the reference decoders accept them.
     if patch_num.is_empty() || patch_num.len() > 6 {
-        return Err(DecodeError::InvalidData("SBR patches"));
+        return Err(DecodeError::Invalid("SBR patches"));
     }
     // limiter table
     let lim = limiter_table(h.limiter_bands, &low, kx, &patch_num)?;

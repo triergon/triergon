@@ -112,7 +112,7 @@ pub(crate) fn parse_st_rps(
             }
         }
         if s0.len() + s1.len() > 16 {
-            return Err(DecodeError::InvalidData("too many RPS entries"));
+            return Err(DecodeError::Invalid("too many RPS entries"));
         }
         out.num_negative = s0.len() as u8;
         out.num_positive = s1.len() as u8;
@@ -124,7 +124,7 @@ pub(crate) fn parse_st_rps(
         let nneg = r.ue_max(max_dec_pic_buffering_minus1.max(15), "num_negative_pics")?;
         let npos = r.ue_max(max_dec_pic_buffering_minus1.max(15), "num_positive_pics")?;
         if nneg + npos > 16 {
-            return Err(DecodeError::InvalidData("too many RPS entries"));
+            return Err(DecodeError::Invalid("too many RPS entries"));
         }
         out.num_negative = nneg as u8;
         out.num_positive = npos as u8;
@@ -228,7 +228,7 @@ impl ScalingListRaw {
                         let delta = r.se_range(-128, 127, "scaling_list_delta_coef")?;
                         next = (next + delta + 256) % 256;
                         if next == 0 {
-                            return Err(DecodeError::InvalidData("scaling list entry zero"));
+                            return Err(DecodeError::Invalid("scaling list entry zero"));
                         }
                         *e = next as u8;
                     }
@@ -551,7 +551,7 @@ pub(crate) fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
     r.skip(4)?; // sps_video_parameter_set_id
     let max_sub_layers_minus1 = r.read(3)?;
     if max_sub_layers_minus1 > 6 {
-        return Err(DecodeError::InvalidData("sps_max_sub_layers_minus1"));
+        return Err(DecodeError::Invalid("sps_max_sub_layers_minus1"));
     }
     let _temporal_id_nesting = r.flag()?;
     let profile_idc = parse_ptl(&mut r, max_sub_layers_minus1)?;
@@ -625,24 +625,22 @@ pub(crate) fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
     let log2_min_tb = r.ue_max(3, "log2_min_luma_transform_block_size_minus2")? + 2;
     let log2_max_tb = log2_min_tb + r.ue_max(3, "log2_diff_max_min_luma_transform_block_size")?;
     if !(4..=6).contains(&log2_ctb) {
-        return Err(DecodeError::InvalidData("CTB size outside 16..64"));
+        return Err(DecodeError::Invalid("CTB size outside 16..64"));
     }
     if log2_min_tb >= log2_min_cb || log2_max_tb > 5 || log2_max_tb > log2_ctb {
-        return Err(DecodeError::InvalidData("transform block size range"));
+        return Err(DecodeError::Invalid("transform block size range"));
     }
     if width == 0
         || height == 0
         || width % (1 << log2_min_cb) != 0
         || height % (1 << log2_min_cb) != 0
     {
-        return Err(DecodeError::InvalidData(
+        return Err(DecodeError::Invalid(
             "picture size not a multiple of MinCbSizeY",
         ));
     }
     if width > MAX_DIM || height > MAX_DIM || (width as u64 * height as u64) > MAX_LUMA_PS {
-        return Err(DecodeError::ResourceLimit(
-            "picture size above level 6.2 limits",
-        ));
+        return Err(DecodeError::Policy("picture size above level 6.2 limits"));
     }
     let max_th_depth_inter = r.ue_max(
         log2_ctb - log2_min_tb,
@@ -674,13 +672,13 @@ pub(crate) fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
         pcm_bit_depth_luma = r.read(4)? + 1;
         pcm_bit_depth_chroma = r.read(4)? + 1;
         if pcm_bit_depth_luma > bit_depth_luma || pcm_bit_depth_chroma > bit_depth_chroma {
-            return Err(DecodeError::InvalidData("PCM bit depth exceeds bit depth"));
+            return Err(DecodeError::Invalid("PCM bit depth exceeds bit depth"));
         }
         log2_min_pcm = r.ue_max(2, "log2_min_pcm_luma_coding_block_size_minus3")? + 3;
         log2_max_pcm =
             log2_min_pcm + r.ue_max(2, "log2_diff_max_min_pcm_luma_coding_block_size")?;
         if log2_max_pcm > 5.min(log2_ctb) {
-            return Err(DecodeError::InvalidData("PCM size"));
+            return Err(DecodeError::Invalid("PCM size"));
         }
         pcm_lf = r.flag()?;
     }
@@ -742,7 +740,7 @@ pub(crate) fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
     let pic_h_ctb = height.div_ceil(ctb_size);
     let sub = 2; // SubWidthC == SubHeightC == 2 for 4:2:0
     if (conf_win[0] + conf_win[1]) * sub >= width || (conf_win[2] + conf_win[3]) * sub >= height {
-        return Err(DecodeError::InvalidData("conformance window"));
+        return Err(DecodeError::Invalid("conformance window"));
     }
     let conf_win = [
         conf_win[0] * sub,
@@ -1006,7 +1004,7 @@ impl Layout {
         let cols = pps.num_tile_columns;
         let rows = pps.num_tile_rows;
         if cols > w || rows > h {
-            return Err(DecodeError::InvalidData("more tiles than CTBs"));
+            return Err(DecodeError::Invalid("more tiles than CTBs"));
         }
         // At most 20 tile columns and 22 rows (num_tile_columns_minus1 <= 19,
         // num_tile_rows_minus1 <= 21).
@@ -1026,7 +1024,7 @@ impl Layout {
                 rem -= col_w[i] as i64;
             }
             if rem <= 0 {
-                return Err(DecodeError::InvalidData("tile column widths"));
+                return Err(DecodeError::Invalid("tile column widths"));
             }
             col_w[cols as usize - 1] = rem as u32;
             let mut rem = h as i64;
@@ -1035,7 +1033,7 @@ impl Layout {
                 rem -= row_h[j] as i64;
             }
             if rem <= 0 {
-                return Err(DecodeError::InvalidData("tile row heights"));
+                return Err(DecodeError::Invalid("tile row heights"));
             }
             row_h[rows as usize - 1] = rem as u32;
         }

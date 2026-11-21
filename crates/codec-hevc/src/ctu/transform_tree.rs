@@ -145,7 +145,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             }
             let off = self.qp_bd_off;
             if v < -(26 + off / 2) || v > 25 + off / 2 {
-                return Err(DecodeError::InvalidData("CuQpDeltaVal"));
+                return Err(DecodeError::Invalid("CuQpDeltaVal"));
             }
             self.is_cu_qp_delta_coded = true;
             self.cu_qp_delta = v;

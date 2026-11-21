@@ -78,7 +78,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                     continue;
                 }
                 if ref_idx[l] as usize >= self.refs.num[l] {
-                    return Err(DecodeError::InvalidData("ref_idx out of range"));
+                    return Err(DecodeError::Invalid("ref_idx out of range"));
                 }
                 let mvp = self.amvp(
                     cu,

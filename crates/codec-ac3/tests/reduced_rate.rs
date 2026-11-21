@@ -173,7 +173,7 @@ fn bsid10_coupled_stereo_matches_ffmpeg() {
         (10, 8000, 1536)
     );
     assert!(info.crc_ok && info.concealed.is_none());
-    assert_eq!(triergon_codec_ac3::layout_name(&out.layout), "2.1");
+    assert_eq!(out.layout.name(), "2.1");
     for (p, want) in K10_FFMPEG.iter().enumerate() {
         for (&i, &w) in IDX.iter().zip(want) {
             let got = out.planes[p][i] as f64;
@@ -219,7 +219,7 @@ fn non_compatible_dependent_is_dropped() {
     });
     assert!(matches!(
         strict.decode(&au, &mut AudioFrame::default()),
-        Err(DecodeError::InvalidData(_))
+        Err(DecodeError::Invalid(_))
     ));
 }
 

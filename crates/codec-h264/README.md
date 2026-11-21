@@ -53,8 +53,8 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   frame buffer (no copy; `row(y)`, `data()`, `raw()`), `pts`, `poc`, `sar`, `colour` and
   `interlaced`. Each picture keeps the timestamp of the access unit that carried it
   through reordering.
-- Errors are typed: `Unsupported(&str)` names the feature, `InvalidData(&str)`,
-  `ResourceLimit(&str)`, `Budget(StorageError)`. The decoder does not panic on
+- Errors are typed (`DecodeError`, the one of triergon-codec): `Unsupported(&str)` names
+  the feature, `Invalid(&str)`, `Policy(&str)`, `Budget(StorageError)`. The decoder does not panic on
   malformed input.
 - Refused with `Unsupported`: bit depth above 8, 4:2:2 and 4:4:4, lossless transform
   bypass, flexible macroblock ordering (more than one slice group), SP/SI slices, data
@@ -72,7 +72,7 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   free once its picture is output and unused for reference; at most three more stores
   than the DPB size are made, and when every one holds a picture, pictures are output
   until one is free (a buffer of reference pictures none of which waits is
-  `ResourceLimit`).
+  `Policy`).
 - Storage: frame buffers (also while output pictures share them), motion and macroblock
   arrays, the decoded picture buffer, deblocking state, RBSP and slice lists are charged
   to a `Budget` before they are allocated. `Decoder::with_limits(Limits { live_storage_bytes })` gives the decoder its
@@ -83,7 +83,7 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   the caller holds) at 640 bytes per stored macroblock (384 of samples, at most 256 of
   motion), plus about 700 bytes per macroblock of one picture's scratch and RBSP: about
   250 MiB.
-- A damaged slice returns `InvalidData`; its macroblocks stay undecoded where FFmpeg
+- A damaged slice returns `Invalid`; its macroblocks stay undecoded where FFmpeg
   would conceal them. An unpaired field is output as a frame with the other field's lines
   unset.
 

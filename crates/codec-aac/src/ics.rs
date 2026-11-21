@@ -166,7 +166,7 @@ pub(crate) fn parse_ics_info(
 ) -> Result<()> {
     if br.bit() {
         // ics_reserved_bit: FFmpeg reports and continues; we treat as invalid like the spec.
-        return Err(DecodeError::InvalidData("ics_reserved_bit"));
+        return Err(DecodeError::Invalid("ics_reserved_bit"));
     }
     info.window_sequence = br.read(2) as u8;
     info.window_shape = br.read(1) as u8;
@@ -202,7 +202,7 @@ pub(crate) fn parse_ics_info(
                     if br.bit() {
                         info.predictor_reset_group = br.read(5) as u8;
                         if info.predictor_reset_group == 0 || info.predictor_reset_group > 30 {
-                            return Err(DecodeError::InvalidData("predictor_reset_group_number"));
+                            return Err(DecodeError::Invalid("predictor_reset_group_number"));
                         }
                     }
                     let n = info.max_sfb.min(PRED_SFB_MAX[cfg.sf_index] as usize);
@@ -222,13 +222,13 @@ pub(crate) fn parse_ics_info(
                         }
                     }
                 }
-                _ => return Err(DecodeError::InvalidData("predictor_data_present in LC")),
+                _ => return Err(DecodeError::Invalid("predictor_data_present in LC")),
             }
         }
     }
     info.num_swb = info.swb.len() - 1;
     if info.max_sfb > info.num_swb {
-        return Err(DecodeError::InvalidData("max_sfb"));
+        return Err(DecodeError::Invalid("max_sfb"));
     }
     Ok(())
 }
@@ -265,18 +265,18 @@ pub(crate) fn parse_ics(
     if !scale_flag {
         if br.bit() {
             if ch.info.window_sequence == EIGHT_SHORT {
-                return Err(DecodeError::InvalidData("pulse data in short window"));
+                return Err(DecodeError::Invalid("pulse data in short window"));
             }
             npulse = br.read(2) as usize + 1;
             let start = br.read(6) as usize;
             if start >= ch.info.num_swb {
-                return Err(DecodeError::InvalidData("pulse_start_sfb"));
+                return Err(DecodeError::Invalid("pulse_start_sfb"));
             }
             let mut k = ch.info.swb[start] as usize;
             for p in pulse.iter_mut().take(npulse) {
                 k += br.read(5) as usize;
                 if k >= 1024 {
-                    return Err(DecodeError::InvalidData("pulse offset"));
+                    return Err(DecodeError::Invalid("pulse offset"));
                 }
                 *p = (k, br.read(4) as i32);
             }
@@ -293,7 +293,7 @@ pub(crate) fn parse_ics(
     ch.pulse_used = npulse > 0;
     decode_spectrum(br, ch, &pulse[..npulse], random)?;
     if br.overrun() {
-        return Err(DecodeError::InvalidData("channel stream overrun"));
+        return Err(DecodeError::Invalid("channel stream overrun"));
     }
     Ok(())
 }
@@ -310,7 +310,7 @@ fn parse_section_data(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Res
         while k < info.max_sfb {
             let cb = br.read(4) as u8;
             if cb == 12 {
-                return Err(DecodeError::InvalidData("reserved codebook 12"));
+                return Err(DecodeError::Invalid("reserved codebook 12"));
             }
             let mut len = 0usize;
             loop {
@@ -320,18 +320,18 @@ fn parse_section_data(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Res
                     break;
                 }
                 if br.overrun() {
-                    return Err(DecodeError::InvalidData("section data overrun"));
+                    return Err(DecodeError::Invalid("section data overrun"));
                 }
             }
             if k + len > info.max_sfb {
-                return Err(DecodeError::InvalidData("section length"));
+                return Err(DecodeError::Invalid("section length"));
             }
             for sfb in k..k + len {
                 ch.band_type[g * MAX_SFB + sfb] = cb;
             }
             k += len;
             if br.overrun() {
-                return Err(DecodeError::InvalidData("section data overrun"));
+                return Err(DecodeError::Invalid("section data overrun"));
             }
         }
         for sfb in info.max_sfb..MAX_SFB {
@@ -356,7 +356,7 @@ fn parse_scalefactors(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Res
                 INTENSITY_HCB | INTENSITY_HCB2 => {
                     let d = vlc
                         .decode(br)
-                        .ok_or(DecodeError::InvalidData("scalefactor code"))?
+                        .ok_or(DecodeError::Invalid("scalefactor code"))?
                         as i32
                         - 60;
                     is_pos += d;
@@ -369,7 +369,7 @@ fn parse_scalefactors(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Res
                     } else {
                         let d = vlc
                             .decode(br)
-                            .ok_or(DecodeError::InvalidData("scalefactor code"))?
+                            .ok_or(DecodeError::Invalid("scalefactor code"))?
                             as i32
                             - 60;
                         noise += d;
@@ -379,12 +379,12 @@ fn parse_scalefactors(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Res
                 _ => {
                     let d = vlc
                         .decode(br)
-                        .ok_or(DecodeError::InvalidData("scalefactor code"))?
+                        .ok_or(DecodeError::Invalid("scalefactor code"))?
                         as i32
                         - 60;
                     sf += d;
                     if !(0..=255).contains(&sf) {
-                        return Err(DecodeError::InvalidData("scalefactor out of range"));
+                        return Err(DecodeError::Invalid("scalefactor out of range"));
                     }
                     ch.sf[i] = sf;
                 }
@@ -414,7 +414,7 @@ fn parse_tns(br: &mut CachedBitReader<'_>, cfg: &CoreCfg, ch: &mut ChannelData) 
             flt.length = br.read(len_bits) as u8;
             flt.order = br.read(ord_bits) as u8;
             if flt.order > max_order {
-                return Err(DecodeError::InvalidData("TNS order"));
+                return Err(DecodeError::Invalid("TNS order"));
             }
             if flt.order > 0 {
                 flt.direction = br.bit();
@@ -517,7 +517,7 @@ fn band<const N: usize, const UNSIGNED: bool>(
         let sym = book
             .vlc
             .decode(br)
-            .ok_or(DecodeError::InvalidData("spectral code"))? as usize;
+            .ok_or(DecodeError::Invalid("spectral code"))? as usize;
         let mut v = [0f32; N];
         v.copy_from_slice(&book.fvalues[sym][..N]);
         if UNSIGNED {
@@ -540,7 +540,7 @@ fn escape(br: &mut CachedBitReader<'_>, v: i32) -> Result<i32> {
     while br.bit() {
         nbits += 1;
         if nbits > 12 {
-            return Err(DecodeError::InvalidData("escape sequence"));
+            return Err(DecodeError::Invalid("escape sequence"));
         }
     }
     let e = (1i32 << nbits) + br.read(nbits) as i32;
@@ -576,7 +576,7 @@ fn band_esc(
             let sym = book
                 .vlc
                 .decode(br)
-                .ok_or(DecodeError::InvalidData("spectral code"))? as usize;
+                .ok_or(DecodeError::Invalid("spectral code"))? as usize;
             let vals = book.values[sym];
             let mut q = [vals[0] as i32, vals[1] as i32];
             read_signs_i32(br, &mut q);
@@ -603,7 +603,7 @@ fn band_int(
         let sym = book
             .vlc
             .decode(br)
-            .ok_or(DecodeError::InvalidData("spectral code"))? as usize;
+            .ok_or(DecodeError::Invalid("spectral code"))? as usize;
         let vals = book.values[sym];
         for i in 0..n {
             o[i] = vals[i] as i32;
@@ -710,10 +710,10 @@ fn decode_bands(
                         }
                     }
                 }
-                _ => return Err(DecodeError::InvalidData("band type")),
+                _ => return Err(DecodeError::Invalid("band type")),
             }
             if br.overrun() {
-                return Err(DecodeError::InvalidData("spectral data overrun"));
+                return Err(DecodeError::Invalid("spectral data overrun"));
             }
         }
         for w in win..win + glen {

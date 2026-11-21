@@ -4,16 +4,17 @@ use core::fmt;
 use triergon_bitstream::cabac::InvalidOffset;
 use triergon_codec::StorageError;
 
-/// Decoder error. Unsupported features are named so callers can tell a gap in the
-/// selected feature set from corrupt input.
+/// Why the decoder refused an access unit: the classes of [`triergon_codec::DecodeError`]
+/// and a missing parameter set. Unsupported features are named so callers can tell a gap
+/// in the selected feature set from corrupt input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
     /// A valid H.265 feature outside the selected Main / Main 10 / Main Still Picture set.
     Unsupported(&'static str),
     /// The bitstream violates a syntax or semantic constraint.
-    InvalidData(&'static str),
+    Invalid(&'static str),
     /// A resource cap (picture size, DPB size, level limit) refused the stream.
-    ResourceLimit(&'static str),
+    Policy(&'static str),
     /// A referenced parameter set has not been received.
     MissingParameterSet(&'static str),
     /// Storage the stream needs does not fit the decoder's budget.
@@ -22,7 +23,7 @@ pub enum DecodeError {
 
 impl From<InvalidOffset> for DecodeError {
     fn from(_: InvalidOffset) -> Self {
-        DecodeError::InvalidData("arithmetic code offset out of range")
+        DecodeError::Invalid("arithmetic code offset out of range")
     }
 }
 
@@ -38,10 +39,10 @@ impl From<DecodeError> for triergon_codec::Error {
     fn from(error: DecodeError) -> Self {
         match error {
             DecodeError::Unsupported(feature) => Self::Unsupported(feature),
-            DecodeError::InvalidData(detail) | DecodeError::MissingParameterSet(detail) => {
+            DecodeError::Invalid(detail) | DecodeError::MissingParameterSet(detail) => {
                 Self::Invalid(detail)
             }
-            DecodeError::ResourceLimit(limit) => Self::Policy(limit),
+            DecodeError::Policy(limit) => Self::Policy(limit),
             DecodeError::Budget(error) => error,
         }
     }
@@ -50,10 +51,10 @@ impl From<DecodeError> for triergon_codec::Error {
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DecodeError::Unsupported(s) => write!(f, "unsupported HEVC feature: {s}"),
-            DecodeError::InvalidData(s) => write!(f, "invalid HEVC data: {s}"),
-            DecodeError::ResourceLimit(s) => write!(f, "HEVC resource limit: {s}"),
-            DecodeError::MissingParameterSet(s) => write!(f, "missing HEVC parameter set: {s}"),
+            DecodeError::Unsupported(s) => write!(f, "unsupported: {s}"),
+            DecodeError::Invalid(s) => write!(f, "invalid data: {s}"),
+            DecodeError::Policy(s) => write!(f, "resource limit: {s}"),
+            DecodeError::MissingParameterSet(s) => write!(f, "missing parameter set: {s}"),
             DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
         }
     }

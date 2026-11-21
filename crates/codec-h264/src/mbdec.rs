@@ -11,7 +11,7 @@ use crate::tables::*;
 use triergon_bitstream::BitReader;
 
 fn inval(s: &'static str) -> SliceError {
-    SliceError::InvalidData(s)
+    SliceError::Invalid(s)
 }
 
 /// Parsed macroblock syntax (scratch, reused).

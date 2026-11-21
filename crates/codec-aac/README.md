@@ -89,8 +89,8 @@ on both targets; every other worker stays on stable.
   `out`, reusing capacity, because rate and layout can change between frames (implicit
   SBR/PS, a new PCE). A frame yields 1024 samples per raw data block, 2048 with SBR.
 - On error `out` is empty and the decoder stays usable. Errors are typed:
-  `Unsupported(Feature)`, `InvalidData(&str)` naming the syntax element,
-  `ResourceLimit(&str)`, `Truncated`, `Budget(StorageError)`.
+  `Unsupported(Feature)`, `Invalid(&str)` naming the syntax element,
+  `Policy(&str)`, `Truncated`, `Budget(StorageError)`.
 - Storage that depends on the stream is charged to the decoder's budget before it is
   allocated. What the ADTS header configures, the elements of a fixed channel
   configuration and the output frame for the configured layout, is charged before an

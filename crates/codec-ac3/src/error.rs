@@ -35,7 +35,7 @@ pub enum DecodeError {
     /// The access unit is empty.
     Empty,
     /// A header or audio-block field holds a value the specification forbids.
-    InvalidData(&'static str),
+    Invalid(&'static str),
     /// CRC check failed and the decoder was configured to reject such frames.
     CrcMismatch {
         /// AC-3 crc1 (first 5/8 of the frame) checks; for E-AC-3 the frame CRC.
@@ -68,7 +68,7 @@ impl From<DecodeError> for triergon_codec::Error {
         match error {
             DecodeError::NoSync => Self::Invalid("AC-3 syncword"),
             DecodeError::Truncated { .. } | DecodeError::Empty => Self::Truncated,
-            DecodeError::InvalidData(detail) => Self::Invalid(detail),
+            DecodeError::Invalid(detail) => Self::Invalid(detail),
             DecodeError::CrcMismatch { .. } => Self::Invalid("syncframe CRC"),
             DecodeError::Unsupported(feature) => Self::Unsupported(match feature {
                 Feature::EnhancedCoupling => "enhanced coupling",
@@ -97,7 +97,7 @@ impl fmt::Display for DecodeError {
                 )
             }
             DecodeError::Empty => write!(f, "empty access unit"),
-            DecodeError::InvalidData(what) => write!(f, "invalid bitstream: {what}"),
+            DecodeError::Invalid(what) => write!(f, "invalid data: {what}"),
             DecodeError::CrcMismatch { crc1_ok, crc2_ok } => {
                 write!(f, "CRC mismatch (crc1 ok: {crc1_ok}, crc2 ok: {crc2_ok})")
             }

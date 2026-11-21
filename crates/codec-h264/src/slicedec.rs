@@ -529,10 +529,10 @@ impl<'a> SliceDecoder<'a> {
 
     fn begin_mb(&mut self, addr: usize) -> Result<(), SliceError> {
         if addr >= self.pic_size() {
-            return Err(SliceError::InvalidData("slice runs past picture end"));
+            return Err(SliceError::Invalid("slice runs past picture end"));
         }
         if self.pic.mbs[addr].slice != 0 {
-            return Err(SliceError::InvalidData("macroblock decoded twice"));
+            return Err(SliceError::Invalid("macroblock decoded twice"));
         }
         self.cur = addr;
         let mut info = MbInfo {
@@ -592,7 +592,7 @@ impl<'a> SliceDecoder<'a> {
             if !is_i {
                 let run = self.br.ue() as usize;
                 if run > self.pic_size() {
-                    return Err(SliceError::InvalidData("mb_skip_run"));
+                    return Err(SliceError::Invalid("mb_skip_run"));
                 }
                 prev_skipped = run > 0;
                 for i in 0..run {
@@ -629,7 +629,7 @@ impl<'a> SliceDecoder<'a> {
             }
             more = self.br.more_rbsp_data();
             if self.br.overrun() {
-                return Err(SliceError::InvalidData("CAVLC data overrun"));
+                return Err(SliceError::Invalid("CAVLC data overrun"));
             }
             addr += 1;
         }
@@ -691,7 +691,7 @@ impl<'a> SliceDecoder<'a> {
             } else {
                 more = c.terminate() == 0;
                 if c.overrun() {
-                    return Err(SliceError::InvalidData("CABAC data overrun"));
+                    return Err(SliceError::Invalid("CABAC data overrun"));
                 }
             }
             self.finish_mb();

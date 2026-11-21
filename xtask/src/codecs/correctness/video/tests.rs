@@ -234,7 +234,7 @@ echo '{"frame":1,"poc":27}' >&2"#;
 
     #[test]
     fn declared_candidate_refusal_cannot_hide_a_late_reference_failure() {
-        let refuse = r#"echo '{"error":"unsupported HEVC feature: unequal luma/chroma bit depth"}' >&2; exit 1"#;
+        let refuse = r#"echo '{"error":"unsupported: unequal luma/chroma bit depth"}' >&2; exit 1"#;
         let frame = "printf abcdef";
         let late_exit = "printf abcdef; exit 2";
         let tmp = TempDir::new(None).unwrap();
@@ -258,7 +258,7 @@ echo '{"frame":1,"poc":27}' >&2"#;
             assert_eq!(
                 decoded.get("ours_errors").unwrap().as_array().unwrap()[0].get("error"),
                 Some(&Value::str(
-                    "unsupported HEVC feature: unequal luma/chroma bit depth"
+                    "unsupported: unequal luma/chroma bit depth"
                 ))
             );
             let row = Value::object([
@@ -280,7 +280,7 @@ echo '{"frame":1,"poc":27}' >&2"#;
     #[test]
     fn refusals_remain_distinct_from_truncated_or_failed_runs() {
         let unsupported =
-            r#"echo '{"error":"unsupported HEVC feature: unequal luma/chroma bit depth"}' >&2"#;
+            r#"echo '{"error":"unsupported: unequal luma/chroma bit depth"}' >&2"#;
         let crash = format!("{unsupported}\nexit 101");
         assert_eq!(
             planar_row(&crash, "printf abcdef").get("status"),

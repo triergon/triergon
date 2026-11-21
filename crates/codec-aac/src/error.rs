@@ -30,9 +30,9 @@ pub enum DecodeError {
     /// The input uses a feature outside the implemented set (named).
     Unsupported(Feature),
     /// Malformed bitstream; the string names the failing syntax element.
-    InvalidData(&'static str),
+    Invalid(&'static str),
     /// A resource limit would be exceeded (channels, elements, ...).
-    ResourceLimit(&'static str),
+    Policy(&'static str),
     /// The access unit is shorter than its header requires.
     Truncated,
     /// Storage the access unit needs does not fit the decoder's budget.
@@ -60,8 +60,8 @@ impl From<DecodeError> for triergon_codec::Error {
                 Feature::RawProgramLayout => "raw program speaker layout",
                 Feature::SampleRateIndex(_) => "sampling frequency index",
             }),
-            DecodeError::InvalidData(detail) => Self::Invalid(detail),
-            DecodeError::ResourceLimit(limit) => Self::Policy(limit),
+            DecodeError::Invalid(detail) => Self::Invalid(detail),
+            DecodeError::Policy(limit) => Self::Policy(limit),
             DecodeError::Truncated => Self::Truncated,
             DecodeError::Budget(error) => error,
         }
@@ -72,8 +72,8 @@ impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DecodeError::Unsupported(x) => write!(f, "unsupported feature: {x:?}"),
-            DecodeError::InvalidData(s) => write!(f, "invalid data: {s}"),
-            DecodeError::ResourceLimit(s) => write!(f, "resource limit: {s}"),
+            DecodeError::Invalid(s) => write!(f, "invalid data: {s}"),
+            DecodeError::Policy(s) => write!(f, "resource limit: {s}"),
             DecodeError::Truncated => write!(f, "truncated access unit"),
             DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
         }

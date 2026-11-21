@@ -394,7 +394,7 @@ impl Sbr {
         match r {
             Ok(ps) => {
                 if br.position() > start + bits {
-                    return Err(DecodeError::InvalidData("SBR data overrun"));
+                    return Err(DecodeError::Invalid("SBR data overrun"));
                 }
                 self.data_ok = true;
                 Ok(ps)
@@ -536,7 +536,7 @@ impl Sbr {
             }
             let mut left = 8 * cnt as isize;
             if br.position() as isize + left > end as isize {
-                return Err(DecodeError::InvalidData("SBR extended data length"));
+                return Err(DecodeError::Invalid("SBR extended data length"));
             }
             while left > 7 {
                 let id = br.read(2);
@@ -740,7 +740,7 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
             let tmp = br.read(2);
             num_env = 1usize << tmp;
             if num_env > 4 {
-                return Err(DecodeError::InvalidData("SBR FIXFIX envelopes"));
+                return Err(DecodeError::Invalid("SBR FIXFIX envelopes"));
             }
             let fr = br.bit();
             c.freq_res[..num_env].fill(fr);
@@ -784,7 +784,7 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
             nrel1 = br.read(2) as usize;
             num_env = nrel0 + nrel1 + 1;
             if num_env > 5 {
-                return Err(DecodeError::InvalidData("SBR VARVAR envelopes"));
+                return Err(DecodeError::Invalid("SBR VARVAR envelopes"));
             }
             for r in rel0.iter_mut().take(nrel0) {
                 *r = 2 * br.read(2) as usize + 2;
@@ -797,7 +797,7 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
         }
     }
     if pointer > num_env {
-        return Err(DecodeError::InvalidData("SBR bs_pointer"));
+        return Err(DecodeError::Invalid("SBR bs_pointer"));
     }
     c.frame_class = class;
     c.num_env = num_env;
@@ -813,11 +813,11 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
     }
     for l in 0..num_env {
         if c.t_env[l] >= c.t_env[l + 1] {
-            return Err(DecodeError::InvalidData("SBR time borders"));
+            return Err(DecodeError::Invalid("SBR time borders"));
         }
     }
     if c.t_env[num_env] > NUM_TIME_SLOTS + 3 {
-        return Err(DecodeError::InvalidData("SBR time borders"));
+        return Err(DecodeError::Invalid("SBR time borders"));
     }
     c.num_noise = if num_env > 1 { 2 } else { 1 };
     c.t_q[0] = c.t_env[0];
@@ -893,7 +893,7 @@ fn parse_invf(br: &mut CachedBitReader<'_>, c: &mut Chan, n_q: usize) {
 fn huff(br: &mut CachedBitReader<'_>, v: &Vlc) -> Result<i32> {
     v.decode(br)
         .map(|s| s as i32)
-        .ok_or(DecodeError::InvalidData("SBR Huffman code"))
+        .ok_or(DecodeError::Invalid("SBR Huffman code"))
 }
 
 /// sbr_envelope() with delta decoding (4.6.18.3.4).

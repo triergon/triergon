@@ -191,12 +191,12 @@ fn read_scale_index(br: &mut BitReader<'_>, shuff: u8, sum: &mut i32) -> i32 {
 fn scale_value(shuff: u8, idx: i32) -> Result<f32, DecodeError> {
     let v = if shuff == 6 {
         if !(0..125).contains(&idx) {
-            return Err(DecodeError::InvalidData("7-bit scale factor index"));
+            return Err(DecodeError::Invalid("7-bit scale factor index"));
         }
         SCALE_7BIT[idx as usize]
     } else {
         if !(0..63).contains(&idx) {
-            return Err(DecodeError::InvalidData("6-bit scale factor index"));
+            return Err(DecodeError::Invalid("6-bit scale factor index"));
         }
         SCALE_6BIT[idx as usize]
     };
@@ -223,7 +223,7 @@ pub(crate) fn decode_subframe(
     for ch in 0..nch {
         let j = hdr.joinx[ch] as usize;
         if j > slot0 + ch {
-            return Err(DecodeError::InvalidData("JOINX source channel"));
+            return Err(DecodeError::Invalid("JOINX source channel"));
         }
     }
     let nssc = p.nssc;
@@ -255,7 +255,7 @@ pub(crate) fn decode_subframe(
                 _ => br.read(5),
             };
             if a > 26 {
-                return Err(DecodeError::InvalidData("ABITS above 26"));
+                return Err(DecodeError::Invalid("ABITS above 26"));
             }
             side.abits[ch][n] = a as u8;
         }
@@ -299,7 +299,7 @@ pub(crate) fn decode_subframe(
         if hdr.joinx[ch] > 0 {
             join_shuff[ch] = br.read(3) as u8;
             if join_shuff[ch] == 7 {
-                return Err(DecodeError::InvalidData("JOIN_SHUFF = 7"));
+                return Err(DecodeError::Invalid("JOIN_SHUFF = 7"));
             }
         }
     }
@@ -310,7 +310,7 @@ pub(crate) fn decode_subframe(
                 let mut s = 0;
                 let v = read_scale_index(br, join_shuff[ch], &mut s) + 64;
                 if !(0..=128).contains(&v) {
-                    return Err(DecodeError::InvalidData("joint scale index"));
+                    return Err(DecodeError::Invalid("joint scale index"));
                 }
                 side.jscale[ch][n] = JOINT_SCALE[v as usize];
             }
@@ -325,7 +325,7 @@ pub(crate) fn decode_subframe(
         let _sicrc = br.read(16);
     }
     if br.overrun() {
-        return Err(DecodeError::InvalidData("side information past frame end"));
+        return Err(DecodeError::Invalid("side information past frame end"));
     }
 
     // --- audio data arrays (Table 5-29) ---
@@ -359,7 +359,7 @@ pub(crate) fn decode_subframe(
         }
         let si = br.read(8) as usize;
         if si >= 125 {
-            return Err(DecodeError::InvalidData("LFE scale index"));
+            return Err(DecodeError::Invalid("LFE scale index"));
         }
         let s = SCALE_7BIT[si] as f32 * 0.035;
         for k in 0..count {
@@ -411,11 +411,11 @@ pub(crate) fn decode_subframe(
             }
         }
         if (ssf == nssc - 1 || p.aspf) && br.read(16) != 0xFFFF {
-            return Err(DecodeError::InvalidData("DSYNC"));
+            return Err(DecodeError::Invalid("DSYNC"));
         }
     }
     if br.overrun() {
-        return Err(DecodeError::InvalidData("audio data past frame end"));
+        return Err(DecodeError::Invalid("audio data past frame end"));
     }
     // Joint intensity (C.3.4): copy scaled source subbands.
     for ch in 0..nch {
@@ -444,8 +444,7 @@ pub(crate) fn read_indices(
 ) -> Result<bool, DecodeError> {
     let nh = books::huffman_sel_count(abits);
     if abits <= 10 && sel < nh {
-        let book =
-            books::sample_book(abits, sel).ok_or(DecodeError::InvalidData(codebook_error))?;
+        let book = books::sample_book(abits, sel).ok_or(DecodeError::Invalid(codebook_error))?;
         for v in q {
             *v = br.huff(book);
         }
@@ -455,7 +454,7 @@ pub(crate) fn read_indices(
         for blk in 0..2 {
             let digits = bc
                 .split(br.read(bc.bits))
-                .ok_or(DecodeError::InvalidData(block_code_error))?;
+                .ok_or(DecodeError::Invalid(block_code_error))?;
             q[blk * 4..blk * 4 + 4].copy_from_slice(&digits);
         }
         Ok(false)

@@ -74,7 +74,7 @@ pub(crate) fn parse_cce<const RAW: bool>(
         Some(i) => i,
         None => {
             if core.cce.len() >= 16 {
-                return Err(DecodeError::ResourceLimit("coupling channel elements"));
+                return Err(DecodeError::Policy("coupling channel elements"));
             }
             let mut c = CceState::new(&core.budget, tag)?;
             if RAW {
@@ -122,7 +122,7 @@ pub(crate) fn parse_cce<const RAW: bool>(
         if cge {
             let a = vlc
                 .decode(br)
-                .ok_or(DecodeError::InvalidData("cce gain code"))? as i32
+                .ok_or(DecodeError::Invalid("cce gain code"))? as i32
                 - 60;
             let gain = scale.powi(-a) as f32;
             for v in g0.iter_mut() {
@@ -139,7 +139,7 @@ pub(crate) fn parse_cce<const RAW: bool>(
                     }
                     let t = vlc
                         .decode(br)
-                        .ok_or(DecodeError::InvalidData("cce gain code"))?
+                        .ok_or(DecodeError::Invalid("cce gain code"))?
                         as i32
                         - 60;
                     if t != 0 {

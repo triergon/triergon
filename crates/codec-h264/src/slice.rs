@@ -72,7 +72,7 @@ pub(crate) struct SliceHeader {
 }
 
 fn inval(what: &'static str) -> DecodeError {
-    DecodeError::InvalidData(what)
+    DecodeError::Invalid(what)
 }
 
 /// Parse only the fields needed to find the PPS (first_mb_in_slice, slice_type, pps_id).

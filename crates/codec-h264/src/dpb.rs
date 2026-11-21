@@ -464,16 +464,16 @@ pub(crate) fn modify_ref_list(
                     } else {
                         no_wrap
                     };
-                    find(pn, Marking::ShortTerm).ok_or(DecodeError::InvalidData(
+                    find(pn, Marking::ShortTerm).ok_or(DecodeError::Invalid(
                         "ref_pic_list_modification: missing short-term picture",
                     ))?
                 }
-                _ => find(v as i32, Marking::LongTerm).ok_or(DecodeError::InvalidData(
+                _ => find(v as i32, Marking::LongTerm).ok_or(DecodeError::Invalid(
                     "ref_pic_list_modification: missing long-term picture",
                 ))?,
             };
             if ref_idx > list.len() {
-                return Err(DecodeError::InvalidData("ref_pic_list_modification index"));
+                return Err(DecodeError::Invalid("ref_pic_list_modification index"));
             }
             list.insert(ref_idx, pic);
             ref_idx += 1;

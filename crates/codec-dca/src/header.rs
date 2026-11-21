@@ -37,7 +37,7 @@ pub(crate) struct FrameHeader {
 impl FrameHeader {
     pub(crate) fn parse(br: &mut BitReader<'_>) -> Result<Self, DecodeError> {
         if br.read(32) != 0x7FFE_8001 {
-            return Err(DecodeError::InvalidData("core sync word"));
+            return Err(DecodeError::Invalid("core sync word"));
         }
         // FTYPE: termination frames decode like normal ones.
         let _ftype = br.bit();
@@ -74,16 +74,16 @@ impl FrameHeader {
         let _dialnorm = br.read(4);
 
         if h.sample_rate == 0 {
-            return Err(DecodeError::InvalidData("core sampling frequency"));
+            return Err(DecodeError::Invalid("core sampling frequency"));
         }
         if h.blocks < 6 {
-            return Err(DecodeError::InvalidData("NBLKS below 5"));
+            return Err(DecodeError::Invalid("NBLKS below 5"));
         }
         if h.fsize < 96 {
-            return Err(DecodeError::InvalidData("FSIZE below 95"));
+            return Err(DecodeError::Invalid("FSIZE below 95"));
         }
         if h.lff == 3 {
-            return Err(DecodeError::InvalidData("LFF = 3"));
+            return Err(DecodeError::Invalid("LFF = 3"));
         }
         Ok(h)
     }
@@ -129,7 +129,7 @@ impl SetHeader {
         for ch in 0..nch {
             h.nsubs[ch] = br.read(5) as u8 + 2;
             if h.nsubs[ch] > 32 {
-                return Err(DecodeError::InvalidData("SUBS above 32 subbands"));
+                return Err(DecodeError::Invalid("SUBS above 32 subbands"));
             }
         }
         for ch in 0..nch {
@@ -144,13 +144,13 @@ impl SetHeader {
         for ch in 0..nch {
             h.shuff[ch] = br.read(3) as u8;
             if h.shuff[ch] == 7 {
-                return Err(DecodeError::InvalidData("SHUFF = 7"));
+                return Err(DecodeError::Invalid("SHUFF = 7"));
             }
         }
         for ch in 0..nch {
             h.bhuff[ch] = br.read(3) as u8;
             if h.bhuff[ch] == 7 {
-                return Err(DecodeError::InvalidData("BHUFF = 7"));
+                return Err(DecodeError::Invalid("BHUFF = 7"));
             }
         }
         for n in 0..10 {

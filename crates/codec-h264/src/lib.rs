@@ -49,6 +49,7 @@ use slicedec::{ColInfo, CurPic, Refs, SliceCtx, SliceDecoder, Wp};
 use std::collections::VecDeque;
 use tables::*;
 use triergon_bitstream::BitReader;
+pub use triergon_codec::DecodeError;
 use triergon_codec::{Budget, BudgetVec, Colour, PictureView, StorageError, VideoDecoder};
 use triergon_framing::nal::AnnexBUnits;
 use triergon_framing::picture_output::levels::max_dpb_mbs;
@@ -56,36 +57,17 @@ use triergon_framing::picture_output::{
     AvcPicture, DecodedPictures, Leave, Marking, NewPicture, PictureId, View,
 };
 
-/// Decoder error. The decoder never panics on bad input.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DecodeError {
-    /// A syntactically valid stream uses a feature outside the selected matrix.
-    Unsupported(&'static str),
-    /// The bitstream violates the specification.
-    InvalidData(&'static str),
-    /// A resource cap (dimensions, DPB size) refused the stream.
-    ResourceLimit(&'static str),
-    /// Storage the stream needs does not fit the decoder's budget.
-    Budget(StorageError),
-}
-
-impl From<StorageError> for DecodeError {
-    fn from(error: StorageError) -> Self {
-        DecodeError::Budget(error)
-    }
-}
-
 /// Error of the slice data path, which charges no storage. Without a `Budget` case it keeps
 /// every macroblock-level `Result` as small as before the budget existed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SliceError {
     Unsupported(&'static str),
-    InvalidData(&'static str),
+    Invalid(&'static str),
 }
 
 impl From<triergon_bitstream::cabac::InvalidOffset> for SliceError {
     fn from(_: triergon_bitstream::cabac::InvalidOffset) -> Self {
-        SliceError::InvalidData("arithmetic code offset out of range")
+        SliceError::Invalid("arithmetic code offset out of range")
     }
 }
 
@@ -93,36 +75,10 @@ impl From<SliceError> for DecodeError {
     fn from(error: SliceError) -> Self {
         match error {
             SliceError::Unsupported(s) => DecodeError::Unsupported(s),
-            SliceError::InvalidData(s) => DecodeError::InvalidData(s),
+            SliceError::Invalid(s) => DecodeError::Invalid(s),
         }
     }
 }
-
-impl From<DecodeError> for triergon_codec::Error {
-    /// The workspace error of the same class; a refused storage charge is the budget's
-    /// own error.
-    fn from(error: DecodeError) -> Self {
-        match error {
-            DecodeError::Unsupported(feature) => Self::Unsupported(feature),
-            DecodeError::InvalidData(detail) => Self::Invalid(detail),
-            DecodeError::ResourceLimit(limit) => Self::Policy(limit),
-            DecodeError::Budget(error) => error,
-        }
-    }
-}
-
-impl std::fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DecodeError::Unsupported(s) => write!(f, "unsupported: {s}"),
-            DecodeError::InvalidData(s) => write!(f, "invalid data: {s}"),
-            DecodeError::ResourceLimit(s) => write!(f, "resource limit: {s}"),
-            DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
-        }
-    }
-}
-
-impl std::error::Error for DecodeError {}
 
 /// Storage limits of one decoder.
 #[derive(Clone, Copy, Debug)]
@@ -572,7 +528,7 @@ impl Decoder {
 
     fn decode_nal(&mut self, nal: &[u8]) -> Result<(), DecodeError> {
         let Some(h) = parse_header(nal) else {
-            return Err(DecodeError::InvalidData("forbidden_zero_bit"));
+            return Err(DecodeError::Invalid("forbidden_zero_bit"));
         };
         match h.nal_unit_type {
             1 | 5 => self.decode_slice_nal(nal, h),
@@ -636,11 +592,11 @@ impl Decoder {
         let (_, _, pps_id) = slice::peek_pps_id(&mut r.clone())?;
         let pps = self.ppss[pps_id as usize]
             .as_deref()
-            .ok_or(DecodeError::InvalidData("missing PPS"))?
+            .ok_or(DecodeError::Invalid("missing PPS"))?
             .clone();
         let sps = self.spss[pps.sps_id as usize]
             .as_deref()
-            .ok_or(DecodeError::InvalidData("missing SPS"))?
+            .ok_or(DecodeError::Invalid("missing SPS"))?
             .clone();
         Self::check_supported(&sps, &pps)?;
         let sh = slice::parse_slice_header(&mut r, h, &sps, &pps)?;
@@ -772,7 +728,7 @@ impl Decoder {
             .unwrap_or_else(|| Motion::empty(&self.budget));
         motion.alloc(w * h)?;
         let fs = target_store(&mut self.dpb, target)
-            .ok_or(DecodeError::InvalidData("first field not stored"))?;
+            .ok_or(DecodeError::Invalid("first field not stored"))?;
         let mut buf = match fs.buf.take().map(std::sync::Arc::try_unwrap) {
             Some(Ok(b)) => b,
             // Still held by an output picture: the second field needs the first field's samples.
@@ -871,9 +827,7 @@ impl Decoder {
             }
             if !self.dpb.bump(leave(&mut self.out, &mut self.free)) {
                 // Every store holds a reference picture none of which waits for output.
-                return Err(DecodeError::ResourceLimit(
-                    "decoded picture buffer overflow",
-                ));
+                return Err(DecodeError::Policy("decoded picture buffer overflow"));
             }
         };
         if fs
@@ -1004,7 +958,7 @@ impl Decoder {
         len: usize,
     ) -> Result<(), DecodeError> {
         let Some(active) = self.active.as_mut() else {
-            return Err(DecodeError::InvalidData("slice without picture"));
+            return Err(DecodeError::Invalid("slice without picture"));
         };
         let pic = &mut active.pic;
         let structure = pic.structure;
@@ -1094,7 +1048,7 @@ impl Decoder {
         };
         let slice_num = pic.slices.len() as u16;
         if slice_num >= 0xFFFE {
-            return Err(DecodeError::ResourceLimit("too many slices"));
+            return Err(DecodeError::Policy("too many slices"));
         }
         pic.slices
             .try_push(SliceDbk {

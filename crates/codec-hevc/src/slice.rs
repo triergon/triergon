@@ -124,7 +124,7 @@ fn parse_pwt(r: &mut BitCursor<'_>, sh: &SliceHeader) -> Result<PredWeightTable>
     let dc = r.se()?;
     let chroma_log2_denom = luma_log2_denom as i32 + dc;
     if !(0..=7).contains(&chroma_log2_denom) {
-        return Err(DecodeError::InvalidData("ChromaLog2WeightDenom"));
+        return Err(DecodeError::Invalid("ChromaLog2WeightDenom"));
     }
     let chroma_log2_denom = chroma_log2_denom as u32;
     let mut t = PredWeightTable {
@@ -197,11 +197,11 @@ pub(crate) fn parse_slice_header(
         }
         segment_address = r.read(ceil_log2(sps.pic_size_ctb()))?;
         if segment_address >= sps.pic_size_ctb() {
-            return Err(DecodeError::InvalidData("slice_segment_address"));
+            return Err(DecodeError::Invalid("slice_segment_address"));
         }
     }
     let mut sh = if dependent {
-        let p = prev.ok_or(DecodeError::InvalidData(
+        let p = prev.ok_or(DecodeError::Invalid(
             "dependent slice segment without independent segment",
         ))?;
         let mut s = p.clone();
@@ -272,7 +272,7 @@ pub(crate) fn parse_slice_header(
                 sh.st_rps = parse_st_rps(&mut r, num_st, num_st, &sps.st_rps[..num_st], mdpb)?;
             } else {
                 if num_st == 0 {
-                    return Err(DecodeError::InvalidData(
+                    return Err(DecodeError::Invalid(
                         "short_term_ref_pic_set_sps_flag without SPS sets",
                     ));
                 }
@@ -282,7 +282,7 @@ pub(crate) fn parse_slice_header(
                     0
                 };
                 if idx >= num_st {
-                    return Err(DecodeError::InvalidData("short_term_ref_pic_set_idx"));
+                    return Err(DecodeError::Invalid("short_term_ref_pic_set_idx"));
                 }
                 sh.st_rps = sps.st_rps[idx];
             }
@@ -295,7 +295,7 @@ pub(crate) fn parse_slice_header(
                 };
                 let num_lt_pics = r.ue_max(32, "num_long_term_pics")?;
                 if num_lt_sps + num_lt_pics > 32 {
-                    return Err(DecodeError::InvalidData("too many long-term pictures"));
+                    return Err(DecodeError::Invalid("too many long-term pictures"));
                 }
                 sh.num_long_term_sps = num_lt_sps;
                 for i in 0..num_lt_sps + num_lt_pics {
@@ -307,7 +307,7 @@ pub(crate) fn parse_slice_header(
                             0
                         };
                         if idx >= nsps {
-                            return Err(DecodeError::InvalidData("lt_idx_sps"));
+                            return Err(DecodeError::Invalid("lt_idx_sps"));
                         }
                         e.poc_lsb = sps.lt_ref_pic_poc_lsb[idx as usize];
                         e.used_by_curr = sps.lt_used_by_curr[idx as usize];
@@ -356,9 +356,7 @@ pub(crate) fn parse_slice_header(
             }
             let total = sh.num_pic_total_curr();
             if total == 0 {
-                return Err(DecodeError::InvalidData(
-                    "P/B slice without reference pictures",
-                ));
+                return Err(DecodeError::Invalid("P/B slice without reference pictures"));
             }
             if pps.lists_modification_present && total > 1 {
                 let bits = ceil_log2(total);
@@ -367,7 +365,7 @@ pub(crate) fn parse_slice_header(
                     for i in 0..sh.num_ref_idx[0] as usize {
                         let v = r.read(bits)?;
                         if v >= total {
-                            return Err(DecodeError::InvalidData("list_entry_l0"));
+                            return Err(DecodeError::Invalid("list_entry_l0"));
                         }
                         sh.list_entry[0][i] = v as u8;
                     }
@@ -378,7 +376,7 @@ pub(crate) fn parse_slice_header(
                         for i in 0..sh.num_ref_idx[1] as usize {
                             let v = r.read(bits)?;
                             if v >= total {
-                                return Err(DecodeError::InvalidData("list_entry_l1"));
+                                return Err(DecodeError::Invalid("list_entry_l1"));
                             }
                             sh.list_entry[1][i] = v as u8;
                         }
@@ -418,7 +416,7 @@ pub(crate) fn parse_slice_header(
         sh.slice_qp = pps.init_qp + qd;
         let bd_off = 6 * (sps.bit_depth_luma as i32 - 8);
         if sh.slice_qp < -bd_off || sh.slice_qp > 51 {
-            return Err(DecodeError::InvalidData("SliceQpY"));
+            return Err(DecodeError::Invalid("SliceQpY"));
         }
         if pps.slice_chroma_qp_offsets_present {
             sh.cb_qp_offset = r.se_range(-12, 12, "slice_cb_qp_offset")?;
@@ -459,7 +457,7 @@ pub(crate) fn parse_slice_header(
     // byte_alignment(): alignment_bit_equal_to_one then zeros.
     let one = r.flag()?;
     if !one {
-        return Err(DecodeError::InvalidData("slice header byte_alignment"));
+        return Err(DecodeError::Invalid("slice header byte_alignment"));
     }
     r.align();
     sh.data_offset = r.position() >> 3;

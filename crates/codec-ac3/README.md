@@ -84,7 +84,7 @@ differ from the text:
 - hebap 4 vector quantization (Table E4.4) decodes index `i` with row `i + 1` and index 31
   as zero.
 - A dependent substream whose rate or block count differs from the core is dropped and
-  the core is output alone (`InvalidData` with `Compat::Specification`).
+  the core is output alone (`Invalid` with `Compat::Specification`).
 - Reading past the frame end yields zero bits (an error with `Compat::Specification`).
 - E-AC-3 reduced sample rates are refused (decoded with `Compat::Specification`).
 

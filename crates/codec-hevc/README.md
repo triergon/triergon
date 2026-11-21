@@ -63,8 +63,8 @@ identical output.
 - `Picture` carries cropped `width`/`height`, `bit_depth`, `chroma`, three `Plane`s
   sharing the decoder's frame buffers, `pts`, `poc`, `sar` and `colour`. Each picture
   keeps the timestamp of the access unit that carried it through reordering.
-- Errors are typed: `Unsupported(&str)` names the tool, `InvalidData(&str)`,
-  `ResourceLimit(&str)`, `MissingParameterSet(&str)`, `Budget(StorageError)`. The decoder
+- Errors are typed: `Unsupported(&str)` names the tool, `Invalid(&str)`,
+  `Policy(&str)`, `MissingParameterSet(&str)`, `Budget(StorageError)`. The decoder
   does not panic on malformed input.
 - Refused with `Unsupported`: monochrome, 4:2:2, 4:4:4, separate colour planes, bit depth
   above 10, unequal luma and chroma bit depth, every SPS range-extension tool, PPS

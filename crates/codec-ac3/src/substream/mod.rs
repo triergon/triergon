@@ -28,7 +28,7 @@ type E = DecodeError;
 
 #[inline]
 fn bad(what: &'static str) -> E {
-    DecodeError::InvalidData(what)
+    DecodeError::Invalid(what)
 }
 
 /// Noise behaviour (diagnostic switch; normal decoding uses `Normal`).

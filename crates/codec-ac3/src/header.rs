@@ -116,10 +116,9 @@ pub fn parse_header(data: &[u8]) -> Result<FrameHeader, DecodeError> {
         let fscod = data[4] >> 6;
         let frmsizecod = data[4] & 0x3f;
         if fscod == 3 {
-            return Err(DecodeError::InvalidData("reserved fscod"));
+            return Err(DecodeError::Invalid("reserved fscod"));
         }
-        let words =
-            ac3_frame_words(fscod, frmsizecod).ok_or(DecodeError::InvalidData("frmsizecod"))?;
+        let words = ac3_frame_words(fscod, frmsizecod).ok_or(DecodeError::Invalid("frmsizecod"))?;
         let acmod = data[6] >> 5;
         // lfeon follows optional cmixlev/surmixlev/dsurmod fields (2 bits each).
         let mut bit = 3u32; // bits of data[6] consumed after acmod
@@ -174,7 +173,7 @@ pub fn parse_header(data: &[u8]) -> Result<FrameHeader, DecodeError> {
     let lfeon = data[4] & 1 != 0;
     let frame_bytes = (frmsiz + 1) * 2;
     if frame_bytes < 8 {
-        return Err(DecodeError::InvalidData("frmsiz too small"));
+        return Err(DecodeError::Invalid("frmsiz too small"));
     }
     Ok(FrameHeader {
         syntax: Syntax::Eac3,
@@ -293,12 +292,12 @@ mod tests {
         // fscod = 3 is reserved for AC-3.
         assert!(matches!(
             parse_header(&[0x0b, 0x77, 0, 0, 0xc0, 0x40, 0, 0]),
-            Err(DecodeError::InvalidData(_))
+            Err(DecodeError::Invalid(_))
         ));
         // frmsizecod 38 does not exist.
         assert!(matches!(
             parse_header(&[0x0b, 0x77, 0, 0, 38, 0x40, 0, 0]),
-            Err(DecodeError::InvalidData(_))
+            Err(DecodeError::Invalid(_))
         ));
         // bsid 17.
         assert_eq!(

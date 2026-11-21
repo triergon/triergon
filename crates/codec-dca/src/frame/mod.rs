@@ -214,7 +214,7 @@ impl FrameDecoder {
         let mut br = BitReader::new(data);
         let h = FrameHeader::parse(&mut br)?;
         if h.fsize > data.len() {
-            return Err(DecodeError::InvalidData("frame shorter than FSIZE"));
+            return Err(DecodeError::Invalid("frame shorter than FSIZE"));
         }
         let frame = &data[..h.fsize];
         let mut br = {
@@ -233,7 +233,7 @@ impl FrameDecoder {
         let nsubfs = br.read(4) as usize + 1;
         let set = SetHeader::parse(&mut br, h.cpf)?;
         if set.nch != speakers.len() {
-            return Err(DecodeError::InvalidData("PCHS does not match AMODE"));
+            return Err(DecodeError::Invalid("PCHS does not match AMODE"));
         }
         let cfg = Config {
             amode: h.amode,
@@ -296,7 +296,7 @@ impl FrameDecoder {
             // PSC (partial subsubframe sample count) is read and ignored, as FFmpeg does.
             let _psc = br.read(3);
             if t0 + nssc * 8 > h.blocks {
-                return Err(DecodeError::InvalidData("subframes exceed NBLKS"));
+                return Err(DecodeError::Invalid("subframes exceed NBLKS"));
             }
             f.sf_nssc[sf] = nssc;
             let p = SubframeParams {
@@ -323,7 +323,7 @@ impl FrameDecoder {
             lfe_pos += 2 * h.lff as usize * nssc;
         }
         if t0 != h.blocks {
-            return Err(DecodeError::InvalidData("subframes do not fill NBLKS"));
+            return Err(DecodeError::Invalid("subframes do not fill NBLKS"));
         }
         Ok(())
     }

@@ -7,7 +7,7 @@ use triergon_bitstream::BitReader;
 pub(crate) type R<T> = Result<T, DecodeError>;
 
 fn inval(what: &'static str) -> DecodeError {
-    DecodeError::InvalidData(what)
+    DecodeError::Invalid(what)
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -409,7 +409,7 @@ pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
         sps.vui = Some(parse_vui(r)?);
     }
     if sps.pic_width_in_mbs > 1024 || sps.frame_height_in_mbs() > 1024 {
-        return Err(DecodeError::ResourceLimit("picture dimensions"));
+        return Err(DecodeError::Policy("picture dimensions"));
     }
     Ok(sps)
 }

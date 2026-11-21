@@ -13,14 +13,16 @@
 use core::marker::PhantomData;
 
 mod division;
+mod error;
 pub mod layout;
 pub mod mdct;
 mod window;
 
 pub use division::{Divisor, divide, divide_u32};
+pub use error::DecodeError;
 pub use layout::{ChannelLayout, Speaker};
-/// [`Error`] where a decoder names a refused storage charge, as in a codec crate's
-/// `DecodeError::Budget`.
+/// [`Error`] where a decoder names a refused storage charge, as in
+/// [`DecodeError::Budget`].
 pub use triergon_core::Error as StorageError;
 pub use triergon_core::{Budget, BudgetVec, Charged, Error, Reservation};
 pub use triergon_pixel::{Colour, PictureView, Plane};
@@ -192,10 +194,9 @@ pub enum SurroundEncoding {
 
 /// An Annex-B video decoder with caller timestamps carried through reordering.
 pub trait VideoDecoder: Send {
-    /// Why the decoder refuses an access unit: its crate's own error. Every decoder of
-    /// this workspace has one that converts to [`Error`], keeping its class (invalid
-    /// data, an unsupported feature, a limit, a refused storage charge) and its detail
-    /// text.
+    /// Why the decoder refuses an access unit: [`DecodeError`], or its crate's own enum
+    /// with the same classes and more detail. Every decoder of this workspace converts it
+    /// to [`Error`], keeping its class and its detail text.
     type Error;
 
     /// One Annex-B access unit with its caller timestamp. A refused access unit leaves
@@ -227,10 +228,9 @@ pub trait VideoDecoder: Send {
 
 /// An audio decoder taking one access unit at a time.
 pub trait AudioDecoder: Send {
-    /// Why the decoder refuses an access unit: its crate's own error. Every decoder of
-    /// this workspace has one that converts to [`Error`], keeping its class (invalid
-    /// data, an unsupported feature, a limit, a refused storage charge) and its detail
-    /// text.
+    /// Why the decoder refuses an access unit: [`DecodeError`], or its crate's own enum
+    /// with the same classes and more detail. Every decoder of this workspace converts it
+    /// to [`Error`], keeping its class and its detail text.
     type Error;
 
     /// Replace `out` with the output of `au` (`samples_per_channel == 0` when it

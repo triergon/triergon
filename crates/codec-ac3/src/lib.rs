@@ -441,7 +441,7 @@ impl Decoder {
             }
             if h.num_blocks != first.num_blocks || h.sample_rate != first.sample_rate {
                 if self.opts.compat != Compat::Reference {
-                    return Err(DecodeError::InvalidData(
+                    return Err(DecodeError::Invalid(
                         "dependent substream block count/rate mismatch",
                     ));
                 }
@@ -581,7 +581,7 @@ fn coded_speakers(au: &[u8], f: &SyncframeRef) -> Result<[Option<Speaker>; NCH],
             }
         }
         if n != nf || (map & 1 != 0) != h.lfeon {
-            return Err(DecodeError::InvalidData(
+            return Err(DecodeError::Invalid(
                 "chanmap does not match acmod/lfeon",
             ));
         }
@@ -599,7 +599,7 @@ fn coded_speakers(au: &[u8], f: &SyncframeRef) -> Result<[Option<Speaker>; NCH],
 /// The output layout of a program in native order and the plane of every coded channel.
 /// A speaker written by a later substream replaces the earlier one.
 fn program_layout(au: &[u8], frames: &[SyncframeRef]) -> Result<ProgramLayout, DecodeError> {
-    let too_many = DecodeError::InvalidData("more than 16 channels");
+    let too_many = DecodeError::Invalid("more than 16 channels");
     let mut speakers = [Speaker::FrontCenter; MAX_CHANNELS];
     let mut nsp = 0usize;
     let mut coded = [[None; NCH]; MAX_PROGRAM_FRAMES];

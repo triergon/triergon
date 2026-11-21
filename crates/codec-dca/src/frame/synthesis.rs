@@ -68,7 +68,7 @@ impl FrameDecoder {
             let xbuf = self
                 .x96buf
                 .as_mut()
-                .ok_or(DecodeError::InvalidData("X96 buffer"))?;
+                .ok_or(DecodeError::Invalid("X96 buffer"))?;
             for ch in 0..set.nch {
                 for b in 0..32 {
                     let core_row = self.sub.row(ch, b);
@@ -140,7 +140,7 @@ impl FrameDecoder {
         let blocks = h.blocks;
         let mut x96 = if have_x96 {
             let bank = self.x96.as_deref_mut();
-            Some(bank.ok_or(DecodeError::InvalidData("X96 filter bank"))?)
+            Some(bank.ok_or(DecodeError::Invalid("X96 filter bank"))?)
         } else {
             None
         };
@@ -243,7 +243,7 @@ impl FrameDecoder {
         };
         out.samples_per_channel = nsamples;
         out.layout = ChannelLayout::new(order.iter().map(|e| e.0))
-            .ok_or(DecodeError::InvalidData("more than 16 output planes"))?;
+            .ok_or(DecodeError::Invalid("more than 16 output planes"))?;
         for (i, &(_, src)) in order.iter().enumerate() {
             if src == LFE_SRC {
                 lfe_plane = Some(i);

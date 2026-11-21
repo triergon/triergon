@@ -99,15 +99,15 @@ fn errors_are_typed() {
     let good = frames[0];
     assert!(matches!(
         dec.decode(&good[..good.len() / 2], &mut out),
-        Err(DecodeError::InvalidData(_))
+        Err(DecodeError::Invalid(_))
     ));
     assert!(matches!(
         dec.decode(&[0u8; 64], &mut out),
-        Err(DecodeError::InvalidData(_))
+        Err(DecodeError::Invalid(_))
     ));
     assert!(matches!(
         dec.decode(&[], &mut out),
-        Err(DecodeError::InvalidData(_))
+        Err(DecodeError::Invalid(_))
     ));
     let am = scenario("amode10");
     assert!(matches!(

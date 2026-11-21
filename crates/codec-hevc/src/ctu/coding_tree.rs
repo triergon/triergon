@@ -402,7 +402,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
     fn pcm_sample(&mut self, x0: u32, y0: u32, log2: u32) -> Result<()> {
         let pos = self.cabac.aligned_byte_position();
         if pos > self.data.len() {
-            return Err(DecodeError::InvalidData("PCM data overrun"));
+            return Err(DecodeError::Invalid("PCM data overrun"));
         }
         let mut r = BitCursor::new(&self.data[pos..]);
         let n = 1usize << log2;

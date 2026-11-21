@@ -391,7 +391,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                 );
             }
             if self.cabac.overrun() {
-                return Err(DecodeError::InvalidData("slice data overrun"));
+                return Err(DecodeError::Invalid("slice data overrun"));
             }
             // WPP storage (9.3.1).
             if pps.entropy_coding_sync
@@ -412,7 +412,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                 return Ok(());
             }
             if self.ctb_ts >= num_ctb {
-                return Err(DecodeError::InvalidData("slice runs past end of picture"));
+                return Err(DecodeError::Invalid("slice runs past end of picture"));
             }
             self.ctb_rs = layout.ctb_addr_ts_to_rs[self.ctb_ts as usize];
             let ntile = layout.tile_id[self.ctb_ts as usize];
@@ -424,7 +424,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
             if (pps.tiles_enabled && ntile != tile) || new_row {
                 let one = self.cabac.terminate();
                 if one != 1 {
-                    return Err(DecodeError::InvalidData("end_of_subset_one_bit"));
+                    return Err(DecodeError::Invalid("end_of_subset_one_bit"));
                 }
                 let pos = self.cabac.aligned_byte_position();
                 self.cabac.restart(pos)?;
