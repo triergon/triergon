@@ -40,10 +40,13 @@ pub struct Canvas {
 }
 
 impl Canvas {
-    /// A `width` x `height` canvas; `None` when either is zero or the image's bytes do
-    /// not fit `usize`.
+    /// The most pixels a side of a canvas has: 65535, so fitting a picture cannot overflow.
+    pub const MAX_SIDE: usize = u16::MAX as usize;
+
+    /// A `width` x `height` canvas; `None` when either is zero or above
+    /// [`MAX_SIDE`](Self::MAX_SIDE), or the image's bytes do not fit `usize`.
     pub const fn new(width: usize, height: usize) -> Option<Canvas> {
-        if width == 0 || height == 0 {
+        if width == 0 || height == 0 || width > Self::MAX_SIDE || height > Self::MAX_SIDE {
             return None;
         }
         match width.checked_mul(height) {
@@ -1170,7 +1173,8 @@ mod tests {
     fn a_canvas_of_another_size_holds_the_same_fitted_picture() {
         assert_eq!(Canvas::new(0, 1080), None);
         assert_eq!(Canvas::new(1920, 0), None);
-        assert_eq!(Canvas::new(usize::MAX / 2, 3), None);
+        assert_eq!(Canvas::new(Canvas::MAX_SIDE + 1, 1), None);
+        assert!(Canvas::new(Canvas::MAX_SIDE, 1).is_some());
         assert_eq!(Canvas::new(1920, 1080), Some(Canvas::default()));
         let mut state = 1_u32;
         let mut noise = |n: usize| -> Vec<u8> {

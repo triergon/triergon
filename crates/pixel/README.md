@@ -115,8 +115,8 @@ and PGS subtitle decoders convert palette entries, and how its MP4 demuxer conve
 a DVD colour table (half a step below).
 
 **Letterbox.** `Scaler::letterbox` writes the complete canvas of the scaler's `Canvas`
-(`Scaler::new`; the default is 1920×1080): opaque black padding and the fitted
-picture. It reproduces FFmpeg's
+(`Scaler::new`; the default is 1920×1080, `Canvas::new` takes sides of 1 to 65535
+pixels): opaque black padding and the fitted picture. It reproduces FFmpeg's
 `scale=W:H:force_original_aspect_ratio=decrease,pad=W:H:(ow-iw)/2:(oh-ih)/2,format=rgba`
 bit for bit. The reference comparisons cover the 1920×1080 canvas; other sizes follow the
 same rules.
