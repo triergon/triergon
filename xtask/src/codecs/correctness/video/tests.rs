@@ -257,9 +257,7 @@ echo '{"frame":1,"poc":27}' >&2"#;
             let decoded = planar_row(refuse, planar);
             assert_eq!(
                 decoded.get("ours_errors").unwrap().as_array().unwrap()[0].get("error"),
-                Some(&Value::str(
-                    "unsupported: unequal luma/chroma bit depth"
-                ))
+                Some(&Value::str("unsupported: unequal luma/chroma bit depth"))
             );
             let row = Value::object([
                 ("lane", Value::str("hevc")),
@@ -279,8 +277,7 @@ echo '{"frame":1,"poc":27}' >&2"#;
 
     #[test]
     fn refusals_remain_distinct_from_truncated_or_failed_runs() {
-        let unsupported =
-            r#"echo '{"error":"unsupported: unequal luma/chroma bit depth"}' >&2"#;
+        let unsupported = r#"echo '{"error":"unsupported: unequal luma/chroma bit depth"}' >&2"#;
         let crash = format!("{unsupported}\nexit 101");
         assert_eq!(
             planar_row(&crash, "printf abcdef").get("status"),
