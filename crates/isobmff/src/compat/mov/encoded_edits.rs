@@ -916,320 +916,16 @@ impl<'a> EncodedEditJob<'a> {
         if self.finished {
             return Ok(CursorStatus::End);
         }
-        if let Some(recovery) = &mut self.recovery_contexts {
-            if !recovery.poll(work, cancel)? {
-                return Ok(CursorStatus::Yield);
-            }
-            self.recovery_observation = Some(
-                self.recovery_contexts
-                    .take()
-                    .ok_or(Error::Invalid("V7 recovery result invariant"))?
-                    .finish()?,
-            );
-        }
-        if let Some(recovery) = &mut self.recovery_walk {
-            if !recovery.poll(work, cancel)? {
-                return Ok(CursorStatus::Yield);
-            }
-            self.recovery_facts = Some(
-                self.recovery_walk
-                    .take()
-                    .ok_or(Error::Invalid("recovery completion invariant"))?
-                    .finish()?,
-            );
-        }
-        if let Some(recovery) = &mut self.empty_recovery {
-            if !recovery.poll(work)? {
-                return Ok(CursorStatus::Yield);
-            }
-            self.empty_recovery = None;
-        }
-        if let Some(parser) = &mut self.aac_program {
-            let config = match parser.step(work, cancel)? {
-                BuildStep::Ready(config) => config,
-                BuildStep::Yield => return Ok(CursorStatus::Yield),
-                BuildStep::Complete => return Err(Error::Invalid("missing AAC program")),
-            };
-            let facts = config.facts();
-            if config.syntax_issues() != 0
-                || config.program_config().is_none()
-                || !(1..=8).contains(&facts.core_channels)
-                || facts.sbr.is_present()
-                || facts.ps.is_present()
-            {
-                return Err(Error::Unsupported("encoded AAC program clock"));
-            }
-            self.aac_program = None;
-        }
-        if !self.initialized {
-            if !work.try_charge(1) {
-                return Ok(CursorStatus::Yield);
-            }
-            let duration = self.entry.duration(self.context.movie_base)?;
-            let rounding = if self.leading_video.is_some()
-                || self.dts_scale.is_some()
-                || self.context.stream.kind() == EncodedEntryKind::Aac
-            {
-                // The MOV view rounds these edit durations to the nearest
-                // media tick before choosing the end of the edit.
-                Rounding::NearestAway
-            } else {
-                Rounding::Floor
-            };
-            let ticks = duration.to_ticks(self.context.media_base, rounding)?;
-            self.end = i128::from(self.entry.media_time)
-                .checked_add(ticks)
-                .ok_or(Error::Overflow)?;
-            if self.end <= i128::from(self.entry.media_time) {
-                return Err(Error::Unsupported("encoded edit sub-tick duration"));
-            }
-            match self.context.stream.kind() {
-                kind if kind.is_video() => {}
-                EncodedEntryKind::Dts => {}
-                EncodedEntryKind::Opus => {
-                    // Opus in ISO BMFF, section 4.4. dOps PreSkip does not
-                    // determine the presentation window.
-                    self.anchor = Some(i128::from(self.entry.media_time));
-                    // The MOV view retains the sample at or before one second
-                    // of history when an edit crops the front of the track.
-                    let second =
-                        Time::new(1, 1)?.to_ticks(self.context.media_base, Rounding::Floor)?;
-                    self.opus_preroll_boundary = i128::from(self.entry.media_time) - second;
-                }
-                EncodedEntryKind::Aac => {
-                    // Indexed AAC-LC with 1024 core samples. Range playback
-                    // also accepts the out-of-band program validated above.
-                    let b = self.context.stream.demux().extradata.as_ref();
-                    let a = *b.first().ok_or(Error::Truncated)?;
-                    let c = *b.get(1).ok_or(Error::Truncated)?;
-                    let index = ((a & 7) << 1) | (c >> 7);
-                    let channel_configuration = (c >> 3) & 15;
-                    let program = self.range_playback && channel_configuration == 0;
-                    if a >> 3 != 2
-                        || c & 7 != 0
-                        || (!program && aac::fixed_channel_count(channel_configuration).is_none())
-                        || (!self.range_playback && channel_configuration > 7)
-                        || aac::indexed_frequency(index).map(u64::from)
-                            != Some(self.context.media_base.denominator())
-                        || self.context.media_base.numerator() != 1
-                    {
-                        return Err(Error::Unsupported(
-                            "encoded AAC LC frame clock not established",
-                        ));
-                    }
-                    self.frame = 1024;
-                    self.anchor = Some(i128::from(self.entry.media_time));
-                    if self.entry.media_time > i64::from(self.frame) * 3 {
-                        return Err(Error::Unsupported(
-                            "encoded AAC long preroll not established",
-                        ));
-                    }
-                }
-                EncodedEntryKind::Ac3 | EncodedEntryKind::Eac3 if self.dolby_config.is_some() => {
-                    if Time::from_ticks(ticks, self.context.media_base)? != duration {
-                        return Err(Error::Unsupported("encoded Dolby edit fractional duration"));
-                    }
-                }
-                _ => {
-                    return Err(Error::Unsupported(
-                        "encoded edited audio codec frame clock not established",
-                    ));
-                }
-            }
-            self.initialized = true;
-        }
-        if let Some(parser) = &mut self.dolby_config {
-            let config = match parser.step(work, cancel)? {
-                BuildStep::Yield => return Ok(CursorStatus::Yield),
-                BuildStep::Ready(config) => config,
-                BuildStep::Complete => return Err(Error::Invalid("Dolby configuration invariant")),
-            };
-            self.validate_dolby_clock(config)?;
-            self.dolby_config = None;
-            self.frame = DOLBY_SAMPLE_TICKS;
-            self.anchor = Some(i128::from(self.entry.media_time));
+        if !self.poll_setup(work, cancel)? {
+            return Ok(CursorStatus::Yield);
         }
         loop {
             self.check(input, work, cancel)?;
             if self.scan_done {
-                if self.context.stream.kind() == EncodedEntryKind::Opus {
-                    // The MOV duration run starts at the first retained occurrence.
-                    // Keep the source sample clock intact alongside that projection.
-                    let runs = self.context.table.decode_runs();
-                    loop {
-                        let previous = self.opus_durations.as_slice().last();
-                        let samples = previous.map_or(0, |run| run.end_sample);
-                        let end_tick = previous.map_or(0, |run| run.end_tick);
-                        if samples >= self.count {
-                            break;
-                        }
-                        if !work.try_charge(1) {
-                            return Ok(CursorStatus::Yield);
-                        }
-                        let row = self.opus_durations.len() as u32;
-                        let count = u64::from(runs.word(row, 0)?);
-                        let ticks = runs.word(row, 4)?;
-                        let end_sample = samples.checked_add(count).ok_or(Error::Overflow)?;
-                        let end_tick = end_tick
-                            .checked_add(i128::from(count) * i128::from(ticks))
-                            .ok_or(Error::Overflow)?;
-                        self.opus_durations
-                            .try_push(OpusDurationRun {
-                                end_sample,
-                                end_tick,
-                                ticks,
-                            })
-                            .map_err(|error| error.error)?;
-                    }
-                }
-                if !work.try_charge(1) {
+                if !self.collect_opus_durations(work)? || !work.try_charge(1) {
                     return Ok(CursorStatus::Yield);
                 }
-                let presentation_end = self.end;
-                // A short edit can overlap a single sync sample without
-                // containing its start. MOV retains that packet as discard
-                // and places it at the end of the leading empty edit.
-                let overlapping_sync = self.leading_video.and_then(|video| {
-                    (video.last_sample == Some(video.prefix + 1))
-                        .then_some(video.overlapping_sync)
-                        .flatten()
-                });
-                let anchor = overlapping_sync.or(self.anchor).ok_or(Error::Unsupported(
-                    "encoded edit has no presentation anchor",
-                ))?;
-                if self.dts_scale.is_some() {
-                    let demux_end = self
-                        .end
-                        .min(self.source_end)
-                        .checked_sub(anchor)
-                        .ok_or(Error::Overflow)?;
-                    i64::try_from(demux_end).map_err(|_| Error::Overflow)?;
-                }
-                if matches!(
-                    self.context.stream.kind(),
-                    EncodedEntryKind::Ac3 | EncodedEntryKind::Eac3
-                ) && self.end != self.source_end
-                {
-                    return Err(Error::Unsupported(
-                        "encoded Dolby edit must end at source end",
-                    ));
-                }
-                let timing = if self.context.stream.kind() == EncodedEntryKind::Opus {
-                    if i128::from(self.entry.media_time) >= self.source_end {
-                        return Err(Error::Invalid("Opus edit starts after the last sample"));
-                    }
-                    EditTiming::Opus
-                } else if self.frame != 0 {
-                    EditTiming::FixedAudio(self.frame)
-                } else {
-                    let duration = self
-                        .end
-                        .checked_sub(i128::from(self.entry.media_time))
-                        .ok_or(Error::Overflow)?;
-                    self.end = anchor.checked_add(duration).ok_or(Error::Overflow)?;
-                    // Reordered non-sync packets beyond a zero-origin edit
-                    // can still be needed to decode the complete edit.
-                    let keeps_reordered_tail = self.range_playback
-                        && anchor == 0
-                        && self.end == self.source_end
-                        && !self.sync_after_edit;
-                    if self.leading_video.is_none()
-                        && !keeps_reordered_tail
-                        && self.maximum_cts.is_some_and(|x| x >= self.end)
-                    {
-                        return Err(Error::Unsupported(
-                            "encoded video tail selection not established",
-                        ));
-                    }
-                    EditTiming::Video
-                };
-                let opus_timing = if matches!(timing, EditTiming::Opus) {
-                    let layout = std::alloc::Layout::new::<[usize; 2]>()
-                        .extend(std::alloc::Layout::new::<OpusTiming>())
-                        .map_err(|_| Error::Overflow)?
-                        .0
-                        .pad_to_align();
-                    let charge = self.pool.reserve(layout.size())?;
-                    Some(Arc::new(OpusTiming {
-                        first: self.opus_first,
-                        first_tick: self.opus_first_tick,
-                        durations: std::mem::replace(
-                            &mut self.opus_durations,
-                            BudgetVec::new(&self.pool),
-                        ),
-                        _charge: charge,
-                    }))
-                } else {
-                    None
-                };
-                let (anchor, video_prefix, video_last, video_seek_offset) = match self.leading_video
-                {
-                    Some(video) => {
-                        let gap = i128::from(video.gap);
-                        let origin = anchor.checked_sub(gap).ok_or(Error::Overflow)?;
-                        let first = video
-                            .first_decode
-                            .checked_sub(origin)
-                            .ok_or(Error::Overflow)?;
-                        let last = video
-                            .last_decode_end
-                            .max(video.last_cts)
-                            .checked_sub(origin)
-                            .ok_or(Error::Overflow)?;
-                        let end = presentation_end
-                            .checked_sub(i128::from(self.entry.media_time))
-                            .and_then(|duration| duration.checked_add(gap))
-                            .ok_or(Error::Overflow)?;
-                        if first <= i128::from(i64::MIN)
-                            || last > i128::from(i64::MAX)
-                            || end >= i128::from(i64::MAX)
-                        {
-                            // An unrepresentable edited track has no usable
-                            // packets. Other tracks keep their own edits.
-                            (origin, 0, 0, 0)
-                        } else {
-                            // MOV seeks from the decode time of the first displayed
-                            // sample, while packet DTS retains the composition lead.
-                            let first_visible = video
-                                .first_visible_decode
-                                .or(overlapping_sync.map(|_| video.first_decode))
-                                .ok_or(Error::Invalid("missing video presentation start"))?;
-                            let seek_offset =
-                                anchor.checked_sub(first_visible).ok_or(Error::Overflow)?;
-                            (
-                                origin,
-                                video.prefix,
-                                video.last_sample.unwrap_or(self.count),
-                                i64::try_from(seek_offset).map_err(|_| Error::Overflow)?,
-                            )
-                        }
-                    }
-                    None => (anchor, 0, self.count, 0),
-                };
-                self.result = Some(EncodedEditPlan {
-                    source_table: self.context.table.raw().clone(),
-                    source_edit: self.context.edits.raw().clone(),
-                    source_config: self.context.stream.configuration_box().clone(),
-                    entry: self.entry,
-                    edit_ordinal: self.edit_ordinal,
-                    media_base: self.context.media_base,
-                    movie_base: self.context.movie_base,
-                    anchor,
-                    end: self.end,
-                    source_end: self.source_end,
-                    presentation_end,
-                    count: self.count,
-                    timing,
-                    video_prefix,
-                    video_last,
-                    video_seek_offset,
-                    opus_timing,
-                    dts_scale: self.dts_scale,
-                    dependency_table: self.dependency_table,
-                    dependency_recovery: self.dependency_recovery,
-                    recovery_facts: self.recovery_facts.take(),
-                    recovery_observation: self.recovery_observation.take(),
-                });
+                self.result = Some(self.build_plan()?);
                 return Ok(CursorStatus::Ready);
             }
             if let Some(s) = self.pending.as_ref() {
@@ -1393,6 +1089,322 @@ impl<'a> EncodedEditJob<'a> {
                 Next::End => self.scan_done = true,
             }
         }
+    }
+    /// Polls the jobs that precede the scan: recovery groups, the AAC program and
+    /// Dolby configurations, and the edit's clock. `false` when the budget ran out.
+    fn poll_setup(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
+        if let Some(recovery) = &mut self.recovery_contexts {
+            if !recovery.poll(work, cancel)? {
+                return Ok(false);
+            }
+            self.recovery_observation = Some(
+                self.recovery_contexts
+                    .take()
+                    .ok_or(Error::Invalid("V7 recovery result invariant"))?
+                    .finish()?,
+            );
+        }
+        if let Some(recovery) = &mut self.recovery_walk {
+            if !recovery.poll(work, cancel)? {
+                return Ok(false);
+            }
+            self.recovery_facts = Some(
+                self.recovery_walk
+                    .take()
+                    .ok_or(Error::Invalid("recovery completion invariant"))?
+                    .finish()?,
+            );
+        }
+        if let Some(recovery) = &mut self.empty_recovery {
+            if !recovery.poll(work)? {
+                return Ok(false);
+            }
+            self.empty_recovery = None;
+        }
+        if let Some(parser) = &mut self.aac_program {
+            let config = match parser.step(work, cancel)? {
+                BuildStep::Ready(config) => config,
+                BuildStep::Yield => return Ok(false),
+                BuildStep::Complete => return Err(Error::Invalid("missing AAC program")),
+            };
+            let facts = config.facts();
+            if config.syntax_issues() != 0
+                || config.program_config().is_none()
+                || !(1..=8).contains(&facts.core_channels)
+                || facts.sbr.is_present()
+                || facts.ps.is_present()
+            {
+                return Err(Error::Unsupported("encoded AAC program clock"));
+            }
+            self.aac_program = None;
+        }
+        if !self.initialized {
+            if !work.try_charge(1) {
+                return Ok(false);
+            }
+            let duration = self.entry.duration(self.context.movie_base)?;
+            let rounding = if self.leading_video.is_some()
+                || self.dts_scale.is_some()
+                || self.context.stream.kind() == EncodedEntryKind::Aac
+            {
+                // The MOV view rounds these edit durations to the nearest
+                // media tick before choosing the end of the edit.
+                Rounding::NearestAway
+            } else {
+                Rounding::Floor
+            };
+            let ticks = duration.to_ticks(self.context.media_base, rounding)?;
+            self.end = i128::from(self.entry.media_time)
+                .checked_add(ticks)
+                .ok_or(Error::Overflow)?;
+            if self.end <= i128::from(self.entry.media_time) {
+                return Err(Error::Unsupported("encoded edit sub-tick duration"));
+            }
+            match self.context.stream.kind() {
+                kind if kind.is_video() => {}
+                EncodedEntryKind::Dts => {}
+                EncodedEntryKind::Opus => {
+                    // Opus in ISO BMFF, section 4.4. dOps PreSkip does not
+                    // determine the presentation window.
+                    self.anchor = Some(i128::from(self.entry.media_time));
+                    // The MOV view retains the sample at or before one second
+                    // of history when an edit crops the front of the track.
+                    let second =
+                        Time::new(1, 1)?.to_ticks(self.context.media_base, Rounding::Floor)?;
+                    self.opus_preroll_boundary = i128::from(self.entry.media_time) - second;
+                }
+                EncodedEntryKind::Aac => {
+                    // Indexed AAC-LC with 1024 core samples. Range playback
+                    // also accepts the out-of-band program validated above.
+                    let b = self.context.stream.demux().extradata.as_ref();
+                    let a = *b.first().ok_or(Error::Truncated)?;
+                    let c = *b.get(1).ok_or(Error::Truncated)?;
+                    let index = ((a & 7) << 1) | (c >> 7);
+                    let channel_configuration = (c >> 3) & 15;
+                    let program = self.range_playback && channel_configuration == 0;
+                    if a >> 3 != 2
+                        || c & 7 != 0
+                        || (!program && aac::fixed_channel_count(channel_configuration).is_none())
+                        || (!self.range_playback && channel_configuration > 7)
+                        || aac::indexed_frequency(index).map(u64::from)
+                            != Some(self.context.media_base.denominator())
+                        || self.context.media_base.numerator() != 1
+                    {
+                        return Err(Error::Unsupported(
+                            "encoded AAC LC frame clock not established",
+                        ));
+                    }
+                    self.frame = 1024;
+                    self.anchor = Some(i128::from(self.entry.media_time));
+                    if self.entry.media_time > i64::from(self.frame) * 3 {
+                        return Err(Error::Unsupported(
+                            "encoded AAC long preroll not established",
+                        ));
+                    }
+                }
+                EncodedEntryKind::Ac3 | EncodedEntryKind::Eac3 if self.dolby_config.is_some() => {
+                    if Time::from_ticks(ticks, self.context.media_base)? != duration {
+                        return Err(Error::Unsupported("encoded Dolby edit fractional duration"));
+                    }
+                }
+                _ => {
+                    return Err(Error::Unsupported(
+                        "encoded edited audio codec frame clock not established",
+                    ));
+                }
+            }
+            self.initialized = true;
+        }
+        if let Some(parser) = &mut self.dolby_config {
+            let config = match parser.step(work, cancel)? {
+                BuildStep::Yield => return Ok(false),
+                BuildStep::Ready(config) => config,
+                BuildStep::Complete => return Err(Error::Invalid("Dolby configuration invariant")),
+            };
+            self.validate_dolby_clock(config)?;
+            self.dolby_config = None;
+            self.frame = DOLBY_SAMPLE_TICKS;
+            self.anchor = Some(i128::from(self.entry.media_time));
+        }
+        Ok(true)
+    }
+    /// Collects the decode runs an Opus plan projects durations from. `false` when the
+    /// budget ran out.
+    fn collect_opus_durations(&mut self, work: &mut WorkBudget) -> Result<bool> {
+        if self.context.stream.kind() == EncodedEntryKind::Opus {
+            // The MOV duration run starts at the first retained occurrence.
+            // Keep the source sample clock intact alongside that projection.
+            let runs = self.context.table.decode_runs();
+            loop {
+                let previous = self.opus_durations.as_slice().last();
+                let samples = previous.map_or(0, |run| run.end_sample);
+                let end_tick = previous.map_or(0, |run| run.end_tick);
+                if samples >= self.count {
+                    break;
+                }
+                if !work.try_charge(1) {
+                    return Ok(false);
+                }
+                let row = self.opus_durations.len() as u32;
+                let count = u64::from(runs.word(row, 0)?);
+                let ticks = runs.word(row, 4)?;
+                let end_sample = samples.checked_add(count).ok_or(Error::Overflow)?;
+                let end_tick = end_tick
+                    .checked_add(i128::from(count) * i128::from(ticks))
+                    .ok_or(Error::Overflow)?;
+                self.opus_durations
+                    .try_push(OpusDurationRun {
+                        end_sample,
+                        end_tick,
+                        ticks,
+                    })
+                    .map_err(|error| error.error)?;
+            }
+        }
+        Ok(true)
+    }
+    /// The plan of a completed scan.
+    fn build_plan(&mut self) -> Result<EncodedEditPlan> {
+        let presentation_end = self.end;
+        // A short edit can overlap a single sync sample without
+        // containing its start. MOV retains that packet as discard
+        // and places it at the end of the leading empty edit.
+        let overlapping_sync = self.leading_video.and_then(|video| {
+            (video.last_sample == Some(video.prefix + 1))
+                .then_some(video.overlapping_sync)
+                .flatten()
+        });
+        let anchor = overlapping_sync.or(self.anchor).ok_or(Error::Unsupported(
+            "encoded edit has no presentation anchor",
+        ))?;
+        if self.dts_scale.is_some() {
+            let demux_end = self
+                .end
+                .min(self.source_end)
+                .checked_sub(anchor)
+                .ok_or(Error::Overflow)?;
+            i64::try_from(demux_end).map_err(|_| Error::Overflow)?;
+        }
+        if matches!(
+            self.context.stream.kind(),
+            EncodedEntryKind::Ac3 | EncodedEntryKind::Eac3
+        ) && self.end != self.source_end
+        {
+            return Err(Error::Unsupported(
+                "encoded Dolby edit must end at source end",
+            ));
+        }
+        let timing = if self.context.stream.kind() == EncodedEntryKind::Opus {
+            if i128::from(self.entry.media_time) >= self.source_end {
+                return Err(Error::Invalid("Opus edit starts after the last sample"));
+            }
+            EditTiming::Opus
+        } else if self.frame != 0 {
+            EditTiming::FixedAudio(self.frame)
+        } else {
+            let duration = self
+                .end
+                .checked_sub(i128::from(self.entry.media_time))
+                .ok_or(Error::Overflow)?;
+            self.end = anchor.checked_add(duration).ok_or(Error::Overflow)?;
+            // Reordered non-sync packets beyond a zero-origin edit
+            // can still be needed to decode the complete edit.
+            let keeps_reordered_tail = self.range_playback
+                && anchor == 0
+                && self.end == self.source_end
+                && !self.sync_after_edit;
+            if self.leading_video.is_none()
+                && !keeps_reordered_tail
+                && self.maximum_cts.is_some_and(|x| x >= self.end)
+            {
+                return Err(Error::Unsupported(
+                    "encoded video tail selection not established",
+                ));
+            }
+            EditTiming::Video
+        };
+        let opus_timing = if matches!(timing, EditTiming::Opus) {
+            let layout = std::alloc::Layout::new::<[usize; 2]>()
+                .extend(std::alloc::Layout::new::<OpusTiming>())
+                .map_err(|_| Error::Overflow)?
+                .0
+                .pad_to_align();
+            let charge = self.pool.reserve(layout.size())?;
+            Some(Arc::new(OpusTiming {
+                first: self.opus_first,
+                first_tick: self.opus_first_tick,
+                durations: std::mem::replace(&mut self.opus_durations, BudgetVec::new(&self.pool)),
+                _charge: charge,
+            }))
+        } else {
+            None
+        };
+        let (anchor, video_prefix, video_last, video_seek_offset) = match self.leading_video {
+            Some(video) => {
+                let gap = i128::from(video.gap);
+                let origin = anchor.checked_sub(gap).ok_or(Error::Overflow)?;
+                let first = video
+                    .first_decode
+                    .checked_sub(origin)
+                    .ok_or(Error::Overflow)?;
+                let last = video
+                    .last_decode_end
+                    .max(video.last_cts)
+                    .checked_sub(origin)
+                    .ok_or(Error::Overflow)?;
+                let end = presentation_end
+                    .checked_sub(i128::from(self.entry.media_time))
+                    .and_then(|duration| duration.checked_add(gap))
+                    .ok_or(Error::Overflow)?;
+                if first <= i128::from(i64::MIN)
+                    || last > i128::from(i64::MAX)
+                    || end >= i128::from(i64::MAX)
+                {
+                    // An unrepresentable edited track has no usable
+                    // packets. Other tracks keep their own edits.
+                    (origin, 0, 0, 0)
+                } else {
+                    // MOV seeks from the decode time of the first displayed
+                    // sample, while packet DTS retains the composition lead.
+                    let first_visible = video
+                        .first_visible_decode
+                        .or(overlapping_sync.map(|_| video.first_decode))
+                        .ok_or(Error::Invalid("missing video presentation start"))?;
+                    let seek_offset = anchor.checked_sub(first_visible).ok_or(Error::Overflow)?;
+                    (
+                        origin,
+                        video.prefix,
+                        video.last_sample.unwrap_or(self.count),
+                        i64::try_from(seek_offset).map_err(|_| Error::Overflow)?,
+                    )
+                }
+            }
+            None => (anchor, 0, self.count, 0),
+        };
+        Ok(EncodedEditPlan {
+            source_table: self.context.table.raw().clone(),
+            source_edit: self.context.edits.raw().clone(),
+            source_config: self.context.stream.configuration_box().clone(),
+            entry: self.entry,
+            edit_ordinal: self.edit_ordinal,
+            media_base: self.context.media_base,
+            movie_base: self.context.movie_base,
+            anchor,
+            end: self.end,
+            source_end: self.source_end,
+            presentation_end,
+            count: self.count,
+            timing,
+            video_prefix,
+            video_last,
+            video_seek_offset,
+            opus_timing,
+            dts_scale: self.dts_scale,
+            dependency_table: self.dependency_table,
+            dependency_recovery: self.dependency_recovery,
+            recovery_facts: self.recovery_facts.take(),
+            recovery_observation: self.recovery_observation.take(),
+        })
     }
     /// Takes the plan once [`poll`](Self::poll) returned `Ready`; `Error::Invalid`
     /// before that. Later polls return `End`.
