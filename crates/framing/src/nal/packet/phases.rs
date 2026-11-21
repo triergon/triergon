@@ -8,6 +8,7 @@ use super::{
     copy_annex_b_whole, empty_packet_segments, freeze_annex_b_output, start_annex_b_output,
 };
 use crate::nal::header::NalHeaderError;
+use crate::started;
 use crate::{
     avc::{self, AvcConfigArrayKind},
     nal::{Codec, LengthSize, NalHeader},
@@ -763,10 +764,7 @@ impl PacketEmission {
     ) -> Result<Step> {
         let parts = state.session.segments.as_slice();
         let configuration = state.config().bytes();
-        let buffer = self
-            .output
-            .as_mut()
-            .ok_or(Error::Invalid("missing packet buffer"))?;
+        let buffer = started(&mut self.output, bytes.budget());
         if self.copy_segment == 0
             && self.copied == 0
             && copy_annex_b_whole(
@@ -820,7 +818,7 @@ impl PacketEmission {
         let bytes = if state.length_width.is_none() {
             packet.bytes.clone()
         } else {
-            match freeze_annex_b_output(&mut self.output, "missing packet buffer") {
+            match freeze_annex_b_output(&mut self.output, packet.bytes.budget()) {
                 Ok(bytes) => bytes,
                 Err(error) => {
                     *source = Some(packet);

@@ -124,13 +124,14 @@ pub(crate) fn start_annex_b_output(pool: &Budget, bytes: usize) -> Result<Budget
     BudgetVec::try_with_owner_capacity(pool, bytes)
 }
 
-/// Retain the charged bytes for retry if publishing the result fails.
+/// Freezes the output started in `output`; a refused freeze keeps the charged bytes
+/// there for retry.
 #[inline(never)]
 pub(crate) fn freeze_annex_b_output(
     output: &mut Option<BudgetVec<u8>>,
-    absent: &'static str,
+    pool: &Budget,
 ) -> Result<Bytes> {
-    let buffer = output.take().ok_or(Error::Invalid(absent))?;
+    let buffer = output.take().unwrap_or_else(|| BudgetVec::new(pool));
     match buffer.freeze() {
         Ok(bytes) => Ok(bytes),
         Err(error) => {
