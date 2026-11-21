@@ -176,19 +176,12 @@ impl RunRecoveryTable {
         if self.storage.sample_count() == 0 {
             return Err(Error::Unsupported("empty recovery stream"));
         }
-        let mut stream = crate::compat::mov::view::StreamView::with_projection_base(
+        crate::compat::mov::view::StreamView::with_projection_base(
             header.source(),
             entry,
             header.demux_projection_base()?,
-        )?;
-        if stream.codec == "rawvideo" {
-            match major_brand {
-                Some(brand) if brand == *b"qt  " => {}
-                Some(_) => stream.vendor_id = None,
-                None => return Err(Error::Unsupported("native major-brand context absent")),
-            }
-        }
-        Ok(stream)
+        )?
+        .with_major_brand(major_brand)
     }
     fn track(
         &self,

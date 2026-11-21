@@ -123,7 +123,9 @@ impl StreamView {
         view.with_major_brand(major_brand)
     }
 
-    fn with_major_brand(mut self, major_brand: Option<[u8; 4]>) -> Result<Self> {
+    /// A raw-video stream keeps its vendor code only in a `qt  ` file; without the major
+    /// brand it is `Error::Unsupported`.
+    pub(crate) fn with_major_brand(mut self, major_brand: Option<[u8; 4]>) -> Result<Self> {
         if self.codec == "rawvideo" {
             match major_brand {
                 Some(brand) if brand == *b"qt  " => {}
