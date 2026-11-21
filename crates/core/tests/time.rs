@@ -32,6 +32,12 @@ fn integer_rescale_agrees_with_canonical_time_at_ties_and_extremes() {
 }
 
 #[test]
+fn the_90_khz_clock_is_the_reduced_base_one_over_90000() {
+    assert_eq!(TimeBase::HZ_90000, TimeBase::new(1, 90_000).unwrap());
+    assert_eq!(TimeBase::HZ_90000, TimeBase::new(3, 270_000).unwrap());
+}
+
+#[test]
 fn mixed_prime_clocks_preserve_their_full_rational() {
     let a = Time::from_ticks(1, TimeBase::new(1, 1_000_003).unwrap()).unwrap();
     let b = Time::from_ticks(1, TimeBase::new(1, 1_000_033).unwrap()).unwrap();

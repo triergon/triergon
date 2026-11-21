@@ -42,6 +42,12 @@ impl TimeBase {
         denominator: NonZeroU64::new(1_000_000_000).unwrap(),
     };
 
+    /// 1/90000 second per tick: the 90 kHz clock of MPEG PTS and DTS values.
+    pub const HZ_90000: Self = Self {
+        numerator: NonZeroU64::MIN,
+        denominator: NonZeroU64::new(90_000).unwrap(),
+    };
+
     /// `numerator / denominator` seconds per tick, reduced. A zero in either
     /// is [`Error::Invalid`].
     pub fn new(numerator: u64, denominator: u64) -> Result<Self> {

@@ -84,7 +84,8 @@ the scaled magnitude fits, with the selected rounding policy. On targets with
 terms uses a binary greatest common divisor and divides by it exactly through
 the divisor's inverse modulo 2⁶⁴, and a tick base that is a multiple of the time's
 denominator is recognised the same way; 64-bit targets divide.
-Use `TimeBase::MICROSECONDS` and `TimeBase::NANOSECONDS` for those fixed clocks.
+Use `TimeBase::MICROSECONDS`, `TimeBase::NANOSECONDS` and `TimeBase::HZ_90000`
+(MPEG PTS and DTS) for those fixed clocks.
 `TickScale::new(from, to)` prepares one conversion for a stream: its `rescale`
 returns what `TimeBase::rescale` returns, dividing by a reciprocal computed once.
 
