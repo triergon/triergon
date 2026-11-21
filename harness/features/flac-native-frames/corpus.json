@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "directory": ".research/flac-test-files",
+  "cases": [
+    {
+      "id": "sample-rate-change",
+      "profile": "sample-rate-change",
+      "file": "uncommon/01 - changing samplerate.flac",
+      "input_url": "https://raw.githubusercontent.com/ietf-wg-cellar/flac-test-files/aa7b0c6cf32994c106ae517a08134c28a96ff5b2/uncommon/01%20-%20changing%20samplerate.flac",
+      "sha256": "9fa8f7c57186be8708f42620885a71d4c4871767ff55cfe063eb1cf3bad8d0a5",
+      "rights": "reviewed-licence",
+      "source": "https://github.com/ietf-wg-cellar/flac-test-files/tree/aa7b0c6cf32994c106ae517a08134c28a96ff5b2/uncommon",
+      "expected": {
+        "packets": 137,
+        "bytes": 4447612,
+        "digest": 7828178742354874995,
+        "eof": true
+      },
+      "licence": "CC0-1.0"
+    },
+    {
+      "id": "channel-increase",
+      "profile": "channel-increase",
+      "file": "uncommon/02 - increasing number of channels.flac",
+      "input_url": "https://raw.githubusercontent.com/ietf-wg-cellar/flac-test-files/aa7b0c6cf32994c106ae517a08134c28a96ff5b2/uncommon/02%20-%20increasing%20number%20of%20channels.flac",
+      "sha256": "fe70d5e324bea56e9569d4ff9d4b6fa9c33d3f763e7fec5b1f27904e648a0482",
+      "rights": "reviewed-licence",
+      "source": "https://github.com/ietf-wg-cellar/flac-test-files/tree/aa7b0c6cf32994c106ae517a08134c28a96ff5b2/uncommon",
+      "expected": {
+        "packets": 157,
+        "bytes": 9763860,
+        "digest": 3775770921712783915,
+        "eof": true
+      },
+      "licence": "CC0-1.0"
+    },
+    {
+      "id": "channel-decrease",
+      "profile": "channel-decrease",
+      "file": "uncommon/03 - decreasing number of channels.flac",
+      "input_url": "https://raw.githubusercontent.com/ietf-wg-cellar/flac-test-files/aa7b0c6cf32994c106ae517a08134c28a96ff5b2/uncommon/03%20-%20decreasing%20number%20of%20channels.flac",
+      "sha256": "8e3c451d835cd9a0ef8914e027cf93c98985bd1bb4d7eea59deb15996b97be3b",
+      "rights": "reviewed-licence",
+      "source": "https://github.com/ietf-wg-cellar/flac-test-files/tree/aa7b0c6cf32994c106ae517a08134c28a96ff5b2/uncommon",
+      "expected": {
+        "packets": 93,
+        "bytes": 3959612,
+        "digest": 12037923191498466282,
+        "eof": true
+      },
+      "licence": "CC0-1.0"
+    }
+  ]
+}

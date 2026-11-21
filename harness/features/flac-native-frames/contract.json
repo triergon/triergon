@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "id": "flac-native-frames",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "flac-native-frame-decode",
+  "candidate": "codec-worker",
+  "worker_operation": "audio-flac-frames-",
+  "reference": "ffmpeg-decode-native",
+  "reviewed_input_sets": ["flac-format-change-inputs"],
+  "fetch_https_cases": true,
+  "contract": [
+    "Open the first audio stream from preloaded FLAC bytes, decode all frames through EOF, and release the reader and decoder.",
+    "Fold each frame's sample rate, channel count and sample count as three little-endian u32 words. Follow with every interleaved little-endian f32 sample in channel order and finish with the four-byte EOF record.",
+    "The pinned reference reads native FLAC decoder frames through the public library API. Both workers keep format changes and convert the native frame samples to f32 without resampling or mixing."
+  ],
+  "required_profiles": ["sample-rate-change", "channel-increase", "channel-decrease"],
+  "required_targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],
+  "iterations": 3,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

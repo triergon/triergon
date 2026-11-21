@@ -30,6 +30,13 @@ Matroska), read through the `triergon` facade, to interleaved f32le: the decoder
 output, without container trims. `--per-frame` prints each frame's format and
 `--reject-crc` rejects frames whose CRC fails.
 
+The [native-frame comparison](../../harness/features/flac-native-frames/contract.json)
+checks the sample rate, channel count, sample count and interleaved PCM on every
+frame of the three format-changing IETF testbench files. It uses the pinned
+public libavcodec adapter with native samples and no resampling. Both workers
+read through EOF and fold the resulting records. The CLI's fixed output grade
+still reports its separate format-change differences.
+
 ## Supported
 
 The whole decoding process of RFC 9639: CONSTANT, VERBATIM, FIXED (orders 0 to 4) and LPC

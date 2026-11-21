@@ -1,0 +1,30 @@
+{
+ "name": "flac-format-change-inputs",
+ "path": "flac-format-change-inputs",
+ "retention": "retained",
+ "reason": "Pinned IETF FLAC decoder testbench media and CC0 license used by the flac-native-frames comparison.",
+ "key": "evidence/flac-format-change-inputs/3b3dd56ba53c958a062ecb4b0cec4d8ed3e581d6f09c7afc1ea0db80a83b6540.tar.gz",
+ "sha256": "3b3dd56ba53c958a062ecb4b0cec4d8ed3e581d6f09c7afc1ea0db80a83b6540",
+ "bytes": 1720473,
+ "unpacked_at": "repository",
+ "files": [
+  {
+   "path": ".research/flac-test-files/LICENSE.txt",
+   "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+  },
+  {
+   "path": ".research/flac-test-files/uncommon/01 - changing samplerate.flac",
+   "sha256": "9fa8f7c57186be8708f42620885a71d4c4871767ff55cfe063eb1cf3bad8d0a5"
+  },
+  {
+   "path": ".research/flac-test-files/uncommon/02 - increasing number of channels.flac",
+   "sha256": "fe70d5e324bea56e9569d4ff9d4b6fa9c33d3f763e7fec5b1f27904e648a0482"
+  },
+  {
+   "path": ".research/flac-test-files/uncommon/03 - decreasing number of channels.flac",
+   "sha256": "8e3c451d835cd9a0ef8914e027cf93c98985bd1bb4d7eea59deb15996b97be3b"
+  }
+ ],
+ "licence": "CC0-1.0",
+ "source": "https://github.com/ietf-wg-cellar/flac-test-files/tree/aa7b0c6cf32994c106ae517a08134c28a96ff5b2"
+}

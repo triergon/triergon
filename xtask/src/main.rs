@@ -1064,6 +1064,7 @@ fn prepare_check(part: Option<Part>) -> Task {
             &["prepare-ffmpeg", "--profile", "transport-dts"],
             &["prepare-mpg123"],
             &["prepare-ffmpeg", "--profile", "video"],
+            &["prepare-ffmpeg", "--profile", "decode"],
             &["fixtures"],
             &["fetch-vectors"],
             &["fonts", "prepare"],
