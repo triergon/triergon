@@ -7,7 +7,7 @@ use triergon_bitstream::{BitError, BitSource};
 
 /// Why a syntax walk stopped.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SyntaxError {
+pub(crate) enum SyntaxError {
     Bits(BitError),
     /// A field outside the range its syntax allows.
     OutOfRange,
@@ -22,7 +22,7 @@ impl From<BitError> for SyntaxError {
 /// Passes over an H.264 SPS's `seq_scaling_matrix_present_flag` and the scaling
 /// lists after it (7.3.2.1.1.1). A `delta_scale` outside -128..=127 is out of
 /// range, as in FFmpeg's decoder.
-pub fn skip_avc_scaling_matrix(
+pub(crate) fn skip_avc_scaling_matrix(
     bits: &mut impl BitSource,
     chroma_format_idc: u32,
 ) -> Result<(), SyntaxError> {

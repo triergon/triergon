@@ -41,7 +41,5 @@ pub use packet::{
 pub use packet_config::{NalPacketConfigOutput, NalPacketConfigRejection, NalPacketConfigWriter};
 pub use raw_annex_b::{RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};
 pub use reader::{Framing, LengthSize, NalFacts, NalFraming, NalReader, NalUnit, ReaderLimits};
-pub use syntax::{
-    SyntaxError, skip_avc_scaling_matrix, skip_hevc_profile_tier_level, skip_vui_to_timing,
-};
+pub use syntax::{skip_hevc_profile_tier_level, skip_vui_to_timing};
 pub use units::{AnnexBUnits, split_length_prefixed, start_code};

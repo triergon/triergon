@@ -165,7 +165,7 @@ fn identical_parameter_sets_reuse_parsing_and_storage_under_pressure() {
     let parses = std::cell::Cell::new(0);
     let parse = |raw: &[u8]| {
         parses.set(parses.get() + 1);
-        syntax::sps(raw)
+        avc::read_sps_raster(raw)
     };
     remember(&mut sets, 1, SPS, parse).unwrap();
     let original = sets.as_slice()[0].bytes.storage_address();
@@ -178,7 +178,10 @@ fn identical_parameter_sets_reuse_parsing_and_storage_under_pressure() {
 
     let mut changed = SPS.to_vec();
     *changed.last_mut().unwrap() ^= 1;
-    assert_eq!(syntax::sps(&changed[1..]), syntax::sps(&SPS[1..]));
+    assert_eq!(
+        avc::read_sps_raster(&changed[1..]),
+        avc::read_sps_raster(&SPS[1..])
+    );
     assert!(matches!(
         remember(&mut sets, 3, &changed, parse),
         Err(Error::Backpressure { .. })
@@ -194,17 +197,17 @@ fn identical_parameter_sets_reuse_parsing_and_storage_under_pressure() {
     assert_eq!(sets.as_slice()[0].bytes.as_ref(), changed);
 
     let invalid = &[0x67];
-    let expected = syntax::sps(&invalid[1..]).unwrap_err();
+    let expected = avc::read_sps_raster(&invalid[1..]).unwrap_err();
     assert_eq!(remember(&mut sets, 4, invalid, parse), Err(expected));
     assert_eq!(parses.get(), 4);
     assert_eq!(sets.as_slice()[0].seen_in_unit, 3);
     assert_eq!(sets.as_slice()[0].bytes.as_ref(), changed);
 
     let mut pps = BudgetVec::new(&pool);
-    remember(&mut pps, 1, PPS, syntax::pps).unwrap();
-    remember(&mut pps, 1, &[0x68, 0x50], syntax::pps).unwrap();
+    remember(&mut pps, 1, PPS, avc::read_pps_ids).unwrap();
+    remember(&mut pps, 1, &[0x68, 0x50], avc::read_pps_ids).unwrap();
     let first = pps.as_slice()[0].bytes.storage_address();
-    remember(&mut pps, 2, PPS, syntax::pps).unwrap();
+    remember(&mut pps, 2, PPS, avc::read_pps_ids).unwrap();
     assert_eq!(pps.len(), 2);
     assert_eq!(pps.as_slice()[0].bytes.storage_address(), first);
     assert_eq!(pps.as_slice()[0].seen_in_unit, 2);

@@ -28,9 +28,9 @@ impl MatroskaHevcDolbyFeed {
             return Ok(None);
         };
         let chain = hevc::startup_chain(config.record().nals().map(|nal| nal.source_bytes()))?;
-        let period = match hevc::vps_timing(chain.vps)? {
+        let period = match hevc::read_vps_timing(chain.vps)? {
             Some(period) => Some(period),
-            None => hevc::sps_timing(chain.sps)?
+            None => hevc::read_sps_timing(chain.sps)?
                 .map(|timing| (timing.num_units_in_tick, timing.time_scale)),
         };
         Ok(Some(MatroskaHevcClock {
@@ -72,7 +72,7 @@ impl MatroskaHevcClock<'_> {
                 }
                 if !self.repeat_prefixes_validated {
                     let [vps, sps, pps] = self.parameter_sets;
-                    hevc::check_repeat_prefixes(vps, sps, pps)?;
+                    hevc::check_parameter_sets(vps, sps, pps)?;
                     self.repeat_prefixes_validated = true;
                 }
                 Ok(true)

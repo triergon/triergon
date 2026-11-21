@@ -3,10 +3,10 @@ use super::{
     Association, FeedCodec, MatroskaFeedPacket, MatroskaFeedPayload, MatroskaPacketTiming,
     MatroskaTrackFeed,
 };
-use crate::{Result, hls_avc::syntax as avc, raw_video::hevc_syntax as hevc};
+use crate::{Result, raw_video::hevc_syntax as hevc};
 use triergon_core::Error;
 use triergon_framing::{
-    avc::AvcAnnexBConfig,
+    avc::{self, AvcAnnexBConfig},
     nal::{Codec, NalHeader},
 };
 use triergon_matroska::TypedPacket as Packet;
@@ -166,10 +166,10 @@ pub(super) fn avc_chain<'a>(nals: impl Iterator<Item = &'a [u8]>) -> Result<(u8,
         match NalHeader::parse(Codec::Avc, nal)? {
             NalHeader::Avc {
                 nal_unit_type: 7, ..
-            } if sps.is_none() => sps = Some(avc::startup_sps(&nal[1..])?),
+            } if sps.is_none() => sps = Some(avc::read_sps_reorder(&nal[1..])?),
             NalHeader::Avc {
                 nal_unit_type: 8, ..
-            } if pps.is_none() => pps = Some(avc::pps(&nal[1..])?),
+            } if pps.is_none() => pps = Some(avc::read_pps_ids(&nal[1..])?),
             _ => return Err(Error::Unsupported("AVC clock parameter-set chain")),
         }
     }
@@ -191,7 +191,7 @@ pub(super) fn picture_nal(
             nal_unit_type: kind @ (1 | 5),
             ..
         } => {
-            let (address, slice_type, pps) = avc::slice_picture(&nal[1..])?;
+            let (address, slice_type, pps) = avc::read_slice_prefix(&nal[1..])?;
             if !(matches!(slice_type, 0 | 2) || reorders && slice_type == 1) {
                 return Err(Error::Unsupported("AVC clock slice type"));
             }

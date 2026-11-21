@@ -7,6 +7,7 @@
 //! | `hvcC` record | [`HvcConfigParser`], [`HvcConfiguration`], [`inspect_config_prefix`] |
 //! | One sample as an Annex B access unit | [`HevcAnnexBConfig`], [`HevcAnnexBJob`] |
 //! | A record's parameter sets as Annex B | [`HvcAnnexBWriter`], [`HvcDecoderConfigWriter`] |
+//! | Identifiers, display raster, timing and reorder limit | [`read_vps_id`], [`read_vps_timing`], [`read_sps_prefix`], [`read_sps_timing`], [`read_sps_reorder`], [`read_pps_ids`], [`read_slice_prefix`], [`check_parameter_sets`] |
 //!
 //! The constants are the `nal_unit_type` values of H.265 Table 7-1; the
 //! functions classify a type value.
@@ -15,6 +16,7 @@ mod access_unit;
 pub(crate) mod config;
 mod config_annexb;
 mod config_decoder;
+mod prefix;
 
 pub use access_unit::{HevcAnnexBAccessUnit, HevcAnnexBConfig, HevcAnnexBJob, HevcAnnexBLimits};
 pub use config::{
@@ -23,6 +25,10 @@ pub use config::{
 };
 pub use config_annexb::{HvcAnnexBOutput, HvcAnnexBWriter};
 pub use config_decoder::{HvcDecoderConfigOutput, HvcDecoderConfigRefusal, HvcDecoderConfigWriter};
+pub use prefix::{
+    HevcSpsPrefix, HevcVuiTiming, check_parameter_sets, read_pps_ids, read_slice_prefix,
+    read_sps_prefix, read_sps_reorder, read_sps_timing, read_vps_id, read_vps_timing,
+};
 
 pub const RADL_N: u8 = 6;
 pub const RADL_R: u8 = 7;

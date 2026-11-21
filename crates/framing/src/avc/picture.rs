@@ -4,7 +4,8 @@
 //! and bitstream restriction) need them, leaving the rest of each RBSP opaque.
 //! [`read_sps`], [`read_pps`] and [`read_slice_header`] serve any
 //! caller; `AvcPictures` compares pictures for access-unit boundaries.
-use crate::nal::{Codec, NalHeader, SyntaxError, skip_avc_scaling_matrix, skip_vui_to_timing};
+use crate::nal::syntax::{SyntaxError, skip_avc_scaling_matrix};
+use crate::nal::{Codec, NalHeader, skip_vui_to_timing};
 use triergon_bitstream::{BitError, BitSource};
 use triergon_core::{Error, Result};
 

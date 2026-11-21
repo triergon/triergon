@@ -1,11 +1,13 @@
 //! Active decoder configuration for raw Annex B AVC and base-layer HEVC.
 pub(crate) mod hevc;
 
-use crate::hls_avc::syntax as avc;
-pub use crate::hls_avc::syntax::AvcVuiTiming;
-pub use hevc::HevcVuiTiming;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId};
-use triergon_framing::nal::{Codec, NalHeader, RawAccessUnit};
+pub use triergon_framing::avc::AvcVuiTiming;
+pub use triergon_framing::hevc::HevcVuiTiming;
+use triergon_framing::{
+    avc,
+    nal::{Codec, NalHeader, RawAccessUnit},
+};
 
 /// Exact active NAL bodies, without start codes or Annex B padding.
 /// Dimensions use the AVC frame crop or HEVC conformance window.
@@ -44,7 +46,7 @@ impl RawVideoConfiguration {
         ) {
             return Err(Error::Invalid("expected base-layer HEVC SPS"));
         }
-        hevc::sps_timing(&self.sps[self.codec.minimum_header_bytes()..])
+        hevc::read_sps_timing(&self.sps[self.codec.minimum_header_bytes()..])
     }
 }
 
@@ -146,8 +148,8 @@ impl RawVideoConfigTracker {
             } else if active.is_none() {
                 let raw = &nal.bytes()[self.codec.minimum_header_bytes()..];
                 let pps_id = match (self.codec, nal_type) {
-                    (Codec::Avc, 1 | 5) => avc::slice_header_prefix(raw)?.1,
-                    (Codec::Hevc, 0..=9 | 16..=21) => hevc::slice_pps(raw, nal_type)?,
+                    (Codec::Avc, 1 | 5) => avc::read_slice_prefix(raw)?.2,
+                    (Codec::Hevc, 0..=9 | 16..=21) => hevc::read_slice_prefix(raw, nal_type)?.1,
                     _ => continue,
                 };
                 active = Some(self.resolve(pps_id, updates.as_slice())?);
@@ -178,17 +180,17 @@ impl RawVideoConfigTracker {
         }
         let raw = &bytes[self.codec.minimum_header_bytes()..];
         let update = match (self.codec, nal_type) {
-            (Codec::Hevc, 32) => Update::Vps(hevc::vps(raw)?, bytes),
+            (Codec::Hevc, 32) => Update::Vps(hevc::read_vps_id(raw)?, bytes),
             (Codec::Hevc, 33) => {
                 let (id, info) = hevc::sps(raw)?;
                 Update::Sps(id, info, bytes)
             }
             (Codec::Hevc, 34) => {
-                let (id, sps) = hevc::pps(raw)?;
+                let (id, sps) = hevc::read_pps_ids(raw)?;
                 Update::Pps(id, sps, bytes)
             }
             (Codec::Avc, 7) => {
-                let (id, raster, avc_timing) = avc::sps_with_timing(raw)?;
+                let (id, raster, avc_timing) = avc::read_sps_timing(raw)?;
                 Update::Sps(
                     id,
                     Sps {
@@ -201,7 +203,7 @@ impl RawVideoConfigTracker {
                 )
             }
             (Codec::Avc, 8) => {
-                let (id, sps) = avc::pps(raw)?;
+                let (id, sps) = avc::read_pps_ids(raw)?;
                 Update::Pps(id, sps, bytes)
             }
             _ => unreachable!("checked parameter-set type"),
@@ -603,14 +605,14 @@ mod tests {
             }
             b.fixed(0, 1); // SPS extension absent.
             let sps = b.nal(&[66, 1]);
-            assert_eq!(hevc::sps_timing(&sps[2..]), Ok(None));
+            assert_eq!(hevc::read_sps_timing(&sps[2..]), Ok(None));
         }
 
         let mut b = hevc_minimal_sps_through_tools();
         b.ue(65);
         let too_many_sets = b.nal(&[66, 1]);
         assert!(matches!(
-            hevc::sps_timing(&too_many_sets[2..]),
+            hevc::read_sps_timing(&too_many_sets[2..]),
             Err(Error::Invalid(_))
         ));
 
@@ -624,7 +626,10 @@ mod tests {
         b.fixed(1, 1);
         // A missing ue(v) field must not be read as zero from the stop bit.
         let truncated = b.nal(&[66, 1]);
-        assert_eq!(hevc::sps_timing(&truncated[2..]), Err(Error::Truncated));
+        assert_eq!(
+            hevc::read_sps_timing(&truncated[2..]),
+            Err(Error::Truncated)
+        );
     }
 
     #[test]
@@ -737,8 +742,8 @@ mod tests {
         bits.zeroes(4); // No HRD, picture structure, or bitstream restrictions.
         let sps = bits.nal(&[0x67]);
 
-        let (id, raster, timing) = avc::sps_with_timing(&sps[1..]).unwrap();
-        assert_eq!((id, raster), avc::sps(&sps[1..]).unwrap());
+        let (id, raster, timing) = avc::read_sps_timing(&sps[1..]).unwrap();
+        assert_eq!((id, raster), avc::read_sps_raster(&sps[1..]).unwrap());
         assert_eq!(
             timing,
             Some(AvcVuiTiming {
@@ -755,7 +760,7 @@ mod tests {
         bits.fixed(1, 1); // VUI present.
         bits.zeroes(9); // No optional fields, including timing.
         let absent = bits.nal(&[0x67]);
-        assert_eq!(avc::sps_with_timing(&absent[1..]).unwrap().2, None);
+        assert_eq!(avc::read_sps_timing(&absent[1..]).unwrap().2, None);
 
         let mut bits = avc_sps_prefix();
         bits.fixed(1, 1);
@@ -765,10 +770,10 @@ mod tests {
         bits.fixed(60_000, 32);
         // The RBSP stop bit cannot stand in for a missing fixed-rate flag.
         let truncated = bits.nal(&[0x67]);
-        assert_eq!(avc::sps_with_timing(&truncated[1..]), Err(Error::Truncated));
+        assert_eq!(avc::read_sps_timing(&truncated[1..]), Err(Error::Truncated));
         assert_eq!(
-            avc::sps(&truncated[1..]).unwrap(),
-            avc::sps(&absent[1..]).unwrap()
+            avc::read_sps_raster(&truncated[1..]).unwrap(),
+            avc::read_sps_raster(&absent[1..]).unwrap()
         );
     }
 

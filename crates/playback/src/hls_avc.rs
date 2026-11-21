@@ -2,8 +2,6 @@
 //! H.222.0 §2.14.1 supplies the delimiter contract. Annex B and the RBSP
 //! prefixes used for active SPS/PPS resolution follow H.264 §7.3 and Annex B.
 
-pub(crate) mod syntax;
-
 use crate::{
     TrackKey, TsNativeCarriage, TsNativeConfiguration,
     hls_pes::{clock_describes, lane_track},
@@ -11,13 +9,16 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, BytesView, Error, Result, SourceId, WorkBudget};
-use triergon_framing::nal::{Codec, NalHeader};
+use triergon_framing::{
+    avc,
+    nal::{Codec, NalHeader},
+};
 use triergon_mpegts::compat::pes::{
     CompactDemuxPacket, DemuxPacket, DemuxPayloadKind, DemuxTimeView, PayloadCursor,
     RegisteredCarriage,
 };
 
-pub use syntax::AvcRaster;
+pub use triergon_framing::avc::AvcRaster;
 
 const SEI: u8 = 6;
 const AUD: u8 = 9;
@@ -714,7 +715,7 @@ impl AvcTsReader {
             AUD if matches!(payload, [value] if value & 0x1f == 0x10) => {}
             AUD => return Err(Error::Invalid("AVC access unit delimiter RBSP")),
             1 | 5 => {
-                let (first_mb, pps) = syntax::slice_header_prefix(payload)?;
+                let (first_mb, _, pps) = avc::read_slice_prefix(payload)?;
                 let idr = nal.kind == 5;
                 if let Some(picture) = unit.picture {
                     if picture.pps != pps || picture.idr != idr || first_mb == 0 {
@@ -743,9 +744,9 @@ impl AvcTsReader {
                     });
                 }
                 if nal.kind == 7 {
-                    remember(&mut self.sps, self.unit_serial, raw, syntax::sps)?;
+                    remember(&mut self.sps, self.unit_serial, raw, avc::read_sps_raster)?;
                 } else {
-                    remember(&mut self.pps, self.unit_serial, raw, syntax::pps)?;
+                    remember(&mut self.pps, self.unit_serial, raw, avc::read_pps_ids)?;
                 }
             }
             SEI | 10 | 11 | 12 => {}

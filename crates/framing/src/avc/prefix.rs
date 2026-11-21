@@ -1,8 +1,16 @@
+//! The leading fields of H.264 parameter sets and slice headers that a container
+//! reader needs without decoding: identifiers, the display raster, the VUI's
+//! timing and its reorder limit (H.264 08/2024 §§7.3.2.1.1, 7.3.2.2, 7.3.3, E.1.1).
+//!
+//! Every reader takes the payload after the one-byte NAL header, reads `00 00 00`
+//! to `00 00 02` inside it as data, and leaves the rest of the RBSP unread.
+
+use crate::nal::syntax::{SyntaxError, skip_avc_scaling_matrix};
+use crate::nal::{Codec, skip_vui_to_timing};
 use triergon_bitstream::{BitError, BitSource};
 use triergon_core::{Error, Result};
-use triergon_framing::nal::{Codec, SyntaxError, skip_avc_scaling_matrix, skip_vui_to_timing};
 
-/// Read RBSP prefixes without copying or decoding their uninspected suffixes.
+/// Reads RBSP prefixes without copying or decoding their uninspected suffixes.
 struct Rbsp<'a>(triergon_bitstream::Rbsp<'a>);
 
 fn rbsp_error(error: BitError) -> Error {
@@ -45,27 +53,45 @@ impl<'a> Rbsp<'a> {
     }
 }
 
+/// The display raster of an SPS: the coded frame after its frame cropping, in
+/// luma samples. Neither side is zero.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AvcRaster {
+    /// Width in luma samples.
     pub width: u32,
+    /// Height in luma samples, of the frame whether or not fields are coded.
     pub height: u32,
 }
 
-/// Literal timing fields from AVC SPS VUI (H.264 Annex E.1.1).
-/// These fields alone do not establish presentation timestamps.
+/// The timing fields of an SPS's VUI (H.264 E.1.1) as coded. They alone do not
+/// establish presentation timestamps.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AvcVuiTiming {
+    /// `num_units_in_tick`.
     pub num_units_in_tick: u32,
+    /// `time_scale`.
     pub time_scale: u32,
+    /// `fixed_frame_rate_flag`.
     pub fixed_frame_rate_flag: bool,
 }
 
-pub(crate) fn sps(raw: &[u8]) -> Result<(u8, AvcRaster)> {
+/// The `seq_parameter_set_id` and display raster of an SPS payload.
+///
+/// # Errors
+///
+/// When the SPS is cut short, a field is out of range, the profile is not one whose
+/// SPS syntax is known, the cropping exceeds the coded frame or the raster is empty.
+pub fn read_sps_raster(raw: &[u8]) -> Result<(u8, AvcRaster)> {
     let (id, raster, _) = sps_prefix(&mut Rbsp::new(raw))?;
     Ok((id, raster))
 }
 
-pub(crate) fn sps_with_timing(raw: &[u8]) -> Result<(u8, AvcRaster, Option<AvcVuiTiming>)> {
+/// As [`read_sps_raster`], with the VUI's timing when the SPS has one.
+///
+/// # Errors
+///
+/// Also when the VUI ends before its timing does.
+pub fn read_sps_timing(raw: &[u8]) -> Result<(u8, AvcRaster, Option<AvcVuiTiming>)> {
     let mut r = Rbsp::new(raw);
     let (id, raster, _) = sps_prefix(&mut r)?;
     let timing = if r.bit()? != 0 {
@@ -80,8 +106,15 @@ pub(crate) fn sps_with_timing(raw: &[u8]) -> Result<(u8, AvcRaster, Option<AvcVu
     Ok((id, raster, timing))
 }
 
-/// Progressive startup chain and its signalled reorder limit, when known.
-pub(crate) fn startup_sps(raw: &[u8]) -> Result<(u8, u8)> {
+/// The `seq_parameter_set_id` of a frame-only SPS payload and the number of frames
+/// its pictures may be reordered by: `max_num_reorder_frames`, or 0 for a
+/// Constrained Baseline SPS that does not state it.
+///
+/// # Errors
+///
+/// As [`read_sps_raster`]; also `Unsupported` when the SPS codes fields, or when it
+/// does not state the limit and is not Constrained Baseline.
+pub fn read_sps_reorder(raw: &[u8]) -> Result<(u8, u8)> {
     let mut r = Rbsp::new(raw);
     let (id, _, frame_only) = sps_prefix(&mut r)?;
     if !frame_only {
@@ -232,17 +265,23 @@ fn vui_timing(r: &mut Rbsp<'_>) -> Result<Option<AvcVuiTiming>> {
     }))
 }
 
-pub(crate) fn pps(raw: &[u8]) -> Result<(u8, u8)> {
+/// The `pic_parameter_set_id` and `seq_parameter_set_id` of a PPS payload.
+///
+/// # Errors
+///
+/// When the PPS is cut short or an identifier is out of range.
+pub fn read_pps_ids(raw: &[u8]) -> Result<(u8, u8)> {
     let mut r = Rbsp::new(raw);
     Ok((r.bounded(255)? as u8, r.bounded(31)? as u8))
 }
 
-pub(crate) fn slice_header_prefix(raw: &[u8]) -> Result<(u32, u8)> {
-    let (first_mb, _, pps) = slice_picture(raw)?;
-    Ok((first_mb, pps))
-}
-
-pub(crate) fn slice_picture(raw: &[u8]) -> Result<(u32, u32, u8)> {
+/// The `first_mb_in_slice`, `slice_type % 5` (0 P, 1 B, 2 I, 3 SP, 4 SI) and
+/// `pic_parameter_set_id` of a slice payload.
+///
+/// # Errors
+///
+/// When the header is cut short or a field is out of range.
+pub fn read_slice_prefix(raw: &[u8]) -> Result<(u32, u32, u8)> {
     let mut r = Rbsp::new(raw);
     let first_mb = r.ue()?;
     let slice_type = r.bounded(9)?;

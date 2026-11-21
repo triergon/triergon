@@ -288,7 +288,7 @@ impl Sample {
             let [Some(vps), Some(sps), Some(pps)] = payloads else {
                 return false;
             };
-            self.hevc_repeats_checked = hevc::check_repeat_prefixes(vps, sps, pps).is_ok();
+            self.hevc_repeats_checked = hevc::check_parameter_sets(vps, sps, pps).is_ok();
         }
         self.hevc_repeats_checked
     }
