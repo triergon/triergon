@@ -23,7 +23,7 @@ pub(crate) const INITIALIZED_AAC_REFERENCE: &str = "ffmpeg-aac-initialized-pcm";
 
 pub const USAGE: &str = "usage: cargo xtask codecs <command>
 
-  aac-access-units --out DIR [--record]
+  aac-access-units --out DIR [--record] [--sbr]
                  prepare the configured AAC-LC workloads and compare every native PCM plane
   aac-ps-tables [--check] [--ffmpeg FF] [--python PY] [--work DIR]
                  rerun the Parametric Stereo table recovery against the pinned FFmpeg 9.0.2
@@ -377,8 +377,13 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
     let (command, rest) = args.split_first().ok_or(USAGE)?;
     match command.as_str() {
         "aac-access-units" => {
-            let a = Args::parse(rest, &["out"], &["record"])?;
-            aac_access_units::run(root, &a.path("out")?, a.get("record").is_some())?;
+            let a = Args::parse(rest, &["out"], &["record", "sbr"])?;
+            aac_access_units::run(
+                root,
+                &a.path("out")?,
+                a.get("record").is_some(),
+                a.get("sbr").is_some(),
+            )?;
         }
         "aac-ps-tables" => {
             let a = Args::parse(rest, &["ffmpeg", "python", "work"], &["check"])?;

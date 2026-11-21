@@ -296,7 +296,6 @@ impl RawSbrDecoder {
             2,
             decoder::FixedLayout::Raw(compat::layout::Policy::Specification),
         )?;
-        core.raw_sbr = true;
         Ok(Self { core })
     }
 
@@ -308,7 +307,7 @@ impl RawSbrDecoder {
             }
             core.reserve_output::<false>(out, 1)?;
             let mut br = CachedBitReader::new(au);
-            core.decode_block::<true>(&mut br, 0, out, 1)?;
+            core.decode_block::<true, true>(&mut br, 0, out, 1)?;
             core.emit_planes(out)?;
             core.frames_out += 1;
             out.sample_rate = core.output_rate();
@@ -411,7 +410,7 @@ fn decode_blocks<const RAW: bool>(
     core.reserve_output::<RAW>(out, usize::from(blocks))?;
     for block in 0..blocks {
         let start = br.position();
-        core.decode_block::<RAW>(&mut br, start, out, usize::from(blocks - block))?;
+        core.decode_block::<RAW, false>(&mut br, start, out, usize::from(blocks - block))?;
         if !RAW {
             core.emit_planes(out)?;
         }

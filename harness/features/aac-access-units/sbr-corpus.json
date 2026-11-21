@@ -1,0 +1,17 @@
+{
+  "schema": "triergon.codecs.workloads.v1",
+  "workloads": [
+    {
+      "id": "al-sbr-cm-48-2",
+      "path": "al-sbr-cm-48-2.aac-access-units",
+      "sha256": "1720e42a88fe4d311316b03fb713720ef4f28d3c6dea23cc0d2f8054ec45d8db",
+      "bytes": 244319,
+      "operation": "audio-aac-access-units-sbr",
+      "iterations": 4,
+      "packets": 754,
+      "sample_rate": 48000,
+      "channels": 2,
+      "source_sha256": "7e7c0390c950eda21775d1a193e05ee703257bed85602884e7d30a8b3c65be90"
+    }
+  ]
+}

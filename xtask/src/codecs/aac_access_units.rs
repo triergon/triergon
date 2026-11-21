@@ -3,12 +3,13 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::{checks, corpus, harness, json, prepare, process, python, sha256};
+use crate::{checks, corpus, fetch, harness, json, prepare, process, python, sha256};
 use json::Value;
 
 use super::correctness::{Rules, channel_stats};
 
 const OPERATION: &str = "audio-aac-access-units";
+const SBR_OPERATION: &str = "audio-aac-access-units-sbr";
 const COMPAT_OPERATION: &str = "audio-aac-access-units-compat";
 const FEATURE: &str = "harness/features/aac-access-units";
 const PARITY_FILE: &str = "parity.json";
@@ -16,7 +17,6 @@ const FFPROBE: &str = "install/bin/ffprobe";
 const NUMERIC_RULES: &str = "harness/codecs/numeric-rules.json";
 const PADDING: [u8; 64] = [0; 64];
 const HEADER_BYTES: usize = 4 * size_of::<u32>();
-const PLANE_BYTES: usize = 1024 * size_of::<f32>();
 const MAX_PACKET: usize = 64 << 10;
 
 fn string<'a>(object: &'a Value, key: &str) -> Result<&'a str, String> {
@@ -193,11 +193,17 @@ pub(super) fn measurement_parity(
     }))
 }
 
-fn access_units(source: &[u8], probe: &Value) -> Result<(Vec<u8>, u32, u32, u32), String> {
+fn access_units(
+    source: &[u8],
+    probe: &Value,
+    sbr: bool,
+) -> Result<(Vec<u8>, u32, u32, u32), String> {
     let Some([stream]) = probe.get("streams").and_then(Value::as_array) else {
         return Err("expected one AAC stream".into());
     };
-    if string(stream, "codec_name")? != "aac" || string(stream, "profile")? != "LC" {
+    if string(stream, "codec_name")? != "aac"
+        || string(stream, "profile")? != if sbr { "HE-AAC" } else { "LC" }
+    {
         return Err("expected an AAC-LC stream".into());
     }
     let rate = number(stream, "sample_rate")?;
@@ -240,8 +246,10 @@ fn compare_pcm(
     channels: usize,
     packets: usize,
     rules: &Rules,
+    samples: usize,
 ) -> Result<(bool, Value), String> {
-    let frame_bytes = channels * PLANE_BYTES;
+    let plane_bytes = samples * size_of::<f32>();
+    let frame_bytes = channels * plane_bytes;
     let expected = frame_bytes
         .checked_mul(packets)
         .ok_or("AAC output size overflow")?;
@@ -253,9 +261,9 @@ fn compare_pcm(
         ));
     }
     let collect_plane = |pcm: &[u8], channel: usize| {
-        let start = channel * PLANE_BYTES;
+        let start = channel * plane_bytes;
         pcm.chunks_exact(frame_bytes)
-            .flat_map(|frame| &frame[start..start + PLANE_BYTES])
+            .flat_map(|frame| &frame[start..start + plane_bytes])
             .copied()
             .collect::<Vec<_>>()
     };
@@ -319,10 +327,11 @@ fn vectors(manifest: &Value) -> Result<&[Value], String> {
         .ok_or_else(|| "missing AAC vectors".to_owned())
 }
 
-pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
+pub fn run(root: &Path, out: &Path, record: bool, sbr: bool) -> Result<(), String> {
     let quicktime = checks::read_json(&root.join("harness/codecs/aac/mov-manifest.json"))?;
     let feature = root.join(FEATURE);
     let authored = checks::read_json(&feature.join("sources.json"))?;
+    let sbr_source = checks::read_json(&feature.join("sbr-source.json"))?;
     let sources = vectors(&quicktime)?
         .iter()
         .map(|source| (source, OPERATION))
@@ -330,7 +339,21 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
             vectors(&authored)?
                 .iter()
                 .map(|source| (source, COMPAT_OPERATION)),
-        );
+        )
+        .collect::<Vec<_>>();
+    let sources = if sbr {
+        let [vector] = vectors(&sbr_source)? else {
+            return Err("expected one pinned SBR source".into());
+        };
+        fetch::fate_sample(
+            &root.join(".research/fate-samples"),
+            string(vector, "source")?,
+            string(vector, "sha256")?,
+        )?;
+        vec![(vector, SBR_OPERATION)]
+    } else {
+        sources
+    };
     fs::create_dir(out).map_err(|error| format!("{}: {error}", out.display()))?;
     let mut workloads = Vec::new();
     let mut results = Vec::new();
@@ -345,7 +368,10 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
                 !id.is_empty() && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
             })
             .ok_or("invalid AAC source name")?;
-        let source_path = if operation == OPERATION {
+        let source_path = if sbr {
+            root.join(".research/fate-samples")
+                .join(string(vector, "source")?)
+        } else if operation == OPERATION {
             root.join(string(vector, "path")?)
         } else {
             feature.join("inputs").join(name)
@@ -377,7 +403,10 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
                 &source_path.to_string_lossy(),
             ],
         )?;
-        let (mut input, rate, channels, count) = access_units(&source, &probe)?;
+        let (mut input, rate, channels, count) = access_units(&source, &probe, sbr)?;
+        if sbr && (rate != 48000 || channels != 2 || count != 754) {
+            return Err("SBR source shape differs".into());
+        }
         let configuration_byte = &mut input[HEADER_BYTES + 1];
         let configuration = *configuration_byte >> 3 & 15;
         if operation == COMPAT_OPERATION {
@@ -444,6 +473,7 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
             channels as usize,
             count as usize,
             &rules,
+            if sbr { 2048 } else { 1024 },
         )?;
         accepted &= layout && pcm;
         results.push(Value::object([
@@ -467,7 +497,11 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
     {
         return Err("AAC comparison tools or rules changed during parity".into());
     }
-    let pinned = root.join(FEATURE).join("corpus.json");
+    let pinned = root.join(FEATURE).join(if sbr {
+        "sbr-corpus.json"
+    } else {
+        "corpus.json"
+    });
     if !record && checks::read_json(&pinned)? != workloads {
         return Err("AAC access-unit workload differs from its pins".into());
     }
@@ -491,6 +525,31 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pcm_comparison_checks_both_plane_shapes_and_the_last_sample() {
+        let rules = Rules {
+            rms: 1e-6,
+            abs: 1e-5,
+            lsb: 0,
+            exact: Vec::new(),
+        };
+        let reference = vec![0; 2 * 2048 * 4];
+        assert!(compare_pcm(&reference, &reference, 2, 1, &rules, 1024).is_err());
+        assert!(
+            compare_pcm(&reference, &reference, 2, 1, &rules, 2048)
+                .unwrap()
+                .0
+        );
+        let mut changed = reference.clone();
+        let last = changed.len() - 4;
+        changed[last..].copy_from_slice(&0.1_f32.to_le_bytes());
+        assert!(
+            !compare_pcm(&changed, &reference, 2, 1, &rules, 2048)
+                .unwrap()
+                .0
+        );
+    }
 
     #[test]
     fn only_the_single_fixed_surround_pair_accepts_different_labels() {

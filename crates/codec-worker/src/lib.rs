@@ -258,7 +258,10 @@ impl Operations {
         self == Operations::All
             || matches!(
                 op,
-                "audio-aac" | aac_access_units::OPERATION | aac_access_units::COMPAT_OPERATION
+                "audio-aac"
+                    | aac_access_units::OPERATION
+                    | aac_access_units::COMPAT_OPERATION
+                    | aac_access_units::SBR_OPERATION
             )
     }
 }
@@ -270,14 +273,21 @@ fn run(op: &str, data: &[u8], out: &mut Output) {
         "audio-ac3" => audio(AudioCodec::Ac3, data, out),
         "audio-eac3" => audio(AudioCodec::Eac3, data, out),
         "audio-aac" => audio(AudioCodec::Aac, data, out),
-        aac_access_units::OPERATION | aac_access_units::COMPAT_OPERATION => {
+        aac_access_units::OPERATION
+        | aac_access_units::COMPAT_OPERATION
+        | aac_access_units::SBR_OPERATION => {
             use triergon_session::compat::aac::Policy;
             let layout = if op == aac_access_units::OPERATION {
                 Policy::Specification
             } else {
                 Policy::ConventionalSurround
             };
-            if let Err(error) = aac_access_units::decode(data, layout, out) {
+            let result = if op == aac_access_units::SBR_OPERATION {
+                aac_access_units::decode::<true>(data, layout, out)
+            } else {
+                aac_access_units::decode::<false>(data, layout, out)
+            };
+            if let Err(error) = result {
                 eprintln!("{error}");
                 std::process::exit(2);
             }
@@ -336,7 +346,9 @@ pub fn main(name: &str, operations: Operations) {
     let input = args.get(2).expect("input");
     let data = if matches!(
         op,
-        aac_access_units::OPERATION | aac_access_units::COMPAT_OPERATION
+        aac_access_units::OPERATION
+            | aac_access_units::COMPAT_OPERATION
+            | aac_access_units::SBR_OPERATION
     ) {
         aac_access_units::load(input).unwrap_or_else(|error| {
             eprintln!("{input}: {error}");

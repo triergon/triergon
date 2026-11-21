@@ -31,7 +31,10 @@ DIR`, start with four little-endian 32-bit words (sample rate, channel count, pa
 count, configuration length), then the AudioSpecificConfig, then each packet with a
 little-endian 32-bit length and 64 zero padding bytes; at most 64 MiB, and every packet
 must give 1024 samples per plane. `audio-aac-access-units` uses the specification channel
-mapping, `-compat` the conventional surround mapping.
+mapping, `-compat` the conventional surround mapping. `audio-aac-access-units-sbr`
+uses the same capsule for the pinned 48 kHz stereo 2× SBR configuration and requires
+2048 samples per plane. `cargo xtask codecs aac-access-units --sbr --out DIR` fetches the pinned FATE
+sample and compares every native output sample against the pinned reference.
 
 ## Outputs
 

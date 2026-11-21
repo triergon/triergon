@@ -51,7 +51,9 @@ decoder synthesizes directly into the caller's reserved planes and reuses them.
 `RawSbrDecoder` accepts fixed stereo AAC-LC raw blocks with 2× SBR and an indexed
 core rate at or below 48 kHz. The first block must carry an SBR extension; output is
 2048 samples per channel at twice the core rate. It uses the same SBR synthesis as the
-ADTS decoder. Reset clears the SBR header, so SBR data cannot be applied until a new
+ADTS decoder. The pinned FATE stereo access-unit comparison is available through
+`cargo xtask codecs aac-access-units --sbr --out DIR`; broader qualification remains open.
+Reset clears the SBR header, so SBR data cannot be applied until a new
 header arrives. It does not configure mono or Parametric
 Stereo, other layouts, or 960-sample core frames.
 

@@ -179,7 +179,6 @@ pub(crate) struct Core {
     pub random: u32,
     /// SBR has been seen (implicit signalling): output at twice the core rate.
     pub sbr_active: bool,
-    pub raw_sbr: bool,
     /// PS has been seen on a mono element: output stereo.
     pub ps_active: bool,
     pub pce: Option<Pce>,
@@ -224,7 +223,6 @@ impl Core {
             fb: Filterbank::new(),
             random: PNS_INITIAL_STATE,
             sbr_active: false,
-            raw_sbr: false,
             ps_active: false,
             pce: None,
             unordered: false,
@@ -541,7 +539,7 @@ impl Core {
     /// Decode one raw_data_block(); appends `frame_len()` samples per plane to `planes`.
     /// Decode one raw_data_block() of the `blocks` (this one included) the access unit has
     /// left; `out` gets room for an in-band reconfiguration before it applies.
-    pub(crate) fn decode_block<const RAW: bool>(
+    pub(crate) fn decode_block<const RAW: bool, const RAW_SBR: bool>(
         &mut self,
         br: &mut CachedBitReader<'_>,
         block_start: usize,
@@ -667,7 +665,7 @@ impl Core {
                             return Err(DecodeError::InvalidData("fill element overrun"));
                         }
                         let ext = br.read(4);
-                        if RAW && !self.raw_sbr && matches!(ext, EXT_SBR_DATA | EXT_SBR_DATA_CRC) {
+                        if RAW && !RAW_SBR && matches!(ext, EXT_SBR_DATA | EXT_SBR_DATA_CRC) {
                             return Err(DecodeError::Unsupported(Feature::RawSbr));
                         }
                         if !RAW
@@ -737,7 +735,7 @@ impl Core {
                 "no channel configuration (missing PCE)",
             ));
         }
-        if RAW && self.raw_sbr {
+        if RAW && RAW_SBR {
             if !self.sbr_active {
                 return Err(DecodeError::InvalidData("missing initial raw SBR"));
             }

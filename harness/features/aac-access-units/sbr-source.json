@@ -1,0 +1,10 @@
+{
+  "license": "FATE sample; redistribution rights unreviewed",
+  "vectors": [
+    {
+      "name": "al-sbr-cm-48-2.mov",
+      "source": "aac/al_sbr_cm_48_2.mp4",
+      "sha256": "7e7c0390c950eda21775d1a193e05ee703257bed85602884e7d30a8b3c65be90"
+    }
+  ]
+}

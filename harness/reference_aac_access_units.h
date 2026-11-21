@@ -10,8 +10,8 @@ static void keep_aac_input(void *opaque, uint8_t *data) {
 }
 
 /* A complete plane is a multiple of 64 bytes, so each lane reads whole words. */
-static void fold_aac_plane(struct fold *digest, const uint8_t *samples) {
-    const size_t bytes = AAC_SAMPLES * sizeof(float);
+static void fold_aac_plane(struct fold *digest, const uint8_t *samples, size_t sample_count) {
+    const size_t bytes = sample_count * sizeof(float);
     digest->total += bytes;
     for (size_t offset = 0; offset < bytes; offset += 64) {
         for (size_t lane = 0; lane < 8; lane++) {
@@ -21,7 +21,7 @@ static void fold_aac_plane(struct fold *digest, const uint8_t *samples) {
     }
 }
 
-static void aac_access_units(const uint8_t *data, size_t size, struct out *out) {
+static void aac_access_units(const uint8_t *data, size_t size, struct out *out, int samples_per_plane) {
     static const uint8_t padding[AAC_PADDING] = {0};
     if (size < 16 || AV_HAVE_BIGENDIAN)
         die("AAC input header", AVERROR_INVALIDDATA);
@@ -64,7 +64,7 @@ static void aac_access_units(const uint8_t *data, size_t size, struct out *out) 
         at += length + AAC_PADDING;
         if ((rc = avcodec_send_packet(decoder, packet)) < 0) die("AAC send", rc);
         if ((rc = avcodec_receive_frame(decoder, frame)) < 0) die("AAC receive", rc);
-        if (frame->format != AV_SAMPLE_FMT_FLTP || frame->nb_samples != AAC_SAMPLES ||
+        if (frame->format != AV_SAMPLE_FMT_FLTP || frame->nb_samples != samples_per_plane ||
             (uint32_t)frame->ch_layout.nb_channels != channels ||
             (uint32_t)frame->sample_rate != rate)
             die("AAC output shape", AVERROR_INVALIDDATA);
@@ -78,10 +78,10 @@ static void aac_access_units(const uint8_t *data, size_t size, struct out *out) 
             }
             out->aac_channels = channels;
         }
-        const size_t plane = AAC_SAMPLES * sizeof(float);
+        const size_t plane = (size_t)samples_per_plane * sizeof(float);
         for (uint32_t channel = 0; channel < channels; channel++) {
             const uint8_t *samples = frame->extended_data[channel];
-            fold_aac_plane(&out->digest, samples);
+            fold_aac_plane(&out->digest, samples, (size_t)samples_per_plane);
             if (out->raw && fwrite(samples, 1, plane, out->raw) != plane)
                 die("AAC PCM output", AVERROR(EIO));
         }
