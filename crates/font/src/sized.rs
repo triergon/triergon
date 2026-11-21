@@ -242,18 +242,6 @@ fn is_tricky(name: NameRecord<'_>) -> bool {
         .any(|n| family.windows(n.len()).any(|w| w == n.as_bytes()))
 }
 
-/// The metrics of a `glyf` glyph without loading its points, passing each
-/// program it runs to `program`.
-fn glyf_metrics(
-    font: &Font,
-    table: &Glyf,
-    index: u16,
-    program: &mut dyn FnMut(&[u8]) -> Result<()>,
-) -> Result<glyf::Metrics> {
-    let mut work = WorkBudget::new(font.limits.work);
-    table.walk(&font.glyf_context(), index, &mut work, program)
-}
-
 /// Whether a TrueType program can only issue `INSTCTRL` with a constant
 /// selector 1 or 2: then the interpreter stays in backward compatibility
 /// mode, where hinting never changes an advance.
@@ -561,11 +549,14 @@ impl<'f> SizedFont<'f> {
         }
     }
 
-    /// The `glyf` metrics of a glyph that hinted loading runs the programs of:
-    /// `Unsupported` where one may leave backward compatibility.
+    /// The `glyf` metrics of a glyph that hinted loading runs the programs of,
+    /// read without its points within the face's work limit: `Unsupported`
+    /// where one of the programs may leave backward compatibility.
     fn hinted_glyf_metrics(&self, table: &Glyf, index: u16) -> Result<glyf::Metrics> {
+        let font = self.font;
+        let mut work = WorkBudget::new(font.limits.work);
         let mut compatible = true;
-        let m = glyf_metrics(self.font, table, index, &mut |program| {
+        let m = table.walk(&font.glyf_context(), index, &mut work, &mut |program| {
             compatible &= keeps_compatibility(program);
             Ok(())
         })?;
