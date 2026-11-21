@@ -36,14 +36,7 @@ fn dispatch(args: &[String]) -> runner::Result<()> {
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    match dispatch(&args) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("transport-worker: {error}");
-            ExitCode::from(2)
-        }
-    }
+    triergon_harness_runner::command(Some("transport-worker"), 2, dispatch)
 }
 
 /// C's entry point, the one exception to the worker's `deny(unsafe_code)`
