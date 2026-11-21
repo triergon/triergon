@@ -1,6 +1,8 @@
 //! MPEG-TS AU controls, authored independently of the container and codec crates.
 //! PES requests remain separate rows; their input bytes never change.
 
+pub mod matched;
+
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};

@@ -51,7 +51,7 @@ jobs:
       # stop the checks. Every entry is verified against its pin before use.
       TRIERGON_DOWNLOAD_CACHE: /home/runner/.cache/triergon-downloads
       # The reference builds the parity part prepares; lint reads FreeType and HarfBuzz.
-      REFERENCES: ffmpeg-matroska ffmpeg-formats ffmpeg-video freetype harfbuzz libass
+      REFERENCES: ffmpeg-matroska ffmpeg-formats ffmpeg-video freetype harfbuzz libass mpg123
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
