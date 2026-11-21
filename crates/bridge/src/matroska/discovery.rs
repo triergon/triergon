@@ -405,7 +405,9 @@ impl<S: Source> MatroskaDiscovery<S> {
         limits: MatroskaDiscoveryLimits,
         buffer: impl FnOnce(&triergon_core::Budget) -> ReplayBuffer,
     ) -> Result<Self> {
-        if !matches!(&engine, Engine::Matroska(reader) if reader.configuration().is_none())
+        if engine
+            .matroska_reader()
+            .is_none_or(|reader| reader.configuration().is_some())
             || limits.outputs == 0
             || limits.packet_bytes == 0
             || limits.source_bytes == 0

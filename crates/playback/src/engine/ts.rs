@@ -10,7 +10,7 @@ use crate::engine::ts::tracks::{PesTrack, PesTracks, TrackUpdate};
 use crate::engine::{TrackFact, track_kind};
 use crate::event::TsEvent;
 use crate::source::SourceReply;
-use crate::{Result, TrackKey};
+use crate::{Result, SeekIntent, TrackKey};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{BudgetVec, Error, InputCursor, Step, WorkBudget};
 use triergon_mpegts::stream::{FeedContinuation, FeedItem, TraceEvent, TransportStream};
@@ -106,6 +106,57 @@ pub struct TsEngine {
 }
 
 impl TsEngine {
+    /// Starts replaying the stream from its start with fresh tables, clocks and observers.
+    pub(crate) fn begin_seek(&mut self, intent: &SeekIntent) -> Result<()> {
+        if self.delivery.discovers_tracks() {
+            return Err(Error::Unsupported("seek needs a fresh TS segment"));
+        }
+        if self.bound_context.is_some() {
+            return Err(Error::Unsupported(
+                "bound native startup needs a fresh observed context after seek",
+            ));
+        }
+        if !self.input.capabilities().random_access {
+            return Err(Error::Unsupported("TS replay needs source rewind"));
+        }
+        let TrackKey::Ts { program, pid: _ } = intent.track else {
+            return Err(Error::Invalid("seek track format"));
+        };
+        if program != self.program {
+            return Err(Error::Invalid("seek source program"));
+        }
+        if matches!(self.policy, SourceTimePolicy::Unanchored)
+            && intent.clock == crate::ClockChoice::Source
+        {
+            return Err(Error::Unsupported("unanchored TS source time"));
+        }
+        self.input.reset(0)?;
+        self.stream = TransportStream::new_with_namespace(
+            self.input.budget().clone(),
+            self.format,
+            self.limits,
+            self.program,
+            self.namespace,
+        )?;
+        self.source_pes_clock = Some(DemuxClock::new(self.program)?);
+        self.tsid = None;
+        self.pcr_pid = None;
+        self.pending = None;
+        self.ended = false;
+        self.draining = false;
+        for track in self.pes_tracks.as_mut_slice() {
+            track.observer = None;
+            track.update = None;
+        }
+        self.pes_active = None;
+        self.pes_adopting = 0;
+        self.pes_pending = None;
+        self.pes_clock = Some(DemuxClock::new(self.program)?);
+        self.event_ordinal = 0;
+        self.pes_updates_from = None;
+        self.entity_end = None;
+        Ok(())
+    }
     fn from_stream(
         input: InputCursor,
         format: ts::PacketFormat,

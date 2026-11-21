@@ -9,7 +9,7 @@ use crate::event::{
     EngineStep, Event, Mp4EmptyPacket, Mp4Event, Mp4MissingSample, Mp4Packet, Mp4ShortPacket,
 };
 use crate::{
-    Result,
+    Result, SeekIntent, TrackKey,
     mp4::open::PendingMedia,
     mp4::plan::{Mp4Configuration, PreparedMp4, SourceRow},
 };
@@ -66,6 +66,79 @@ pub struct Mp4Engine {
 }
 
 impl Mp4Engine {
+    /// Starts replaying the plan from the landing, or from its start without one.
+    pub(crate) fn begin_seek(
+        &mut self,
+        intent: &SeekIntent,
+        mp4_landing: Option<Mp4RangeLanding<'_>>,
+    ) -> Result<()> {
+        if self.progressive.is_some() {
+            return Err(Error::Unsupported(
+                "progressive replay requires retained source/index context",
+            ));
+        }
+        if !self.input.capabilities().random_access {
+            return Err(Error::Unsupported("MP4 replay needs source ranges"));
+        }
+        if self.plan.unavailable_first.is_some() {
+            return Err(Error::Unsupported("native first sample is unavailable"));
+        }
+        let TrackKey::Mp4(id) = intent.track else {
+            return Err(Error::Invalid("seek track format"));
+        };
+        let t = self.plan.track(id)?;
+        if t.snapshot.handler != *b"vide" {
+            return Err(Error::Invalid("MP4 seek track is not video"));
+        }
+        let (row, offset, skip_video_until, demux_seek) = match mp4_landing {
+            Some(Mp4RangeLanding::Source(landing)) => {
+                let rows = self.plan.source_rows();
+                let first = rows
+                    .get(landing.first_row)
+                    .ok_or(Error::Invalid("MP4 seek first row"))?;
+                let sync = rows
+                    .get(landing.sync_row)
+                    .ok_or(Error::Invalid("MP4 seek sync row"))?;
+                if landing.first_row > landing.sync_row
+                    || sync.track_id != id
+                    || !sync.sample.is_container_sync()
+                {
+                    return Err(Error::Invalid("MP4 seek landing"));
+                }
+                let skip_video =
+                    (landing.first_row < landing.sync_row).then_some((id, landing.sync_row));
+                (
+                    landing.first_row,
+                    first.sample.range.start,
+                    skip_video,
+                    None,
+                )
+            }
+            Some(Mp4RangeLanding::Demux(replay)) => {
+                let first = replay.first_row();
+                let occurrence = self
+                    .plan
+                    .demux_row(first)
+                    .ok_or(Error::Invalid("MP4 native seek first row"))?;
+                (
+                    first,
+                    occurrence.source.range.start,
+                    None,
+                    Some(replay.clone()),
+                )
+            }
+            Some(Mp4RangeLanding::DemuxCursor(offset)) => (0, offset, None, None),
+            None => (0, 0, None, None),
+        };
+        self.input.reset(offset)?;
+        self.row = row;
+        self.skip_video_until = skip_video_until;
+        self.demux_seek = demux_seek;
+        self.packet = None;
+        self.ended_short = false;
+        self.configs = [None; 64];
+        Ok(())
+    }
     pub(crate) fn is_progressive(&self) -> bool {
         self.progressive.is_some()
     }

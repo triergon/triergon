@@ -22,9 +22,8 @@ use triergon_core::{
 };
 use triergon_isobmff::compat::mov::packets::PacketCursor;
 use triergon_matroska::Reader;
-use triergon_mpegts::compat::pes::DemuxClock;
 use triergon_mpegts::psi::DescriptorNamespace;
-use triergon_mpegts::stream::{ProgramStream, TransportStream};
+use triergon_mpegts::stream::ProgramStream;
 use triergon_mpegts::{self as mpegts, clock::SourceTimePolicy};
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct TrackFact {
@@ -349,6 +348,13 @@ impl Engine {
         t.draining = true;
         Ok(())
     }
+    /// The Matroska reader of a Matroska engine.
+    pub fn matroska_reader(&self) -> Option<&Reader> {
+        match self {
+            Self::Matroska(m) => Some(&m.reader),
+            _ => None,
+        }
+    }
     /// The container format.
     pub fn format(&self) -> Format {
         match self {
@@ -419,7 +425,7 @@ impl Engine {
     /// The input generation; a seek starts a new one.
     pub fn generation(&self) -> u64 {
         match self {
-            Self::Matroska(r) => r.generation(),
+            Self::Matroska(r) => r.reader.generation(),
             Self::Mp4(r) => r.input.generation(),
             Self::Ts(r) => r.input.generation(),
         }
@@ -427,7 +433,7 @@ impl Engine {
     /// The budget the engine's storage is charged to.
     pub fn pool(&self) -> &Budget {
         match self {
-            Self::Matroska(r) => r.budget(),
+            Self::Matroska(r) => r.reader.budget(),
             Self::Mp4(r) => r.input.budget(),
             Self::Ts(r) => r.input.budget(),
         }
@@ -500,13 +506,14 @@ impl Engine {
         let mut out = BudgetVec::new(self.pool());
         match self {
             Self::Matroska(r) => {
-                if r.tracks().len() > 64 {
+                let tracks = r.reader.tracks();
+                if tracks.len() > 64 {
                     return Err(Error::Limit {
-                        requested: r.tracks().len(),
+                        requested: tracks.len(),
                         maximum: 64,
                     });
                 }
-                for t in r.tracks() {
+                for t in tracks {
                     out.try_push(TrackFact {
                         key: TrackKey::Matroska(t.number),
                         kind: track_kind(t.kind()),
@@ -540,139 +547,9 @@ impl Engine {
         mp4_landing: Option<Mp4RangeLanding<'_>>,
     ) -> Result<()> {
         match self {
-            Self::Matroska(r) => {
-                let TrackKey::Matroska(number) = intent.track else {
-                    return Err(Error::Invalid("seek track format"));
-                };
-                let at = r
-                    .tracks()
-                    .iter()
-                    .position(|t| t.number == number && t.kind == 1)
-                    .ok_or(Error::Invalid("seek needs source video track"))?;
-                r.reader.seek_for_playback(
-                    at,
-                    intent
-                        .target
-                        .to_nanoseconds(triergon_core::Rounding::Floor)?,
-                )?;
-            }
-            Self::Mp4(r) => {
-                if r.progressive.is_some() {
-                    return Err(Error::Unsupported(
-                        "progressive replay requires retained source/index context",
-                    ));
-                }
-                if !r.input.capabilities().random_access {
-                    return Err(Error::Unsupported("MP4 replay needs source ranges"));
-                }
-                if r.plan.unavailable_first.is_some() {
-                    return Err(Error::Unsupported("native first sample is unavailable"));
-                }
-                let TrackKey::Mp4(id) = intent.track else {
-                    return Err(Error::Invalid("seek track format"));
-                };
-                let t = r.plan.track(id)?;
-                if t.snapshot.handler != *b"vide" {
-                    return Err(Error::Invalid("MP4 seek track is not video"));
-                }
-                let (row, offset, skip_video_until, demux_seek) = match mp4_landing {
-                    Some(Mp4RangeLanding::Source(landing)) => {
-                        let rows = r.plan.source_rows();
-                        let first = rows
-                            .get(landing.first_row)
-                            .ok_or(Error::Invalid("MP4 seek first row"))?;
-                        let sync = rows
-                            .get(landing.sync_row)
-                            .ok_or(Error::Invalid("MP4 seek sync row"))?;
-                        if landing.first_row > landing.sync_row
-                            || sync.track_id != id
-                            || !sync.sample.is_container_sync()
-                        {
-                            return Err(Error::Invalid("MP4 seek landing"));
-                        }
-                        let skip_video = (landing.first_row < landing.sync_row)
-                            .then_some((id, landing.sync_row));
-                        (
-                            landing.first_row,
-                            first.sample.range.start,
-                            skip_video,
-                            None,
-                        )
-                    }
-                    Some(Mp4RangeLanding::Demux(replay)) => {
-                        let first = replay.first_row();
-                        let occurrence = r
-                            .plan
-                            .demux_row(first)
-                            .ok_or(Error::Invalid("MP4 native seek first row"))?;
-                        (
-                            first,
-                            occurrence.source.range.start,
-                            None,
-                            Some(replay.clone()),
-                        )
-                    }
-                    Some(Mp4RangeLanding::DemuxCursor(offset)) => (0, offset, None, None),
-                    None => (0, 0, None, None),
-                };
-                r.input.reset(offset)?;
-                r.row = row;
-                r.skip_video_until = skip_video_until;
-                r.demux_seek = demux_seek;
-                r.packet = None;
-                r.ended_short = false;
-                r.configs = [None; 64];
-            }
-            Self::Ts(r) => {
-                if r.delivery.discovers_tracks() {
-                    return Err(Error::Unsupported("seek needs a fresh TS segment"));
-                }
-                if r.bound_context.is_some() {
-                    return Err(Error::Unsupported(
-                        "bound native startup needs a fresh observed context after seek",
-                    ));
-                }
-                if !r.input.capabilities().random_access {
-                    return Err(Error::Unsupported("TS replay needs source rewind"));
-                }
-                let TrackKey::Ts { program, pid: _ } = intent.track else {
-                    return Err(Error::Invalid("seek track format"));
-                };
-                if program != r.program {
-                    return Err(Error::Invalid("seek source program"));
-                }
-                if matches!(r.policy, SourceTimePolicy::Unanchored)
-                    && intent.clock == crate::ClockChoice::Source
-                {
-                    return Err(Error::Unsupported("unanchored TS source time"));
-                }
-                r.input.reset(0)?;
-                r.stream = TransportStream::new_with_namespace(
-                    r.input.budget().clone(),
-                    r.format,
-                    r.limits,
-                    r.program,
-                    r.namespace,
-                )?;
-                r.source_pes_clock = Some(DemuxClock::new(r.program)?);
-                r.tsid = None;
-                r.pcr_pid = None;
-                r.pending = None;
-                r.ended = false;
-                r.draining = false;
-                for track in r.pes_tracks.as_mut_slice() {
-                    track.observer = None;
-                    track.update = None;
-                }
-                r.pes_active = None;
-                r.pes_adopting = 0;
-                r.pes_pending = None;
-                r.pes_clock = Some(DemuxClock::new(r.program)?);
-                r.event_ordinal = 0;
-                r.pes_updates_from = None;
-                r.entity_end = None;
-            }
+            Self::Matroska(r) => r.begin_seek(intent),
+            Self::Mp4(r) => r.begin_seek(intent, mp4_landing),
+            Self::Ts(r) => r.begin_seek(intent),
         }
-        Ok(())
     }
 }
