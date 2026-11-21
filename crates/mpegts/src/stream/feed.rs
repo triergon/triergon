@@ -12,8 +12,13 @@ use triergon_core::{Error, InputCursor, Result, SourceLocation, WorkBudget};
 /// Disposition of a validated PES body carrier offered directly to a feed.
 #[derive(Debug)]
 pub enum FeedContinuation {
+    /// The feed left the carrier unchanged; the poll publishes it as a transport event.
     Emit,
+    /// The feed took the carrier; the poll counts its events as omitted and reads the
+    /// next carrier.
     Buffered,
+    /// The feed took the carrier; the poll counts its events as omitted and returns
+    /// `Yield`.
     Yield,
 }
 
@@ -22,6 +27,7 @@ pub enum FeedContinuation {
 pub struct FeedCarrier<'a>(pub(super) &'a mut FramedCarrier);
 
 impl FeedCarrier<'_> {
+    /// The 13-bit PID of the carrier.
     pub fn pid(&self) -> u16 {
         self.0.pid()
     }
@@ -49,7 +55,10 @@ impl FeedCarrier<'_> {
 /// An ordinary carrier or a shared-window prefix offered to a progressive feed.
 #[derive(Debug)]
 pub enum FeedItem<'a> {
+    /// One validated PES continuation carrier.
     Carrier(FeedCarrier<'a>),
+    /// Two or more payload-only continuations on one PID in the shared input window,
+    /// accepted only through [`FeedPayloadRun::append_ready`].
     PayloadRun(FeedPayloadRun<'a>),
 }
 
@@ -80,6 +89,7 @@ pub struct FeedPayloadRun<'a> {
 }
 
 impl FeedPayloadRun<'_> {
+    /// The 13-bit PID every carrier of the run shares.
     pub fn pid(&self) -> u16 {
         self.pid
     }

@@ -9,6 +9,7 @@ pub struct ObservedTrace<T> {
     pub(crate) origin: TraceOrigin,
 }
 impl<T> ObservedTrace<T> {
+    /// The source event.
     pub fn event(&self) -> &T {
         &self.event
     }
@@ -40,9 +41,11 @@ pub struct MediaEntityEnd {
     pub(crate) budget: Budget,
 }
 impl MediaEntityEnd {
+    /// The entity's source and its end offset, one past its last byte.
     pub fn location(&self) -> SourceLocation {
         self.location
     }
+    /// The clock and configuration epochs in force when the entity ended.
     pub fn epochs(&self) -> SourceEpochs {
         self.epochs
     }

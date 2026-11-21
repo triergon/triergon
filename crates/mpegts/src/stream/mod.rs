@@ -105,6 +105,11 @@ pub struct TransportStream {
 }
 
 impl TransportStream {
+    /// A stream of `format` packets that demultiplexes `program`, with private
+    /// descriptors left uninterpreted (`DescriptorNamespace::Unspecified`).
+    ///
+    /// Fails with `Invalid` for program 0, which names the network PID, and for `limits`
+    /// out of range.
     pub fn new(
         budget: Budget,
         format: PacketFormat,
@@ -244,6 +249,7 @@ impl TransportStream {
     pub fn selected_program(&self) -> u16 {
         self.program
     }
+    /// The clock and configuration epochs in force at the current position.
     pub fn source_epochs(&self) -> SourceEpochs {
         SourceEpochs {
             clock: self.clock_epoch,

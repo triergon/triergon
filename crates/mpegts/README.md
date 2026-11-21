@@ -13,18 +13,46 @@ single-program stream for one video elementary stream ([Writing TS](#writing-ts)
 
 The crate exposes two views:
 
-- **Source view** (`Reader`, `TransportStream` and its parts). Every value is a wire
-  fact: raw 33-bit PTS/DTS, raw PCR, descriptor bytes, source byte ranges.
-  Unknown DTS stays unknown.
+- **Source view** (`Reader` and the modules `transport`, `psi`, `pes`, `stream`
+  and `clock`). Every value is a wire fact: raw 33-bit PTS/DTS, raw PCR,
+  descriptor bytes, source byte ranges. Unknown DTS stays unknown.
 - **FFmpeg-compatible view** (`compat::pes`, `compat::input`). It reproduces
   the packets, positions, flags and timestamps of FFmpeg's MPEG-TS demuxer,
   including its handling of damaged and headerless PES. It is fed from the same
   transport packets and never rewrites source facts.
 
-The non-default `reference-trace` feature adds `reference_trace`, the projections
-that exist only to compare traces with FFmpeg: `recovery` (packets from rejected
-carriers), `catalogue` (programs and streams), `dvb` and `input`.
-Its `packet_completion` module re-exports the consumer policy in `compat::pes`.
+## Modules
+
+The crate root holds the access-unit reader (`Reader`, `ReaderEvent`,
+`ReaderLimits`, `Track`, `Packet`, `AccessUnit`) and the shared source facts
+(`PacketFormat`, `ParseLimits`, `SourceRange`, `SourceEpochs`, `AssemblyStep`).
+Everything else lives in its module:
+
+- `transport`: packets (`TransportPacket`, `Adaptation`, `Pcr`, `parse_transport`),
+  framing (`TransportFramer`, `FrameStep`, `FrameState`, `NullCarrierRun`),
+  continuity (`Continuity`, `ContinuityOutcome`) and in-place carrier inspection
+  (`TransportInspector`, `TransportInspection`, `TransportObservation`,
+  `RejectedTransport`).
+- `pes`: PES assembly (`PesAssembler`) and its output (`Pes`, `PesHeader`, `PesSpan`).
+- `psi`: sections (`SectionAssembler`), PAT and PMT tables, and descriptors.
+- `stream`: the selected-program source operation (`TransportStream`), its events
+  (`TraceEvent`, `TraceFault`, `FaultKind`, `CompactTraceEvent`,
+  `CarrierObservation`), feed delivery (`FeedItem`, `FeedCarrier`,
+  `FeedPayloadRun`, `FeedContinuation`) and source witnesses (`ObservedTrace`,
+  `MediaEntityEnd`).
+- `reader`: the root reader types with their policies (`AudioEofPolicy`,
+  `DvbSubtitleTailPolicy`), entity plans (`EntityTransition`, `SeekEntity`),
+  source events and clocks (`SourceEvent`, `PacketClock`, `PayloadSource`) and
+  access units (`Ac3AccessUnit`, `DtsAudioFrame`, `DtsExtensionFrame`,
+  `DvbSubtitleUnit`, `LoasFrame`, `MpegAudioFrame`, `IncompleteVideo`,
+  `UnframedAudio`).
+- `clock`: raw timestamps lifted to exact time (`source_timestamp`, `SourceTimePolicy`).
+- `mux`: the single-program writer ([Writing TS](#writing-ts)).
+- `compat`: FFmpeg-compatible policies, one module per family: `pes`, `stream`,
+  `input`, `adts`, `latm`, `dts`, `annex_b` and `opaque_video`.
+- `reference_trace` (non-default feature `reference-trace`): the projections that
+  exist only to compare traces with FFmpeg, in `recovery` (packets from rejected
+  carriers), `catalogue` (programs and streams), `dvb` and `input`.
 
 `compat::pes::PacketCompletion` confirms that one physical input contained only
 control traffic. Poll the source with `TransportStream::poll_observed` and
@@ -48,7 +76,7 @@ actual source diagnostic through `confirm_source_fault`. Until that confirmation
 `poll` retains the carrier and returns `NeedPayload`. Combined faults, incomplete
 PES, other headers and entity or epoch transitions remain unsupported.
 
-`TransportObservation::Faulted` retains the unchanged carrier, source diagnostic,
+`RecoveredPes::Faulted` retains the unchanged carrier, source diagnostic,
 event contexts, byte ranges and charged storage. Its payload may be damaged or
 scrambled: it is neither validated source PES nor a codec access unit.
 `DemuxClock::project_transport_fault` places the encoded PTS in the existing demux
@@ -64,7 +92,7 @@ default constructor keeps all additional choices disabled. Accepted carriers wit
 timing encoding must receive their matching later PES diagnostic before output.
 Rejected carriers must have only the selected clock fault, complete syntax
 inspection and no secondary error; their original bytes and rejection remain
-in `TransportObservation::PesFault`. Each admitted PES must be complete, finite
+in `RecoveredPes::PesFault`. Each admitted PES must be complete, finite
 and nonempty in one AVC-signalled TS188 carrier. No source clock, accepted
 transport packet or source PES is reconstructed.
 
@@ -320,7 +348,7 @@ Repeated sections that match the active PAT or PMT retain each occurrence's
 source ranges. The reader reuses the accepted table when the bytes match.
 
 `Reader::step_with_carriers` delivers transport and ordinary continuity
-observations to a borrowed callback in source order. A `TransportObservation`
+observations to a borrowed callback in source order. A `transport::TransportObservation`
 exposes the original bytes and location. Call `to_packet` to retain the complete
 carrier and its parsed fields. Complete TS188 continuations can move their
 payload backing directly into a prepared PES span. Complete carriers can also
@@ -658,16 +686,16 @@ file.
 | Task | Entry points |
 | --- | --- |
 | Complete source access units | `Reader`, `ReaderLimits`, `ContainerReader` |
-| Whole stream, one program | `TransportStream::{new, new_with_namespace}` |
+| Whole stream, one program | `stream::TransportStream::{new, new_with_namespace}` |
 | One HLS segment (TS188, in-band PAT/PMT) | `TransportStream::new_single_program_segment`, `new_single_program_feed` |
 | Sequential TS188 playback input | `TransportStream::new_single_program_progressive_feed` |
-| Packets only | `parse_transport`, `TransportFramer`, `carrier::TransportInspector` |
-| Continuity | `Continuity::observe` → `ContinuityOutcome` |
-| PSI | `SectionAssembler`, `psi::{PatReader, PmtReader, PatCollector}` |
+| Packets only | `transport::{parse_transport, TransportFramer, TransportInspector}` |
+| Continuity | `transport::Continuity::observe` → `ContinuityOutcome` |
+| PSI | `psi::{SectionAssembler, PatReader, PmtReader, PatCollector}` |
 | Track classification | `psi::ElementaryStream` implements `triergon_core::container::TrackInfo` |
 | Descriptors | `psi::Descriptor::{registration, languages, avc_video, hevc_video, dvb_ac3, dvb_eac3, dvb_subtitling}` |
 | Stream codec | `psi::ElementaryStream::{codec, dvb_descriptor_codec}` → `triergon_core::CodecId` |
-| PES | `PesAssembler` → `Pes`, `PesHeader::{raw_pts_time, raw_dts_time}` |
+| PES | `pes::PesAssembler` → `Pes`, `PesHeader::{raw_pts_time, raw_dts_time}` |
 | Timestamps | `clock::source_timestamp` with `clock::SourceTimePolicy` |
 | FFmpeg-compatible PES | `compat::pes::DemuxObserver::{new_registered, new_private_audio, new_hls_private_audio, new_dvb_subtitles}`; `compat::pes::PesCutter` → `CutPes` for one PID of any stream type |
 | FFmpeg-compatible streams | `compat::stream::{ProgramReader, codec, configuration, is_video}`: programs, stream codecs (adds 0x81, 0x87, 0x90 and DVB tags outside a DVB namespace) and subtitle configuration |

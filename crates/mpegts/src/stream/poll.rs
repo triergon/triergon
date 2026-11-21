@@ -164,6 +164,16 @@ impl TransportStream {
         })
     }
 
+    /// Advances the stream within `work` and returns at most one event, in source order.
+    /// `NeedInput` asks for more bytes, `Yield` means `work` is spent, and `End` reports
+    /// the end of the input entity; call
+    /// [`end_of_source`](Self::end_of_source) there when it is the logical end of media.
+    ///
+    /// Source faults are [`TraceEvent::Diagnostic`] events, not errors. Fails with
+    /// `Cancelled` when `cancel` is set, with `Invalid` after
+    /// [`TraceEvent::Finished`], and with the budget's and the input cursor's errors.
+    /// A stream built as a feed omits some events and counts them; see
+    /// [`take_feed_omissions`](Self::take_feed_omissions).
     pub fn poll(
         &mut self,
         input: &mut InputCursor,
@@ -303,6 +313,9 @@ impl TransportStream {
         )
     }
 
+    /// Like [`poll`](Self::poll), returning each run of null packets as one
+    /// [`CompactTraceEvent::NullRun`] instead of one transport event per packet. On a
+    /// feed stream, events are omitted and counted as by `poll`.
     pub fn poll_compact(
         &mut self,
         input: &mut InputCursor,

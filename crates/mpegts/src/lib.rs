@@ -1,13 +1,14 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr,
     clippy::unwrap_used
 )]
-// Pending: `missing_docs`, `clippy::expect_used`.
+// Pending: `clippy::expect_used`.
 
 pub mod clock;
 pub mod compat;
@@ -25,15 +26,29 @@ pub use transport::PacketFormat;
 
 use triergon_core::{BudgetVec, Error, Result, SourceId};
 
-/// Format policy, independent from the shared live-capacity Budget.
+/// Format bounds on sections, PES packets and tables, independent from the shared
+/// live-capacity budget.
+///
+/// Input beyond a bound fails with `Limit`. Building a parser fails with `Invalid` when
+/// `section_bytes` is outside 3..=4096, `pes_bytes` is below 6 or any count is zero.
 #[derive(Clone, Copy, Debug)]
 pub struct ParseLimits {
-    /// PAT/PMT still have a normative 1024-byte total, even under this private limit.
+    /// Maximum bytes of one PSI section, from its table ID through its CRC; 3 to 4096,
+    /// default 4096. PAT and PMT sections keep their normative 1024-byte limit even when
+    /// this is larger.
     pub section_bytes: usize,
+    /// Maximum bytes of one PES packet, from its start code through its payload; at least
+    /// 6, default 16 MiB. Also bounds an unbounded video PES.
     pub pes_bytes: usize,
+    /// Maximum source ranges of one section, and of one PES header or payload span list;
+    /// default 4096.
     pub source_spans: usize,
+    /// Maximum program entries in one PAT version, across its sections; default 64.
     pub programs: usize,
+    /// Maximum elementary streams in one PMT; default 64.
     pub streams: usize,
+    /// Maximum descriptors in one PMT section, program and stream loops together; default
+    /// 256.
     pub descriptors: usize,
 }
 
@@ -68,12 +83,17 @@ impl ParseLimits {
 /// Container-local provenance. Entity identity is not an I/O generation or epoch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourceRange {
+    /// The source entity the bytes were read from.
     pub entity: SourceId,
+    /// Byte offset of the first byte in that entity.
     pub offset: u64,
+    /// Length of the range in bytes.
     pub bytes: usize,
 }
 
 impl SourceRange {
+    /// The offset one past the last byte. Fails with `Overflow` when that does not fit
+    /// in a `u64`.
     pub fn end(self) -> Result<u64> {
         self.offset
             .checked_add(u64::try_from(self.bytes).map_err(|_| Error::Overflow)?)
@@ -84,16 +104,25 @@ impl SourceRange {
 /// Source facts supplied by the format coordinator; neither is an I/O token.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SourceEpochs {
+    /// Advances at each accepted PCR discontinuity and each explicit stream
+    /// discontinuity; 0 for the initial time base.
     pub clock: u64,
+    /// Advances with each accepted program map, each PAT that changes the selected
+    /// program's PMT PID or transport stream ID, and each explicit stream discontinuity;
+    /// 0 before the first PAT.
     pub configuration: u64,
 }
 
 /// One parser poll produces at most one owned object and never performs source I/O.
 #[derive(Debug)]
 pub enum AssemblyStep<T> {
+    /// A completed object.
     Output(T),
+    /// The pushed payload is used up; push the next payload before polling again.
     NeedPayload,
+    /// The work grant is spent; poll again with a new grant.
     Yield,
+    /// The source has ended and every object has been returned.
     Finished,
 }
 
