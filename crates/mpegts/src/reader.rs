@@ -1108,13 +1108,20 @@ impl Reader {
             }
             if let Some((index, source, key)) = self.queued_pes.take() {
                 let mut source = Some(source);
-                match self.lanes.as_mut_slice()[index].push(&mut source, key, work) {
+                let lane = &mut self.lanes.as_mut_slice()[index];
+                let probing = self.limits.probe_unlabelled_dts_core && lane.is_probing_dts();
+                match lane.push(&mut source, key, work) {
                     Ok(true) => {
-                        if self.limits.probe_unlabelled_dts_core {
-                            self.tracks.as_mut_slice()[index] =
-                                self.lanes.as_slice()[index].track.clone();
-                        }
                         self.active = Some(index);
+                        if probing {
+                            if let Some(error) = lane.unsupported {
+                                return Ok(Step::Ready(Event::Other(ReaderEvent::Unsupported {
+                                    track: lane.track.clone(),
+                                    error,
+                                })));
+                            }
+                            self.tracks.as_mut_slice()[index] = lane.track.clone();
+                        }
                     }
                     retry => {
                         self.queued_pes = Some((index, source.expect("queued PES on retry"), key));
@@ -1131,6 +1138,7 @@ impl Reader {
                 self.unsupported_at = (index + 1 < self.lanes.len()).then_some(index + 1);
                 if let Some(lane) = self.lanes.as_slice().get(index)
                     && let Some(error) = lane.unsupported
+                    && !lane.is_probing_dts()
                 {
                     return Ok(Step::Ready(Event::Other(ReaderEvent::Unsupported {
                         track: lane.track.clone(),

@@ -708,23 +708,6 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                 cause,
                 ..
             }))) if matches!(cause.event(), TraceEvent::Discontinuity { .. }) => (),
-            // The opt-in reader announces unsupported source signalling before
-            // its first-PES probe. Keep reading; EOF with no packets still refuses.
-            Step::Ready(Event::Other(ContinuityEvent::Source(ReaderEvent::Unsupported {
-                track,
-                ..
-            }))) if request.probe_dts_core
-                && track.program_map().program_descriptors.is_empty()
-                && track.stream().stream_type == 6
-                && track.stream().descriptor_bytes.is_empty()
-                && track
-                    .program_map()
-                    .streams
-                    .as_slice()
-                    .iter()
-                    .filter(|stream| stream.stream_type == 6 && stream.descriptor_bytes.is_empty())
-                    .count()
-                    == 1 => {}
             Step::Ready(Event::Other(ContinuityEvent::Source(event))) => {
                 if let Some(original) = deferred_continuity {
                     return Ok(original);

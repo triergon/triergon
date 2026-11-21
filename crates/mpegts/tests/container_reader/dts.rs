@@ -480,6 +480,9 @@ fn automatic_core_probe_requires_two_envelopes_and_keeps_source_facts() {
                     assert_eq!(packet.dts(), (count == 0).then_some(89_000));
                     count += 1;
                 }
+                Event::Other(ReaderEvent::Unsupported { .. }) => {
+                    panic!("the first PES proves DTS before publishing an unsupported track")
+                }
                 _ => (),
             }
         }
@@ -514,9 +517,28 @@ fn automatic_core_probe_refuses_false_positives_and_ambiguous_routes() {
         // A later valid PES cannot rescue a failed initial probe.
         ts.pes(PID, 0xbd, valid, None, None);
         let mut drive = Drive::new(&ts.bytes, probe_limits(), 7, 1);
+        let mut source_pes = 0;
+        let mut failed_probe = false;
         while let Some(event) = drive.next().unwrap() {
-            assert!(!matches!(event, Event::Packet(_)));
+            match event {
+                Event::Packet(_) => panic!("an unsupported stream has no access units"),
+                Event::Other(ReaderEvent::Source(source))
+                    if matches!(source.event(), TraceEvent::Pes(_)) =>
+                {
+                    source_pes += 1;
+                }
+                Event::Other(ReaderEvent::Unsupported {
+                    error: Error::Unsupported("MPEG-TS private PES does not prove DTS core"),
+                    ..
+                }) => {
+                    assert_eq!(source_pes, 1);
+                    assert!(!failed_probe);
+                    failed_probe = true;
+                }
+                _ => (),
+            }
         }
+        assert_eq!(failed_probe, descriptors.is_empty() && !ambiguous);
     }
 }
 

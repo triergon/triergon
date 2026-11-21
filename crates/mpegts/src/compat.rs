@@ -68,7 +68,7 @@ pub mod dts {
     //! rate, channel mode and block count. At most 32768 payload bytes are read,
     //! one work unit per byte or span boundary, with no allocation or sync search.
     //! The original PES stays in the charged mailbox across yields. A failed
-    //! initial probe cannot be rescued by later PES. A new map, clock or byte run
+    //! initial probe emits an unsupported-track event at that PES. A new map, clock or byte run
     //! requires fresh evidence; neither source signalling nor clocks are rewritten.
     //! This proves envelopes, not audio decoding or absence of embedded extensions.
     //!

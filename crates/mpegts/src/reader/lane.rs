@@ -1147,6 +1147,10 @@ pub(super) struct Lane {
 }
 
 impl Lane {
+    pub(super) fn is_probing_dts(&self) -> bool {
+        self.probe.is_some()
+    }
+
     pub(super) fn new(
         pool: &Budget,
         track: Track,
@@ -1263,6 +1267,10 @@ impl Lane {
                 self.track = track;
                 self.framer = Some(framer);
                 self.unsupported = None;
+            } else {
+                self.unsupported = Some(Error::Unsupported(
+                    "MPEG-TS private PES does not prove DTS core",
+                ));
             }
             self.probe = None;
         }
