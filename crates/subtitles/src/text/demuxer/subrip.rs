@@ -23,6 +23,9 @@ struct Open {
     text_start: usize,
     /// Where the last line's separator and the line itself start.
     last_line: Option<(usize, usize)>,
+    /// Where its timing line starts in the source.
+    #[cfg(feature = "reference-trace")]
+    offset: usize,
 }
 
 #[derive(Debug)]
@@ -62,6 +65,8 @@ impl Parser {
                 duration_ms: i64::from(end_ms.wrapping_sub(start_ms) as i32),
                 text_start: self.text.len(),
                 last_line: None,
+                #[cfg(feature = "reference-trace")]
+                offset: span.start,
             });
         } else if !content.is_empty() && self.cue.is_some() {
             self.append(source, span)?;
@@ -112,6 +117,8 @@ impl Parser {
             text: cue.text_start..self.text.len(),
             identifier: None,
             settings: None,
+            #[cfg(feature = "reference-trace")]
+            offset: cue.offset,
         })
     }
 

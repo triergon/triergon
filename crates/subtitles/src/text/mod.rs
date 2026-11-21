@@ -10,8 +10,6 @@
 #![forbid(unsafe_code)]
 
 pub(crate) mod ass_decoder;
-#[cfg(feature = "reference-trace")]
-pub(crate) mod carriage;
 pub mod charset;
 pub(crate) mod decoded;
 pub(crate) mod demuxer;

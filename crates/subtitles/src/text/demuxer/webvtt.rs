@@ -166,6 +166,8 @@ pub(super) fn block(
         text: range(cue.text),
         identifier: cue.identifier.map(range),
         settings: cue.settings.map(range),
+        #[cfg(feature = "reference-trace")]
+        offset: block.end,
     })?;
     Ok(true)
 }

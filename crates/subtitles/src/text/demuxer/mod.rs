@@ -17,6 +17,9 @@ mod timestamp;
 mod utf16;
 mod webvtt;
 
+#[cfg(feature = "reference-trace")]
+pub(crate) use timestamp::subrip as subrip_timing;
+
 use blocks::{Block, Blocks};
 use lines::{Line, Lines};
 use std::ops::Range;
@@ -78,6 +81,10 @@ pub struct Cue {
     pub identifier: Option<Bytes>,
     /// The WebVTT cue settings.
     pub settings: Option<Bytes>,
+    /// Where the cue was read in the parsed text: the start of its SubRip
+    /// timing line, or the end of its WebVTT block.
+    #[cfg(feature = "reference-trace")]
+    pub(crate) offset: usize,
 }
 
 /// What a [`Reader::poll`] produced.
@@ -101,6 +108,9 @@ struct Entry {
     text: Range<usize>,
     identifier: Option<Range<usize>>,
     settings: Option<Range<usize>>,
+    /// [`Cue::offset`].
+    #[cfg(feature = "reference-trace")]
+    offset: usize,
 }
 
 impl Entry {
@@ -167,6 +177,9 @@ pub struct Reader {
     entries: Entries,
     /// The bytes cue ranges point into: SubRip text, or the source for WebVTT.
     text: Option<Bytes>,
+    /// A converted document's line ends ([`Reader::line_ends`]).
+    #[cfg(feature = "reference-trace")]
+    line_ends: Option<BudgetVec<(usize, usize)>>,
 }
 
 impl Reader {
@@ -211,7 +224,23 @@ impl Reader {
                 maximum: limits.cues,
             },
             text: None,
+            #[cfg(feature = "reference-trace")]
+            line_ends: None,
         })
+    }
+
+    /// The text the cues were read from: the document, or its UTF-8
+    /// conversion.
+    #[cfg(feature = "reference-trace")]
+    pub(crate) fn source(&self) -> &Bytes {
+        &self.source
+    }
+
+    /// For a document converted from UTF-16, the offset after each LF in the
+    /// conversion and in the document, in order.
+    #[cfg(feature = "reference-trace")]
+    pub(crate) fn line_ends(&self) -> Option<&[(usize, usize)]> {
+        self.line_ends.as_ref().map(BudgetVec::as_slice)
     }
 
     fn parse_phase(pool: &Budget, source: &Bytes, syntax: Syntax, limits: Limits) -> Phase {
@@ -237,6 +266,10 @@ impl Reader {
                     let Some(converted) = decoder.advance(self.source.as_ref(), work)? else {
                         return Ok(Status::Yield);
                     };
+                    #[cfg(feature = "reference-trace")]
+                    {
+                        self.line_ends = Some(decoder.take_line_ends());
+                    }
                     self.source = converted;
                     self.phase =
                         Self::parse_phase(&self.pool, &self.source, self.syntax, self.limits);
@@ -324,6 +357,8 @@ impl Reader {
                         text: slice(&entry.text)?,
                         identifier: entry.identifier.as_ref().map(slice).transpose()?,
                         settings: entry.settings.as_ref().map(slice).transpose()?,
+                        #[cfg(feature = "reference-trace")]
+                        offset: entry.offset,
                     };
                     return Ok(Status::Cue(cue));
                 }
