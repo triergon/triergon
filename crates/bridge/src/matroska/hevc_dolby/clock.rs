@@ -1,4 +1,4 @@
-//! Separate native packet timing for the admitted single-layer HEVC feed.
+//! The demux packet clock of the single-layer HEVC feed, kept beside its source times.
 use super::{FeedCodec, MatroskaHevcDolbyFeed, MatroskaHevcDolbyPacket, MatroskaHevcDolbyPayload};
 use crate::matroska::{Association, MatroskaPacketTiming, video_clock::DecodeClock};
 use triergon_core::{Error, Result};
@@ -22,7 +22,7 @@ pub struct MatroskaHevcClock<'feed> {
 }
 
 impl MatroskaHevcDolbyFeed {
-    /// Bind a native clock to this feed's single base-layer parameter-set
+    /// Bind a demux clock to this feed's single base-layer parameter-set
     /// chain and temporal sublayer. A Dolby audio feed returns `None`.
     pub fn demux_hevc_clock(&self) -> Result<Option<MatroskaHevcClock<'_>>> {
         let FeedCodec::Hevc(config) = &self.codec else {
@@ -84,7 +84,7 @@ impl MatroskaHevcClock<'_> {
 }
 
 fn duration_ns((units, scale): (u32, u32), tick_ns: u64) -> Option<u64> {
-    // The selected native path uses the codec clock on a millisecond or
+    // The reference uses the codec clock on a millisecond or
     // finer packet grid. Bound the rational to an exactly representable
     // receiver rate strictly below 1,000 frames per second.
     if units == 0

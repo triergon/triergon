@@ -14,8 +14,8 @@ use triergon_mpegts::{
 use triergon_playback::pes_feed::SpentLists;
 use triergon_playback::{compat::pes::AdmittedCarriage, compat::pes::Carriage};
 
-/// The legacy AVC/AAC reader uses concrete lanes. Only the codec-negotiated
-/// reader needs the variant dispatch or larger lane and output storage.
+/// The AVC and AAC reader uses concrete lanes. Only the reader that takes its codecs
+/// from the PMT needs the variant dispatch and the larger lane and output storage.
 pub(super) trait LaneAssembler: Sized {
     type Unit;
 

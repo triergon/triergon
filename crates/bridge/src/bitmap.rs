@@ -214,7 +214,7 @@ impl<'a> PgsQueuePicture<'a> {
 }
 
 impl<M> PgsOutput<M> {
-    /// Project the receiver's first native event to the packet-clock bitmap
+    /// Project the receiver's first event to the packet-clock bitmap
     /// queue. A zero-rectangle event clears the track. An absent event or an
     /// event whose rectangles cannot be displayed leaves the queue unchanged.
     pub fn packet_clock_action(&self) -> Result<Option<PgsQueueAction<'_>>> {

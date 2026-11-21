@@ -1,4 +1,6 @@
-//! Complete source text packets/documents. Unicode and native views stay distinct.
+//! Text subtitles as cues: [`TextBridge`] takes one complete packet or document of a
+//! track at a time and reports the cues the text extractor of `triergon-subtitles`
+//! reads from it.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation, Time, WorkBudget,

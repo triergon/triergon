@@ -605,7 +605,7 @@ mod tests {
             dts: Option<u32>,
         ) -> (Option<DemuxPacket>, DemuxTimeView) {
             // Authored finite PES, carried in one TS packet with adaptation
-            // padding. The real native observer supplies the charged spans.
+            // padding. The transport observer supplies the charged spans.
             let optional = if dts.is_some() { 10 } else { 5 };
             let pes_length = (3 + optional + bytes.len()) as u16;
             let pes_length = pes_length.to_be_bytes();

@@ -270,7 +270,7 @@ pub struct MatroskaHevcDolbyPacket<'a> {
 }
 
 impl MatroskaHevcDolbyPacket<'_> {
-    /// Return the declared duration on the native packet clock, or project
+    /// Return the declared duration on the demux packet clock, or project
     /// the final CRC-valid independent syncframe of an admitted Dolby packet.
     /// The fallback checks up to 32 complete syncframes. The typed source
     /// keeps its original container timing.
@@ -312,7 +312,7 @@ fn dolby_final_syncframe(family: Ac3Family, mut raw: &[u8]) -> Option<Ac3FrameHe
         }
         let (frame, remaining) = raw.split_at_checked(header.frame_bytes)?;
         if remaining.is_empty() {
-            // The native header parser takes its duration from the final
+            // The reference header parser takes its duration from the final
             // syncframe. The CRC covers bytes after the sync word.
             if crc16_a52(0, &frame[2..]) != 0 {
                 return None;

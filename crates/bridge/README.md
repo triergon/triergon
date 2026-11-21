@@ -27,7 +27,7 @@ first slice of an access unit. Configuration array types must match parameter
 set NAL headers. Repeated VPS timing requires positive tick units and time
 scale when those fields are present. The single-layer VPS is checked through
 its trailing bits, the SPS through its timing fields, and the base PPS through
-its extension flags. The native packet clock also accepts matching in-band
+its extension flags. The demux packet clock also accepts matching in-band
 sets before a picture's first slice.
 
 **Access units.** `AccessUnits` frames what a container stores in its own

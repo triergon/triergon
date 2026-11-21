@@ -1,4 +1,4 @@
-//! Native-compatible timing for ordered AC-3 family packets.
+//! The demux clock of AC-3 and E-AC-3 packets in order.
 use super::{
     FeedCodec, MatroskaHevcDolbyFeed, MatroskaHevcDolbyPacket, MatroskaHevcDolbyPayload,
     check_limit, dolby_final_syncframe, syncframe_duration_ns,
@@ -67,7 +67,7 @@ impl MatroskaHevcDolbyFeed {
 }
 
 fn integral_nominal_ac3_duration(rate: f64, scale: u64) -> Option<u64> {
-    // When the selected native parser has no usable AC-3 header, the
+    // When the reference parser has no usable AC-3 header, the
     // demux clock can still use the track rate and fixed 1536-sample period.
     // This fallback admits only periods integral on the source clock.
     if !(1.0..=f64::from(i32::MAX)).contains(&rate) {

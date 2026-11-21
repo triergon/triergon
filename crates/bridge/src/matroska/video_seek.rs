@@ -1,4 +1,5 @@
-//! Native selected-video admission over the source's complete-cluster replay.
+//! Admission of the selected video track's packets after a seek, on the demux clock,
+//! over the source's replay of complete clusters.
 use triergon_core::{Error, Result};
 use triergon_matroska::Event as MkvEvent;
 use triergon_playback::{Delivery, Event, Output, OutputScope, TrackKey};

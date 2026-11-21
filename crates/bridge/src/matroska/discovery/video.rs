@@ -167,7 +167,7 @@ fn propagate(error: Error) -> bool {
 
 impl Setup {
     fn new(output: &Output, packet: &Packet, track: &Track) -> Result<Option<Self>> {
-        // The native Matroska probe has both frame rates at open for this range.
+        // The reference's Matroska probe has both frame rates at open for this range.
         // Keep away from the rounded endpoints of its rational reduction.
         if !track
             .default_duration_ns

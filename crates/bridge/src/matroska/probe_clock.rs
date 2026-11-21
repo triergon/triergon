@@ -1,10 +1,10 @@
-//! Shared native initial-packet timing over a bounded probe prefix.
+//! The demux clock of a track's first packets, read from a bounded probe prefix.
 use triergon_core::{Budget, BudgetVec, Error, Result};
 use triergon_matroska::TypedPacket as Packet;
 
 const MAX_PREFIX_PACKETS: usize = 4096;
 
-/// One packet's native clock in nanoseconds.
+/// One packet's demux clock in nanoseconds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MatroskaPacketTiming {
     /// The presentation time.

@@ -1,4 +1,4 @@
-//! Native-compatible timing for ordered indexed AAC-LC core packets.
+//! The demux clock of AAC-LC packets in order.
 use super::{
     FeedCodec, MatroskaFeedPacket, MatroskaFeedPayload, MatroskaTrackFeed, check_limit,
     probe_clock::{

@@ -32,13 +32,13 @@ pub struct TsProgressiveLimits {
 #[derive(Debug)]
 pub enum TsProgressiveUnit {
     /// Annex B in decode order. The clock retains raw source timestamps and
-    /// their native 90 kHz view, which supplies a decode tick for PTS-only PES.
+    /// their demux 90 kHz view, which supplies a decode tick for PTS-only PES.
     Video(AvcTsAccessUnit),
     /// One ADTS AAC frame.
     Audio {
         /// The frame, with the timestamps of its PES.
         frame: HlsAacFrame,
-        /// Exact presentation time on this body's native PES clock. Missing anchors
+        /// Exact presentation time on this body's demux PES clock. Missing anchors
         /// advance from the preceding frame by its ADTS sample duration.
         /// The frame retains the original PTS/DTS presence independently.
         presentation: Time,
@@ -338,7 +338,7 @@ impl<S: Source> TsProgressiveReader<S> {
                 requested,
                 available,
             }),
-            // A native track refusal while reading is terminal.
+            // A refused track while reading is terminal.
             Error::Allocation if self.phase != Phase::Read => Err(Error::Allocation),
             error => {
                 self.fail();
