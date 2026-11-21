@@ -278,4 +278,6 @@ Verification: the FFmpeg comparisons are defined in
 [harness/features/isobmff-reader](../../harness/features/isobmff-reader),
 [isobmff-open-index](../../harness/features/isobmff-open-index) and
 [isobmff-seek](../../harness/features/isobmff-seek); results are in
-[docs/status.md](../../docs/status.md).
+[docs/status.md](../../docs/status.md). The reader comparison includes first-entry
+source colour on the `nclc` and `nclx` fixtures. It excludes colour on the
+configuration-change fixture because ffprobe aggregates a later entry.

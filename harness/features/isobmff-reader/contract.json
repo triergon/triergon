@@ -9,6 +9,8 @@
     "open each input as a seekable file through triergon_isobmff::Reader, the neutral ContainerReader, and read every packet through end of file; a seek case asks request_seek for one track's time with SeekPolicy::PreviousRandomAccess once the movie is open, then reads every packet that follows",
     "the reference is the formats profile's ffprobe with the MOV demuxer forced and the options rules.json gives (-fflags +noparse+nofillin, -ignore_editlist 1); a seek case reads from the same time with -read_intervals",
     "tracks pair with FFmpeg's streams by track_ID; per track, packets are aligned by source position and size, and every packet's size, position, payload MD5, sync flag, pts, dts and duration are compared, the reader's times expressed in FFmpeg's stream time base; the order of the packets across tracks, the set of tracks and how reading ended are compared too",
+    "cases marked first_entry_colour also compare each track ID and the opening sample entry source primaries, transfer, matrix and range against ffprobe stream colour fields; unknown range is absent, and a mismatch fails independently of packet dispositions",
+    "r-colour-config-change has no colour on the first sample entry; ffprobe aggregates the later entry, so its colour is not compared",
     "every difference is a failure unless it is one of the reviewed differences of its case in differences.json and within the scope of exactly one disposition rules.json defines and the case lists",
     "every input is checked against its pinned SHA-256 before it is read"
   ],

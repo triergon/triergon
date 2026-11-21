@@ -56,6 +56,7 @@ pub struct Case {
     pub sha256: String,
     /// The track (`track_ID`) and the target in microseconds.
     pub seek: Option<(u64, i64)>,
+    pub first_entry_colour: bool,
 }
 
 /// The corpus inputs, once each, with their pinned SHA-256.
@@ -121,6 +122,11 @@ pub fn corpus(root: &Path) -> Result<Vec<Case>, String> {
             path: text("path")?,
             sha256: text("sha256")?,
             seek,
+            first_entry_colour: match item.get("first_entry_colour") {
+                None => false,
+                Some(Value::Bool(value)) => *value,
+                _ => return Err("invalid first_entry_colour".into()),
+            },
         });
     }
     let contract = crate::checks::read_json(&root.join(FEATURE).join("contract.json"))?;
@@ -432,6 +438,7 @@ type Fields = [Value; 7];
 #[derive(Debug, Default)]
 struct Reading {
     tracks: Vec<i128>,
+    colours: Vec<(i128, Value)>,
     streams: Vec<(i128, Vec<(usize, Fields)>)>,
     error: Option<String>,
 }
@@ -488,6 +495,7 @@ fn reference(
     options: &[String],
     path: &str,
     seek: Option<(u64, i64)>,
+    colour: bool,
 ) -> Result<Referenced, Stop> {
     let mut argv = vec![ffprobe.to_owned(), "-v".into(), "error".into()];
     argv.extend(options.iter().cloned());
@@ -495,10 +503,15 @@ fn reference(
         argv.push("-read_intervals".into());
         argv.push(format!("{}.{:06}%", micros / 1_000_000, micros % 1_000_000));
     }
+    let entries = if colour {
+        "stream=index,id,codec_type,time_base,color_primaries,color_transfer,color_space,color_range:packet=stream_index,pts,dts,duration,size,pos,flags,data_hash"
+    } else {
+        "stream=index,id,codec_type,time_base:packet=stream_index,pts,dts,duration,size,pos,flags,data_hash"
+    };
     argv.extend(
         [
             "-show_entries",
-            "stream=index,id,codec_type,time_base:packet=stream_index,pts,dts,duration,size,pos,flags,data_hash",
+            entries,
             "-show_data_hash",
             "MD5",
             "-of",
@@ -532,6 +545,28 @@ fn reference(
             .unwrap_or(-1 - index);
         keys.push((index, key));
         reading.tracks.push(key);
+        if colour {
+            let code = |field: &str| match stream.get(field).and_then(Value::as_str) {
+                Some("bt709") => Value::int(1),
+                Some("bt2020") | Some("bt2020nc") => Value::int(9),
+                Some("smpte2084") => Value::int(16),
+                Some(other) => Value::str(other),
+                None => Value::Null,
+            };
+            let range = match stream.get("color_range").and_then(Value::as_str) {
+                None | Some("unknown") => Value::Null,
+                Some(value) => Value::str(value),
+            };
+            reading.colours.push((
+                key,
+                Value::Array(vec![
+                    code("color_primaries"),
+                    code("color_transfer"),
+                    code("color_space"),
+                    range,
+                ]),
+            ));
+        }
         if let Some(base) = stream
             .get("time_base")
             .and_then(Value::as_str)
@@ -541,6 +576,7 @@ fn reference(
         }
     }
     reading.tracks.sort_unstable();
+    reading.colours.sort_by_key(|(id, _)| *id);
     for (at, packet) in document
         .get("packets")
         .and_then(Value::as_array)
@@ -588,11 +624,12 @@ fn candidate(
     path: &str,
     seek: Option<(u64, i64)>,
     bases: &[(i128, Ratio)],
+    colour: bool,
 ) -> Result<Result<(Reading, Value), String>, Stop> {
     let mut argv = vec![
         python::path(worker),
         "packets".to_owned(),
-        "mov".to_owned(),
+        if colour { "mov-colour" } else { "mov" }.to_owned(),
         path.to_owned(),
     ];
     if let Some((track, micros)) = seek {
@@ -606,10 +643,14 @@ fn candidate(
             python::tail(&done.stderr, 300)
         )));
     }
-    Ok(parse_candidate(&done.stdout, bases))
+    Ok(parse_candidate(&done.stdout, bases, colour))
 }
 
-fn parse_candidate(stdout: &str, bases: &[(i128, Ratio)]) -> Result<(Reading, Value), String> {
+fn parse_candidate(
+    stdout: &str,
+    bases: &[(i128, Ratio)],
+    colour: bool,
+) -> Result<(Reading, Value), String> {
     let lines = python::splitlines(stdout);
     let (last, lines) = lines.split_last().ok_or("codec-worker printed nothing")?;
     let end = python::loads(last).ok_or("codec-worker: the last line is not JSON")?;
@@ -626,6 +667,16 @@ fn parse_candidate(stdout: &str, bases: &[(i128, Ratio)]) -> Result<(Reading, Va
         ..Reading::default()
     };
     reading.tracks.sort_unstable();
+    if colour {
+        for track in tracks {
+            let id = int(track.get("id")).ok_or("codec-worker: track without id")?;
+            let value = track
+                .get("colour")
+                .ok_or("codec-worker: track without colour field")?;
+            reading.colours.push((id, value.clone()));
+        }
+    }
+    reading.colours.sort_by_key(|(id, _)| *id);
     let mut receipt = Value::Null;
     let mut at = 0;
     for line in lines {
@@ -1196,9 +1247,21 @@ fn compare_case(options: &Options, rules: &Rules, case: &Case, path: &str) -> Re
         reading: theirs,
         summary,
         bases,
-    } = reference(&options.ffprobe, &rules.ffprobe_options, path, case.seek)?;
+    } = reference(
+        &options.ffprobe,
+        &rules.ffprobe_options,
+        path,
+        case.seek,
+        case.first_entry_colour,
+    )?;
     let mut fields = vec![("ffprobe".to_owned(), summary)];
-    let (ours, receipt) = match candidate(&options.codec_worker, path, case.seek, &bases)? {
+    let (ours, receipt) = match candidate(
+        &options.codec_worker,
+        path,
+        case.seek,
+        &bases,
+        case.first_entry_colour,
+    )? {
         Ok(reading) => reading,
         Err(error) => {
             fields.push(("candidate_error".into(), Value::str(error)));
@@ -1230,6 +1293,25 @@ fn compare_case(options: &Options, rules: &Rules, case: &Case, path: &str) -> Re
     let comparison = Comparison::new(&ours, &theirs);
     let found = comparison.differences(&rules.compare);
     let mut graded = grade(rules, &comparison, &found, case);
+    if case.first_entry_colour {
+        let rows = |values: &[(i128, Value)]| {
+            Value::Array(
+                values
+                    .iter()
+                    .map(|(id, value)| Value::Array(vec![Value::int(*id), value.clone()]))
+                    .collect(),
+            )
+        };
+        fields.push(("candidate_colour".into(), rows(&ours.colours)));
+        fields.push(("reference_colour".into(), rows(&theirs.colours)));
+        if ours.colours.is_empty() || ours.colours != theirs.colours {
+            graded.status = "fail";
+            fields.push((
+                "colour_error".into(),
+                Value::str("first-entry colour differs or is missing"),
+            ));
+        }
+    }
     fields.append(&mut graded.fields);
     graded.fields = fields;
     Ok(graded)

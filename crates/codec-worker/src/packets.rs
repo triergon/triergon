@@ -298,15 +298,16 @@ fn elementary_packets<F: Format>(file: File, out: &mut impl Write) -> std::io::R
 pub fn run(format: &str, path: &str, seek: Option<&str>) -> Result<(), String> {
     if let Some(seek) = seek
         && format != "mov"
+        && format != "mov-colour"
     {
         return Err(format!("{format} does not seek ({seek})"));
     }
     let file = File::open(path).map_err(|e| format!("{path}: {e}"))?;
     let mut out = BufWriter::new(std::io::stdout().lock());
     let written = match format {
-        "mov" => {
+        "mov" | "mov-colour" => {
             let seek = seek.map(super::isobmff_packets::Seek::parse).transpose()?;
-            super::isobmff_packets::packets(file, seek, &mut out)
+            super::isobmff_packets::packets(file, seek, format == "mov-colour", &mut out)
         }
         "ogg" => ogg_packets(file, None, &mut out),
         "flac" => elementary_packets::<Flac>(file, &mut out),

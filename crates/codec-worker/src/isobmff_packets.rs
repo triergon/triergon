@@ -13,7 +13,7 @@
 //! `[segment_duration, media_time, rate_integer, rate_fraction]` rows (`null` without
 //! one) and the movie timescale, and how reading ended: `eof`, or `error` with the
 //! reader's message. Reader errors are results, so the process exits 0 whenever it
-//! could read the file.
+//! could read the file. `mov-colour` adds the source colour fields to each track.
 
 use std::fs::File;
 use std::io::{BufReader, Write};
@@ -97,7 +97,7 @@ fn packet_line(reader: &Reader, packet: &triergon_isobmff::Packet) -> String {
     line
 }
 
-fn track_line(index: usize, track: &Track, movie_timescale: Option<u32>) -> String {
+fn track_line(index: usize, track: &Track, movie_timescale: Option<u32>, colour: bool) -> String {
     let mut extra = format!(
         ",\"id\":{},\"kind\":{},\"time_base\":{}",
         track.id().0,
@@ -125,6 +125,34 @@ fn track_line(index: usize, track: &Track, movie_timescale: Option<u32>) -> Stri
         "movie_timescale",
         &movie_timescale.map_or_else(|| "null".to_owned(), |t| t.to_string()),
     );
+    if colour {
+        let value = track.colour().map_or_else(
+            || "null".to_owned(),
+            |c| {
+                let range = match (c.range.origin, c.range.value) {
+                    (_, triergon::ColourRange::Unspecified) => "null",
+                    (triergon::Origin::Container, triergon::ColourRange::Limited) => "\"tv\"",
+                    (triergon::Origin::Container, triergon::ColourRange::Full) => "\"pc\"",
+                    _ => "null",
+                };
+                let source = |value: triergon::Sourced<u64>| {
+                    if value.origin == triergon::Origin::Container {
+                        value.value.to_string()
+                    } else {
+                        "null".to_owned()
+                    }
+                };
+                format!(
+                    "[{}, {}, {}, {}]",
+                    source(c.primaries),
+                    source(c.transfer),
+                    source(c.matrix),
+                    range
+                )
+            },
+        );
+        field(&mut extra, "colour", &value);
+    }
     super::packets::track_line(index, track, &extra)
 }
 
@@ -172,7 +200,12 @@ fn read(
 }
 
 /// Print the packets of `path`, seeking first when `seek` is given.
-pub fn packets(file: File, seek: Option<Seek>, out: &mut impl Write) -> std::io::Result<()> {
+pub fn packets(
+    file: File,
+    seek: Option<Seek>,
+    colour: bool,
+    out: &mut impl Write,
+) -> std::io::Result<()> {
     let opened = Budget::new(POOL).and_then(|pool| {
         let capabilities = SourceCapabilities {
             length: Some(file.metadata()?.len()),
@@ -198,7 +231,7 @@ pub fn packets(file: File, seek: Option<Seek>, out: &mut impl Write) -> std::io:
         .tracks()
         .iter()
         .enumerate()
-        .map(|(index, track)| track_line(index, track, timescale))
+        .map(|(index, track)| track_line(index, track, timescale, colour))
         .collect();
     super::packets::finish(out, &tracks, end)
 }
