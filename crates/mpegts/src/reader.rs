@@ -467,7 +467,9 @@ impl Reader {
             transition,
         });
         self.continued_entity = true;
-        self.seek_index = None;
+        if self.seek_entities.is_none() {
+            self.seek_index = None;
+        }
         Ok(())
     }
     pub fn fail(

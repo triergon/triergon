@@ -157,6 +157,27 @@
         "bytes": 5523,
         "digest": 14828060183821136300
       }
+    },
+    {
+      "id": "avc-split-repeated-preroll",
+      "profile": "avc-split-repeated-preroll",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc.ts",
+      "sha256": "8c0e8f659fc8b4eeb9094a2d201a5fc80c95e023f4f8f052ad80f8c03c03bb87",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "90000",
+        "preroll",
+        "112000",
+        "split=564"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 15138,
+        "digest": 9848075047287076207
+      }
     }
   ]
 }

@@ -166,7 +166,10 @@ reads the entity prefix to reconstruct transport state and packet provenance,
 then streams the selected suffix. The index preserves the last
 packet on tied timestamps. It falls back to scanning when anchors are out of
 order or the entry or storage limit is reached. The source must remain stable.
-Reset, close and entity continuation discard the index.
+Reset, close and continuation outside a seek plan discard the index.
+`Reader::request_seek_in_entities_and_index` builds the same bounded index over
+a contiguous entity plan. A later seek with exactly the same IDs, lengths and
+order can reuse it for the same selected track.
 
 Use `Reader::new_with_packet_tracks` when the caller has already chosen the
 elementary PIDs. Only those PIDs allocate access-unit framers and produce

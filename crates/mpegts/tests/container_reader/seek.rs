@@ -630,12 +630,18 @@ fn seek_across_entities_replays_a_split_pes_and_continues_through_eof() {
         target: clock(ticks),
         policy: SeekPolicy::PlaybackPreroll,
     };
-    for (target, landed, count, explicit_end) in
-        [(109_000, 105_000, 2, true), (90_000, 90_000, 3, false)]
-    {
-        let request = reader
-            .request_seek_in_entities(seek(target), &plan)
-            .unwrap();
+    for (target, landed, count, explicit_end, collect_index, method) in [
+        (109_000, 105_000, 2, true, false, SeekMethod::BoundedScan),
+        (90_000, 90_000, 3, false, false, SeekMethod::BoundedScan),
+        (109_000, 105_000, 2, true, true, SeekMethod::BoundedScan),
+        (90_000, 90_000, 3, false, false, SeekMethod::Index),
+    ] {
+        let request = if collect_index {
+            reader.request_seek_in_entities_and_index(seek(target), &plan, 16)
+        } else {
+            reader.request_seek_in_entities(seek(target), &plan)
+        }
+        .unwrap();
         assert_eq!((request.source, request.offset), (ID, 0));
         let mut read = 0;
         let mut announced = false;
@@ -670,7 +676,13 @@ fn seek_across_entities_replays_a_split_pes_and_continues_through_eof() {
                     assert!(!announced);
                     assert_eq!(result.landing, clock(landed));
                     assert_eq!(result.discard_until, clock(target));
-                    assert_eq!(result.scanned_bytes, ts.bytes.len() as u64);
+                    let scanned = if method == SeekMethod::BoundedScan {
+                        ts.bytes.len() as u64
+                    } else {
+                        0
+                    };
+                    assert_eq!(result.method, method);
+                    assert_eq!(result.scanned_bytes, scanned);
                     announced = true;
                 }
                 Step::Ready(Event::Packet(packet)) => {

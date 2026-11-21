@@ -81,6 +81,27 @@
       }
     },
     {
+      "id": "adts-aac-lc-split-repeated-preroll",
+      "profile": "adts-aac-lc-split-repeated-preroll",
+      "file": "harness/features/mpegts-previous-audio/inputs/adts-aac-lc.ts",
+      "sha256": "de2b5c9b1482ea65e3edaa15e1a13f91554d2962acd5ea55788caf61162ba5dd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "90000",
+        "preroll",
+        "split=564",
+        "100000"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 1365,
+        "digest": 12642569711709793592
+      }
+    },
+    {
       "id": "dvb-ac3-previous",
       "profile": "dvb-ac3-previous",
       "file": "harness/features/mpegts-previous-audio/inputs/dvb-ac3.m2ts",

@@ -444,20 +444,20 @@ int main(int argc, char **argv)
     if (!option && argc != start + 3)
         return 2;
 #else
-    const int extended = argc == track + 4;
     int repeat = 0;
     long long repeat_target = 0;
-    if ((!extended && argc != track + 3) || !number(argv[track+1], INT64_MIN, INT64_MAX, &target))
+    if (argc < track + 3 || argc > track + 5
+        || !number(argv[track+1], INT64_MIN, INT64_MAX, &target))
         return 2;
-    if (extended) {
-        const char *extra = argv[track+3];
+    for (int i = track + 3; i < argc; ++i) {
+        const char *extra = argv[i];
         if (!strncmp(extra, "split=", 6)) {
-            if (!number(extra + 6, 1, LLONG_MAX, &split))
+            if (split || !number(extra + 6, 1, LLONG_MAX, &split))
                 return 2;
         } else {
-            repeat = 1;
-            if (!number(extra, INT64_MIN, INT64_MAX, &repeat_target))
+            if (repeat || !number(extra, INT64_MIN, INT64_MAX, &repeat_target))
                 return 2;
+            repeat = 1;
         }
     }
     option = !strcmp(argv[track+2], "preroll");
