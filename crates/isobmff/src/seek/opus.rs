@@ -30,6 +30,14 @@ pub struct OpusRecoveryLanding {
     pub preroll: Time,
 }
 
+/// What an Opus recovery seek reads: the `roll` entry at the sync sample, then the sample
+/// the decoder starts at.
+#[derive(Debug)]
+enum Stage<'a> {
+    Roll(RecoveryLookup<'a>),
+    Preroll(SampleLocator<'a>),
+}
+
 #[derive(Debug)]
 pub(crate) struct OpusRecoverySeek<'a> {
     track_id: u32,
@@ -37,8 +45,7 @@ pub(crate) struct OpusRecoverySeek<'a> {
     base: TimeBase,
     ordinal: u64,
     ticks: i128,
-    roll: Option<RecoveryLookup<'a>>,
-    locate: Option<SampleLocator<'a>>,
+    stage: Stage<'a>,
     _charge: Reservation,
 }
 
@@ -57,12 +64,11 @@ impl<'a> OpusRecoverySeek<'a> {
             ticks: sync
                 .dts_ticks
                 .ok_or(Error::Invalid("missing Opus seek clock"))?,
-            roll: Some(RecoveryLookup::new(
+            stage: Stage::Roll(RecoveryLookup::new(
                 scope,
                 sync.ordinal,
                 RecoveryLimits::default(),
             )?),
-            locate: None,
             _charge: pool.reserve(size_of::<Self>())?,
         }))
     }
@@ -76,55 +82,55 @@ impl<'a> OpusRecoverySeek<'a> {
             return Err(Error::Cancelled);
         }
         let minimum = Time::new(2, 25)?; // Opus in ISO BMFF, section 4.3.6.2.
-        if let Some(roll) = &mut self.roll
-            && (roll.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1))
-        {
-            return Ok(None);
-        }
-        if let Some(roll) = self.roll.take() {
-            let selected = roll.finish()?;
-            let first = if selected.description.is_none() {
-                // An ungrouped sample near the beginning can decode from
-                // source start, which provides all available history.
-                if Time::from_ticks(self.ticks, self.base)? >= minimum {
-                    return Err(Error::Unsupported("missing Opus roll at seek"));
+        loop {
+            match &mut self.stage {
+                Stage::Roll(roll) => {
+                    if roll.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1) {
+                        return Ok(None);
+                    }
+                    let selected = roll.take_selection()?;
+                    let first = if selected.description.is_none() {
+                        // An ungrouped sample near the beginning can decode from
+                        // source start, which provides all available history.
+                        if Time::from_ticks(self.ticks, self.base)? >= minimum {
+                            return Err(Error::Unsupported("missing Opus roll at seek"));
+                        }
+                        1
+                    } else {
+                        let preceding = selected.preceding_samples()?;
+                        if preceding == 0 {
+                            return Err(Error::Invalid("zero Opus roll distance"));
+                        }
+                        self.ordinal.saturating_sub(u64::from(preceding)).max(1)
+                    };
+                    self.stage = Stage::Preroll(self.table.locate(first)?);
                 }
-                1
-            } else {
-                let preceding = selected.preceding_samples()?;
-                if preceding == 0 {
-                    return Err(Error::Invalid("zero Opus roll distance"));
+                Stage::Preroll(locator) => {
+                    let sample = match locator.poll(work)? {
+                        Next::Yield => return Ok(None),
+                        Next::Item(sample) => sample,
+                        Next::End => return Err(Error::Invalid("missing Opus preroll sample")),
+                    };
+                    let start = sample
+                        .dts_ticks
+                        .ok_or(Error::Invalid("missing Opus preroll clock"))?;
+                    let preroll = Time::from_ticks(
+                        self.ticks.checked_sub(start).ok_or(Error::Overflow)?,
+                        self.base,
+                    )?;
+                    if preroll < minimum && sample.ordinal != 1 {
+                        return Err(Error::Unsupported(
+                            "Opus roll provides less than 80 ms of preroll",
+                        ));
+                    }
+                    return Ok(Some(OpusRecoveryLanding {
+                        track_id: self.track_id,
+                        sync_sample: self.ordinal,
+                        first_sample: sample.ordinal,
+                        preroll,
+                    }));
                 }
-                self.ordinal.saturating_sub(u64::from(preceding)).max(1)
-            };
-            self.locate = Some(self.table.locate(first)?);
+            }
         }
-        let locator = self
-            .locate
-            .as_mut()
-            .ok_or(Error::Invalid("missing Opus preroll sample"))?;
-        let sample = match locator.poll(work)? {
-            Next::Yield => return Ok(None),
-            Next::Item(sample) => sample,
-            Next::End => return Err(Error::Invalid("missing Opus preroll sample")),
-        };
-        let start = sample
-            .dts_ticks
-            .ok_or(Error::Invalid("missing Opus preroll clock"))?;
-        let preroll = Time::from_ticks(
-            self.ticks.checked_sub(start).ok_or(Error::Overflow)?,
-            self.base,
-        )?;
-        if preroll < minimum && sample.ordinal != 1 {
-            return Err(Error::Unsupported(
-                "Opus roll provides less than 80 ms of preroll",
-            ));
-        }
-        Ok(Some(OpusRecoveryLanding {
-            track_id: self.track_id,
-            sync_sample: self.ordinal,
-            first_sample: sample.ordinal,
-            preroll,
-        }))
     }
 }
