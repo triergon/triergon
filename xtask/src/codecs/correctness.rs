@@ -45,7 +45,7 @@ pub(super) fn decoder_only_lane(lane: &str) -> bool {
 }
 
 fn uses_initialized_aac_reference(lane: &str, name: &str, sha256: &str) -> bool {
-    matches!(lane, "aac" | AAC_CONTAINER_PRIMING)
+    matches!(lane, "aac" | "session-aac" | AAC_CONTAINER_PRIMING)
         && name == "aac-sce-in-stereo.adts"
         && sha256 == AAC_SINGLE_SCE_STEREO_SHA256
 }
@@ -747,6 +747,19 @@ fn audio_decoder(
             Value::str(python::tail(&reference_run.stderr, 300)),
         ),
     ];
+    if variant_manifest(lane).is_some() {
+        row.extend([
+            ("ours_pcm_bytes".into(), Value::int(candidate.len() as u64)),
+            (
+                "ffmpeg_pcm_bytes".into(),
+                Value::int(reference.len() as u64),
+            ),
+            (
+                "ours_stderr_tail".into(),
+                Value::str(python::tail(&ours_run.stderr, 500)),
+            ),
+        ]);
+    }
     if initialized_aac {
         row.push((
             "float_reference".into(),
@@ -766,6 +779,20 @@ fn audio_decoder(
         )
     {
         status(&mut row, "fail");
+        return Ok(Value::Object(row));
+    }
+    if through_session
+        && reference.is_empty()
+        && candidate.is_empty()
+        && ours_run.code > 0
+        && reference_run.code > 0
+    {
+        // The two commands independently refused the file before producing PCM.
+        status(&mut row, "ffmpeg-refused");
+        row.push((
+            "ours_stderr_tail".into(),
+            Value::str(python::tail(&ours_run.stderr, 300)),
+        ));
         return Ok(Value::Object(row));
     }
     let mut same_frames = true;
@@ -808,10 +835,6 @@ fn audio_decoder(
             return Ok(Value::Object(row));
         }
     }
-    if lane == "ac3-nodither" && !reference_run.stderr.is_empty() {
-        status(&mut row, "fail");
-        return Ok(Value::Object(row));
-    }
     if reference.is_empty() {
         status(&mut row, "ffmpeg-refused");
         return Ok(Value::Object(row));
@@ -847,9 +870,8 @@ fn audio_decoder(
             Value::Bool(surround_pair_labels),
         ));
     }
-    let exact = same_frames
-        && (!(through_session || lane == "track-reset")
-            || ours_run.code == 0 && reference_run.code == 0)
+    let exact = (!(through_session || lane == "track-reset")
+        || ours_run.code == 0 && reference_run.code == 0)
         && same(ours_channels, reference_channels)
         && same(ours_rate, reference_rate)
         && candidate.len() == reference.len()
@@ -883,12 +905,37 @@ fn audio_decoder(
         } else {
             worst_rms <= a.rules.rms && worst_abs <= a.rules.abs
         };
-        status(&mut row, if pass { "pass" } else { "fail" });
+        let reference_clean =
+            lane != "ac3-nodither" || reference_run.code == 0 && reference_run.stderr.is_empty();
+        status(
+            &mut row,
+            if pass && same_frames && reference_clean {
+                "pass"
+            } else {
+                "fail"
+            },
+        );
     } else {
         row.push(("stats".into(), Value::Null));
         row.push(("worst_rms".into(), Value::Null));
         row.push(("worst_abs".into(), Value::Null));
         status(&mut row, "fail");
+    }
+    if variant_manifest(lane).is_some()
+        && row
+            .last()
+            .is_some_and(|(key, value)| key == "status" && value.as_str() == Some("fail"))
+    {
+        row.extend([
+            (
+                "ours_pcm_sha256".into(),
+                Value::str(sha256::hex(&candidate)),
+            ),
+            (
+                "ffmpeg_pcm_sha256".into(),
+                Value::str(sha256::hex(&reference)),
+            ),
+        ]);
     }
     Ok(Value::Object(row))
 }
@@ -1203,7 +1250,7 @@ pub fn grade(a: &Grade) -> Result<(), String> {
         } else {
             let path = python::path(&path);
             let sha256 = text(v, "sha256")?;
-            let initialized_aac = uses_initialized_aac_reference(&lane, &name, &sha256);
+            let initialized_aac = uses_initialized_aac_reference(&lane, &text(v, "name")?, &sha256);
             let session_video = matches!(lane.as_str(), "session-h264" | "session-hevc");
             let output = if decoder_only_lane(&lane) {
                 None
